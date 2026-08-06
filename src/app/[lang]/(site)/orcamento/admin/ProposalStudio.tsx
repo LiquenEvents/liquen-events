@@ -1727,35 +1727,62 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
                   key={gi}
                   className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
                 >
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <input
-                      className="bo-input w-12 shrink-0 px-2 py-2 text-xs text-foreground/70 text-center"
-                      value={g.letter ?? ""}
-                      onChange={(e) => updateGroup(gi, { letter: e.target.value })}
-                      placeholder="a)"
-                      aria-label="Letra do grupo (a, b, c…)"
-                    />
-                    <input
-                      className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                      value={g.title}
-                      onChange={(e) => updateGroup(gi, { title: e.target.value })}
-                      placeholder="Decoração Floral de Casamento"
-                      aria-label="Título do grupo"
-                    />
-                    <MoveBtns
-                      onUp={() => moveGroup(gi, -1)}
-                      onDown={() => moveGroup(gi, 1)}
-                      disUp={gi === 0}
-                      disDown={gi === doc.serviceGroups.length - 1}
-                    />
-                    <button
-                      type="button"
-                      className={REMOVE_BTN}
-                      onClick={() => removeGroup(gi)}
-                      aria-label="Remover grupo"
-                    >
-                      ×
-                    </button>
+                  {/* A LETRA E O TÍTULO NA MESMA LINHA, no telemóvel.
+
+                      O que aqui estava, medido a 375 px: um campo de LARGURA
+                      TOTAL para escrever "a)" — dois caracteres num campo de
+                      343 px —, o título noutra linha, e as acções numa
+                      terceira. Três linhas para o cabeçalho de um grupo, numa
+                      lista onde há um cabeçalho destes por cada grupo.
+
+                      A causa não estava aqui: o `w-12` da letra nunca chegou a
+                      valer, porque o `.bo-input` declarava `width: 100%` fora
+                      de camada e no Tailwind v4 isso ganha a qualquer `w-*`
+                      (a razão longa está no `globals.css`, e o
+                      `CamadasCss.contrato.test.ts` guarda-a). Com a largura
+                      arrumada, a letra volta aos 48 px que sempre pediu.
+
+                      Feito isso, a letra e o título cabem na primeira linha (a
+                      letra fixa, o título com o resto) e as acções descem para
+                      a segunda. A partir de `sm` volta tudo à mesma linha, que
+                      é onde cabe. */}
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-1">
+                      <input
+                        className="bo-input w-12 shrink-0 px-2 py-2 text-center text-xs text-foreground/70"
+                        value={g.letter ?? ""}
+                        onChange={(e) => updateGroup(gi, { letter: e.target.value })}
+                        placeholder="a)"
+                        aria-label="Letra do grupo (a, b, c…)"
+                      />
+                      {/* `min-w-0` e não `min-w-[12rem]`: a partilhar a linha
+                          com a letra, um mínimo de 12rem só o impedia de
+                          encolher para caber — e é o `flex-1` que lhe dá a
+                          largura, não o mínimo. */}
+                      <input
+                        className="bo-input min-w-0 flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                        value={g.title}
+                        onChange={(e) => updateGroup(gi, { title: e.target.value })}
+                        placeholder="Decoração Floral de Casamento"
+                        aria-label="Título do grupo"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MoveBtns
+                        onUp={() => moveGroup(gi, -1)}
+                        onDown={() => moveGroup(gi, 1)}
+                        disUp={gi === 0}
+                        disDown={gi === doc.serviceGroups.length - 1}
+                      />
+                      <button
+                        type="button"
+                        className={REMOVE_BTN}
+                        onClick={() => removeGroup(gi)}
+                        aria-label="Remover grupo"
+                      >
+                        ×
+                      </button>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-2 pl-1">
                     {g.items.map((it, ii) => (
