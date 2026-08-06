@@ -229,6 +229,20 @@ export interface ProposalDoc {
    * negociação — e há um teste em `proposal-doc-pdf` a garanti-lo.
    */
   budgetCosts?: (number | null)[];
+  /**
+   * Como é que cada linha ESCALA com o número de convidados: fixa (o normal),
+   * por convidado, ou por mesa. Mesmo array paralelo dos outros.
+   *
+   * Quando uma linha tem escala, o `budgetAmounts[i]` dela deixa de ser escrito
+   * à mão e passa a ser o RESULTADO da multiplicação — escrito no mesmo sítio
+   * de sempre, para que a soma, o desvio do total, a margem e o resumo
+   * continuem a ler o que já liam sem saberem que aquele número foi calculado.
+   *
+   * Ver `src/lib/orcamento/escala.ts`.
+   */
+  budgetScales?: (import("./orcamento/escala").Escala | null)[];
+  /** Quantas pessoas por mesa, para as linhas "por mesa" (por omissão 10). */
+  convidadosPorMesa?: number;
   totalLabel: string; // "Valor Total Decoração"
   totalText: string; // "3000,00 € + IVA" — kept as text to match the studio's format
   /** Linhas adicionais mostradas por baixo do total (Deslocação, Wedding
