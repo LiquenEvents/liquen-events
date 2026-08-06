@@ -177,6 +177,7 @@ export default function FazerProposta({
         <ProposalStudio
           key={`fazer-proposta-${escolhido.id}`}
           quote={escolhido}
+          quotes={quotes}
           onQuoteUpdated={onQuoteUpdated}
           onSent={() => onSent(escolhido)}
         />

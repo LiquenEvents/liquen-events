@@ -18,6 +18,8 @@ import {
 } from "@/lib/proposal-doc";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel } from "@/lib/orcamento/data";
+import PainelInterno from "./PainelInterno";
+import { custosDe } from "@/lib/orcamento/margem";
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
 import NavEstudio from "./NavEstudio";
@@ -378,6 +380,13 @@ export function avisoDeConteudoIncompleto(emFalta: number, cortes: Corte[]): str
 
 interface Props {
   quote: Quote;
+  /**
+   * Os outros pedidos, só para o painel interno saber o que ela costuma cobrar
+   * num casamento desta dimensão. Opcional: sem eles o estúdio funciona na
+   * mesma e o aviso de "valor fora do habitual" simplesmente não aparece —
+   * comparar com dois eventos seria pior do que não comparar.
+   */
+  quotes?: Quote[];
   onSent?: () => void;
   /**
    * O valor mudou aqui. O pai actualiza a sua cópia do pedido para o "Preço
@@ -387,7 +396,7 @@ interface Props {
   onQuoteUpdated?: (quote: Quote) => void;
 }
 
-export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props) {
+export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }: Props) {
   const { toast } = useToast();
   const DRAFT_KEY = `liquen-proposal-studio-${quote.id}`;
   const SIDE_KEY = `${DRAFT_KEY}:meta`;
@@ -2271,6 +2280,37 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
           {/* Total, IVA e validade — fonte de verdade do dinheiro. O valor + o modo
           de IVA eliminam a ambiguidade "3.000,00 €" (com IVA?) vs "+ IVA"; o
           texto do PDF é composto a partir daqui. */}
+          {/* ── O painel que o cliente nunca vê ────────────────────────────
+              Custos, margem, deslocação calculada e o aviso de valor fora do
+              habitual. Vive AQUI, no fim do orçamento, porque é aqui que os
+              números que ele comenta acabam de ser escritos. */}
+          <PainelInterno
+            doc={doc as ProposalDoc}
+            quote={quote}
+            quotes={quotes}
+            totalBruto={money.gross}
+            onCusto={(i, custo) =>
+              setDoc((d) => ({
+                ...d,
+                // O array dos custos acompanha sempre o das linhas — se ficasse
+                // mais curto, o índice 3 passava a ser o custo da linha 4.
+                budgetCosts: custosDe(d as ProposalDoc).map((v, j) => (j === i ? custo : v)),
+              }))
+            }
+            onDeslocacao={(label, valueText) =>
+              setDoc((d) => {
+                // Se já lá está uma linha de deslocação, actualiza-se essa em
+                // vez de acrescentar uma segunda — duas linhas de deslocação
+                // numa proposta são uma pergunta do cliente ao telefone.
+                const extras = [...(d.budgetExtras ?? [])];
+                const i = extras.findIndex((e) => /desloca/i.test(e.label ?? ""));
+                if (i >= 0) extras[i] = { ...extras[i], label, valueText };
+                else extras.push({ label, valueText });
+                return { ...d, budgetExtras: extras };
+              })
+            }
+          />
+
           <Section title="Total, IVA e validade" id="total">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">

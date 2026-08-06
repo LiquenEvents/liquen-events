@@ -3522,6 +3522,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 <ProposalStudio
                                   key={`studio-${selected.id}`}
                                   quote={selected}
+                                  quotes={activeQuotes}
                                   // O valor é um só: o estúdio grava-o no
                                   // pedido, e o "Preço final" aqui ao lado tem
                                   // de mostrar o mesmo número sem ser preciso
