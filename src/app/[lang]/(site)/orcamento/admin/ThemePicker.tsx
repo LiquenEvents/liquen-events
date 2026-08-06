@@ -992,7 +992,11 @@ export default function ThemePicker({
                   // continua alcançável pelo teclado).
                   const blocked = (atLimit && !on) || importing;
                   return (
-                    <div key={im.path} className="group relative">
+                    // `aspect-square` PASSOU PARA AQUI, do botão para o
+                    // invólucro. É o que torna a altura da célula independente
+                    // do que está lá dentro — e sem isso `content-visibility`
+                    // não podia saltar o conteúdo sem a célula encolher.
+                    <div key={im.path} className="celula-saltavel group relative aspect-square">
                       <button
                         type="button"
                         data-cell={i}
@@ -1008,7 +1012,7 @@ export default function ThemePicker({
                         }`}
                         onClick={(e) => toggleAt(i, e.shiftKey)}
                         onFocus={() => setFocusIndex(i)}
-                        className={`relative block aspect-square w-full overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-all ${
+                        className={`relative block h-full w-full overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-all ${
                           on
                             ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
                             : "border-foreground/[0.1] hover:border-[#4d6350]/45"

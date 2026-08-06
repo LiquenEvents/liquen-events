@@ -1750,6 +1750,37 @@ body:has([data-orcamento-mode]) .eyebrow {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   CÉLULAS QUE O BROWSER PODE SALTAR
+   ══════════════════════════════════════════════════════════════════════════
+
+   `content-visibility: auto` diz ao browser que pode NÃO desenhar uma célula
+   que está fora do ecrã — nem layout, nem pintura, nem descodificar a imagem
+   que está lá dentro. Assim que ela se aproxima da janela, desenha.
+
+   Porquê aqui e não uma virtualização a sério: as grelhas de fotos são de
+   navegação por TECLADO (setas entre células, Shift para escolher um
+   intervalo, V para ver em grande), e isso depende de as células existirem no
+   DOM — `gridRef.current.querySelector('[data-cell="…"]')`. Uma virtualização
+   que arranque do DOM as células fora do ecrã parte a navegação por teclado e
+   a escolha por intervalo, que é como se escolhem trinta fotos de uma vez.
+   Isto dá o mesmo alívio de renderização sem tocar em nenhuma das duas.
+
+   `contain-intrinsic-size` não é preciso: `content-visibility: auto` implica
+   `contain: size`, e o elemento é quadrado por `aspect-ratio` numa coluna de
+   largura fixa — a altura resolve-se sem olhar para o conteúdo, portanto uma
+   célula saltada ocupa EXACTAMENTE o mesmo espaço que uma desenhada. Sem
+   saltos na barra de deslocamento, sem CLS.
+
+   Em `@layer utilities` de propósito: é um utilitário e tem de se comportar
+   como tal — uma regra sem camada ganharia a toda a gente, que é precisamente
+   o erro que este ficheiro já documenta mais acima. */
+@layer utilities {
+  .celula-saltavel {
+    content-visibility: auto;
+  }
+}
+
 /* ── Print / PDF ── */
 @media print {
   body::before {

@@ -2977,7 +2977,11 @@ function ThemeFolder({
                       setDragFrom(null);
                       setDragOver(null);
                     }}
-                    className={`group relative aspect-square overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-[opacity,box-shadow] ${
+                    // `celula-saltavel`: fora do ecrã, o browser não desenha
+                    // nem descodifica esta célula. A altura não depende disso
+                    // (é `aspect-square` numa coluna de largura fixa), por
+                    // isso a barra de deslocamento não mexe. Ver globals.css.
+                    className={`celula-saltavel group relative aspect-square overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-[opacity,box-shadow] ${
                       isSelected
                         ? "border-[#4d6350] ring-2 ring-[#4d6350]/40"
                         : "border-foreground/[0.1]"
