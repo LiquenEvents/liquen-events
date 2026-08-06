@@ -2390,7 +2390,15 @@ export default function ProposalStudio({ quote, onSent, onQuoteUpdated }: Props)
         // próprio contexto de empilhamento — desenham-se POR CIMA desta barra, e o
         // texto do total aparecia misturado com o do campo por baixo. Vê-se na
         // captura de ecrã antes desta linha existir; nenhum teste apanhava.
-        className="sticky bottom-0 z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3"
+        /* A barra encosta ao fundo do CONTEÚDO, mas por baixo dela ainda vem a
+           barra de navegação do back office (56 px, fixa, só abaixo de `lg`).
+           Com `bottom-0` a acção principal — "Pré-visualizar", "Enviar" —
+           ficava por baixo dela: tocar ali tocava na navegação e mudava de
+           vista. Foi o cheque de oclusão a apanhá-lo; à vista não se distingue
+           de um toque que não pegou.
+           A partir de `lg` a navegação passa a barra lateral e a folga deixa de
+           fazer sentido. */
+        className="sticky bottom-[calc(56px+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3 lg:bottom-0"
       >
         {step === "conteudo" && (
           <>
