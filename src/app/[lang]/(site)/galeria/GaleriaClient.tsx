@@ -1979,20 +1979,37 @@ function Lightbox({
           aria-hidden
           className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
         >
-          {preloadNeighbours && pool.length > 1 && heroLoaded && (
-            <Image
-              key={(index + 1) % pool.length}
-              src={pool[(index + 1) % pool.length].src}
-              alt=""
-              fill
-              // O MESMO `sizes` da foto mostrada (ver a nota lá em cima sobre a
-              // regex do Next), para o browser acertar no recurso exacto que já
-              // ficou em cache e o → ser instantâneo.
-              sizes="90vw"
-              quality={72}
-              loading="eager"
-            />
-          )}
+          {preloadNeighbours &&
+            pool.length > 1 &&
+            heroLoaded &&
+            /**
+             * OS DOIS VIZINHOS, não só o seguinte.
+             *
+             * Isto pré-carregava só o `+1`, com a justificação de que o sentido
+             * de navegação dominante é para a frente e o `←` é raro. É verdade
+             * em média — e é exactamente por isso que o `←` era o gesto que
+             * doía: quem volta atrás está a voltar a uma fotografia de que
+             * gostou, e essa era a única que aparecia preta.
+             *
+             * O `-1` está quase sempre em cache (acabou de se passar por ela),
+             * portanto na prática isto custa zero bytes na navegação para a
+             * frente; só paga alguma coisa quando se ABRE a meio da grelha, que
+             * é uma vez por sessão.
+             */
+            [1, -1].map((passo) => (
+              <Image
+                key={`${passo}:${(index + passo + pool.length) % pool.length}`}
+                src={pool[(index + passo + pool.length) % pool.length].src}
+                alt=""
+                fill
+                // O MESMO `sizes` da foto mostrada (ver a nota lá em cima sobre
+                // a regex do Next), para o browser acertar no recurso exacto
+                // que já ficou em cache e a navegação ser instantânea.
+                sizes="90vw"
+                quality={72}
+                loading="eager"
+              />
+            ))}
         </div>
 
         {/* Botão próxima */}

@@ -203,14 +203,35 @@ const TRAVESSIA = `
   parar = true;
   await new Promise((r) => setTimeout(r, 400));
 
-  // Frames perdidos: cada intervalo acima de 1,5 frames conta o que falta.
-  let perdidos = 0, piorMs = 0;
-  for (let i = 1; i < frames.length; i++) {
-    const d = frames[i] - frames[i - 1];
-    piorMs = Math.max(piorMs, d);
-    if (d > 16.7 * 1.5) perdidos += Math.round(d / 16.7) - 1;
-  }
-  return { frames: frames.length, perdidos, piorMs: Math.round(piorMs) };
+  /**
+   * FLUIDEZ — e o que este número NÃO é.
+   *
+   * Um Chromium headless não tem pipeline de ecrã: o requestAnimationFrame
+   * pode correr acima ou abaixo dos 60 Hz por razões que nada têm a ver com a
+   * pagina. Contar "frames perdidos" a partir daqui, como se fosse um ecrã a
+   * sério, era dar precisão a um numero que não a tem — e foi o que a primeira
+   * versão deste ficheiro fez (dava 2200 frames em 25 s num perfil e 6231 em
+   * 55 s noutro, ou seja, taxas base diferentes na mesma máquina).
+   *
+   * O que se guarda em vez disso é a DISTRIBUIÇÃO dos intervalos, que é
+   * comparável entre corridas do mesmo arnês: a percentagem de intervalos
+   * acima de 32 ms (dois frames a 60 Hz) e a cauda. Serve para comparar antes
+   * e depois; não serve para dizer "o telemóvel dela perde N frames".
+   */
+  const ds = [];
+  for (let i = 1; i < frames.length; i++) ds.push(frames[i] - frames[i - 1]);
+  ds.sort((a, b) => a - b);
+  const q = (p) => (ds.length ? Math.round(ds[Math.floor((p / 100) * ds.length)]) : 0);
+  const acima32 = ds.filter((d) => d > 32).length;
+  return {
+    intervalos: ds.length,
+    medianaMs: q(50),
+    p95Ms: q(95),
+    p99Ms: q(99),
+    piorMs: Math.round(ds[ds.length - 1] || 0),
+    acimaDe32ms: acima32,
+    percentagemAcima32: ds.length ? +((acima32 / ds.length) * 100).toFixed(1) : 0,
+  };
 })()
 `;
 
@@ -521,7 +542,9 @@ for (const r of resultados) {
       `negativas ${r.antecipacaoNegativas}/${r.antecipacaoTotal}`,
   );
   console.log(
-    `Scroll: ${r.scroll.perdidos} frames perdidos em ${r.scroll.frames} · pior intervalo ${r.scroll.piorMs} ms`,
+    `Fluidez: intervalos acima de 32 ms ${r.scroll.percentagemAcima32}% ` +
+      `(${r.scroll.acimaDe32ms} de ${r.scroll.intervalos}) · mediana ${r.scroll.medianaMs} ms · ` +
+      `p95 ${r.scroll.p95Ms} ms · p99 ${r.scroll.p99Ms} ms · pior ${r.scroll.piorMs} ms`,
   );
   console.log(`Documento: ${r.alturaDoc} px`);
 }

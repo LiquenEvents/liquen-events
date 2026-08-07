@@ -1393,16 +1393,25 @@ body:has([data-orcamento-mode]) .eyebrow {
    dropped and the boxes take their full height). Keeping opacity at 1 means each
    tile always shows its blur placeholder, so there is never a dark gap; the tile
    just slides up into place. */
+/* O `will-change` vive SÓ enquanto a transição corre.
+   Estava no estado de REPOUSO, ou seja, em todos os mosaicos montados e ainda
+   não revelados. Com a antecipação a montar até seis ecrãs à frente do dedo,
+   isso são ~100 mosaicos a segurar uma camada de composição cada um, ao mesmo
+   tempo, sem nada a animar — e uma camada custa memória de vídeo e trabalho de
+   composição por frame, mesmo parada.
+
+   Pô-lo no `.in` é a leitura correcta da propriedade: ela serve para avisar o
+   browser do que VAI mudar, e o que vai mudar é a transição que a classe `.in`
+   acabou de começar. O `.done` volta a largá-lo. */
 .g-reveal {
   transform: translateY(20px);
-  will-change: transform;
 }
 .g-reveal.in {
   transform: none;
   transition: transform 0.7s var(--ease-out);
   transition-delay: var(--reveal-delay, 0ms);
+  will-change: transform;
 }
-/* Após revelar, larga o will-change (poupa memória de composição). */
 .g-reveal.done {
   will-change: auto;
 }
