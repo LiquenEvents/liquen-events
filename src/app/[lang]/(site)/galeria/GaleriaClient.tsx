@@ -12,6 +12,7 @@ import type { Dict } from "@/lib/i18n";
 import { ViewTransition } from "@/components/vt";
 import GalleryImage from "./GalleryImage";
 import { galleryImageLoader } from "./gallery-image-loader";
+import { useAntecipacao } from "./useAntecipacao";
 
 /**
  * Morph thumbnail→lightbox (View Transitions API). Cada miniatura e a foto do
@@ -820,6 +821,9 @@ export default function GaleriaClient({
   // IntersectionObserver fall back to the manual button (see `ioSupported`).
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [ioSupported, setIoSupported] = useState(true);
+  // Quantos píxeis à frente do dedo é que os mosaicos seguintes entram no DOM.
+  // Adapta-se à velocidade do scroll — ver `useAntecipacao`.
+  const { margemPx: margemAntecipacao } = useAntecipacao();
   useEffect(() => {
     setIoSupported(typeof window !== "undefined" && "IntersectionObserver" in window);
   }, []);
@@ -1110,18 +1114,31 @@ export default function GaleriaClient({
         if (entries[0]?.isIntersecting)
           startTransition(() => setShown((s) => Math.min(s + PAGE, pool.length)));
       },
-      // 800px, NÃO menos. Tentou-se 400px (para encurtar a rajada) e partiu o
-      // scroll infinito: no fundo da página a sentinela fica ~707px ACIMA do
-      // viewport, porque debaixo dela ainda vem a secção do Instagram; com uma
-      // margem de 400px deixava de intersectar e a galeria congelava em 252 de
-      // 427 no telemóvel (medido). Quem limita a rajada agora é a fila de
-      // pedidos (load-queue.ts), não esta margem, por isso ela pode ficar
-      // folgada.
-      { rootMargin: "800px 0px" },
+      /**
+       * A MARGEM É O QUE DECIDE SE A FOTO CHEGA A TEMPO — e por isso não pode
+       * ser fixa.
+       *
+       * Esteve em 800 px. Não por acaso: com 400 px o scroll infinito partia-se
+       * (no fundo da página a sentinela fica ~707 px ACIMA do viewport, porque
+       * debaixo dela ainda vem a secção do Instagram) e a galeria congelava em
+       * 252 de 427 no telemóvel. Mas 800 px também não chegava: medido, a
+       * antecipação real ficava em ~1100 px, o que a 1668 px/s dá 660 ms — e a
+       * 4000 px/s, que é um flick a sério, dá 275 ms. Uma foto não vem em
+       * 275 ms. Daí as 35 fotografias que na secretária eram pedidas com o
+       * mosaico JÁ à vista.
+       *
+       * `useAntecipacao` devolve a margem que mantém constante o TEMPO de
+       * aviso (1,2 s), com piso de 2 ecrãs e tecto de 6 — e em degraus
+       * inteiros, para não se criar um observador por frame.
+       *
+       * O que continua igual: quem limita a rajada de pedidos é a fila
+       * (load-queue.ts), não esta margem. Ela pode ser folgada à vontade.
+       */
+      { rootMargin: `${margemAntecipacao}px 0px` },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [shown, pool.length]);
+  }, [shown, pool.length, margemAntecipacao]);
 
   // Lightbox navigation (through entire pool, not just shown)
   // Abrir/fechar dentro de startTransition ativa o morph <ViewTransition>;
