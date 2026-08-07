@@ -359,3 +359,39 @@ filtros, um de cada lado da fronteira:
   de estado. **Este é novo**: antes essa informação morria no browser.
 
 Com os dois, uma foto que desapareça deixa de precisar de adivinhação.
+
+---
+
+## O bucket público, que tu pediste que eu avaliasse
+
+> «Avalia e recomenda: bucket público com nomes opacos e imprevisíveis. Se
+> houver motivo real de privacidade que o impeça, explica-o.»
+
+**Recomendo que não — mas por uma razão diferente da que esperas, e a parte que
+te interessa dá-se sem isso.**
+
+O que o público traria: `Cache-Control` imutável de um ano, cache de CDN, e o
+fim dos URLs expirados. O primeiro e o segundo valem mesmo; o terceiro deixou de
+ser problema hoje (`assinatura.ts`).
+
+**Há motivo real de privacidade, e não é o que costuma ser.** Um nome opaco
+protege razoavelmente uma fotografia solta. O que ele não protege é o
+**conjunto**: as fotos de uma proposta vivem todas em `<pedido>/`, e o `pedido`
+é a referência que vai no email ao casal e no URL do portal. Quem tenha um
+desses — um reencaminhamento, um print, um histórico de browser partilhado —
+tem o prefixo, e num bucket público listar o prefixo devolve as fotos todas
+daquele casamento. Não é uma fotografia: é o casamento inteiro de outra pessoa.
+Isso pode fechar-se (desligar a listagem, mudar o esquema de nomes), mas passa a
+ser uma configuração de bucket que ninguém volta a olhar, contra uma assinatura
+que falha fechada por omissão.
+
+**A biblioteca é o caso mais claro:** são milhares de fotografias de casamentos
+de clientes reais. Um bucket público é, na prática, uma publicação — e nenhum
+desses casais consentiu isso.
+
+**O ganho que querias sem a decisão que não queres:** as assinaturas de proposta
+já duram 10 anos, portanto o URL é estável e o browser guarda-o. O que falta é
+`Cache-Control` nos objectos, que o Supabase aceita **em buckets privados
+também** (`cacheControl` no upload). É uma linha em cada `upload`, e dá a cache
+sem abrir nada. Fica identificado; não o fiz nesta ronda porque só tem efeito
+nas fotos NOVAS, e a conversa toda desta semana é sobre as antigas.
