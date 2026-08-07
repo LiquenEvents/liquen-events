@@ -983,6 +983,17 @@ export default function OrcamentoForm({
                   {to.labelNoivos}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">
+                  {/*
+                    OS DOIS CAMPOS SÃO IGUAIS, e é isso que os torna certos.
+
+                    Diziam "Nome do noivo" e "Nome da noiva". Para dois homens
+                    ou duas mulheres, o formulário estava a dizer-lhes que não
+                    contava com eles — logo no primeiro contacto.
+
+                    Quem os distingue é o `aria-label`, não o que se vê: para
+                    quem OUVE o formulário, dois campos "Nome" seguidos seriam
+                    indistinguíveis, e é aí que a diferença faz falta.
+                  */}
                   <FloatingField htmlFor="of-noivo" label={to.phNoivo}>
                     <input
                       id="of-noivo"
@@ -993,6 +1004,7 @@ export default function OrcamentoForm({
                       onChange={(e) => setNoivo(e.target.value)}
                       className={ffInputCls}
                       placeholder={to.phNoivo}
+                      aria-label={to.ariaNoivoA}
                     />
                   </FloatingField>
                   <FloatingField htmlFor="of-noiva" label={to.phNoiva}>
@@ -1005,6 +1017,7 @@ export default function OrcamentoForm({
                       onChange={(e) => setNoiva(e.target.value)}
                       className={ffInputCls}
                       placeholder={to.phNoiva}
+                      aria-label={to.ariaNoivoB}
                     />
                   </FloatingField>
                 </div>

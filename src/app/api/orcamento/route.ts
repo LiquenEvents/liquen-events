@@ -257,7 +257,9 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   const eventRows =
     row("Convidados", esc(convidados)) +
     row("Local", esc(local)) +
-    (noivos ? row("Noivos", esc(noivos)) : "") +
+    // "Casal" e não "Noivos": o formulário deixou de presumir que são um homem
+    // e uma mulher, e o email que ela lê a seguir não pode voltar a presumi-lo.
+    (noivos ? row("Casal", esc(noivos)) : "") +
     (decor ? row("Decoração", esc(decor)) : "") +
     (budgetLabel ? row("Orçamento", esc(budgetLabel)) : "") +
     (urgencyLabel ? row("Antecedência", esc(urgencyLabel)) : "");

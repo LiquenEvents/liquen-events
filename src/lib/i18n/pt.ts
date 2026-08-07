@@ -468,9 +468,29 @@ export const pt = {
     // priced. Asked as a question, not a form label.
     labelMensagem: "Como imagina o seu evento?",
     phPessoas: "Ex.: 120",
-    labelNoivos: "Nomes dos noivos",
-    phNoivo: "Nome do noivo",
-    phNoiva: "Nome da noiva",
+    /**
+     * ── DOIS NOMES, SEM PRESUMIR QUEM SÃO ─────────────────────────────────
+     *
+     * Dizia "Nome do noivo" e "Nome da noiva". Para dois homens ou duas
+     * mulheres, o formulário estava a dizer-lhes que não contava com eles —
+     * logo no primeiro contacto, e num pedido de orçamento de casamento, que é
+     * o momento em que menos se quer que isso aconteça.
+     *
+     * Os dois campos passam a ser IGUAIS, "Nome" e "Nome", debaixo de "Nomes do
+     * casal". Não é uma solução tímida: é a única que não tem de escolher uma
+     * ordem nem um género. Quem distingue os campos é o rótulo acessível
+     * (`aria-label`), que diz "uma das pessoas" e "a outra pessoa" — para quem
+     * ouve o formulário em vez de o ver não ficar com dois campos "Nome"
+     * indistinguíveis.
+     *
+     * Os dados já estavam certos: o servidor guarda `partnerA`/`partnerB`
+     * desde sempre. Era só o texto.
+     */
+    labelNoivos: "Nomes do casal",
+    phNoivo: "Nome",
+    phNoiva: "Nome",
+    ariaNoivoA: "Nome de uma das pessoas do casal",
+    ariaNoivoB: "Nome da outra pessoa do casal",
     hintNoivos: "Aparecem na proposta. Pode deixar em branco e dizer-nos depois.",
     phLocal: "Ex.: cidade ou espaço do evento…",
     phNome: "O seu nome",
