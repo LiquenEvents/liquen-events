@@ -491,7 +491,7 @@ export const pt = {
     phNoiva: "Nome",
     ariaNoivoA: "Nome de uma das pessoas do casal",
     ariaNoivoB: "Nome da outra pessoa do casal",
-    hintNoivos: "Aparecem na proposta. Pode deixar em branco e dizer-nos depois.",
+    hintNoivos: "Aparecem na proposta.",
     phLocal: "Ex.: cidade ou espaço do evento…",
     phNome: "O seu nome",
     phEmail: "email@exemplo.com",

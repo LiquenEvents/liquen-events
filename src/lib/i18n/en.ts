@@ -460,7 +460,7 @@ export const en: Dict = {
     phNoiva: "Name",
     ariaNoivoA: "Name of one of the partners",
     ariaNoivoB: "Name of the other partner",
-    hintNoivos: "They appear on the proposal. You can leave this and tell us later.",
+    hintNoivos: "They appear on the proposal.",
     phLocal: "e.g. city or venue…",
     phNome: "Your name",
     phEmail: "email@example.com",
