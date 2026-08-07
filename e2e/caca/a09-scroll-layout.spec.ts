@@ -12,20 +12,36 @@ import { auditar, entrar, escutar, exigirSilencio, irPara, assentar, provar } fr
  * um único teste vermelho que obriga a ler o log para saber onde.
  */
 
+/**
+ * ── ESTA LISTA TEM DE SER A DO MENU, E TINHA DERIVADO ─────────────────────
+ *
+ * Três entradas apontavam para sítios que já não existem, e o teste falhava a
+ * dizer "não consegui chegar" — o que parece um defeito do produto e é um
+ * defeito do teste. Como o passo que as corre é informativo, ninguém reparou.
+ *
+ * As três, com a origem de cada uma:
+ *  · `Acompanhamento` e `Serviços` — destinos que ELA mandou tirar do menu, e
+ *    que eu tirei. A lista ficou para trás;
+ *  · `Contratos` — renomeado para "Propostas Aceites" numa ronda anterior;
+ *  · `Fazer Proposta` — o menu diz "Fazer proposta", com `p` pequeno, e a
+ *    expressão exigia maiúscula.
+ *
+ * O `nav.contrato.test.ts` guarda o menu; esta lista é a projecção dele nos
+ * percursos de ergonomia, e mantê-las de acordo é trabalho manual até alguém
+ * as ligar por código.
+ */
 const VISTAS: { rotulo: RegExp; nome: string }[] = [
   { rotulo: /^Visão Geral$/, nome: "visao-geral" },
   { rotulo: /^Pedidos$/, nome: "pedidos" },
-  { rotulo: /^Fazer Proposta$/, nome: "fazer-proposta" },
-  { rotulo: /^Acompanhamento$/, nome: "acompanhamento" },
+  { rotulo: /^Fazer proposta$/, nome: "fazer-proposta" },
   { rotulo: /^Propostas$/, nome: "propostas" },
   { rotulo: /^Calendário$/, nome: "calendario" },
   { rotulo: /^Tarefas$/, nome: "tarefas" },
   { rotulo: /^Faturas$/, nome: "faturas" },
-  { rotulo: /^Contratos$/, nome: "contratos" },
+  { rotulo: /^Propostas Aceites$/, nome: "propostas-aceites" },
   { rotulo: /^Material$/, nome: "material" },
   { rotulo: /^Temas$/, nome: "temas" },
   { rotulo: /^Estatísticas$/, nome: "estatisticas" },
-  { rotulo: /^Serviços$/, nome: "servicos" },
   { rotulo: /^Definições$/, nome: "definicoes" },
 ];
 

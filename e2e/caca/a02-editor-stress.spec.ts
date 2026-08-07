@@ -15,7 +15,7 @@ const EMOJI = "Arco floral 🌿💐 — cerimónia ☀️";
 
 /** Abre o estúdio do primeiro pedido disponível. */
 async function abrirEstudio(page: import("@playwright/test").Page) {
-  await irPara(page, /^Fazer Proposta$/);
+  await irPara(page, /^Fazer proposta$/);
   await assentar(page, 800);
   // O passo "Fazer proposta" pode pedir para escolher um pedido primeiro.
   const escolher = page.getByRole("button", { name: /Escolher|Seleccionar|Abrir/i }).first();
