@@ -258,10 +258,31 @@ tem tratamento próprio. **Preciso da mensagem, ou dos registos.**
 **11. Quantas imagens tenta carregar de uma vez?**
 
 **[CÓDIGO]** **60 por página** (`THEME_PAGE_SIZE`, `theme-types.ts:117`), com
-tecto de 200. São 60 células a pedir imagem ao mesmo tempo, e o browser serve
-6 por anfitrião — as últimas ficam em fila. **Não há limite de concorrência nem
-`IntersectionObserver` nesta grelha**, ao contrário da galeria pública, que
-levou os dois. É o ponto 4 da tua correcção, e é justo.
+tecto de 200.
+
+> ⚠️ **A primeira versão desta resposta estava errada, e a correcção é a parte
+> mais útil do documento.** Escrevi «não há limite de concorrência nem
+> carregamento diferido nesta grelha». Há os dois, nos dois ecrãs
+> (`ThemePicker.tsx:139` e `Temas.tsx:115`), com a medição ao lado:
+>
+> - `HEAVY_IMAGE_CONCURRENCY = 3` — **só para as fotos SEM miniatura**, que são
+>   as que obrigam a puxar o original;
+> - `loading="lazy"` em tudo o que não seja a primeira dobra
+>   (`ABOVE_FOLD` = 10 no seletor, 12 na biblioteca), essa com
+>   `fetchPriority="high"`.
+>
+> E o comentário que lá está **já descreve o problema exactamente**, com
+> números: «Uma foto sem miniatura (tudo o que foi carregado antes de elas
+> existirem) obriga a puxar o original: ~2,6 MB para desenhar uma célula de
+> 150 px. Medido […] com os 60 pedidos ao mesmo tempo […] a PRIMEIRA foto
+> aparece aos 26 351 ms […] Com um tecto de 3 em voo, a primeira aparece aos
+> 1405 ms.»
+
+Isto muda a conclusão para melhor: **o sintoma já foi mitigado e a causa nunca
+foi tratada.** A fila de 3 baixou a primeira foto de 26 s para 1,4 s, mas as 60
+continuam a descarregar 2,6 MB cada, uma a seguir à outra. Enquanto as fotos
+antigas não tiverem miniatura, a grelha é lenta por construção — e nenhum
+ajuste de carregamento a salva.
 
 ---
 
@@ -285,31 +306,56 @@ O que tenho:
    produzem exactamente a mensagem que vês. Nenhum está provado como *a* causa —
    provo-os assim que tiver uma reprodução.
 
-4. **Para os sintomas 1 e 2, a infraestrutura que a missão pede já existe**
-   (derivadas 400/96/LQIP, assinatura em lote, pré-aquecimento) — **excepto para
-   as fotos carregadas antes de as miniaturas existirem**, que continuam a servir
-   o original de 2200 px, e **excepto o carregamento diferido**: 60 células pedem
-   imagem ao mesmo tempo, sem `IntersectionObserver` e sem tecto de concorrência.
+4. **Para os sintomas 1 e 2, toda a infraestrutura que a missão pede já
+   existe** — derivadas de 400/96 px e LQIP geradas no browser, assinatura em
+   lote, pré-aquecimento, carregamento diferido, tecto de concorrência. **O que
+   nunca foi feito foi gerar as derivadas das fotos antigas.** Essas continuam
+   a puxar o original de 2200 px (~576 KB, ~2,6 MB nos temas) para desenhar uma
+   célula de 150 px, e nenhum ajuste de carregamento as salva.
 
-**O meu palpite ordenado**, dito como palpite: (a) fotos antigas sem miniatura, a
-servir 576 KB numa célula de 174 px, 60 ao mesmo tempo; (b) as 6 horas de
-validade dos URLs de tema a cruzarem-se com URLs guardados no `localStorage`;
-(c) fotos que já não existem no bucket, para o PDF.
+**A causa mais provável, agora com o código a apoiá-la e não só o meu palpite:**
+as fotos carregadas antes de as miniaturas existirem não têm nenhuma. A fila de
+3 baixou a primeira foto de 26 s para 1,4 s — mas as 60 continuam a
+descarregar megabytes cada uma.
+
+**Quantas são, é o que ninguém sabe.** `scripts/derivadas-em-falta.mjs` conta,
+sem escrever nada. Enquanto esse número não existir, tudo o resto é ao escuro.
+
+Depois disso, por ordem: (b) as 6 horas de validade dos URLs de tema a
+cruzarem-se com URLs guardados no `localStorage` — **corrigido**; (c) fotos que
+já não existem no bucket, para o PDF — o gerador passa a **recusar** servir um
+documento incompleto em vez de o mandar calado.
 
 ---
 
 ## O que fazer a seguir — por ordem de quanto responde por quanto custa
 
-1. **Ler os registos do servidor** (Vercel → Logs, filtrar por
-   `imagem não resolveu`). Custa cinco minutos e responde ao sintoma 3 **hoje**.
-   Se preferires, mando-te o filtro exacto.
-2. **Contar quantas fotos não têm miniatura.** É um script de leitura, sem
-   escritas, que corre contra o Storage e diz o número. Sem isso, «gerar as
-   derivadas que faltam» é trabalho ao escuro.
-3. **A reprodução.** Ou me dizes que posso entrar no site com uma conta de teste
-   e carregar duas fotografias de teste, ou instrumento o estúdio para me mandar
-   o URL e o código de estado quando a célula falhar — que é, aliás, o «log do
-   erro no servidor» que tu própria pediste. A segunda não te toca nos dados.
+**1. Contar as derivadas em falta.** Só leitura, não escreve nada:
 
-Diz-me qual, e sigo. Não avanço para as correcções sem isto, porque cada uma
-delas é grande e duas das três podem ser para o lado errado.
+```
+set -a; . .env.local; set +a
+node scripts/derivadas-em-falta.mjs
+```
+
+Diz, por tema e por pedido, quantas fotos não têm miniatura. **É o número que
+falta para tudo o resto deixar de ser palpite.** Se der zero, a minha hipótese
+principal cai e volto ao princípio — e é bom que caia depressa.
+
+**2. Gerá-las**, quando o número justificar:
+
+```
+node scripts/derivadas-em-falta.mjs --aplicar
+```
+
+Não apaga nada, não toca nos originais, não substitui o que já existe, e
+repetir é seguro — é assim que se retoma uma execução interrompida.
+
+**3. Ler os registos do servidor** (Vercel → Logs), para o sintoma 3. Dois
+filtros, um de cada lado da fronteira:
+
+- `imagem não resolveu` — o servidor, a dizer que foto falta no PDF e de que
+  família é a causa;
+- `imagem não desenhou no browser` — o ecrã dela, a dizer o caminho e o código
+  de estado. **Este é novo**: antes essa informação morria no browser.
+
+Com os dois, uma foto que desapareça deixa de precisar de adivinhação.
