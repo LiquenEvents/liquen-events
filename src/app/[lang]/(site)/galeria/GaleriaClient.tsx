@@ -19,6 +19,7 @@ import {
   ficheiroDaGaleria,
   srcsetDaGaleria,
 } from "./gallery-srcset";
+import { snapGalleryWidth } from "./gallery-image-loader";
 import { useAntecipacao } from "./useAntecipacao";
 import { useBlurTardio } from "./useBlurTardio";
 
@@ -1616,9 +1617,31 @@ function Lightbox({
    * preto. Repõe-se a cada foto.
    */
   const [lbRaw, setLbRaw] = useState(false);
+  /**
+   * ── O FORMATO DA FOTOGRAFIA GRANDE ────────────────────────────────────────
+   *
+   * A grelha passou a AVIF e o lightbox tinha ficado para trás: pedia
+   * `<chave>-1280.webp` para a foto mostrada E para os dois vizinhos
+   * pré-carregados. Medido na escada: 169,9 KB em WebP contra 125,8 em AVIF a
+   * 1280 px — **~44 KB por fotografia aberta**, e quem percorre o lightbox
+   * foto a foto paga isso em cada uma.
+   *
+   * Porquê uma ESCADA de formato e não um `<picture>` como na grelha: esta
+   * fotografia está embrulhada no `<ViewTransition>` do morph e tem de
+   * continuar a ser UM elemento com um nome só. Um `<picture>` aqui obrigava a
+   * refazer o morph. Um degrau a mais na escada de recuo que já existia
+   * (avif → webp → ficheiro original) dá o mesmo resultado sem lhe tocar.
+   *
+   * Um browser sem AVIF falha o primeiro pedido e cai no WebP — um pedido
+   * desperdiçado, uma vez por fotografia, para uma minoria que de outra forma
+   * não teria fotografia nenhuma. O degrau seguinte continua a ser o ficheiro
+   * original, que existe sempre.
+   */
+  const [lbFormato, setLbFormato] = useState<"avif" | "webp">("avif");
   useEffect(() => {
     setHeroLoaded(false);
     setLbRaw(false);
+    setLbFormato("avif");
   }, [index]);
 
   // Defer the (secondary) thumbnail strip to the frame AFTER the lightbox
@@ -1990,7 +2013,7 @@ function Lightbox({
           </picture>
           <VTWrap key={index} name={vtId(pool[index].src)} exit="vt-lb">
             <Image
-              key={`${index}${lbRaw ? "-raw" : ""}`}
+              key={`${index}-${lbRaw ? "raw" : lbFormato}`}
               src={pool[index].src}
               alt={altText(pool[index].src, pool[index].label)}
               fill
@@ -2006,10 +2029,21 @@ function Lightbox({
               // escolhe é a mesma (medido nos 8 perfis de dispositivo).
               sizes="90vw"
               quality={72}
-              // Sem optimizador quando ele já falhou uma vez: o ficheiro
-              // original, tal e qual (ver `lbRaw`).
-              {...(lbRaw ? { loader: ({ src }: { src: string }) => src } : {})}
-              onError={() => setLbRaw(true)}
+              // A escada de formato, e depois o ficheiro original tal e qual
+              // (ver `lbFormato` e `lbRaw`).
+              {...(lbRaw
+                ? { loader: ({ src }: { src: string }) => src }
+                : {
+                    loader: ({ src, width }: { src: string; width: number }) =>
+                      ficheiroDaGaleria(src, snapGalleryWidth(width), lbFormato),
+                  })}
+              onError={() => {
+                // avif → webp → original. Nunca salta um degrau: o WebP é o que
+                // salva quem não sabe ler AVIF, e o original é o que salva quem
+                // não tem a derivada.
+                if (!lbRaw && lbFormato === "avif") setLbFormato("webp");
+                else setLbRaw(true);
+              }}
               // priority: the full-res lightbox photo is a DIFFERENT srcset
               // candidate than the tile thumbnail, so opening starts a cold fetch.
               // Fetching it high-priority (instead of default) shortens the
@@ -2066,6 +2100,12 @@ function Lightbox({
                 // que já ficou em cache e a navegação ser instantânea.
                 sizes="90vw"
                 quality={72}
+                // E o MESMO FORMATO, pela mesma razão: pré-carregar o WebP e
+                // depois pedir o AVIF (ou o contrário) seria descarregar a
+                // fotografia duas vezes e não adiantar nada ao `→`.
+                loader={({ src, width }: { src: string; width: number }) =>
+                  ficheiroDaGaleria(src, snapGalleryWidth(width), lbFormato)
+                }
                 loading="eager"
               />
             ))}
