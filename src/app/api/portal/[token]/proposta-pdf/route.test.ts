@@ -130,13 +130,16 @@ describe("portal proposta-pdf — fotos em falta", () => {
     db.newestByQuote.set("q-1", { id: "p", quoteId: "q-1", doc: { which: "x" } });
     db.emFalta = 2;
     // A segunda passagem corre com o Storage a responder.
+    // `Buffer` e não `Uint8Array`: a assinatura devolve `Buffer<ArrayBuffer>`, e
+    // um mock com o tipo errado é um mock que não prova nada sobre o real.
+    const bytes = () => Buffer.from([1, 2, 3]) as Buffer<ArrayBuffer>;
     vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async (doc) => {
       db.rendered.push(doc);
-      return { pdf: new Uint8Array([1, 2, 3]), missingImages: 2, truncations: [] };
+      return { pdf: bytes(), missingImages: 2, truncations: [] };
     });
     vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async (doc) => {
       db.rendered.push(doc);
-      return { pdf: new Uint8Array([1, 2, 3]), missingImages: 0, truncations: [] };
+      return { pdf: bytes(), missingImages: 0, truncations: [] };
     });
 
     const res = await call();
