@@ -127,9 +127,27 @@ test("@galeria a grelha não salta: cada foto tem caixa antes de chegar", async 
     const maus: string[] = [];
     for (const t of document.querySelectorAll("[data-tile-idx]")) {
       const el = t as HTMLElement;
-      // A célula reserva o espaço pela proporção...
-      if (!el.style.aspectRatio) maus.push(`mosaico ${el.dataset.tileIdx} sem aspect-ratio`);
-      // ...e a própria imagem declara dimensões, para o browser não ter de
+      /**
+       * As fotos 1 a 4 existem DUAS vezes no DOM — nos satélites do
+       * mosaico-herói (`hidden sm:block`) e no masonry (`sm:hidden`) — e o CSS
+       * esconde uma das cópias conforme o tamanho do ecrã. A que está
+       * escondida tem altura zero, e isso está certo: não é um mosaico sem
+       * caixa, é um mosaico que não está a ser desenhado.
+       */
+      if (el.offsetParent === null) continue;
+      /**
+       * A célula tem de ter ALTURA sem depender da fotografia. Como lá chega é
+       * indiferente, e há duas maneiras legítimas em uso: os mosaicos do
+       * masonry declaram `aspect-ratio` (a proporção real da foto), e os cinco
+       * do mosaico-herói recebem a altura das linhas da grelha
+       * (`h-[320px] sm:h-[480px]`). A primeira versão deste teste exigia
+       * `aspect-ratio` em todos e reprovava os cinco do herói — estava a
+       * verificar o MECANISMO em vez da propriedade.
+       */
+      if (el.getBoundingClientRect().height < 1) {
+        maus.push(`mosaico ${el.dataset.tileIdx} sem altura reservada`);
+      }
+      // E a própria imagem declara dimensões, para o browser não ter de
       // esperar pelos bytes para saber que forma tem.
       const im = el.querySelector("img");
       if (im && (!im.getAttribute("width") || !im.getAttribute("height"))) {
