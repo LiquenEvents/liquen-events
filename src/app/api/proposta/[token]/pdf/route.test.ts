@@ -13,6 +13,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const db = vi.hoisted(() => ({
   proposals: new Map<string, Record<string, unknown>>(),
   rendered: [] as unknown[],
+  /** Fotos que o gerador não conseguiu meter no documento. */
+  emFalta: 0,
 }));
 
 vi.mock("@/lib/proposal-token", () => ({
@@ -28,13 +30,26 @@ vi.mock("@/lib/proposal-doc-render", () => ({
     db.rendered.push(doc);
     return new Uint8Array([37, 80, 68, 70]); // "%PDF"
   }),
+  /**
+   * A cache do PDF passou a pedir o RELATÓRIO e não só os bytes: é assim que
+   * uma proposta com fotos a menos deixa de sair calada para o cliente. O
+   * `emFalta` é regulável por caso para se poder exercitar a recusa.
+   */
+  renderStoredProposalDocPdfWithReport: vi.fn(async (doc: unknown) => {
+    db.rendered.push(doc);
+    return {
+      pdf: new Uint8Array([37, 80, 68, 70]),
+      missingImages: db.emFalta ?? 0,
+      truncations: [],
+    };
+  }),
 }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { GET } from "./route";
 import { esvaziarCachePdf } from "@/lib/proposal-pdf-cache";
 import { getProposal } from "@/lib/proposals-store";
-import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
+import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 
 // Um IP diferente por chamada: o limitador é real (12/minuto por IP) e é
 // partilhado por todo o processo de testes — sem isto, um teste gastava a
@@ -73,7 +88,7 @@ describe("GET /api/proposta/[token]/pdf", () => {
     // seria uma degradação de cinco ou seis vezes em vez de uma melhoria.
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", doc: { ref: "PO" } });
     await call();
-    expect(renderStoredProposalDocPdf).toHaveBeenCalledTimes(1);
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
 
     const req = new Request("http://x", {
       headers: { "x-real-ip": `10.0.1.${++n % 250}`, range: "bytes=0-1" },
@@ -81,7 +96,7 @@ describe("GET /api/proposta/[token]/pdf", () => {
     const res = await GET(req, { params: Promise.resolve({ token: "bom-p1" }) });
     expect(res.status).toBe(206);
     expect(res.headers.get("Content-Range")).toBe("bytes 0-1/4");
-    expect(renderStoredProposalDocPdf).toHaveBeenCalledTimes(1);
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
   });
 
   it("serve o documento guardado NA proposta do token", async () => {
@@ -107,7 +122,7 @@ describe("GET /api/proposta/[token]/pdf", () => {
     db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1" });
     const res = await call();
     expect(res.status).toBe(404);
-    expect(renderStoredProposalDocPdf).not.toHaveBeenCalled();
+    expect(renderStoredProposalDocPdfWithReport).not.toHaveBeenCalled();
   });
 
   it("404 a uma proposta que já não existe", async () => {
@@ -138,7 +153,9 @@ describe("GET /api/proposta/[token]/pdf", () => {
 
   it("500 sem detalhes quando o desenho rebenta (nada do erro chega ao cliente)", async () => {
     db.proposals.set("p1", { id: "p1", doc: { ref: "PO" } });
-    vi.mocked(renderStoredProposalDocPdf).mockRejectedValueOnce(new Error("sharp em baixo"));
+    vi.mocked(renderStoredProposalDocPdfWithReport).mockRejectedValueOnce(
+      new Error("sharp em baixo"),
+    );
     const res = await call();
     expect(res.status).toBe(500);
     expect(await res.text()).toBe("");

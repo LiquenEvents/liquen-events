@@ -1,7 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import type { ProposalDoc } from "@/lib/proposal-doc";
-import { renderStoredProposalDocPdf } from "@/lib/proposal-doc-render";
+import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
+import { log } from "@/lib/logger";
 
 /**
  * O PDF já desenhado, guardado por conteúdo.
@@ -94,9 +95,63 @@ export async function pdfDaPropostaEmCache(doc: ProposalDoc): Promise<Buffer<Arr
     cache.set(chave, guardado);
     return guardado;
   }
-  const pdf = await renderStoredProposalDocPdf(doc);
-  guardar(chave, pdf);
-  return pdf;
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * UM PDF COM BURACOS NÃO SAI DAQUI
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Esta função serve o documento **ao casal**. Até aqui chamava
+   * `renderStoredProposalDocPdf`, que deita fora o relatório: uma fotografia
+   * que não resolvesse desaparecia da proposta e o ficheiro seguia na mesma,
+   * bonito e incompleto, sem ninguém saber. O ecrã do back office já avisava
+   * (cabeçalho `X-Fotos-Em-Falta`); a porta do cliente não avisava nada.
+   *
+   * UMA SEGUNDA TENTATIVA, E DEPOIS PÁRA. A causa mais comum de uma foto não
+   * resolver é passageira — um pedido ao Storage que expirou, uma ligação que
+   * caiu a meio de oitenta. Repetir apanha esse caso, e não custa nada quando
+   * não é esse (o caminho normal é zero em falta e não repete).
+   *
+   * Se à segunda continuar a faltar, **não se serve**. É o pedido dela, e está
+   * certo: uma proposta com fotos a menos enviada a um casal é pior do que um
+   * erro, porque o erro vê-se e a falta não — nem ela nem o casal sabem o que
+   * era suposto lá estar.
+   *
+   * O que NÃO se faz aqui é guardar em cache o que falhou. A falha é
+   * passageira por definição; guardá-la fixava-a até ao próximo arranque a
+   * frio — o mesmo erro de gravar uma falha como se fosse um facto que já
+   * apareceu na cache de fotografias e na célula do estúdio.
+   */
+  let ultimo = await renderStoredProposalDocPdfWithReport(doc);
+  if (ultimo.missingImages > 0) {
+    log.warn("proposta-pdf: fotos em falta, a tentar segunda vez", {
+      emFalta: ultimo.missingImages,
+    });
+    ultimo = await renderStoredProposalDocPdfWithReport(doc);
+  }
+  if (ultimo.missingImages > 0) {
+    log.error("proposta-pdf: RECUSADO — o documento sairia com fotos a menos", null, {
+      emFalta: ultimo.missingImages,
+    });
+    throw new PropostaIncompleta(ultimo.missingImages);
+  }
+
+  guardar(chave, ultimo.pdf);
+  return ultimo.pdf;
+}
+
+/**
+ * O documento não pode ser servido porque sairia com fotografias a menos.
+ *
+ * Tem tipo próprio para quem chama poder distinguir isto de uma avaria
+ * qualquer: a resposta ao cliente é diferente (isto é temporário e tem
+ * conserto) e a mensagem para os registos também.
+ */
+export class PropostaIncompleta extends Error {
+  constructor(public readonly emFalta: number) {
+    super(`A proposta sairia com ${emFalta} fotografia(s) em falta.`);
+    this.name = "PropostaIncompleta";
+  }
 }
 
 /** Só para os testes: esvaziar entre casos. */

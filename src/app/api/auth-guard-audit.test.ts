@@ -412,6 +412,11 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // As conversões offline expõem o VALOR de cada casamento fechado — é
   // informação comercial, não uma exportação técnica inofensiva.
   { path: "./admin/conversoes/route", methods: ["GET"] },
+  // O relato de uma imagem que não desenhou no browser. É telemetria e não
+  // devolve nada de útil — mas ESCREVE nos registos, e uma rota de registo
+  // aberta é um sítio onde qualquer pessoa põe o que quiser no sítio onde nós
+  // procuramos a verdade. Sem sessão, 401.
+  { path: "./admin/imagem-falhou/route", methods: ["POST"] },
   // O mesmo, do lado da Meta: o relatório e o envio dos casamentos fechados
   // trazem o valor de cada negócio. O POST é o que efectivamente ENVIA
   // conversões para fora — sem sessão não pode sequer ser tentado.

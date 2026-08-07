@@ -11,6 +11,8 @@ const db = vi.hoisted(() => ({
   newestByQuote: new Map<string, Record<string, unknown>>(),
   acceptedContractByQuote: new Map<string, Record<string, unknown>>(),
   rendered: [] as unknown[],
+  /** Fotos que o gerador não conseguiu meter no documento. */
+  emFalta: 0,
 }));
 
 vi.mock("@/lib/portal-token", () => ({
@@ -32,6 +34,15 @@ vi.mock("@/lib/proposal-doc-render", () => ({
   renderStoredProposalDocPdf: vi.fn(async (doc: unknown) => {
     db.rendered.push(doc);
     return new Uint8Array([1, 2, 3]);
+  }),
+  /**
+   * A cache do PDF passou a pedir o RELATÓRIO e não só os bytes: é assim que
+   * uma proposta com fotos a menos deixa de sair calada para o cliente. O
+   * `emFalta` é regulável por caso para se poder exercitar a recusa.
+   */
+  renderStoredProposalDocPdfWithReport: vi.fn(async (doc: unknown) => {
+    db.rendered.push(doc);
+    return { pdf: new Uint8Array([1, 2, 3]), missingImages: db.emFalta ?? 0, truncations: [] };
   }),
 }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));

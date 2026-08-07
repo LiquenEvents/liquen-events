@@ -9,9 +9,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * até 80 fotos ao Storage e reencodá-las com o sharp.
  */
 
+/**
+ * O `desenhar` devolve só os BYTES, como sempre devolveu — o relatório é
+ * embrulhado à volta dele aqui. Assim os casos que só querem provar a cache
+ * continuam a ler-se como antes, e quem quiser exercitar as fotos em falta
+ * mexe em `emFalta`.
+ */
 const desenhar = vi.fn();
+/** Fotos em falta em cada passagem, por ordem. Vazia = zero, sempre. */
+let filaDeFaltas: number[] = [];
 vi.mock("./proposal-doc-render", () => ({
-  renderStoredProposalDocPdf: (...args: unknown[]) => desenhar(...args),
+  renderStoredProposalDocPdfWithReport: async (...args: unknown[]) => {
+    const pdf = await desenhar(...args);
+    return { pdf, missingImages: filaDeFaltas.shift() ?? 0, truncations: [] };
+  },
 }));
 
 import { pdfDaPropostaEmCache, esvaziarCachePdf, estadoCachePdf } from "./proposal-pdf-cache";
@@ -23,6 +34,7 @@ const pdfDe = (n: number, byte = 7) => Buffer.alloc(n, byte) as Buffer<ArrayBuff
 beforeEach(() => {
   esvaziarCachePdf();
   desenhar.mockReset();
+  filaDeFaltas = [];
 });
 
 describe("pdfDaPropostaEmCache", () => {
@@ -90,5 +102,55 @@ describe("pdfDaPropostaEmCache", () => {
     expect(desenhar, '"a" foi usada há pouco e não devia ter saído').not.toHaveBeenCalled();
     await pdfDaPropostaEmCache(doc("b"));
     expect(desenhar, '"b" era a mais antiga e devia ter saído').toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * UM PDF COM BURACOS NÃO SAI DAQUI
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Esta cache serve o documento ao CASAL. Deitava fora o relatório do gerador:
+ * uma fotografia que não resolvesse desaparecia da proposta e o ficheiro seguia
+ * na mesma, bonito e incompleto — e a moldura não fica vazia, simplesmente não
+ * existe, portanto ninguém dá por nada.
+ */
+describe("fotos em falta", () => {
+  it("tenta segunda vez: a causa mais comum é passageira", async () => {
+    /**
+     * A primeira versão deste teste punha `emFalta = 0` logo a seguir a lançar
+     * a promessa, e o mock — que lê `emFalta` DEPOIS do `await` — já via zero.
+     * Não havia segunda passagem nenhuma e a asserção («chamado uma vez»)
+     * passava por acidente, a medir o caso normal. Uma FILA diz mesmo o que
+     * cada passagem devolveu.
+     */
+    filaDeFaltas = [3, 0];
+    desenhar.mockResolvedValue(pdfDe(100));
+
+    const pdf = await pdfDaPropostaEmCache(doc("LIQ-9"));
+    expect(pdf).toBeTruthy();
+    expect(desenhar).toHaveBeenCalledTimes(2);
+  });
+
+  it("recusa quando à segunda continuam a faltar", async () => {
+    desenhar.mockResolvedValue(pdfDe(100));
+    filaDeFaltas = [1, 1];
+    await expect(pdfDaPropostaEmCache(doc("LIQ-10"))).rejects.toThrow(/em falta/i);
+    expect(desenhar).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * O ERRO QUE ISTO IMPEDE: guardar a falha em cache. A falha é passageira por
+   * definição; fixá-la até ao próximo arranque a frio é o mesmo "gravar uma
+   * falha como se fosse um facto" que já apareceu duas vezes neste projecto.
+   */
+  it("uma recusa não fica guardada", async () => {
+    desenhar.mockResolvedValue(pdfDe(100));
+    filaDeFaltas = [1, 1];
+    await expect(pdfDaPropostaEmCache(doc("LIQ-11"))).rejects.toThrow();
+    expect(estadoCachePdf().entradas).toBe(0);
+
+    await expect(pdfDaPropostaEmCache(doc("LIQ-11"))).resolves.toBeTruthy();
+    expect(estadoCachePdf().entradas).toBe(1);
   });
 });

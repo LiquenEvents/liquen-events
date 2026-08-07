@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal } from "@/lib/proposals-store";
-import { pdfDaPropostaEmCache } from "@/lib/proposal-pdf-cache";
+import { pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
 import { respostaPdf } from "@/lib/pdf-resposta";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
@@ -63,6 +63,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
     return respostaPdf(request, pdf, { nome: `Proposta-Liquen-${ref}.pdf` });
   } catch (err) {
+    /**
+     * A PROPOSTA SAIRIA COM FOTOS A MENOS — e por isso não sai.
+     *
+     * 503 e não 500: isto tem conserto e é temporário. O `Retry-After` diz ao
+     * leitor de PDF do cliente para voltar, e o registo do lado de lá
+     * (`proposal-storage`: «imagem não resolveu») diz QUAL foto e porquê.
+     *
+     * Um ficheiro com buracos era o que saía antes, calado. Um casal a ver uma
+     * proposta a que faltam duas fotografias não sabe que faltam — a moldura
+     * simplesmente não existe.
+     */
+    if (err instanceof PropostaIncompleta) {
+      log.error("proposta pdf: recusado, o documento sairia incompleto", null, {
+        proposalId: claim.proposalId,
+        emFalta: err.emFalta,
+      });
+      return new NextResponse(null, { status: 503, headers: { "Retry-After": "30" } });
+    }
     log.error("proposta pdf GET falhou", err, { proposalId: claim.proposalId });
     return new NextResponse(null, { status: 500 });
   }

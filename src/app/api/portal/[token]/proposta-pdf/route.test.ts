@@ -13,6 +13,8 @@ const db = vi.hoisted(() => ({
   newestByQuote: new Map<string, Record<string, unknown>>(),
   acceptedContractByQuote: new Map<string, Record<string, unknown>>(),
   rendered: [] as unknown[],
+  /** Fotos que o gerador não conseguiu meter no documento. */
+  emFalta: 0,
 }));
 
 vi.mock("@/lib/portal-token", () => ({
@@ -35,11 +37,21 @@ vi.mock("@/lib/proposal-doc-render", () => ({
     db.rendered.push(doc);
     return new Uint8Array([1, 2, 3]);
   }),
+  /**
+   * A cache do PDF passou a pedir o RELATÓRIO e não só os bytes: é assim que
+   * uma proposta com fotos a menos deixa de sair calada para o cliente. O
+   * `emFalta` é regulável por caso para se poder exercitar a recusa.
+   */
+  renderStoredProposalDocPdfWithReport: vi.fn(async (doc: unknown) => {
+    db.rendered.push(doc);
+    return { pdf: new Uint8Array([1, 2, 3]), missingImages: db.emFalta ?? 0, truncations: [] };
+  }),
 }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { GET } from "./route";
 import { esvaziarCachePdf } from "@/lib/proposal-pdf-cache";
+import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 
 function call(token = "good") {
   return GET(new Request("http://x"), { params: Promise.resolve({ token }) });
@@ -55,6 +67,7 @@ beforeEach(() => {
   db.newestByQuote.clear();
   db.acceptedContractByQuote.clear();
   db.rendered = [];
+  db.emFalta = 0;
   db.quotes.set("q-1", { id: "q-1", name: "Cliente" });
   vi.clearAllMocks();
 });
@@ -99,5 +112,63 @@ describe("portal proposta-pdf — serves the accepted proposal's document", () =
 
     const res = await call();
     expect(res.status).toBe(404);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * UM PDF COM BURACOS NÃO SAI PARA O CASAL
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Esta rota serve o documento ao CLIENTE. Até aqui deitava fora o relatório do
+ * gerador: uma fotografia que não resolvesse desaparecia da proposta e o
+ * ficheiro seguia na mesma, bonito e incompleto. Ninguém dava por nada — a
+ * moldura não fica vazia, simplesmente não existe.
+ */
+describe("portal proposta-pdf — fotos em falta", () => {
+  it("tenta SEGUNDA vez antes de desistir: a falha mais comum é passageira", async () => {
+    db.newestByQuote.set("q-1", { id: "p", quoteId: "q-1", doc: { which: "x" } });
+    db.emFalta = 2;
+    // A segunda passagem corre com o Storage a responder.
+    vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async (doc) => {
+      db.rendered.push(doc);
+      return { pdf: new Uint8Array([1, 2, 3]), missingImages: 2, truncations: [] };
+    });
+    vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async (doc) => {
+      db.rendered.push(doc);
+      return { pdf: new Uint8Array([1, 2, 3]), missingImages: 0, truncations: [] };
+    });
+
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(2);
+  });
+
+  it("503 quando à segunda continuam a faltar — e NADA é servido", async () => {
+    db.newestByQuote.set("q-1", { id: "p", quoteId: "q-1", doc: { which: "x" } });
+    db.emFalta = 1;
+
+    const res = await call();
+    expect(res.status).toBe(503);
+    // 503 e não 500: isto tem conserto e é temporário.
+    expect(res.headers.get("Retry-After")).toBe("30");
+    expect(await res.text()).toBe("");
+  });
+
+  /**
+   * O ERRO QUE ISTO IMPEDE: guardar a falha em cache.
+   *
+   * A falha é passageira por definição. Guardá-la fixava-a até ao próximo
+   * arranque a frio — é o mesmo "gravar uma falha como se fosse um facto" que
+   * já apareceu na cache de fotografias e na célula do estúdio.
+   */
+  it("uma recusa não fica em cache: a chamada seguinte volta a desenhar", async () => {
+    db.newestByQuote.set("q-1", { id: "p", quoteId: "q-1", doc: { which: "x" } });
+    db.emFalta = 1;
+    expect((await call()).status).toBe(503);
+
+    db.emFalta = 0;
+    const res = await call();
+    expect(res.status).toBe(200);
   });
 });
