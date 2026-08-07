@@ -29,7 +29,13 @@ jobs:
     # minutos e meio do trabalho real, e a variação normal de velocidade dos
     # runners chega para o ultrapassar. 25 minutos volta a dar folga sem
     # deixar um job encravado a arder durante meia hora.
-    timeout-minutes: 25
+    #
+    # 2026-08: sobe para 35. O AVIF ao lado do WebP levou o pré-gerador de ~2
+    # para ~13 minutos numa cache fria, e este job passou a 20m03s — a três
+    # minutos do tecto outra vez. A cache abaixo devolve os 13 minutos na
+    # maioria das corridas; o tecto cobre a primeira corrida depois de entrar
+    # uma fotografia nova, que paga o encode na mesma.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -61,6 +67,27 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # ── A CACHE DAS DERIVADAS ──────────────────────────────────────────────
+      # Sem isto, cada corrida re-encoda as 2785 miniaturas do zero. Enquanto
+      # eram só WebP isso custava ~2 minutos e passava despercebido; com o AVIF
+      # ao lado passou a ~13, e foi o que empurrou este job para lá dos 30
+      # minutos e o fez ser cancelado a meio do passo das imagens.
+      #
+      # A Vercel preserva `.next/cache` entre builds sozinha — foi por isso que
+      # os deploys continuaram verdes e só o CI partiu. Aqui é preciso pedir.
+      #
+      # A chave inclui os parâmetros de encode (larguras, qualidades, formatos)
+      # porque mudá-los TEM de invalidar a cache: o pré-gerador já carimba cada
+      # ficheiro com eles, e uma chave que os ignorasse traria de volta
+      # ficheiros da qualidade anterior sem ninguém dar por isso.
+      - name: Cache das miniaturas pré-geradas
+        uses: actions/cache@v4
+        with:
+          path: .next/cache/pregen-gallery
+          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs') }}
+          restore-keys: |
+            pregen-${{ runner.os }}-
+
       - name: Build
         run: npm run build
         env:
@@ -71,7 +98,12 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 45 e não 30. Este job foi CANCELADO aos 30 minutos, a meio do passo das
+    # imagens e com tudo o que já tinha corrido a passar — não por um teste
+    # falhar, mas porque o build à frente ficou ~13 minutos mais lento quando o
+    # AVIF entrou. A cache abaixo trata da causa; este tecto é a folga para a
+    # corrida em que ela não acerta.
+    timeout-minutes: 45
     # O `continue-on-error` DESCEU DO JOB PARA O PASSO informativo, e é a única
     # razão por que este ficheiro foi tocado.
     #
@@ -96,6 +128,27 @@ jobs:
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
+
+      # ── A CACHE DAS DERIVADAS ──────────────────────────────────────────────
+      # Sem isto, cada corrida re-encoda as 2785 miniaturas do zero. Enquanto
+      # eram só WebP isso custava ~2 minutos e passava despercebido; com o AVIF
+      # ao lado passou a ~13, e foi o que empurrou este job para lá dos 30
+      # minutos e o fez ser cancelado a meio do passo das imagens.
+      #
+      # A Vercel preserva `.next/cache` entre builds sozinha — foi por isso que
+      # os deploys continuaram verdes e só o CI partiu. Aqui é preciso pedir.
+      #
+      # A chave inclui os parâmetros de encode (larguras, qualidades, formatos)
+      # porque mudá-los TEM de invalidar a cache: o pré-gerador já carimba cada
+      # ficheiro com eles, e uma chave que os ignorasse traria de volta
+      # ficheiros da qualidade anterior sem ninguém dar por isso.
+      - name: Cache das miniaturas pré-geradas
+        uses: actions/cache@v4
+        with:
+          path: .next/cache/pregen-gallery
+          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs') }}
+          restore-keys: |
+            pregen-${{ runner.os }}-
 
       - name: Build
         run: npm run build
