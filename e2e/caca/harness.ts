@@ -1,4 +1,13 @@
-import { expect, type Locator, type Page, type Request, type TestInfo } from "@playwright/test";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import {
+  expect,
+  type BrowserContext,
+  type Locator,
+  type Page,
+  type Request,
+  type TestInfo,
+} from "@playwright/test";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -86,6 +95,13 @@ export function escutar(page: Page): Recolha {
     if (!url.includes("/api/")) return;
     if (res.status() >= 500)
       r.pedidosFalhados.push(`${res.status()} ${res.request().method()} ${url}`);
+    /**
+     * O 429 tem linha própria porque o browser, sozinho, só diz «Failed to load
+     * resource: 429» — sem URL. Duas vezes perdi tempo a descobrir QUAL era o
+     * tecto atingido a partir dessa frase. Agora o relatório di-lo.
+     */
+    if (res.status() === 429)
+      r.pedidosFalhados.push(`429 ${res.request().method()} ${url} — tecto de pedidos atingido`);
   });
 
   page.on("request", (req) => {
@@ -103,31 +119,180 @@ export function exigirSilencio(r: Recolha, onde: string) {
 }
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O COFRE DA SESSÃO — e o tecto de entradas que partia a caça inteira
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `/api/admin/login` tem um travão de força bruta: **oito entradas por minuto
+ * por endereço** (`rateLimit("login:" + ip, 8, 60_000)`). Está certo e não se
+ * mexe — é a única coisa entre a palavra-passe e quem a queira adivinhar.
+ *
+ * O que estava errado era isto: cada percurso da caça entrava de novo. Só o
+ * a09 tem catorze testes; com o a02 e o a10 na mesma corrida são vinte e cinco
+ * entradas no mesmo minuto, do mesmo endereço (o localhost). As primeiras oito
+ * passavam; as restantes levavam 429, ficavam no ecrã de entrada — e o erro que
+ * o relatório mostrava era `Não consegui chegar à vista /^Temas$/`, que parece
+ * um defeito do MENU. Fui à procura do menu duas vezes.
+ *
+ * Media-se pela ordem: falhavam sempre os ÚLTIMOS testes do ficheiro, nunca os
+ * primeiros, e os mesmos quatro que falhavam em conjunto passavam sozinhos num
+ * minuto limpo (medido: 4/4 verdes, 6,3s). Um defeito de produto não escolhe as
+ * vítimas por ordem de execução.
+ *
+ * A correcção é entrar UMA vez e reaproveitar os cookies — que é, aliás, o que
+ * uma pessoa faz. Em arranque frio cada worker entra uma vez (≈4 entradas), bem
+ * abaixo do tecto; daí em diante ninguém volta a pedir entrada. Um cookie
+ * expirado não precisa de tratamento especial: o painel não abre, cai-se no
+ * formulário, e o cofre é reescrito.
+ *
+ * ── DUAS ARMADILHAS, AMBAS PAGAS ───────────────────────────────────────────
+ *
+ * **O cofre NÃO pode viver em `test-results/`.** O Playwright limpa essa pasta
+ * ao arrancar; um cofre lá dentro é apagado precisamente quando faria falta.
+ * Vive em `node_modules/.cache/`, que ninguém varre e o git já ignora.
+ *
+ * **O cookie não existe no instante em que o painel aparece.** O painel é
+ * desenhado a partir da resposta do login, e o Chromium ainda não pôs o
+ * `Set-Cookie` no frasco: medido, `context.cookies()` devolveu ZERO nesse
+ * instante e dois 500 ms depois. A primeira versão disto gravou `[]` no cofre,
+ * o cofre nunca mais restaurou nada, e a corrida seguinte teve MAIS falhas do
+ * que antes da correcção — 17 em vez de 6. Daí o `esperarPelaSessao`: só se
+ * grava quando o cookie de sessão existe mesmo, e nunca se grava vazio.
+ */
+const COFRE = join(process.cwd(), "node_modules", ".cache", "caca-sessao.json");
+
+/** O nome do cookie de sessão do back office (ver `src/lib/admin-auth.ts`). */
+const COOKIE_DA_SESSAO = /liquen_admin/;
+
+type Biscoitos = Awaited<ReturnType<BrowserContext["cookies"]>>;
+
+function lerCofre(): Biscoitos | null {
+  try {
+    if (!existsSync(COFRE)) return null;
+    const guardados = JSON.parse(readFileSync(COFRE, "utf8"));
+    return Array.isArray(guardados) && guardados.length > 0 ? guardados : null;
+  } catch {
+    return null;
+  }
+}
+
+function gravarCofre(cookies: Biscoitos) {
+  // Um cofre vazio é pior do que nenhum: passa a fechadura sem trancar nada e
+  // ninguém volta a olhar para ele.
+  if (!cookies.some((k) => COOKIE_DA_SESSAO.test(k.name))) return;
+  // De resto o cofre é só uma optimização. Se não der para o gravar, o pior que
+  // acontece é entrar-se outra vez — nunca falhar um teste por causa disto.
+  try {
+    mkdirSync(dirname(COFRE), { recursive: true });
+    // Renomeação atómica: há vários workers a escrever no mesmo sítio, e um
+    // ficheiro meio-escrito lido por outro worker é JSON inválido.
+    const temporario = `${COFRE}.${process.pid}`;
+    writeFileSync(temporario, JSON.stringify(cookies));
+    renameSync(temporario, COFRE);
+  } catch {
+    /* sem cofre, com paciência */
+  }
+}
+
+/** Espera que o cookie de sessão chegue mesmo ao frasco do contexto. */
+async function esperarPelaSessao(contexto: BrowserContext): Promise<Biscoitos> {
+  let cookies: Biscoitos = [];
+  for (let tentativa = 0; tentativa < 20; tentativa += 1) {
+    cookies = await contexto.cookies();
+    if (cookies.some((k) => COOKIE_DA_SESSAO.test(k.name))) return cookies;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return cookies;
+}
+
+/**
  * Entra no back office com as credenciais de desenvolvimento.
  *
  * Devolve `false` — em vez de falhar — quando o login não existe neste
  * ambiente (build de produção sem ADMIN_PASSWORD_HASH). Quem chama decide se
  * salta ou se falha; um percurso que precisa de sessão deve saltar, para o
  * relatório não encher de falsos positivos do ambiente.
+ *
+ * Levar 429 é caso à parte e ATIRA, em vez de devolver `false`: um teste
+ * saltado ou uma falha genérica escondem a causa, e a causa aqui tem nome.
  */
 export async function entrar(page: Page): Promise<boolean> {
+  /**
+   * ── A TELEMETRIA FICA DE FORA ──────────────────────────────────────────────
+   *
+   * `/api/vitals` aceita 40 pedidos por minuto por endereço. Para uma pessoa é
+   * folgado; para vinte e cinco percursos a abrir o back office no mesmo minuto
+   * do mesmo localhost, não — cada carregamento envia várias medições e a partir
+   * da quarta ronda vem 429 (medido: rondas 3 e 4 de doze). O Chromium escreve
+   * `Failed to load resource: 429` na consola, e a caça, que trata um
+   * `console.error` como defeito, reprovava ecrãs que estavam perfeitos.
+   *
+   * O tecto está certo e não se mexe. Quem está fora do normal é a corrida de
+   * testes, e a medição de web vitals não é o que estes percursos caçam.
+   */
+  await page.route("**/api/vitals", (rota) => rota.fulfill({ status: 204, body: "" }));
+
+  const painel = page.getByRole("navigation", { name: /Navegação do back office/i });
+  const guardados = lerCofre();
+  if (guardados)
+    await page
+      .context()
+      .addCookies(guardados)
+      .catch(() => {});
+
   await page.goto("/orcamento/admin");
+
+  /**
+   * ESPERAR POR UM DOS DOIS, não perguntar por um deles.
+   *
+   * `isVisible()` responde no instante, sem esperar. Perguntado logo a seguir
+   * ao `goto`, responde «não» às duas coisas enquanto a página ainda está a
+   * hidratar — e o percurso concluía «não há login neste ambiente» e SALTAVA.
+   * Catorze testes saltados numa corrida, todos verdes no relatório. Um teste
+   * saltado por engano é pior do que um vermelho: não se vê.
+   */
   const titulo = page.getByRole("heading", { name: /Painel de Gestão/i });
-  if (!(await titulo.isVisible().catch(() => false))) {
-    // Já autenticado (sessão reaproveitada) — o painel abre directo.
-    return await page
-      .getByRole("navigation", { name: /Navegação do back office/i })
-      .isVisible()
-      .catch(() => false);
+  const apareceu = await painel
+    .or(titulo)
+    .first()
+    .waitFor({ state: "visible", timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!apareceu) return false;
+
+  if (await painel.isVisible().catch(() => false)) {
+    // Já autenticado (sessão do cofre, ou do teste anterior) — o painel abre
+    // directo e não se gasta uma entrada.
+    return true;
   }
+
   await page.getByLabel(/O teu nome/i).fill("Catarina");
   await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
   await page.getByRole("button", { name: /^Entrar$/ }).click();
-  return await page
-    .getByRole("navigation", { name: /Navegação do back office/i })
+
+  const dentro = await painel
     .isVisible({ timeout: 10_000 })
     .then(() => true)
     .catch(() => false);
+
+  if (dentro) {
+    gravarCofre(await esperarPelaSessao(page.context()));
+    return true;
+  }
+
+  const travado = await page
+    .getByText(/Demasiadas tentativas/i)
+    .isVisible()
+    .catch(() => false);
+  if (travado) {
+    throw new Error(
+      "A entrada levou 429 (tecto de 8 por minuto por IP em /api/admin/login). " +
+        "Isto quer dizer que o cofre de sessão não está a funcionar — ver o " +
+        "bloco «O COFRE DA SESSÃO» em e2e/caca/harness.ts. O tecto está certo; " +
+        "quem tem de entrar menos vezes são os testes.",
+    );
+  }
+  return false;
 }
 
 /**

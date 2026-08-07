@@ -29,6 +29,14 @@ import { auditar, entrar, escutar, exigirSilencio, irPara, assentar, provar } fr
  * O `nav.contrato.test.ts` guarda o menu; esta lista é a projecção dele nos
  * percursos de ergonomia, e mantê-las de acordo é trabalho manual até alguém
  * as ligar por código.
+ *
+ * ── E NÃO ERA SÓ A LISTA ───────────────────────────────────────────────────
+ * Corrigida a lista, quatro vistas continuavam a falhar com o mesmo «não
+ * consegui chegar» — e não tinham nada de errado: era o tecto de oito entradas
+ * por minuto do `/api/admin/login`, que este ficheiro sozinho estoirava com
+ * catorze testes. Falhavam sempre as ÚLTIMAS. Está contado em `harness.ts`, no
+ * bloco «O COFRE DA SESSÃO»; o que fica aqui é o aviso de que um «não consegui
+ * chegar à vista X» tem duas causas possíveis e a segunda não se vê no menu.
  */
 const VISTAS: { rotulo: RegExp; nome: string }[] = [
   { rotulo: /^Visão Geral$/, nome: "visao-geral" },
