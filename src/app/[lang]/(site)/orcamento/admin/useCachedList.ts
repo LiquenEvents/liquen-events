@@ -66,7 +66,15 @@ function loadOnce(key: string, url: string): Promise<Entry | null> {
       // desfazer à frente dos olhos dela uma alteração que já ficou gravada.
       return cache.get(key) ?? before ?? null;
     }
-    if (!res.ok) throw new Error(String(res.status));
+    if (!res.ok) {
+      // A MENSAGEM do servidor, quando ele deu uma. É a diferença entre a
+      // vista dizer "não foi possível ler" e dizer "falta correr o
+      // db/schema.sql" — e essa segunda frase é a que resolve o problema
+      // sozinha, sem ninguém ter de ir aos registos.
+      const corpo = await res.json().catch(() => null);
+      const dito = typeof corpo?.error === "string" ? corpo.error : "";
+      throw new Error(dito || String(res.status));
+    }
 
     const entry: Entry = {
       data: await res.json(),
@@ -100,6 +108,9 @@ export interface CachedList<T> {
   setData: (updater: T | ((prev: T) => T)) => void;
   loading: boolean;
   error: boolean;
+  /** O que o servidor disse, quando disse alguma coisa. Vazio se a falha não
+   *  trouxe explicação (rede em baixo, 500 mudo). */
+  errorMessage: string;
   /** Force a foreground refresh (shows loading). */
   refresh: () => void;
 }
@@ -110,6 +121,7 @@ export function useCachedList<T>(key: string, url: string): CachedList<T> {
   // Only the true first load (nothing cached) shows the skeleton.
   const [loading, setLoading] = useState(cached === undefined);
   const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const revalidate = useCallback(
     async (silent: boolean) => {
@@ -120,8 +132,10 @@ export function useCachedList<T>(key: string, url: string): CachedList<T> {
         // React descarta a actualização e não há render nenhum.
         if (entry) setDataState(entry.data as T);
         setError(false);
-      } catch {
+        setErrorMessage("");
+      } catch (e) {
         setError(true);
+        setErrorMessage(e instanceof Error ? e.message : "");
       } finally {
         setLoading(false);
       }
@@ -159,7 +173,7 @@ export function useCachedList<T>(key: string, url: string): CachedList<T> {
     void revalidate(false);
   }, [key, revalidate]);
 
-  return { data, setData, loading, error, refresh };
+  return { data, setData, loading, error, errorMessage, refresh };
 }
 
 /** Esquece tudo o que está em cache. Só para testes — o produto não precisa. */

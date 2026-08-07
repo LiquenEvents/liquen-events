@@ -4,6 +4,11 @@ import { listRules, createRule } from "@/lib/material-rules-store";
 import type { MatchKind, RuleAction } from "@/lib/material-rules";
 import { jsonWithEtag } from "@/lib/api-cache";
 import { log } from "@/lib/logger";
+import { isMissingTable } from "@/lib/repository";
+
+const NAO_INSTALADO =
+  "O Material ainda não está criado na base de dados. No Supabase → SQL Editor, cole e corra o " +
+  "ficheiro db/schema.sql (pode repetir-se sem risco) e recarregue esta página.";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +21,11 @@ export async function GET(request: NextRequest) {
   try {
     return jsonWithEtag(request, await listRules());
   } catch (err) {
+    // A tabela em falta não é uma avaria: é uma instalação por acabar,
+    // e tem uma resolução que ela pode fazer sozinha.
+    if (isMissingTable(err)) {
+      return NextResponse.json({ error: NAO_INSTALADO }, { status: 503 });
+    }
     log.error("material regras GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
@@ -63,6 +73,11 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(regra);
   } catch (err) {
+    // A tabela em falta não é uma avaria: é uma instalação por acabar,
+    // e tem uma resolução que ela pode fazer sozinha.
+    if (isMissingTable(err)) {
+      return NextResponse.json({ error: NAO_INSTALADO }, { status: 503 });
+    }
     log.error("material regras POST falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }

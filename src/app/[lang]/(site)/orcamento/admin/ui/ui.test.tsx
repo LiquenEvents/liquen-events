@@ -75,6 +75,27 @@ describe("Field", () => {
     expect(document.getElementById(describedBy)).toHaveTextContent("Email inválido");
   });
 
+  /**
+   * Um campo mal escrito não pode levar o ecrã inteiro atrás. Passar um
+   * `<input>` por DENTRO do Field punha um filho num elemento vazio e o React
+   * abortava a árvore toda — o separador ficava em branco, sem mensagem. O
+   * `Field.contrato.test.ts` impede que isto chegue ao main; isto garante que,
+   * se chegar, o estrago é UM campo e não a página.
+   */
+  it("um controlo passado por dentro é ignorado, e o ecrã sobrevive", () => {
+    const erro = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() =>
+      render(
+        <Field label="Nome">
+          <input className="bo-input" />
+        </Field>,
+      ),
+    ).not.toThrow();
+    expect(screen.getByLabelText("Nome").tagName).toBe("INPUT");
+    expect(erro).toHaveBeenCalled();
+    erro.mockRestore();
+  });
+
   it("renders a select with forwarded options", () => {
     render(
       <Field as="select" label="Estado" defaultValue="novo">

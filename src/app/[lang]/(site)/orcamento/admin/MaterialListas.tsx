@@ -7,6 +7,7 @@ import { quantidadePara, porCadaQuantos } from "@/lib/material-list-types";
 import { useToast } from "./Toast";
 import { Button, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 /**
  * LISTAS BASE — as receitas do que costuma ir em cada montagem.
@@ -29,7 +30,7 @@ const PAX_EXEMPLO = 120;
 
 export default function MaterialListas() {
   const { toast } = useToast();
-  const { data, setData, loading } = useCachedList<Resposta>(
+  const { data, setData, loading, error, errorMessage, refresh } = useCachedList<Resposta>(
     "material-listas",
     "/api/material/listas",
   );
@@ -179,6 +180,18 @@ export default function MaterialListas() {
     }
   }
 
+  // A falha primeiro: sem isto, uma leitura que rebentou passava por "ainda
+  // não há listas" e o botão de semear ia falhar outra vez, sem explicação.
+  if (error && listas.length === 0) {
+    return (
+      <AvisoDeFalha
+        titulo="Não foi possível ler as listas"
+        mensagem={errorMessage}
+        aoTentarDeNovo={refresh}
+      />
+    );
+  }
+
   if (loading && listas.length === 0) {
     return <p className="bo-text-muted text-sm">A carregar…</p>;
   }
@@ -186,17 +199,17 @@ export default function MaterialListas() {
   return (
     <div>
       <div className="flex flex-wrap items-end gap-3">
-        <Field label="Lista nova">
-          <input
-            className="bo-input"
-            value={novoNome}
-            onChange={(e) => setNovoNome(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void criar();
-            }}
-            placeholder="Ex.: Montagem de cerimónia ao ar livre"
-          />
-        </Field>
+        {/* O `Field` desenha o próprio controlo — dar-lhe um `<input>` por
+            dentro rebentava o ecrã ao montar. Ver `ui/Field`. */}
+        <Field
+          label="Lista nova"
+          value={novoNome}
+          onChange={(e) => setNovoNome(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void criar();
+          }}
+          placeholder="Ex.: Montagem de cerimónia ao ar livre"
+        />
         <Button size="sm" onClick={criar} disabled={ocupado || !novoNome.trim()}>
           Criar
         </Button>
@@ -331,19 +344,18 @@ export default function MaterialListas() {
                     )}
 
                     <div className="mt-3 flex flex-wrap items-end gap-2">
-                      <Field label="Acrescentar do catálogo">
-                        <select
-                          className="bo-input"
-                          value={aAcrescentar}
-                          onChange={(e) => setAAcrescentar(e.target.value)}
-                        >
-                          <option value="">Escolher…</option>
-                          {catalogo.map((i) => (
-                            <option key={i.id} value={i.id}>
-                              {i.name}
-                            </option>
-                          ))}
-                        </select>
+                      <Field
+                        as="select"
+                        label="Acrescentar do catálogo"
+                        value={aAcrescentar}
+                        onChange={(e) => setAAcrescentar(e.target.value)}
+                      >
+                        <option value="">Escolher…</option>
+                        {catalogo.map((i) => (
+                          <option key={i.id} value={i.id}>
+                            {i.name}
+                          </option>
+                        ))}
                       </Field>
                       <Button
                         size="sm"

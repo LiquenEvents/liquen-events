@@ -60,6 +60,33 @@ describe("useCachedList — primeira visita", () => {
     await waitFor(() => expect(result.current.error).toBe(true));
     expect(result.current.loading).toBe(false);
   });
+
+  it("guarda a MENSAGEM que o servidor deu, para o ecrã a poder mostrar", async () => {
+    // É a diferença entre "não foi possível ler" e "falta correr o
+    // db/schema.sql" — a segunda resolve-se sozinha, sem ir aos registos.
+    replies = [{ status: 503, body: { error: "Falta correr o db/schema.sql." } }];
+    const { result } = renderHook(() => useCachedList("k", "/api/k"));
+    await waitFor(() => expect(result.current.error).toBe(true));
+    expect(result.current.errorMessage).toBe("Falta correr o db/schema.sql.");
+  });
+
+  it("uma falha muda não inventa mensagem nenhuma", async () => {
+    replies = [{ status: 500, body: null }];
+    const { result } = renderHook(() => useCachedList("k", "/api/k"));
+    await waitFor(() => expect(result.current.error).toBe(true));
+    expect(result.current.errorMessage).toBe("500");
+  });
+
+  it("uma leitura que corre bem a seguir limpa o erro E a mensagem", async () => {
+    replies = [{ status: 503, body: { error: "Falta correr o db/schema.sql." } }];
+    const { result } = renderHook(() => useCachedList<{ id: string }[]>("k", "/api/k"));
+    await waitFor(() => expect(result.current.error).toBe(true));
+
+    replies = [{ status: 200, body: [{ id: "a" }], etag: 'W/"v1"' }];
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.error).toBe(false));
+    expect(result.current.errorMessage).toBe("");
+  });
 });
 
 describe("useCachedList — revalidação condicional", () => {

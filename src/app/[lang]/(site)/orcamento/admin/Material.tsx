@@ -15,6 +15,7 @@ import { Button, Card, EmptyState, Field, Segmented, Toolbar } from "./ui";
 import MaterialListas from "./MaterialListas";
 import MaterialRegras from "./MaterialRegras";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 /**
  * CATÁLOGO DE MATERIAL DE LOGÍSTICA.
@@ -146,6 +147,9 @@ function Catalogo() {
     data: items = [],
     setData: setItems,
     loading,
+    error,
+    errorMessage,
+    refresh,
   } = useCachedList<MaterialItem[]>("material", "/api/material");
   const [search, setSearch] = useState("");
   const dSearch = useDeferredValue(search);
@@ -318,40 +322,40 @@ function Catalogo() {
     ]);
   }
 
+  // O `Field` DESENHA o controlo — recebe as propriedades dele e devolve
+  // `<label for>` + `<input>`/`<select>` já ligados. Passar-lhe um `<input>`
+  // por dentro punha um filho num elemento vazio e o React abortava o ecrã
+  // inteiro (era isto que fazia o Material "não funcionar"). Ver `ui/Field`.
   const campos = (f: FormState, set: (f: FormState) => void) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      <Field label="Nome">
-        <input
-          className="bo-input"
-          value={f.name}
-          onChange={(e) => set({ ...f, name: e.target.value })}
-          placeholder="Escadote 3 degraus"
-        />
+      <Field
+        label="Nome"
+        value={f.name}
+        onChange={(e) => set({ ...f, name: e.target.value })}
+        placeholder="Escadote 3 degraus"
+      />
+      <Field
+        as="select"
+        label="Categoria"
+        value={f.category}
+        onChange={(e) => set({ ...f, category: e.target.value })}
+      >
+        {MATERIAL_CATEGORIES.map((c) => (
+          <option key={c}>{c}</option>
+        ))}
       </Field>
-      <Field label="Categoria">
-        <select
-          className="bo-input"
-          value={f.category}
-          onChange={(e) => set({ ...f, category: e.target.value })}
-        >
-          {MATERIAL_CATEGORIES.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
+      <Field
+        as="select"
+        label="Tipo"
+        value={f.kind}
+        onChange={(e) => set({ ...f, kind: e.target.value as MaterialKind })}
+      >
+        <option value="reutilizavel">Reutilizável (tem de voltar)</option>
+        <option value="consumivel">Consumível (gasta-se)</option>
       </Field>
-      <Field label="Tipo">
-        <select
-          className="bo-input"
-          value={f.kind}
-          onChange={(e) => set({ ...f, kind: e.target.value as MaterialKind })}
-        >
-          <option value="reutilizavel">Reutilizável (tem de voltar)</option>
-          <option value="consumivel">Consumível (gasta-se)</option>
-        </select>
-      </Field>
-      <Field label="Unidade">
-        <input
-          className="bo-input"
+      <div>
+        <Field
+          label="Unidade"
           list="material-units"
           value={f.unit}
           onChange={(e) => set({ ...f, unit: e.target.value })}
@@ -361,33 +365,27 @@ function Catalogo() {
             <option key={u} value={u} />
           ))}
         </datalist>
-      </Field>
-      <Field label="Stock">
-        <input
-          className="bo-input"
-          inputMode="decimal"
-          value={f.stock}
-          onChange={(e) => set({ ...f, stock: e.target.value })}
-        />
-      </Field>
-      <Field label="Mínimo (vazio = não vigiar)">
-        <input
-          className="bo-input"
-          inputMode="decimal"
-          value={f.minStock}
-          onChange={(e) => set({ ...f, minStock: e.target.value })}
-          placeholder="—"
-        />
-      </Field>
+      </div>
+      <Field
+        label="Stock"
+        inputMode="decimal"
+        value={f.stock}
+        onChange={(e) => set({ ...f, stock: e.target.value })}
+      />
+      <Field
+        label="Mínimo (vazio = não vigiar)"
+        inputMode="decimal"
+        value={f.minStock}
+        onChange={(e) => set({ ...f, minStock: e.target.value })}
+        placeholder="—"
+      />
       <div className="sm:col-span-2 lg:col-span-3">
-        <Field label="Notas">
-          <input
-            className="bo-input"
-            value={f.notes}
-            onChange={(e) => set({ ...f, notes: e.target.value })}
-            placeholder="Onde está guardado, cuidados, o que costuma faltar…"
-          />
-        </Field>
+        <Field
+          label="Notas"
+          value={f.notes}
+          onChange={(e) => set({ ...f, notes: e.target.value })}
+          placeholder="Onde está guardado, cuidados, o que costuma faltar…"
+        />
       </div>
     </div>
   );
@@ -532,7 +530,16 @@ function Catalogo() {
       )}
 
       {/* ── Lista ───────────────────────────────────────────────────────── */}
-      {loading && items.length === 0 ? (
+      {/* A falha ANTES do estado vazio: sem isto, uma leitura que rebentou
+          aparecia como "Catálogo vazio" e mandava-a carregar o que já lá
+          estava. Ver `AvisoDeFalha`. */}
+      {error && items.length === 0 ? (
+        <AvisoDeFalha
+          titulo="Não foi possível ler o material"
+          mensagem={errorMessage}
+          aoTentarDeNovo={refresh}
+        />
+      ) : loading && items.length === 0 ? (
         <p className="bo-text-muted mt-6 text-sm">A carregar…</p>
       ) : visiveis.length === 0 ? (
         <EmptyState

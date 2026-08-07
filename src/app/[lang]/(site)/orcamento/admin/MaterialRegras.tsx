@@ -7,6 +7,7 @@ import type { MaterialRule, MatchKind } from "@/lib/material-rules";
 import { useToast } from "./Toast";
 import { Button, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 /**
  * AS REGRAS — o que a proposta implica em material.
@@ -29,10 +30,13 @@ interface Listas {
 
 export default function MaterialRegras() {
   const { toast } = useToast();
-  const { data: regras = [], setData: setRegras } = useCachedList<MaterialRule[]>(
-    "material-regras",
-    "/api/material/regras",
-  );
+  const {
+    data: regras = [],
+    setData: setRegras,
+    error,
+    errorMessage,
+    refresh,
+  } = useCachedList<MaterialRule[]>("material-regras", "/api/material/regras");
   const { data: dados } = useCachedList<Listas>("material-listas", "/api/material/listas");
   const { data: catalogo = [] } = useCachedList<MaterialItem[]>("material", "/api/material");
   const listas = dados?.listas ?? [];
@@ -114,92 +118,97 @@ export default function MaterialRegras() {
       ? (listas.find((l) => l.id === r.listId)?.name ?? "(lista apagada)")
       : (catalogo.find((i) => i.id === r.itemId)?.name ?? "(item apagado)");
 
+  // A falha primeiro, e SEM o formulário: criar uma regra contra uma tabela
+  // que não existe só produzia um segundo erro, este sem explicação nenhuma.
+  if (error && regras.length === 0) {
+    return (
+      <AvisoDeFalha
+        titulo="Não foi possível ler as regras"
+        mensagem={errorMessage}
+        aoTentarDeNovo={refresh}
+      />
+    );
+  }
+
   return (
     <div>
       <div className="rounded-xl border border-foreground/12 p-4">
         <p className="mb-3 text-sm font-medium">Regra nova</p>
+        {/* O `Field` desenha o controlo a partir das propriedades. Um `<input>`
+            ou `<select>` passado por DENTRO ia parar aos filhos de um elemento
+            vazio e o React abortava o ecrã todo. Ver `ui/Field`. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Nome (para si)">
-            <input
-              className="bo-input"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Arco floral leva estrutura"
-            />
-          </Field>
-          <Field label="Quando">
-            <select
-              className="bo-input"
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value as MatchKind)}
-            >
-              {(Object.keys(TIPO_LABEL) as MatchKind[]).map((k) => (
-                <option key={k} value={k}>
-                  {TIPO_LABEL[k]}
-                </option>
-              ))}
-            </select>
+          <Field
+            label="Nome (para si)"
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            placeholder="Arco floral leva estrutura"
+          />
+          <Field
+            as="select"
+            label="Quando"
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as MatchKind)}
+          >
+            {(Object.keys(TIPO_LABEL) as MatchKind[]).map((k) => (
+              <option key={k} value={k}>
+                {TIPO_LABEL[k]}
+              </option>
+            ))}
           </Field>
           {tipo !== "sempre" && (
-            <Field label={tipo === "pax" ? "Número de convidados" : "Palavras a procurar"}>
-              <input
-                className="bo-input"
-                value={valor}
-                onChange={(e) => setValor(e.target.value)}
-                inputMode={tipo === "pax" ? "numeric" : "text"}
-                placeholder={tipo === "pax" ? "100" : "arco floral"}
-              />
-            </Field>
+            <Field
+              label={tipo === "pax" ? "Número de convidados" : "Palavras a procurar"}
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              inputMode={tipo === "pax" ? "numeric" : "text"}
+              placeholder={tipo === "pax" ? "100" : "arco floral"}
+            />
           )}
-          <Field label="Então acrescenta">
-            <select
-              className="bo-input"
-              value={acao}
-              onChange={(e) => setAcao(e.target.value as "add_list" | "add_item")}
-            >
-              <option value="add_list">Uma lista inteira</option>
-              <option value="add_item">Um item</option>
-            </select>
+          <Field
+            as="select"
+            label="Então acrescenta"
+            value={acao}
+            onChange={(e) => setAcao(e.target.value as "add_list" | "add_item")}
+          >
+            <option value="add_list">Uma lista inteira</option>
+            <option value="add_item">Um item</option>
           </Field>
           {acao === "add_list" ? (
-            <Field label="Lista">
-              <select
-                className="bo-input"
-                value={listaId}
-                onChange={(e) => setListaId(e.target.value)}
-              >
-                <option value="">Escolher…</option>
-                {listas.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
+            <Field
+              as="select"
+              label="Lista"
+              value={listaId}
+              onChange={(e) => setListaId(e.target.value)}
+            >
+              <option value="">Escolher…</option>
+              {listas.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
             </Field>
           ) : (
             <>
-              <Field label="Item">
-                <select
-                  className="bo-input"
-                  value={itemId}
-                  onChange={(e) => setItemId(e.target.value)}
-                >
-                  <option value="">Escolher…</option>
-                  {catalogo.map((i) => (
-                    <option key={i.id} value={i.id}>
-                      {i.name}
-                    </option>
-                  ))}
-                </select>
+              <Field
+                as="select"
+                label="Item"
+                value={itemId}
+                onChange={(e) => setItemId(e.target.value)}
+              >
+                <option value="">Escolher…</option>
+                {catalogo.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
               </Field>
-              <Field label="Quantos">
-                <input
-                  className="bo-input"
-                  inputMode="decimal"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                />
-              </Field>
+              <Field
+                label="Quantos"
+                inputMode="decimal"
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+              />
             </>
           )}
         </div>

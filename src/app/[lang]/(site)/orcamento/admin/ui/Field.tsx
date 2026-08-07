@@ -117,7 +117,7 @@ export function Field(props: FieldProps) {
     className,
   );
 
-  const shared = {
+  const shared: Record<string, unknown> & { id: string } = {
     id,
     required,
     "aria-describedby": describedBy,
@@ -125,6 +125,27 @@ export function Field(props: FieldProps) {
     className: controlClass,
     ...control,
   };
+
+  // ── Rede de segurança: filhos num `<input>` ──────────────────────────────
+  // Este componente DESENHA o controlo. Quem escreve
+  // `<Field label="Nome"><input /></Field>` — que compila, porque as
+  // propriedades nativas são reencaminhadas — põe um filho dentro de um
+  // elemento vazio, e aí o React não avisa: ABORTA a árvore inteira. Um ecrã
+  // do back office ficava em branco por causa de um campo mal escrito (foi o
+  // que aconteceu aos três separadores do Material).
+  //
+  // Aqui deitam-se os filhos fora para o resto do ecrã sobreviver. O
+  // `Field.contrato.test.ts` é que impede o erro de chegar ao main; isto é só
+  // para o estrago nunca ser "a página toda".
+  if (as !== "select" && as !== "textarea" && shared.children != null) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error(
+        "<Field> desenha o próprio controlo: passe as propriedades ao Field " +
+          '(e use as="select" quando quiser <option>s). Os filhos foram ignorados.',
+      );
+    }
+    delete shared.children;
+  }
 
   return (
     <div className={cn("flex flex-col gap-1.5", containerClassName)}>
