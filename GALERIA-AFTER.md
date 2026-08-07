@@ -221,6 +221,52 @@ O lightbox pré-carregava só o vizinho seguinte. Agora pré-carrega os dois —
 `←` era o gesto que doía, porque quem volta atrás está a voltar a uma fotografia
 de que gostou.
 
+### Pilar 6 — o lightbox abre a partir da cache
+
+Abria directamente a fotografia em resolução inteira. É o pedido certo — mas é
+um pedido, e a 4G lento o que se vê nesse intervalo é preto. Agora desenha-se
+primeiro a miniatura que a grelha já descarregou, e a versão grande entra por
+cima quando chega.
+
+**Verificado contra o build**, que era onde estava o risco (se o `sizes` da
+pré-visualização não escolhesse o candidato já em cache, isto passava a ser um
+segundo download no pior momento):
+
+| | telemóvel | secretária |
+|---|---|---|
+| Fotografia visível depois de abrir | **0 ms** | **1 ms** |
+| Pedidos causados pela pré-visualização | **0** | **0** |
+
+Zero milissegundos é a prova de que acertou na cache: nada se descarrega em
+zero.
+
+**Dois itens do Pilar 6 que não fiz, de propósito:**
+
+- **Os filtros por categoria.** O código diz `Category filter bar removed on
+  request` — foi um pedido dela. Não desfaço uma decisão sua para cumprir uma
+  alínea de uma lista. Se os quiser de volta, repõem-se.
+- **A revelação com fade.** A actual sobe 20 px sem tocar na opacidade, e o
+  código explica porquê: um estado de repouso com `opacity: 0` deixava mosaicos
+  invisíveis quando a animação não corria. Trocar isso por "fade + 8 px" seria
+  reintroduzir um defeito documentado por causa de 12 px que ninguém vê.
+
+### Achado por tratar: a fotografia do lightbox ainda é WebP
+
+A mesma sonda mostrou o que o lightbox pede ao abrir: `<chave>-1280.webp` para
+a fotografia mostrada e para os dois vizinhos pré-carregados. Ou seja, **a
+grelha passou a AVIF mas o lightbox não** — continua a usar `next/image` com o
+carregador antigo, que só emite WebP.
+
+São ~44 KB por fotografia aberta (169,9 KB em WebP contra 125,8 em AVIF, na
+média medida a 1280 px). Para quem percorre o lightbox foto a foto, isso soma
+depressa.
+
+Não o mudei nesta ronda porque a fotografia do lightbox está embrulhada no
+`<ViewTransition>` do morph e tem a sua própria escada de re-tentativa
+(`lbRaw`); passá-la a `<picture>` obriga a refazer as duas, e não quis tocar
+nisso sem poder medir o resultado com o mesmo cuidado. **Fica identificado, com
+o número.**
+
 ### A rede que impede o regresso
 
 `e2e/galeria-desempenho.spec.ts` (`@galeria`), **bloqueante no CI**, em dois
@@ -242,8 +288,8 @@ assim que chegou a 55 MB sem ninguém dar por isso.
   não o scroll.
 - **Terceiros.** Não revi o que o Google Tag Manager custa ao carregamento desta
   página. O preload das primeiras fotografias está feito e verificado.
-- **Pilar 6.** A grelha editorial, os filtros sem recarregar e o *stagger* da
-  revelação ficaram como estavam.
+- **A fotografia do lightbox ainda é WebP** e não AVIF: ~44 KB por fotografia
+  aberta. Identificado acima, com a razão de não ter sido feito agora.
 - **Pilar 7.** Os `alt` já são únicos e localizados e as dimensões são
   explícitas; falta o `ImageObject`.
 - **Secretária a 2,14×.** Fica 7 % acima da regra. Descer ao degrau seguinte
