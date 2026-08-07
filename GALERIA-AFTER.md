@@ -166,12 +166,54 @@ React, porque um placeholder é pintura e não conteúdo.
 
 O CLS da secretária caiu de **0,079 para 0,0001**.
 
-### Pilar 4 — parcial
+### Pilar 4 — feito, e a virtualização NÃO foi feita de propósito
 
 O `will-change: transform` estava no estado de repouso de todos os mosaicos
 montados: com a antecipação a montar até seis ecrãs à frente, eram ~100 camadas
-de composição paradas ao mesmo tempo. Passou para o `.in`, que é onde a
-transição existe.
+de composição paradas ao mesmo tempo, sem nada a animar. Passou para o `.in`,
+que é onde a transição existe.
+
+**O efeito medido é grande.** Bloqueio total da thread principal numa sessão
+completa (carregamento + travessia das 427), telemóvel:
+
+| | bloqueio |
+|---|---|
+| antes desta correcção | **1449 ms** |
+| depois | **410 ms** |
+
+— uma queda de 72 %, na mesma medida e no mesmo arnês.
+
+#### Porque é que não há virtualização
+
+A missão pedia-a explicitamente ("virtualização se a galeria tiver mais de ~80
+imagens"). **Não a fiz, e a razão é uma medição, não uma preferência.**
+
+Antes de arrancar mosaicos do DOM, perguntei se o número deles custa alguma
+coisa. Percorri a galeria em seis blocos de oito ecrãs, medindo o bloqueio da
+thread principal dentro de cada bloco e os mosaicos montados no início e no fim:
+
+| bloco | mosaicos | bloqueio no bloco | duração |
+|---|---|---|---|
+| 1 | 16 → 40 | **0 ms** | 2,9 s |
+| 2 | 40 → 40 | **0 ms** | 2,8 s |
+| 3 | 40 → 40 | **0 ms** | 2,9 s |
+| 4 | 64 → 64 | **0 ms** | 3,0 s |
+| 5 | 64 → 64 | **0 ms** | 2,9 s |
+| 6 | 64 → 88 | 27 ms | 2,9 s |
+
+O bloqueio não cresce com os mosaicos montados — é praticamente zero em todo o
+percurso. O que se sente ao percorrer a galeria deixou de ser a thread
+principal; é a fotografia a chegar pela rede.
+
+Virtualizar custaria caro em coisas que funcionam: a navegação por teclado
+percorre as 427 fotografias e depende de as células existirem no DOM
+(`querySelector('[data-tile-idx="N"]')`), e o restauro da posição de scroll —
+que já foi medido, corrigido e documentado ao pormenor — repõe `{y, shown}` a
+contar com os mosaicos montados. Trocar isso por um ganho que a medição diz ser
+zero seria arriscar duas funcionalidades por nada.
+
+**Se algum dia o bloqueio por bloco deixar de ser zero, a decisão muda.** A
+sonda que produziu esta tabela demora dois minutos a correr.
 
 ### Pilar 6 — parcial
 
@@ -194,12 +236,12 @@ assim que chegou a 55 MB sem ninguém dar por isso.
 
 ## 7. O que fica por fazer, dito por escrito
 
-- **Pilar 4 a sério.** Não há virtualização: os 432 mosaicos ficam montados. O
-  TBT de carregamento (410 / 674 ms) está acima do alvo de 150 ms e a
-  distribuição de frames não tem um "antes" comparável.
-- **Pilar 5.** Não foi feito: sem preload das 2 a 4 primeiras fotografias no
-  `<head>`, sem revisão dos terceiros. (O `Cache-Control: immutable` de um ano e
-  o `/_img` no CDN já lá estavam.)
+- **O TBT de carregamento** (410 / 674 ms) continua acima do alvo de 150 ms, e a
+  distribuição de frames não tem um "antes" comparável. A virtualização foi
+  descartada com medição (ver Pilar 4); o que resta do bloqueio é a hidratação,
+  não o scroll.
+- **Terceiros.** Não revi o que o Google Tag Manager custa ao carregamento desta
+  página. O preload das primeiras fotografias está feito e verificado.
 - **Pilar 6.** A grelha editorial, os filtros sem recarregar e o *stagger* da
   revelação ficaram como estavam.
 - **Pilar 7.** Os `alt` já são únicos e localizados e as dimensões são
