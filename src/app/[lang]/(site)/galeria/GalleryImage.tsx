@@ -76,6 +76,13 @@ export type GalleryImageProps = {
   /** Texto mostrado se, esgotadas as tentativas, a foto continuar sem vir. */
   unavailableLabel: string;
   onLoaded?: () => void;
+  /**
+   * Chamado com o `<img>` assim que ele existe. É por aqui que o blur tardio
+   * entra: um placeholder é pintura, não conteúdo, por isso é aplicado
+   * directamente no elemento em vez de obrigar a galeria a voltar a desenhar
+   * centenas de mosaicos no meio do scroll. Ver `useBlurTardio`.
+   */
+  registarImg?: (el: HTMLImageElement | null) => void;
 };
 
 export default function GalleryImage({
@@ -89,6 +96,7 @@ export default function GalleryImage({
   anchorRef,
   unavailableLabel,
   onLoaded,
+  registarImg,
 }: GalleryImageProps) {
   const releaseRef = useRef<(() => void) | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -350,6 +358,7 @@ export default function GalleryImage({
             />
           ))}
           <img
+            ref={registarImg}
             src={srcFinal}
             alt={alt}
             width={Math.round(propW * 100)}

@@ -13,6 +13,7 @@ import { ViewTransition } from "@/components/vt";
 import GalleryImage from "./GalleryImage";
 import { galleryImageLoader } from "./gallery-image-loader";
 import { useAntecipacao } from "./useAntecipacao";
+import { useBlurTardio } from "./useBlurTardio";
 
 /**
  * Morph thumbnail→lightbox (View Transitions API). Cada miniatura e a foto do
@@ -319,6 +320,7 @@ const Tile = memo(function Tile({
   onKeyNav,
   onTileFocus,
   registerTile,
+  registarImg,
 }: {
   photo: Photo;
   idx: number;
@@ -337,6 +339,8 @@ const Tile = memo(function Tile({
   onKeyNav: (e: React.KeyboardEvent, idx: number) => void;
   onTileFocus: (idx: number) => void;
   registerTile: (el: HTMLDivElement | null) => void;
+  /** Ver `useBlurTardio`: o placeholder é aplicado no elemento, sem render. */
+  registarImg: (el: HTMLImageElement | null, src: string) => void;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
   return (
@@ -384,6 +388,7 @@ const Tile = memo(function Tile({
           aspectRatio={photo.aspectRatio}
           priority={eager}
           anchorRef={btnRef}
+          registarImg={(el) => registarImg(el, photo.src)}
           unavailableLabel={unavailableLabel}
           blurDataURL={photo.blurDataURL}
         />
@@ -824,6 +829,13 @@ export default function GaleriaClient({
   // Quantos píxeis à frente do dedo é que os mosaicos seguintes entram no DOM.
   // Adapta-se à velocidade do scroll — ver `useAntecipacao`.
   const { margemPx: margemAntecipacao } = useAntecipacao();
+  /**
+   * O blur das 427, buscado depois da primeira pintura. Só as primeiras 48
+   * vêm no HTML (ver BLUR_WINDOW em page.tsx) — mandar todas custava ~63 KB e
+   * atrasava a PRIMEIRA fotografia em ~800 ms. As outras chegam por aqui,
+   * muito antes de alguém lá scrollar.
+   */
+  const blurTardio = useBlurTardio(true);
   useEffect(() => {
     setIoSupported(typeof window !== "undefined" && "IntersectionObserver" in window);
   }, []);
@@ -1420,6 +1432,7 @@ export default function GaleriaClient({
                       onKeyNav={onKeyNav}
                       onTileFocus={onTileFocus}
                       registerTile={registerTile}
+                      registarImg={blurTardio.registar}
                     />
                   );
                 })}
