@@ -1440,6 +1440,33 @@ body:has([data-orcamento-mode]) .eyebrow {
   contain-intrinsic-size: auto var(--cv-h, clamp(480px, 60vh, 680px));
 }
 
+/* ── Do desfocado para o nítido, nunca um corte seco ──
+   A fotografia entra por cima do seu próprio blur com um esbatimento curto.
+   250 ms é o ponto em que se lê como "assentou" e não como "apareceu": abaixo
+   de ~180 ms o olho regista um estalo, acima de ~350 ms nota-se a esperar.
+
+   `opacity` só — trabalho de compositor, nunca layout, portanto isto pode
+   correr no meio do scroll sem lhe tirar frames. E o estado de repouso é
+   `opacity: 1`, não 0: uma foto que nunca dispare o `load` (JavaScript
+   desligado, um erro) fica VISÍVEL em vez de invisível para sempre. O que a
+   classe faz é começar transparente só quando há blur por baixo de onde
+   esbater. */
+.g-foto {
+  opacity: 0;
+}
+.g-foto-pronta {
+  opacity: 1;
+  transition: opacity 0.25s var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .g-foto {
+    opacity: 1;
+  }
+  .g-foto-pronta {
+    transition: none;
+  }
+}
+
 /* Fundo neutro (moss muito escuro) por baixo de cada foto da galeria, para que
    um tile ainda sem imagem/blur nunca pisque a preto puro. */
 .g-tile {

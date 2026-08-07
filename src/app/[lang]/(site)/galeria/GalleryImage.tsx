@@ -1,9 +1,14 @@
 "use client";
 
-import Image, { type ImageLoaderProps } from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { galleryLoadQueue } from "./load-queue";
-import { galleryImageUrl } from "./gallery-image-loader";
+import {
+  CORTE_TELEMOVEL,
+  ESCADA_ECRA_GRANDE,
+  ESCADA_TELEMOVEL,
+  ficheiroDaGaleria,
+  srcsetDaGaleria,
+} from "./gallery-srcset";
 
 /**
  * A foto de um mosaico da galeria, com re-tentativa.
@@ -46,9 +51,16 @@ const NEAR_VIEWPORT = "1200px 0px";
 export type GalleryImageProps = {
   src: string;
   alt: string;
+  /**
+   * A largura da CAIXA por classe de ecrã. Continua a ser preciso (é o que diz
+   * ao browser que candidato escolher DENTRO da escada), mas já não decide o
+   * tecto: isso é do `<source media>` — ver `gallery-srcset.ts`.
+   */
   sizes: string;
-  quality: number;
   className: string;
+  /** Proporção real da foto, para o `<img>` levar `width`/`height` e a caixa
+      nunca depender de a fotografia ter chegado. */
+  aspectRatio?: string;
   blurDataURL?: string;
   /** Candidato a LCP: salta a fila e a espera pelo viewport. */
   priority?: boolean;
@@ -70,8 +82,8 @@ export default function GalleryImage({
   src,
   alt,
   sizes,
-  quality,
   className,
+  aspectRatio,
   blurDataURL,
   priority = false,
   anchorRef,
@@ -113,6 +125,12 @@ export default function GalleryImage({
    * escolha aqui é entre uma fotografia pesada e nenhuma fotografia.
    */
   const [raw, setRaw] = useState(false);
+  /**
+   * A fotografia já pintou? Serve duas coisas: tirar o blur de baixo (senão
+   * fica lá para sempre a gastar memória de composição) e correr o
+   * esbatimento de entrada — nunca um corte seco entre o desfocado e o nítido.
+   */
+  const [carregada, setCarregada] = useState(false);
 
   const releaseSlot = useCallback(() => {
     releaseRef.current?.();
@@ -166,6 +184,7 @@ export default function GalleryImage({
       attemptsRef.current = 0;
       setRaw(false);
       setExhausted(false);
+      setCarregada(false);
       setBust((b) => b + 1);
       // Re-armar SEMPRE pela fila (mesmo a foto com prioridade): já não estamos
       // no caminho do LCP, estamos a recuperar de uma falha, e nesse momento a
@@ -194,6 +213,7 @@ export default function GalleryImage({
   const handleLoad = useCallback(() => {
     releaseSlot();
     attemptsRef.current = 0;
+    setCarregada(true);
     onLoaded?.();
   }, [releaseSlot, onLoaded]);
 
@@ -274,15 +294,42 @@ export default function GalleryImage({
    * `raw` continua a ser a rede de segurança final: se até o ficheiro
    * pré-gerado faltar, serve-se o original de `/imagens/x.jpg`.
    */
-  const retryLoader = useMemo(() => {
-    // O original leva o mesmo cache-buster das re-tentativas. Sem ele, as
-    // tentativas seguintes repetiam o URL exacto que acabou de falhar e podiam
-    // apanhar a resposta falhada em cache — a escada corria toda sem nunca
-    // fazer um pedido novo. A query é ignorada pelo servidor de estáticos.
-    if (raw) return ({ src: s }: ImageLoaderProps) => (bust ? `${s}?r=${bust}` : s);
-    return ({ src: s, width }: ImageLoaderProps) =>
-      `${galleryImageUrl(s, width)}${bust ? `?r=${bust}` : ""}`;
-  }, [raw, bust]);
+  const sufixo = bust ? `?r=${bust}` : "";
+
+  /**
+   * As quatro fontes do `<picture>`, por ordem de preferência do browser.
+   *
+   * A ordem importa e é esta: **telemóvel-AVIF, telemóvel-WebP, grande-AVIF,
+   * grande-WebP**. O browser fica com a primeira `<source>` cujo `media` case
+   * E cujo `type` ele saiba ler, portanto quem não souber AVIF cai na linha
+   * seguinte — do MESMO tamanho — em vez de saltar para a escada errada.
+   *
+   * `raw` (o último recurso) não tem `<source>` nenhuma: aí o que interessa é
+   * servir o ficheiro original tal e qual, e um `<picture>` a apontar para
+   * derivadas que já se sabe que faltam só voltaria a falhar.
+   */
+  const fontes = useMemo(() => {
+    if (raw) return [];
+    return [
+      { media: CORTE_TELEMOVEL, escada: ESCADA_TELEMOVEL, tipo: "avif" as const },
+      { media: CORTE_TELEMOVEL, escada: ESCADA_TELEMOVEL, tipo: "webp" as const },
+      { media: undefined, escada: ESCADA_ECRA_GRANDE, tipo: "avif" as const },
+      { media: undefined, escada: ESCADA_ECRA_GRANDE, tipo: "webp" as const },
+    ];
+  }, [raw]);
+
+  /**
+   * O `src` do `<img>`, que é o que vale quando nenhuma `<source>` serve (um
+   * browser antigo, ou o `raw`). Fica no maior degrau da escada de ecrã grande:
+   * é o candidato mais seguro para quem não sabe interpretar `srcset`.
+   */
+  const srcFinal = raw
+    ? `${src}${sufixo}`
+    : ficheiroDaGaleria(src, ESCADA_ECRA_GRANDE[ESCADA_ECRA_GRANDE.length - 1], "webp") + sufixo;
+
+  // `width`/`height` explícitos a partir da proporção real: o browser reserva a
+  // caixa antes de a fotografia chegar, e o mosaico não pode saltar (CLS).
+  const [propW, propH] = (aspectRatio ?? "3 / 2").split("/").map((n) => parseFloat(n) || 1);
 
   // Fragmento com no máximo UM elemento montado de cada vez (a foto OU o
   // fallback): é o que o `<ViewTransition>` do mosaico-herói precisa para
@@ -290,38 +337,72 @@ export default function GalleryImage({
   return (
     <>
       {armed && (
-        <Image
-          // `key` inclui o nº da tentativa: garante um <img> NOVO por tentativa
-          // em vez de uma mudança de atributo num elemento em estado de erro.
-          key={bust}
-          src={src}
-          loader={retryLoader}
-          alt={alt}
-          fill
-          sizes={sizes}
-          quality={quality}
-          className={className}
-          /**
-           * O adiamento é do BROWSER, não nosso.
-           *
-           * Isto esteve "eager" para todos, o que fazia sentido quando o `src`
-           * só era montado depois de um IntersectionObserver decidir que o
-           * mosaico estava perto. Agora que a foto vem no HTML do servidor (para
-           * existir sem JavaScript), "eager" em todos os mosaicos mandaria os
-           * doze primeiros pedidos de uma vez — a mesma rajada que estamos a
-           * tentar evitar.
-           *
-           * `lazy` devolve essa decisão ao browser, que a toma com informação
-           * que nós não temos (velocidade da ligação, direcção do scroll) e sem
-           * esperar por hidratação nenhuma. As re-tentativas continuam a passar
-           * pela fila, que é onde o limite importa.
-           */
-          loading={priority ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : "auto"}
-          onLoad={handleLoad}
-          onError={handleError}
-          {...(blurDataURL ? ({ placeholder: "blur", blurDataURL } as const) : {})}
-        />
+        // `key` inclui o nº da tentativa: garante um <img> NOVO por tentativa
+        // em vez de uma mudança de atributo num elemento em estado de erro.
+        <picture key={bust}>
+          {fontes.map((f, i) => (
+            <source
+              key={i}
+              {...(f.media ? { media: f.media } : {})}
+              type={`image/${f.tipo}`}
+              srcSet={srcsetDaGaleria(src, f.escada, f.tipo, sufixo)}
+              sizes={sizes}
+            />
+          ))}
+          <img
+            src={srcFinal}
+            alt={alt}
+            width={Math.round(propW * 100)}
+            height={Math.round(propH * 100)}
+            // `g-foto` faz o esbatimento do blur para a fotografia (250 ms) e
+            // só existe quando há blur por baixo: sem placeholder não há de
+            // onde esbater, e um `opacity: 0` inicial deixaria o mosaico VAZIO
+            // enquanto a foto não vem — pior do que a cor média que lá está.
+            className={`absolute inset-0 h-full w-full ${blurDataURL ? "g-foto" : ""} ${
+              carregada ? "g-foto-pronta" : ""
+            } ${className}`}
+            /**
+             * O adiamento é do BROWSER, não nosso.
+             *
+             * Isto esteve "eager" para todos, o que fazia sentido quando o
+             * `src` só era montado depois de um IntersectionObserver decidir
+             * que o mosaico estava perto. Agora que a foto vem no HTML do
+             * servidor (para existir sem JavaScript), "eager" em todos os
+             * mosaicos mandaria os doze primeiros pedidos de uma vez — a mesma
+             * rajada que estamos a tentar evitar.
+             *
+             * `lazy` devolve essa decisão ao browser, que a toma com informação
+             * que nós não temos (velocidade da ligação, direcção do scroll) e
+             * sem esperar por hidratação nenhuma. Quem garante que o mosaico
+             * EXISTE a tempo de o lazy poder disparar cedo é a antecipação do
+             * GaleriaClient.
+             */
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
+            /**
+             * `async` em TODAS, incluindo a de prioridade. O que trava o scroll
+             * não é o download — é a descodificação: medida nesta galeria em
+             * 45,4 ms de mediana por fotografia num telemóvel estrangulado,
+             * quase três frames. Com `sync` (o valor por omissão para uma
+             * imagem já visível) esse custo entra na thread principal no meio
+             * do scroll; com `async` o browser pode tirá-lo de lá.
+             */
+            decoding="async"
+            style={
+              // O blur da própria foto por baixo, enquanto ela não vem. Sai
+              // sozinho quando a fotografia carrega (ver `handleLoad`).
+              blurDataURL && !carregada
+                ? {
+                    backgroundImage: `url(${blurDataURL})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }
+                : undefined
+            }
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+        </picture>
       )}
       {exhausted && (
         <span

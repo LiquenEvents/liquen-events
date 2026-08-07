@@ -379,11 +379,8 @@ const Tile = memo(function Tile({
           // bytes" que isso mostrava eram fotografias mais pequenas do que o
           // sítio onde são desenhadas, não compressão melhor.
           sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw"
-          // 65 (was 72): thumbnails, so a lean file that loads fast on the grid
-          // burst matters more than the last few % of sharpness — the full-res
-          // photo opens in the lightbox. Smaller download + faster cold encode.
-          quality={65}
           className={`object-cover ${zoomClass}`}
+          aspectRatio={photo.aspectRatio}
           priority={eager}
           anchorRef={btnRef}
           unavailableLabel={unavailableLabel}
@@ -455,12 +452,8 @@ function SatelliteTile({
             src={photo.src}
             alt={alt}
             sizes="25vw"
-            // 65 (era 75): alinhado com o resto da grelha. Medido nas mesmas 10
-            // fotos, no candidato que estes satélites usam (w=360), q75 dá 20KB
-            // contra 16KB a q65 (+25% de bytes por nada de visível numa
-            // miniatura de 359px).
-            quality={65}
             className={`object-cover ${zoomClass}`}
+            aspectRatio={photo.aspectRatio}
             anchorRef={btnRef}
             unavailableLabel={unavailableLabel}
             blurDataURL={photo.blurDataURL}
@@ -1327,8 +1320,8 @@ export default function GaleriaClient({
                     src={visible[0].src}
                     alt={altText(visible[0].src, visible[0].label)}
                     sizes="(max-width: 640px) 100vw, 50vw"
-                    quality={75}
                     className={`object-cover ${zoomClass}`}
+                    aspectRatio={visible[0].aspectRatio}
                     // The 2×2 flagship tile is the largest grid image, the LCP
                     // candidate on this route, and the lightbox morph source —
                     // eager so it resolves without a lazy delay / pop-in.

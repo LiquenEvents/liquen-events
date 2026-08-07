@@ -58,7 +58,6 @@ function renderTile(props: Partial<React.ComponentProps<typeof GalleryImage>> = 
         src="/imagens/DaniGui_Preview20.jpg"
         alt="Casamento no Alentejo: Daniela & Guilherme (foto 1 de 30)"
         sizes="33vw"
-        quality={65}
         className="object-cover"
         anchorRef={anchorRef}
         unavailableLabel="Foto indisponível"
@@ -73,6 +72,9 @@ function renderTile(props: Partial<React.ComponentProps<typeof GalleryImage>> = 
 const img = () => document.querySelector("img");
 /** O `url=` que o optimizador do Next recebe, mais os parâmetros extra. */
 const currentSrc = () => img()?.getAttribute("src") ?? "";
+/** Os `srcset` de todas as `<source>` do `<picture>`. */
+const todasAsFontes = () =>
+  [...document.querySelectorAll("source")].map((s) => s.getAttribute("srcset") ?? "");
 
 describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
   beforeEach(() => {
@@ -101,10 +103,42 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     expect(src).not.toContain("/_next/image");
     expect(src).toContain(PREGEN_PREFIX);
     expect(src).toMatch(/\.webp$/);
-    // E o srcset inteiro, não só o src: nem um único candidato pelo optimizador.
-    const srcset = img()!.getAttribute("srcset") ?? "";
-    expect(srcset).not.toContain("/_next/image");
-    expect(srcset).toContain(PREGEN_PREFIX);
+    // E TODOS os candidatos, não só o src. Já não vivem num `srcset` no <img>:
+    // vivem nas <source> do <picture>, que é o que permite dar uma escada
+    // diferente ao telemóvel e ao ecrã grande.
+    for (const s of todasAsFontes()) {
+      expect(s).not.toContain("/_next/image");
+      expect(s).toContain(PREGEN_PREFIX);
+    }
+  });
+
+  it("o AVIF vem à frente do WebP, e o WebP existe sempre", () => {
+    // A ordem É o mecanismo: o browser fica com a primeira <source> cujo
+    // `media` case e cujo `type` ele saiba ler. Se o WebP viesse primeiro,
+    // ninguém receberia AVIF; se o WebP não existisse, um browser sem AVIF
+    // ficava sem fotografia.
+    renderTile();
+    const tipos = [...document.querySelectorAll("source")].map((s) => s.getAttribute("type"));
+    expect(tipos).toEqual(["image/avif", "image/webp", "image/avif", "image/webp"]);
+  });
+
+  it("o telemóvel não recebe candidatos acima de 768 px", () => {
+    // O achado da Fase 0: servia-se 1280 px para caixas de 412 CSS px (3,11x)
+    // em 374 de 374 fotos, e isso sozinho era 55 MB por travessia. O tecto do
+    // telemóvel é o que corta -69% dos bytes sem se ver diferença — e não pode
+    // ser reintroduzido por distracção num `sizes`.
+    renderTile();
+    const doTelemovel = [...document.querySelectorAll("source")].filter((s) =>
+      (s.getAttribute("media") ?? "").includes("max-width: 639px"),
+    );
+    expect(doTelemovel).toHaveLength(2);
+    for (const s of doTelemovel) {
+      const larguras = [...(s.getAttribute("srcset") ?? "").matchAll(/ (\d+)w/g)].map((m) =>
+        Number(m[1]),
+      );
+      expect(larguras.length).toBeGreaterThan(0);
+      expect(Math.max(...larguras)).toBeLessThanOrEqual(768);
+    }
   });
 
   it("uma miniatura que falha vai JÁ ao original, sem esperar recuo nenhum", () => {
