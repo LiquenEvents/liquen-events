@@ -242,7 +242,17 @@ vi.mock("@/lib/proposal-storage", () =>
       "createProposalUploadTickets",
       "confirmProposalUploads",
     ],
-    { UPLOAD_TICKET_TTL: 300, MAX_UPLOAD_TICKETS: 40, BUCKET_FILE_SIZE_LIMIT: 12 * 1024 * 1024 },
+    {
+      UPLOAD_TICKET_TTL: 300,
+      MAX_UPLOAD_TICKETS: 40,
+      BUCKET_FILE_SIZE_LIMIT: 12 * 1024 * 1024,
+      // Os NOMES dos buckets são constantes, não comportamento — quem os
+      // importa (`lib/derivadas.ts`) só quer a string. Deixá-los de fora fazia
+      // a rota rebentar ao carregar o módulo, e o teste dizia "não devolveu
+      // 401" quando o que se passava era o mock a faltar.
+      PROPOSAL_BUCKET: "proposal-assets",
+      PROPOSAL_THUMB_BUCKET: "proposal-thumbs",
+    },
   ),
 );
 vi.mock("@/lib/supabase", () =>
@@ -417,6 +427,11 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // aberta é um sítio onde qualquer pessoa põe o que quiser no sítio onde nós
   // procuramos a verdade. Sem sessão, 401.
   { path: "./admin/imagem-falhou/route", methods: ["POST"] },
+  // Contar as miniaturas em falta lê a biblioteca INTEIRA e as pastas de todas
+  // as propostas; gerar ESCREVE no Storage. Nem uma nem outra podem ficar
+  // abertas — a primeira desenha o mapa do armazenamento a quem perguntar, a
+  // segunda gasta-o.
+  { path: "./admin/derivadas/route", methods: ["GET", "POST"] },
   // O mesmo, do lado da Meta: o relatório e o envio dos casamentos fechados
   // trazem o valor de cada negócio. O POST é o que efectivamente ENVIA
   // conversões para fora — sem sessão não pode sequer ser tentado.

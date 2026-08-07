@@ -6,6 +6,7 @@ import { custoPorKm, sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
 import { Button, Card } from "./ui";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
+import Miniaturas from "./Miniaturas";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -275,6 +276,16 @@ export default function DefinicoesProposta() {
           </Button>
         </div>
       </Card>
+
+      {/*
+        MANUTENÇÃO DAS FOTOGRAFIAS.
+
+        Aqui e não nos Temas porque não é uma acção sobre UM tema: percorre a
+        biblioteca inteira e também as pastas das propostas. E vive dentro deste
+        componente, e não no `AdminClient`, para viajar no mesmo pedaço de
+        código que já é carregado só quando esta vista abre.
+      */}
+      <Miniaturas />
     </div>
   );
 }

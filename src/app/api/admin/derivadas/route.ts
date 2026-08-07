@@ -1,0 +1,67 @@
+import { NextRequest, NextResponse } from "next/server";
+import { isAuthed } from "@/lib/admin-auth";
+import { isDatabaseConfigured } from "@/lib/supabase";
+import { contarDerivadasEmFalta, gerarLoteDeDerivadas } from "@/lib/derivadas";
+import { log } from "@/lib/logger";
+
+// `sharp` precisa do runtime de Node.
+export const runtime = "nodejs";
+// Um lote são até 25 fotografias, cada uma um download + um encode + um upload.
+// Sessenta segundos chega com folga e trava um pedido que tenha ficado preso.
+export const maxDuration = 60;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS MINIATURAS QUE FALTAM — contar (GET) e gerar aos poucos (POST)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Há `scripts/derivadas-em-falta.mjs`, que faz o mesmo no terminal. Esta rota
+ * existe porque quem precisa disto trabalha no back office e no telemóvel:
+ * pedir-lhe um terminal, um `.env.local` e uma variável de ambiente é pedir-lhe
+ * que não o faça.
+ *
+ * **O GET não escreve nada.** É de propósito que contar e gerar são verbos
+ * diferentes: ver o número tem de ser uma coisa que se faz sem medo, e um botão
+ * que conta e gera ao mesmo tempo é um botão em que se hesita.
+ */
+export async function GET(request: NextRequest) {
+  if (!isAuthed(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json({ error: "Armazenamento indisponível." }, { status: 503 });
+  }
+  try {
+    const contagem = await contarDerivadasEmFalta();
+    return NextResponse.json({ ok: true, ...contagem });
+  } catch (e) {
+    log.error("derivadas: contagem falhou", e);
+    return NextResponse.json({ error: "Não consegui contar." }, { status: 500 });
+  }
+}
+
+/**
+ * Gera UM lote e diz quantas ficaram. Quem chama repete até `restantes` dar
+ * zero.
+ *
+ * Aos poucos porque uma função serverless tem minutos e isto pode ter milhares
+ * de fotografias pela frente — um pedido que tentasse tudo era morto a meio, e
+ * morrer a meio sem dizer onde ia é o que faz ninguém voltar a tentar. Cada
+ * lote é uma paragem segura: nada é substituído, portanto retomar é só chamar
+ * outra vez.
+ */
+export async function POST(request: NextRequest) {
+  if (!isAuthed(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json({ error: "Armazenamento indisponível." }, { status: 503 });
+  }
+  try {
+    const r = await gerarLoteDeDerivadas();
+    return NextResponse.json({ ok: true, ...r });
+  } catch (e) {
+    log.error("derivadas: geração falhou", e);
+    return NextResponse.json({ error: "Não consegui gerar." }, { status: 500 });
+  }
+}
