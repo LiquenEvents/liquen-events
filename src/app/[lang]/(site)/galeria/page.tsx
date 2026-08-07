@@ -9,12 +9,19 @@ import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
 import { blurFor } from "@/lib/blur";
 import { aspectFor } from "@/lib/image-meta";
-import { BreadcrumbJsonLd } from "@/components/JsonLd";
+import { BreadcrumbJsonLd, JsonLd } from "@/components/JsonLd";
+import { SITE } from "@/lib/site";
 import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import { PHOTOS } from "./photos-data";
 import { interleaveByCollection } from "./interleave";
+import {
+  CORTE_TELEMOVEL,
+  ESCADA_ECRA_GRANDE,
+  ESCADA_TELEMOVEL,
+  srcsetDaGaleria,
+} from "./gallery-srcset";
 import TILE_COLORS from "./tile-colors.json";
 
 // Resolved server-side (from blur-map.json / image-dims.json / tile-colors.json)
@@ -61,11 +68,44 @@ const withRatio = PHOTOS.map((p) => ({
   aspectRatio: aspectFor(p.src),
   color: (TILE_COLORS as Record<string, string>)[p.src],
 }));
-const blurSrc = new Set(
-  interleaveByCollection(withRatio, ORDER_SEED)
-    .slice(0, BLUR_WINDOW)
-    .map((p) => p.src),
-);
+const ordemFinal = interleaveByCollection(withRatio, ORDER_SEED);
+const blurSrc = new Set(ordemFinal.slice(0, BLUR_WINDOW).map((p) => p.src));
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * PRELOAD DA PRIMEIRA FOTOGRAFIA — E PORQUE É QUE ELE VOLTOU A SER PRECISO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O mosaico 2×2 do topo é a maior fotografia da página e a primeira que o
+ * visitante vê. Enquanto foi desenhado por `next/image` com `priority`, o Next
+ * emitia sozinho um `<link rel="preload">` para ele.
+ *
+ * Ao trocar o `next/image` por um `<picture>` (para poder dar um tecto de
+ * resolução diferente ao telemóvel e ao ecrã grande — ver `gallery-srcset.ts`)
+ * ganhámos 69% dos bytes e PERDEMOS esse preload sem dar por isso. O
+ * `fetchpriority="high"` continua lá, mas só entra em vigor quando o
+ * analisador chega à etiqueta; o preload existe para o pedido sair com o
+ * cabeçalho, antes de o corpo ser analisado.
+ *
+ * Duas ligações e não uma: o `media` escolhe a mesma escada que a `<source>`
+ * correspondente vai escolher, e o `imagesrcset`/`imagesizes` são os MESMOS
+ * daquela `<source>`. Se divergirem, o browser descarrega um candidato no
+ * preload e outro na etiqueta — ou seja, a fotografia duas vezes. É por isso
+ * que estes valores saem das mesmas funções e não de literais copiados.
+ */
+const SIZES_HERO = "(max-width: 640px) 100vw, 50vw";
+/** As da primeira janela, para os dados estruturados (ver o uso, abaixo). */
+const fotosDestacadas = ordemFinal.slice(0, 12);
+const primeira = ordemFinal[0];
+const preloads = primeira
+  ? [
+      { media: CORTE_TELEMOVEL, escada: ESCADA_TELEMOVEL },
+      { media: `not all and ${CORTE_TELEMOVEL}`, escada: ESCADA_ECRA_GRANDE },
+    ].map((v) => ({
+      media: v.media,
+      srcSet: srcsetDaGaleria(primeira.src, v.escada, "avif"),
+    }))
+  : [];
 const galleryPhotos = withRatio.map((p) =>
   blurSrc.has(p.src) ? { ...p, blurDataURL: blurFor(p.src).blurDataURL } : p,
 );
@@ -122,6 +162,51 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
           __html: `try{if('scrollRestoration' in history)history.scrollRestoration='manual'}catch(e){}`,
         }}
       />
+      {/*
+        DADOS ESTRUTURADOS DAS FOTOGRAFIAS.
+
+        A galeria é uma página cujo CONTEÚDO são imagens, e sem isto o Google
+        vê 427 ficheiros sem saber que são um portefólio de trabalho feito. O
+        `ImageObject` dá-lhe o nome, a descrição e o autor — que é o que faz
+        uma fotografia aparecer na pesquisa de imagens com a legenda certa.
+
+        SÓ AS DA PRIMEIRA JANELA, e por uma razão de peso: 427 entradas seriam
+        ~64 KB de HTML a competir com as fotografias por largura de banda, no
+        momento exacto em que ela é mais escassa. As primeiras chegam para o
+        motor perceber o que a página é; as outras são encontradas na mesma
+        pelo `alt` de cada uma, que já é único e localizado.
+      */}
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          name: t.meta.galeriaTitle,
+          itemListElement: fotosDestacadas.map((p, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            item: {
+              "@type": "ImageObject",
+              contentUrl: `${SITE.url}${p.src}`,
+              name: t.galeria.alt[p.label],
+              creditText: SITE.name,
+              creator: { "@type": "Organization", name: SITE.name },
+            },
+          })),
+        }}
+      />
+      {/* Ver a nota junto a `preloads`: isto substitui o preload que o
+          next/image emitia e que se perdeu ao passar a <picture>. */}
+      {preloads.map((l) => (
+        <link
+          key={l.media}
+          rel="preload"
+          as="image"
+          type="image/avif"
+          media={l.media}
+          imageSrcSet={l.srcSet}
+          imageSizes={SIZES_HERO}
+        />
+      ))}
       <BreadcrumbJsonLd
         locale={locale}
         homeName={t.nav.inicio}
