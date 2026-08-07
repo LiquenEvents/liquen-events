@@ -18,6 +18,8 @@ import {
 } from "@/lib/proposal-doc";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel } from "@/lib/orcamento/data";
+import { urlAindaBom } from "./assinatura";
+import { relatarFalhaDeImagem } from "./relatar-falha";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import Versoes from "./Versoes";
@@ -249,7 +251,6 @@ function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
   }
   return next;
 }
-
 
 /**
  * Quantos passos atrás o Cmd+Z consegue ir.
@@ -665,15 +666,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           const next = { ...prev };
           // A miniatura ganha ao original: é este o caminho que corre quando se
           // REABRE uma proposta, que é onde a grelha mais pesa.
+          //
+          // E o guardado só ganha ao fresco ENQUANTO SERVIR. Antes era um
+          // `!next[im.path]` seco, que deitava fora a assinatura fresca mesmo
+          // quando a guardada já estava morta — as fotos de tema assinam a 6
+          // horas, e um rascunho aberto de um dia para o outro voltava com a
+          // grelha inteira a pedir URLs que o Supabase recusa. Ver
+          // `assinatura.ts` para porque é que não bastava substituir sempre.
           for (const im of imgs)
-            if (im.path && im.url && !next[im.path]) next[im.path] = im.thumbUrl || im.url;
+            if (im.path && im.url)
+              next[im.path] = urlAindaBom(next[im.path], im.thumbUrl || im.url);
           return next;
         });
         // O original fica guardado à parte, para a célula ter para onde cair
         // quando a miniatura não existir.
         setAssetOriginais((prev) => {
           const next = { ...prev };
-          for (const im of imgs) if (im.path && im.url) next[im.path] = im.url;
+          for (const im of imgs)
+            if (im.path && im.url) next[im.path] = urlAindaBom(next[im.path], im.url);
           return next;
         });
       } catch {
@@ -789,7 +799,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     flushDraft.current = save;
     const t = setTimeout(save, 800);
     return () => clearTimeout(t);
-  }, [doc, assetUrls, assetOriginais, themeOrigins, refEdited, DRAFT_KEY, SIDE_KEY, quote.id, toast]);
+  }, [
+    doc,
+    assetUrls,
+    assetOriginais,
+    themeOrigins,
+    refEdited,
+    DRAFT_KEY,
+    SIDE_KEY,
+    quote.id,
+    toast,
+  ]);
 
   /** Ctrl/Cmd+Enter nos Serviços — grava agora e diz que gravou. */
   const saveNow = useCallback(() => {
@@ -2136,6 +2156,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         onRemove={() => removeCoverAt(idx)}
                         className="aspect-[4/3]"
                         pendente={isPendingImage(path)}
+                        onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
+                        refDoc={path}
                       />
                     ) : (
                       <>
@@ -2251,6 +2273,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           key={ii}
                           url={assetUrls[path]}
                           planoB={assetOriginais[path]}
+                          onde="mood-board"
+                          refDoc={path}
                           onRemove={() => removeBoardImage(bi, path)}
                           className="aspect-square"
                           foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
@@ -3519,8 +3543,27 @@ export function useFotoComPlanoB(url?: string, planoB?: string) {
     alvo: tentativa === "planoB" ? planoB : url,
     /** Esgotaram-se as tentativas. */
     desistiu: tentativa === "desistiu",
+    /**
+     * O ÚLTIMO URL que esta célula chegou a pedir — o que interessa registar e
+     * o que o «Abrir ficheiro» abre.
+     *
+     * Calculado, não guardado numa referência: a cascata só tem dois degraus, e
+     * qual foi o último sabe-se das próprias props. A primeira versão disto
+     * guardava-o num `useRef` e lia-o durante o desenho, que é precisamente o
+     * que o React não garante — e o linter apanhou-o antes de mim.
+     */
+    ultimoAlvo: planoB && planoB !== url ? planoB : url,
     aoFalhar: () =>
       setTentativa((t) => (t === "principal" && planoB && planoB !== url ? "planoB" : "desistiu")),
+    /**
+     * Voltar ao princípio, a pedido dela.
+     *
+     * «Desistiu» nunca deve querer dizer «para sempre». Uma rede que voltou, um
+     * ficheiro que já foi copiado, uma assinatura entretanto renovada — em
+     * qualquer desses casos a foto está lá e a célula é a única coisa a dizer
+     * que não. O botão custa uma linha e poupa um recarregamento da página.
+     */
+    tentarDeNovo: () => setTentativa("principal"),
   };
 }
 
@@ -3531,6 +3574,10 @@ function Thumb({
   className = "",
   foraDoPdf = false,
   pendente = false,
+  onde = "estúdio",
+  // `refDoc` e não `ref`: o React trata `ref` como prop especial, e uma string
+  // ali dentro é o padrão antigo das string refs, que ele recusa.
+  refDoc,
 }: {
   url?: string;
   /** O ORIGINAL, para quando a miniatura não existir. Ver `assetOriginais`. */
@@ -3541,9 +3588,39 @@ function Thumb({
   foraDoPdf?: boolean;
   /** A foto já ocupa este lugar mas a cópia ainda não confirmou. */
   pendente?: boolean;
+  /** Onde está esta célula, para os registos do servidor dizerem qual falhou. */
+  onde?: string;
+  /** O caminho no documento — o que se procura no Storage quando isto falha. */
+  refDoc?: string;
 }) {
-  const { alvo, desistiu: failed, aoFalhar } = useFotoComPlanoB(url, planoB);
+  const {
+    alvo,
+    desistiu: failed,
+    aoFalhar,
+    tentarDeNovo,
+    ultimoAlvo,
+  } = useFotoComPlanoB(url, planoB);
   const src = useSrcSemPiscar(alvo);
+
+  /**
+   * UMA FOTO A CAMINHO NÃO É UMA FOTO PARTIDA.
+   *
+   * Enquanto a cópia não confirma, a célula desenha a miniatura que o seletor
+   * já tinha — e essa é provisória por natureza. Dizer «não foi possível
+   * pré-visualizar» a meio disso é acusar de avaria o que ainda está a
+   * acontecer. Espera-se pelo caminho definitivo, que traz URL novo e uma
+   * oportunidade nova.
+   */
+  const semRemedio = failed && !pendente;
+
+  // O registo sai UMA vez por célula que desiste, com o caminho e o código de
+  // estado — que é o que nem ela nem eu tínhamos quando isto apareceu.
+  useEffect(() => {
+    if (semRemedio && ultimoAlvo) {
+      void relatarFalhaDeImagem({ onde, ref: refDoc, url: ultimoAlvo });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [semRemedio]);
   return (
     <div
       // `aria-busy` e não só a opacidade: quem não vê a célula esbatida tem de
@@ -3554,7 +3631,7 @@ function Thumb({
         foraDoPdf ? "border-[#8a2a22]/60 opacity-60" : "border-foreground/[0.1]"
       } ${pendente ? "opacity-45" : ""} ${className}`}
     >
-      {src && !failed ? (
+      {src && !semRemedio ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
@@ -3572,10 +3649,31 @@ function Thumb({
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center text-[9px] leading-relaxed text-foreground/40">
-          {failed ? (
+          {semRemedio ? (
             <>
-              <span className="font-medium text-foreground/55">Imagem carregada</span>
-              <span>Guardada, mas não foi possível pré-visualizar aqui.</span>
+              <span className="font-medium text-foreground/55">Imagem guardada</span>
+              {/* A frase antiga acabava aqui, e era um beco: a foto estava lá,
+                  havia coisas a fazer, e o ecrã não oferecia nenhuma. */}
+              <span>Não consegui mostrá-la neste ecrã.</span>
+              <span className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                <button
+                  type="button"
+                  onClick={tentarDeNovo}
+                  className="rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-foreground/[0.06]"
+                >
+                  Tentar novamente
+                </button>
+                {ultimoAlvo && (
+                  <a
+                    href={ultimoAlvo}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2 text-foreground/60 hover:text-foreground/80"
+                  >
+                    Abrir ficheiro
+                  </a>
+                )}
+              </span>
             </>
           ) : (
             <span className="tracking-[0.15em] uppercase text-foreground/30">Imagem</span>
