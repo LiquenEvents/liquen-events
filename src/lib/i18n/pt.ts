@@ -471,7 +471,7 @@ export const pt = {
     labelNoivos: "Nomes dos noivos",
     phNoivo: "Nome do noivo",
     phNoiva: "Nome da noiva",
-    hintNoivos: "Aparecem na proposta e no contrato. Pode deixar em branco e dizer-nos depois.",
+    hintNoivos: "Aparecem na proposta. Pode deixar em branco e dizer-nos depois.",
     phLocal: "Ex.: cidade ou espaço do evento…",
     phNome: "O seu nome",
     phEmail: "email@exemplo.com",

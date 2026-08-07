@@ -457,8 +457,7 @@ export const en: Dict = {
     labelNoivos: "Names of the couple",
     phNoivo: "Groom's name",
     phNoiva: "Bride's name",
-    hintNoivos:
-      "They appear on the proposal and the contract. You can leave this and tell us later.",
+    hintNoivos: "They appear on the proposal. You can leave this and tell us later.",
     phLocal: "e.g. city or venue…",
     phNome: "Your name",
     phEmail: "email@example.com",
