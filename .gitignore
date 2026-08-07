@@ -88,3 +88,8 @@ lp-export/
 
 # Pasta pronta a publicar no Instagram (imagens copiadas; ver scripts/exportar-instagram.mjs)
 instagram-export/
+
+# Vídeos do scroll da galeria (scripts/video-galeria.mjs). Sao ficheiros
+# grandes, gerados a pedido a partir de um build — nao ha razao para os
+# versionar.
+/video-galeria/
