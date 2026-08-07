@@ -22,11 +22,10 @@ DPR 3) e **secretária** (1440×900, DPR 2). O arnês é
 | FCP | 1540 ms | 1668 ms | — |
 | CLS | 0,0002 | **0,079** | 0 |
 | INP | **264 ms** | **248 ms** | < 200 ms |
-| TBT | **949 ms** | **1998 ms** | < 150 ms |
+| Bloqueio da thread principal (sessão inteira) | 949 ms | 1998 ms | *(ver nota)* |
 | Peso das imagens numa travessia completa | **55,0 MB** | **44,6 MB** | −70 % |
 | Fotos descarregadas | 369 | 427 | — |
-| Frames perdidos ao percorrer tudo | **523** de 6231 | **1362** de 2200 | 0 |
-| Pior intervalo entre frames | 99 ms | 133 ms | 16,7 ms |
+| Frames perdidos ao percorrer tudo | *(retirado — ver §2.7)* | *(retirado)* | 0 |
 
 **A queixa — "as fotos de baixo ainda estão a carregar" — sai desta subtracção:**
 
@@ -62,10 +61,15 @@ Acima. Duas notas:
   fora da grelha (a grelha tem `aspect-ratio` em cada célula e não salta); o
   valor aparece na primeira janela, com o mosaico-herói de altura fixa
   (`h-[320px] sm:h-[480px] lg:h-[600px]`) a assentar.
-- **TBT de 1998 ms na secretária** é o dobro do telemóvel apesar de a máquina
-  ser mais rápida. A razão é o número de mosaicos montados: 432 contra 381, num
-  documento com menos de metade da altura (88 764 px contra 197 194 px), ou
-  seja, muito mais React por píxel percorrido.
+- **O bloqueio da thread principal** está aqui como "949 / 1998 ms", e eu
+  chamei-lhe TBT. **Não é TBT.** A soma inclui a travessia inteira — mais de um
+  minuto a percorrer 427 fotografias — e o TBT é uma métrica do CARREGAMENTO.
+  Medido à parte, só o carregamento custa ~300 ms (284/318/322 em três
+  corridas). O arnês passou a separar os dois; o `GALERIA-AFTER.md` já traz a
+  coluna certa. O que se aguenta desta linha é a comparação relativa entre os
+  dois perfis: a secretária bloqueia o dobro do telemóvel apesar de a máquina
+  ser mais rápida, porque monta 432 mosaicos num documento com menos de metade
+  da altura.
 
 ### 2.2 Peso
 
@@ -159,17 +163,25 @@ Sonda própria: os ficheiros já servidos, descodificados outra vez com
 tempo são ~540 ms de thread principal — e é isto, mais do que o download, que
 faz o scroll tropeçar quando um lote aterra.
 
-### 2.7 Frames perdidos
+### 2.7 Frames perdidos — **este número foi retirado**
 
-| | telemóvel | secretária |
-|---|---|---|
-| Frames observados | 6231 | 2200 |
-| Perdidos | **523** | **1362** |
-| Pior intervalo | 99 ms | 133 ms |
-
-A secretária perde **62 % dos frames** ao percorrer a galeria. Não é a máquina:
-é o custo de manter 432 mosaicos montados num documento curto, com o
-`content-visibility` a salvar a pintura mas não a reconciliação do React.
+> **CORRECÇÃO.** Aqui estava escrito "523 frames perdidos no telemóvel, 1362 na
+> secretária". **Ignore esses dois números: eram meus e estavam errados.**
+>
+> Vinham dos intervalos de `requestAnimationFrame` num Chromium headless, que
+> não tem pipeline de ecrã. Na mesma corrida, na mesma máquina, o arnês contou
+> 2200 frames em 25 s num perfil e 6231 em 55 s no outro — taxas base
+> diferentes. Contar "frames perdidos" a partir disso é dar precisão a um
+> número que não a tem, e a conclusão que eu tinha tirado ("a secretária perde
+> 62 % dos frames") não se aguenta.
+>
+> O arnês passou a guardar a DISTRIBUIÇÃO dos intervalos (percentagem acima de
+> 32 ms, mediana, p95, p99, cauda), que é comparável entre corridas do mesmo
+> arnês — e não serve para afirmar quantos frames um telemóvel real perde. Os
+> valores do depois estão em `GALERIA-AFTER.md` §4, com a mesma ressalva.
+>
+> **A fluidez do scroll fica, portanto, por medir.** É a única secção deste
+> relatório sem número de confiança.
 
 ### 2.8 Placeholders
 
@@ -205,8 +217,9 @@ atrasava a primeira fotografia de 3,4 s para 4,2 s.
    antes, e pedir a imagem por observador próprio com margem adaptada à
    velocidade do scroll — não pelo `lazy` nativo, que na secretária chega tarde
    em 35 fotos.
-4. **Deixar de reconciliar 432 mosaicos** (Pilar 4). É a causa dos 1362 frames
-   perdidos e dos 1998 ms de TBT.
+4. **Deixar de reconciliar 432 mosaicos** (Pilar 4). O número de frames que eu
+   tinha aqui não era de confiar (§2.7); o que se aguenta é o bloqueio da
+   thread principal e o número de mosaicos montados.
 5. **Blur para as 427** (Pilar 3), mas por um caminho que não custe 63 KB de
    HTML.
 6. **CLS 0,079 na secretária** (Pilar 3): encontrar o que assenta na primeira
