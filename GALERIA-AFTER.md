@@ -250,22 +250,34 @@ zero.
   invisíveis quando a animação não corria. Trocar isso por "fade + 8 px" seria
   reintroduzir um defeito documentado por causa de 12 px que ninguém vê.
 
-### Achado por tratar: a fotografia do lightbox ainda é WebP
+### O lightbox também passou a AVIF
 
-A mesma sonda mostrou o que o lightbox pede ao abrir: `<chave>-1280.webp` para
-a fotografia mostrada e para os dois vizinhos pré-carregados. Ou seja, **a
-grelha passou a AVIF mas o lightbox não** — continua a usar `next/image` com o
-carregador antigo, que só emite WebP.
+A mesma sonda que verificou a abertura mostrou que o lightbox pedia
+`<chave>-1280.webp` para a fotografia mostrada **e** para os dois vizinhos
+pré-carregados: a grelha tinha passado a AVIF e ele ficara para trás. São
+~44 KB por fotografia aberta (169,9 KB contra 125,8 a 1280 px), pagos em cada
+uma por quem percorre o portefólio foto a foto.
 
-São ~44 KB por fotografia aberta (169,9 KB em WebP contra 125,8 em AVIF, na
-média medida a 1280 px). Para quem percorre o lightbox foto a foto, isso soma
-depressa.
+Não virou `<picture>` como a grelha: esta fotografia está embrulhada no
+`<ViewTransition>` do morph e tem de continuar a ser UM elemento com um nome
+só. Em vez disso ganhou um degrau na escada de recuo que já existia —
+**avif → webp → ficheiro original**.
 
-Não o mudei nesta ronda porque a fotografia do lightbox está embrulhada no
-`<ViewTransition>` do morph e tem a sua própria escada de re-tentativa
-(`lbRaw`); passá-la a `<picture>` obriga a refazer as duas, e não quis tocar
-nisso sem poder medir o resultado com o mesmo cuidado. **Fica identificado, com
-o número.**
+**Verificado contra o build:**
+
+| | telemóvel | secretária |
+|---|---|---|
+| Candidatos grandes pedidos | 4 | 7 |
+| Em AVIF | **4** | **7** |
+| Em WebP | **0** | **0** |
+| Abrir, navegar com ←/→ e fechar com Esc | ✓ | ✓ |
+
+> **Um erro da minha sonda, não do código.** A primeira corrida dizia que o
+> lightbox não fechava. Contava `[role="dialog"]` e esperava zero — mas a
+> página tem sempre um: o menu de telemóvel, que vive no DOM escondido. O
+> lightbox passa de 2 para 1 ao fechar, ou seja, fecha. Verifiquei também que o
+> menu está bem escondido (`aria-hidden="true"` e `visibility: hidden`, que
+> retira mesmo da ordem de tabulação) — não há aqui defeito nenhum.
 
 ### A rede que impede o regresso
 
@@ -288,8 +300,9 @@ assim que chegou a 55 MB sem ninguém dar por isso.
   não o scroll.
 - **Terceiros.** Não revi o que o Google Tag Manager custa ao carregamento desta
   página. O preload das primeiras fotografias está feito e verificado.
-- **A fotografia do lightbox ainda é WebP** e não AVIF: ~44 KB por fotografia
-  aberta. Identificado acima, com a razão de não ter sido feito agora.
+- **O vídeo do *antes*.** O gravador está feito e o *depois* está gravado; a
+  comparação lado a lado precisa de um build a partir do commit anterior às
+  mudanças, e isso não foi feito.
 - **Pilar 7.** Os `alt` já são únicos e localizados e as dimensões são
   explícitas; falta o `ImageObject`.
 - **Secretária a 2,14×.** Fica 7 % acima da regra. Descer ao degrau seguinte
