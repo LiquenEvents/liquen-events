@@ -12,6 +12,13 @@ import type { Dict } from "@/lib/i18n";
 import { ViewTransition } from "@/components/vt";
 import GalleryImage from "./GalleryImage";
 import { galleryImageLoader } from "./gallery-image-loader";
+import {
+  CORTE_TELEMOVEL,
+  ESCADA_ECRA_GRANDE,
+  ESCADA_TELEMOVEL,
+  ficheiroDaGaleria,
+  srcsetDaGaleria,
+} from "./gallery-srcset";
 import { useAntecipacao } from "./useAntecipacao";
 import { useBlurTardio } from "./useBlurTardio";
 
@@ -57,6 +64,12 @@ const PAGE = 24;
 // cuts that freeze; the infinite-scroll append (in a yieldable startTransition)
 // fills the rest within a frame. Same value SSR + client → no hydration mismatch.
 const INITIAL_PAGE = 12;
+/**
+ * O `sizes` que os mosaicos da grelha declaram. O lightbox reutiliza-o para a
+ * pré-visualização instantânea — ver a nota lá em baixo: é o que garante que o
+ * browser escolhe o ficheiro que já tem em cache em vez de pedir outro.
+ */
+const SIZES_DA_GRELHA = "(max-width: 639px) 100vw, (max-width: 767px) 50vw, 33vw";
 
 // ── Restauro da posição de scroll ───────────────────────────────────────────
 /**
@@ -1929,6 +1942,52 @@ function Lightbox({
           className="lb-photo-layer absolute inset-0 mx-2 md:mx-20 overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
+          {/*
+            ABRE COM A MINIATURA QUE JÁ ESTÁ EM CACHE, e só depois troca.
+
+            O que se abria era directamente a fotografia em resolução inteira,
+            com `fetchPriority="high"`. Isso é o pedido certo — mas é um pedido:
+            a 4G lento são umas centenas de milissegundos entre o toque e a
+            fotografia, e o que se vê nesse intervalo é preto.
+
+            A miniatura do mosaico em que se acabou de tocar já está no disco do
+            browser. Desenhá-la primeiro faz a abertura ser INSTANTÂNEA — a
+            fotografia está lá no mesmo frame do toque, ampliada, e a versão
+            grande entra por cima quando chega.
+
+            O `sizes` aqui é o DA GRELHA, não o do lightbox, e é de propósito:
+            é o que faz o browser escolher exactamente o candidato que já
+            descarregou. Com `90vw` escolheria outro ficheiro e isto passaria a
+            ser um segundo download em vez de um acerto na cache.
+          */}
+          {/*
+            Fica montada mesmo depois de a grande carregar. Tirá-la no `onLoad`
+            parece a limpeza óbvia e é um erro: o `onLoad` dispara quando a
+            fotografia grande está pronta, não quando ela está VISÍVEL — ela
+            entra com um esbatimento de 0,42 s (`lb-open-in`). Desmontar a
+            miniatura nesse instante deixava preto por baixo durante todo o
+            esbatimento, que é exactamente o buraco que isto veio tapar.
+          */}
+          <picture>
+            <source
+              media={CORTE_TELEMOVEL}
+              type="image/avif"
+              srcSet={srcsetDaGaleria(pool[index].src, ESCADA_TELEMOVEL, "avif")}
+              sizes={SIZES_DA_GRELHA}
+            />
+            <source
+              type="image/avif"
+              srcSet={srcsetDaGaleria(pool[index].src, ESCADA_ECRA_GRANDE, "avif")}
+              sizes={SIZES_DA_GRELHA}
+            />
+            <img
+              src={ficheiroDaGaleria(pool[index].src, 768, "webp")}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full object-contain"
+              decoding="async"
+            />
+          </picture>
           <VTWrap key={index} name={vtId(pool[index].src)} exit="vt-lb">
             <Image
               key={`${index}${lbRaw ? "-raw" : ""}`}
