@@ -92,7 +92,22 @@ describe("gallery-image-loader: a grelha não depende do optimizador", () => {
       "/_img/g/DaniGui_Preview20-1024.webp",
     );
     expect(PREGEN_SCRIPT).toContain('path.join(PUBLIC, "_img", "g")');
-    expect(PREGEN_SCRIPT).toContain("`${key}-${w}.webp`");
+    // O nome do ficheiro passou a ter o formato como variável (`.${f.ext}`),
+    // porque a escada emite AVIF **e** WebP. O que este teste prende continua a
+    // ser o mesmo: que o padrão escrito pelo script é o padrão que o loader
+    // constrói — chave, traço, largura, ponto, extensão.
+    expect(PREGEN_SCRIPT).toContain("`${key}-${w}.${f.ext}`");
+  });
+
+  it("o script gera as duas famílias, e o WebP continua a ser uma delas", () => {
+    // O AVIF é a que vai à frente na negociação; o WebP é a rede de segurança
+    // para quem não o souber ler. Perder o WebP daqui seria deixar esses
+    // visitantes sem fotografia nenhuma — e o loader continua a apontar para
+    // `.webp` no `<img>` de recurso.
+    const bloco = PREGEN_SCRIPT.match(/const FORMATOS = \[([\s\S]*?)\];/);
+    expect(bloco, "não encontrei `const FORMATOS = [...]` no script").not.toBeNull();
+    expect(bloco![1]).toContain('ext: "webp"');
+    expect(bloco![1]).toContain('ext: "avif"');
   });
 
   it("larguras e qualidade estão em sincronia com scripts/pregen-gallery.mjs", () => {

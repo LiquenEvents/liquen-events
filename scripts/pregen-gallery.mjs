@@ -69,6 +69,39 @@ const SKIP_DIRS = new Set(["_intake"]);
 const WIDTHS = [384, 640, 768, 1024, 1280];
 const QUALITY = 65;
 
+/**
+ * ── AVIF, ao lado do WebP ──────────────────────────────────────────────────
+ *
+ * O WebP continua a existir e continua a ser o que qualquer browser recebe se
+ * não souber AVIF: é a rede de segurança, não um plano B teórico. O AVIF vai à
+ * frente na negociação do `<picture>`.
+ *
+ * PORQUÊ VALE A PENA, medido nesta pasta (16 fotos, as 5 larguras da escada):
+ *
+ *   webp q65 (o que havia)   19,4 / 44,8 / 60,6 / 101,4 / 152,3 KB
+ *   avif q52 effort 3        cerca de -30% em todas as larguras
+ *
+ * PORQUÊ QUALIDADE 52 E NÃO 65. As escalas não são comparáveis entre formatos:
+ * o q52 do AVIF cai, nesta amostra, entre o q72 e o q75 do WebP em termos
+ * perceptuais (ver scripts/comparar-qualidade.mjs, que mede SSIM contra o
+ * original). Ou seja, isto sobe a qualidade e desce os bytes ao mesmo tempo.
+ *
+ * PORQUÊ effort 3 E NÃO O 4 POR OMISSÃO. Medido nesta máquina, por ficheiro:
+ *   effort 0 → 43,1 KB · 129 ms      effort 3 → 40,0 KB ·  470 ms
+ *   effort 2 → 42,2 KB · 306 ms      effort 4 → 37,5 KB · 2575 ms
+ * O 4 custa 5,5x o tempo do 3 para poupar 6% dos bytes. Com 557 fotos x 5
+ * larguras isso é a diferença entre acrescentar ~6 minutos ao primeiro build e
+ * acrescentar ~1 hora — e o build da Vercel tem limite. Os ficheiros ficam em
+ * .next/cache, portanto este custo paga-se UMA vez por fotografia.
+ */
+const AVIF_QUALITY = 52;
+const AVIF_EFFORT = 3;
+/** As duas famílias, para os sítios que percorrem a escada toda. */
+const FORMATOS = [
+  { ext: "webp", encode: (s) => s.webp({ quality: QUALITY }) },
+  { ext: "avif", encode: (s) => s.avif({ quality: AVIF_QUALITY, effort: AVIF_EFFORT }) },
+];
+
 // sharp já é multi-thread no seu próprio pool; mais workers do que núcleos só
 // serve para manter o pool cheio enquanto uns fazem I/O.
 const CONCURRENCY = Number(process.env.PREGEN_CONCURRENCY) || Math.max(2, os.cpus().length);
@@ -149,7 +182,10 @@ try {
 /** Carimbo de uma fonte: muda se o ficheiro mudar (mtime + tamanho) ou se as
     larguras/qualidade mudarem — nesse caso toda a galeria é regenerada. */
 function stamp(st) {
-  return `${Math.round(st.mtimeMs)}:${st.size}:${WIDTHS.join(",")}:${QUALITY}`;
+  // Os parâmetros do AVIF entram no carimbo: mudar a qualidade tem de
+  // invalidar a cache, senão o build seguinte serve ficheiros da qualidade
+  // anterior e ninguém dá por isso.
+  return `${Math.round(st.mtimeMs)}:${st.size}:${WIDTHS.join(",")}:${QUALITY}:a${AVIF_QUALITY}e${AVIF_EFFORT}`;
 }
 
 const nextIndex = {};
@@ -158,6 +194,7 @@ let encoded = 0;
 let reused = 0;
 let i = 0;
 const bytesByWidth = Object.fromEntries(WIDTHS.map((w) => [w, 0]));
+const bytesAvifByWidth = Object.fromEntries(WIDTHS.map((w) => [w, 0]));
 const countByWidth = Object.fromEntries(WIDTHS.map((w) => [w, 0]));
 const failures = [];
 /** src -> cor média, escrito em tile-colors.json (ver mais abaixo). */
@@ -235,12 +272,15 @@ async function worker() {
       if (cached) color = entry.color;
       if (cached) {
         for (const w of WIDTHS) {
-          try {
-            await fs.access(path.join(CACHE_DIR, `${key}-${w}.webp`));
-          } catch {
-            cached = false;
-            break;
+          for (const f of FORMATOS) {
+            try {
+              await fs.access(path.join(CACHE_DIR, `${key}-${w}.${f.ext}`));
+            } catch {
+              cached = false;
+              break;
+            }
           }
+          if (!cached) break;
         }
       }
 
@@ -260,12 +300,28 @@ async function worker() {
         for (const w of WIDTHS) {
           // Nunca ampliar acima da fonte (igual ao next/image).
           const target = meta.width ? Math.min(w, meta.width) : w;
-          const buf = await sharp(input)
+          /**
+           * UM redimensionamento por largura, dois encodes a partir dele. O
+           * custo dominante é o decode do original (feito uma vez, acima) e o
+           * resize; repetir a cadeia inteira por formato pagava o resize duas
+           * vezes sem necessidade.
+           *
+           * `.toColourspace("srgb")` é explícito de propósito: as fotografias
+           * de casamento saem de máquinas configuradas em AdobeRGB ou
+           * ProPhoto com frequência, e um ficheiro entregue ao browser com
+           * cores nesse espaço mas sem perfil aparece dessaturado. O sharp
+           * larga os metadados (incluindo o EXIF e o perfil ICC) por omissão,
+           * portanto o perfil NÃO vai no ficheiro — o que torna obrigatório
+           * converter os píxeis antes de o largar.
+           */
+          const base = sharp(input)
             .resize(target, null, { withoutEnlargement: true })
-            .webp({ quality: QUALITY })
-            .toBuffer();
-          await fs.writeFile(path.join(CACHE_DIR, `${key}-${w}.webp`), buf);
-          smallest ??= buf;
+            .toColourspace("srgb");
+          for (const f of FORMATOS) {
+            const buf = await f.encode(base.clone()).toBuffer();
+            await fs.writeFile(path.join(CACHE_DIR, `${key}-${w}.${f.ext}`), buf);
+            if (f.ext === "webp") smallest ??= buf;
+          }
         }
         // Cor média da foto, para o mosaico nunca ser um rectângulo liso do
         // fundo da página enquanto a fotografia não chega (ver tile-colors.json
@@ -283,11 +339,19 @@ async function worker() {
     }
 
     for (const w of WIDTHS) {
-      const cacheFile = path.join(CACHE_DIR, `${key}-${w}.webp`);
-      await link(cacheFile, path.join(OUT_DIR, `${key}-${w}.webp`));
-      const s = await fs.stat(cacheFile);
-      bytesByWidth[w] += s.size;
-      countByWidth[w]++;
+      for (const f of FORMATOS) {
+        const cacheFile = path.join(CACHE_DIR, `${key}-${w}.${f.ext}`);
+        await link(cacheFile, path.join(OUT_DIR, `${key}-${w}.${f.ext}`));
+        const s = await fs.stat(cacheFile);
+        // O relatório continua a contar o WebP: é a linha comparável com todas
+        // as medições anteriores. O AVIF tem contagem própria.
+        if (f.ext === "webp") {
+          bytesByWidth[w] += s.size;
+          countByWidth[w]++;
+        } else {
+          bytesAvifByWidth[w] += s.size;
+        }
+      }
     }
     nextIndex[key] = { stamp: want, color };
     colors[src] = color;
@@ -324,16 +388,18 @@ const badKeys = new Set();
 for (const src of sources) {
   const key = galleryKey(src);
   for (const w of WIDTHS) {
-    const out = path.join(OUT_DIR, `${key}-${w}.webp`);
-    try {
-      const s = await fs.stat(out);
-      if (s.size === 0) {
-        missing.push(`${key}-${w}.webp (0 bytes)`);
+    for (const f of FORMATOS) {
+      const out = path.join(OUT_DIR, `${key}-${w}.${f.ext}`);
+      try {
+        const s = await fs.stat(out);
+        if (s.size === 0) {
+          missing.push(`${key}-${w}.${f.ext} (0 bytes)`);
+          badKeys.add(key);
+        }
+      } catch {
+        missing.push(`${key}-${w}.${f.ext}`);
         badKeys.add(key);
       }
-    } catch {
-      missing.push(`${key}-${w}.webp`);
-      badKeys.add(key);
     }
   }
 }
@@ -351,13 +417,15 @@ if (missing.length) {
    */
   for (const key of badKeys) {
     for (const w of WIDTHS) {
-      await fs.rm(path.join(CACHE_DIR, `${key}-${w}.webp`), { force: true });
-      await fs.rm(path.join(OUT_DIR, `${key}-${w}.webp`), { force: true });
+      for (const f of FORMATOS) {
+        await fs.rm(path.join(CACHE_DIR, `${key}-${w}.${f.ext}`), { force: true });
+        await fs.rm(path.join(OUT_DIR, `${key}-${w}.${f.ext}`), { force: true });
+      }
     }
   }
   console.error(
     `pregen-gallery: ${missing.length} ficheiro(s) em falta na saída, de ` +
-      `${sources.length * WIDTHS.length} esperados:`,
+      `${sources.length * WIDTHS.length * FORMATOS.length} esperados:`,
   );
   for (const m of missing.slice(0, 20)) console.error(`  - ${m}`);
   console.error(
@@ -369,7 +437,8 @@ if (missing.length) {
 // Limpeza: ficheiros de fotos que já não existem em public/imagens/, tanto na
 // saída como na cache (senão a cache cresce para sempre).
 const wanted = new Set();
-for (const key of byKey.keys()) for (const w of WIDTHS) wanted.add(`${key}-${w}.webp`);
+for (const key of byKey.keys())
+  for (const w of WIDTHS) for (const f of FORMATOS) wanted.add(`${key}-${w}.${f.ext}`);
 let pruned = 0;
 for (const dir of [OUT_DIR, CACHE_DIR]) {
   for (const name of await fs.readdir(dir)) {
