@@ -18,20 +18,27 @@
  * posição do scroll nesse instante e com a posição do mosaico no documento.
  *
  * ── O QUE ISTO MEDE, E COMO ────────────────────────────────────────────────
- *  1. LCP, FCP, CLS, INP e TBT — PerformanceObserver, com a página a ser
- *     percorrida como um visitante a percorre.
+ *  1. LCP, FCP, CLS, INP e bloqueio da thread principal — PerformanceObserver,
+ *     com a página a ser percorrida como um visitante a percorre. O bloqueio
+ *     vem SEPARADO em dois: o de CARREGAMENTO (que é o que a métrica TBT
+ *     significa, e o que se compara com o alvo) e o da TRAVESSIA (a soma de
+ *     mais de um minuto a percorrer 427 fotografias, que não se compara com
+ *     alvo nenhum). Somá-los dava "TBT 1449 ms" onde o carregamento custa
+ *     ~300 ms.
  *  2. Peso — `transferSize` por recurso, separando imagens do resto.
- *  3. Por imagem — bytes, píxeis servidos (naturalWidth), píxeis de exibição
- *     (getBoundingClientRect × DPR), formato (pelo content-type) e o RÁCIO
- *     entre servido e exibido, que é onde os bytes se desperdiçam.
+ *  3. Por imagem — bytes, píxeis servidos (lidos do NOME do ficheiro, porque o
+ *     naturalWidth vem corrigido pela densidade e mente), píxeis de exibição,
+ *     formato (pelo content-type) e o RÁCIO entre servido e exibido, que é
+ *     onde os bytes se desperdiçam.
  *  4. Eager vs lazy, e a antecipação descrita acima.
  *  5. Descodificação — sonda própria: volta a descodificar uma amostra das
  *     imagens servidas com `createImageBitmap`, na mesma thread e com o mesmo
  *     estrangulamento de CPU. Não é o que o browser gastou (isso vive no
  *     rasterizador), é o custo de descodificar aquele ficheiro naquela
  *     máquina — que é o número que decide se a descodificação trava o scroll.
- *  6. Frames perdidos — deltas de `requestAnimationFrame` durante uma
- *     travessia programática, contra o orçamento de 16,7 ms.
+ *  6. Fluidez — a DISTRIBUIÇÃO dos intervalos de `requestAnimationFrame`
+ *     durante uma travessia programática. Não "frames perdidos": ver a nota
+ *     dentro da travessia sobre porque é que esse número não existe aqui.
  *  7. Placeholders — quantos mosaicos têm blur, quantos só têm cor, quantos
  *     não têm nada.
  *
@@ -427,11 +434,33 @@ async function medirPerfil(browser, perfil, url) {
     await page.waitForTimeout(600);
   }
 
+  /**
+   * O instante em que a travessia começa. Serve para separar duas coisas que
+   * eu estava a somar numa só e a chamar TBT:
+   *
+   *   • o BLOQUEIO DE CARREGAMENTO — o que trava a página antes de ela estar
+   *     utilizável. É o que a métrica TBT significa, e é o que se compara com
+   *     o alvo de 150 ms.
+   *   • o BLOQUEIO DA TRAVESSIA — o que trava a thread principal ao percorrer
+   *     as 427 fotografias. É interessante, mas é a soma de uma sessão de mais
+   *     de um minuto e não se compara com nenhum alvo de TBT.
+   *
+   * Somar os dois dava "TBT 1449 ms" onde o carregamento custa ~300 ms. Uma
+   * corrida só de carregamento (sem scroll nenhum) mede 284/318/322 ms em três
+   * repetições — ou seja, o número grande era quase todo travessia.
+   */
+  const marcoTravessia = await page.evaluate(() => performance.now());
   const scroll = await page.evaluate(TRAVESSIA);
   const inv = await page.evaluate(INVENTARIO);
 
-  // TBT: o que passa dos 50 ms em cada tarefa longa, até ao fim do carregamento.
-  const tbt = inv.medida.longas.reduce((s, t) => s + Math.max(0, t.dur - 50), 0);
+  const bloqueio = (desde, ate) =>
+    Math.round(
+      inv.medida.longas
+        .filter((t) => t.inicio >= desde && t.inicio < ate)
+        .reduce((s, t) => s + Math.max(0, t.dur - 50), 0),
+    );
+  const tbt = bloqueio(0, marcoTravessia);
+  const bloqueioTravessia = bloqueio(marcoTravessia, Infinity);
 
   const alturaViewport = perfil.contexto.viewport?.height ?? 852;
   const antecip = calcularAntecipacao(inv, alturaViewport);
@@ -457,7 +486,8 @@ async function medirPerfil(browser, perfil, url) {
     fcp: Math.round(inv.medida.fcp),
     cls: +inv.medida.cls.toFixed(4),
     inp: Math.round(inv.medida.inp),
-    tbt: Math.round(tbt),
+    tbt,
+    bloqueioTravessia,
     pedidos: inv.pedidos,
     bytesTotais: inv.bytesTotais,
     bytesImagem: inv.bytesImagem,

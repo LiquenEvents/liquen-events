@@ -81,10 +81,25 @@ const QUALITY = 65;
  *   webp q65 (o que havia)   19,4 / 44,8 / 60,6 / 101,4 / 152,3 KB
  *   avif q52 effort 3        cerca de -30% em todas as larguras
  *
- * PORQUÊ QUALIDADE 52 E NÃO 65. As escalas não são comparáveis entre formatos:
- * o q52 do AVIF cai, nesta amostra, entre o q72 e o q75 do WebP em termos
- * perceptuais (ver scripts/comparar-qualidade.mjs, que mede SSIM contra o
- * original). Ou seja, isto sobe a qualidade e desce os bytes ao mesmo tempo.
+ * PORQUÊ QUALIDADE 52. As escalas não são comparáveis entre formatos, por isso
+ * a escolha foi MEDIDA e não arbitrada (scripts/comparar-qualidade.mjs, SSIM
+ * contra o original, 8 fotos a 768 e 1024 px):
+ *
+ *   webp q65 (o que havia)   SSIM 0,9312   62,9 KB
+ *   webp q72                 SSIM 0,9392   72,1 KB
+ *   webp q75                 SSIM 0,9423   76,1 KB
+ *   avif q52 (o novo)        SSIM 0,9330   50,4 KB
+ *   avif q60                 SSIM 0,9505   73,8 KB
+ *
+ * O q52 do AVIF é o mesmo ponto de qualidade do q65 do WebP que substitui
+ * (0,9330 contra 0,9312 — a diferença não se vê) por menos 20% de bytes. NÃO
+ * chega ao q75 do WebP; uma versão anterior deste comentário dizia que sim, e
+ * era falso.
+ *
+ * Se um dia se quiser mais nitidez do que bytes, o degrau é o `avif q60`: sobe
+ * o SSIM 0,018 (a maior subida da tabela) mas fica 17% MAIS pesado do que o
+ * WebP que havia — ou seja, desfaz a poupança. Fica dito, com o número ao lado,
+ * para essa ser uma decisão e não uma descoberta.
  *
  * PORQUÊ effort 3 E NÃO O 4 POR OMISSÃO. Medido nesta máquina, por ficheiro:
  *   effort 0 → 43,1 KB · 129 ms      effort 3 → 40,0 KB ·  470 ms
