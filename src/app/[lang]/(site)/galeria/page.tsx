@@ -186,7 +186,12 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
             position: i + 1,
             item: {
               "@type": "ImageObject",
-              contentUrl: `${SITE.url}${p.src}`,
+              // `encodeURI` e não interpolação crua: há fotografias com
+              // ESPAÇOS no nome ("Natalia e Jonathan-620.jpg"), e um espaço
+              // por codificar torna o URL inválido — o motor de busca não o
+              // consegue ir buscar e a entrada inteira não serve para nada.
+              // Medido no HTML gerado antes desta correcção.
+              contentUrl: encodeURI(`${SITE.url}${p.src}`),
               name: t.galeria.alt[p.label],
               creditText: SITE.name,
               creator: { "@type": "Organization", name: SITE.name },

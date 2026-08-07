@@ -158,3 +158,37 @@ test("@galeria a grelha não salta: cada foto tem caixa antes de chegar", async 
   });
   expect(semCaixa, semCaixa.join("\n")).toEqual([]);
 });
+
+test("@galeria os dados estruturados das fotografias têm URLs válidos", async ({ page }) => {
+  /**
+   * Um `contentUrl` com um espaço por codificar é um URL inválido: o motor de
+   * busca não o consegue ir buscar e a entrada inteira não serve para nada.
+   * Aconteceu — há fotografias com espaços no nome ("Natalia e Jonathan-620.jpg")
+   * e a primeira versão disto interpolava o caminho tal e qual. O JSON-LD
+   * continua a validar, o HTML continua bonito, e o efeito é zero.
+   */
+  await page.goto("/galeria");
+  const urls = await page.evaluate(() => {
+    const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')];
+    for (const s of scripts) {
+      const dados = JSON.parse(s.textContent || "{}");
+      if (dados["@type"] !== "ItemList") continue;
+      return (dados.itemListElement ?? []).map(
+        (e: { item?: { contentUrl?: string } }) => e.item?.contentUrl ?? "",
+      );
+    }
+    return [];
+  });
+
+  expect(urls.length, "não encontrei o ItemList das fotografias").toBeGreaterThan(0);
+  const invalidos = urls.filter((u: string) => {
+    if (!u) return true;
+    try {
+      // Um URL válido sobrevive à ida e volta; um com espaços crus não.
+      return new URL(u).href !== u;
+    } catch {
+      return true;
+    }
+  });
+  expect(invalidos, `contentUrl inválidos: ${invalidos.join(", ")}`).toEqual([]);
+});
