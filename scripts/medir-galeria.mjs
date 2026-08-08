@@ -198,6 +198,8 @@ const SONDA = `
    * naquela passagem. É o pior caso da queixa e conta-se separadamente.
    */
   M.desfoque = [];
+  M.desfoqueErro = "";
+  try {
   const porTile = new Map();   // elemento do mosaico -> registo
   const imgsVistas = new WeakSet();
 
@@ -292,13 +294,28 @@ const SONDA = `
   // mosaicos com o CPU 4x mais lento mudava aquilo que se está a medir.
   new MutationObserver((muts) => {
     for (const m of muts) for (const n of m.addedNodes) varrerNo(n);
-  }).observe(document.documentElement, { childList: true, subtree: true });
+    // Observa-se o DOCUMENTO, não o document.documentElement.
+    //
+    // Esta sonda é instalada ANTES de existir conteúdo, e nesse instante
+    // 'document.documentElement' ainda é null: o parser ainda não criou o
+    // <html>. Passar null ao observe() atira TypeError, e como isto tudo corre
+    // dentro de uma IIFE, o erro abortava o RESTO da sonda — foi assim que uma
+    // corrida inteira saiu com 0 mosaicos observados e sem 'primeiraPintura'.
+    // O nó 'document' existe sempre e um subtree a partir dele apanha o <html>
+    // quando ele nascer.
+  }).observe(document, { childList: true, subtree: true });
 
   const varreduraInicial = () => varrerNo(document.body);
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", varreduraInicial);
   } else varreduraInicial();
   window.addEventListener("load", varreduraInicial);
+  } catch (e) {
+    // Nunca deixar esta sonda derrubar as outras: uma falha aqui tem de sair
+    // como um campo vazio E uma mensagem, não como uma corrida silenciosamente
+    // sem métricas.
+    M.desfoqueErro = String((e && e.message) || e);
+  }
 
   M.primeiraPintura = null;
   const contar = () => {
