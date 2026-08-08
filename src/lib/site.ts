@@ -12,13 +12,18 @@ export const SITE = {
   email: "liquen.alentejo@gmail.com",
   phone: "+351919259820",
   phoneDisplay: "+351 919 259 820",
-  // Registered address. Used ONLY where an address of record is required — the
-  // schema.org PostalAddress (a LocalBusiness node needs one) and the contract
-  // letterhead. Deliberately NOT used in marketing copy, metadata or keywords:
-  // the studio works all over the country and must not read as a single-region
-  // vendor. The regional MARKETS it sells into live in src/lib/ads/polos.ts,
-  // where the Alentejo is one of thirteen — that is the national posture done
-  // properly. Service area: AREAS_SERVED below.
+  /**
+   * ── A MORADA DE REGISTO SÓ EXISTE ONDE É OBRIGATÓRIA ────────────────────
+   *
+   * Fica para o papel timbrado dos contratos, que é um documento legal e tem
+   * de dizer onde a empresa está. NÃO sai daqui para mais lado nenhum: nem
+   * para texto, nem para metadados, nem para os dados estruturados.
+   *
+   * Antes alimentava o `PostalAddress` do schema.org. Deixou de o fazer: um
+   * `addressRegion: "Alentejo"` é a mesma afirmação que se tirou do texto,
+   * escrita numa linguagem que só as máquinas leem. O que se lê é diferente;
+   * o que se diz é igual.
+   */
   city: "Évora",
   region: "Alentejo",
   country: "PT",
@@ -44,19 +49,31 @@ export const SITE = {
   ogImage: "/og-liquen.jpg",
 } as const;
 
-/** Areas served. The country leads: the studio decorates events everywhere in
- *  Portugal, and this list must not read as a home-region cluster. The cities
- *  below are illustrative of that national reach; the thirteen regional wedding
- *  markets are enumerated separately in src/lib/ads/polos.ts. */
-export const AREAS_SERVED = [
-  "Portugal",
-  "Lisboa",
-  "Porto",
-  "Setúbal",
-  "Cascais",
-  "Sintra",
-  "Comporta",
-] as const;
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A ÁREA DE SERVIÇO DEIXOU DE SER DECLARADA — e é de propósito
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Havia aqui um `AREAS_SERVED` com Portugal à cabeça e seis cidades a seguir,
+ * emitido como `areaServed` no nó da empresa e em cada serviço. Era a mesma
+ * frase que estava no ecrã — "trabalhamos em todo o Portugal" — dita ao Google
+ * em vez de à pessoa.
+ *
+ * Ela quis a geografia fora do site, e isso inclui o que não se vê: um
+ * `areaServed` continua a dizer aos motores de busca que isto é um fornecedor
+ * português, com os mesmos efeitos sobre quem o site atrai.
+ *
+ * O que se perde, dito com todas as letras: sem `areaServed`, sem `address` e
+ * sem `geo`, o nó deixa de poder ser `LocalBusiness` (o schema.org exige
+ * morada) e passa a `Organization` + `ProfessionalService`. Isso custa a
+ * elegibilidade para os resultados locais do Google — o pacote de mapas. As
+ * estrelas e o Perfil de Empresa continuam a existir e a ser ligados por
+ * `sameAs`/`hasMap`; o que se perde é o site reivindicar sozinho um sítio.
+ *
+ * As regiões que a operação de anúncios VENDE continuam em `src/lib/ads/`,
+ * onde cada uma tem a sua página e o seu público. Aí a geografia é o produto;
+ * aqui era só uma etiqueta.
+ */
 
 /** Default keyword set for the SITE-WIDE metadata. National only — no
  *  region-locked terms here: these ride on every page, and a regional term on
@@ -64,24 +81,15 @@ export const AREAS_SERVED = [
  *  keywords belong to the individual polo pages and to the Ads campaigns
  *  (src/lib/ads/), where they are matched to a specific landing page. */
 export const SITE_KEYWORDS = [
-  "decoração de casamentos Portugal",
-  "decoração de eventos Portugal",
+  "decoração de eventos",
   "coordenação de casamentos",
   "empresa de decoração de eventos",
   "decoração de eventos corporativos",
   "decoração de casamentos",
   "decoração de eventos de empresa",
-  "empresa de eventos Portugal",
+  "empresa de eventos",
   "Líquen Events",
 ] as const;
-
-/** schema.org `areaServed` array with each place correctly typed — Portugal is
- *  a Country, the rest Cities. Shared by the Organization node and per-Service
- *  JSON-LD so both declare the same nationwide service area. */
-export function areaServedSchema(): { "@type": string; name: string }[] {
-  const areaType = (name: string) => (name === "Portugal" ? "Country" : "City");
-  return AREAS_SERVED.map((name) => ({ "@type": areaType(name), name }));
-}
 
 /** Absolute URL helper for canonical/OG links. */
 export function abs(path = ""): string {

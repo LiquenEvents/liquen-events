@@ -123,7 +123,7 @@ export async function generateMetadata({
     description: t.meta.galeriaDescription,
     path: "/galeria",
     image: "/imagens/DaniGui_Preview20.jpg",
-    keywords: ["galeria de eventos", "fotografias de casamentos Portugal"],
+    keywords: ["galeria de eventos", "fotografias de casamentos"],
     ogLocale: t.meta.ogLocale,
   });
 }

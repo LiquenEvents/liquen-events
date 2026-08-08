@@ -30,7 +30,7 @@ export async function generateMetadata({
     description: t.meta.contactoDescription,
     path: "/contacto",
     image: "/imagens/DJI_20250913190635_0120_D.jpg",
-    keywords: ["contacto Líquen Events", "decoração de eventos Portugal"],
+    keywords: ["contacto Líquen Events", "decoração de eventos"],
     ogLocale: t.meta.ogLocale,
   });
 }

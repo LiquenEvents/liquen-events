@@ -30,7 +30,7 @@ export async function generateMetadata({
     description: t.meta.clientesDescription,
     path: "/clientes",
     image: "/imagens/EW1_1393.jpg",
-    keywords: ["clientes Líquen Events", "empresa de decoração de eventos Portugal"],
+    keywords: ["clientes Líquen Events", "empresa de decoração de eventos"],
     ogLocale: t.meta.ogLocale,
   });
 }

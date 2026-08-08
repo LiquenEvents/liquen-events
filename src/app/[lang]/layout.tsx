@@ -137,7 +137,7 @@ export async function generateMetadata({
           url: SITE.ogImage,
           width: 1200,
           height: 630,
-          alt: "Líquen Events, decoração de eventos em todo o Portugal",
+          alt: "Líquen Events, decoração de eventos",
         },
       ],
     },

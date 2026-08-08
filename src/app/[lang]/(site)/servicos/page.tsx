@@ -27,10 +27,10 @@ export async function generateMetadata({
     path: "/servicos",
     image: "/imagens/EW1_1330.jpg",
     keywords: [
-      "decoração de casamentos Portugal",
+      "decoração de casamentos",
       "coordenação de casamentos",
-      "eventos corporativos Portugal",
-      "decoração de eventos Portugal",
+      "eventos corporativos",
+      "decoração de eventos",
     ],
     ogLocale: t.meta.ogLocale,
   });

@@ -45,7 +45,11 @@ const GALLERY_SPANS = [
 // Highlight brand/national keywords without dangerouslySetInnerHTML: split the
 // text on the keywords and render the matches as <strong>. Safe by construction
 // (no HTML is ever injected), even if the source copy changes.
-const EMPHASIS = /(Líquen Events|Portugal)/g;
+// Só a marca. "Portugal" estava aqui porque aparecia nos parágrafos das
+// páginas de serviço e valia a pena destacá-lo; deixou de aparecer, e uma
+// alternativa morta numa expressão regular é uma armadilha para quem lá
+// mexer a seguir.
+const EMPHASIS = /(Líquen Events)/g;
 function emphasize(text: string) {
   return text.split(EMPHASIS).map((part, i) =>
     i % 2 === 1 ? (

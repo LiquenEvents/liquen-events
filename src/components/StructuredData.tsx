@@ -1,4 +1,4 @@
-import { SITE, areaServedSchema, abs } from "@/lib/site";
+import { SITE, abs } from "@/lib/site";
 import { jsonLd } from "@/lib/jsonld";
 import { getDictionary, htmlLang, type Locale } from "@/lib/i18n";
 
@@ -29,7 +29,10 @@ export default function StructuredData({ locale }: { locale: Locale }) {
       // ProfessionalService is the real schema.org LocalBusiness subtype for a
       // service studio. ("EventPlanner" isn't a schema.org type — search engines
       // ignore unknown types, losing the intended specificity.)
-      "@type": ["Organization", "LocalBusiness", "ProfessionalService"],
+      // Sem morada, sem `geo` e sem `areaServed`, isto já não pode ser um
+      // `LocalBusiness` — o schema.org exige-lhe um endereço. Ver a nota em
+      // `site.ts` para o que essa escolha custa e porque foi tomada.
+      "@type": ["Organization", "ProfessionalService"],
       "@id": orgId,
       name: SITE.name,
       legalName: SITE.legalName,
@@ -43,19 +46,6 @@ export default function StructuredData({ locale }: { locale: Locale }) {
       foundingDate: SITE.founded,
       founder: { "@type": "Person", name: "Catarina Gaspar", jobTitle: "Founder & CEO" },
       priceRange: "€€€",
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: SITE.city,
-        addressRegion: SITE.region,
-        addressCountry: SITE.country,
-      },
-      // Approximate geo of the registered address — schema.org requires a
-      // LocalBusiness to carry one. The SERVICE area is national (areaServed).
-      geo: {
-        "@type": "GeoCoordinates",
-        latitude: 38.5714,
-        longitude: -7.9135,
-      },
       hasMap: SITE.googleBusiness,
       openingHoursSpecification: [
         {
@@ -65,7 +55,6 @@ export default function StructuredData({ locale }: { locale: Locale }) {
           closes: "20:00",
         },
       ],
-      areaServed: areaServedSchema(),
       knowsLanguage: ["pt-PT", "en"],
       sameAs: [SITE.instagram, SITE.facebook, SITE.googleBusiness],
       contactPoint: {
@@ -73,7 +62,6 @@ export default function StructuredData({ locale }: { locale: Locale }) {
         telephone: SITE.phone,
         email: SITE.email,
         contactType: "customer service",
-        areaServed: "PT",
         availableLanguage: ["Portuguese", "English"],
       },
       // NB: no aggregateRating / review here. Google disallows *self-serving*
@@ -88,7 +76,7 @@ export default function StructuredData({ locale }: { locale: Locale }) {
         name: t.jsonld.hasOfferCatalogName,
         itemListElement: t.jsonld.services.map((service) => ({
           "@type": "Offer",
-          itemOffered: { "@type": "Service", name: service, areaServed: "PT" },
+          itemOffered: { "@type": "Service", name: service },
         })),
       },
     },
