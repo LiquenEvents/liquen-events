@@ -830,7 +830,10 @@ async function medirPerfil(browser, perfil, url) {
 
   await ctx.close();
 
-  const comBytes = inv.imgs.filter((i) => i.bytes > 0);
+  // `corpo` = encodedBodySize. Ver a nota nos bytes dentro do INVENTARIO:
+  // `bytes` (transferSize) vem a zero em quase tudo com a rede emulada, e
+  // filtrar por ele reduzia esta amostra de 383 fotografias para 7.
+  const comBytes = inv.imgs.filter((i) => i.corpo > 0);
   const racios = inv.imgs.filter((i) => i.racio > 0).map((i) => i.racio);
   const decodeMs = decode.filter((d) => d.ms).map((d) => d.ms);
   const antecipPx = antecip.map((a) => a.px);
@@ -857,19 +860,39 @@ async function medirPerfil(browser, perfil, url) {
     racioMediano: pct(racios, 50),
     racioP95: pct(racios, 95),
     acimaDe2x: inv.imgs.filter((i) => i.racio > 2).length,
+    kbMinPorFoto: kb(
+      pct(
+        comBytes.map((i) => i.corpo),
+        0,
+      ),
+    ),
     kbMedianoPorFoto: kb(
       pct(
-        comBytes.map((i) => i.bytes),
+        comBytes.map((i) => i.corpo),
         50,
+      ),
+    ),
+    kbP90PorFoto: kb(
+      pct(
+        comBytes.map((i) => i.corpo),
+        90,
       ),
     ),
     kbP95PorFoto: kb(
       pct(
-        comBytes.map((i) => i.bytes),
+        comBytes.map((i) => i.corpo),
         95,
       ),
     ),
-    acimaDe120kb: comBytes.filter((i) => i.bytes > 120 * 1024).length,
+    kbMaxPorFoto: kb(Math.max(0, ...comBytes.map((i) => i.corpo))),
+    bytesImagemTransfer: inv.bytesImagemTransfer,
+    imagensComTransferSize: inv.imgs.filter((i) => i.bytes > 0).length,
+    desfoqueErro: inv.desfoqueErro,
+    racioFisicoMediano: pct(
+      inv.imgs.filter((i) => i.racioFisico > 0).map((i) => i.racioFisico),
+      50,
+    ),
+    acimaDe120kb: comBytes.filter((i) => i.corpo > 120 * 1024).length,
     decodeMedianoMs: pct(decodeMs, 50),
     decodeP95Ms: pct(decodeMs, 95),
     decode,
@@ -924,8 +947,15 @@ for (const r of resultados) {
     `Rácio servido/exibido: mediana ${r.racioMediano}× · p95 ${r.racioP95}× · acima de 2×: ${r.acimaDe2x}`,
   );
   console.log(
-    `KB por foto: mediana ${r.kbMedianoPorFoto} · p95 ${r.kbP95PorFoto} · acima de 120 KB: ${r.acimaDe120kb}`,
+    `KB por foto (encodedBodySize): min ${r.kbMinPorFoto} · mediana ${r.kbMedianoPorFoto} · ` +
+      `p90 ${r.kbP90PorFoto} · p95 ${r.kbP95PorFoto} · max ${r.kbMaxPorFoto} · ` +
+      `acima de 120 KB: ${r.acimaDe120kb} de ${r.imagensComBytes}`,
   );
+  console.log(
+    `  (transferSize, inutilizavel com rede emulada: ${kb(r.bytesImagemTransfer)} KB em ` +
+      `${r.imagensComTransferSize} imagens de ${r.imagensNoDom})`,
+  );
+  console.log(`Racio contra pixeis FISICOS: mediana ${r.racioFisicoMediano}x`);
   console.log(`Descodificação: mediana ${r.decodeMedianoMs} ms · p95 ${r.decodeP95Ms} ms`);
   const d = r.desfoque;
   console.log(
