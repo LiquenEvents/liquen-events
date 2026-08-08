@@ -112,6 +112,22 @@ export function heroImageUrl(src: string, width: number): string {
   return `/_img/${heroKey(src)}-${snapHeroWidth(width)}.webp`;
 }
 
+/**
+ * O `srcset` AVIF completo de um herói, para a `<source>` do `<picture>`.
+ *
+ * Devolve `null` quando a origem não é um herói conhecido — e essa é a
+ * salvaguarda que interessa: só se anuncia AVIF para os ficheiros que o
+ * `pregen-heroes.mjs` gera de certeza. Um `<source>` que aponte para um ficheiro
+ * inexistente não cai para o `<img>`: o browser escolhe a fonte pelo `type`,
+ * não pela existência, e a rede de recuperação do `SafeImage` fica do lado de
+ * lá a olhar.
+ */
+export function heroAvifSrcSet(src: string): string | null {
+  if (!HERO_SOURCES.has(src)) return null;
+  const key = heroKey(src);
+  return HERO_WIDTHS.map((w) => `/_img/${key}-${w}.avif ${w}w`).join(", ");
+}
+
 export function heroImageLoader({ src, width }: ImageLoaderProps): string {
   if (HERO_SOURCES.has(src)) return heroImageUrl(src, width);
   /**

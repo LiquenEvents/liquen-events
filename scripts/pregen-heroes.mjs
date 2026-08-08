@@ -122,6 +122,43 @@ for (const src of HERO_SOURCES) {
       .webp({ quality: 75, effort: 6 })
       .toFile(outPath);
     written++;
+
+    /**
+     * ── E O MESMO EM AVIF ────────────────────────────────────────────────
+     *
+     * MEDIDO, e é o buraco que faltava: a grelha da galeria tem 2785 ficheiros
+     * AVIF e esta pasta tinha 192 WebP e ZERO. Os heróis ficaram de fora da
+     * conversão. E não é uma imagem qualquer — na secretária o herói É o
+     * elemento de LCP (3388 ms, 104,6 KB em WebP a 2048 px).
+     *
+     * `quality: 46`, MEDIDO — e a primeira tentativa foi a 55, que não valeu
+     * nada. Copiei a relação da galeria (AVIF q52 contra WebP q65) sem reparar
+     * que aqui a linha de base é OUTRA: os heróis são WebP q75, não q65. A
+     * q55, metade dos ficheiros saíam MAIORES do que o WebP que substituíam, e
+     * no herói que é o elemento de LCP a poupança era de 1 KB em 102.
+     *
+     * A curva, no herói de LCP (DaniGui_Preview20 a 2048 px), com PSNR contra
+     * o mesmo redimensionamento sem perdas — a mesma métrica que já decidiu o
+     * `quality: 75` do WebP aqui em cima:
+     *
+     *   WebP  q75   102 KB   38,67 dB   ← o que serve hoje
+     *   AVIF  q50    82 KB   39,20 dB   (−20 %, e MELHOR qualidade)
+     *   AVIF  q46    63 KB   38,44 dB   (−38 %, −0,23 dB)
+     *   AVIF  q42    51 KB   37,73 dB   (−50 %, −0,94 dB)
+     *
+     * Escolhido q46: −38 % dos bytes por 0,23 dB. O comentário do WebP aqui
+     * em cima recusou uma troca de 1,35 dB por −19 % — esta é seis vezes mais
+     * barata em qualidade e o dobro em bytes.
+     *
+     * `effort: 4` e não mais: a curva está medida na galeria — 3 → 4 custa
+     * 5,5x o tempo de encode para 6% de bytes. Aqui são 43 origens × 4
+     * larguras e o build já espera pelo pré-gerador da galeria.
+     */
+    await sharp(inputPath)
+      .resize(target, null, { withoutEnlargement: true })
+      .avif({ quality: 46, effort: 4 })
+      .toFile(path.join(OUT_DIR, `${key}-${w}.avif`));
+    written++;
   }
 }
 
