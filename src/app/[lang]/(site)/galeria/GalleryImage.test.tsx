@@ -303,3 +303,41 @@ describe("GalleryImage: um mosaico falhado volta a ser pedido", () => {
     expect(screen.getByText(/indispon/i)).toBeTruthy();
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O DESFOCADO NÃO PODE SER PINTADO NO ELEMENTO QUE O CSS APAGA
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O jsdom não carrega o globals.css, portanto não se pode perguntar aqui pela
+ * opacidade calculada (disso trata o teste `@galeria o desfocado que se envia é
+ * o desfocado que se vê`). O que se pode fixar, e é onde o defeito nasceu, é a
+ * RELAÇÃO: o elemento que leva a pintura não pode ser o mesmo que leva a classe
+ * `g-foto`, porque essa classe é `opacity: 0` e a opacidade apaga também o fundo
+ * do elemento. Foi assim que 16 mosaicos de 16 mandaram um desfocado que nunca
+ * ninguém viu.
+ */
+describe("GalleryImage: onde é que o desfocado é pintado", () => {
+  it("o desfocado vai no <picture>, nunca no <img> que começa transparente", () => {
+    renderTile({ blurDataURL: "data:image/webp;base64,AAAA" });
+
+    const el = document.querySelector("img")!;
+    const moldura = document.querySelector("picture")!;
+
+    expect(moldura.style.backgroundImage, "o <picture> devia levar o desfocado").toContain(
+      "data:image/webp",
+    );
+    expect(el.style.backgroundImage, "o <img> não pode levar o desfocado").toBe("");
+    // E a classe que o apagaria continua onde tem de estar: no <img>.
+    expect(el.className).toContain("g-foto");
+    expect(moldura.className).not.toContain("g-foto");
+  });
+
+  it("carregada a fotografia, o desfocado sai — não fica a ocupar memória", () => {
+    renderTile({ blurDataURL: "data:image/webp;base64,AAAA" });
+    act(() => {
+      fireEvent.load(document.querySelector("img")!);
+    });
+    expect(document.querySelector("picture")!.style.backgroundImage).toBe("");
+  });
+});

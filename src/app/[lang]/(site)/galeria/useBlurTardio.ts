@@ -68,18 +68,35 @@ export function useBlurTardio(activo: boolean): BlurTardio {
   /** Mosaicos montados que ainda estão à espera de mapa. */
   const pendentesRef = useRef(new Map<HTMLImageElement, string>());
 
+  /**
+   * ONDE é que a pintura entra. No `<picture>` que envolve o `<img>`, não no
+   * `<img>` — pela mesma razão que levou o placeholder do HTML a mudar de sítio
+   * (ver `.g-moldura` em globals.css): quando há desfocado, o `<img>` leva
+   * `g-foto`, que é `opacity: 0`, e um fundo pintado nele fica apagado com ele.
+   *
+   * Aqui não chegava a dar-se por isso, porque estas fotos (da 49.ª em diante)
+   * NÃO vêm com placeholder no HTML e portanto não levam `g-foto` — a pintura
+   * via-se por acaso. Deixar as duas no mesmo elemento é o que faz com que a
+   * próxima pessoa que mexa numa não parta a outra sem saber.
+   */
+  const molduraDe = (el: HTMLImageElement): HTMLElement =>
+    el.parentElement?.tagName === "PICTURE" ? el.parentElement : el;
+
   const aplicar = (el: HTMLImageElement, src: string, mapa: Mapa) => {
     const blur = mapa[src];
+    const alvo = molduraDe(el);
     // Já tem placeholder (veio no HTML), já carregou, ou não há blur para esta
     // foto: em qualquer dos casos não há nada a fazer.
-    if (!blur || el.style.backgroundImage || el.complete) return;
-    el.style.backgroundImage = `url(${blur})`;
-    el.style.backgroundSize = "cover";
-    el.style.backgroundPosition = "center";
+    if (!blur || alvo.style.backgroundImage || el.complete) return;
+    alvo.style.backgroundImage = `url(${blur})`;
+    // `background-size`/`position` já vêm da `.g-moldura` quando o alvo é o
+    // `<picture>`; ficam aqui para o caso de o alvo ser o próprio `<img>`.
+    alvo.style.backgroundSize = "cover";
+    alvo.style.backgroundPosition = "center";
     el.addEventListener(
       "load",
       () => {
-        el.style.backgroundImage = "";
+        alvo.style.backgroundImage = "";
       },
       { once: true },
     );

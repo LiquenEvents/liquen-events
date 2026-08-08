@@ -112,10 +112,16 @@ describe("ordem da galeria", () => {
     // galeria/page.tsx).
     const comBlur = photos.map((p) => ({ ...p, blurDataURL: "data:image/webp;base64,AAAA" }));
     render(<GaleriaClient photos={comBlur} dict={pt.galeria} orderSeed={SEED} />);
-    const imgs = [...document.querySelectorAll<HTMLImageElement>("[data-tile-idx] img")];
-    expect(imgs.length).toBeGreaterThan(0);
-    for (const img of imgs) {
-      expect(img.style.backgroundImage, img.getAttribute("src") ?? "").toContain("data:image/webp");
+    // O desfocado é pintado no `<picture>` e não no `<img>`: o `<img>` leva
+    // `g-foto`, que é `opacity: 0` até a fotografia carregar, e isso apagava
+    // também o fundo dele — o desfocado ia no HTML e não se via (ver
+    // GalleryImage.tsx). Este teste continua a perguntar o mesmo, ao elemento
+    // certo: todo o mosaico montado tem placeholder.
+    const molduras = [...document.querySelectorAll<HTMLElement>("[data-tile-idx] picture")];
+    expect(molduras.length).toBeGreaterThan(0);
+    for (const moldura of molduras) {
+      const src = moldura.querySelector("img")?.getAttribute("src") ?? "";
+      expect(moldura.style.backgroundImage, src).toContain("data:image/webp");
     }
   });
 });

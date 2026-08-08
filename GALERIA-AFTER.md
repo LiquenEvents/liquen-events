@@ -25,6 +25,7 @@ Continuação de `GALERIA-BEFORE.md`. **Mesmo arnês, mesmas condições:**
 | TBT (carregamento) | — | **410 ms** | | — | **674 ms** | |
 | Fotos pedidas já à vista | 1 de 374 | 1 de 390 | | **35 de 432** | **4 de 432** | ✓ |
 | Placeholder no 1.º ecrã | 16 de 16 | 16 de 16 | | 16 de 16 | 16 de 16 | |
+| ~~Placeholder no 1.º ecrã~~ **VISÍVEL** | 0 de 16 | **16 de 16** | | 0 de 16 | **16 de 16** | |
 | Fotos com blur disponível | 48 de 427 | **427 de 427** | | 48 | **427** | |
 
 ---
@@ -157,6 +158,26 @@ com piso de 2 ecrãs e tecto de 6. Resultado medido: as fotografias pedidas já 
 vista na secretária caíram de **35 para 4**.
 
 ### Pilar 3 — os buracos
+
+> **CORRECÇÃO, 8 de Agosto.** A linha «Placeholder no 1.º ecrã: 16 de 16» desta
+> tabela contava placeholders **no DOM**, e por isso deu certo enquanto o
+> defeito estava à vista de quem abrisse a página: o desfocado era pintado como
+> `background-image` no próprio `<img>`, e o `<img>` leva a classe `g-foto`, que
+> é `opacity: 0` até a fotografia carregar. A opacidade apaga o elemento todo, o
+> fundo dele incluído. Medido no sítio construído: **16 mosaicos com desfocado
+> no DOM, 0 a mostrá-lo**, nos dois tamanhos de ecrã.
+>
+> Ironia com consequências: as fotografias da 49.ª em diante — as que recebem o
+> desfocado tarde, por `useBlurTardio` — NÃO trazem placeholder no HTML, logo
+> não levam `g-foto`, logo o delas via-se. O desfocado funcionava em todo o lado
+> menos no primeiro ecrã, que é o único que toda a gente vê.
+>
+> Corrigido a 8 de Agosto: a pintura passou para o `<picture>` (`.g-moldura`),
+> que não tem opacidade nenhuma a apagá-la, e o `<img>` continua a esbater por
+> cima. Depois: **16 de 16 visíveis em secretária, 13 de 13 em telemóvel** (os
+> outros 3 já tinham carregado e largado o desfocado, que é o que devem fazer).
+> Guardado por `@galeria o desfocado que se envia é o desfocado que se vê`, que
+> pergunta pela opacidade calculada e não pela presença no DOM.
 
 O blur cobria 48 de 427 fotografias. Mandar as 427 no HTML custava ~63 KB e
 atrasava a primeira fotografia em ~800 ms. Agora as primeiras vão no HTML e as

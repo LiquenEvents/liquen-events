@@ -1449,6 +1449,26 @@ body:has([data-orcamento-mode]) .eyebrow {
   contain-intrinsic-size: auto var(--cv-h, clamp(480px, 60vh, 680px));
 }
 
+/* ── A moldura de cada fotografia da galeria: é ELA que leva o desfocado ──
+   MEDIDO, e é um defeito de anular-se a si próprio: o desfocado era pintado
+   como `background-image` no PRÓPRIO <img>, e o <img> leva `.g-foto`, que é
+   `opacity: 0`. A opacidade de um elemento apaga-o por inteiro — o fundo dele
+   incluído. Resultado: 16 de 16 mosaicos do primeiro ecrã tinham o desfocado no
+   DOM e 0 de 16 chegavam a mostrá-lo, nos dois tamanhos de ecrã. Os bytes eram
+   enviados, o navegador desenhava-os, e ninguém os via.
+
+   O desfocado passa para o <picture>, que é o elemento por baixo e não tem
+   opacidade nenhuma. O <img> continua a esbater de 0 para 1 por cima — o que
+   antes era um esbatimento a partir do castanho liso do mosaico é agora o que
+   sempre se quis: a fotografia a assentar sobre a sua própria sombra. */
+.g-moldura {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-size: cover;
+  background-position: center;
+}
+
 /* ── Do desfocado para o nítido, nunca um corte seco ──
    A fotografia entra por cima do seu próprio blur com um esbatimento curto.
    250 ms é o ponto em que se lê como "assentou" e não como "apareceu": abaixo

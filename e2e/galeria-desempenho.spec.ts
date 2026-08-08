@@ -124,16 +124,64 @@ test("@galeria nenhum mosaico do primeiro ecrã aparece vazio", async ({ page })
     const maus: string[] = [];
     for (const t of document.querySelectorAll("[data-tile-idx]")) {
       const el = t as HTMLElement;
-      const im = el.querySelector("img");
-      const temBlur = im ? /data:image/.test(im.style.backgroundImage || "") : false;
+      // O desfocado vive no `<picture>` (ver `.g-moldura`); o `<img>` continua
+      // aqui porque o blur tardio pode cair nele quando não há `<picture>`.
+      const pintado = [...el.querySelectorAll("picture, img")].find((n) =>
+        /data:image/.test((n as HTMLElement).style.backgroundImage || ""),
+      );
       const temCor = /rgb|#/.test(el.style.backgroundColor || "");
-      if (!temBlur && !temCor) maus.push(el.getAttribute("data-tile-idx") ?? "?");
+      if (!pintado && !temCor) maus.push(el.getAttribute("data-tile-idx") ?? "?");
     }
     return maus;
   });
   expect(vazios, `mosaicos sem placeholder nenhum: ${vazios.join(", ")}`).toEqual([]);
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * TER O DESFOCADO NÃO É MOSTRÁ-LO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O teste acima conta placeholders no DOM, e a tabela do GALERIA-AFTER também
+ * ("Placeholder no 1.º ecrã: 16 de 16"). Os dois estavam certos e os dois
+ * deixavam passar o defeito: o desfocado era pintado no `<img>`, que a classe
+ * `g-foto` põe a `opacity: 0` até a fotografia carregar. Medido no sítio
+ * construído, antes da correcção: **16 mosaicos com desfocado no DOM, 0 a
+ * mostrá-lo**, em telemóvel e em secretária.
+ *
+ * Este teste pergunta a única coisa que interessa a quem está a olhar: o
+ * elemento que leva a pintura chega a ter opacidade? Não mede beleza, mede
+ * visibilidade — e é o que faltava para o defeito não poder voltar em silêncio.
+ */
+test("@galeria o desfocado que se envia é o desfocado que se vê", async ({ page }) => {
+  await page.goto("/galeria");
+  const r = await page.evaluate(() => {
+    const invisiveis: string[] = [];
+    let comBlur = 0;
+    for (const t of document.querySelectorAll("[data-tile-idx]")) {
+      const el = t as HTMLElement;
+      const pintado = [...el.querySelectorAll("picture, img")].find((n) =>
+        /data:image/.test((n as HTMLElement).style.backgroundImage || ""),
+      ) as HTMLElement | undefined;
+      if (!pintado) continue;
+      comBlur += 1;
+      const opacidade = Number(getComputedStyle(pintado).opacity);
+      if (!(opacidade > 0.01)) {
+        invisiveis.push(`${el.getAttribute("data-tile-idx")} (${pintado.tagName}, ${opacidade})`);
+      }
+    }
+    return { comBlur, invisiveis };
+  });
+
+  expect(
+    r.comBlur,
+    "não encontrei nenhum mosaico com desfocado — o teste não testou nada",
+  ).toBeGreaterThan(0);
+  expect(
+    r.invisiveis,
+    `mosaicos com desfocado pintado num elemento invisível: ${r.invisiveis.join(", ")}`,
+  ).toEqual([]);
+});
 test("@galeria a grelha não salta: cada foto tem caixa antes de chegar", async ({ page }) => {
   await page.goto("/galeria");
   const semCaixa = await page.evaluate(() => {

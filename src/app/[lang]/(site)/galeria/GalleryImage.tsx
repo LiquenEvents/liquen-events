@@ -417,7 +417,31 @@ export default function GalleryImage({
       {armed && (
         // `key` inclui o nº da tentativa: garante um <img> NOVO por tentativa
         // em vez de uma mudança de atributo num elemento em estado de erro.
-        <picture key={bust}>
+        <picture
+          key={bust}
+          /**
+           * ══════════════════════════════════════════════════════════════════
+           * O DESFOCADO VIVE AQUI, E NÃO NO <img>
+           * ══════════════════════════════════════════════════════════════════
+           *
+           * Esteve no `<img>` — o mesmo elemento que a classe `g-foto` põe a
+           * `opacity: 0` à espera do `load`. A opacidade apaga o elemento
+           * inteiro, o fundo dele incluído, portanto o desfocado nunca foi
+           * visto: medido no sítio construído, 16 mosaicos de 16 traziam-no no
+           * HTML e 0 de 16 o mostravam, em telemóvel e em secretária.
+           *
+           * É um erro que se esconde bem, porque a página não fica feia: fica
+           * apenas com o castanho liso do mosaico onde devia estar a sombra da
+           * fotografia, que é exactamente o que a dona descreve como "estar à
+           * espera". E a tabela do GALERIA-AFTER dizia "Placeholder no 1.º ecrã
+           * 16 de 16" — que era verdade sobre o DOM e falso sobre o ecrã.
+           *
+           * Aqui em baixo não há opacidade nenhuma a apagá-lo, e o `<img>`
+           * continua a esbater por cima. Ver `.g-moldura` em globals.css.
+           */
+          className="g-moldura"
+          style={blurDataURL && !carregada ? { backgroundImage: `url(${blurDataURL})` } : undefined}
+        >
           {fontes.map((f, i) => (
             <source
               key={i}
@@ -434,9 +458,10 @@ export default function GalleryImage({
             width={Math.round(propW * 100)}
             height={Math.round(propH * 100)}
             // `g-foto` faz o esbatimento do blur para a fotografia (250 ms) e
-            // só existe quando há blur por baixo: sem placeholder não há de
-            // onde esbater, e um `opacity: 0` inicial deixaria o mosaico VAZIO
-            // enquanto a foto não vem — pior do que a cor média que lá está.
+            // só existe quando há blur por baixo — agora no `<picture>`: sem
+            // placeholder não há de onde esbater, e um `opacity: 0` inicial
+            // deixaria o mosaico VAZIO enquanto a foto não vem, o que é pior do
+            // que a cor média que lá está.
             className={`absolute inset-0 h-full w-full ${blurDataURL ? "g-foto" : ""} ${
               carregada ? "g-foto-pronta" : ""
             } ${className}`}
@@ -467,17 +492,8 @@ export default function GalleryImage({
              * do scroll; com `async` o browser pode tirá-lo de lá.
              */
             decoding="async"
-            style={
-              // O blur da própria foto por baixo, enquanto ela não vem. Sai
-              // sozinho quando a fotografia carrega (ver `handleLoad`).
-              blurDataURL && !carregada
-                ? {
-                    backgroundImage: `url(${blurDataURL})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }
-                : undefined
-            }
+            // Sem `style`: o desfocado subiu para o `<picture>`, que é onde se
+            // vê. Aqui em baixo estava debaixo da própria opacidade zero.
             onLoad={handleLoad}
             onError={handleError}
           />
