@@ -106,24 +106,24 @@ export const pt = {
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Decoração de Casamentos e Eventos em Portugal | Líquen Events",
+    homeTitle: "Decoração de Casamentos e Eventos | Líquen Events",
     homeDescription:
-      "A Líquen Events decora e coordena casamentos, eventos de empresa e celebrações privadas em todo o Portugal. Mais de 100 eventos desde 2018.",
-    sobreTitle: "Empresa de Decoração de Eventos em Portugal",
+      "A Líquen Events decora e coordena casamentos, eventos de empresa e celebrações privadas. Mais de 100 eventos desde 2018.",
+    sobreTitle: "Empresa de Decoração e Coordenação de Eventos",
     sobreDescription:
-      "Líquen Events, empresa de decoração e coordenação de eventos em todo o Portugal. Mais de 100 casamentos e celebrações decorados desde 2018.",
-    servicosTitle: "Decoração de Casamentos e Eventos em Portugal",
+      "Líquen Events, empresa de decoração e coordenação de eventos. Mais de 100 casamentos e celebrações decorados desde 2018.",
+    servicosTitle: "Decoração de Casamentos e Eventos",
     servicosDescription:
-      "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas em todo o Portugal.",
-    galeriaTitle: "Galeria de Casamentos e Eventos em Portugal",
+      "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas.",
+    galeriaTitle: "Galeria de Casamentos e Eventos",
     galeriaDescription:
-      "Galeria de fotografias de eventos decorados pela Líquen Events em todo o Portugal: casamentos, eventos corporativos, conferências e celebrações.",
+      "Galeria de fotografias de eventos decorados pela Líquen Events: casamentos, eventos corporativos, conferências e celebrações.",
     clientesTitle: "Empresas e Instituições que Confiam em Nós",
     clientesDescription:
-      "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
+      "Empresas e instituições que confiam na Líquen Events: universidades, câmaras municipais, José de Mello, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto: Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para decorar o seu evento em qualquer ponto do país. Receba uma proposta à medida para o seu evento.",
+      "Contacte a Líquen Events para decorar o seu evento, onde quer que aconteça. Receba uma proposta à medida.",
     orcamentoTitle: "Pedir Orçamento: Casamentos e Eventos",
     orcamentoDescription:
       "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas, e receba uma proposta à medida.",
@@ -141,7 +141,7 @@ export const pt = {
     ],
     servicosServiceName: "Decoração de eventos e coordenação de casamentos",
     servicosServiceDescription:
-      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e celebrações. Em todo o Portugal, de norte a sul do país.",
+      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e celebrações.",
   },
 
   home: {
@@ -173,9 +173,9 @@ export const pt = {
     manifestoEyebrow: "A nossa essência",
     manifestoTitleLine1: "Decoramos eventos.",
     manifestoTitleLine2: "Eternizamos memórias.",
-    manifestoText: "Mais de 100 eventos desde 2018, em todo o País.",
+    manifestoText: "Mais de 100 eventos desde 2018.",
     // Legenda de canto (idioma-capítulo) sobre a fotografia do manifesto.
-    manifestoImageCaption: "Portugal · de norte a sul",
+    manifestoImageCaption: "Eventos · desde 2018",
     statementLead: "Não decoramos apenas espaços.",
     statementRest: " Desenhamos experiências que ficam para sempre.",
     founderEyebrow: "As pessoas",
@@ -218,7 +218,7 @@ export const pt = {
       Corporativo: "Evento corporativo organizado pela Líquen Events",
       Conferência: "Conferência organizada pela Líquen Events",
       Aéreo: "Vista aérea de evento da Líquen Events",
-      Evento: "Evento organizado pela Líquen Events em Portugal",
+      Evento: "Evento organizado pela Líquen Events",
     },
     lbGallery: "Galeria",
     lbPhoto: "foto",
@@ -344,7 +344,7 @@ export const pt = {
       phoneLabel: "Telefone",
       phoneSub: "Ligue ou envie mensagem",
       locationLabel: "Localização",
-      locationValue: "Em todo o Portugal",
+      locationValue: "Onde o seu evento acontecer",
       locationSub: "Reuniões presenciais disponíveis",
       quoteLink: "Pedir orçamento para o seu evento",
       whatsappLink: "Falar pelo WhatsApp",
@@ -411,8 +411,8 @@ export const pt = {
         a: "Para casamentos recomendamos pelo menos 12 meses de antecedência. Para eventos corporativos, 3 a 6 meses é o ideal. Para celebrações mais simples, 4 a 8 semanas é geralmente suficiente.",
       },
       {
-        q: "Trabalham em todo o território nacional?",
-        a: "Sim. Trabalhamos em Portugal. Temos uma vasta rede de fornecedores e parceiros em diversas regiões.",
+        q: "Deslocam-se ao local do evento?",
+        a: "Sim. Deslocamo-nos ao local do seu evento. Temos uma vasta rede de fornecedores e parceiros de confiança.",
       },
       {
         q: "Podem assumir apenas parte da organização?",
@@ -525,7 +525,7 @@ export const pt = {
       "Casamentos, eventos de empresa e celebrações privadas. Desenhamos a decoração à volta do que tem em mente e do orçamento com que conta.",
     nav: ["Celebrações", "Empresas"],
     interludeEyebrow: "Líquen Events",
-    interludeTitle: "Em todo o Portugal: mais de 100 eventos desde 2018.",
+    interludeTitle: "Mais de 100 eventos desde 2018.",
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
     philoEyebrow: "A nossa assinatura",
@@ -581,9 +581,9 @@ export const pt = {
       },
     ],
     seoEyebrow: "Onde atuamos",
-    seoTitle: "De norte a sul do país",
+    seoTitle: "Vamos ter consigo",
     seoText:
-      "Casamentos, eventos corporativos e celebrações, do conceito à execução. Onde quer que seja o seu evento, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
+      "Casamentos, eventos corporativos e celebrações, do conceito à execução. Onde quer que seja o seu evento, levamos connosco a nossa equipa e a nossa rede de fornecedores.",
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Vamos dar vida",
     ctaTitleMoss: "à sua ideia?",
@@ -617,7 +617,7 @@ export const pt = {
     lead: "Vamos ler tudo com atenção, confirmar a disponibilidade da data e pensar no que faz sentido para este evento, antes de responder. O que se segue não é um preço automático, é o princípio de uma proposta feita à medida.",
     countdown: "Faltam {days} dias para a data do evento.",
     highSeasonNote:
-      "De maio a outubro as melhores quintas do país fecham agenda com muita antecedência. Vale a pena não deixar arrastar.",
+      "De maio a outubro as melhores quintas fecham agenda com muita antecedência. Vale a pena não deixar arrastar.",
     recapTitle: "O que nos contou",
     recapTitlePlural: "O que nos contaram",
     refLabel: "Referência do Pedido",
@@ -845,7 +845,6 @@ export const pt = {
       "Festas e Aniversários",
     ],
     contacto: "Contacto",
-    country: "Portugal",
     pedirOrcamento: "Pedir orçamento",
     rights: "Todos os direitos reservados",
     legal: "Legal",

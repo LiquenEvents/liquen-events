@@ -180,7 +180,6 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 >
                   {SITE.phoneDisplay}
                 </TrackedAnchor>
-                <span className="text-white/55">{t.footer.country}</span>
               </div>
             </div>
           </div>

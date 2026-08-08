@@ -89,7 +89,7 @@ export const en: Dict = {
       servicosCeremony: "Outdoor ceremony planned by Líquen Events",
       servicosEvening: "Wedding celebrated at dusk on a country estate",
       orcamentoPanel: "Celebration dinner with a set table and candlelit décor",
-      galeriaHeader: "Gallery of weddings and events decorated by Líquen Events across Portugal",
+      galeriaHeader: "Gallery of weddings and events decorated by Líquen Events",
       galeriaInstagram: "Events decorated by Líquen Events on Instagram",
       sobreCelebration: "Wedding celebration decorated by Líquen Events",
       sobreFounder: "Catarina Gaspar, Founder & CEO of Líquen Events",
@@ -106,24 +106,24 @@ export const en: Dict = {
 
   meta: {
     ogLocale: "en_GB",
-    homeTitle: "Wedding & Event Decoration in Portugal | Líquen Events",
+    homeTitle: "Wedding & Event Decoration | Líquen Events",
     homeDescription:
-      "Líquen Events decorates and coordinates weddings, company events and private celebrations across Portugal. Over 100 events since 2018.",
-    sobreTitle: "Event Decoration Company in Portugal",
+      "Líquen Events decorates and coordinates weddings, company events and private celebrations. Over 100 events since 2018.",
+    sobreTitle: "Event Decoration & Coordination Company",
     sobreDescription:
-      "Líquen Events, an event decoration and coordination company working across Portugal. Over 100 weddings and celebrations decorated since 2018.",
-    servicosTitle: "Wedding & Event Decoration in Portugal",
+      "Líquen Events, an event decoration and coordination company. Over 100 weddings and celebrations decorated since 2018.",
+    servicosTitle: "Wedding & Event Decoration",
     servicosDescription:
-      "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties right across Portugal.",
-    galeriaTitle: "Wedding & Event Gallery in Portugal",
+      "Wedding decoration and coordination, plus decoration of corporate events, gala dinners and private parties.",
+    galeriaTitle: "Wedding & Event Gallery",
     galeriaDescription:
-      "Photo gallery of events decorated by Líquen Events across Portugal: weddings, corporate events, conferences and celebrations.",
+      "Photo gallery of events decorated by Líquen Events: weddings, corporate events, conferences and celebrations.",
     clientesTitle: "Companies and Institutions That Trust Us",
     clientesDescription:
-      "Companies and institutions that trust Líquen Events: University of Évora, Évora City Council, José de Mello, Aernnova, Mainova and many more.",
+      "Companies and institutions that trust Líquen Events: universities, city councils, José de Mello, Aernnova, Mainova and many more.",
     contactoTitle: "Contact: Request Your Event Quote",
     contactoDescription:
-      "Contact Líquen Events to decorate your event anywhere in the country. Receive a tailored proposal for your event.",
+      "Contact Líquen Events to decorate your event, wherever it takes place. Receive a tailored proposal.",
     orcamentoTitle: "Request a Quote: Weddings & Events",
     orcamentoDescription:
       "Request your quote from Líquen Events. Tell us the event type, date and number of guests, and receive a tailored proposal.",
@@ -141,7 +141,7 @@ export const en: Dict = {
     ],
     servicosServiceName: "Event decoration and wedding coordination",
     servicosServiceDescription:
-      "Wedding decoration and coordination, plus decoration of corporate events, conferences and celebrations, anywhere in Portugal.",
+      "Wedding decoration and coordination, plus decoration of corporate events, conferences and celebrations.",
   },
 
   home: {
@@ -170,9 +170,9 @@ export const en: Dict = {
     manifestoEyebrow: "Our essence",
     manifestoTitleLine1: "We decorate events.",
     manifestoTitleLine2: "We make memories last.",
-    manifestoText: "Over 100 events since 2018, all over the country.",
+    manifestoText: "Over 100 events since 2018.",
     // Corner caption (chapter idiom) over the manifesto photograph.
-    manifestoImageCaption: "Across Portugal",
+    manifestoImageCaption: "Events · since 2018",
     statementLead: "We don't just decorate spaces.",
     statementRest: " We design experiences that last forever.",
     founderEyebrow: "The people",
@@ -216,7 +216,7 @@ export const en: Dict = {
       Corporativo: "Corporate event organised by Líquen Events",
       Conferência: "Conference organised by Líquen Events",
       Aéreo: "Aerial view of a Líquen Events event",
-      Evento: "Event organised by Líquen Events in Portugal",
+      Evento: "Event organised by Líquen Events",
     },
     lbGallery: "Gallery",
     lbPhoto: "photo",
@@ -334,7 +334,7 @@ export const en: Dict = {
       phoneLabel: "Phone",
       phoneSub: "Call or message us",
       locationLabel: "Location",
-      locationValue: "Across Portugal",
+      locationValue: "Events · since 2018",
       locationSub: "In-person meetings available",
       quoteLink: "Request a quote for your event",
       whatsappLink: "Chat on WhatsApp",
@@ -401,8 +401,8 @@ export const en: Dict = {
         a: "For weddings we recommend at least 12 months in advance. For corporate events, 3 to 6 months is ideal. For simpler celebrations, 4 to 8 weeks is usually enough.",
       },
       {
-        q: "Do you work across the whole country?",
-        a: "Yes. We work in Portugal. We have a wide network of suppliers and partners across many regions.",
+        q: "Do you travel to the event venue?",
+        a: "Yes. We travel to wherever your event takes place. We have a wide network of trusted suppliers and partners.",
       },
       {
         q: "Can you handle only part of the organisation?",
@@ -494,7 +494,7 @@ export const en: Dict = {
       "Weddings, company events and private celebrations. We design the decoration around what you have in mind and the budget you are working with.",
     nav: ["Celebrations", "Companies"],
     interludeEyebrow: "Líquen Events",
-    interludeTitle: "All over Portugal: over 100 events since 2018.",
+    interludeTitle: "Over 100 events since 2018.",
     verMais: "View more",
     verDetalhes: "View details",
     philoEyebrow: "Our signature",
@@ -550,9 +550,9 @@ export const en: Dict = {
       },
     ],
     seoEyebrow: "Where we work",
-    seoTitle: "All over Portugal",
+    seoTitle: "We come to you",
     seoText:
-      "Weddings, corporate events and celebrations, from concept to execution. Wherever the event is, we bring our team and our network of suppliers to every corner of the country.",
+      "Weddings, corporate events and celebrations, from concept to execution. Wherever the event is, we bring our team and our network of suppliers with us.",
     ctaEyebrow: "Next step",
     ctaTitleLine1: "Shall we bring",
     ctaTitleMoss: "your idea to life?",
@@ -586,7 +586,7 @@ export const en: Dict = {
     lead: "We'll read everything carefully, check availability for the date and think about what makes sense for this event, before we reply. What follows isn't an automatic price, it's the beginning of a proposal built for you.",
     countdown: "{days} days to go until the event.",
     highSeasonNote:
-      "May to October is the busy season and the best estates in the country close their calendars far in advance. It's worth not leaving it too long.",
+      "May to October is the busy season and the best estates close their calendars far in advance. It's worth not leaving it too long.",
     recapTitle: "What you told us",
     recapTitlePlural: "What you told us",
     refLabel: "Request Reference",
@@ -811,7 +811,6 @@ export const en: Dict = {
       "Parties & Celebrations",
     ],
     contacto: "Contact",
-    country: "Portugal",
     pedirOrcamento: "Request a quote",
     rights: "All rights reserved",
     legal: "Legal",
