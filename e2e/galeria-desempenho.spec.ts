@@ -90,8 +90,21 @@ for (const ecra of ECRAS) {
       page,
     }) => {
       await page.goto("/galeria");
+      /**
+       * `[data-tile-idx] picture` e não `picture`: este teste dizia respeito à
+       * GRELHA e apanhava o primeiro `<picture>` da página, fosse ele de quem
+       * fosse. Passou a haver outro antes dele — o herói da própria página da
+       * galeria, que desde os heróis em AVIF é um `<picture>` com UMA só fonte
+       * (AVIF), tendo o `<img>` em WebP por baixo como rede. O teste reprovou a
+       * dizer `Received array: ["image/avif"]`, e tinha razão sobre o que via:
+       * não estava a olhar para um mosaico.
+       *
+       * A regra das duas fontes é da grelha, onde as duas escadas coexistem por
+       * `media`. Do herói trata o `e2e/heroi-avif.spec.ts`, que é onde a regra
+       * dele — uma fonte AVIF e um `<img>` WebP que pinta — faz sentido.
+       */
       const fontes = await page.evaluate(() =>
-        [...document.querySelectorAll("picture")]
+        [...document.querySelectorAll("[data-tile-idx] picture")]
           .slice(0, 3)
           .map((p) => [...p.querySelectorAll("source")].map((s) => s.type)),
       );

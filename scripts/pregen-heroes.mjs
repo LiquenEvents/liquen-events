@@ -14,10 +14,36 @@
  */
 import sharp from "sharp";
 import { promises as fs } from "fs";
+import { createHash } from "crypto";
 import path from "path";
 
 const PUBLIC = path.join(process.cwd(), "public");
 const OUT_DIR = path.join(PUBLIC, "_img");
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE JÁ ESTÁ FEITO NÃO SE VOLTA A FAZER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Este pré-gerador re-codificava as 43 origens × 4 larguras a CADA build,
+ * mesmo sem nada ter mudado — os ficheiros estão versionados em `public/_img`,
+ * portanto o trabalho era todo deitado fora por cima de si próprio. Enquanto
+ * era só WebP passou despercebido. Com o AVIF a juntar-se (que é muito mais
+ * lento a codificar), o build da Vercel do commit dos heróis em AVIF morreu aos
+ * ~45 minutos, que é o tecto dela. Aqui neste contentor a mesma passagem levou
+ * 17 minutos só nos heróis.
+ *
+ * O manifesto guarda, por origem, um carimbo (hash do ficheiro-fonte + os
+ * ajustes de codificação) e o TAMANHO de cada ficheiro produzido. Uma origem
+ * só é re-codificada se o carimbo mudar ou se algum dos ficheiros faltar ou
+ * tiver outro tamanho — o que também apanha o caso em que alguém gravou no
+ * repositório um ficheiro truncado a meio de uma codificação (aconteceu: 132
+ * dos 172 AVIF foram commitados com o encode ainda a correr).
+ *
+ * Vive fora de `public/` de propósito: é metadado de build, não um recurso
+ * para servir. Está versionado para que um clone fresco (a Vercel faz um por
+ * deploy) já saiba que não tem nada a fazer.
+ */
+const MANIFESTO = path.join(process.cwd(), "scripts", "pregen-heroes.manifest.json");
 
 // The six full-bleed page heroes (kept in sync with each page + HeroWarm).
 const HERO_SOURCES = [
@@ -86,9 +112,43 @@ function heroKey(src) {
   return base.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
+/** Os ajustes de codificação fazem parte do carimbo: mudá-los invalida tudo. */
+const AJUSTES = `l:${HERO_WIDTHS.join(",")}|webp:q75e6|avif:q46e4`;
+
+/** Carimbo de uma origem: o conteúdo dela mais os ajustes. Não usa `mtime` —
+    num clone fresco o `mtime` é a hora do checkout e nunca coincidiria. */
+async function carimboDe(inputPath) {
+  const conteudo = await fs.readFile(inputPath);
+  const hash = createHash("sha256").update(conteudo).digest("hex").slice(0, 16);
+  return `${AJUSTES}|${hash}`;
+}
+
+/** Todos os ficheiros da entrada existem e têm o tamanho que ela diz? */
+async function saidaIntacta(ficheiros) {
+  if (!ficheiros || typeof ficheiros !== "object") return false;
+  for (const [nome, tamanho] of Object.entries(ficheiros)) {
+    try {
+      const st = await fs.stat(path.join(OUT_DIR, nome));
+      if (st.size !== tamanho) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+let manifesto = {};
+try {
+  manifesto = JSON.parse(await fs.readFile(MANIFESTO, "utf8"));
+} catch {
+  // Sem manifesto (a primeira vez, ou apagado de propósito): gera tudo.
+}
+
 await fs.mkdir(OUT_DIR, { recursive: true });
 
 let written = 0;
+let saltadas = 0;
+const novoManifesto = {};
 for (const src of HERO_SOURCES) {
   const inputPath = path.join(PUBLIC, src);
   const key = heroKey(src);
@@ -99,6 +159,16 @@ for (const src of HERO_SOURCES) {
     console.warn(`skip ${src}: ${err.message}`);
     continue;
   }
+
+  const carimbo = await carimboDe(inputPath);
+  const anterior = manifesto[key];
+  if (anterior?.carimbo === carimbo && (await saidaIntacta(anterior.ficheiros))) {
+    novoManifesto[key] = anterior;
+    saltadas += 1;
+    continue;
+  }
+
+  const ficheiros = {};
   for (const w of HERO_WIDTHS) {
     // Never upscale past the source width (matches next/image behaviour).
     const target = meta.width ? Math.min(w, meta.width) : w;
@@ -121,6 +191,7 @@ for (const src of HERO_SOURCES) {
       // largura, e há véus que os tapam mas há páginas onde não há.
       .webp({ quality: 75, effort: 6 })
       .toFile(outPath);
+    ficheiros[`${key}-${w}.webp`] = (await fs.stat(outPath)).size;
     written++;
 
     /**
@@ -154,12 +225,22 @@ for (const src of HERO_SOURCES) {
      * 5,5x o tempo de encode para 6% de bytes. Aqui são 43 origens × 4
      * larguras e o build já espera pelo pré-gerador da galeria.
      */
+    const avifPath = path.join(OUT_DIR, `${key}-${w}.avif`);
     await sharp(inputPath)
       .resize(target, null, { withoutEnlargement: true })
       .avif({ quality: 46, effort: 4 })
-      .toFile(path.join(OUT_DIR, `${key}-${w}.avif`));
+      .toFile(avifPath);
+    ficheiros[`${key}-${w}.avif`] = (await fs.stat(avifPath)).size;
     written++;
   }
+
+  novoManifesto[key] = { carimbo, ficheiros };
 }
 
-console.log(`pregen-heroes: wrote ${written} files to public/_img`);
+// O manifesto é escrito só no fim e por inteiro: uma corrida interrompida a
+// meio não deixa para trás um manifesto que jure que o trabalho está feito.
+await fs.writeFile(MANIFESTO, `${JSON.stringify(novoManifesto, null, 2)}\n`);
+
+console.log(
+  `pregen-heroes: wrote ${written} files to public/_img (${saltadas} origens já estavam feitas)`,
+);

@@ -70,9 +70,28 @@ export default function HeroImage(props: Omit<SafeImageProps, "initialLoader">) 
       initialLoader={heroImageLoader}
       src={src}
       sizes={sizes}
-      // Sem AVIF nada muda: o `priority` do Next continua a fazer o seu
-      // preload, que aponta para o WebP que o `<img>` vai mesmo usar.
-      {...(avif
+      /**
+       * SÓ O HERÓI DE PRIORIDADE TROCA DE MECANISMO.
+       *
+       * A primeira versão disto aplicava `loading="eager"` a QUALQUER herói com
+       * AVIF, tivesse ele prioridade ou não. Hoje isso não muda nada em página
+       * nenhuma — contadas uma a uma, as 10 utilizações do `<HeroImage>` passam
+       * todas `priority`, porque um herói está sempre no topo da sua página. É
+       * uma armadilha, não um defeito à vista: o primeiro herói que alguém puser
+       * abaixo da dobra sem `priority` seria descarregado já, a roubar a ligação
+       * ao que está mesmo à frente dos olhos, e nada o denunciaria.
+       *
+       * (Foi assim que apareceu: fui verificar o HTML servido à procura de outra
+       * coisa. Ao escrever isto como "há heróis abaixo da dobra" estava a
+       * descrever um risco como se fosse um sintoma — não era, e fica corrigido.)
+       *
+       * Sem prioridade: nada muda, o `priority` do Next passa como sempre
+       * passou (`false`) e o `lazy` continua a decidir.
+       * Com prioridade e AVIF: o preload do Next é desligado — apontaria para o
+       * WebP que o `<picture>` não vai usar — e substituído pelo nosso, mais o
+       * `eager`/`high` que é o que o `priority` fazia de útil.
+       */
+      {...(avif && priority
         ? { priority: false, loading: "eager" as const, fetchPriority: "high" as const }
         : { priority })}
       {...resto}
