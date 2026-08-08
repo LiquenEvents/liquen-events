@@ -61,6 +61,24 @@ const SO_PERFIL = (() => {
   const i = process.argv.indexOf("--perfil");
   return i >= 0 ? process.argv[i + 1] : "";
 })();
+/**
+ * A VELOCIDADE DA TRAVESSIA, agora explícita — e porque isso importa.
+ *
+ * Os 900 px de 260 em 260 ms que aqui estavam dão ~1500 px/s medidos: um
+ * scroll contínuo e educado. Um dedo a atirar a página faz 3000–5000 px/s, e
+ * é aí que a antecipação deixa de comprar tempo suficiente. Medir só a
+ * velocidade gentil e concluir "não há desfoque" seria responder a uma
+ * pergunta que ninguém fez.
+ *
+ *   --passo <px>    px por salto      (omissão: 900)
+ *   --espera <ms>   ms entre saltos   (omissão: 260)
+ */
+const numArg = (nome, omissao) => {
+  const i = process.argv.indexOf(nome);
+  return i >= 0 ? Number(process.argv[i + 1]) : omissao;
+};
+const PASSO_PX = numArg("--passo", 900);
+const ESPERA_MS = numArg("--espera", 260);
 
 /**
  * 4G lento, os números do painel do Chrome: 1,6 Mbit/s a descer, 750 kbit/s a
@@ -225,6 +243,7 @@ const SONDA = `
     if (!im || imgsVistas.has(im)) return;
     imgsVistas.add(im);
     r.imgs++;
+    r.im = im;   // apagado antes de serializar; serve o censo abaixo
     // O que o mosaico mostra ENQUANTO espera, lido no momento em que o <img>
     // aparece (depois some: o componente tira o background ao carregar).
     if (r.placeholder === null) {
@@ -310,7 +329,47 @@ const SONDA = `
     document.addEventListener("DOMContentLoaded", varreduraInicial);
   } else varreduraInicial();
   window.addEventListener("load", varreduraInicial);
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * O CENSO — a mesma pergunta, medida por outro caminho
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * O tempo desfocado acima sai de dois carimbos (entrou no ecrã / decode
+   * resolvido) e depende do IntersectionObserver entregar a observação a
+   * horas. Com o CPU 4x mais lento e a thread ocupada, essa entrega pode
+   * atrasar-se — e um 'tEntra' atrasado ENCURTA artificialmente o tempo
+   * desfocado. Ou seja: o erro daquela sonda empurra o número para zero, que é
+   * exactamente a resposta que convém. Não se aceita um número desses sem uma
+   * segunda medição que falhe de outra maneira.
+   *
+   * O censo é essa segunda medição, e não usa carimbos nenhuns: em cada passo
+   * do scroll pergunta ao DOM, mosaico a mosaico, o que está no ecrã AGORA e o
+   * que esse mosaico está a mostrar. "Desfocado" é literalmente o que o
+   * visitante vê: o <img> ainda tem o data:image do blur por baixo, porque o
+   * componente só o tira no onLoad.
+   */
+  M.censo = [];
+  M.fazerCenso = () => {
+    const h = window.innerHeight;
+    let visiveis = 0, desfocados = 0, semFoto = 0;
+    for (const r of M.desfoque) {
+      if (!r.el) continue;
+      const c = r.el.getBoundingClientRect();
+      if (c.bottom <= 0 || c.top >= h || c.height === 0) continue;
+      visiveis++;
+      const im = r.im;
+      if (!im) { semFoto++; desfocados++; continue; }
+      if (!(im.complete && im.naturalWidth > 0)) semFoto++;
+      if (/data:image/.test(im.style.backgroundImage || "")) desfocados++;
+    }
+    M.censo.push({
+      t: Math.round(performance.now()),
+      y: window.scrollY,
+      visiveis, desfocados, semFoto,
+    });
+  };
   } catch (e) {
+    M.fazerCenso = () => {};
     // Nunca deixar esta sonda derrubar as outras: uma falha aqui tem de sair
     // como um campo vazio E uma mensagem, não como uma corrida silenciosamente
     // sem métricas.
@@ -343,9 +402,7 @@ const SONDA = `
 
 /** Percorre a página toda a uma velocidade humana, contando frames perdidos. */
 const TRAVESSIA = `
-(async () => {
-  const PASSO = 900;          // px por salto
-  const ESPERA = 260;         // ms entre saltos (~3,4 ecrãs por segundo)
+(async (PASSO, ESPERA) => {
   const frames = [];
   let parar = false;
   const rAF = () => {
@@ -355,9 +412,36 @@ const TRAVESSIA = `
   requestAnimationFrame(rAF);
 
   let anterior = -1;
+  /**
+   * MODO CONTÍNUO (--espera 0): um dedo a atirar a página.
+   *
+   * Os saltos com pausa medem um scroll educado. Um flick é movimento
+   * CONTÍNUO e rápido, e a diferença não é só de velocidade: com saltos
+   * grandes há mosaicos que passam inteiros entre dois frames e nunca chegam a
+   * gerar uma observação de intersecção — ou seja, o próprio método perderia
+   * de vista exactamente as fotografias que mais interessam. Aqui anda-se
+   * PASSO px por frame, sem buracos, e tira-se o censo de 8 em 8 frames.
+   */
+  if (ESPERA === 0) {
+    let n = 0;
+    for (;;) {
+      await new Promise((r) => requestAnimationFrame(r));
+      window.scrollBy(0, PASSO);
+      if (++n % 8 === 0) { try { window.__medida.fazerCenso(); } catch (e) {} }
+      const y = window.scrollY;
+      const noFim = y + window.innerHeight >= document.documentElement.scrollHeight - 4;
+      if (noFim && y === anterior) break;
+      anterior = y;
+      if (n > 20000) break;
+    }
+  } else
   for (let i = 0; i < 400; i++) {
     window.scrollBy(0, PASSO);
     await new Promise((r) => setTimeout(r, ESPERA));
+    // O censo é tirado DEPOIS da espera, ou seja no estado em que o visitante
+    // ficaria a olhar se parasse aqui — não no frame imediatamente a seguir ao
+    // salto, que mediria sempre o pior instante possível.
+    try { window.__medida.fazerCenso(); } catch (e) {}
     const y = window.scrollY;
     const fim = y + window.innerHeight >= document.documentElement.scrollHeight - 4;
     if (fim && y === anterior) break;
@@ -365,6 +449,7 @@ const TRAVESSIA = `
   }
   parar = true;
   await new Promise((r) => setTimeout(r, 400));
+  const censo = (window.__medida.censo || []).slice();
 
   /**
    * FLUIDEZ — e o que este número NÃO é.
@@ -386,7 +471,26 @@ const TRAVESSIA = `
   ds.sort((a, b) => a - b);
   const q = (p) => (ds.length ? Math.round(ds[Math.floor((p / 100) * ds.length)]) : 0);
   const acima32 = ds.filter((d) => d > 32).length;
+  /**
+   * O CENSO, resumido. 'desfocadosPorEcra' é a conta que responde à queixa:
+   * em média, quantos mosaicos DOS QUE ESTÃO NO ECRÃ estão a mostrar o
+   * desfocado em vez da fotografia.
+   */
+  const totVis = censo.reduce((s, c) => s + c.visiveis, 0);
+  const totDes = censo.reduce((s, c) => s + c.desfocados, 0);
+  const totSem = censo.reduce((s, c) => s + c.semFoto, 0);
+  const passosComDesfoque = censo.filter((c) => c.desfocados > 0).length;
+  const piorPasso = censo.reduce((m, c) => (c.desfocados > m ? c.desfocados : m), 0);
   return {
+    censoPassos: censo.length,
+    mosaicosVisiveisSomados: totVis,
+    desfocadosSomados: totDes,
+    semFotoSomados: totSem,
+    percentagemDesfocadaNoEcra: totVis ? +((totDes / totVis) * 100).toFixed(1) : 0,
+    percentagemSemFotoNoEcra: totVis ? +((totSem / totVis) * 100).toFixed(1) : 0,
+    passosComAlgumDesfocado: passosComDesfoque,
+    piorPassoDesfocados: piorPasso,
+    mediaVisiveisPorPasso: censo.length ? +(totVis / censo.length).toFixed(1) : 0,
     intervalos: ds.length,
     medianaMs: q(50),
     p95Ms: q(95),
@@ -395,7 +499,7 @@ const TRAVESSIA = `
     acimaDe32ms: acima32,
     percentagemAcima32: ds.length ? +((acima32 / ds.length) * 100).toFixed(1) : 0,
   };
-})()
+})
 `;
 
 /** O estado final: cada imagem com bytes, píxeis servidos e píxeis de exibição. */
@@ -641,7 +745,7 @@ const EH_IMAGEM = (u) => /\.(webp|avif|jpe?g|png)(\?|$)/i.test(u || "");
  * Nessa passagem o visitante viu SÓ o desfocado. É o pior caso, e é o que a
  * dona descreve.
  */
-function analisarDesfoque(desfoque, marcoTravessia) {
+function analisarDesfoque(desfoque, marcoTravessia, fcp) {
   const comAmbos = desfoque.filter((r) => r.tEntra !== null && r.tDecode !== null);
   const calc = (lista) => {
     const ms = lista.map((r) => Math.max(0, r.tDecode - r.tEntra));
@@ -667,6 +771,22 @@ function analisarDesfoque(desfoque, marcoTravessia) {
     };
   };
   const primeiroEcra = comAmbos.filter((r) => r.tEntra < marcoTravessia);
+  /**
+   * O PRIMEIRO ECRÃ TEM UM RELÓGIO DIFERENTE.
+   *
+   * Para um mosaico que já lá estava quando a página abriu, 'tEntra' é o
+   * instante em que o IntersectionObserver entregou a primeira observação — que
+   * acontece assim que há layout, ANTES de haver pintura. Antes do FCP não há
+   * nada no ecrã, portanto o visitante não pode estar a olhar para um
+   * placeholder desfocado.
+   *
+   * O tempo que ele passa mesmo a ver desfocado no primeiro ecrã é, então,
+   * medido a partir do FCP: 'tDecode − max(tEntra, FCP)'. É este o número
+   * honesto para "abri a galeria e as fotos estavam desfocadas".
+   */
+  const desdeFcp = primeiroEcra
+    .map((r) => r.tDecode - Math.max(r.tEntra, fcp))
+    .map((v) => Math.max(0, v));
   const noScroll = comAmbos.filter((r) => r.tEntra >= marcoTravessia);
   // Saiu do ecrã antes de a fotografia estar pronta.
   const nuncaChegou = comAmbos.filter((r) => r.tSai !== null && r.tDecode > r.tSai);
@@ -684,6 +804,12 @@ function analisarDesfoque(desfoque, marcoTravessia) {
   return {
     todas: calc(comAmbos),
     primeiroEcra: calc(primeiroEcra),
+    primeiroEcraDesdeFcp: {
+      n: desdeFcp.length,
+      medianaMs: Math.round(pct(desdeFcp, 50)),
+      p90Ms: Math.round(pct(desdeFcp, 90)),
+      piorMs: Math.round(Math.max(0, ...desdeFcp)),
+    },
     noScroll: calc(noScroll),
     mosaicosObservados: desfoque.length,
     semTDecode: semFoto.length,
@@ -807,7 +933,7 @@ async function medirPerfil(browser, perfil, url) {
    * repetições — ou seja, o número grande era quase todo travessia.
    */
   const marcoTravessia = await page.evaluate(() => performance.now());
-  const scroll = await page.evaluate(TRAVESSIA);
+  const scroll = await page.evaluate(`(${TRAVESSIA})(${PASSO_PX}, ${ESPERA_MS})`);
   const inv = await page.evaluate(INVENTARIO);
 
   const bloqueio = (desde, ate) =>
@@ -905,9 +1031,11 @@ async function medirPerfil(browser, perfil, url) {
     primeiraPintura: inv.medida.primeiraPintura,
     scroll,
     alturaDoc: inv.alturaDoc,
-    desfoque: analisarDesfoque(inv.desfoque, marcoTravessia),
+    desfoque: analisarDesfoque(inv.desfoque, marcoTravessia, inv.medida.fcp),
     concorrencia: analisarConcorrencia(inv.medida.recursos, inv.desfoque),
     marcoTravessia: Math.round(marcoTravessia),
+    passoPx: PASSO_PX,
+    esperaMs: ESPERA_MS,
     imgs: inv.imgs,
     desfoqueBruto: inv.desfoque,
   };
@@ -964,6 +1092,9 @@ for (const r of resultados) {
       `p95 ${d.todas.p95Ms} ms · pior ${d.todas.piorMs} ms · média ${d.todas.mediaMs} ms\n` +
       `  1.º ecrã (${d.primeiroEcra.n}):    mediana ${d.primeiroEcra.medianaMs} ms · ` +
       `p90 ${d.primeiroEcra.p90Ms} ms · pior ${d.primeiroEcra.piorMs} ms\n` +
+      `  1.º ecrã DESDE O FCP (${d.primeiroEcraDesdeFcp.n}): mediana ` +
+      `${d.primeiroEcraDesdeFcp.medianaMs} ms · p90 ${d.primeiroEcraDesdeFcp.p90Ms} ms · ` +
+      `pior ${d.primeiroEcraDesdeFcp.piorMs} ms\n` +
       `  no scroll (${d.noScroll.n}):  mediana ${d.noScroll.medianaMs} ms · ` +
       `p90 ${d.noScroll.p90Ms} ms · pior ${d.noScroll.piorMs} ms\n` +
       `  Já prontas ao assomar (0 ms de desfoque): ${d.todas.semDesfoque} de ${d.todas.n}` +
@@ -990,6 +1121,14 @@ for (const r of resultados) {
       `${r.velocidadeScrollPxS} px/s) · p10 ${r.antecipacaoP10Px} px · ` +
       `negativas ${r.antecipacaoNegativas}/${r.antecipacaoTotal}`,
   );
+  console.log(
+    `CENSO no ecrã (2.º método, sem carimbos): ${r.scroll.percentagemDesfocadaNoEcra}% dos ` +
+      `mosaicos visíveis estavam desfocados · ${r.scroll.percentagemSemFotoNoEcra}% sem foto ` +
+      `carregada · pior passo ${r.scroll.piorPassoDesfocados} mosaicos · ` +
+      `${r.scroll.passosComAlgumDesfocado} de ${r.scroll.censoPassos} passos com algum ` +
+      `desfocado · média ${r.scroll.mediaVisiveisPorPasso} mosaicos visíveis por passo`,
+  );
+  console.log(`Travessia: passo ${r.passoPx} px / espera ${r.esperaMs} ms`);
   console.log(
     `Fluidez: intervalos acima de 32 ms ${r.scroll.percentagemAcima32}% ` +
       `(${r.scroll.acimaDe32ms} de ${r.scroll.intervalos}) · mediana ${r.scroll.medianaMs} ms · ` +
