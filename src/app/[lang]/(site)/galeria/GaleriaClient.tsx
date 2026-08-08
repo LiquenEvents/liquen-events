@@ -401,6 +401,10 @@ const Tile = memo(function Tile({
           className={`object-cover ${zoomClass}`}
           aspectRatio={photo.aspectRatio}
           priority={eager}
+          // Fora das duas primeiras filas, a fotografia deixa de
+          // competir com as que já estão à vista. Ver a nota em
+          // `GalleryImage`: é ganho de ORDEM, não de bytes.
+          longe={idx >= 12}
           anchorRef={btnRef}
           registarImg={(el) => registarImg(el, photo.src)}
           unavailableLabel={unavailableLabel}

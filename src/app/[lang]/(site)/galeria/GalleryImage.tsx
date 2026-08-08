@@ -65,6 +65,24 @@ export type GalleryImageProps = {
   /** Candidato a LCP: salta a fila e a espera pelo viewport. */
   priority?: boolean;
   /**
+   * ── A ORDEM VALE TANTO COMO OS BYTES ──────────────────────────────────────
+   *
+   * MEDIDO: no telemóvel são pedidas 5 fotografias antes de a primeira estar
+   * pronta; na secretária, 8. Todas com `fetchpriority="auto"`, ou seja todas
+   * iguais aos olhos do browser — a que está debaixo do polegar reparte o tubo
+   * com a que está três filas abaixo.
+   *
+   * Aritmética dos ficheiros reais a 1,6 Mbit/s: doze mosaicos × 49,4 KB são
+   * 593 KB ≈ 3,0 s. Em paralelo justo, as doze ficam à espera ~3,0 s e chegam
+   * quase todas ao mesmo tempo. Por ordem, a primeira estaria pronta a ~250 ms.
+   * **Os mesmos bytes, e menos de metade da espera na que se está a olhar.**
+   *
+   * `longe` marca o que ainda vai longe do ecrã: passa a `low` e deixa de
+   * disputar a ligação com o que já se vê. Não é adiar — o pedido sai na mesma;
+   * é deixar de o pôr em pé de igualdade com o que está à frente dos olhos.
+   */
+  longe?: boolean;
+  /**
    * O elemento cuja proximidade do ecrã decide quando carregar: o próprio
    * botão do mosaico. Não se usa um wrapper aqui por duas razões: (a) o botão
    * leva `content-visibility: auto`, portanto os seus descendentes nem sequer
@@ -93,6 +111,7 @@ export default function GalleryImage({
   aspectRatio,
   blurDataURL,
   priority = false,
+  longe = false,
   anchorRef,
   unavailableLabel,
   onLoaded,
@@ -438,7 +457,7 @@ export default function GalleryImage({
              * GaleriaClient.
              */
             loading={priority ? "eager" : "lazy"}
-            fetchPriority={priority ? "high" : "auto"}
+            fetchPriority={priority ? "high" : longe ? "low" : "auto"}
             /**
              * `async` em TODAS, incluindo a de prioridade. O que trava o scroll
              * não é o download — é a descodificação: medida nesta galeria em
