@@ -192,3 +192,50 @@ test("@galeria os dados estruturados das fotografias têm URLs válidos", async 
   });
   expect(invalidos, `contentUrl inválidos: ${invalidos.join(", ")}`).toEqual([]);
 });
+
+test("@galeria nenhuma fotografia fica descarregada e invisível", async ({ page }) => {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O DEFEITO QUE ISTO GUARDA, E PORQUE É QUE NINGUÉM DEU POR ELE
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Medido no primeiro ecrã: fotografias DESCARREGADAS E DESCODIFICADAS que
+   * ficavam invisíveis para sempre — 3 de 3 em secretária, 2 de 2 em telemóvel,
+   * ainda presas aos 9,6 s.
+   *
+   * A classe `g-foto` põe o `<img>` a `opacity: 0`; quem lha devolve é
+   * `g-foto-pronta`, posta pelo `onLoad` do React. Mas a fotografia vem no HTML
+   * do servidor: se acabar de descarregar ANTES da hidratação, esse `onLoad`
+   * nunca dispara. Acontece precisamente às fotos mais rápidas — as do primeiro
+   * ecrã.
+   *
+   * Os testes que já cá estavam não o podiam apanhar. Um verifica que o
+   * placeholder EXISTE, outro que a caixa tem altura, outro que a resolução não
+   * é excessiva. Nenhum perguntou a coisa mais simples: **vê-se?**
+   *
+   * Por isso este teste não olha para classes nem para estado. Pergunta ao
+   * browser a opacidade COMPUTADA de cada fotografia que já tem bytes.
+   */
+  await page.goto("/galeria");
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForTimeout(2000);
+
+  const presas = await page.evaluate(() => {
+    const maus: string[] = [];
+    for (const im of document.querySelectorAll("img")) {
+      if (!im.currentSrc.includes("/_img/g/")) continue;
+      // Só interessam as que JÁ têm imagem: uma que ainda não chegou tem todo
+      // o direito de estar transparente.
+      if (!im.complete || im.naturalWidth === 0) continue;
+      if (Number(getComputedStyle(im).opacity) < 0.99) {
+        maus.push(im.currentSrc.split("/").pop() ?? "?");
+      }
+    }
+    return maus;
+  });
+
+  expect(
+    presas,
+    `fotografias descarregadas e invisíveis (opacidade < 1): ${presas.join(", ")}`,
+  ).toEqual([]);
+});

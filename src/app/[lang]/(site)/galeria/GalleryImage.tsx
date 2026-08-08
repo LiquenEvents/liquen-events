@@ -225,6 +225,57 @@ export default function GalleryImage({
     onLoaded?.();
   }, [releaseSlot, onLoaded]);
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A FOTOGRAFIA NÃO PODE DEPENDER DO REACT PARA APARECER
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * MEDIDO, e é um defeito, não uma lentidão: no primeiro ecrã havia
+   * fotografias DESCARREGADAS E DESCODIFICADAS que ficavam invisíveis para
+   * sempre — 3 de 3 em secretária e 2 de 2 em telemóvel, ainda presas aos
+   * 9,6 s de observação.
+   *
+   * O mecanismo é este. A classe `g-foto` põe o `<img>` a `opacity: 0`, e quem
+   * lhe devolve a opacidade é `g-foto-pronta`, posta pelo `onLoad` do React. Só
+   * que a fotografia vem no HTML do servidor: se acabar de descarregar ANTES de
+   * a hidratação ligar os ouvintes, o `onLoad` do React **nunca dispara**. A
+   * foto está lá, descodificada, por baixo de uma opacidade zero que ninguém
+   * volta a mexer.
+   *
+   * É o pior caso possível — acontece precisamente às fotos mais rápidas, que
+   * são as do primeiro ecrã, que é o que a visitante vê primeiro. E lê-se
+   * exactamente como a queixa dela: um rectângulo de cor que nunca resolve.
+   *
+   * A correcção não é esperar melhor pelo React: é não esperar por ele. No
+   * instante em que o elemento existe pergunta-se-lhe se JÁ está carregado
+   * (`complete` + `naturalWidth`, que é a única forma honesta de o saber) e,
+   * se não estiver, escuta-se o `load` NATIVO. A classe entra no elemento
+   * directamente, sem passar por um commit — o mesmo padrão que o
+   * `useBlurTardio` já usa para tirar o desfocado, e pela mesma razão.
+   *
+   * O `setCarregada` continua a ser chamado para o resto do componente saber;
+   * o que deixou de acontecer é a IMAGEM depender disso para se ver.
+   */
+  const aoMontarImg = useCallback(
+    (el: HTMLImageElement | null) => {
+      registarImg?.(el);
+      if (!el) return;
+      const revelar = () => {
+        el.classList.add("g-foto-pronta");
+        handleLoad();
+      };
+      // `naturalWidth > 0` e não só `complete`: um `<img>` que falhou também
+      // fica `complete`, e revelar uma imagem partida é trocar um mosaico de
+      // cor por um ícone de imagem partida.
+      if (el.complete && el.naturalWidth > 0) {
+        revelar();
+        return;
+      }
+      el.addEventListener("load", revelar, { once: true });
+    },
+    [registarImg, handleLoad],
+  );
+
   const handleError = useCallback(() => {
     releaseSlot();
     /**
@@ -358,7 +409,7 @@ export default function GalleryImage({
             />
           ))}
           <img
-            ref={registarImg}
+            ref={aoMontarImg}
             src={srcFinal}
             alt={alt}
             width={Math.round(propW * 100)}

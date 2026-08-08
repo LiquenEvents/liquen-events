@@ -402,6 +402,20 @@ const SONDA = `
 
 /** Percorre a página toda a uma velocidade humana, contando frames perdidos. */
 const TRAVESSIA = `
+/**
+ * ATENÇÃO AO 'behavior: "instant"' — sem ele esta travessia mede outra coisa.
+ *
+ * O globals.css tem 'html { scroll-behavior: smooth }', e um 'scrollBy(0, N)'
+ * sem 'behavior' HERDA-O: cada salto passa a ser uma animação. Pedir 900 px de
+ * 260 em 260 ms parecia dar 3462 px/s e media-se 1496 px/s — a diferença era a
+ * animação a comer o pedido seguinte. No modo contínuo (um scrollBy por frame)
+ * o efeito é catastrófico: cada chamada interrompe a animação anterior e a
+ * página andou 75 px/s em vez de ~3500, com a travessia a chegar ao fim das
+ * 20 000 iterações tendo visto 69 fotografias de 427.
+ *
+ * A velocidade REAL de cada corrida sai sempre em 'velocidadeScrollPxS'. É
+ * esse o número a citar, nunca o nominal.
+ */
 (async (PASSO, ESPERA) => {
   const frames = [];
   let parar = false;
@@ -426,7 +440,7 @@ const TRAVESSIA = `
     let n = 0;
     for (;;) {
       await new Promise((r) => requestAnimationFrame(r));
-      window.scrollBy(0, PASSO);
+      window.scrollBy({ top: PASSO, behavior: "instant" });
       if (++n % 8 === 0) { try { window.__medida.fazerCenso(); } catch (e) {} }
       const y = window.scrollY;
       const noFim = y + window.innerHeight >= document.documentElement.scrollHeight - 4;
@@ -436,7 +450,7 @@ const TRAVESSIA = `
     }
   } else
   for (let i = 0; i < 400; i++) {
-    window.scrollBy(0, PASSO);
+    window.scrollBy({ top: PASSO, behavior: "instant" });
     await new Promise((r) => setTimeout(r, ESPERA));
     // O censo é tirado DEPOIS da espera, ou seja no estado em que o visitante
     // ficaria a olhar se parasse aqui — não no frame imediatamente a seguir ao
@@ -526,6 +540,17 @@ const INVENTARIO = `
   const imgs = [...document.querySelectorAll("img")].map((im) => {
     const r = im.getBoundingClientRect();
     const t = porUrl.get(im.currentSrc) || {};
+    /**
+     * A FOTOGRAFIA CHEGOU — MAS VÊ-SE?
+     *
+     * '.g-foto { opacity: 0 }' e '.g-foto-pronta { opacity: 1 }', e a segunda
+     * classe é posta pelo 'onLoad' do React. Se o <img> vier no HTML do
+     * servidor e acabar o download ANTES da hidratação, esse 'onLoad' nunca
+     * dispara: a fotografia fica descarregada, descodificada e a opacidade 0
+     * para sempre. Mede-se, não se deduz — 'completa' é o browser a dizer que
+     * tem os píxeis, 'opacidade' é o que chega ao ecrã.
+     */
+    const cs = getComputedStyle(im);
     const topoNoDoc = r.top + window.scrollY;
     /**
      * A LARGURA SERVIDA VEM DO NOME DO FICHEIRO, NÃO DE naturalWidth.
@@ -562,6 +587,9 @@ const INVENTARIO = `
       bytes: t.bytes || 0,
       corpo: t.corpo || 0,
       inicio: t.inicio || 0,
+      completa: !!(im.complete && im.naturalWidth > 0),
+      opacidade: Number(cs.opacity),
+      classesG: im.className.split(" ").filter((c) => c.indexOf("g-") === 0).join(" "),
       topoNoDoc: Math.round(topoNoDoc),
     };
   });
@@ -603,8 +631,18 @@ const INVENTARIO = `
    * fotografia que lhe corresponde, para se poder cruzar depois.
    */
   const porUrlBytes = porUrl;
+  /**
+   * NÓS DESLIGADOS. O React descarta parte dos nós vindos do HTML do servidor e
+   * monta outros no lugar. Os antigos ficam a ser observados por esta sonda mas
+   * já não estão no documento: nunca intersectam, e um getBoundingClientRect
+   * sobre eles devolve zeros — o que dava um 'topoNoDoc' igual à posição do
+   * scroll no momento do inventário (medido: 198422 px, ou seja o fundo da
+   * página, para mosaicos que estão no topo). Marcam-se para não entrarem nas
+   * contagens como se fossem mosaicos a mais.
+   */
   const desfoque = window.__medida.desfoque.map((r) => {
-    const cx = r.el ? r.el.getBoundingClientRect() : null;
+    const ligado = !!(r.el && document.contains(r.el));
+    const cx = ligado ? r.el.getBoundingClientRect() : null;
     const t = porUrlBytes.get(r.url) || {};
     return {
       idx: r.idx,
@@ -619,6 +657,7 @@ const INVENTARIO = `
       imgs: r.imgs,
       bytes: t.bytes || 0,
       pedidoEm: t.inicio || 0,
+      ligado,
       topoNoDoc: cx ? Math.round(cx.top + window.scrollY) : null,
     };
   });
@@ -811,7 +850,8 @@ function analisarDesfoque(desfoque, marcoTravessia, fcp) {
       piorMs: Math.round(Math.max(0, ...desdeFcp)),
     },
     noScroll: calc(noScroll),
-    mosaicosObservados: desfoque.length,
+    mosaicosObservados: desfoque.filter((r) => r.ligado !== false).length,
+    registosDesligados: desfoque.filter((r) => r.ligado === false).length,
     semTDecode: semFoto.length,
     nuncaVisivelNitida: nuncaChegou.length,
     nuncaVisivelNitidaNoScroll: nuncaChegou.filter((r) => r.tEntra >= marcoTravessia).length,
@@ -904,7 +944,38 @@ async function medirPerfil(browser, perfil, url) {
 
   await page.addInitScript(SONDA);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 180_000 });
-  await page.waitForTimeout(3500);
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * O PRIMEIRO ECRÃ, medido sem depender de carimbos
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * Para os mosaicos que já lá estão quando a página abre, o 'tEntra' do
+   * IntersectionObserver não é de confiar: mediu-se 5436 ms para um mosaico
+   * cujo topo está a 863 px numa janela de 915 px — ou seja, visível desde o
+   * princípio. A causa é a hidratação: o React descarta o nó vindo do servidor
+   * e monta outro, e a observação só começa aí.
+   *
+   * Isto pergunta ao DOM directamente, de 250 em 250 ms durante os primeiros
+   * segundos: quantos mosaicos estão no ecrã AGORA e quantos deles ainda
+   * mostram o desfocado. Dá a curva com que a primeira janela fica nítida, que
+   * é a experiência de quem abre a galeria.
+   */
+  const linhaDoTempo = [];
+  for (let i = 0; i < 24; i++) {
+    await page.waitForTimeout(250);
+    linhaDoTempo.push(
+      await page.evaluate(() => {
+        window.__medida.fazerCenso();
+        const c = window.__medida.censo[window.__medida.censo.length - 1];
+        return c || null;
+      }),
+    );
+  }
+  // A partir daqui o censo volta a servir só a travessia.
+  await page.evaluate(() => {
+    window.__medida.censo.length = 0;
+  });
 
   // Uma interação a sério, para o INP ter o que medir.
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -1018,6 +1089,10 @@ async function medirPerfil(browser, perfil, url) {
       inv.imgs.filter((i) => i.racioFisico > 0).map((i) => i.racioFisico),
       50,
     ),
+    fotosInvisiveis: inv.imgs.filter((i) => i.completa && i.opacidade < 0.05).length,
+    fotosInvisiveisSemPronta: inv.imgs.filter(
+      (i) => i.completa && i.opacidade < 0.05 && !/g-foto-pronta/.test(i.classesG || ""),
+    ).length,
     acimaDe120kb: comBytes.filter((i) => i.corpo > 120 * 1024).length,
     decodeMedianoMs: pct(decodeMs, 50),
     decodeP95Ms: pct(decodeMs, 95),
@@ -1036,6 +1111,7 @@ async function medirPerfil(browser, perfil, url) {
     marcoTravessia: Math.round(marcoTravessia),
     passoPx: PASSO_PX,
     esperaMs: ESPERA_MS,
+    primeiroEcraLinhaDoTempo: linhaDoTempo.filter(Boolean),
     imgs: inv.imgs,
     desfoqueBruto: inv.desfoque,
   };
@@ -1084,6 +1160,10 @@ for (const r of resultados) {
       `${r.imagensComTransferSize} imagens de ${r.imagensNoDom})`,
   );
   console.log(`Racio contra pixeis FISICOS: mediana ${r.racioFisicoMediano}x`);
+  console.log(
+    `FOTOS DESCARREGADAS MAS INVISIVEIS (<img> a opacidade 0): ${r.fotosInvisiveis} ` +
+      `(${r.fotosInvisiveisSemPronta} sem a classe g-foto-pronta) de ${r.imagensNoDom}`,
+  );
   console.log(`Descodificação: mediana ${r.decodeMedianoMs} ms · p95 ${r.decodeP95Ms} ms`);
   const d = r.desfoque;
   console.log(
@@ -1102,7 +1182,8 @@ for (const r of resultados) {
       `  Saíram do ecrã ANTES de a foto estar pronta: ${d.nuncaVisivelNitida}` +
       ` (${d.nuncaVisivelNitidaNoScroll} durante o scroll)\n` +
       `  Mosaicos que assomaram e nunca tiveram foto: ${d.semTDecode}` +
-      ` · mosaicos observados: ${d.mosaicosObservados}\n` +
+      ` · mosaicos ligados ao documento: ${d.mosaicosObservados}` +
+      ` · registos de nós descartados pelo React: ${d.registosDesligados}\n` +
       `  Placeholder visto por quem esperou: ${JSON.stringify(d.placeholderQuandoEsperou)}\n` +
       `  Até o frame de pintura (rAF a seguir ao decode): mediana ${d.atePintarMedianaMs} ms · ` +
       `p90 ${d.atePintarP90Ms} ms\n` +
@@ -1128,7 +1209,21 @@ for (const r of resultados) {
       `${r.scroll.passosComAlgumDesfocado} de ${r.scroll.censoPassos} passos com algum ` +
       `desfocado · média ${r.scroll.mediaVisiveisPorPasso} mosaicos visíveis por passo`,
   );
-  console.log(`Travessia: passo ${r.passoPx} px / espera ${r.esperaMs} ms`);
+  console.log(
+    `Travessia: passo ${r.passoPx} px / espera ${r.esperaMs} ms · ` +
+      `velocidade MEDIDA ${r.velocidadeScrollPxS} px/s`,
+  );
+  const lt = r.primeiroEcraLinhaDoTempo;
+  if (lt && lt.length) {
+    console.log(
+      "1.º ECRÃ, mosaicos desfocados ao longo do tempo (t ms: desfocados/visíveis):\n  " +
+        lt.map((c) => `${c.t}:${c.desfocados}/${c.visiveis}`).join("  "),
+    );
+    const limpo = lt.find((c) => c.visiveis > 0 && c.desfocados === 0);
+    console.log(
+      `  → primeira janela sem nenhum mosaico desfocado aos ${limpo ? limpo.t + " ms" : "NUNCA (nesta janela de 6 s)"}`,
+    );
+  }
   console.log(
     `Fluidez: intervalos acima de 32 ms ${r.scroll.percentagemAcima32}% ` +
       `(${r.scroll.acimaDe32ms} de ${r.scroll.intervalos}) · mediana ${r.scroll.medianaMs} ms · ` +
