@@ -412,7 +412,11 @@ const INVENTARIO = `
   const porUrl = new Map();
   for (const e of recursos) {
     const ja = porUrl.get(e.url);
-    if (!ja || (!ja.bytes && e.bytes)) porUrl.set(e.url, e);
+    // Prefere-se a entrada que TEM corpo (encodedBodySize). Ver a nota grande
+    // sobre bytes mais abaixo: o transferSize vem a zero em quase tudo com a
+    // emulação de rede do CDP, por isso desempatar por ele mantinha entradas
+    // vazias.
+    if (!ja || (!ja.corpo && e.corpo) || (!ja.bytes && e.bytes)) porUrl.set(e.url, e);
   }
 
   const imgs = [...document.querySelectorAll("img")].map((im) => {
@@ -458,16 +462,35 @@ const INVENTARIO = `
     };
   });
 
-  let bytesTotais = 0, bytesImagem = 0, pedidos = 0;
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * OS BYTES CONTAM-SE PELO encodedBodySize, NÃO PELO transferSize
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * Está escrito no GALERIA-BEFORE.md §2.2 e o código não estava a cumpri-lo:
+   * somava 'e.bytes' (transferSize). Com a emulação de rede do CDP ligada, o
+   * transferSize vem a ZERO em quase todas as respostas — medido nesta corrida:
+   * 7 de 429 imagens no telemóvel e 16 de 432 na secretária tinham
+   * transferSize > 0, contra 383 e 432 com encodedBodySize > 0.
+   *
+   * O efeito era um peso de imagens vinte vezes menor do que o real e uma
+   * mediana de KB por foto calculada sobre a mão-cheia de respostas onde o
+   * transferSize calhou vir preenchido — ou seja, uma amostra de 7.
+   *
+   * Guardam-se os dois: 'corpo' (encodedBodySize, o número que se usa) e
+   * 'transfer' (transferSize, mantido só para se ver que é inutilizável aqui).
+   */
+  let bytesTotais = 0, bytesImagem = 0, bytesImagemTransfer = 0, pedidos = 0;
   for (const e of recursos) {
-    bytesTotais += e.bytes || 0;
+    bytesTotais += e.corpo || 0;
     pedidos++;
     if (/\\.(webp|avif|jpe?g|png)(\\?|$)/i.test(e.url) || e.tipo === "img") {
-      bytesImagem += e.bytes || 0;
+      bytesImagem += e.corpo || 0;
+      bytesImagemTransfer += e.bytes || 0;
     }
   }
   const nav = performance.getEntriesByType("navigation")[0];
-  bytesTotais += (nav && nav.transferSize) || 0;
+  bytesTotais += (nav && nav.encodedBodySize) || 0;
 
   /**
    * Os registos de desfoque saem SEM a referência ao elemento ('el'), que não
@@ -502,8 +525,10 @@ const INVENTARIO = `
     imgs,
     bytesTotais,
     bytesImagem,
+    bytesImagemTransfer,
     pedidos,
     desfoque,
+    desfoqueErro: window.__medida.desfoqueErro || "",
     medida: {
       lcp: window.__medida.lcp,
       fcp: window.__medida.fcp,
