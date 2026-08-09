@@ -193,7 +193,12 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
     const obtidas = await mapLimit(
       mb.images.map((ref, i) => ({ ref, caixa: previstas[i] ?? null })),
       FETCH_CONCURRENCY,
-      ({ ref, caixa }) => buscarComTecto(ref, caixa),
+      // Uma referência VAZIA não é uma foto que faltou: é um lugar que nunca
+      // teve foto nenhuma. Ir buscá-la falhava sempre e somava ao contador —
+      // e o estúdio dizia «1 foto em falta» numa proposta que estava inteira.
+      // Um aviso que toca sem razão é um aviso que se deixa de ler. (A capa já
+      // tinha esta guarda; os mood boards não.)
+      ({ ref, caixa }) => (ref ? buscarComTecto(ref, caixa) : Promise.resolve(null)),
     );
 
     // ── 2.ª passagem: com as sobreviventes, a disposição VERDADEIRA ──

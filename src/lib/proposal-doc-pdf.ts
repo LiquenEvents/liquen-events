@@ -38,6 +38,14 @@ import {
 } from "@/lib/proposal-fonts";
 import { opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { winAnsiSafe } from "@/lib/pdf-text";
+import {
+  caixasDaCapa,
+  caixasDoCollage,
+  PAGINA_W,
+  PAGINA_H,
+  PAGINA_M,
+  type CaixaPdf,
+} from "@/lib/proposal-geometria";
 import { log } from "@/lib/logger";
 
 const PT_MONTHS_SHORT = [
@@ -63,10 +71,19 @@ function prettyDate(iso: string): string {
   return `${Number(m[3])} de ${PT_MONTHS_SHORT[mo - 1]} de ${m[1]}`;
 }
 
-// ── Landscape A4 ──
-const W = 841.89;
-const H = 595.28;
-const M = 68; // page margin — generous editorial whitespace, let the page breathe
+// ── Landscape A4 ── (a fonte é `proposal-geometria`, partilhada com o estúdio)
+const W = PAGINA_W;
+const H = PAGINA_H;
+const M = PAGINA_M; // page margin — generous editorial whitespace, let the page breathe
+/**
+ * O CHÃO DA MANCHA — abaixo disto não se escreve.
+ *
+ * Um número só, para todas as secções. Era `M + 6` numas e `M + 24` noutras, e
+ * havia secções (o cronograma) onde simplesmente não havia chão nenhum: o texto
+ * continuava a ser desenhado para baixo, para fora da folha, sem erro e sem
+ * aviso. O rodapé é desenhado em `M - 26`; isto fica bem acima dele.
+ */
+const CHAO = M + 6;
 // Max text measure: long lines (~120+ chars edge-to-edge) are the biggest "DIY"
 // tell. Cap body copy near the 45–75 char ideal.
 const MEASURE = 430;
@@ -136,72 +153,17 @@ const MAX_ANNOTATION_LINES = 5; // descrição sob o collage
    porquê. Por isso é uma função só, e é esta que o desenho usa.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/** Uma caixa na página, em pontos PDF. `y` é a base (o PDF conta de baixo). */
-export interface CaixaPdf {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
 /**
- * As duas caixas da capa: duas fotos a toda a altura, a ladear o painel
- * escuro central. É a mesma geometria na capa e na contracapa, de propósito —
- * uma faz de eco da outra.
- */
-export function caixasDaCapa(): CaixaPdf[] {
-  const panelW = W * 0.34;
-  const sideW = (W - panelW) / 2;
-  return [
-    { x: 0, y: 0, w: sideW, h: H },
-    { x: sideW + panelW, y: 0, w: sideW, h: H },
-  ];
-}
-
-/**
- * Onde é desenhada cada uma das `n` fotos de um mood board, pela ordem em que
- * aparecem no documento.
+ * A geometria mudou-se para `@/lib/proposal-geometria` — o mesmo raciocínio de
+ * cima, com um terceiro leitor: o ESTÚDIO, no browser, que precisa de mostrar
+ * cada foto com a forma que ela vai ter no documento. Este ficheiro é
+ * `server-only`, portanto nada do lado do cliente lhe pode tocar; a geometria
+ * não é, e continua a ser uma função só.
  *
- * `alturaAnotacao` é o espaço reservado em baixo para a descrição. Quem desenha
- * sabe-o ao certo (mediu as linhas); quem vai buscar as fotos não tem fontes
- * para o medir e passa o mínimo — o que dá as caixas MAIORES e, portanto, um
- * pedido de resolução por excesso. Errar para o lado de descarregar um ficheiro
- * grande de mais é invisível; errar para o outro é uma foto desfocada no PDF.
+ * Reexportado aqui para que quem já importava daqui — e os testes que substituem
+ * este módulo — continue a funcionar sem saber que a casa mudou.
  */
-export function caixasDoCollage(n: number, alturaAnotacao = 8): CaixaPdf[] {
-  if (n <= 0) return [];
-  const top = H - M - 112;
-  const bottom = M + alturaAnotacao;
-  const areaW = W - 2 * M;
-  const areaH = top - bottom;
-  const gap = 8;
-
-  if (n === 1) return [{ x: M, y: bottom, w: areaW, h: areaH }];
-  if (n === 2) {
-    const cw = (areaW - gap) / 2;
-    return [
-      { x: M, y: bottom, w: cw, h: areaH },
-      { x: M + cw + gap, y: bottom, w: cw, h: areaH },
-    ];
-  }
-  // Disposição em destaque: uma foto grande à esquerda + as restantes numa
-  // grelha à direita.
-  const featW = areaW * 0.56;
-  const caixas: CaixaPdf[] = [{ x: M, y: bottom, w: featW, h: areaH }];
-  const restantes = n - 1;
-  const rx = M + featW + gap;
-  const rW = areaW - featW - gap;
-  const rCols = restantes <= 2 ? 1 : 2;
-  const rRows = Math.ceil(restantes / rCols);
-  const cw = (rW - gap * (rCols - 1)) / rCols;
-  const ch = (areaH - gap * (rRows - 1)) / rRows;
-  for (let i = 0; i < restantes; i++) {
-    const r = Math.floor(i / rCols);
-    const c = i % rCols;
-    caixas.push({ x: rx + c * (cw + gap), y: top - r * (ch + gap) - ch, w: cw, h: ch });
-  }
-  return caixas;
-}
+export { caixasDaCapa, caixasDoCollage, type CaixaPdf };
 const MAX_EVENT_FIELD_LINES = 2; // cada campo da faixa de detalhes
 const MAX_COVER_NAME_LINES = 2; // nome do casal na capa
 
@@ -252,7 +214,22 @@ const CREAM_DIM = rgb(0.72, 0.74, 0.71); // muted cream/sage for sub-text on dar
  *  formatos, e a biblioteca do estúdio tem WebP a sério lá dentro (as fotos do
  *  Pinterest) — sem esta conversão, essas fotos não eram desenhadas de todo e
  *  ficava um buraco na página de inspiração. */
-async function embedImage(doc: PDFDocument, bytes: Buffer): Promise<PDFImage | null> {
+async function embedImage(doc: PDFDocument, cru: Buffer): Promise<PDFImage | null> {
+  /**
+   * UM `Buffer` DO NODE NEM SEMPRE COMEÇA NO PRINCÍPIO DA SUA MEMÓRIA.
+   *
+   * Abaixo de 4 KB, o `Buffer.from` serve-se de uma reserva partilhada: o
+   * conteúdo é o esperado, mas vive a meio de um bloco maior — `byteOffset` não
+   * é zero. O `JpegEmbedder` do `pdf-lib` faz `new DataView(bytes.buffer)` e
+   * ignora esse deslocamento, portanto lê o princípio do BLOCO em vez do
+   * princípio da imagem e recusa-a com «SOI not found in JPEG».
+   *
+   * Copiar para um `Uint8Array` que começa onde a imagem começa custa uns
+   * poucos KB e fecha a porta. Atinge só ficheiros pequenos — o caminho
+   * principal vem do sharp, que devolve sempre deslocamento zero — mas uma foto
+   * pequena que desaparece é uma foto que desaparece.
+   */
+  const bytes = new Uint8Array(cru);
   const isJpg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8;
   const isPng = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e;
   if (isJpg) {
@@ -284,7 +261,7 @@ async function embedImage(doc: PDFDocument, bytes: Buffer): Promise<PDFImage | n
   // JPEG baseline e embute-se isso. Guardado como tudo o resto: uma foto que
   // nem assim entra é omitida, nunca deita abaixo o documento.
   try {
-    const jpeg = await transcodificarParaJpeg(bytes);
+    const jpeg = await transcodificarParaJpeg(cru);
     if (jpeg) return await doc.embedJpg(jpeg);
   } catch {
     /* segue para o `null` */
@@ -414,8 +391,26 @@ async function drawCoverImage(
   // Falhar em silêncio é o defeito. Contar não corrige a causa, mas põe-na à
   // vista: quem gerar uma proposta passa a saber que ela saiu pesada, e o
   // registo diz porquê.
+  //
+  // ── E TEM DE PASSAR PELO SHARP, NEM QUE SEJA SÓ PARA RODAR ────────────────
+  // O `pdf-lib` lê o tamanho de um JPEG no marcador SOF e não faz ideia do que
+  // seja a orientação EXIF. Uma foto tirada com o telemóvel ao alto vem
+  // guardada deitada, com uma etiqueta a dizer «roda-me» — e por este caminho
+  // era embutida tal como está: DEITADA na página, e recortada contra o eixo
+  // errado, que é a segunda maneira de uma foto sair «desconfigurada».
+  //
+  // `transcodificarParaJpeg` faz `.rotate()` (e achata a transparência), e é
+  // barato comparado com o que se está a evitar. Só se ISSO falhar é que se
+  // embute o original em bruto — o último dos últimos recursos.
   aoUsarRecurso?.();
-  const orig = await once(cache, `${content}@original`, () => embedImage(doc, input));
+  const orig = await once(cache, `${content}@original`, async () => {
+    const direito = await transcodificarParaJpeg(input);
+    if (direito) {
+      const img = await embedImage(doc, direito);
+      if (img) return img;
+    }
+    return embedImage(doc, input);
+  });
   if (orig) {
     drawImageCover(page, orig, x, y, w, h);
     return true;
@@ -789,7 +784,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     frame(p);
     let y = H - M - 64;
     const ensure = (need: number) => {
-      if (y - need < M + 6) {
+      if (y - need < CHAO) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
@@ -856,10 +851,101 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       y = top - (rows - 1) * rowH - 42;
     }
 
-    y = sectionHeader(p, "O que propomos", "Serviços", y);
+    /* ═══════════════════════════════════════════════════════════════════════
+       ONDE A PÁGINA PARTE — E ONDE NÃO PODE PARTIR
+       ═══════════════════════════════════════════════════════════════════════
+
+       Ela abriu uma proposta de três serviços e encontrou o cabeçalho
+       «Serviços» sozinho no fundo de uma página, sem nada por baixo; e, mais à
+       frente, uma página do corpo com UMA frase e mais nada.
+
+       A causa era sempre a mesma: decidia-se mudar de página com uma medida
+       MENOR do que aquilo que se ia desenhar a seguir.
+
+         · o cabeçalho da secção era desenhado sem verificação nenhuma;
+         · o título do grupo reservava 30 pt — o título e uma linha;
+         · a descrição partia LINHA A LINHA, portanto podia deixar uma sozinha.
+
+       A regra passa a ser uma só, e é a que a secção «Condições Gerais» deste
+       mesmo ficheiro já usava: MEDIR O BLOCO INTEIRO ANTES DE O DESENHAR. Um
+       serviço ou cabe onde está, ou começa na página seguinte — nunca metade.
+
+       O preço é algum espaço em branco no fundo de algumas páginas. É o preço
+       certo: um pouco mais de branco lê-se como desenho, uma frase órfã lê-se
+       como erro. */
     const descSize = org ? 9.5 : T_BODY;
+    const DESC_X = M + 24;
+    const AVANCO_1 = descSize + 6; // avanço depois da primeira linha de um item
+    const AVANCO_N = descSize + 5; // avanço depois de cada linha seguinte
+    const ALTURA_TITULO = 22; // avanço depois do título de um grupo
+    /** Nunca menos de duas linhas de cada lado de uma quebra. */
+    const MIN_LINHAS = 2;
+
+    /**
+     * As linhas de um item, medidas EXACTAMENTE como vão ser desenhadas.
+     *
+     * É a única função que quebra o texto: a altura que se mede é a altura que
+     * se desenha, por construção. Medir num sítio e desenhar noutro é como isto
+     * se estragou da primeira vez.
+     *
+     * (As linhas seguintes são desenhadas em `DESC_X`, mais à esquerda do que a
+     * medida que as quebrou — sobra-lhes largura, nunca falta. Conservador de
+     * propósito: transbordar seria pior do que uma linha curta.)
+     */
+    const medirItem = (it: { label: string; desc?: string }) => {
+      if (!it.desc) return { lab: "", dx: DESC_X, lines: [it.label] };
+      // Sanitiza aqui também: `lab` é medido diretamente com
+      // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
+      const lab = winAnsiSafe(`${it.label}: `);
+      const dx = DESC_X + f.bold.widthOfTextAtSize(lab, descSize);
+      return { lab, dx, lines: wrap(f.reg, it.desc, descSize, W - M - dx) };
+    };
+    const alturaItem = (n: number) => AVANCO_1 + Math.max(0, n - 1) * AVANCO_N;
+    /** A altura de uma página inteira de corpo — o tecto do que se pode exigir
+     *  a um `ensure`. Sem isto, um item mais alto do que uma página pedia uma
+     *  página nova para sempre. */
+    const COLUNA = H - M - 64 - CHAO;
+    /** O que o `sectionHeader` consome antes de devolver o `y` do corpo. */
+    const ALTURA_CABECALHO = 58;
+
+    const desenharItem = (it: { label: string; desc?: string }) => {
+      const { lab, dx, lines } = medirItem(it);
+      p.drawCircle({ x: M + 12, y: y + 3, size: 1.2, color: FAINT });
+      if (lab) text(p, lab, DESC_X, y, { font: f.bold, size: descSize });
+      text(p, lines[0] ?? "", lab ? dx : DESC_X, y, { size: descSize });
+      y -= AVANCO_1;
+      for (let i = 1; i < lines.length; i++) {
+        /**
+         * Só chega aqui um item mais alto do que uma página inteira — raro, mas
+         * possível numa descrição muito longa. Reserva-se espaço para DUAS
+         * linhas enquanto houver duas por escrever: assim a quebra nunca deixa
+         * uma linha sozinha à espera das outras na página seguinte.
+         */
+        ensure(AVANCO_N * Math.min(lines.length - i, MIN_LINHAS));
+        text(p, lines[i], DESC_X, y, { size: descSize });
+        y -= AVANCO_N;
+      }
+    };
+
+    /**
+     * O cabeçalho «Serviços» viaja com o título do primeiro grupo e com o
+     * primeiro serviço. Um cabeçalho no fundo de uma página não é conteúdo — é
+     * uma página desperdiçada com ar de erro.
+     */
+    const primeiroGrupo = doc.serviceGroups[0];
+    const primeiroItem = primeiroGrupo?.items[0];
+    const alturaDoPrimeiro = primeiroItem
+      ? Math.min(alturaItem(medirItem(primeiroItem).lines.length), COLUNA)
+      : 0;
+    ensure(ALTURA_CABECALHO + (primeiroGrupo ? ALTURA_TITULO + alturaDoPrimeiro : 0));
+    y = sectionHeader(p, "O que propomos", "Serviços", y);
+
     for (const g of doc.serviceGroups) {
-      ensure(30);
+      // O título do grupo viaja com o seu primeiro serviço, pela mesma razão.
+      const abre = g.items[0];
+      ensure(
+        ALTURA_TITULO + (abre ? Math.min(alturaItem(medirItem(abre).lines.length), COLUNA) : 0),
+      );
       // Group title in serif; the ordinal marker stays quiet grey, not coloured.
       if (g.letter) text(p, g.letter, M, y, { font: f.serifB, size: T_SUB, color: MUTED });
       const letterW = g.letter ? f.serifB.widthOfTextAtSize(winAnsiSafe(g.letter) + " ", T_SUB) : 0;
@@ -868,28 +954,12 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         size: T_SUB,
         color: INK,
       });
-      y -= 22;
+      y -= ALTURA_TITULO;
       for (const it of g.items) {
-        p.drawCircle({ x: M + 12, y: y + 3, size: 1.2, color: FAINT });
-        if (it.desc) {
-          // Sanitiza aqui também: `lab` é medido diretamente com
-          // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
-          const lab = winAnsiSafe(`${it.label}: `);
-          text(p, lab, M + 24, y, { font: f.bold, size: descSize });
-          const dx = M + 24 + f.bold.widthOfTextAtSize(lab, descSize);
-          const lines = wrap(f.reg, it.desc, descSize, W - M - dx);
-          text(p, lines[0] ?? "", dx, y, { size: descSize });
-          y -= descSize + 6;
-          for (let i = 1; i < lines.length; i++) {
-            ensure(descSize + 4);
-            text(p, lines[i], M + 24, y, { size: descSize });
-            y -= descSize + 5;
-          }
-        } else {
-          text(p, it.label, M + 24, y, { size: descSize });
-          y -= descSize + 6;
-        }
-        ensure(descSize + 8);
+        const altura = alturaItem(medirItem(it).lines.length);
+        // Cabe inteiro? Então ou fica onde está, ou muda de página INTEIRO.
+        if (altura <= COLUNA) ensure(altura);
+        desenharItem(it);
       }
       y -= 8;
     }
@@ -900,19 +970,49 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     let p = pdf.addPage([W, H]);
     frame(p);
     let y = H - M - 64;
-    y = sectionHeader(p, "Como avançamos", "Cronograma de Organização", y);
-    for (const phase of doc.cronograma) {
-      if (y - 24 < M + 24) {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * O CRONOGRAMA ESCREVIA PARA FORA DA FOLHA
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * A única verificação era por FASE, e media só o título. Dentro do ciclo
+     * das tarefas — e dentro do ciclo das linhas de cada tarefa — não havia
+     * nenhuma: o `y` descia e o desenho continuava. Medido numa fase com 40
+     * tarefas: doze delas desenhadas ABAIXO do rodapé, a última em `y = -664`.
+     *
+     * Não saíam cortadas nem davam erro. Desapareciam. E a contagem de
+     * truncagens, que existe precisamente para dizer o que a composição não
+     * mostra, não as via — porque ninguém lhe tinha dito que isto acontecia.
+     *
+     * É a mesma regra dos serviços aqui em cima: mede-se o bloco antes de o
+     * desenhar, e o título de uma fase viaja com a primeira tarefa.
+     */
+    const ensure = (need: number) => {
+      if (y - need < CHAO) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
       }
+    };
+    const COLUNA = H - M - 64 - CHAO;
+    const linhasDa = (it: string) => wrap(f.reg, it, T_BODY, MEASURE + 120);
+
+    y = sectionHeader(p, "Como avançamos", "Cronograma de Organização", y);
+    for (const phase of doc.cronograma) {
+      const abre = phase.items[0];
+      ensure(20 + (abre ? Math.min(linhasDa(abre).length * 15, COLUNA) : 0));
       text(p, phase.title, M, y, { font: f.serifB, size: T_SUB, color: INK });
       y -= 20;
       for (const it of phase.items) {
-        const lines = wrap(f.reg, it, T_BODY, MEASURE + 120);
+        const lines = linhasDa(it);
+        const altura = lines.length * 15;
+        // Uma tarefa não se parte a meio se couber inteira numa página.
+        if (altura <= COLUNA) ensure(altura);
         p.drawCircle({ x: M + 12, y: y + 3, size: 1.2, color: FAINT });
-        for (const ln of lines) {
+        for (const [i, ln] of lines.entries()) {
+          // Só para a tarefa gigante que não cabe numa página: nunca deixa uma
+          // linha sozinha à espera das outras na página seguinte.
+          if (i > 0) ensure(15 * Math.min(lines.length - i, 2));
           text(p, ln, M + 24, y, { size: T_BODY });
           y -= 15;
         }

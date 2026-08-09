@@ -320,7 +320,21 @@ describe("renderProposalDocPdf", () => {
     const parsed = await PDFDocument.load(
       await renderProposalDocPdf({ ...decoracaoDoc(), coverImages: [photo, photo] }),
     );
-    const covers = embeddedImages(parsed).filter((im) => im.jpeg && im.height > 1000);
+    /**
+     * A capa identifica-se pelo ASPECTO, e já não por «tem mais de 1000 px de
+     * altura».
+     *
+     * Essa altura vinha de a caixa da capa pedir 617×1323 px — e vinha-lhe
+     * SEMPRE, mesmo quando a foto de origem tinha 120×240, porque o
+     * redimensionamento ampliava sem limite. Deixou de ampliar (ver
+     * `resizeToBox`: não se inventam pixéis), portanto uma foto pequena entra
+     * pequena. O que não muda, e é o que este teste precisa, é a FORMA: o
+     * recorte é sempre ao aspecto exacto da caixa, ≈ 0,467.
+     */
+    const ASPECTO_DA_CAPA = 277.8 / 595.28;
+    const covers = embeddedImages(parsed).filter(
+      (im) => im.jpeg && Math.abs(im.width / im.height - ASPECTO_DA_CAPA) < 0.02,
+    );
     expect(covers).toHaveLength(1);
     // …e continua a ser desenhada nos dois lados das duas capas.
     const front = coverPhotoXs(pageContent(parsed, 0));

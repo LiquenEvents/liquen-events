@@ -142,13 +142,76 @@ export function imageContentKey(bytes: Buffer): string {
 }
 
 /**
+ * A cor contra a qual a TRANSPARÊNCIA é achatada antes de virar JPEG.
+ *
+ * ── Porque é que isto tem de existir ──────────────────────────────────────
+ *
+ * O JPEG não tem canal alfa. Quando o `sharp` escreve um JPEG a partir de uma
+ * imagem com transparência, a banda alfa é DEITADA FORA — e o que fica é a cor
+ * que estava guardada por baixo. Nos PNG que o Photoshop, o Canva e o browser
+ * exportam, essa cor é preto. Resultado: um PNG com fundo transparente — um
+ * recorte, um logótipo, um desenho — que no back office aparece bem (o ecrã é
+ * branco por trás) saía no PDF como uma MANCHA PRETA.
+ *
+ * Foi assim que uma imagem carregada na biblioteca de temas chegou ao cliente:
+ * a foto estava lá, tinha sido guardada, tinha sido descarregada, tinha sido
+ * desenhada — e era um rectângulo preto.
+ *
+ * Achatar contra branco dá exactamente o que a pessoa via no ecrã, porque o
+ * ecrã por trás é branco. E o achatamento é feito ANTES do redimensionamento,
+ * pela mesma razão que já está explicada em `achatarLogotipo`: encolher
+ * primeiro deixaria os pixéis das bordas meio-transparentes a misturarem-se
+ * entre si antes de saberem contra que cor vão assentar, e ficaria um halo.
+ */
+const FUNDO_BRANCO = { r: 255, g: 255, b: 255 };
+
+/**
+ * As dimensões que a imagem tem DEPOIS de aplicada a orientação EXIF.
+ *
+ * `metadata()` devolve as dimensões como estão guardadas; uma foto de telemóvel
+ * com orientação 5 a 8 é mostrada com a largura e a altura TROCADAS, e é sobre
+ * essas que o recorte trabalha (porque `resizeToBox` faz `.rotate()` primeiro).
+ * Devolve `null` quando nem o sharp lê os bytes — quem chama segue sem limite,
+ * que é o comportamento de sempre.
+ */
+async function dimensoesReais(bytes: Buffer): Promise<{ w: number; h: number } | null> {
+  try {
+    const m = await sharp(bytes, { failOn: "none" }).metadata();
+    if (!m.width || !m.height) return null;
+    const deitada = typeof m.orientation === "number" && m.orientation >= 5;
+    return deitada ? { w: m.height, h: m.width } : { w: m.width, h: m.height };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Recorta `bytes` ao aspeto exato da caixa e reencoda em JPEG baseline.
  *
- * Duas tentativas antes de desistir: o recorte inteligente (`attention`, que
- * escolhe a zona com mais interesse visual) e, se esse falhar, um recorte ao
- * centro com `failOn: "none"` — que aceita ficheiros truncados ou com avisos.
- * Só se as duas falharem devolve `null`, e aí quem chama tem de decidir o que
- * fazer com o original. Nunca lança.
+ * Duas tentativas antes de desistir: a estrita e, se essa falhar, uma tolerante
+ * (`failOn: "none"`), que aceita ficheiros truncados ou com avisos. Só se as
+ * duas falharem devolve `null`, e aí quem chama tem de decidir o que fazer com
+ * o original. Nunca lança.
+ *
+ * ── O RECORTE É AO CENTRO, E É DE PROPÓSITO ───────────────────────────────
+ *
+ * Era `attention` — o recorte "inteligente" do sharp, que escolhe a zona com
+ * mais interesse visual. Duas razões para sair:
+ *
+ * 1. O estúdio mostra-lhe a foto com `object-cover`, que corta AO CENTRO. Com
+ *    `attention`, o que ela escolhia no ecrã e o que saía no PDF eram recortes
+ *    diferentes da mesma fotografia — e numa caixa de capa, que é altíssima e
+ *    estreita, sobra tão pouca largura que os dois recortes podem não ter nada
+ *    em comum. É a definição de «desconfigurada»: ela reconhece a foto, mas não
+ *    reconhece o que lá está.
+ *
+ * 2. `attention` persegue saturação e contornos, não pessoas. Numa fotografia
+ *    de casamento escolhe as flores e as luzes e corta as caras.
+ *
+ * E as DUAS tentativas usam agora o mesmo recorte. Antes, a tentativa tolerante
+ * usava `centre` e a primeira `attention`: a mesma foto na mesma caixa saía
+ * enquadrada de uma maneira ou de outra consoante os bytes estivessem limpos —
+ * um resultado que mudava sem nada ter mudado.
  */
 export async function resizeToBox(
   bytes: Buffer,
@@ -157,20 +220,45 @@ export async function resizeToBox(
   placement: ImagePlacement,
 ): Promise<Buffer | null> {
   if (bytes.length < 32) return null;
-  const { width, height } = pixelsForBox(widthPt, heightPt, placement);
-  const crop = async (position: string, failOn: "warning" | "none") =>
+  let { width, height } = pixelsForBox(widthPt, heightPt, placement);
+
+  /**
+   * NÃO INVENTAR PIXÉIS.
+   *
+   * `pixelsForBox` diz quantos pixéis a caixa MERECE, sem olhar para o que a
+   * foto tem. Uma foto pequena — e o carregamento deixa passar intacto qualquer
+   * JPEG abaixo de 1,5 MB, que pode ter 800 px de largura — era ampliada pelo
+   * lanczos até aos 617×1323 da capa e só depois recortada. Ampliar não
+   * acrescenta detalhe nenhum: acrescenta peso e desfoque.
+   *
+   * Aqui as duas medidas descem pelo MESMO fator, portanto o aspeto da caixa
+   * mantém-se exacto e o desenho continua a não poder esticar nada. A foto sai
+   * com menos pixéis do que a caixa gostaria — que é a verdade do ficheiro que
+   * ela carregou, e é melhor mostrá-la do que fingir o contrário.
+   */
+  const origem = await dimensoesReais(bytes);
+  if (origem) {
+    const ampliacao = Math.max(width / origem.w, height / origem.h);
+    if (ampliacao > 1) {
+      width = Math.max(1, Math.round(width / ampliacao));
+      height = Math.max(1, Math.round(height / ampliacao));
+    }
+  }
+
+  const crop = async (failOn: "warning" | "none") =>
     sharp(bytes, { failOn })
       .rotate() // aplica a orientação EXIF, senão as fotos de telemóvel saem deitadas
-      .resize(width, height, { fit: "cover", position, kernel: "lanczos3" })
+      .flatten({ background: FUNDO_BRANCO }) // transparência → branco, nunca preto
+      .resize(width, height, { fit: "cover", position: "centre", kernel: "lanczos3" })
       .jpeg(PDF_JPEG_OPTIONS)
       .toBuffer();
   try {
-    return await crop("attention", "warning");
+    return await crop("warning");
   } catch {
     /* segue para a tentativa tolerante */
   }
   try {
-    return await crop("centre", "none");
+    return await crop("none");
   } catch {
     return null;
   }
@@ -207,6 +295,8 @@ export async function transcodificarParaJpeg(bytes: Buffer): Promise<Buffer | nu
   const converter = (failOn: "warning" | "none") =>
     sharp(bytes, { failOn })
       .rotate() // orientação EXIF, como no resto do módulo
+      .flatten({ background: FUNDO_BRANCO }) // ver `FUNDO_BRANCO`: sem isto, um PNG
+      // com transparência sai preto
       .resize({
         width: MAX_IMAGE_EDGE_PX,
         height: MAX_IMAGE_EDGE_PX,

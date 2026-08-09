@@ -40,6 +40,10 @@ import ModelosParciais from "./ModelosParciais";
 import NavEstudio from "./NavEstudio";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
 import { depositPercentOf } from "@/lib/proposal-doc";
+// A geometria do documento, para a pré-visualização mostrar a forma que cada
+// foto vai MESMO ter. Módulo próprio, sem `server-only`, exactamente para poder
+// ser lido aqui — ver `proposal-geometria`.
+import { aspetoDaCapa, aspetoDoCollage } from "@/lib/proposal-geometria";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { CampoAMudar } from "@/lib/proposal-copy";
 import {
@@ -2162,7 +2166,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         url={assetUrls[path]}
                         planoB={assetOriginais[path]}
                         onRemove={() => removeCoverAt(idx)}
-                        className="aspect-[4/3]"
+                        // A forma REAL da tira de capa, e não um 4:3 que o
+                        // documento nunca desenha. Ver `aspeto` em `Thumb`.
+                        aspeto={aspetoDaCapa()}
                         pendente={isPendingImage(path)}
                         onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
                         refDoc={path}
@@ -2284,7 +2290,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           onde="mood-board"
                           refDoc={path}
                           onRemove={() => removeBoardImage(bi, path)}
-                          className="aspect-square"
+                          // A forma da célula que ESTA foto vai ocupar na
+                          // página — muda com o número de fotos do board, e
+                          // nenhuma delas é quadrada. As que já não são
+                          // impressas ficam quadradas: não têm caixa nenhuma.
+                          aspeto={
+                            ii < MOOD_BOARD_MAX_IMAGES
+                              ? aspetoDoCollage(
+                                  Math.min(b.images.length, MOOD_BOARD_MAX_IMAGES),
+                                  ii,
+                                )
+                              : 1
+                          }
                           foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
                           pendente={isPendingImage(path)}
                         />
@@ -3580,6 +3597,7 @@ function Thumb({
   planoB,
   onRemove,
   className = "",
+  aspeto,
   foraDoPdf = false,
   pendente = false,
   onde = "estúdio",
@@ -3592,6 +3610,23 @@ function Thumb({
   planoB?: string;
   onRemove: () => void;
   className?: string;
+  /**
+   * O ASPECTO DA CAIXA QUE ESTA FOTO VAI OCUPAR NO PDF.
+   *
+   * A célula pré-visualizava as capas em 4:3 e as fotos dos mood boards em
+   * quadrado — e o documento não desenha NENHUMA foto em 4:3 nem NENHUMA em
+   * quadrado. As capas são tiras altas (≈ 0,47:1, quase 1:2) e as células do
+   * collage mudam de forma consoante o número de fotos do board.
+   *
+   * O resultado era ela escolher uma foto pelo que via e o cliente receber
+   * outra coisa: a MESMA fotografia, cortada noutro sítio. Com uma tira de capa
+   * tão estreita, os dois recortes podem não ter nada em comum — é a definição
+   * de «desconfigurada», e não havia como descobri-lo sem gerar o PDF.
+   *
+   * Vem de `proposal-geometria`, a mesma função que o desenho usa. Em falta,
+   * mantém-se o que o `className` disser.
+   */
+  aspeto?: number;
   /** Esta foto está no rascunho mas a página do PDF já não a desenha. */
   foraDoPdf?: boolean;
   /** A foto já ocupa este lugar mas a cópia ainda não confirmou. */
@@ -3635,9 +3670,13 @@ function Thumb({
       // saber na mesma que esta foto ainda está a entrar (a pastilha «X a
       // caminho» diz o total, isto diz QUAL).
       aria-busy={pendente || undefined}
+      // `self-start` com o aspecto: dentro de uma grelha, sem isto a célula
+      // esticava-se à altura da linha e o `aspect-ratio` era ignorado — que é
+      // exactamente o contrário do que se quer aqui.
+      style={aspeto ? { aspectRatio: String(aspeto) } : undefined}
       className={`group relative overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-opacity motion-safe:duration-500 ${
         foraDoPdf ? "border-[#8a2a22]/60 opacity-60" : "border-foreground/[0.1]"
-      } ${pendente ? "opacity-45" : ""} ${className}`}
+      } ${pendente ? "opacity-45" : ""} ${aspeto ? "self-start" : ""} ${className}`}
     >
       {src && !semRemedio ? (
         // eslint-disable-next-line @next/next/no-img-element
