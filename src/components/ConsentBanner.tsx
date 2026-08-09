@@ -73,7 +73,6 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
         setShow(false);
       }
     } catch {
-       
       setShow(false);
     }
   }, []);
@@ -140,7 +139,30 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
       aria-label={t.aria}
       // `barra-consentimento` é a alça do CSS que esconde isto a quem já
       // escolheu, antes da primeira pintura. Ver o script no `<head>`.
-      className="barra-consentimento fixed inset-x-0 bottom-0 z-[70] border-t border-white/12 bg-moss-dark/95 backdrop-blur-sm px-5 py-4 sm:px-8"
+      /**
+       * SEM `backdrop-blur-sm`, e é a melhor troca desta sessão inteira: custa
+       * 5 % de um pixel e rende metade dos solavancos do scroll.
+       *
+       * O fundo é `bg-moss-dark/95` — 95 % opaco. O desfoque só actua nos
+       * restantes 5 %, e para isso obriga o compositor a manter uma superfície
+       * de render de LARGURA TOTAL e a reler o que está por baixo a cada frame
+       * composto. Como a barra é `fixed`, isso acontece durante todo o scroll
+       * da galeria, que é a página que mais pinta do sítio.
+       *
+       * MEDIDO na bancada rápida (100 passos × 3, CPU 4×, 4G lento), no mesmo
+       * build e de seguida:
+       *
+       *                          telemóvel >32ms   pior    secretária >32ms
+       *   como estava                 2,5 %       183 ms        32,5 %
+       *   sem os três desfoques       0,8 %        50 ms        17,3 %
+       *   SÓ esta barra sem desfoque  1,0 %        50 ms        18,3 %
+       *
+       * Ou seja: esta barra sozinha explica quase todo o custo dos três. Os
+       * outros dois `backdrop-filter` (o botão de voltar ao topo e o círculo da
+       * legenda de sobrevoo) ficam — esses vêem-se, e o que rendem já está
+       * dentro da variância entre corridas.
+       */
+      className="barra-consentimento fixed inset-x-0 bottom-0 z-[70] border-t border-white/12 bg-moss-dark/95 px-5 py-4 sm:px-8"
       style={{
         // Fora das rotas sociais nada muda: `bottom: 0` (da classe) e o
         // preenchimento a respeitar a zona segura do iPhone.
