@@ -1138,6 +1138,42 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       });
     }
 
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * OS VALORES ADICIONAIS VÊM ANTES DO TOTAL — PORQUE FAZEM PARTE DELE
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Estas linhas — Deslocação da equipa, Wedding Coordinator, Tecidos,
+     * Mobiliário opção A/B — eram desenhadas DEPOIS do total, e portanto liam-se
+     * como somas por cima dele: «6.875 € … e mais 1.550 € de deslocação». Não
+     * eram: o total nunca as incluiu, e o cliente ficava a fazer uma conta que
+     * ninguém tinha feito.
+     *
+     * Agora o estúdio soma-as ao total no momento em que são escritas (é dele
+     * que saem também o sinal de 30% e a factura). Passam para cima do total,
+     * que é onde uma linha de orçamento se lê: as linhas primeiro, o total
+     * depois. O número grande passa a ser o número que se paga.
+     */
+    const extras = (doc.budgetExtras ?? []).filter(
+      (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
+    );
+    if (extras.length) {
+      budgetBreak(24 + extras.length * 18);
+      eyebrow(p, "Valores adicionais", M, y);
+      y -= 18;
+      for (const ex of extras) {
+        const lines = wrap(f.reg, ex.label, 10.5, boxW - PRICE_COL);
+        budgetBreak(Math.max(18, lines.length * 14));
+        lines.forEach((ln, i) => {
+          text(p, ln, M, y, { size: 10.5, color: INK });
+          if (i === 0) textRight(p, ex.valueText, M + boxW, y, { size: 10.5, color: MUTED });
+          y -= 14;
+        });
+        y -= 4;
+      }
+      y -= 8;
+    }
+
     budgetBreak(boxH + 24);
     y -= 16;
     drawTotal(p, y);
@@ -1172,30 +1208,6 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         { size: 9, color: MUTED },
       );
       y -= 22;
-    }
-
-    // Extra budget lines — per-couple add-ons shown right under the total, exactly
-    // as in the studio's real proposals (Deslocação da equipa, Wedding Coordinator,
-    // Tecidos suspensos, Mobiliário opção A/B, …). Display-only free text; the
-    // billed total / 30-70 split come from the structured total above.
-    const extras = (doc.budgetExtras ?? []).filter(
-      (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
-    );
-    if (extras.length) {
-      budgetBreak(24 + extras.length * 18);
-      eyebrow(p, "Valores adicionais", M, y);
-      y -= 18;
-      for (const ex of extras) {
-        const lines = wrap(f.reg, ex.label, 10.5, boxW - PRICE_COL);
-        budgetBreak(Math.max(18, lines.length * 14));
-        lines.forEach((ln, i) => {
-          text(p, ln, M, y, { size: 10.5, color: INK });
-          if (i === 0) textRight(p, ex.valueText, M + boxW, y, { size: 10.5, color: MUTED });
-          y -= 14;
-        });
-        y -= 4;
-      }
-      y -= 8;
     }
 
     // Payment schedule with the actual amounts (30% sinal / 70% saldo) — the

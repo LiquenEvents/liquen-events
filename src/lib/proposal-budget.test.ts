@@ -4,6 +4,7 @@ import {
   precosDe,
   linhasDe,
   somaDosItens,
+  somaDosExtras,
   desalinhamento,
   sinalESaldo,
   asDuasFormas,
@@ -237,5 +238,58 @@ describe("linhas e preços andam sempre a par", () => {
     } as unknown as ProposalDoc;
     expect(precosDe(torto)).toEqual([10]);
     expect(somaDosItens(torto)).toBe(10);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS VALORES ADICIONAIS VALEM DINHEIRO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A deslocação da equipa, o wedding coordinator, os tecidos. São escritos como
+ * TEXTO na proposta («896,00 €», «895,00 € + IVA», «a definir») porque é assim
+ * que aparecem nas propostas verdadeiras — e é o estúdio que os soma ao total,
+ * que é o mesmo número de onde saem o sinal de 30% e a factura.
+ *
+ * Ler mal um destes textos é dinheiro a menos ou a mais numa factura.
+ */
+describe("somaDosExtras", () => {
+  it("soma o que consegue ler", () => {
+    expect(
+      somaDosExtras([
+        { label: "Deslocação da equipa Líquen", valueText: "1.550,00 €" },
+        { label: "Wedding Coordinator", valueText: "895,00 € + IVA" },
+      ]),
+    ).toBe(2445);
+  });
+
+  it("o que não tem número não conta — e não estraga a soma", () => {
+    expect(
+      somaDosExtras([
+        { label: "Deslocação", valueText: "1.550,00 €" },
+        { label: "Mobiliário", valueText: "a definir" },
+        { label: "Tecidos", valueText: "" },
+      ]),
+    ).toBe(1550);
+  });
+
+  it("sem extras nenhuns é zero, para poder somar-se sempre", () => {
+    expect(somaDosExtras([])).toBe(0);
+    expect(somaDosExtras(undefined)).toBe(0);
+  });
+
+  it("«1.500» é mil e quinhentos, e não um e meio", () => {
+    // A mesma regra do resto do ficheiro: sem ela, uma deslocação de 1.500 €
+    // entrava na factura como 1,50 €.
+    expect(somaDosExtras([{ label: "Deslocação", valueText: "1.500" }])).toBe(1500);
+  });
+
+  it("arredonda ao cêntimo — somar floats dá 0,30000000000000004", () => {
+    expect(
+      somaDosExtras([
+        { label: "a", valueText: "0,10" },
+        { label: "b", valueText: "0,20" },
+      ]),
+    ).toBe(0.3);
   });
 });

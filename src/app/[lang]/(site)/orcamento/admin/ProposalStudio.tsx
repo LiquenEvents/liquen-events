@@ -55,6 +55,7 @@ import {
   normalizarValor,
   removerLinha,
   somaDosItens,
+  somaDosExtras,
   asDuasFormas,
 } from "@/lib/proposal-budget";
 import { eur, splitSinal } from "@/lib/money";
@@ -1611,21 +1612,56 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setDoc((d) => marcarExtra(d as ProposalDoc, i, extra) as StudioDoc);
   }
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * MEXER NUM VALOR ADICIONAL MEXE NO TOTAL
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «colocámos a deslocação da equipa Líquen, que são mil
+   * quinhentos e cinquenta euros, e depois no total, naquela aba onde diz total
+   * IVA e validade, isto não soma. Eu quero que o back office tenha
+   * inteligência suficiente para ver os valores que nós colocamos em cada aba e
+   * faça a soma com o valor total.»
+   *
+   * O problema era maior do que o ecrã. Este total é também o PREÇO FINAL do
+   * pedido, e é dele que saem a factura, o sinal de 30% e o saldo: uma
+   * deslocação de 1.550 € escrita aqui aparecia na proposta que o cliente lê e
+   * não entrava em nada do que se cobra. O sinal era pedido a menos e a factura
+   * era emitida a menos.
+   *
+   * ── PORQUE É QUE SE SOMA A DIFERENÇA, E NÃO O TOTAL DOS EXTRAS ───────────
+   *
+   * Aplica-se ao total o que MUDOU (o depois menos o antes), e nunca o valor
+   * inteiro. É isso que torna a conta imune a ser feita duas vezes: escrever
+   * «1550» são quatro teclas, e quatro somas do valor inteiro dariam um total
+   * absurdo. Assim, cada tecla soma o que acrescentou e o resultado final é
+   * exactamente a diferença entre o que lá estava e o que ficou.
+   *
+   * Também é o que respeita um total escrito à mão: quem apagar um extra vê o
+   * total descer o mesmo que ele subiu, e mais nada é tocado.
+   */
+  function definirExtras(novos: { label: string; valueText: string }[]) {
+    const delta =
+      Math.round((somaDosExtras(novos) - somaDosExtras(doc.budgetExtras ?? [])) * 100) / 100;
+    setDoc((d) => ({ ...d, budgetExtras: novos }));
+    if (delta === 0) return;
+    // Um total não pode ficar negativo por causa de um extra apagado.
+    const base = Math.max(0, Math.round((parseMoneyText(totalInput) + delta) * 100) / 100);
+    setTotalInput(base > 0 ? String(base) : "");
+    writeTotal(base > 0 ? amountParaBase(base, vatMode) : undefined, vatMode);
+    persistirPreco(base > 0 ? base : undefined);
+  }
+
   // ── Budget extras: linhas adicionais (Deslocação, Coordenação, Tecidos…) ──
   function addBudgetExtra() {
-    setDoc((d) => ({
-      ...d,
-      budgetExtras: [...(d.budgetExtras ?? []), { label: "", valueText: "" }],
-    }));
+    // Uma linha nova nasce vazia: não há valor nenhum para somar ainda.
+    definirExtras([...(doc.budgetExtras ?? []), { label: "", valueText: "" }]);
   }
   function updateBudgetExtra(i: number, p: Partial<{ label: string; valueText: string }>) {
-    setDoc((d) => ({
-      ...d,
-      budgetExtras: (d.budgetExtras ?? []).map((r, j) => (j === i ? { ...r, ...p } : r)),
-    }));
+    definirExtras((doc.budgetExtras ?? []).map((r, j) => (j === i ? { ...r, ...p } : r)));
   }
   function removeBudgetExtra(i: number) {
-    setDoc((d) => ({ ...d, budgetExtras: (d.budgetExtras ?? []).filter((_, j) => j !== i) }));
+    definirExtras((doc.budgetExtras ?? []).filter((_, j) => j !== i));
   }
 
   // ── Budget: organizacao (per-item rows) ──
@@ -2573,15 +2609,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   />
                 </div>
 
-                {/* Valores adicionais — linhas mostradas por baixo do total (Deslocação,
-                  Wedding Coordinator, Tecidos, Mobiliário opção A/B, …). Só aparecem no
-                  PDF; o valor faturado e o sinal 30/70 continuam a partir do «Total» abaixo. */}
+                {/* Valores adicionais — linhas do orçamento que entram no total
+                  (Deslocação, Wedding Coordinator, Tecidos, Mobiliário opção A/B, …).
+                  Escrever um valor aqui SOMA-O ao total: ver `definirExtras`. */}
                 <div className="mt-5">
                   <span className="bo-eyebrow">Valores adicionais</span>
                   <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
-                    Linhas mostradas por baixo do total na proposta (ex.: deslocação, coordenação,
-                    tecidos). Só para o PDF — o total faturado e o sinal continuam a partir do
-                    «Total».
+                    Linhas mostradas na proposta antes do total (ex.: deslocação, coordenação,
+                    tecidos). <strong className="font-semibold">Somam ao total</strong> — e portanto
+                    ao sinal e à factura.
                   </p>
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
@@ -2618,6 +2654,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         </button>
                       </div>
                     ))}
+                    {/* A conta à vista. Sem isto ela tinha de a fazer de
+                        cabeça para saber se o total já a incluía — que é
+                        exactamente o que a fez descobrir que não incluía. */}
+                    {somaDosExtras(doc.budgetExtras) > 0 && (
+                      <p className="text-xs text-foreground/55">
+                        Somado ao total:{" "}
+                        <strong className="font-semibold text-foreground/75">
+                          {eur(somaDosExtras(doc.budgetExtras))}
+                        </strong>
+                      </p>
+                    )}
                     <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
                       + Adicionar valor adicional
                     </button>
@@ -2700,18 +2747,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 budgetCosts: custosDe(d as ProposalDoc).map((v, j) => (j === i ? custo : v)),
               }))
             }
-            onDeslocacao={(label, valueText) =>
-              setDoc((d) => {
-                // Se já lá está uma linha de deslocação, actualiza-se essa em
-                // vez de acrescentar uma segunda — duas linhas de deslocação
-                // numa proposta são uma pergunta do cliente ao telefone.
-                const extras = [...(d.budgetExtras ?? [])];
-                const i = extras.findIndex((e) => /desloca/i.test(e.label ?? ""));
-                if (i >= 0) extras[i] = { ...extras[i], label, valueText };
-                else extras.push({ label, valueText });
-                return { ...d, budgetExtras: extras };
-              })
-            }
+            onDeslocacao={(label, valueText) => {
+              // Se já lá está uma linha de deslocação, actualiza-se essa em
+              // vez de acrescentar uma segunda — duas linhas de deslocação
+              // numa proposta são uma pergunta do cliente ao telefone.
+              //
+              // Passa por `definirExtras` como todas as outras: aceitar a
+              // deslocação calculada tem de somar ao total, ou volta a haver
+              // um valor na proposta que não está no que se cobra.
+              const extras = [...(doc.budgetExtras ?? [])];
+              const i = extras.findIndex((e) => /desloca/i.test(e.label ?? ""));
+              if (i >= 0) extras[i] = { ...extras[i], label, valueText };
+              else extras.push({ label, valueText });
+              definirExtras(extras);
+            }}
           />
 
           <Section title="Total, IVA e validade" id="total">

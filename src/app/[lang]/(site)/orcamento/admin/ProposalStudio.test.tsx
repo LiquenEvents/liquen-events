@@ -900,3 +900,81 @@ describe("uma célula que não conseguiu desenhar a foto", () => {
     expect(avisoDeFalha()).toBeNull();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS «VALORES ADICIONAIS» ENTRAM NO TOTAL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «colocámos a deslocação da equipa Líquen, que são mil
+ * quinhentos e cinquenta euros, e depois no total, naquela aba onde diz total
+ * IVA e validade, isto não soma.»
+ *
+ * O que estava em jogo não era só o ecrã: este total é o PREÇO FINAL do pedido,
+ * e é dele que saem o sinal de 30% e a factura. Uma deslocação escrita aqui
+ * aparecia na proposta que o cliente lê e não entrava em nada do que se cobra.
+ */
+describe("os valores adicionais somam ao total", () => {
+  const comPreco = (preco?: number) => ({ ...quote, quotedPrice: preco }) as Quote;
+  const desenhar = (q: Quote) =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={q} />
+      </ToastProvider>,
+    );
+
+  async function escreverExtra(valor: string) {
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
+    const campo = await screen.findByLabelText(/Valor da linha adicional/i);
+    await user.type(campo, valor);
+    return user;
+  }
+
+  it("escrever 1550 num valor adicional leva o total de 6875 a 8425", async () => {
+    desenhar(comPreco(6875));
+    await escreverExtra("1550");
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("8425");
+  });
+
+  /**
+   * A razão de a conta ser feita pela DIFERENÇA e não pelo valor inteiro:
+   * escrever «1550» são quatro teclas, e quatro somas do valor inteiro davam um
+   * total absurdo. Este teste é o que garante que a tecla a tecla converge.
+   */
+  it("escrever tecla a tecla não soma quatro vezes", async () => {
+    desenhar(comPreco(1000));
+    await escreverExtra("100");
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("1100");
+  });
+
+  it("apagar o valor adicional devolve o total ao que era", async () => {
+    desenhar(comPreco(6875));
+    const user = await escreverExtra("1550");
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("8425");
+    await user.click(await screen.findByRole("button", { name: /Remover linha adicional/i }));
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("6875");
+  });
+
+  it("um valor sem número («a definir») não mexe no total", async () => {
+    desenhar(comPreco(6875));
+    await escreverExtra("a definir");
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("6875");
+  });
+
+  it("a conta fica à vista, para não ter de ser feita de cabeça", async () => {
+    desenhar(comPreco(6875));
+    await escreverExtra("1550");
+    expect(await screen.findByText(/Somado ao total:/i)).toBeTruthy();
+  });
+
+  it("e chega ao PREÇO FINAL do pedido — é dele que sai a factura", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    desenhar(comPreco(6875));
+    await escreverExtra("1550");
+    await vi.advanceTimersByTimeAsync(800);
+    const gravacoes = fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
+    expect(JSON.parse(String(gravacoes.at(-1)?.[1]?.body))).toMatchObject({ quotedPrice: 8425 });
+    vi.useRealTimers();
+  });
+});

@@ -88,6 +88,44 @@ export function linhasDe(
 }
 
 /**
+ * Os valores adicionais que se conseguem LER, em euros.
+ *
+ * São texto livre no documento ("896,00 €", "895,00 € + IVA", "a definir",
+ * "sob consulta") porque é assim que aparecem nas propostas verdadeiras. O que
+ * tem um número conta; o resto não conta e também não estraga nada.
+ */
+function valoresDosExtras(extras: ProposalDoc["budgetExtras"]): number[] {
+  return (extras ?? [])
+    .map((e) => normalizarValor(e.valueText))
+    .filter((p): p is number => p !== null);
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANTO VALEM OS «VALORES ADICIONAIS»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «nós colocámos a deslocação da equipa Líquen, que são mil
+ * quinhentos e cinquenta euros, e ele depois no total não soma o valor total
+ * que nós estamos a colocar. Eu quero que o back office tenha inteligência
+ * suficiente para ver os valores que nós colocamos em cada aba e faça a soma.»
+ *
+ * Tinha razão, e o problema era maior do que o ecrã: o total era também o
+ * PREÇO FINAL do pedido, e é dele que saem a factura, o sinal de 30% e o saldo.
+ * Uma deslocação de 1.550 € escrita como valor adicional saía da proposta para
+ * o cliente, e não entrava em nada do que se cobra — o sinal era calculado sem
+ * ela e a factura era emitida sem ela.
+ *
+ * Devolve `0` quando não há nenhum valor legível, que é o que permite somá-lo
+ * sempre sem perguntar primeiro.
+ */
+export function somaDosExtras(extras: ProposalDoc["budgetExtras"]): number {
+  const valores = valoresDosExtras(extras);
+  if (valores.length === 0) return 0;
+  return Math.round(valores.reduce((a, b) => a + b, 0) * 100) / 100;
+}
+
+/**
  * A soma dos itens mais os valores adicionais.
  *
  * `null` quando NÃO HÁ NENHUM preço — que é diferente de somar zero. Sem esta
@@ -99,11 +137,7 @@ export function somaDosItens(
   doc: Pick<ProposalDoc, "budgetItems" | "budgetAmounts" | "budgetExtras">,
 ): number | null {
   const dosItens = precosDe(doc).filter((p): p is number => p !== null);
-  // Os valores adicionais são texto livre no PDF ("896,00 €", "895,00 € + IVA").
-  // O que se conseguir ler conta; o que for "a definir" não.
-  const dosExtras = (doc.budgetExtras ?? [])
-    .map((e) => normalizarValor(e.valueText))
-    .filter((p): p is number => p !== null);
+  const dosExtras = valoresDosExtras(doc.budgetExtras);
   const todos = [...dosItens, ...dosExtras];
   if (todos.length === 0) return null;
   // Arredondar ao cêntimo: somar floats dá 3249.9999999999995.
