@@ -31,7 +31,29 @@ const COPY = {
 } as const;
 
 export default function ConsentBanner({ locale }: { locale: Locale }) {
-  const [show, setShow] = useState(false);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * ARRANCA VISÍVEL — E É POR ISSO QUE ELE EXISTE NO HTML
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Isto era `useState(false)`: o servidor devolvia `null` e a barra só nascia
+   * quando o React hidratava e o efeito lá em baixo lia o `localStorage`.
+   * MEDIDO: o parágrafo desta barra era o elemento de LCP do telemóvel, a
+   * 3348–3588 ms, e `grep "Usamos cookies"` no HTML construído dava zero. O
+   * maior bloco de texto do primeiro ecrã esperava pelo JavaScript todo para
+   * existir — em todas as páginas do sítio.
+   *
+   * Agora vem desenhado do servidor. Quem já escolheu não o chega a ver: um
+   * script em linha no `<head>` (ver `[lang]/layout.tsx`) lê a escolha aos
+   * ~11 ms e marca o `<html>`, e o CSS esconde a barra antes da primeira
+   * pintura. Este efeito continua a existir para a TIRAR do DOM — o CSS só a
+   * esconde; quem a remove é o React, e é ele que manda no fim.
+   *
+   * O estado inicial `true` é também o que mantém a hidratação coerente: o
+   * primeiro render do cliente tem de desenhar exactamente o que o servidor
+   * desenhou.
+   */
+  const [show, setShow] = useState(true);
   const pathname = usePathname();
   // The consent bar governs Google's public-visitor tracking; it has no place
   // over the authenticated back office (…/orcamento/admin[/…], locale-prefixed
@@ -40,15 +62,19 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
   const isBackOffice = pathname?.includes("/orcamento/admin") ?? false;
 
   useEffect(() => {
-    // Only surface the bar when no choice has been stored yet. Wrapped in
-    // try/catch because localStorage throws in private-mode / blocked-storage.
+    // A lógica é a mesma de sempre, ao contrário: a barra já está desenhada, e
+    // o que este efeito faz é TIRÁ-LA quando já houve escolha. O `catch`
+    // mantém a decisão antiga (sem armazenamento, não se mostra a barra) —
+    // e o script em linha do `<head>` já a tinha escondido, portanto isto só
+    // acaba o trabalho, sem piscar.
     try {
-      if (!localStorage.getItem("liquen-consent")) {
+      if (localStorage.getItem("liquen-consent")) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setShow(true);
+        setShow(false);
       }
     } catch {
-      /* storage unavailable — skip the banner rather than risk a throw */
+       
+      setShow(false);
     }
   }, []);
 
@@ -56,7 +82,14 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
   // change or withdraw their choice at any time (RGPD: withdrawing consent must
   // be as easy as giving it).
   useEffect(() => {
-    const open = () => setShow(true);
+    const open = () => {
+      // Tirar TAMBÉM a marca do `<html>`: é ela que o CSS usa para esconder a
+      // barra a quem já escolheu, e sem isto o "Gerir cookies" do rodapé
+      // montava um elemento que ficava invisível — a retirada do consentimento
+      // deixava de ser possível, que é precisamente o que o RGPD não permite.
+      document.documentElement.classList.remove("consentimento-decidido");
+      setShow(true);
+    };
     window.addEventListener("liquen:open-consent", open);
     return () => window.removeEventListener("liquen:open-consent", open);
   }, []);
@@ -105,7 +138,9 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
       // modal dialogs on the page (gallery lightbox) under getByRole('dialog').
       role="region"
       aria-label={t.aria}
-      className="fixed inset-x-0 bottom-0 z-[70] border-t border-white/12 bg-moss-dark/95 backdrop-blur-sm px-5 py-4 sm:px-8"
+      // `barra-consentimento` é a alça do CSS que esconde isto a quem já
+      // escolheu, antes da primeira pintura. Ver o script no `<head>`.
+      className="barra-consentimento fixed inset-x-0 bottom-0 z-[70] border-t border-white/12 bg-moss-dark/95 backdrop-blur-sm px-5 py-4 sm:px-8"
       style={{
         // Fora das rotas sociais nada muda: `bottom: 0` (da classe) e o
         // preenchimento a respeitar a zona segura do iPhone.

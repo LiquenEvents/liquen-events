@@ -241,13 +241,24 @@ const SONDA = `
 
   const engancharImg = (im, r) => {
     if (!im || imgsVistas.has(im)) return;
+    // ── ONDE ESTA PINTADO O DESFOCADO ──────────────────────────────────────
+    // No elemento picture, desde 8 de Agosto: a imagem leva a classe g-foto,
+    // que e opacity 0, e um fundo pintado nela ficava apagado com ela. Este
+    // instrumento continuava a perguntar ao img — e por isso passou a relatar
+    // "blur 0 · so cor 16" numa pagina que mostra 16 desfocados de 16. Uma
+    // medicao que nao acompanha a correccao mente com a mesma confianca com
+    // que media bem. Pergunta-se aos dois, que e o que aguenta as duas epocas
+    // e o blur tardio (que pode cair na propria imagem).
+    // SEM ACENTOS GRAVES NESTE BLOCO: isto vive dentro de um template literal
+    // injectado no browser, e um acento grave fecha-o. Foi assim que se partiu.
     imgsVistas.add(im);
     r.imgs++;
     r.im = im;   // apagado antes de serializar; serve o censo abaixo
     // O que o mosaico mostra ENQUANTO espera, lido no momento em que o <img>
     // aparece (depois some: o componente tira o background ao carregar).
     if (r.placeholder === null) {
-      const fundoImg = im.style.backgroundImage || "";
+      const moldura = im.parentElement && im.parentElement.tagName === "PICTURE" ? im.parentElement : null;
+      const fundoImg = (moldura && moldura.style.backgroundImage) || im.style.backgroundImage || "";
       const tile = r.el;
       r.placeholder = /data:image/.test(fundoImg)
         ? "blur"
@@ -360,7 +371,8 @@ const SONDA = `
       const im = r.im;
       if (!im) { semFoto++; desfocados++; continue; }
       if (!(im.complete && im.naturalWidth > 0)) semFoto++;
-      if (/data:image/.test(im.style.backgroundImage || "")) desfocados++;
+      const mold = im.parentElement && im.parentElement.tagName === "PICTURE" ? im.parentElement : null;
+      if (/data:image/.test((mold && mold.style.backgroundImage) || im.style.backgroundImage || "")) desfocados++;
     }
     M.censo.push({
       t: Math.round(performance.now()),
@@ -382,7 +394,8 @@ const SONDA = `
     let blur = 0, cor = 0, nada = 0;
     for (const t of tiles) {
       const im = t.querySelector("img");
-      const temBlur = im && /data:image/.test(im.style.backgroundImage || "");
+      const mold = im && im.parentElement && im.parentElement.tagName === "PICTURE" ? im.parentElement : null;
+      const temBlur = !!im && /data:image/.test((mold && mold.style.backgroundImage) || im.style.backgroundImage || "");
       const temCor = /rgb|#/.test(t.style.backgroundColor || "");
       if (temBlur) blur++;
       else if (temCor) cor++;

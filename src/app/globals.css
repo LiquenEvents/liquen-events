@@ -1449,6 +1449,20 @@ body:has([data-orcamento-mode]) .eyebrow {
   contain-intrinsic-size: auto var(--cv-h, clamp(480px, 60vh, 680px));
 }
 
+/* ── O aviso de cookies de quem já respondeu ──
+   A barra vem SEMPRE no HTML do servidor (a razão está no `[lang]/layout.tsx`:
+   ela era o elemento de LCP e só nascia na hidratação, aos ~2 s). Quem já
+   escolheu não a pode ver, e quem decide isso é um script em linha no `<head>`
+   que marca o `<html>` aos ~11 ms — antes da primeira pintura.
+
+   `display: none` e não `opacity`/`visibility`: além de invisível, tem de sair
+   da árvore de acessibilidade e deixar de ocupar espaço; e assim também não
+   pode ser candidata a LCP para quem já respondeu. Segundos depois o React
+   tira-a mesmo do DOM. */
+html.consentimento-decidido .barra-consentimento {
+  display: none;
+}
+
 /* ── O itálico do Playfair, que é um desenho à parte e não uma inclinação ──
    Vive numa família própria, servida SEM pré-carregamento (ver o comentário
    longo em `[lang]/layout.tsx`): pesa 38 888 B, era pedido em prioridade alta

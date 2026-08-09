@@ -246,6 +246,39 @@ export default async function RootLayout({
         JavaScript que chegavam a uma landing page paga cujo trabalho inteiro
         é mostrar uma fotografia, uma frase e um botão.
       */}
+      <head>
+        {/*
+          ══════════════════════════════════════════════════════════════════════
+          A DECISÃO SOBRE O AVISO DE COOKIES É TOMADA AOS ~11 ms, NÃO AOS ~2 s
+          ══════════════════════════════════════════════════════════════════════
+
+          MEDIDO: o elemento de LCP do telemóvel na /galeria era o parágrafo
+          deste aviso, a 3348–3588 ms. E `grep "Usamos cookies"` no HTML
+          construído dava ZERO: o aviso não existia no documento — nascia quando
+          o React hidratava e um efeito lia o `localStorage`. Ou seja, o maior
+          bloco de texto do primeiro ecrã esperava pelo JavaScript inteiro para
+          existir, e arrastava o LCP de TODAS as páginas do sítio com ele.
+
+          O aviso passa a vir desenhado do servidor. Quem já escolheu não o pode
+          ver — e é este script que o resolve, antes da primeira pintura: lê a
+          escolha e marca o `<html>`, e o CSS esconde a barra a partir daí.
+
+          O `catch` esconde também: mantém a decisão que já estava escrita no
+          componente («storage unavailable — skip the banner rather than risk a
+          throw»). Sem isto, quem navega em modo privado passaria a ver o aviso
+          em todas as páginas, sem poder guardar a resposta.
+
+          Corre em linha e sem `defer` de propósito: se corresse depois da
+          primeira pintura, quem já escolheu via o aviso a piscar.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('liquen-consent'))document.documentElement.classList.add('consentimento-decidido')}" +
+              "catch(e){document.documentElement.classList.add('consentimento-decidido')}",
+          }}
+        />
+      </head>
       <body className="flex flex-col min-h-screen antialiased">
         <LocaleProvider locale={locale} dict={pickChromeDict(t)}>
           {imageCdnOrigin && <link rel="preconnect" href={imageCdnOrigin} />}
