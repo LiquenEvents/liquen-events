@@ -204,6 +204,74 @@ describe("POST /api/orcamento", () => {
     });
   });
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A CERIMÓNIA E O ESPAÇO — as duas perguntas que mudam o trabalho
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Uma cerimónia religiosa é um SEGUNDO sítio para decorar no mesmo dia, com
+   * as suas regras e uma deslocação a meio; ao ar livre há sempre uma montagem
+   * alternativa a preparar para o caso de chover. Nenhuma das duas coisas se
+   * consegue orçamentar sem a resposta, e nenhuma das duas se lembra de
+   * perguntar ao telefone.
+   *
+   * O que estes testes guardam é o caminho todo: o que o cliente escolhe tem de
+   * chegar ao pedido gravado, ao email da equipa e de volta ao próprio cliente.
+   */
+  describe("tipo de cerimónia e tipo de espaço", () => {
+    const comAmbos = {
+      ...validForm,
+      eventType: "casamentos",
+      ceremonyType: "civil-religiosa",
+      spaceType: "exterior",
+    };
+
+    it("chegam ao pedido gravado", async () => {
+      await POST(req("POST", { form: comAmbos }));
+      const [gravado] = store.create.mock.calls[0] as unknown as [
+        { ceremonyType?: string; spaceType?: string },
+      ];
+      expect(gravado.ceremonyType).toBe("civil-religiosa");
+      expect(gravado.spaceType).toBe("exterior");
+    });
+
+    it("aparecem no email à equipa, com o rótulo e não com o identificador", async () => {
+      await POST(req("POST", { form: comAmbos }));
+      const equipa = sendMailMock.mock.calls[0][0];
+      expect(equipa.text ?? "").toContain("Cerimónia: Civil e religiosa");
+      expect(equipa.text ?? "").toContain("Espaço: Exterior");
+      // O identificador é interno: nunca deve ser o que ela lê.
+      expect(equipa.text ?? "").not.toContain("civil-religiosa");
+    });
+
+    it("são devolvidos ao cliente na confirmação", async () => {
+      await POST(req("POST", { form: comAmbos }));
+      const cliente = sendMailMock.mock.calls[1][0];
+      expect(cliente.text ?? "").toContain("Civil e religiosa");
+      expect(cliente.text ?? "").toContain("Exterior");
+    });
+
+    it("um identificador inventado não passa para os emails", async () => {
+      await POST(
+        req("POST", {
+          form: { ...comAmbos, ceremonyType: "<script>", spaceType: "<script>" },
+        }),
+      );
+      for (const [args] of sendMailMock.mock.calls) {
+        expect(args.html).not.toContain("<script>");
+        expect(args.text ?? "").not.toContain("<script>");
+      }
+    });
+
+    it("quem não respondeu não ganha uma linha vazia", async () => {
+      await POST(req("POST", { form: validForm }));
+      for (const [args] of sendMailMock.mock.calls) {
+        expect(args.text ?? "").not.toMatch(/Cerim[óo]nia:\s*$/m);
+        expect(args.text ?? "").not.toMatch(/Espa[çc]o:\s*$/m);
+      }
+    });
+  });
+
   it("não mete o 'Como nos conheceu' no email", async () => {
     // Ela fotografou a linha `Como nos conheceu  ref:www.google.com` e pediu
     // para a tirar. O campo não é escrito por ninguém — é apanhado pelo

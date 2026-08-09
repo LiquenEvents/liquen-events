@@ -17,7 +17,7 @@ import {
   type VatMode,
 } from "@/lib/proposal-doc";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
-import { guestRangeLabel } from "@/lib/orcamento/data";
+import { guestRangeLabel, ceremonyTypeLabel } from "@/lib/orcamento/data";
 import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
 import PainelInterno from "./PainelInterno";
@@ -153,7 +153,15 @@ function initialDoc(quote: Quote): StudioDoc {
     // Sem número exacto, vale a ordem de grandeza que o casal deu ("100 a 150").
     // Escrever "0 pax" era pior do que não escrever nada.
     guests: quote.guests ? `${quote.guests} pax` : guestRangeLabel(quote.guestsRange),
-    ceremony: "",
+    // A cerimónia que o casal escolheu no pedido, já escrita no documento.
+    // O campo existe desde sempre («Civil, simbólica») e abria vazio, para ela
+    // preencher à mão a partir do que estivesse no pedido — que era exactamente
+    // onde a resposta se perdia. Continua editável: isto é uma semente, não uma
+    // trave, e um casal que muda de ideias muda-se aqui.
+    //
+    // Em português mesmo quando o pedido veio em inglês: o documento do estúdio
+    // é escrito em português.
+    ceremony: ceremonyTypeLabel(quote.ceremonyType),
     time: "",
     weddingPlanners: "",
     serviceGroups: [],

@@ -21,6 +21,7 @@ import { daysUntil, isHighSeason, longDate } from "@/lib/workdays";
 import { track } from "@/lib/track";
 import { reportLeadConversion } from "@/lib/ads-conversion";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
+import { ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcamento/data";
 import { CONFIRMACAO_PHOTOS, type ConfirmacaoPhotoKey } from "./photos";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -315,6 +316,12 @@ export default function ConfirmacaoClient({
           note: !eventDate && openDate ? tc.openDateNote : undefined,
         },
         { label: tc.local, value: quote.location ?? "" },
+        // Interior/exterior e o tipo de cerimónia, pela mesma razão que a
+        // decoração aqui abaixo: o que o cliente respondeu tem de aparecer nos
+        // dois sítios — no ecrã e no email — ou fica a duvidar de que o pedido
+        // tenha chegado inteiro. `filter` no fim remove as linhas em branco.
+        { label: tc.espaco, value: spaceTypeLabel(quote.spaceType, locale) },
+        { label: tc.cerimonia, value: ceremonyTypeLabel(quote.ceremonyType, locale) },
         {
           // O mesmo resumo que vai no email. Se o casal escolheu os pontos de
           // decoração, tem de os ver de volta nos dois sítios — ver uma coisa

@@ -442,6 +442,13 @@ export const en: Dict = {
     labelDecor: "Where would you like decoration?",
     hintDecor:
       "Tick whatever feels right. It helps us prepare a proposal with only what you want, and if you are not sure yet, skip this part: we will work it out together.",
+    // Ver `pt.ts` para o porquê de cada uma destas perguntas.
+    labelCerimonia: "What kind of ceremony?",
+    hintCerimonia:
+      "A church ceremony means a second space to decorate, on top of the reception. If it is not decided yet, just move on.",
+    labelEspaco: "Is the space indoors or outdoors?",
+    hintEspaco:
+      "Outdoors we always prepare a fallback in case the weather turns, and there are flowers and materials we choose differently.",
     labelData: "Event date",
     dateFlexibleLabel: "Date still to be decided",
     guestsFlexibleLabel: "Still to be decided",
@@ -596,6 +603,8 @@ export const en: Dict = {
     convidados: "Guests",
     data: "Date",
     local: "Location",
+    cerimonia: "Ceremony",
+    espaco: "Space",
     decoracao: "Decoration",
     mensagem: "Message",
     adicionais: "Additional Services",

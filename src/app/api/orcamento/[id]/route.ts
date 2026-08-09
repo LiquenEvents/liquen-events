@@ -55,6 +55,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       // dados que a própria pessoa acabou de escrever; o que esta lista
       // protege é o que é INTERNO (preços, notas da equipa), e isto não é.
       decorPoints: quote.decorPoints ?? [],
+      // Mesma razão dos pontos de decoração: são respostas que a própria pessoa
+      // acabou de dar, e recarregar a página de confirmação não as pode fazer
+      // desaparecer. O que esta lista protege é o que é INTERNO — preços, notas
+      // da equipa — e isto não é nenhuma dessas coisas.
+      ceremonyType: quote.ceremonyType ?? "",
+      spaceType: quote.spaceType ?? "",
     };
     return NextResponse.json(safe);
   } catch (err) {

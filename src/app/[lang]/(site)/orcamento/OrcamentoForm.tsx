@@ -13,7 +13,12 @@ import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
 import { track } from "@/lib/track";
 import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
 import { lerClique, serializar } from "@/lib/ads/click-id";
-import { QUOTE_EVENT_OPTIONS, GUEST_RANGES } from "@/lib/orcamento/data";
+import {
+  QUOTE_EVENT_OPTIONS,
+  GUEST_RANGES,
+  CEREMONY_TYPES,
+  SPACE_TYPES,
+} from "@/lib/orcamento/data";
 import { PONTOS_DECORACAO } from "@/lib/orcamento/decoracao";
 
 /**
@@ -121,6 +126,84 @@ function FloatingField({
   );
 }
 
+/** A legenda de uma secção do formulário. Ao nível do módulo (e já não dentro
+ *  do componente) para que `EscolhaUnica`, aqui abaixo, use exactamente a mesma
+ *  — duas legendas parecidas mas diferentes notam-se logo. */
+const labelCls =
+  "block text-[10.5px] font-medium text-foreground/60 tracking-[0.16em] uppercase mb-3 transition-colors duration-300 group-focus-within:text-moss-dark";
+
+/**
+ * Grupo de escolha ÚNICA e OPCIONAL, em pastilhas — o mesmo desenho das outras
+ * do formulário (tipo de evento, pontos de decoração, ordem de grandeza).
+ *
+ * Duas decisões que valem a pena dizer em voz alta:
+ *
+ * · Carregar na opção já escolhida DESMARCA-A. São perguntas opcionais, e um
+ *   grupo de rádios sem forma de voltar atrás obriga a recarregar a página só
+ *   para tirar uma resposta dada por engano.
+ *
+ * · Por isso mesmo NÃO é um `radiogroup`: um rádio, para a tecnologia de apoio,
+ *   é uma escolha entre alternativas que se percorre com as setas e da qual não
+ *   se sai. Isto são botões de alternar independentes, cada um com o seu
+ *   `aria-pressed`, dentro de um grupo com nome — que é o que estes botões
+ *   realmente fazem.
+ */
+function EscolhaUnica({
+  legendId,
+  legend,
+  hint,
+  options,
+  value,
+  onChange,
+  english,
+  onStart,
+}: {
+  legendId: string;
+  legend: string;
+  hint?: string;
+  options: { id: string; label: string; en: string }[];
+  value: string;
+  onChange: (id: string) => void;
+  english: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <fieldset className="group">
+      <legend id={legendId} className={labelCls}>
+        {legend}
+      </legend>
+      {hint && <p className="mt-2 mb-4 text-[12px] leading-relaxed text-foreground/50">{hint}</p>}
+      <div
+        role="group"
+        aria-labelledby={legendId}
+        className={`flex flex-wrap gap-3${hint ? "" : " mt-3"}`}
+      >
+        {options.map((o) => {
+          const active = value === o.id;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => {
+                onStart();
+                onChange(active ? "" : o.id);
+              }}
+              className={`px-4 py-2 pointer-coarse:min-h-11 rounded-full text-[10px] tracking-[0.12em] uppercase border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.97] ${
+                active
+                  ? "bg-moss border-moss text-white shadow-sm shadow-moss/20"
+                  : "border-foreground/12 text-foreground/55 hover:border-moss/40 hover:text-foreground/85"
+              }`}
+            >
+              {english ? o.en : o.label}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
 // `panelBlur` (the left-panel image's blur placeholder) is resolved on the
 // SERVER page and passed in as a single string, so this client component never
 // imports blurFor / blur-map.json — that ~107KB map used to bundle into this
@@ -165,6 +248,20 @@ export default function OrcamentoForm({
    * orçamento. Continua opcional: quem não faz mesmo ideia deixa em branco.
    */
   const [pessoasAprox, setPessoasAprox] = useState("");
+  /**
+   * O tipo de cerimónia (civil, religiosa, as duas, simbólica) e o tipo de
+   * espaço (interior, exterior, os dois).
+   *
+   * Os dois são OPCIONAIS e desmarcáveis — voltar a carregar na mesma opção
+   * limpa-a. Muita gente pede orçamento precisamente porque ainda não decidiu
+   * isto, e um campo obrigatório aqui só serviria para receber uma resposta
+   * inventada, que é pior do que uma resposta em branco: a proposta nasceria
+   * desenhada para uma coisa que ninguém escolheu.
+   *
+   * A cerimónia só existe no casamento; o espaço aplica-se a todos os eventos.
+   */
+  const [cerimonia, setCerimonia] = useState("");
+  const [espaco, setEspaco] = useState("");
   const alternarDecor = (id: string) =>
     setDecor((atual) => (atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]));
   const [website, setWebsite] = useState(""); // honeypot — fica vazio
@@ -228,6 +325,8 @@ export default function OrcamentoForm({
       if (d.mensagem) setMensagem(d.mensagem);
       if (d.decor) setDecor(d.decor.split(",").filter(Boolean));
       if (d.pessoasAprox) setPessoasAprox(d.pessoasAprox);
+      if (d.cerimonia) setCerimonia(d.cerimonia);
+      if (d.espaco) setEspaco(d.espaco);
     } catch {
       /* localStorage indisponível — segue sem rascunho */
     }
@@ -278,6 +377,8 @@ export default function OrcamentoForm({
       // têm vírgulas.
       decor: decor.join(","),
       pessoasAprox,
+      cerimonia,
+      espaco,
     };
   }, [
     eventType,
@@ -292,6 +393,8 @@ export default function OrcamentoForm({
     mensagem,
     decor,
     pessoasAprox,
+    cerimonia,
+    espaco,
   ]);
   // Once the quote is submitted the draft is intentionally cleared; block any
   // later lifecycle flush (the router.push unmount below) from resurrecting it.
@@ -327,6 +430,8 @@ export default function OrcamentoForm({
     mensagem,
     decor,
     pessoasAprox,
+    cerimonia,
+    espaco,
     flushDraft,
   ]);
 
@@ -440,6 +545,15 @@ export default function OrcamentoForm({
       // agarrado a uma festa que não é um casamento.
       partnerA: opt?.eventType === "casamentos" ? noivo.trim() || undefined : undefined,
       partnerB: opt?.eventType === "casamentos" ? noiva.trim() || undefined : undefined,
+      // A cerimónia é uma pergunta de casamento, e leva a mesma guarda que os
+      // pontos e os nomes: escolher "religiosa" e depois mudar para
+      // "Aniversário" não pode deixar uma cerimónia agarrada a uma festa que
+      // não tem nenhuma.
+      //
+      // O espaço NÃO leva guarda nenhuma: interior ou exterior é uma pergunta
+      // válida em todos os tipos de evento, e é a mesma pergunta em todos.
+      ceremonyType: opt?.eventType === "casamentos" ? cerimonia : "",
+      spaceType: espaco,
       // Só quando NÃO há número: os dois nunca convivem, e é o número que
       // manda. Enviar os dois deixava a equipa sem saber qual acreditar.
       guestsRange: guestsFlexible ? pessoasAprox : "",
@@ -580,8 +694,6 @@ export default function OrcamentoForm({
   // and focus switches it to solid moss.
   const ffInputCls =
     "ff-input field-line w-full bg-transparent border-b border-foreground/45 text-sm text-foreground focus:outline-none focus:border-moss";
-  const labelCls =
-    "block text-[10.5px] font-medium text-foreground/60 tracking-[0.16em] uppercase mb-3 transition-colors duration-300 group-focus-within:text-moss-dark";
   const hintCls = "mt-2 text-[11px] tracking-wide text-gold-text";
 
   // lg:pt-20 clears the tall at-rest navbar (≈164px logo lockup vs the global
@@ -735,6 +847,24 @@ export default function OrcamentoForm({
                 </p>
               )}
             </fieldset>
+
+            {/* Tipo de cerimónia — só no casamento, porque só aí existe uma.
+                Vem ANTES dos pontos de decoração de propósito: é um facto sobre
+                o dia (e sobre quantos sítios há para montar), e os pontos são o
+                que o casal quer feito. Primeiro o que o dia é, depois o que
+                querem nele. */}
+            {ehCasamento && (
+              <EscolhaUnica
+                legendId="of-cerimonia-legend"
+                legend={to.labelCerimonia}
+                hint={to.hintCerimonia}
+                options={CEREMONY_TYPES}
+                value={cerimonia}
+                onChange={setCerimonia}
+                english={locale.startsWith("en")}
+                onStart={markStart}
+              />
+            )}
 
             {/* Pontos de decoração — só no casamento.
                 Sem preços de propósito: uma lista com valores ao lado
@@ -921,6 +1051,22 @@ export default function OrcamentoForm({
                 placeholder={to.phLocal}
               />
             </FloatingField>
+
+            {/* Interior ou exterior — logo a seguir ao local, porque é a mesma
+                pergunta continuada: onde é, e como é esse onde. Aparece em
+                TODOS os tipos de evento; ao ar livre há sempre uma montagem
+                alternativa a preparar, e isso conta-se em horas e em material
+                antes de se contar em euros. */}
+            <EscolhaUnica
+              legendId="of-espaco-legend"
+              legend={to.labelEspaco}
+              hint={to.hintEspaco}
+              options={SPACE_TYPES}
+              value={espaco}
+              onChange={setEspaco}
+              english={locale.startsWith("en")}
+              onStart={markStart}
+            />
 
             {/* Nome + Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-9">

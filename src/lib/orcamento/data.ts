@@ -664,6 +664,75 @@ export function guestRangeLabel(id: unknown, locale = "pt"): string {
   return locale.startsWith("en") ? r.en : r.label;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * TIPO DE CERIMÓNIA — civil, religiosa, ou as duas
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Muda o trabalho antes de mudar o preço. Uma cerimónia religiosa acontece
+ * numa igreja que não é o espaço do copo de água: é um segundo sítio para
+ * decorar, com regras próprias (o que a paróquia deixa pôr, a que horas se
+ * pode montar) e uma deslocação da equipa a meio do dia. Uma cerimónia civil
+ * costuma acontecer no próprio espaço, e aí a decoração da cerimónia e a do
+ * cocktail são a mesma montagem.
+ *
+ * Saber isto no PEDIDO evita a pergunta na primeira chamada — e evita orçamentar
+ * uma montagem quando eram duas, que é a maneira mais cara de descobrir.
+ *
+ * ── PORQUE É QUE SÃO QUATRO E NÃO DUAS ───────────────────────────────────
+ *
+ * Ela pediu «civil ou religiosa». Em Portugal, muitos casais fazem as duas (o
+ * registo civil antes, a igreja no dia), e há quem faça uma cerimónia simbólica
+ * com celebrante — sem valor legal, mas com arco, cadeiras e passadeira, que
+ * para quem decora é uma cerimónia a sério. Com duas opções só, esses casais
+ * escolheriam a errada, e uma resposta errada é pior do que uma em branco.
+ *
+ * Não há opção «ainda não sei» de propósito: o campo é OPCIONAL e as opções
+ * desmarcam-se, portanto não responder já é a resposta «ainda não sabemos».
+ */
+export const CEREMONY_TYPES: { id: string; label: string; en: string }[] = [
+  { id: "civil", label: "Civil", en: "Civil" },
+  { id: "religiosa", label: "Religiosa", en: "Religious" },
+  { id: "civil-religiosa", label: "Civil e religiosa", en: "Civil and religious" },
+  { id: "simbolica", label: "Simbólica", en: "Symbolic" },
+];
+
+/** O rótulo do tipo de cerimónia, na língua do pedido. Vazio se não o conhecermos. */
+export function ceremonyTypeLabel(id: unknown, locale = "pt"): string {
+  const c = CEREMONY_TYPES.find((x) => x.id === id);
+  if (!c) return "";
+  return locale.startsWith("en") ? c.en : c.label;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * INTERIOR OU EXTERIOR — a pergunta que decide o plano B
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É a diferença entre pôr um arranjo numa mesa e pôr o mesmo arranjo onde ele
+ * tem de aguentar vento, sol de agosto e a hipótese de chover. Ao ar livre há
+ * flores que não sobrevivem à tarde, velas que não ficam acesas, estruturas que
+ * precisam de peso, e há sempre uma montagem alternativa a preparar para o caso
+ * de o tempo virar — trabalho que existe ou não existe consoante esta resposta,
+ * e que ninguém consegue orçamentar sem ela.
+ *
+ * Ao contrário do tipo de cerimónia, esta pergunta aparece em TODOS os eventos:
+ * um aniversário no jardim e um jantar de empresa numa sala têm exactamente o
+ * mesmo problema.
+ */
+export const SPACE_TYPES: { id: string; label: string; en: string }[] = [
+  { id: "interior", label: "Interior", en: "Indoors" },
+  { id: "exterior", label: "Exterior", en: "Outdoors" },
+  { id: "interior-exterior", label: "Interior e exterior", en: "Indoors and outdoors" },
+];
+
+/** O rótulo do tipo de espaço, na língua do pedido. Vazio se não o conhecermos. */
+export function spaceTypeLabel(id: unknown, locale = "pt"): string {
+  const s = SPACE_TYPES.find((x) => x.id === id);
+  if (!s) return "";
+  return locale.startsWith("en") ? s.en : s.label;
+}
+
 export const BUDGET_RANGES: { id: string; label: string }[] = [
   { id: "ate_5k", label: "Até €5.000" },
   { id: "5k_15k", label: "€5.000 – €15.000" },

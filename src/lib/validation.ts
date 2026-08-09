@@ -82,6 +82,18 @@ export const quoteFormSchema = z
     // todos os outros: o esquema faz `.strip()`, e um campo não declarado é
     // descartado em silêncio.
     guestsRange: trimmed(20).optional().default(""),
+    // O tipo de cerimónia (civil/religiosa/…) e o tipo de espaço
+    // (interior/exterior). Declarados aqui pela mesma razão de todos os outros:
+    // o esquema faz `.strip()`, e um campo não declarado é descartado em
+    // silêncio — o casal escolhia, a rota aceitava o pedido, e a escolha nunca
+    // chegava à base de dados.
+    //
+    // Identificadores livres e curtos, não enums fechados: o que o servidor não
+    // conhecer é ignorado na LEITURA (`ceremonyTypeLabel`/`spaceTypeLabel`
+    // devolvem vazio), que é o sítio certo para essa decisão. Assim acrescentar
+    // uma opção ao catálogo do formulário nunca exige mexer neste ficheiro.
+    ceremonyType: trimmed(30).optional().default(""),
+    spaceType: trimmed(30).optional().default(""),
     budgetRange: trimmed(30).nullish(),
     urgency: trimmed(30).optional(),
     referralSource: trimmed(200).optional().default(""),

@@ -90,6 +90,24 @@ export interface QuoteFormData {
    * dois nunca convivem, e é o número que manda.
    */
   guestsRange?: string;
+  /**
+   * Civil, religiosa, as duas ou simbólica (ver `CEREMONY_TYPES`). Só existe
+   * nos casamentos — noutro tipo de evento não há cerimónia nenhuma a
+   * qualificar — e é sempre OPCIONAL: muitos casais pedem orçamento antes de
+   * terem isso decidido. Vazio em todos os pedidos anteriores a este campo.
+   *
+   * Guardado como identificador livre (e não como um enum fechado) pela mesma
+   * razão dos pontos de decoração: acrescentar uma opção ao catálogo não pode
+   * exigir uma alteração coordenada no validador do servidor.
+   */
+  ceremonyType?: string;
+  /**
+   * Interior, exterior ou os dois (ver `SPACE_TYPES`). Ao contrário do tipo de
+   * cerimónia, aplica-se a QUALQUER evento — e é o que diz se há uma montagem
+   * alternativa a preparar para o caso de chover. Opcional e vazio nos pedidos
+   * anteriores a este campo.
+   */
+  spaceType?: string;
   budgetRange: BudgetRange | null;
   urgency: Urgency;
   notes: string;

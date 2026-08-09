@@ -29,7 +29,7 @@ import {
 } from "@/lib/orcamento/espera";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
-import { guestRangeLabel } from "@/lib/orcamento/data";
+import { guestRangeLabel, ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import CommandPalette, { type Command } from "./CommandPalette";
 import ShortcutsModal from "./ShortcutsModal";
@@ -3283,6 +3283,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                     : guestRangeLabel(selected.guestsRange)
                                       ? `~ ${guestRangeLabel(selected.guestsRange)}`
                                       : null,
+                                },
+                                {
+                                  // Interior ou exterior. Fica ao lado do
+                                  // local porque é a continuação da mesma
+                                  // pergunta — e porque é o que diz se há uma
+                                  // montagem alternativa a preparar.
+                                  l: "Espaço",
+                                  v: spaceTypeLabel(selected.spaceType) || null,
+                                },
+                                {
+                                  // Civil, religiosa ou as duas: é o que diz se
+                                  // são dois sítios para montar num só dia.
+                                  l: "Cerimónia",
+                                  v: ceremonyTypeLabel(selected.ceremonyType) || null,
                                 },
                                 {
                                   // O que o casal marcou no pedido. Aparece

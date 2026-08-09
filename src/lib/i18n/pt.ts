@@ -454,6 +454,16 @@ export const pt = {
     labelDecor: "Onde quer decoração?",
     hintDecor:
       "Marque o que fizer sentido. Ajuda-nos a preparar uma proposta só com o que quer, e se ainda não souber, salte esta parte: falamos disso juntos.",
+    // Só aparece no casamento. A pergunta é feita pelo que ela muda no trabalho
+    // — uma cerimónia religiosa é um segundo sítio para decorar — e não como
+    // uma curiosidade sobre a vida de quem preenche.
+    labelCerimonia: "Que tipo de cerimónia?",
+    hintCerimonia:
+      "Se for na igreja, é mais um espaço para decorar além do da festa. Se ainda não estiver decidido, siga em frente.",
+    // Aparece em todos os tipos de evento.
+    labelEspaco: "O espaço é interior ou exterior?",
+    hintEspaco:
+      "Ao ar livre preparamos sempre uma alternativa para o caso de o tempo virar, e há flores e materiais que escolhemos de outra maneira.",
     labelData: "Data do evento",
     dateFlexibleLabel: "Data ainda a definir",
     guestsFlexibleLabel: "Ainda a definir",
@@ -627,6 +637,8 @@ export const pt = {
     convidados: "Convidados",
     data: "Data",
     local: "Local",
+    cerimonia: "Cerimónia",
+    espaco: "Espaço",
     decoracao: "Decoração",
     mensagem: "Mensagem",
     adicionais: "Serviços Adicionais",

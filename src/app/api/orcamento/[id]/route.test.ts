@@ -83,7 +83,20 @@ describe("GET /api/orcamento/[id] — PII protection", () => {
     // keys, so a new Quote field can never leak by accident. (JSON drops the
     // allowlisted-but-undefined ones, e.g. packageTier/eventName here.)
     expect(Object.keys(json).sort()).toEqual(
-      ["id", "submittedAt", "status", "guests", "date", "addons", "decorPoints"].sort(),
+      [
+        "id",
+        "submittedAt",
+        "status",
+        "guests",
+        "date",
+        "addons",
+        "decorPoints",
+        // Tipo de espaço e tipo de cerimónia: respostas que a própria pessoa
+        // deu no formulário, e que a página de confirmação volta a mostrar. Se
+        // esta linha aparecer num diff sem uma razão dessas, é uma fuga.
+        "spaceType",
+        "ceremonyType",
+      ].sort(),
     );
     expect(json.status).toBe("pendente");
     expect(json.guests).toBe(50);

@@ -9,7 +9,7 @@ import {
 } from "@/lib/orcamento/data";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
-import { guestRangeLabel } from "@/lib/orcamento/data";
+import { guestRangeLabel, ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcamento/data";
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
@@ -254,9 +254,16 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     : guestRangeLabel(form.guestsRange)
       ? `~ ${guestRangeLabel(form.guestsRange)}`
       : "";
+  // A cerimónia e o espaço vão no bloco de DECISÃO pela mesma razão que a
+  // decoração: são as duas linhas que dizem, antes da primeira chamada, quantas
+  // montagens são e se é preciso um plano para o caso de chover.
+  const cerimonia = ceremonyTypeLabel(form.ceremonyType);
+  const espaco = spaceTypeLabel(form.spaceType);
   const eventRows =
     row("Convidados", esc(convidados)) +
     row("Local", esc(local)) +
+    (espaco ? row("Espaço", esc(espaco)) : "") +
+    (cerimonia ? row("Cerimónia", esc(cerimonia)) : "") +
     // "Casal" e não "Noivos": o formulário deixou de presumir que são um homem
     // e uma mulher, e o email que ela lê a seguir não pode voltar a presumi-lo.
     (noivos ? row("Casal", esc(noivos)) : "") +
@@ -442,6 +449,8 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     dateHero ? `Data: ${dateHero}${isWeekend ? " (fim de semana)" : ""}` : null,
     convidados ? `Convidados: ${convidados}` : null,
     local ? `Local: ${local}` : null,
+    espaco ? `Espaço: ${espaco}` : null,
+    cerimonia ? `Cerimónia: ${cerimonia}` : null,
     decor ? `Decoração: ${decor}` : null,
     budgetLabel ? `Orçamento: ${budgetLabel}` : null,
     urgencyLabel ? `Antecedência: ${urgencyLabel}` : null,
@@ -634,6 +643,9 @@ export async function POST(request: NextRequest) {
           // Na língua do email, não na da equipa: quem escreveu em inglês
           // recebe "Ceremony · Dinner tables", não "Cerimónia · Mesas".
           decor: rotularPontos(form.decorPoints ?? [], locale),
+          // Na língua do email, como tudo o resto deste resumo.
+          ceremony: ceremonyTypeLabel(form.ceremonyType, locale),
+          space: spaceTypeLabel(form.spaceType, locale),
         },
       });
       // Per-recipient daily cap: this email goes to a user-SUPPLIED address, so
