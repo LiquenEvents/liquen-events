@@ -129,6 +129,8 @@ export default function GalleryImage({
   const releaseRef = useRef<(() => void) | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptsRef = useRef(0);
+  /** A `<img>` que está montada agora — só para a poder LARGAR quando sair. */
+  const imgRef = useRef<HTMLImageElement | null>(null);
   /**
    * `armed` = o <Image> está montado com src (o pedido está a ser feito).
    *
@@ -288,9 +290,14 @@ export default function GalleryImage({
     (el: HTMLImageElement | null) => {
       registarImg?.(el, src);
       if (!el) {
-        esquecer(anchorRef.current);
+        // A fotografia que ESTAVA aqui, guardada num ref nosso: quando o React
+        // chama isto com `null`, o `anchorRef` do botão já foi anulado (ele
+        // desliga os refs de pai para filho) e usá-lo aqui não largava nada.
+        esquecer(imgRef.current);
+        imgRef.current = null;
         return;
       }
+      imgRef.current = el;
       /**
        * Nasce `low`, sobe a `auto` quando o mosaico chega ao ecrã. Ver
        * `prioridade-a-vista.ts`: sem isto, 415 das 427 fotografias ficavam

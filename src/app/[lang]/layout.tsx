@@ -271,11 +271,38 @@ export default async function RootLayout({
           Corre em linha e sem `defer` de propósito: se corresse depois da
           primeira pintura, quem já escolheu via o aviso a piscar.
         */}
+        {/*
+          E A SEGUNDA MARCA, QUE PAGA A PRIMEIRA.
+
+          Trazer a barra para o HTML ganhou 1,4 s de LCP e comprou um CLS de
+          0,0605 no telemóvel. MEDIDO, com a altura da barra amostrada a cada
+          frame: aos 1440 ms ela pinta com o tipo de letra de recurso e ocupa
+          CINCO linhas (181 px); aos 1644 ms o Inter chega, o texto passa a
+          QUATRO (161 px) e, como a barra está ancorada em baixo, o topo dela
+          salta 20 px. As fontes ficaram prontas aos 1664 ms.
+
+          A barra fica portanto à espera das fontes — e só das fontes. Aparece
+          já na forma final, sem refluir, e o LCP não sofre: ele estava a ser
+          marcado aos ~1684 ms, que é precisamente o instante da troca de tipo
+          de letra. Ganha-se o CLS de graça.
+
+          O `setTimeout` é a rede: se o tipo de letra não chegar (bloqueado,
+          rede a cair), a barra tem de aparecer na mesma — um aviso de cookies
+          que não aparece é pior do que um aviso que salta 20 px.
+
+          Sem JavaScript nada disto corre e a barra aparece de imediato, que é
+          o comportamento certo para esse caso.
+        */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{if(localStorage.getItem('liquen-consent'))document.documentElement.classList.add('consentimento-decidido')}" +
-              "catch(e){document.documentElement.classList.add('consentimento-decidido')}",
+              "var d=document.documentElement;" +
+              "try{if(localStorage.getItem('liquen-consent'))d.classList.add('consentimento-decidido')}" +
+              "catch(e){d.classList.add('consentimento-decidido')}" +
+              "d.classList.add('fontes-por-assentar');" +
+              "var s=function(){d.classList.remove('fontes-por-assentar')};" +
+              "try{document.fonts.ready.then(s)}catch(e){s()}" +
+              "setTimeout(s,2500);",
           }}
         />
       </head>

@@ -47,6 +47,21 @@
 
 /** Botão observado → a fotografia que ele contém. */
 const aEsperar = new WeakMap<Element, HTMLImageElement>();
+/**
+ * E o caminho inverso: fotografia → botão que está a ser observado por ela.
+ *
+ * ISTO EXISTE POR CAUSA DE UMA FUGA QUE EU PRÓPRIO ESCREVI. A limpeza era
+ * `esquecer(anchorRef.current)`, chamada quando o `ref` do `<img>` é desligado.
+ * Só que o React desliga os `ref`s de PAI PARA FILHO: quando o do `<img>`
+ * corre, o do `<button>` já foi anulado e `anchorRef.current` já é `null` — a
+ * limpeza saía na primeira linha sem fazer nada.
+ *
+ * O preço não é teórico: um `IntersectionObserver` guarda referência FORTE aos
+ * alvos. Cada mosaico desmontado (mudar de colecção, mudar de filtro) deixava
+ * lá o botão e, através dele, a fotografia — a somar cálculo de intersecção em
+ * todos os frames do resto da visita, e sem nada disso poder ser recolhido.
+ */
+const ancoraDe = new WeakMap<HTMLImageElement, Element>();
 let observador: IntersectionObserver | null = null;
 
 function obterObservador(): IntersectionObserver | null {
@@ -58,6 +73,7 @@ function obterObservador(): IntersectionObserver | null {
       const img = aEsperar.get(entrada.target);
       observador?.unobserve(entrada.target);
       aEsperar.delete(entrada.target);
+      if (img) ancoraDe.delete(img);
       // `auto` e não `high`: o que se quer é devolver a decisão ao browser,
       // que sabe da ligação e da direcção do scroll o que nós não sabemos. Pôr
       // `high` em tudo o que está à vista seria o mesmo erro ao contrário.
@@ -80,11 +96,22 @@ export function promoverQuandoAVista(ancora: Element | null, img: HTMLImageEleme
     return;
   }
   aEsperar.set(ancora, img);
+  ancoraDe.set(img, ancora);
   io.observe(ancora);
 }
 
-/** Larga um mosaico que saiu do DOM antes de chegar a ver-se. */
-export function esquecer(ancora: Element | null): void {
+/**
+ * Larga uma fotografia que saiu do DOM antes de chegar a ver-se.
+ *
+ * Recebe a FOTOGRAFIA e não o botão de propósito: quando o React desliga o
+ * `ref` do `<img>`, o `ref` do botão já foi anulado (ele desliga de pai para
+ * filho) e uma limpeza que dependesse dele não largava nada. Ver a nota do
+ * `ancoraDe` lá em cima.
+ */
+export function esquecer(img: HTMLImageElement | null): void {
+  if (!img) return;
+  const ancora = ancoraDe.get(img);
+  ancoraDe.delete(img);
   if (!ancora) return;
   aEsperar.delete(ancora);
   observador?.unobserve(ancora);
