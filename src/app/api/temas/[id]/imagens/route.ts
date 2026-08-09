@@ -11,7 +11,8 @@ import {
   type ThemeThumbInput,
 } from "@/lib/theme-storage";
 import { isFingerprint } from "@/lib/theme-fingerprint";
-import { garantirFormatoImprimivel } from "@/lib/proposal-image";
+import { garantirFormatoImprimivel, motivoDaRecusa } from "@/lib/proposal-image";
+import { recusaDeImagem } from "@/lib/recusa-de-imagem";
 import {
   THEME_PAGE_SIZE,
   MAX_THEME_PAGE_SIZE,
@@ -266,8 +267,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // intermediário nenhum, os bytes que o gerador de PDF vai buscar.
     const pronto = await garantirFormatoImprimivel(recebidos, file.type);
     if (!pronto) {
+      // A frase diz O QUE aconteceu e o que fazer — ver `recusa-de-imagem`.
       return NextResponse.json(
-        { error: `Não foi possível processar a imagem: ${file.name}.` },
+        { error: recusaDeImagem(motivoDaRecusa(recebidos, file.type), file.name) },
         { status: 415 },
       );
     }

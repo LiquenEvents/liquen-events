@@ -27,7 +27,13 @@ vi.mock("@/lib/proposal-storage", () => ({
   uploadProposalImage: st.upload,
   listProposalImages: st.list,
 }));
-vi.mock("@/lib/proposal-image", () => ({ garantirFormatoImprimivel: st.converter }));
+// `motivoDaRecusa` é PURO (olha para os bytes e diz porque não servem) e é o
+// que escolhe a frase que a pessoa lê. Fica o real: substituí-lo era testar a
+// rota contra um diagnóstico inventado.
+vi.mock("@/lib/proposal-image", async (importOriginal) => ({
+  garantirFormatoImprimivel: st.converter,
+  motivoDaRecusa: (await importOriginal<typeof import("@/lib/proposal-image")>()).motivoDaRecusa,
+}));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 // The route reads image dimensions via sharp to reject decompression bombs.
 // Test fixtures are dummy bytes, so mock sharp to report a normal-sized image

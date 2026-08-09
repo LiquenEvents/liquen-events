@@ -185,6 +185,55 @@ export async function createProposalUploadTickets(
 const HEADER_BYTES = 256 * 1024;
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM REDIRECCIONAMENTO NÃO PODE FAZER UMA FOTO DESAPARECER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Os pedidos ao armazenamento iam com `redirect: "error"`. É uma boa defesa —
+ * é o que impede um endereço aparentemente inofensivo de nos levar a um sítio
+ * interno — mas é uma defesa cega: se o armazenamento responder «isto agora
+ * está noutro sítio» (uma rede de distribuição à frente, uma rota assinada que
+ * muda de forma), o `fetch` lança, a foto conta como em falta, e não fica nada
+ * escrito a dizer porquê. A proposta sai com um buraco e o registo está mudo.
+ *
+ * Passa a SEGUIR o redireccionamento, com a mesma guarda a cada salto: só
+ * `https`, e só para o mesmo anfitrião que já era o único permitido. Um desvio
+ * para outro lado continua a ser recusado — mas agora fica REGISTADO, com o
+ * destino, que é a diferença entre uma defesa e um mistério.
+ */
+const MAX_SALTOS = 3;
+
+async function fetchSeguindoRedireccoes(
+  url: string,
+  init: RequestInit,
+  permitido: string | null,
+): Promise<Response | null> {
+  let alvo = url;
+  for (let salto = 0; salto <= MAX_SALTOS; salto++) {
+    const res = await fetch(alvo, { ...init, redirect: "manual" });
+    if (res.status < 300 || res.status >= 400) return res;
+    const destino = res.headers.get("location");
+    if (!destino) return res;
+    let seguinte: URL;
+    try {
+      seguinte = new URL(destino, alvo);
+    } catch {
+      log.warn("storage: redireccionamento com destino ilegível", { de: alvo });
+      return null;
+    }
+    if (seguinte.protocol !== "https:" || !permitido || seguinte.host !== permitido) {
+      log.error("storage: redireccionamento para fora do anfitrião permitido (SSRF guard)", null, {
+        host: seguinte.host,
+      });
+      return null;
+    }
+    alvo = seguinte.toString();
+  }
+  log.warn("storage: demasiados redireccionamentos", { url });
+  return null;
+}
+
+/**
  * Teto de pixéis, o mesmo que a rota multipart já aplicava.
  *
  * Um teto de BYTES não chega: um PNG minúsculo pode descodificar para
@@ -206,12 +255,15 @@ async function fetchHeader(bucket: string, path: string): Promise<Buffer | null>
   try {
     const { data } = await sb.storage.from(bucket).createSignedUrl(path, 60);
     if (!data?.signedUrl) return null;
-    const res = await fetch(data.signedUrl, {
-      headers: { Range: `bytes=0-${HEADER_BYTES - 1}` },
-      redirect: "error",
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok || !res.body) return null;
+    const res = await fetchSeguindoRedireccoes(
+      data.signedUrl,
+      {
+        headers: { Range: `bytes=0-${HEADER_BYTES - 1}` },
+        signal: AbortSignal.timeout(8000),
+      },
+      new URL(data.signedUrl).host,
+    );
+    if (!res || !res.ok || !res.body) return null;
     const chunks: Uint8Array[] = [];
     let total = 0;
     const reader = res.body.getReader();
@@ -485,8 +537,12 @@ async function fetchProposalImageBytesInner(ref: string): Promise<Buffer | null>
       return null;
     }
     try {
-      const res = await fetch(ref, { redirect: "error", signal: AbortSignal.timeout(8000) });
-      if (!res.ok) return null;
+      const res = await fetchSeguindoRedireccoes(
+        ref,
+        { signal: AbortSignal.timeout(8000) },
+        allowedHost,
+      );
+      if (!res || !res.ok) return null;
       const declared = Number(res.headers.get("content-length") ?? "0");
       if (declared && declared > MAX_IMAGE_BYTES) return null;
       const buf = Buffer.from(await res.arrayBuffer());

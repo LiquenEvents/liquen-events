@@ -24,6 +24,9 @@
 
 import type { WorkerRequest, WorkerResponse } from "./image-worker";
 import { LQIP_EDGE, LQIP_MAX_CHARS, LQIP_QUALITY, MICRO_EDGE, MICRO_QUALITY } from "./image-worker";
+// A mesma explicação que o servidor dá, num sítio só. Este módulo não traz nada
+// de servidor atrás — ver `recusa-de-imagem`.
+import { CONSELHO_HEIC, nomeOuTipoDeHeic } from "@/lib/recusa-de-imagem";
 
 const SUPPORTED = /^image\/(jpe?g|png|webp)$/i;
 
@@ -459,6 +462,19 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
     // servidor que o converte antes de guardar — a porta fecha-se lá, e não
     // aqui, precisamente para casos como este.
     if (SUPPORTED.test(file.type)) return { file, thumb: null, micro: null, lqip: null };
+    /**
+     * O caso mais provável tem nome: um HEIC arrastado do telemóvel para o
+     * computador e carregado no Chrome, que não sabe descodificá-lo. Aqui é
+     * onde a pessoa encontra o problema — não chega a haver pedido nenhum ao
+     * servidor — e a frase antiga («converta para JPG») não dizia como.
+     *
+     * A explicação é a MESMA que o servidor dá, e está num sítio só (ver
+     * `recusa-de-imagem`): duas versões da mesma instrução acabam sempre com
+     * uma delas desactualizada.
+     */
+    if (nomeOuTipoDeHeic(file.name, file.type)) {
+      throw new Error(`"${file.name}" ${CONSELHO_HEIC}`);
+    }
     throw new Error(
       `"${file.name}" não é suportada neste navegador. Converta para JPG e tente de novo.`,
     );

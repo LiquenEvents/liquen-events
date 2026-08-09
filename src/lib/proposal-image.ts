@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import sharp, { type JpegOptions } from "sharp";
+import type { MotivoDeRecusa } from "./recusa-de-imagem";
 
 /**
  * Preparação das fotos que entram no PDF da proposta.
@@ -319,6 +320,79 @@ export async function transcodificarParaJpeg(bytes: Buffer): Promise<Buffer | nu
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM FICHEIRO QUE CHEGOU A MEIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma fotografia cujo carregamento se interrompeu a meio continua a ser uma
+ * imagem válida do ponto de vista do descodificador: tem cabeçalho, tem
+ * dimensões, e o `sharp` desenha-a — até onde os dados chegam. O resto sai
+ * CINZENTO. Era guardada, era desenhada, e contava como boa: a proposta seguia
+ * para o casal com meia fotografia e uma faixa cinzenta por baixo.
+ *
+ * Detectar isto não precisa de descodificar nada: os três formatos que aqui
+ * entram dizem onde acabam.
+ *
+ *   · o JPEG acaba no marcador EOI (FF D9);
+ *   · o PNG acaba no bloco IEND;
+ *   · o WebP traz o tamanho declarado no cabeçalho RIFF.
+ *
+ * Procura-se numa JANELA GENEROSA no fim do ficheiro (e não exactamente nos
+ * últimos dois bytes) porque há máquinas que deixam lixo, miniaturas ou XMP
+ * depois do fim. O erro que não se pode cometer é recusar uma foto boa; deixar
+ * passar uma partida é o comportamento que já havia.
+ */
+export function ficheiroIncompleto(bytes: Buffer, contentType: string): boolean {
+  const ehJpeg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8;
+  const ehPng = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e;
+  const ehWebp =
+    bytes.length > 12 &&
+    bytes.toString("ascii", 0, 4) === "RIFF" &&
+    bytes.toString("ascii", 8, 12) === "WEBP";
+
+  if (ehJpeg) {
+    const janela = bytes.subarray(Math.max(0, bytes.length - 2048));
+    return janela.indexOf(Buffer.from([0xff, 0xd9])) === -1;
+  }
+  if (ehPng) {
+    const janela = bytes.subarray(Math.max(0, bytes.length - 64));
+    return janela.indexOf("IEND", 0, "ascii") === -1;
+  }
+  if (ehWebp) {
+    // O RIFF diz quantos bytes vêm DEPOIS dos oito primeiros.
+    const declarado = bytes.readUInt32LE(4) + 8;
+    return bytes.length < declarado;
+  }
+  // Formato que não sabemos ler ao fim: não se inventa um diagnóstico.
+  const _ = contentType;
+  return false;
+}
+
+/**
+ * Isto é um HEIC do iPhone?
+ *
+ * A caixa `ftyp` está no princípio do ficheiro e traz a MARCA. As do HEIC são
+ * as da família HEVC; o AVIF usa a mesma caixa com a marca `avif`, e esse o
+ * `sharp` lê — por isso a lista é explícita em vez de «tudo o que tem ftyp».
+ */
+export function pareceHeic(bytes: Buffer): boolean {
+  if (bytes.length < 12 || bytes.toString("ascii", 4, 8) !== "ftyp") return false;
+  const marca = bytes.toString("ascii", 8, 12);
+  return ["heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1"].includes(
+    marca,
+  );
+}
+
+/** Porque é que estes bytes não servem — para se poder DIZER, em vez de dar o
+ *  mesmo «não foi possível processar a imagem» a três avarias diferentes. O
+ *  tipo e as frases vivem em `recusa-de-imagem`, que o navegador também lê. */
+export function motivoDaRecusa(bytes: Buffer, contentType: string): MotivoDeRecusa {
+  if (ficheiroIncompleto(bytes, contentType)) return "incompleta";
+  if (pareceHeic(bytes)) return "heic";
+  return "ilegivel";
+}
+
+/**
  * Garante que os bytes que vão ser GUARDADOS estão num formato que o PDF sabe
  * imprimir: o que já é JPEG/PNG passa intacto, o resto é convertido para JPEG.
  *
@@ -328,13 +402,18 @@ export async function transcodificarParaJpeg(bytes: Buffer): Promise<Buffer | nu
  * formato imprimível. Recusar o WebP à porta fecharia o fluxo de trabalho; o
  * problema nunca foi aceitar o formato, foi guardá-lo.
  *
- * `null` = nem o sharp lê estes bytes; quem chama recusa o ficheiro (não é uma
- * imagem que se possa guardar, porque nunca chegaria a ser impressa).
+ * Um ficheiro que chegou a meio é recusado AQUI, e é a mudança que interessa:
+ * era guardado (é legível!) e só se via meses depois, cinzento, na proposta de
+ * alguém. À porta ainda se pode dizer «volte a carregar»; no PDF já não.
+ *
+ * `null` = estes bytes não podem ser guardados. Quem chama pergunta a
+ * {@link motivoDaRecusa} o que dizer à pessoa.
  */
 export async function garantirFormatoImprimivel(
   bytes: Buffer,
   contentType: string,
 ): Promise<{ bytes: Buffer; contentType: string } | null> {
+  if (ficheiroIncompleto(bytes, contentType)) return null;
   if (embutivelNoPdf(contentType)) return { bytes, contentType };
   const jpeg = await transcodificarParaJpeg(bytes);
   return jpeg ? { bytes: jpeg, contentType: "image/jpeg" } : null;

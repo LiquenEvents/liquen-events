@@ -11,7 +11,8 @@ import {
 import { getProposalByQuote } from "@/lib/proposals-store";
 import { getProposalDraft } from "@/lib/proposal-drafts";
 import { refsDeTemaNoDoc } from "@/lib/theme-materializar";
-import { garantirFormatoImprimivel } from "@/lib/proposal-image";
+import { garantirFormatoImprimivel, motivoDaRecusa } from "@/lib/proposal-image";
+import { recusaDeImagem } from "@/lib/recusa-de-imagem";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -171,8 +172,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // e qual acabava numa moldura vazia na proposta do cliente.
     const pronto = await garantirFormatoImprimivel(bytes, file.type);
     if (!pronto) {
+      // A frase diz O QUE aconteceu e o que fazer — ver `recusa-de-imagem`.
       return NextResponse.json(
-        { error: `Não foi possível processar a imagem: ${file.name}.` },
+        { error: recusaDeImagem(motivoDaRecusa(bytes, file.type), file.name) },
         { status: 415 },
       );
     }
