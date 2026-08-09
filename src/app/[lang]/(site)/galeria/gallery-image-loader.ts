@@ -55,10 +55,28 @@ export const GALLERY_WIDTHS = [384, 640, 768, 1024, 1280] as const;
 /** A qualidade WebP com que os ficheiros são gerados (fica cozida no ficheiro). */
 export const GALLERY_QUALITY = 65;
 
-/** Basename sem extensão, tudo fora de [A-Za-z0-9_-] colapsado em "_". */
+/**
+ * Basename sem extensão, tudo fora de [A-Za-z0-9_-] colapsado em "_".
+ *
+ * COM CACHE, pela mesma razão que o `collectionFor` já tem: isto é chamado
+ * MUITO. Cada `<picture>` da grelha tem quatro `srcset`, cada um com 3 ou 4
+ * candidatos — são ~15 chamadas por fotografia e por render, e há dois renders
+ * por mosaico. Numa travessia das 427 dá na ordem das 13 000 chamadas, cada uma
+ * com um `split`, um `pop` e DUAS substituições por expressão regular.
+ *
+ * A resposta é a mesma para o mesmo caminho, para sempre, e os caminhos são um
+ * conjunto fechado (`photos-data.ts`), portanto não há invalidação a fazer nem
+ * memória a crescer sem fim.
+ */
+const chaves = new Map<string, string>();
+
 export function galleryKey(src: string): string {
+  const guardada = chaves.get(src);
+  if (guardada !== undefined) return guardada;
   const base = (src.split("/").pop() ?? src).replace(/\.[^.]+$/, "");
-  return base.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const chave = base.replace(/[^a-zA-Z0-9_-]/g, "_");
+  chaves.set(src, chave);
+  return chave;
 }
 
 /** Arredonda para cima até à largura pré-gerada mais próxima (satura no topo). */

@@ -267,9 +267,30 @@ const ZOOM_CLASS =
 // nome acessível de cada mosaico saía com a informação colada 2-3 vezes
 // ("Casamento … : Sophia & Artur Sophia & Artur CASAMENTO", lido da árvore de
 // acessibilidade); o nome vem agora só do aria-label do botão.
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * NUM ECRÃ TÁCTIL ISTO NUNCA SE VÊ — E MESMO ASSIM CUSTAVA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta sobreposição são nove elementos por mosaico: um gradiente do tamanho da
+ * fotografia, duas linhas de texto (uma com `truncate`, ou seja com medição de
+ * texto e com o Playfair), um SVG, e um círculo com `backdrop-filter`. Só
+ * aparece com `:hover` ou `:focus-visible`.
+ *
+ * O `content-visibility: auto` do mosaico não a torna grátis — adia o estilo,
+ * o layout e o registo de pintura até o mosaico entrar na banda, e depois
+ * paga-os todos de uma vez. Num telemóvel, onde não há rato, é trabalho que se
+ * faz na íntegra para uma coisa que nunca é desenhada.
+ *
+ * `hover: none` esconde-a por CSS (ver `.g-sobrepor` em globals.css): o custo
+ * de layout desaparece e o teclado continua servido, porque em qualquer
+ * aparelho com teclado há também um apontador fino. O nome acessível do
+ * mosaico nunca dependeu disto — vem do `aria-label` do botão, e esta camada é
+ * `aria-hidden` desde sempre.
+ */
 function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
   return (
-    <span aria-hidden>
+    <span aria-hidden className="g-sobrepor">
       {/* Reveal on keyboard focus too (not just hover) so tabbing the grid
           surfaces the same caption sighted mouse users get (WCAG 1.4.13). */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/65 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-500 pointer-events-none" />

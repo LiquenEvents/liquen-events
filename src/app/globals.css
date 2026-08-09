@@ -1491,6 +1491,23 @@ html.fontes-por-assentar .barra-consentimento {
   font-style: italic;
 }
 
+/* ── A legenda de sobrevoo não existe onde não há sobrevoo ──
+   Nove elementos por mosaico — gradiente, duas linhas de texto (uma com
+   medição de texto e Playfair), um SVG e um `backdrop-filter` — que só aparecem
+   com `:hover`/`:focus-visible`. Num ecrã táctil não há nem um nem outro, mas o
+   estilo e o layout são pagos na mesma quando o mosaico entra na banda do
+   `content-visibility`, e são 427 mosaicos.
+
+   `hover: none` cobre exactamente os aparelhos onde isto é impossível de ver.
+   Onde há teclado há apontador fino, portanto o `:focus-visible` continua
+   servido — que é o requisito de acessibilidade (WCAG 1.4.13) pelo qual esta
+   camada responde ao foco e não só ao rato. */
+@media (hover: none) {
+  .g-sobrepor {
+    display: none;
+  }
+}
+
 /* ── A moldura de cada fotografia da galeria: é ELA que leva o desfocado ──
    MEDIDO, e é um defeito de anular-se a si próprio: o desfocado era pintado
    como `background-image` no PRÓPRIO <img>, e o <img> leva `.g-foto`, que é
