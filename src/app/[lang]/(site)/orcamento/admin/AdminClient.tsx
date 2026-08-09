@@ -105,7 +105,7 @@ const VIEW_WRAP = "mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-10 py-6 lg:p
 
 const STATUS_OPTIONS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "pendente", label: "Novo", color: "bg-foreground/10 text-foreground/50" },
-  { id: "em_revisao", label: "Em revisão", color: "bg-moss/15 text-moss" },
+  { id: "em_revisao", label: "Aguardar resposta", color: "bg-moss/15 text-moss" },
   { id: "cotado", label: "Proposta enviada", color: "bg-moss/25 text-moss" },
   { id: "aceite", label: "Ganho", color: "bg-moss/35 text-moss" },
   { id: "rejeitado", label: "Perdido", color: "bg-foreground/8 text-foreground/30" },

@@ -68,7 +68,13 @@ describe("map-closing: every request status label is explained in the glossary",
   })();
 
   it("finds all five QuoteStatus labels in AdminClient (guards the regex)", () => {
-    expect(statusLabels).toEqual(["Novo", "Em revisão", "Proposta enviada", "Ganho", "Perdido"]);
+    expect(statusLabels).toEqual([
+      "Novo",
+      "Aguardar resposta",
+      "Proposta enviada",
+      "Ganho",
+      "Perdido",
+    ]);
   });
 
   it("has a glossary entry for each status label", () => {

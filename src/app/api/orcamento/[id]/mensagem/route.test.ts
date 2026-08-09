@@ -3,9 +3,15 @@ import type { NextRequest } from "next/server";
 
 const authed = vi.hoisted(() => ({ ok: false }));
 const store = vi.hoisted(() => ({
+  estado: "pendente" as string,
   get: vi.fn(async (id: string) =>
     id === "LIQ-1"
-      ? { id: "LIQ-1", email: "ana@x.pt", messages: [{ at: "t0", body: "old" }] }
+      ? {
+          id: "LIQ-1",
+          email: "ana@x.pt",
+          status: store.estado,
+          messages: [{ at: "t0", body: "old" }],
+        }
       : null,
   ),
   update: vi.fn(async (id: string, patch: Record<string, unknown>) => ({ id, ...patch })),
@@ -64,8 +70,71 @@ describe("POST /api/orcamento/[id]/mensagem", () => {
     expect(mail.send).toHaveBeenCalledTimes(1);
     expect(mail.send.mock.calls[0][0]).toMatchObject({ to: "ana@x.pt" });
     // The existing message is preserved and the new one appended (not clobbered).
-    expect(store.update).toHaveBeenCalledWith("LIQ-1", {
-      messages: [{ at: "t0", body: "old" }, expect.objectContaining({ body: "Nova mensagem" })],
+    // `objectContaining` e não igualdade exacta: responder passou também a subir
+    // o estado para «Aguardar resposta» (ver o bloco no fim deste ficheiro). O
+    // que ESTE teste guarda é o histórico — que a mensagem antiga sobrevive e a
+    // nova é acrescentada, nunca substituída.
+    expect(store.update).toHaveBeenCalledWith(
+      "LIQ-1",
+      expect.objectContaining({
+        messages: [{ at: "t0", body: "old" }, expect.objectContaining({ body: "Nova mensagem" })],
+      }),
+    );
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * RESPONDER PÕE O PEDIDO EM «AGUARDAR RESPOSTA»
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Enviar uma mensagem só acrescentava uma linha ao histórico: na lista, o pedido
+ * continuava em «Novo», indistinguível de um a que ninguém tinha tocado. A única
+ * forma de saber que já se tinha respondido era abrir e ler.
+ *
+ * O que estes testes guardam não é o valor do campo — é a REGRA: a bola passa
+ * para o lado do cliente quando lhe respondemos, e nunca anda para trás.
+ */
+describe("POST /api/orcamento/[id]/mensagem — o estado segue a conversa", () => {
+  it("um pedido novo passa a «Aguardar resposta» quando lhe respondemos", async () => {
+    authed.ok = true;
+    store.estado = "pendente";
+    const res = await POST(req({ message: "Olá! Já vos respondo com a proposta." }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(store.update).toHaveBeenCalledWith(
+      "LIQ-1",
+      expect.objectContaining({ status: "em_revisao" }),
+    );
+  });
+
+  /**
+   * Um estado que anda para trás sozinho é a maneira mais rápida de ela deixar
+   * de confiar na coluna. Mandar uma nota a um casamento já fechado não o
+   * desfecha.
+   */
+  for (const estado of ["cotado", "aceite", "rejeitado"]) {
+    it(`não faz recuar um pedido que já está em «${estado}»`, async () => {
+      authed.ok = true;
+      store.estado = estado;
+      await POST(req({ message: "Uma nota rápida." }), ctx("LIQ-1"));
+      const patch = store.update.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+      expect(patch, "o estado nem sequer é tocado").not.toHaveProperty("status");
     });
+  }
+
+  it("não reescreve o estado de quem já está a aguardar resposta", async () => {
+    authed.ok = true;
+    store.estado = "em_revisao";
+    await POST(req({ message: "Segue o link das fotografias." }), ctx("LIQ-1"));
+    const patch = store.update.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("status");
+  });
+
+  it("a mensagem continua a ser guardada em qualquer dos casos", async () => {
+    authed.ok = true;
+    store.estado = "aceite";
+    await POST(req({ message: "Confirmado para as 15h." }), ctx("LIQ-1"));
+    const patch = store.update.mock.calls.at(-1)?.[1] as { messages?: unknown[] };
+    expect(patch.messages).toHaveLength(2);
   });
 });

@@ -39,7 +39,7 @@ import { choquesDeData } from "@/lib/orcamento/choque-de-datas";
 /** Os mesmos rótulos e cores dos estados usados no resto do back office. */
 const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
   pendente: { label: "Novo", classe: "bg-foreground/10 text-foreground/50" },
-  em_revisao: { label: "Em revisão", classe: "bg-[#4d6350]/15 text-[#4d6350]" },
+  em_revisao: { label: "Aguardar resposta", classe: "bg-[#4d6350]/15 text-[#4d6350]" },
   cotado: { label: "Proposta enviada", classe: "bg-[#4d6350]/25 text-[#4d6350]" },
   aceite: { label: "Ganho", classe: "bg-[#4d6350]/35 text-[#4d6350]" },
   rejeitado: { label: "Perdido", classe: "bg-foreground/[0.08] text-foreground/30" },

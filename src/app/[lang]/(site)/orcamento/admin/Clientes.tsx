@@ -8,10 +8,10 @@ import { Button, Card, EmptyState, Segmented, Toolbar } from "./ui";
 import { eur0 as eur } from "@/lib/money";
 import { metaFor } from "./status-meta";
 
-// Unified status vocabulary (Novo / Em revisão / Proposta enviada / Ganho / Perdido).
+// Unified status vocabulary (Novo / Aguardar resposta / Proposta enviada / Ganho / Perdido).
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   pendente: { label: "Novo", color: "#8a8a82" },
-  em_revisao: { label: "Em revisão", color: "#9aa36a" },
+  em_revisao: { label: "Aguardar resposta", color: "#9aa36a" },
   cotado: { label: "Proposta enviada", color: "#7c854b" },
   aceite: { label: "Ganho", color: "#525a2f" },
   rejeitado: { label: "Perdido", color: "#5a5a55" },

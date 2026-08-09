@@ -16,7 +16,7 @@ const MemoAgenda = memo(Agenda);
 
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   pendente: { label: "Novo", color: "#8a8a82" },
-  em_revisao: { label: "Em revisão", color: "#9aa36a" },
+  em_revisao: { label: "Aguardar resposta", color: "#9aa36a" },
   cotado: { label: "Proposta enviada", color: "#7c854b" },
   aceite: { label: "Ganho", color: "#525a2f" },
   rejeitado: { label: "Perdido", color: "#5a5a55" },
@@ -25,7 +25,7 @@ const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
 // Order the pipeline reads as a funnel: new leads → qualified → quoted → won.
 const FUNNEL: { id: QuoteStatus; label: string }[] = [
   { id: "pendente", label: "Novo" },
-  { id: "em_revisao", label: "Em revisão" },
+  { id: "em_revisao", label: "Aguardar resposta" },
   { id: "cotado", label: "Proposta enviada" },
   { id: "aceite", label: "Ganho" },
 ];
@@ -913,7 +913,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
     const billed = received + outstanding;
 
     // Active pipeline = everything not yet won/lost. Pending review = the leads
-    // still waiting on us to send a proposal (Novo + Em revisão).
+    // still waiting on us to send a proposal (Novo + Aguardar resposta).
     const active =
       (byStatus["pendente"] ?? 0) + (byStatus["em_revisao"] ?? 0) + (byStatus["cotado"] ?? 0);
     const pendingReview = (byStatus["pendente"] ?? 0) + (byStatus["em_revisao"] ?? 0);

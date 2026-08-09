@@ -10,11 +10,11 @@ import { Button, Card, EmptyState, Segmented } from "./ui";
 import AnalisePropostas from "./AnalisePropostas";
 
 // Unified status vocabulary — the same words a newcomer sees everywhere else in
-// the back office (Overview, Kanban): Novo / Em revisão / Proposta enviada /
+// the back office (Overview, Kanban): Novo / Aguardar resposta / Proposta enviada /
 // Ganho / Perdido.
 const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   pendente: { label: "Novo", color: "#8a8a82" },
-  em_revisao: { label: "Em revisão", color: "#9aa36a" },
+  em_revisao: { label: "Aguardar resposta", color: "#9aa36a" },
   cotado: { label: "Proposta enviada", color: "#7c854b" },
   aceite: { label: "Ganho", color: "#525a2f" },
   rejeitado: { label: "Perdido", color: "#5a5a55" },

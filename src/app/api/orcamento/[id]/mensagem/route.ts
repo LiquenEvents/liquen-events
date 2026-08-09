@@ -52,7 +52,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const newMessage: QuoteMessage = { at: new Date().toISOString(), body: message };
     const messages = [...(quote.messages ?? []), newMessage];
 
-    const updated = await updateQuote(id, { messages });
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * RESPONDER MUDA O ESTADO — A BOLA PASSA PARA O LADO DE LÁ
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Enviar uma mensagem só acrescentava uma linha ao histórico. O pedido
+     * ficava em «Novo» na lista, indistinguível de um que tinha acabado de
+     * chegar e ao qual ninguém tinha tocado — e a única forma de saber que já
+     * se tinha respondido era abrir o pedido e ler o histórico.
+     *
+     * Passa a subir para `em_revisao`, que é o estado agora rotulado
+     * **«Aguardar resposta»**: já respondemos, falta o cliente responder.
+     *
+     * ── PORQUE É QUE SÓ SOBE DE «pendente» ────────────────────────────────
+     *
+     * Um pedido que já tem proposta enviada (`cotado`), que já foi ganho
+     * (`aceite`) ou perdido (`rejeitado`) NÃO volta para trás por causa de uma
+     * mensagem. Mandar uma nota a um casamento já fechado não o desfecha — e um
+     * estado que anda para trás sozinho é a maneira mais rápida de ela deixar de
+     * confiar na coluna.
+     *
+     * Um pedido que já esteja em «Aguardar resposta» também não muda: já lá
+     * está, e reescrever o mesmo valor só serviria para mexer no `lastUpdated`.
+     */
+    const subirEstado = quote.status === "pendente";
+    const updated = await updateQuote(id, {
+      messages,
+      ...(subirEstado ? { status: "em_revisao" as const } : {}),
+    });
 
     return NextResponse.json({ ok: true, emailed: mail.sent, quote: updated });
   } catch (err) {

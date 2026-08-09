@@ -7,7 +7,7 @@
  * Regra de ouro: os nomes aqui têm de coincidir com o que aparece nos ecrãs.
  * Rótulos verificados no código:
  *   · Estados do pedido — STATUS_OPTIONS em AdminClient.tsx:
- *       Novo · Em revisão · Proposta enviada · Ganho · Perdido
+ *       Novo · Aguardar resposta · Proposta enviada · Ganho · Perdido
  *   · Fases do Dossier — STAGE_LABELS em src/lib/orcamento/dossier.ts
  *   · Estados da fatura — invoice-validation.ts: emitida · paga · anulada
  *   · "Guião do dia" (folha de operações), "Mood boards",
@@ -63,15 +63,15 @@ export const LIFECYCLE: LifecycleStep[] = [
 export const GLOSSARY: GlossaryEntry[] = [
   {
     term: "Pedido",
-    def: "Um contacto de alguém que quer um orçamento. Cada pedido tem um estado que mostra em que ponto está: Novo, Em revisão, Proposta enviada, Ganho ou Perdido.",
+    def: "Um contacto de alguém que quer um orçamento. Cada pedido tem um estado que mostra em que ponto está: Novo, Aguardar resposta, Proposta enviada, Ganho ou Perdido.",
   },
   {
     term: "Novo",
     def: "O estado de um pedido acabado de chegar, que ainda ninguém tratou. É o ponto de partida de todos os pedidos.",
   },
   {
-    term: "Em revisão",
-    def: "O estado de um pedido que estamos a analisar — a preparar a proposta ou a confirmar detalhes. Ainda não enviámos nada ao cliente.",
+    term: "Aguardar resposta",
+    def: "O estado de um pedido a quem já respondemos e que está agora do lado do cliente. Um pedido entra aqui sozinho assim que lhe enviamos uma mensagem — antes disso fica em Novo. Chamou-se “Em revisão” até Agosto de 2026, mas esse nome descrevia o nosso trabalho e não o que falta acontecer.",
   },
   {
     term: "Organização de propostas",

@@ -98,7 +98,7 @@ describe("Kanban — o quadro", () => {
     // 60 pedidos distribuídos por 5 colunas, 12 em cada. Os rótulos procuram-se
     // com `getAllByText` porque "Ganho" também é o nome de um dos totais no topo
     // do quadro — `getByText` rebentava por ambiguidade, não por falta.
-    for (const label of ["Novo", "Em revisão", "Proposta enviada", "Ganho", "Perdido"]) {
+    for (const label of ["Novo", "Aguardar resposta", "Proposta enviada", "Ganho", "Perdido"]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
     expect(screen.getAllByRole("button", { name: /^Par \d+,/ })).toHaveLength(60);
