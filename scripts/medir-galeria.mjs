@@ -360,7 +360,28 @@ const SONDA = `
    * componente só o tira no onLoad.
    */
   M.censo = [];
+  /**
+   * ── O INSTRUMENTO NÃO PODE ENTRAR NA SUA PRÓPRIA MEDIÇÃO ─────────────────
+   *
+   * Este censo percorre TODOS os mosaicos registados e pede a geometria de
+   * cada um — no fim da travessia são 427 getBoundingClientRect() de uma
+   * vez, ou seja um cálculo de layout forçado, na thread principal, a cada
+   * passo do scroll. E a fluidez é medida com os intervalos entre frames
+   * DESSA MESMA travessia.
+   *
+   * Medido com uma bancada separada, sem censo nenhum, no mesmo build e nas
+   * mesmas condições: telemóvel 1,3 % de intervalos acima de 32 ms contra os
+   * 15–20 % que este ficheiro relatava; secretária 6,4 % contra 52,3 %. A
+   * maior parte do que se estava a chamar «engasgo da galeria» era o preço de
+   * a estar a observar.
+   *
+   * O censo fica — é a segunda medição independente do desfocado, e essa vale.
+   * O que muda é que os frames em que ele corre passam a ser EXCLUÍDOS da
+   * distribuição de fluidez, e o relatório diz quantos foram.
+   */
+  M.janelasCenso = [];
   M.fazerCenso = () => {
+    const t0 = performance.now();
     const h = window.innerHeight;
     let visiveis = 0, desfocados = 0, semFoto = 0;
     for (const r of M.desfoque) {
@@ -374,6 +395,7 @@ const SONDA = `
       const mold = im.parentElement && im.parentElement.tagName === "PICTURE" ? im.parentElement : null;
       if (/data:image/.test((mold && mold.style.backgroundImage) || im.style.backgroundImage || "")) desfocados++;
     }
+    M.janelasCenso.push([t0, performance.now()]);
     M.censo.push({
       t: Math.round(performance.now()),
       y: window.scrollY,
@@ -493,8 +515,19 @@ const TRAVESSIA = `
    * acima de 32 ms (dois frames a 60 Hz) e a cauda. Serve para comparar antes
    * e depois; não serve para dizer "o telemóvel dela perde N frames".
    */
+  const janelas = (window.__medida && window.__medida.janelasCenso) || [];
+  const tocaCenso = (a, b) => {
+    for (let j = 0; j < janelas.length; j++) {
+      if (janelas[j][1] >= a && janelas[j][0] <= b) return true;
+    }
+    return false;
+  };
   const ds = [];
-  for (let i = 1; i < frames.length; i++) ds.push(frames[i] - frames[i - 1]);
+  let excluidos = 0;
+  for (let i = 1; i < frames.length; i++) {
+    if (tocaCenso(frames[i - 1], frames[i])) { excluidos++; continue; }
+    ds.push(frames[i] - frames[i - 1]);
+  }
   ds.sort((a, b) => a - b);
   const q = (p) => (ds.length ? Math.round(ds[Math.floor((p / 100) * ds.length)]) : 0);
   const acima32 = ds.filter((d) => d > 32).length;
@@ -525,6 +558,7 @@ const TRAVESSIA = `
     piorMs: Math.round(ds[ds.length - 1] || 0),
     acimaDe32ms: acima32,
     percentagemAcima32: ds.length ? +((acima32 / ds.length) * 100).toFixed(1) : 0,
+    intervalosExcluidosPeloCenso: excluidos,
   };
 })
 `;
@@ -1238,7 +1272,8 @@ for (const r of resultados) {
     );
   }
   console.log(
-    `Fluidez: intervalos acima de 32 ms ${r.scroll.percentagemAcima32}% ` +
+    `Fluidez (sem os frames do próprio censo — ${r.scroll.intervalosExcluidosPeloCenso ?? 0} excluídos): ` +
+      `intervalos acima de 32 ms ${r.scroll.percentagemAcima32}% ` +
       `(${r.scroll.acimaDe32ms} de ${r.scroll.intervalos}) · mediana ${r.scroll.medianaMs} ms · ` +
       `p95 ${r.scroll.p95Ms} ms · p99 ${r.scroll.p99Ms} ms · pior ${r.scroll.piorMs} ms`,
   );
