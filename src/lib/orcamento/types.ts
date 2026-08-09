@@ -398,6 +398,22 @@ export interface Proposal {
    * Serve para uma pergunta só, e é a que interessa: os extras vendem-se?
    */
   versaoEscolhida?: import("./versoes-da-proposta").VersaoEscolhida;
+  /**
+   * ── O SELO DO DOCUMENTO ───────────────────────────────────────────────────
+   *
+   * A impressão digital (SHA-256, em hexadecimal) do PDF EXACTO que seguiu para
+   * o casal, e o tamanho dele em bytes. Calculados no envio, onde os bytes já
+   * estão em memória — não custa um milissegundo a mais nem um pedido extra.
+   *
+   * O aceite já guarda o nome escrito, a hora, o IP e o texto congelado dos
+   * termos. Faltava provar QUAL documento foi aceite: um PDF é reconstruído a
+   * partir do `doc`, e uma mudança no código do desenho (uma fonte, uma
+   * margem, uma fotografia que entretanto mudou) dá um ficheiro diferente do
+   * que o casal viu. Com o selo, comparar é uma linha de comando; sem ele, é a
+   * palavra de um contra a do outro.
+   */
+  pdfSha256?: string;
+  pdfBytes?: number;
   /** Rich multi-page proposal document (Proposal Studio). Stored so the studio
    *  can re-open and re-edit a sent proposal. Image fields hold Storage paths,
    *  not bytes. Optional — legacy line-item proposals don't set it. */

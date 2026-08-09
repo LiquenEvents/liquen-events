@@ -307,7 +307,34 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
       y,
       { size: 8.5, color: MUTED },
     );
-    y -= 16;
+    y -= 14;
+    /**
+     * ── O SELO DO DOCUMENTO ACEITE ─────────────────────────────────────────
+     *
+     * Impresso, e não só guardado na base de dados: um selo que ninguém vê é um
+     * selo que ninguém invoca. Assim ele viaja com o contrato, chega ao casal e
+     * ao contabilista, e numa discussão de dentro de dois anos ela pode apontar
+     * para a linha em vez de ir buscar registos.
+     *
+     * Doze caracteres chegam: são 48 bits, e a probabilidade de dois PDFs
+     * diferentes coincidirem neles é indistinguível de zero para esta escala. O
+     * valor inteiro fica guardado, para quem quiser conferir a sério.
+     *
+     * Ausente nos contratos anteriores a esta mudança — e nesses não se imprime
+     * linha nenhuma, em vez de se imprimir um "—" que daria a entender que o
+     * documento não tinha selo por alguma razão.
+     */
+    if (contract.propostaPdfSha256) {
+      text(
+        `Documento aceite: ${contract.propostaPdfSha256.slice(0, 12)}` +
+          (contract.propostaPdfBytes ? `  ·  ${contract.propostaPdfBytes} bytes` : ""),
+        MARGIN,
+        y,
+        { size: 8.5, color: MUTED },
+      );
+      y -= 14;
+    }
+    y -= 2;
     text(
       "Aceitação registada por via eletrónica, com valor probatório equivalente a assinatura.",
       MARGIN,

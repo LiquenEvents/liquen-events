@@ -656,6 +656,11 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       "./proposta/route",
       "./cron/reminders/route",
       "./cron/inbox-check/route",
+      // A cópia de segurança automática. Mesmo guarda das irmãs (Bearer com
+      // CRON_SECRET, comparado em tempo constante, a falhar fechado em
+      // produção) — e sai daqui um ficheiro com TODOS os dados de clientes,
+      // por isso é a rota desta lista onde a guarda mais tem de valer.
+      "./cron/backup/route",
       "./devproposalpreview/route",
     ];
     const covered = new Set([...ADMIN.map((r) => r.path), ...NON_ADMIN]);
@@ -786,7 +791,11 @@ describe("TOKEN-guarded routes deny a bad token", () => {
 describe("SECRET-guarded cron routes fail closed", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  for (const path of ["./cron/reminders/route", "./cron/inbox-check/route"]) {
+  for (const path of [
+    "./cron/reminders/route",
+    "./cron/inbox-check/route",
+    "./cron/backup/route",
+  ]) {
     it(`GET ${path} → 401 in production with no CRON_SECRET, and never scans`, async () => {
       vi.stubEnv("CRON_SECRET", "");
       vi.stubEnv("NODE_ENV", "production");

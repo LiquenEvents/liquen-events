@@ -36,6 +36,12 @@ export const mapper: Mapper<Contract> = {
     accepted_at: c.acceptedAt || null,
     accepted_name: c.acceptedName || null,
     accepted_ip: c.acceptedIp || null,
+    // Só entram na linha quando existem — mesma razão do `doc` das propostas:
+    // numa base onde o `alter table` ainda não correu, escrever uma coluna
+    // inexistente partia o aceite inteiro, e um aceite por gravar é um negócio
+    // perdido. O selo é importante; não é mais importante do que o contrato.
+    ...(c.propostaPdfSha256 !== undefined ? { proposta_pdf_sha256: c.propostaPdfSha256 } : {}),
+    ...(c.propostaPdfBytes !== undefined ? { proposta_pdf_bytes: c.propostaPdfBytes } : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -50,6 +56,8 @@ export const mapper: Mapper<Contract> = {
     acceptedAt: (r.accepted_at as string) ?? undefined,
     acceptedName: (r.accepted_name as string) ?? undefined,
     acceptedIp: (r.accepted_ip as string) ?? undefined,
+    ...(r.proposta_pdf_sha256 ? { propostaPdfSha256: String(r.proposta_pdf_sha256) } : {}),
+    ...(r.proposta_pdf_bytes != null ? { propostaPdfBytes: Number(r.proposta_pdf_bytes) } : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),

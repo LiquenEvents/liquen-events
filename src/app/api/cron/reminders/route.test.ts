@@ -9,6 +9,7 @@ import type { NextRequest } from "next/server";
 const data = vi.hoisted(() => ({
   quotes: [] as Record<string, unknown>[],
   events: [] as Record<string, unknown>[],
+  proposals: [] as Record<string, unknown>[],
   sent: 4,
   authed: false,
 }));
@@ -16,6 +17,7 @@ const data = vi.hoisted(() => ({
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => data.authed }));
 vi.mock("@/lib/quotes-store", () => ({ listQuotes: vi.fn(async () => data.quotes) }));
 vi.mock("@/lib/calendar-store", () => ({ listCalendarEvents: vi.fn(async () => data.events) }));
+vi.mock("@/lib/proposals-store", () => ({ listAllProposals: vi.fn(async () => data.proposals) }));
 vi.mock("@/lib/push", () => ({ sendPushToAll: vi.fn(async () => ({ sent: data.sent })) }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
@@ -47,6 +49,7 @@ function awaitingQuote(): Record<string, unknown> {
 beforeEach(() => {
   data.quotes = [];
   data.events = [];
+  data.proposals = [];
   data.sent = 4;
   data.authed = false;
   vi.clearAllMocks();
@@ -205,5 +208,81 @@ describe("GET /api/cron/reminders — digest logic (clock pinned 2026-07-20)", (
     data.quotes = [awaitingQuote()];
     const res = await GET(req());
     expect(await res.json()).toMatchObject({ sent: 7 });
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O SEGUIMENTO MARCADO NA PROPOSTA TEM DE CHEGAR AO RESUMO DA MANHÃ
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * `followUpAt` existe em dois sítios com o mesmo nome — no pedido e na proposta.
+ * O botão que ela usa («Marcar seguimento», no Acompanhamento) grava na
+ * PROPOSTA; este resumo lia só o do pedido. Ela marcava, confiava, e não era
+ * avisada de nada.
+ *
+ * É uma falha que não dá erro: dá esquecimento. Por isso o teste é pelo
+ * comportamento — o que o resumo diz — e não pelo campo que foi lido.
+ */
+describe("GET /api/cron/reminders — seguimentos marcados na proposta", () => {
+  const pedidoVivo = {
+    id: "q-1",
+    name: "Casal do seguimento",
+    status: "em_revisao",
+    messages: [{ id: "m1" }],
+    submittedAt: "2026-07-01T09:00:00.000Z",
+  };
+
+  it("conta o seguimento marcado na PROPOSTA, que antes era invisível", async () => {
+    data.authed = true;
+    data.quotes = [pedidoVivo];
+    data.proposals = [{ id: "p-1", quoteId: "q-1", status: "enviada", followUpAt: "2026-07-20" }];
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      summary: expect.arrayContaining([expect.stringContaining("1 seguimento")]),
+    });
+  });
+
+  it("não conta o mesmo casal duas vezes quando está marcado nos dois sítios", async () => {
+    data.authed = true;
+    data.quotes = [{ ...pedidoVivo, followUpAt: "2026-07-19" }];
+    data.proposals = [{ id: "p-1", quoteId: "q-1", status: "enviada", followUpAt: "2026-07-20" }];
+    const res = await GET(req());
+    const { summary } = (await res.json()) as { summary: string[] };
+    expect(
+      summary.find((l) => l.includes("seguimento")),
+      "é a mesma chamada a fazer — contar duas vezes só a faria desconfiar do número",
+    ).toContain("1 seguimento");
+  });
+
+  it("ignora seguimentos de propostas já respondidas", async () => {
+    data.authed = true;
+    data.quotes = [pedidoVivo];
+    data.proposals = [
+      { id: "p-1", quoteId: "q-1", status: "aceite", followUpAt: "2026-07-20" },
+      { id: "p-2", quoteId: "q-1", status: "rejeitada", followUpAt: "2026-07-20" },
+    ];
+    const res = await GET(req());
+    const body = (await res.json()) as { summary?: string[]; reason?: string };
+    expect(body.summary?.some((l) => l.includes("seguimento")) ?? false).toBe(false);
+  });
+
+  it("ignora seguimentos de propostas cujo pedido já foi aceite ou arquivado", async () => {
+    data.authed = true;
+    data.quotes = [{ ...pedidoVivo, status: "aceite" }];
+    data.proposals = [{ id: "p-1", quoteId: "q-1", status: "enviada", followUpAt: "2026-07-20" }];
+    const res = await GET(req());
+    const body = (await res.json()) as { summary?: string[]; reason?: string };
+    expect(body.summary?.some((l) => l.includes("seguimento")) ?? false).toBe(false);
+  });
+
+  it("um seguimento marcado para depois de hoje não entra no resumo de hoje", async () => {
+    data.authed = true;
+    data.quotes = [pedidoVivo];
+    data.proposals = [{ id: "p-1", quoteId: "q-1", status: "enviada", followUpAt: "2026-07-25" }];
+    const res = await GET(req());
+    const body = (await res.json()) as { summary?: string[]; reason?: string };
+    expect(body.summary?.some((l) => l.includes("seguimento")) ?? false).toBe(false);
   });
 });

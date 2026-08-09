@@ -229,6 +229,20 @@ export async function POST(request: NextRequest) {
           acceptedAt: respondedAt,
           acceptedName,
           acceptedIp: clientIp(request),
+          /**
+           * O SELO DO DOCUMENTO, copiado da proposta que ele acabou de aceitar.
+           *
+           * Não se volta a desenhar o PDF aqui — seriam segundos de espera na
+           * única página onde não se pode fazer o casal esperar, e seria um
+           * documento RECONSTRUÍDO em vez do que eles viram. A impressão digital
+           * foi calculada no envio, sobre os bytes que seguiram mesmo.
+           *
+           * Propostas enviadas antes desta mudança não têm selo, e o contrato
+           * fica sem ele — que é o correcto: um selo inventado a posteriori não
+           * provaria nada.
+           */
+          propostaPdfSha256: proposal.pdfSha256,
+          propostaPdfBytes: proposal.pdfBytes,
         });
         if (created) {
           // O sinal confirma a reserva da data. A percentagem é a da PROPOSTA

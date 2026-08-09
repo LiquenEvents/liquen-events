@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { listQuotes } from "@/lib/quotes-store";
+import { listAllProposals } from "@/lib/proposals-store";
 import { listCalendarEvents } from "@/lib/calendar-store";
 import { sendPushToAll } from "@/lib/push";
 import { isAuthed } from "@/lib/admin-auth";
@@ -46,9 +47,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [allQuotes, calEvents] = await Promise.all([
+    const [allQuotes, calEvents, allProposals] = await Promise.all([
       listQuotes().catch(() => []),
       listCalendarEvents().catch(() => []),
+      listAllProposals().catch(() => []),
     ]);
     // Archived quotes are soft-deleted — never worth a notification.
     const quotes = allQuotes.filter((q) => !q.archived);
@@ -103,14 +105,43 @@ export async function GET(request: NextRequest) {
         new Date(q.submittedAt).getTime() < oneDayAgo,
     ).length;
 
-    // 4. Follow-ups due today or overdue (active deals only)
-    const followUpsDue = quotes.filter(
-      (q) =>
-        q.followUpAt &&
-        q.followUpAt <= todayKey &&
-        q.status !== "aceite" &&
-        q.status !== "rejeitado",
-    ).length;
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * 4. SEGUIMENTOS — E HÁ DOIS CAMPOS COM O MESMO NOME
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * `followUpAt` existe em DOIS sítios: no pedido (`Quote`, types.ts:273) e na
+     * proposta (`Proposal`, types.ts:383). Este resumo lia só o do pedido.
+     *
+     * Só que o botão «Marcar seguimento» que ela usa todos os dias está no
+     * painel de Acompanhamento, e esse grava na PROPOSTA. Resultado: ela marcava
+     * o seguimento na terça-feira, confiava, e o resumo da manhã seguinte não
+     * dizia nada — o telefone nunca tocava. A falha mais silenciosa do percurso,
+     * porque não dá erro nenhum: dá esquecimento.
+     *
+     * Aqui contam-se os dois, deduplicados POR PEDIDO — um seguimento marcado na
+     * proposta e outro no pedido do mesmo casal são a mesma chamada a fazer, e
+     * contá-los duas vezes só serviria para ela desconfiar do número.
+     *
+     * As propostas já respondidas não contam: uma proposta aceite ou recusada
+     * não tem seguimento nenhum a fazer, tal como já acontecia do lado do pedido.
+     */
+    const pedidosVivos = new Map(
+      quotes
+        .filter((q) => q.status !== "aceite" && q.status !== "rejeitado")
+        .map((q) => [q.id, q] as const),
+    );
+    const comSeguimento = new Set<string>();
+    for (const q of pedidosVivos.values()) {
+      if (q.followUpAt && q.followUpAt <= todayKey) comSeguimento.add(q.id);
+    }
+    for (const p of allProposals) {
+      if (!p.followUpAt || p.followUpAt > todayKey) continue;
+      if (p.status === "aceite" || p.status === "rejeitada") continue;
+      // Sem pedido vivo por trás, não há a quem telefonar.
+      if (p.quoteId && pedidosVivos.has(p.quoteId)) comSeguimento.add(p.quoteId);
+    }
+    const followUpsDue = comSeguimento.size;
 
     const lines: string[] = [];
     if (upcomingEvents.length > 0) {

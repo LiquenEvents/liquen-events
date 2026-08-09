@@ -165,3 +165,62 @@ describe("Faturas — escrever no formulário não redesenha o livro", () => {
     expect(screen.getAllByText(`Cliente ${ROWS - 1}`).length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O VALOR QUE ENTRA NA FATURA É COM IVA — E JÁ ESTEVE 23 % ABAIXO
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Escolher um evento na caixa "Evento" pré-preenchia o valor com
+ * `quote.quotedPrice`, que é o campo «Preço final (SEM IVA)» do estúdio. Mas
+ * `Invoice.amount` é o valor COM IVA — o PDF calcula a base dividindo por
+ * (1 + taxa). Um casamento de 10 000 € + IVA passava a uma fatura de 10 000 €
+ * com IVA incluído: 2 300 € por cobrar, e o documento internamente coerente,
+ * portanto sem nada que denunciasse.
+ *
+ * Este teste não olha para a implementação: escolhe um evento e lê o campo. É a
+ * pergunta que a dona faria — «o que é que aparece aqui quando escolho este
+ * casamento?».
+ */
+describe("Faturas — o valor pré-preenchido inclui o IVA", () => {
+  const COM_PRECO_LIQUIDO = [
+    {
+      id: "q-net",
+      name: "Casal do preço final",
+      eventName: "Casamento",
+      email: "casal@exemplo.pt",
+      quotedPrice: 10000, // «Preço final (sem IVA)»
+      vatRate: 0.23,
+    },
+  ] as never[];
+
+  it("10 000 € sem IVA entram como 12 300 €, não como 10 000 €", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <Faturas quotes={COM_PRECO_LIQUIDO} />
+      </ToastProvider>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /nova fatura/i }));
+    await user.selectOptions(screen.getByLabelText(/evento \(opcional\)/i), "q-net");
+
+    const valor = screen.getByLabelText(/com IVA/i) as HTMLInputElement;
+    await waitFor(() => expect(valor.value).not.toBe(""));
+    expect(
+      Number(valor.value),
+      "o campo é «com IVA» — 10 000 aqui seria faturar 2 300 € a menos",
+    ).toBeCloseTo(12300, 2);
+  });
+
+  it("o rótulo diz que o valor é com IVA", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <Faturas quotes={COM_PRECO_LIQUIDO} />
+      </ToastProvider>,
+    );
+    await user.click(await screen.findByRole("button", { name: /nova fatura/i }));
+    expect(screen.getByLabelText(/com IVA/i)).toBeTruthy();
+  });
+});

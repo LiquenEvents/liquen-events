@@ -46,6 +46,20 @@ create table if not exists public.proposals (
 -- Migração para instalações existentes (a tabela acima só é criada se não existir).
 alter table public.proposals add column if not exists responded_at timestamptz;
 
+-- ── O SELO DO DOCUMENTO ────────────────────────────────────────────────────
+-- A impressão digital (SHA-256) do PDF EXACTO que foi enviado ao casal, e o
+-- tamanho dele em bytes. Calculada no momento em que a proposta segue — os
+-- bytes já estão em memória, portanto não custa nada — e copiada para o
+-- contrato quando o casal aceita.
+--
+-- Para que serve: o aceite já guarda o nome escrito, a hora, o IP e o texto
+-- congelado dos termos, o que em Portugal já é uma assinatura electrónica
+-- simples. O que faltava era provar QUAL documento foi aceite. Numa discussão
+-- do género "o arco não estava incluído", isto é a diferença entre ganhar e
+-- ceder — e custa zero.
+alter table public.proposals add column if not exists pdf_sha256 text;
+alter table public.proposals add column if not exists pdf_bytes integer;
+
 -- Documento do Estúdio de Propostas: o PDF que o casal recebe, em estrutura —
 -- capa, mood boards, serviços, orçamento, condições e observações. As fotos NÃO
 -- estão aqui: guarda-se o CAMINHO de cada uma no bucket `proposal-assets`.
@@ -553,6 +567,12 @@ create table if not exists public.contracts (
   accepted_name  text,
   accepted_ip    text
 );
+
+-- O selo do documento aceite: a impressão digital do PDF que o casal viu,
+-- copiada da proposta no momento do aceite. Ver a nota nas colunas homónimas
+-- da tabela `proposals`.
+alter table public.contracts add column if not exists proposta_pdf_sha256 text;
+alter table public.contracts add column if not exists proposta_pdf_bytes integer;
 
 create index if not exists contracts_proposal_id_idx on public.contracts (proposal_id);
 

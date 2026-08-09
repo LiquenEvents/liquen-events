@@ -9,6 +9,7 @@ import type { Invoice } from "@/lib/invoices-store";
 import { SkeletonList } from "./Skeleton";
 import { eur2 } from "./util";
 import { splitThirtySeventy } from "@/lib/money";
+import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState, Field, Segmented } from "./ui";
 import { useCachedList } from "./useCachedList";
@@ -273,7 +274,29 @@ export default function Faturas({ quotes }: Props) {
     if (q) {
       setClientName(q.name || "");
       setClientEmail(q.email || "");
-      const total = q.quotedPrice ?? q.priceBreakdown?.total ?? 0;
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * COM IVA — e a linha anterior tirava 23 % à factura sem ninguém dar por isso
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Estava `q.quotedPrice ?? q.priceBreakdown?.total`. Os dois ramos deste
+       * `??` NÃO estão na mesma unidade, e a diferença é exactamente o IVA:
+       *
+       *   · `quotedPrice` é o campo «Preço final (SEM IVA)» do estúdio;
+       *   · `priceBreakdown.total` é BRUTO;
+       *   · e `Invoice.amount`, que é onde isto ia parar, é «valor com IVA»
+       *     (`invoice-pdf.ts`, que a partir dele calcula a base por divisão).
+       *
+       * Um casamento fechado por 10 000 € + IVA passava a uma factura de
+       * 10 000 € COM IVA incluído — base 8 130,08 € e IVA 1 869,92 €. Faltavam
+       * 2 300 € ao que o casal devia pagar, e o PDF saía internamente coerente,
+       * por isso nada acusava. Só se descobre a somar o livro à mão.
+       *
+       * `contractedAmounts` é a cascata certa e já existia — é a mesma que o
+       * dossier usa, e o comentário dela descreve este erro de ~23 % noutro
+       * sítio onde já tinha sido corrigido. Este ecrã ficou para trás.
+       */
+      const total = contractedAmounts(q).gross;
       if (total > 0) setAmount(String(total));
     }
     // Carregar o que já foi faturado a este evento, para bloquear um 2.º sinal.
@@ -565,7 +588,10 @@ export default function Faturas({ quotes }: Props) {
             )}
 
             <Field
-              label={mode === "split" ? "Total do evento (€)" : "Valor (€)"}
+              // «com IVA» no rótulo, e não só no código: é o que o campo espera
+              // (`Invoice.amount` é bruto) e é o que evita que alguém volte a
+              // escrever aqui o preço sem IVA à mão.
+              label={mode === "split" ? "Total do evento (€, com IVA)" : "Valor (€, com IVA)"}
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}

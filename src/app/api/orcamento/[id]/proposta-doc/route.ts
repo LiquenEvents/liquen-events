@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Proposal } from "@/lib/orcamento/types";
 import {
   type ProposalDoc,
@@ -110,6 +110,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       createdAt: new Date().toISOString(),
       sentAt: new Date().toISOString(),
       doc, // stored with Storage paths so it can be re-opened + edited
+      /**
+       * ── O SELO DO DOCUMENTO ────────────────────────────────────────────────
+       *
+       * A impressão digital do PDF que segue AGORA para o casal. Os bytes já
+       * estão em memória (foram desenhados dez linhas acima), portanto isto
+       * custa um `createHash` sobre um buffer e mais nada — nem um pedido, nem
+       * um milissegundo de espera do lado dela.
+       *
+       * PORQUÊ AQUI E NÃO NO ACEITE: no aceite, desenhar o PDF outra vez seriam
+       * segundos (259 ms fixos + ~75 ms por fotografia) na única página onde não
+       * se pode fazer o casal esperar — a do «sim». E seria um documento
+       * RECONSTRUÍDO, não o que eles viram. Aqui é o próprio.
+       *
+       * O que isto passa a permitir: numa discussão do género «o arco não
+       * estava incluído», comparar o PDF que ela tem com o que foi aceite é
+       * `sha256sum` contra o valor guardado no contrato. Sem isto, o `doc` é
+       * reconstruído e qualquer mudança no código do desenho — uma fonte, uma
+       * margem, uma fotografia entretanto substituída — dá um ficheiro
+       * diferente, sem forma de saber se o conteúdo mudou ou só o desenho.
+       */
+      pdfSha256: createHash("sha256").update(pdfBuffer).digest("hex"),
+      pdfBytes: pdfBuffer.byteLength,
     };
 
     // A proposta fica guardada COM o documento (`doc`): é a única cópia

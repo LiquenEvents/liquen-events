@@ -36,6 +36,10 @@ export const mapper: Mapper<Proposal> = {
     //    "aceitar proposta". Assim só quem GRAVA um documento é que apanha o
     //    erro de coluna em falta, e a rota do estúdio trata-o (isMissingTable).
     ...(p.doc !== undefined ? { doc: p.doc } : {}),
+    // Mesmo cuidado do `doc`: só entram na linha quando existem, para uma base
+    // onde o `alter table` ainda não correu continuar a aceitar tudo o resto.
+    ...(p.pdfSha256 !== undefined ? { pdf_sha256: p.pdfSha256 } : {}),
+    ...(p.pdfBytes !== undefined ? { pdf_bytes: p.pdfBytes } : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -65,6 +69,8 @@ export const mapper: Mapper<Proposal> = {
     // coluna existir, e o portal do cliente a esconder o botão do PDF em vez de
     // oferecer um documento que não há.
     ...(r.doc && typeof r.doc === "object" ? { doc: r.doc as Proposal["doc"] } : {}),
+    ...(r.pdf_sha256 ? { pdfSha256: String(r.pdf_sha256) } : {}),
+    ...(r.pdf_bytes != null ? { pdfBytes: Number(r.pdf_bytes) } : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
