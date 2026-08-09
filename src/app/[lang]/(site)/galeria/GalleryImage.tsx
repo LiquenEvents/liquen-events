@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { galleryLoadQueue } from "./load-queue";
+import { esquecer, promoverQuandoAVista } from "./prioridade-a-vista";
 import {
   CORTE_TELEMOVEL,
   ESCADA_ECRA_GRANDE,
@@ -100,7 +101,15 @@ export type GalleryImageProps = {
    * directamente no elemento em vez de obrigar a galeria a voltar a desenhar
    * centenas de mosaicos no meio do scroll. Ver `useBlurTardio`.
    */
-  registarImg?: (el: HTMLImageElement | null) => void;
+  /**
+   * Recebe o `src` como SEGUNDO argumento em vez de ser fechado num arrow lá
+   * fora. Parece um detalhe de estilo e não é: o arrow `(el) => registar(el,
+   * photo.src)` era criado de novo em cada render do mosaico, o que trocava a
+   * identidade do `ref` do `<img>` e obrigava o React a desligá-lo e a religá-lo
+   * — com um ouvinte de `load` novo de cada vez. Com o `src` a viajar como
+   * argumento, a função pode ser a MESMA para os 427 mosaicos.
+   */
+  registarImg?: (el: HTMLImageElement | null, src: string) => void;
 };
 
 export default function GalleryImage({
@@ -277,8 +286,17 @@ export default function GalleryImage({
    */
   const aoMontarImg = useCallback(
     (el: HTMLImageElement | null) => {
-      registarImg?.(el);
-      if (!el) return;
+      registarImg?.(el, src);
+      if (!el) {
+        esquecer(anchorRef.current);
+        return;
+      }
+      /**
+       * Nasce `low`, sobe a `auto` quando o mosaico chega ao ecrã. Ver
+       * `prioridade-a-vista.ts`: sem isto, 415 das 427 fotografias ficavam
+       * `low` para sempre — a que está debaixo do polegar incluída.
+       */
+      if (longe && !priority) promoverQuandoAVista(anchorRef.current, el);
       const revelar = () => {
         el.classList.add("g-foto-pronta");
         handleLoad();
@@ -292,7 +310,7 @@ export default function GalleryImage({
       }
       el.addEventListener("load", revelar, { once: true });
     },
-    [registarImg, handleLoad],
+    [registarImg, src, handleLoad, longe, priority, anchorRef],
   );
 
   const handleError = useCallback(() => {
@@ -482,6 +500,9 @@ export default function GalleryImage({
              * GaleriaClient.
              */
             loading={priority ? "eager" : "lazy"}
+            // O `low` é o ESTADO INICIAL, não uma sentença: quem o levanta é o
+            // observador de `prioridade-a-vista`, no instante em que o mosaico
+            // entra no ecrã. Escrito no elemento, sem re-render.
             fetchPriority={priority ? "high" : longe ? "low" : "auto"}
             /**
              * `async` em TODAS, incluindo a de prioridade. O que trava o scroll

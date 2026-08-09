@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -82,7 +82,7 @@ export function useBlurTardio(activo: boolean): BlurTardio {
   const molduraDe = (el: HTMLImageElement): HTMLElement =>
     el.parentElement?.tagName === "PICTURE" ? el.parentElement : el;
 
-  const aplicar = (el: HTMLImageElement, src: string, mapa: Mapa) => {
+  const aplicar = useCallback((el: HTMLImageElement, src: string, mapa: Mapa) => {
     const blur = mapa[src];
     const alvo = molduraDe(el);
     // Já tem placeholder (veio no HTML), já carregou, ou não há blur para esta
@@ -100,10 +100,11 @@ export function useBlurTardio(activo: boolean): BlurTardio {
       },
       { once: true },
     );
-  };
+  }, []);
 
   useEffect(() => {
     if (!activo || typeof window === "undefined") return;
+    const pendentes = pendentesRef.current;
     let vivo = true;
     const cancelar = quandoOcioso(() => {
       fetch(CAMINHO, { priority: "low" } as RequestInit)
@@ -111,8 +112,8 @@ export function useBlurTardio(activo: boolean): BlurTardio {
         .then((mapa: Mapa | null) => {
           if (!vivo || !mapa) return;
           mapaRef.current = mapa;
-          for (const [el, src] of pendentesRef.current) aplicar(el, src, mapa);
-          pendentesRef.current.clear();
+          for (const [el, src] of pendentes) aplicar(el, src, mapa);
+          pendentes.clear();
         })
         .catch(() => {
           // Sem o ficheiro, a galeria fica como estava: blur na primeira
@@ -126,12 +127,38 @@ export function useBlurTardio(activo: boolean): BlurTardio {
     };
   }, [activo]);
 
-  const registar = (el: HTMLImageElement | null, src: string) => {
-    if (!el) return;
-    const mapa = mapaRef.current;
-    if (mapa) aplicar(el, src, mapa);
-    else pendentesRef.current.set(el, src);
-  };
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A IDENTIDADE DESTA FUNÇÃO É O QUE DECIDE SE 427 MOSAICOS RE-RENDERIZAM
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Isto era uma função simples, declarada no corpo do hook, devolvida dentro
+   * de um objecto literal. Ou seja: função NOVA e objecto NOVO em cada render.
+   * E vai directa a `registarImg` de TODOS os mosaicos, que são `memo(...)`
+   * com comparação superficial — uma prop com identidade nova chega para o
+   * `memo` falhar em todos eles, sempre.
+   *
+   * O efeito: qualquer mudança de estado do `GaleriaClient` — abrir uma
+   * fotografia, o botão de voltar ao topo, mover o foco com as setas — voltava
+   * a construir a árvore dos mosaicos montados INTEIRA. O custo é proporcional
+   * ao número de mosaicos montados, e isso explica um número que estava à
+   * frente dos olhos e que nunca foi explicado: o INP da SECRETÁRIA (240 ms)
+   * ser pior do que o do telemóvel (160 ms) numa máquina muito mais rápida. A
+   * secretária monta mais mosaicos no mesmo scroll.
+   *
+   * `useCallback` sem dependências porque tudo o que isto lê são refs. O
+   * objecto devolvido leva `useMemo` pela mesma razão — devolver `{ registar }`
+   * cru punha um objecto novo por render e anulava o `useCallback`.
+   */
+  const registar = useCallback(
+    (el: HTMLImageElement | null, src: string) => {
+      if (!el) return;
+      const mapa = mapaRef.current;
+      if (mapa) aplicar(el, src, mapa);
+      else pendentesRef.current.set(el, src);
+    },
+    [aplicar],
+  );
 
-  return { registar };
+  return useMemo(() => ({ registar }), [registar]);
 }

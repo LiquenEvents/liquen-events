@@ -564,7 +564,7 @@ export default function ConfirmacaoClient({
                 <figure className="mt-14">
                   <figcaption className={`${microLabel} mb-4`}>{tc.mensagem}</figcaption>
                   <blockquote
-                    className="font-display italic text-foreground/85 leading-[1.62] whitespace-pre-line border-l border-gold/60 pl-6"
+                    className="font-display-italico text-foreground/85 leading-[1.62] whitespace-pre-line border-l border-gold/60 pl-6"
                     style={{ fontSize: "clamp(17px, 1.9vw, 22px)" }}
                   >
                     {clientMessage}
@@ -738,14 +738,14 @@ export default function ConfirmacaoClient({
           <div className="mx-auto max-w-6xl border-t border-foreground/15 pt-10 flex flex-col gap-10 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p
-                className="font-display italic text-moss-dark leading-snug max-w-md"
+                className="font-display-italico text-moss-dark leading-snug max-w-md"
                 style={{ fontSize: "clamp(17px, 1.9vw, 21px)" }}
               >
                 {tc.greetingWarm}
               </p>
               <p className="mt-7 text-foreground/70 text-[13px]">{tc.signOff}</p>
               <p
-                className="font-display italic text-moss mt-1"
+                className="font-display-italico text-moss mt-1"
                 style={{ fontSize: "clamp(22px, 2.6vw, 28px)" }}
               >
                 {tc.signName}

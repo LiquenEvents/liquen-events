@@ -1449,6 +1449,21 @@ body:has([data-orcamento-mode]) .eyebrow {
   contain-intrinsic-size: auto var(--cv-h, clamp(480px, 60vh, 680px));
 }
 
+/* ── O itálico do Playfair, que é um desenho à parte e não uma inclinação ──
+   Vive numa família própria, servida SEM pré-carregamento (ver o comentário
+   longo em `[lang]/layout.tsx`): pesa 38 888 B, era pedido em prioridade alta
+   em TODAS as páginas, e no sítio público é desenhado em três sítios, todos na
+   confirmação do pedido de orçamento.
+
+   `font-display italic` já não serve para isto: a família `--font-display`
+   passou a ter só o romano, portanto pedir-lhe itálico dava a oblíqua
+   sintética do browser — que foi exactamente o que se recusou quando isto foi
+   escrito. Esta classe é o único sítio que deve tocar no itálico. */
+.font-display-italico {
+  font-family: var(--font-playfair-italico), Georgia, "Times New Roman", Times, serif;
+  font-style: italic;
+}
+
 /* ── A moldura de cada fotografia da galeria: é ELA que leva o desfocado ──
    MEDIDO, e é um defeito de anular-se a si próprio: o desfocado era pintado
    como `background-image` no PRÓPRIO <img>, e o <img> leva `.g-foto`, que é
@@ -1508,7 +1523,19 @@ body:has([data-orcamento-mode]) .eyebrow {
      `contain-intrinsic-size: auto` lets the browser remember the last real size
      as a belt-and-braces fallback. */
   content-visibility: auto;
-  contain-intrinsic-size: auto;
+  /* `auto 400px` e não `auto`. O `auto` sozinho é gramática INVÁLIDA — a
+     gramática é `auto? [ none | <length{1,2}> ]`, o `auto` é um modificador e
+     não um valor — portanto o parser deitava a declaração inteira fora e a rede
+     que o comentário aqui em cima promete («remember the last real size») nunca
+     existiu. Verificado no browser: `getComputedStyle(tile).containIntrinsicSize`
+     devolvia `none`.
+
+     Hoje não custava nada, e é preciso dizê-lo: a altura dos mosaicos do
+     masonry vem do `aspect-ratio` em linha, por isso o CLS ficou em 0,0002 na
+     mesma. O perigo era outro — os cinco mosaicos do herói também levam
+     `.g-tile` e NÃO têm `aspect-ratio`: dependem da altura fixa da grelha. No
+     dia em que alguém lha tirasse, não havia rede nenhuma por baixo. */
+  contain-intrinsic-size: auto 400px;
 }
 
 /* Confirmação de orçamento — o visto desenha-se: primeiro o anel, depois o
@@ -1540,13 +1567,25 @@ body:has([data-orcamento-mode]) .eyebrow {
    IntersectionObserver, como as .anim-*). Termina em transform:none para não
    deixar containing-block que afete o morph <ViewTransition> — mesmo cuidado
    que a .g-reveal do masonry. */
+/* SEM `opacity` — e é a mesma decisão que a `.g-reveal` já tinha tomado dez
+   regras acima («Reveal by a gentle RISE only — never opacity»), da qual o
+   mosaico-herói tinha ficado de fora.
+
+   MEDIDO no HTML construído: os cinco mosaicos do herói levam
+   `--hero-delay: 0/70/140/210/280ms` e o `both` faz a opacidade 0 valer TAMBÉM
+   antes do atraso. Ou seja, a maior peça do primeiro ecrã de secretária depois
+   da fotografia de capa estava transparente de 0 a 280 ms e só ficava opaca aos
+   900–1180 ms — mesmo com os bytes já cá dentro. E um elemento a esbater de 0
+   também não é candidato a LCP enquanto esbate.
+
+   Fica a subida de 18 px, que é o que dá o gesto, e a cascata desce de 70 para
+   40 ms: a onda continua a ler-se e a parede está lá quase quatro vezes mais
+   cedo. */
 @keyframes g-hero-in {
   from {
-    opacity: 0;
     transform: translateY(18px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }

@@ -55,13 +55,46 @@ const inter = Inter({
 const playfair = Playfair_Display({
   variable: "--font-playfair",
   subsets: ["latin"],
-  // The real italic, not the browser's synthetic slant. Playfair's italic is a
-  // separate drawing (single-storey a, calligraphic f), and the sign-off, the
-  // pull-quote and the warm greeting are all set in it — a faux-oblique of the
-  // roman looked mechanical exactly where the page is trying to feel written.
-  style: ["normal", "italic"],
+  style: ["normal"],
   display: "swap",
   adjustFontFallback: true,
+  fallback: ["Georgia", "Times New Roman", "Times", "serif"],
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ITÁLICO DO PLAYFAIR SAI DO CAMINHO CRÍTICO DE TODAS AS PÁGINAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Continua a ser o itálico A SÉRIO, e não a inclinação sintética do browser —
+ * a razão original mantém-se: o itálico do Playfair é um desenho à parte (o `a`
+ * de um andar, o `f` caligráfico) e a despedida, a citação e a saudação estão
+ * nele. O que mudou é ONDE ele é pedido.
+ *
+ * MEDIDO no HTML construído da /galeria: o `<head>` pedia três ficheiros de
+ * tipo de letra antes de tudo o resto — Playfair romano (38 460 B), Playfair
+ * **itálico** (38 888 B) e Inter (48 432 B), 125 780 B ao todo, em prioridade
+ * alta e ~35 ms antes do herói, que pesa 39 339 B. Ou seja: 3,2× o peso do
+ * elemento de LCP, à frente dele na fila.
+ *
+ * E o itálico não tem um único glifo nessa página — `grep -c italic` no
+ * documento construído dá 0. Em todo o sítio público ele é usado em TRÊS
+ * sítios, todos na página de confirmação do pedido de orçamento, que é o ecrã
+ * a seguir a submeter um formulário. Estava a ser pré-carregado em todas as
+ * páginas para ser desenhado numa.
+ *
+ * Instância própria com `preload: false`: continua a ser servido por nós (a CSP
+ * é `font-src 'self'`) e continua com `display: "swap"`, portanto quando for
+ * preciso entra sem bloquear nada. É a mesma decisão, e pela mesma razão, que o
+ * `Archivo` do back office já tinha tomado aqui em baixo.
+ */
+const playfairItalico = Playfair_Display({
+  variable: "--font-playfair-italico",
+  subsets: ["latin"],
+  style: ["italic"],
+  display: "swap",
+  adjustFontFallback: true,
+  preload: false,
   fallback: ["Georgia", "Times New Roman", "Times", "serif"],
 });
 
@@ -196,7 +229,7 @@ export default async function RootLayout({
     <html
       lang={htmlLang(locale)}
       data-scroll-behavior="smooth"
-      className={`${inter.variable} ${playfair.variable} ${archivo.variable}`}
+      className={`${inter.variable} ${playfair.variable} ${playfairItalico.variable} ${archivo.variable}`}
     >
       {/*
         O QUE FICA AQUI E O QUE SAIU DAQUI.

@@ -133,7 +133,14 @@ export const config = {
   // files from the matcher means each such request skips the Node proxy
   // invocation entirely and is served straight from the static layer — the
   // response is byte-for-byte identical to the previous NextResponse.next().
+  // `_img/` estava a faltar nesta lista, e é a pasta com mais tráfego de todas:
+  // são as miniaturas pré-geradas da galeria (5 570 ficheiros) e os heróis. Uma
+  // travessia da galeria invocava esta função ~428 vezes para ela percorrer o
+  // `isNonLocalized` e devolver `next()` — exactamente o desperdício que a
+  // exclusão do `imagens/` aqui ao lado existe para evitar. Não é um descuido
+  // de raciocínio: é de sequência — o `/_img` nasceu com o pré-gerador, depois
+  // de esta linha estar escrita.
   matcher: [
-    "/((?!_next/static|_next/image|imagens/|logos/|favicon\\.ico|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt).*)",
+    "/((?!_next/static|_next/image|_img/|imagens/|logos/|favicon\\.ico|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt).*)",
   ],
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import ReactDOM from "react-dom";
 import SafeImage, { type SafeImageProps } from "@/components/SafeImage";
 import { heroImageLoader, heroAvifSrcSet } from "@/lib/hero-image-loader";
 
@@ -46,9 +47,23 @@ import { heroImageLoader, heroAvifSrcSet } from "@/lib/hero-image-loader";
  * escritas aqui:
  *   · `loading="eager"` + `fetchPriority="high"` no `<img>`, que é o que o
  *     `priority` fazia de útil;
- *   · um `<link rel="preload">` nosso, com `type="image/avif"` e o `imageSrcSet`
- *     do AVIF, para o browser puxar a fonte que vai MESMO usar. O React 19
- *     iça-o para o `<head>` sozinho, de onde quer que seja desenhado.
+ *   · um pré-carregamento nosso, com `type="image/avif"` e o `imageSrcSet` do
+ *     AVIF, para o browser puxar a fonte que vai MESMO usar.
+ *
+ * ── E ONDE É QUE ELE ATERRA NO DOCUMENTO ──────────────────────────────────
+ *
+ * Isto esteve escrito como um `<link>` em JSX, com um comentário meu a dizer
+ * que «o React 19 iça-o para o `<head>` sozinho». FUI MEDIR NO HTML CONSTRUÍDO
+ * e é falso: o `</head>` fecha no byte 5456 e o `<link>` do herói saía no byte
+ * 31 982 — dentro do corpo, depois da barra de navegação, do menu de telemóvel
+ * e de três blocos de dados estruturados. O pedido do elemento de LCP saía a
+ * 1/6 do documento mais tarde do que podia, e o comentário garantia o
+ * contrário a quem viesse a seguir.
+ *
+ * `ReactDOM.preload` é a API que faz mesmo o que aquele comentário prometia: é
+ * declarada durante o render e o React põe-na no `<head>`, deduplicada. O
+ * `<link>` em JSX fica para quem o quiser voltar a tentar — mas então que meça
+ * o byte, como aqui.
  *
  * ── A SALVAGUARDA ─────────────────────────────────────────────────────────
  *
@@ -62,6 +77,20 @@ import { heroImageLoader, heroAvifSrcSet } from "@/lib/hero-image-loader";
 export default function HeroImage(props: Omit<SafeImageProps, "initialLoader">) {
   const { priority, sizes, src, ...resto } = props;
   const avif = typeof src === "string" ? heroAvifSrcSet(src) : null;
+
+  // Declarado durante o render, que é como esta API se usa. O `href` é o maior
+  // degrau: serve de chave de deduplicação e de recurso para quem não perceba
+  // `imageSrcSet` — quem perceber escolhe pelo srcset e ignora-o.
+  if (avif && priority) {
+    const maior = avif.split(", ").pop()?.split(" ")[0] ?? "";
+    ReactDOM.preload(maior, {
+      as: "image",
+      type: "image/avif",
+      imageSrcSet: avif,
+      imageSizes: sizes,
+      fetchPriority: "high",
+    });
+  }
 
   const imagem = (
     // O `eslint-disable` do `jsx-a11y/alt-text` que aqui estava deixou de ser
@@ -101,21 +130,9 @@ export default function HeroImage(props: Omit<SafeImageProps, "initialLoader">) 
   if (!avif) return imagem;
 
   return (
-    <>
-      {priority && (
-        <link
-          rel="preload"
-          as="image"
-          type="image/avif"
-          imageSrcSet={avif}
-          imageSizes={sizes}
-          fetchPriority="high"
-        />
-      )}
-      <picture>
-        <source type="image/avif" srcSet={avif} sizes={sizes} />
-        {imagem}
-      </picture>
-    </>
+    <picture>
+      <source type="image/avif" srcSet={avif} sizes={sizes} />
+      {imagem}
+    </picture>
   );
 }

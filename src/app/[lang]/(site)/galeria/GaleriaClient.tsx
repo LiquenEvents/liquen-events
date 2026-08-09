@@ -406,7 +406,10 @@ const Tile = memo(function Tile({
           // `GalleryImage`: é ganho de ORDEM, não de bytes.
           longe={idx >= 12}
           anchorRef={btnRef}
-          registarImg={(el) => registarImg(el, photo.src)}
+          // Sem arrow: o `src` viaja como argumento (ver `registarImg` no
+          // GalleryImage). Um arrow aqui era uma função nova por render, e
+          // trocava a identidade do `ref` do `<img>` de cada mosaico.
+          registarImg={registarImg}
           unavailableLabel={unavailableLabel}
           blurDataURL={photo.blurDataURL}
         />
@@ -467,7 +470,10 @@ function SatelliteTile({
       data-sub={cap.sub}
       className={`g-hero g-tile relative hidden sm:block h-full w-full overflow-hidden group ${FOCUS_RING}`}
       style={
-        { "--hero-delay": `${idx * 70}ms`, backgroundColor: photo.color } as React.CSSProperties
+        // 40 ms e não 70: com a opacidade fora da animação (ver `g-hero-in`), o
+        // atraso deixou de ser tempo com o mosaico invisível, mas continua a ser
+        // tempo até a parede assentar. A onda lê-se na mesma.
+        { "--hero-delay": `${idx * 40}ms`, backgroundColor: photo.color } as React.CSSProperties
       }
     >
       {!hidden && (
@@ -2005,6 +2011,29 @@ function Lightbox({
             <source
               type="image/avif"
               srcSet={srcsetDaGaleria(pool[index].src, ESCADA_ECRA_GRANDE, "avif")}
+              sizes={SIZES_DA_GRELHA}
+            />
+            {/*
+              AS DUAS LINHAS DE WebP, QUE FALTAVAM.
+
+              Esta pré-visualização existe para ser um acerto de cache: as
+              mesmas escadas e o mesmo `sizes` da grelha, para o browser
+              reutilizar o ficheiro que já tem e a fotografia aparecer a 0 ms.
+              Só que só havia `<source>` de AVIF — quem não lê AVIF caía no
+              `<img>`, que estava preso ao WebP de 768. Em secretária a grelha
+              guardou o de 1024: ficheiro diferente, cache falhada, e ~69 KB
+              descarregados no instante em que se prometeu "instantâneo".
+              São ~5 % das visitas, e para essas isto era ruído puro.
+            */}
+            <source
+              media={CORTE_TELEMOVEL}
+              type="image/webp"
+              srcSet={srcsetDaGaleria(pool[index].src, ESCADA_TELEMOVEL, "webp")}
+              sizes={SIZES_DA_GRELHA}
+            />
+            <source
+              type="image/webp"
+              srcSet={srcsetDaGaleria(pool[index].src, ESCADA_ECRA_GRANDE, "webp")}
               sizes={SIZES_DA_GRELHA}
             />
             <img
