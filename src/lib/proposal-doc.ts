@@ -313,6 +313,16 @@ export interface ProposalDoc {
   /** Linhas adicionais mostradas por baixo do total (Deslocação, Wedding
    *  Coordinator, Tecidos, Mobiliário opção A/B, …). Só DISPLAY — ver {@link BudgetExtra}. */
   budgetExtras?: BudgetExtra[];
+
+  /**
+   * Desenhar a linha «Total a pagar» a fechar o orçamento.
+   *
+   * Ligada por omissão: com cada valor adicional a poder ter o seu próprio IVA,
+   * a soma deixa de ser trivial, e uma proposta não deve pedir contas de cabeça
+   * a quem a lê. A proposta feita à mão não a tinha — quem preferir a folha tal
+   * e qual desliga-a, e o documento fica com as parcelas e sem o todo.
+   */
+  mostrarTotalAPagar?: boolean;
   // Organização template: per-item estimated values.
   budgetRows?: BudgetRow[];
   totalEstimatedText?: string; // "[Valor Total]" / "12.500,00 €"

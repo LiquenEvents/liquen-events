@@ -30,7 +30,8 @@ import {
   resolveProposalMoney,
   resolveValidUntil,
 } from "@/lib/proposal-doc";
-import { splitSinal, eur } from "@/lib/money";
+import { splitSinal, eur, round2 } from "@/lib/money";
+import { somaDosExtrasSemIva } from "@/lib/proposal-budget";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
 import {
   CARLITO_REGULAR_TTF_B64,
@@ -1085,14 +1086,14 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     const boxH = 50;
     // Flat, typographic total: a single thin gold hairline (the one accent moment
     // in the interior), a quiet grey label and the amount in serif ink. No fill.
-    const drawTotal = (pg: PDFPage, ty: number) => {
+    const drawTotal = (pg: PDFPage, ty: number, rotulo?: string) => {
       pg.drawLine({
         start: { x: M, y: ty },
         end: { x: M + boxW, y: ty },
         thickness: 1,
         color: GOLD,
       });
-      text(pg, totalLbl, M, ty - 26, { font: f.serifB, size: 13, color: INK });
+      text(pg, rotulo ?? totalLbl, M, ty - 26, { font: f.serifB, size: 13, color: INK });
       // O total também passa pelo normalizador: quando o texto foi GERADO pelo
       // estúdio (que usa o mesmo `eur` que nós) vem com espaço inquebrável, e
       // ficaria a discordar dos números que desenhamos por baixo dele.
@@ -1164,35 +1165,93 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       });
     }
 
+    // O desdobramento do total (base, IVA, bruto) é preciso já aqui: a linha
+    // «Valor Total» é o que sobra depois de tirar os adicionais, e essa conta
+    // tem de ser feita na mesma unidade em que o número está impresso.
+    const money = resolveProposalMoney(doc);
     /**
      * ════════════════════════════════════════════════════════════════════════
-     * OS VALORES ADICIONAIS VÊM ANTES DO TOTAL — PORQUE FAZEM PARTE DELE
+     * COMO NA PROPOSTA FEITA À MÃO: O VALOR DOS ITENS, OS ADICIONAIS, A SOMA
      * ════════════════════════════════════════════════════════════════════════
      *
-     * Estas linhas — Deslocação da equipa, Wedding Coordinator, Tecidos,
-     * Mobiliário opção A/B — eram desenhadas DEPOIS do total, e portanto liam-se
-     * como somas por cima dele: «6.875 € … e mais 1.550 € de deslocação». Não
-     * eram: o total nunca as incluiu, e o cliente ficava a fazer uma conta que
-     * ninguém tinha feito.
+     * A proposta da Mariana e do João diz, por esta ordem:
      *
-     * Agora o estúdio soma-as ao total no momento em que são escritas (é dele
-     * que saem também o sinal de 30% e a factura). Passam para cima do total,
-     * que é onde uma linha de orçamento se lê: as linhas primeiro, o total
-     * depois. O número grande passa a ser o número que se paga.
+     *     Valor Total                   7890 € + Iva
+     *     Serviço de coordenação         950,50€ + Iva
+     *     Deslocação da Equipa Líquen    250,00 €
+     *
+     * O «Valor Total» são os 7.890 da decoração — os itens listados acima dele.
+     * A coordenação e a deslocação vêm DEPOIS, e não estão lá dentro. É a
+     * estrutura dela, e é a que se replica.
+     *
+     * ── PORQUE É QUE ISTO PARECIA UMA CONTRADIÇÃO E NÃO ERA ─────────────────
+     *
+     * Ela pediu duas coisas que pareciam opostas: primeiro «o back office tem
+     * de somar a deslocação ao total», depois «os adicionais parecem incluídos
+     * no total e não estão». As duas são verdade ao mesmo tempo, e o conflito
+     * era do código, que tinha UM número para DUAS coisas:
+     *
+     *   · o que se COBRA — e é sobre isso que saem a factura, o sinal e o saldo;
+     *   · o que se IMPRIME na linha «Valor Total» — que são só os itens.
+     *
+     * `totalAmount` continua a ser o que se cobra, e por isso nada muda a
+     * jusante. O que muda é o desenho: a linha «Valor Total» passa a mostrar o
+     * que sobra depois de tirar os adicionais, eles aparecem por baixo com o
+     * seu próprio IVA, e o número grande passa a chamar-se «Total a pagar»,
+     * porque é o que o casal vai pagar e é a única conta que ninguém deve ter
+     * de fazer de cabeça.
+     *
+     * Sem adicionais nenhuns não há nada a separar: fica o total de sempre, com
+     * o rótulo de sempre.
      */
     const extras = (doc.budgetExtras ?? []).filter(
       (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
     );
+    const mostrarSoma = doc.mostrarTotalAPagar !== false;
+
     if (extras.length) {
-      budgetBreak(24 + extras.length * 18);
-      eyebrow(p, "Valores adicionais", M, y);
-      y -= 18;
+      // Na unidade em que o total está impresso: líquida quando o documento diz
+      // «+ IVA», bruta quando diz «IVA incluído». Somar em unidades diferentes é
+      // o erro que já custou 460 € num PDF — ver o bloco das versões, abaixo.
+      const extrasBase = somaDosExtrasSemIva(doc.budgetExtras, {
+        mode: money.mode,
+        vatRate: money.vatRate,
+      });
+      const paraAUnidadeImpressa = (base: number) =>
+        money.mode === "acrescer" ? base : round2(base * (1 + money.vatRate));
+      const dosItens = Math.max(0, round2(money.base - extrasBase));
+      const maisIva = money.mode === "acrescer" ? " + IVA" : "";
+
+      budgetBreak(30 + (extras.length + 1) * 18);
+      // A linha do valor dos itens, com o peso de uma linha de orçamento e não
+      // de um total — o total é o de baixo.
+      text(p, orgT ? "Valor Total Estimado" : "Valor Total", M, y, {
+        font: f.serifB,
+        size: 11,
+        color: INK,
+      });
+      textRight(
+        p,
+        `${milharesComPonto(eur(paraAUnidadeImpressa(dosItens)))}${maisIva}`,
+        M + boxW,
+        y,
+        {
+          font: f.serifB,
+          size: 11,
+          color: INK,
+        },
+      );
+      y -= 20;
+
       for (const ex of extras) {
         const lines = wrap(f.reg, ex.label, 10.5, boxW - PRICE_COL);
         budgetBreak(Math.max(18, lines.length * 14));
         lines.forEach((ln, i) => {
           text(p, ln, M, y, { size: 10.5, color: INK });
-          if (i === 0) textRight(p, ex.valueText, M + boxW, y, { size: 10.5, color: MUTED });
+          // O valor sai TAL COMO ELA O ESCREVEU, com o «+ IVA» ou sem ele. É
+          // por linha de propósito: na proposta antiga a deslocação não leva
+          // IVA e a coordenação leva, e essa diferença é dela para dizer.
+          if (i === 0) textRight(p, ex.valueText, M + boxW, y, { size: 10.5, color: INK });
           y -= 14;
         });
         y -= 4;
@@ -1200,10 +1259,17 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       y -= 8;
     }
 
-    budgetBreak(boxH + 24);
-    y -= 16;
-    drawTotal(p, y);
-    y -= boxH + 20;
+    if (extras.length && !mostrarSoma) {
+      // Ela desligou a soma: o documento fica com as parcelas e sem o todo, que
+      // é como a proposta antiga era. Não se desenha um total grande a repetir
+      // só uma das parcelas — seria o número errado em corpo 22.
+      y -= 8;
+    } else {
+      budgetBreak(boxH + 24);
+      y -= 16;
+      drawTotal(p, y, extras.length ? "Total a pagar" : undefined);
+      y -= boxH + 20;
+    }
 
     // ── A versão SEM os extras ─────────────────────────────────────────────
     // O total grande é a proposta inteira; por baixo dele, e só quando há
@@ -1227,7 +1293,6 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     // impresso — líquida quando o documento diz «+ IVA», bruta quando diz «IVA
     // incluído». Ver `orcamento/versoes-da-proposta.ts`: é lá que a conta vive,
     // uma vez só, partilhada com o estúdio.
-    const money = resolveProposalMoney(doc);
     const versoes = totaisDasVersoes(doc);
     if (versoes && versoes.comoOTotal.base > 0 && versoes.extras > 0) {
       const maisIva = money.mode === "acrescer" ? " + IVA" : "";

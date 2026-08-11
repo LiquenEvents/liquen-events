@@ -213,3 +213,71 @@ describe("«sem os extras» está na mesma unidade do total grande", () => {
     expect(texto).toContain("30.750,00 €");
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ORÇAMENTO COMO ESTÁ NA PROPOSTA FEITA À MÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A proposta da Mariana e do João diz, por esta ordem:
+ *
+ *     Valor Total                   7890 € + Iva
+ *     Serviço de coordenação         950,50€ + Iva
+ *     Deslocação da Equipa Líquen    250,00 €
+ *
+ * O «Valor Total» são os 7.890 da decoração; a coordenação e a deslocação vêm
+ * depois e NÃO estão lá dentro. O que se cobra — e é sobre isso que saem a
+ * factura e o sinal — é a soma, e é ela que fecha o quadro.
+ */
+describe("o orçamento com valores adicionais", () => {
+  const comExtras = {
+    // 7890 + 950,50 + 250 = 9090,50 — é o que se cobra.
+    totalAmount: 9090.5,
+    // O texto é escrito pelo estúdio a partir do montante — aqui é posto à mão
+    // porque o número grande é o que está ESCRITO no documento, e é ele que o
+    // casal lê.
+    totalText: "9.090,50 € + IVA",
+    totalVatMode: "acrescer" as const,
+    budgetItems: ["Design Floral e Decor Jantar", "Decor Mesa Buffet", "Bouquet da Noiva"],
+    budgetExtras: [
+      { label: "Serviço de coordenação", valueText: "950,50 € + IVA" },
+      { label: "Deslocação da Equipa Líquen", valueText: "250,00 €" },
+    ],
+  };
+
+  it("o «Valor Total» é só o dos itens, sem os adicionais", async () => {
+    const texto = await textoDoPdf(proposta(comExtras));
+    expect(texto).toMatch(/Valor Total/);
+    expect(texto).toMatch(/7\.?890,00/);
+  });
+
+  it("fecha com «Total a pagar» na soma de tudo", async () => {
+    const texto = await textoDoPdf(proposta(comExtras));
+    expect(texto).toContain("Total a pagar");
+    expect(texto).toMatch(/9\.?090,50/);
+  });
+
+  it("cada adicional sai com o IVA que ela lhe escreveu, e só esse", async () => {
+    const texto = await textoDoPdf(proposta(comExtras));
+    expect(texto).toContain("Serviço de coordenação");
+    expect(texto).toContain("Deslocação da Equipa Líquen");
+    // A deslocação não leva IVA na proposta dela, e não pode ganhar um aqui.
+    expect(texto).toMatch(/Deslocação da Equipa Líquen\s*250,00 €/);
+  });
+
+  it("sem adicionais nenhuns, fica o total de sempre com o rótulo de sempre", async () => {
+    const texto = await textoDoPdf(proposta({ totalAmount: 7890, totalVatMode: "acrescer" }));
+    expect(texto).not.toContain("Total a pagar");
+  });
+
+  /**
+   * A folha dela não tinha a linha da soma. Quem preferir a folha tal e qual
+   * desliga-a — e aí o documento fica com as parcelas e sem o todo, em vez de
+   * um número grande a repetir só uma das parcelas.
+   */
+  it("desligada, não desenha um total grande com o número errado", async () => {
+    const texto = await textoDoPdf(proposta({ ...comExtras, mostrarTotalAPagar: false }));
+    expect(texto).not.toContain("Total a pagar");
+    expect(texto).toMatch(/7\.?890,00/);
+  });
+});
