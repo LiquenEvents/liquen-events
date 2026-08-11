@@ -126,6 +126,67 @@ export function somaDosExtras(extras: ProposalDoc["budgetExtras"]): number {
 }
 
 /**
+ * O que a PRÓPRIA linha declara sobre o IVA, ou `null` quando não declara nada.
+ *
+ * Não é o `detectVatMode` do `proposal-doc`: esse responde sempre, e responde
+ * «incluído» quando o texto está calado — o que é a leitura certa para o total
+ * escrito à mão e a errada para uma linha, porque uma linha calada não está a
+ * dizer «com IVA», está a não dizer nada. A diferença entre «não diz» e «diz
+ * incluído» é o que permite cair para o modo do DOCUMENTO em vez de adivinhar.
+ */
+function modoDeIvaDaLinha(texto: string | undefined): "acrescer" | "incluido" | null {
+  if (!texto) return null;
+  const t = texto.toLowerCase();
+  if (/\+\s*iva|mais\s+iva|acresce\s+(?:o\s+)?iva|iva\s+n[aã]o\s+inclu|s\/\s*iva|sem\s+iva/.test(t))
+    return "acrescer";
+  if (/iva\s+inclu|c\/\s*iva|com\s+iva/.test(t)) return "incluido";
+  return null;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANTO É QUE OS ADICIONAIS ACRESCENTAM À BASE — LENDO O IVA QUE ELES DIZEM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O campo do total no estúdio chama-se «Preço final (SEM IVA)»: é a base
+ * tributável, e é dela que saem a factura, o sinal e o saldo. Os adicionais são
+ * texto livre, e nas propostas verdadeiras aparecem das duas maneiras —
+ * «895,00 € + IVA» e «895,00 €».
+ *
+ * A soma tratava-as exactamente da mesma maneira: pegava no número e somava-o à
+ * base. Para «895,00 € + IVA» isso está certo — o texto diz que 895 é líquido.
+ * Para «895,00 €» numa proposta que se lê COM IVA, está errado: a linha promete
+ * ao casal que aquilo custa 895, e o total sobe 895 de base, ou seja 1.101 do
+ * que eles vão pagar. A linha e o total dizem números diferentes sobre a mesma
+ * coisa, no mesmo documento.
+ *
+ * A regra, por ordem:
+ *   1. o que a linha DIZ ganha sempre («+ IVA» ⇒ líquido, «IVA incluído» ⇒
+ *      bruto). É a intenção escrita por quem a escreveu;
+ *   2. uma linha calada segue o modo do DOCUMENTO — é a leitura que o casal vai
+ *      fazer, porque é a que está impressa ao lado do total;
+ *   3. sem contexto nenhum, líquido, que é o comportamento de sempre.
+ *
+ * Devolve SEMPRE base (sem IVA), para poder ser somado ao campo do total sem
+ * mais conversões.
+ */
+export function somaDosExtrasSemIva(
+  extras: ProposalDoc["budgetExtras"],
+  contexto?: { mode?: "acrescer" | "incluido"; vatRate?: number },
+): number {
+  const taxa =
+    typeof contexto?.vatRate === "number" && contexto.vatRate >= 0 ? contexto.vatRate : 0.23;
+  const total = (extras ?? []).reduce((acc, e) => {
+    const valor = normalizarValor(e.valueText);
+    if (valor === null) return acc;
+    const modo = modoDeIvaDaLinha(e.valueText) ?? contexto?.mode ?? "acrescer";
+    // Bruto → base. Nunca o contrário: o que se soma é sempre a base.
+    return acc + (modo === "incluido" ? valor / (1 + taxa) : valor);
+  }, 0);
+  return Math.round(total * 100) / 100;
+}
+
+/**
  * A soma dos itens mais os valores adicionais.
  *
  * `null` quando NÃO HÁ NENHUM preço — que é diferente de somar zero. Sem esta

@@ -12,6 +12,7 @@ import {
   removerLinha,
   definirItem,
   definirPreco,
+  somaDosExtrasSemIva,
 } from "./proposal-budget";
 import type { ProposalDoc } from "./proposal-doc";
 
@@ -291,5 +292,57 @@ describe("somaDosExtras", () => {
         { label: "b", valueText: "0,20" },
       ]),
     ).toBe(0.3);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O «+ IVA» QUE A LINHA DECLARA TEM DE CONTAR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O campo a que isto se soma é a BASE («Preço final (sem IVA)»), e é dele que
+ * saem a factura, o sinal e o saldo. Somar «895,00 €» e «895,00 € + IVA» da
+ * mesma maneira faz a linha e o total dizerem números diferentes sobre a mesma
+ * coisa, no mesmo documento que vai para o casal.
+ */
+describe("somaDosExtrasSemIva", () => {
+  const IVA = { mode: "incluido" as const, vatRate: 0.23 };
+  const SEM = { mode: "acrescer" as const, vatRate: 0.23 };
+
+  it("«+ IVA» é líquido e entra tal e qual, em qualquer documento", () => {
+    const linha = [{ label: "Coordenação", valueText: "895,00 € + IVA" }];
+    expect(somaDosExtrasSemIva(linha, IVA)).toBe(895);
+    expect(somaDosExtrasSemIva(linha, SEM)).toBe(895);
+  });
+
+  it("uma linha calada num documento COM IVA é bruta, e converte-se", () => {
+    // 895 / 1,23 = 727,64 de base. Somar 895 punha no total mais 1.101 do que
+    // o casal vai pagar, quando a linha lhe prometeu 895.
+    expect(somaDosExtrasSemIva([{ label: "Deslocação", valueText: "895,00 €" }], IVA)).toBe(727.64);
+  });
+
+  it("uma linha calada num documento SEM IVA é líquida", () => {
+    expect(somaDosExtrasSemIva([{ label: "Deslocação", valueText: "895,00 €" }], SEM)).toBe(895);
+  });
+
+  it("«IVA incluído» escrito na linha ganha ao modo do documento", () => {
+    const linha = [{ label: "Tecidos", valueText: "1.230,00 € (IVA incluído)" }];
+    expect(somaDosExtrasSemIva(linha, SEM)).toBe(1000);
+  });
+
+  it("sem contexto nenhum, líquido — é o comportamento de sempre", () => {
+    expect(somaDosExtrasSemIva([{ label: "X", valueText: "1.550,00 €" }])).toBe(1550);
+  });
+
+  it("«a definir» não conta e não estraga a soma das outras", () => {
+    expect(
+      somaDosExtrasSemIva(
+        [
+          { label: "Deslocação", valueText: "a definir" },
+          { label: "Coordenação", valueText: "1.500,00 € + IVA" },
+        ],
+        IVA,
+      ),
+    ).toBe(1500);
   });
 });
