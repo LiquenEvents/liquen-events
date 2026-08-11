@@ -26,11 +26,14 @@ const pdfMock = vi.hoisted(() => ({
 vi.mock("@/lib/proposal-storage", () => ({
   fetchProposalImageBytes: fetchMock,
   fetchProposalThumbBytes: async () => null,
+  fetchProposalCoverBytes: async () => null,
+  uploadProposalCover: async () => false,
 }));
 vi.mock("@/lib/proposal-doc-pdf", async (importOriginal) => ({
   // A GEOMETRIA é real. É ela que o resolvedor usa para decidir o tamanho de
   // cada ficheiro; substituí-la por um duplo mediria outra coisa qualquer.
   caixasDoCollage: (await importOriginal<typeof import("./proposal-doc-pdf")>()).caixasDoCollage,
+  caixasDaCapa: (await importOriginal<typeof import("./proposal-doc-pdf")>()).caixasDaCapa,
   renderProposalDocPdfWithReport: vi.fn(async (doc: unknown) => {
     pdfMock.docs.push(doc);
     return {

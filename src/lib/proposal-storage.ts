@@ -741,6 +741,130 @@ export async function uploadProposalThumb(
   }
 }
 
+// ── Derivadas da capa ──────────────────────────────────────────────────────
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A TIRA DA CAPA, JÁ RECORTADA, GUARDADA À ESPERA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O mesmo desenho das miniaturas — **bucket paralelo, MESMA chave** — mas do
+ * outro lado da escala. A miniatura serve a grelha do estúdio (400 px); esta
+ * serve a caixa mais cara do documento: a tira de capa de 617×1323 px que, a
+ * partir do original, custa 250 ms de `sharp` por cada geração de PDF, para
+ * sempre. Guardada já recortada, custa 0,1 ms — o `resizeToBox` reconhece que
+ * os pixéis são exactamente os que ia produzir e devolve os bytes intactos.
+ *
+ * Dois buckets e não um, pela mesma razão que as miniaturas são dois: uma foto
+ * da pasta de um pedido e uma foto da Biblioteca têm caminhos com a MESMA forma
+ * (`<pasta>/<ficheiro>.jpg`), e metê-las no mesmo bucket seria pôr a
+ * possibilidade de duas fotos diferentes se escreverem por cima uma da outra à
+ * espera de um pedido que por acaso se chamasse como uma pasta de temas.
+ *
+ * Uma derivada em falta NÃO é um erro: as fotos carregadas antes disto existir
+ * não têm nenhuma, e caem para o original — o comportamento de sempre. É por
+ * isso que não há migração obrigatória nenhuma.
+ */
+export const PROPOSAL_COVER_BUCKET = "proposal-capas";
+/** O gémeo para as fotos escolhidas da Biblioteca de Temas. */
+export const THEME_COVER_BUCKET = "theme-capas";
+
+const capaBucketPronto = new Set<string>();
+
+/** Onde vive a derivada da capa desta referência — ou `null` se ela não pode
+ *  ter derivada (uma imagem embutida, um URL externo). */
+function destinoDaCapa(ref: string): { bucket: string; caminho: string } | null {
+  if (!ref || ref.startsWith("data:") || /^https?:\/\//i.test(ref)) return null;
+  if (ehRefDeTema(ref)) {
+    const caminho = caminhoDoRefDeTema(ref);
+    return caminho ? { bucket: THEME_COVER_BUCKET, caminho } : null;
+  }
+  return { bucket: PROPOSAL_COVER_BUCKET, caminho: ref };
+}
+
+/** Garante o bucket das capas. Só quem ESCREVE chama isto — ler nunca cria
+ *  nada, para uma instalação sem derivada nenhuma não pagar por leitura. */
+async function ensureCapaBucket(bucket: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  if (capaBucketPronto.has(bucket)) return true;
+  const { data } = await sb.storage.getBucket(bucket);
+  if (!data) {
+    const { error } = await sb.storage.createBucket(bucket, {
+      public: false,
+      fileSizeLimit: BUCKET_FILE_SIZE_LIMIT,
+      allowedMimeTypes: UPLOAD_MIME_TYPES,
+    });
+    if (error && !/exist/i.test(error.message)) {
+      log.warn("proposal-storage: createBucket das capas falhou", { bucket, erro: error.message });
+      return false;
+    }
+  }
+  capaBucketPronto.add(bucket);
+  return true;
+}
+
+/**
+ * Guarda a derivada da capa de uma foto, na MESMA chave do original.
+ *
+ * Melhor esforço do princípio ao fim, como a miniatura, e pela mesma razão: é
+ * uma derivada descartável, a foto boa já está guardada, e falhar aqui não pode
+ * fazer falhar o carregamento nem a geração do PDF que a mandou escrever.
+ * Devolve se ficou mesmo guardada — quem chama usa isso só para registos.
+ */
+export async function uploadProposalCover(ref: string, bytes: Buffer): Promise<boolean> {
+  const sb = getSupabase();
+  const destino = destinoDaCapa(ref);
+  if (!sb || !destino || bytes.length === 0) return false;
+  try {
+    if (!(await ensureCapaBucket(destino.bucket))) return false;
+    // TECTO DE TEMPO. Isto também é chamado A MEIO de uma geração de PDF que
+    // alguém está à espera (ver `proposal-doc-render`), e é trabalho de que
+    // ESSA geração já não precisa — está a guardar para a próxima. Um
+    // armazenamento pendurado não pode segurar a proposta de um casal por causa
+    // de uma optimização: passados 5 segundos desiste-se, e a derivada será
+    // escrita da próxima vez.
+    const { error } = await Promise.race([
+      sb.storage
+        .from(destino.bucket)
+        .upload(destino.caminho, bytes, { contentType: "image/jpeg", upsert: true }),
+      new Promise<{ error: { message: string } }>((r) =>
+        setTimeout(() => r({ error: { message: "tempo esgotado" } }), 5000),
+      ),
+    ]);
+    if (error) {
+      log.warn("proposal-storage: derivada da capa não guardada", {
+        ...destino,
+        erro: error.message,
+      });
+      return false;
+    }
+    return true;
+  } catch (e) {
+    log.warn("proposal-storage: derivada da capa não guardada", { ...destino, erro: String(e) });
+    return false;
+  }
+}
+
+/**
+ * Os bytes da derivada de capa de uma referência, ou `null` se não houver.
+ *
+ * `null` é o caso normal numa instalação que ainda não tem derivadas, e não é
+ * erro nenhum: quem chama vai buscar o original, exactamente como antes disto
+ * existir. Nunca lança.
+ */
+export async function fetchProposalCoverBytes(ref: string): Promise<Buffer | null> {
+  const sb = getSupabase();
+  const destino = destinoDaCapa(ref);
+  if (!sb || !destino) return null;
+  try {
+    const { data, error } = await sb.storage.from(destino.bucket).download(destino.caminho);
+    if (error || !data) return null;
+    return Buffer.from(await data.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
 /**
  * URL assinado da miniatura de cada caminho, EM LOTE.
  *

@@ -181,6 +181,7 @@ ninguém lá chega sem passar pela aplicação.
 | Nome / nota / capa de cada tema          | tabela `proposal_themes` (`db/schema.sql`), via `src/lib/themes-store.ts`        |
 | Fotos                                    | bucket privado `theme-assets`, uma pasta por tema — `src/lib/theme-storage.ts`   |
 | Miniaturas                               | bucket privado `theme-thumbs`, **a mesma chave** da foto, noutro bucket          |
+| Tira de capa já recortada                | bucket privado `theme-capas`, a mesma chave — escrita na 1.ª proposta que a use  |
 | Preparação da foto + miniatura (browser) | `src/app/[lang]/orcamento/admin/image-prep.ts`                                   |
 | Ecrã de gestão                           | `src/app/[lang]/orcamento/admin/Temas.tsx`                                       |
 | Seletor dentro do estúdio                | `src/app/[lang]/orcamento/admin/ThemePicker.tsx`                                 |

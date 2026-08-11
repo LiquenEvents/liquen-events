@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import sharp, { type JpegOptions } from "sharp";
+import { caixasDaCapa } from "./proposal-geometria";
 import type { MotivoDeRecusa } from "./recusa-de-imagem";
 
 /**
@@ -257,6 +258,11 @@ export async function resizeToBox(
    */
   const origem = await dimensoesReais(bytes);
   if (origem) {
+    const ampliacao = Math.max(width / origem.w, height / origem.h);
+    if (ampliacao > 1) {
+      width = Math.max(1, Math.round(width / ampliacao));
+      height = Math.max(1, Math.round(height / ampliacao));
+    }
     /**
      * ════════════════════════════════════════════════════════════════════════
      * SE JÁ ESTÁ DO TAMANHO CERTO, NÃO SE FAZ NADA
@@ -277,14 +283,17 @@ export async function resizeToBox(
      * que é precisamente o defeito que este módulo existe para não ter. E os
      * bytes já vêm de cá — foram escritos por este mesmo caminho, com este
      * mesmo encode — portanto quando batem certo, batem certo mesmo.
+     *
+     * ── E É DEPOIS DO LIMITE DE AMPLIAÇÃO, NÃO ANTES ────────────────────────
+     * Estava antes, e nesse sítio só apanhava as fotos grandes. Uma derivada
+     * feita a partir de um original PEQUENO sai com menos pixéis do que a caixa
+     * pede (é a regra de não inventar pixéis, aqui em cima) — e ao voltar cá
+     * dentro era comparada com o tamanho CHEIO da caixa, não batia certo, e
+     * corria o sharp para produzir exactamente os bytes que já tinha na mão.
+     * Comparar depois do limite compara com o que se vai mesmo pedir.
      */
     if (origem.w === width && origem.h === height && ehJpegBaseline(bytes)) {
       return bytes;
-    }
-    const ampliacao = Math.max(width / origem.w, height / origem.h);
-    if (ampliacao > 1) {
-      width = Math.max(1, Math.round(width / ampliacao));
-      height = Math.max(1, Math.round(height / ampliacao));
     }
   }
 
@@ -305,6 +314,47 @@ export async function resizeToBox(
   } catch {
     return null;
   }
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DERIVADA DA CAPA — o trabalho feito uma vez, e não a cada PDF
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As duas tiras da capa são a fatia mais cara de uma proposta: cada uma pede
+ * 617×1323 px recortados de um original de 2200 px, e são desenhadas duas vezes
+ * (capa e contracapa). Medido: 250 ms por tira a partir do original, 0,1 ms a
+ * partir de uma derivada com os pixéis exactos — porque aí o `resizeToBox`
+ * reconhece o tamanho e devolve os bytes sem o sharp chegar a correr.
+ *
+ * É o mesmo raciocínio da miniatura, do outro lado da escala: em vez de encolher
+ * para a grelha do estúdio, recorta-se ANTES para a caixa da capa. O carregamento
+ * paga uma vez o que a geração do PDF pagava sempre, e a foto que viaja do
+ * armazenamento passa de ~576 KB a ~100 KB.
+ *
+ * ── PORQUE É QUE UMA FOTO PEQUENA NÃO GERA DERIVADA ───────────────────────
+ * O `resizeToBox` não amplia (ver lá dentro): de um original com 800 px sai uma
+ * derivada mais pequena do que a caixa. Guardá-la seria guardar uma tira que
+ * nunca chega para a caixa, e quem a fosse buscar teria de medir para descobrir
+ * isso. Devolver `null` mantém a regra simples do outro lado: **se a derivada
+ * existe, serve** — e uma foto pequena segue pelo caminho de sempre, com o
+ * original, exactamente como hoje.
+ */
+export async function derivadaDaCapa(bytes: Buffer): Promise<Buffer | null> {
+  const caixa = caixasDaCapa()[0];
+  if (!caixa) return null;
+  const alvo = pixelsForBox(caixa.w, caixa.h, "cover");
+  const origem = await dimensoesReais(bytes);
+  // Não chega para encher a caixa — não há derivada a fazer.
+  if (!origem || origem.w < alvo.width || origem.h < alvo.height) return null;
+  const saida = await resizeToBox(bytes, caixa.w, caixa.h, "cover");
+  if (!saida) return null;
+  // Cinto e suspensórios: só se guarda o que o atalho vai mesmo reconhecer.
+  // Se por alguma razão não bater certo, é melhor não haver derivada nenhuma do
+  // que haver uma que obriga a descarregar duas coisas para usar uma.
+  const feita = await dimensoesReais(saida);
+  if (!feita || feita.w !== alvo.width || feita.h !== alvo.height) return null;
+  return saida;
 }
 
 /**

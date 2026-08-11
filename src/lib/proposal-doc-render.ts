@@ -2,13 +2,19 @@ import "server-only";
 import sharp from "sharp";
 import { MOOD_BOARD_MAX_IMAGES, type ProposalDoc, withProposalDefaults } from "@/lib/proposal-doc";
 import {
+  caixasDaCapa,
   caixasDoCollage,
   renderProposalDocPdfWithReport,
   type CaixaPdf,
   type DocTruncation,
 } from "@/lib/proposal-doc-pdf";
-import { fetchProposalImageBytes, fetchProposalThumbBytes } from "@/lib/proposal-storage";
-import { pixelsForBox, type TargetPixels } from "@/lib/proposal-image";
+import {
+  fetchProposalCoverBytes,
+  fetchProposalImageBytes,
+  fetchProposalThumbBytes,
+  uploadProposalCover,
+} from "@/lib/proposal-storage";
+import { derivadaDaCapa, pixelsForBox, type TargetPixels } from "@/lib/proposal-image";
 import { log } from "@/lib/logger";
 
 /**
@@ -132,25 +138,70 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
   }
 
   /**
-   * Busca uma foto, preferindo a miniatura quando ela chega para `caixa`.
+   * Busca uma foto, preferindo a derivada que serve `caixa`.
    *
-   * `caixa` a `null` quer dizer "vai direito ao original" — é o caso da capa,
-   * cujas tiras correm de topo a fundo da A4 e pedem ~617×1323 px. Nenhuma
-   * miniatura de 400 px lá chega, e tentar seria uma ida ao Storage
-   * desperdiçada por fotografia.
+   * `caixa` a `null` é a CAPA, e tem um caminho próprio: as suas tiras correm de
+   * topo a fundo da A4 e pedem ~617×1323 px, onde nenhuma miniatura de 400 px
+   * chega. Ver {@link buscarCapa}.
    */
   const buscar = async (ref: string, caixa: CaixaPdf | null): Promise<Resolvida | null> => {
-    if (caixa) {
-      const alvo = pixelsForBox(caixa.w, caixa.h, "collage");
-      // Só se vai buscar a miniatura quando ela PODE servir. Acima do lado dela
-      // não há sequer hipótese, e a ida seria deitada fora.
-      if (Math.max(alvo.width, alvo.height) <= MINIATURA_LADO) {
-        const mini = await fetchProposalThumbBytes(ref);
-        if (mini && (await cobre(mini, alvo))) return { ref, bytes: mini, original: false };
-      }
+    if (!caixa) return buscarCapa(ref);
+    const alvo = pixelsForBox(caixa.w, caixa.h, "collage");
+    // Só se vai buscar a miniatura quando ela PODE servir. Acima do lado dela
+    // não há sequer hipótese, e a ida seria deitada fora.
+    if (Math.max(alvo.width, alvo.height) <= MINIATURA_LADO) {
+      const mini = await fetchProposalThumbBytes(ref);
+      if (mini && (await cobre(mini, alvo))) return { ref, bytes: mini, original: false };
     }
     const bytes = await fetchProposalImageBytes(ref);
     return bytes ? { ref, bytes, original: true } : null;
+  };
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A CAPA — a derivada primeiro, e escrita da primeira vez que faltar
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A tira da capa é a fatia mais cara do documento: recortar 617×1323 px a
+   * partir do original custa ~250 ms de `sharp`, e há duas tiras, desenhadas na
+   * capa e na contracapa. Isso era pago EM CADA geração de PDF, para sempre,
+   * para produzir sempre exactamente os mesmos bytes.
+   *
+   * Aqui pergunta-se primeiro se a derivada já existe. Se existe: 0,1 ms (o
+   * `resizeToBox` reconhece os pixéis e devolve-os intactos) e ~100 KB pela rede
+   * em vez de ~576 KB.
+   *
+   * ── E se não existir, faz-se AGORA e guarda-se ────────────────────────────
+   * Isto é o que evita ter de migrar seja o que for. As fotos já carregadas — e
+   * as da Biblioteca de Temas, que são escolhidas para capa e não passam pelo
+   * carregamento de propostas — não têm derivada nenhuma; a primeira proposta
+   * que as use escreve-a, e a partir daí ninguém volta a pagar.
+   *
+   * E não custa nada a ESTA geração: o recorte ia acontecer na mesma, uns
+   * milissegundos à frente, dentro do desenho. Só se faz mais cedo, guarda-se, e
+   * entregam-se os mesmos bytes que o desenho ia produzir. O único custo extra é
+   * a escrita, que é melhor esforço e tem tecto de tempo.
+   *
+   * A ordem — derivada, original, derivar — nunca deixa a capa sem foto: cada
+   * degrau só desce quando o de cima não deu.
+   */
+  const buscarCapa = async (ref: string): Promise<Resolvida | null> => {
+    const caixa = caixasDaCapa()[0];
+    const alvo = caixa ? pixelsForBox(caixa.w, caixa.h, "cover") : null;
+    if (alvo) {
+      const pronta = await fetchProposalCoverBytes(ref);
+      // Mede-se antes de confiar: uma derivada de uma versão anterior da
+      // geometria seria uma foto ampliada na primeira página da proposta.
+      if (pronta && (await cobre(pronta, alvo))) return { ref, bytes: pronta, original: true };
+    }
+    const bytes = await fetchProposalImageBytes(ref);
+    if (!bytes) return null;
+    const derivada = await derivadaDaCapa(bytes);
+    if (!derivada) return { ref, bytes, original: true };
+    // Melhor esforço: se a escrita falhar, a proposta sai na mesma com estes
+    // bytes e a próxima geração volta a tentar.
+    await uploadProposalCover(ref, derivada);
+    return { ref, bytes: derivada, original: true };
   };
 
   /** `buscar` com o tecto de imagens por documento e a contagem das que faltam. */

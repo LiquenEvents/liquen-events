@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import sharp from "sharp";
 import { withProposalDefaults, type ProposalDoc } from "./proposal-doc";
+import { caixasDaCapa } from "./proposal-geometria";
+import { pixelsForBox } from "./proposal-image";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -32,6 +34,14 @@ const st = vi.hoisted(() => ({
   tamanhoDaMini: {} as Record<string, { w: number; h: number } | null>,
   /** Referências para as quais nem o original existe. */
   semOriginal: new Set<string>(),
+  /** `(ref)` de cada ida buscar a DERIVADA DA CAPA. */
+  capas: [] as string[],
+  /** Dimensões da derivada de capa que já está guardada, por referência. */
+  capaGuardada: {} as Record<string, { w: number; h: number } | null>,
+  /** O que foi ESCRITO no bucket das capas: referência e dimensões. */
+  capasEscritas: [] as { ref: string; w: number; h: number }[],
+  /** Dimensões do original que o duplo devolve (por omissão, 2200×1467). */
+  tamanhoDoOriginal: {} as Record<string, { w: number; h: number }>,
 }));
 
 /** Um JPEG verdadeiro das dimensões pedidas — o `sharp` tem de o conseguir ler. */
@@ -44,12 +54,24 @@ async function jpeg(w: number, h: number): Promise<Buffer> {
 vi.mock("./proposal-storage", () => ({
   fetchProposalImageBytes: async (ref: string) => {
     st.originais.push(ref);
-    return st.semOriginal.has(ref) ? null : jpeg(2200, 1467);
+    if (st.semOriginal.has(ref)) return null;
+    const t = st.tamanhoDoOriginal[ref] ?? { w: 2200, h: 1467 };
+    return jpeg(t.w, t.h);
   },
   fetchProposalThumbBytes: async (ref: string) => {
     st.miniaturas.push(ref);
     const t = st.tamanhoDaMini[ref];
     return t ? jpeg(t.w, t.h) : null;
+  },
+  fetchProposalCoverBytes: async (ref: string) => {
+    st.capas.push(ref);
+    const t = st.capaGuardada[ref];
+    return t ? jpeg(t.w, t.h) : null;
+  },
+  uploadProposalCover: async (ref: string, bytes: Buffer) => {
+    const m = await sharp(bytes).metadata();
+    st.capasEscritas.push({ ref, w: m.width ?? 0, h: m.height ?? 0 });
+    return true;
   },
 }));
 
@@ -60,6 +82,7 @@ vi.mock("./proposal-doc-pdf", async (importOriginal) => ({
   // A GEOMETRIA é real: é ela que decide os tamanhos, e substituí-la por um
   // duplo faria estes testes medir uma página que não existe.
   caixasDoCollage: (await importOriginal<typeof import("./proposal-doc-pdf")>()).caixasDoCollage,
+  caixasDaCapa: (await importOriginal<typeof import("./proposal-doc-pdf")>()).caixasDaCapa,
   renderProposalDocPdfWithReport: vi.fn(async (doc: ProposalDoc) => {
     pdf.docs.push(doc);
     return { bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]), truncations: [] };
@@ -98,6 +121,10 @@ beforeEach(() => {
   st.miniaturas = [];
   st.tamanhoDaMini = {};
   st.semOriginal = new Set();
+  st.capas = [];
+  st.capaGuardada = {};
+  st.capasEscritas = [];
+  st.tamanhoDoOriginal = {};
   pdf.docs = [];
 });
 
@@ -186,5 +213,68 @@ describe("que tamanho é descarregado para cada sítio", () => {
         `${r}: ficou com uma miniatura numa caixa maior — sai ampliada no PDF`,
       ).toContain(r);
     }
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DERIVADA DA CAPA — o recorte feito uma vez, não a cada PDF
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A tira da capa é a fatia mais cara do documento: 617×1323 px recortados de um
+ * original de 2200 px, ~250 ms de `sharp` por tira, duas tiras, em CADA geração
+ * — sempre para produzir exactamente os mesmos bytes.
+ *
+ * Como nos outros testes deste ficheiro, o que se verifica é O QUE FOI BUSCADO
+ * e O QUE FOI GUARDADO, não o aspecto do ficheiro: é a única forma de ver a
+ * diferença entre pagar o recorte uma vez e pagá-lo para sempre.
+ */
+describe("a derivada da capa", () => {
+  /** Os pixéis que a tira da capa merece, vindos da geometria verdadeira. */
+  const ALVO = pixelsForBox(caixasDaCapa()[0].w, caixasDaCapa()[0].h, "cover");
+
+  it("existindo, é usada — e o original nem chega a ser descarregado", async () => {
+    st.capaGuardada["q-1/capa.jpg"] = { w: ALVO.width, h: ALVO.height };
+
+    await renderStoredProposalDocPdfWithReport(docCom(["q-1/capa.jpg", ""], []));
+
+    expect(st.capas, "nem sequer procurou a derivada").toEqual(["q-1/capa.jpg"]);
+    expect(st.originais, "descarregou o original de 2200 px tendo a tira já recortada").toEqual([]);
+  });
+
+  it("não existindo, é feita e GUARDADA com os pixéis exactos da caixa", async () => {
+    await renderStoredProposalDocPdfWithReport(docCom(["q-1/capa.jpg", ""], []));
+
+    expect(st.originais, "tinha de cair para o original desta vez").toEqual(["q-1/capa.jpg"]);
+    expect(st.capasEscritas).toEqual([{ ref: "q-1/capa.jpg", w: ALVO.width, h: ALVO.height }]);
+  });
+
+  /**
+   * Guardar uma derivada mais pequena do que a caixa seria guardar uma tira que
+   * nunca serve — e obrigava quem a fosse buscar a medi-la para descobrir isso.
+   * O `resizeToBox` não amplia (não se inventam pixéis), portanto a resposta
+   * certa é não haver derivada nenhuma e a foto seguir pelo caminho de sempre.
+   */
+  it("de um original pequeno de mais, não se guarda derivada nenhuma", async () => {
+    st.tamanhoDoOriginal["q-1/pequena.jpg"] = { w: 800, h: 1200 };
+
+    await renderStoredProposalDocPdfWithReport(docCom(["q-1/pequena.jpg", ""], []));
+
+    expect(st.originais).toEqual(["q-1/pequena.jpg"]);
+    expect(st.capasEscritas, "guardou uma tira que não chega para a caixa").toEqual([]);
+  });
+
+  /**
+   * Uma derivada de uma versão ANTERIOR da geometria (a caixa mudou de tamanho)
+   * seria uma fotografia ampliada na primeira página da proposta. Mede-se antes
+   * de confiar, exactamente como se faz com as miniaturas.
+   */
+  it("uma derivada pequena de mais é recusada e sobe ao original", async () => {
+    st.capaGuardada["q-1/capa.jpg"] = { w: 400, h: 858 };
+
+    await renderStoredProposalDocPdfWithReport(docCom(["q-1/capa.jpg", ""], []));
+
+    expect(st.capas).toEqual(["q-1/capa.jpg"]);
+    expect(st.originais, "aceitou uma derivada que ia ser ampliada").toEqual(["q-1/capa.jpg"]);
   });
 });

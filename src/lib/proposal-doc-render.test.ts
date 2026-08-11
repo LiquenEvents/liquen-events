@@ -16,6 +16,10 @@ vi.mock("@/lib/proposal-storage", () => ({
   // Sem miniaturas nesta instalação: o resolvedor cai para o original, que é
   // exactamente o caminho que estes testes exercitam.
   fetchProposalThumbBytes: async () => null,
+  // Nem derivadas de capa: a primeira geração recorta e tenta guardar, e é
+  // isso que estes testes vêem — sem armazenamento por baixo.
+  fetchProposalCoverBytes: async () => null,
+  uploadProposalCover: async () => false,
 }));
 
 // Import DEPOIS do mock (a factory acima é elevada pelo Vitest).
