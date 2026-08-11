@@ -20,6 +20,31 @@ import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «NÃO DÁ PARA MANDAR A PROPOSTA PARA O CLIENTE»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta é a rota mais pesada da aplicação inteira: vai buscar ao armazenamento
+ * até oitenta fotografias, redimensiona cada uma com o sharp, desenha um PDF de
+ * uma dúzia de páginas, guarda a proposta e envia um email com o ficheiro em
+ * anexo. E era a ÚNICA das rotas pesadas que não dizia quanto tempo precisa.
+ *
+ * Sem esta linha, a plataforma dá o mínimo — dez segundos — e mata a função a
+ * meio. Do lado dela não aparece um erro que se perceba: aparece um erro
+ * qualquer, ou nada, depois de o botão ter ficado a rodar. E o mais cruel é que
+ * funciona nos testes e nas propostas pequenas: só falha nas que têm fotografias
+ * a sério, que são exactamente as que ela manda aos casais.
+ *
+ * A comparação diz tudo: a rota que serve o PDF já feito ao cliente pede 20 s,
+ * a que faz miniaturas pede 60, e a que faz TUDO isto não pedia nada.
+ *
+ * 60 s é o tecto do plano e é o valor certo aqui: não torna nada mais lento (só
+ * se paga o que se usa), e é a diferença entre uma proposta que sai e uma
+ * proposta que morre a meio sem explicação.
+ */
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });

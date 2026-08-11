@@ -17,6 +17,9 @@ import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
+// Carrega a foto, redimensiona-a com o sharp, guarda o original E a
+// miniatura. Dez segundos não chegam para uma fotografia de telemóvel.
+export const maxDuration = 60;
 
 const MAX_BYTES = 12 * 1024 * 1024; // 12 MB per image
 // Pixel-dimension cap: a byte cap alone doesn't stop a decompression bomb (a

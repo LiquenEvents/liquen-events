@@ -1,0 +1,12 @@
+[
+  {
+    "id": "item-1",
+    "name": "Castiçais de latão",
+    "category": "Castiçais e Velas",
+    "quantity": 24,
+    "condition": "bom",
+    "updatedAt": "2026-03-01T09:00:00.000Z",
+    "unit": "un",
+    "location": "Atelier"
+  }
+]

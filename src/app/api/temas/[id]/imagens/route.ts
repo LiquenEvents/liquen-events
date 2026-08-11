@@ -26,6 +26,9 @@ import { lqipAceitavel } from "@/lib/lqip";
 import { garantirFoto, updateFoto } from "@/lib/biblioteca-fotos-store";
 
 export const runtime = "nodejs";
+// Igual aos anexos da proposta: sharp, armazenamento, miniatura e LQIP,
+// vezes o número de fotos que ela largou de uma vez na biblioteca.
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 12 * 1024 * 1024; // 12 MB por imagem

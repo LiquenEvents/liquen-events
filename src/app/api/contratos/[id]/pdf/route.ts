@@ -6,6 +6,8 @@ import { log } from "@/lib/logger";
 
 // pdf-lib precisa do runtime Node.
 export const runtime = "nodejs";
+// Desenha um PDF. O mesmo raciocínio da proposta, em menor escala.
+export const maxDuration = 30;
 
 /**
  * PDF do contrato para o back office — a prova em papel do aceite. Autenticado

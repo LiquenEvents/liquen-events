@@ -1,0 +1,30 @@
+[
+  {
+    "key": "proposta-enviada",
+    "name": "Proposta enviada",
+    "subject": "A sua proposta",
+    "body": "<p>Olá {nome}</p>",
+    "updatedAt": "2026-03-01T09:00:00.000Z"
+  },
+  {
+    "key": "sinal-recebido",
+    "name": "Sinal recebido",
+    "subject": "Sinal recebido, reserva confirmada",
+    "body": "<div style=\"font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111\">\n  <h2 style=\"font-size:18px;margin:0 0 16px;color:#1b2119\">Está tudo tratado</h2>\n  <p style=\"font-size:14px;line-height:1.6;margin:0 0 12px\">Olá {nome},</p>\n  <p style=\"font-size:14px;line-height:1.6;margin:0 0 16px\">Confirmamos a receção do sinal de <strong style=\"color:#7c854b\">{valor}</strong>. A sua data está oficialmente reservada e podemos avançar com a preparação.</p>\n  <p style=\"font-size:13px;margin:0 0 16px;color:#555\">Data do evento: <strong>{data_evento}</strong></p>\n  <p style=\"font-size:13px;line-height:1.6;margin:0 0 20px;color:#555\">Nas próximas semanas iremos afinar cada detalhe consigo. Para já, pode descansar, o mais importante já está garantido.</p>\n  <hr style=\"border:none;border-top:1px solid #eee;margin:0 0 12px\">\n  <p style=\"font-size:12px;color:#999;margin:0\">Líquen Events · Portugal</p>\n</div>",
+    "updatedAt": "1970-01-01T00:00:00.000Z"
+  },
+  {
+    "key": "semana-evento",
+    "name": "Falta uma semana",
+    "subject": "Falta uma semana para {data_evento}",
+    "body": "<div style=\"font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111\">\n  <h2 style=\"font-size:18px;margin:0 0 16px;color:#1b2119\">A contagem decrescente começou</h2>\n  <p style=\"font-size:14px;line-height:1.6;margin:0 0 12px\">Olá {nome},</p>\n  <p style=\"font-size:14px;line-height:1.6;margin:0 0 16px\">Falta apenas uma semana para o grande dia. Está tudo alinhado da nossa parte e mal podemos esperar por o receber em <strong>{local}</strong>.</p>\n  <p style=\"font-size:13px;line-height:1.6;margin:0 0 20px;color:#555\">Se surgir alguma questão de última hora, estamos a um email de distância. Aproveite estes dias com tranquilidade, o resto é connosco.</p>\n  <hr style=\"border:none;border-top:1px solid #eee;margin:0 0 12px\">\n  <p style=\"font-size:12px;color:#999;margin:0\">Líquen Events · Portugal</p>\n</div>",
+    "updatedAt": "1970-01-01T00:00:00.000Z"
+  },
+  {
+    "key": "agradecimento",
+    "name": "Agradecimento pós-evento",
+    "subject": "Obrigado por nos ter escolhido",
+    "body": "<div style=\"font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111\">\n  <h2 style=\"font-size:18px;margin:0 0 16px;color:#1b2119\">Foi uma honra</h2>\n  <p style=\"font-size:14px;line-height:1.6;margin:0 0 12px\">Olá {nome},</p>\n  <p style=\"font-size:14px;line-height:1.6;margin:0 0 16px\">Obrigado por nos ter confiado um dia tão especial. Foi um privilégio fazer parte dele e ver tudo ganhar vida.</p>\n  <p style=\"font-size:13px;line-height:1.6;margin:0 0 20px;color:#555\">Se guardou fotografias ou quiser partilhar uma palavra sobre a experiência, teríamos muito gosto em ouvi-lo. Até uma próxima celebração!</p>\n  <hr style=\"border:none;border-top:1px solid #eee;margin:0 0 12px\">\n  <p style=\"font-size:12px;color:#999;margin:0\">Líquen Events · Portugal</p>\n</div>",
+    "updatedAt": "1970-01-01T00:00:00.000Z"
+  }
+]

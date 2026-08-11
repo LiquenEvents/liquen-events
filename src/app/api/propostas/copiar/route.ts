@@ -9,6 +9,8 @@ import { log } from "@/lib/logger";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 
 export const runtime = "nodejs";
+// Copia as fotografias de uma proposta para outra, uma a uma.
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 /**

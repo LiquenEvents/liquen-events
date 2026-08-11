@@ -10,6 +10,8 @@ const NAO_INSTALADO =
   "ficheiro db/schema.sql (pode repetir-se sem risco) e recarregue esta página.";
 
 export const runtime = "nodejs";
+// Importação em bloco: tantas linhas quantas o ficheiro trouxer.
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 /** Um CSV de inventário completo cabe folgadamente aqui; acima disto é engano. */

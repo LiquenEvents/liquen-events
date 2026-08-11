@@ -28,6 +28,8 @@ import { getSupabase } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
+// Lê treze conjuntos de dados inteiros. O gémeo agendado já pedia 60.
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 /**

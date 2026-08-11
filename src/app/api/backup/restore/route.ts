@@ -7,6 +7,8 @@ import { buildBackupPayload } from "../route";
 import { gunzipSync } from "node:zlib";
 
 export const runtime = "nodejs";
+// Reescreve treze conjuntos de dados inteiros.
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 /**

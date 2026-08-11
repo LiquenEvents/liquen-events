@@ -25,6 +25,9 @@ import { eur, splitSinal } from "@/lib/money";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 
 export const runtime = "nodejs";
+// O aceite: grava o contrato, desenha o PDF do contrato e manda dois
+// emails. É o momento em que o negócio fecha — não pode morrer a meio.
+export const maxDuration = 60;
 
 /**
  * Public endpoint for a client to accept or decline a proposal via the signed
