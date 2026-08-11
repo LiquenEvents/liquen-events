@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import type { Proposal } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
-import { getQuote, updateQuote } from "@/lib/quotes-store";
+import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
+import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
@@ -215,7 +216,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // à mão escreve-o líquido, e o `contractedAmounts` multiplica-o pela taxa
       // para obter o valor com IVA. Gravar aqui o total inflacionava a margem
       // do evento em cerca de 23%.
-      await updateQuote(id, { status: "cotado", quotedPrice: subtotal });
+      //
+      // O ESTADO passa pela decisão única (`@/lib/orcamento/estado-do-pedido`)
+      // em vez de ser escrito a seco: escrever "cotado" incondicionalmente
+      // fazia recuar um pedido já ganho a quem se reenviasse uma proposta
+      // revista. O preço grava-se nos dois casos — ver a nota longa na rota
+      // irmã, que tem exactamente o mesmo problema e a mesma solução.
+      await updateQuoteWith(id, (actual) => {
+        const transicao = transicaoDoPedido({
+          acontecimento: "proposta_enviada",
+          estadoActual: actual.status,
+          detalhe: eur(total),
+        });
+        return {
+          ...actual,
+          quotedPrice: subtotal,
+          ...(transicao
+            ? {
+                status: transicao.status,
+                activityLog: [...(actual.activityLog ?? []), transicao.entrada],
+              }
+            : {}),
+        };
+      });
     } catch (e) {
       log.error("actualizar pedido falhou", e);
     }

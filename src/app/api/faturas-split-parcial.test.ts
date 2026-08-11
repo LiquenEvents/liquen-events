@@ -34,6 +34,16 @@ const proposalsDb = vi.hoisted(() => ({ store: new Map<string, Record<string, un
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
 
+/**
+ * Emitir uma factura passou a EMPURRAR o estado do pedido (ver
+ * `@/lib/orcamento/estado-do-pedido`). Este ficheiro testa outra coisa — o que
+ * a rota RESPONDE quando o sinal grava e o saldo não — mas sem um duplo do
+ * armazenamento dos pedidos ia bater no repositório a sério. Devolver `null`
+ * (pedido inexistente) é o caminho inofensivo: a transição é melhor esforço e
+ * não pode alterar nenhuma das respostas que aqui se prendem.
+ */
+vi.mock("@/lib/quotes-store", () => ({ updateQuoteWith: vi.fn(async () => null) }));
+
 vi.mock("@/lib/invoices-store", () => ({
   listInvoices: vi.fn(async () => [...db.store.values()]),
   listInvoicesForQuote: vi.fn(async (quoteId: string) =>

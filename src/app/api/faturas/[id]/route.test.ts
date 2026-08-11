@@ -5,8 +5,27 @@ import type { NextRequest } from "next/server";
 const invoicesDb = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
 const proposalsDb = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
 
+/**
+ * Os pedidos, em memória. Dar uma factura por paga passou a EMPURRAR o estado
+ * do pedido para «Ganho» (ver `@/lib/orcamento/estado-do-pedido`) — sem este
+ * duplo, a rota ia bater no repositório a sério a meio de um teste de unidade.
+ */
+const pedidos = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
+
 const authState = vi.hoisted(() => ({ authed: true }));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authState.authed }));
+
+vi.mock("@/lib/quotes-store", () => ({
+  updateQuoteWith: vi.fn(
+    async (id: string, mutar: (q: Record<string, unknown>) => Record<string, unknown>) => {
+      const actual = pedidos.store.get(id);
+      if (!actual) return null;
+      const proximo = mutar(actual);
+      pedidos.store.set(id, proximo);
+      return proximo;
+    },
+  ),
+}));
 
 vi.mock("@/lib/invoices-store", () => ({
   getInvoice: vi.fn(async (id: string) => invoicesDb.store.get(id) ?? null),
@@ -75,6 +94,9 @@ function rawPatchReq(
 }
 
 function seedSinal(id: string, over: Record<string, unknown> = {}) {
+  // O pedido a que a factura pertence, no estado em que estaria: a proposta
+  // seguiu, o cliente ainda não está marcado como ganho no quadro.
+  pedidos.store.set(`q-${id}`, { id: `q-${id}`, name: "Cliente Teste", status: "cotado" });
   invoicesDb.store.set(id, {
     id,
     number: "FT 2026/0001",
@@ -100,8 +122,78 @@ function delReq(id: string): { req: NextRequest; params: Promise<{ id: string }>
 beforeEach(() => {
   invoicesDb.store.clear();
   proposalsDb.store.clear();
+  pedidos.store.clear();
   authState.authed = true;
   vi.clearAllMocks();
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * DINHEIRO RECEBIDO É O SINAL MAIS FORTE DE TODOS
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Marcar uma factura como paga não tocava no pedido. É a acção que menos
+ * ambiguidade tem em todo o back office — entrou dinheiro — e era a que menos
+ * consequências tinha no quadro: ela dava o sinal por recebido, a data ficava
+ * reservada, e o pedido continuava a dizer «Proposta enviada».
+ *
+ * A regra está guardada nos testes de `@/lib/orcamento/estado-do-pedido`; o que
+ * estes prendem é a ligação, e sobretudo o que ela NÃO faz ao voltar atrás.
+ */
+describe("PATCH /api/faturas/[id] — o estado do pedido segue o dinheiro", () => {
+  it("dar o sinal por pago passa o pedido a «Ganho»", async () => {
+    seedSinal("f1");
+    const { req, params } = patchReq("f1", { status: "paga" });
+    await PATCH(req, { params });
+    expect(pedidos.store.get("q-f1")).toMatchObject({ status: "aceite" });
+  });
+
+  it("deixa no histórico a fatura e o valor que causaram a mudança", async () => {
+    seedSinal("f1");
+    const { req, params } = patchReq("f1", { status: "paga" });
+    await PATCH(req, { params });
+    const log = (pedidos.store.get("q-f1")?.activityLog ?? []) as {
+      actor?: string;
+      summary: string;
+    }[];
+    expect(log).toHaveLength(1);
+    expect(log[0].actor).toBe("Sistema");
+    expect(log[0].summary).toContain("FT 2026/0001");
+  });
+
+  /**
+   * O não-recuo, do lado que mais custa: uma factura anulada por engano de
+   * digitação não pode desfechar um casamento no quadro. Se o trabalho se
+   * perdeu mesmo, quem o marca como perdido é uma pessoa.
+   */
+  it("reverter ou anular a fatura NÃO puxa o pedido para trás", async () => {
+    seedSinal("f1");
+    await PATCH(patchReq("f1", { status: "paga" }).req, {
+      params: Promise.resolve({ id: "f1" }),
+    });
+    expect(pedidos.store.get("q-f1")).toMatchObject({ status: "aceite" });
+
+    for (const estado of ["emitida", "anulada"]) {
+      await PATCH(patchReq("f1", { status: estado }).req, {
+        params: Promise.resolve({ id: "f1" }),
+      });
+      expect(pedidos.store.get("q-f1")).toMatchObject({ status: "aceite" });
+    }
+  });
+
+  it("uma edição que não seja o pagamento não mexe no pedido", async () => {
+    seedSinal("f1");
+    const { req, params } = patchReq("f1", { note: "a rever com a cliente" });
+    await PATCH(req, { params });
+    expect(pedidos.store.get("q-f1")).toMatchObject({ status: "cotado" });
+  });
+
+  it("regravar uma fatura JÁ paga não volta a escrever no histórico", async () => {
+    seedSinal("f1", { status: "paga", paidAt: "2026-07-02" });
+    const { req, params } = patchReq("f1", { status: "paga" });
+    await PATCH(req, { params });
+    expect(pedidos.store.get("q-f1")?.activityLog).toBeUndefined();
+  });
 });
 
 describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {

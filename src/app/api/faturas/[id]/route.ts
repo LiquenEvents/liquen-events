@@ -12,7 +12,8 @@ import {
   type Invoice,
 } from "@/lib/invoices-store";
 import { getProposalByQuote } from "@/lib/proposals-store";
-import { splitSinal, saldoAPartirDoSinal } from "@/lib/money";
+import { splitSinal, saldoAPartirDoSinal, eur } from "@/lib/money";
+import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { log } from "@/lib/logger";
 import { invoiceUpdateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
@@ -235,6 +236,36 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const saldo = becamePaid ? await maybeAutoIssueSaldo(updated) : null;
     const saldoAnnulled = revertedFromPaid ? await maybeAnnulOrphanSaldo(updated) : null;
+
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * DINHEIRO RECEBIDO É O SINAL MAIS FORTE DE TODOS
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Marcar uma factura como paga não tocava no pedido. É a acção que menos
+     * ambiguidade tem em todo o back office — entrou dinheiro — e era a que
+     * menos consequências tinha no quadro.
+     *
+     * `becamePaid` acima é estreito de propósito (só o SINAL, para emitir o
+     * saldo); aqui interessa QUALQUER espécie: um saldo pago, um pagamento
+     * avulso pago, tudo diz a mesma coisa sobre o pedido.
+     *
+     * ── O QUE ISTO NÃO FAZ ────────────────────────────────────────────────
+     *
+     * Não desfaz nada. Reverter uma factura de `paga` para `emitida`, ou anulá-la,
+     * NÃO puxa o pedido para trás — o estado nunca anda para trás sozinho, e
+     * uma factura anulada por engano de digitação não pode desfechar um
+     * casamento no quadro. Se o trabalho se perdeu mesmo, quem o marca como
+     * perdido é uma pessoa.
+     */
+    const ficouPaga = updated.status === "paga" && prior.status !== "paga";
+    if (ficouPaga) {
+      await registarAcontecimento(
+        updated.quoteId,
+        "pagamento_recebido",
+        `${updated.number} · ${eur(updated.amount)}`,
+      );
+    }
 
     // Incluímos o saldo criado/anulado (quando há) para a UI refrescar sem refetch.
     if (saldo) return NextResponse.json({ ...updated, saldoAutoIssued: saldo });

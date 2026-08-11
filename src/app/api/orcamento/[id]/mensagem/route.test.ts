@@ -130,6 +130,32 @@ describe("POST /api/orcamento/[id]/mensagem — o estado segue a conversa", () =
     expect(patch).not.toHaveProperty("status");
   });
 
+  /**
+   * A mudança passou a deixar rasto. Antes, a coluna mudava e não havia onde ir
+   * ver porquê — e uma coluna que muda sem explicação é pior do que uma parada.
+   * A entrada é assinada pelo «Sistema» para se distinguir, na mesma lista, do
+   * que foi ela a mudar à mão.
+   */
+  it("deixa no histórico a linha que explica a mudança automática", async () => {
+    authed.ok = true;
+    store.estado = "pendente";
+    await POST(req({ message: "Olá! Já vos respondo com a proposta." }), ctx("LIQ-1"));
+    const patch = store.update.mock.calls.at(-1)?.[1] as {
+      activityLog?: { actor?: string; summary: string }[];
+    };
+    expect(patch.activityLog).toHaveLength(1);
+    expect(patch.activityLog![0].actor).toBe("Sistema");
+    expect(patch.activityLog![0].summary).toBe("Novo → Aguardar resposta · respondemos ao cliente");
+  });
+
+  it("sem mudança de estado não escreve linha nenhuma — a lista dela já é longa", async () => {
+    authed.ok = true;
+    store.estado = "cotado";
+    await POST(req({ message: "Uma nota rápida." }), ctx("LIQ-1"));
+    const patch = store.update.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("activityLog");
+  });
+
   it("a mensagem continua a ser guardada em qualquer dos casos", async () => {
     authed.ok = true;
     store.estado = "aceite";

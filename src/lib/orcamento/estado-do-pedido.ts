@@ -1,0 +1,209 @@
+import { idCurto } from "@/lib/id-unico";
+import type { ActivityEntry, QuoteStatus } from "./types";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ESTADO DO PEDIDO SEGUE O QUE JÁ SE FEZ AO CLIENTE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O quadro tinha uma coluna de estado que só mudava quando alguém se lembrava
+ * de a arrastar. Entretanto o back office fazia coisas ao pedido — mandava uma
+ * mensagem, mandava a proposta, emitia o sinal, dava um pagamento por recebido
+ * — e a coluna continuava a dizer a mesma palavra de há três semanas.
+ *
+ * O caso concreto que fecha o assunto: o sinal emitido e pago, a data
+ * reservada, o trabalho GANHO — e o pedido a dizer «Proposta enviada». Quem
+ * olha para o quadro para saber o que falta fazer vê um negócio por fechar que
+ * já está fechado, e vai atrás dele outra vez.
+ *
+ * ── PORQUE É QUE ISTO É UM FICHEIRO E NÃO SEIS LINHAS EM SEIS ROTAS ────────
+ *
+ * A regra («responder põe em Aguardar resposta», «o estado nunca anda para
+ * trás») já vivia escrita à mão dentro da rota das mensagens. Copiá-la para a
+ * rota das facturas, para a dos recibos, para a do PATCH dos pagamentos, é a
+ * forma garantida de ao fim de um ano haver seis regras diferentes — e de a
+ * sexta ser a que faz um casamento ganho voltar a «Proposta enviada» porque
+ * alguém emitiu lá uma factura.
+ *
+ * Aqui está a decisão inteira, sem base de dados e sem HTTP, para poder ser
+ * lida e testada de uma assentada. Quem chama só diz O QUE ACONTECEU e em que
+ * estado o pedido está; o que sai é o estado novo e a linha para o histórico,
+ * ou `null` quando não há nada a mudar.
+ *
+ * ── AS TRÊS REGRAS QUE NÃO SE NEGOCEIAM ───────────────────────────────────
+ *
+ * 1. O ESTADO NUNCA ANDA PARA TRÁS. Emitir uma factura num pedido já `aceite`
+ *    não o põe em `cotado`; mandar uma nota a um casamento fechado não o
+ *    desfecha. Um estado que recua sozinho é a maneira mais rápida de a coluna
+ *    deixar de merecer confiança — e a partir daí ninguém olha para ela.
+ *
+ * 2. NÃO HÁ ESTADOS NOVOS. São os cinco de `QuoteStatus` e mais nenhum: são os
+ *    que o Kanban, a lista, o funil, as estatísticas e o dossier sabem pintar.
+ *
+ * 3. `rejeitado` NÃO SE ATINGE NEM SE LARGA SOZINHO. Perder um trabalho é uma
+ *    decisão de uma pessoa (ou do próprio cliente, a recusar a proposta pelo
+ *    link) e nenhum acontecimento automático a toma nem a desfaz. Por isso
+ *    `rejeitado` não está na escada abaixo: está fora dela, e um pedido que lá
+ *    esteja fica quieto até alguém o mexer à mão.
+ */
+
+/**
+ * O que o back office FEZ ao pedido. Não é o estado, é o acontecimento — a
+ * tradução de um para o outro é o que este módulo faz, e é a única.
+ *
+ * Um acontecimento só entra nesta lista quando há um sítio real que o produz.
+ * Um caso que NÃO está aqui de propósito: o cliente aceitar a proposta pelo
+ * link público. Essa é uma decisão dele, é a única porta para `rejeitado`
+ * (recusa) e vive inteira em `src/app/api/proposta/route.ts`.
+ */
+export type AcontecimentoDoPedido =
+  | "mensagem_enviada"
+  | "proposta_enviada"
+  | "fatura_emitida"
+  | "pagamento_recebido"
+  | "contrato_registado";
+
+/**
+ * A escada, por ordem. A posição de cada estado é o que decide se uma
+ * transição sobe (aplica-se) ou desce (ignora-se).
+ *
+ * `rejeitado` não está aqui e não é esquecimento — ver a regra 3 no cabeçalho.
+ */
+export const ORDEM_DOS_ESTADOS = [
+  "pendente",
+  "em_revisao",
+  "cotado",
+  "aceite",
+] as const satisfies readonly QuoteStatus[];
+
+/**
+ * Os rótulos que ela lê no quadro. Vivem aqui porque é aqui que se escreve a
+ * linha do histórico: se o histórico dissesse «pendente → cotado» e a coluna
+ * dissesse «Novo» e «Proposta enviada», eram duas linguagens para a mesma
+ * coisa. Espelham `STATUS_OPTIONS` (AdminClient) e as colunas do Kanban.
+ */
+export const ROTULO_DO_ESTADO: Record<QuoteStatus, string> = {
+  pendente: "Novo",
+  em_revisao: "Aguardar resposta",
+  cotado: "Proposta enviada",
+  aceite: "Ganho",
+  rejeitado: "Perdido",
+};
+
+/**
+ * A tabela inteira: acontecimento → estado a que ele dá direito.
+ *
+ * «Dá direito» e não «põe»: é o TECTO que aquele acontecimento justifica. Se o
+ * pedido já estiver acima, fica onde está (regra 1).
+ *
+ * Porque é que emitir uma factura vale `aceite` (= «Ganho»): não se manda uma
+ * factura a quem ainda está a pensar. Um documento fiscal em nome do cliente é
+ * a afirmação mais forte que este negócio produz de que o trabalho é nosso —
+ * mais forte, até, do que o carimbo do aceite, que pode ter sido dado ao
+ * telefone e nunca ter passado pelo link.
+ */
+export const ESTADO_APOS: Record<AcontecimentoDoPedido, QuoteStatus> = {
+  mensagem_enviada: "em_revisao",
+  proposta_enviada: "cotado",
+  fatura_emitida: "aceite",
+  pagamento_recebido: "aceite",
+  contrato_registado: "aceite",
+};
+
+/**
+ * O porquê, em português, para a linha do histórico. Ela vê a coluna mudar
+ * sozinha; sem isto, não tem como saber o que a mudou.
+ */
+const MOTIVO: Record<AcontecimentoDoPedido, string> = {
+  mensagem_enviada: "respondemos ao cliente",
+  proposta_enviada: "proposta enviada ao cliente",
+  fatura_emitida: "fatura emitida",
+  pagamento_recebido: "pagamento recebido",
+  contrato_registado: "contrato registado",
+};
+
+/**
+ * Em que degrau da escada está este estado. `null` para `rejeitado`, que está
+ * fora dela.
+ *
+ * Um estado ausente ou desconhecido conta como o degrau ZERO, não como um erro:
+ * há pedidos gravados antes de metade destes campos existirem, e uma rota que
+ * leia um pedido sem `status` tem de poder avançá-lo na mesma. Recusar seria
+ * escolher deixar o quadro errado por causa de um campo em falta.
+ */
+export function degrauDoEstado(estado: QuoteStatus | null | undefined): number | null {
+  if (estado === "rejeitado") return null;
+  const i = (ORDEM_DOS_ESTADOS as readonly QuoteStatus[]).indexOf(estado as QuoteStatus);
+  return i >= 0 ? i : 0;
+}
+
+/**
+ * O estado NOVO que este acontecimento justifica, ou `null` quando não há nada
+ * a fazer — porque o pedido já lá está, porque já está mais à frente, ou
+ * porque está `rejeitado` e isso só uma pessoa desfaz.
+ */
+export function estadoApos(
+  acontecimento: AcontecimentoDoPedido,
+  estadoActual: QuoteStatus | null | undefined,
+): QuoteStatus | null {
+  const actual = degrauDoEstado(estadoActual);
+  if (actual === null) return null; // rejeitado: fica quieto
+  const destino = ESTADO_APOS[acontecimento];
+  const alvo = degrauDoEstado(destino);
+  if (alvo === null || alvo <= actual) return null;
+  return destino;
+}
+
+export interface TransicaoDoPedido {
+  /** O estado novo. Nunca é o actual — se fosse, não havia transição. */
+  status: QuoteStatus;
+  /** A linha já escrita para o `activityLog` do pedido. */
+  entrada: ActivityEntry;
+}
+
+/**
+ * A decisão completa: o estado novo mais a linha do histórico que o explica,
+ * ou `null` quando o acontecimento não mexe em nada.
+ *
+ * `detalhe` é o que torna a linha útil meses depois — o número da factura, o
+ * valor recebido, a referência do contrato. Sem ele a entrada diz que houve
+ * uma factura; com ele diz QUAL.
+ *
+ * `at` e `id` são injectáveis para os testes poderem ser determinísticos; em
+ * produção ninguém os passa.
+ */
+export function transicaoDoPedido(pedido: {
+  acontecimento: AcontecimentoDoPedido;
+  estadoActual: QuoteStatus | null | undefined;
+  detalhe?: string;
+  at?: string;
+  id?: string;
+  actor?: string;
+}): TransicaoDoPedido | null {
+  const destino = estadoApos(pedido.acontecimento, pedido.estadoActual);
+  if (!destino) return null;
+
+  // O estado de partida tal como ele vai aparecer na frase. Um pedido sem
+  // estado nenhum (registo antigo) parte de «Novo», que é o que ele é.
+  const de = ROTULO_DO_ESTADO[pedido.estadoActual as QuoteStatus] ?? ROTULO_DO_ESTADO.pendente;
+  const para = ROTULO_DO_ESTADO[destino];
+  const motivo = MOTIVO[pedido.acontecimento];
+  const detalhe = pedido.detalhe?.trim();
+
+  return {
+    status: destino,
+    entrada: {
+      id: pedido.id ?? idCurto(),
+      at: pedido.at ?? new Date().toISOString(),
+      // O mesmo `kind` que o arrasto no Kanban e a gaveta usam: para quem lê o
+      // histórico isto É uma mudança de estado, e tem de ter o mesmo ícone e a
+      // mesma cor. O que a distingue de uma mudança à mão é o `actor`.
+      kind: "status_change",
+      // «Sistema» é o nome que o resto do back office já usa para o que não foi
+      // ninguém (ver o pré-preenchimento da produção no aceite). É por aqui que
+      // ela distingue, na mesma lista, o que mudou sozinho do que ela mudou.
+      actor: pedido.actor ?? "Sistema",
+      summary: `${de} → ${para} · ${motivo}${detalhe ? ` (${detalhe})` : ""}`,
+    },
+  };
+}

@@ -11,7 +11,23 @@ const ledger = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
+/**
+ * O pedido, em memória. Emitir um recibo daqui passou a EMPURRAR o estado do
+ * pedido (ver `@/lib/orcamento/estado-do-pedido`), por isso o duplo do
+ * armazenamento tem de saber gravar e não só ler.
+ */
+const pedidos = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
+
 vi.mock("@/lib/quotes-store", () => ({
+  updateQuoteWith: vi.fn(
+    async (id: string, mutar: (q: Record<string, unknown>) => Record<string, unknown>) => {
+      const actual = pedidos.store.get(id);
+      if (!actual) return null;
+      const proximo = mutar(actual);
+      pedidos.store.set(id, proximo);
+      return proximo;
+    },
+  ),
   getQuote: vi.fn(async (id: string) =>
     id === "LIQ-1" ? { id, name: "Ana Silva", email: "ana@example.com", nif: "500000000" } : null,
   ),
@@ -45,6 +61,7 @@ vi.mock("@/lib/mail", () => ({
 import { POST } from "./route";
 import { createInvoice, nextInvoiceNumber } from "@/lib/invoices-store";
 import { renderInvoicePdf } from "@/lib/invoice-pdf";
+import { updateQuoteWith } from "@/lib/quotes-store";
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 function req(body: unknown): NextRequest {
@@ -59,6 +76,8 @@ beforeEach(() => {
   ledger.rows = [];
   ledger.idSeq = 0;
   ledger.numSeq = 0;
+  pedidos.store.clear();
+  pedidos.store.set("LIQ-1", { id: "LIQ-1", name: "Ana Silva", status: "cotado" });
   vi.clearAllMocks();
 });
 
@@ -301,5 +320,73 @@ describe("POST /api/orcamento/[id]/fatura", () => {
     const res = await POST(req({ paymentId: "p-1", kind: "sinal", amount: 100 }), ctx("nope"));
     expect(res.status).toBe(404);
     expect(createInvoice).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O RECIBO SAIU — O QUADRO TEM DE SABER
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Emitir daqui não mexia no pedido. Ela podia ter o sinal emitido e pago, a
+ * data reservada, e o pedido a dizer «Cotado» — o trabalho ganho e a única
+ * coluna que ela usa para saber o que falta fazer a mentir-lhe.
+ *
+ * A regra está guardada nos testes de `@/lib/orcamento/estado-do-pedido`; o
+ * que estes prendem é a ligação, e a distinção entre os dois acontecimentos.
+ */
+describe("POST /api/orcamento/[id]/fatura — o estado do pedido segue o documento", () => {
+  it("emitir um recibo já pago dá o pedido por ganho", async () => {
+    const res = await POST(
+      req({ kind: "sinal", amount: 3000, date: "2026-07-18", paid: true }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    expect(pedidos.store.get("LIQ-1")).toMatchObject({ status: "aceite" });
+  });
+
+  it("emitir sem estar pago também o dá por ganho — a fatura já é o compromisso", async () => {
+    const res = await POST(req({ kind: "sinal", amount: 3000, paid: false }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(pedidos.store.get("LIQ-1")).toMatchObject({ status: "aceite" });
+  });
+
+  /**
+   * Meses depois, ao ler o histórico, «fatura emitida» e «pagamento recebido»
+   * não são a mesma frase — uma é o compromisso, a outra é o dinheiro.
+   */
+  it("distingue no histórico a fatura emitida do pagamento recebido", async () => {
+    await POST(req({ kind: "pagamento", amount: 500, paid: false }), ctx("LIQ-1"));
+    const emitida = (pedidos.store.get("LIQ-1")?.activityLog ?? []) as { summary: string }[];
+    expect(emitida[0].summary).toContain("fatura emitida");
+
+    pedidos.store.set("LIQ-1", { id: "LIQ-1", name: "Ana Silva", status: "cotado" });
+    await POST(req({ kind: "pagamento", amount: 700, paid: true }), ctx("LIQ-1"));
+    const paga = (pedidos.store.get("LIQ-1")?.activityLog ?? []) as { summary: string }[];
+    expect(paga[0].summary).toContain("pagamento recebido");
+  });
+
+  it("não tira de «Perdido» um pedido que alguém deu por perdido", async () => {
+    pedidos.store.set("LIQ-1", { id: "LIQ-1", name: "Ana Silva", status: "rejeitado" });
+    await POST(req({ kind: "pagamento", amount: 500, paid: true }), ctx("LIQ-1"));
+    expect(pedidos.store.get("LIQ-1")).toMatchObject({ status: "rejeitado" });
+  });
+
+  /**
+   * O recibo tem de sair mesmo que a actualização do estado rebente: o
+   * documento vai para o cliente e o número fiscal já foi gasto. Uma coluna com
+   * a cor errada corrige-se com um arrasto; um recibo que a aplicação diz não
+   * ter emitido, não.
+   */
+  it("o recibo sai na mesma quando a gravação do estado rebenta", async () => {
+    vi.mocked(updateQuoteWith).mockRejectedValueOnce(new Error("base de dados em baixo"));
+    const res = await POST(
+      req({ kind: "pagamento", amount: 500, paid: true, email: false }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.number).toMatch(/^FT \d{4}\/\d{4}$/);
+    expect(json.pdfBase64).toBeTruthy();
   });
 });

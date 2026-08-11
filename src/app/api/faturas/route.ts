@@ -15,9 +15,29 @@ import { getProposalByQuote } from "@/lib/proposals-store";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { log } from "@/lib/logger";
 import { invoiceCreateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
+import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * EMITIR UMA FACTURA PASSA O PEDIDO A «GANHO»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto não mexia no pedido nenhum. Ela emitia o sinal daqui — que é a reserva
+ * da data, o momento em que o trabalho fica mesmo dela — e o quadro continuava
+ * a dizer «Proposta enviada». O negócio estava ganho e a única vista que serve
+ * para saber o que falta fazer não sabia.
+ *
+ * A decisão de PARA ONDE sobe (e de quando não sobe) é toda de
+ * `@/lib/orcamento/estado-do-pedido`; aqui só se diz o que aconteceu. E chama-se
+ * DEPOIS de a factura estar no livro, nunca antes: se a numeração falhar, não
+ * há factura nenhuma e não há nada a registar.
+ *
+ * `registarAcontecimento` nunca atira — uma factura emitida não pode virar
+ * «Erro ao criar a fatura» por causa da cor de uma coluna (ver a nota lá).
+ */
 
 const clean = (v: unknown, max: number) =>
   String(v ?? "")
@@ -179,6 +199,9 @@ export async function POST(request: NextRequest) {
         const sobreOSaldo = isUniqueViolation(err)
           ? `o saldo não foi emitido por já existir uma fatura de saldo para este evento`
           : `a fatura de saldo (${saldoInv.amount.toFixed(2)} €) NÃO foi emitida`;
+        // O SINAL ESTÁ EMITIDO — e é o sinal que diz que o trabalho é dela. Que
+        // o saldo tenha falhado não muda isso, por isso o estado sobe na mesma.
+        await registarAcontecimento(quoteId, "fatura_emitida", `sinal ${sinalInv.number}`);
         return NextResponse.json(
           {
             invoices: [sinalInv],
@@ -190,6 +213,11 @@ export async function POST(request: NextRequest) {
           { status: 201 },
         );
       }
+      await registarAcontecimento(
+        quoteId,
+        "fatura_emitida",
+        `sinal ${sinalInv.number} + saldo ${saldoInv.number}`,
+      );
       return NextResponse.json({ invoices: [sinalInv, saldoInv] }, { status: 201 });
     }
 
@@ -229,6 +257,7 @@ export async function POST(request: NextRequest) {
       }
       throw err;
     }
+    await registarAcontecimento(quoteId, "fatura_emitida", invoice.number);
     return NextResponse.json({ invoices: [invoice] }, { status: 201 });
   } catch (err) {
     log.error("faturas POST falhou", err);

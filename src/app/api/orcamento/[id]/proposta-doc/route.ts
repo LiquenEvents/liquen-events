@@ -10,7 +10,9 @@ import {
 } from "@/lib/proposal-doc";
 import { isAuthed } from "@/lib/admin-auth";
 import { isMissingTable } from "@/lib/repository";
-import { getQuote, updateQuote } from "@/lib/quotes-store";
+import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
+import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
+import { eur } from "@/lib/money";
 import { createProposal } from "@/lib/proposals-store";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import { createProposalToken } from "@/lib/proposal-token";
@@ -339,19 +341,60 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     try {
-      // `money.base` (SEM IVA) e não `money.gross`. O campo chama-se "Preço
-      // final (sem IVA)" no ecrã, quem o escreve à mão escreve-o líquido, e o
-      // `contractedAmounts` (dossier.ts) trata-o como líquido — faz
-      // `gross = quotedPrice * (1 + taxa)` para obter o valor com IVA.
-      //
-      // Gravar aqui o valor COM IVA punha as três coisas em desacordo e o
-      // estrago era em cascata: a margem do evento (EventCosts) compara
-      // `revenueNet` com os custos líquidos, e `revenueNet` passava a ser o
-      // valor com IVA — margem cerca de 23% melhor do que a real. O valor "com
-      // IVA" derivado ficava 51% acima. E ao fazer uma segunda proposta para o
-      // mesmo casamento, o estúdio partia desse número já com IVA e voltava a
-      // marcar "+ IVA" por cima.
-      await updateQuote(id, { status: "cotado", quotedPrice: money.base });
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * O PREÇO GRAVA-SE SEMPRE; O ESTADO SÓ SOBE
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * `money.base` (SEM IVA) e não `money.gross`. O campo chama-se "Preço
+       * final (sem IVA)" no ecrã, quem o escreve à mão escreve-o líquido, e o
+       * `contractedAmounts` (dossier.ts) trata-o como líquido — faz
+       * `gross = quotedPrice * (1 + taxa)` para obter o valor com IVA.
+       *
+       * Gravar aqui o valor COM IVA punha as três coisas em desacordo e o
+       * estrago era em cascata: a margem do evento (EventCosts) compara
+       * `revenueNet` com os custos líquidos, e `revenueNet` passava a ser o
+       * valor com IVA — margem cerca de 23% melhor do que a real. O valor "com
+       * IVA" derivado ficava 51% acima. E ao fazer uma segunda proposta para o
+       * mesmo casamento, o estúdio partia desse número já com IVA e voltava a
+       * marcar "+ IVA" por cima.
+       *
+       * ── O QUE MUDOU: `status: "cotado"` ERA INCONDICIONAL ────────────────
+       *
+       * Escrever "cotado" a seco fazia RECUAR um pedido já ganho. E não é um
+       * caso teórico: rever a proposta DEPOIS do aceite acontece (o cálculo do
+       * saldo em faturas/[id] tem uma nota inteira sobre isso). Bastava
+       * reenviar o documento com uma linha corrigida para o casamento fechado
+       * voltar a «Proposta enviada» no quadro — com o sinal já emitido e pago.
+       *
+       * Agora a decisão é a de `@/lib/orcamento/estado-do-pedido`, que nunca
+       * desce a escada, e deixa a linha no histórico a dizer o que a causou.
+       * O PREÇO grava-se na mesma nos dois casos: é o valor da proposta que
+       * acabou de seguir, e nada nele depende do estado.
+       *
+       * `updateQuoteWith` e não `updateQuote` porque o `getQuote` do princípio
+       * desta rota está a dezenas de segundos daqui — pelo meio desenhou-se um
+       * PDF de uma dúzia de páginas e mandou-se um email. A regra tem de ser
+       * avaliada contra o que está gravado AGORA, e a linha nova do histórico
+       * não pode apagar a que outra ferramenta escreveu entretanto.
+       */
+      await updateQuoteWith(id, (actual) => {
+        const transicao = transicaoDoPedido({
+          acontecimento: "proposta_enviada",
+          estadoActual: actual.status,
+          detalhe: eur(money.gross),
+        });
+        return {
+          ...actual,
+          quotedPrice: money.base,
+          ...(transicao
+            ? {
+                status: transicao.status,
+                activityLog: [...(actual.activityLog ?? []), transicao.entrada],
+              }
+            : {}),
+        };
+      });
     } catch (e) {
       log.error("proposta-doc: actualizar pedido falhou", e);
     }

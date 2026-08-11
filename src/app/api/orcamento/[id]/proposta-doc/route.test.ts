@@ -16,15 +16,32 @@ const renderMock = vi.hoisted(() => ({
   sequencia: [] as number[],
   chamadas: 0,
 }));
-/** O que foi gravado no pedido (para verificar o "Preço final (sem IVA)"). */
-const updated = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
+/** O que foi gravado no pedido (para verificar o "Preço final (sem IVA)"), e o
+ *  estado em que o pedido está ANTES do envio — a transição decide sobre ele. */
+const updated = vi.hoisted(() => ({
+  last: null as Record<string, unknown> | null,
+  estado: "pendente" as string,
+}));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
 vi.mock("@/lib/quotes-store", () => ({
-  getQuote: vi.fn(async (id: string) => ({ id, email: "cliente@example.com" })),
-  updateQuote: vi.fn(async (_id: string, patch: Record<string, unknown>) => {
-    updated.last = patch;
-  }),
+  getQuote: vi.fn(async (id: string) => ({
+    id,
+    email: "cliente@example.com",
+    status: updated.estado,
+  })),
+  /**
+   * A rota grava com `updateQuoteWith` e não com `updateQuote`: a decisão do
+   * estado tem de ser tomada sobre o pedido FRESCO, e entre o `getQuote` do
+   * princípio e a gravação desenha-se um PDF de uma dúzia de páginas e manda-se
+   * um email. O duplo corre a mutação sobre o pedido gravado.
+   */
+  updateQuoteWith: vi.fn(
+    async (id: string, mutar: (q: Record<string, unknown>) => Record<string, unknown>) => {
+      updated.last = mutar({ id, email: "cliente@example.com", status: updated.estado });
+      return updated.last;
+    },
+  ),
 }));
 /** Avaria a injetar na PRIMEIRA gravação (a segunda é sempre aceite). Serve
  *  para retratar uma base onde a coluna `proposals.doc` ainda não existe. */
@@ -104,6 +121,8 @@ const params = Promise.resolve({ id: "q1" });
 
 beforeEach(() => {
   created.last = null;
+  updated.last = null;
+  updated.estado = "pendente";
   store.failFirstWith = null;
   store.attempts = 0;
   vi.clearAllMocks();
@@ -493,5 +512,52 @@ describe("POST /api/orcamento/[id]/proposta-doc — uma base sem as colunas nova
     const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
     expect(res.status).toBe(503);
     expect((await res.json()).error).toMatch(/db\/schema\.sql/);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * REENVIAR UMA PROPOSTA NÃO DESFAZ UM NEGÓCIO GANHO
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * A rota escrevia `status: "cotado"` a seco. Rever a proposta DEPOIS do aceite
+ * é coisa que acontece a sério — o cálculo do saldo (faturas/[id]) tem uma nota
+ * inteira sobre isso — e bastava reenviar o documento com uma linha corrigida
+ * para o casamento fechado voltar a «Proposta enviada» no quadro, com o sinal
+ * já emitido e pago. Um estado que anda para trás sozinho é a maneira mais
+ * rápida de ela deixar de confiar na coluna.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — o estado nunca anda para trás", () => {
+  // O bloco anterior deixa `createProposal` a atirar (retrata uma base sem as
+  // colunas novas) e `mockImplementation` sobrevive ao `clearAllMocks`. Aqui a
+  // gravação tem de correr bem, senão a rota nunca chega a tocar no pedido.
+  beforeEach(() => {
+    vi.mocked(createProposal).mockImplementation(async (p: Proposal) => {
+      created.last = p;
+    });
+  });
+
+  it("um pedido novo passa a «Proposta enviada»", async () => {
+    updated.estado = "pendente";
+    await POST(sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "acrescer" })), { params });
+    expect(updated.last).toMatchObject({ status: "cotado", quotedPrice: 3000 });
+  });
+
+  it("um pedido já ganho fica ganho — mas o preço novo grava-se na mesma", async () => {
+    updated.estado = "aceite";
+    await POST(sendReq(baseDoc({ totalAmount: 5000, totalVatMode: "acrescer" })), { params });
+    expect(updated.last).toMatchObject({ status: "aceite", quotedPrice: 5000 });
+    // Sem transição não se escreve linha nenhuma: uma entrada «Ganho → Ganho»
+    // seria ruído a esconder o que interessa numa lista que já é longa.
+    expect(updated.last).not.toHaveProperty("activityLog");
+  });
+
+  it("deixa no histórico a linha que explica a mudança automática", async () => {
+    updated.estado = "pendente";
+    await POST(sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "acrescer" })), { params });
+    const log = (updated.last?.activityLog ?? []) as { actor?: string; summary: string }[];
+    expect(log).toHaveLength(1);
+    expect(log[0].actor).toBe("Sistema");
+    expect(log[0].summary).toContain("Proposta enviada");
   });
 });

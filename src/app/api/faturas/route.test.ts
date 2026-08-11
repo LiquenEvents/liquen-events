@@ -10,7 +10,27 @@ const ledger = vi.hoisted(() => ({
   numSeq: 0,
 }));
 
+/**
+ * Os pedidos, em memória. Emitir uma factura passou a EMPURRAR o estado do
+ * pedido (ver `@/lib/orcamento/estado-do-pedido`): sem este duplo, a rota ia
+ * bater no repositório a sério a meio de um teste de unidade.
+ */
+const pedidos = vi.hoisted(() => ({
+  store: new Map<string, Record<string, unknown>>(),
+}));
+
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
+vi.mock("@/lib/quotes-store", () => ({
+  updateQuoteWith: vi.fn(
+    async (id: string, mutar: (q: Record<string, unknown>) => Record<string, unknown>) => {
+      const actual = pedidos.store.get(id);
+      if (!actual) return null;
+      const proximo = mutar(actual);
+      pedidos.store.set(id, proximo);
+      return proximo;
+    },
+  ),
+}));
 vi.mock("@/lib/invoices-store", () => ({
   listInvoices: vi.fn(async () => ledger.rows),
   listInvoicesForQuote: vi.fn(async (quoteId: string) =>
@@ -34,6 +54,7 @@ vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.
 
 import { POST } from "./route";
 import { createInvoice, nextInvoiceNumber } from "@/lib/invoices-store";
+import { updateQuoteWith } from "@/lib/quotes-store";
 
 function req(body: unknown): NextRequest {
   return new Request("https://liquen.test/api/faturas", {
@@ -69,6 +90,8 @@ beforeEach(() => {
   ledger.rows = [];
   ledger.idSeq = 0;
   ledger.numSeq = 0;
+  pedidos.store.clear();
+  pedidos.store.set("q-1", { id: "q-1", name: "Ana", status: "cotado" });
   vi.clearAllMocks();
 });
 
@@ -305,5 +328,76 @@ describe("POST /api/faturas — input validation (400s, never 500 / bad data)", 
     const json = await res.json();
     expect(json.invoices[0].amount).toBe(3000);
     expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * EMITIR A FACTURA PASSA O PEDIDO A «GANHO»
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta rota não tocava no pedido. Ela emitia o sinal daqui — que é a reserva da
+ * data, o momento em que o trabalho fica mesmo dela — e o quadro continuava a
+ * dizer «Proposta enviada». O negócio ganho, e a única vista que serve para
+ * saber o que falta fazer a não saber.
+ *
+ * A regra em si está guardada nos testes de `@/lib/orcamento/estado-do-pedido`.
+ * O que ESTES testes prendem é a ligação: que esta rota a chama, com o
+ * acontecimento certo, depois de a factura estar mesmo no livro.
+ */
+describe("POST /api/faturas — o estado do pedido segue a emissão", () => {
+  it("o par sinal + saldo dá o pedido por ganho", async () => {
+    const res = await POST(req({ split: true, quoteId: "q-1", clientName: "Ana", total: 10000 }));
+    expect(res.status).toBe(201);
+    expect(pedidos.store.get("q-1")).toMatchObject({ status: "aceite" });
+  });
+
+  it("uma fatura avulsa também o dá por ganho", async () => {
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(res.status).toBe(201);
+    expect(pedidos.store.get("q-1")).toMatchObject({ status: "aceite" });
+  });
+
+  /** Ela vê a coluna mudar sozinha; tem de poder ir ver porquê. */
+  it("deixa no histórico o número da fatura que causou a mudança", async () => {
+    await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    const log = (pedidos.store.get("q-1")?.activityLog ?? []) as {
+      actor?: string;
+      summary: string;
+    }[];
+    expect(log).toHaveLength(1);
+    expect(log[0].actor).toBe("Sistema");
+    expect(log[0].summary).toContain("FT 2026/");
+  });
+
+  /**
+   * Um trabalho perdido é uma decisão de uma pessoa, e uma factura de
+   * cancelamento não o ressuscita no quadro.
+   */
+  it("não tira de «Perdido» um pedido que alguém deu por perdido", async () => {
+    pedidos.store.set("q-1", { id: "q-1", name: "Ana", status: "rejeitado" });
+    await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 500, kind: "total" }));
+    expect(pedidos.store.get("q-1")).toMatchObject({ status: "rejeitado" });
+  });
+
+  /**
+   * A factura fica emitida mesmo que o pedido já não exista (foi apagado à
+   * mão depois de o link ter saído) ou que a gravação do estado rebente. Uma
+   * factura EMITIDA não pode virar "Erro ao criar a fatura" por causa da cor
+   * de uma coluna: ela lê "erro", tenta outra vez, e leva com o 409 da guarda
+   * de duplicação.
+   */
+  it("a fatura sai na mesma quando o pedido já não existe", async () => {
+    const res = await POST(
+      req({ quoteId: "fantasma", clientName: "Ana", amount: 3000, kind: "total" }),
+    );
+    expect(res.status).toBe(201);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("uma fatura sem pedido associado não tenta mexer em pedido nenhum", async () => {
+    const res = await POST(req({ clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(res.status).toBe(201);
+    expect(updateQuoteWith).not.toHaveBeenCalled();
   });
 });

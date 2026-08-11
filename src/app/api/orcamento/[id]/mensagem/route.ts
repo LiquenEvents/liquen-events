@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { QuoteMessage } from "@/lib/orcamento/types";
+import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
@@ -103,11 +104,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      *
      * Um pedido que já esteja em «Aguardar resposta» também não muda: já lá
      * está, e reescrever o mesmo valor só serviria para mexer no `lastUpdated`.
+     *
+     * ── PORQUE É QUE A REGRA JÁ NÃO ESTÁ ESCRITA AQUI ─────────────────────
+     *
+     * Era uma linha (`quote.status === "pendente"`) e estava certa. Mas passou
+     * a haver mais meia dúzia de sítios que também têm de mexer no estado —
+     * emitir uma factura, registar um pagamento, guardar o contrato — e cada um
+     * a escrever a sua versão da regra é como se chega a seis regras
+     * diferentes, sendo a sexta a que faz um casamento ganho voltar atrás.
+     *
+     * A decisão mudou-se inteira para `@/lib/orcamento/estado-do-pedido`, com
+     * testes próprios. O comportamento aqui é exactamente o mesmo, mais uma
+     * coisa que faltava: a mudança passa a deixar uma LINHA NO HISTÓRICO. Sem
+     * ela, ela via a coluna mudar sozinha e não tinha onde ir ver porquê.
      */
-    const subirEstado = quote.status === "pendente";
+    const transicao = transicaoDoPedido({
+      acontecimento: "mensagem_enviada",
+      estadoActual: quote.status,
+    });
     const updated = await updateQuote(id, {
       messages,
-      ...(subirEstado ? { status: "em_revisao" as const } : {}),
+      ...(transicao
+        ? {
+            status: transicao.status,
+            activityLog: [...(quote.activityLog ?? []), transicao.entrada],
+          }
+        : {}),
     });
 
     return NextResponse.json({

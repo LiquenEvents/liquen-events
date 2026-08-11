@@ -14,6 +14,7 @@ import { SITE } from "@/lib/site";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 import { eur } from "@/lib/money";
+import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
 
 export const runtime = "nodejs";
 
@@ -155,6 +156,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       await createInvoice(record);
       invoice = record;
     }
+
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * O DOCUMENTO ESTÁ NO LIVRO — O QUADRO TEM DE SABER
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Emitir um recibo daqui não mexia no pedido. Ela podia ter o sinal
+     * emitido e pago, a data reservada, e o pedido a dizer «Cotado»: o trabalho
+     * ganho e a única coluna que ela usa para saber o que falta fazer a mentir.
+     *
+     * São dois acontecimentos diferentes e vale a pena distingui-los na linha
+     * do histórico, mesmo que hoje levem ao mesmo estado: uma factura EMITIDA é
+     * o compromisso, um pagamento RECEBIDO é o dinheiro. Meses depois, ao ler o
+     * histórico, não é a mesma frase.
+     *
+     * Depois de o livro estar escrito e ANTES do PDF/email de propósito: a
+     * transição não pode ficar refém de um envio de correio que falhe. E não
+     * atira — ver `registarAcontecimento`.
+     */
+    await registarAcontecimento(
+      id,
+      invoice.status === "paga" ? "pagamento_recebido" : "fatura_emitida",
+      `${invoice.number} · ${eur(invoice.amount)}`,
+    );
 
     // Render a partir do registo persistido → o número no PDF é, por construção,
     // o número no livro. (O NIF vive no pedido, não na fatura.)

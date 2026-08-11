@@ -22,6 +22,16 @@ const authState = vi.hoisted(() => ({ authed: true }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authState.authed }));
 
+/**
+ * Emitir/liquidar uma factura passou a EMPURRAR o estado do pedido (ver
+ * `@/lib/orcamento/estado-do-pedido`). Este ficheiro não testa isso — testa as
+ * guardas do livro — mas sem um duplo do armazenamento dos pedidos as rotas
+ * iam bater no repositório a sério. Devolver `null` (pedido inexistente) é o
+ * caminho inofensivo: a transição é melhor esforço e não altera nenhuma das
+ * respostas que aqui se prendem.
+ */
+vi.mock("@/lib/quotes-store", () => ({ updateQuoteWith: vi.fn(async () => null) }));
+
 vi.mock("@/lib/invoices-store", () => ({
   listInvoices: vi.fn(async () => [...db.store.values()]),
   listInvoicesForQuote: vi.fn(async (quoteId: string) =>

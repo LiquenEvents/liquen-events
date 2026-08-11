@@ -12,10 +12,25 @@ const quotes = vi.hoisted(() => ({
           date: "2026-09-01",
           guests: 50,
           location: "Lisboa",
+          status: quotes.estado,
         }
       : null,
   ),
-  update: vi.fn(async () => ({})),
+  /** O estado GRAVADO do pedido — a decisão da transição lê-o daqui. */
+  estado: "pendente" as string,
+  /**
+   * A rota grava com `updateQuoteWith` (e não `updateQuote`) porque a decisão
+   * do estado tem de ser tomada sobre o pedido FRESCO — entre o `getQuote` do
+   * princípio e a gravação há um PDF desenhado e um email enviado. O duplo
+   * corre a mutação sobre o pedido gravado e guarda o resultado.
+   */
+  update: vi.fn(
+    async (id: string, mutar: (q: Record<string, unknown>) => Record<string, unknown>) => {
+      quotes.gravado = mutar({ id, name: "Ana", email: "ana@x.pt", status: quotes.estado });
+      return quotes.gravado;
+    },
+  ),
+  gravado: null as Record<string, unknown> | null,
 }));
 const proposals = vi.hoisted(() => ({
   create: vi.fn(async (_p?: unknown) => {}),
@@ -24,7 +39,7 @@ const proposals = vi.hoisted(() => ({
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_opts?: unknown) => ({ sent: true })) }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
-vi.mock("@/lib/quotes-store", () => ({ getQuote: quotes.get, updateQuote: quotes.update }));
+vi.mock("@/lib/quotes-store", () => ({ getQuote: quotes.get, updateQuoteWith: quotes.update }));
 vi.mock("@/lib/proposals-store", () => ({
   createProposal: proposals.create,
   listProposalsForQuote: proposals.listForQuote,
@@ -54,6 +69,8 @@ const validItems = { lineItems: [{ description: "Decoração", qty: 1, unitPrice
 
 beforeEach(() => {
   authed.ok = false;
+  quotes.estado = "pendente";
+  quotes.gravado = null;
   vi.clearAllMocks();
 });
 
@@ -119,7 +136,45 @@ describe("POST /api/orcamento/[id]/proposta", () => {
     // Quote status advances (best-effort) to cotado with the quoted total.
     // 2460 era o total COM IVA; o campo é o "Preço final (sem IVA)", portanto
     // grava-se o subtotal (2000). Ver a nota na rota.
-    expect(quotes.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado", quotedPrice: 2000 });
+    expect(quotes.gravado).toMatchObject({ status: "cotado", quotedPrice: 2000 });
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * REENVIAR UMA PROPOSTA NÃO DESFAZ UM NEGÓCIO GANHO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A rota escrevia `status: "cotado"` a seco. Rever a proposta DEPOIS do
+   * aceite é coisa que acontece (o cálculo do saldo tem uma nota inteira sobre
+   * isso) — e bastava reenviar o documento com uma linha corrigida para o
+   * casamento fechado voltar a «Proposta enviada» no quadro, com o sinal já
+   * emitido e pago. Um estado que anda para trás sozinho é a maneira mais
+   * rápida de ela deixar de confiar na coluna.
+   */
+  it("não faz recuar um pedido já ganho, mas grava o preço novo na mesma", async () => {
+    authed.ok = true;
+    quotes.estado = "aceite";
+    const res = await POST(
+      req("POST", { lineItems: [{ description: "Decoração revista", qty: 1, unitPrice: 2500 }] }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    expect(quotes.gravado).toMatchObject({ status: "aceite", quotedPrice: 2500 });
+  });
+
+  /**
+   * Ela vê a coluna mudar sozinha; sem uma linha no histórico não tem onde ir
+   * ver porquê. A entrada é assinada pelo «Sistema» para se distinguir, na
+   * mesma lista, do que foi ela a mudar à mão.
+   */
+  it("deixa no histórico a linha que explica a mudança automática", async () => {
+    authed.ok = true;
+    quotes.estado = "pendente";
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    const log = (quotes.gravado?.activityLog ?? []) as { actor?: string; summary: string }[];
+    expect(log).toHaveLength(1);
+    expect(log[0].actor).toBe("Sistema");
+    expect(log[0].summary).toContain("Proposta enviada");
   });
 
   it("returns 503 (does not send an un-acceptable proposal) when persistence fails", async () => {
