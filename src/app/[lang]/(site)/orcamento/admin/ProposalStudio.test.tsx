@@ -1777,3 +1777,251 @@ describe("o rascunho preso neste navegador é reenviado ao abrir", () => {
     expect(corpos("proposta-rascunho")).toEqual([]);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O BOTÃO «GUARDAR AGORA»
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «quero que haja um botão para guardar onde se ficou». O
+ * estúdio já grava sozinho ao fim de 800 ms — e isso é INVISÍVEL. O botão não
+ * substitui o automático: é o gesto de quem se vai levantar da secretária e
+ * quer ter a certeza antes de fechar o portátil.
+ *
+ * E por ser esse o gesto, é o botão que MAIS não pode mentir de toda a página:
+ * quem carrega nele e lê «guardado» fecha o portátil. Por isso são três os
+ * casos aqui — guardou, não chegou ao servidor, e não havia nada por guardar.
+ */
+describe("o botão «Guardar agora»", () => {
+  const naoGuardou = () =>
+    reply({
+      ok: false,
+      status: 503,
+      json: {
+        ok: false,
+        guardado: false,
+        motivo: "tabela-em-falta",
+        permanente: true,
+        erro: "A base de dados não tem a tabela dos rascunhos (falta correr o db/schema.sql no Supabase).",
+      },
+    });
+
+  /** Um rascunho local já sincronizado, para o resgate da abertura não fazer
+   *  ruído nas contagens de gravações (é o mesmo cuidado do indicador). */
+  function jaSincronizado() {
+    seedDraft(1);
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now() - 3600_000));
+    rascunhoServidor = {
+      updatedAt: new Date().toISOString(),
+      doc: JSON.parse(localStorage.getItem(DRAFT_KEY)!),
+    };
+  }
+
+  const botao = () => screen.getByRole("button", { name: /guardar agora/i });
+
+  it("grava JÁ o que estava por gravar, sem esperar pelos 800 ms", async () => {
+    jaSincronizado();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Clientes"), "Beatriz e Nuno");
+    const antes = corpos("proposta-rascunho").length;
+    await user.click(botao());
+    // O tecto de 500 ms é a prova: o travão da gravação automática são 800 ms,
+    // portanto uma gravação que aparece aqui só pode ter vindo do botão.
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(antes), {
+      timeout: 500,
+    });
+    expect(corpos("proposta-rascunho").at(-1) ?? "").toContain("Beatriz e Nuno");
+  });
+
+  it("diz que guardou — depois de o servidor o ter dito, não antes", async () => {
+    jaSincronizado();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Clientes"), "!");
+    await user.click(botao());
+    expect(
+      await screen.findAllByText(/rascunho guardado no servidor/i, undefined, { timeout: 3000 }),
+    ).not.toEqual([]);
+  });
+
+  it("com o servidor a recusar, diz «só neste computador» — nunca «guardado»", async () => {
+    gravacaoDoRascunho = naoGuardou;
+    jaSincronizado();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Clientes"), "!");
+    await user.click(botao());
+    // As MESMAS palavras do indicador. Ela não pode ter de aprender duas
+    // linguagens no mesmo back office.
+    expect(
+      await screen.findAllByText(/só neste computador/i, undefined, { timeout: 3000 }),
+    ).not.toEqual([]);
+    expect(screen.queryAllByText(/rascunho guardado no servidor/i)).toEqual([]);
+  });
+
+  /** À segunda tentativa o aviso grande já não aparece (aparece uma vez só) —
+   *  e é aí que um botão calado passaria por um botão que guardou. */
+  it("continua a dizer a verdade à segunda vez que se carrega", async () => {
+    gravacaoDoRascunho = naoGuardou;
+    jaSincronizado();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Clientes"), "!");
+    await user.click(botao());
+    await screen.findAllByText(/só neste computador/i, undefined, { timeout: 3000 });
+    await user.type(await screen.findByLabelText("Clientes"), "?");
+    await user.click(botao());
+    await waitFor(
+      () => expect(screen.queryAllByText(/rascunho guardado no servidor/i)).toEqual([]),
+      { timeout: 1000 },
+    );
+    expect(screen.queryAllByText(/só neste computador/i)).not.toEqual([]);
+  });
+
+  it("sem nada por gravar, di-lo em vez de fingir que gravou", async () => {
+    jaSincronizado();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Clientes"), "!");
+    // Espera pela gravação automática: a partir daqui não há nada pendente.
+    await waitFor(() => expect(localStorage.getItem(DRAFT_KEY) ?? "").toContain("!"), {
+      timeout: 3000,
+    });
+    await user.click(botao());
+    expect(
+      await screen.findAllByText(/não havia nada por gravar/i, undefined, { timeout: 3000 }),
+    ).not.toEqual([]);
+  });
+
+  /** O atalho existe para quem trabalha com as mãos no teclado, e faz o MESMO
+   *  que o botão — não uma segunda gravação com outras regras. */
+  it("⌘/Ctrl+S faz o mesmo que o botão", async () => {
+    jaSincronizado();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Clientes"), "Beatriz e Nuno");
+    const antes = corpos("proposta-rascunho").length;
+    await user.keyboard("{Control>}s{/Control}");
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(antes), {
+      timeout: 500,
+    });
+    expect(corpos("proposta-rascunho").at(-1) ?? "").toContain("Beatriz e Nuno");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AS FOTOGRAFIAS DEIXAM DE SER CORTADAS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, em duas páginas de PDF: «há imagens que estão cortadas,
+ * resolve isso». Estava medido: no mosaico deitava-se fora entre 16% e 79% da
+ * área de cada fotografia, no destaque entre 3% e 72%. Uma foto de um portão
+ * coberto de flores chegava à proposta com dois terços do portão de fora — e a
+ * página existe para mostrar o portão.
+ *
+ * A geometria que resolve isto já existe (`proposal-geometria`), e nasce
+ * DESLIGADA de propósito: o PDF é redesenhado a cada vez que o casal abre o
+ * link, e ligá-la calada mudava propostas que já foram enviadas, discutidas ao
+ * telefone e talvez impressas.
+ *
+ * Estes testes prendem o que falta — ligá-la onde é dela ligar-se:
+ *   · um mood board NOVO nasce sem recorte;
+ *   · o interruptor dos que já existem liga e desliga, e isso chega ao
+ *     documento gravado;
+ *   · o diagrama que ela vê muda com o interruptor. Este é o que não pode
+ *     falhar: escolher por um desenho e receber outro é o defeito que já custou
+ *     caro neste projecto.
+ */
+describe("as fotografias do mood board deixam de ser cortadas", () => {
+  const interruptor = () =>
+    screen.getByRole("checkbox", { name: /manter a forma de cada fotografia/i });
+
+  /** A geometria dos diagramas do selector, tal como está desenhada agora. É
+   *  isto que tem de mudar quando o interruptor muda — senão ela escolhe por um
+   *  desenho e recebe outro. */
+  const diagramas = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll("svg rect"))
+      .map((r) => `${r.getAttribute("width")}×${r.getAttribute("height")}`)
+      .join("|");
+
+  it("um mood board novo nasce a manter a forma das fotografias", async () => {
+    seedDraft(0);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Adicionar mood board/ }));
+    await waitFor(
+      () => expect(corpos("proposta-rascunho").at(-1) ?? "").toContain("forma-da-foto"),
+      { timeout: 3000 },
+    );
+  });
+
+  it("o interruptor liga e desliga, e a escolha vai no documento gravado", async () => {
+    // Um board como os que ela já tem a meio: sem o campo, portanto a sair
+    // exactamente como saía antes.
+    seedDraft(3, { layout: "mosaico" });
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("checkbox", { name: /manter a forma/i }));
+    await waitFor(
+      () => expect(corpos("proposta-rascunho").at(-1) ?? "").toContain("forma-da-foto"),
+      { timeout: 3000 },
+    );
+
+    // E desligar volta a tirá-lo do documento — não fica lá um `false` que os
+    // documentos antigos não conhecem.
+    await user.click(interruptor());
+    await waitFor(
+      () => expect(corpos("proposta-rascunho").at(-1) ?? "").not.toContain("forma-da-foto"),
+      { timeout: 3000 },
+    );
+  });
+
+  it("o diagrama muda com o interruptor — ela escolhe pelo que vê", async () => {
+    seedDraft(3, { layout: "mosaico" });
+    const { container } = renderStudio();
+    const user = userEvent.setup();
+    await screen.findByRole("checkbox", { name: /manter a forma/i });
+    const antes = diagramas(container);
+    await user.click(interruptor());
+    await waitFor(() => expect(diagramas(container)).not.toEqual(antes), { timeout: 3000 });
+  });
+
+  /** Por fotografia e não por disposição: na mesma página uma panorâmica perde
+   *  5% e uma vertical 69%. Um aviso por página obrigava-a a adivinhar qual. */
+  it("com corte, diz quantas fotografias são cortadas e quanto perdem", async () => {
+    seedDraft(3, { layout: "mosaico" });
+    renderStudio();
+    expect(await screen.findByText(/são cortadas/i, undefined, { timeout: 3000 })).toBeTruthy();
+    // Com o interruptor ligado não há nada para avisar: a perda é zero.
+    await userEvent.setup().click(screen.getByRole("checkbox", { name: /manter a forma/i }));
+    await waitFor(() => expect(screen.queryByText(/são cortadas/i)).toBeNull(), { timeout: 3000 });
+  });
+
+  /**
+   * A capa é o único sítio onde o corte é inevitável: a tira tem aspecto
+   * 0,467:1 e nenhuma fotografia normal tem essa forma. O que se pode fazer é
+   * DIZER o número, para escolher uma vertical deixar de ser sorte.
+   */
+  it("na capa, diz quanto é que aquela fotografia perde", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["capas/uma.jpg", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+    renderStudio();
+    expect(
+      await screen.findByText(/perde \d+% da área/i, undefined, { timeout: 3000 }),
+    ).toBeTruthy();
+  });
+});

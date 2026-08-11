@@ -5,6 +5,8 @@ import userEvent from "@testing-library/user-event";
 import type { Quote } from "@/lib/orcamento/types";
 import Overview from "./Overview";
 import { __resetListCache } from "./useCachedList";
+import { RegistoDeGravacoesProvider } from "./registo-de-gravacoes";
+import BotaoGuardarTudo from "./GuardarTudo";
 
 /**
  * ── O ECRÃ QUE MENTIA ─────────────────────────────────────────────────────
@@ -544,5 +546,45 @@ describe("uma leitura para os dois cartões", () => {
       vi.mocked(fetch).mock.calls.filter(([url]) => String(url).startsWith(rota)).length;
     await waitFor(() => expect(contar("/api/tarefas")).toBe(1));
     expect(contar("/api/calendario")).toBe(1);
+  });
+});
+
+/**
+ * ── AS NOTAS DA EQUIPA NO GESTO ÚNICO DO BACK OFFICE ──────────────────────
+ *
+ * O botão «Guardar tudo» do cabeçalho só pode falar por quem está inscrito no
+ * registo. Este cartão é o quinto sítio do back office com trabalho por gravar,
+ * e é o que está na vista que abre o dia — deixá-lo de fora era o botão dizer
+ * «tudo guardado» com as notas dela por gravar à frente dos olhos.
+ */
+describe("as notas da equipa e o «Guardar tudo»", () => {
+  it("com texto por gravar, o botão do cabeçalho conta-o e grava-o", async () => {
+    render(
+      <RegistoDeGravacoesProvider>
+        <BotaoGuardarTudo />
+        <Overview
+          quotes={quotes}
+          userName="Rita"
+          onOpen={() => {}}
+          onGoStats={() => {}}
+          onGo={() => {}}
+          onNew={() => {}}
+        />
+      </RegistoDeGravacoesProvider>,
+    );
+    await screen.findByText("Sem notas.");
+    await userEvent.click(within(cartaoNotas()).getByRole("button", { name: /adicionar nota/i }));
+    fireEvent.change(screen.getByLabelText("Notas da equipa"), {
+      target: { value: "Confirmar as cadeiras com o fornecedor" },
+    });
+
+    // Antes do atraso da gravação: o trabalho está por gravar, e o botão di-lo.
+    const botao = await screen.findByRole("button", { name: /guardar tudo \(1\)/i });
+    expect(botao.getAttribute("title") ?? "").toContain("Notas da equipa");
+
+    await userEvent.click(botao);
+    await waitFor(() => expect(gravacoes).toHaveLength(1), { timeout: 3000 });
+    expect(gravacoes[0].value).toBe("Confirmar as cadeiras com o fornecedor");
+    expect(await screen.findByText(/está tudo guardado no servidor/i)).toBeInTheDocument();
   });
 });

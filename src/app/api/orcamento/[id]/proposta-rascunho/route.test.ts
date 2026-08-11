@@ -17,6 +17,9 @@ const st = vi.hoisted(() => ({
   /** O que o `app_state` responde à escrita. `null` = gravou. Ver o teste da
    *  tabela em falta: é a instalação da colaboradora, tal e qual. */
   falhaDeEscrita: null as null | "tabela-em-falta" | "sem-permissao" | "escrita-recusada",
+  /** A escrita ACONTECEU, mas no disco efémero da função (produção sem
+   *  Supabase). É gravado — e não dura até ao próximo deploy. */
+  soNoFicheiroEfemero: false,
   save: vi.fn(),
   clear: vi.fn(),
 }));
@@ -31,13 +34,28 @@ vi.mock("@/lib/proposal-drafts", async () => {
   // é o texto que a pessoa lê, e um duplo aqui deixaria de o testar.
   const real =
     await vi.importActual<typeof import("@/lib/proposal-drafts")>("@/lib/proposal-drafts");
-  const persistencia = () =>
-    st.falhaDeEscrita
-      ? { gravado: false as const, onde: "nenhures" as const, motivo: st.falhaDeEscrita }
-      : { gravado: true as const, onde: "servidor" as const };
+  const persistencia = () => {
+    if (st.falhaDeEscrita) {
+      return {
+        gravado: false as const,
+        duradouro: false as const,
+        onde: "nenhures" as const,
+        motivo: st.falhaDeEscrita,
+      };
+    }
+    if (st.soNoFicheiroEfemero) {
+      return {
+        gravado: true as const,
+        duradouro: false as const,
+        onde: "ficheiro-efemero" as const,
+      };
+    }
+    return { gravado: true as const, duradouro: true as const, onde: "servidor" as const };
+  };
   return {
     porqueNaoGuardou: real.porqueNaoGuardou,
     ehFalhaPermanente: real.ehFalhaPermanente,
+    avisoDeSitioEfemero: real.avisoDeSitioEfemero,
     getProposalDraft: vi.fn(async () => {
       if (st.throwOnGet) throw new Error("db down");
       return st.stored;
@@ -66,8 +84,11 @@ function req(
   method: "GET" | "PUT" | "DELETE",
   body?: unknown,
   cookie?: string,
+  /** A query da chamada — é por aqui que entra a `?variante=` da ferramenta
+   *  antiga. Vazia é o estúdio, que é quem estreou esta rota. */
+  query = "",
 ): [NextRequest, Ctx] {
-  const r = new Request("https://liquen.test/api/orcamento/q-1/proposta-rascunho", {
+  const r = new Request(`https://liquen.test/api/orcamento/q-1/proposta-rascunho${query}`, {
     method,
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -87,6 +108,7 @@ beforeEach(() => {
   st.stored = null;
   st.throwOnGet = false;
   st.falhaDeEscrita = null;
+  st.soNoFicheiroEfemero = false;
   vi.clearAllMocks();
 });
 
@@ -229,6 +251,50 @@ describe("PUT /api/orcamento/[id]/proposta-rascunho — quando a base recusa a e
   });
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * GRAVADO NUM SÍTIO QUE UM DEPLOY APAGA — MELHOR DO QUE NADA, E INSUFICIENTE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Em produção sem Supabase o `setState` escreve no `data/app-state.json`, que
+ * em Vercel vive no disco da função: não sobrevive a um deploy e muitas vezes
+ * nem à invocação seguinte. A escrita ACONTECEU — por isso não é 503, e por
+ * isso a edição segue como sempre —, mas dizer «guardado» e mais nada era
+ * repetir o «Guardado às 14:32» que fez desaparecer uma proposta inteira.
+ *
+ * A resposta tem de dar as duas coisas ao estúdio: que ficou, e que não dura.
+ */
+describe("PUT — quando a gravação só foi ao disco efémero da função", () => {
+  it("não é 503: a edição não pode ser bloqueada por causa disto", async () => {
+    st.soNoFicheiroEfemero = true;
+    const res = await PUT(...req("PUT", { doc: { ref: "X" } }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).guardado).toBe(true);
+  });
+
+  it("mas não passa por gravado no servidor: diz que não dura, e porquê", async () => {
+    st.soNoFicheiroEfemero = true;
+    const body = await (await PUT(...req("PUT", { doc: { ref: "X" } }))).json();
+    expect(body.duradouro).toBe(false);
+    expect(body.onde).toBe("ficheiro-efemero");
+    // A frase que ela lê tem de dizer o que fazer, não «erro de armazenamento».
+    expect(body.aviso).toMatch(/deploy/i);
+    expect(body.aviso).toMatch(/SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY/);
+  });
+
+  it("a marca de tempo continua a servir — o estúdio compara-a com a cópia local", async () => {
+    st.soNoFicheiroEfemero = true;
+    const body = await (await PUT(...req("PUT", { doc: { ref: "X" } }))).json();
+    expect(body.updatedAt).toBe("2026-07-28T23:00:00.000Z");
+  });
+
+  it("uma gravação no servidor diz-se duradoura, e não leva aviso nenhum", async () => {
+    const body = await (await PUT(...req("PUT", { doc: { ref: "X" } }))).json();
+    expect(body.duradouro).toBe(true);
+    expect(body.aviso).toBeUndefined();
+  });
+});
+
 describe("DELETE /api/orcamento/[id]/proposta-rascunho", () => {
   it("rejeita quem não está autenticado e nunca apaga", async () => {
     st.authed = false;
@@ -250,5 +316,42 @@ describe("DELETE /api/orcamento/[id]/proposta-rascunho", () => {
     const res = await DELETE(...req("DELETE"));
     expect(res.status).toBe(200);
     expect((await res.json()).apagado).toBe(false);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A SEGUNDA GAVETA: A FERRAMENTA ANTIGA NO MESMO PEDIDO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A tabela de linhas do `ProposalBuilder` não guardava nada e passou a guardar
+ * aqui. Se guardasse na chave do estúdio, as duas ferramentas escreviam por
+ * cima uma da outra à «última escrita vence» — e o que isso quer dizer, na
+ * prática, é abrir o estúdio e encontrar lá dentro um documento de linhas, ou
+ * escrever doze linhas e encontrá-las substituídas por um mood board.
+ */
+describe("a variante do rascunho", () => {
+  it("guarda a ferramenta antiga numa gaveta só dela", async () => {
+    await PUT(...req("PUT", { doc: { linhas: 12 } }, undefined, "?variante=orcamento-linhas"));
+    expect(st.save).toHaveBeenCalledWith("q-1--orcamento-linhas", { linhas: 12 }, undefined);
+  });
+
+  it("sem variante continua a ser o rascunho do estúdio, como sempre foi", async () => {
+    await PUT(...req("PUT", { doc: { ref: "X" } }));
+    expect(st.save).toHaveBeenCalledWith("q-1", { ref: "X" }, undefined);
+  });
+
+  /** A chave vai parar ao `app_state`, que é partilhado com marcadores de
+   *  operação e contadores. Um nome inventado por quem chama não pode escolher
+   *  a gaveta — fora da lista, ignora-se. */
+  it("um nome que não está na lista não abre gaveta nenhuma", async () => {
+    await PUT(...req("PUT", { doc: { ref: "X" } }, undefined, "?variante=invoice-seq-2026"));
+    expect(st.save).toHaveBeenCalledWith("q-1", { ref: "X" }, undefined);
+  });
+
+  it("ler e apagar usam a mesma gaveta que a escrita", async () => {
+    await GET(...req("GET", undefined, undefined, "?variante=orcamento-linhas"));
+    await DELETE(...req("DELETE", undefined, undefined, "?variante=orcamento-linhas"));
+    expect(st.clear).toHaveBeenCalledWith("q-1--orcamento-linhas");
   });
 });

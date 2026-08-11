@@ -15,6 +15,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
+import { AvisoDeArmazenamento } from "./AvisoDeArmazenamento";
 import { formatPrice } from "@/lib/orcamento/pricing";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import {
@@ -47,6 +48,15 @@ import {
   downloadEventIcs,
 } from "./export";
 import { prefetchList } from "./useCachedList";
+import {
+  useGravacaoAutomatica,
+  useTravaoDeSaida,
+  fetchComTecto,
+  respostaDeHttp,
+  type RespostaDoEnvio,
+} from "./useGravacaoAutomatica";
+import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
+import BotaoGuardarTudo from "./GuardarTudo";
 import { onIdle } from "@/lib/onIdle";
 import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
@@ -634,6 +644,75 @@ const QuoteCard = memo(function QuoteCard({
   );
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE O PAINEL DO PEDIDO GRAVA SOZINHO — E O QUE CONTINUA A PEDIR UM CLIQUE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O que acontecia: escreviam-se três mil caracteres nas notas internas, tocava
+ * o telefone, fechava-se o separador, e não tinha sido enviado nada. Tudo o que
+ * este painel edita vivia em estado do React até alguém carregar em «Guardar».
+ *
+ * A divisão não é «campos pequenos gravam-se, campos grandes não». É esta:
+ *
+ *  · **O que se ESCREVE grava-se sozinho** — as notas internas e o motivo de
+ *    perda. É prosa, é dela, e o pior que uma gravação a meio produz é uma
+ *    frase por acabar, que a gravação seguinte completa. Ficar por gravar é que
+ *    é o estrago.
+ *
+ *  · **O que é uma DECISÃO, ou um FACTO que outros ecrãs lêem, continua a
+ *    exigir um clique** — o estado, o preço, a data, os convidados, o local, o
+ *    responsável. Três razões, e nenhuma delas é preguiça:
+ *      1. metade de um número é um número errado: «8» a caminho de «80»
+ *         gravado sozinho põe oitenta convidados a oito, e a data, o local e o
+ *         preço aparecem no calendário, nas contas e na proposta;
+ *      2. mudar o estado muda a coluna do quadro e o que conta como ganho —
+ *         é uma coisa que se faz, não uma coisa que se rascunha;
+ *      3. a rota trata a PRESENÇA de `status` no PATCH como «escolhido à mão»
+ *         e desliga as transições automáticas por causa disso. Mandá-lo em cada
+ *         gravação automática desligava-as em silêncio, para sempre.
+ *
+ * O motivo de perda é o caso de fronteira: é prosa, mas escrito no MESMO gesto
+ * em que se marca o pedido como perdido é parte dessa decisão. Por isso grava-se
+ * sozinho só quando não há uma mudança de estado à espera de confirmação.
+ */
+interface NotasAutomaticas {
+  id: string;
+  adminNotes: string;
+  /** `null` quando o motivo de perda viaja com a decisão do estado e não sozinho. */
+  lostReason: string | null;
+}
+
+/**
+ * Comparação por CAMPOS e não por identidade: o `selected` é substituído por
+ * tudo o que grava neste painel (etiquetas, seguimento, pagamentos, a própria
+ * revalidação da lista), e comparar objectos fazia cada uma dessas substituições
+ * parecer uma alteração dela — uma gravação por cada redesenho.
+ */
+function mesmasNotas(a: NotasAutomaticas, b: NotasAutomaticas): boolean {
+  return a.id === b.id && a.adminNotes === b.adminNotes && a.lostReason === b.lostReason;
+}
+
+/** O preço como o campo o mostra — para saber se o que lá está veio do pedido
+ *  ou foi escrito por ela. */
+function textoDoPreco(q: Quote): string {
+  return q.quotedPrice ? String(q.quotedPrice) : "";
+}
+
+/**
+ * O que se diz de uma gravação recusada, pelo código que voltou. O código não é
+ * um detalhe técnico a esconder: é a única coisa que distingue «a sessão
+ * expirou» (volta a entrar) de «o servidor está em baixo» (espera um pouco), e
+ * cada um tem uma acção diferente do outro lado.
+ */
+function porqueNaoGravou(status: number): string | undefined {
+  if (status === 401 || status === 403) return "A sessão expirou — volte a entrar.";
+  if (status === 413) return "O texto é grande demais para ser guardado assim.";
+  if (status === 400) return "O servidor recusou o conteúdo.";
+  if (status >= 500) return "O servidor não está a aceitar gravações neste momento.";
+  return undefined;
+}
+
 export default function AdminClient({ initialQuotes, userName = "Catarina" }: Props) {
   // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
   // estado tem mesmo de ser `Quote[]`: assim que um pedido é aberto ou gravado,
@@ -752,25 +831,232 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const pathname = usePathname();
   const lang = pathname?.split("/").filter(Boolean)[0] || "pt";
 
-  // Does the detail panel have edits (status/price/notes) not yet saved? Used to
-  // warn before switching/closing a quote so work is never silently lost.
-  const isDirty =
+  /**
+   * O motivo de perda acompanha a decisão do estado?
+   *
+   * Enquanto houver uma mudança de estado por confirmar, o motivo escrito faz
+   * parte dessa mudança e vai com ela no clique. Sem mudança nenhuma à espera
+   * (o pedido já está marcado como perdido e ela está a arrumar o texto), é
+   * prosa como as notas — e grava-se sozinho.
+   */
+  const motivoVaiComADecisao = !!selected && editStatus !== selected.status;
+
+  /**
+   * As alterações que ainda esperam por um clique. São só os campos que NÃO
+   * gravam sozinhos — o que se escreve já foi (ou está a ser) gravado, e
+   * contá-lo aqui punha o painel a pedir para guardar o que já está guardado.
+   */
+  const alteracoesPorConfirmar =
     !!selected &&
     (editStatus !== selected.status ||
-      editNotes !== (selected.adminNotes ?? "") ||
       // Compare parsed values, not raw strings — "1500,50" vs "1500.5" or a
       // trailing zero must not read as a phantom edit.
       parsePriceInput(editPrice) !== (selected.quotedPrice ?? undefined) ||
       editAssigned !== (selected.assignedTo ?? "") ||
-      editLostReason !== (selected.lostReason ?? "") ||
+      (motivoVaiComADecisao && editLostReason !== (selected.lostReason ?? "")) ||
       editDate !== (selected.date ?? "") ||
       editGuests !== String(selected.guests ?? "") ||
       editLocation !== (selected.location ?? ""));
+
+  /** O que se escreve e ainda não está igual ao que o servidor tem. */
+  const escritoPorGravar =
+    !!selected &&
+    (editNotes !== (selected.adminNotes ?? "") ||
+      (!motivoVaiComADecisao && editLostReason !== (selected.lostReason ?? "")));
+
+  // Does the detail panel have edits not yet saved? Used to warn before
+  // switching/closing a quote so work is never silently lost.
+  const isDirty = alteracoesPorConfirmar || escritoPorGravar;
   // Latest value mirrored into a ref for listeners bound earlier (e.g. Escape).
+  // É o que ainda exige um clique: o que grava sozinho não se «descarta» — está
+  // no servidor, ou a caminho dele.
   const dirtyRef = useRef(false);
   useEffect(() => {
-    dirtyRef.current = isDirty;
-  }, [isDirty]);
+    dirtyRef.current = alteracoesPorConfirmar;
+  }, [alteracoesPorConfirmar]);
+
+  // ── A gravação automática do que se escreve ───────────────────────────────
+  //
+  // É a MESMA cadeia do estúdio de propostas (ver `useGravacaoAutomatica`): o
+  // adiamento, a descarga do que ficou pendente ao fechar ou ao trocar de
+  // pedido, o travão de fechar o separador, as repetições, e o indicador que só
+  // diz «guardado» depois de o servidor o confirmar. Não há aqui um segundo
+  // mecanismo — há este, usado por mais um ecrã.
+
+  /** O pedido aberto, para quem corre fora do desenho. */
+  const selectedRef = useRef<Quote | null>(null);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+
+  /**
+   * O que o SERVIDOR tem dos campos que gravam sozinhos.
+   *
+   * É contra isto que se decide o que enviar. Enviar um campo que ninguém tocou
+   * é escrever por cima do que outra pessoa acabou de lá pôr — e gravar sozinho
+   * torna esse encontro mais frequente, não menos.
+   */
+  const escritoNoServidor = useRef<NotasAutomaticas | null>(null);
+  /** O pedido cuja linha «Notas internas atualizadas» já foi escrita. O registo
+   *  de atividade conta O QUE ACONTECEU, não quantas vezes o temporizador
+   *  correu: uma linha por sessão de edição, não uma a cada 800 ms. */
+  const registouNotas = useRef<string | null>(null);
+
+  /**
+   * A linha de base acompanha o pedido que está aberto — SEMPRE, e não só no
+   * `openQuote`.
+   *
+   * O painel adopta um pedido por mais caminhos do que um: duplicar um cliente,
+   * a paleta de comandos, uma acção da lista. Marcar a base num sítio só era
+   * deixar esses caminhos com uma gravação automática que não sabe contra o quê
+   * comparar — e uma gravação que não sabe o que está no servidor não deve
+   * escrever lá nada.
+   */
+  useEffect(() => {
+    if (!selected) {
+      escritoNoServidor.current = null;
+      return;
+    }
+    if (escritoNoServidor.current?.id === selected.id) return;
+    escritoNoServidor.current = {
+      id: selected.id,
+      adminNotes: selected.adminNotes ?? "",
+      lostReason: selected.lostReason ?? "",
+    };
+    registouNotas.current = null;
+  }, [selected]);
+
+  /**
+   * Arruma o pedido que o servidor devolveu.
+   *
+   * Os campos que ela NÃO tocou passam a mostrar o que o servidor tem — é a
+   * forma barata de o painel deixar de ser cego ao que outra pessoa gravou
+   * enquanto ele esteve aberto. Os que ela tocou ficam como estão: substituí-los
+   * era deitar fora trabalho por causa de uma gravação alheia.
+   */
+  const absorverDoServidor = useCallback((updated: Quote) => {
+    const antes = selectedRef.current;
+    setQuotes((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+    setSelected((prev) => (prev?.id === updated.id ? updated : prev));
+    if (!antes || antes.id !== updated.id) return;
+    setEditStatus((v) => (v === antes.status ? updated.status : v));
+    setEditPrice((v) => (v === textoDoPreco(antes) ? textoDoPreco(updated) : v));
+    setEditAssigned((v) => (v === (antes.assignedTo ?? "") ? (updated.assignedTo ?? "") : v));
+    setEditDate((v) => (v === (antes.date ?? "") ? (updated.date ?? "") : v));
+    setEditGuests((v) => (v === String(antes.guests ?? "") ? String(updated.guests ?? "") : v));
+    setEditLocation((v) => (v === (antes.location ?? "") ? (updated.location ?? "") : v));
+  }, []);
+
+  /**
+   * Manda ao servidor SÓ o que foi tocado. Uma tentativa — a repetição é do
+   * hook.
+   */
+  const enviarEscrito = useCallback(
+    async (v: NotasAutomaticas): Promise<RespostaDoEnvio> => {
+      const base = escritoNoServidor.current;
+      if (!base || base.id !== v.id) {
+        // Sem saber o que está no servidor não se escreve por cima dele às
+        // cegas. Não se repete: a resposta seguinte seria a mesma.
+        return {
+          estado: "falhou",
+          porque: "O pedido ainda não foi lido do servidor.",
+          definitivo: true,
+        };
+      }
+      const corpo: Record<string, unknown> = {};
+      if (v.adminNotes !== base.adminNotes) corpo.adminNotes = v.adminNotes;
+      if (v.lostReason !== null && v.lostReason !== base.lostReason) {
+        corpo.lostReason = v.lostReason || null;
+      }
+      // Não há nada por enviar — o clique em «Guardar» chegou primeiro. Está
+      // guardado, e dizê-lo é a verdade.
+      if (Object.keys(corpo).length === 0) return { estado: "guardado" };
+
+      const primeiraNota = corpo.adminNotes !== undefined && registouNotas.current !== v.id;
+      if (primeiraNota) {
+        corpo.activityLogAppend = [
+          {
+            id: randomId(),
+            at: new Date().toISOString(),
+            kind: "note_added",
+            actor: userName,
+            summary: "Notas internas atualizadas",
+          },
+        ];
+      }
+
+      const res = await fetchComTecto(`/api/orcamento/${encodeURIComponent(v.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corpo),
+      });
+      if (!res.ok) return respostaDeHttp(res.status, { porque: porqueNaoGravou(res.status) });
+      const updated = (await res.json()) as Quote;
+      if (primeiraNota) registouNotas.current = v.id;
+      escritoNoServidor.current = {
+        id: updated.id,
+        adminNotes: updated.adminNotes ?? "",
+        lostReason: updated.lostReason ?? "",
+      };
+      absorverDoServidor(updated);
+      return { estado: "guardado" };
+    },
+    [userName, absorverDoServidor],
+  );
+
+  const escritoNoEcra = useMemo<NotasAutomaticas>(
+    () => ({
+      id: selected?.id ?? "",
+      adminNotes: editNotes,
+      lostReason: motivoVaiComADecisao ? null : editLostReason,
+    }),
+    [selected?.id, editNotes, editLostReason, motivoVaiComADecisao],
+  );
+
+  const gravacao = useGravacaoAutomatica<NotasAutomaticas>({
+    valor: escritoNoEcra,
+    enviar: enviarEscrito,
+    // Fechado, não há nada para gravar; e a `chave` faz com que fechar ou trocar
+    // de pedido descarregue primeiro o que ficou por gravar do anterior.
+    activo: !!selected,
+    chave: selected?.id ?? null,
+    saoIguais: mesmasNotas,
+    // Este painel inscreve-se no registo À MÃO, mesmo por baixo. Não é
+    // esquecimento: pelo hook entrava só o texto que grava sozinho, e este
+    // painel tem também as decisões que continuam a exigir um clique. Duas
+    // linhas sobre o mesmo pedido no botão «Guardar tudo» seria ela ter de
+    // perceber por que é que o pedido dela aparece duas vezes.
+    nome: null,
+  });
+
+  /**
+   * ── O PAINEL DO PEDIDO NO BOTÃO «GUARDAR TUDO» ────────────────────────────
+   *
+   * Uma linha só, com o nome por que ela chama ao pedido, e que conta as duas
+   * metades do painel: o que se escreve (grava sozinho) e o que é uma decisão
+   * (espera por um clique). A segunda metade é a que mais falta fazia aqui — é
+   * trabalho feito, à espera de um gesto, e sem isto o gesto único do back
+   * office passava-lhe ao lado.
+   */
+  const nomeNoRegisto = selected ? `Pedido ${selected.id} — ${selected.name}` : "";
+  const oRegistoFalaPeloPedido = useInscricaoNoRegisto({
+    nome: nomeNoRegisto,
+    porGravar: escritoPorGravar || alteracoesPorConfirmar || !!gravacao.naoChegouAoServidor,
+    // Calado: quem dá a notícia é a resposta do «Guardar tudo», que fala de
+    // todos os ecrãs de uma vez e nomeia cada um.
+    gravarJa: () => guardarTudoDoPedido(true),
+    activo: !!selected,
+  });
+
+  // O travão de fechar o separador vale TAMBÉM para o que ainda exige um
+  // clique. (O que grava sozinho já tem o seu, dentro do hook.) Era isto que
+  // não existia de todo: escrevia-se, tocava o telefone, fechava-se o
+  // separador, e o navegador não perguntava nada.
+  //
+  // Havendo registo, quem trava é ele — um só travão para o back office
+  // inteiro, e que sabe nomear o que se perde. Sem registo, este continua a
+  // valer: um travão que desaparecesse em silêncio seria a pior troca possível.
+  useTravaoDeSaida(!oRegistoFalaPeloPedido && alteracoesPorConfirmar);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -1060,9 +1346,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     [quotes, toast],
   );
 
-  // Returns true to proceed; if there are unsaved edits, asks for confirmation.
+  /**
+   * Devolve true para prosseguir; havendo alterações por confirmar, pergunta.
+   *
+   * Pergunta só pelo que AINDA EXIGE UM CLIQUE. O que se escreve já não se
+   * descarta — está no servidor, ou vai a caminho dele mal este gesto largue o
+   * painel (ver a `chave` da gravação automática). Continuar a perguntar por
+   * isso era ensinar-lhe que «Descartar» deita fora o que ela escreveu, quando
+   * não deita.
+   */
   function discardGuard(): boolean {
-    if (!isDirty) return true;
+    if (!alteracoesPorConfirmar) return true;
     return window.confirm("Tem alterações por guardar neste pedido. Descartar?");
   }
   function closeDetail() {
@@ -1144,7 +1438,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     } catch {
       /* ignore */
     }
-    setEditPrice(q.quotedPrice ? String(q.quotedPrice) : "");
+    setEditPrice(textoDoPreco(q));
     setEditNotes(q.adminNotes ?? "");
     setEditStatus(q.status);
     setEditAssigned(q.assignedTo ?? "");
@@ -1320,8 +1614,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     }
   }
 
-  async function saveChanges() {
-    if (!selected) return;
+  /**
+   * Confirma o que exige um clique.
+   *
+   * Devolve se ficou guardado, e sabe estar CALADO: quando é o gesto «Guardar
+   * tudo» a chamá-lo, quem dá a notícia é a resposta desse gesto — item a item,
+   * com o nome de cada um. Dois recados ao mesmo tempo sobre a mesma gravação
+   * seriam ruído, e o recado que sobra é sempre o menos exacto dos dois.
+   */
+  async function saveChanges(opcoes: { silencioso?: boolean } = {}): Promise<boolean> {
+    if (!selected) return true;
+    const dizer = (mensagem: string, tipo: "success" | "error") => {
+      if (!opcoes.silencioso) toast(mensagem, tipo);
+    };
     setSaving(true);
     try {
       const newEntries: ActivityEntry[] = [];
@@ -1400,22 +1705,46 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         });
       }
 
-      // Campos limpos são enviados como null/"" (e não omitidos): `undefined`
-      // desaparece no JSON e o merge parcial do servidor mantinha o valor
-      // antigo — apagar um responsável/preço/data nunca chegava a gravar.
-      const body: Record<string, unknown> = {
-        status: editStatus,
-        quotedPrice: newPrice ?? null,
-        adminNotes: editNotes,
-        assignedTo: editAssigned.trim() || null,
-        lostReason: editLostReason.trim() || null,
-        date: editDate,
-        guests: newGuests,
-        location: newLocation,
-      };
+      /**
+       * ── SÓ O QUE FOI TOCADO ─────────────────────────────────────────────
+       *
+       * Isto mandava os oito campos em todas as gravações, com os valores que
+       * ESTE ecrã tinha lido ao abrir. Duas pessoas no mesmo pedido escreviam
+       * por cima uma da outra sem nunca colidirem: bastava uma delas guardar
+       * para os oito campos voltarem ao que ela tinha à frente.
+       *
+       * Um campo que ninguém tocou não vai. Um campo LIMPO continua a ir (como
+       * `null`/`""`, nunca omitido): `undefined` desaparece no JSON e o merge
+       * parcial do servidor mantinha o valor antigo — apagar um responsável ou
+       * uma data nunca chegava a gravar.
+       *
+       * E o `status` é o mais importante de todos para não ir por hábito: a
+       * rota trata a presença dele como «estado escolhido à mão» e desliga as
+       * transições automáticas por causa disso.
+       */
+      const body: Record<string, unknown> = {};
+      if (editStatus !== selected.status) body.status = editStatus;
+      if (newPrice !== (selected.quotedPrice ?? undefined)) body.quotedPrice = newPrice ?? null;
+      if (editNotes !== (selected.adminNotes ?? "")) body.adminNotes = editNotes;
+      if (editAssigned !== (selected.assignedTo ?? "")) {
+        body.assignedTo = editAssigned.trim() || null;
+      }
+      if (editLostReason !== (selected.lostReason ?? "")) {
+        body.lostReason = editLostReason.trim() || null;
+      }
+      if (editDate !== (selected.date ?? "")) body.date = editDate;
+      if (newGuests !== selected.guests) body.guests = newGuests;
+      if (newLocation !== (selected.location ?? "")) body.location = newLocation;
       if (newEntries.length > 0) {
         // Append server-side (nunca o array completo) — ver appendActivity.
         body.activityLogAppend = newEntries;
+      }
+
+      // Nada mudou (o botão foi carregado depois de a gravação automática já ter
+      // feito o trabalho). Não se inventa um pedido para não fazer nada.
+      if (Object.keys(body).length === 0) {
+        dizer("Já está tudo guardado", "success");
+        return true;
       }
 
       const res = await fetch(`/api/orcamento/${selected.id}`, {
@@ -1430,19 +1759,72 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       // Re-sync EVERY edit field to what the server persisted, so the form can
       // never sit dirty on a value the user did not type (e.g. price formatting).
       setEditStatus(updated.status);
-      setEditPrice(updated.quotedPrice ? String(updated.quotedPrice) : "");
+      setEditPrice(textoDoPreco(updated));
       setEditNotes(updated.adminNotes ?? "");
       setEditAssigned(updated.assignedTo ?? "");
       setEditLostReason(updated.lostReason ?? "");
       setEditDate(updated.date ?? "");
       setEditGuests(String(updated.guests ?? ""));
       setEditLocation(updated.location ?? "");
-      toast("Pedido atualizado", "success");
+      // A linha de base da gravação automática move-se com este clique: sem
+      // isto, a gravação adiada que estivesse a caminho reenviava o texto que o
+      // botão acabou de gravar.
+      escritoNoServidor.current = {
+        id: updated.id,
+        adminNotes: updated.adminNotes ?? "",
+        lostReason: updated.lostReason ?? "",
+      };
+      dizer("Pedido atualizado", "success");
+      return true;
     } catch {
-      toast("Não foi possível guardar as alterações", "error");
+      dizer("Não foi possível guardar as alterações", "error");
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  /**
+   * O painel do pedido inteiro, gravado de uma vez.
+   *
+   * Faz as duas coisas pela ordem certa: primeiro descarrega o que grava
+   * sozinho (é o que ela está a tentar outra vez quando a gravação automática
+   * falhou), e só depois confirma o que exige um clique. Ao contrário, o clique
+   * gravava o texto e a gravação adiada voltava a mandá-lo a seguir.
+   *
+   * É esta a função que o botão «Guardar» do painel usa E a que o registo
+   * chama quando ela carrega em «Guardar tudo» — o mesmo trabalho pelo mesmo
+   * caminho, para os dois gestos não poderem divergir com o tempo.
+   *
+   * O que devolve não arredonda para melhor: basta uma das metades falhar para
+   * a resposta ser «não ficou guardado». Aqui não há cópia local nenhuma — o
+   * que não chega ao servidor não existe em mais lado nenhum, e é por isso que
+   * o desfecho é `nao-guardado` e não «só neste computador».
+   */
+  async function guardarTudoDoPedido(silencioso = false): Promise<ResultadoDoEcra> {
+    let porque: string | undefined;
+    let falhou = false;
+    if (gravacao.porGravar || gravacao.naoChegouAoServidor || escritoPorGravar) {
+      const r = await gravacao.gravarJa();
+      if (r.estado !== "guardado") {
+        falhou = true;
+        porque = r.porque;
+      }
+    }
+    if (alteracoesPorConfirmar) {
+      const ok = await saveChanges({ silencioso });
+      if (!ok) {
+        falhou = true;
+        porque = porque ?? "O servidor não aceitou as alterações do pedido.";
+      }
+    }
+    return falhou ? { estado: "nao-guardado", porque } : { estado: "guardado" };
+  }
+
+  /** O botão «Guardar» da barra do painel. Fala por si (com `toast`), porque
+   *  aqui o gesto é dela e a resposta é sobre este pedido e mais nenhum. */
+  function guardarAgora() {
+    void guardarTudoDoPedido();
   }
 
   // Apply a status to every selected pedido in one go.
@@ -2370,6 +2752,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     <path d="M12 17h.01" strokeLinecap="round" />
                   </svg>
                 </button>
+                {/* ── O GESTO QUE GRAVA TUDO ──────────────────────────────
+                    Vive aqui, no cabeçalho, porque é o único sítio que está
+                    sempre à vista seja qual for a vista aberta — e o que ele
+                    diz («2 por gravar» ou «Tudo guardado») tem de valer antes
+                    de se carregar nele. Um botão de guardar que só fala depois
+                    do clique obriga a carregar nele para saber se era preciso.
+                    Fica ANTES da campainha e da pesquisa: entre saber se o
+                    trabalho está guardado e ver notificações, a pergunta que se
+                    faz de portátil na mão é a primeira. */}
+                <BotaoGuardarTudo />
                 <NotificationBell />
                 {/* A vista dos Temas tem campo de procura próprio, e dois sítios
                     para procurar na mesma página é uma escolha a mais sem ganho
@@ -2438,6 +2830,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </div>
             </div>
           </header>
+
+          {/* ── O ARMAZENAMENTO, ANTES DE SE COMEÇAR A TRABALHAR ─────────────
+              Uma colaboradora montou uma proposta inteira — fotos, mood boards,
+              textos — numa instalação onde a tabela dos rascunhos não existia.
+              O sistema dizia «Guardado» e não estava a guardar nada. Isto é a
+              mesma verdade dita à ABERTURA, enquanto ainda dá para não começar.
+
+              Aqui e num sítio só: fica por baixo da navegação e por cima de
+              todas as vistas, portanto vê-se em qualquer separador sem ter de
+              ser repetido dentro de cada um. Quase nunca aparece — só quando o
+              servidor diz que há mesmo alguma coisa errada. Ver o cabeçalho do
+              componente. */}
+          <AvisoDeArmazenamento />
 
           {/* ── Overview ── */}
           {view === "overview" && (
@@ -3418,6 +3823,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               <div>
                                 <label className="bo-eyebrow block mb-1.5">Estado</label>
                                 <select
+                                  // O rótulo ao lado não está ligado ao campo
+                                  // (é um `label` sem `for`), e sem isto quem
+                                  // usa leitor de ecrã ouve só «combobox».
+                                  aria-label="Estado do pedido"
                                   value={editStatus}
                                   onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
                                   className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
@@ -3574,6 +3983,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               <label className="bo-eyebrow block mb-1.5">Notas internas</label>
                               <textarea
                                 rows={3}
+                                aria-label="Notas internas"
+                                // O que se escreve aqui grava-se sozinho — ver a
+                                // gravação automática lá em cima. A barra de
+                                // baixo diz em que pé está.
+                                aria-describedby="estado-da-gravacao-do-pedido"
                                 value={editNotes}
                                 onChange={(e) => setEditNotes(e.target.value)}
                                 placeholder="Notas internas sobre este pedido…"
@@ -4127,30 +4541,84 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         </div>
                       </div>
 
-                      {/* ── Barra de gravação fixa — aparece SEMPRE que há
-                          alterações por guardar, seja qual for a secção onde o
-                          utilizador está. Nunca mais um "guardar" escondido. */}
-                      {isDirty && (
-                        <div className="sticky bottom-0 z-10 -mx-5 -mb-6 border-t border-foreground/[0.08] bg-white px-5 py-3 sm:-mx-7 sm:-mb-8 sm:px-7">
-                          <div className="flex items-center justify-between gap-3">
-                            <p
-                              role="status"
-                              className="flex items-center gap-1.5 text-[11px] tracking-wide text-gold-text"
-                            >
-                              <span className="h-1.5 w-1.5 rounded-full bg-gold/80" />
-                              Alterações por guardar
-                            </p>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={saveChanges}
-                              loading={saving}
-                            >
-                              {saving ? "A guardar…" : "Guardar alterações"}
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                      {/* ── Barra de gravação fixa ──────────────────────────
+                          Aparece seja qual for a secção onde ela está — nunca
+                          mais um "guardar" escondido — e agora também DEPOIS de
+                          gravar, porque «guardado às 14:32» é a informação que
+                          dispensa a pergunta «isto ficou guardado?».
+
+                          O botão não desaparece: ela pediu «um botão para
+                          guardar ou então que guarde automaticamente», e ter os
+                          dois é melhor do que ter um — o automático protege, o
+                          botão dá sossego. Mas tem de dizer a verdade: se já
+                          está guardado, é isso que ele diz. */}
+                      {(isDirty || gravacao.estado) &&
+                        (() => {
+                          const alarme = !!gravacao.naoChegouAoServidor;
+                          const porque = gravacao.naoChegouAoServidor?.porque;
+                          const rotuloDoBotao = saving
+                            ? "A guardar…"
+                            : alarme
+                              ? "Tentar de novo"
+                              : alteracoesPorConfirmar
+                                ? "Guardar alterações"
+                                : "Guardado";
+                          const haQueFazer = alteracoesPorConfirmar || alarme || gravacao.porGravar;
+                          return (
+                            <div className="sticky bottom-0 z-10 -mx-5 -mb-6 border-t border-foreground/[0.08] bg-white px-5 py-3 sm:-mx-7 sm:-mb-8 sm:px-7">
+                              <div className="flex items-center justify-between gap-3">
+                                <p
+                                  id="estado-da-gravacao-do-pedido"
+                                  role="status"
+                                  // Um aviso que não chegou ao servidor tem de
+                                  // ser anunciado, não descoberto.
+                                  aria-live={alarme ? "assertive" : "polite"}
+                                  className={
+                                    alarme
+                                      ? "flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-[#a03123]"
+                                      : "flex items-center gap-1.5 text-[11px] tracking-wide text-gold-text"
+                                  }
+                                >
+                                  {alarme ? (
+                                    <>
+                                      <span aria-hidden>⚠</span>
+                                      {gravacao.texto?.longo}
+                                      {porque ? ` ${porque}` : ""}
+                                    </>
+                                  ) : (
+                                    <>
+                                      {alteracoesPorConfirmar && (
+                                        <>
+                                          <span className="h-1.5 w-1.5 rounded-full bg-gold/80" />
+                                          Alterações por guardar
+                                        </>
+                                      )}
+                                      {gravacao.texto && (
+                                        <span
+                                          className={
+                                            alteracoesPorConfirmar ? "text-foreground/45" : ""
+                                          }
+                                        >
+                                          {alteracoesPorConfirmar ? "· " : ""}
+                                          {gravacao.texto.longo}
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </p>
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={guardarAgora}
+                                  loading={saving}
+                                  disabled={!haQueFazer}
+                                >
+                                  {rotuloDoBotao}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })()}
                     </div>
                   </div>
                 </>

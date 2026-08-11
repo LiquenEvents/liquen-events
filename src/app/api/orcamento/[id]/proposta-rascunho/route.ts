@@ -6,6 +6,7 @@ import {
   clearProposalDraft,
   ehFalhaPermanente,
   porqueNaoGuardou,
+  avisoDeSitioEfemero,
   type StoredProposalDraft,
 } from "@/lib/proposal-drafts";
 import { log } from "@/lib/logger";
@@ -20,6 +21,47 @@ export const dynamic = "force-dynamic";
  * tentar guardar meio megabyte de lixo a cada meio segundo.
  */
 const MAX_DRAFT_BYTES = 512 * 1024;
+
+/**
+ * ── DUAS FERRAMENTAS, DOIS RASCUNHOS, O MESMO PEDIDO ───────────────────────
+ *
+ * O estúdio não é a única maneira de montar uma proposta: a ferramenta antiga
+ * (a tabela de linhas do `ProposalBuilder`) vive no mesmo separador, sobre o
+ * MESMO pedido, e não guardava absolutamente nada — doze linhas escritas à mão
+ * desapareciam ao trocar de cliente.
+ *
+ * Guardá-las aqui é a resposta óbvia — o armazém já existe, já está na cópia de
+ * segurança e já sabe dizer quando NÃO gravou. O que não podia era ficarem na
+ * mesma chave: `proposal-draft:<pedido>` é um documento do estúdio, e um
+ * documento de linhas escrito por cima dele fazia as duas ferramentas
+ * disputarem a mesma gaveta à «última escrita vence» — que aqui significa
+ * apagar o trabalho uma da outra.
+ *
+ * Por isso a variante, e por isso uma LISTA FECHADA: o nome entra numa chave do
+ * `app_state`, uma tabela partilhada por marcadores de operação e contadores.
+ * Sem a lista, quem chamasse a rota escolhia a chave que quisesse dentro do
+ * espaço de nomes. Fora da lista, o parâmetro é simplesmente ignorado — grava
+ * no rascunho do estúdio, que é o comportamento de sempre.
+ *
+ * A forma `<pedido>--<variante>` continua a passar no `ehChaveDeRascunho`
+ * (letras, dígitos, `-` e `_`), portanto estas gavetas vão na cópia de
+ * segurança e voltam na reposição pelo mesmo caminho das outras.
+ */
+const VARIANTES_DE_RASCUNHO = new Set(["orcamento-linhas"]);
+
+function idDoRascunho(request: NextRequest, id: string): string {
+  let variante: string | null = null;
+  try {
+    // `new URL(request.url)` e não `request.nextUrl`: esta rota é chamada com
+    // pedidos que nem sempre são um `NextRequest` completo (os testes usam um
+    // `Request` simples), e uma leitura de parâmetros não pode ser o motivo
+    // pelo qual uma gravação estoira.
+    variante = new URL(request.url).searchParams.get("variante");
+  } catch {
+    /* URL ilegível — vale o rascunho do estúdio, como sempre valeu */
+  }
+  return variante && VARIANTES_DE_RASCUNHO.has(variante) ? `${id}--${variante}` : id;
+}
 
 /** Quem está a gravar, para o aviso poder dizer "alterado pela Catarina" em vez
  *  de "alterado noutro sítio". É só um nome escrito no login — não é
@@ -38,7 +80,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    return NextResponse.json({ ok: true, draft: await getProposalDraft(id) });
+    return NextResponse.json({
+      ok: true,
+      draft: await getProposalDraft(idDoRascunho(request, id)),
+    });
   } catch (err) {
     log.error("proposta-rascunho GET falhou", err, { id });
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
@@ -79,19 +124,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Rascunho demasiado grande." }, { status: 413 });
     }
 
-    const current = await getProposalDraft(id);
+    const chave = idDoRascunho(request, id);
+    const current = await getProposalDraft(chave);
     const base = typeof body.baseUpdatedAt === "string" ? body.baseUpdatedAt : null;
     const overwrote = Boolean(current && base && current.updatedAt !== base);
 
     const { draft: saved, persistencia } = await saveProposalDraft(
-      id,
+      chave,
       body.doc,
       whoIsSaving(request),
     );
     if (!persistencia.gravado) {
       const motivo = persistencia.motivo;
       log.error("proposta-rascunho: NÃO guardado — o trabalho ficou só no navegador", null, {
-        id,
+        id: chave,
         motivo,
       });
       return NextResponse.json(
@@ -105,15 +151,37 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         { status: 503 },
       );
     }
+    // ── O caso do meio: ficou, e não dura ────────────────────────────────
+    //
+    // Produção sem Supabase: o `setState` escreve no `data/app-state.json`, que
+    // em Vercel é o disco da função — não sobrevive a um deploy e muitas vezes
+    // nem à invocação seguinte. A escrita ACONTECEU, por isso não é 503 e a
+    // edição segue exactamente como sempre seguiu; o que não pode é sair daqui
+    // um «guardado» seco, que é a mesma frase que o estúdio escreveu no dia em
+    // que uma proposta inteira ficou presa no `localStorage` de um portátil.
+    //
+    // 200 com `duradouro: false` e a frase por escrito: quem já lê `guardado`
+    // continua a ler o que lia, e quem quiser dizer a verdade tem com quê.
+    if (!persistencia.duradouro) {
+      log.warn("proposta-rascunho: guardado num sítio que um deploy apaga", {
+        id: chave,
+        onde: persistencia.onde,
+      });
+    }
     return NextResponse.json({
       ok: true,
       guardado: true,
+      duradouro: persistencia.duradouro,
+      ...(persistencia.duradouro ? {} : { onde: persistencia.onde, aviso: avisoDeSitioEfemero() }),
       updatedAt: saved.updatedAt,
       overwrote,
       ...(overwrote && current?.savedBy ? { previousBy: current.savedBy } : {}),
     } satisfies {
       ok: true;
       guardado: true;
+      duradouro: boolean;
+      onde?: string;
+      aviso?: string;
       updatedAt: string;
       overwrote: boolean;
       previousBy?: string;
@@ -136,7 +204,7 @@ export async function DELETE(
     // fica onde estava e volta a aparecer na próxima abertura. Por isso continua
     // a ser 200. Mas o `apagado` diz a verdade, para o estúdio não prometer uma
     // limpeza que não houve.
-    const { gravado } = await clearProposalDraft(id);
+    const { gravado } = await clearProposalDraft(idDoRascunho(request, id));
     return NextResponse.json({ ok: true, apagado: gravado } satisfies {
       ok: true;
       apagado: boolean;

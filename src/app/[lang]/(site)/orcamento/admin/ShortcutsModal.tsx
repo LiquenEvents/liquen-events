@@ -12,6 +12,10 @@ const GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = 
   {
     title: "Geral",
     items: [
+      // Deixou de ser um atalho do estúdio de propostas: vale em qualquer sítio
+      // do back office e grava TODOS os ecrãs com trabalho por gravar — é o
+      // mesmo gesto do botão «Guardar tudo» do cabeçalho, com a mesma resposta.
+      { keys: ["⌘", "S"], label: "Guardar tudo o que está por gravar" },
       { keys: ["⌘", "K"], label: "Pesquisar / comandos" },
       { keys: ["/"], label: "Procurar nos pedidos" },
       { keys: ["N"], label: "Novo pedido" },
@@ -32,6 +36,10 @@ const GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = 
       { keys: ["G", "F"], label: "Fornecedores" },
       { keys: ["G", "E"], label: "Estatísticas" },
     ],
+  },
+  {
+    title: "Estúdio de propostas",
+    items: [{ keys: ["⌘", "Z"], label: "Desfazer" }],
   },
   {
     title: "Organização de propostas — com um cartão focado",

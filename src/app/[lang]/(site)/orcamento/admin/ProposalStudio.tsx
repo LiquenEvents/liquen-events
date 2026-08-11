@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./Toast";
+import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import {
   withProposalDefaults,
   resolveProposalMoney,
@@ -56,6 +57,9 @@ import {
   layoutSugerido,
   PAGINA_H,
   PAGINA_W,
+  perdaNaCapa,
+  perdasDoMoodboard,
+  PERDA_QUE_SE_AVISA,
   type LayoutDeMoodboard,
 } from "@/lib/proposal-geometria";
 import type { ProposalDoc } from "@/lib/proposal-doc";
@@ -1275,20 +1279,104 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }, []);
 
   /**
-   * Ctrl/Cmd+Enter nos Serviços — grava agora e diz o que aconteceu.
+   * ════════════════════════════════════════════════════════════════════════
+   * «GUARDAR AGORA» — O BOTÃO, O ⌘S E O CTRL/CMD+ENTER DOS SERVIÇOS
+   * ════════════════════════════════════════════════════════════════════════
    *
-   * Dizia «Rascunho guardado» no instante do atalho, sem esperar por resposta
-   * nenhuma: era o mesmo erro do indicador, à escala de uma mensagem. Agora
-   * espera, e quando não ficou no servidor cala-se — o aviso grande de
-   * `registarSoLocal` já está a dizer o que interessa, e duas mensagens
-   * contraditórias seriam pior do que uma.
+   * Palavras dela: «quero que haja um botão para guardar onde se ficou». O
+   * estúdio grava sozinho ao fim de 800 ms — e isso é invisível. Um botão
+   * continua a valer com o automático a funcionar: é o gesto de quem se vai
+   * levantar da secretária e quer ter a CERTEZA antes de fechar o portátil.
+   *
+   * E é justamente por ser esse o gesto que este é o sítio da página onde uma
+   * mentira custa mais caro. Três respostas, e nenhuma delas inventada:
+   *
+   *  · GUARDOU — di-lo depois de o SERVIDOR o ter confirmado, nunca no instante
+   *    do clique. Dizia «Rascunho guardado» sem esperar por resposta nenhuma:
+   *    era o mesmo erro do indicador, à escala de uma mensagem.
+   *
+   *  · NÃO CHEGOU AO SERVIDOR — di-lo com as palavras do indicador («guardado
+   *    só neste computador»), porque ela não pode ter de aprender duas
+   *    linguagens no mesmo back office. Cala-se apenas quando o aviso grande
+   *    de `registarSoLocal` está a aparecer NESTE momento — esse diz tudo isto
+   *    e mais o que fazer a seguir, e duas mensagens ao mesmo tempo seriam
+   *    ruído. Mas o aviso grande só aparece UMA vez por avaria; à segunda vez
+   *    que ela carregue no botão é esta mensagem que fala, senão um botão
+   *    calado passaria por um botão que guardou.
+   *
+   *  · NÃO HAVIA NADA POR GRAVAR — di-lo. A alternativa era responder
+   *    «guardado» a um gesto que não guardou coisa nenhuma, e ensinar que a
+   *    palavra «guardado» aparece sempre, carregue-se quando se carregar.
+   *
+   * O `soNesteComputador` entra na conta do «nada por gravar» de propósito: com
+   * o servidor a recusar, a cópia local está feita (portanto `porGravarRef` é
+   * falso) e o trabalho continua a não existir em mais lado nenhum. É o caso em
+   * que mais falta faz voltar a tentar — e entre gravar a mais e gravar a
+   * menos, grava-se a mais.
    */
-  const saveNow = useCallback(() => {
+  const [aGuardarAgora, setAGuardarAgora] = useState(false);
+  const guardarAgora = useCallback(() => {
     void (async () => {
-      const r = await flushDraft.current();
-      if (r.estado === "guardado") toast("Rascunho guardado", "success");
+      // `aGravarNoServidor` entra na conta com a mesma lógica: a cópia local é
+      // síncrona e apaga o «por gravar» ANTES de o servidor responder. Nessa
+      // janela, dizer «já está guardado no servidor» era dizer uma coisa que
+      // ainda ninguém sabe — grava-se outra vez e responde-se pelo que voltar.
+      if (!porGravarRef.current && !soNesteComputador && aGravarNoServidor === 0) {
+        toast("Não havia nada por gravar — o rascunho já está guardado no servidor.", "info");
+        return;
+      }
+      // Lido ANTES da gravação: é o que distingue «o aviso grande vai falar» de
+      // «o aviso grande já falou e agora é comigo».
+      const avisoGrandeVaiFalar = !avisouSoLocal.current;
+      setAGuardarAgora(true);
+      try {
+        const r = await flushDraft.current();
+        if (r.estado === "guardado") {
+          toast("Rascunho guardado no servidor.", "success");
+        } else if (!avisoGrandeVaiFalar) {
+          toast("Guardado só neste computador — não chegou ao servidor.", "error");
+        }
+      } finally {
+        setAGuardarAgora(false);
+      }
     })();
-  }, [toast]);
+  }, [toast, soNesteComputador, aGravarNoServidor]);
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O ESTÚDIO NO REGISTO DO BACK OFFICE
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A inscrição é feita À MÃO, e não pelo hook partilhado
+   * (`useGravacaoAutomatica`), porque este ecrã ainda tem a sua própria cópia
+   * da máquina de gravar — reescrevê-la agora era mexer no ficheiro onde a
+   * perda de trabalho já foi cara, para ganhar arrumação e arriscar o resto.
+   * A inscrição não precisa de esperar por essa migração: são três linhas que
+   * põem o estúdio dentro do gesto único, e no dia em que a máquina migrar,
+   * isto sai daqui sem deixar buraco.
+   *
+   * O nome é o que ELA lhe chama: «Proposta de Rita & Tomás». Nunca o nome do
+   * ecrã — a pergunta ao fechar o separador tem de dizer QUE proposta é que
+   * está em risco, não que componente é que está montado.
+   */
+  const nomeNoRegisto = doc.clientNames?.trim()
+    ? `Proposta de ${doc.clientNames.trim()}`
+    : `Proposta do pedido ${quote.id}`;
+  const oRegistoFalaPorMim = useInscricaoNoRegisto({
+    nome: nomeNoRegisto,
+    porGravar: porGravar || aGravarNoServidor > 0 || !!soNesteComputador,
+    gravarJa: async (): Promise<ResultadoDoEcra> => {
+      const r = await flushDraft.current();
+      // A cópia local é feita SEMPRE (é síncrona e não depende de rede), por
+      // isso o desfecho de uma recusa do servidor aqui é «só neste
+      // computador» e nunca «não ficou guardado»: o trabalho existe, mas só
+      // neste portátil — que é precisamente a diferença que fez perder uma
+      // proposta inteira.
+      return r.estado === "guardado"
+        ? { estado: "guardado" }
+        : { estado: "so-neste-computador", porque: r.porque };
+    },
+  });
 
   const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
 
@@ -1508,7 +1596,34 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   useEffect(() => {
     function aoTeclar(e: KeyboardEvent) {
       const meta = e.metaKey || e.ctrlKey;
-      if (!meta || e.key.toLowerCase() !== "z" || e.shiftKey) return;
+      if (!meta) return;
+      /**
+       * ⌘/Ctrl+S — o MESMO gesto do botão «Guardar agora».
+       *
+       * É o atalho que toda a gente já tem nos dedos de outros programas, e o
+       * que o browser faz com ele por omissão («guardar a página») não serve
+       * aqui a ninguém — daí o `preventDefault`. Ao contrário do ⌘Z, vale
+       * TAMBÉM com o cursor dentro de uma caixa de texto: é precisamente a
+       * meio de escrever um parágrafo que apetece guardar, e não há um
+       * «guardar» do browser dentro de um campo para lhe ficar no caminho.
+       *
+       * DENTRO DO BACK OFFICE ESTE ATALHO NÃO É DAQUI. Passou a ser o gesto
+       * único, tratado pelo registo, que grava o estúdio E tudo o resto que
+       * tenha coisa por gravar — e responde por todos de uma vez. Dois
+       * tratadores para a mesma tecla dariam duas gravações e duas respostas
+       * diferentes ao mesmo gesto, que é como se ensina uma pessoa a
+       * desconfiar das duas.
+       *
+       * Fica aqui como recurso para quando o estúdio é montado FORA do registo
+       * (o dossier do evento, um teste): um atalho que desaparecesse em
+       * silêncio nesses sítios seria trocar uma duplicação por uma perda.
+       */
+      if (!oRegistoFalaPorMim && e.key.toLowerCase() === "s" && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        guardarAgora();
+        return;
+      }
+      if (e.key.toLowerCase() !== "z" || e.shiftKey) return;
       // Dentro de uma caixa de texto, o Cmd+Z do browser desfaz a escrita —
       // que é o que ela espera. Só se assume o comando fora dos campos, ou
       // quando o browser já não tem nada para desfazer nesse campo.
@@ -1546,12 +1661,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // estreita nenhuma — é todo o tempo em que o servidor recusar as gravações.
   // Fechar o separador nesse estado não perde o `localStorage`, mas perde a
   // única pessoa que ainda podia fazer alguma coisa acerca disso.
+  //
+  // DENTRO DO BACK OFFICE QUEM TRAVA É O REGISTO: um travão só para todos os
+  // ecrãs, e capaz de nomear o que se perde («Proposta de Rita & Tomás») em vez
+  // de dizer apenas que se perde alguma coisa. Este continua a valer onde não
+  // há registo — o dossier do evento, um teste — porque um travão que
+  // desaparecesse em silêncio seria a pior troca possível.
   useEffect(() => {
+    if (oRegistoFalaPorMim) return;
     if (!porGravar && !soNesteComputador && aGravarNoServidor === 0) return;
     const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", aviso);
     return () => window.removeEventListener("beforeunload", aviso);
-  }, [porGravar, soNesteComputador, aGravarNoServidor]);
+  }, [oRegistoFalaPorMim, porGravar, soNesteComputador, aGravarNoServidor]);
 
   // ── A contagem dos dez segundos para anular a limpeza ─────────────────
   useEffect(() => {
@@ -1951,10 +2073,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   );
 
   // ── Mood boards (decoracao) ──
+  /**
+   * Um mood board NOVO nasce a manter a forma das fotografias.
+   *
+   * O campo está no documento e não no código de desenho justamente para os
+   * documentos ANTIGOS não mudarem (o PDF é redesenhado a cada abertura do link
+   * do casal, e uma proposta já enviada não pode mudar de aspecto por baixo
+   * dele). Mas uma página que ainda não existe não tem passado nenhum a
+   * proteger — e o que ela pediu, por escrito e em duas páginas, foi que as
+   * fotografias deixassem de sair cortadas. Portanto o que nasce hoje nasce
+   * assim; o que já lá está muda quando ela quiser, no interruptor de cada
+   * bloco.
+   */
   function addBoard() {
     setDoc((d) => ({
       ...d,
-      moodBoards: [...d.moodBoards, { title: "", annotation: "", images: [] }],
+      moodBoards: [
+        ...d.moodBoards,
+        { title: "", annotation: "", images: [], enquadramento: "forma-da-foto" },
+      ],
     }));
   }
 
@@ -2798,20 +2935,50 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <div className="grid grid-cols-2 gap-3">
               {[0, 1].map((idx) => {
                 const path = doc.coverImages?.[idx];
+                /**
+                 * ── O ÚNICO SÍTIO ONDE O RECORTE NÃO SE PODE EVITAR ─────────
+                 *
+                 * As tiras da capa correm de topo a fundo da página e têm
+                 * aspecto 0,467:1 — quase 1:2. Nenhuma fotografia normal tem
+                 * essa forma, e dar-lhe a forma da foto deixaria uma barra de
+                 * fundo entre ela e a aresta da folha, que é pior.
+                 *
+                 * O que se pode fazer é DIZER o número antes: uma fotografia ao
+                 * alto perde ali ~30%, uma deitada ~69%. Com o número à frente,
+                 * escolher uma vertical para a capa deixa de ser sorte — e ela
+                 * deixa de descobrir o corte com o PDF já feito.
+                 */
+                const perdaDaCapa = path
+                  ? perdaNaCapa(aspetosDasFotos[path] ?? ASPETO_POR_OMISSAO)
+                  : 0;
                 return (
                   <div key={idx}>
                     {path ? (
-                      <Thumb
-                        url={assetUrls[path]}
-                        planoB={assetOriginais[path]}
-                        onRemove={() => removeCoverAt(idx)}
-                        // A forma REAL da tira de capa, e não um 4:3 que o
-                        // documento nunca desenha. Ver `aspeto` em `Thumb`.
-                        aspeto={aspetoDaCapa()}
-                        pendente={isPendingImage(path)}
-                        onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
-                        refDoc={path}
-                      />
+                      <>
+                        <Thumb
+                          url={assetUrls[path]}
+                          planoB={assetOriginais[path]}
+                          onRemove={() => removeCoverAt(idx)}
+                          // A forma REAL da tira de capa, e não um 4:3 que o
+                          // documento nunca desenha. Ver `aspeto` em `Thumb`.
+                          aspeto={aspetoDaCapa()}
+                          // Medir aqui é o que dá o número do aviso de baixo —
+                          // a mesma medida que os mood boards já faziam, na
+                          // célula que já está no ecrã e sem pedir nada ao
+                          // servidor.
+                          onMedida={(a) => registarAspeto(path, a)}
+                          pendente={isPendingImage(path)}
+                          onde={idx === 0 ? "capa-esquerda" : "capa-direita"}
+                          refDoc={path}
+                        />
+                        {perdaDaCapa > PERDA_QUE_SE_AVISA && (
+                          <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
+                            A tira da capa é muito mais alta do que larga: esta fotografia perde{" "}
+                            {Math.round(perdaDaCapa * 100)}% da área. Uma fotografia ao alto perde
+                            menos.
+                          </p>
+                        )}
+                      </>
                     ) : (
                       <>
                         <UploadArea
@@ -2857,7 +3024,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               groups={doc.serviceGroups}
               onGroupsChange={setServiceGroups}
               showDesc={!isDeco}
-              onSave={saveNow}
+              // O Ctrl/Cmd+Enter dos Serviços é o MESMO gesto do botão
+              // «Guardar agora» — e por isso a mesma função, não uma segunda
+              // gravação com outras regras e outras palavras.
+              onSave={guardarAgora}
             />
           </Section>
 
@@ -2883,10 +3053,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   const aspectos = b.images
                     .slice(0, MOOD_BOARD_MAX_IMAGES)
                     .map((p) => aspetosDasFotos[p] ?? ASPETO_POR_OMISSAO);
-                  const caixas = caixasDoMoodboard(
-                    b.layout ?? layoutSugerido(aspectos.length),
-                    aspectos,
-                  );
+                  /**
+                   * A escolha desta página: as caixas tomam a FORMA das
+                   * fotografias em vez de as recortarem. Viaja daqui para as
+                   * três coisas que têm de concordar — a forma de cada célula
+                   * da grelha, os diagramas do selector, e a página do PDF.
+                   * Se uma delas ficasse para trás, ela escolhia por um
+                   * desenho e recebia outro.
+                   */
+                  const semRecorte = b.enquadramento === "forma-da-foto";
+                  const layoutDoBoard = b.layout ?? layoutSugerido(aspectos.length);
+                  const caixas = caixasDoMoodboard(layoutDoBoard, aspectos, undefined, semRecorte);
+                  /**
+                   * Quanto é que cada fotografia perde, uma a uma.
+                   *
+                   * Por fotografia e não por disposição: na mesma página, uma
+                   * panorâmica perde 5% e uma vertical 69%. Um aviso por página
+                   * obrigava-a a adivinhar qual é que era o problema — e a
+                   * resposta a «qual delas?» é a única coisa que torna o aviso
+                   * accionável (trocar aquela foto, ou ligar o interruptor).
+                   */
+                  const cortadas = semRecorte
+                    ? []
+                    : perdasDoMoodboard(layoutDoBoard, aspectos)
+                        .map((perda, i) => ({ perda, i }))
+                        .filter(({ perda }) => perda > PERDA_QUE_SE_AVISA);
                   return (
                     <div
                       key={bi}
@@ -2991,11 +3182,53 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         <SelectorDeLayout
                           valor={b.layout}
                           aspectos={aspectos}
+                          semRecorte={semRecorte}
                           // `undefined` APAGA o campo: um mood board sem layout
                           // gravado continua sem ele, e uma proposta já enviada
                           // não muda de aspecto por causa disto.
                           onEscolher={(layout) => updateBoard(bi, { layout })}
                         />
+                      )}
+                      {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
+                          Está aqui, por baixo dos diagramas, porque é com eles
+                          que se percebe o que ele faz: liga-se e as caixas
+                          mudam de forma à frente dela.
+
+                          Desligar APAGA o campo (não guarda um `false`): um
+                          mood board que nunca teve a escolha tem de continuar
+                          sem ela, para uma proposta já enviada sair como
+                          sempre saiu. */}
+                      <label className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-foreground/65">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
+                          checked={semRecorte}
+                          onChange={(e) =>
+                            updateBoard(bi, {
+                              enquadramento: e.target.checked ? "forma-da-foto" : undefined,
+                            })
+                          }
+                        />
+                        <span>
+                          Manter a forma de cada fotografia (não corta)
+                          <span className="block text-[11px] text-foreground/40">
+                            Desligado, as fotografias são recortadas para encher as caixas da
+                            disposição — como saía antes.
+                          </span>
+                        </span>
+                      </label>
+                      {cortadas.length > 0 && (
+                        <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
+                          Nesta disposição{" "}
+                          {cortadas.length === 1
+                            ? "1 fotografia é cortada"
+                            : `${cortadas.length} fotografias são cortadas`}
+                          :{" "}
+                          {cortadas
+                            .map(({ perda, i }) => `a ${i + 1}.ª perde ${Math.round(perda * 100)}%`)
+                            .join(", ")}
+                          . Ligue «Manter a forma de cada fotografia» para não perder nada.
+                        </p>
                       )}
                       <div className="mt-2 flex flex-wrap items-center gap-4">
                         <button
@@ -3782,6 +4015,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   );
                 })()}
             </p>
+            {/* O BOTÃO FICA COLADO AO INDICADOR, e não lá em cima ao pé do
+                «Limpar rascunho».
+
+                Quem carrega aqui quer saber o que aconteceu, e o que aconteceu
+                está escrito no indicador que está mesmo ao lado — «guardado às
+                14:32» ou «guardado só neste computador». Separá-los obrigava a
+                procurar a resposta no outro extremo da página. Esta barra é
+                fixa, portanto acompanha-a por todo o formulário: no momento em
+                que ela decide levantar-se da secretária, o botão está à mão,
+                onde quer que esteja a escrever. */}
+            <Button
+              variant="secondary"
+              onClick={guardarAgora}
+              loading={aGuardarAgora}
+              title="Guardar agora (⌘S)"
+            >
+              Guardar agora
+            </Button>
             <Button
               variant="primary"
               onClick={() => setStep("prever")}
@@ -4359,8 +4610,24 @@ const LAYOUTS: LayoutDeMoodboard[] = [
  * são uns pontos na base da mancha: invisível num diagrama de 90 px, e é o lado
  * certo para onde errar (as caixas saem por excesso, nunca por defeito).
  */
-function DiagramaDeLayout({ layout, aspectos }: { layout: LayoutDeMoodboard; aspectos: number[] }) {
-  const caixas = caixasDoMoodboard(layout, aspectos);
+function DiagramaDeLayout({
+  layout,
+  aspectos,
+  semRecorte = false,
+}: {
+  layout: LayoutDeMoodboard;
+  aspectos: number[];
+  /**
+   * A mesma escolha que a página tem («Manter a forma de cada fotografia»).
+   *
+   * Vem por prop e não por omissão: o diagrama e a página TÊM de ser desenhados
+   * com os mesmos argumentos. Se divergirem, ela escolhe uma disposição por um
+   * desenho e recebe outra — que é o defeito que este selector existe para não
+   * haver, e que já custou caro nesta casa.
+   */
+  semRecorte?: boolean;
+}) {
+  const caixas = caixasDoMoodboard(layout, aspectos, undefined, semRecorte);
   return (
     <svg
       viewBox={`0 0 ${PAGINA_W} ${PAGINA_H}`}
@@ -4423,11 +4690,14 @@ function DiagramaDeLayout({ layout, aspectos }: { layout: LayoutDeMoodboard; asp
 function SelectorDeLayout({
   valor,
   aspectos,
+  semRecorte = false,
   onEscolher,
 }: {
   valor: LayoutDeMoodboard | undefined;
   /** A forma de cada foto que a página vai desenhar, pela ordem delas. */
   aspectos: number[];
+  /** O enquadramento deste mood board — os diagramas desenham-se com ele. */
+  semRecorte?: boolean;
   onEscolher: (layout: LayoutDeMoodboard | undefined) => void;
 }) {
   const sugerido = layoutSugerido(aspectos.length);
@@ -4477,7 +4747,11 @@ function SelectorDeLayout({
               }`}
             >
               <span className="block overflow-hidden rounded-[3px] border border-foreground/[0.08] bg-white">
-                <DiagramaDeLayout layout={op ?? sugerido} aspectos={aspectos} />
+                <DiagramaDeLayout
+                  layout={op ?? sugerido}
+                  aspectos={aspectos}
+                  semRecorte={semRecorte}
+                />
               </span>
               {/* A escolha nunca é só cor: a opção assinalada muda de peso e de
                   elevação, e o `aria-checked` diz o mesmo a quem ouve. */}

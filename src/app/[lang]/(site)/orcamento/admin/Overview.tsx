@@ -7,6 +7,7 @@ import Reminders from "./Reminders";
 import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
 import { metaFor } from "./status-meta";
+import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 
 // Memoised so editing the revenue goal or the team notes (local Overview state)
 // doesn't re-render these two heavier panels every keystroke — their props
@@ -674,12 +675,48 @@ const NotasEquipa = memo(function NotasEquipa({
   // Sair da página com texto por gravar (ou com uma gravação falhada) é
   // exactamente a forma de perder trabalho sem aviso que este ecrã tinha.
   const arriscado = porGravar || estado.tipo === "erro" || estado.tipo === "conflito";
+
+  /**
+   * ── ESTE CARTÃO NO «GUARDAR TUDO» DO BACK OFFICE ─────────────────────────
+   *
+   * É o quinto sítio da casa com trabalho por gravar, e está na vista que abre
+   * o dia: deixá-lo de fora do registo era o botão do cabeçalho dizer «tudo
+   * guardado» com as notas dela por gravar à frente dos olhos — a mentira por
+   * omissão que esse botão existe para acabar.
+   *
+   * O nome diz onde é, e não o que o componente se chama: «Notas da equipa
+   * (Visão Geral)» é o que ela reconhece na pergunta ao fechar o separador.
+   */
+  const oRegistoFalaPorMim = useInscricaoNoRegisto({
+    nome: "Notas da equipa (Visão Geral)",
+    porGravar: arriscado,
+    gravarJa: async (): Promise<ResultadoDoEcra> => {
+      // O que estava adiado vai JÁ — este é o gesto de quem se vai levantar da
+      // secretária, e esperar pelos 800 ms era gravar depois de ela sair.
+      cancelarTimer();
+      if (await onGuardar(teamNotes)) return { estado: "guardado" };
+      // Não há cópia local nenhuma destas notas: o que não chega ao servidor
+      // não existe em mais lado nenhum. Num conflito é ainda mais concreto —
+      // há uma versão mais recente lá, e alguém tem de escolher.
+      return {
+        estado: "nao-guardado",
+        porque:
+          estado.tipo === "conflito"
+            ? "Há uma versão mais recente no servidor — escolha qual fica, na Visão Geral."
+            : "O servidor não aceitou as notas da equipa.",
+      };
+    },
+  });
+
+  // Havendo registo, quem trava a saída é ele — e nomeia o que se perde. Sem
+  // registo (um teste, ou este cartão montado fora do back office), este
+  // continua a valer.
   useEffect(() => {
-    if (!arriscado) return;
+    if (oRegistoFalaPorMim || !arriscado) return;
     const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", aviso);
     return () => window.removeEventListener("beforeunload", aviso);
-  }, [arriscado]);
+  }, [oRegistoFalaPorMim, arriscado]);
 
   return (
     <div className="bo-card p-4">
