@@ -13,6 +13,7 @@ import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState, Field, Segmented } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 import { metaFor } from "./status-meta";
 
 type Status = Invoice["status"];
@@ -245,6 +246,9 @@ export default function Faturas({ quotes }: Props) {
     data: invoices = [],
     setData: setInvoices,
     loading,
+    error,
+    errorMessage,
+    refresh,
   } = useCachedList<Invoice[]>("faturas", "/api/faturas");
   const [filter, setFilter] = useState<Status | "all">("all");
   const [busy, setBusy] = useState<string | null>(null);
@@ -405,12 +409,34 @@ export default function Faturas({ quotes }: Props) {
       }
       const created: Invoice[] = data.invoices ?? [];
       setInvoices((prev) => [...created, ...prev]);
-      toast(
-        mode === "split"
-          ? `Emitidas ${created.length} faturas (sinal + saldo)`
-          : `Fatura ${created[0]?.number ?? ""} emitida`,
-        "success",
-      );
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * O 30/70 PODE CORRER SÓ METADE — E ISSO NÃO É NEM ÊXITO NEM FALHA
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * A rota emite o sinal e o saldo em dois passos. Quando o sinal fica
+       * gravado e o saldo não, ela responde 201 com um `aviso` — porque um erro
+       * seco fazia-a concluir que não tinha acontecido nada, tentar de novo, e
+       * levar com "Já existe uma fatura de sinal": o ecrã a dizer ao mesmo
+       * tempo que falhou e que já existe.
+       *
+       * A frase vem TAL E QUAL do servidor: é lá que se sabe que número foi
+       * emitido e qual é que ficou por emitir, e é isso que ela precisa de
+       * saber para não voltar a emitir o sinal. Vai como "error" de propósito —
+       * não porque tenha falhado, mas porque é o único tom que interrompe, e um
+       * aviso destes perdido no meio dos sucessos não serve para nada.
+       */
+      const aviso = typeof data.aviso === "string" ? data.aviso : "";
+      if (aviso) {
+        toast(aviso, "error");
+      } else {
+        toast(
+          mode === "split"
+            ? `Emitidas ${created.length} faturas (sinal + saldo)`
+            : `Fatura ${created[0]?.number ?? ""} emitida`,
+          "success",
+        );
+      }
       // Reset the transient fields, keep the date defaults handy.
       setShowForm(false);
       setQuoteId("");
@@ -517,6 +543,35 @@ export default function Faturas({ quotes }: Props) {
     }
     return { emitido, pago, divida: Math.max(0, emitido - pago), counts };
   }, [invoices]);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * UM LIVRO QUE NÃO SE CONSEGUIU ABRIR NÃO DIZ "EM DÍVIDA 0,00 €"
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O `useCachedList` devolve `data` indefinido tanto com o livro vazio como
+   * com a leitura rebentada, e este ecrã só olhava para o `loading`. Com o
+   * servidor em baixo os três cartões de topo passavam a AFIRMAR
+   * "Emitido 0,00 € · Pago 0,00 € · Em dívida 0,00 €".
+   *
+   * Nenhum outro estado vazio custa isto. "Em dívida 0,00 €" é uma frase sobre
+   * o dinheiro dela, e é a frase que a faz não ir atrás de um saldo por cobrar
+   * — nem sequer levanta a pergunta, porque não parece haver nada por
+   * responder. Um total em euros só se escreve depois de se ter lido o livro.
+   *
+   * A falha vem ANTES do esqueleto porque, com `error` a verdade já é
+   * conhecida. Quando há dados em cache continuamos a mostrar o livro (velho,
+   * mas verdadeiro) — ver o mesmo desenho no ecrã Material.
+   */
+  if (error && invoices.length === 0) {
+    return (
+      <AvisoDeFalha
+        titulo="Não foi possível ler as faturas"
+        mensagem={errorMessage}
+        aoTentarDeNovo={refresh}
+      />
+    );
+  }
 
   if (loading) return <SkeletonList rows={5} />;
 

@@ -6,6 +6,7 @@ import { downloadCsv, dateStamp } from "./export";
 import { SkeletonCard } from "./Skeleton";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 const CATEGORIES = [
   "Catering",
@@ -48,6 +49,9 @@ export default function Fornecedores() {
     data: suppliers = [],
     setData: setSuppliers,
     loading,
+    error,
+    errorMessage,
+    refresh,
   } = useCachedList<Supplier[]>("fornecedores", "/api/fornecedores");
   const [search, setSearch] = useState("");
   // Defer so the filter/row reconcile runs off the keystroke; input stays instant.
@@ -151,6 +155,19 @@ export default function Fornecedores() {
         }),
     [suppliers, cat, dSearch],
   );
+
+  // A falha ANTES do estado vazio: "Sem fornecedores ainda — guarde aqui os
+  // contactos" manda-a começar de novo uma agenda que já existe, e o florista
+  // que ela veio procurar continua sem telefone.
+  if (error && suppliers.length === 0) {
+    return (
+      <AvisoDeFalha
+        titulo="Não foi possível ler os fornecedores"
+        mensagem={errorMessage}
+        aoTentarDeNovo={refresh}
+      />
+    );
+  }
 
   return (
     <div>

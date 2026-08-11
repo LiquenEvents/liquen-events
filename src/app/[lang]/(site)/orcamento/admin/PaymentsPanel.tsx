@@ -436,12 +436,6 @@ export default function PaymentsPanel({
           data?.error || `Falha ao gerar ${docLabel === "Recibo" ? "o recibo" : "a fatura"}.`,
         );
       }
-      if (data.pdfBase64 && !email) {
-        const a = document.createElement("a");
-        a.href = `data:application/pdf;base64,${data.pdfBase64}`;
-        a.download = `${docLabel}-${String(data.number ?? p.id).replace(/\//g, "-")}.pdf`;
-        a.click();
-      }
       if (email) {
         toast(
           data.emailed
@@ -449,8 +443,38 @@ export default function PaymentsPanel({
             : `${docLabel} gerado (email não configurado)`,
           data.emailed ? "success" : "info",
         );
-      } else {
+      } else if (data.pdfBase64) {
+        const a = document.createElement("a");
+        a.href = `data:application/pdf;base64,${data.pdfBase64}`;
+        a.download = `${docLabel}-${String(data.number ?? p.id).replace(/\//g, "-")}.pdf`;
+        // ── O <a> tem de estar na árvore no momento do clique ───────────────
+        // Um elemento fora do documento não dispara a transferência no Firefox:
+        // o `click()` corria, nada acontecia, e a frase "descarregado" saía na
+        // mesma. O `ProposalStudio` já fazia isto assim — é o mesmo gesto.
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
         toast(`${docLabel} descarregado`, "success");
+      } else {
+        /**
+         * ════════════════════════════════════════════════════════════════════
+         * "DESCARREGADO" SÓ SE TIVER SAÍDO UM FICHEIRO
+         * ════════════════════════════════════════════════════════════════════
+         *
+         * Este `toast` estava FORA do `if (data.pdfBase64)`. Uma resposta 200 sem
+         * PDF — o que a rota devolve quando o gerador não produziu nada — dizia
+         * na mesma "Recibo descarregado". Ela vai à pasta das transferências,
+         * não encontra nada, e não tem como saber se falhou o programa, o
+         * browser, ou ela. Ao telefone com o cliente, promete o recibo na mesma.
+         *
+         * O documento FOI emitido (o número está gasto e o livro mudou), o que
+         * faltou foi o ficheiro. A frase tem de separar as duas coisas, senão a
+         * reacção certa — voltar a pedir o PDF, e não reemitir — não é óbvia.
+         */
+        toast(
+          `${docLabel} ${data.number ? `${data.number} ` : ""}emitido, mas não foi possível gerar o PDF. Tente descarregar outra vez.`,
+          "error",
+        );
       }
       // O livro de faturas mudou — recarregar para a tabela e a reconciliação
       // refletirem o novo documento sem reabrir o separador.

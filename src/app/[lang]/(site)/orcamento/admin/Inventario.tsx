@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 import ModoDeCarga from "./ModoDeCarga";
 
 type Condition = PropItem["condition"];
@@ -104,6 +105,9 @@ export default function Inventario() {
     data: items = [],
     setData: setItems,
     loading,
+    error,
+    errorMessage,
+    refresh,
   } = useCachedList<PropItem[]>("inventario", "/api/inventario");
   const [search, setSearch] = useState("");
   // Defer so filtering + row reconcile runs off the keystroke; input stays instant.
@@ -152,7 +156,26 @@ export default function Inventario() {
     const payload = toPayload(editForm);
     if (!payload.name) return;
     setSaving(true);
-    // Optimistic — reconcile with the server response.
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * SE O SERVIDOR RECUSA, O ECRÃ TEM DE VOLTAR ATRÁS
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * A escrita optimista é a certa — o ecrã responde já e a lista não pisca.
+     * O que faltava era a outra metade: quando o servidor recusava, mostrava-se
+     * a mensagem e ficava por ali, com os valores novos na lista. E o `setItems`
+     * do `useCachedList` escreve através para a cache, por isso sair do
+     * inventário e voltar mostrava-os de novo — agora sozinhos, sem nenhuma
+     * mensagem por perto que lhes tirasse a razão.
+     *
+     * Ela corrige "4" para "40" arcos, o servidor recusa, a mensagem passa, e o
+     * ecrã continua a dizer 40. Na véspera carrega-se a carrinha por um número
+     * que nunca existiu na base de dados.
+     *
+     * O `remove()` aqui em baixo já guardava o estado anterior e o repunha nos
+     * dois desfechos maus. É o mesmo gesto.
+     */
+    const snapshot = items;
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...payload } : i)));
     try {
       const res = await fetch(`/api/inventario/${id}`, {
@@ -168,9 +191,13 @@ export default function Inventario() {
         setEditingId(null);
         toast("Alterações guardadas.", "success");
       } else {
+        // A edição fica ABERTA de propósito: o que ela escreveu não se perde, e
+        // o campo por onde recomeçar é o mesmo em que estava.
+        setItems(snapshot);
         toast("Não foi possível guardar as alterações.", "error");
       }
     } catch {
+      setItems(snapshot);
       toast("Erro de ligação ao guardar.", "error");
     } finally {
       setSaving(false);
@@ -259,6 +286,20 @@ export default function Inventario() {
   // procura e pela categoria. Carregar a carrinha é sempre sobre um
   // subconjunto, nunca sobre o catálogo inteiro.
   if (aCarregar) return <ModoDeCarga itens={filtered} onSair={() => setACarregar(false)} />;
+
+  // A falha ANTES do estado vazio: "Sem itens no inventário" convida a comprar
+  // outra vez o que já está no armazém — e o modo de carga, que é o que se usa
+  // na véspera, ia percorrer uma lista vazia sem nada a dizer que estava a
+  // mentir. Ver `AvisoDeFalha`.
+  if (error && items.length === 0) {
+    return (
+      <AvisoDeFalha
+        titulo="Não foi possível ler o inventário"
+        mensagem={errorMessage}
+        aoTentarDeNovo={refresh}
+      />
+    );
+  }
 
   return (
     <div>

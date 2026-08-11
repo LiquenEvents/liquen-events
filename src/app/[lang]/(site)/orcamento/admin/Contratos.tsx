@@ -10,6 +10,7 @@ import { SkeletonList } from "./Skeleton";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Toolbar } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 // Estado do contrato → rótulo + paleta. Aceite usa o musgo (positivo); pendente
 // fica esbatido, à espera da assinatura do cliente. Mesma linguagem cromática
@@ -72,10 +73,13 @@ function StatusChip({ status }: { status: ContractStatus }) {
 }
 
 export default function Contratos() {
-  const { data: contracts = [], loading } = useCachedList<Contract[]>(
-    "contratos",
-    "/api/contratos",
-  );
+  const {
+    data: contracts = [],
+    loading,
+    error,
+    errorMessage,
+    refresh,
+  } = useCachedList<Contract[]>("contratos", "/api/contratos");
   const [search, setSearch] = useState("");
   // Defer so filtering + row reconcile runs off the keystroke; input stays instant.
   const dSearch = useDeferredValue(search);
@@ -125,6 +129,21 @@ export default function Contratos() {
       ]),
     ];
     downloadCsv(`contratos-${dateStamp()}`, rows);
+  }
+
+  // A falha ANTES do estado vazio: sem isto, uma leitura que rebentou aparecia
+  // como "Sem contratos ainda — aparecem aqui quando um cliente aceita a
+  // proposta", que descreve um sistema a funcionar e a aguardar clientes. O
+  // contrato que ela procura pode estar assinado há uma semana. Ver
+  // `AvisoDeFalha`.
+  if (error && contracts.length === 0) {
+    return (
+      <AvisoDeFalha
+        titulo="Não foi possível ler os contratos"
+        mensagem={errorMessage}
+        aoTentarDeNovo={refresh}
+      />
+    );
   }
 
   if (loading) return <SkeletonList rows={5} />;

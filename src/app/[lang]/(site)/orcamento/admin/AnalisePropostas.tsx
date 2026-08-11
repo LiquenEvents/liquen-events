@@ -5,6 +5,7 @@ import type { Proposal } from "@/lib/orcamento/types";
 import { analisar, NOME_DO_MOTIVO } from "@/lib/orcamento/analise-de-propostas";
 import { eur0 as eur } from "@/lib/money";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -34,8 +35,27 @@ function Numero({ valor, rotulo, nota }: { valor: string; rotulo: string; nota?:
 }
 
 export default function AnalisePropostas() {
-  const { data: propostas } = useCachedList<Proposal[]>("propostas", "/api/propostas");
+  const {
+    data: propostas,
+    error,
+    errorMessage,
+    refresh,
+  } = useCachedList<Proposal[]>("propostas", "/api/propostas");
   const a = useMemo(() => analisar(propostas ?? []), [propostas]);
+
+  // Uma leitura falhada dava `a.enviadas === 0` e este painel desaparecia sem
+  // uma palavra — dentro de uma secção chamada "Propostas" que fica aberta e
+  // vazia. Lê-se como "ainda não enviaste nenhuma proposta", que é uma resposta
+  // à pergunta, e é falsa. Desaparecer em silêncio também é dizer uma coisa.
+  if (error && !propostas) {
+    return (
+      <AvisoDeFalha
+        titulo="Não foi possível ler as propostas"
+        mensagem={errorMessage}
+        aoTentarDeNovo={refresh}
+      />
+    );
+  }
 
   // Sem propostas enviadas não há nada a dizer, e um painel de zeros ensina a
   // não voltar a este ecrã.

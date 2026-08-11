@@ -13,6 +13,7 @@ import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -101,6 +102,9 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
     data: propostas,
     loading,
     setData,
+    error,
+    errorMessage,
+    refresh,
   } = useCachedList<Proposal[]>("propostas", "/api/propostas");
   const { toast } = useToast();
   const [aGravar, setAGravar] = useState<string | null>(null);
@@ -165,6 +169,20 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
     },
     [propostas, setData, toast],
   );
+
+  // Este ecrã EXISTE para dizer o que está por responder. Uma leitura que
+  // rebentou levava-o a afirmar "Nenhuma proposta à espera de resposta" — a
+  // única frase que o dispensa de ser aberto. As validades continuam a correr
+  // na mesma, e os seguimentos marcados passam sem ninguém dar por eles.
+  if (error && !propostas) {
+    return (
+      <AvisoDeFalha
+        titulo="Não foi possível ler as propostas"
+        mensagem={errorMessage}
+        aoTentarDeNovo={refresh}
+      />
+    );
+  }
 
   if (loading && !propostas) return <SkeletonList rows={4} />;
 

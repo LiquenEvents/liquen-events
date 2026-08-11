@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import { isDateKey, todayKey } from "./util";
 import { Button, Card, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const MONTHS = [
@@ -246,10 +247,13 @@ export default function Calendario({ quotes, onOpen }: Props) {
   });
 
   // Standalone calendar entries (reuniões, marcações, bloqueios…)
-  const { data: events = [], setData: setEvents } = useCachedList<CalendarEvent[]>(
-    "calendario",
-    "/api/calendario",
-  );
+  const {
+    data: events = [],
+    setData: setEvents,
+    error: erroDeLeitura,
+    errorMessage: mensagemDeErro,
+    refresh: recarregar,
+  } = useCachedList<CalendarEvent[]>("calendario", "/api/calendario");
   const [modalDate, setModalDate] = useState<string | null>(null);
   // Day peek: the day whose events are expanded in the panel under the grid.
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -409,6 +413,20 @@ export default function Calendario({ quotes, onOpen }: Props) {
 
   return (
     <>
+      {/* ── A grelha desenha-se na mesma, mas com o aviso à frente ──────────
+          Os pedidos vêm por `props` e continuam certos; o que falhou foram as
+          MARCAÇÕES — reuniões, provas, e sobretudo os bloqueios. Um mês
+          desenhado sem bloqueios não parece avariado, parece livre, e é sobre
+          um dia "livre" desses que se marca uma prova por cima de férias. Por
+          isso o aviso fica por cima, e a grelha fica: metade da informação é
+          útil desde que se saiba que é metade. */}
+      {erroDeLeitura && events.length === 0 && (
+        <AvisoDeFalha
+          titulo="Não foi possível ler as marcações do calendário"
+          mensagem={mensagemDeErro}
+          aoTentarDeNovo={recarregar}
+        />
+      )}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
         {/* Margem interna estreita no telemóvel, a de sempre a partir de `sm`.
             A CONTA: num ecrã de 375 px sobram 343 depois da margem da vista.

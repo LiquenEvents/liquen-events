@@ -129,10 +129,9 @@ export async function POST(request: NextRequest) {
       const saldoInv = await build("saldo", saldo);
       try {
         await createInvoice(sinalInv);
-        await createInvoice(saldoInv);
       } catch (err) {
-        // Backstop de corrida: entre a verificação acima e estes inserts, uma
-        // emissão concorrente pode ter criado o sinal/saldo — os índices parciais
+        // Backstop de corrida: entre a verificação acima e este insert, uma
+        // emissão concorrente pode ter criado o sinal — os índices parciais
         // únicos (db/schema.sql) fazem o insert falhar. Tratamos como duplicado
         // (409) em vez de 500, coerente com a guarda de duplicação acima.
         if (isUniqueViolation(err)) {
@@ -141,7 +140,55 @@ export async function POST(request: NextRequest) {
             { status: 409 },
           );
         }
+        // Nada ficou gravado — aqui um 500 é honesto, e o `catch` de topo dá-o.
         throw err;
+      }
+
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * A PARTIR DAQUI O SINAL ESTÁ NO LIVRO — E ISSO MUDA O QUE SE PODE DIZER
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Estes dois inserts estavam num `try` só. Se o SEGUNDO rebentasse por
+       * outra coisa que não duplicação, o erro subia ao `catch` de topo e a
+       * resposta era 500 "Erro ao criar a fatura" — com o sinal já gravado e o
+       * seu número fiscal gasto. O que ela via a seguir:
+       *
+       *   1. "Erro ao criar a fatura" → conclui, com toda a razão, que não se
+       *      emitiu nada;
+       *   2. tenta outra vez;
+       *   3. "Já existe uma fatura de sinal para este evento" — 409, da guarda
+       *      de duplicação.
+       *
+       * O ecrã a afirmar ao mesmo tempo que falhou e que já existe. Nenhuma das
+       * duas frases é a verdade, que é simples: o sinal está emitido, o saldo
+       * não, falta emitir o saldo e NÃO se deve reemitir o sinal.
+       *
+       * Uma resposta de erro não consegue dizer isto — quem a lê arruma-a como
+       * "não aconteceu nada". Por isso, com o sinal persistido, isto passa a ser
+       * um ÊXITO COM AVISO: 201, a lista do que ficou mesmo emitido, e uma frase
+       * que nomeia as duas metades. Não se inventa um saldo que não existe.
+       */
+      try {
+        await createInvoice(saldoInv);
+      } catch (err) {
+        log.error("faturas POST: saldo falhou com o sinal já emitido", err);
+        // Numa violação de unicidade o saldo EXISTE (emissão concorrente); em
+        // qualquer outra falha não existe. São duas situações diferentes e a
+        // acção seguinte dela também é.
+        const sobreOSaldo = isUniqueViolation(err)
+          ? `o saldo não foi emitido por já existir uma fatura de saldo para este evento`
+          : `a fatura de saldo (${saldoInv.amount.toFixed(2)} €) NÃO foi emitida`;
+        return NextResponse.json(
+          {
+            invoices: [sinalInv],
+            aviso:
+              `Foi emitida a fatura de sinal ${sinalInv.number} ` +
+              `(${sinalInv.amount.toFixed(2)} €), mas ${sobreOSaldo}. ` +
+              `Não volte a emitir o sinal — emita apenas o saldo.`,
+          },
+          { status: 201 },
+        );
       }
       return NextResponse.json({ invoices: [sinalInv, saldoInv] }, { status: 201 });
     }

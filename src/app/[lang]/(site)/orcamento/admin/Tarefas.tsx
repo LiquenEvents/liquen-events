@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import { todayKey } from "./util";
 import { Button, Card, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 import { metaFor } from "./status-meta";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
@@ -155,6 +156,9 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     data: tasks = [],
     setData: setTasks,
     loading,
+    error,
+    errorMessage,
+    refresh,
   } = useCachedList<Task[]>("tarefas", "/api/tarefas");
   const [adding, setAdding] = useState(false);
   const [showDone, setShowDone] = useState(false);
@@ -411,6 +415,20 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         onToggle={toggle}
         onEdit={startEditTask}
         onRemove={remove}
+      />
+    );
+  }
+
+  // A falha ANTES de tudo: sem isto, uma leitura que rebentou desenhava
+  // "Tudo em dia — não há tarefas pendentes". É a frase mais tranquilizadora do
+  // ecrã, e é exactamente o contrário do que se sabe. Ela fecha o separador e
+  // vai fazer outra coisa, com a semana da montagem por combinar.
+  if (error && tasks.length === 0) {
+    return (
+      <AvisoDeFalha
+        titulo="Não foi possível ler as tarefas"
+        mensagem={errorMessage}
+        aoTentarDeNovo={refresh}
       />
     );
   }
