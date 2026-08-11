@@ -559,22 +559,54 @@ async function fetchProposalImageBytesInner(ref: string): Promise<Buffer | null>
   // é igual. `ehRefDeTema` já validou a forma do caminho, portanto o que chega
   // ao Storage nunca é uma travessia.
   if (ehRefDeTema(ref)) {
-    try {
-      const { data, error } = await sb.storage.from(THEME_BUCKET).download(caminhoDoRefDeTema(ref));
-      if (error || !data) return null;
-      return Buffer.from(await data.arrayBuffer());
-    } catch {
-      return null;
-    }
+    return descarregar(sb, THEME_BUCKET, caminhoDoRefDeTema(ref));
   }
   // Bucket storage path.
-  try {
-    const { data, error } = await sb.storage.from(PROPOSAL_BUCKET).download(ref);
-    if (error || !data) return null;
-    return Buffer.from(await data.arrayBuffer());
-  } catch {
-    return null;
+  return descarregar(sb, PROPOSAL_BUCKET, ref);
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA FALHA PASSAGEIRA NÃO PODE CUSTAR UMA FOTOGRAFIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma proposta descarrega até oitenta ficheiros seguidos. Basta UM pedido a
+ * cair — uma ligação reciclada do outro lado, um pico no armazenamento — para
+ * essa fotografia desaparecer do documento: devolvia-se `null` à primeira e
+ * ficava uma moldura vazia numa proposta que ia para um casal.
+ *
+ * Duas tentativas extra, com uma pausa curta pelo meio. É o mesmo raciocínio
+ * do envio (`proposta-doc`), um nível abaixo: em vez de desenhar o documento
+ * todo outra vez por causa de uma foto, repete-se a foto.
+ *
+ * A pausa cresce (150 ms, 300 ms) porque um armazenamento que acabou de
+ * recusar um pedido raramente aceita o seguinte no mesmo instante — e é curta
+ * porque isto acontece dentro de uma geração de PDF que alguém está a esperar.
+ */
+const TENTATIVAS = 3;
+const PAUSA_MS = 150;
+
+async function descarregar(
+  sb: NonNullable<ReturnType<typeof getSupabase>>,
+  bucket: string,
+  caminho: string,
+): Promise<Buffer | null> {
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+    try {
+      const { data, error } = await sb.storage.from(bucket).download(caminho);
+      if (!error && data) return Buffer.from(await data.arrayBuffer());
+    } catch {
+      /* segue para a tentativa seguinte */
+    }
+    if (tentativa < TENTATIVAS) {
+      await new Promise((r) => setTimeout(r, PAUSA_MS * tentativa));
+    }
   }
+  // Três vezes não é passageiro: ou o ficheiro não está lá, ou o armazenamento
+  // está em baixo. Quem chama conta-a como foto em falta — e o envio, com esta
+  // contagem, recusa-se a mandar a proposta.
+  log.warn("storage: foto não descarregada ao fim de três tentativas", { bucket, caminho });
+  return null;
 }
 
 /**

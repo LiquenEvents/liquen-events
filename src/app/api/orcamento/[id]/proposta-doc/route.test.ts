@@ -11,6 +11,10 @@ const created = vi.hoisted(() => ({ last: null as Proposal | null }));
 const renderMock = vi.hoisted(() => ({
   missing: 0,
   truncations: [] as { where: string; dropped: number; unit: "fotos" | "linhas" }[],
+  /** Contagens a devolver POR CHAMADA, para poder testar a segunda tentativa
+   *  do envio: a primeira falha, a segunda resolve. Vazio = usa `missing`. */
+  sequencia: [] as number[],
+  chamadas: 0,
 }));
 /** O que foi gravado no pedido (para verificar o "Preço final (sem IVA)"). */
 const updated = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
@@ -37,11 +41,16 @@ vi.mock("@/lib/proposal-doc-render", () => ({
   renderStoredProposalDocPdf: vi.fn(async () => Buffer.from("%PDF-1.4")),
   // A rota passou a usar a variante que também conta as fotos que não
   // resolveram, para poder avisar antes de a proposta seguir para o cliente.
-  renderStoredProposalDocPdfWithReport: vi.fn(async () => ({
-    pdf: Buffer.from("%PDF-1.4"),
-    missingImages: renderMock.missing,
-    truncations: renderMock.truncations,
-  })),
+  renderStoredProposalDocPdfWithReport: vi.fn(async () => {
+    const i = renderMock.chamadas++;
+    return {
+      pdf: Buffer.from("%PDF-1.4"),
+      missingImages: renderMock.sequencia.length
+        ? (renderMock.sequencia[i] ?? 0)
+        : renderMock.missing,
+      truncations: renderMock.truncations,
+    };
+  }),
 }));
 vi.mock("@/lib/proposal-token", () => ({ createProposalToken: vi.fn(() => "tok") }));
 vi.mock("@/lib/mail", () => ({
@@ -167,6 +176,8 @@ describe("POST /api/orcamento/[id]/proposta-doc — fotos em falta no ENVIO", ()
   beforeEach(() => {
     renderMock.missing = 0;
     renderMock.truncations = [];
+    renderMock.sequencia = [];
+    renderMock.chamadas = 0;
   });
 
   it("o envio devolve a contagem, não só a pré-visualização", async () => {
@@ -333,5 +344,67 @@ describe("POST /api/orcamento/[id]/proposta-doc — o documento fica guardado", 
     const body = await res.json();
     expect("docSaved" in body).toBe(false);
     expect("docError" in body).toBe(false);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * SEGUNDA TENTATIVA ANTES DE UMA PROPOSTA SEGUIR COM BURACOS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A causa mais comum de uma foto não resolver é passageira: um pedido ao
+ * armazenamento que expirou, uma ligação que caiu a meio de oitenta. O envio
+ * desenhava UMA vez e mandava o que saísse.
+ *
+ * Isto NÃO recusa o envio — essa decisão está tomada noutro sentido, e com
+ * razão escrita («recusar seria pior: ela fica sem nada e sem perceber
+ * porquê»). O que faz é dar à proposta a segunda hipótese que quase sempre
+ * basta.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — a segunda tentativa do envio", () => {
+  beforeEach(() => {
+    renderMock.missing = 0;
+    renderMock.truncations = [];
+    renderMock.sequencia = [];
+    renderMock.chamadas = 0;
+  });
+
+  it("uma falha passageira é apanhada: a segunda tentativa resolve", async () => {
+    renderMock.sequencia = [2, 0];
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(2);
+    // A proposta que seguiu é a SEGUNDA, a que está completa.
+    expect(body.missingImages).toBe(0);
+  });
+
+  it("com tudo resolvido à primeira NÃO se desenha duas vezes", async () => {
+    // Repetir sempre seria pagar o desenho a dobrar em todos os envios bons.
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
+  });
+
+  it("se a segunda correr PIOR, fica-se com a primeira", async () => {
+    // Repetir nunca pode deixar a proposta pior do que estava.
+    renderMock.sequencia = [1, 4];
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect((await res.json()).missingImages).toBe(1);
+  });
+
+  it("e continua a seguir, mesmo quando as duas falham", async () => {
+    // A decisão de produto mantém-se: sai, mas avisada.
+    renderMock.sequencia = [3, 3];
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    expect((await res.json()).missingImages).toBe(3);
+    expect(created.last).toBeTruthy();
+  });
+
+  it("a pré-visualização não repete — é onde ela DESCOBRE o que falta", async () => {
+    renderMock.missing = 2;
+    const res = await POST(previewReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.headers.get("X-Fotos-Em-Falta")).toBe("2");
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
   });
 });

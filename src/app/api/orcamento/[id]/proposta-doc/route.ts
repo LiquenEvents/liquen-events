@@ -61,11 +61,55 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Shared pipeline (resolve Storage images → render) — the exact same helper
     // the public portal PDF route uses, so both emit an identical document.
-    const {
-      pdf: pdfBuffer,
-      missingImages,
-      truncations,
-    } = await renderStoredProposalDocPdfWithReport(doc);
+    let relatorio = await renderStoredProposalDocPdfWithReport(doc);
+
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * SEGUNDA TENTATIVA ANTES DE UMA PROPOSTA SEGUIR COM BURACOS
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * O envio desenhava o documento UMA vez. Se uma fotografia não resolvesse,
+     * o email saía à mesma com uma moldura vazia e o estúdio dizia, depois,
+     * «no PDF que seguiu, falta uma foto; verifique e reenvie» — com o casal já
+     * com a proposta incompleta na caixa de correio.
+     *
+     * A causa mais comum de uma foto não resolver é PASSAGEIRA: um pedido ao
+     * armazenamento que expirou, uma ligação que caiu a meio de oitenta.
+     * Desenhar outra vez apanha esse caso, e não custa nada quando não é esse —
+     * o caminho normal é zero em falta e não repete.
+     *
+     * ── O QUE ISTO NÃO FAZ, E PORQUÊ ─────────────────────────────────────
+     *
+     * NÃO recusa o envio. A porta do CLIENTE recusa (ver `proposal-pdf-cache`,
+     * `PropostaIncompleta`), e aqui está escrito o contrário de propósito, com
+     * a razão dela: «recusar seria pior — ela fica sem nada e sem perceber
+     * porquê». É uma decisão de produto e não é minha para virar; a repetição
+     * melhora-a sem lhe tocar. Se um dia quiser que o envio também trave, é
+     * mudar estas linhas e o teste que as guarda.
+     *
+     * Fica-se com o MELHOR dos dois desenhos: se a segunda tentativa correr
+     * pior do que a primeira (o armazenamento a piorar a meio), manda-se a
+     * primeira. Repetir nunca pode deixar a proposta pior do que estava.
+     *
+     * A pré-visualização não repete: é onde ela DESCOBRE o que falta, e é para
+     * ser rápida.
+     */
+    if (mode === "send" && relatorio.missingImages > 0) {
+      log.warn("proposta-doc: fotos em falta no envio, a desenhar segunda vez", {
+        id,
+        emFalta: relatorio.missingImages,
+      });
+      const segunda = await renderStoredProposalDocPdfWithReport(doc);
+      if (segunda.missingImages < relatorio.missingImages) relatorio = segunda;
+      if (relatorio.missingImages > 0) {
+        log.error("proposta-doc: a proposta segue com fotos a menos", null, {
+          id,
+          emFalta: relatorio.missingImages,
+        });
+      }
+    }
+
+    const { pdf: pdfBuffer, missingImages, truncations } = relatorio;
 
     if (mode === "preview") {
       return new NextResponse(pdfBuffer, {
