@@ -458,12 +458,10 @@ export const pt = {
     // — uma cerimónia religiosa é um segundo sítio para decorar — e não como
     // uma curiosidade sobre a vida de quem preenche.
     labelCerimonia: "Que tipo de cerimónia?",
-    hintCerimonia:
-      "Se for na igreja, é mais um espaço para decorar além do da festa. Se ainda não estiver decidido, siga em frente.",
+    hintCerimonia: "Se for na igreja, é mais um espaço para decorar além do da festa.",
     // Aparece em todos os tipos de evento.
     labelEspaco: "O espaço é interior ou exterior?",
-    hintEspaco:
-      "Ao ar livre preparamos sempre uma alternativa para o caso de o tempo virar, e há flores e materiais que escolhemos de outra maneira.",
+    hintEspaco: "Diga-nos apenas se vai ser num espaço interior ou ao ar livre.",
     labelData: "Data do evento",
     dateFlexibleLabel: "Data ainda a definir",
     guestsFlexibleLabel: "Ainda a definir",
