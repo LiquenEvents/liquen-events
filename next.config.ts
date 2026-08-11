@@ -17,7 +17,17 @@ const nextConfig: NextConfig = {
   // cover-crop). Keep it external so it's loaded from node_modules at runtime
   // instead of being bundled — a bundled native binary can fail to load on
   // serverless and throw when the first image is processed.
-  serverExternalPackages: ["sharp"],
+  //
+  // O `pdfjs-dist` é externo por outra razão, e é uma que só se descobre em
+  // produção: para LER um PDF, o pdf.js carrega o seu descodificador — o
+  // «worker» — com um `import()` calculado em tempo de execução, e cai para
+  // uma cópia dentro do mesmo processo quando não há Web Workers, que é o caso
+  // do Node. Um `import()` cujo destino não é uma constante não é seguido pelo
+  // empacotador: o módulo do worker fica fora do pacote, e o motor que lê as
+  // propostas antigas (`src/lib/proposta-de-pdf`) rebentaria na primeira
+  // leitura, já implantado, com um ficheiro que não se encontra. Externo, é o
+  // Node a resolvê-lo a partir de node_modules, que é onde ele está.
+  serverExternalPackages: ["sharp", "pdfjs-dist"],
   images: {
     // O CARREGADOR GLOBAL DO next/image. Toda a imagem que não passe um
     // `loader={…}` próprio deixa de pedir ao optimizador on-demand e passa a
