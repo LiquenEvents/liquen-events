@@ -7,6 +7,7 @@ import { SkeletonCard } from "./Skeleton";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { useToast } from "./Toast";
 
 const CATEGORIES = [
   "Catering",
@@ -45,6 +46,8 @@ const PlusIcon = (
 );
 
 export default function Fornecedores() {
+  const { toast } = useToast();
+
   const {
     data: suppliers = [],
     setData: setSuppliers,
@@ -62,35 +65,88 @@ export default function Fornecedores() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════════
+   * ESTE ECRÃ GRAVAVA E NUNCA PERGUNTAVA SE O SERVIDOR TINHA ACEITADO
+   * ════════════════════════════════════════════════════════════════════════════
+   *
+   * As três escritas daqui — acrescentar, apagar, alterar — mandavam o pedido e
+   * seguiam. Sem `res.ok`, sem `catch`, sem aviso. E como o `setSuppliers` do
+   * `useCachedList` escreve através para a cache, a alteração que o servidor
+   * recusou sobrevivia a mudar de separador e voltar: parecia gravada até ao
+   * recarregamento seguinte, onde nunca tinha existido.
+   *
+   * O caso que isto apanha é o mais banal de todos: a sessão expira — ela deixa
+   * o back office aberto horas seguidas —, ela corrige as notas de um
+   * fornecedor («só atende depois das 18h, factura a 60 dias»), o pedido leva
+   * 401, e o ecrã mostra o texto novo como se estivesse guardado.
+   *
+   * Era o ÚNICO ecrã de escrita que tinha ficado de fora do padrão que os
+   * outros seis já usam (Inventário, Tarefas, Convidados, Custos, Plano de
+   * produção, Cronograma): guardar o estado anterior, verificar a resposta,
+   * repor e dizer o que aconteceu.
+   */
   async function add() {
     if (!form.name.trim()) return;
-    const res = await fetch("/api/fornecedores", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch("/api/fornecedores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        // O formulário fica ABERTO e preenchido: o que ela escreveu não se
+        // perde, e o campo por onde recomeçar é o mesmo em que estava.
+        toast("Não foi possível guardar o fornecedor.", "error");
+        return;
+      }
       const created = await res.json();
       setSuppliers((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
       setForm({ name: "", category: "Catering", phone: "", email: "", location: "", notes: "" });
       setAdding(false);
+    } catch {
+      toast("Erro de ligação ao guardar o fornecedor.", "error");
     }
   }
+
   async function remove(id: string) {
     const s = suppliers.find((x) => x.id === id);
     if (!confirm(`Remover o fornecedor${s ? ` "${s.name}"` : ""}? Esta ação não pode ser anulada.`))
       return;
+    const snapshot = suppliers;
     setSuppliers((prev) => prev.filter((x) => x.id !== id));
-    await fetch(`/api/fornecedores/${id}`, { method: "DELETE" });
+    try {
+      const res = await fetch(`/api/fornecedores/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        setSuppliers(snapshot);
+        toast("Não foi possível remover o fornecedor.", "error");
+      }
+    } catch {
+      setSuppliers(snapshot);
+      toast("Erro de ligação ao remover o fornecedor.", "error");
+    }
   }
 
-  async function patchSupplier(id: string, patch: Partial<Supplier>) {
+  async function patchSupplier(id: string, patch: Partial<Supplier>): Promise<boolean> {
+    const snapshot = suppliers;
     setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-    await fetch(`/api/fornecedores/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
+    try {
+      const res = await fetch(`/api/fornecedores/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) {
+        setSuppliers(snapshot);
+        toast("Não foi possível guardar as alterações.", "error");
+        return false;
+      }
+      return true;
+    } catch {
+      setSuppliers(snapshot);
+      toast("Erro de ligação ao guardar as alterações.", "error");
+      return false;
+    }
   }
 
   function startEdit(s: Supplier) {
@@ -106,7 +162,9 @@ export default function Fornecedores() {
   }
 
   async function saveEdit(id: string) {
-    await patchSupplier(id, editForm);
+    // A edição só FECHA se o servidor tiver aceitado. Fechá-la de qualquer
+    // maneira era mostrar-lhe o valor antigo de volta sem explicação nenhuma.
+    if (!(await patchSupplier(id, editForm))) return;
     setEditingId(null);
   }
 
