@@ -1,5 +1,5 @@
-import type { ProposalDoc } from "./proposal-doc";
-import { somaDosItens } from "./proposal-budget";
+import { resolveProposalMoney, type ProposalDoc } from "./proposal-doc";
+import { desalinhamento } from "./proposal-budget";
 
 /**
  * ONDE ESTOU, O QUE JÁ ESTÁ FEITO, E O QUE FALTA PARA PODER ENVIAR.
@@ -157,8 +157,20 @@ export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Imped
     faltas.push({ seccao: "moodboards", texto: "Sem mood boards", trava: false });
   }
   // O aviso do orçamento vive na secção do total, que é onde ela o resolve.
-  const soma = somaDosItens(doc);
-  if (soma !== null && Math.abs(soma - (doc.totalAmount ?? 0)) > 0.01) {
+  //
+  // ── PORQUE É QUE ISTO CHAMA `desalinhamento` E NÃO SUBTRAI À MÃO ─────────
+  // Subtraía. Comparava `somaDosItens(doc)` — que é LÍQUIDA, porque os preços
+  // por linha são sem IVA — com o `doc.totalAmount` cru, que só é a base em
+  // modo "acrescer"; em "incluído" é o BRUTO. Numa proposta certa de 10.000 €
+  // de base com o IVA lá dentro (12.300 € guardados), a conta dava 2.300 € de
+  // diferença e este painel dizia «O total não bate com a soma das linhas» —
+  // em TODAS as propostas com IVA incluído, desde o primeiro segundo. Pior:
+  // ao lado das linhas, onde a mesma pergunta é feita com a BASE, não havia
+  // aviso nenhum. Os dois ecrãs discordavam sobre o mesmo número.
+  //
+  // Agora é a mesma função, com a mesma base, nos dois sítios — que é a razão
+  // pela qual este módulo existe.
+  if (desalinhamento(doc, resolveProposalMoney(doc).base) !== null) {
     faltas.push({ seccao: "total", texto: "O total não bate com a soma das linhas", trava: false });
   }
 

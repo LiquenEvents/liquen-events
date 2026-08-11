@@ -123,6 +123,49 @@ describe("oQueFaltaParaEnviar", () => {
   });
 
   /**
+   * O AVISO QUE TOCAVA EM TODAS AS PROPOSTAS COM «IVA INCLUÍDO».
+   *
+   * Os preços das linhas são LÍQUIDOS — é a base, sem IVA, que se soma. O
+   * `totalAmount`, esse, só é a base em modo "acrescer"; em "incluído" é o
+   * BRUTO. Comparar a soma líquida com o total bruto dava, numa proposta
+   * perfeitamente certa de 10.000 € de base, uma diferença de 2.300 € — e o
+   * painel «O que falta para enviar» dizia «O total não bate com a soma das
+   * linhas» em TODAS as propostas com IVA incluído, sempre. Ao lado das linhas
+   * (que compara base com base) não aparecia aviso nenhum, portanto os dois
+   * ecrãs discordavam um do outro.
+   *
+   * Um aviso que toca sempre é um aviso que se deixa de ler — e a seguir passa
+   * despercebido o dia em que o total está mesmo errado.
+   */
+  it("com IVA incluído, não inventa um desalinhamento de 23%", () => {
+    const comIvaIncluido = {
+      ...COMPLETO,
+      budgetItems: ["Decor Cerimónia", "Decor Jantar"],
+      budgetAmounts: [8000, 2000],
+      // A base é 10.000 €; com o IVA lá dentro, o documento guarda 12.300 €.
+      totalAmount: 12_300,
+      totalVatMode: "incluido",
+    } as unknown as ProposalDoc;
+    const f = oQueFaltaParaEnviar(comIvaIncluido, 12_300);
+    expect(f.map((x) => x.texto)).not.toContain("O total não bate com a soma das linhas");
+  });
+
+  it("com IVA incluído, continua a apanhar um total mesmo errado", () => {
+    // A mesma proposta com a base a 9.000 € (11.070 € com IVA) e as linhas a
+    // somar 10.000 €: aí o aviso TEM de aparecer.
+    const torto = {
+      ...COMPLETO,
+      budgetItems: ["Decor Cerimónia", "Decor Jantar"],
+      budgetAmounts: [8000, 2000],
+      totalAmount: 11_070,
+      totalVatMode: "incluido",
+    } as unknown as ProposalDoc;
+    expect(oQueFaltaParaEnviar(torto, 11_070).map((x) => x.texto)).toContain(
+      "O total não bate com a soma das linhas",
+    );
+  });
+
+  /**
    * A RAZÃO DE ISTO SER UM MÓDULO.
    *
    * A mesma verdade é precisa na navegação, no aviso e no botão. Se

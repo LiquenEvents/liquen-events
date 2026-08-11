@@ -111,6 +111,70 @@ describe("texto de exemplo esquecido", () => {
     expect(achar(vs, "placeholders").severidade).toBe("erro");
   });
 
+  /**
+   * O «A DEFINIR» DE UM VALOR ADICIONAL NÃO É TEXTO DE EXEMPLO.
+   *
+   * O `valueText` de um adicional é texto livre — está escrito em
+   * `proposal-budget.ts`, e as propostas verdadeiras da Líquen usam-no assim:
+   * "896,00 €", "895,00 € + IVA", "a definir", "sob consulta". Escrever
+   * «Deslocação da equipa Líquen — a definir» porque ainda não se sabe o local
+   * é o comportamento certo, e a conferência acendia-o a vermelho como «Texto
+   * de exemplo · Ficou por substituir».
+   *
+   * O custo não era o vermelho a mais: era ela aprender a ignorar o único
+   * aviso que existe para apanhar um "[Valor Total]" a caminho do cliente.
+   */
+  it("«a definir» num valor adicional é um valor legítimo, não um resto de modelo", () => {
+    const vs = conferir({
+      doc: documento({
+        totalText: "12.000,00 € + IVA",
+        budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "a definir" }],
+      }),
+      quote: pedido(),
+      ...base,
+    });
+    expect(achar(vs, "placeholders").severidade).toBe("ok");
+  });
+
+  it("«sob consulta» também", () => {
+    const vs = conferir({
+      doc: documento({
+        totalText: "12.000,00 € + IVA",
+        budgetExtras: [{ label: "Tecidos suspensos", valueText: "sob consulta" }],
+      }),
+      quote: pedido(),
+      ...base,
+    });
+    expect(achar(vs, "placeholders").severidade).toBe("ok");
+  });
+
+  it("mas um marcador de modelo num adicional continua a ser erro", () => {
+    // O que se abriu foi o texto livre do VALOR — não a porta a um "[Valor]"
+    // a caminho do cliente.
+    const vs = conferir({
+      doc: documento({
+        totalText: "12.000,00 € + IVA",
+        budgetExtras: [{ label: "Wedding Coordinator", valueText: "[Valor]" }],
+      }),
+      quote: pedido(),
+      ...base,
+    });
+    expect(achar(vs, "placeholders").severidade).toBe("erro");
+  });
+
+  it("o rótulo de um adicional não é texto livre — «a definir» aí é erro", () => {
+    // O valor é que fica por saber; o NOME do que se está a cobrar, não.
+    const vs = conferir({
+      doc: documento({
+        totalText: "12.000,00 € + IVA",
+        budgetExtras: [{ label: "a definir", valueText: "896,00 €" }],
+      }),
+      quote: pedido(),
+      ...base,
+    });
+    expect(achar(vs, "placeholders").severidade).toBe("erro");
+  });
+
   it("não inventa problemas num documento limpo", () => {
     const vs = conferir({
       doc: documento({ totalText: "12.000,00 € + IVA" }),

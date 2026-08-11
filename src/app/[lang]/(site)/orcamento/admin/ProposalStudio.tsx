@@ -14,8 +14,10 @@ import {
   DEFAULT_VALID_DAYS,
   DEFAULT_VAT_RATE,
   MOOD_BOARD_MAX_IMAGES,
+  type MoodBoard,
   type VatMode,
 } from "@/lib/proposal-doc";
+import { ehRefDeTema } from "@/lib/theme-ref";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel, ceremonyTypeLabel } from "@/lib/orcamento/data";
 import { urlAindaBom } from "./assinatura";
@@ -56,6 +58,7 @@ import {
   removerLinha,
   somaDosItens,
   somaDosExtras,
+  somaDosExtrasSemIva,
   asDuasFormas,
 } from "@/lib/proposal-budget";
 import { eur, splitSinal } from "@/lib/money";
@@ -679,14 +682,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // A local só ganha se for MESMO mais recente; em empate vale a do
         // servidor, que é a que os outros dispositivos veem.
         if (localStamp > Date.parse(draft.updatedAt ?? 0)) return;
+        // ── O VALOR É A EXCEPÇÃO, AQUI TAMBÉM ───────────────────────────
+        //
+        // A montagem aplica o "Preço final" do PEDIDO por cima do rascunho,
+        // de propósito e com a razão escrita lá em cima: é o mesmo número
+        // visto de dois sítios. Este merge, 100–300 ms depois, punha o
+        // `totalAmount` do rascunho por cima outra vez — e ganhava quase
+        // sempre, porque o carimbo local é escrito ANTES do PUT e o
+        // `updatedAt` do servidor DEPOIS, portanto a comparação de datas
+        // acima está estruturalmente a favor do servidor.
+        //
+        // O percurso: ela corrigia o preço de 8.100 para 9.400 na Gestão do
+        // pedido, voltava ao estúdio, e o campo voltava sozinho a 8.100. Ao
+        // enviar, gravava 8.100 e a correcção desaparecia dos DOIS lados.
+        //
+        // O rascunho traz o texto, as fotos e as condições — tudo menos o
+        // valor. Quem manda no valor é o pedido, e só quando ele tem um.
+        const doPedido = quote.quotedPrice;
+        const mandaOPedido = typeof doPedido === "number" && doPedido > 0;
         setDoc((d) => {
           const merged = { ...d, ...(draft.doc as Partial<StudioDoc>) };
-          return stripPendingImages({
+          const limpo = stripPendingImages({
             ...merged,
             coverImages: normaliseCoverImages(merged.coverImages),
           });
+          return mandaOPedido ? aplicarBase(limpo, doPedido) : limpo;
         });
-        const base = baseDoDoc(draft.doc as Partial<StudioDoc>);
+        const base = mandaOPedido ? doPedido : baseDoDoc(draft.doc as Partial<StudioDoc>);
         if (base != null) setTotalInput(String(base));
       } catch {
         /* sem rede: continua-se com a cópia local, como antes */
@@ -702,49 +724,63 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // Fills in signed URLs for any image already used in the draft (covers / mood
   // boards) so thumbnails render even on a fresh device or after the cached URL
   // expired. Uploaded images are NOT offered back as a re-pickable gallery.
+  //
+  // É uma função e não só um efeito porque há um segundo momento em que a
+  // pasta do pedido ganha fotos SEM ser por carregamento: quando um modelo
+  // parcial traz fotos de outro pedido e elas são recopiadas para cá. Sem uma
+  // segunda leitura, as células ficavam sem miniatura até recarregar a página.
+  const hidratarAssets = useCallback(
+    async (vivo: () => boolean = () => true) => {
+      {
+        try {
+          const res = await fetch(`/api/orcamento/${quote.id}/assets`);
+          if (!res.ok) return;
+          const data = await res.json().catch(() => null);
+          const imgs: { path: string; url: string; thumbUrl?: string }[] = Array.isArray(
+            data?.images,
+          )
+            ? data.images
+            : [];
+          if (!vivo() || imgs.length === 0) return;
+          setAssetUrls((prev) => {
+            const next = { ...prev };
+            // A miniatura ganha ao original: é este o caminho que corre quando se
+            // REABRE uma proposta, que é onde a grelha mais pesa.
+            //
+            // E o guardado só ganha ao fresco ENQUANTO SERVIR. Antes era um
+            // `!next[im.path]` seco, que deitava fora a assinatura fresca mesmo
+            // quando a guardada já estava morta — as fotos de tema assinam a 6
+            // horas, e um rascunho aberto de um dia para o outro voltava com a
+            // grelha inteira a pedir URLs que o Supabase recusa. Ver
+            // `assinatura.ts` para porque é que não bastava substituir sempre.
+            for (const im of imgs)
+              if (im.path && im.url)
+                next[im.path] = urlAindaBom(next[im.path], im.thumbUrl || im.url);
+            return next;
+          });
+          // O original fica guardado à parte, para a célula ter para onde cair
+          // quando a miniatura não existir.
+          setAssetOriginais((prev) => {
+            const next = { ...prev };
+            for (const im of imgs)
+              if (im.path && im.url) next[im.path] = urlAindaBom(next[im.path], im.url);
+            return next;
+          });
+        } catch {
+          /* offline / storage unavailable — the studio still works with uploads */
+        }
+      }
+    },
+    [quote.id],
+  );
+
   useEffect(() => {
     let alive = true;
-    (async () => {
-      try {
-        const res = await fetch(`/api/orcamento/${quote.id}/assets`);
-        if (!res.ok) return;
-        const data = await res.json().catch(() => null);
-        const imgs: { path: string; url: string; thumbUrl?: string }[] = Array.isArray(data?.images)
-          ? data.images
-          : [];
-        if (!alive || imgs.length === 0) return;
-        setAssetUrls((prev) => {
-          const next = { ...prev };
-          // A miniatura ganha ao original: é este o caminho que corre quando se
-          // REABRE uma proposta, que é onde a grelha mais pesa.
-          //
-          // E o guardado só ganha ao fresco ENQUANTO SERVIR. Antes era um
-          // `!next[im.path]` seco, que deitava fora a assinatura fresca mesmo
-          // quando a guardada já estava morta — as fotos de tema assinam a 6
-          // horas, e um rascunho aberto de um dia para o outro voltava com a
-          // grelha inteira a pedir URLs que o Supabase recusa. Ver
-          // `assinatura.ts` para porque é que não bastava substituir sempre.
-          for (const im of imgs)
-            if (im.path && im.url)
-              next[im.path] = urlAindaBom(next[im.path], im.thumbUrl || im.url);
-          return next;
-        });
-        // O original fica guardado à parte, para a célula ter para onde cair
-        // quando a miniatura não existir.
-        setAssetOriginais((prev) => {
-          const next = { ...prev };
-          for (const im of imgs)
-            if (im.path && im.url) next[im.path] = urlAindaBom(next[im.path], im.url);
-          return next;
-        });
-      } catch {
-        /* offline / storage unavailable — the studio still works with uploads */
-      }
-    })();
+    void hidratarAssets(() => alive);
     return () => {
       alive = false;
     };
-  }, [quote.id]);
+  }, [hidratarAssets]);
 
   // ── Auto-compose the reference until the user overrides it ──
   useEffect(() => {
@@ -764,8 +800,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
   // Assim que o documento muda há trabalho por gravar. Volta a false quando a
   // gravação local acontece, oitocentos milissegundos depois.
+  //
+  // O `ref` ao lado do estado existe para a limpeza da desmontagem (mais
+  // abaixo) o poder ler: essa corre uma vez só, com as dependências vazias, e
+  // portanto ficaria para sempre com o `porGravar` do primeiro desenho.
+  const porGravarRef = useRef(false);
   useEffect(() => {
     if (!hydrated.current) return;
+    porGravarRef.current = true;
     setPorGravar(true);
   }, [doc, assetUrls, themeOrigins, refEdited]);
 
@@ -813,6 +855,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           }),
         );
         setGravadoEm(new Date());
+        porGravarRef.current = false;
         setPorGravar(false);
       } catch {
         /* quota / unavailable — non-fatal */
@@ -861,6 +904,35 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     quote.id,
     toast,
   ]);
+
+  /**
+   * ── AO DESMONTAR, GRAVA-SE O QUE FALTAVA ──────────────────────────────
+   *
+   * A gravação acima é um `setTimeout` a 800 ms, e a sua limpeza corre em
+   * QUALQUER desmontagem. A única protecção era um `beforeunload`, que apanha
+   * fechar o separador — e mais nada.
+   *
+   * Só que o estúdio é desmontado por gestos normais, e frequentes: «Trocar de
+   * cliente» (o `key` em `FazerProposta`), o link «Rápida» do `AdminClient`, e
+   * mudar de separador de detalhe. O percurso: ela escreve a última linha de
+   * um grupo e clica em «Trocar de cliente» dentro de 800 ms. A gravação era
+   * cancelada, o indicador continuava a dizer «Guardado às 14:32» — a hora da
+   * gravação ANTERIOR — e ao voltar faltava a linha. Um indicador que diz que
+   * gravou aquilo que não gravou é pior do que não haver indicador nenhum.
+   *
+   * Corre DEPOIS da limpeza de cima (as limpezas seguem a ordem de declaração
+   * dos efeitos), portanto o `setTimeout` já foi cancelado e não há gravação a
+   * dobrar. E só grava quando há mesmo trabalho por gravar: sem o `ref`, cada
+   * troca de separador pagava um PUT para reescrever o que já lá estava.
+   *
+   * O `flushDraft.current` é reatribuído a cada alteração do documento, por
+   * isso o que aqui corre é a gravação da ÚLTIMA versão, não a da montagem.
+   */
+  useEffect(() => {
+    return () => {
+      if (porGravarRef.current) flushDraft.current();
+    };
+  }, []);
 
   /** Ctrl/Cmd+Enter nos Serviços — grava agora e diz que gravou. */
   const saveNow = useCallback(() => {
@@ -1147,6 +1219,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     if (!limpo) return;
     setDoc(limpo.doc);
     setTotalInput(limpo.total);
+    // E o preço volta ao pedido com ele: quem repôs o rascunho repôs o valor
+    // que lá estava, e deixá-lo só no ecrã era voltar a ter duas verdades.
+    const base = parseMoneyText(limpo.total);
+    persistirPreco(base > 0 ? base : undefined);
     setLimpo(null);
     toast("Rascunho reposto.", "success");
   }
@@ -1176,6 +1252,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // o número da versão que se acabou de substituir.
     const base = baseDoDoc(reposto);
     setTotalInput(typeof base === "number" && base > 0 ? String(base) : "");
+    // E GRAVA-SE no pedido. Escrever no campo do valor já gravava — é a
+    // promessa que está escrita ao lado dele, «Há um número só» — e repor uma
+    // versão trocava o documento inteiro, valor incluído, sem gravar nada. O
+    // estúdio passava a dizer 8.000 e a Gestão do pedido, o Kanban e o dossier
+    // continuavam a dizer 9.400 até ela enviar. Duas verdades sobre o mesmo
+    // negócio, e a errada era a que aparecia em todos os outros ecrãs.
+    persistirPreco(typeof base === "number" && base > 0 ? base : undefined);
     // A referência é composta a partir dos campos ATÉ alguém lhe mexer. Uma
     // versão reposta traz a referência com que seguiu, e recompô-la por cima
     // trocava o número da proposta que o cliente tem em mãos.
@@ -1521,6 +1604,80 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       moodBoards: [...d.moodBoards, { title: "", annotation: "", images: [] }],
     }));
   }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * INSERIR UM MOOD BOARD GUARDADO COMO MODELO
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * ── Porque é que isto não é um `setDoc` de uma linha ────────────────────
+   * Era. E as fotos do modelo vêm com o caminho que tinham onde foram
+   * guardadas — `<quoteIdOrigem>/<uuid>.jpg`, debaixo de OUTRO pedido.
+   * Inseridas tal e qual, o documento novo ficava a apontar para a pasta
+   * alheia: as células abriam sem miniatura (a listagem de fotos é por
+   * pedido), e no dia em que esse pedido fosse apagado a proposta — a essa
+   * altura já enviada — ficava sem imagens, sem ninguém dar por nada.
+   *
+   * É o mesmo problema que o «Criar a partir de…» já resolvia com
+   * `duplicarFotosParaPedido`, e que ao inserir um BLOCO ninguém resolvia.
+   *
+   * ── O que NÃO se recopia ────────────────────────────────────────────────
+   * As referências à Biblioteca (`tema:…`) não vivem debaixo de pedido nenhum
+   * — são estáveis por construção e copiá-las seria desfazer o que a
+   * referência veio ganhar (ver `theme-ref.ts`). As embutidas (`data:`) viajam
+   * dentro do documento. E as que já são deste pedido ficam onde estão.
+   *
+   * ── E se a cópia falhar ─────────────────────────────────────────────────
+   * O bloco fica na mesma, com os caminhos de origem, e diz-se. É a mesma
+   * política do «Criar a partir de…»: uma proposta acoplada à pasta de outro
+   * pedido é pior do que uma proposta com fotos — mas é muito melhor do que um
+   * mood board vazio e um gesto que não fez nada.
+   */
+  async function inserirMoodBoardDeModelo(modelo: MoodBoard) {
+    const novo: MoodBoard = { ...modelo, images: [...(modelo.images ?? [])] };
+    setDoc((d) => ({ ...d, moodBoards: [...d.moodBoards, novo] }));
+
+    // O predicado é uma função à parte, e a referência à Biblioteca fica para
+    // ÚLTIMO: `ehRefDeTema` é um type guard (`ref is string`), portanto negá-lo
+    // a meio estreita a string até `never` e o TypeScript recusa tudo o que
+    // venha a seguir sobre a mesma variável.
+    const precisaDeCopia = (p: string): boolean => {
+      if (!p || p.startsWith("data:") || isPendingImage(p)) return false;
+      if (p.startsWith(`${quote.id}/`)) return false;
+      return !ehRefDeTema(p);
+    };
+    const deOutroPedido = novo.images.filter(
+      (p): p is string => typeof p === "string" && precisaDeCopia(p),
+    );
+    if (deOutroPedido.length === 0) return;
+
+    try {
+      const res = await fetch("/api/propostas/copiar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quoteId: quote.id, fotos: deOutroPedido }),
+      });
+      const dados = await res.json().catch(() => null);
+      const mapa = (dados?.fotos ?? {}) as Record<string, string>;
+      const copiadas = Object.keys(mapa);
+      if (!res.ok || copiadas.length === 0) throw new Error("sem cópias");
+      // A troca é feita no documento INTEIRO e por caminho: se ela já tiver
+      // mexido no bloco entretanto (arrastado, removido uma foto), a troca
+      // acompanha na mesma em vez de escrever por cima do que ela fez.
+      setDoc((d) => mapImagePaths(d, (p) => mapa[p] ?? p));
+      // As fotos novas ainda não têm assinatura nenhuma neste ecrã.
+      void hidratarAssets();
+      const ficaram = deOutroPedido.length - copiadas.length;
+      if (ficaram > 0) {
+        toast(`${ficaram} foto(s) do modelo ficaram na pasta da proposta de origem.`, "error");
+      }
+    } catch {
+      toast(
+        "As fotos deste modelo ficaram na pasta da proposta de origem — volte a escolhê-las se essa proposta for apagada.",
+        "error",
+      );
+    }
+  }
   function updateBoard(bi: number, p: Partial<StudioDoc["moodBoards"][number]>) {
     setDoc((d) => ({
       ...d,
@@ -1679,8 +1836,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * total descer o mesmo que ele subiu, e mais nada é tocado.
    */
   function definirExtras(novos: { label: string; valueText: string }[]) {
+    /**
+     * ── O IVA QUE A LINHA DECLARA CONTA ─────────────────────────────────────
+     *
+     * Este campo é a base (o rótulo diz «Preço final (sem IVA)»), por isso o que
+     * se lhe soma tem de ser base. A soma pegava no número e somava-o tal e
+     * qual: «895,00 € + IVA» e «895,00 €» acabavam exactamente no mesmo sítio.
+     *
+     * Só a primeira estava certa. Numa proposta que se lê COM IVA, a segunda
+     * promete ao casal que aquela linha custa 895 — e fazia o total subir 895 de
+     * BASE, que são 1.101 do que eles vão pagar. A linha e o total a dizerem
+     * números diferentes sobre a mesma coisa, no mesmo documento.
+     *
+     * `somaDosExtrasSemIva` lê o que cada linha declara e, quando ela não
+     * declara nada, segue o modo do documento — que é a leitura que o casal faz,
+     * porque é a que está impressa ao lado do total.
+     */
+    const contexto = { mode: vatMode, vatRate: doc.vatRate };
     const delta =
-      Math.round((somaDosExtras(novos) - somaDosExtras(doc.budgetExtras ?? [])) * 100) / 100;
+      Math.round(
+        (somaDosExtrasSemIva(novos, contexto) -
+          somaDosExtrasSemIva(doc.budgetExtras ?? [], contexto)) *
+          100,
+      ) / 100;
     setDoc((d) => ({ ...d, budgetExtras: novos }));
     if (delta === 0) return;
     // Um total não pode ficar negativo por causa de um extra apagado.
@@ -1905,7 +2083,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
   /** O documento copiado passa a ser este, com os campos a confirmar marcados. */
   function aplicarCopia(e: Escolha) {
-    setDoc(e.doc as StudioDoc);
+    const copiado = e.doc as StudioDoc;
+    setDoc(copiado);
+    // O campo do valor é estado à parte (aceita texto a meio de ser escrito),
+    // por isso não acompanha o documento de graça: ficava a mostrar o número
+    // ANTERIOR enquanto o documento copiado já tinha outro — ou nenhum. E,
+    // como no repor, o valor GRAVA-SE no pedido: sem isto o estúdio dizia um
+    // número e a Gestão do pedido, o Kanban e o dossier diziam outro.
+    const base = baseDoDoc(copiado);
+    const temValor = typeof base === "number" && base > 0;
+    setTotalInput(temValor ? String(base) : "");
+    persistirPreco(temValor ? base : undefined);
     setPorConfirmar(new Set(e.camposAMudar));
     // O título interno volta a gerar-se sozinho: a cópia esvaziou-o de
     // propósito para não ficar com o nome do casal anterior no cabeçalho.
@@ -2414,16 +2602,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         }
                       />
                     </div>
-                    <button
-                      type="button"
-                      className={`${ADD_BTN} mt-2`}
-                      onClick={() => setPicker({ kind: "board", bi })}
-                      onPointerEnter={aquecerBiblioteca}
-                      onFocus={aquecerBiblioteca}
-                      onTouchStart={aquecerBiblioteca}
-                    >
-                      Escolher da biblioteca de temas
-                    </button>
+                    <div className="mt-2 flex flex-wrap items-center gap-4">
+                      <button
+                        type="button"
+                        className={ADD_BTN}
+                        onClick={() => setPicker({ kind: "board", bi })}
+                        onPointerEnter={aquecerBiblioteca}
+                        onFocus={aquecerBiblioteca}
+                        onTouchStart={aquecerBiblioteca}
+                      >
+                        Escolher da biblioteca de temas
+                      </button>
+                      {/* GUARDAR ESTE, e não «o primeiro com título».
+                          O controlo era único para a secção inteira e recebia
+                          `doc.moodBoards.find(…)` — portanto guardava sempre o
+                          PRIMEIRO mood board com título. Ela montava o
+                          terceiro, carregava em «Guardar como modelo», e
+                          guardava o primeiro; para o terceiro não havia
+                          maneira nenhuma. Agora o botão vive ao lado do bloco
+                          a que se refere, que é a única forma de a pergunta
+                          "qual deles?" não ter de ser respondida por adivinha. */}
+                      {(b.title ?? "").trim() && (
+                        <ModelosParciais
+                          tipo="moodboard"
+                          mostrar="guardar"
+                          toast={toast}
+                          paraGuardar={b}
+                          nomeSugerido={b.title}
+                        />
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2433,15 +2641,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </button>
                 <ModelosParciais
                   tipo="moodboard"
+                  mostrar="inserir"
                   toast={toast}
-                  onInserir={(b) =>
-                    setDoc((d) => ({
-                      ...d,
-                      moodBoards: [...d.moodBoards, b as StudioDoc["moodBoards"][number]],
-                    }))
-                  }
-                  paraGuardar={doc.moodBoards.find((b) => (b.title ?? "").trim())}
-                  nomeSugerido={doc.moodBoards.find((b) => (b.title ?? "").trim())?.title}
+                  onInserir={(b) => void inserirMoodBoardDeModelo(b as MoodBoard)}
                 />
               </div>
             </Section>

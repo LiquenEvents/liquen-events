@@ -153,13 +153,36 @@ function reply(body: { ok?: boolean; json?: unknown; headers?: Record<string, st
 
 /** O que a rota `proposta-doc` devolve neste teste (pré-visualização e envio). */
 let propostaDoc: Response = reply({ headers: {}, json: { ok: true, emailed: true } });
+/** O rascunho que o SERVIDOR tem guardado (null = não tem nenhum). */
+let rascunhoServidor: { doc: unknown; updatedAt: string } | null = null;
+/** As versões já enviadas, e o documento de cada uma (`?doc=<id>`). */
+let versoesServidor: unknown[] = [];
+let docsDeVersao: Record<string, unknown> = {};
+/** As propostas anteriores e os modelos, para o «Criar a partir de…». */
+let propostasServidor: unknown[] = [];
+let modelosServidor: unknown[] = [];
+/** O que /api/propostas/copiar devolve — a cópia inteira ou o mapa das fotos. */
+let copiaServidor: unknown = {};
 /** Tudo o que saiu daqui — é onde se lê o que foi GRAVADO e o que foi ENVIADO. */
 let pedidos: { url: string; init?: RequestInit }[] = [];
 const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
+  const metodo = init?.method ?? "GET";
   pedidos.push({ url, init });
   if (url.includes("proposta-doc")) return propostaDoc;
-  if (url.includes("proposta-rascunho")) return reply({ ok: false });
+  if (url.includes("proposta-rascunho")) {
+    if (metodo === "GET" && rascunhoServidor) return reply({ json: { draft: rascunhoServidor } });
+    return reply({ ok: false });
+  }
+  if (url.includes("/versoes")) {
+    const qual = /[?&]doc=([^&]+)/.exec(url);
+    if (qual) return reply({ json: { doc: docsDeVersao[qual[1]] ?? null } });
+    return reply({ json: { versoes: versoesServidor } });
+  }
+  // Antes do `/propostas` genérico: senão a cópia caía na lista de resumos.
+  if (url.includes("/propostas/copiar")) return reply({ json: copiaServidor });
+  if (url.includes("/propostas/modelos")) return reply({ json: { modelos: modelosServidor } });
+  if (url.includes("/api/propostas?")) return reply({ json: propostasServidor });
   return reply({ json: { images: [] } });
 });
 
@@ -176,6 +199,12 @@ beforeEach(() => {
   seletor.n = 0;
   pedidos = [];
   propostaDoc = reply({ headers: {}, json: { ok: true, emailed: true } });
+  rascunhoServidor = null;
+  versoesServidor = [];
+  docsDeVersao = {};
+  propostasServidor = [];
+  modelosServidor = [];
+  copiaServidor = {};
   fetchMock.mockClear();
   vi.stubGlobal("fetch", fetchMock);
   // O descarregamento do PDF passa por um blob: URL, que o jsdom não tem.
@@ -1055,5 +1084,329 @@ describe("porqueFalhouOEnvio", () => {
     for (const status of [504, 401, 413, 503]) {
       expect(porqueFalhouOEnvio(status)).not.toBe("Não foi possível enviar a proposta.");
     }
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O NÚMERO É UM SÓ — E O RASCUNHO DO SERVIDOR NÃO PODE DESFAZÊ-LO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O percurso: ela corrige o preço final de 8.100 para 9.400 na Gestão do
+ * pedido, sai, volta ao estúdio, e o campo volta sozinho a 8.100. Envia, e a
+ * correcção desaparece dos dois lados.
+ *
+ * A corrida: o valor do PEDIDO é aplicado ao montar; o rascunho do servidor
+ * chega 100–300 ms depois e reescreve `totalAmount`. E ganha quase sempre,
+ * porque o carimbo local é escrito ANTES do PUT e o `updatedAt` do servidor
+ * DEPOIS — a comparação de datas está sempre a favor do servidor.
+ */
+describe("o preço do pedido sobrevive ao rascunho do servidor", () => {
+  /** Um rascunho de servidor com um valor JÁ ULTRAPASSADO lá dentro. */
+  function rascunhoComValorVelho() {
+    rascunhoServidor = {
+      updatedAt: new Date().toISOString(),
+      doc: {
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        // Marca para se saber que o rascunho do servidor JÁ chegou.
+        location: "Herdade do Servidor",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 8100,
+        totalVatMode: "acrescer",
+        totalText: "8100,00 € + IVA",
+        totalLabel: "Valor Total Decoração",
+      },
+    };
+  }
+
+  const comPrecoCorrigido = { ...quote, quotedPrice: 9400 } as Quote;
+
+  const renderComPreco = () =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={comPrecoCorrigido} />
+      </ToastProvider>,
+    );
+
+  it("o campo do valor continua a dizer o que a Gestão do pedido diz", async () => {
+    rascunhoComValorVelho();
+    renderComPreco();
+    // Esperar que o rascunho do servidor tenha MESMO chegado — senão o teste
+    // passava por não ter havido corrida nenhuma.
+    await screen.findByDisplayValue("Herdade do Servidor");
+    expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("9400");
+  });
+
+  it("e o documento que se grava leva o valor corrigido, não o do rascunho", async () => {
+    rascunhoComValorVelho();
+    renderComPreco();
+    await screen.findByDisplayValue("Herdade do Servidor");
+    // 8100 + IVA são 9963; 9400 + IVA são 11562. É pelo valor do documento que
+    // se vê qual dos dois ficou.
+    await waitFor(() => {
+      const gravados = corpos("proposta-rascunho");
+      expect(gravados.length).toBeGreaterThan(0);
+      expect(gravados[gravados.length - 1]).toContain('"totalAmount":9400');
+    });
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * REPOR UMA VERSÃO E COPIAR UMA PROPOSTA TAMBÉM MEXEM NO PREÇO DO PEDIDO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Escrever no campo do valor GRAVA no pedido — é a promessa escrita ao lado do
+ * campo: «Há um número só». Repor uma versão antiga e copiar uma proposta
+ * trocavam o documento inteiro (valor incluído) e não gravavam nada: o estúdio
+ * passava a dizer 8.000 e a Gestão do pedido, o Kanban e o dossier continuavam
+ * a dizer 9.400 até ela enviar.
+ */
+describe("repor e copiar gravam o preço no pedido", () => {
+  const comPreco = { ...quote, quotedPrice: 9400 } as Quote;
+
+  /** Os `quotedPrice` que foram gravados no pedido, pela ordem. */
+  function precosGravados(): unknown[] {
+    return corpos(`/api/orcamento/${quote.id}`, "PATCH")
+      .map((b) => {
+        try {
+          return (JSON.parse(b) as { quotedPrice?: unknown }).quotedPrice;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((v) => v !== undefined);
+  }
+
+  it("repor uma versão antiga grava o valor dessa versão", async () => {
+    versoesServidor = [
+      {
+        id: "v1",
+        enviadaEm: "2026-02-01T10:00:00.000Z",
+        total: 9840,
+        estado: "enviada",
+        mudancas: [],
+        resumo: "Primeira",
+      },
+    ];
+    docsDeVersao.v1 = {
+      template: "decoracao",
+      ref: "PO Decoração v1",
+      clientNames: "Maria & Zé",
+      eventType: "Casamento",
+      eventDate: "12 de setembro de 2026",
+      location: "Évora",
+      guests: "80 pax",
+      serviceGroups: [],
+      moodBoards: [],
+      budgetItems: [],
+      coverImages: ["", ""],
+      totalAmount: 8000,
+      totalVatMode: "acrescer",
+      totalLabel: "Valor Total Decoração",
+    };
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={comPreco} />
+      </ToastProvider>,
+    );
+    const user = userEvent.setup();
+    // O painel das versões vive no passo do envio.
+    await user.click(await screen.findByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Repor esta versão/ }));
+
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("8000");
+    });
+    await waitFor(() => expect(precosGravados()).toContain(8000));
+  });
+
+  it("copiar uma proposta grava o valor copiado e arruma o campo", async () => {
+    propostasServidor = [
+      {
+        id: "p1",
+        quoteId: "q9",
+        clientName: "Rita & Paulo",
+        createdAt: "2026-01-05T10:00:00.000Z",
+        status: "aceite",
+        temDoc: true,
+        eventType: "Casamento",
+        eventDate: "1 de junho de 2026",
+        location: "Estremoz",
+        guests: "100 pax",
+        grupos: 1,
+        moodBoards: 0,
+        linhas: 1,
+        fotos: 0,
+      },
+    ];
+    copiaServidor = {
+      nomeDaOrigem: "Rita & Paulo",
+      camposAMudar: [],
+      fotosCopiadas: 0,
+      fotosPartilhadas: 0,
+      doc: {
+        template: "decoracao",
+        ref: "",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração Copiada", items: [] }],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 6000,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      },
+    };
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={comPreco} />
+      </ToastProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Criar a partir de…/ }));
+    await user.click(await screen.findByRole("button", { name: /Rita & Paulo/ }));
+    await screen.findByDisplayValue("Decoração Copiada");
+
+    // O campo mostrava o número ANTERIOR enquanto o documento já tinha outro.
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Valor \(sem IVA\)/) as HTMLInputElement).value).toBe("6000");
+    });
+    await waitFor(() => expect(precosGravados()).toContain(6000));
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TROCAR DE CLIENTE A MEIO DE UMA FRASE NÃO PODE APAGAR A FRASE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A gravação é um `setTimeout` a 800 ms e a limpeza corre em QUALQUER
+ * desmontagem. O «Trocar de cliente», o link «Rápida» e mudar de separador
+ * desmontam o estúdio — e cancelavam a gravação. O indicador continuava a
+ * dizer «Guardado às 14:32», e ao voltar faltava a última linha escrita.
+ */
+describe("o rascunho por gravar não se perde ao desmontar", () => {
+  it("desmontar dentro dos 800 ms grava o que estava escrito", async () => {
+    const { unmount } = renderStudio();
+    const user = userEvent.setup();
+    const campo = await screen.findByLabelText("Clientes");
+    // Uma gravação já aconteceu ao semear o rascunho; contam-se as de agora.
+    const antes = corpos("proposta-rascunho").length;
+    await user.type(campo, "Beatriz e Nuno");
+    unmount();
+    await waitFor(() => {
+      const gravados = corpos("proposta-rascunho");
+      expect(gravados.length).toBeGreaterThan(antes);
+      expect(gravados[gravados.length - 1]).toContain("Beatriz e Nuno");
+    });
+    expect(localStorage.getItem(DRAFT_KEY) ?? "").toContain("Beatriz e Nuno");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * MODELOS PARCIAIS DE MOOD BOARD
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * (a) As fotos de um modelo vêm da pasta de OUTRO pedido. Inseridas tal e qual,
+ *     o documento novo aponta para lá — as células abrem sem miniatura, e no
+ *     dia em que esse pedido for apagado a proposta fica sem imagens.
+ * (b) O «Guardar como modelo» era único para a secção inteira e guardava sempre
+ *     o PRIMEIRO mood board com título. Não havia maneira de guardar o terceiro.
+ */
+describe("modelos parciais de mood board", () => {
+  function seedComTresBoards() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [
+          { title: "Cerimónia", annotation: "", images: [] },
+          { title: "Cocktail", annotation: "", images: [] },
+          { title: "Jantar", annotation: "", images: [] },
+        ],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+  }
+
+  it("dá para guardar o TERCEIRO mood board, não só o primeiro", async () => {
+    seedComTresBoards();
+    renderStudio();
+    const user = userEvent.setup();
+    const guardar = await screen.findAllByRole("button", { name: /Guardar como modelo/ });
+    // Um controlo por mood board (mais o da proposta inteira, no cabeçalho) —
+    // senão o terceiro board não tem como ser guardado de todo.
+    expect(guardar.length).toBeGreaterThanOrEqual(4);
+    await user.click(guardar[guardar.length - 1]);
+    const nome = await screen.findByLabelText(/Nome do modelo/);
+    // O nome sugerido é o do board em que ela carregou.
+    expect((nome as HTMLInputElement).value).toBe("Jantar");
+    await user.click(screen.getByRole("button", { name: /^Guardar$/ }));
+    await waitFor(() => {
+      const corpo = corpos("/api/propostas/modelos", "POST").at(-1) ?? "";
+      expect(corpo).toContain("Jantar");
+      expect(corpo).not.toContain("Cerimónia");
+    });
+  });
+
+  it("as fotos de um modelo são recopiadas para a pasta deste pedido", async () => {
+    seedComTresBoards();
+    modelosServidor = [
+      {
+        id: "mb1",
+        nome: "Cerimónia na igreja",
+        tipo: "moodboard",
+        moodboard: {
+          title: "Cerimónia na igreja",
+          annotation: "",
+          // A pasta de OUTRO pedido — é isto que não pode ficar no documento.
+          images: ["LQ-999/aaa.jpg", "LQ-999/bbb.jpg"],
+        },
+      },
+    ];
+    copiaServidor = {
+      fotos: { "LQ-999/aaa.jpg": "q1/nova-1.jpg", "LQ-999/bbb.jpg": "q1/nova-2.jpg" },
+    };
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click((await screen.findAllByRole("button", { name: /De um modelo…/ }))[0]);
+    await user.click(await screen.findByRole("button", { name: "Cerimónia na igreja" }));
+
+    // Pediu a recópia…
+    await waitFor(() => {
+      const corpo = corpos("/api/propostas/copiar", "POST").at(-1) ?? "";
+      expect(corpo).toContain("LQ-999/aaa.jpg");
+    });
+    // …e o documento gravado já não aponta para a pasta do outro pedido.
+    await waitFor(() => {
+      const gravado = corpos("proposta-rascunho").at(-1) ?? "";
+      expect(gravado).toContain("q1/nova-1.jpg");
+      expect(gravado).not.toContain("LQ-999/aaa.jpg");
+    });
   });
 });

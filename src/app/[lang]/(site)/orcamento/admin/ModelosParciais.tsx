@@ -23,11 +23,29 @@ import type { ModeloProposta, TipoModelo } from "@/lib/proposal-templates";
 interface Props {
   tipo: Extract<TipoModelo, "grupo" | "moodboard">;
   /** O que inserir quando ela escolhe um modelo. */
-  onInserir: (conteudo: NonNullable<ModeloProposta["grupo"] | ModeloProposta["moodboard"]>) => void;
+  onInserir?: (
+    conteudo: NonNullable<ModeloProposta["grupo"] | ModeloProposta["moodboard"]>,
+  ) => void;
   /** O bloco que está neste momento em edição, para o poder guardar. */
   paraGuardar?: NonNullable<ModeloProposta["grupo"] | ModeloProposta["moodboard"]>;
   /** Um nome de partida para a caixa do nome (o título do grupo/board). */
   nomeSugerido?: string;
+  /**
+   * Que controlos desenhar.
+   *
+   * ── PORQUE É QUE ISTO É UMA ESCOLHA E NÃO SÃO SEMPRE OS DOIS ────────────
+   * Os dois botões têm âmbitos DIFERENTES. «De um modelo…» acrescenta um bloco
+   * novo ao fim da secção — pertence à secção, e um por secção chega.
+   * «Guardar como modelo» guarda UM bloco concreto, e por isso tem de viver ao
+   * lado desse bloco.
+   *
+   * Enquanto foram um par indivisível ao fundo da secção, o `paraGuardar` era
+   * escolhido por quem chamava — na prática, «o primeiro mood board com
+   * título». Ela montava o terceiro mood board, carregava em «Guardar como
+   * modelo», e guardava o primeiro. Sem aviso, e sem maneira nenhuma de
+   * guardar o terceiro.
+   */
+  mostrar?: "ambos" | "inserir" | "guardar";
   toast?: (mensagem: string, tipo?: "success" | "error") => void;
   className?: string;
 }
@@ -42,6 +60,7 @@ export default function ModelosParciais({
   onInserir,
   paraGuardar,
   nomeSugerido,
+  mostrar = "ambos",
   toast,
   className,
 }: Props) {
@@ -118,23 +137,28 @@ export default function ModelosParciais({
   const botao =
     "alvo-toque py-2 text-xs text-foreground/50 underline-offset-2 hover:text-foreground/80 hover:underline";
 
+  const podeInserir = mostrar !== "guardar" && !!onInserir;
+  const podeGuardar = mostrar !== "inserir" && !!paraGuardar;
+
   return (
     <div ref={caixa} className={`relative inline-flex items-center gap-3 ${className ?? ""}`}>
-      <button
-        type="button"
-        className={botao}
-        aria-expanded={aberto}
-        onClick={() => {
-          const vai = !aberto;
-          setAberto(vai);
-          setAGuardar(false);
-          if (vai) void carregar();
-        }}
-      >
-        {ROTULO[tipo].inserir}
-      </button>
+      {podeInserir && (
+        <button
+          type="button"
+          className={botao}
+          aria-expanded={aberto}
+          onClick={() => {
+            const vai = !aberto;
+            setAberto(vai);
+            setAGuardar(false);
+            if (vai) void carregar();
+          }}
+        >
+          {ROTULO[tipo].inserir}
+        </button>
+      )}
 
-      {paraGuardar && (
+      {podeGuardar && (
         <button
           type="button"
           className={botao}
@@ -173,7 +197,7 @@ export default function ModelosParciais({
                       // Cópia funda: inserir o mesmo objecto duas vezes fazia
                       // as duas cópias partilharem os itens, e editar uma
                       // mudava a outra.
-                      onInserir(JSON.parse(JSON.stringify(conteudo)));
+                      onInserir?.(JSON.parse(JSON.stringify(conteudo)));
                       setAberto(false);
                     }}
                   >

@@ -29,10 +29,47 @@ export async function POST(request: NextRequest) {
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
   }
-  const { quoteId, propostaId, modeloId } = body as Record<string, unknown>;
+  const { quoteId, propostaId, modeloId, fotos } = body as Record<string, unknown>;
   if (typeof quoteId !== "string" || !quoteId) {
     return NextResponse.json({ error: "Falta o pedido de destino" }, { status: 400 });
   }
+
+  /**
+   * ── SÓ AS FOTOS ─────────────────────────────────────────────────────────
+   *
+   * Um MODELO PARCIAL de mood board traz caminhos que vivem debaixo do pedido
+   * de ONDE foi guardado (`<quoteIdOrigem>/<uuid>.jpg`). Inseri-los tal e qual
+   * deixava a proposta nova a apontar para a pasta de outro pedido: as células
+   * abrem sem miniatura (a listagem de fotos é por pedido), e no dia em que
+   * esse pedido for apagado a proposta — provavelmente já enviada — fica sem
+   * imagens, em silêncio. É exactamente o problema que o «Criar a partir de…»
+   * já resolvia, e que ao inserir um bloco ninguém resolvia.
+   *
+   * Vive nesta rota e não numa nova porque é a MESMA operação, com a mesma
+   * chave de serviço, o mesmo tecto de tempo e o mesmo melhor esforço — e uma
+   * segunda rota a copiar fotos era uma segunda guarda para manter alinhada.
+   */
+  if (Array.isArray(fotos)) {
+    const caminhos = fotos.filter((p): p is string => typeof p === "string" && p !== "");
+    if (caminhos.length === 0) {
+      return NextResponse.json({ error: "Nenhuma foto indicada" }, { status: 400 });
+    }
+    try {
+      // O que falhar NÃO aparece no mapa: quem chama mantém o caminho antigo e
+      // a proposta continua a funcionar, acoplada à origem, em vez de ficar
+      // com um buraco onde estava uma foto.
+      const mapa = await duplicarFotosParaPedido(caminhos, quoteId);
+      return NextResponse.json({
+        fotos: Object.fromEntries(mapa),
+        fotosCopiadas: mapa.size,
+        fotosPartilhadas: caminhos.filter((p) => !mapa.has(p)).length,
+      });
+    } catch (err) {
+      log.error("copiar fotos falhou", err, { quoteId });
+      return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+    }
+  }
+
   if (!propostaId && !modeloId) {
     return NextResponse.json({ error: "Falta a origem" }, { status: 400 });
   }

@@ -45,19 +45,39 @@ function mesmoNome(a: string, b: string): boolean {
 }
 
 /**
- * Texto de exemplo que ficou por substituir.
- *
- * São os marcadores que os modelos usam. Um "[Valor Total]" que chega ao
- * cliente diz-lhe, com todas as letras, que recebeu um modelo por preencher.
+ * Marcadores de MODELO — os que nunca são texto verdadeiro, escrevam-se onde
+ * se escreverem. Um "[Valor Total]" que chega ao cliente diz-lhe, com todas as
+ * letras, que recebeu um modelo por preencher.
  */
-const PLACEHOLDERS = [
+const MARCADORES_DE_MODELO = [
   /\[[^\]]+\]/, // [Valor Total], [Nome], [Data]
   /\bxxx+\b/i,
   /\blorem ipsum\b/i,
-  /\bpor preencher\b/i,
-  /\ba definir\b/i,
 ];
 
+/**
+ * E as frases de «ainda não sei» — que num campo normal são um esquecimento.
+ *
+ * Um cabeçalho, um local ou um nome de serviço a dizer "a definir" é trabalho
+ * por acabar a caminho do cliente. Ver a excepção logo a seguir.
+ */
+const POR_SABER = [/\bpor preencher\b/i, /\ba definir\b/i];
+
+/**
+ * ── A EXCEPÇÃO DOS VALORES ADICIONAIS ─────────────────────────────────────
+ * O `valueText` de um `BudgetExtra` é TEXTO LIVRE — está dito com todas as
+ * letras em `proposal-budget.ts`, e é assim que aparece nas propostas
+ * verdadeiras da Líquen: "896,00 €", "895,00 € + IVA", "a definir", "sob
+ * consulta". Escrever «Deslocação da equipa Líquen — a definir» porque ainda
+ * não se sabe onde é o evento é o comportamento certo, e a conferência
+ * acendia-o a vermelho como «Ficou por substituir».
+ *
+ * O estrago não era o vermelho a mais: ou ela apagava um valor legítimo, ou
+ * aprendia a ignorar o único aviso que existe para apanhar um "[Valor Total]"
+ * a caminho do cliente. Por isso este campo — e só este — é conferido apenas
+ * contra os marcadores de modelo. O RÓTULO do adicional não: o valor é que
+ * fica por saber, o nome do que se cobra não.
+ */
 function encontrarPlaceholders(doc: ProposalDoc): string[] {
   const campos: (string | undefined)[] = [
     doc.headerTitle,
@@ -74,14 +94,14 @@ function encontrarPlaceholders(doc: ProposalDoc): string[] {
       ...(g.items ?? []).map((i) => i.label),
       ...(g.items ?? []).map((i) => i.desc),
     ]),
-    ...(doc.budgetExtras ?? []).flatMap((e) => [e.label, e.valueText]),
+    ...(doc.budgetExtras ?? []).map((e) => e.label),
   ];
   const achados: string[] = [];
-  for (const c of campos) {
-    const t = texto(c);
-    if (!t) continue;
-    if (PLACEHOLDERS.some((re) => re.test(t))) achados.push(t.slice(0, 60));
-  }
+  const junta = (t: string, regras: RegExp[]) => {
+    if (t && regras.some((re) => re.test(t))) achados.push(t.slice(0, 60));
+  };
+  for (const c of campos) junta(texto(c), [...MARCADORES_DE_MODELO, ...POR_SABER]);
+  for (const e of doc.budgetExtras ?? []) junta(texto(e.valueText), MARCADORES_DE_MODELO);
   return [...new Set(achados)];
 }
 

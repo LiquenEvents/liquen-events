@@ -150,6 +150,179 @@ describe("o evento", () => {
   });
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «ESTA VERSÃO ESTÁ IGUAL À ÚLTIMA ENVIADA» — COM TUDO TROCADO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O percurso que isto prende, em bloco: ela troca as três fotos do mood board
+ * e as duas de capa, acrescenta «Wedding Coordinator 1.500 €», baixa a
+ * validade de 30 para 5 dias e o sinal de 30% para 50%. O painel Versões dizia,
+ * a verde, «Esta versão está igual à última enviada» — e ela enviava a segunda
+ * a acreditar que era a primeira.
+ */
+describe("o percurso completo: tudo trocado", () => {
+  const antes = doc({
+    totalAmount: 10_000,
+    totalVatMode: "acrescer",
+    moodBoards: [{ title: "Cerimónia", images: ["a.jpg", "b.jpg", "c.jpg"] }],
+    coverImages: ["capa-e.jpg", "capa-d.jpg"],
+    budgetExtras: [],
+    validUntilDays: 30,
+    depositPercent: 30,
+  });
+  const depois = doc({
+    totalAmount: 10_000,
+    totalVatMode: "acrescer",
+    moodBoards: [{ title: "Cerimónia", images: ["x.jpg", "y.jpg", "z.jpg"] }],
+    coverImages: ["capa-nova-e.jpg", "capa-nova-d.jpg"],
+    budgetExtras: [{ label: "Wedding Coordinator", valueText: "1.500,00 €" }],
+    validUntilDays: 5,
+    depositPercent: 50,
+  });
+
+  it("não diz que está igual", () => {
+    expect(diferencas(antes, depois)).not.toEqual([]);
+  });
+
+  it("conta as fotos do mood board", () => {
+    expect(
+      frases(antes, depois).some((t) => /mood board/i.test(t) && t.includes("Cerimónia")),
+    ).toBe(true);
+  });
+
+  it("conta as fotos de capa", () => {
+    expect(frases(antes, depois).some((t) => /capa/i.test(t))).toBe(true);
+  });
+
+  it("conta o valor adicional que entrou, com o valor", () => {
+    const t = frases(antes, depois);
+    expect(t.some((x) => x.includes("Wedding Coordinator") && x.includes("1.500,00 €"))).toBe(true);
+  });
+
+  it("conta a validade", () => {
+    expect(frases(antes, depois)).toContain("A validade passou de 30 para 5 dias");
+  });
+
+  it("conta a percentagem do sinal", () => {
+    expect(frases(antes, depois)).toContain("O sinal passou de 30% para 50%");
+  });
+});
+
+describe("o modo de IVA", () => {
+  /**
+   * O cliente paga o mesmo — e a frase dizia que o total tinha subido 2.300 €.
+   *
+   * O estúdio guarda SEMPRE a mesma base ao trocar de modo: em "acrescer" o
+   * `totalAmount` é a base, em "incluído" é a base já com o IVA. Comparar o
+   * número cru fazia de uma mudança de apresentação um aumento de preço.
+   */
+  it("trocar de modo com a mesma base não é um aumento de preço", () => {
+    const t = frases(
+      doc({ totalAmount: 10_000, totalVatMode: "acrescer", vatRate: 0.23 }),
+      doc({ totalAmount: 12_300, totalVatMode: "incluido", vatRate: 0.23 }),
+    );
+    expect(t.some((x) => x.startsWith("O total passou de"))).toBe(false);
+  });
+
+  it("mas diz que a apresentação mudou — não fica calado", () => {
+    const t = frases(
+      doc({ totalAmount: 10_000, totalVatMode: "acrescer", vatRate: 0.23 }),
+      doc({ totalAmount: 12_300, totalVatMode: "incluido", vatRate: 0.23 }),
+    );
+    expect(t.some((x) => /IVA/.test(x))).toBe(true);
+  });
+
+  it("uma subida a sério continua a ser dita, seja qual for o modo", () => {
+    const t = frases(
+      doc({ totalAmount: 10_000, totalVatMode: "acrescer", vatRate: 0.23 }),
+      doc({ totalAmount: 11_000, totalVatMode: "acrescer", vatRate: 0.23 }),
+    );
+    expect(t[0]).toContain("O total passou de");
+  });
+});
+
+describe("os valores adicionais", () => {
+  it("distingue entrar, sair e mudar de valor", () => {
+    const t = frases(
+      doc({
+        budgetExtras: [
+          { label: "Deslocação da equipa Líquen", valueText: "896,00 €" },
+          { label: "Tecidos suspensos", valueText: "450,00 €" },
+        ],
+      }),
+      doc({
+        budgetExtras: [
+          { label: "Deslocação da equipa Líquen", valueText: "1.200,00 €" },
+          { label: "Wedding Coordinator", valueText: "1.500,00 €" },
+        ],
+      }),
+    );
+    expect(t.some((x) => x.includes("Deslocação") && x.includes("1.200,00 €"))).toBe(true);
+    expect(t.some((x) => x.includes("Wedding Coordinator"))).toBe(true);
+    expect(t.some((x) => x.includes("Tecidos suspensos"))).toBe(true);
+  });
+});
+
+describe("as fotos", () => {
+  it("um mood board que entra diz-se pelo nome", () => {
+    const t = frases(
+      doc({ moodBoards: [] }),
+      doc({ moodBoards: [{ title: "Cerimónia", images: ["a.jpg"] }] }),
+    );
+    expect(t).toEqual(['Entrou o mood board "Cerimónia" com 1 foto']);
+  });
+
+  it("um mood board que fica mas troca de fotos diz quantas", () => {
+    const t = frases(
+      doc({ moodBoards: [{ title: "Jantar", images: ["a.jpg", "b.jpg"] }] }),
+      doc({ moodBoards: [{ title: "Jantar", images: ["a.jpg", "c.jpg", "d.jpg"] }] }),
+    );
+    expect(t).toHaveLength(1);
+    expect(t[0]).toContain("Jantar");
+    expect(t[0]).toMatch(/2 (fotos )?entraram|entraram 2/i);
+  });
+
+  it("a mesma foto na mesma posição não é uma alteração", () => {
+    const t = frases(
+      doc({ moodBoards: [{ title: "Jantar", images: ["a.jpg"] }], coverImages: ["c.jpg", ""] }),
+      doc({ moodBoards: [{ title: "Jantar", images: ["a.jpg"] }], coverImages: ["c.jpg", ""] }),
+    );
+    expect(t).toEqual([]);
+  });
+
+  it("as capas dizem de que lado", () => {
+    const t = frases(
+      doc({ coverImages: ["velha-e.jpg", "d.jpg"] }),
+      doc({ coverImages: ["nova-e.jpg", "d.jpg"] }),
+    );
+    expect(t).toHaveLength(1);
+    expect(t[0]).toContain("esquerda");
+  });
+});
+
+describe("as condições e os prazos", () => {
+  it("um ponto acrescentado às condições gerais aparece", () => {
+    const t = frases(
+      doc({ condicoesGerais: ["Aos valores acresce o IVA."] }),
+      doc({ condicoesGerais: ["Aos valores acresce o IVA.", "O pagamento é a 30 dias."] }),
+    );
+    expect(t.some((x) => /Condições Gerais/i.test(x))).toBe(true);
+  });
+
+  it("uma data de validade explícita lê-se como data", () => {
+    const t = frases(doc({ validUntil: "2026-09-01" }), doc({ validUntil: "2026-07-15" }));
+    expect(t.some((x) => x.includes("2026-07-15"))).toBe(true);
+  });
+
+  it("um documento sem sinal escrito vale a percentagem da casa, e não muda nada", () => {
+    // Um documento antigo não tem `depositPercent`. Dizer que «o sinal passou
+    // de nada para 30%» seria inventar uma alteração que ninguém fez.
+    const t = frases(doc({}), doc({ depositPercent: 30 }));
+    expect(t).toEqual([]);
+  });
+});
+
 describe("o que NÃO se compara", () => {
   it("custos e notas internas mudam sem gerar frase nenhuma", () => {
     // Não é esquecimento: são reais, mas não fazem parte do que ela tem de
