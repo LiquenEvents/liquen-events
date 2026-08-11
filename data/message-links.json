@@ -1,9 +1,0 @@
-[
-  {
-    "messageId": "<msg-1@exemplo.pt>",
-    "quoteId": "LIQ-AAA-1",
-    "labels": ["importante"],
-    "pinned": true,
-    "createdAt": "2026-03-01T09:00:00.000Z"
-  }
-]

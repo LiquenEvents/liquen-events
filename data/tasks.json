@@ -1,14 +1,11 @@
 [
   {
-    "id": "task-1",
-    "title": "Confirmar catering",
-    "done": false,
-    "priority": "alta",
-    "createdAt": "2026-03-01T09:00:00.000Z",
-    "dueDate": "2026-04-01",
-    "quoteId": "LIQ-AAA-1",
-    "clientName": "Ana Dias",
+    "id": "8bf39119-729c-4a75-be2f-fe0a73ba2e1c",
+    "createdAt": "2026-06-09T11:41:24.851Z",
+    "done": true,
+    "title": "fdkljfdfjdklfj",
+    "priority": "normal",
     "assignee": "Catarina",
-    "area": "Produção"
+    "area": "Decoração"
   }
 ]
