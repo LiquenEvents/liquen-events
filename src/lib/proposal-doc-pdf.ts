@@ -26,10 +26,11 @@ import {
   type ProposalDoc,
   type MoodBoard,
   MOOD_BOARD_MAX_IMAGES,
+  depositPercentOf,
   resolveProposalMoney,
   resolveValidUntil,
 } from "@/lib/proposal-doc";
-import { splitThirtySeventy, eur } from "@/lib/money";
+import { splitSinal, eur } from "@/lib/money";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
 import {
   CARLITO_REGULAR_TTF_B64,
@@ -70,6 +71,28 @@ function prettyDate(iso: string): string {
   if (mo < 1 || mo > 12) return iso;
   return `${Number(m[3])} de ${PT_MONTHS_SHORT[mo - 1]} de ${m[1]}`;
 }
+
+/**
+ * O SEPARADOR DE MILHARES DESTA FOLHA É O PONTO.
+ *
+ * O `Intl` pt-PT separa os milhares com um espaço inquebrável — «10 300,00 €».
+ * O «Valor Total» é texto escrito por ela, e ela escreve-o como toda a gente
+ * escreve em Portugal: «12.300,00 €». O resultado era um orçamento com os dois
+ * lado a lado, no mesmo quadro, com pontuação diferente — o género de pormenor
+ * que faz um casal olhar duas vezes para uma folha de dinheiro e perguntar se
+ * os números vieram de sítios diferentes. (Vieram: um é dela, o outro é uma
+ * conta nossa. Não se deve notar.)
+ *
+ * Normaliza-se AQUI, no desenho, e não no `eur` partilhado: isto é uma decisão
+ * tipográfica deste documento, não uma mudança na forma como a aplicação inteira
+ * mostra dinheiro. O espaço inquebrável ANTES do «€» fica — esse é o certo.
+ */
+function milharesComPonto(texto: string): string {
+  return texto.replace(/\u00A0(?=\d{3}(?:\D|$))/g, ".");
+}
+
+/** Euros como o resto da folha os escreve. */
+const eurDoc = (n: number): string => milharesComPonto(eur(n));
 
 // ── Landscape A4 ── (a fonte é `proposal-geometria`, partilhada com o estúdio)
 const W = PAGINA_W;
@@ -1070,7 +1093,10 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         color: GOLD,
       });
       text(pg, totalLbl, M, ty - 26, { font: f.serifB, size: 13, color: INK });
-      const amount = totalStr || "—";
+      // O total também passa pelo normalizador: quando o texto foi GERADO pelo
+      // estúdio (que usa o mesmo `eur` que nós) vem com espaço inquebrável, e
+      // ficaria a discordar dos números que desenhamos por baixo dele.
+      const amount = milharesComPonto(totalStr || "—");
       pg.drawText(winAnsiSafe(amount), {
         x: M + boxW - f.serifB.widthOfTextAtSize(winAnsiSafe(amount), 22),
         y: ty - 32,
@@ -1187,12 +1213,27 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     // Um extra sem preço não se desconta, e nesse caso os dois números sairiam
     // iguais — melhor não desenhar nada do que desenhar duas vezes o mesmo
     // número com rótulos diferentes.
-    const versoes = totaisDasVersoes(doc, doc.totalAmount ?? 0);
-    if (versoes && versoes.base > 0 && versoes.extras > 0) {
-      const maisIva = doc.totalVatMode === "acrescer" ? " + IVA" : "";
+    //
+    // ── O SEGUNDO NÚMERO TEM DE ESTAR NA UNIDADE DO PRIMEIRO ──────────────
+    // Isto era `totaisDasVersoes(doc, doc.totalAmount ?? 0)`, e o `totalAmount`
+    // só é a BASE em modo «acrescer»; em «IVA incluído» é o BRUTO. Como os
+    // preços das linhas são sempre líquidos, a subtracção cruzava duas
+    // unidades: numa proposta de base 10.000 € (total 12.300 €) com uma linha
+    // extra de 2.000 €, saía «Sem os extras assinalados 10.300 €» quando o
+    // correcto são 9.840 €. São 460 € oferecidos ao casal — impressos no PDF,
+    // no número por que ele vai pedir o desconto, sem nada que o denunciasse.
+    //
+    // `comoOTotal` é a leitura na MESMA unidade em que o total grande está
+    // impresso — líquida quando o documento diz «+ IVA», bruta quando diz «IVA
+    // incluído». Ver `orcamento/versoes-da-proposta.ts`: é lá que a conta vive,
+    // uma vez só, partilhada com o estúdio.
+    const money = resolveProposalMoney(doc);
+    const versoes = totaisDasVersoes(doc);
+    if (versoes && versoes.comoOTotal.base > 0 && versoes.extras > 0) {
+      const maisIva = money.mode === "acrescer" ? " + IVA" : "";
       budgetBreak(40);
       text(p, "Sem os extras assinalados", M, y, { size: 10.5, color: MUTED });
-      textRight(p, `${eur(versoes.base)}${maisIva}`, M + boxW, y, {
+      textRight(p, `${eurDoc(versoes.comoOTotal.base)}${maisIva}`, M + boxW, y, {
         font: f.serif,
         size: 13,
         color: INK,
@@ -1210,22 +1251,38 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       y -= 22;
     }
 
-    // Payment schedule with the actual amounts (30% sinal / 70% saldo) — the
-    // clarity a client wants right under the total. Amounts come from the same
-    // money resolver the invoicing uses, so they always agree.
-    const money = resolveProposalMoney(doc);
+    // ── O faseamento, com os valores a sério ───────────────────────────────
+    // A clareza que o cliente quer logo por baixo do total. Os montantes saem
+    // do mesmo resolvedor de dinheiro que a facturação usa, para nunca
+    // discordarem.
+    //
+    // A PERCENTAGEM TAMBÉM. Estava escrita à letra — «Sinal 30%» / «Saldo 70%»
+    // — mas há uma caixa editável no estúdio (`depositPercent`) e são as rotas
+    // de facturação que a lêem quando emitem o sinal e o saldo. Numa proposta
+    // de 50% o documento dizia «Sinal 30% 3.000,00 €» num total de 10.000 €, o
+    // casal aceitava, e a factura do sinal saía a 5.000 €: o documento
+    // assinado e a factura emitida a discordarem em 2.000 €.
     if (money.gross > 0) {
-      const { sinal, saldo } = splitThirtySeventy(money.gross);
+      const pctSinal = depositPercentOf(doc);
+      const { sinal, saldo } = splitSinal(money.gross, pctSinal);
       budgetBreak(58);
       eyebrow(p, "Faseamento do pagamento", M, y);
       y -= 18;
-      text(p, `Sinal 30%   ${eur(sinal)}`, M, y, { font: f.serif, size: 12, color: INK });
+      text(p, `Sinal ${pctSinal}%   ${eurDoc(sinal)}`, M, y, {
+        font: f.serif,
+        size: 12,
+        color: INK,
+      });
       textRight(p, "na adjudicação, para reservar a data", M + boxW, y, {
         size: 9.5,
         color: MUTED,
       });
       y -= 17;
-      text(p, `Saldo 70%   ${eur(saldo)}`, M, y, { font: f.serif, size: 12, color: INK });
+      text(p, `Saldo ${100 - pctSinal}%   ${eurDoc(saldo)}`, M, y, {
+        font: f.serif,
+        size: 12,
+        color: INK,
+      });
       textRight(p, "até 1 mês antes do evento", M + boxW, y, { size: 9.5, color: MUTED });
       y -= 20;
     }

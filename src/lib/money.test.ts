@@ -2,17 +2,23 @@ import { describe, it, expect } from "vitest";
 import { splitThirtySeventy, eur, eur0, round2, splitSinal, saldoAPartirDoSinal } from "./money";
 
 describe("round2", () => {
-  it("rounds to two decimals (half-up on exact .xx5 representable values)", () => {
+  it("arredonda aos cêntimos com o meio cêntimo a SUBIR, como manda a factura", () => {
     expect(round2(1.234)).toBe(1.23);
-    expect(round2(1.235)).toBe(1.24); // 1.235*100 = 123.5 → 124
-    expect(round2(2.675)).toBe(2.68); // 2.675*100 = 267.5000…06 → 268
-    expect(round2(1.005)).toBe(1); // classic float: 1.005*100 = 100.4999… → 100
+    expect(round2(1.235)).toBe(1.24);
+    expect(round2(2.675)).toBe(2.68);
+    // Este era o caso que dava 1,00. Ver a nota em `money.ts`: 1,005 não existe
+    // em vírgula flutuante e o que lá está arredonda mesmo para baixo. Um IVA
+    // de 1,005 € facturado a 1,00 € é um cêntimo a menos entregue ao Estado.
+    expect(round2(1.005)).toBe(1.01);
     expect(round2(0)).toBe(0);
     expect(round2(100)).toBe(100);
   });
 
-  it("handles negatives and large magnitudes", () => {
-    expect(round2(-1.005)).toBe(-1); // -1.005*100 = -100.49… → -100
+  it("nos negativos o meio cêntimo afasta-se do zero, como no simétrico", () => {
+    // Uma margem de −1,005 € arredonda para −1,01, e não para −1,00. Sem isto,
+    // `round2` não era simétrico e um prejuízo era sempre um cêntimo menor do
+    // que o lucro equivalente.
+    expect(round2(-1.005)).toBe(-1.01);
     expect(round2(-2.5)).toBe(-2.5);
     expect(round2(1_000_000.019)).toBe(1_000_000.02);
   });
@@ -85,25 +91,27 @@ describe("splitThirtySeventy", () => {
   });
 });
 
-describe("round2 — rounding mode is half-up on the FLOATING product (not decimal half-up / not bankers')", () => {
-  it("an EXACTLY-representable .xx5 half rounds UP (half-up, not half-even)", () => {
-    // 0.125 is exactly representable; 0.125*100 === 12.5 exactly → Math.round → 13.
-    // Bankers' (half-even) rounding would give 0.12 — this pins that money.ts is half-up.
+describe("round2 — o modo de arredondamento é o comercial: meio cêntimo afasta-se do zero", () => {
+  it("um .xx5 exactamente representável sobe (meio para cima, não «meio para o par»)", () => {
+    // 0,125 é exactamente representável. O arredondamento bancário (half-even)
+    // daria 0,12; a regra comercial, que é a da factura, dá 0,13.
     expect(round2(0.125)).toBe(0.13);
-    expect(round2(2.5)).toBe(2.5); // already 2dp, unchanged
+    expect(round2(2.5)).toBe(2.5); // já tem duas casas, não muda
   });
 
-  it("negative halves round toward +Infinity (Math.round), so |round2| is NOT symmetric", () => {
-    // -0.125*100 === -12.5 → Math.round(-12.5) === -12 → -0.12, while +0.125 → +0.13.
-    // Invoices are non-negative so this never bites in practice; pinned as documentation.
-    expect(round2(-0.125)).toBe(-0.12);
+  it("o simétrico arredonda para o simétrico", () => {
+    // Era −0,12 contra +0,13: o `Math.round` puxa os meios negativos para o
+    // +Infinito. As facturas não são negativas, mas as MARGENS são, e uma
+    // margem de −0,125 € valia um cêntimo a menos do que o lucro de +0,125 €.
+    expect(round2(-0.125)).toBe(-0.13);
     expect(round2(0.125)).toBe(0.13);
   });
 
-  it("a .xx5 that is NOT exactly representable can round DOWN (float, not decimal, half-up)", () => {
-    // 0.145*100 === 14.499999999999998 (< 14.5) → 14 → 0.14, even though decimal
-    // half-up would say 0.15. This is inherent to float *100 rounding.
-    expect(round2(0.145)).toBe(0.14);
+  it("um .xx5 que NÃO é exactamente representável sobe na mesma", () => {
+    // 0,145 × 100 é 14,499999999999998 em vírgula flutuante e arredondava para
+    // 0,14. Em decimal é meio cêntimo e sobe. Era este o caso que fazia o IVA
+    // de certas bases sair um cêntimo abaixo do que a factura diz.
+    expect(round2(0.145)).toBe(0.15);
   });
 
   it("propagates non-finite inputs (NaN/Infinity) unguarded — unlike eur()", () => {

@@ -1,5 +1,6 @@
-import type { ProposalDoc } from "@/lib/proposal-doc";
+import { resolveProposalMoney, type ProposalDoc } from "@/lib/proposal-doc";
 import { precosDe } from "@/lib/proposal-budget";
+import { round2 } from "@/lib/money";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -45,13 +46,40 @@ export function opcionaisDe(doc: Pick<ProposalDoc, "budgetItems" | "budgetOpcion
   return Array.from({ length: n }, (_, i) => guardado[i] === true);
 }
 
-export interface Totais {
-  /** O que a proposta inteira vale — o número escrito. */
+/** Um par de números na mesma unidade — ver {@link Totais}. */
+export interface TresValores {
+  /** O que a proposta inteira vale. */
   comExtras: number;
   /** O que vale sem as linhas assinaladas. */
   base: number;
   /** Quanto valem os extras, somados. */
   extras: number;
+}
+
+export interface Totais extends TresValores {
+  /**
+   * ── OS TRÊS NÚMEROS DE CIMA SÃO SEM IVA ──────────────────────────────────
+   *
+   * E têm de ser: a subtracção que aqui se faz tira PREÇOS DE LINHA a um
+   * total, e um preço de linha é sempre líquido — é um campo numérico, sem
+   * IVA nenhum escrito ao lado. Enquanto o total entrava aqui em cru
+   * (`doc.totalAmount`), a conta cruzava duas unidades sem dar por isso: em
+   * modo «IVA incluído» esse campo é o BRUTO. Numa proposta de 10.000 € de
+   * base (12.300 € guardados) com uma linha extra de 2.000 €, saía «sem os
+   * extras: 10.300 €» onde o certo são 9.840 €. São 460 € oferecidos ao
+   * casal, impressos no PDF, num número que ele vai usar para negociar.
+   */
+  /** Os mesmos três, COM IVA — o que o casal paga. */
+  bruto: TresValores;
+  /**
+   * Os mesmos três na unidade em que o TOTAL da proposta está impresso: sem
+   * IVA quando o documento diz «+ IVA», com IVA quando diz «IVA incluído».
+   *
+   * É este que os ecrãs e o PDF devem mostrar. Um número líquido impresso
+   * debaixo de um total bruto são dois números que não se comparam, e quem os
+   * lê não tem como saber disso.
+   */
+  comoOTotal: TresValores;
   /** Quantas linhas estão assinaladas. */
   linhasExtra: number;
   /**
@@ -64,15 +92,31 @@ export interface Totais {
   extrasSemPreco: number;
 }
 
+/** Os campos do documento de que esta conta precisa. */
+type DocComTotais = Pick<ProposalDoc, "budgetItems" | "budgetAmounts" | "budgetOpcional"> &
+  Partial<
+    Pick<
+      ProposalDoc,
+      "totalAmount" | "totalVatMode" | "vatRate" | "totalText" | "totalEstimatedText"
+    >
+  >;
+
 /**
- * Os dois totais, a partir do total escrito e das linhas assinaladas.
+ * Os dois totais, a partir da BASE da proposta e das linhas assinaladas.
+ *
+ * ── O QUE O SEGUNDO ARGUMENTO TEM DE SER ───────────────────────────────────
+ * A BASE TRIBUTÁVEL, sem IVA — nunca o `doc.totalAmount` cru, que só é a base
+ * em modo «acrescer». Por omissão é lida do próprio documento, e essa é a
+ * forma de o chamar que não pode estar errada: `totaisDasVersoes(doc)`. Quem
+ * já tem o dinheiro resolvido à mão passa `resolveProposalMoney(doc).base`, o
+ * mesmo número por outro caminho.
  *
  * `null` quando não há extras nenhuns — e nesse caso não há duas versões, há
  * uma proposta como as de sempre.
  */
 export function totaisDasVersoes(
-  doc: Pick<ProposalDoc, "budgetItems" | "budgetAmounts" | "budgetOpcional">,
-  totalEscrito: number,
+  doc: DocComTotais,
+  baseSemIva: number = resolveProposalMoney(doc).base,
 ): Totais | null {
   const marcas = opcionaisDe(doc);
   const linhasExtra = marcas.filter(Boolean).length;
@@ -87,15 +131,39 @@ export function totaisDasVersoes(
     if (p === null) extrasSemPreco += 1;
     else extras += p;
   });
-  extras = Math.round(extras * 100) / 100;
+  extras = round2(extras);
 
-  const comExtras = Math.round((totalEscrito || 0) * 100) / 100;
+  const comExtras = round2(baseSemIva || 0);
   // A base nunca desce abaixo de zero: extras somados a mais do que o total é
   // um engano de quem escreveu, e um total negativo em PDF seria pior do que o
   // engano. O aviso de desalinhamento (proposal-budget) já apanha o caso.
-  const base = Math.max(0, Math.round((comExtras - extras) * 100) / 100);
+  const base = Math.max(0, round2(comExtras - extras));
 
-  return { comExtras, base, extras, linhasExtra, extrasSemPreco };
+  // ── A leitura COM IVA ────────────────────────────────────────────────────
+  // O bruto da proposta inteira NÃO se recalcula: é o mesmo que a factura, o
+  // contrato e o dossier lêem. Só os extras são convertidos, e a versão base
+  // sai por SUBTRACÇÃO — assim os três brutos fecham entre si ao cêntimo, tal
+  // como o sinal e o saldo fecham o total. Multiplicar as três parcelas cada
+  // uma por sua conta deixava um cêntimo a sobrar de vez em quando, e um
+  // cêntimo a sobrar num quadro de orçamento é uma pergunta ao telefone.
+  const dinheiro = resolveProposalMoney(doc);
+  const brutoComExtras = dinheiro.gross;
+  const brutoExtras = round2(extras * (1 + dinheiro.vatRate));
+  const brutoBase = Math.max(0, round2(brutoComExtras - brutoExtras));
+  const bruto: TresValores = {
+    comExtras: brutoComExtras,
+    base: brutoBase,
+    extras: brutoExtras,
+  };
+
+  const semIva: TresValores = { comExtras, base, extras };
+  return {
+    ...semIva,
+    bruto,
+    comoOTotal: dinheiro.mode === "acrescer" ? semIva : bruto,
+    linhasExtra,
+    extrasSemPreco,
+  };
 }
 
 /**

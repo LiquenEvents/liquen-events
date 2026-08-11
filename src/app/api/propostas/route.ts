@@ -5,7 +5,7 @@ import { jsonWithEtag } from "@/lib/api-cache";
 import { log } from "@/lib/logger";
 import { opcionaisDe } from "@/lib/orcamento/versoes-da-proposta";
 import type { Proposal } from "@/lib/orcamento/types";
-import type { ProposalDoc } from "@/lib/proposal-doc";
+import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,13 +61,22 @@ function resumir(p: Awaited<ReturnType<typeof listAllProposals>>[number]) {
  * documento, e o documento é quase tudo o que se descarrega (mood boards,
  * grupos de serviços, condições, dezenas de caminhos de fotos).
  *
- * Vão dois factos DERIVADOS do documento, porque são os únicos que as listas
+ * Vão três factos DERIVADOS do documento, porque são os únicos que as listas
  * lhe tiram e sem eles a mudança não seria neutra:
  *   · `temDoc`       — uma proposta de linhas antiga não tem documento nenhum.
  *   · `temOpcionais` — a proposta tinha linhas marcadas como extra. É o que o
  *                      Acompanhamento usa para perguntar «qual das versões é
  *                      que eles ficaram?» e a Análise para contar quantas
  *                      aceites tinham extras.
+ *   · `pctSinal`     — a percentagem do sinal desta proposta. É a MESMA que as
+ *                      rotas de facturação usam para emitir o sinal e o saldo
+ *                      (`depositPercentOf`), e os ecrãs do back office —
+ *                      Faturas, Pagamentos — precisam dela para prometerem o
+ *                      número que o servidor vai mesmo emitir. Sem isto
+ *                      dividiam 30/70 à letra: o formulário dizia «sinal
+ *                      3.690,00 €» e no livro apareciam duas faturas de
+ *                      6.150,00 €. Um número, não o documento — é para isto
+ *                      que serve esta forma sem `doc`.
  *
  * O campo `doc` é OMITIDO, não truncado: um documento pela metade é a espécie
  * de coisa que passa despercebida até alguém desenhar um PDF a partir dele.
@@ -78,6 +87,7 @@ function semDocumento(p: Proposal) {
     ...resto,
     temDoc: !!doc,
     temOpcionais: !!doc && opcionaisDe(doc).some(Boolean),
+    pctSinal: depositPercentOf(doc),
   };
 }
 

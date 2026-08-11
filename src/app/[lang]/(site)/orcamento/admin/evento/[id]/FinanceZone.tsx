@@ -4,6 +4,7 @@ import type { Quote } from "@/lib/orcamento/types";
 import { eur } from "@/lib/money";
 import type { DossierInvoice, FinanceReconciliation } from "@/lib/orcamento/dossier";
 import { PaymentsPanel, EventCosts } from "../../lazy";
+import { usePercentagemDoSinal } from "../../percentagem-do-sinal";
 
 /** yyyy-mm-dd → "12/09/26"; "—" se ausente. */
 function shortDate(v?: string): string {
@@ -13,11 +14,15 @@ function shortDate(v?: string): string {
   return dt.toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
-const KIND_LABEL: Record<DossierInvoice["kind"], string> = {
-  sinal: "Sinal (30%)",
-  saldo: "Saldo (70%)",
+// A percentagem é a da PROPOSTA deste evento, não 30/70 escritos à mão: é ela
+// que as rotas de facturação usam para emitir o sinal e o saldo. Rotular «Sinal
+// (30%)» uma fatura emitida a 50% é dizer com toda a confiança um número que
+// ninguém usou — e este quadro está a três centímetros do valor real dela.
+const kindLabel = (pctSinal: number): Record<DossierInvoice["kind"], string> => ({
+  sinal: `Sinal (${pctSinal}%)`,
+  saldo: `Saldo (${100 - pctSinal}%)`,
   total: "Total",
-};
+});
 const STATUS_LABEL: Record<DossierInvoice["status"], string> = {
   emitida: "Emitida",
   paga: "Paga",
@@ -43,6 +48,9 @@ interface Props {
 }
 
 export default function FinanceZone({ quote, invoices, reconciliation, onQuoteChange }: Props) {
+  const pctSinal = usePercentagemDoSinal(quote.id);
+  const KIND_LABEL = kindLabel(pctSinal);
+
   return (
     <section id="zone-financeiro" className="bo-card p-5 sm:p-6 scroll-mt-40 flex flex-col gap-6">
       <p className="bo-eyebrow">Financeiro</p>
@@ -133,7 +141,7 @@ export default function FinanceZone({ quote, invoices, reconciliation, onQuoteCh
         )}
       </div>
 
-      {/* Pagamentos (faseamento 30/70) */}
+      {/* Pagamentos (faseamento sinal/saldo da proposta) */}
       <PaymentsPanel
         key={`pay-${quote.id}`}
         quote={quote}

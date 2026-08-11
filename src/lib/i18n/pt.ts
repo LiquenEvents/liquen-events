@@ -795,10 +795,12 @@ export const pt = {
     pagamentos: {
       title: "Pagamentos",
       intro:
-        "O pagamento é faseado: 30% de sinal para reservar a data e 70% de saldo antes do evento.",
+        "O pagamento é faseado: {sinal}% de sinal para reservar a data e {saldo}% de saldo antes do evento.",
       scheduleTitle: "Plano previsto",
-      sinal: "Sinal (30%)",
-      saldo: "Saldo (70%)",
+      // As percentagens vêm preenchidas (`fill`) com as da PROPOSTA — é
+      // editável por proposta e é a mesma que as facturas usam.
+      sinal: "Sinal ({sinal}%)",
+      saldo: "Saldo ({saldo}%)",
       faturasTitle: "Faturas",
       thNumero: "Nº",
       thTipo: "Tipo",

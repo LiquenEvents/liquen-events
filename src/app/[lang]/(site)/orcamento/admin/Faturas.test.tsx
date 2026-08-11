@@ -224,3 +224,56 @@ describe("Faturas — o valor pré-preenchido inclui o IVA", () => {
     expect(screen.getByLabelText(/com IVA/i)).toBeTruthy();
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O QUE O FORMULÁRIO PROMETE TEM DE SER O QUE O SERVIDOR EMITE
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O "split" emite duas faturas, e a rota calcula-as com a percentagem da
+ * PROPOSTA (`depositPercentOf`). Aqui a frase de pré-visualização dividia
+ * sempre 30/70: numa proposta de 50%, ela lia «sinal 3.690,00 € + saldo
+ * 8.610,00 €», carregava em Emitir, e no livro apareciam duas faturas de
+ * 6.150,00 €. Não é um erro de contabilidade — é o ecrã a dizer uma coisa e o
+ * botão a fazer outra.
+ */
+describe("Faturas — a divisão prometida é a da proposta", () => {
+  const CASAL = [
+    {
+      id: "q-50",
+      name: "Casal de metade",
+      eventName: "Casamento",
+      email: "casal@exemplo.pt",
+      quotedPrice: 10000, // «Preço final (sem IVA)» → 12 300 € com IVA
+      vatRate: 0.23,
+    },
+  ] as never[];
+
+  const comPercentagem = (pctSinal: number) =>
+    vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.startsWith("/api/propostas")) return ok([{ id: "p1", quoteId: "q-50", pctSinal }]);
+      if (u.startsWith("/api/faturas?quoteId=")) return ok([]);
+      if (u.startsWith("/api/faturas")) return ok(invoices);
+      return ok([]);
+    });
+
+  it("uma proposta de 50% promete duas metades", async () => {
+    vi.stubGlobal("fetch", comPercentagem(50));
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <Faturas quotes={CASAL} />
+      </ToastProvider>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /nova fatura/i }));
+    await user.selectOptions(screen.getByLabelText(/evento \(opcional\)/i), "q-50");
+
+    // 12 300 € ao meio: 6 150 € + 6 150 €.
+    const frase = () => screen.getByText(/Serão emitidas duas faturas/).textContent ?? "";
+    await waitFor(() => expect(frase()).toMatch(/sinal 6\D?150,00/));
+    expect(frase()).toMatch(/saldo 6\D?150,00/);
+    expect(frase()).not.toMatch(/3\D?690,00/);
+  });
+});

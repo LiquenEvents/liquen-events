@@ -352,28 +352,44 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       profCosts = 0,
       profMargin = 0,
       profCount = 0;
+    /**
+     * ── A PERCENTAGEM DE MARGEM DIVIDE-SE PELA RECEITA LÍQUIDA ──────────────
+     *
+     * A margem de `computeEventMetrics` é líquida contra líquida — o IVA não é
+     * receita nem é custo (ver a nota em `EventMetrics.margin`). Dividi-la pelo
+     * valor CONTRATADO, que é bruto, misturava as duas unidades: uma margem
+     * real de 40% aparecia como 32,5%, e o «Margem média» do painel dizia,
+     * sistematicamente, menos ~19% do que a verdade. O numerador e o
+     * denominador têm de vir da mesma leitura.
+     *
+     * O valor contratado continua a mostrar-se BRUTO na coluna do lado: é o
+     * que o cliente paga e é o número que ela reconhece do contrato.
+     */
+    let profContractedNet = 0;
     const byTypeProfit: Record<
       string,
-      { contracted: number; cost: number; margin: number; count: number }
+      { contracted: number; contractedNet: number; cost: number; margin: number; count: number }
     > = {};
     for (const q of filteredQuotes) {
       if (q.status !== "aceite") continue;
       const m = computeEventMetrics({ quote: q, proposal: null, contract: null, invoices: [] });
       if (m.contracted <= 0) continue;
       profContracted += m.contracted;
+      profContractedNet += m.contractedNet;
       profCosts += m.supplierCosts;
       profMargin += m.margin;
       profCount++;
       const label = eventTypeLabel(q);
       const bucket =
         byTypeProfit[label] ??
-        (byTypeProfit[label] = { contracted: 0, cost: 0, margin: 0, count: 0 });
+        (byTypeProfit[label] = { contracted: 0, contractedNet: 0, cost: 0, margin: 0, count: 0 });
       bucket.contracted += m.contracted;
+      bucket.contractedNet += m.contractedNet;
       bucket.cost += m.supplierCosts;
       bucket.margin += m.margin;
       bucket.count++;
     }
-    const profAvgMarginPct = profContracted > 0 ? (profMargin / profContracted) * 100 : 0;
+    const profAvgMarginPct = profContractedNet > 0 ? (profMargin / profContractedNet) * 100 : 0;
     const profByType = Object.entries(byTypeProfit)
       .map(([label, b]) => ({
         label,
@@ -381,7 +397,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         cost: b.cost,
         margin: b.margin,
         count: b.count,
-        marginPct: b.contracted > 0 ? (b.margin / b.contracted) * 100 : 0,
+        marginPct: b.contractedNet > 0 ? (b.margin / b.contractedNet) * 100 : 0,
       }))
       .sort((a, b) => b.margin - a.margin);
 

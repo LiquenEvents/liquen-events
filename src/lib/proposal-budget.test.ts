@@ -78,6 +78,23 @@ describe("somaDosItens", () => {
   });
 
   it("junta os valores adicionais, que são texto livre no PDF", () => {
+    /**
+     * ── O ADICIONAL ENTRA NA SOMA NA MESMA UNIDADE DAS LINHAS ───────────────
+     *
+     * O DOC não declara modo de IVA nenhum, e um documento calado lê-se com o
+     * IVA INCLUÍDO — é a regra de `detectVatMode`, e é a leitura que o casal
+     * faz de um «896,00 €» impresso sem mais nada ao lado.
+     *
+     * Logo, esses 896 € são o que ele PAGA, e valem 728,46 € de base. As
+     * linhas do orçamento são todas base (são campos numéricos, sem IVA
+     * escrito ao lado), e é com a BASE da proposta que esta soma vai ser
+     * comparada. Somar 896 crus punha a soma 167,54 € acima do que devia — e o
+     * aviso «o total não bate com a soma das linhas» acendia numa proposta que
+     * estava certa.
+     *
+     * Numa proposta que diga «+ IVA» — no documento ou na própria linha — os
+     * 896 são base e entram inteiros. Está pinado logo a seguir.
+     */
     const comExtras = {
       ...DOC,
       budgetExtras: [
@@ -86,7 +103,26 @@ describe("somaDosItens", () => {
       ],
     } as unknown as ProposalDoc;
     // O "a definir" não conta — não é um número.
-    expect(somaDosItens(comExtras)).toBe(7771);
+    expect(somaDosItens(comExtras)).toBe(7603.46); // 6875 + 896/1,23
+  });
+
+  it("num documento que diz «+ IVA», o mesmo adicional entra inteiro", () => {
+    const acresce = {
+      ...DOC,
+      totalVatMode: "acrescer",
+      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "896,00 €" }],
+    } as unknown as ProposalDoc;
+    expect(somaDosItens(acresce)).toBe(7771);
+  });
+
+  it("e o que a própria linha declara ganha ao modo do documento", () => {
+    // «896,00 € + IVA» é base, esteja o documento no modo que estiver. É a
+    // intenção de quem a escreveu, e está impressa no PDF ao lado do valor.
+    const linhaDiz = {
+      ...DOC,
+      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "896,00 € + IVA" }],
+    } as unknown as ProposalDoc;
+    expect(somaDosItens(linhaDiz)).toBe(7771);
   });
 
   /**

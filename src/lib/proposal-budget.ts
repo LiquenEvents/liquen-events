@@ -1,4 +1,5 @@
-import type { ProposalDoc } from "./proposal-doc";
+import { DEFAULT_VAT_RATE, resolveProposalMoney, type ProposalDoc } from "./proposal-doc";
+import { round2, splitSinal } from "./money";
 
 /**
  * O ORÇAMENTO QUE SE SOMA SOZINHO.
@@ -27,6 +28,25 @@ import type { ProposalDoc } from "./proposal-doc";
  * alterações passam pelos ajudantes deste ficheiro, e a leitura normaliza
  * sempre o comprimento. Um desalinhamento perde um preço; nunca parte nada.
  */
+
+/**
+ * O documento visto por quem SOMA: as linhas, os adicionais, e os campos que
+ * dizem como o total se lê.
+ *
+ * Os campos do total são opcionais porque uma proposta a meio de ser escrita
+ * ainda não tem total nenhum — e nesse caso a leitura cai no que
+ * `resolveProposalMoney` decide por omissão, que é o mesmo que o PDF fará.
+ */
+export type DocComLinhasETotal = Pick<
+  ProposalDoc,
+  "budgetItems" | "budgetAmounts" | "budgetExtras"
+> &
+  Partial<
+    Pick<
+      ProposalDoc,
+      "totalAmount" | "totalVatMode" | "vatRate" | "totalText" | "totalEstimatedText"
+    >
+  >;
 
 /** Uma linha do orçamento, já emparelhada com o seu preço. */
 export interface LinhaOrcamento {
@@ -122,7 +142,7 @@ function valoresDosExtras(extras: ProposalDoc["budgetExtras"]): number[] {
 export function somaDosExtras(extras: ProposalDoc["budgetExtras"]): number {
   const valores = valoresDosExtras(extras);
   if (valores.length === 0) return 0;
-  return Math.round(valores.reduce((a, b) => a + b, 0) * 100) / 100;
+  return round2(valores.reduce((a, b) => a + b, 0));
 }
 
 /**
@@ -175,7 +195,12 @@ export function somaDosExtrasSemIva(
   contexto?: { mode?: "acrescer" | "incluido"; vatRate?: number },
 ): number {
   const taxa =
-    typeof contexto?.vatRate === "number" && contexto.vatRate >= 0 ? contexto.vatRate : 0.23;
+    typeof contexto?.vatRate === "number" && contexto.vatRate >= 0
+      ? contexto.vatRate
+      : DEFAULT_VAT_RATE;
+  // Soma-se tudo em vírgula flutuante e arredonda-se UMA vez, no fim.
+  // Arredondar cada linha ao converter deixava a soma de três adicionais a
+  // divergir da conversão da soma — e é a soma que vai para o total.
   const total = (extras ?? []).reduce((acc, e) => {
     const valor = normalizarValor(e.valueText);
     if (valor === null) return acc;
@@ -183,7 +208,7 @@ export function somaDosExtrasSemIva(
     // Bruto → base. Nunca o contrário: o que se soma é sempre a base.
     return acc + (modo === "incluido" ? valor / (1 + taxa) : valor);
   }, 0);
-  return Math.round(total * 100) / 100;
+  return round2(total);
 }
 
 /**
@@ -193,16 +218,44 @@ export function somaDosExtrasSemIva(
  * distinção, uma proposta ainda por orçamentar dizia «a soma dos itens é
  * 0,00 €» e o aviso de desalinhamento aparecia sempre, em todas as propostas,
  * desde o primeiro segundo. Um aviso que toca sempre deixa de ser lido.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * A SOMA É SEM IVA, PORQUE É COM A BASE QUE ELA VAI SER COMPARADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Os preços por LINHA são sempre líquidos — são campos numéricos, sem IVA
+ * nenhum escrito ao lado. Os ADICIONAIS não: são texto livre, e nas propostas
+ * verdadeiras aparecem «895,00 € + IVA» e «895,00 €», que querem dizer coisas
+ * diferentes. Esta soma pegava nos dois e somava-os tal e qual.
+ *
+ * O estrago aparecia do outro lado: quem lê esta soma compara-a com a BASE da
+ * proposta (`desalinhamento`, o painel de progresso, o aviso ao lado das
+ * linhas). Numa proposta que se lê COM IVA, uma deslocação escrita «1.550,00 €»
+ * entrava na soma por 1.550 de líquido quando o casal só paga 1.550 no total —
+ * 1.260,16 de base. A soma ficava 289,84 € acima da base e o aviso «o total não
+ * bate com a soma das linhas» acendia numa proposta que estava certa.
+ *
+ * Agora o adicional passa por {@link somaDosExtrasSemIva}, que lê o que a
+ * própria linha declara e, quando ela está calada, segue o modo do DOCUMENTO.
+ * Os dois lados da comparação ficam na mesma unidade — que é a única maneira de
+ * a comparação querer dizer alguma coisa.
+ *
+ * O que NÃO se decide aqui: se os adicionais estão DENTRO do total ou ACRESCEM
+ * a ele. Continuam a entrar na soma, exactamente como entravam. Essa pergunta
+ * está em aberto com a dona do negócio (fim de `PROPOSTAS-O-QUE-MELHORAR.md`) e
+ * não é um problema de aritmética.
  */
-export function somaDosItens(
-  doc: Pick<ProposalDoc, "budgetItems" | "budgetAmounts" | "budgetExtras">,
-): number | null {
+export function somaDosItens(doc: DocComLinhasETotal): number | null {
   const dosItens = precosDe(doc).filter((p): p is number => p !== null);
-  const dosExtras = valoresDosExtras(doc.budgetExtras);
-  const todos = [...dosItens, ...dosExtras];
-  if (todos.length === 0) return null;
+  const extrasLegiveis = valoresDosExtras(doc.budgetExtras);
+  if (dosItens.length === 0 && extrasLegiveis.length === 0) return null;
+
+  // O mesmo modo e a mesma taxa por que o total é lido — sem isso, os dois
+  // lados da comparação saem de leituras diferentes do mesmo documento.
+  const { mode, vatRate } = resolveProposalMoney(doc);
+  const dosExtras = somaDosExtrasSemIva(doc.budgetExtras, { mode, vatRate });
   // Arredondar ao cêntimo: somar floats dá 3249.9999999999995.
-  return Math.round(todos.reduce((a, b) => a + b, 0) * 100) / 100;
+  return round2(dosItens.reduce((a, b) => a + b, 0) + dosExtras);
 }
 
 /**
@@ -213,28 +266,31 @@ export function somaDosItens(
  * vírgula flutuante e o total foi escrito por uma pessoa.
  */
 export function desalinhamento(
-  doc: Pick<ProposalDoc, "budgetItems" | "budgetAmounts" | "budgetExtras" | "totalAmount">,
+  doc: DocComLinhasETotal,
   base: number,
 ): { soma: number; total: number; diferenca: number } | null {
   const soma = somaDosItens(doc);
   if (soma === null) return null;
-  const diferenca = Math.round((base - soma) * 100) / 100;
+  const diferenca = round2(base - soma);
   if (Math.abs(diferenca) <= 0.01) return null;
   return { soma, total: base, diferenca };
 }
 
-/** Sinal e saldo, a partir do total e da percentagem do sinal. */
+/**
+ * Sinal e saldo, a partir do total e da percentagem do sinal.
+ *
+ * Delega em {@link splitSinal}, e é de propósito que não repete a conta: eram
+ * duas implementações da mesma divisão — esta e a de `money.ts` — e enquanto
+ * foram duas podiam arredondar para lados diferentes. O sinal que o estúdio
+ * mostra tem de ser, ao cêntimo, o sinal que a factura emite; se forem duas
+ * funções, um dia deixam de ser o mesmo número e ninguém dá por isso até um
+ * cliente perguntar.
+ */
 export function sinalESaldo(
   total: number,
   percentagemSinal: number,
 ): { sinal: number; saldo: number } {
-  const pct = Math.min(100, Math.max(0, percentagemSinal));
-  const sinal = Math.round(total * (pct / 100) * 100) / 100;
-  // O saldo é o RESTO e não `total × (100-pct)`: assim os dois somam sempre
-  // exactamente o total, mesmo quando o arredondamento do sinal come um
-  // cêntimo. Uma factura em que a soma das parcelas não dá o total é uma
-  // conversa com o contabilista.
-  return { sinal, saldo: Math.round((total - sinal) * 100) / 100 };
+  return splitSinal(total, percentagemSinal);
 }
 
 /** As duas leituras do mesmo número, para ela ver o que o cliente vai ver. */
@@ -245,14 +301,17 @@ export function asDuasFormas(
   acrescer: { base: number; iva: number; total: number };
   incluido: { base: number; iva: number; total: number };
 } {
-  const cent = (n: number) => Math.round(n * 100) / 100;
+  const cent = round2;
   // "acresce": o número escrito é a base e o IVA soma-se por cima.
   const ivaAcrescer = cent(base * taxa);
   // "incluído": o número escrito JÁ traz o IVA lá dentro, e a base extrai-se.
   const baseIncluido = cent(base / (1 + taxa));
+  // Nos dois casos o IVA sai por SUBTRACÇÃO ou o total por SOMA das parcelas
+  // já arredondadas — nunca as três por sua conta. É o que garante que estas
+  // duas leituras, que existem para ela comparar, fecham cada uma em si.
   return {
-    acrescer: { base: cent(base), iva: ivaAcrescer, total: cent(base + ivaAcrescer) },
-    incluido: { base: baseIncluido, iva: cent(base - baseIncluido), total: cent(base) },
+    acrescer: { base: cent(base), iva: ivaAcrescer, total: cent(cent(base) + ivaAcrescer) },
+    incluido: { base: baseIncluido, iva: cent(cent(base) - baseIncluido), total: cent(base) },
   };
 }
 

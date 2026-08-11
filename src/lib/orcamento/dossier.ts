@@ -13,6 +13,7 @@
  */
 import type { Quote, Proposal, Payment } from "./types";
 import { round2 } from "@/lib/money";
+import { depositPercentOf } from "@/lib/proposal-doc";
 
 /**
  * Fatura tal como o Dossier a consome — subconjunto serializável do tipo
@@ -141,19 +142,41 @@ export interface ContractedAmounts {
  * (erro de ~23% nos negócios de preço manual).
  */
 export function contractedAmounts(quote: Quote, proposal?: Proposal | null): ContractedAmounts {
-  if (proposal && proposal.total != null) {
-    const gross = proposal.total;
-    const net = proposal.subtotal ?? round2(gross / (1 + (proposal.vatRate || 0.23)));
-    const iva = proposal.vat ?? round2(gross - net);
-    return { net, iva, gross };
+  /**
+   * ── O IVA SAI SEMPRE POR SUBTRACÇÃO ──────────────────────────────────────
+   * `net + iva` tem de dar `gross` ao cêntimo, venha o total de onde vier.
+   * Enquanto o IVA era lido do campo `proposal.vat`, bastava uma proposta cujo
+   * trio gravado não fechasse (uma linha migrada, um valor corrigido à mão na
+   * base de dados) para o dossier mostrar três números que não somam — e o
+   * «em falta» é calculado a partir deles.
+   *
+   * ── E O LÍQUIDO A ZERO ───────────────────────────────────────────────────
+   * As linhas de `proposals` anteriores à coluna `subtotal` lêem-se como 0
+   * (ver `proposals-store.fromRow`), e `??` não apanha um zero. O dossier
+   * dizia então que um casamento de 12.300 € valia 0 € sem IVA e 12.300 € de
+   * IVA. A margem do evento, que compara líquidos, saía a menos o preço todo:
+   * um casamento lucrativo aparecia com prejuízo igual aos custos. Um zero num
+   * campo que devia trazer o líquido é um campo POR PREENCHER, não um preço
+   * de zero euros — a proposta tem total, portanto tem base.
+   */
+  if (proposal && proposal.total != null && proposal.total > 0) {
+    const gross = round2(proposal.total);
+    const taxa =
+      typeof proposal.vatRate === "number" && proposal.vatRate > 0 ? proposal.vatRate : 0.23;
+    const net = proposal.subtotal > 0 ? round2(proposal.subtotal) : round2(gross / (1 + taxa));
+    return { net, iva: round2(gross - net), gross };
   }
   if (quote.quotedPrice != null) {
-    const net = quote.quotedPrice;
+    const net = round2(quote.quotedPrice);
     const gross = round2(net * (1 + effectiveVatRate(quote)));
     return { net, iva: round2(gross - net), gross };
   }
   const pb = quote.priceBreakdown;
-  if (pb) return { net: pb.subtotal, iva: pb.iva, gross: pb.total };
+  if (pb) {
+    const gross = round2(pb.total);
+    const net = round2(pb.subtotal);
+    return { net, iva: round2(gross - net), gross };
+  }
   return { net: 0, iva: 0, gross: 0 };
 }
 
@@ -329,7 +352,28 @@ export interface EventMetrics {
   ledgerPaid: number;
   informalPaid: number;
   pctPaid: number;
+  /** Custos de fornecedor COM IVA — é assim que eles são registados. */
   supplierCosts: number;
+  /** Os mesmos custos SEM IVA — a base em que a margem se calcula. */
+  supplierCostsNet: number;
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A MARGEM É LÍQUIDA CONTRA LÍQUIDA — E ANTES NÃO ERA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Era `contratado com IVA − custos com IVA`. As duas parcelas estavam na
+   * mesma unidade, o que parece bastar, e não basta: o IVA não é receita nem
+   * é custo. Entra do cliente e sai para o Estado, e a diferença entre dois
+   * brutos é a margem verdadeira MULTIPLICADA por 1,23.
+   *
+   * Num casamento de 20.000 € de base com 12.000 € de custos, a margem real
+   * são 8.000 € e o quadro dizia 9.840 €. É um lucro que não existe, em cima
+   * do qual se decide baixar um preço.
+   *
+   * Também deixava dois ecrãs a discordarem sobre o mesmo evento: o painel
+   * de custos (EventCosts) já comparava líquidos e dizia 8.000 €, enquanto o
+   * quadro de rentabilidade (StatsDashboard), que lê este campo, dizia 9.840.
+   */
   margin: number;
   countdownDays: number | null;
   rsvpConfirmed: number;
@@ -350,11 +394,15 @@ export function computeEventMetrics(d: DossierData, today: Date = new Date()): E
   const informalPaid = informalPaidTotal(quote);
   const pctPaid = contracted > 0 ? ledgerPaid / contracted : 0;
 
-  const supplierCosts = (quote.eventSuppliers ?? []).reduce(
-    (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
-    0,
+  const supplierCosts = round2(
+    (quote.eventSuppliers ?? []).reduce((s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0), 0),
   );
-  const margin = contracted - supplierCosts;
+  // Os custos de fornecedor são registados COM IVA (ver `EventSupplier`), e o
+  // IVA suportado é dedutível — não é custo. Passa-se a líquido à mesma taxa a
+  // que a receita foi facturada, que é a única taxa que este evento conhece.
+  const vatRate = amounts.gross > 0 && amounts.net > 0 ? amounts.gross / amounts.net - 1 : 0.23;
+  const supplierCostsNet = round2(supplierCosts / (1 + vatRate));
+  const margin = round2(amounts.net - supplierCostsNet);
 
   const guests = quote.guestList ?? [];
   const rsvpTotal = guests.reduce((s, g) => s + (g.party || 0), 0);
@@ -373,6 +421,7 @@ export function computeEventMetrics(d: DossierData, today: Date = new Date()): E
     informalPaid,
     pctPaid,
     supplierCosts,
+    supplierCostsNet,
     margin,
     countdownDays: countdownDays(quote.date, today),
     rsvpConfirmed,
@@ -423,6 +472,12 @@ export function nextAction(
   d: DossierData,
   today: Date = new Date(),
 ): NextAction {
+  // A percentagem do sinal é a da PROPOSTA aceite, não os 30% da casa escritos
+  // à mão. Uma proposta a 50% deixava o cabeçalho a mandar «Emitir fatura de
+  // sinal (30%)» e a rota a emitir 50% — o ecrã a discordar da factura que ele
+  // próprio manda emitir. Sem proposta vale a percentagem por omissão, que é
+  // exactamente o que estas frases sempre disseram.
+  const pctSinal = depositPercentOf(d.proposal?.doc);
   switch (stage) {
     case "lead":
       return {
@@ -438,7 +493,7 @@ export function nextAction(
       };
     case "aceite":
       return {
-        label: "Emitir fatura de sinal (30%)",
+        label: `Emitir fatura de sinal (${pctSinal}%)`,
         hint: "Contrato aceite — falta receber o sinal para arrancar.",
         kind: "fatura_sinal",
       };
@@ -458,7 +513,7 @@ export function nextAction(
       const { pctPaid } = computeEventMetrics(d, today);
       if (pctPaid < 1) {
         return {
-          label: "Liquidar o saldo (70%)",
+          label: `Liquidar o saldo (${100 - pctSinal}%)`,
           hint: "Evento esta semana — falta liquidar o saldo antes do dia.",
           kind: "fatura_saldo",
         };

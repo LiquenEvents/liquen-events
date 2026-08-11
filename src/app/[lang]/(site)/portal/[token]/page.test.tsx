@@ -132,3 +132,49 @@ describe("Portal page — accepted proposal is the source of truth (FIX 6)", () 
     expect(getProposalByQuote).toHaveBeenCalledWith("q-1");
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O PORTAL MOSTRA O SINAL DA PROPOSTA, NÃO TRINTA POR CENTO FIXOS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A percentagem do sinal é editável no estúdio e é ela que as rotas de
+ * facturação usam para emitir o sinal e o saldo (`depositPercentOf`). O portal
+ * dividia sempre 30/70. Numa proposta de 50%, o cliente abria o link privado,
+ * lia «Sinal (30%) 3.000,00 €» e recebia por email uma factura de 5.000 € — o
+ * sítio onde ele vai confirmar o valor é precisamente este.
+ */
+describe("Portal page — a percentagem do sinal é a da proposta", () => {
+  it("uma proposta de 50% divide o total ao meio", async () => {
+    db.newestByQuote.set("q-1", {
+      id: "p-50",
+      quoteId: "q-1",
+      total: 10000,
+      currency: "EUR",
+      status: "enviada",
+      doc: { depositPercent: 50 },
+    });
+
+    const props = await renderProps();
+
+    expect(props.schedule).toEqual({ sinal: 5000, saldo: 5000 });
+    // A vista também precisa do número para escrever o rótulo.
+    expect(props.depositPercent).toBe(50);
+  });
+
+  it("sem percentagem escrita, continua a ser a da casa", async () => {
+    db.newestByQuote.set("q-1", {
+      id: "p-dflt",
+      quoteId: "q-1",
+      total: 10000,
+      currency: "EUR",
+      status: "enviada",
+      doc: {},
+    });
+
+    const props = await renderProps();
+
+    expect(props.schedule).toEqual({ sinal: 3000, saldo: 7000 });
+    expect(props.depositPercent).toBe(30);
+  });
+});

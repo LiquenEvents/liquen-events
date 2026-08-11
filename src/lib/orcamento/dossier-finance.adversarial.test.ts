@@ -103,11 +103,14 @@ describe("computeEventMetrics — margin adversarial edges", () => {
       }),
     });
     const m = computeEventMetrics(d, TODAY);
-    // 5 000 € é o preço SEM IVA; contratado = 6 150 € com IVA, a mesma base dos
-    // custos de fornecedor (também com IVA). A margem continua negativa.
+    // 5 000 € é o preço SEM IVA; contratado = 6 150 € com IVA, que é a base em
+    // que os pagamentos e as facturas se comparam. A MARGEM, essa, corre em
+    // líquido dos dois lados — o IVA não é receita nem é custo (ver a nota em
+    // `EventMetrics.margin`): 5 000 − 6 504,07 = −1 504,07 €.
     expect(m.contracted).toBe(6150);
     expect(m.supplierCosts).toBe(8000);
-    expect(m.margin).toBe(-1850); // receita − custo, honestly negative
+    expect(m.supplierCostsNet).toBe(6504.07);
+    expect(m.margin).toBe(-1504.07); // receita − custo, honestamente negativa
     expect(Number.isFinite(m.margin)).toBe(true);
     expect(m.pctPaid).toBe(0); // nothing paid, no divide-by-zero
   });
@@ -231,6 +234,8 @@ describe("computeEventMetrics — aggregation invariant (the Estatísticas sum)"
     ];
     let sumContracted = 0,
       sumCosts = 0,
+      sumCostsNet = 0,
+      sumNet = 0,
       sumMargin = 0;
     for (const q of quotes) {
       const m = computeEventMetrics(
@@ -239,14 +244,21 @@ describe("computeEventMetrics — aggregation invariant (the Estatísticas sum)"
       );
       sumContracted += m.contracted;
       sumCosts += m.supplierCosts;
+      sumCostsNet += m.supplierCostsNet;
+      sumNet += m.contractedNet;
       sumMargin += m.margin;
     }
     // 20 000 + 5 000 + 10 000 sem IVA = 35 000 € → 43 050 € com IVA, que é a base
-    // em que os custos de fornecedor também estão gravados.
+    // em que os pagamentos e as facturas se comparam.
     expect(sumContracted).toBe(43050);
     expect(sumCosts).toBe(20000);
-    expect(sumMargin).toBe(23050);
-    expect(sumMargin).toBe(sumContracted - sumCosts); // fold stays coherent with a −3000 event mixed in
+    expect(sumNet).toBe(35000);
+    // A margem soma-se em LÍQUIDO dos dois lados: 35 000 − 16 260,17. O total
+    // que se mostra no quadro de rentabilidade tem de continuar a ser a soma das
+    // margens de cada evento, com o evento a perder lá pelo meio.
+    expect(sumCostsNet).toBeCloseTo(16260.17, 2);
+    expect(sumMargin).toBeCloseTo(18739.83, 2);
+    expect(sumMargin).toBeCloseTo(sumNet - sumCostsNet, 10); // o fold mantém-se coerente
   });
 });
 

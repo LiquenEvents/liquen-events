@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
+import { __resetListCache } from "./useCachedList";
 import PaymentsPanel from "./PaymentsPanel";
 import type { Payment, Quote } from "@/lib/orcamento/types";
 
@@ -196,5 +197,52 @@ describe("PaymentsPanel — lista", () => {
     await user.click(repetir);
     await waitFor(() => expect(lastSavedPayments()).toHaveLength(2));
     expect(screen.queryByText("Não guardado")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O ATALHO DO SINAL TEM DE DAR O MESMO NÚMERO QUE A FACTURA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A percentagem do sinal é uma caixa editável na proposta, e é ela que as
+ * rotas de facturação usam (`depositPercentOf`). Este painel dividia sempre
+ * 30/70: numa proposta de 50%, o botão oferecia 369 € e a factura emitida era
+ * de 615 €. Ela regista o que o botão diz, e o «Em falta» fica errado a partir
+ * daí — sem nada no ecrã a denunciá-lo.
+ */
+describe("PaymentsPanel — o sinal sugerido é o da proposta", () => {
+  beforeEach(() => {
+    __resetListCache();
+  });
+
+  const comProposta = (pctSinal: number) =>
+    vi.fn(async (url: string) =>
+      String(url).startsWith("/api/propostas")
+        ? ({
+            ok: true,
+            status: 200,
+            headers: new Headers(),
+            json: async () => [{ id: "p1", quoteId: "q1", pctSinal }],
+          } as unknown as Response)
+        : okResponse(),
+    );
+
+  it("uma proposta de 50% sugere metade do total", async () => {
+    fetchMock = comProposta(50);
+    vi.stubGlobal("fetch", fetchMock);
+    renderPanel(makeQuote());
+
+    // Total c/ IVA = 1230 € → 50% = 615 €.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Sinal 50%/ }).textContent).toMatch(/615,00/),
+    );
+  });
+
+  it("sem proposta que diga outra coisa, continua a ser 30%", async () => {
+    renderPanel(makeQuote());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Sinal 30%/ }).textContent).toMatch(/369,00/),
+    );
   });
 });

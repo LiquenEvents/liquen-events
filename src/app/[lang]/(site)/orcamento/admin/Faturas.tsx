@@ -8,7 +8,8 @@ import type { Quote } from "@/lib/orcamento/types";
 import type { Invoice } from "@/lib/invoices-store";
 import { SkeletonList } from "./Skeleton";
 import { eur2 } from "./util";
-import { splitThirtySeventy } from "@/lib/money";
+import { splitSinal } from "@/lib/money";
+import { usePercentagemDoSinal } from "./percentagem-do-sinal";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { useToast } from "./Toast";
 import { Button, Card, EmptyState, Field, Segmented } from "./ui";
@@ -41,9 +42,18 @@ const PlusIcon = (
   </svg>
 );
 
+/**
+ * Rótulos do LIVRO — que mistura faturas de eventos diferentes.
+ *
+ * Sem percentagem, e de propósito: a percentagem do sinal é de cada proposta, e
+ * aqui cada linha é de um casamento diferente. Escrever «Sinal (30%)» ao lado
+ * de uma fatura emitida a 50% era dizer, com toda a confiança, um número que
+ * ninguém tinha usado. Onde a percentagem é conhecida — o formulário, que sabe
+ * qual é o evento escolhido — ela aparece.
+ */
 const KIND_LABEL: Record<Kind, string> = {
-  sinal: "Sinal (30%)",
-  saldo: "Saldo (70%)",
+  sinal: "Sinal",
+  saldo: "Saldo",
   total: "Total",
 };
 
@@ -271,6 +281,17 @@ export default function Faturas({ quotes }: Props) {
   // Datas + IVA têm valores predefinidos sensatos (IVA 23%, emissão hoje), por
   // isso ficam recolhidos: o essencial de uma fatura é cliente + valor.
   const [showDates, setShowDates] = useState(false);
+
+  /**
+   * A percentagem com que o SERVIDOR vai dividir este split.
+   *
+   * Estava escrita 30/70 nesta frase de pré-visualização, mas a rota calcula-a
+   * a partir da proposta do evento (`depositPercentOf`). Numa proposta de 50%,
+   * o formulário prometia «sinal 3.690,00 € + saldo 8.610,00 €» e no livro
+   * apareciam duas faturas de 6.150,00 € — o ecrã a dizer uma coisa e o botão a
+   * fazer outra, sobre dinheiro que já foi para o cliente.
+   */
+  const pctSinal = usePercentagemDoSinal(quoteId);
 
   async function onPickQuote(id: string) {
     setQuoteId(id);
@@ -621,7 +642,7 @@ export default function Faturas({ quotes }: Props) {
             />
             <p className="mt-2.5 text-xs leading-relaxed text-foreground/50">
               {mode === "split"
-                ? "Cria duas faturas de uma vez: o sinal (entrada de 30% agora) e o saldo (os 70% restantes)."
+                ? `Cria duas faturas de uma vez: o sinal (entrada de ${pctSinal}% agora) e o saldo (os ${100 - pctSinal}% restantes).`
                 : "Cria só uma fatura — pode ser o total, só o sinal ou só o saldo."}
             </p>
           </div>
@@ -661,8 +682,8 @@ export default function Faturas({ quotes }: Props) {
                 onChange={(e) => setKind(e.target.value as Kind)}
               >
                 <option value="total">Total</option>
-                <option value="sinal">Sinal (30%)</option>
-                <option value="saldo">Saldo (70%)</option>
+                <option value="sinal">Sinal ({pctSinal}%)</option>
+                <option value="saldo">Saldo ({100 - pctSinal}%)</option>
               </Field>
             )}
 
@@ -742,8 +763,8 @@ export default function Faturas({ quotes }: Props) {
             parseFloat(amount) > 0 && (
               <p className="mt-4 text-sm leading-relaxed text-foreground/55">
                 Serão emitidas duas faturas: sinal{" "}
-                {eur2(splitThirtySeventy(parseFloat(amount)).sinal)} + saldo{" "}
-                {eur2(splitThirtySeventy(parseFloat(amount)).saldo)}.
+                {eur2(splitSinal(parseFloat(amount), pctSinal).sinal)} + saldo{" "}
+                {eur2(splitSinal(parseFloat(amount), pctSinal).saldo)}.
               </p>
             )
           )}

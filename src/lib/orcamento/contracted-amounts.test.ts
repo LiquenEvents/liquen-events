@@ -260,10 +260,28 @@ describe("contractedTotal — os três ramos na MESMA unidade (com IVA)", () => 
     expect(m.pctPaid).toBe(1); // antes: 24 600 / 20 000 = 1,23
   });
 
-  it("a margem confronta receita e custos ambos COM IVA", () => {
-    // Custos de fornecedor são gravados com IVA (ver `EventSupplier`); comparar
-    // 20 000 € líquidos com 18 000 € brutos dava uma margem de 2 000 € quando a
-    // real é 6 600 €.
+  it("a margem confronta receita e custos ambos SEM IVA", () => {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * DUAS UNIDADES IGUAIS NÃO SÃO A UNIDADE CERTA
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Este teste dizia 6.600 €, que é `24.600 − 18.000`: receita bruta menos
+     * custos brutos. As duas parcelas estavam na mesma unidade — o que parece
+     * bastar, e não basta. O IVA não é receita nem é custo: entra do cliente e
+     * sai para o Estado, e o IVA suportado nos fornecedores é dedutível. A
+     * diferença entre dois brutos é a margem verdadeira multiplicada por 1,23.
+     *
+     * Os números deste casamento: 20.000 € de base, 24.600 € facturados,
+     * 18.000 € de custo com IVA (14.634,15 € de custo real). A margem são
+     * 5.365,85 € e não 6.600 €. Os 1.234,15 € de diferença são IVA que passa
+     * pela conta da Líquen e não fica lá — e era com eles em cima da mesa que
+     * se decidia se valia a pena baixar um preço.
+     *
+     * É também o número que o painel de custos do evento (EventCosts) já
+     * mostrava: os dois ecrãs diziam margens diferentes sobre o mesmo
+     * casamento, e o quadro de rentabilidade era o que estava errado.
+     */
     const d = casamento("preco_cotado");
     d.quote = {
       ...d.quote,
@@ -272,7 +290,11 @@ describe("contractedTotal — os três ramos na MESMA unidade (com IVA)", () => 
       ],
     };
     const m = computeEventMetrics(d, DEPOIS_DO_EVENTO);
+    // O custo continua a ser mostrado como foi registado — com IVA.
     expect(m.supplierCosts).toBe(18000);
-    expect(m.margin).toBe(6600);
+    expect(m.supplierCostsNet).toBe(14634.15);
+    expect(m.margin).toBe(5365.85);
+    // E a margem fecha com as duas parcelas líquidas, ao cêntimo.
+    expect(m.contractedNet - m.supplierCostsNet).toBeCloseTo(m.margin, 10);
   });
 });

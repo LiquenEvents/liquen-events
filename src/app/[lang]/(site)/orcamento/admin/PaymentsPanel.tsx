@@ -9,7 +9,8 @@ import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
 // `import type` é apagado no build, por isso puxar a forma da fatura do store
 // server-only não arrasta o guarda `server-only` para este bundle de cliente.
 import type { Invoice } from "@/lib/invoices-store";
-import { splitThirtySeventy } from "@/lib/money";
+import { splitSinal } from "@/lib/money";
+import { usePercentagemDoSinal } from "./percentagem-do-sinal";
 import {
   computeEventMetrics,
   reconcileFinance,
@@ -44,11 +45,14 @@ const GRID =
   "@min-[36rem]:grid-cols-[6.25rem_5.5rem_7.25rem_minmax(3.5rem,1fr)_5rem_5.5rem]";
 
 // Rótulos do livro de faturas (FT) — espelham a Zona Financeira do Dossier.
-const INV_KIND_LABEL: Record<DossierInvoice["kind"], string> = {
-  sinal: "Sinal (30%)",
-  saldo: "Saldo (70%)",
+// A percentagem é a DESTE evento (as faturas listadas são todas dele), por isso
+// não pode ser um 30/70 escrito à mão: numa proposta de 50% o livro rotulava
+// «Sinal (30%)» uma fatura que tinha sido emitida a 50%.
+const invKindLabel = (pctSinal: number): Record<DossierInvoice["kind"], string> => ({
+  sinal: `Sinal (${pctSinal}%)`,
+  saldo: `Saldo (${100 - pctSinal}%)`,
   total: "Total",
-};
+});
 const INV_STATUS_META: Record<DossierInvoice["status"], { label: string; color: string }> = {
   emitida: { label: "Emitida", color: "#9aa36a" },
   paga: { label: "Paga", color: "#4d6350" },
@@ -230,8 +234,15 @@ export default function PaymentsPanel({
   const allReceived = total > 0 && outstanding === 0;
   // Aviso suave: registaram-se recebimentos acima do total contratado.
   const overReceived = total > 0 && headlinePaid > total;
-  // Faseamento 30/70 sobre o total com IVA — alimenta os atalhos de registo.
-  const split = useMemo(() => splitThirtySeventy(total), [total]);
+  // Faseamento sobre o total com IVA — alimenta os atalhos de registo.
+  //
+  // A percentagem é a da PROPOSTA deste pedido, não 30% fixos: é ela que as
+  // rotas de facturação usam para emitir o sinal e o saldo. Enquanto isto
+  // dividia sempre 30/70, o atalho oferecia 369 € numa proposta de 50% cuja
+  // factura de sinal era de 615 € — ela registava o que o botão dizia e o «Em
+  // falta» ficava errado a partir daí, sem nada no ecrã a denunciá-lo.
+  const pctSinal = usePercentagemDoSinal(quote.id);
+  const split = useMemo(() => splitSinal(total, pctSinal), [total, pctSinal]);
   const today = todayKey();
   const yesterday = useMemo(() => yesterdayKey(), []);
 
@@ -266,7 +277,7 @@ export default function PaymentsPanel({
   }, [payments]);
 
   // Ecrã vazio útil: em vez de uma caixa a dizer que não há nada, a linha de
-  // registo já vem com o sinal de 30% preenchido — falta só carregar em Registar.
+  // registo já vem com o sinal da proposta preenchido — falta carregar em Registar.
   useEffect(() => {
     if (prefilled.current || payments.length > 0 || total <= 0) return;
     prefilled.current = true;
@@ -802,10 +813,10 @@ export default function PaymentsPanel({
             <button
               type="button"
               onClick={() => suggest(split.sinal, "sinal")}
-              title="Preencher com o sinal de 30% do total"
+              title={`Preencher com o sinal de ${pctSinal}% do total`}
               className={chip}
             >
-              Sinal 30% · {eur2(split.sinal)}
+              Sinal {pctSinal}% · {eur2(split.sinal)}
             </button>
             <button
               type="button"
@@ -1086,7 +1097,9 @@ export default function PaymentsPanel({
                         <td className="py-2 pr-3 text-foreground/55 tabular-nums whitespace-nowrap">
                           {i.number}
                         </td>
-                        <td className="py-2 pr-3 text-foreground/50">{INV_KIND_LABEL[i.kind]}</td>
+                        <td className="py-2 pr-3 text-foreground/50">
+                          {invKindLabel(pctSinal)[i.kind]}
+                        </td>
                         <td className="py-2 pr-3 text-foreground/70 tabular-nums text-right whitespace-nowrap">
                           {eur2(i.amount)}
                         </td>

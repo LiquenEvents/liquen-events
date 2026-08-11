@@ -297,7 +297,13 @@ describe("computeEventMetrics", () => {
     expect(m.ledgerPaid).toBe(6000);
     expect(m.pctPaid).toBeCloseTo(0.3, 5);
     expect(m.supplierCosts).toBe(4200 + 1500); // actualCost ?? estimatedCost
-    expect(m.margin).toBe(20000 - 5700);
+    // A margem corre em LÍQUIDO dos dois lados: a proposta de 20.000 € brutos
+    // vale 16.260,16 € de base, e os 5.700 € de custo com IVA são 4.634,15 € de
+    // custo real. O IVA entra do cliente e sai para o Estado — não é receita
+    // nem é custo (ver a nota em `EventMetrics.margin`).
+    expect(m.contractedNet).toBe(16260); // o `subtotal` que a proposta gravou
+    expect(m.supplierCostsNet).toBe(4634.1);
+    expect(m.margin).toBe(11625.9);
     expect(m.countdownDays).toBe(7);
     expect(m.rsvpConfirmed).toBe(6);
     expect(m.rsvpTotal).toBe(9);
@@ -325,9 +331,11 @@ describe("computeEventMetrics", () => {
     });
     const m = computeEventMetrics(d, TODAY);
     expect(m.supplierCosts).toBe(0);
-    // 5 000 € é o "Preço final (sem IVA)"; a receita contratada é o que o cliente
-    // paga (6 150 €), a mesma base dos custos de fornecedor.
-    expect(m.margin).toBe(6150);
+    // 5 000 € é o "Preço final (sem IVA)". O valor CONTRATADO é o que o cliente
+    // paga (6 150 €), porque é com pagamentos e facturas que ele se compara; a
+    // MARGEM é sobre o líquido, e sem custos nenhuns é o preço todo.
+    expect(m.contracted).toBe(6150);
+    expect(m.margin).toBe(5000);
     expect(m.rsvpTotal).toBe(2); // 0 + 2
     expect(m.rsvpConfirmed).toBe(2); // party 0 contributes nothing
   });

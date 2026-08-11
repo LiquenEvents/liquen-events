@@ -406,12 +406,31 @@ export const DEFAULT_OBSERVACOES_GERAIS: string[] = [
   "O conteúdo desta proposta é intransmissível, pessoal e confidencial, não podendo ser reproduzido ou partilhado com terceiros sem autorização expressa, por escrito, por parte da Líquen Events.",
 ];
 
-/** "Faseamento do Pagamento". */
-export const DEFAULT_FASEAMENTO: string[] = [
-  "30% na adjudicação;",
-  "70% 1 mês antes;",
-  "A adjudicação de um serviço só é considerada válida após pagamento no valor da primeira percentagem definida.",
-];
+/**
+ * "Faseamento do Pagamento" — as duas primeiras linhas seguem a percentagem.
+ *
+ * Era um array fixo a dizer «30% na adjudicação; 70% 1 mês antes». Assim que a
+ * percentagem do sinal passou a ser editável na proposta (ver
+ * {@link depositPercentOf}), esse texto passou a poder CONTRADIZER a folha onde
+ * está impresso: o quadro dos valores dizia «Sinal 50% 5.000,00 €» e três
+ * parágrafos abaixo as condições continuavam a dizer 30%. Duas percentagens no
+ * mesmo documento é uma conversa desagradável, e a que o casal vai defender é a
+ * mais baixa.
+ *
+ * A terceira linha não menciona números de propósito — fala da «primeira
+ * percentagem definida», que é exactamente o que a primeira linha diz.
+ */
+export function faseamentoPorOmissao(pctSinal: number = SINAL_POR_OMISSAO): string[] {
+  const sinal = depositPercentOf({ depositPercent: pctSinal });
+  return [
+    `${sinal}% na adjudicação;`,
+    `${100 - sinal}% 1 mês antes;`,
+    "A adjudicação de um serviço só é considerada válida após pagamento no valor da primeira percentagem definida.",
+  ];
+}
+
+/** O faseamento da casa (30/70) — o mesmo texto de sempre. */
+export const DEFAULT_FASEAMENTO: string[] = faseamentoPorOmissao();
 
 /** "Cancelamento". */
 export const DEFAULT_CANCELAMENTO: string[] = [
@@ -562,9 +581,15 @@ export interface ProposalMoney {
  *  - modo "incluido": `amount` é o BRUTO ⇒ `base = gross/(1+taxa)`, `vat = gross-base`.
  */
 export function resolveProposalMoney(
-  doc: Pick<
-    ProposalDoc,
-    "totalAmount" | "totalVatMode" | "vatRate" | "totalText" | "totalEstimatedText"
+  // `Partial` de propósito: um documento a meio de ser escrito ainda não tem
+  // texto de total nenhum, e um `Pick` estrito obrigava quem chama a inventar
+  // um `totalText: ""` só para satisfazer o tipo — o género de campo inventado
+  // que depois alguém lê como se fosse verdade.
+  doc: Partial<
+    Pick<
+      ProposalDoc,
+      "totalAmount" | "totalVatMode" | "vatRate" | "totalText" | "totalEstimatedText"
+    >
   >,
 ): ProposalMoney {
   const vatRate =
@@ -585,6 +610,34 @@ export function resolveProposalMoney(
   const base = round2(gross / (1 + vatRate));
   const vat = round2(gross - base);
   return { base, vat, gross, vatRate, mode };
+}
+
+/**
+ * O `totalAmount` a GRAVAR para uma dada base, no modo de IVA em vigor.
+ *
+ * É a volta de {@link resolveProposalMoney}, e existe para as duas contas não
+ * poderem divergir. O campo do estúdio chama-se «Preço final (sem IVA)» e o
+ * que ela lá escreve é sempre a BASE; o que o documento guarda depende do
+ * modo — em "acrescer" é a própria base, em "incluído" é a base já com o IVA
+ * somado, porque é assim que o resolvedor a volta a ler.
+ *
+ * ── PORQUE É QUE A BASE É ARREDONDADA PRIMEIRO ─────────────────────────────
+ * O estúdio fazia `base × (1+taxa)` e arredondava no fim. Com uma base a
+ * chegar do PATCH do pedido com mais de dois decimais (999,995 €), a ida dava
+ * 1.229,99 € e a volta devolvia 999,99 € — o campo mudava sozinho debaixo dos
+ * dedos dela e o pedido e a proposta separavam-se por um cêntimo sem ninguém
+ * ter tocado em nada. Um valor em euros tem cêntimos e mais nada: arredonda-se
+ * ANTES de o multiplicar, e a ida e volta passa a devolver sempre o mesmo
+ * número.
+ */
+export function totalAmountParaBase(
+  base: number,
+  mode: VatMode,
+  vatRate: number = DEFAULT_VAT_RATE,
+): number {
+  const taxa = typeof vatRate === "number" && vatRate >= 0 ? vatRate : DEFAULT_VAT_RATE;
+  const b = round2(base);
+  return mode === "acrescer" ? b : round2(b * (1 + taxa));
 }
 
 /** Data de validade (yyyy-mm-dd) de uma proposta: honra uma `validUntil`
@@ -658,7 +711,10 @@ export function withProposalDefaults(
     naoIncluido: doc.naoIncluido ?? DEFAULT_NAO_INCLUIDO,
     condicoesGerais: (doc.condicoesGerais ?? DEFAULT_CONDICOES_GERAIS).map(fill),
     observacoesGerais: doc.observacoesGerais ?? DEFAULT_OBSERVACOES_GERAIS,
-    faseamento: doc.faseamento ?? DEFAULT_FASEAMENTO,
+    // O faseamento por omissão SEGUE a percentagem do sinal deste documento —
+    // um faseamento escrito à mão continua a mandar, como todos os outros
+    // blocos de texto fixo.
+    faseamento: doc.faseamento ?? faseamentoPorOmissao(depositPercentOf(doc)),
     cancelamento: doc.cancelamento ?? DEFAULT_CANCELAMENTO,
   };
 }

@@ -4,7 +4,9 @@ import { readPortalToken } from "@/lib/portal-token";
 import { getQuote } from "@/lib/quotes-store";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote, getContractByProposal } from "@/lib/contracts-store";
-import { listInvoicesForQuote, splitThirtySeventy } from "@/lib/invoices-store";
+import { listInvoicesForQuote } from "@/lib/invoices-store";
+import { splitSinal } from "@/lib/money";
+import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
 import type { EventType, Quote } from "@/lib/orcamento/types";
 import PortalView from "./PortalView";
@@ -90,6 +92,17 @@ export default async function PortalPage({
   ]);
 
   const total = proposal?.total ?? 0;
+  /**
+   * ── O SINAL QUE O CLIENTE LÊ AQUI É O QUE LHE VAI SER FACTURADO ─────────
+   *
+   * A percentagem do sinal é uma caixa editável na proposta e é ela que as
+   * rotas de facturação usam para emitir o sinal e o saldo
+   * (`depositPercentOf`). Este plano dividia sempre 30/70: numa proposta de
+   * 50%, o cliente abria o link privado, lia «Sinal (30%) 3.000,00 €» e depois
+   * recebia por email uma factura de 5.000 €. Este é precisamente o ecrã a que
+   * ele volta para confirmar o valor antes de transferir.
+   */
+  const depositPercent = depositPercentOf(proposal?.doc as ProposalDoc | undefined);
 
   return (
     <PortalView
@@ -139,7 +152,8 @@ export default async function PortalPage({
         dueAt: fmtDate(i.dueAt, t.dateLocale),
         paidAt: fmtDate(i.paidAt, t.dateLocale),
       }))}
-      schedule={proposal ? splitThirtySeventy(total) : null}
+      schedule={proposal ? splitSinal(total, depositPercent) : null}
+      depositPercent={depositPercent}
       currency={proposal?.currency || "EUR"}
     />
   );

@@ -5,6 +5,7 @@ import { useToast } from "./Toast";
 import {
   withProposalDefaults,
   resolveProposalMoney,
+  totalAmountParaBase,
   detectVatMode,
   parseMoneyText,
   normaliseCoverImages,
@@ -210,7 +211,11 @@ const STEPS: { id: Step; n: string; label: string }[] = [
 function aplicarBase(d: StudioDoc, base: number): StudioDoc {
   const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
   const rate = d.vatRate ?? DEFAULT_VAT_RATE;
-  const amount = mode === "acrescer" ? base : Math.round(base * (1 + rate) * 100) / 100;
+  // A conta é a partilhada, e não uma cópia: arredondar a base ANTES de a
+  // multiplicar é o que faz base → bruto → base devolver o mesmo número. Feita
+  // à mão aqui, uma base com mais de dois decimais perdia um cêntimo em cada
+  // ida e volta, e o campo mudava sozinho debaixo dos dedos dela.
+  const amount = totalAmountParaBase(base, mode, rate);
   const text = mode === "acrescer" ? `${eur(amount)} + IVA` : eur(amount);
   return d.template === "organizacao"
     ? { ...d, totalAmount: amount, totalVatMode: mode, totalEstimatedText: text }
@@ -263,7 +268,16 @@ function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
   // dois números separavam-se em silêncio. Agora semeia-se SEMPRE, e o efeito
   // de sincronização trata das alterações posteriores.
   if (typeof quotedPrice === "number" && quotedPrice > 0) {
-    next = { ...next, totalAmount: quotedPrice, totalVatMode: next.totalVatMode ?? "acrescer" };
+    // `totalAmount` NÃO é o preço do pedido: é a base em «acrescer» e o BRUTO
+    // em «IVA incluído». Escrever aqui o líquido cru fazia uma proposta já em
+    // «IVA incluído» perder 23% em silêncio — o número do pedido passava a ser
+    // lido como se já trouxesse o imposto dentro.
+    const modo: VatMode = next.totalVatMode ?? "acrescer";
+    next = {
+      ...next,
+      totalAmount: totalAmountParaBase(quotedPrice, modo, next.vatRate ?? DEFAULT_VAT_RATE),
+      totalVatMode: modo,
+    };
   }
   return next;
 }
@@ -988,7 +1002,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * ser o número do pedido, que é o que o rótulo "(sem IVA)" promete.
    */
   function amountParaBase(base: number, mode: VatMode): number {
-    return mode === "acrescer" ? base : Math.round(base * (1 + money.vatRate) * 100) / 100;
+    return totalAmountParaBase(base, mode, money.vatRate);
   }
 
   /** O que se grava no pedido, com a mão travada: escrever "3000" são quatro
@@ -1109,9 +1123,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
       const amount =
         typeof doPedido === "number" && doPedido > 0
-          ? mode === "acrescer"
-            ? doPedido
-            : Math.round(doPedido * (1 + (d.vatRate ?? DEFAULT_VAT_RATE)) * 100) / 100
+          ? totalAmountParaBase(doPedido, mode, d.vatRate ?? DEFAULT_VAT_RATE)
           : undefined;
       const text = amount == null ? "" : mode === "acrescer" ? `${eur(amount)} + IVA` : eur(amount);
       return d.template === "organizacao"
@@ -2841,12 +2853,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       números escritos podiam discordar no dia em que ela
                       corrigisse só um. */}
                   {(() => {
-                    const v = totaisDasVersoes(doc as ProposalDoc, doc.totalAmount ?? 0);
+                    // Sem segundo argumento: a base sai do próprio documento, e é a
+                    // mesma leitura que o PDF faz. Passar `totalAmount` cru dava a
+                    // base em «acrescer» e o BRUTO em «IVA incluído» — o ecrã e o
+                    // documento a discordarem sobre o mesmo casamento.
+                    const v = totaisDasVersoes(doc as ProposalDoc);
                     if (!v) return null;
                     return (
                       <div className="mt-1 rounded-xl border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5">
                         <p className="text-xs leading-relaxed text-foreground/70">
-                          {`Versão base ${eur(v.base)} · com extras ${eur(v.comExtras)}`}
+                          {`Versão base ${eur(v.comoOTotal.base)} · com extras ${eur(v.comoOTotal.comExtras)}`}
                         </p>
                         <p className="mt-0.5 text-[11px] leading-relaxed text-foreground/45">
                           {v.linhasExtra === 1

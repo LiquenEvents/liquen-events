@@ -45,6 +45,13 @@ interface PortalViewProps {
   contratoPdfHref: string | null;
   invoices: InvoiceRow[];
   schedule: { sinal: number; saldo: number } | null;
+  /**
+   * A percentagem do sinal desta proposta (1–99), resolvida no servidor.
+   *
+   * Vem como prop e não escrita nos rótulos porque é editável por proposta, e é
+   * ela que as facturas usam. Ver o comentário em `page.tsx`.
+   */
+  depositPercent: number;
   currency: string;
 }
 
@@ -108,10 +115,14 @@ export default function PortalView({
   contratoPdfHref,
   invoices,
   schedule,
+  depositPercent,
   currency,
 }: PortalViewProps) {
   const locale = t.dateLocale;
   const firstName = clientName?.trim().split(" ")[0] || clientName;
+  // Os rótulos do faseamento trazem as duas percentagens — a do sinal e o que
+  // sobra — para não poderem discordar do valor impresso ao lado.
+  const pcts = { sinal: String(depositPercent), saldo: String(100 - depositPercent) };
 
   // Event line: type · name · date · location, dropping any missing parts.
   const eventParts = [eventLabel, eventName, eventDate ?? t.semData, location ?? t.semLocal].filter(
@@ -212,13 +223,15 @@ export default function PortalView({
 
         {/* ── Pagamentos ── */}
         <Section title={t.pagamentos.title}>
-          <p className="text-foreground/72 text-sm leading-relaxed">{t.pagamentos.intro}</p>
+          <p className="text-foreground/72 text-sm leading-relaxed">
+            {fill(t.pagamentos.intro, pcts)}
+          </p>
 
           {schedule ? (
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-md border border-foreground/8 px-4 py-3">
                 <p className="text-foreground/62 text-[11px] tracking-[0.12em] uppercase">
-                  {t.pagamentos.sinal}
+                  {fill(t.pagamentos.sinal, pcts)}
                 </p>
                 <p className="text-foreground/85 text-sm tabular-nums mt-1">
                   {eur(schedule.sinal, currency, locale)}
@@ -226,7 +239,7 @@ export default function PortalView({
               </div>
               <div className="rounded-md border border-foreground/8 px-4 py-3">
                 <p className="text-foreground/62 text-[11px] tracking-[0.12em] uppercase">
-                  {t.pagamentos.saldo}
+                  {fill(t.pagamentos.saldo, pcts)}
                 </p>
                 <p className="text-foreground/85 text-sm tabular-nums mt-1">
                   {eur(schedule.saldo, currency, locale)}

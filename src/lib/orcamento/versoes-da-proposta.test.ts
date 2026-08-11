@@ -50,6 +50,80 @@ describe("os dois totais", () => {
     expect(totaisDasVersoes(d, 5000)!.base).toBe(0);
   });
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS 460 € OFERECIDOS AO CASAL — O CASO QUE ESTA FUNÇÃO DEIXAVA PASSAR
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A proposta: 10.000 € de base, IVA incluído, 12.300 € guardados em
+   * `totalAmount`. Uma linha extra de 2.000 € (preço de linha, portanto
+   * LÍQUIDO).
+   *
+   * O que se fazia: `totaisDasVersoes(doc, doc.totalAmount ?? 0)` — subtrair
+   * 2.000 líquidos a 12.300 brutos. Saía 10.300 €, e o PDF imprimia «Sem os
+   * extras assinalados: 10.300,00 €» debaixo de um total de 12.300 €.
+   *
+   * O correcto: a versão base vale 8.000 € de base, que são 9.840 € com IVA.
+   * A diferença — 460 € — ia impressa num número que o casal usa para
+   * negociar, e nada no documento a denunciava.
+   */
+  it("a versão base não sai 460 € acima por se subtrair líquido a bruto", () => {
+    const d = doc({
+      budgetItems: ["Decoração", "Iluminação"],
+      budgetAmounts: [8000, 2000],
+      budgetOpcional: [false, true],
+      totalAmount: 12300,
+      totalVatMode: "incluido",
+      vatRate: 0.23,
+    });
+    // Sem segundo argumento, a base sai do próprio documento — e é esta a
+    // forma de chamar que não pode estar errada.
+    const t = totaisDasVersoes(d)!;
+    expect(t.comExtras).toBe(10000); // a base, não os 12.300 guardados
+    expect(t.base).toBe(8000);
+    expect(t.extras).toBe(2000);
+    // E o que o casal paga por cada uma das versões.
+    expect(t.bruto.comExtras).toBe(12300);
+    expect(t.bruto.base).toBe(9840); // era 10.300 €
+    expect(t.bruto.extras).toBe(2460);
+    // O número a MOSTRAR debaixo de um total impresso com IVA é o bruto.
+    expect(t.comoOTotal.base).toBe(9840);
+  });
+
+  it("num documento que diz «+ IVA», o número a mostrar é o líquido", () => {
+    // Aqui o total impresso é «10.000,00 € + IVA», e a linha por baixo tem de
+    // estar na mesma unidade — senão são dois números que não se comparam.
+    const d = doc({
+      budgetItems: ["Decoração", "Iluminação"],
+      budgetAmounts: [8000, 2000],
+      budgetOpcional: [false, true],
+      totalAmount: 10000,
+      totalVatMode: "acrescer",
+      vatRate: 0.23,
+    });
+    const t = totaisDasVersoes(d)!;
+    expect(t.comoOTotal.base).toBe(8000);
+    expect(t.comoOTotal.comExtras).toBe(10000);
+    expect(t.bruto.base).toBe(9840); // o mesmo número, na outra leitura
+  });
+
+  it("as três parcelas brutas fecham entre si, sem um cêntimo a sobrar", () => {
+    // A versão base bruta sai por SUBTRACÇÃO do total bruto, e não de uma
+    // multiplicação própria: multiplicar cada parcela por sua conta deixava um
+    // cêntimo a boiar de vez em quando, e um cêntimo a sobrar num quadro de
+    // orçamento é uma pergunta ao telefone.
+    const d = doc({
+      budgetItems: ["a", "b"],
+      budgetAmounts: [333.33, 333.34],
+      budgetOpcional: [false, true],
+      totalAmount: 666.67,
+      totalVatMode: "acrescer",
+      vatRate: 0.23,
+    });
+    const t = totaisDasVersoes(d)!;
+    expect(t.bruto.base + t.bruto.extras).toBeCloseTo(t.bruto.comExtras, 10);
+  });
+
   it("soma cêntimos sem os espalhar", () => {
     const d = doc({
       budgetItems: ["a", "b"],

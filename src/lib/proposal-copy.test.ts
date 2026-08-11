@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { copiarParaPedido, fotosDoDocumento, dataPorExtenso, trocarFotos } from "./proposal-copy";
-import type { ProposalDoc } from "./proposal-doc";
+import { resolveProposalMoney, withProposalDefaults, type ProposalDoc } from "./proposal-doc";
 import type { Quote } from "./orcamento/types";
 
 /** A proposta da Catarina Martins, reduzida ao que importa para copiar. */
@@ -139,6 +139,167 @@ describe("copiarParaPedido", () => {
     const antes = JSON.stringify(ORIGEM);
     copiarParaPedido(ORIGEM, PEDIDO_NOVO);
     expect(JSON.stringify(ORIGEM)).toBe(antes);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AS CONDIÇÕES GERAIS DE UMA PROPOSTA GRAVADA JÁ NÃO TÊM TOKENS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `withProposalDefaults` substitui `{DATA}` e `{CONVIDADOS}` no SERVIDOR ANTES
+ * de gravar. Por isso o documento de uma proposta ENVIADA — que é de onde se
+ * copia — traz as frases já materializadas: "…no dia 18 de setembro de 2027",
+ * "…para o número de 250 pax convidados". Copiá-las tal e quais levava a data e
+ * os convidados do casal anterior para dentro das Condições Gerais do casal
+ * novo, e já não havia token nenhum para lá voltar a passar.
+ *
+ * O casal novo assina um documento que diz que só é válido para o casamento de
+ * outra pessoa. É a mesma família de erro que o resto deste ficheiro persegue —
+ * só que escondido no meio de um bloco de texto legal que ninguém relê.
+ */
+describe("as Condições Gerais falam do casal certo", () => {
+  /** A proposta da Catarina como fica GRAVADA: já sem tokens. */
+  const GRAVADA = {
+    ...ORIGEM,
+    condicoesGerais: [
+      "Aos valores acresce o IVA à taxa legal em vigor como descrito.",
+      "Esta proposta só é válida para o evento a realizar no dia 18 de setembro de 2027.",
+      "O orçamento é válido para o número de 250 pax convidados; abaixo ou acima deste número o valor da proposta terá de ser revisto.",
+    ],
+  } as unknown as ProposalDoc;
+
+  it("não leva a data nem os convidados do casamento anterior", () => {
+    const { doc } = copiarParaPedido(GRAVADA, PEDIDO_NOVO);
+    const texto = doc.condicoesGerais.join(" | ");
+    expect(texto).not.toContain("18 de setembro de 2027");
+    expect(texto).not.toContain("250 pax");
+  });
+
+  it("depois de o servidor preencher, as frases são as do casal novo", () => {
+    // O caminho verdadeiro: copiar → gravar/desenhar (que passa sempre por
+    // `withProposalDefaults`). É aí que a frase tem de sair certa.
+    const { doc } = copiarParaPedido(GRAVADA, PEDIDO_NOVO);
+    const texto = withProposalDefaults(doc).condicoesGerais.join(" | ");
+    expect(texto).toContain("no dia 10 de junho de 2027");
+    expect(texto).toContain("para o número de 120 pax convidados");
+  });
+
+  it("mantém a redacção dela — só troca o que era do outro casal", () => {
+    const { doc } = copiarParaPedido(GRAVADA, PEDIDO_NOVO);
+    expect(doc.condicoesGerais).toHaveLength(3);
+    expect(doc.condicoesGerais[0]).toBe(
+      "Aos valores acresce o IVA à taxa legal em vigor como descrito.",
+    );
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE É PRIVADO NÃO VIAJA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * "Cliente da AMARA, cuidado com o prazo." "Já recusaram uma proposta em 2025
+ * por preço." São frases escritas sobre UM negócio e sobre UM casal. Não são
+ * desenhadas no PDF — há testes a garanti-lo — mas ficam no documento, à vista
+ * de quem abrir o estúdio da proposta nova, coladas ao casal errado.
+ */
+describe("as notas do outro negócio ficam no outro negócio", () => {
+  const COM_NOTAS = {
+    ...ORIGEM,
+    notasInternas: "Cliente da AMARA, cuidado com o prazo. Recusaram em 2025 por preço.",
+    notasPorSeccao: { orcamento: "Margem apertada, não descer mais." },
+  } as unknown as ProposalDoc;
+
+  it("não copia as notas internas nem as notas por secção", () => {
+    const { doc } = copiarParaPedido(COM_NOTAS, PEDIDO_NOVO);
+    expect(doc.notasInternas).toBeUndefined();
+    expect(doc.notasPorSeccao).toBeUndefined();
+    expect(JSON.stringify(doc)).not.toContain("Recusaram em 2025");
+    expect(JSON.stringify(doc)).not.toContain("Margem apertada");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A PROPOSTA É PARA QUEM CASA, NÃO PARA QUEM PREENCHEU O FORMULÁRIO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O estúdio já sabe isto: `initialDoc` abre com os dois nomes do casal e só cai
+ * no `quote.name` quando não há nenhum. A cópia não sabia, e escrevia o
+ * `quote.name` — que pode ser «Mãe da noiva» ou o nome de uma planner. Uma
+ * proposta endereçada a quem preencheu o formulário em vez de a quem casa
+ * lê-se como um erro de quem a mandou.
+ */
+describe("o nome no documento é o do casal", () => {
+  it("usa os dois nomes quando o pedido os traz", () => {
+    const pedido = {
+      ...PEDIDO_NOVO,
+      name: "Mãe da noiva",
+      partnerA: "Rita",
+      partnerB: "Tomás",
+    } as unknown as Quote;
+    const { doc } = copiarParaPedido(ORIGEM, pedido);
+    expect(doc.clientNames).toBe("Rita & Tomás");
+  });
+
+  it("com um só nome escrito, meio par continua a ser melhor do que o outro", () => {
+    const pedido = { ...PEDIDO_NOVO, name: "Mãe da noiva", partnerA: "Rita" } as unknown as Quote;
+    expect(copiarParaPedido(ORIGEM, pedido).doc.clientNames).toBe("Rita");
+  });
+
+  it("sem nomes do casal, fica quem preencheu — é tudo o que há", () => {
+    expect(copiarParaPedido(ORIGEM, PEDIDO_NOVO).doc.clientNames).toBe("Irina e Hugo");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «VALOR TOTAL —» COM O BOTÃO DE ENVIAR LIGADO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A cópia apagava `totalText`/`totalEstimatedText` e repunha só o
+ * `totalAmount`. O PDF imprime o TEXTO (`totalStr || "—"`), mas quem decide se
+ * a proposta pode seguir lê o `totalAmount` — portanto o documento saía com
+ * «Valor Total —» seguido, três linhas abaixo, de «Sinal 30% 2.988,90 €», que é
+ * uma percentagem de um número que a folha não mostra.
+ *
+ * E havia um segundo erro por baixo: `quote.quotedPrice` é o «Preço final (SEM
+ * IVA)». Numa proposta copiada em modo «IVA incluído», o `totalAmount` é o
+ * BRUTO — pôr lá o líquido fazia a base cair 23% em silêncio.
+ */
+describe("o total da proposta nova é um número que se vê", () => {
+  const PEDIDO_COM_PRECO = { ...PEDIDO_NOVO, quotedPrice: 10000 } as unknown as Quote;
+
+  it("escreve o texto do total, e não só o número escondido", () => {
+    const { doc } = copiarParaPedido(ORIGEM, PEDIDO_COM_PRECO);
+    // ORIGEM está em «acrescer»: o texto acompanha o modo.
+    expect(doc.totalText).not.toBe("");
+    expect(doc.totalText).toMatch(/10\D?000,00\s€ \+ IVA/);
+  });
+
+  it("em «IVA incluído» o preço do pedido é a BASE, não o bruto", () => {
+    const origemComIva = {
+      ...ORIGEM,
+      totalVatMode: "incluido",
+      totalText: "8456,25 €",
+    } as unknown as ProposalDoc;
+    const { doc } = copiarParaPedido(origemComIva, PEDIDO_COM_PRECO);
+    // O que o pedido diz é 10.000 € sem IVA. Depois de resolvido, a base tem
+    // de continuar a ser 10.000 € — e o bruto 12.300 €.
+    const money = resolveProposalMoney(doc);
+    expect(money.base).toBeCloseTo(10000, 2);
+    expect(money.gross).toBeCloseTo(12300, 2);
+    expect(doc.totalText).toMatch(/12\D?300,00/);
+  });
+
+  it("sem preço no pedido, o total fica mesmo vazio", () => {
+    // Um documento sem total é honesto: o estúdio pede-o antes de deixar
+    // enviar. O que não pode é ter número por dentro e traço por fora.
+    const { doc } = copiarParaPedido(ORIGEM, PEDIDO_NOVO);
+    expect(doc.totalAmount).toBeUndefined();
+    expect(doc.totalText).toBe("");
+    expect(doc.totalEstimatedText).toBe("");
   });
 });
 
