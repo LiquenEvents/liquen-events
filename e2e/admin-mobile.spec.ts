@@ -74,6 +74,48 @@ async function login(page: Page): Promise<boolean> {
 }
 
 /**
+ * UM PEDIDO PARA HAVER O QUE MEDIR.
+ *
+ * Estes testes percorrem o back office num telemóvel e precisam de pelo menos
+ * um pedido na lista — sem nenhum, o estúdio nunca chega a abrir e o que se
+ * queria medir não é medido.
+ *
+ * Durante muito tempo isso veio de graça: os `data/*.json` do repositório
+ * traziam pedidos de exemplo. Deixaram de trazer, e por uma boa razão — em
+ * produção esse conteúdo reaparecia a CADA DEPLOY por cima do que tinha sido
+ * escrito, e um `git checkout` apagava os rascunhos de quem trabalha sem base
+ * de dados (ver `ONDE-FICA-GUARDADO.md`).
+ *
+ * Portanto o teste passa a criar o que precisa. É melhor assim mesmo sem essa
+ * razão: um teste que depende do que outra pessoa deixou no repositório passa
+ * ou falha por motivos que não são o que ele diz medir.
+ */
+async function garantirUmPedido(page: Page): Promise<void> {
+  // ANTES de entrar, e sem perguntar se já há algum: a lista do back office é
+  // desenhada NO SERVIDOR quando a página abre, portanto um pedido criado
+  // depois disso não aparece; e a consulta que diria «já há» exige sessão, que
+  // ainda não existe. Criar um a mais não custa nada — o armazenamento do CI
+  // morre com o processo.
+  await page.request.post("/api/orcamento", {
+    data: {
+      form: {
+        name: "Rita e Tomás",
+        email: "rita.tomas@example.pt",
+        phone: "912345678",
+        category: "particulares",
+        eventType: "casamentos",
+        eventName: "Casamento",
+        date: "2028-05-20",
+        guests: 80,
+        location: "Herdade da Maridona, Glória",
+      },
+      website: "",
+      submissionId: `e2e-movel-${Date.now().toString(36)}`,
+    },
+  });
+}
+
+/**
  * As quatro regras de ergonomia táctil, numa vista.
  *
  * O que se mede e porquê está escrito em `ergonomia-tactil.mjs`, que é o mesmo
@@ -212,6 +254,7 @@ test.describe("Back office — mobile", () => {
     page,
   }) => {
     const errors = collectErrors(page);
+    await garantirUmPedido(page);
     const loggedIn = await login(page);
     // Fora do CI, uma máquina sem `ADMIN_PASSWORD_HASH` não consegue entrar e o
     // passeio salta-se — é o que permite corrê-lo à mão sem montar nada. No CI
@@ -344,6 +387,7 @@ test.describe("Back office — mobile", () => {
    * O que fica de fora, de propósito, está escrito em NO-KEYBOARD.md.
    */
   test("@movel phone: nada precisa de teclado, e nada anuncia teclas", async ({ page }) => {
+    await garantirUmPedido(page);
     const loggedIn = await login(page);
     if (process.env.CI) {
       expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
@@ -434,6 +478,7 @@ test.describe("Back office — mobile", () => {
    * disso, alguma coisa voltou a ser empilhada.
    */
   test("@movel phone: o cabeçalho cabe numa faixa, e encolhe ao descer", async ({ page }) => {
+    await garantirUmPedido(page);
     const loggedIn = await login(page);
     if (process.env.CI) {
       expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
@@ -496,6 +541,7 @@ test.describe("Back office — mobile", () => {
    * partiu, e que ninguém repara a olhar para uma vista de cada vez.
    */
   test("@movel phone: a barra de baixo e a gaveta não repetem destinos", async ({ page }) => {
+    await garantirUmPedido(page);
     const loggedIn = await login(page);
     if (process.env.CI) {
       expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
