@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
-import ProposalStudio, { avisoDeConteudoIncompleto, cortesDoCabecalho } from "./ProposalStudio";
+import ProposalStudio, {
+  avisoDeConteudoIncompleto,
+  cortesDoCabecalho,
+  porqueFalhouOEnvio,
+} from "./ProposalStudio";
 import type { Quote } from "@/lib/orcamento/types";
 
 /** O runtime de importação do seletor, reduzido aos três momentos que o estúdio
@@ -976,5 +980,80 @@ describe("os valores adicionais somam ao total", () => {
     const gravacoes = fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
     expect(JSON.parse(String(gravacoes.at(-1)?.[1]?.body))).toMatchObject({ quotedPrice: 8425 });
     vi.useRealTimers();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «ENVIADA» SÓ QUANDO FOI MESMO ENVIADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Um pedido sem email de cliente válido devolvia 200 com `emailed:false` — e o
+ * ecrã mostrava um aviso cinzento, marcava o passo como «Proposta enviada ✓» e
+ * seguia. Ela ficava convencida de que tinha ido; o casal não recebia nada.
+ *
+ * É, ao pé da letra, «não dá para mandar a proposta para o cliente» — e da pior
+ * maneira, porque nem sequer parecia falhar.
+ */
+describe("o envio não se dá por feito quando o email não saiu", () => {
+  const comPreco = (preco?: number) => ({ ...quote, quotedPrice: preco }) as Quote;
+
+  function desenhar(q: Quote) {
+    return render(
+      <ToastProvider>
+        <ProposalStudio quote={q} />
+      </ToastProvider>,
+    );
+  }
+
+  it("diz que o email NÃO saiu, e não dá o passo por feito", async () => {
+    propostaDoc = reply({
+      json: {
+        ok: true,
+        emailed: false,
+        emailError: "O pedido não tem um email de cliente válido.",
+        missingImages: 0,
+        truncations: [],
+      },
+    });
+    desenhar(comPreco(3000));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+
+    const alerta = await screen.findByRole("alert");
+    expect(alerta.textContent ?? "").toMatch(/email de cliente válido/i);
+    // E o passo NÃO fica dado por feito: o botão continua lá para ela poder
+    // corrigir o contacto e enviar a sério.
+    expect(screen.queryByText(/Proposta enviada ✓/)).toBeNull();
+  });
+});
+
+/**
+ * Cada falha do envio tinha a MESMA frase de oito palavras, e a pior delas — o
+ * tempo esgotado — nem sequer traz corpo na resposta para se poder explicar.
+ */
+describe("porqueFalhouOEnvio", () => {
+  it("o tempo esgotado diz que demorou demais E o que fazer", () => {
+    for (const status of [504, 502, 408]) {
+      const frase = porqueFalhouOEnvio(status);
+      expect(frase, String(status)).toMatch(/demor/i);
+      expect(frase, String(status)).toMatch(/fotografias|fotos/i);
+    }
+  });
+
+  it("a sessão expirada tranquiliza sobre o rascunho", () => {
+    expect(porqueFalhouOEnvio(401)).toMatch(/rascunho está guardado/i);
+  });
+
+  it("e o que não se conhece leva o número, para se poder procurar", () => {
+    expect(porqueFalhouOEnvio(500)).toContain("500");
+  });
+
+  it("nenhuma das frases é a antiga de oito palavras", () => {
+    for (const status of [504, 401, 413, 503]) {
+      expect(porqueFalhouOEnvio(status)).not.toBe("Não foi possível enviar a proposta.");
+    }
   });
 });

@@ -61,6 +61,7 @@ vi.mock("@/lib/mail", () => ({
 
 import { POST } from "./route";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
+import { createProposal } from "@/lib/proposals-store";
 
 /** Minimal studio doc — only `ref` + `clientNames` are validated by the route;
  *  the money fields under test are added per-case. */
@@ -406,5 +407,91 @@ describe("POST /api/orcamento/[id]/proposta-doc — a segunda tentativa do envio
     const res = await POST(previewReq(baseDoc({ totalAmount: 3000 })), { params });
     expect(res.headers.get("X-Fotos-Em-Falta")).toBe("2");
     expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA COLUNA QUE FALTA NÃO PODE PARAR O NEGÓCIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «detetámos que não dá para mandar a proposta para o cliente».
+ *
+ * O `db/schema.sql` é corrido À MÃO. Numa base onde a versão nova ainda não foi
+ * aplicada, as colunas novas não existem — e o envio passou a escrever SEMPRE o
+ * selo do documento (`pdf_sha256`, `pdf_bytes`). O resgate que existia tirava só
+ * o `doc`, portanto a segunda tentativa levava o selo na mesma, rebentava pela
+ * mesma razão, e a resposta era 503. Tentar outra vez nunca resolvia.
+ *
+ * A pré-visualização continuava perfeita — devolve o PDF antes de chegar à
+ * gravação. O documento via-se, o envio é que nunca ia.
+ *
+ * ── PORQUE É QUE OS TESTES NÃO APANHARAM ISTO ────────────────────────────
+ *
+ * Porque o duplo da loja falhava só na PRIMEIRA tentativa, fosse o que fosse
+ * que a segunda levasse. Aqui o duplo falha pela razão VERDADEIRA — a coluna
+ * não existe — e portanto falha as vezes que forem precisas até o código
+ * deixar de a escrever.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — uma base sem as colunas novas", () => {
+  /** O erro que o PostgREST devolve quando a coluna não existe. */
+  const semColuna = (coluna: string) =>
+    Object.assign(new Error(`Could not find the '${coluna}' column of 'proposals'`), {
+      code: "PGRST204",
+    });
+
+  beforeEach(() => {
+    renderMock.missing = 0;
+    renderMock.truncations = [];
+    renderMock.sequencia = [];
+    renderMock.chamadas = 0;
+    store.failFirstWith = null;
+    store.attempts = 0;
+    created.last = null;
+  });
+
+  it("a proposta SEGUE — sem o documento e sem o selo, mas segue", async () => {
+    // Falha sempre que a gravação levar um campo que a base não conhece.
+    const real = vi.mocked(createProposal);
+    real.mockImplementation(async (p: Proposal) => {
+      if (p.doc !== undefined) throw semColuna("doc");
+      if (p.pdfSha256 !== undefined) throw semColuna("pdf_sha256");
+      if (p.pdfBytes !== undefined) throw semColuna("pdf_bytes");
+      created.last = p;
+    });
+
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status, "o envio não pode morrer por causa de uma coluna").toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    // A proposta ficou gravada, sem os campos que a base não aceita.
+    expect(created.last).toBeTruthy();
+    expect(created.last!.doc).toBeUndefined();
+    expect(created.last!.pdfSha256).toBeUndefined();
+    expect(created.last!.pdfBytes).toBeUndefined();
+    // E o email seguiu na mesma.
+    expect(body.emailed).toBe(true);
+  });
+
+  it("e diz o que se perdeu, com o nome do que é preciso correr", async () => {
+    const real = vi.mocked(createProposal);
+    real.mockImplementation(async (p: Proposal) => {
+      if (p.doc !== undefined || p.pdfSha256 !== undefined) throw semColuna("pdf_sha256");
+      created.last = p;
+    });
+    const body = await (await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params })).json();
+    expect(body.docError, "tem de nomear o ficheiro a correr").toMatch(/db\/schema\.sql/);
+    expect(body.docSaved).toBe(false);
+  });
+
+  /** Quando a base recusa mesmo o mínimo, aí sim é 503 — mas a frase deixa de
+   *  mandar «tentar outra vez», que é o que nunca resolvia. */
+  it("uma base que recusa tudo dá 503, e a frase diz onde procurar", async () => {
+    vi.mocked(createProposal).mockImplementation(async () => {
+      throw semColuna("client_name");
+    });
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/db\/schema\.sql/);
   });
 });

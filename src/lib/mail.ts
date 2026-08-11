@@ -28,6 +28,30 @@ function getTransport() {
     port,
     secure: port === 465,
     auth: { user, pass },
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O EMAIL NÃO PODE FICAR COM A FUNÇÃO INTEIRA NA MÃO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Por omissão o nodemailer espera DOIS MINUTOS pela ligação, trinta
+     * segundos pela saudação do servidor e DEZ MINUTOS pelo resto. São
+     * valores pensados para um processo que vive para sempre — e aqui isto
+     * corre dentro de uma função que tem 60 segundos no total.
+     *
+     * O envio da proposta grava PRIMEIRO e manda o email a seguir. Se o
+     * servidor de correio estiver lento (uma limitação do Gmail, um porto
+     * 465 a arrastar-se), a função morre a meio do SMTP: a proposta fica
+     * gravada, ninguém sabe se o email saiu, e o ecrã mostra um erro
+     * genérico. É a pior das combinações — parece que falhou tudo, e não se
+     * sabe o que falhou.
+     *
+     * Com estes limites, um servidor lento devolve `sent: false` a tempo, e
+     * aí a resposta diz o que aconteceu: a proposta ficou guardada e o email
+     * não saiu. Uma frase verdadeira em vez de uma função morta.
+     */
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 20000,
   });
 }
 

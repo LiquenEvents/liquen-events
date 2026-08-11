@@ -585,6 +585,9 @@ async function fetchProposalImageBytesInner(ref: string): Promise<Buffer | null>
  */
 const TENTATIVAS = 3;
 const PAUSA_MS = 150;
+/** Tecto por tentativa. Ver a corrida lá dentro: sem isto, um pedido pendurado
+ *  fica com a função inteira na mão. */
+const TEMPO_POR_TENTATIVA_MS = 8000;
 
 async function descarregar(
   sb: NonNullable<ReturnType<typeof getSupabase>>,
@@ -593,7 +596,25 @@ async function descarregar(
 ): Promise<Buffer | null> {
   for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
     try {
-      const { data, error } = await sb.storage.from(bucket).download(caminho);
+      /**
+       * COM TEMPO CONTADO, SEMPRE.
+       *
+       * O `download` do cliente do Storage não traz limite nenhum: um pedido
+       * que fica pendurado fica pendurado até a PLATAFORMA matar a função — e
+       * leva com ele a proposta inteira, que estava a ser desenhada. O caminho
+       * por URL, aqui em cima, já tinha este cuidado (`AbortSignal.timeout`);
+       * este não tinha, e é o que corre oitenta vezes seguidas.
+       *
+       * Oito segundos é generoso para uma fotografia e é curto ao pé do
+       * orçamento da função: mais vale três tentativas rápidas do que uma
+       * eterna.
+       */
+      const { data, error } = await Promise.race([
+        sb.storage.from(bucket).download(caminho),
+        new Promise<never>((_, rejeitar) =>
+          setTimeout(() => rejeitar(new Error("tempo esgotado")), TEMPO_POR_TENTATIVA_MS),
+        ),
+      ]);
       if (!error && data) return Buffer.from(await data.arrayBuffer());
     } catch {
       /* segue para a tentativa seguinte */

@@ -220,20 +220,58 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // Uma proposta por enviar é um negócio parado; uma proposta sem `doc` é
       // só um botão a menos no link do cliente, e um `psql` de um minuto.
       if (isMissingTable(e)) {
+        /**
+         * ══════════════════════════════════════════════════════════════════
+         * UMA COLUNA QUE FALTA NÃO PODE PARAR O NEGÓCIO
+         * ══════════════════════════════════════════════════════════════════
+         *
+         * O `db/schema.sql` é corrido À MÃO no editor de SQL. Numa base onde
+         * a versão nova ainda não foi aplicada, as colunas novas não existem
+         * — e a gravação rebenta.
+         *
+         * Este resgate existia e tirava só o `doc`. Não chegava: o envio
+         * passou a escrever TAMBÉM o selo do documento (`pdf_sha256`,
+         * `pdf_bytes`, acrescentados na mesma altura), portanto a segunda
+         * tentativa levava-os na mesma, rebentava exactamente pela mesma
+         * razão, e a resposta era 503 — «Não foi possível guardar a proposta.
+         * Tente novamente.» Tentar outra vez nunca resolvia.
+         *
+         * E a avaria era invisível de uma maneira cruel: a PRÉ-VISUALIZAÇÃO
+         * continuava perfeita, porque devolve o PDF antes de chegar aqui. O
+         * documento via-se, o envio é que nunca ia — que é ao pé da letra
+         * «não dá para mandar a proposta para o cliente».
+         *
+         * Agora tira-se TUDO o que possa não existir numa base antiga, de uma
+         * vez. A proposta é gravada com o que a base aceita, o email segue, e
+         * o que se perdeu é DITO — em vez de se perder o negócio para guardar
+         * um campo acessório.
+         */
         log.error(
-          "proposta-doc: coluna `proposals.doc` em falta — proposta guardada SEM o documento; corra db/schema.sql",
+          "proposta-doc: coluna em falta na tabela `proposals` — proposta guardada sem os campos novos; corra db/schema.sql",
           e,
           { id },
         );
         try {
-          await createProposal({ ...proposal, doc: undefined });
+          await createProposal({
+            ...proposal,
+            doc: undefined,
+            pdfSha256: undefined,
+            pdfBytes: undefined,
+          });
           docSaved = false;
           docError =
-            "A proposta foi guardada, mas o documento não: falta correr o db/schema.sql (coluna `proposals.doc`). Sem ele o cliente não vê o PDF no link, e do documento enviado só fica o rascunho do estúdio (que se apaga e não vai na cópia de segurança).";
+            "A proposta foi guardada e enviada, mas sem o documento nem o selo: falta correr o " +
+            "db/schema.sql na base de dados (colunas `proposals.doc`, `pdf_sha256`, `pdf_bytes`). " +
+            "Sem o documento o cliente não vê o PDF no link, e do que foi enviado só fica o " +
+            "rascunho do estúdio (que se apaga e não vai na cópia de segurança).";
         } catch (e2) {
-          log.error("proposta-doc: guardar falhou", e2, { id });
+          log.error("proposta-doc: guardar falhou mesmo sem os campos novos", e2, { id });
           return NextResponse.json(
-            { error: "Não foi possível guardar a proposta. Tente novamente." },
+            {
+              error:
+                "Não foi possível guardar a proposta — a base de dados recusou a gravação. " +
+                "Verifique se o db/schema.sql foi corrido nesta base.",
+            },
             { status: 503 },
           );
         }

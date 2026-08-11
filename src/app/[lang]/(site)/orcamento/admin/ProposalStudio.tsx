@@ -380,6 +380,44 @@ function fraseDeCorte(c: Corte): string {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE FALHOU, QUANDO O SERVIDOR NEM CHEGA A EXPLICAR-SE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Todas as falhas do envio caíam na MESMA frase de oito palavras — «Não foi
+ * possível enviar a proposta.» — porque o código lia a explicação do corpo da
+ * resposta, e as falhas que não trazem corpo nenhum ficavam sem nada.
+ *
+ * A pior delas é o TEMPO ESGOTADO: a plataforma mata a função e responde com
+ * uma página de erro que não é sequer JSON. Do lado dela, um botão que roda e
+ * uma frase que não distingue «a base recusou» de «demorou demais» de «não
+ * estás autenticada». Foi com essa frase que este problema chegou até mim, e é
+ * também por isso que demorou a ser encontrado.
+ *
+ * O código de estado não é um detalhe técnico a esconder: é a única coisa que
+ * distingue estes casos, e cada um tem uma acção diferente do outro lado.
+ */
+export function porqueFalhouOEnvio(status: number): string {
+  if (status === 504 || status === 502 || status === 408) {
+    return (
+      "O servidor demorou demasiado a preparar a proposta e desistiu a meio. " +
+      "Propostas com muitas fotografias demoram mais — tente outra vez; se voltar a " +
+      "acontecer, tire algumas fotos dos mood boards."
+    );
+  }
+  if (status === 401 || status === 403) {
+    return "A sessão expirou. Volte a entrar e tente de novo — o rascunho está guardado.";
+  }
+  if (status === 413) {
+    return "A proposta é grande demais para ser guardada. Tire algumas fotos ou encurte os textos.";
+  }
+  if (status === 503) {
+    return "O serviço não está disponível neste momento. Tente daqui a pouco.";
+  }
+  return `Não foi possível enviar a proposta (erro ${status}).`;
+}
+
+/**
  * A frase única do aviso, ou `null` quando o documento vai completo.
  *
  * As duas perdas aparecem JUNTAS porque, para quem vai carregar em "Enviar", o
@@ -1780,7 +1818,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "Não foi possível enviar a proposta.");
+      if (!res.ok) throw new Error(data?.error || porqueFalhouOEnvio(res.status));
       // A proposta ficou guardada em qualquer caso; a mensagem distingue enviada
       // por email vs guardada-mas-sem-email, para a equipa saber o que fazer.
       // O DOCUMENTO INCOMPLETO É O AVISO MAIS IMPORTANTE DOS TRÊS, por isso é o
@@ -1789,17 +1827,41 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // é secundário quando o documento que ele leva está incompleto.
       const emFalta = Number(data?.missingImages ?? 0);
       const aviso = avisoDeConteudoIncompleto(emFalta, normalizaCortes(data?.truncations));
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * «ENVIADA» SÓ QUANDO FOI MESMO ENVIADA
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Um pedido sem email de cliente válido devolvia 200 com `emailed:false`
+       * — e o ecrã mostrava um aviso cinzento, marcava o passo como «Proposta
+       * enviada ✓» e seguia. Ela ficava convencida de que tinha ido; o casal
+       * não recebia nada. É, ao pé da letra, «não dá para mandar a proposta
+       * para o cliente» — e da pior maneira, porque nem sequer parecia falhar.
+       *
+       * O email não ter saído é um ERRO, não uma informação. E o passo só é
+       * dado por feito quando o email saiu: a proposta fica gravada na mesma
+       * (isso não se perde), mas o botão continua lá para ela poder corrigir o
+       * contacto e enviar a sério.
+       */
+      const saiu = Boolean(data?.emailed);
       if (aviso) {
         toast(`No PDF que seguiu, ${aviso}. Verifique a proposta e reenvie.`, "error");
-      } else if (data?.emailed) {
+      } else if (saiu) {
         toast("Proposta enviada ao cliente", "success");
       } else {
-        toast(data?.emailError || "Proposta gerada (email não enviado)", "info");
+        toast(
+          data?.emailError ||
+            "A proposta foi gravada mas o EMAIL NÃO SAIU — o cliente não recebeu nada.",
+          "error",
+        );
       }
       // Trava contra reenvio acidental: o passo Enviar passa a mostrar a
       // confirmação "Proposta enviada ✓" em vez do botão pronto a disparar.
-      setSent(true);
-      onSent?.();
+      // Só quando há mesmo o que confirmar.
+      if (saiu) {
+        setSent(true);
+        onSent?.();
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : "Erro ao enviar a proposta.", "error");
     } finally {
