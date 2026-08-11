@@ -58,21 +58,38 @@ Hoje: **6 fotos no máximo** por moodboard e **um só layout** — uma grande à
 esquerda, as restantes em grelha à direita. É exactamente o que a antiga não
 faz.
 
-Cinco layouts, escolhidos por moodboard, com sugestão automática pelo número de
-fotos. Medidas reais da área útil: **706 × 415 pt**.
+Área útil real: **706 × 339 pt** (o valor que aqui estava, 415, era o topo da
+mancha e não a altura dela).
 
-| Layout | Fotos | Célula |
+**A descoberta que muda o desenho, e que só se vê no documento verdadeiro: cada
+foto conserva as suas proporções.** Na página das mesas de jantar há dez fotos em
+duas filas; dentro de cada fila todas têm a MESMA ALTURA e larguras diferentes —
+a segunda é larga, a terceira é estreita. Não são células iguais. Uma grelha de
+células iguais recortava as dez ao mesmo formato, e é exactamente isso que dá ao
+PDF de hoje o aspecto de relatório.
+
+Por isso os layouts pedem os ASPECTOS das fotos, e não só quantas são.
+
+| Layout | Fotos | O que faz |
 | --- | --- | --- |
-| Grelha larga (2×5) | até 10 | 137 × 203 pt |
-| Fila única | 5 | 137 × 415 pt |
-| Mosaico orgânico | 6 a 10 | variável |
-| Destaque + satélites | 4 a 7 | variável |
-| Texto + imagem de apoio | 1 | ~340 × 415 pt |
+| Filas justificadas | 4 a 12 | 2 ou 3 filas; dentro de cada fila, mesma altura e larguras conforme a foto |
+| Fila única | 2 a 6 | uma linha só, de margem a margem |
+| Mosaico orgânico | 4 a 8 | tamanhos muito diferentes, sem filas — a página do Decor Mesa Buffet |
+| Destaque + satélites | 2 a 4 | uma grande com outras à volta (o que já existia) |
+| Texto + imagem de apoio | 1 | o bloco de texto à esquerda, a foto à direita |
+
+**A largura manda; a altura é o que sair.** As filas enchem sempre a largura da
+mancha, e o bloco encosta ao topo — se sobrar branco em baixo, sobra, que é o que
+a página antiga faz. Esticar a altura para encher a página seria errado: a
+largura de cada foto é `aspecto × altura`, portanto esticar uma estica a outra.
+A primeira versão disto fazia-o e as filas saíam 267 pontos para fora da página;
+os testes apanharam-no.
 
 **Como é que o mosaico é orgânico E ordenado.** As caixas não podem ser
-sorteadas — sai desalinhado e nota-se. Saem de uma grelha fina (12 colunas × 6
-linhas) onde cada foto ocupa um rectângulo de células diferente. Tamanhos
-variados, linhas e colunas rigorosamente alinhadas: é esse o efeito da antiga.
+sorteadas — sai desalinhado e nota-se. Saem de cortes sucessivos de um rectângulo
+só, sempre em fronteiras de uma grelha fina de 12 × 6. Tamanhos todos diferentes,
+arestas todas alinhadas, sem buracos nem sobreposições — e determinístico, senão
+a pré-visualização mentia.
 
 Mais: subtítulo opcional por moodboard, legendas por baixo do bloco de imagens,
 e a serifa da marca em vez da manuscrita.
