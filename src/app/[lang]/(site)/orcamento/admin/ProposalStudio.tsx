@@ -470,6 +470,140 @@ export function avisoDeConteudoIncompleto(emFalta: number, cortes: Corte[]): str
   return partes.length ? partes.join("; ") : null;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS TRÊS ESTADOS DO INDICADOR DE GRAVAÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Tinha dois — «a guardar…» e «guardado às 14:32» — e o segundo era dito
+ * também quando a gravação no servidor tinha falhado, porque a cópia local
+ * tinha corrido bem e mais nada era verificado. «Guardado» é a palavra que faz
+ * uma pessoa fechar o portátil descansada, e foi exactamente isso que
+ * aconteceu: uma proposta inteira ficou num `localStorage` e o ecrã disse, o
+ * tempo todo, que estava guardada.
+ *
+ * O terceiro estado tem de ser LIDO, não decifrado. Por isso não é um visto de
+ * outra cor: são as palavras «só neste computador», por extenso, também no
+ * telemóvel — é a única forma de a informação mudar o que a pessoa faz a
+ * seguir.
+ */
+export type EstadoDaGravacaoNoEcra = "a-guardar" | "so-neste-computador" | "guardado";
+
+export function textoDaGravacao(
+  estado: EstadoDaGravacaoNoEcra,
+  gravadoEm: Date | null,
+): { curto: string; longo: string; leitor: string } {
+  if (estado === "a-guardar") {
+    return { curto: "…", longo: "a guardar…", leitor: "a guardar" };
+  }
+  const horas = gravadoEm
+    ? gravadoEm.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })
+    : "";
+  if (estado === "so-neste-computador") {
+    // A hora entra na frase porque a pergunta seguinte dela é sempre «desde
+    // quando?» — é o que lhe diz quanto trabalho está em risco.
+    return {
+      curto: "⚠ guardado só neste computador",
+      longo: horas ? `guardado só neste computador às ${horas}` : "guardado só neste computador",
+      leitor: "atenção: o rascunho está guardado só neste computador e não chegou ao servidor",
+    };
+  }
+  return { curto: "✓", longo: `guardado às ${horas}`, leitor: "rascunho guardado no servidor" };
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O RASCUNHO NO SERVIDOR — E O QUE SE FAZ QUANDO ELE NÃO LÁ CHEGA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta gravação era um `fetch` seco: `if (!res.ok) return`, e um `catch` vazio
+ * com o comentário «offline — a cópia local guarda o trabalho até haver rede».
+ * A cópia local guarda mesmo — mas só naquele computador. Uma colaboradora
+ * montou uma proposta inteira com esta chamada a falhar de cada vez, o
+ * indicador a dizer «guardado às 14:32» o tempo todo, e quem a foi abrir noutra
+ * máquina encontrou o ecrã vazio.
+ *
+ * Duas coisas mudam. A primeira é REPETIR: uma gravação que morre por causa de
+ * uma ligação que caiu não pode morrer à primeira. É o mesmo desenho de
+ * `proposal-storage.descarregar` e da segunda tentativa do envio — tentativas
+ * com pausa curta e crescente, e um tecto de tempo por tentativa para um pedido
+ * pendurado não segurar o resto. A segunda é DIZER o que aconteceu, que é a
+ * parte que faltava por inteiro.
+ *
+ * O que não se repete: um 4xx (o pedido é que está errado — sessão expirada,
+ * rascunho grande demais) e um 503 marcado como `permanente` (a instalação não
+ * tem a tabela, ou a chave não a pode escrever). Nesses, tentar outra vez dá
+ * exactamente a mesma resposta e só atrasa o aviso.
+ */
+const GRAVACAO_TENTATIVAS = 3;
+const GRAVACAO_PAUSA_MS = 400;
+const GRAVACAO_TECTO_MS = 10000;
+
+export type ResultadoDaGravacao =
+  | { estado: "guardado"; updatedAt?: string; overwrote?: boolean; previousBy?: string }
+  /** Não ficou no servidor. O trabalho está no ecrã e na cópia local — e é isso
+   *  mesmo que a pessoa tem de ouvir, com estas palavras. */
+  | { estado: "so-local"; porque?: string };
+
+/** Um `fetch` com tecto de tempo próprio. Sem ele, uma rede que aceita a
+ *  ligação e nunca responde deixa a gravação pendurada para sempre — e o
+ *  indicador ficaria eternamente em «a guardar…», que é outra maneira de
+ *  mentir. */
+async function fetchComTecto(url: string, init: RequestInit, ms: number): Promise<Response> {
+  const abortador = new AbortController();
+  const t = setTimeout(() => abortador.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: abortador.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/**
+ * Grava o rascunho no servidor, repetindo enquanto fizer sentido, e devolve a
+ * VERDADE sobre onde ele ficou. Nunca lança.
+ */
+export async function gravarRascunhoNoServidor(
+  quoteId: string,
+  corpo: { doc: unknown; baseUpdatedAt: string | null },
+): Promise<ResultadoDaGravacao> {
+  let porque: string | undefined;
+  for (let tentativa = 1; tentativa <= GRAVACAO_TENTATIVAS; tentativa++) {
+    try {
+      const res = await fetchComTecto(
+        `/api/orcamento/${quoteId}/proposta-rascunho`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(corpo),
+        },
+        GRAVACAO_TECTO_MS,
+      );
+      const dados = await res.json().catch(() => null);
+      if (res.ok) {
+        return {
+          estado: "guardado",
+          updatedAt: typeof dados?.updatedAt === "string" ? dados.updatedAt : undefined,
+          overwrote: Boolean(dados?.overwrote),
+          previousBy: typeof dados?.previousBy === "string" ? dados.previousBy : undefined,
+        };
+      }
+      porque = typeof dados?.erro === "string" ? dados.erro : undefined;
+      // Um 4xx é o pedido que está errado, e repeti-lo dá o mesmo. Um 503
+      // `permanente` é a instalação que está incompleta — também dá o mesmo.
+      if (res.status < 500 || dados?.permanente === true) break;
+    } catch {
+      // Rede em baixo, ou o tecto de tempo. É exactamente o caso que a
+      // repetição existe para apanhar.
+      porque = undefined;
+    }
+    if (tentativa < GRAVACAO_TENTATIVAS) {
+      await new Promise((r) => setTimeout(r, GRAVACAO_PAUSA_MS * tentativa));
+    }
+  }
+  return { estado: "so-local", porque };
+}
+
 interface Props {
   quote: Quote;
   /**
@@ -509,6 +643,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [gravadoEm, setGravadoEm] = useState<Date | null>(null);
   /** Há alterações à espera do debounce? É o que o aviso de saída lê. */
   const [porGravar, setPorGravar] = useState(false);
+  /**
+   * ── O TERCEIRO ESTADO DO INDICADOR ────────────────────────────────────────
+   *
+   * O indicador tinha dois: «a guardar…» e «guardado às 14:32». Faltava o que
+   * de facto acontecia quando o servidor recusava a gravação — o rascunho ficava
+   * no `localStorage` DESTE computador e em mais lado nenhum, e o ecrã dizia
+   * «guardado», que é a palavra que faz uma pessoa fechar o portátil descansada.
+   *
+   * É por isso que este estado existe e é por isso que o que ele mostra tem de
+   * ser lido de longe: quem está a trabalhar não vai investigar um visto cinzento
+   * — só muda de comportamento se lhe disserem, com estas palavras, que o
+   * trabalho está guardado SÓ NESTE COMPUTADOR.
+   *
+   * `porque` é o que se sabe da causa (a tabela em falta, as permissões), para o
+   * aviso poder dizer o que resolver em vez de só que não deu.
+   */
+  const [soNesteComputador, setSoNesteComputador] = useState<{ porque?: string } | null>(null);
+  /** Já dissemos isto em voz alta? O indicador diz-o sempre; o aviso grande
+   *  aparece UMA vez, para não virar ruído a cada 800 ms. */
+  const avisouSoLocal = useRef(false);
+  /**
+   * Quantas gravações estão AGORA a caminho do servidor.
+   *
+   * Sem isto havia uma janela em que o ecrã dizia «guardado às 14:32» sem
+   * ninguém saber ainda se tinha ficado guardado: a cópia local corre primeiro
+   * e é síncrona, o pedido ao servidor demora — e com as repetições demora
+   * mais. Uma contagem e não um booleano porque a gravação de saída (a da
+   * desmontagem) pode sobrepor-se à do debounce.
+   */
+  const [aGravarNoServidor, setAGravarNoServidor] = useState(0);
   /**
    * O rascunho que o "Limpar" deitou fora, à espera de ser resgatado.
    *
@@ -705,6 +869,67 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * O rascunho não chegou ao servidor. Duas coisas acontecem, e são diferentes
+   * de propósito:
+   *
+   *  1. o INDICADOR passa a dizê-lo, e continua a dizê-lo enquanto for verdade —
+   *     é o que está à vista quando ela olha para o ecrã;
+   *  2. um aviso grande, UMA vez. À segunda seria ruído a cada 800 ms, e um
+   *     aviso que aparece sempre é um aviso que se aprende a ignorar.
+   */
+  const registarSoLocal = useCallback(
+    (porque?: string) => {
+      setSoNesteComputador({ porque });
+      if (avisouSoLocal.current) return;
+      avisouSoLocal.current = true;
+      toast(
+        `Este rascunho está guardado SÓ NESTE COMPUTADOR — não chegou ao servidor.${
+          porque ? ` ${porque}` : ""
+        } Não feche o separador sem falar com quem gere a instalação: noutro dispositivo esta proposta não existe.`,
+        "error",
+      );
+    },
+    [toast],
+  );
+
+  /** A gravação chegou ao servidor. Limpa o aviso E rearma-o: se voltar a
+   *  falhar mais tarde, ela tem de ouvir outra vez — a rede pode ter voltado a
+   *  cair e o segundo silêncio custaria tanto como o primeiro. */
+  const marcarGuardadoNoServidor = useCallback(() => {
+    setSoNesteComputador(null);
+    avisouSoLocal.current = false;
+  }, []);
+
+  /**
+   * Manda o rascunho ao servidor e ARRUMA a verdade que voltar: o carimbo, o
+   * indicador, o aviso. Está num sítio só porque são dois os caminhos que
+   * gravam — o debounce de cada alteração e o resgate da abertura — e um deles
+   * a esquecer-se de dizer que falhou é exactamente o problema que isto veio
+   * resolver.
+   */
+  const enviarParaServidor = useCallback(
+    async (docGravavel: unknown): Promise<ResultadoDaGravacao> => {
+      setAGravarNoServidor((n) => n + 1);
+      try {
+        const r = await gravarRascunhoNoServidor(quote.id, {
+          doc: docGravavel,
+          baseUpdatedAt: serverStamp.current,
+        });
+        if (r.estado === "guardado") {
+          if (r.updatedAt) serverStamp.current = r.updatedAt;
+          marcarGuardadoNoServidor();
+        } else {
+          registarSoLocal(r.porque);
+        }
+        return r;
+      } finally {
+        setAGravarNoServidor((n) => Math.max(0, n - 1));
+      }
+    },
+    [quote.id, marcarGuardadoNoServidor, registarSoLocal],
+  );
+
   // ── O rascunho que está no SERVIDOR ──
   // A cópia local abre primeiro (é instantânea e funciona sem rede); logo a
   // seguir vai-se buscar a do servidor e, se for mais recente, é essa que
@@ -713,56 +938,121 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   useEffect(() => {
     let active = true;
     (async () => {
+      // O que este navegador tem guardado, e de quando. Lê-se ANTES de falar
+      // com o servidor porque é isto que decide se há alguma coisa para
+      // resgatar — ver o bloco do resgate, mais abaixo.
+      let localStamp = 0;
+      let docLocal: unknown = null;
+      try {
+        localStamp = Number(localStorage.getItem(`${DRAFT_KEY}:at`) ?? 0);
+        const cru = localStorage.getItem(DRAFT_KEY);
+        if (cru) docLocal = JSON.parse(cru);
+      } catch {
+        /* localStorage indisponível ou rascunho ilegível — fica a valer o servidor */
+      }
+
+      let leituraOk = false;
+      let draft: { doc?: unknown; updatedAt?: string } | null = null;
       try {
         const res = await fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, {
           cache: "no-store",
         });
-        if (!res.ok) return;
-        const data = await res.json().catch(() => null);
-        const draft = data?.draft;
-        if (!active || !draft?.doc || typeof draft.doc !== "object") return;
-        serverStamp.current = typeof draft.updatedAt === "string" ? draft.updatedAt : null;
-
-        let localStamp = 0;
-        try {
-          localStamp = Number(localStorage.getItem(`${DRAFT_KEY}:at`) ?? 0);
-        } catch {
-          /* localStorage indisponível — fica a valer a do servidor */
+        if (res.ok) {
+          leituraOk = true;
+          const data = await res.json().catch(() => null);
+          const d = data?.draft;
+          if (d?.doc && typeof d.doc === "object") draft = d;
         }
-        // A local só ganha se for MESMO mais recente; em empate vale a do
-        // servidor, que é a que os outros dispositivos veem.
-        if (localStamp > Date.parse(draft.updatedAt ?? 0)) return;
-        // ── O VALOR É A EXCEPÇÃO, AQUI TAMBÉM ───────────────────────────
-        //
-        // A montagem aplica o "Preço final" do PEDIDO por cima do rascunho,
-        // de propósito e com a razão escrita lá em cima: é o mesmo número
-        // visto de dois sítios. Este merge, 100–300 ms depois, punha o
-        // `totalAmount` do rascunho por cima outra vez — e ganhava quase
-        // sempre, porque o carimbo local é escrito ANTES do PUT e o
-        // `updatedAt` do servidor DEPOIS, portanto a comparação de datas
-        // acima está estruturalmente a favor do servidor.
-        //
-        // O percurso: ela corrigia o preço de 8.100 para 9.400 na Gestão do
-        // pedido, voltava ao estúdio, e o campo voltava sozinho a 8.100. Ao
-        // enviar, gravava 8.100 e a correcção desaparecia dos DOIS lados.
-        //
-        // O rascunho traz o texto, as fotos e as condições — tudo menos o
-        // valor. Quem manda no valor é o pedido, e só quando ele tem um.
-        const doPedido = quote.quotedPrice;
-        const mandaOPedido = typeof doPedido === "number" && doPedido > 0;
-        setDoc((d) => {
-          const merged = { ...d, ...(draft.doc as Partial<StudioDoc>) };
-          const limpo = stripPendingImages({
-            ...merged,
-            coverImages: normaliseCoverImages(merged.coverImages),
-          });
-          return mandaOPedido ? aplicarBase(limpo, doPedido) : limpo;
-        });
-        const base = mandaOPedido ? doPedido : baseDoDoc(draft.doc as Partial<StudioDoc>);
-        if (base != null) setTotalInput(String(base));
       } catch {
         /* sem rede: continua-se com a cópia local, como antes */
       }
+      if (!active) return;
+      if (draft) {
+        serverStamp.current = typeof draft.updatedAt === "string" ? draft.updatedAt : null;
+      }
+
+      const carimboDoServidor = draft ? Date.parse(draft.updatedAt ?? "") || 0 : 0;
+      const localMaisRecente = localStamp > carimboDoServidor;
+
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * O RESGATE DO QUE FICOU PRESO NESTE NAVEGADOR
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Este é o caminho por onde o trabalho da colaboradora volta. Enquanto o
+       * servidor recusou as gravações, tudo o que ela montou ficou no
+       * `localStorage` daquele portátil — intacto, e invisível para toda a
+       * gente. O estúdio abria, via que o servidor não tinha rascunho nenhum, e
+       * não fazia nada com essa informação: esperava pela próxima tecla.
+       *
+       * Agora, ao abrir, se a cópia deste navegador for mais recente do que a
+       * do servidor — ou se o servidor não tiver nenhuma e esta existir —
+       * tenta-se ENVIÁ-LA outra vez. É o gesto que a pessoa faria se soubesse
+       * que tinha de o fazer, feito sem ela ter de saber.
+       *
+       * Só quando a leitura CORREU BEM. Se o `GET` falhou não se sabe o que
+       * está lá; escrever por cima às cegas podia apagar uma versão mais
+       * recente feita noutro dispositivo, e trocar uma perda por outra não é
+       * resgate nenhum.
+       */
+      if (leituraOk && docLocal && typeof docLocal === "object" && (localMaisRecente || !draft)) {
+        // Os marcadores provisórios saem, como em qualquer gravação. Mas se o
+        // rascunho preso for de uma versão antiga e não tiver a forma toda, o
+        // que se envia é o que lá está: entre enviar com um marcador a mais e
+        // não enviar de todo, envia-se — é isto que está a resgatar trabalho.
+        let paraEnviar: unknown = docLocal;
+        try {
+          paraEnviar = stripPendingImages(docLocal as StudioDoc);
+        } catch {
+          /* fica o original */
+        }
+        void (async () => {
+          const r = await enviarParaServidor(paraEnviar);
+          // Dizer que o resgate aconteceu é metade do resgate: sem isto ela não
+          // tem como saber que o que estava preso já está a salvo, e continua a
+          // não fechar o portátil.
+          if (active && r.estado === "guardado") {
+            toast(
+              "O rascunho que estava guardado só neste computador foi enviado para o servidor. Já pode ser aberto noutro dispositivo.",
+              "success",
+            );
+          }
+        })();
+      }
+
+      if (!draft?.doc || typeof draft.doc !== "object") return;
+      // A local só ganha se for MESMO mais recente; em empate vale a do
+      // servidor, que é a que os outros dispositivos veem.
+      if (localMaisRecente) return;
+      // ── O VALOR É A EXCEPÇÃO, AQUI TAMBÉM ───────────────────────────
+      //
+      // A montagem aplica o "Preço final" do PEDIDO por cima do rascunho,
+      // de propósito e com a razão escrita lá em cima: é o mesmo número
+      // visto de dois sítios. Este merge, 100–300 ms depois, punha o
+      // `totalAmount` do rascunho por cima outra vez — e ganhava quase
+      // sempre, porque o carimbo local é escrito ANTES do PUT e o
+      // `updatedAt` do servidor DEPOIS, portanto a comparação de datas
+      // acima está estruturalmente a favor do servidor.
+      //
+      // O percurso: ela corrigia o preço de 8.100 para 9.400 na Gestão do
+      // pedido, voltava ao estúdio, e o campo voltava sozinho a 8.100. Ao
+      // enviar, gravava 8.100 e a correcção desaparecia dos DOIS lados.
+      //
+      // O rascunho traz o texto, as fotos e as condições — tudo menos o
+      // valor. Quem manda no valor é o pedido, e só quando ele tem um.
+      const doPedido = quote.quotedPrice;
+      const mandaOPedido = typeof doPedido === "number" && doPedido > 0;
+      const doDoServidor = draft.doc as Partial<StudioDoc>;
+      setDoc((d) => {
+        const merged = { ...d, ...doDoServidor };
+        const limpo = stripPendingImages({
+          ...merged,
+          coverImages: normaliseCoverImages(merged.coverImages),
+        });
+        return mandaOPedido ? aplicarBase(limpo, doPedido) : limpo;
+      });
+      const base = mandaOPedido ? doPedido : baseDoDoc(doDoServidor);
+      if (base != null) setTotalInput(String(base));
     })();
     return () => {
       active = false;
@@ -846,7 +1136,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // `flushDraft` guarda a MESMA gravação que o debounce ia fazer, para o
   // Ctrl/Cmd+Enter dos Serviços a poder disparar já (sem duplicar a lógica nem
   // encurtar o debounce, que é o que segura a escrita durante a escrita).
-  const flushDraft = useRef<() => void>(() => {});
+  // Devolve o que o SERVIDOR respondeu, e não `void`: é o que permite ao
+  // Ctrl/Cmd+Enter dizer «guardado» só quando o for mesmo, em vez de o dizer
+  // por ter escrito no `localStorage` — que era o erro original, em ponto
+  // pequeno.
+  const flushDraft = useRef<() => Promise<ResultadoDaGravacao>>(async () => ({
+    estado: "so-local",
+  }));
 
   // Assim que o documento muda há trabalho por gravar. Volta a false quando a
   // gravação local acontece, oitocentos milissegundos depois.
@@ -912,32 +1208,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       }
       // E no servidor, que é o que sobrevive à mudança de dispositivo. Falhar
       // aqui não interrompe o trabalho: a cópia local continua a valer e a
-      // gravação seguinte tenta de novo.
-      void (async () => {
-        try {
-          const res = await fetch(`/api/orcamento/${quote.id}/proposta-rascunho`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ doc: gravavel, baseUpdatedAt: serverStamp.current }),
-          });
-          if (!res.ok) return;
-          const data = await res.json().catch(() => null);
-          if (typeof data?.updatedAt === "string") serverStamp.current = data.updatedAt;
-          // Alguém gravou entre a nossa leitura e esta escrita. A nossa versão
-          // fica (a última vence), mas dizê-lo é o mínimo — desaparecer com o
-          // trabalho de outra pessoa em silêncio, não.
-          if (data?.overwrote && !warnedOverwrite.current) {
-            warnedOverwrite.current = true;
-            toast(
-              data.previousBy
-                ? `Este rascunho tinha sido alterado por ${data.previousBy} noutro sítio. Ficou a sua versão.`
-                : "Este rascunho tinha sido alterado noutro sítio. Ficou a sua versão.",
-              "info",
-            );
-          }
-        } catch {
-          /* offline — a cópia local guarda o trabalho até haver rede */
+      // gravação seguinte tenta de novo. O que NÃO pode acontecer é falhar sem
+      // se ver — era isso que fazia o indicador dizer «guardado» a uma proposta
+      // que só existia neste portátil.
+      return (async () => {
+        const r = await enviarParaServidor(gravavel);
+        if (r.estado === "so-local") return r;
+        // Alguém gravou entre a nossa leitura e esta escrita. A nossa versão
+        // fica (a última vence), mas dizê-lo é o mínimo — desaparecer com o
+        // trabalho de outra pessoa em silêncio, não.
+        if (r.overwrote && !warnedOverwrite.current) {
+          warnedOverwrite.current = true;
+          toast(
+            r.previousBy
+              ? `Este rascunho tinha sido alterado por ${r.previousBy} noutro sítio. Ficou a sua versão.`
+              : "Este rascunho tinha sido alterado noutro sítio. Ficou a sua versão.",
+            "info",
+          );
         }
+        return r;
       })();
     };
     flushDraft.current = save;
@@ -953,6 +1242,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     SIDE_KEY,
     quote.id,
     toast,
+    enviarParaServidor,
   ]);
 
   /**
@@ -980,14 +1270,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   useEffect(() => {
     return () => {
-      if (porGravarRef.current) flushDraft.current();
+      if (porGravarRef.current) void flushDraft.current();
     };
   }, []);
 
-  /** Ctrl/Cmd+Enter nos Serviços — grava agora e diz que gravou. */
+  /**
+   * Ctrl/Cmd+Enter nos Serviços — grava agora e diz o que aconteceu.
+   *
+   * Dizia «Rascunho guardado» no instante do atalho, sem esperar por resposta
+   * nenhuma: era o mesmo erro do indicador, à escala de uma mensagem. Agora
+   * espera, e quando não ficou no servidor cala-se — o aviso grande de
+   * `registarSoLocal` já está a dizer o que interessa, e duas mensagens
+   * contraditórias seriam pior do que uma.
+   */
   const saveNow = useCallback(() => {
-    flushDraft.current();
-    toast("Rascunho guardado", "success");
+    void (async () => {
+      const r = await flushDraft.current();
+      if (r.estado === "guardado") toast("Rascunho guardado", "success");
+    })();
   }, [toast]);
 
   const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
@@ -1241,12 +1541,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // ── Aviso ao sair com trabalho por gravar ─────────────────────────────
   // A janela é estreita (a gravação é a 800ms), mas existe: fechar o
   // separador logo a seguir a escrever perdia essas últimas palavras.
+  //
+  // E também quando o rascunho ficou SÓ NESTE COMPUTADOR: aí a janela não é
+  // estreita nenhuma — é todo o tempo em que o servidor recusar as gravações.
+  // Fechar o separador nesse estado não perde o `localStorage`, mas perde a
+  // única pessoa que ainda podia fazer alguma coisa acerca disso.
   useEffect(() => {
-    if (!porGravar) return;
+    if (!porGravar && !soNesteComputador && aGravarNoServidor === 0) return;
     const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", aviso);
     return () => window.removeEventListener("beforeunload", aviso);
-  }, [porGravar]);
+  }, [porGravar, soNesteComputador, aGravarNoServidor]);
 
   // ── A contagem dos dez segundos para anular a limpeza ─────────────────
   useEffect(() => {
@@ -3437,33 +3742,45 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   Preencha o conteúdo e avance para pré-visualizar.
                 </span>
               )}
-              {(gravadoEm || porGravar) && (
-                <span
-                  className="ml-2 text-[11px] text-foreground/35"
-                  title={
-                    porGravar
-                      ? "a guardar…"
-                      : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}`
-                  }
-                >
-                  <span aria-hidden className="sm:hidden">
-                    {porGravar ? "…" : "✓"}
-                  </span>
-                  <span className="hidden sm:inline">
-                    {porGravar
-                      ? "a guardar…"
-                      : `guardado às ${gravadoEm!.toLocaleTimeString("pt-PT", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}`}
-                  </span>
-                  {/* O visto sozinho não diz nada a quem usa leitor de ecrã. */}
-                  <span className="sr-only">{porGravar ? "a guardar" : "rascunho guardado"}</span>
-                </span>
-              )}
+              {(gravadoEm || porGravar || soNesteComputador) &&
+                (() => {
+                  const estado: EstadoDaGravacaoNoEcra =
+                    porGravar || aGravarNoServidor > 0
+                      ? "a-guardar"
+                      : soNesteComputador
+                        ? "so-neste-computador"
+                        : "guardado";
+                  const t = textoDaGravacao(estado, gravadoEm);
+                  const alarme = estado === "so-neste-computador";
+                  return (
+                    <span
+                      // O aviso não pode ter o cinzento discreto dos outros dois:
+                      // este é para dar nas vistas, e o `aria-live` faz com que
+                      // também seja anunciado a quem não olha para aqui.
+                      className={
+                        alarme
+                          ? "ml-2 rounded-full bg-[#c0392b]/12 px-2 py-0.5 text-[11px] font-semibold text-[#a03123]"
+                          : "ml-2 text-[11px] text-foreground/35"
+                      }
+                      aria-live={alarme ? "assertive" : "polite"}
+                      title={
+                        alarme && soNesteComputador?.porque
+                          ? `${t.longo} — ${soNesteComputador.porque}`
+                          : t.longo
+                      }
+                    >
+                      {/* No telemóvel os outros dois estados são um glifo; este
+                          NÃO, e é de propósito: um triângulo sozinho não avisa
+                          de nada. */}
+                      <span aria-hidden className="sm:hidden">
+                        {t.curto}
+                      </span>
+                      <span className="hidden sm:inline">{t.longo}</span>
+                      {/* O visto sozinho não diz nada a quem usa leitor de ecrã. */}
+                      <span className="sr-only">{t.leitor}</span>
+                    </span>
+                  );
+                })()}
             </p>
             <Button
               variant="primary"

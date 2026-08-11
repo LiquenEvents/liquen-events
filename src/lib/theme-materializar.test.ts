@@ -29,6 +29,8 @@ const st = vi.hoisted(() => ({
   rascunhos: {} as Record<string, { doc: unknown; updatedAt: string }>,
   varreduraCompleta: true,
   escritas: [] as { key: string; value: unknown }[],
+  /** A escrita do rascunho é recusada pela base (a tabela não existe). */
+  escritaFalha: false,
   /** Caminhos cuja cópia de salvaguarda falha. */
   copiaFalha: new Set<string>(),
   copias: [] as { themePath: string; quoteId: string }[],
@@ -50,8 +52,14 @@ vi.mock("./proposals-store", () => ({
 
 vi.mock("./app-state", () => ({
   getState: async (key: string) => st.rascunhos[key] ?? null,
+  // Devolve o resultado da escrita, como o `app-state` a sério: é por ele que
+  // o `gravar` do rascunho responde se pôs mesmo o documento a salvo — e é
+  // dessa resposta que depende poder apagar a foto do Storage.
   setState: async (key: string, value: unknown) => {
     st.escritas.push({ key, value });
+    return st.escritaFalha
+      ? { gravado: false, onde: "nenhures", motivo: "tabela-em-falta" }
+      : { gravado: true, onde: "servidor" };
   },
   listStateByPrefix: async (prefix: string) => ({
     entradas: Object.entries(st.rascunhos)
@@ -96,6 +104,7 @@ beforeEach(() => {
   st.rascunhos = {};
   st.varreduraCompleta = true;
   st.escritas = [];
+  st.escritaFalha = false;
   st.copiaFalha = new Set();
   st.copias = [];
   st.apagouFoto = [];
@@ -265,6 +274,20 @@ describe("rascunhos do estúdio", () => {
     expect(st.escritas[0].value).toMatchObject({
       doc: { moodBoards: [{ images: ["q-9/copia-de-italia-a.jpg"] }] },
     });
+  });
+
+  /**
+   * A gravação do rascunho reescrito é o que AUTORIZA apagar a foto do
+   * Storage. O `setState` não lança quando a base recusa a escrita — só o
+   * regista —, e este `gravar` respondia `true` a seguir sem ter como saber se
+   * era verdade. O resultado seria a foto apagada e o rascunho por reescrever:
+   * um mood board com buracos que ninguém volta a conseguir explicar.
+   */
+  it("uma gravação recusada NÃO autoriza apagar a foto", async () => {
+    st.escritaFalha = true;
+    const res = await apagarFotoDaBiblioteca("italia/a.jpg");
+    expect(res.ok).toBe(false);
+    expect(st.apagouFoto).toEqual([]);
   });
 
   /**

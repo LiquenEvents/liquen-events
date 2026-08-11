@@ -139,8 +139,17 @@ async function todosOsPortadores(): Promise<{ portadores: Portador[]; completo: 
           // dez segundos apagava esse trabalho. O que se preserva é sempre a
           // versão MAIS RECENTE, com as referências trocadas.
           const actual = (await getState<StoredProposalDraft>(key)) ?? value;
-          await setState(key, { ...actual, doc: trocarRefsNoDoc(actual.doc, substituicoes) });
-          return true;
+          // `setState` NÃO lança quando a escrita é recusada — dizia-o só nos
+          // registos. Este `return true` era, por isso, uma promessa que não
+          // tinha como saber se era verdade, e o que ela autoriza a seguir é
+          // APAGAR as fotos do Storage. Um rascunho que ficou por reescrever com
+          // as fotos já apagadas é um mood board com buracos que ninguém volta a
+          // conseguir explicar. Passa a responder o que o `app-state` respondeu.
+          const { gravado } = await setState(key, {
+            ...actual,
+            doc: trocarRefsNoDoc(actual.doc, substituicoes),
+          });
+          return gravado;
         } catch {
           return false;
         }

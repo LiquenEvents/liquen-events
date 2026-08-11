@@ -145,11 +145,18 @@ function seedDraft(n: number, extra: Record<string, unknown> = {}) {
 }
 
 /** Resposta mínima que o estúdio sabe ler. */
-function reply(body: { ok?: boolean; json?: unknown; headers?: Record<string, string> }): Response {
+function reply(body: {
+  ok?: boolean;
+  /** O código, quando não basta «correu bem / não correu» — um 503 do rascunho
+   *  não é a mesma coisa que um 500, e o estúdio trata-os de maneira diferente. */
+  status?: number;
+  json?: unknown;
+  headers?: Record<string, string>;
+}): Response {
   const headers = body.headers ?? {};
   return {
     ok: body.ok ?? true,
-    status: body.ok === false ? 500 : 200,
+    status: body.status ?? (body.ok === false ? 500 : 200),
     headers: { get: (k: string) => headers[k] ?? null },
     json: async () => body.json ?? {},
     blob: async () => new Blob(["%PDF-"], { type: "application/pdf" }),
@@ -160,6 +167,19 @@ function reply(body: { ok?: boolean; json?: unknown; headers?: Record<string, st
 let propostaDoc: Response = reply({ headers: {}, json: { ok: true, emailed: true } });
 /** O rascunho que o SERVIDOR tem guardado (null = não tem nenhum). */
 let rascunhoServidor: { doc: unknown; updatedAt: string } | null = null;
+/**
+ * O que o servidor responde ao PUT do rascunho.
+ *
+ * Por omissão GUARDA — que é o caso normal, e era o que este duplo não fazia:
+ * respondia sempre `ok: false`, ou seja, todos estes testes corriam com o
+ * servidor a recusar a gravação sem nada nem ninguém dar por isso. Era
+ * exactamente o problema real, reproduzido aqui dentro sem intenção.
+ * A recusa passa a ter de ser PEDIDA, e há testes que a pedem.
+ */
+let gravacaoDoRascunho: () => Response = () =>
+  reply({ json: { ok: true, guardado: true, updatedAt: new Date().toISOString() } });
+/** A LEITURA do rascunho falha (rede em baixo). Diferente de «não há rascunho». */
+let leituraDoRascunhoFalha = false;
 /** As versões já enviadas, e o documento de cada uma (`?doc=<id>`). */
 let versoesServidor: unknown[] = [];
 let docsDeVersao: Record<string, unknown> = {};
@@ -176,7 +196,15 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   pedidos.push({ url, init });
   if (url.includes("proposta-doc")) return propostaDoc;
   if (url.includes("proposta-rascunho")) {
-    if (metodo === "GET" && rascunhoServidor) return reply({ json: { draft: rascunhoServidor } });
+    // A leitura RESPONDE, mesmo quando não há rascunho nenhum — «não há» é uma
+    // resposta e é diferente de «não se conseguiu perguntar». É essa diferença
+    // que decide se o estúdio pode reenviar o que tem preso no navegador.
+    if (metodo === "GET") {
+      return leituraDoRascunhoFalha
+        ? reply({ ok: false })
+        : reply({ json: { ok: true, draft: rascunhoServidor } });
+    }
+    if (metodo === "PUT") return gravacaoDoRascunho();
     return reply({ ok: false });
   }
   if (url.includes("/versoes")) {
@@ -205,6 +233,9 @@ beforeEach(() => {
   pedidos = [];
   propostaDoc = reply({ headers: {}, json: { ok: true, emailed: true } });
   rascunhoServidor = null;
+  gravacaoDoRascunho = () =>
+    reply({ json: { ok: true, guardado: true, updatedAt: new Date().toISOString() } });
+  leituraDoRascunhoFalha = false;
   versoesServidor = [];
   docsDeVersao = {};
   propostasServidor = [];
@@ -799,10 +830,15 @@ describe("fotos da biblioteca em estado provisório", () => {
     await screen.findByRole("heading", { name: "Mood boards" });
     // Uma foto no mood board, uma capa — e nenhuma célula provisória.
     expect(estados()).toEqual([null, null]);
-    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+    // Espera-se pela reescrita da CÓPIA LOCAL, e não pelo primeiro PUT: desde
+    // que o estúdio reenvia ao abrir o rascunho que estava preso no navegador,
+    // o primeiro PUT é esse reenvio — acontece antes do debounce, e chegava cá
+    // com o `localStorage` ainda por limpar.
+    await waitFor(() => expect(localStorage.getItem(DRAFT_KEY)).not.toContain("pending:"), {
       timeout: 3000,
     });
-    expect(localStorage.getItem(DRAFT_KEY)).not.toContain("pending:");
+    // E o que segue para o servidor também vai limpo, incluindo o reenvio.
+    expect(corpos("proposta-rascunho").join("")).not.toContain("pending:");
   });
 });
 
@@ -1508,5 +1544,236 @@ describe("modelos parciais de mood board", () => {
       expect(gravado).toContain("q1/nova-1.jpg");
       expect(gravado).not.toContain("LQ-999/aaa.jpg");
     });
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «GUARDADO» SÓ SE DIZ QUANDO CHEGOU AO SERVIDOR
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O que aconteceu: uma colaboradora montou uma proposta inteira — imagens,
+ * textos, orçamento — numa instalação onde a tabela `app_state` não existia. A
+ * gravação no servidor falhava de cada vez, a falha era engolida ao longo de
+ * toda a cadeia, e o indicador dizia «guardado às 14:32» porque a cópia LOCAL
+ * tinha corrido bem. A dona do negócio foi ver noutro computador e não estava
+ * lá nada.
+ *
+ * O indicador tem de ter três estados e tem de os DIZER — e o do meio, o que
+ * faltava, é o que muda o comportamento de quem está a trabalhar.
+ */
+describe("o indicador diz onde é que o rascunho ficou", () => {
+  /** A resposta da rota quando o `app_state` recusa a escrita (a instalação
+   *  dela: falta correr o `db/schema.sql`). */
+  const naoGuardou = () =>
+    reply({
+      ok: false,
+      status: 503,
+      json: {
+        ok: false,
+        guardado: false,
+        motivo: "tabela-em-falta",
+        permanente: true,
+        erro: "A base de dados não tem a tabela dos rascunhos (falta correr o db/schema.sql no Supabase).",
+      },
+    });
+
+  /**
+   * Semeia um rascunho local JÁ sincronizado — o servidor tem uma cópia mais
+   * recente. É preciso porque, com um rascunho local órfão, o estúdio reenvia-o
+   * ao abrir (e faz bem: é o resgate, testado mais abaixo). Aqui o que se olha é
+   * o indicador das gravações que vêm A SEGUIR, e o resgate só faria ruído.
+   */
+  function jaSincronizado() {
+    seedDraft(1);
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now() - 3600_000));
+    rascunhoServidor = {
+      updatedAt: new Date().toISOString(),
+      doc: JSON.parse(localStorage.getItem(DRAFT_KEY)!),
+    };
+  }
+
+  /** O texto do próprio indicador, que começa sempre pela palavra «guardado» —
+   *  ao contrário das mensagens, que começam por outra coisa. */
+  const soLocal = /^(⚠ )?guardado só neste computador/i;
+  const noServidor = /^guardado às /;
+
+  async function escrever() {
+    const user = userEvent.setup();
+    const campo = await screen.findByLabelText("Clientes");
+    await user.type(campo, "!");
+    // A gravação tem 800 ms de travão; esperar por ela é esperar pelo momento
+    // em que o indicador já tem alguma coisa verdadeira para dizer.
+    await waitFor(() => expect(localStorage.getItem(DRAFT_KEY) ?? "").toContain("!"), {
+      timeout: 3000,
+    });
+  }
+
+  it("no caso normal continua a dizer a hora a que guardou", async () => {
+    jaSincronizado();
+    renderStudio();
+    await escrever();
+    expect(await screen.findAllByText(noServidor, undefined, { timeout: 5000 })).not.toEqual([]);
+    expect(screen.queryAllByText(soLocal)).toEqual([]);
+  });
+
+  it("quando o servidor recusa, diz «só neste computador» — não «guardado»", async () => {
+    gravacaoDoRascunho = naoGuardou;
+    jaSincronizado();
+    renderStudio();
+    await escrever();
+    // Está no ecrã, por extenso, e não escondido num visto de outra cor.
+    expect(await screen.findAllByText(soLocal, undefined, { timeout: 5000 })).not.toEqual([]);
+    // E o que NÃO pode aparecer é a frase que a fazia fechar o portátil.
+    expect(screen.queryAllByText(noServidor)).toEqual([]);
+  });
+
+  it("diz também o que é preciso fazer para o servidor voltar a aceitar", async () => {
+    gravacaoDoRascunho = naoGuardou;
+    jaSincronizado();
+    renderStudio();
+    await escrever();
+    expect(await screen.findAllByText(/schema\.sql/i, undefined, { timeout: 5000 })).not.toEqual(
+      [],
+    );
+  });
+
+  /** A edição NUNCA falha porque a gravação falhou: o que muda é o que se diz. */
+  it("continua a deixar escrever com o servidor a recusar", async () => {
+    gravacaoDoRascunho = naoGuardou;
+    jaSincronizado();
+    renderStudio();
+    await escrever();
+    await screen.findAllByText(soLocal, undefined, { timeout: 5000 });
+    const campo = (await screen.findByLabelText("Clientes")) as HTMLInputElement;
+    expect(campo.disabled).toBe(false);
+    expect(campo.value).toContain("!");
+    // E o trabalho está mesmo salvo no navegador — é o que o resgate vai buscar.
+    expect(localStorage.getItem(DRAFT_KEY) ?? "").toContain("!");
+  });
+
+  /**
+   * Uma gravação que falha por rede não pode morrer à primeira — é o mesmo
+   * desenho do envio da proposta. À segunda tentativa passa, e o que ela vê é
+   * um rascunho guardado, sem nunca ter sabido que houve uma falha.
+   */
+  it("uma falha passageira é repetida, e a segunda tentativa guarda", async () => {
+    let n = 0;
+    gravacaoDoRascunho = () =>
+      ++n === 1
+        ? reply({ ok: false, status: 500, json: { ok: false } })
+        : reply({ json: { ok: true, guardado: true, updatedAt: new Date().toISOString() } });
+    jaSincronizado();
+    renderStudio();
+    await escrever();
+    expect(await screen.findAllByText(noServidor, undefined, { timeout: 5000 })).not.toEqual([]);
+    expect(n).toBeGreaterThan(1);
+    expect(screen.queryAllByText(soLocal)).toEqual([]);
+  });
+
+  /** Uma instalação sem a tabela responde o mesmo à terceira vez que à
+   *  primeira: repetir só atrasa o aviso. */
+  it("uma falha permanente não é repetida", async () => {
+    let n = 0;
+    gravacaoDoRascunho = () => {
+      n++;
+      return naoGuardou();
+    };
+    jaSincronizado();
+    renderStudio();
+    await escrever();
+    await screen.findAllByText(soLocal, undefined, { timeout: 5000 });
+    // Uma por gravação — nunca três.
+    expect(n).toBe(corpos("proposta-rascunho").length);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE FICOU PRESO NO NAVEGADOR VOLTA AO ABRIR
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * É por aqui que o trabalho da colaboradora regressa. Enquanto o servidor
+ * recusou as gravações, tudo o que ela montou ficou no `localStorage` daquele
+ * portátil — intacto e invisível. O estúdio abria, via que o servidor não tinha
+ * rascunho nenhum, e não fazia nada com essa informação.
+ */
+describe("o rascunho preso neste navegador é reenviado ao abrir", () => {
+  /** Um rascunho local com marca de tempo — como o que ficou no portátil dela. */
+  function rascunhoOrfaoLocal(marca: string) {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: marca,
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
+  }
+
+  it("um rascunho local sem nenhum no servidor é enviado, e diz-se que foi", async () => {
+    rascunhoOrfaoLocal("Beatriz e Nuno");
+    rascunhoServidor = null;
+    renderStudio();
+    await waitFor(
+      () => expect(corpos("proposta-rascunho").at(0) ?? "").toContain("Beatriz e Nuno"),
+      { timeout: 3000 },
+    );
+    expect(
+      await screen.findAllByText(/foi enviado para o servidor/i, undefined, { timeout: 3000 }),
+    ).not.toEqual([]);
+  });
+
+  it("um rascunho local MAIS RECENTE do que o do servidor também é reenviado", async () => {
+    rascunhoOrfaoLocal("Beatriz e Nuno");
+    rascunhoServidor = {
+      // Uma hora mais velho do que a cópia deste navegador.
+      updatedAt: new Date(Date.now() - 3600_000).toISOString(),
+      doc: { template: "decoracao", ref: "PO", clientNames: "Versão velha do servidor" },
+    };
+    renderStudio();
+    expect(
+      await screen.findAllByText(/foi enviado para o servidor/i, undefined, { timeout: 3000 }),
+    ).not.toEqual([]);
+    expect(corpos("proposta-rascunho").at(0) ?? "").toContain("Beatriz e Nuno");
+    // E a versão velha do servidor NÃO é posta por cima do que está no ecrã.
+    expect((await screen.findByLabelText("Clientes")) as HTMLInputElement).toHaveProperty(
+      "value",
+      "Beatriz e Nuno",
+    );
+  });
+
+  it("com o servidor mais recente não se reenvia nada — seria apagar trabalho", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ template: "decoracao", clientNames: "Velha" }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now() - 3600_000));
+    rascunhoServidor = {
+      updatedAt: new Date().toISOString(),
+      doc: { template: "decoracao", ref: "PO", clientNames: "Herdade do Servidor" },
+    };
+    renderStudio();
+    await screen.findByDisplayValue("Herdade do Servidor");
+    expect(corpos("proposta-rascunho").join("")).not.toContain("Velha");
+  });
+
+  /** Se o GET falhou não se sabe o que lá está: escrever por cima às cegas
+   *  podia apagar uma versão mais recente feita noutro dispositivo. */
+  it("não reenvia às cegas quando nem sequer se conseguiu ler o servidor", async () => {
+    rascunhoOrfaoLocal("Beatriz e Nuno");
+    leituraDoRascunhoFalha = true;
+    renderStudio();
+    await screen.findByDisplayValue("Beatriz e Nuno");
+    // Sem tecla nenhuma não há gravação — e portanto nenhum reenvio cego.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(corpos("proposta-rascunho")).toEqual([]);
   });
 });

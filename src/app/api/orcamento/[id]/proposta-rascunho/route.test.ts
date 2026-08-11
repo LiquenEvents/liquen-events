@@ -14,6 +14,9 @@ const st = vi.hoisted(() => ({
   authed: false,
   stored: null as { doc: unknown; updatedAt: string; savedBy?: string } | null,
   throwOnGet: false,
+  /** O que o `app_state` responde à escrita. `null` = gravou. Ver o teste da
+   *  tabela em falta: é a instalação da colaboradora, tal e qual. */
+  falhaDeEscrita: null as null | "tabela-em-falta" | "sem-permissao" | "escrita-recusada",
   save: vi.fn(),
   clear: vi.fn(),
 }));
@@ -23,22 +26,37 @@ vi.mock("@/lib/admin-auth", () => ({
   ADMIN_NAME_COOKIE: "liquen_user",
 }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
-vi.mock("@/lib/proposal-drafts", () => ({
-  getProposalDraft: vi.fn(async () => {
-    if (st.throwOnGet) throw new Error("db down");
-    return st.stored;
-  }),
-  saveProposalDraft: vi.fn(async (id: string, doc: unknown, savedBy?: string) => {
-    st.save(id, doc, savedBy);
-    const draft = { doc, updatedAt: "2026-07-28T23:00:00.000Z", ...(savedBy ? { savedBy } : {}) };
-    st.stored = draft;
-    return draft;
-  }),
-  clearProposalDraft: vi.fn(async (id: string) => {
-    st.clear(id);
-    st.stored = null;
-  }),
-}));
+vi.mock("@/lib/proposal-drafts", async () => {
+  // As duas frases (`porqueNaoGuardou`, `ehFalhaPermanente`) são as verdadeiras:
+  // é o texto que a pessoa lê, e um duplo aqui deixaria de o testar.
+  const real =
+    await vi.importActual<typeof import("@/lib/proposal-drafts")>("@/lib/proposal-drafts");
+  const persistencia = () =>
+    st.falhaDeEscrita
+      ? { gravado: false as const, onde: "nenhures" as const, motivo: st.falhaDeEscrita }
+      : { gravado: true as const, onde: "servidor" as const };
+  return {
+    porqueNaoGuardou: real.porqueNaoGuardou,
+    ehFalhaPermanente: real.ehFalhaPermanente,
+    getProposalDraft: vi.fn(async () => {
+      if (st.throwOnGet) throw new Error("db down");
+      return st.stored;
+    }),
+    saveProposalDraft: vi.fn(async (id: string, doc: unknown, savedBy?: string) => {
+      st.save(id, doc, savedBy);
+      const draft = { doc, updatedAt: "2026-07-28T23:00:00.000Z", ...(savedBy ? { savedBy } : {}) };
+      // Só entra no armazém quando a escrita foi mesmo aceite — é este o ponto
+      // todo: o rascunho existe na resposta e NÃO existe na base de dados.
+      if (!st.falhaDeEscrita) st.stored = draft;
+      return { draft, persistencia: persistencia() };
+    }),
+    clearProposalDraft: vi.fn(async (id: string) => {
+      st.clear(id);
+      if (!st.falhaDeEscrita) st.stored = null;
+      return persistencia();
+    }),
+  };
+});
 
 import { GET, PUT, DELETE } from "./route";
 
@@ -68,6 +86,7 @@ beforeEach(() => {
   st.authed = true;
   st.stored = null;
   st.throwOnGet = false;
+  st.falhaDeEscrita = null;
   vi.clearAllMocks();
 });
 
@@ -106,6 +125,7 @@ describe("PUT /api/orcamento/[id]/proposta-rascunho", () => {
     const res = await PUT(...req("PUT", { doc: { ref: "X" } }));
     expect(res.status).toBe(200);
     const body = await res.json();
+    expect(body.guardado).toBe(true);
     expect(body.updatedAt).toBe("2026-07-28T23:00:00.000Z");
     expect(body.overwrote).toBe(false);
     expect(st.save).toHaveBeenCalledWith("q-1", { ref: "X" }, undefined);
@@ -154,6 +174,61 @@ describe("PUT /api/orcamento/[id]/proposta-rascunho", () => {
   });
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UMA ESCRITA RECUSADA NÃO PODE SAIR DAQUI COMO «OK»
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O caso real: a tabela `app_state` não existia naquela instalação (o
+ * `db/schema.sql` estava por correr). Cada gravação falhava, o `app-state`
+ * engolia o erro, `saveProposalDraft` devolvia o rascunho na mesma e esta rota
+ * respondia `{ ok: true }`. O estúdio escrevia «guardado às 14:32» e a proposta
+ * inteira ficou no `localStorage` de um portátil.
+ *
+ * O que estes testes prendem é o elo do meio: a rota tem de DIZER que não
+ * guardou, e tem de dizer o suficiente para se saber o que fazer a seguir.
+ */
+describe("PUT /api/orcamento/[id]/proposta-rascunho — quando a base recusa a escrita", () => {
+  it("não responde OK: diz que não guardou", async () => {
+    st.falhaDeEscrita = "tabela-em-falta";
+    const res = await PUT(...req("PUT", { doc: { ref: "X" } }));
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.guardado).toBe(false);
+    // E não é um `updatedAt` que passa por gravação nenhuma.
+    expect(body.updatedAt).toBeUndefined();
+  });
+
+  it("uma tabela em falta diz-se pelo nome, e não vale a pena repetir", async () => {
+    st.falhaDeEscrita = "tabela-em-falta";
+    const body = await (await PUT(...req("PUT", { doc: { ref: "X" } }))).json();
+    expect(body.motivo).toBe("tabela-em-falta");
+    expect(body.permanente).toBe(true);
+    expect(body.erro).toMatch(/schema\.sql/i);
+  });
+
+  it("uma permissão recusada também não se resolve a repetir", async () => {
+    st.falhaDeEscrita = "sem-permissao";
+    const body = await (await PUT(...req("PUT", { doc: { ref: "X" } }))).json();
+    expect(body.motivo).toBe("sem-permissao");
+    expect(body.permanente).toBe(true);
+    expect(body.erro).toMatch(/permiss/i);
+  });
+
+  it("uma avaria passageira PODE ser repetida — e a rota di-lo", async () => {
+    st.falhaDeEscrita = "escrita-recusada";
+    const body = await (await PUT(...req("PUT", { doc: { ref: "X" } }))).json();
+    expect(body.permanente).toBe(false);
+  });
+
+  it("a edição nunca falha por causa disto: a gravação foi mesmo tentada", async () => {
+    st.falhaDeEscrita = "tabela-em-falta";
+    await PUT(...req("PUT", { doc: { ref: "X" } }));
+    expect(st.save).toHaveBeenCalledWith("q-1", { ref: "X" }, undefined);
+  });
+});
+
 describe("DELETE /api/orcamento/[id]/proposta-rascunho", () => {
   it("rejeita quem não está autenticado e nunca apaga", async () => {
     st.authed = false;
@@ -164,6 +239,16 @@ describe("DELETE /api/orcamento/[id]/proposta-rascunho", () => {
   it("descarta o rascunho do pedido", async () => {
     const res = await DELETE(...req("DELETE"));
     expect(res.status).toBe(200);
+    expect((await res.json()).apagado).toBe(true);
     expect(st.clear).toHaveBeenCalledWith("q-1");
+  });
+
+  // Falhar a limpeza não perde trabalho — o rascunho fica onde estava —, por
+  // isso continua a ser 200. Mas não se pode dizer que apagou.
+  it("não promete uma limpeza que não houve", async () => {
+    st.falhaDeEscrita = "tabela-em-falta";
+    const res = await DELETE(...req("DELETE"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).apagado).toBe(false);
   });
 });
