@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import type { Quote } from "@/lib/orcamento/types";
 import Overview from "./Overview";
+import { __resetListCache } from "./useCachedList";
 
 /**
  * ── O ECRÃ QUE MENTIA ─────────────────────────────────────────────────────
@@ -165,6 +166,10 @@ beforeEach(() => {
   proximaFalha = null;
   leituraFalha = false;
   localStorage.clear();
+  // O Reminders e a Agenda lêem as tarefas e o calendário pela cache
+  // partilhada, que vive no MÓDULO e sobreviveria de um teste para o outro —
+  // e um teste que conta pedidos tem de começar sempre da mesma folha.
+  __resetListCache();
   instalarFetch();
 });
 
@@ -518,5 +523,26 @@ describe("uma leitura para os dois cartões", () => {
     await screen.findByText("Sem notas.");
     const pedidos = vi.mocked(fetch).mock.calls.filter(([url]) => String(url).startsWith(ROTA));
     expect(pedidos).toHaveLength(1);
+  });
+
+  /**
+   * ── O MESMO ECRÃ PEDIA AS TAREFAS TRÊS VEZES ──────────────────────────
+   *
+   * O Reminders pedia `/api/tarefas` por sua conta, a Agenda pedia outra vez
+   * (mais `/api/calendario`), e o aquecimento ocioso do AdminClient pedia as
+   * duas uma terceira/segunda vez. Três respostas iguais para desenhar dois
+   * cartões lado a lado.
+   *
+   * Não é o React em modo estrito a duplicar efeitos: são componentes
+   * DIFERENTES, cada um com o seu `fetch`. A prova é este teste — corre sem
+   * StrictMode e contava três.
+   */
+  it("o Reminders e a Agenda partilham a leitura das tarefas e do calendário", async () => {
+    desenhar();
+    await screen.findByText("Sem notas.");
+    const contar = (rota: string) =>
+      vi.mocked(fetch).mock.calls.filter(([url]) => String(url).startsWith(rota)).length;
+    await waitFor(() => expect(contar("/api/tarefas")).toBe(1));
+    expect(contar("/api/calendario")).toBe(1);
   });
 });

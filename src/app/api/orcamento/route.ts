@@ -13,7 +13,14 @@ import { guestRangeLabel, ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcame
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
-import { createQuote, listQuotes, getQuote, generateQuoteId, quoteIdFor } from "@/lib/quotes-store";
+import {
+  createQuote,
+  listQuotes,
+  listQuoteSummaries,
+  getQuote,
+  generateQuoteId,
+  quoteIdFor,
+} from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { jsonWithEtag } from "@/lib/api-cache";
 import { sendPushToAll } from "@/lib/push";
@@ -732,8 +739,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const quotes = await listQuotes();
-    return jsonWithEtag(request, quotes);
+    /**
+     * `?resumo=1` devolve a lista SEM as colecções que só o pedido aberto
+     * mostra — ver `resumirQuote`. É a mesma forma que a página de
+     * administração recebe no primeiro carregamento, e é preciso aqui pela
+     * mesma razão: esta rota é relida ao voltar ao separador, ao devolver o
+     * foco e de dois em dois minutos. Sem o resumo, a lista inteira voltava a
+     * descarregar-se de dois em dois minutos e a poupança do primeiro
+     * carregamento durava até à primeira mudança de separador.
+     *
+     * Por ADESÃO: sem o parâmetro a resposta é a de sempre, com tudo.
+     */
+    const resumo = new URL(request.url).searchParams.get("resumo") === "1";
+    return jsonWithEtag(request, resumo ? await listQuoteSummaries() : await listQuotes());
   } catch (err) {
     log.error("orcamento GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

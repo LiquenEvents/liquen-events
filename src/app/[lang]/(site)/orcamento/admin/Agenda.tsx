@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { Quote, CalendarEvent, Task } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { eur0 as eur } from "@/lib/money";
 import { todayKey } from "./util";
 import { Card, EmptyState } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 const DAYS_AHEAD = 14;
 
@@ -51,22 +52,22 @@ interface Props {
 }
 
 export default function Agenda({ quotes, onOpen }: Props) {
-  const [calEvents, setCalEvents] = useState<CalendarEvent[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/calendario", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : []))
-        .catch(() => []),
-      fetch("/api/tarefas", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : []))
-        .catch(() => []),
-    ]).then(([c, t]) => {
-      if (Array.isArray(c)) setCalEvents(c);
-      if (Array.isArray(t)) setTasks(t);
-    });
-  }, []);
+  /**
+   * A MESMA leitura que o Calendário e as Tarefas fazem, e não uma segunda.
+   *
+   * Isto pedia `/api/calendario` e `/api/tarefas` por sua conta, ao lado do
+   * Reminders (que pedia as tarefas outra vez) e do aquecimento ocioso do
+   * AdminClient (que pedia as duas mais uma vez): abrir a Visão Geral eram
+   * TRÊS pedidos de tarefas e DOIS de calendário, todos com a mesma resposta.
+   *
+   * O `useCachedList` já resolve isto com as chaves que as vistas grandes usam
+   * ("calendario", "tarefas"): partilha a cache entre montagens e junta os
+   * pedidos em voo numa só viagem, mesmo quando três sítios pedem ao mesmo
+   * tempo — que é exactamente o que aqui acontecia. Uma falha continua a
+   * dar-nos uma lista vazia e uma agenda com o que dá para mostrar, como antes.
+   */
+  const { data: calEvents = [] } = useCachedList<CalendarEvent[]>("calendario", "/api/calendario");
+  const { data: tasks = [] } = useCachedList<Task[]>("tarefas", "/api/tarefas");
 
   const { byDay, days } = useMemo(() => {
     const today = new Date();

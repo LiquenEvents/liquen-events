@@ -361,3 +361,79 @@ describe("a base de dados não está ligada", () => {
     expect((await res.json()).error).toMatch(/Supabase/);
   });
 });
+
+/**
+ * ── A LISTA QUE NÃO MUDA, PEDIDA EM TODOS OS ECRÃS ────────────────────────
+ *
+ * A biblioteca de temas é lida em quase todo o lado e muda muito pouco — o
+ * caso de manual para uma resposta condicional, como já faziam /api/propostas,
+ * /api/faturas e as outras listas do back office. Aqui não fazia: cada
+ * revalidação descarregava a lista inteira outra vez.
+ *
+ * A ARMADILHA que estes testes prendem: as capas e as tiras vêm em URLs
+ * ASSINADOS, e uma assinatura leva a hora em que foi feita. Um ETag tirado do
+ * corpo mudava a cada pedido e o 304 nunca acontecia — teria ficado um
+ * cabeçalho a não fazer nada, com ar de estar a fazer. O carimbo é tirado do
+ * que está POR BAIXO das assinaturas: que temas há e que ficheiros são a capa
+ * e as tiras.
+ */
+describe("GET /api/temas — resposta condicional", () => {
+  function reqCom(etag: string): NextRequest {
+    return new Request("https://liquen.test/api/temas", {
+      method: "GET",
+      headers: { "If-None-Match": etag },
+    }) as unknown as NextRequest;
+  }
+
+  /** Assina como o Storage assina: o mesmo ficheiro, um token novo de cada vez. */
+  function assinaturasSempreNovas() {
+    let n = 0;
+    st.sign.mockImplementation(async (paths: string[]) => {
+      n += 1;
+      return new Map(paths.map((p) => [p, `https://signed/${p}?token=${n}`] as const));
+    });
+  }
+
+  beforeEach(() => {
+    st.authed = true;
+    st.themes = [theme("t-1", "Terracotta")];
+    st.files = { "t-1": folder(["a.jpg", "b.jpg"]) };
+    assinaturasSempreNovas();
+  });
+
+  it("carimba a resposta com um ETag", async () => {
+    const res = await GET(req("GET"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("etag")).toMatch(/^W\//);
+  });
+
+  it("responde 304 sem corpo quando a biblioteca é a mesma — apesar de as assinaturas serem novas", async () => {
+    const primeira = await GET(req("GET"));
+    const segunda = await GET(reqCom(primeira.headers.get("etag")!));
+    expect(segunda.status).toBe(304);
+    expect(await segunda.text()).toBe("");
+  });
+
+  it("uma foto nova muda o carimbo e a lista volta a vir inteira", async () => {
+    const primeira = await GET(req("GET"));
+    st.files = { "t-1": folder(["nova.jpg", "a.jpg", "b.jpg"]) };
+    const segunda = await GET(reqCom(primeira.headers.get("etag")!));
+    expect(segunda.status).toBe(200);
+    expect((await segunda.json())[0].coverUrl).toMatch(/t-1\/nova\.jpg/);
+  });
+
+  it("um tema novo também", async () => {
+    const primeira = await GET(req("GET"));
+    st.themes = [theme("t-1", "Terracotta"), theme("t-2", "Itália")];
+    expect((await GET(reqCom(primeira.headers.get("etag")!))).status).toBe(200);
+  });
+
+  it("o corpo de um 200 leva sempre assinaturas frescas, nunca as do carimbo", async () => {
+    const primeira = await GET(req("GET"));
+    const segunda = await GET(req("GET"));
+    const a = (await primeira.json())[0].coverUrl;
+    const b = (await segunda.json())[0].coverUrl;
+    expect(a).not.toBe(b);
+    expect(a.split("?")[0]).toBe(b.split("?")[0]);
+  });
+});

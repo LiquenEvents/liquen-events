@@ -3,6 +3,8 @@ import { isAuthed } from "@/lib/admin-auth";
 import { listAllProposals } from "@/lib/proposals-store";
 import { jsonWithEtag } from "@/lib/api-cache";
 import { log } from "@/lib/logger";
+import { opcionaisDe } from "@/lib/orcamento/versoes-da-proposta";
+import type { Proposal } from "@/lib/orcamento/types";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 
 export const runtime = "nodejs";
@@ -48,12 +50,49 @@ function resumir(p: Awaited<ReturnType<typeof listAllProposals>>[number]) {
   };
 }
 
+/**
+ * A MESMA proposta, sem o documento — a forma que as LISTAS precisam.
+ *
+ * Não confundir com `resumir` acima: aquilo é um cartão de escolha para o
+ * "Criar a partir de…" (meia dúzia de campos e umas contagens). Isto é a
+ * proposta INTEIRA — estado, cliente, totais, validade, seguimento, motivo de
+ * recusa, versão escolhida — a que só falta o `doc`. É o que os painéis de
+ * Propostas, Acompanhamento e Análise desenham: nenhum deles imprime o
+ * documento, e o documento é quase tudo o que se descarrega (mood boards,
+ * grupos de serviços, condições, dezenas de caminhos de fotos).
+ *
+ * Vão dois factos DERIVADOS do documento, porque são os únicos que as listas
+ * lhe tiram e sem eles a mudança não seria neutra:
+ *   · `temDoc`       — uma proposta de linhas antiga não tem documento nenhum.
+ *   · `temOpcionais` — a proposta tinha linhas marcadas como extra. É o que o
+ *                      Acompanhamento usa para perguntar «qual das versões é
+ *                      que eles ficaram?» e a Análise para contar quantas
+ *                      aceites tinham extras.
+ *
+ * O campo `doc` é OMITIDO, não truncado: um documento pela metade é a espécie
+ * de coisa que passa despercebida até alguém desenhar um PDF a partir dele.
+ */
+function semDocumento(p: Proposal) {
+  const { doc, ...resto } = p;
+  return {
+    ...resto,
+    temDoc: !!doc,
+    temOpcionais: !!doc && opcionaisDe(doc).some(Boolean),
+  };
+}
+
 export async function GET(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const propostas = await listAllProposals();
-    if (new URL(request.url).searchParams.get("resumo") === "1") {
+    const params = new URL(request.url).searchParams;
+    if (params.get("resumo") === "1") {
       return jsonWithEtag(request, propostas.map(resumir));
+    }
+    // Por ADESÃO: sem o parâmetro, a resposta é byte a byte a de sempre. Quem
+    // pede a lista sem saber deste modo continua a receber tudo.
+    if (params.get("semDoc") === "1") {
+      return jsonWithEtag(request, propostas.map(semDocumento));
     }
     return jsonWithEtag(request, propostas);
   } catch (err) {

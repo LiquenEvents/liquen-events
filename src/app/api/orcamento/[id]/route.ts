@@ -35,7 +35,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     }
     if (isAuthed(request)) {
-      return NextResponse.json(quote);
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * QUEM RECEBE TEM DE PODER DISTINGUIR ESTA RESPOSTA DA DE BAIXO
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Esta rota responde 200 nos dois casos: com sessão devolve o pedido
+       * INTEIRO, sem sessão devolve a lista curta e pública lá em baixo — que
+       * também leva `id`. São 200 com o mesmo aspecto à distância.
+       *
+       * O back office passou a ir buscar aqui o pedido completo quando ela abre
+       * um pedido da lista (ver `openQuote` em AdminClient). Com a sessão
+       * expirada — e ela fica com o separador aberto horas seguidas — a
+       * resposta pública passava por completa: o painel abria sem nome, sem
+       * contacto, sem pagamentos e sem convidados, e o pedido da lista era
+       * substituído por essa versão amputada.
+       *
+       * Este cabeçalho é a distinção, dita e não adivinhada. Adivinhá-la pela
+       * presença de um campo seria uma regra a partir-se sozinha no dia em que
+       * a lista pública crescesse um campo.
+       */
+      return NextResponse.json(quote, { headers: { "x-pedido": "completo" } });
     }
     const safe = {
       id: quote.id,

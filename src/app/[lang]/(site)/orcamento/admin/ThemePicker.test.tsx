@@ -30,10 +30,31 @@ import ThemePicker, { __resetThemePickerState } from "./ThemePicker";
 // Uma resposta por `MÉTODO /caminho`; o que não estiver registado rebenta o
 // teste em vez de ir à rede. O URL completo chega ao handler para se poder
 // honrar a paginação (`?offset=&limit=`), que é o que está em causa.
-type Res = { ok: boolean; status: number; json: () => Promise<unknown> };
+// `headers` faz parte da resposta e não estava aqui — o duplo mentia sobre a
+// forma de uma `Response`. Quando a cache do seletor passou a ler o `ETag`
+// para o pedido condicional seguinte, o `res.headers` era `undefined` e a
+// biblioteca deixava de abrir: 26 testes vermelhos por uma propriedade que o
+// duplo devia ter desde sempre.
+type Res = {
+  ok: boolean;
+  status: number;
+  headers: { get: (nome: string) => string | null };
+  json: () => Promise<unknown>;
+};
 type Handler = (url: string, init?: RequestInit) => Res | Promise<Res>;
-const ok = (body: unknown): Res => ({ ok: true, status: 200, json: async () => body });
-const bad = (status: number, body: unknown): Res => ({ ok: false, status, json: async () => body });
+const semCabecalhos = { get: () => null };
+const ok = (body: unknown): Res => ({
+  ok: true,
+  status: 200,
+  headers: semCabecalhos,
+  json: async () => body,
+});
+const bad = (status: number, body: unknown): Res => ({
+  ok: false,
+  status,
+  headers: semCabecalhos,
+  json: async () => body,
+});
 
 let routes: Map<string, Handler>;
 /** Todos os URLs pedidos, pela ordem — é aqui que se vê o que foi assinado. */

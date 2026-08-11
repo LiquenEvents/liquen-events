@@ -113,3 +113,66 @@ describe("aquecer as fotos em segundo plano", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 });
+
+/**
+ * ── CONFIRMAR A LISTA DEIXOU DE CUSTAR A LISTA ────────────────────────────
+ *
+ * A entrada guardada mostra-se já e confirma-se por trás (ver `vaiRevalidar`).
+ * Essa confirmação descarregava a biblioteca inteira outra vez — capas, tiras,
+ * tudo — quase sempre para dizer que estava igual. A rota passou a carimbar a
+ * resposta com um ETag e aqui reenvia-se esse carimbo.
+ *
+ * O que estes testes prendem é a parte que se pode partir sem dar erro:
+ *   · num 304 fica-se com o array que já se tinha, e com a MESMA referência
+ *     (é isso que impede a grelha de voltar a desenhar);
+ *   · e o `at` NÃO se renova. É ele que mata a entrada aos 30 minutos e obriga
+ *     a URLs assinados de novo; renová-lo num 304 deixava a entrada viver até
+ *     as assinaturas expirarem às 6 horas, e a grelha aparecia vazia.
+ */
+describe("a lista de temas revalida-se com ETag", () => {
+  const lista = [{ id: "t-1", name: "Terracotta", imageCount: 2 }];
+
+  /** Resposta completa, com carimbo. */
+  const cheia = (etag: string) =>
+    new Response(JSON.stringify(lista), { status: 200, headers: { ETag: etag } });
+
+  it("reenvia o carimbo da leitura anterior", async () => {
+    const { buscarTemas } = await import("./theme-picker-cache");
+    fetchMock.mockResolvedValueOnce(cheia('W/"biblioteca-1"'));
+    await buscarTemas(true);
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 304 }));
+    await buscarTemas(true);
+
+    const init = fetchMock.mock.calls[1]?.[1] as { headers?: Record<string, string> };
+    expect(init?.headers?.["If-None-Match"]).toBe('W/"biblioteca-1"');
+  });
+
+  it("num 304 devolve o que já tinha — a MESMA lista, sem corpo novo", async () => {
+    const { buscarTemas } = await import("./theme-picker-cache");
+    fetchMock.mockResolvedValueOnce(cheia('W/"biblioteca-1"'));
+    const primeira = await buscarTemas(true);
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 304 }));
+    const segunda = await buscarTemas(true);
+
+    expect(segunda).toBe(primeira);
+  });
+
+  it("um 200 novo substitui a lista e o carimbo", async () => {
+    const { buscarTemas } = await import("./theme-picker-cache");
+    fetchMock.mockResolvedValueOnce(cheia('W/"biblioteca-1"'));
+    await buscarTemas(true);
+
+    const outra = [...lista, { id: "t-2", name: "Itália", imageCount: 5 }];
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(outra), { status: 200, headers: { ETag: 'W/"biblioteca-2"' } }),
+    );
+    expect(await buscarTemas(true)).toHaveLength(2);
+
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 304 }));
+    await buscarTemas(true);
+    const init = fetchMock.mock.calls[2]?.[1] as { headers?: Record<string, string> };
+    expect(init?.headers?.["If-None-Match"]).toBe('W/"biblioteca-2"');
+  });
+});

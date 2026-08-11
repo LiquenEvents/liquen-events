@@ -116,7 +116,22 @@ function makeQuote(over: Partial<Quote> = {}): Quote {
   } as Quote;
 }
 
+/**
+ * Os pedidos que o "servidor" tem, por id.
+ *
+ * A lista chega em RESUMO (ver `resumirQuote`), sem as colecções que só o
+ * pedido aberto mostra, e abrir um pedido vai buscar o resto a
+ * `/api/orcamento/<id>`. O `fetch` de mentira lê daqui para que abrir um
+ * pedido funcione nos testes como funciona no produto.
+ */
+const servidor = new Map<string, Quote>();
+
+/** Cabeçalhos de resposta com a interface que o código usa (`.get`). */
+const cabecalhos = (mapa: Record<string, string>) => ({ get: (k: string) => mapa[k] ?? null });
+
 function renderAdmin(quotes: Quote[]) {
+  servidor.clear();
+  for (const q of quotes) servidor.set(q.id, q);
   return render(
     <ToastProvider>
       <AdminClient initialQuotes={quotes} userName="Teste" />
@@ -146,7 +161,24 @@ beforeEach(() => {
   // missing serviceWorker), but stub fetch so a stray call can never hit the network.
   vi.stubGlobal(
     "fetch",
-    vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve([]) })),
+    vi.fn((url: string) => {
+      const m = /^\/api\/orcamento\/(.+)$/.exec(String(url));
+      const pedido = m ? servidor.get(decodeURIComponent(m[1])) : undefined;
+      if (pedido)
+        return Promise.resolve({
+          ok: true,
+          // O cabeçalho que a rota põe quando há sessão e a resposta é o
+          // pedido INTEIRO. Sem sessão a mesma rota responde 200 com uma lista
+          // curta e pública, e é isto que as distingue — ver `comPedidoInteiro`.
+          headers: cabecalhos({ "x-pedido": "completo" }),
+          json: () => Promise.resolve(pedido),
+        });
+      return Promise.resolve({
+        ok: true,
+        headers: cabecalhos({}),
+        json: () => Promise.resolve([]),
+      });
+    }),
   );
 });
 
@@ -193,7 +225,7 @@ describe("AdminClient shell", () => {
     expect(screen.getByTestId("view-faturas")).toBeInTheDocument();
   });
 
-  it("opens a quote's detail panel and closes it", () => {
+  it("opens a quote's detail panel and closes it", async () => {
     const quote = makeQuote({ id: "LQ-042", name: "Carla Nunes" });
     renderAdmin([quote]);
 
@@ -207,14 +239,100 @@ describe("AdminClient shell", () => {
     fireEvent.click(screen.getByText("Carla Nunes"));
 
     // The detail drawer is now open: its close control exists and the id is
-    // echoed a second time inside the panel header.
-    expect(screen.getByRole("button", { name: "Fechar" })).toBeInTheDocument();
+    // echoed a second time inside the panel header. Abre depois de o pedido
+    // INTEIRO chegar — a lista só traz o resumo, e o painel de convidados (e
+    // os outros três) copia a colecção para estado interno no primeiro render:
+    // aberto sobre o resumo ficava com uma lista vazia e a primeira edição
+    // gravava-a por cima da verdadeira.
+    expect(await screen.findByRole("button", { name: "Fechar" })).toBeInTheDocument();
     expect(screen.getAllByText(/LQ-042/)).toHaveLength(2);
 
     // Closing the drawer tears it down again.
     fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
     expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
     expect(screen.getAllByText(/LQ-042/)).toHaveLength(1);
+  });
+
+  /**
+   * ── ABRIR UM PEDIDO VAI BUSCAR O PEDIDO INTEIRO ─────────────────────────
+   *
+   * A lista chega em resumo: sem convidados, checklist, plano de produção nem
+   * cronograma (ver `resumirQuote` — com 300 pedidos era isso que enchia o
+   * HTML da página). O painel de detalhe é o dono desses quatro, e cada um
+   * deles copia a colecção para estado interno no primeiro render, preso por
+   * `key` ao id do pedido: aberto sobre o resumo ficava com uma lista VAZIA
+   * que a primeira edição gravava por cima da verdadeira.
+   *
+   * Daí estes três testes: vai-se buscar, vai-se buscar UMA vez, e se não se
+   * conseguir NÃO se abre um painel que parece completo e não está.
+   */
+  it("abre com a versão inteira do servidor, não com o resumo da lista", async () => {
+    renderAdmin([makeQuote({ id: "LQ-777", name: "Sara Lopes" })]);
+    navTo(/Pedidos/);
+    fireEvent.click(screen.getByText("Sara Lopes"));
+    await screen.findByRole("button", { name: "Fechar" });
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith("/api/orcamento/LQ-777", expect.anything());
+  });
+
+  it("reabrir o mesmo pedido não volta a pedi-lo ao servidor", async () => {
+    renderAdmin([makeQuote({ id: "LQ-777", name: "Sara Lopes" })]);
+    navTo(/Pedidos/);
+    const idas = () =>
+      vi.mocked(fetch).mock.calls.filter(([url]) => String(url).startsWith("/api/orcamento/"))
+        .length;
+
+    fireEvent.click(screen.getByText("Sara Lopes"));
+    fireEvent.click(await screen.findByRole("button", { name: "Fechar" }));
+    fireEvent.click(screen.getByText("Sara Lopes"));
+    await screen.findByRole("button", { name: "Fechar" });
+    expect(idas()).toBe(1);
+  });
+
+  it("se o pedido inteiro não vier, o painel NÃO abre com o resumo", async () => {
+    renderAdmin([makeQuote({ id: "LQ-777", name: "Sara Lopes" })]);
+    navTo(/Pedidos/);
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "Erro interno" }),
+    } as never);
+
+    fireEvent.click(screen.getByText("Sara Lopes"));
+    // A falha é DITA. O silêncio aqui seria um painel de convidados vazio a
+    // fingir que aquele casamento não tem convidados nenhuns.
+    expect(await screen.findByText(/Não foi possível abrir o pedido/)).toBeInTheDocument();
+    // O painel ecoa a referência do pedido no cabeçalho; com ele fechado, a
+    // referência aparece uma vez só — na linha da lista.
+    expect(screen.getAllByText(/LQ-777/)).toHaveLength(1);
+  });
+
+  /**
+   * ── SESSÃO EXPIRADA RESPONDE 200 ────────────────────────────────────────
+   *
+   * `/api/orcamento/<id>` é pública: a página de confirmação do casal lê-a. Sem
+   * sessão devolve uma lista CURTA de factos do evento — que também traz `id` e
+   * também vem com 200. Ela deixa o back office aberto horas seguidas, portanto
+   * isto não é um caso de laboratório.
+   *
+   * Aceitá-la abria o painel sem nome, sem contacto, sem pagamentos e sem
+   * convidados, e ainda substituía o pedido na lista por essa versão amputada.
+   * O cabeçalho `x-pedido: completo` é o que distingue as duas respostas.
+   */
+  it("uma resposta 200 SEM a marca de pedido completo não abre o painel", async () => {
+    renderAdmin([makeQuote({ id: "LQ-777", name: "Sara Lopes" })]);
+    navTo(/Pedidos/);
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: cabecalhos({}),
+      // Exactamente a forma pública: tem `id`, e mais nada do que interessa.
+      json: () => Promise.resolve({ id: "LQ-777", status: "novo", eventType: "Casamento" }),
+    } as never);
+
+    fireEvent.click(screen.getByText("Sara Lopes"));
+
+    expect(await screen.findByText(/Não foi possível abrir o pedido/)).toBeInTheDocument();
+    expect(screen.getAllByText(/LQ-777/)).toHaveLength(1);
   });
 
   /**
@@ -250,7 +368,7 @@ describe("AdminClient shell", () => {
     await screen.findByText("Filipa Nova");
 
     const pedidos = fetchMock.mock.calls.filter(
-      (args) => (args as unknown as [string])[0] === "/api/orcamento",
+      (args) => (args as unknown as [string])[0] === "/api/orcamento?resumo=1",
     );
     expect(pedidos).toHaveLength(1);
     expect(screen.queryByText("Gabriel Antigo")).not.toBeInTheDocument();

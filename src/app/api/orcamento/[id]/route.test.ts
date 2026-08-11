@@ -114,6 +114,27 @@ describe("GET /api/orcamento/[id] — PII protection", () => {
     expect(json.email).toBe("ana@example.com");
   });
 
+  /**
+   * ── AS DUAS RESPOSTAS DE 200 TÊM DE SER DISTINGUÍVEIS ───────────────────
+   *
+   * Com sessão sai o pedido inteiro; sem sessão sai a lista pública acima — e
+   * ambas são 200 com `id`. O back office vai buscar aqui o pedido completo
+   * quando ela abre um da lista, e com a sessão expirada (o separador fica
+   * aberto horas) aceitava a versão pública como se fosse o pedido: painel sem
+   * nome, sem contacto, sem pagamentos e sem convidados, e o pedido da lista
+   * substituído por essa versão.
+   *
+   * A marca vive no cabeçalho porque adivinhar pela presença de um campo é uma
+   * regra que se parte sozinha no dia em que a lista pública crescer um campo.
+   */
+  it("marca a resposta com sessão, e SÓ essa, como pedido completo", async () => {
+    authed.ok = true;
+    expect((await GET(req("GET"), ctx("LIQ-1"))).headers.get("x-pedido")).toBe("completo");
+
+    authed.ok = false;
+    expect((await GET(req("GET"), ctx("LIQ-1"))).headers.get("x-pedido")).toBeNull();
+  });
+
   it("returns 404 for an unknown id", async () => {
     expect((await GET(req("GET"), ctx("nope"))).status).toBe(404);
   });

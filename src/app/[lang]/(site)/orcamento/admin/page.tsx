@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import type { Quote } from "@/lib/orcamento/types";
+import type { QuoteSummary } from "@/lib/orcamento/types";
 import AdminClient from "./AdminClient";
 import AdminLogin from "./AdminLogin";
 import { ToastProvider } from "./Toast";
 import { ADMIN_COOKIE, ADMIN_NAME_COOKIE, readSession } from "@/lib/admin-auth";
-import { listQuotes } from "@/lib/quotes-store";
+import { listQuoteSummaries } from "@/lib/quotes-store";
 
 // Kept out of robots.txt (crawling) *and* given noindex here (indexing) —
 // disallow alone only stops crawling; a stray external link could still get
@@ -15,9 +15,16 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-async function getQuotes(): Promise<Quote[]> {
+/**
+ * A lista vai em RESUMO. O pedido inteiro é grande (150 convidados, checklist,
+ * plano de produção, cronograma) e tudo isso era serializado para dentro deste
+ * HTML, 300 vezes, antes de haver um pixel desenhado. O que a lista, os
+ * filtros e os painéis de conjunto lêem continua cá todo; o resto vai buscar-se
+ * quando um pedido é ABERTO. Ver `resumirQuote` em quotes-store.
+ */
+async function getQuotes(): Promise<QuoteSummary[]> {
   try {
-    return await listQuotes();
+    return await listQuoteSummaries();
   } catch {
     return [];
   }

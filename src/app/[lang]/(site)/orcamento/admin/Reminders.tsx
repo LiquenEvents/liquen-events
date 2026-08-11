@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { Quote, Task } from "@/lib/orcamento/types";
 import { eur0 } from "@/lib/money";
 import { Card } from "./ui";
+import { useCachedList } from "./useCachedList";
 
 interface Reminder {
   kind: "evento" | "pagamento" | "pedido" | "tarefa" | "seguimento";
@@ -22,18 +23,11 @@ interface Props {
 
 /** Derived reminders: upcoming events, overdue payments, stale requests, due tasks. */
 export default function Reminders({ quotes, onOpen }: Props) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/tarefas", { cache: "no-store" });
-        if (res.ok) setTasks(await res.json());
-      } catch {
-        /* ignore */
-      }
-    })();
-  }, []);
+  // A mesma leitura das Tarefas e da Agenda, pela chave partilhada do
+  // `useCachedList` — este painel e a Agenda são desenhados lado a lado na
+  // Visão Geral e pediam a mesma lista duas vezes (três, com o aquecimento
+  // ocioso do AdminClient). A cache junta os pedidos em voo numa só viagem.
+  const { data: tasks = [] } = useCachedList<Task[]>("tarefas", "/api/tarefas");
 
   const reminders = useMemo(() => {
     const now = Date.now();

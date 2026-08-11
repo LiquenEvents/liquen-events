@@ -313,6 +313,55 @@ export interface Quote extends QuoteFormData {
   locale?: string;
 }
 
+/**
+ * ── AS COLECÇÕES QUE SÓ O PEDIDO ABERTO LÊ ─────────────────────────────────
+ *
+ * O painel de administração recebe a tabela de pedidos INTEIRA no HTML da
+ * página (ver `orcamento/admin/page.tsx`), e um pedido já trabalhado é um blob
+ * grande: medido sobre um casamento com 150 convidados, a lista de convidados
+ * sozinha é 47% dos bytes do pedido, e com a checklist, o plano de produção e
+ * o cronograma passa dos 68%.
+ *
+ * Estes quatro campos — mais os pontos de decoração — têm uma coisa em comum
+ * que os outros não têm: NENHUMA vista de conjunto os lê. Só aparecem dentro
+ * de um pedido aberto (GuestList, EventChecklist, ProductionPlan,
+ * EventTimeline, e as impressões do dossier), e esses painéis recebem o pedido
+ * ABERTO, não a lista. Por isso podem viajar mais tarde, quando um pedido é
+ * aberto, em vez de viajarem 300 vezes no primeiro byte da página.
+ *
+ * O QUE **NÃO** ESTÁ AQUI, e porquê — cada um destes é lido sobre a lista
+ * inteira e tirá-lo mudaria números no ecrã sem ninguém dar por isso:
+ *   · `payments`        — Overview, Reminders, Agenda, StatsDashboard e o CSV
+ *                         da tesouraria somam-nos em todos os pedidos.
+ *   · `messages`        — Reminders ("já respondemos?") e o tempo de resposta
+ *                         das Estatísticas.
+ *   · `activityLog`     — o painel de Propostas ACRESCENTA-LHE uma entrada ao
+ *                         aceitar uma proposta; sem o histórico, gravava por
+ *                         cima dele com uma linha só.
+ *   · `eventSuppliers`  — a margem por evento nas Estatísticas.
+ *   · `adminNotes`      — abrir um pedido copia-o para a caixa de notas e
+ *                         gravar escreve a caixa de volta: se chegasse vazio,
+ *                         gravar apagava as notas internas.
+ */
+export const CAMPOS_SO_DO_DETALHE = [
+  "guestList",
+  "checklist",
+  "productionPlan",
+  "timeline",
+  "decorPoints",
+] as const;
+
+/**
+ * Um pedido como a LISTA o precisa: tudo menos {@link CAMPOS_SO_DO_DETALHE}.
+ *
+ * Continua a ser um `Quote` válido para o TypeScript — os campos omitidos são
+ * todos opcionais —, e é de propósito: as doze vistas que recebem a lista
+ * continuam a escrever `Quote[]` sem uma única alteração. O que a distinção
+ * serve é dizer a quem lê ONDE é que a diferença existe, e obrigar quem abrir
+ * um pedido a ir buscar o resto (ver `openQuote` em AdminClient).
+ */
+export type QuoteSummary = Omit<Quote, (typeof CAMPOS_SO_DO_DETALHE)[number]>;
+
 /** Standalone calendar entry (reunião, marcação, bloqueio…) not tied to a quote. */
 export type CalendarEventKind = "reuniao" | "evento" | "bloqueio" | "nota";
 

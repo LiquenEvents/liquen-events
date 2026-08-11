@@ -9,6 +9,7 @@ import {
   themeFolder,
   isThemePath,
 } from "@/lib/theme-storage";
+import { jsonWithEtag } from "@/lib/api-cache";
 import { isUniqueViolation } from "@/lib/invoices-store";
 import { isMissingTable, isPersistenceUnavailable } from "@/lib/repository";
 import {
@@ -44,6 +45,12 @@ const PREVIEWS_POR_CARTAO = 3;
 
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
+}
+
+/** O ficheiro que um URL assinado aponta, sem a assinatura (que muda a cada
+ *  pedido). Serve só para comparar respostas — ver o validador no GET. */
+function semAssinatura(url: string | undefined): string {
+  return url ? url.split("?")[0] : "";
 }
 
 /**
@@ -153,7 +160,31 @@ export async function GET(request: NextRequest) {
         ...(previewUrls.length ? { previewUrls, previewFallbackUrls } : {}),
       };
     });
-    return NextResponse.json(summaries);
+    /**
+     * A lista de temas é lida em quase todos os ecrãs e muda muito pouco —
+     * exactamente o caso em que uma resposta condicional (ETag → 304) vale a
+     * pena, como já acontece em /api/propostas, /api/faturas e nas outras
+     * listas do back office.
+     *
+     * Só que aqui o corpo NÃO se repete: cada capa e cada tira vêm num URL
+     * assinado que leva a hora da assinatura, por isso dois pedidos seguidos
+     * com os mesmos temas dão corpos diferentes. Um ETag tirado do corpo nunca
+     * daria 304 nenhum.
+     *
+     * O que identifica a lista é o que está POR BAIXO das assinaturas: que
+     * temas há, com que nome e notas, quantas fotos têm, e QUE ficheiros são a
+     * capa e as tiras. É essa a forma que se carimba — os URLs entram nela sem
+     * a parte assinada. Acrescentar uma foto, mudar a capa, renomear ou apagar
+     * um tema muda o carimbo; voltar a assinar as mesmas fotos não muda.
+     */
+    const validador = summaries.map((s) => ({
+      ...s,
+      coverUrl: semAssinatura(s.coverUrl),
+      coverFallbackUrl: semAssinatura(s.coverFallbackUrl),
+      previewUrls: s.previewUrls?.map(semAssinatura),
+      previewFallbackUrls: s.previewFallbackUrls?.map(semAssinatura),
+    }));
+    return jsonWithEtag(request, summaries, validador);
   } catch (err) {
     if (isMissingTable(err)) {
       return NextResponse.json({ error: NAO_INSTALADO }, { status: 503 });

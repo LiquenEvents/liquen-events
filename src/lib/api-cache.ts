@@ -59,10 +59,27 @@ export function matchesEtag(ifNoneMatch: string | null, etag: string): boolean {
 /**
  * `NextResponse.json(data)` com ETag — e 304 quando o cliente já tem esta
  * versão. Substituto directo nas rotas GET de lista do back office.
+ *
+ * `validador` existe para as respostas que trazem URLS ASSINADOS. Um URL
+ * assinado leva a hora em que foi assinado, portanto MUDA a cada pedido mesmo
+ * quando nada mudou — um ETag tirado do corpo nunca voltaria a bater certo e o
+ * pedido condicional era teatro. Quem tiver esse problema passa aqui a mesma
+ * resposta com os URLs reduzidos ao caminho: é sobre ESSA forma que se decide
+ * "isto é a mesma lista", e o corpo enviado continua a ser o de sempre, com
+ * assinaturas frescas.
+ *
+ * Quem usa isto assume uma coisa e tem de a garantir: num 304 o cliente fica
+ * com os URLs da resposta ANTERIOR, por isso a cache dele tem de expirar
+ * bastante antes da validade das assinaturas (ver `theme-picker-cache.ts`, que
+ * deita a entrada fora ao fim de 30 minutos contra 6 horas de validade).
  */
-export function jsonWithEtag(request: NextRequest, data: unknown): NextResponse {
+export function jsonWithEtag(
+  request: NextRequest,
+  data: unknown,
+  validador?: unknown,
+): NextResponse {
   const body = JSON.stringify(data);
-  const etag = etagFor(body);
+  const etag = etagFor(validador === undefined ? body : JSON.stringify(validador));
   const headers = {
     ETag: etag,
     // Pode guardar, mas revalida sempre. Nunca partilhado entre sessões.

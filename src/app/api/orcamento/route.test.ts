@@ -4,6 +4,10 @@ import type { NextRequest } from "next/server";
 const store = vi.hoisted(() => ({
   create: vi.fn(async () => {}),
   list: vi.fn(async () => [{ id: "LIQ-1" }]),
+  // A mesma lista sem as colecções que só o pedido aberto mostra — o que
+  // `resumirQuote` faz (provado em quotes-store.test.ts). Aqui interessa a
+  // LIGAÇÃO: qual dos dois leitores é que a rota escolhe.
+  resumos: vi.fn(async () => [{ id: "LIQ-1" }]),
 }));
 const authed = vi.hoisted(() => ({ ok: false }));
 const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter?: number } }));
@@ -11,6 +15,7 @@ const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter
 vi.mock("@/lib/quotes-store", () => ({
   createQuote: store.create,
   listQuotes: store.list,
+  listQuoteSummaries: store.resumos,
   generateQuoteId: () => "LIQ-TEST-0000000000000000",
 }));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
@@ -32,8 +37,8 @@ import { sendMail } from "@/lib/mail";
 
 const sendMailMock = vi.mocked(sendMail);
 
-function req(method: "POST" | "GET", body?: unknown): NextRequest {
-  return new Request("https://liquen.test/api/orcamento", {
+function req(method: "POST" | "GET", body?: unknown, query = ""): NextRequest {
+  return new Request(`https://liquen.test/api/orcamento${query}`, {
     method,
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -326,5 +331,31 @@ describe("GET /api/orcamento", () => {
     const res = await GET(req("GET"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([{ id: "LIQ-1" }]);
+  });
+
+  /**
+   * ── `?resumo=1` ─────────────────────────────────────────────────────────
+   *
+   * O painel relê esta rota ao voltar ao separador, ao devolver o foco e de
+   * dois em dois minutos. Sem o resumo, a lista INTEIRA voltava a
+   * descarregar-se aí — e a poupança do primeiro carregamento durava até à
+   * primeira mudança de separador, que é o mesmo que não existir.
+   *
+   * Sem o parâmetro nada muda: é isso que deixa os testes de ponta a ponta e
+   * qualquer outro leitor continuarem a receber tudo.
+   */
+  it("por omissão lê a lista INTEIRA, como sempre leu", async () => {
+    authed.ok = true;
+    await GET(req("GET"));
+    expect(store.list).toHaveBeenCalled();
+    expect(store.resumos).not.toHaveBeenCalled();
+  });
+
+  it("com ?resumo=1 lê os resumos, e não a lista inteira", async () => {
+    authed.ok = true;
+    const res = await GET(req("GET", undefined, "?resumo=1"));
+    expect(res.status).toBe(200);
+    expect(store.resumos).toHaveBeenCalled();
+    expect(store.list).not.toHaveBeenCalled();
   });
 });

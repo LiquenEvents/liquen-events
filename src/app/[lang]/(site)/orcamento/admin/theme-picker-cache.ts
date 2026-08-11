@@ -61,6 +61,8 @@ export interface PaginaTema {
 interface Guardado<T> {
   valor: T;
   at: number;
+  /** O ETag da última resposta completa, para o pedido condicional seguinte. */
+  etag?: string;
 }
 
 const temas: { entrada: Guardado<ThemeSummary[]> | null } = { entrada: null };
@@ -100,10 +102,29 @@ export async function buscarTemas(forcar = false): Promise<ThemeSummary[]> {
   if (emVooTemas.p) return emVooTemas.p;
   const p = (async () => {
     try {
-      const res = await fetch("/api/temas", { cache: "no-store" });
+      const anterior = temas.entrada;
+      const res = await fetch("/api/temas", {
+        cache: "no-store",
+        headers: anterior?.etag ? { "If-None-Match": anterior.etag } : undefined,
+      });
+      /**
+       * NADA MUDOU NA BIBLIOTECA — e a rota disse-o sem mandar corpo nenhum.
+       *
+       * É o caso comum: reabrir o seletor passados 30 segundos confirmava a
+       * lista descarregando-a outra vez inteira, com todas as capas e tiras.
+       * Agora custa uma viagem sem corpo, e ficamos com o array que já
+       * tínhamos — a MESMA referência, por isso a grelha nem volta a desenhar.
+       *
+       * O `at` NÃO se actualiza de propósito. É ele que faz a entrada morrer
+       * aos 30 minutos e obriga a uma resposta completa, com URLs assinados de
+       * novo; renová-lo aqui deixava a entrada viver para sempre com
+       * assinaturas cada vez mais velhas até expirarem às 6 horas — e aí a
+       * grelha aparecia vazia sem nada que o explicasse.
+       */
+      if (res.status === 304 && anterior) return anterior.valor;
       if (!res.ok) throw new Error("falhou");
       const list: ThemeSummary[] = await res.json();
-      temas.entrada = { valor: list, at: Date.now() };
+      temas.entrada = { valor: list, at: Date.now(), etag: res.headers.get("etag") ?? undefined };
       return list;
     } finally {
       emVooTemas.p = null;

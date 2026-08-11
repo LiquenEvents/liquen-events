@@ -13,7 +13,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Quote, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
+import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { formatPrice } from "@/lib/orcamento/pricing";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
@@ -254,7 +254,15 @@ const VIEW_KEYS: Record<string, View> = {
 const VIEW_STORAGE_KEY = "liquen-admin-view";
 
 interface Props {
-  initialQuotes: Quote[];
+  /**
+   * A lista vem em RESUMO do servidor (ver `resumirQuote`): traz tudo o que
+   * esta lista, os filtros e as vistas de conjunto lêem, e NÃO traz as
+   * colecções que só o pedido aberto mostra. Um resumo continua a ser um
+   * `Quote` válido — os campos que faltam são todos opcionais —, por isso as
+   * vistas que recebem a lista não mudam; o que muda é `openQuote`, que vai
+   * buscar o pedido inteiro antes de o mostrar.
+   */
+  initialQuotes: QuoteSummary[];
   userName?: string;
 }
 
@@ -627,8 +635,18 @@ const QuoteCard = memo(function QuoteCard({
 });
 
 export default function AdminClient({ initialQuotes, userName = "Catarina" }: Props) {
+  // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
+  // estado tem mesmo de ser `Quote[]`: assim que um pedido é aberto ou gravado,
+  // o elemento da lista passa a ser o pedido INTEIRO devolvido pelo servidor.
   const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
   const [selected, setSelected] = useState<Quote | null>(null);
+  /**
+   * Os pedidos que já foram buscados por inteiro nesta sessão. Sem esta marca
+   * não havia como distinguir «este casamento não tem convidados registados»
+   * de «a lista de convidados ainda não veio» — as duas coisas são um campo
+   * ausente —, e reabrir o mesmo pedido pagava outra ida ao servidor.
+   */
+  const completos = useRef(new Set<string>());
   const [filterStatus, setFilterStatus] = useState<QuoteStatus | "all">("all");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>("all");
@@ -776,7 +794,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // skeleton. Cheap + non-blocking; skipped if already cached/in-flight.
   useEffect(() => {
     return onIdle(() => {
-      prefetchList("propostas", "/api/propostas");
+      // A lista de propostas vai em modo LEVE (`?semDoc=1`): aquecer a cache
+      // não pode custar o documento inteiro de cada proposta — com um ano de
+      // trabalho lá dentro são megabytes descarregados a seguir à primeira
+      // pintura, para uma vista em que muitas vezes ninguém chega a tocar.
+      //
+      // Chave PRÓPRIA, e é de propósito: os painéis de Propostas,
+      // Acompanhamento e Análise ainda pedem a forma pesada em "propostas", e
+      // servir-lhes o que não têm (o `doc`) a partir da cache mostrava-lhes
+      // números errados durante uma pintura. Quando passarem a `?semDoc=1`,
+      // passam também a esta chave e voltam a aproveitar o aquecimento.
+      prefetchList("propostas-leves", "/api/propostas?semDoc=1");
       prefetchList("faturas", "/api/faturas");
       prefetchList("tarefas", "/api/tarefas");
       prefetchList("calendario", "/api/calendario");
@@ -1041,13 +1069,70 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     if (discardGuard()) setSelected(null);
   }
 
-  function openQuote(q: Quote) {
+  /**
+   * O PEDIDO INTEIRO, ANTES DE O PAINEL ABRIR.
+   *
+   * A lista chega em resumo (ver `resumirQuote`), sem convidados, checklist,
+   * plano de produção nem cronograma. Aqui vai-se buscar o resto — uma vez por
+   * pedido e por sessão.
+   *
+   * Porque é que se ESPERA em vez de mostrar já e completar por trás: o
+   * GuestList, o EventChecklist, o ProductionPlan e o EventTimeline copiam a
+   * colecção para estado interno no primeiro render (`useState(quote.guestList
+   * ?? [])`) e estão presos por `key` ao id do pedido — não voltam a ler a
+   * propriedade quando ela mudar. Abertos com o resumo, ficavam com uma lista
+   * VAZIA que a primeira edição gravava por cima da verdadeira. A diferença
+   * entre esperar e não esperar é um painel que abre um instante mais tarde
+   * contra uma lista de 150 convidados apagada sem ninguém dar por isso.
+   *
+   * Se a ida ao servidor falhar, NÃO se abre com o resumo — devolve-se null e
+   * quem chamou avisa. Uma falha visível é melhor do que um painel que parece
+   * completo e não está.
+   */
+  async function comPedidoInteiro(q: Quote): Promise<Quote | null> {
+    if (completos.current.has(q.id)) return q;
+    try {
+      const res = await fetch(`/api/orcamento/${encodeURIComponent(q.id)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      /**
+       * SESSÃO EXPIRADA RESPONDE 200. Esta rota é pública — a página de
+       * confirmação do casal lê-a — e sem sessão devolve uma lista curta de
+       * factos do evento que TAMBÉM tem `id` e TAMBÉM vem com 200. Aceitá-la
+       * era abrir o painel sem nome, sem contacto, sem pagamentos e sem
+       * convidados, e ainda substituir o pedido na lista por essa versão.
+       *
+       * O cabeçalho é a única marca fiável de que veio o pedido inteiro; a
+       * rota explica porquê. Sem ele, isto é uma falha — e uma falha visível é
+       * melhor do que um painel que parece completo e não está.
+       */
+      if (res.headers.get("x-pedido") !== "completo") return null;
+      const inteiro = (await res.json()) as Quote;
+      if (!inteiro?.id) return null;
+      completos.current.add(inteiro.id);
+      setQuotes((prev) => prev.map((x) => (x.id === inteiro.id ? inteiro : x)));
+      return inteiro;
+    } catch {
+      return null;
+    }
+  }
+
+  async function openQuote(pedido: Quote) {
     if (!discardGuard()) return;
     // Remember who opened the detail so focus can return there on close.
     if (typeof document !== "undefined") {
       detailOpenerRef.current = document.activeElement as HTMLElement | null;
     }
+    // A vista muda JÁ — quem clicou num pedido no Calendário ou no Kanban vê a
+    // resposta ao clique no mesmo instante em que a dava antes. O que espera
+    // pelo servidor é só o painel de detalhe.
     setView("pedidos");
+    const q = await comPedidoInteiro(pedido);
+    if (!q) {
+      toast("Não foi possível abrir o pedido. Verifique a ligação e tente de novo.", "error");
+      return;
+    }
     setSelected(q);
     // Track in recently-viewed list (localStorage)
     try {
@@ -1149,7 +1234,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       if (!forcar && agora - ultimaRevalidacao.current < 15_000) return;
       ultimaRevalidacao.current = agora;
       try {
-        const res = await fetch("/api/orcamento", {
+        // Em RESUMO, como no primeiro carregamento: isto corre de dois em dois
+        // minutos e sem o resumo a lista inteira voltava a descarregar-se aí,
+        // deitando fora a poupança da página logo à primeira revalidação.
+        const res = await fetch("/api/orcamento?resumo=1", {
           cache: "no-store",
           headers: {
             "x-admin-refresh": "1",
@@ -1161,6 +1249,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         if (Array.isArray(data)) {
           quotesEtag.current = res.headers.get("etag");
           setQuotes(data);
+          // A lista voltou a ser de RESUMOS: o que estava completo já não está.
+          // Não limpar isto era o pior dos casos — reabrir um pedido dado como
+          // completo montava o painel de convidados sobre uma lista vazia, e a
+          // primeira edição gravava-a por cima da verdadeira.
+          completos.current.clear();
         }
       } catch {
         // Sem rede não há nada a dizer: a lista que está no ecrã continua a ser
