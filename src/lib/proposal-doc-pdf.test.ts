@@ -413,10 +413,14 @@ describe("relatório de conteúdo CORTADO pelo desenho", () => {
     expect(truncations).toEqual([]);
   });
 
-  it("mood board com 9 fotos: desenha 6 e DIZ que 3 ficaram de fora", async () => {
+  // A lotação subiu de 6 para 10 quando os layouts passaram a ser cinco: a
+  // proposta feita à mão chega às dez numa página, em duas filas. O aviso
+  // continua a existir e a contar o que fica de fora — é ele que impede uma
+  // proposta de seguir com fotos a menos sem ninguém saber.
+  it("mood board com 13 fotos: desenha 10 e DIZ que 3 ficaram de fora", async () => {
     const doc = {
       ...decoracaoDoc(),
-      moodBoards: [{ title: "Decoração Cerimónia", images: await distinctPhotos(9) }],
+      moodBoards: [{ title: "Decoração Cerimónia", images: await distinctPhotos(13) }],
     };
     const { bytes, truncations } = await renderProposalDocPdfWithReport(doc);
     expect(truncations).toContainEqual({
@@ -424,7 +428,7 @@ describe("relatório de conteúdo CORTADO pelo desenho", () => {
       dropped: 3,
       unit: "fotos",
     });
-    // O desenho NÃO mudou para caber mais: continuam a ser 6 na página.
+    // O desenho não passa da lotação: continuam a ser MOOD_BOARD_MAX_IMAGES.
     const parsed = await PDFDocument.load(bytes);
     expect(collagePhotos(parsed)).toBe(MOOD_BOARD_MAX_IMAGES);
   }, 30_000);
@@ -444,8 +448,8 @@ describe("relatório de conteúdo CORTADO pelo desenho", () => {
     const doc = {
       ...decoracaoDoc(),
       moodBoards: [
-        { title: "", images: await distinctPhotos(8) },
-        { title: "Copo d'água", images: await distinctPhotos(7) },
+        { title: "", images: await distinctPhotos(12) },
+        { title: "Copo d'água", images: await distinctPhotos(11) },
       ],
     };
     const { truncations } = await renderProposalDocPdfWithReport(doc);

@@ -240,6 +240,24 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
     // board que ficou com fotos de fora (`Mood board Cerimónia — 4 fotos`).
     // A poupança seria de um caso que o estúdio não deixa acontecer; a perda
     // de aviso seria real. Só o TAMANHO de cada ficheiro muda aqui.
+    /**
+     * ── PORQUE É QUE ISTO CONTINUA A MEDIR PELO «DESTAQUE» ─────────────────
+     *
+     * O desenho passou a ter cinco layouts, e o que sai depende da FORMA de
+     * cada fotografia ({@link caixasDoMoodboard}) — que só se conhece depois de
+     * a descarregar. Aqui ainda não se descarregou nada: é este o ovo e a
+     * galinha.
+     *
+     * Mede-se pelo arranjo em destaque, que tem a maior caixa de todos (56% da
+     * largura da mancha). Nenhuma célula de nenhum outro layout é maior do que
+     * essa, portanto o ficheiro pedido nunca fica curto — erra-se para o lado
+     * de descarregar grande de mais, que é invisível, e nunca para o lado de
+     * uma foto ampliada, que se vê no documento do casal.
+     *
+     * O preço é vir um original onde uma miniatura chegava, em páginas de
+     * muitas fotos. Fecha-se quando as formas forem conhecidas antes da
+     * primeira ida ao armazenamento.
+     */
     const previstas = caixasDoCollage(Math.min(mb.images.length, MOOD_BOARD_MAX_IMAGES));
     const obtidas = await mapLimit(
       mb.images.map((ref, i) => ({ ref, caixa: previstas[i] ?? null })),

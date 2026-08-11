@@ -206,6 +206,23 @@ async function dimensoesReais(bytes: Buffer): Promise<{ w: number; h: number } |
 }
 
 /**
+ * A forma de uma imagem — largura ÷ altura, DEPOIS da orientação EXIF.
+ *
+ * É o que os layouts de mood board precisam de saber para respeitar a forma de
+ * cada fotografia em vez de a recortar toda ao mesmo formato (ver
+ * `proposal-geometria.ts`). Lê-se do cabeçalho, sem descodificar a imagem: são
+ * microssegundos.
+ *
+ * `null` quando nem o sharp lê os bytes — quem chama assume uma forma neutra em
+ * vez de deixar cair a foto, porque uma foto ilegível ainda pode ser desenhada
+ * pelo caminho de recurso.
+ */
+export async function aspetoDaImagem(bytes: Buffer): Promise<number | null> {
+  const d = await dimensoesReais(bytes);
+  return d && d.h > 0 ? d.w / d.h : null;
+}
+
+/**
  * Recorta `bytes` ao aspeto exato da caixa e reencoda em JPEG baseline.
  *
  * Duas tentativas antes de desistir: a estrita e, se essa falhar, uma tolerante

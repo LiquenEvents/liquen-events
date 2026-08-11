@@ -405,19 +405,22 @@ describe("pontos de decoração escolhidos no pedido", () => {
 
 describe("mood board com mais fotos do que a página desenha", () => {
   it("marca AO MONTAR as fotos que não vão ser impressas", async () => {
-    seedDraft(8);
+    // A lotação subiu de 6 para 10 quando os layouts passaram a ser cinco (a
+    // proposta feita à mão chega às dez numa página). O aviso é o mesmo; o
+    // número é que mudou.
+    seedDraft(12);
     renderStudio();
-    // A sétima e a oitava ficam marcadas — as seis primeiras não.
+    // A décima primeira e a décima segunda ficam marcadas — as dez primeiras não.
     expect(await screen.findAllByText("fora do PDF")).toHaveLength(2);
-    expect(screen.getByText(/A página deste mood board mostra 6 fotos/i).textContent).toMatch(
+    expect(screen.getByText(/A página deste mood board mostra 10 fotos/i).textContent).toMatch(
       /as 2 últimas.*não são impressas/i,
     );
   });
 
-  it("avisa NO INSTANTE em que a sétima foto entra no mood board", async () => {
+  it("avisa NO INSTANTE em que a foto a mais entra no mood board", async () => {
     // Não depois de gerar o PDF, não depois de enviar: agora, com a mão ainda
     // na foto que acabou de escolher.
-    seedDraft(6);
+    seedDraft(10);
     renderStudio();
     const user = userEvent.setup();
     await user.click(
@@ -425,14 +428,14 @@ describe("mood board com mais fotos do que a página desenha", () => {
     );
     await user.click(await screen.findByRole("button", { name: "escolher-foto-de-teste" }));
     const alerta = await screen.findByRole("alert");
-    expect(alerta.textContent).toMatch(/fica com 7 fotos e a página do PDF mostra 6/);
+    expect(alerta.textContent).toMatch(/fica com 11 fotos e a página do PDF mostra 10/);
     expect(alerta.textContent).toMatch(/a última não entra/);
     // …e a foto a mais fica marcada, para o aviso não morrer com o toast.
     expect(await screen.findAllByText("fora do PDF")).toHaveLength(1);
   });
 
   it("não marca nada quando as fotos todas cabem", async () => {
-    seedDraft(6);
+    seedDraft(10);
     renderStudio();
     // O título da SECÇÃO. A coluna lateral também diz "Mood boards", e sem
     // esta distinção o teste apanhava os dois e falhava por ambiguidade.

@@ -17,6 +17,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { SITE } from "@/lib/site";
 import {
   achatarLogotipo,
+  aspetoDaImagem,
   imageContentKey,
   resizeToBox,
   transcodificarParaJpeg,
@@ -41,6 +42,8 @@ import {
 import { opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { winAnsiSafe } from "@/lib/pdf-text";
 import {
+  caixasDoMoodboard,
+  layoutSugerido,
   caixasDaCapa,
   caixasDoCollage,
   PAGINA_W,
@@ -1052,6 +1055,18 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     frame(p);
     eyebrow(p, "Inspiração", M, H - M - 48);
     text(p, mb.title, M, H - M - 76, { font: f.serifIt, size: 24, color: INK });
+    // O subtítulo, quando existe. Na proposta feita à mão é o «Ramo de Noiva (a
+    // definir com a Noiva)» por baixo de «Complementos dos Noivos»: o título diz
+    // o capítulo, o subtítulo diz o que aquelas fotos são e o que ainda está por
+    // decidir. Na mesma serifa da marca — a manuscrita da folha antiga não se
+    // replica.
+    if (mb.subtitulo?.trim()) {
+      text(p, mb.subtitulo.trim(), M, H - M - 96, {
+        font: f.serifIt,
+        size: 13,
+        color: MUTED,
+      });
+    }
     // Como o mood board se chama num aviso. Sem título, vale a posição — é
     // assim que ele aparece no estúdio, contado a partir de 1.
     const boardName = mb.title.trim() ? `«${mb.title.trim()}»` : `${bi + 1}`;
@@ -1614,11 +1629,36 @@ async function drawCollage(
     p.drawRectangle({ x, y: yBottom, width: w, height: h, borderColor: LINE, borderWidth: 0.5 });
   };
 
-  // A geometria vem de `caixasDoCollage` — a MESMA função que o resolvedor usa
-  // para decidir que tamanho de ficheiro descarregar. Ver o cabeçalho dela.
-  const caixas = caixasDoCollage(n, annH);
+  /**
+   * ── AS FOTOS COM A FORMA QUE TÊM ────────────────────────────────────────
+   *
+   * A geometria vem de `caixasDoMoodboard`, que precisa de saber a FORMA de
+   * cada fotografia — é isso que faz uma vertical sair vertical em vez de ser
+   * recortada ao mesmo rectângulo das outras, e é a diferença entre uma página
+   * de inspiração e uma folha de contactos. Ver `proposal-geometria.ts`.
+   *
+   * Uma foto que não se consiga medir entra com 3:2, o formato mais comum de
+   * uma máquina fotográfica: perde-se a forma dela e não se perde a foto.
+   *
+   * O layout GUARDADO no documento manda sempre. Só quando não há nenhum é que
+   * se usa o que o número de fotos sugere — uma sugestão que mudasse com o
+   * código reescrevia páginas de propostas já enviadas.
+   */
+  const aspectos = await Promise.all(
+    imgs.map(async (b64) => {
+      try {
+        const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+        return (await aspetoDaImagem(Buffer.from(raw, "base64"))) ?? 1.5;
+      } catch {
+        return 1.5;
+      }
+    }),
+  );
+  const layout = mb.layout ?? layoutSugerido(n);
+  const caixas = caixasDoMoodboard(layout, aspectos, annH);
   for (let i = 0; i < n; i++) {
     const c = caixas[i];
+    if (!c) continue;
     await place(imgs[i], c.x, c.y, c.w, c.h);
   }
 

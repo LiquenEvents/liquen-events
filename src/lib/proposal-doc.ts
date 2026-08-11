@@ -9,6 +9,7 @@
  */
 
 import { SINAL_POR_OMISSAO } from "./money";
+import type { LayoutDeMoodboard } from "./proposal-geometria";
 
 import { round2 } from "@/lib/money";
 
@@ -52,7 +53,14 @@ export type VatMode = "incluido" | "acrescer";
  * `server-only`) para desenhar, e o estúdio, no browser, para avisar ao pôr a
  * sétima foto num mood board. Um número, um sítio.
  */
-export const MOOD_BOARD_MAX_IMAGES = 6;
+/**
+ * Quantas fotos cabem num mood board.
+ *
+ * Eram 6, e vinham do único arranjo que existia (uma grande e uma grelha de
+ * cinco). A proposta feita à mão chega às DEZ numa página, em duas filas — e é
+ * isso que os layouts novos fazem. Ver `caixasDoMoodboard`.
+ */
+export const MOOD_BOARD_MAX_IMAGES = 10;
 
 /**
  * Teto do tamanho de um documento GUARDADO (JSON, em bytes).
@@ -76,10 +84,28 @@ export const MAX_PROPOSAL_DOC_BYTES = 512 * 1024;
 export interface MoodBoard {
   /** Elegant serif title, e.g. "Decoração Cerimónia". */
   title: string;
+  /**
+   * Subtítulo opcional, por baixo do título.
+   *
+   * A proposta feita à mão tem «Complementos dos Noivos» com «Ramo de Noiva (a
+   * definir com a Noiva)» por baixo: o primeiro diz o capítulo, o segundo diz o
+   * que aquelas fotos são e o que ainda está por decidir. Sem ele, ou se perde
+   * a segunda frase ou se enfia tudo num título com parênteses.
+   */
+  subtitulo?: string;
   /** Uploaded reference photos, laid out as an automatic collage. */
   images: ImageData[];
   /** Optional handwritten-style annotation under the collage. */
   annotation?: string;
+  /**
+   * Como as fotos se dispõem na página.
+   *
+   * Ausente = o layout que o número de fotos sugere ({@link layoutSugerido}).
+   * Guardar a escolha é o que faz uma proposta reaberta meses depois voltar a
+   * sair como saiu — uma sugestão que mudasse com o código reescrevia páginas
+   * de documentos já enviados.
+   */
+  layout?: LayoutDeMoodboard;
 }
 
 export interface ServiceItem {
