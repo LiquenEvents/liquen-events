@@ -6,7 +6,6 @@ import { ToastProvider } from "./Toast";
 import AdminClient from "./AdminClient";
 import { ATRASO_DA_GRAVACAO } from "./useGravacaoAutomatica";
 import { RegistoDeGravacoesProvider } from "./registo-de-gravacoes";
-import BotaoGuardarTudo from "./GuardarTudo";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

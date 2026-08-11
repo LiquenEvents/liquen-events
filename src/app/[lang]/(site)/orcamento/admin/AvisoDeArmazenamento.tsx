@@ -80,6 +80,9 @@ export interface EstadoDoArmazenamentoLido {
 let cache: EstadoDoArmazenamentoLido | null = null;
 /** Uma pergunta em voo: três montagens ao mesmo tempo são uma viagem só. */
 let emCurso: Promise<EstadoDoArmazenamentoLido | null> | null = null;
+/** Identidade da viagem que está na vaga — ver o `finally` lá em baixo. */
+let emCursoBilhete = 0;
+let contador = 0;
 
 async function perguntar(forcar: boolean): Promise<EstadoDoArmazenamentoLido | null> {
   if (!forcar && cache) return cache;
@@ -101,11 +104,29 @@ async function perguntar(forcar: boolean): Promise<EstadoDoArmazenamentoLido | n
     }
   })();
 
-  if (!forcar) emCurso = viagem;
+  /**
+   * A viagem em curso guarda-se com um NÚMERO ao lado, e não se compara a
+   * promessa consigo própria no fim.
+   *
+   * Fazia-se `if (emCurso === viagem)` — correcto, e a análise de segurança
+   * lia aquilo como uma promessa usada sem `await`. Não era: era uma
+   * comparação de identidade, para só limpar a vaga se ela ainda for MINHA
+   * (entretanto pode ter entrado uma pergunta forçada). Um aviso que é preciso
+   * explicar de cada vez que alguém passa por aqui acaba por ser ignorado —
+   * mais vale escrever a intenção de maneira a não precisar de defesa.
+   */
+  const bilhete = ++contador;
+  if (!forcar) {
+    emCurso = viagem;
+    emCursoBilhete = bilhete;
+  }
   try {
     return await viagem;
   } finally {
-    if (emCurso === viagem) emCurso = null;
+    if (emCursoBilhete === bilhete) {
+      emCurso = null;
+      emCursoBilhete = 0;
+    }
   }
 }
 
