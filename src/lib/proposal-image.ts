@@ -167,6 +167,24 @@ export function imageContentKey(bytes: Buffer): string {
 const FUNDO_BRANCO = { r: 255, g: 255, b: 255 };
 
 /**
+ * É um JPEG baseline, do tipo que o PDF sabe embutir directamente?
+ *
+ * O atalho de «já está do tamanho certo» só pode devolver bytes que o
+ * `embedJpg` aceite sem discussão. Um PNG do tamanho exacto teria de passar na
+ * mesma pelo encode (o documento é todo JPEG baseline, por causa do scroll), e
+ * um progressivo é justamente o que o `PDF_JPEG_OPTIONS` existe para evitar.
+ *
+ * SOI + a ausência do marcador de início progressivo (SOF2, `FF C2`).
+ */
+function ehJpegBaseline(bytes: Buffer): boolean {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return false;
+  for (let i = 2; i + 1 < bytes.length - 1; i++) {
+    if (bytes[i] === 0xff && bytes[i + 1] === 0xc2) return false;
+  }
+  return true;
+}
+
+/**
  * As dimensões que a imagem tem DEPOIS de aplicada a orientação EXIF.
  *
  * `metadata()` devolve as dimensões como estão guardadas; uma foto de telemóvel
@@ -239,6 +257,30 @@ export async function resizeToBox(
    */
   const origem = await dimensoesReais(bytes);
   if (origem) {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * SE JÁ ESTÁ DO TAMANHO CERTO, NÃO SE FAZ NADA
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Medido: recortar a tira da capa a partir do original custa 250 ms. A
+     * partir de uma derivada de 1400 px, 155 ms. A partir de uma derivada que
+     * JÁ tem os pixéis exactos da caixa: **0,1 ms** — porque o sharp não chega
+     * a correr, os bytes vão directos para o PDF.
+     *
+     * Uma proposta tem duas capas. São 500 ms de trabalho que desaparecem por
+     * completo quando a derivada certa existe — e é isto que faz esse trabalho
+     * poder ser feito no CARREGAMENTO, uma vez, em vez de a cada geração de
+     * PDF, para sempre.
+     *
+     * A condição é EXACTA de propósito. «Parecido» não serve: um pixel de
+     * diferença numa caixa desenhada com as medidas da caixa esticaria a foto,
+     * que é precisamente o defeito que este módulo existe para não ter. E os
+     * bytes já vêm de cá — foram escritos por este mesmo caminho, com este
+     * mesmo encode — portanto quando batem certo, batem certo mesmo.
+     */
+    if (origem.w === width && origem.h === height && ehJpegBaseline(bytes)) {
+      return bytes;
+    }
     const ampliacao = Math.max(width / origem.w, height / origem.h);
     if (ampliacao > 1) {
       width = Math.max(1, Math.round(width / ampliacao));

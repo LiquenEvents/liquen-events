@@ -172,3 +172,69 @@ describe("a orientação EXIF", () => {
     expect(m.height).toBe(400);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TRABALHO QUE NÃO SE FAZ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Medido, com uma foto real de 1707×2560: recortar a tira da capa a partir do
+ * original custa 250 ms, a partir de uma derivada de 1400 px custa 155 ms, e a
+ * partir de uma derivada que JÁ tem os pixéis da caixa custa 0,1 ms — porque o
+ * sharp não chega a correr.
+ *
+ * Uma proposta tem duas capas: são meio segundo que desaparece por completo. É
+ * este atalho que faz o trabalho poder ser feito UMA vez, no carregamento, em
+ * vez de a cada geração de PDF para sempre.
+ */
+describe("uma derivada já do tamanho certo não é reprocessada", () => {
+  /** Os pixéis que a caixa da capa merece — os mesmos que `pixelsForBox` dá. */
+  const CAPA_PX = { w: 617, h: 1323 };
+
+  async function derivadaDaCapa(): Promise<Buffer> {
+    return sharp({
+      create: { width: CAPA_PX.w, height: CAPA_PX.h, channels: 3, background: "#889" },
+    })
+      .jpeg()
+      .toBuffer();
+  }
+
+  it("devolve os MESMOS bytes, sem lhes tocar", async () => {
+    const pronta = await derivadaDaCapa();
+    const saida = await resizeToBox(pronta, CAPA_W, CAPA_H, "cover");
+    // Byte a byte: não foi reencodada, não perdeu qualidade, não custou nada.
+    expect(saida!.equals(pronta)).toBe(true);
+  });
+
+  /**
+   * A condição é EXACTA de propósito. «Parecido» não serve: a foto é desenhada
+   * com as medidas da caixa, portanto um pixel a mais numa das dimensões
+   * esticá-la-ia — que é o defeito que este módulo existe para não ter.
+   */
+  it("um pixel de diferença já não conta como pronta", async () => {
+    const quase = await sharp({
+      create: { width: CAPA_PX.w + 1, height: CAPA_PX.h, channels: 3, background: "#889" },
+    })
+      .jpeg()
+      .toBuffer();
+    const saida = await resizeToBox(quase, CAPA_W, CAPA_H, "cover");
+    expect(saida!.equals(quase)).toBe(false);
+    const m = await sharp(saida!).metadata();
+    expect(Math.abs(m.width! / m.height! - CAPA_W / CAPA_H)).toBeLessThan(0.01);
+  });
+
+  /**
+   * O documento é todo JPEG baseline por causa do scroll (ver
+   * `PDF_JPEG_OPTIONS`). Um progressivo do tamanho certo tem de ser reencodado
+   * na mesma — o atalho não pode ser a porta por onde ele entra.
+   */
+  it("um JPEG progressivo do tamanho certo NÃO passa pelo atalho", async () => {
+    const progressivo = await sharp({
+      create: { width: CAPA_PX.w, height: CAPA_PX.h, channels: 3, background: "#889" },
+    })
+      .jpeg({ progressive: true })
+      .toBuffer();
+    const saida = await resizeToBox(progressivo, CAPA_W, CAPA_H, "cover");
+    expect(saida!.equals(progressivo)).toBe(false);
+  });
+});
