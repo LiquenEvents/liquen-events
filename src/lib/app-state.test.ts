@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -39,7 +39,7 @@ vi.mock("fs", () => ({
   },
 }));
 
-import { setState } from "./app-state";
+import { setState, oFicheiroEhEfemero } from "./app-state";
 
 /** Um duplo do cliente do Supabase que responde o que `st.respostas` mandar. */
 function supabaseQueResponde() {
@@ -65,7 +65,7 @@ beforeEach(() => {
 describe("setState diz onde é que a coisa ficou", () => {
   it("aceite pelo Supabase: gravado no servidor", async () => {
     const r = await setState("proposal-draft:LQ-1", { doc: {} });
-    expect(r).toEqual({ gravado: true, onde: "servidor" });
+    expect(r).toEqual({ gravado: true, duradouro: true, onde: "servidor" });
   });
 
   /** O caso da colaboradora, tal e qual: o `db/schema.sql` por correr. */
@@ -100,7 +100,7 @@ describe("setState diz onde é que a coisa ficou", () => {
   it("uma falha passageira é repetida, e a segunda tentativa vale", async () => {
     st.respostas = [{ message: "fetch failed" }, null];
     const r = await setState("k", 1);
-    expect(r).toEqual({ gravado: true, onde: "servidor" });
+    expect(r).toEqual({ gravado: true, duradouro: true, onde: "servidor" });
     expect(st.chamadas).toBe(2);
   });
 
@@ -131,7 +131,7 @@ describe("setState sem base de dados (o recurso de desenvolvimento)", () => {
   it("o ficheiro conta como gravado — é o servidor local, e é visível de qualquer navegador", async () => {
     st.cliente = null;
     const r = await setState("k", { a: 1 });
-    expect(r).toEqual({ gravado: true, onde: "ficheiro" });
+    expect(r).toEqual({ gravado: true, duradouro: true, onde: "ficheiro" });
     expect(st.escritoNoFicheiro ?? "").toContain('"a": 1');
   });
 
@@ -141,5 +141,60 @@ describe("setState sem base de dados (o recurso de desenvolvimento)", () => {
     const r = await setState("k", { a: 1 });
     expect(r.gravado).toBe(false);
     expect(r.onde).toBe("nenhures");
+    expect(r.duradouro).toBe(false);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UM SÍTIO EFÉMERO NÃO CONTA COMO GUARDADO ONDE NÃO DURA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O mesmo defeito do «Guardado» que era mentira, com outra roupa. Ali a mentira
+ * era sobre ter escrito; aqui é sobre o SÍTIO durar: em Vercel o
+ * `data/app-state.json` vive no disco da função, que não sobrevive a um deploy
+ * e muitas vezes nem à invocação seguinte — o contentor é reciclado. O
+ * `setState` respondia `{ gravado: true, onde: "ficheiro" }` com a mesma
+ * confiança com que responde `"servidor"`.
+ *
+ * Na máquina de alguém o mesmo ficheiro é legítimo e tem de continuar a
+ * funcionar. A diferença é o AMBIENTE, e é aí que a distinção vive — na mesma
+ * regra que o `repository.assertWritableInProd` e o restauro já usam.
+ */
+describe("o ficheiro em produção não é um sítio", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("em produção uma escrita que só foi ao ficheiro NÃO é dada como guardada no servidor", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    st.cliente = null;
+    const r = await setState("proposal-draft:LQ-1", { doc: {} });
+    // Aconteceu — o rascunho está lá para esta invocação, e isso é melhor do
+    // que nada. Mas não é o servidor, e não dura.
+    expect(r.onde).toBe("ficheiro-efemero");
+    expect(r.duradouro).toBe(false);
+    expect(r.onde).not.toBe("servidor");
+  });
+
+  it("fora de produção o mesmo ficheiro continua a ser um sítio", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    st.cliente = null;
+    const r = await setState("k", 1);
+    expect(r.onde).toBe("ficheiro");
+    expect(r.duradouro).toBe(true);
+  });
+
+  it("a regra de ambiente é a mesma do resto do código, e lê-se na hora", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(oFicheiroEhEfemero()).toBe(true);
+    vi.stubEnv("NODE_ENV", "development");
+    expect(oFicheiroEhEfemero()).toBe(false);
+  });
+
+  it("o servidor dura em qualquer ambiente", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const r = await setState("k", 1);
+    expect(r).toEqual({ gravado: true, duradouro: true, onde: "servidor" });
   });
 });

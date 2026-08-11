@@ -16,14 +16,33 @@
 # mesmo a intenção. Avisa-se, com os nomes à frente, para a pessoa poder
 # desfazer antes de gravar. Um aviso é o suficiente quando o problema é
 # distracção e não intenção.
+#
+# ── E NO REPOSITÓRIO ELES ESTÃO VAZIOS DE PROPÓSITO ────────────────────────
+#
+# Estiveram commitados com dados de exemplo (um pedido da "Maria Teste", uma
+# tarefa, e um RASCUNHO de proposta inteiro dentro do `app-state.json`), e isso
+# tinha duas consequências más:
+#
+#   • numa instalação em produção SEM base de dados, o que se lê é essa
+#     fotografia congelada — e ela volta a aparecer a cada deploy, por cima do
+#     que tiver sido escrito entretanto. Parece que "os dados voltaram atrás";
+#   • em qualquer máquina, um `git checkout` de outro ramo escreve por cima do
+#     `data/app-state.json` local — ou seja, por cima dos rascunhos de quem
+#     estiver a trabalhar sem base de dados.
+#
+# Por isso o conteúdo commitado é `[]` / `{}`. Se um commit os traz com
+# REGISTOS lá dentro, é quase de certeza resíduo de uma passagem de testes ou
+# de uma tarde de desenvolvimento — não uma alteração que alguém queira gravar.
 DADOS=$(git diff --cached --name-only --diff-filter=ACM | grep '^data/' || true)
 if [ -n "$DADOS" ]; then
   echo ""
   echo "  ⚠  Há ficheiros de DADOS LOCAIS neste commit:"
   echo "$DADOS" | sed 's/^/       /'
   echo ""
-  echo "     Estes ficheiros são reescritos pelos testes e pelo servidor de"
-  echo "     desenvolvimento. Se não foi de propósito:"
+  echo "     No repositório estes ficheiros são VAZIOS de propósito ([] / {}):"
+  echo "     o que estiver lá dentro reaparece a cada deploy por cima do que"
+  echo "     foi escrito, e um checkout apaga os rascunhos locais de quem"
+  echo "     trabalha sem base de dados. Se não foi de propósito:"
   echo ""
   echo "         git restore --staged data/ && git checkout -- data/"
   echo ""

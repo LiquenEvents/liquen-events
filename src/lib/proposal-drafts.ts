@@ -91,6 +91,12 @@ export async function getProposalDraft(quoteId: string): Promise<StoredProposalD
  * propósito. A marca de tempo é útil ao estúdio (é o que ele compara com a
  * cópia local) e a gravação falhada NÃO é uma edição falhada: o trabalho está
  * no ecrã e na cópia local do navegador. O que muda é o que se DIZ.
+ *
+ * E são TRÊS desfechos, não dois: gravado no servidor (`gravado` e `duradouro`),
+ * gravado num sítio que um deploy apaga (`gravado` sem `duradouro` — ver
+ * `avisoDeSitioEfemero`), e não gravado. Quem só olhar para `gravado` continua
+ * a ler o que sempre leu; quem diz «Guardado» a uma pessoa tem de olhar para os
+ * dois.
  */
 export interface RascunhoGravado {
   draft: StoredProposalDraft;
@@ -147,6 +153,27 @@ export function porqueNaoGuardou(motivo: MotivoDeFalha | undefined): string {
  *  vez está só a adiar o aviso. */
 export function ehFalhaPermanente(motivo: MotivoDeFalha | undefined): boolean {
   return motivo === "tabela-em-falta" || motivo === "sem-permissao";
+}
+
+/**
+ * A frase para o caso do meio: o rascunho FICOU, mas no disco efémero da função
+ * (produção sem Supabase — ver `oFicheiroEhEfemero` em `app-state.ts`).
+ *
+ * É uma frase à parte e não um `MotivoDeFalha` porque não houve falha nenhuma:
+ * a escrita aconteceu, ela pode fechar o separador e voltar a abrir o rascunho
+ * daqui a cinco minutos que ele lá está. O que não pode é ficar descansada — o
+ * próximo deploy leva-o. Dizer «Guardado» e mais nada era repetir, com outra
+ * roupa, o «guardado às 14:32» que fez desaparecer uma proposta inteira.
+ *
+ * Diz o que fazer e nomeia as variáveis, porque quem lê isto no estúdio é quem
+ * tem de ir ter com quem gere a instalação — e uma frase com o nome da variável
+ * poupa-lhe a viagem de descobrir qual é.
+ */
+export function avisoDeSitioEfemero(): string {
+  return (
+    "Guardado apenas no disco do servidor, que é apagado no próximo deploy. " +
+    "Ligue a base de dados (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY) para o trabalho ficar mesmo guardado."
+  );
 }
 
 // ════════════════════════════════════════════════════════════════════════════

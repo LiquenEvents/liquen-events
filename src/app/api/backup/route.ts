@@ -25,6 +25,7 @@ import { readOverviewSettings } from "@/lib/overview-settings-store";
 import { listarDefinicoes } from "@/lib/proposta-definicoes-store";
 import { listarServicos } from "@/lib/servicos-catalogo-store";
 import { listProposalDrafts } from "@/lib/proposal-drafts";
+import { registarCopiaEnviada } from "@/lib/copia-de-seguranca-marcador";
 import { getSupabase } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -304,8 +305,29 @@ export async function GET(request: NextRequest) {
   }
   try {
     const payload = await buildBackupPayload();
+    const corpo = JSON.stringify(payload, null, 2);
 
-    return new NextResponse(JSON.stringify(payload, null, 2), {
+    /**
+     * Uma cópia descarregada à mão CONTA como cópia.
+     *
+     * O carimbo é lido pelo painel do back office para dizer «não chega uma
+     * cópia há N dias» (ver `lib/copia-de-seguranca-marcador.ts`). Se só a
+     * tarefa agendada carimbasse, quem faz o descarregamento à mão — que é
+     * precisamente o que o RUNBOOK manda fazer antes de mexer em dados, e o
+     * caminho enquanto o `CRON_SECRET` não estiver resolvido — continuaria a
+     * levar com o aviso. Um aviso que aparece a quem acabou de fazer o que ele
+     * pede é um aviso que se aprende a ignorar.
+     *
+     * Sem `await`: o ficheiro é o que interessa, e o carimbo nunca pode ser o
+     * motivo pelo qual o descarregamento demora ou falha.
+     */
+    void registarCopiaEnviada({
+      bytes: Buffer.byteLength(corpo, "utf8"),
+      parcial: (payload.incomplete ?? []).length > 0,
+      modo: "manual",
+    });
+
+    return new NextResponse(corpo, {
       headers: {
         "Content-Type": "application/json",
         "Content-Disposition": `attachment; filename="liquen-backup-${new Date().toISOString().slice(0, 10)}.json"`,

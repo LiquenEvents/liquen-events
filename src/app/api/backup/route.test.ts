@@ -43,8 +43,18 @@ const stores = vi.hoisted(() => ({
 /** Estado do cliente Supabase falso que serve os contadores de numeração. */
 const sb = vi.hoisted(() => ({ configured: true, rows: [] as unknown[], fails: false }));
 
+/** O carimbo de «esta cópia chegou». Duplo, e não o verdadeiro, porque o
+ *  verdadeiro escreve no `app_state` — que sem Supabase é o `data/app-state.json`
+ *  de quem estiver a correr os testes. */
+const carimbos = vi.hoisted(() => ({ registados: [] as unknown[] }));
+
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authState.authed }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
+vi.mock("@/lib/copia-de-seguranca-marcador", () => ({
+  registarCopiaEnviada: vi.fn(async (info: unknown) => {
+    carimbos.registados.push(info);
+  }),
+}));
 vi.mock("@/lib/quotes-store", () => ({ listQuotes: stores.quotes }));
 vi.mock("@/lib/proposals-store", () => ({ listAllProposals: stores.proposals }));
 vi.mock("@/lib/suppliers-store", () => ({ listSuppliers: stores.suppliers }));
@@ -121,6 +131,7 @@ beforeEach(() => {
     fn.mockReset();
     fn.mockResolvedValue([]);
   }
+  carimbos.registados = [];
   vi.clearAllMocks();
 });
 
@@ -293,5 +304,42 @@ describe("GET /api/backup", () => {
     );
     // E o README diz a mesma coisa por palavras, para quem não lê listas.
     expect(json.readme).toMatch(/rascunhos/i);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA CÓPIA DESCARREGADA À MÃO TAMBÉM É UMA CÓPIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel do back office avisa quando não chega uma cópia há três dias (ver
+ * `lib/copia-de-seguranca-marcador.ts`). Se só a tarefa agendada carimbasse,
+ * quem faz o descarregamento à mão — que é o que o RUNBOOK manda fazer antes de
+ * mexer em dados, e o caminho enquanto o `CRON_SECRET` não estiver resolvido —
+ * continuaria a levar com o aviso depois de ter feito exactamente o que ele
+ * pede. Um aviso assim aprende-se a ignorar.
+ */
+describe("GET /api/backup — o carimbo da cópia", () => {
+  it("descarregar carimba, e diz que foi à mão", async () => {
+    await GET(get());
+    // O carimbo é disparado sem `await` (o ficheiro é o que interessa), por
+    // isso espera-se pela volta seguinte do event loop.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(carimbos.registados).toHaveLength(1);
+    expect(carimbos.registados[0]).toMatchObject({ modo: "manual", parcial: false });
+  });
+
+  it("sem sessão não se carimba nada — não saiu cópia nenhuma", async () => {
+    authState.authed = false;
+    await GET(get());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(carimbos.registados).toHaveLength(0);
+  });
+
+  it("uma cópia com conjuntos em falta fica carimbada como parcial", async () => {
+    stores.quotes.mockRejectedValue(new Error("base de dados em baixo"));
+    await GET(get());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(carimbos.registados[0]).toMatchObject({ parcial: true });
   });
 });

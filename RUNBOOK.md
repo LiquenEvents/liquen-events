@@ -82,6 +82,10 @@ recusa-se a repor se:
 O contador de numeração de facturas **só sobe, nunca desce** — repor uma cópia
 antiga não reemite números já usados.
 
+> **Nunca fizeste isto?** Então não é hoje, com dados a sério, que se aprende.
+> A secção 9 é o ensaio: o mesmo percurso contra uma base de dados de treino,
+> onde enganar-se não custa nada.
+
 ### 3.3 O que a reposição NÃO recupera
 
 - **As fotografias.** Vivem nos buckets do Supabase Storage e não vão na cópia.
@@ -169,6 +173,7 @@ As tarefas estão em `vercel.json`:
 
 | Rota | Quando | O que faz |
 |---|---|---|
+| `/api/cron/backup` | 04:00 diário | Envia a cópia de segurança por email (dados + a lista das fotografias) |
 | `/api/cron/reminders` | 07:00 diário | Resumo diário e lembretes |
 | `/api/cron/inbox-check` | 08:00 diário | Lê as respostas dos clientes na caixa de correio |
 
@@ -177,6 +182,15 @@ produção e param **sem dar erro nenhum**.
 
 Para testar à mão, com sessão de administrador aberta, basta abrir a rota no
 browser.
+
+> **Como é que se dá por isso?** Da cópia de segurança já se dá: cada envio bem
+> sucedido deixa um carimbo, e passados três dias sem nenhum o back office
+> escreve, no topo, há quanto tempo é que não chega uma cópia e qual é a
+> variável a confirmar. Descarregar uma cópia à mão também carimba, portanto o
+> aviso não persegue quem já fez o que ele pede.
+>
+> As outras duas continuam sem sinal nenhum: se o resumo diário deixar de
+> chegar, a falta do email é o único sintoma.
 
 > **Uma vez por dia é pouco, e é uma limitação do plano, não uma escolha.** O
 > plano Hobby da Vercel só permite tarefas diárias — tentar de 15 em 15 minutos
@@ -198,3 +212,128 @@ browser.
 - Se o incidente tiver sido causado por algo que os testes não apanharam,
   escreve o teste antes de fechar o assunto. É a regra que este projecto tem
   seguido e é a razão de a mesma coisa não acontecer duas vezes.
+
+---
+
+## 9. Ensaio de reposição (contra uma base de dados de treino)
+
+**Isto não se corre contra nada de verdade.** A reposição escreve por cima de
+facturas com numeração fiscal e de contratos aceites por clientes — o ensaio
+existe precisamente para que a primeira vez que alguém faz isto não seja no dia
+mau, com pressa e com os dados a sério à frente.
+
+O caminho da aplicação tem teste automático de ida e volta, e esse teste já
+apanhou um defeito real (o `created_at` não era escrito, o que re-datava todas
+as propostas numa reposição). O que nunca foi feito foi o ensaio COMPLETO, de
+ponta a ponta, com uma pessoa a carregar nos botões. É o que está aqui.
+
+Demora cerca de uma hora. Vale a pena repeti-lo uma vez por ano e sempre que o
+formato do ficheiro mudar (`schemaVersion` no topo da cópia).
+
+### 9.0 O que é preciso ter à mão
+
+| O quê | Onde se arranja |
+|---|---|
+| Um projecto Supabase **novo e vazio** (o de treino) | supabase.com → New project. O plano gratuito chega. |
+| Uma cópia de segurança recente | O `.json.gz` que chega por email às 04:00, ou Back office → Descarregar cópia |
+| A aplicação a correr contra o projecto de treino | `.env.local` com `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` **do treino** |
+
+> **A regra que não se quebra:** antes de começar, abre o `.env.local` e
+> confirma com os olhos que o `SUPABASE_URL` é o do projecto de TREINO. Todo o
+> resto deste ensaio é seguro; enganar-se aqui não é. Se o URL for o de
+> produção, pára — não há passo seguinte que corrija isso.
+
+### 9.1 Preparar a base de treino
+
+1. No projecto de treino, abre **SQL Editor** e cola o `db/schema.sql` inteiro.
+   Corre. É idempotente e não apaga nada.
+2. **Verificar:** em **Table Editor** aparecem as tabelas (`quotes`,
+   `proposals`, `invoices`, `invoice_counters`, `contracts`, `app_state`…), todas
+   vazias.
+3. Arranca a aplicação (`npm run dev`) com o `.env.local` do treino e entra no
+   back office.
+4. **Verificar:** o back office abre vazio — zero pedidos, zero facturas — e
+   **não** aparece o aviso vermelho de armazenamento no topo. Se aparecer, lê o
+   que ele diz e resolve isso primeiro: é a mesma frase que apareceria em
+   produção, e este ensaio também serve para a ver funcionar.
+
+### 9.2 Pôr alguma coisa lá dentro (para haver o que perder)
+
+Isto é o que torna o ensaio honesto: a reposição tem de ser vista a APAGAR
+coisas, não só a criar.
+
+1. Cria **um pedido** pelo formulário público do site (`/orcamento`).
+2. Cria **uma tarefa** e **um fornecedor** no back office.
+3. Emite **uma factura** de total (valor pequeno, cliente inventado).
+4. **Verificar:** anota o número que saiu — deve ser `FT <ano>/0001`. Anota-o
+   num papel; vai ser preciso no passo 9.5.
+
+### 9.3 O ensaio propriamente dito — o passo que não escreve nada
+
+1. Back office → **Repor cópia de segurança** → escolhe o ficheiro `.json.gz`
+   (ou `.json`) da cópia de produção.
+2. **Verificar, no plano que aparece, e sem carregar em mais nada:**
+
+   | Coluna | O que tem de acontecer |
+   |---|---|
+   | **Entram** | Números grandes — são os dados de produção que a base de treino não tem |
+   | **Substituídos** | Zero ou quase (só se algum id coincidir) |
+   | **Desaparecem** | O pedido, a tarefa, o fornecedor e a factura do passo 9.2 |
+   | Avisos a vermelho | Lê-os todos. Um conjunto `saltado` traz a razão por extenso |
+
+3. **Verificar que nada foi escrito:** abre outro separador do back office e
+   confirma que o pedido do passo 9.2 ainda lá está. O ensaio não escreve —
+   este passo prova-o.
+4. Fecha o diálogo **sem confirmar**. O ensaio tem de poder ser abandonado.
+
+### 9.4 A reposição a sério
+
+1. Repete o passo 9.3 e, desta vez, escreve à mão a frase de confirmação:
+   **`REPOR TUDO`**. (É pedida só na reposição real; o ensaio nunca a pede.)
+2. **Verificar imediatamente a seguir:**
+   - a aplicação entregou uma **cópia do estado anterior** — guarda-a, é a rede
+     de segurança desta operação;
+   - o ecrã diz, conjunto a conjunto, o que foi reposto;
+   - se algum conjunto falhou, ele aparece nomeado. Não é atómico entre
+     tabelas: uns podem ficar repostos e outros não, e o ecrã diz quais.
+
+### 9.5 Verificar que a reposição fez o que devia
+
+Este é o passo que ninguém tem paciência para fazer e é o único que prova
+alguma coisa. Um por um:
+
+| Verificar | Onde | O que tem de estar |
+|---|---|---|
+| Os pedidos voltaram | Pedidos | O número bate certo com o `counts.quotes` do ficheiro |
+| **As datas não mudaram** | Pedidos | Um pedido antigo continua com a data ANTIGA. Foi aqui que apareceu o defeito do `created_at` |
+| As propostas voltaram | Propostas | Abre uma proposta enviada: o texto e os valores estão lá |
+| **As fotografias NÃO voltaram** | Uma proposta com mood board | As imagens aparecem partidas. **É o esperado** — ver 3.3 |
+| Os contratos aceites | Contratos | A data de aceitação e o `termsSnapshot` estão lá |
+| O livro de facturas | Facturas | Todas as facturas da cópia, com os números originais |
+| **A numeração não recuou** | Emite uma factura nova | O número tem de ser **maior** do que o mais alto do livro — e não `FT <ano>/0002`, que era o que seguia à do passo 9.2 |
+| Os rascunhos por enviar | Estúdio, num pedido que tinha rascunho | O rascunho volta, com os textos. Sem as fotos |
+| Os marcadores NÃO voltaram | — | É de propósito: repô-los faria o robô da caixa de entrada voltar a avisar de emails já avisados |
+
+Se algum destes falhar, **escreve o que viste antes de mexer em mais nada** — é
+a única altura em que a informação existe. E escreve o teste antes de fechar o
+assunto (secção 8).
+
+### 9.6 Arrumar
+
+1. Volta a pôr o `.env.local` a apontar para produção (ou apaga-o).
+2. **Verificar:** o back office volta a mostrar os dados de verdade.
+3. O projecto de treino pode ficar como está — serve para o ensaio do ano
+   seguinte. Se ficar meses sem uso, o Supabase suspende-o, e retomá-lo é um
+   botão.
+
+### 9.7 O que este ensaio NÃO prova
+
+- **Que as fotografias voltam.** Não voltam: não estão em cópia nenhuma. O que
+  existe é a LISTA delas — o manifesto que vai no email diário (segundo anexo,
+  `liquen-fotografias-<data>.json.gz`), e que serve para saber o que se perdeu,
+  não para o devolver. Ver `RESILIENCE.md` §6.
+- **Que uma cópia de há dois meses serve.** Prova que o mecanismo funciona. O
+  que se perde entre a data da cópia e hoje continua perdido.
+- **Que a base de dados de produção aguenta a operação.** O treino está vazio;
+  produção não. O tecto do corpo do pedido (~4,5 MB no alojamento) é o limite
+  que aparece primeiro, e a cópia vai comprimida precisamente por isso (3.4).

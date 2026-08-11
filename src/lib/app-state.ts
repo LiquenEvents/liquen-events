@@ -36,6 +36,16 @@ import { log } from "./logger";
  * lançar (uma edição nunca pode falhar por a gravação ter falhado), e quem só
  * quer disparar e esquecer continua a escrever `await setState(...)` sem olhar
  * para o resultado — o que muda é que quem PRECISA de saber já pode perguntar.
+ *
+ * ── E «ONDE FICOU» TEM DE INCLUIR «QUANTO TEMPO FICA» ──────────────────────
+ *
+ * A primeira versão disto dizia `{ gravado: true, onde: "ficheiro" }` sempre
+ * que não havia Supabase — em produção também. Em Vercel esse ficheiro vive no
+ * disco da função: não sobrevive a um deploy e muitas vezes nem à invocação
+ * seguinte. Ou seja, era o mesmo defeito com outra roupa — ali a mentira era
+ * sobre ter escrito, aqui era sobre o sítio DURAR. Daí o `duradouro` e o
+ * `onde: "ficheiro-efemero"`: a escrita aconteceu, e não conta como guardada
+ * onde não dura.
  */
 const FILE = path.join(process.cwd(), "data", "app-state.json");
 
@@ -53,19 +63,60 @@ const FILE = path.join(process.cwd(), "data", "app-state.json");
  */
 export type MotivoDeFalha = "tabela-em-falta" | "sem-permissao" | "escrita-recusada";
 
-/** Onde a escrita ficou mesmo. `ficheiro` é o recurso de desenvolvimento —
- *  serve o servidor local, e portanto é visível de qualquer navegador que fale
- *  com ele, mas é efémero em serverless (ver o cabeçalho). */
-export type OndeFicou = "servidor" | "ficheiro" | "nenhures";
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O MESMO FICHEIRO É UM SÍTIO NUMA MÁQUINA E NÃO É UM SÍTIO EM VERCEL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Na máquina de alguém, o `data/app-state.json` é o servidor local: sobrevive a
+ * fechar o portátil, é visível de qualquer navegador que fale com ele, e é o
+ * recurso legítimo de quem trabalha sem base de dados. Em Vercel, o MESMO
+ * ficheiro vive no disco da função — não sobrevive a um deploy, e muitas vezes
+ * nem à invocação seguinte, porque o contentor é reciclado.
+ *
+ * A diferença é o AMBIENTE, e é por isso que a distinção vive aqui e não numa
+ * propriedade do ficheiro. A regra é a MESMA que o `repository.assertWritableInProd`
+ * e o restauro (`backup-restore.replaceAll`) já usam para recusar escritas —
+ * deliberadamente a mesma, para não haver duas ideias diferentes de «isto é
+ * produção» a divergirem com o tempo.
+ *
+ * Lê-se na hora e não no arranque do módulo: os testes trocam o ambiente por
+ * caso, e um valor congelado à importação fazia o segundo caso responder o do
+ * primeiro.
+ */
+export function oFicheiroEhEfemero(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
+/**
+ * Onde a escrita ficou mesmo.
+ *
+ *  - `servidor`         → a tabela `app_state`. Dura.
+ *  - `ficheiro`         → o `data/app-state.json` de uma máquina de trabalho.
+ *                         Dura o que a máquina durar, que é o que se pede.
+ *  - `ficheiro-efemero` → o mesmo ficheiro, no disco de uma função serverless.
+ *                         Melhor do que nada — quem gravou ainda o relê nesta
+ *                         invocação — e insuficiente: um deploy apaga-o.
+ *  - `nenhures`         → não ficou.
+ */
+export type OndeFicou = "servidor" | "ficheiro" | "ficheiro-efemero" | "nenhures";
 
 /**
  * O que aconteceu a uma escrita.
  *
- * `gravado` é a única coisa que a maior parte de quem chama precisa de olhar: é
- * a resposta à pergunta «isto sobrevive a este processo e a este navegador?».
+ * São DUAS perguntas, e confundi-las foi o defeito:
+ *
+ *  - `gravado`   → «a escrita aconteceu nalgum lado?». É o que a maior parte de
+ *                  quem chama precisa: distingue uma edição que foi escrita de
+ *                  uma que se perdeu na hora.
+ *  - `duradouro` → «esse lado sobrevive a um deploy?». É a pergunta que faltava.
+ *                  Uma escrita no disco efémero da função responde `true` à
+ *                  primeira e `false` a esta, e quem diz «Guardado» à pessoa
+ *                  que está a trabalhar tem de olhar para as duas.
  */
 export interface ResultadoDeEscrita {
   gravado: boolean;
+  duradouro: boolean;
   onde: OndeFicou;
   motivo?: MotivoDeFalha;
 }
@@ -217,7 +268,7 @@ export async function setState<T>(key: string, value: T): Promise<ResultadoDeEsc
           sb.from("app_state").upsert({ key, value, updated_at: new Date().toISOString() }),
           TEMPO_POR_TENTATIVA_MS,
         );
-        if (!error) return { gravado: true, onde: "servidor" };
+        if (!error) return { gravado: true, duradouro: true, onde: "servidor" };
         ultimoErro = error;
       } catch (err) {
         ultimoErro = err;
@@ -237,16 +288,29 @@ export async function setState<T>(key: string, value: T): Promise<ResultadoDeEsc
         motivo,
       },
     );
-    return { gravado: false, onde: "nenhures", motivo };
+    return { gravado: false, duradouro: false, onde: "nenhures", motivo };
   }
   try {
     const all = await readFileState();
     all[key] = value;
     await fs.mkdir(path.dirname(FILE), { recursive: true });
     await fs.writeFile(FILE, JSON.stringify(all, null, 2));
-    return { gravado: true, onde: "ficheiro" };
+    // A escrita aconteceu nos dois casos. O que muda — e é tudo o que muda — é
+    // o que se DIZ sobre o sítio onde ela ficou.
+    if (oFicheiroEhEfemero()) {
+      // `warn` e não `error`: isto não é uma avaria, é uma instalação sem base
+      // de dados. O `env.ts` já grita por SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY
+      // no arranque; esta linha é para quem for ver os registos depois de o
+      // trabalho desaparecer, e diz-lhe exactamente onde ele tinha ficado.
+      log.warn(
+        "app-state: escrita só no disco efémero da função — não sobrevive a um deploy (falta SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)",
+        { key },
+      );
+      return { gravado: true, duradouro: false, onde: "ficheiro-efemero" };
+    }
+    return { gravado: true, duradouro: true, onde: "ficheiro" };
   } catch (err) {
     log.error("app-state: escrita em ficheiro falhou", err, { key });
-    return { gravado: false, onde: "nenhures", motivo: "escrita-recusada" };
+    return { gravado: false, duradouro: false, onde: "nenhures", motivo: "escrita-recusada" };
   }
 }

@@ -112,6 +112,32 @@ describe("POST /api/push/subscribe", () => {
     const res = await POST(req("POST", VALID_SUB));
     expect(res.status).toBe(500);
   });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * «NÃO DÁ PARA LIGAR» É UMA RESPOSTA; UM «ERRO» NÃO É
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Sem base de dados em produção, a subscrição é recusada de propósito (ver
+   * `lib/push.ts`): guardá-la no disco da função fazia as notificações
+   * aparecerem como ACTIVAS no telemóvel e não chegar nenhuma, sem erro em
+   * lado nenhum.
+   *
+   * A recusa só vale se do outro lado aparecer o que se passa. Um 500 «Erro»
+   * põe alguém a tentar outra vez, a mudar de browser e a escrever a alguém —
+   * a única coisa que não faz é levar à variável que falta.
+   */
+  it("sem sítio onde guardar responde 503 e diz o que falta, não «Erro»", async () => {
+    push.save.mockRejectedValue(
+      new Error("Persistence unavailable: Supabase not configured in production"),
+    );
+    const res = await POST(req("POST", VALID_SUB));
+    expect(res.status).toBe(503);
+    const json = await res.json();
+    expect(json.error).toMatch(/SUPABASE_SERVICE_ROLE_KEY|base de dados/i);
+    // E não pode dizer que ficou ligado.
+    expect(json.ok).toBeUndefined();
+  });
 });
 
 describe("DELETE /api/push/subscribe", () => {

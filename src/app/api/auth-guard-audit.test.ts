@@ -437,6 +437,11 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // abertas — a primeira desenha o mapa do armazenamento a quem perguntar, a
   // segunda gasta-o.
   { path: "./admin/derivadas/route", methods: ["GET", "POST"] },
+  // O estado do armazenamento diz se a base de dados responde, se a tabela
+  // existe e se a chave em uso tem permissões — o mapa da instalação, com os
+  // nomes das variáveis a confirmar. E a verificação ESCREVE (é assim que ela é
+  // honesta: tenta gravar e volta a ler). Sem sessão, nem se pergunta.
+  { path: "./admin/armazenamento/route", methods: ["GET"] },
   // O mesmo, do lado da Meta: o relatório e o envio dos casamentos fechados
   // trazem o valor de cada negócio. O POST é o que efectivamente ENVIA
   // conversões para fora — sem sessão não pode sequer ser tentado.

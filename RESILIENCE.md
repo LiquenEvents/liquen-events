@@ -21,6 +21,7 @@ ficheiro é o estado do sistema e o que ficou por fazer.
 | Cache / CDN | Coberto |
 | Tectos de corpo e de upload | Coberto |
 | Cópias de segurança e reposição | Coberto no que é da aplicação; **falta confirmar o Supabase** — §6 |
+| Fotografias (buckets) | **A LISTA vai na cópia diária**; os BYTES continuam por copiar — §6 |
 | Alertas | **Escrito, por ligar** — §7 |
 
 ---
@@ -148,11 +149,68 @@ apanha: a base de dados inteira desaparecer.
 
 **Teste de restauro:** o caminho da aplicação tem teste de ida-e-volta
 automatizado (apanhou um defeito real — `created_at` não era escrito, o que
-re-datava todas as propostas numa reposição). Um ensaio a sério contra a base
-de dados de produção **não foi feito** e precisa de uma base de dados de treino.
+re-datava todas as propostas numa reposição). Um ensaio a sério **continua por
+fazer** — mas deixou de ser um ensaio por inventar: está escrito passo a passo
+no [RUNBOOK §9](./RUNBOOK.md#9-ensaio-de-reposição-contra-uma-base-de-dados-de-treino),
+contra uma base de treino, com o que verificar em cada passo (incluindo os
+três que costumam falhar em silêncio: as datas dos pedidos, a numeração de
+facturas não recuar, e as fotografias NÃO voltarem). Falta alguém correr o
+procedimento; é uma hora.
 
-**As fotografias não estão em nenhuma cópia.** Vivem nos buckets do Storage. É
-a maior lacuna que resta.
+### As fotografias — o que passou a existir e o que continua a faltar
+
+**Continuam a não estar em cópia nenhuma.** Vivem nos buckets do Storage
+(`proposal-assets` e `theme-assets`), a cópia diária leva os CAMINHOS e não os
+ficheiros, e uma reposição devolve propostas e mood boards a apontar para
+imagens que têm de já existir. É a maior lacuna que resta, e é uma lacuna de
+BYTES.
+
+**O que passou a existir: o manifesto.** A cópia diária leva agora um segundo
+anexo, `liquen-fotografias-<data>.json.gz` — a lista dos originais com chave,
+tamanho, assinatura (`eTag`) e data. Não transfere um único byte:
+`src/lib/manifesto-de-fotografias.ts` lê o que a própria listagem do Storage já
+devolve, o que custa uma chamada por pasta.
+
+Porque é que vale a pena sem os bytes: o dia mau começa sempre pela mesma
+pergunta — *o que é que faltou?* — e até aqui não havia como responder. Com o
+manifesto, comparar o bucket com o ficheiro de ontem é uma diferença de duas
+listas, e o que se perdeu fica com nome, tamanho e data. Sem ele, uma proposta
+reposta aponta para `LIQ-3/mood-2.jpg` e ninguém sabe sequer se essa foto
+existiu.
+
+O que o manifesto **não** faz, dito para ninguém prometer o que ele não dá: não
+devolve uma fotografia. E o `eTag` só é o MD5 do conteúdo para ficheiros
+enviados de uma vez — em envios em partes é uma assinatura composta (sufixo
+`-N`) que não se recalcula com um `md5sum` local. Serve para dizer se o ficheiro
+de hoje é o mesmo de ontem; não serve para provar a integridade de uma cópia
+feita à mão.
+
+As **derivadas** (`proposal-thumbs`, `theme-thumbs`, `theme-micro`,
+`proposal-capas`, `theme-capas`) ficam de fora do manifesto de propósito:
+refazem-se dos originais num botão (Definições → Miniaturas). Insubstituível é o
+original.
+
+### E os bytes? — recomendação, com o custo
+
+Copiar os bytes **não deve ser feito por esta aplicação**, e a razão não é
+preguiça: uma cópia guardada pelo mesmo servidor que já tem acesso de escrita
+aos buckets não protege contra o caso que interessa (uma chave comprometida, um
+`delete` errado, o projecto suspenso). E uma função serverless com 60 segundos
+não copia gigabytes.
+
+As três hipóteses, por ordem de recomendação:
+
+| Hipótese | Custo real | O que protege | O que não protege |
+|---|---|---|---|
+| **1. Cópias do próprio Supabase** (Point-in-Time Recovery / backups do projecto) | Exige plano **Pro** (~25 USD/mês). Zero trabalho de código | O Storage inteiro, com retenção. É a opção certa | Não protege contra "a conta Supabase desapareceu" |
+| **2. Descarregamento periódico para fora** (um `rclone`/guião no computador dela ou num NAS, contra o manifesto) | Zero em dinheiro; ~1 h a montar; a primeira cópia é a única lenta (as seguintes só levam o que o manifesto diz que é novo) | Tudo, incluindo o fim da conta | Depende de alguém se lembrar de o ligar — o defeito que este repositório já apanhou duas vezes |
+| **3. Segundo bucket noutro fornecedor, escrito pela aplicação** | Uma dependência nova, uma conta nova, chaves novas, e o dobro do custo de armazenamento | Pouco mais do que a 1 | **Não recomendado.** Fica dentro do alcance da mesma aplicação, que é o que o dia mau costuma comprometer |
+
+**Recomendação: 1, e a 2 como reforço** enquanto o plano for o gratuito. O
+manifesto já resolve a parte que o dinheiro não compra: saber o que se perdeu.
+
+**O que só ela pode fazer** está em [ONDE-FICA-GUARDADO.md](./ONDE-FICA-GUARDADO.md)
+e na tabela final deste ficheiro.
 
 ---
 
@@ -165,6 +223,36 @@ a maior lacuna que resta.
 | `SENTRY_DSN` | Erros para o Sentry, agrupados, com histórico e regras de alerta |
 | `ERROR_WEBHOOK_URL` | Cada erro em tempo real para um canal à escolha |
 | `CRON_SECRET` | Sem ela as tarefas agendadas param **em silêncio** |
+
+### Corrigido: o silêncio do `CRON_SECRET` deixou de ser silêncio
+
+Sem `CRON_SECRET`, `/api/cron/backup` responde 401 todos os dias: não envia
+email nenhum, não regista erro nenhum, e ninguém repara. Uma cópia que não corre
+há semanas é **pior** do que não ter cópia, porque dá a certeza de estar salvo a
+quem já não está — e essa certeza só se desfaz no dia em que se precisa dela.
+
+Cada cópia bem sucedida passa a deixar um carimbo
+(`src/lib/copia-de-seguranca-marcador.ts`, chave `copia-de-seguranca:ultima` no
+`app_state`), e a verificação de armazenamento lê-o. Passados **três dias** sem
+cópia, o painel do back office escreve há quanto tempo é que não chega uma e
+nomeia a variável a confirmar.
+
+Os três cuidados que fazem disto um aviso e não um alarme falso:
+
+- **um dia falhado não é uma avaria** (um deploy à hora da tarefa, um atraso do
+  agendador): só se fala ao terceiro;
+- **uma instalação estreada hoje nunca teve cópia**, e gritar-lhe isso à
+  primeira abertura era o alarme falso perfeito. A primeira pergunta carimba
+  «começámos a olhar agora» e só o silêncio a partir daí é que avisa;
+- **não se pergunta em desenvolvimento** (a tarefa não corre num portátil) **nem
+  com a base de dados em baixo** (o carimbo vive lá, e a avaria a resolver é a
+  outra — dois vermelhos pela mesma causa dividem a atenção).
+
+Descarregar uma cópia à mão também carimba: o aviso não persegue quem acabou de
+fazer o que ele pede.
+
+**O que continua sem sinal:** o resumo diário e a leitura da caixa de entrada. Se
+pararem, a falta do email é o único sintoma.
 
 **O que isto não resolve, dito sem rodeios:** nada disto deteta o site em baixo
 por inteiro, porque o código que avisaria também não corre. Para isso é preciso
@@ -202,9 +290,11 @@ plano seja apanhado por um teste em vez de por uma publicação falhada.
 | # | O quê | De quem |
 |---|---|---|
 | 1 | Ligar `SENTRY_DSN` e `ERROR_WEBHOOK_URL` | Dona (Vercel) |
-| 2 | Confirmar `CRON_SECRET` definida em produção | Dona (Vercel) |
+| 2 | Confirmar `CRON_SECRET` definida em produção | Dona (Vercel) — **agora com sinal**: sem ela o back office avisa ao terceiro dia |
 | 3 | Vigia externo a chamar `/api/health` | Dona (Vercel ou serviço) |
-| 4 | Confirmar cópias automáticas do Supabase e a retenção | Dona (Supabase) |
-| 5 | Ensaio de restauro contra uma base de treino | Ambos |
-| 6 | Cópia de segurança das fotografias dos buckets | Por decidir |
+| 4 | Confirmar cópias automáticas do Supabase e a retenção | Dona (Supabase) — é a **hipótese 1** do §6, a recomendada para as fotografias |
+| 5 | Ensaio de restauro contra uma base de treino | Dona, com o procedimento escrito ([RUNBOOK §9](./RUNBOOK.md)) — ~1 h |
+| 6 | Cópia dos BYTES das fotografias | Dona (Supabase Pro, ou descarregamento periódico). A LISTA já vai na cópia diária |
 | 7 | Reutilização de ligação IMAP, se a frequência subir | Adiado, com razão |
+| 8 | Recurso a ficheiro sem guarda de produção | **Fechado** — `push.ts` era o último; recusa e diz porquê |
+| 9 | Contador de facturas a reiniciar num deploy | **Fechado** — sem base de dados em produção, recusa emitir |
