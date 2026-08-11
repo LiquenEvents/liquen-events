@@ -61,18 +61,33 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
     setQuote((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  // Registo de atividade: acrescenta a entrada e persiste o log completo. É o
-  // único PATCH que o container faz (o ActivityLog delega no pai, tal como no
-  // drawer).
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * ACRESCENTAR AO REGISTO, E NÃO REESCREVÊ-LO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Isto gravava o registo INTEIRO — o que estava neste ecrã mais a linha nova.
+   * E esta página é desenhada no servidor: o `quote` que ela tem é o retrato do
+   * momento em que foi aberta, e nunca revalida.
+   *
+   * O resultado: abre-se o dossier de manhã, deixa-se o separador aberto, e ao
+   * fim da tarde regista-se uma chamada. O que se grava é o registo DE MANHÃ
+   * mais essa linha — e tudo o que qualquer outra ferramenta escreveu pelo meio
+   * (a proposta que seguiu, as mudanças de estado, os pagamentos) desaparece.
+   * Sem erro nenhum, e só se dá por isso muito depois.
+   *
+   * O servidor já tinha o caminho seguro — `activityLogAppend`, que junta ao
+   * registo FRESCO — e a gaveta do back office já o usava, com o comentário a
+   * explicar porquê. Este ecrã e o Quadro eram os dois que faltavam.
+   */
   const appendActivity = useCallback(
     async (entry: ActivityEntry) => {
-      const activityLog = [...(quote.activityLog ?? []), entry];
-      setQuote((prev) => ({ ...prev, activityLog }));
+      setQuote((prev) => ({ ...prev, activityLog: [...(prev.activityLog ?? []), entry] }));
       try {
         const res = await fetch(`/api/orcamento/${quote.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ activityLog }),
+          body: JSON.stringify({ activityLogAppend: [entry] }),
         });
         if (res.ok) {
           const updated: Quote = await res.json();

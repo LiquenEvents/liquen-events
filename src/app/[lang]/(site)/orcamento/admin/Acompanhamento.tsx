@@ -86,6 +86,16 @@ interface Props {
   onOpenQuote?: (q: Quote) => void;
 }
 
+/**
+ * O corpo de um PATCH a uma proposta.
+ *
+ * `null` é «APAGA ESTE CAMPO», e `undefined` não sabe dizer isso: desaparece
+ * no `JSON.stringify` e o servidor, que só escreve o que vem no corpo, não
+ * apaga nada. É a diferença entre retirar um seguimento e julgar que o
+ * retirou.
+ */
+type PatchDeProposta = Partial<{ [K in keyof Proposal]: Proposal[K] | null }>;
+
 export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
   const {
     data: propostas,
@@ -122,12 +132,20 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
   );
 
   const gravar = useCallback(
-    async (id: string, patch: Partial<Proposal>, comoDizer: string) => {
+    async (id: string, patch: PatchDeProposta, comoDizer: string) => {
       setAGravar(id);
       // Otimista: o ecrã muda já e desfaz-se se o servidor recusar. Ver a
       // decisão em PaymentsPanel — o mesmo padrão, pelas mesmas razões.
+      //
+      // No ECRÃ, `null` (que quer dizer «apaga») lê-se como campo ausente; no
+      // CORPO do pedido tem de ir mesmo `null`, senão o servidor não apaga
+      // nada. São duas linguagens para a mesma intenção, e é aqui que se
+      // traduzem.
+      const paraOEcra = Object.fromEntries(
+        Object.entries(patch).map(([k, v]) => [k, v === null ? undefined : v]),
+      ) as Partial<Proposal>;
       const antes = propostas ?? [];
-      setData(antes.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+      setData(antes.map((p) => (p.id === id ? { ...p, ...paraOEcra } : p)));
       try {
         const res = await fetch(`/api/propostas/${id}`, {
           method: "PATCH",
@@ -267,10 +285,23 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
                   "Registado. Fica na contagem dos motivos.",
                 );
               }}
+              /**
+               * `null` e NÃO `undefined` ao retirar.
+               *
+               * `JSON.stringify({ followUpAt: undefined })` é `"{}"`, e o
+               * servidor só escreve o que vem no corpo (`if (k in body)`).
+               * Resultado: o patch ia vazio, a data ficava na base de dados, e
+               * o ecrã dizia «Seguimento retirado» na mesma.
+               *
+               * Isto agravou-se quando o resumo da manhã passou a contar
+               * também os seguimentos das PROPOSTAS: um seguimento que ela
+               * julgava ter retirado voltava a aparecer todas as manhãs, para
+               * sempre, sem forma nenhuma de o apagar.
+               */
               onSeguimento={(followUpAt, followUpNote) =>
                 gravar(
                   l.proposta.id,
-                  { followUpAt: followUpAt || undefined, followUpNote: followUpNote || undefined },
+                  { followUpAt: followUpAt || null, followUpNote: followUpNote || null },
                   followUpAt ? `Seguimento a ${dataCurta(followUpAt)}` : "Seguimento retirado",
                 )
               }

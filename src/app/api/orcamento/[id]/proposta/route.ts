@@ -171,20 +171,42 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    const mail = await sendMail({
-      to: quote.email,
-      replyTo: MAIL_TO,
-      subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
-      html: clientHtml,
-      text: clientText,
-      attachments: [
-        {
-          filename: `Proposta-Liquen-${id}.pdf`,
-          content: pdfBuffer,
-          contentType: "application/pdf",
-        },
-      ],
-    });
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * SEM EMAIL, O ENVIO CRIAVA PROPOSTAS FANTASMA
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Um pedido criado a partir de um telefonema tem `email: ""`. O servidor
+     * de correio recusa um destinatário vazio, o envio atirava, e o `catch` de
+     * topo devolvia 500 — mas a proposta JÁ TINHA SIDO GRAVADA, com um
+     * identificador novo, e o estado do pedido nunca chegava a avançar.
+     *
+     * Cada nova tentativa gravava MAIS UMA proposta. Três tentativas eram três
+     * propostas «enviada» na lista, no Acompanhamento, nas contagens e na
+     * Análise — nenhuma delas enviada a ninguém.
+     *
+     * Agora sem destinatário não se tenta enviar: a proposta fica gravada (o
+     * link continua a servir), o estado avança, e a resposta diz que o email
+     * não saiu e porquê. Uma proposta por enviar é um negócio parado; três
+     * propostas fantasma são um negócio confuso.
+     */
+    const temDestinatario = !!quote.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(quote.email);
+    const mail = temDestinatario
+      ? await sendMail({
+          to: quote.email,
+          replyTo: MAIL_TO,
+          subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
+          html: clientHtml,
+          text: clientText,
+          attachments: [
+            {
+              filename: `Proposta-Liquen-${id}.pdf`,
+              content: pdfBuffer,
+              contentType: "application/pdf",
+            },
+          ],
+        })
+      : { sent: false as const };
 
     // Advance the quote status (best-effort — the proposal is already saved & sent).
     try {
@@ -203,6 +225,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       id: proposal.id,
       total,
       emailed: mail.sent,
+      ...(temDestinatario
+        ? {}
+        : {
+            emailError:
+              "Este pedido não tem email de cliente — a proposta foi gravada e o link continua a " +
+              "servir, mas não foi enviada a ninguém. Acrescente o email e reenvie.",
+          }),
       pdfBase64: pdfBuffer.toString("base64"),
     });
   } catch (err) {

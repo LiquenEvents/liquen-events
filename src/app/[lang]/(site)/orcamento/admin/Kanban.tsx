@@ -286,11 +286,19 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
           actor: userName,
           summary: `${fromLabel} → ${toLabel}`,
         };
-        const activityLog = [...(q.activityLog ?? []), entry];
+        /**
+         * ACRESCENTAR, e não reescrever o registo inteiro.
+         *
+         * Gravar `activityLog` completo escreve o retrato que ESTE ecrã tem
+         * mais a linha nova — e apaga tudo o que outra ferramenta escreveu
+         * entretanto. Num quadro que fica aberto o dia todo, isso é o normal e
+         * não o excepcional. O servidor já tinha o caminho seguro, que junta ao
+         * registo fresco; a gaveta do back office já o usava, este ecrã não.
+         */
         const res = await fetch(`/api/orcamento/${q.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status, activityLog }),
+          body: JSON.stringify({ status, activityLogAppend: [entry] }),
         });
         if (!res.ok) throw new Error();
         const updated = await res.json();

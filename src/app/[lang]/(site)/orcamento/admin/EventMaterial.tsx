@@ -30,8 +30,34 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
 
   const buscar = useCallback(async () => {
     try {
-      const r = await fetch(`/api/orcamento/${quote.id}/material`).then((x) => x.json());
-      setDados(r);
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * UM ERRO AQUI REBENTAVA O BACK OFFICE INTEIRO
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Não havia `res.ok`. Numa resposta de erro o corpo é `{ error: "…" }`,
+       * portanto `dados.itens` ficava `undefined` — e a linha que conta o
+       * progresso faz `itens.filter(...)`, que atira.
+       *
+       * Este painel é desenhado DENTRO da gaveta do pedido, por isso a excepção
+       * subia até ao ecrã de erro da aplicação e substituía o back office todo.
+       * Com a gaveta aberta, o preço meio escrito e as notas por gravar a irem
+       * com ele.
+       *
+       * E os gatilhos não são exóticos: a rota devolve 401 quando a sessão
+       * caduca ou quando alguém carrega em Sair noutro aparelho, e 500 se as
+       * tabelas de material ainda não existirem.
+       *
+       * A guarda é a mesma que o ecrã da carrinha já fazia — este ficheiro era
+       * a excepção. Nunca se escreve no estado o que não tem a forma certa.
+       */
+      const res = await fetch(`/api/orcamento/${quote.id}/material`);
+      if (!res.ok) return;
+      const r = await res.json();
+      setDados({
+        evento: r?.evento ?? null,
+        itens: Array.isArray(r?.itens) ? r.itens : [],
+      });
     } catch {
       /* silêncio: o painel mostra o estado vazio e o botão de gerar */
     } finally {

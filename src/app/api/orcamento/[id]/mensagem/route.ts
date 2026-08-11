@@ -41,13 +41,41 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       </div>
     </div>`;
 
-    const mail = await sendMail({
-      to: quote.email,
-      replyTo: MAIL_TO,
-      subject: `Líquen Events — sobre o seu pedido (${id})`,
-      html,
-      text: message,
-    });
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * UM PEDIDO SEM EMAIL NÃO PODE ENGOLIR A MENSAGEM
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Um pedido criado a partir de um TELEFONEMA tem `email: ""` — o «Novo
+     * pedido» só exige o nome, e o formulário público aceita «email OU
+     * telefone». Com o endereço vazio, o servidor de correio recusa («No
+     * recipients defined»), o envio atirava, e a rota devolvia 500 «Erro ao
+     * enviar a mensagem» — sem nunca dizer que o que faltava era o email.
+     *
+     * E o pior não era o erro: a gravação vinha DEPOIS do envio, portanto a
+     * mensagem nunca chegava a ser guardada. Ela escrevia, carregava em
+     * Enviar, e o histórico do pedido continuava vazio — sem forma nenhuma de
+     * registar que já tinha respondido, nem que fosse por telefone.
+     *
+     * Passa a ser como no envio da proposta, que já resolvia isto: sem
+     * destinatário válido não se tenta enviar, a mensagem é GRAVADA na mesma
+     * (é o registo de que ela respondeu), e a resposta diz porque é que o
+     * email não saiu. O ecrã já sabe mostrar essa frase.
+     */
+    const temDestinatario = !!quote.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(quote.email);
+    const mail = temDestinatario
+      ? await sendMail({
+          to: quote.email,
+          replyTo: MAIL_TO,
+          subject: `Líquen Events — sobre o seu pedido (${id})`,
+          html,
+          text: message,
+        })
+      : { sent: false as const };
+    const emailError = temDestinatario
+      ? undefined
+      : "Este pedido não tem email — a mensagem ficou registada, mas não foi enviada. " +
+        "Acrescente o email do cliente para lhe poder escrever daqui.";
 
     const newMessage: QuoteMessage = { at: new Date().toISOString(), body: message };
     const messages = [...(quote.messages ?? []), newMessage];
@@ -82,7 +110,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ...(subirEstado ? { status: "em_revisao" as const } : {}),
     });
 
-    return NextResponse.json({ ok: true, emailed: mail.sent, quote: updated });
+    return NextResponse.json({
+      ok: true,
+      emailed: mail.sent,
+      ...(emailError ? { emailError } : {}),
+      quote: updated,
+    });
   } catch (err) {
     log.error("mensagem POST falhou", err);
     return NextResponse.json({ error: "Erro ao enviar a mensagem" }, { status: 500 });

@@ -354,11 +354,35 @@ export default function Faturas({ quotes }: Props) {
     }
     setSubmitting(true);
     try {
+      /**
+       * ════════════════════════════════════════════════════════════════════
+       * UM IVA VAZIO NÃO É UM IVA DE ZERO POR CENTO
+       * ════════════════════════════════════════════════════════════════════
+       *
+       * Era `parseFloat(vatRate) || 0`. Com o campo vazio — e apagá-lo com o
+       * polegar no telemóvel é um gesto, ainda por cima dentro de uma secção
+       * recolhida — isso dava ZERO. E o servidor aceita o zero: é um número,
+       * portanto o valor por omissão de 23% nunca chegava a correr.
+       *
+       * Uma factura de 12.300 € saía com base 12.300 € e IVA 0,00 €. É a
+       * mesma perda de cerca de 2.300 € que já tínhamos corrigido noutro
+       * sítio, por outra porta — e desta vez o número impresso é internamente
+       * coerente, portanto nada acusa.
+       *
+       * Agora: um campo vazio NÃO viaja, e o servidor aplica os 23%. Um valor
+       * que não seja um número recusa-se aqui, com uma frase.
+       */
+      const taxa = vatRate.trim() === "" ? null : parseFloat(vatRate.replace(",", "."));
+      if (taxa !== null && (!Number.isFinite(taxa) || taxa < 0 || taxa > 100)) {
+        toast("Indique uma taxa de IVA válida (por exemplo, 23).", "error");
+        setSubmitting(false);
+        return;
+      }
       const payload: Record<string, unknown> = {
         quoteId: quoteId || undefined,
         clientName: clientName.trim(),
         clientEmail: clientEmail.trim(),
-        vatRate: (parseFloat(vatRate) || 0) / 100,
+        ...(taxa === null ? {} : { vatRate: taxa / 100 }),
         issuedAt,
         dueAt: dueAt || undefined,
       };
