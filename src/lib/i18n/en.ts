@@ -440,8 +440,7 @@ export const en: Dict = {
     ],
     labelTipo: "Event type",
     labelDecor: "Where would you like decoration?",
-    hintDecor:
-      "Tick whatever feels right. It helps us prepare a proposal with only what you want, and if you are not sure yet, skip this part: we will work it out together.",
+    hintDecor: "Tell us where you would like the decoration for your wedding.",
     // Ver `pt.ts` para o porquê de cada uma destas perguntas.
     labelCerimonia: "What kind of ceremony?",
     hintCerimonia: "A church ceremony means a second space to decorate, on top of the reception.",

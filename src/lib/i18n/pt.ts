@@ -452,8 +452,7 @@ export const pt = {
     // Só aparece no casamento. Perguntado como uma conversa, não como uma
     // lista de compras: o que se quer saber é ONDE querem decoração.
     labelDecor: "Onde quer decoração?",
-    hintDecor:
-      "Marque o que fizer sentido. Ajuda-nos a preparar uma proposta só com o que quer, e se ainda não souber, salte esta parte: falamos disso juntos.",
+    hintDecor: "Diga-nos onde quer a decoração do seu casamento.",
     // Só aparece no casamento. A pergunta é feita pelo que ela muda no trabalho
     // — uma cerimónia religiosa é um segundo sítio para decorar — e não como
     // uma curiosidade sobre a vida de quem preenche.
