@@ -1658,10 +1658,18 @@ async function drawCollage(
     }),
   );
   const layout = mb.layout ?? layoutSugerido(n);
-  const caixas = caixasDoMoodboard(layout, aspectos, annH);
+  const caixas = caixasDoMoodboard(layout, aspectos, annH, mb.enquadramento === "forma-da-foto");
   for (let i = 0; i < n; i++) {
     const c = caixas[i];
-    if (!c) continue;
+    // Uma foto sem caixa não pode sair da página em silêncio. Hoje a geometria
+    // devolve sempre uma caixa por foto — mas era ela que devolvia UMA só no
+    // arranjo «texto e imagem», e as outras desapareciam sem nada nem ninguém
+    // dar por isso. Se voltar a acontecer, conta como foto por desenhar e o
+    // estúdio avisa antes de a proposta seguir.
+    if (!c) {
+      noteUndrawn(imgs[i]);
+      continue;
+    }
     await place(imgs[i], c.x, c.y, c.w, c.h);
   }
 

@@ -106,6 +106,31 @@ export interface MoodBoard {
    * de documentos já enviados.
    */
   layout?: LayoutDeMoodboard;
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * AS CAIXAS TOMAM A FORMA DAS FOTOGRAFIAS
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * `"forma-da-foto"` = nenhuma fotografia desta página é recortada: cada uma
+   * recebe uma caixa com a forma que tem. Medido no arranjo em destaque antes
+   * disto: uma foto ao alto perdia 68% da área, uma panorâmica 63%, e no mosaico
+   * a média das formas mais comuns andava nos 40%. Uma foto de um portão coberto
+   * de flores chegava à proposta com dois terços do portão de fora — e a página
+   * existe para mostrar o portão.
+   *
+   * ── PORQUE É QUE ISTO É UM CAMPO E NÃO É O COMPORTAMENTO E PRONTO ───────
+   *
+   * O PDF de uma proposta NÃO é um ficheiro guardado: é redesenhado a partir
+   * deste documento de cada vez que o casal abre o link (a cache é de memória e
+   * morre com o processo). Mudar a geometria calada mudava a página de uma
+   * proposta que já foi enviada, discutida ao telefone e talvez impressa. Por
+   * isso a escolha nova nasce num campo que os documentos antigos não têm:
+   * ausente, sai exactamente o que sempre saiu.
+   *
+   * Nos arranjos «filas» e «fila única» não muda nada — esses já davam a cada
+   * foto a forma dela, e é medido: 0% de perda antes e depois.
+   */
+  enquadramento?: "forma-da-foto";
 }
 
 export interface ServiceItem {
