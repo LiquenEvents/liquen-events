@@ -49,6 +49,20 @@ export const mapper: Mapper<FotoEtiqueta> = {
   }),
   order: { column: "created_at", ascending: true },
   fileCompare: (a, b) => a.createdAt.localeCompare(b.createdAt),
+  /**
+   * SEM `touch`, e de propósito. A linha É o facto («esta foto é um seating
+   * plan»): põe-se (`etiquetar`) ou tira-se (`desetiquetar`), nunca se edita —
+   * não há `update` nenhum neste store, e mudar uma ligação significa apagar
+   * uma e criar outra. A `origem` também não se actualiza, por decisão
+   * explícita (ver `etiquetar`): uma etiqueta que a equipa confirmou não volta
+   * a `migracao` por a migração ter sido corrida outra vez.
+   *
+   * Além disso o `id` é uma coluna GERADA a partir de `path` e `etiqueta_id`,
+   * por isso o `toRow` nem o manda — esta tabela não tem sequer a forma de
+   * quem se actualiza. O trabalho à mão que aqui mora está protegido por outra
+   * via: a chave primária derivada impede o par repetido, e o que se perde
+   * perde-se por `delete`, não por escrita cega.
+   */
 };
 
 /** Uma origem que não reconheçamos conta como `manual` — o lado seguro: nunca

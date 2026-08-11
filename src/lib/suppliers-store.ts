@@ -28,6 +28,17 @@ export const mapper: Mapper<Supplier> = {
   }),
   order: { column: "name", ascending: true },
   fileCompare: (a, b) => a.name.localeCompare(b.name),
+  /**
+   * Compare-and-set sobre o `updated_at`.
+   *
+   * A ficha do fornecedor é uma caderneta de contactos que várias pessoas
+   * corrigem à medida que descobrem coisas — o telefone novo da florista numa
+   * semana, uma nota sobre prazos noutra. Cada correcção manda o seu campo, mas
+   * o `update` reescreve a linha toda: quem tivesse a ficha aberta desde antes
+   * do telefone novo apagava-o ao gravar a nota, e o contacto certo voltava a
+   * ser o antigo sem ninguém dar por isso.
+   */
+  touch: true,
 };
 
 const repo = createRepository(mapper);

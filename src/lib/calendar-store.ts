@@ -26,6 +26,19 @@ export const mapper: Mapper<CalendarEvent> = {
   }),
   order: { column: "event_date", ascending: true },
   fileCompare: (a, b) => a.date.localeCompare(b.date),
+  /**
+   * SEM `touch`, e de propósito: esta tabela não tem caminho de actualização
+   * nenhum. O store expõe `listCalendarEvents`, `createCalendarEvent` e
+   * `deleteCalendarEvent`, a rota `/api/calendario/[id]` só tem `DELETE`, e uma
+   * entrada corrige-se apagando e voltando a criar. Não havendo `update`, o
+   * compare-and-set não protegeria escrita nenhuma — seria uma coluna a ser
+   * escrita por ninguém.
+   *
+   * QUEM ACRESCENTAR AQUI UM `updateCalendarEvent` tem de fazer as duas metades
+   * na mesma alteração: `alter table public.calendar_events add column if not
+   * exists updated_at timestamptz` em `db/schema.sql` E `touch: true` aqui. Uma
+   * sem a outra ou não protege nada, ou faz falhar todas as escritas.
+   */
 };
 
 const repo = createRepository(mapper);

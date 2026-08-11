@@ -874,6 +874,60 @@ insert into public.biblioteca_etiquetas (id, eixo, nome, ordem) values
   ('estilo:editorial',    'estilo', 'editorial',      60)
 on conflict (id) do nothing;
 
+-- ════════════════════════════════════════════════════════════════
+-- ESCREVER POR CIMA DO TRABALHO DE OUTRA PESSOA
+-- ════════════════════════════════════════════════════════════════
+--
+-- A perda que ninguém vê acontecer. Duas pessoas abrem a mesma factura: uma
+-- marca-a como paga, a outra corrige a nota a partir de um ecrã que abriu dois
+-- minutos antes. A segunda gravação reescreve a LINHA INTEIRA com o estado que
+-- ela leu — a factura volta a "emitida", o `paid_at` fica vazio, e não há erro
+-- nenhum, nem registo, nem aviso. O livro fiscal passa a dizer que não entrou
+-- dinheiro que entrou.
+--
+-- A aplicação sabe impedir isto desde sempre (src/lib/repository.ts): a escrita
+-- leva um `where updated_at = <o que foi lido>` e, se nenhuma linha for
+-- afectada, alguém escreveu no meio — relê-se e volta a aplicar-se a alteração
+-- por cima do que a outra pessoa gravou. Só que essa comparação precisa de uma
+-- coluna onde se apoiar, e a maior parte destas tabelas não a tinha. Estas
+-- colunas são essa metade.
+--
+-- ── AS DUAS METADES TÊM DE ANDAR JUNTAS ─────────────────────────
+-- QUEM COMPARA é o `touch: true` no mapper do store; QUEM ESCREVE é esta
+-- coluna. Uma sem a outra não é meia protecção:
+--   · coluna sem `touch`  → a coluna fica a nulo e não protege nada;
+--   · `touch` sem coluna  → TODAS as escritas da tabela falham com
+--                           "column updated_at does not exist".
+-- Há um teste que prende as duas (src/lib/bloqueio-optimista.test.ts): para
+-- cada mapper com `touch`, procura a coluna NESTE ficheiro.
+--
+-- ── PORQUE É `timestamptz` NULO E NÃO `not null default now()` ──
+-- Nulo é a verdade para uma linha que ainda nunca foi actualizada, e a
+-- comparação sabe lidar com isso (`is null` na primeira escrita, `= <valor>`
+-- daí em diante). Um `default now()` diria que todas as linhas antigas foram
+-- tocadas no momento em que este ficheiro correu, o que não aconteceu. É também
+-- a forma que `quotes`, `proposals` e `message_links` já usam.
+--
+-- IDEMPOTENTE: `add column if not exists` — este ficheiro é para ser colado
+-- outra vez sempre que for preciso, e correr duas vezes não faz nada na segunda.
+-- Correr isto NÃO muda nada do que se vê; só dá à comparação onde se apoiar.
+--
+-- `proposals` não aparece aqui: a coluna já nasce com a tabela lá em cima (e
+-- estava lá desde o primeiro dia sem nunca ser escrita — a protecção montada e
+-- desligada). `email_templates` e `proposal_settings` também já a têm, mas por
+-- outra razão (mostrar "definido há quatro meses") e continuam sem comparação:
+-- as duas escrevem a linha inteira, e nesse caso a repetição chegaria ao mesmo
+-- resultado — o que falta ali é o cliente dizer sobre que versão escreveu, como
+-- a Visão Geral faz. As tabelas que ficam de fora estão explicadas no mapper de
+-- cada store.
+alter table public.invoices             add column if not exists updated_at timestamptz;
+alter table public.contracts            add column if not exists updated_at timestamptz;
+alter table public.tasks                add column if not exists updated_at timestamptz;
+alter table public.suppliers            add column if not exists updated_at timestamptz;
+alter table public.material_list_items  add column if not exists updated_at timestamptz;
+alter table public.event_material_items add column if not exists updated_at timestamptz;
+alter table public.biblioteca_etiquetas add column if not exists updated_at timestamptz;
+
 -- ── Segurança ───────────────────────────────────────────────────
 -- Ativamos RLS sem políticas públicas: só o servidor (service_role key,
 -- que ignora o RLS) consegue ler/escrever. Os dados ficam privados.

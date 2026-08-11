@@ -4,6 +4,8 @@ import { getForQuote } from "@/lib/event-material-store";
 import { listItemsOfEvent, updateEventItem } from "@/lib/event-material-items-store";
 import { registar } from "@/lib/event-material-log-store";
 import type { AccaoOffline } from "@/lib/material-offline";
+import { isConflictError } from "@/lib/repository";
+import { respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -48,6 +50,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     let aplicadas = 0;
     let ignoradas = 0;
+    // Marcações que perderam uma corrida de escrita (não uma corrida de
+    // relógios, que é a `ignoradas`). Contam-se à parte porque significam outra
+    // coisa: alguém marcou a MESMA linha no mesmo instante a partir de outro
+    // telemóvel. Ver o tratamento por marcação, mais abaixo.
+    let conflitos = 0;
 
     for (const m of marcacoes) {
       const itemId = typeof m?.itemId === "string" ? m.itemId : "";
@@ -113,17 +120,48 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           patch.usedQty = Number(m?.valor) || 0;
           break;
       }
-      await updateEventItem(item.id, patch);
-      aplicadas++;
+      // ── A colisão trata-se AQUI, por marcação, e nunca deita o lote fora ──
+      //
+      // O bloqueio optimista (ver o `touch` em event-material-items-store) pode
+      // recusar esta escrita: duas pessoas a marcar a mesma linha ao mesmo
+      // tempo enquanto carregam a carrinha é o caso normal desta tabela, não a
+      // excepção. Se o erro subisse até ao `catch` de topo, uma linha
+      // disputada devolvia 500 e levava atrás as outras trinta e nove
+      // marcações de quem esteve duas horas sem rede — precisamente o que esta
+      // rota existe para não deixar acontecer.
+      //
+      // Nada se perde ao contar em vez de atirar: o `registar` acima já gravou
+      // esta marcação no registo do evento ANTES da escrita, com quem a fez e a
+      // que horas. Perde-se a aplicação, nunca o facto — e ele fica
+      // recuperável à mão a partir do registo.
+      try {
+        await updateEventItem(item.id, patch);
+        aplicadas++;
+      } catch (err) {
+        if (!isConflictError(err)) throw err;
+        conflitos++;
+        log.warn("material marcar: marcação em conflito com outra pessoa na mesma linha", {
+          eventId: evento.id,
+          itemId,
+          accao,
+          actor,
+        });
+      }
     }
 
     return NextResponse.json({
       ok: true,
       aplicadas,
       ignoradas,
+      conflitos,
       itens: await listItemsOfEvent(evento.id),
     });
   } catch (err) {
+    // Ver `respostaDeMigracaoEmFalta`: a checklist compara sobre `updated_at` e
+    // quem está no armazém a marcar material merece saber que falta correr o
+    // ficheiro, não "Erro interno" a meio de um carregamento.
+    const migracao = respostaDeMigracaoEmFalta(err, "As marcações de material");
+    if (migracao) return migracao;
     log.error("material marcar falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }

@@ -3,6 +3,7 @@ import type { Task } from "@/lib/orcamento/types";
 import { isAuthed } from "@/lib/admin-auth";
 import { updateTask, deleteTask } from "@/lib/tasks-store";
 import { taskUpdateSchema, firstError } from "@/lib/validation";
+import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -42,6 +43,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!updated) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     return NextResponse.json(updated);
   } catch (err) {
+    // Duas pessoas na mesma tarefa (uma risca-a no telemóvel, outra muda-lhe o
+    // responsável) — ver o `touch` em tasks-store.
+    const conflito = respostaDeConflito(err);
+    if (conflito) return conflito;
+    const migracao = respostaDeMigracaoEmFalta(err, "As tarefas");
+    if (migracao) return migracao;
     log.error("tarefas PATCH falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }

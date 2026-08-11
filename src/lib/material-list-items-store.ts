@@ -47,6 +47,17 @@ export const mapper: Mapper<MaterialListItem> = {
   }),
   order: { column: "position", ascending: true },
   fileCompare: (a, b) => a.position - b.position,
+  /**
+   * Compare-and-set sobre o `updated_at`.
+   *
+   * Reordenar uma lista é o caso mau: arrastar uma linha grava `position` em
+   * várias linhas de seguida, e enquanto isso outra pessoa corrige a
+   * quantidade de uma delas. Os dois patches são pequenos e não se cruzam, mas
+   * o que chega em segundo reescreve a linha inteira com o resto como ela
+   * estava na leitura dele — a quantidade corrigida volta atrás, ou a lista
+   * fica ordenada por metade. Nenhum dos dois vê nada acontecer.
+   */
+  touch: true,
 };
 
 const repo = createRepository(mapper);

@@ -89,13 +89,68 @@ export interface Backend<T> {
   remove(id: string): Promise<void>;
 }
 
-/** A concurrent write happened between read and write; the caller should re-read and retry. */
-export class ConflictError extends Error {
-  constructor(id: string) {
+/**
+ * Houve uma escrita concorrente entre a leitura e a escrita: quem chama tem de
+ * reler e voltar a tentar. O `updateWith` faz isso sozinho três vezes; se ainda
+ * assim não resolver, este erro sai para fora — e é aí que ele tem de trazer
+ * matéria com que se fale a uma pessoa.
+ *
+ * ── PORQUE É QUE O ERRO TRANSPORTA AS DUAS VERSÕES ────────────────────────
+ * Uma colisão não pode acabar em silêncio (o último a gravar apaga o outro) nem
+ * em erro cru ("Erro interno", que é o mesmo que silêncio com barulho). Quem
+ * gravou tem direito a ver o que o servidor tem AGORA (`current`) ao lado do que
+ * ela estava a gravar (`attempted`) e a escolher — que é exactamente o que a
+ * rota da Visão Geral já faz com o `StaleWriteError` (409 com a versão do
+ * servidor no corpo, ver `src/app/api/visao-geral/route.ts`).
+ *
+ * O `attempted` é a parte que não se pode cortar: sem ele, a resposta de erro é
+ * o sítio onde o trabalho da pessoa desaparece. Com ele, o que ela escreveu
+ * continua recuperável mesmo tendo a gravação sido recusada.
+ */
+export class ConflictError<T = Record<string, unknown>> extends Error {
+  /** A linha em causa. */
+  readonly id: string;
+  /** A tabela, quando quem lançou o erro a conhece — para o registo dizer onde. */
+  readonly table?: string;
+  /** O que o servidor tem agora. É a versão a mostrar ao lado da da pessoa. */
+  readonly current?: T;
+  /** O que esta escrita queria gravar. Não pode perder-se com a recusa. */
+  readonly attempted?: T;
+
+  constructor(id: string, detalhes?: { table?: string; current?: T; attempted?: T }) {
     super(`Concurrent update on "${id}" — stale read`);
     this.name = "ConflictError";
+    this.id = id;
+    this.table = detalhes?.table;
+    this.current = detalhes?.current;
+    this.attempted = detalhes?.attempted;
   }
 }
+
+/**
+ * O `instanceof` sozinho não chega. Em Next o mesmo módulo pode ser carregado
+ * mais do que uma vez (bundles diferentes para rotas, testes que reimportam), e
+ * aí `err instanceof ConflictError` dá falso para um erro que É um
+ * ConflictError — a colisão voltava a sair como 500 "Erro interno" numa rota e
+ * como 409 noutra, consoante o bundle. Reconhecer também pelo `name` é a mesma
+ * defesa que `isMissingTable` e `isUniqueViolation` já fazem por código.
+ */
+export function isConflictError(err: unknown): err is ConflictError {
+  return (
+    err instanceof ConflictError ||
+    (!!err && typeof err === "object" && (err as { name?: unknown }).name === "ConflictError")
+  );
+}
+
+/**
+ * A frase a mostrar quando a repetição não resolveu. Escrita para a pessoa que
+ * está a olhar para o ecrã, não para quem lê registos: diz o que aconteceu, diz
+ * que o texto dela NÃO ficou gravado (o pior seria deixá-la supor que ficou) e
+ * diz o que fazer a seguir.
+ */
+export const MENSAGEM_DE_CONFLITO =
+  "Isto foi alterado por outra pessoa entretanto. O que escreveu NÃO foi gravado — " +
+  "veja a versão que está agora no servidor e volte a aplicar a sua alteração.";
 
 /**
  * A tabela — ou uma COLUNA dela — ainda não existe na base de dados, quase
@@ -251,7 +306,7 @@ export class SupabaseBackend<T> implements Backend<T> {
       const guarded = stamp === null ? base.is("updated_at", null) : base.eq("updated_at", stamp);
       const { data, error } = await guarded.select("id");
       if (error) throw error;
-      if (!data?.length) throw new ConflictError(id);
+      if (!data?.length) throw new ConflictError<T>(id, { table: this.m.table, attempted: merged });
       return;
     }
 
@@ -376,7 +431,11 @@ export class FileBackend<T> implements Backend<T> {
       // meio e o `updateWith` tem de reler e voltar a aplicar a alteração —
       // sobrepor aqui apagaria o trabalho dessa pessoa sem ninguém dar por isso.
       if (expected !== undefined && JSON.stringify(all[idx]) !== expected) {
-        throw new ConflictError(id);
+        throw new ConflictError<T>(id, {
+          table: this.m.table,
+          current: all[idx],
+          attempted: merged,
+        });
       }
       all[idx] = merged;
       await this.write(all);
@@ -441,7 +500,31 @@ export class Repository<T> {
         await backend.persist(id, merged, current);
         return merged;
       } catch (err) {
-        if (!(err instanceof ConflictError) || attempt >= MAX_ATTEMPTS) throw err;
+        if (!isConflictError(err)) throw err;
+        if (attempt >= MAX_ATTEMPTS) {
+          // Três voltas e o registo continua a mudar debaixo dos pés. Isto já
+          // não é uma corrida entre dois cliques — é gente a trabalhar sobre a
+          // mesma linha ao mesmo tempo, e a resposta certa é dizê-lo, não
+          // insistir até uma das versões vencer por sorte.
+          //
+          // Relemos de propósito antes de desistir: o `current` desta volta já
+          // é velho (foi por isso que a escrita falhou), e quem vai mostrar as
+          // duas versões lado a lado precisa da do servidor, não de uma
+          // terceira. Se a releitura falhar, vale a que temos — nunca ficamos
+          // sem `current`.
+          const doServidor = await backend.get(id).catch(() => null);
+          throw new ConflictError<T>(id, {
+            table: this.mapper.table,
+            current: doServidor ?? current,
+            attempted: merged,
+          });
+        }
+        // Uma pausa curta e desigual entre tentativas. Sem ela as três voltas
+        // acontecem no mesmo instante e disputam a mesma janela: quem perdeu a
+        // primeira perde as três, e o conflito sobe sem ter havido repetição
+        // nenhuma na prática. O acaso separa duas escritas que arrancaram
+        // juntas (dois separadores, dois telemóveis na mesma checklist).
+        await new Promise((r) => setTimeout(r, attempt * 5 + Math.random() * 10));
       }
     }
   }

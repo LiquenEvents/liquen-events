@@ -74,6 +74,22 @@ export const mapper: Mapper<Proposal> = {
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+  /**
+   * Compare-and-set sobre o `updated_at` (ver `SupabaseBackend.persist`).
+   *
+   * A coluna já existia em `db/schema.sql` desde o primeiro dia e nunca foi
+   * escrita nem lida — a protecção estava montada e desligada. O que corria sem
+   * ela: a proposta é o documento que seguiu para o casal, e há pelo menos três
+   * caminhos a escrevê-la ao mesmo tempo — o Estúdio a gravar o `doc`, a rota
+   * `/api/propostas/[id]` a mudar o estado ou a pôr um motivo de perda, e o
+   * portal do cliente a registar o aceite (`/api/proposta`). Cada um manda um
+   * patch pequeno, mas o `update` reescreve a LINHA INTEIRA a partir da leitura
+   * que fez: quem tivesse aberto a proposta antes do aceite repunha o estado em
+   * «enviada» ao gravar uma nota, e o aceite do casal desaparecia sem erro
+   * nenhum. Agora essa escrita é recusada, o `updateWith` relê e volta a
+   * aplicar o patch por cima do aceite — sobrevivem os dois.
+   */
+  touch: true,
 };
 
 const repo = createRepository(mapper);

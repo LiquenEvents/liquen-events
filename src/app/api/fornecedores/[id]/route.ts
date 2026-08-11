@@ -3,6 +3,7 @@ import type { Supplier } from "@/lib/orcamento/types";
 import { isAuthed } from "@/lib/admin-auth";
 import { updateSupplier, deleteSupplier } from "@/lib/suppliers-store";
 import { supplierUpdateSchema, firstError } from "@/lib/validation";
+import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -36,6 +37,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!updated) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     return NextResponse.json(updated);
   } catch (err) {
+    // Duas correcções à mesma ficha (o telefone novo e uma nota) — ver o
+    // `touch` em suppliers-store.
+    const conflito = respostaDeConflito(err);
+    if (conflito) return conflito;
+    const migracao = respostaDeMigracaoEmFalta(err, "Os fornecedores");
+    if (migracao) return migracao;
     log.error("fornecedores PATCH falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }

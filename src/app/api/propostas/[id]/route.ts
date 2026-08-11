@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { deleteProposal, updateProposal } from "@/lib/proposals-store";
+import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -58,6 +59,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!updated) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     return NextResponse.json(updated);
   } catch (err) {
+    // A proposta é o documento que seguiu para o casal e tem vários donos ao
+    // mesmo tempo: o Estúdio a gravar, esta rota a mudar o estado, o portal do
+    // cliente a registar o aceite. Quando as releituras não resolvem, quem
+    // gravou tem de ver o que o servidor tem — não "Erro interno".
+    const conflito = respostaDeConflito(err);
+    if (conflito) return conflito;
+    const migracao = respostaDeMigracaoEmFalta(err, "As propostas");
+    if (migracao) return migracao;
     log.error("propostas PATCH falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }

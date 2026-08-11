@@ -401,3 +401,47 @@ describe("POST /api/faturas — o estado do pedido segue a emissão", () => {
     expect(updateQuoteWith).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANDO A NUMERAÇÃO NÃO ESTÁ DISPONÍVEL, ISSO TEM DE SE PERCEBER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * `nextInvoiceNumber` recusa emitir em dois casos, ambos fiscais: com Supabase
+ * configurado e a RPC atómica em baixo (migração por correr), e em produção sem
+ * Supabase nenhum (o contador viveria num ficheiro que o deploy apaga e a
+ * numeração recomeçaria em 0001, repetindo números já emitidos).
+ *
+ * A recusa estava a sair daqui como «Erro ao criar a fatura», 500. Isso é o
+ * pior dos dois mundos: impede-se a emissão — que é a decisão certa — e não se
+ * diz porquê, portanto ela tenta outra vez, e outra, e acaba a escrever a
+ * alguém. A recusa só vale se trouxer o que fazer a seguir.
+ */
+describe("POST /api/faturas — a numeração fiscal indisponível é uma resposta, não um erro", () => {
+  it("responde 503 com a frase que diz o que falta", async () => {
+    vi.mocked(nextInvoiceNumber).mockRejectedValueOnce(
+      new Error(
+        "Numeração de faturas indisponível: sem base de dados, o contador não sobrevive a um deploy e a numeração fiscal repetir-se-ia. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no alojamento antes de emitir.",
+      ),
+    );
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/Numeração de faturas indisponível/);
+  });
+
+  it("e não cria factura nenhuma", async () => {
+    vi.mocked(nextInvoiceNumber).mockRejectedValueOnce(
+      new Error("Numeração de faturas indisponível: o contador atómico falhou."),
+    );
+    await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  /** Qualquer outra avaria continua a ser um 500 genérico: não se põe o texto
+   *  interno de um erro desconhecido à frente de quem está a trabalhar. */
+  it("uma avaria qualquer continua a ser 500", async () => {
+    vi.mocked(nextInvoiceNumber).mockRejectedValueOnce(new Error("ligação perdida"));
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(res.status).toBe(500);
+  });
+});

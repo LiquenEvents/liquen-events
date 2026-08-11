@@ -260,6 +260,30 @@ export async function POST(request: NextRequest) {
     await registarAcontecimento(quoteId, "fatura_emitida", invoice.number);
     return NextResponse.json({ invoices: [invoice] }, { status: 201 });
   } catch (err) {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * A NUMERAÇÃO INDISPONÍVEL É UMA RESPOSTA, NÃO UM «ERRO INTERNO»
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * `nextInvoiceNumber` RECUSA emitir em dois casos, ambos fiscais: com o
+     * Supabase configurado e o contador atómico em baixo (a migração
+     * `db/schema.sql` por correr), e em produção sem Supabase nenhum (aí o
+     * contador de recurso vive num ficheiro que o deploy apaga — a numeração
+     * recomeçaria em FT AAAA/0001 e repetiria números já emitidos).
+     *
+     * Recusar é a decisão certa. Sair daqui como «Erro ao criar a fatura» é que
+     * não: ela tenta outra vez, e outra, e acaba a escrever a alguém — a única
+     * coisa que esse 500 não faz é levá-la ao que falta. A mensagem que vem de
+     * lá já é escrita para ser lida por quem gere a instalação, e nomeia o
+     * ficheiro a correr ou as variáveis a definir.
+     *
+     * 503 e não 500: não está avariado, está indisponível — e volta a estar
+     * disponível assim que a instalação estiver completa.
+     */
+    if (err instanceof Error && err.message.startsWith("Numeração de faturas indisponível")) {
+      log.error("faturas POST: emissão recusada por numeração indisponível", err);
+      return NextResponse.json({ error: err.message }, { status: 503 });
+    }
     log.error("faturas POST falhou", err);
     return NextResponse.json({ error: "Erro ao criar a fatura" }, { status: 500 });
   }

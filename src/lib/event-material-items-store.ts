@@ -71,6 +71,19 @@ export const mapper: Mapper<EventMaterialItem> = {
   },
   order: { column: "category", ascending: true },
   fileCompare: (a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name),
+  /**
+   * Compare-and-set sobre o `updated_at`.
+   *
+   * Esta é a tabela com mais escritas simultâneas de todo o sistema, e a única
+   * que é editada por várias pessoas ao mesmo tempo POR DESENHO: a checklist de
+   * carga de um evento, com duas ou três pessoas a marcar no telemóvel enquanto
+   * carregam a carrinha. Um marca «carregado», outro marca «em falta» na mesma
+   * linha um segundo depois — e sem comparação o segundo repõe `loaded_at` e
+   * `loaded_by` a nulo, porque a leitura dele é anterior. O material aparece
+   * por carregar depois de ter sido carregado; alguém volta atrás para o
+   * procurar e não o encontra, porque já está na carrinha.
+   */
+  touch: true,
 };
 
 const repo = createRepository(mapper);

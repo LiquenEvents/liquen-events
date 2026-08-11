@@ -34,6 +34,22 @@ export const mapper: Mapper<Etiqueta> = {
   }),
   order: { column: "ordem", ascending: true },
   fileCompare: (a, b) => a.eixo.localeCompare(b.eixo) || a.ordem - b.ordem,
+  /**
+   * Compare-and-set sobre o `updated_at`.
+   *
+   * O `updateEtiqueta` recebe patches parciais e disjuntos — ora `{nome}`
+   * (corrigir «Terracota» para «Terracotta»), ora `{ordem}` (arrumar a lista) —
+   * que é exactamente a forma em que uma escrita cega apaga a outra: quem
+   * reordena a partir de um ecrã aberto antes da correcção devolve o nome
+   * errado ao vocabulário, e ele fica visível em todas as fotos que têm a
+   * etiqueta, porque o `id` é estável e não muda com o rótulo.
+   *
+   * Ainda não há rota a chamá-lo (o vocabulário edita-se por criação e
+   * remoção), e é meia razão para ligar isto agora: quem lhe der um ecrã não
+   * vai lembrar-se de fazer também a migração da coluna, e sem ela a protecção
+   * não existe — ou, pior, ligada só de um lado, faz falhar todas as escritas.
+   */
+  touch: true,
 };
 
 const repo = createRepository(mapper);

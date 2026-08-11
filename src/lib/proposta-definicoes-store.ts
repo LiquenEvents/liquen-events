@@ -63,6 +63,18 @@ export const mapper: Mapper<Definicao> = {
   }),
   order: { column: "id", ascending: true },
   fileCompare: (a, b) => a.id.localeCompare(b.id),
+  /**
+   * SEM `touch`, coerente com a decisão explicada no cabeçalho («última escrita
+   * ganha»), e por uma razão mecânica além dessa: o `gravarDefinicao` escreve a
+   * LINHA INTEIRA — constrói uma `Definicao` nova com o `valor` completo do
+   * formulário. O compare-and-set do Repository só evita perdas quando a
+   * escrita é um patch parcial sobre uma leitura velha; num substituto
+   * completo, a repetição do `updateWith` reaplicaria a mesma substituição e o
+   * estado final seria idêntico. Seria maquinaria a girar sem mover nada.
+   *
+   * (E as duas definições vivem em LINHAS separadas — `deslocacao` e `margem` —
+   * por isso mudar uma nunca pisa a outra.)
+   */
 };
 
 const repo = createRepository(mapper);

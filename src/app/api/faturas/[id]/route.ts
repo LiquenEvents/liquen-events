@@ -17,6 +17,7 @@ import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { log } from "@/lib/logger";
 import { invoiceUpdateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
+import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 
 export const runtime = "nodejs";
 
@@ -272,6 +273,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (saldoAnnulled) return NextResponse.json({ ...updated, saldoAnnulled });
     return NextResponse.json(updated);
   } catch (err) {
+    // Colisão: outra pessoa gravou esta fatura entre a nossa leitura e a nossa
+    // escrita, e as três releituras do `updateWith` não chegaram. Um 500 aqui
+    // seria o pior desfecho possível — ela concluiria que falhou, gravava outra
+    // vez e à segunda passava por cima do que a colega escreveu. 409 com as
+    // duas versões: o livro fiscal não perde uma escrita nem por descuido.
+    const conflito = respostaDeConflito(err);
+    if (conflito) return conflito;
+    // A comparação apoia-se na coluna `updated_at` das faturas. Sem o
+    // `db/schema.sql` corrido ela não existe e TODAS as edições falhariam com
+    // "Erro interno" — que num livro fiscal é a mensagem mais assustadora
+    // possível para uma instalação a que só falta um minuto de SQL.
+    const migracao = respostaDeMigracaoEmFalta(err, "As faturas");
+    if (migracao) return migracao;
     log.error("faturas PATCH falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }

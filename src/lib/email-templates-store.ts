@@ -40,6 +40,28 @@ export const mapper: Mapper<EmailTemplate> = {
   }),
   order: { column: "id", ascending: true },
   fileCompare: (a, b) => a.key.localeCompare(b.key),
+  /**
+   * SEM `touch`, e isto merece explicação porque a tabela É do tipo que se
+   * perde: o corpo de um modelo é texto escrito por uma pessoa, exactamente a
+   * classe de trabalho que o bloqueio optimista existe para salvar.
+   *
+   * A razão é que aqui ele não salvava nada. O compare-and-set do Repository só
+   * evita perdas quando a escrita é um PATCH PARCIAL fundido sobre uma leitura
+   * velha — é aí que a repetição do `updateWith` relê e volta a aplicar o
+   * patch por cima do que a outra pessoa gravou. O `upsertTemplate` escreve a
+   * LINHA INTEIRA (`name`, `subject`, `body`, todos vindos do formulário), por
+   * isso a repetição reaplicaria a substituição completa e o resultado final
+   * seria byte a byte o mesmo: o último a gravar continua a ganhar. Ligar a
+   * comparação daria uma ida-e-volta a mais e a sensação de estar protegido.
+   *
+   * O que resolve isto de verdade é o desenho que a Visão Geral já usa (ver
+   * `overview-settings-store` + `src/app/api/visao-geral/route.ts`): quem grava
+   * DIZ sobre que versão escreveu, e se já não for a actual a escrita é
+   * recusada com 409 e a versão do servidor no corpo, para o ecrã mostrar as
+   * duas. Isso precisa de um `baseUpdatedAt` vindo do cliente — meia dúzia de
+   * linhas aqui, na rota, e no editor. A coluna `updated_at` desta tabela já
+   * existe e já é escrita, portanto a base para isso está pronta.
+   */
 };
 
 const repo = createRepository(mapper);

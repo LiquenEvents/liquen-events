@@ -12,6 +12,7 @@ import { renderInvoicePdf } from "@/lib/invoice-pdf";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
 import { isAuthed } from "@/lib/admin-auth";
+import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
 import { eur } from "@/lib/money";
 import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
@@ -242,6 +243,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       pdfBase64: pdfBuffer.toString("base64"),
     });
   } catch (err) {
+    // Colisão ao reaproveitar um documento já emitido (marcá-lo `paga`, anexar
+    // o marcador do pagamento) enquanto alguém o editava em /faturas. Um 500
+    // aqui dizia "Erro ao gerar o recibo" com o livro por saber se mexeu — e ela
+    // reemitia. 409 com as duas versões: o número não se gasta, nada se duplica.
+    const conflito = respostaDeConflito(err);
+    if (conflito) return conflito;
+    const migracao = respostaDeMigracaoEmFalta(err, "As faturas");
+    if (migracao) return migracao;
     log.error("fatura POST falhou", err);
     return NextResponse.json({ error: "Erro ao gerar o recibo" }, { status: 500 });
   }

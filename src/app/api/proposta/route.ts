@@ -20,6 +20,7 @@ import { checklistTemplate } from "@/lib/checklist-templates";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
+import { isConflictError } from "@/lib/repository";
 import { log } from "@/lib/logger";
 import { eur, splitSinal } from "@/lib/money";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
@@ -181,7 +182,43 @@ export async function POST(request: NextRequest) {
 
     const newStatus = accepted ? "aceite" : "rejeitada";
     const respondedAt = new Date().toISOString();
-    await updateProposal(proposal.id, { status: newStatus, respondedAt });
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * A RESPOSTA DO CASAL NÃO PODE APANHAR UM «ERRO INTERNO»
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Esta escrita passou a ter bloqueio optimista (ver o `touch` em
+     * proposals-store) — que é o que impede a equipa, a mexer na proposta no
+     * back office nesse mesmo minuto, de apagar o aceite que acabou de entrar.
+     * A troco disso, a escrita pode ser RECUSADA se a linha continuar a mudar
+     * durante as três releituras.
+     *
+     * Do outro lado desta rota não está a equipa: está um casal numa página
+     * pública a carregar em «Aceitar». Um 500 aqui diz-lhes que o aceite falhou
+     * quando ninguém sabe se falhou, e a frase da equipa («foi alterado por
+     * outra pessoa») não lhes diz nada. Por isso: nada é criado — nem contrato,
+     * nem sinal, porque isto acontece ANTES dos dois — e o que sai é um 409 com
+     * uma frase que eles percebem e uma acção que resolve, carregar outra vez.
+     *
+     * Vale a pena que seja raro, e é: exige que alguém esteja a gravar a mesma
+     * proposta ao mesmo tempo, três vezes seguidas.
+     */
+    try {
+      await updateProposal(proposal.id, { status: newStatus, respondedAt });
+    } catch (err) {
+      if (!isConflictError(err)) throw err;
+      log.warn("proposta: resposta do cliente em conflito com uma gravação da equipa", {
+        id: proposal.id,
+      });
+      return NextResponse.json(
+        {
+          error:
+            "Estamos a actualizar esta proposta neste preciso momento. " +
+            "A sua resposta ainda NÃO ficou registada — carregue outra vez daqui a instantes.",
+        },
+        { status: 409 },
+      );
+    }
     // Advance the linked quote in the pipeline, recording the client's
     // decision in its activity log (the team's audit trail).
     try {
