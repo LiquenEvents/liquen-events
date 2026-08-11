@@ -168,12 +168,24 @@ function areaDoMoodboard(alturaAnotacao: number) {
 /** O respiro entre fotos. Uniforme de propósito: o que varia são as FORMAS. */
 const RESPIRO = 8;
 
-/** Aspecto utilizável: sem informação, assume-se 3:2 deitado, que é o formato
- *  mais comum numa máquina fotográfica. Um valor absurdo é ignorado — uma foto
- *  não pode ser mil vezes mais larga do que alta, e deixar passar isso fazia a
- *  fila inteira encolher para uma tira. */
+/**
+ * O aspecto de uma foto que não se conseguiu medir: 3:2 deitado, o formato mais
+ * comum numa máquina fotográfica.
+ *
+ * Vive aqui, exportado, porque quem não consegue medir são DOIS: o gerador do
+ * PDF, quando o ficheiro não abre, e o estúdio, quando a miniatura ainda não
+ * carregou (é `loading="lazy"`, e uma célula fora do ecrã não tem medidas). Se
+ * cada um escolhesse o seu, o diagrama que ela vê e a página que sai partiam de
+ * pressupostos diferentes — que é precisamente o defeito que este módulo existe
+ * para não haver.
+ */
+export const ASPETO_POR_OMISSAO = 1.5;
+
+/** Aspecto utilizável: sem informação, assume-se {@link ASPETO_POR_OMISSAO}. Um
+ *  valor absurdo é ignorado — uma foto não pode ser mil vezes mais larga do que
+ *  alta, e deixar passar isso fazia a fila inteira encolher para uma tira. */
 function aspetoSeguro(a: number | undefined): number {
-  if (typeof a !== "number" || !Number.isFinite(a) || a <= 0) return 1.5;
+  if (typeof a !== "number" || !Number.isFinite(a) || a <= 0) return ASPETO_POR_OMISSAO;
   return Math.min(4, Math.max(0.35, a));
 }
 

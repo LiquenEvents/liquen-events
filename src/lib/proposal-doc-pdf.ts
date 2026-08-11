@@ -42,6 +42,7 @@ import {
 import { opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { winAnsiSafe } from "@/lib/pdf-text";
 import {
+  ASPETO_POR_OMISSAO,
   caixasDoMoodboard,
   layoutSugerido,
   caixasDaCapa,
@@ -1637,8 +1638,10 @@ async function drawCollage(
    * recortada ao mesmo rectângulo das outras, e é a diferença entre uma página
    * de inspiração e uma folha de contactos. Ver `proposal-geometria.ts`.
    *
-   * Uma foto que não se consiga medir entra com 3:2, o formato mais comum de
-   * uma máquina fotográfica: perde-se a forma dela e não se perde a foto.
+   * Uma foto que não se consiga medir entra com {@link ASPETO_POR_OMISSAO}, o
+   * formato mais comum de uma máquina fotográfica: perde-se a forma dela e não
+   * se perde a foto. É a MESMA omissão que o estúdio usa quando ainda não
+   * mediu a miniatura, para o diagrama e a página partirem do mesmo sítio.
    *
    * O layout GUARDADO no documento manda sempre. Só quando não há nenhum é que
    * se usa o que o número de fotos sugere — uma sugestão que mudasse com o
@@ -1648,9 +1651,9 @@ async function drawCollage(
     imgs.map(async (b64) => {
       try {
         const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
-        return (await aspetoDaImagem(Buffer.from(raw, "base64"))) ?? 1.5;
+        return (await aspetoDaImagem(Buffer.from(raw, "base64"))) ?? ASPETO_POR_OMISSAO;
       } catch {
-        return 1.5;
+        return ASPETO_POR_OMISSAO;
       }
     }),
   );

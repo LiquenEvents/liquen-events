@@ -45,8 +45,19 @@ import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposa
 import { depositPercentOf } from "@/lib/proposal-doc";
 // A geometria do documento, para a pré-visualização mostrar a forma que cada
 // foto vai MESMO ter. Módulo próprio, sem `server-only`, exactamente para poder
-// ser lido aqui — ver `proposal-geometria`.
-import { aspetoDaCapa, aspetoDoCollage } from "@/lib/proposal-geometria";
+// ser lido aqui — ver `proposal-geometria`. Os diagramas do selector de
+// disposição saem das MESMAS caixas que o PDF desenha (`caixasDoMoodboard`):
+// um segundo desenho, aproximado, mentia no dia em que divergisse.
+import {
+  ASPETO_POR_OMISSAO,
+  aspetoDaCaixa,
+  aspetoDaCapa,
+  caixasDoMoodboard,
+  layoutSugerido,
+  PAGINA_H,
+  PAGINA_W,
+  type LayoutDeMoodboard,
+} from "@/lib/proposal-geometria";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { CampoAMudar } from "@/lib/proposal-copy";
 import {
@@ -576,6 +587,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // não vai para o PDF, e um rascunho antigo — que não o tem — abre na mesma,
   // apenas sem as marcas.
   const [themeOrigins, setThemeOrigins] = useState<Record<string, string>>({});
+  /**
+   * ── A FORMA DE CADA FOTO, MEDIDA NA CÉLULA QUE JÁ A MOSTRA ────────────────
+   *
+   * Os diagramas do selector de disposição precisam do aspecto (largura ÷
+   * altura) de cada fotografia: é isso que faz uma vertical sair vertical e é
+   * disso que `caixasDoMoodboard` vive. A informação já está no browser — a
+   * miniatura da grelha do estúdio está descodificada e sabe o seu
+   * `naturalWidth`/`naturalHeight` —, por isso mede-se ALI, no `onLoad` da
+   * célula (ver `Thumb`), e não se pede nada de novo ao servidor. Um pedido por
+   * foto só para saber a forma seria pagar outra vez o que já foi pago, e na
+   * ligação por onde ela está a trabalhar.
+   *
+   * Chave: o caminho no documento — a mesma foto usada em dois mood boards é
+   * medida uma vez só. Não vai para o rascunho: é uma medida do ficheiro, não
+   * uma decisão dela, e volta sozinha quando a célula carregar outra vez.
+   *
+   * O que fica de fora fica com {@link ASPETO_POR_OMISSAO}: as células são
+   * `loading="lazy"` e uma que nunca chegou ao ecrã não tem medidas.
+   */
+  const [aspetosDasFotos, setAspetosDasFotos] = useState<Record<string, number>>({});
+  /** Regista a medida de uma foto. Estável (o `Thumb` guarda-a numa `ref`) e
+   *  silencioso quando o valor não mudou, para medir não redesenhar a secção. */
+  const registarAspeto = useCallback((ref: string, aspeto: number) => {
+    setAspetosDasFotos((m) => (m[ref] === aspeto ? m : { ...m, [ref]: aspeto }));
+  }, []);
   const [refEdited, setRefEdited] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<null | "preview" | "send">(null);
@@ -2527,105 +2563,147 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 grupos de imagens de inspiração para o cliente
               </p>
               <div className="flex flex-col gap-3">
-                {doc.moodBoards.map((b, bi) => (
-                  <div
-                    key={bi}
-                    className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-                  >
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <input
-                        className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                        value={b.title}
-                        onChange={(e) => updateBoard(bi, { title: e.target.value })}
-                        placeholder="Decoração Cerimónia"
-                        aria-label="Título do mood board"
-                      />
-                      <MoveBtns
-                        onUp={() => moveBoard(bi, -1)}
-                        onDown={() => moveBoard(bi, 1)}
-                        disUp={bi === 0}
-                        disDown={bi === doc.moodBoards.length - 1}
-                      />
-                      <button
-                        type="button"
-                        className={REMOVE_BTN}
-                        onClick={() => removeBoard(bi)}
-                        aria-label="Remover mood board"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <textarea
-                      className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
-                      rows={2}
-                      value={b.annotation ?? ""}
-                      onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
-                      placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
-                      aria-label="Descrição do mood board"
-                    />
-                    {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
-                      fotos. As que passam disso ficam marcadas — e ditas por
-                      extenso a seguir — em vez de desaparecerem caladas no PDF. */}
-                    {b.images.length > MOOD_BOARD_MAX_IMAGES && (
-                      <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
-                        A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES} fotos:{" "}
-                        {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
-                          ? "a última, marcada «fora do PDF», não é impressa"
-                          : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
-                        . Remova fotos ou crie outro mood board.
-                      </p>
-                    )}
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {b.images.map((path, ii) => (
-                        <Thumb
-                          // A chave é a POSIÇÃO, não o caminho: quando o
-                          // marcador provisório dá lugar ao caminho definitivo,
-                          // uma chave com o caminho faria o React desmontar a
-                          // célula e a foto piscava a meio da troca.
-                          key={ii}
-                          url={assetUrls[path]}
-                          planoB={assetOriginais[path]}
-                          onde="mood-board"
-                          refDoc={path}
-                          onRemove={() => removeBoardImage(bi, path)}
-                          // A forma da célula que ESTA foto vai ocupar na
-                          // página — muda com o número de fotos do board, e
-                          // nenhuma delas é quadrada. As que já não são
-                          // impressas ficam quadradas: não têm caixa nenhuma.
-                          aspeto={
-                            ii < MOOD_BOARD_MAX_IMAGES
-                              ? aspetoDoCollage(
-                                  Math.min(b.images.length, MOOD_BOARD_MAX_IMAGES),
-                                  ii,
-                                )
-                              : 1
-                          }
-                          foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
-                          pendente={isPendingImage(path)}
+                {doc.moodBoards.map((b, bi) => {
+                  /**
+                   * A FORMA DE CADA FOTO, E DAÍ AS CAIXAS DESTA PÁGINA.
+                   *
+                   * As medidas vêm das miniaturas que já estão no ecrã (ver
+                   * `aspetosDasFotos`); o que ainda não se mediu entra com a
+                   * omissão, que é a mesma do gerador. Daqui saem as duas
+                   * coisas que têm de concordar: os diagramas do selector e a
+                   * forma de cada célula da grelha. Antes a célula usava o
+                   * arranjo único e antigo, e mostrava um recorte que a página
+                   * já não fazia — a mesma fotografia, cortada noutro sítio.
+                   */
+                  const aspectos = b.images
+                    .slice(0, MOOD_BOARD_MAX_IMAGES)
+                    .map((p) => aspetosDasFotos[p] ?? ASPETO_POR_OMISSAO);
+                  const caixas = caixasDoMoodboard(
+                    b.layout ?? layoutSugerido(aspectos.length),
+                    aspectos,
+                  );
+                  return (
+                    <div
+                      key={bi}
+                      className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                    >
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <input
+                          className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                          value={b.title}
+                          onChange={(e) => updateBoard(bi, { title: e.target.value })}
+                          placeholder="Decoração Cerimónia"
+                          aria-label="Título do mood board"
                         />
-                      ))}
-                      <UploadArea
-                        label="+ Imagens"
-                        busy={!!uploading[`board-${bi}`]}
-                        multiple
-                        compact
-                        onFiles={(files) =>
-                          handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
-                        }
+                        {/* O SEGUNDO andar do cabeçalho da página.
+                            A proposta feita à mão tem «Complementos dos Noivos»
+                            e, por baixo, «Ramo de Noiva (a definir com a
+                            Noiva)»: o primeiro diz o capítulo, o segundo diz o
+                            que aquelas fotos são e o que ainda está por
+                            decidir. Sem campo, ou se perdia a segunda frase ou
+                            se enfiava tudo num título com parênteses. */}
+                        <input
+                          className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                          value={b.subtitulo ?? ""}
+                          onChange={(e) => updateBoard(bi, { subtitulo: e.target.value })}
+                          placeholder="Subtítulo (opcional) — ex.: Ramo de Noiva (a definir com a Noiva)"
+                          aria-label="Subtítulo do mood board"
+                        />
+                        <MoveBtns
+                          onUp={() => moveBoard(bi, -1)}
+                          onDown={() => moveBoard(bi, 1)}
+                          disUp={bi === 0}
+                          disDown={bi === doc.moodBoards.length - 1}
+                        />
+                        <button
+                          type="button"
+                          className={REMOVE_BTN}
+                          onClick={() => removeBoard(bi)}
+                          aria-label="Remover mood board"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <textarea
+                        className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
+                        rows={2}
+                        value={b.annotation ?? ""}
+                        onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
+                        placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
+                        aria-label="Descrição do mood board"
                       />
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-4">
-                      <button
-                        type="button"
-                        className={ADD_BTN}
-                        onClick={() => setPicker({ kind: "board", bi })}
-                        onPointerEnter={aquecerBiblioteca}
-                        onFocus={aquecerBiblioteca}
-                        onTouchStart={aquecerBiblioteca}
-                      >
-                        Escolher da biblioteca de temas
-                      </button>
-                      {/* GUARDAR ESTE, e não «o primeiro com título».
+                      {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
+                          fotos. As que passam disso ficam marcadas — e ditas por
+                          extenso a seguir — em vez de desaparecerem caladas no
+                          PDF. */}
+                      {b.images.length > MOOD_BOARD_MAX_IMAGES && (
+                        <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
+                          A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES} fotos:{" "}
+                          {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
+                            ? "a última, marcada «fora do PDF», não é impressa"
+                            : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
+                          . Remova fotos ou crie outro mood board.
+                        </p>
+                      )}
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {b.images.map((path, ii) => (
+                          <Thumb
+                            // A chave é a POSIÇÃO, não o caminho: quando o
+                            // marcador provisório dá lugar ao caminho definitivo,
+                            // uma chave com o caminho faria o React desmontar a
+                            // célula e a foto piscava a meio da troca.
+                            key={ii}
+                            url={assetUrls[path]}
+                            planoB={assetOriginais[path]}
+                            onde="mood-board"
+                            refDoc={path}
+                            onRemove={() => removeBoardImage(bi, path)}
+                            onMedida={(a) => registarAspeto(path, a)}
+                            // A forma da célula que ESTA foto vai ocupar na
+                            // página — sai da caixa que a disposição escolhida
+                            // lhe dá, e muda com ela e com o número de fotos.
+                            // Nenhuma delas é quadrada. As que já não são
+                            // impressas ficam quadradas: não têm caixa nenhuma.
+                            aspeto={aspetoDaCaixa(caixas[ii])}
+                            foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
+                            pendente={isPendingImage(path)}
+                          />
+                        ))}
+                        <UploadArea
+                          label="+ Imagens"
+                          busy={!!uploading[`board-${bi}`]}
+                          multiple
+                          compact
+                          onFiles={(files) =>
+                            handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
+                          }
+                        />
+                      </div>
+                      {/* Sem fotos não há disposição nenhuma para escolher — o
+                        selector aparece com a primeira foto, que é quando a
+                        pergunta passa a ter resposta. */}
+                      {aspectos.length > 0 && (
+                        <SelectorDeLayout
+                          valor={b.layout}
+                          aspectos={aspectos}
+                          // `undefined` APAGA o campo: um mood board sem layout
+                          // gravado continua sem ele, e uma proposta já enviada
+                          // não muda de aspecto por causa disto.
+                          onEscolher={(layout) => updateBoard(bi, { layout })}
+                        />
+                      )}
+                      <div className="mt-2 flex flex-wrap items-center gap-4">
+                        <button
+                          type="button"
+                          className={ADD_BTN}
+                          onClick={() => setPicker({ kind: "board", bi })}
+                          onPointerEnter={aquecerBiblioteca}
+                          onFocus={aquecerBiblioteca}
+                          onTouchStart={aquecerBiblioteca}
+                        >
+                          Escolher da biblioteca de temas
+                        </button>
+                        {/* GUARDAR ESTE, e não «o primeiro com título».
                           O controlo era único para a secção inteira e recebia
                           `doc.moodBoards.find(…)` — portanto guardava sempre o
                           PRIMEIRO mood board com título. Ela montava o
@@ -2634,18 +2712,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           maneira nenhuma. Agora o botão vive ao lado do bloco
                           a que se refere, que é a única forma de a pergunta
                           "qual deles?" não ter de ser respondida por adivinha. */}
-                      {(b.title ?? "").trim() && (
-                        <ModelosParciais
-                          tipo="moodboard"
-                          mostrar="guardar"
-                          toast={toast}
-                          paraGuardar={b}
-                          nomeSugerido={b.title}
-                        />
-                      )}
+                        {(b.title ?? "").trim() && (
+                          <ModelosParciais
+                            tipo="moodboard"
+                            mostrar="guardar"
+                            toast={toast}
+                            paraGuardar={b}
+                            nomeSugerido={b.title}
+                          />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-4">
                 <button type="button" className={ADD_BTN} onClick={addBoard}>
@@ -3921,12 +4000,209 @@ export function useFotoComPlanoB(url?: string, planoB?: string) {
   };
 }
 
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * ESCOLHER A DISPOSIÇÃO A VER, E NÃO A LER
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Os cinco arranjos existiam no documento e o estúdio não os deixava escolher.
+ * Uma lista de nomes resolvia metade do problema e criava outro: «mosaico» e
+ * «filas» não querem dizer nada até se ver o que dão — e o que dão depende das
+ * fotos DESTE mood board, porque a geometria respeita a forma de cada uma (uma
+ * fila de verticais fica alta, a mesma fila de panorâmicas fica baixa).
+ *
+ * Por isso cada opção é um diagrama, desenhado com `caixasDoMoodboard` e com os
+ * aspectos verdadeiros das fotos que o board tem NESTE momento. É a mesma
+ * função que o PDF chama: não há aqui geometria nenhuma, só a conversão do
+ * sistema de coordenadas do PDF (que conta de baixo) para o do SVG (que conta
+ * de cima).
+ */
+const NOME_DO_LAYOUT: Record<LayoutDeMoodboard, string> = {
+  filas: "Filas",
+  "fila-unica": "Fila única",
+  mosaico: "Mosaico",
+  destaque: "Destaque",
+  "texto-e-imagem": "Texto e imagem",
+};
+
+/** Pela ordem em que aparecem no selector — do mais usado ao mais especial. */
+const LAYOUTS: LayoutDeMoodboard[] = [
+  "filas",
+  "fila-unica",
+  "mosaico",
+  "destaque",
+  "texto-e-imagem",
+];
+
+/**
+ * As caixas de um layout, desenhadas à escala da página.
+ *
+ * `caixasDoMoodboard` fica com a altura de anotação por omissão — a mesma que o
+ * resolvedor usa quando ainda não tem fontes para medir o texto. A diferença
+ * são uns pontos na base da mancha: invisível num diagrama de 90 px, e é o lado
+ * certo para onde errar (as caixas saem por excesso, nunca por defeito).
+ */
+function DiagramaDeLayout({ layout, aspectos }: { layout: LayoutDeMoodboard; aspectos: number[] }) {
+  const caixas = caixasDoMoodboard(layout, aspectos);
+  return (
+    <svg
+      viewBox={`0 0 ${PAGINA_W} ${PAGINA_H}`}
+      className="block h-auto w-full"
+      // O diagrama é o mesmo que o rótulo diz por palavras; para quem ouve o
+      // ecrã, repeti-lo em caixinhas não acrescenta nada.
+      aria-hidden="true"
+      focusable="false"
+    >
+      {/* O «texto e imagem» é o único arranjo que não é só fotos: a nota ocupa
+          a esquerda e a página fica meia vazia sem ela. Estes traços são
+          indicativos e nascem da PRÓPRIA caixa da foto (vão da margem até onde
+          ela começa), portanto não têm como divergir da geometria. */}
+      {layout === "texto-e-imagem" &&
+        caixas[0] &&
+        [0, 1, 2].map((i) => (
+          <line
+            key={i}
+            x1={caixas[0].x * 0.18}
+            x2={caixas[0].x * 0.82}
+            y1={PAGINA_H * 0.3 + i * 34}
+            y2={PAGINA_H * 0.3 + i * 34}
+            stroke="#2a2620"
+            strokeOpacity={0.18}
+            strokeWidth={9}
+            strokeLinecap="round"
+          />
+        ))}
+      {caixas.map((c, i) => (
+        <rect
+          key={i}
+          x={c.x}
+          // O PDF conta o `y` a partir da BASE da página; o SVG a partir do
+          // topo. É a única conta que este diagrama faz.
+          y={PAGINA_H - c.y - c.h}
+          width={c.w}
+          height={c.h}
+          rx={6}
+          fill="#4d6350"
+          fillOpacity={0.22}
+          stroke="#4d6350"
+          strokeOpacity={0.45}
+          strokeWidth={3}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * O selector de disposição de UM mood board.
+ *
+ * `valor` a `undefined` é a opção «Automático», e é uma opção a sério — não é o
+ * mesmo que escolher à mão o layout que hoje calha ser sugerido. Sem escolha, a
+ * página acompanha o número de fotos (tirar uma de cinco muda o arranjo); com
+ * escolha, fica como está para sempre, que é o que faz uma proposta reaberta
+ * meses depois voltar a sair como saiu. O rótulo diz as duas coisas ao mesmo
+ * tempo: «Automático (fila única)».
+ */
+function SelectorDeLayout({
+  valor,
+  aspectos,
+  onEscolher,
+}: {
+  valor: LayoutDeMoodboard | undefined;
+  /** A forma de cada foto que a página vai desenhar, pela ordem delas. */
+  aspectos: number[];
+  onEscolher: (layout: LayoutDeMoodboard | undefined) => void;
+}) {
+  const sugerido = layoutSugerido(aspectos.length);
+  const opcoes: (LayoutDeMoodboard | undefined)[] = [undefined, ...LAYOUTS];
+  const escolhido = opcoes.findIndex((o) => o === valor);
+
+  // Um só ponto de paragem no tabulador e as setas a andar de opção em opção —
+  // a mesma navegação do `Segmented`, que é o outro grupo de opções do estúdio.
+  function aoTeclar(e: React.KeyboardEvent<HTMLDivElement>) {
+    const passo =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (!passo || escolhido === -1) return;
+    e.preventDefault();
+    onEscolher(opcoes[(escolhido + passo + opcoes.length) % opcoes.length]);
+  }
+
+  return (
+    <div className="mt-3">
+      <p className="mb-1.5 text-[10px] tracking-[0.14em] uppercase text-foreground/35">
+        Disposição na página
+      </p>
+      <div
+        role="radiogroup"
+        aria-label="Disposição das fotos na página"
+        onKeyDown={aoTeclar}
+        className="flex flex-wrap gap-2"
+      >
+        {opcoes.map((op, i) => {
+          const activo = op === valor;
+          const rotulo = op ? NOME_DO_LAYOUT[op] : "Automático";
+          return (
+            <button
+              key={op ?? "auto"}
+              type="button"
+              role="radio"
+              aria-checked={activo}
+              tabIndex={i === (escolhido === -1 ? 0 : escolhido) ? 0 : -1}
+              onClick={() => onEscolher(op)}
+              className={`w-[5.75rem] rounded-lg border p-1.5 text-left motion-safe:transition-colors ${
+                activo
+                  ? "border-[#4d6350]/70 bg-[#4d6350]/[0.07] shadow-[0_1px_2px_rgba(42,38,32,0.08)]"
+                  : "border-foreground/[0.1] bg-white hover:border-[#4d6350]/40"
+              }`}
+            >
+              <span className="block overflow-hidden rounded-[3px] border border-foreground/[0.08] bg-white">
+                <DiagramaDeLayout layout={op ?? sugerido} aspectos={aspectos} />
+              </span>
+              {/* A escolha nunca é só cor: a opção assinalada muda de peso e de
+                  elevação, e o `aria-checked` diz o mesmo a quem ouve. */}
+              <span
+                className={`mt-1 block text-[10px] leading-tight ${
+                  activo ? "font-semibold text-foreground/85" : "text-foreground/55"
+                }`}
+              >
+                {rotulo}
+                {!op && (
+                  <span className="block text-[9px] text-foreground/40">
+                    ({NOME_DO_LAYOUT[sugerido].toLowerCase()})
+                  </span>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {/* «Texto e imagem» desenha UMA foto — as outras ficam de fora, e isso
+          tem de ser dito aqui, no instante da escolha, e não descoberto no PDF
+          já enviado. É o mesmo princípio do aviso das fotos a mais. */}
+      {(valor ?? sugerido) === "texto-e-imagem" && aspectos.length > 1 && (
+        <p className="mt-2 text-xs leading-relaxed text-[#8a2a22]">
+          «Texto e imagem» desenha só a primeira foto ao lado da descrição:{" "}
+          {aspectos.length - 1 === 1
+            ? "a outra não é impressa"
+            : `as outras ${aspectos.length - 1} não são impressas`}
+          .
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Thumb({
   url,
   planoB,
   onRemove,
   className = "",
   aspeto,
+  onMedida,
   foraDoPdf = false,
   pendente = false,
   onde = "estúdio",
@@ -3956,6 +4232,17 @@ function Thumb({
    * mantém-se o que o `className` disser.
    */
   aspeto?: number;
+  /**
+   * A FORMA REAL DESTA FOTOGRAFIA, dita assim que a célula consegue medi-la.
+   *
+   * A imagem que está aqui já foi descodificada pelo navegador — tem
+   * `naturalWidth`/`naturalHeight` e não custa mais nada perguntar. É daqui que
+   * o selector de disposição tira os aspectos com que desenha os diagramas (ver
+   * `aspetosDasFotos`), em vez de haver um pedido novo por foto só para saber a
+   * forma. Quando o URL é o da miniatura serve na mesma: a miniatura é gerada
+   * dentro de uma caixa, conservando as proporções (ver `image-prep`).
+   */
+  onMedida?: (aspeto: number) => void;
   /** Esta foto está no rascunho mas a página do PDF já não a desenha. */
   foraDoPdf?: boolean;
   /** A foto já ocupa este lugar mas a cópia ainda não confirmou. */
@@ -3993,6 +4280,25 @@ function Thumb({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [semRemedio]);
+
+  /**
+   * Mede e diz. Vive numa `ref` para o `ref={}` da imagem poder ser uma função
+   * ESTÁVEL: uma função nova a cada desenho fazia o React desligar e voltar a
+   * ligar a referência da imagem em cada tecla escrita na secção.
+   *
+   * Chamado nos dois momentos possíveis — quando a imagem acaba de carregar, e
+   * quando o elemento aparece já completo (o navegador serviu-a da cache, que é
+   * o caso normal aqui: o `useSrcSemPiscar` pré-carrega-a antes de a desenhar).
+   */
+  const medidaRef = useRef(onMedida);
+  useEffect(() => {
+    medidaRef.current = onMedida;
+  }, [onMedida]);
+  const medir = useCallback((img: HTMLImageElement | null) => {
+    if (!img?.complete) return;
+    const { naturalWidth: w, naturalHeight: h } = img;
+    if (w > 0 && h > 0) medidaRef.current?.(w / h);
+  }, []);
   return (
     <div
       // `aria-busy` e não só a opacidade: quem não vê a célula esbatida tem de
@@ -4012,6 +4318,10 @@ function Thumb({
         <img
           src={src}
           alt=""
+          // A forma desta fotografia sai desta imagem, que já cá está e já foi
+          // descodificada — ver `onMedida`.
+          ref={medir}
+          onLoad={(e) => medir(e.currentTarget)}
           // Cada célula puxa o ORIGINAL — medido, 1130 KB por foto para uma
           // caixa de 174 px (ver IMAGES-BEFORE.md). Enquanto as propostas não
           // tiverem miniaturas próprias, `lazy` é o que impede as células fora

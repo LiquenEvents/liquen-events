@@ -111,8 +111,12 @@ const quote = {
 const DRAFT_KEY = `liquen-proposal-studio-${quote.id}`;
 
 /** Um rascunho já com um mood board de `n` fotos, como se ela tivesse acabado
- *  de as carregar (o estúdio restaura o rascunho local ao abrir). */
-function seedDraft(n: number) {
+ *  de as carregar (o estúdio restaura o rascunho local ao abrir).
+ *
+ *  `extra` acrescenta campos ao mood board — é como se semeia um rascunho que já
+ *  traz uma disposição escolhida à mão (`{ layout: "mosaico" }`), que é o caso
+ *  que distingue «apagar a escolha» de «nunca ter havido escolha». */
+function seedDraft(n: number, extra: Record<string, unknown> = {}) {
   localStorage.setItem(
     DRAFT_KEY,
     JSON.stringify({
@@ -129,6 +133,7 @@ function seedDraft(n: number) {
           title: "Cerimónia",
           annotation: "",
           images: Array.from({ length: n }, (_, i) => `board/foto-${i}.jpg`),
+          ...extra,
         },
       ],
       budgetItems: [],
@@ -442,6 +447,98 @@ describe("mood board com mais fotos do que a página desenha", () => {
     await screen.findByRole("heading", { name: "Mood boards" });
     expect(screen.queryByText("fora do PDF")).toBeNull();
     expect(screen.queryByText(/A página deste mood board mostra/i)).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A DISPOSIÇÃO DAS FOTOS NA PÁGINA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Os cinco arranjos e o desenho já existiam; o que faltava era ela poder
+ * ESCOLHER. E escolher por uma lista de nomes não é escolher: «mosaico» e
+ * «filas» só querem dizer alguma coisa depois de se ver o que dão com ESTAS
+ * fotos — por isso cada opção traz o diagrama das caixas, tirado da mesma
+ * geometria que o PDF usa.
+ *
+ * O que estes testes prendem:
+ *  · escolher grava (uma proposta reaberta volta a sair como saiu);
+ *  · «Automático» APAGA o campo em vez de gravar o layout sugerido — é a
+ *    diferença entre acompanhar o número de fotos e ficar preso a um arranjo;
+ *  · o subtítulo chega ao documento;
+ *  · e os diagramas seguem as fotos que o board tem naquele momento.
+ */
+describe("a disposição das fotos do mood board", () => {
+  /** As caixas desenhadas no diagrama de uma opção — uma por foto. */
+  const caixasDe = (opcao: HTMLElement) => opcao.querySelectorAll("rect");
+
+  it("escolher uma disposição grava-a no documento", async () => {
+    seedDraft(5);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("radio", { name: "Mosaico" }));
+    await waitFor(() => {
+      expect(corpos("proposta-rascunho").at(-1) ?? "").toContain('"layout":"mosaico"');
+    });
+    expect(localStorage.getItem(DRAFT_KEY) ?? "").toContain('"layout":"mosaico"');
+    // E fica assinalada, para o ecrã dizer o que o documento diz.
+    expect(screen.getByRole("radio", { name: "Mosaico" }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
+  });
+
+  it("«Automático» APAGA a escolha — não grava o layout sugerido", async () => {
+    seedDraft(5, { layout: "mosaico" });
+    renderStudio();
+    const user = userEvent.setup();
+    // Semeado com uma escolha à mão: é essa que está assinalada, não o automático.
+    expect(
+      (await screen.findByRole("radio", { name: "Mosaico" })).getAttribute("aria-checked"),
+    ).toBe("true");
+    pedidos = [];
+    await user.click(screen.getByRole("radio", { name: /^Automático/ }));
+    await waitFor(() => {
+      const gravado = corpos("proposta-rascunho").at(-1) ?? "";
+      expect(gravado).toContain("Cerimónia");
+      expect(gravado).not.toContain('"layout"');
+    });
+    expect(localStorage.getItem(DRAFT_KEY) ?? "").not.toContain('"layout"');
+  });
+
+  it("o subtítulo do mood board é gravado", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(
+      await screen.findByLabelText("Subtítulo do mood board"),
+      "Ramo de Noiva (a definir com a Noiva)",
+    );
+    await waitFor(() => {
+      expect(corpos("proposta-rascunho").at(-1) ?? "").toContain(
+        "Ramo de Noiva (a definir com a Noiva)",
+      );
+    });
+  });
+
+  it("os diagramas seguem o número de fotos do mood board", async () => {
+    seedDraft(5);
+    renderStudio();
+    const user = userEvent.setup();
+    // Cinco fotos: o sugerido é a fila única, e o diagrama do mosaico tem cinco
+    // caixas — a geometria verdadeira, não um desenho aproximado.
+    const automatico = await screen.findByRole("radio", { name: /^Automático/ });
+    expect(automatico.textContent).toMatch(/fila única/i);
+    expect(caixasDe(screen.getByRole("radio", { name: "Mosaico" }))).toHaveLength(5);
+
+    // Mais uma foto e tudo acompanha: outro sugerido, outro diagrama.
+    await user.click(
+      await screen.findByRole("button", { name: /Escolher da biblioteca de temas/ }),
+    );
+    await user.click(await screen.findByRole("button", { name: "escolher-foto-de-teste" }));
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: /^Automático/ }).textContent).toMatch(/mosaico/i);
+    });
+    expect(caixasDe(screen.getByRole("radio", { name: "Mosaico" }))).toHaveLength(6);
   });
 });
 
