@@ -1,1 +1,32 @@
+#!/bin/sh
+# ═══════════════════════════════════════════════════════════════════════════
+# OS DADOS LOCAIS NÃO ENTRAM NUM COMMIT POR ACIDENTE
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Os ficheiros em `data/` são o armazenamento local — o que a aplicação usa
+# quando não há base de dados configurada. O conjunto de testes ESCREVE neles
+# ao correr, e um servidor de desenvolvimento também.
+#
+# O que aconteceu (e é por isso que isto existe): um `git add -A` levou treze
+# desses ficheiros num commit que era sobre limites de tempo em rotas. Cinco
+# alterados por uma passagem de testes, oito criados do zero. Nada disso é uma
+# alteração de código, e ninguém os quis ali.
+#
+# Não se recusa o commit — há alturas em que mexer nos dados de exemplo é
+# mesmo a intenção. Avisa-se, com os nomes à frente, para a pessoa poder
+# desfazer antes de gravar. Um aviso é o suficiente quando o problema é
+# distracção e não intenção.
+DADOS=$(git diff --cached --name-only --diff-filter=ACM | grep '^data/' || true)
+if [ -n "$DADOS" ]; then
+  echo ""
+  echo "  ⚠  Há ficheiros de DADOS LOCAIS neste commit:"
+  echo "$DADOS" | sed 's/^/       /'
+  echo ""
+  echo "     Estes ficheiros são reescritos pelos testes e pelo servidor de"
+  echo "     desenvolvimento. Se não foi de propósito:"
+  echo ""
+  echo "         git restore --staged data/ && git checkout -- data/"
+  echo ""
+fi
+
 npx lint-staged
