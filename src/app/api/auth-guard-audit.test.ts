@@ -312,7 +312,12 @@ vi.mock("@/lib/theme-storage", () =>
   ),
 );
 vi.mock("@/lib/proposal-drafts", () =>
-  H.build("proposal-drafts", ["getProposalDraft", "saveProposalDraft", "clearProposalDraft"]),
+  H.build("proposal-drafts", ["getProposalDraft", "saveProposalDraft", "clearProposalDraft"], {
+    // A cópia de segurança lê os rascunhos como um conjunto seu. Devolve lista
+    // (e não `undefined`) porque o caminho autenticado de `/api/backup` conta
+    // os registos de cada conjunto — uma espia muda rebentava-o a contar.
+    listProposalDrafts: H.afn("proposal-drafts.listProposalDrafts", async () => []),
+  }),
 );
 // Parcial: o esquema Zod da rota lê OVERVIEW_FIELDS/MAX_* no topo do módulo e o
 // 409 depende da classe StaleWriteError real — só as duas funções de I/O é que

@@ -61,6 +61,35 @@ function missingColumnIn(table: string, columns: readonly string[]): string | nu
   return columns.map((c) => c.trim()).find((c) => absent.has(c)) ?? null;
 }
 
+/**
+ * O `like` do PostgREST em expressão regular: `%` é o curinga, `_` é um
+ * carácter, e `\` escapa qualquer um deles. Existe aqui porque a varredura dos
+ * RASCUNHOS do estúdio é um `like` sobre o prefixo (`proposal-draft:%`) e um
+ * fake que ignorasse o filtro devolvia a tabela `app_state` inteira — incluindo
+ * os marcadores de operação, que é exactamente o que a cópia não pode levar.
+ */
+function likeParaRegExp(padrao: string): RegExp {
+  const escapar = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let fonte = "";
+  for (let i = 0; i < padrao.length; i++) {
+    const c = padrao[i];
+    if (c === "\\" && i + 1 < padrao.length) fonte += escapar(padrao[++i]);
+    else if (c === "%") fonte += ".*";
+    else if (c === "_") fonte += ".";
+    else fonte += escapar(c);
+  }
+  return new RegExp(`^${fonte}$`);
+}
+
+/** A chave primária de cada tabela, para o `upsert` do fake saber o que é a
+ *  mesma linha. `app_state` é a que obriga a isto: a chave dela é `key`, e
+ *  procurar por `id` fazia duas chaves diferentes passarem pela mesma linha. */
+function chavePrimaria(table: string): string {
+  if (table === "invoice_counters") return "year";
+  if (table === "app_state") return "key";
+  return "id";
+}
+
 function shouldFail(table: string, op: "read" | "write"): boolean {
   const mode = db.fail.get(table);
   return mode === "all" || mode === op;
@@ -93,11 +122,22 @@ function fakeSupabase() {
               q.order = { column, ascending: opts?.ascending !== false };
               return builder;
             },
-            limit() {
+            limit(n?: number) {
+              // Respeitado a sério: a varredura dos rascunhos pede `limite + 1`
+              // linhas justamente para saber se ficou truncada, e um `limit`
+              // decorativo fazia esse mecanismo passar por testado sem o estar.
+              if (typeof n === "number") q.limit = n;
               return builder;
             },
             eq(column: string, value: unknown) {
               filtered = (filtered ?? rowsOf(table)).filter((r) => r[column] === value);
+              return builder;
+            },
+            like(column: string, padrao: string) {
+              const re = likeParaRegExp(padrao);
+              filtered = (filtered ?? rowsOf(table)).filter((r) =>
+                re.test(String(r[column] ?? "")),
+              );
               return builder;
             },
             async maybeSingle() {
@@ -127,6 +167,7 @@ function fakeSupabase() {
                 });
               }
               data = data.map((r) => ({ ...r }));
+              if (typeof q.limit === "number") data = data.slice(0, q.limit as number);
               return Promise.resolve(resolve({ data, error: null }));
             },
           };
@@ -150,7 +191,7 @@ function fakeSupabase() {
           if (shouldFail(table, "write")) return { error: new Error(`${table} recusa escritas`) };
           const list = Array.isArray(payload) ? payload : [payload];
           db.writes.push(`upsert:${table}:${list.length}`);
-          const key = table === "invoice_counters" ? "year" : "id";
+          const key = chavePrimaria(table);
           for (const r of list) {
             const existing = rowsOf(table).find((x) => x[key] === r[key]);
             if (existing) Object.assign(existing, r);
@@ -222,6 +263,14 @@ const DOC_DO_ESTUDIO = {
   totalText: "10.000,00 € + IVA",
   coverImages: ["LIQ-AAA-1/capa.jpg", ""],
   condicoesGerais: ["Aos valores acresce o IVA à taxa legal em vigor."],
+};
+
+/** Um rascunho por acabar: a mesma proposta um passo antes de seguir, ainda só
+ *  no estúdio. É o que se perdia por inteiro quando a cópia saltava a tabela. */
+const RASCUNHO_DO_ESTUDIO = {
+  ...DOC_DO_ESTUDIO,
+  totalText: "9.500,00 € + IVA (por confirmar)",
+  moodBoards: [{ title: "Copo de água", images: ["LIQ-AAA-1/foto-7.jpg"] }],
 };
 
 /** Um registo representativo de CADA conjunto, com os campos que o `mapper`
@@ -371,6 +420,24 @@ function seedBusiness(): void {
     updated_at: ONTEM,
   });
   rowsOf("invoice_counters").push({ year: 2026, n: 7 });
+  // ── `app_state`: a tabela partilhada ──────────────────────────────────────
+  // Os RASCUNHOS do estúdio (trabalho de horas que não existe em mais lado
+  // nenhum) e, ao lado deles, os marcadores de operação. A cópia leva os
+  // primeiros e não os segundos, e a reposição não pode tocar nos segundos —
+  // é por isso que os dois estão aqui.
+  rowsOf("app_state").push({
+    key: "proposal-draft:LIQ-AAA-1",
+    value: { doc: RASCUNHO_DO_ESTUDIO, updatedAt: ONTEM, savedBy: "Catarina" },
+    updated_at: ONTEM,
+  });
+  // Um rascunho APAGADO: a linha fica, o trabalho não. Não é trabalho, não vai
+  // na cópia (ver `clearProposalDraft`).
+  rowsOf("app_state").push({
+    key: "proposal-draft:LIQ-ZZZ-9",
+    value: null,
+    updated_at: ONTEM,
+  });
+  rowsOf("app_state").push({ key: "inbox-last-uid", value: 4211, updated_at: ONTEM });
 }
 
 /** Só os conjuntos de dados de uma cópia (sem os metadados do envelope). */
@@ -469,6 +536,126 @@ describe("percurso completo: exportar → apagar → repor", () => {
     expect(depois[0].doc).toEqual(DOC_DO_ESTUDIO);
     // A coluna existe MESMO na linha (não é só o `fromRow` a inventar).
     expect(rowsOf("proposals")[0].doc).toEqual(DOC_DO_ESTUDIO);
+  });
+
+  /**
+   * ── OS RASCUNHOS DO ESTÚDIO ─────────────────────────────────────────────
+   *
+   * O maior bloco de trabalho irrecuperável da casa, e o que esta cópia saltava
+   * durante todo o tempo em que ele cá esteve. Uma colaboradora montou uma
+   * proposta inteira — fotos escolhidas, mood boards compostos, textos — e
+   * noutro computador não estava lá nada. Aqui prova-se o percurso todo:
+   * exportar → apagar → repor → o rascunho volta IGUAL.
+   */
+  it("o RASCUNHO do estúdio volta inteiro — mood boards, textos e a marca de tempo", async () => {
+    seedBusiness();
+    const antes = await buildBackupPayload();
+    expect(antes.incomplete).toEqual([]);
+    expect(antes.proposalDrafts).toEqual([
+      {
+        key: "proposal-draft:LIQ-AAA-1",
+        doc: RASCUNHO_DO_ESTUDIO,
+        updatedAt: ONTEM,
+        savedBy: "Catarina",
+      },
+    ]);
+
+    wipeEverything();
+    expect((await buildBackupPayload()).proposalDrafts).toEqual([]);
+
+    const file = mustValidate(antes);
+    const plan = await planRestore(file);
+    const rascunhos = plan.datasets.find((d) => d.key === "proposalDrafts")!;
+    expect(rascunhos.label).toBe("Rascunhos do Estúdio de Propostas");
+    expect(rascunhos.incoming).toBe(1);
+    const result = await applyRestore(file, plan);
+    expect(result.failed).toEqual([]);
+
+    const depois = await buildBackupPayload();
+    expect(depois.proposalDrafts).toEqual(antes.proposalDrafts);
+    // E está mesmo na linha do `app_state`, não é o `fromRow` a inventar: é
+    // desta chave que o estúdio lê o rascunho ao reabrir a proposta.
+    const linha = rowsOf("app_state").find((r) => r.key === "proposal-draft:LIQ-AAA-1")!;
+    expect(linha.value).toEqual({
+      doc: RASCUNHO_DO_ESTUDIO,
+      updatedAt: ONTEM,
+      savedBy: "Catarina",
+    });
+  });
+
+  it("um rascunho APAGADO não vai na cópia — e repô-lo não ressuscita linhas vazias", async () => {
+    // `clearProposalDraft` grava `null` em vez de remover a linha: a chave fica
+    // lá com "não há rascunho". Isso não é trabalho e não tem nada que ser
+    // copiado — nem, ao repor, que voltar a aparecer como se fosse.
+    seedBusiness();
+    const copia = await buildBackupPayload();
+    expect((copia.proposalDrafts as { key: string }[]).map((d) => d.key)).toEqual([
+      "proposal-draft:LIQ-AAA-1",
+    ]);
+
+    const file = mustValidate(copia);
+    await applyRestore(file, await planRestore(file));
+    expect(
+      rowsOf("app_state").find((r) => r.key === "proposal-draft:LIQ-ZZZ-9")!.value,
+      "a chave apagada tinha de continuar a null",
+    ).toBeNull();
+  });
+
+  it("repor os rascunhos NÃO toca nos marcadores de operação da mesma tabela", async () => {
+    // `app_state` é partilhada. Se a reposição apagasse a tabela para reescrever
+    // os rascunhos, levava à frente o marcador da caixa de entrada — e o robô
+    // voltava a avisar de emails já avisados no dia da reposição, que é o dia
+    // em que a atenção tem de estar toda nos dados.
+    seedBusiness();
+    const copia = await buildBackupPayload();
+    expect(
+      JSON.stringify(copia),
+      "o marcador de operação não pode sequer ir no ficheiro",
+    ).not.toContain("inbox-last-uid");
+
+    const file = mustValidate(copia);
+    await applyRestore(file, await planRestore(file));
+    expect(rowsOf("app_state").find((r) => r.key === "inbox-last-uid")?.value).toBe(4211);
+  });
+
+  it("SUBSTITUI dentro do espaço de nomes: um rascunho que a cópia não traz é apagado", async () => {
+    seedBusiness();
+    const copia = await buildBackupPayload();
+    copia.exportedAt = "2026-03-02T00:00:00.000Z";
+
+    // Depois da cópia começou-se outra proposta, que não está no ficheiro.
+    rowsOf("app_state").push({
+      key: "proposal-draft:LIQ-BBB-2",
+      value: { doc: { ref: "começada depois da cópia" }, updatedAt: "2026-04-02T10:00:00.000Z" },
+      updated_at: "2026-04-02T10:00:00.000Z",
+    });
+
+    const file = mustValidate(copia);
+    const plan = await planRestore(file);
+    const rascunhos = plan.datasets.find((d) => d.key === "proposalDrafts")!;
+    expect(rascunhos.current).toBe(2);
+    expect(rascunhos.removed, "o rascunho novo conta como trabalho que desaparece").toBe(1);
+    // E é dito por extenso: a cópia é mais velha do que o que lá está.
+    const aviso = plan.warnings.find((w) => w.message.includes("MAIS ANTIGA"));
+    expect(aviso?.message).toContain("Rascunhos do Estúdio de Propostas (1)");
+
+    await applyRestore(file, plan);
+    expect(rowsOf("app_state").find((r) => r.key === "proposal-draft:LIQ-BBB-2")!.value).toBeNull();
+    expect(rowsOf("app_state").find((r) => r.key === "inbox-last-uid")?.value).toBe(4211);
+  });
+
+  it("uma cópia com uma chave FORA do espaço de nomes é recusada na validação", async () => {
+    // O ficheiro vem de fora e a `app_state` é partilhada: sem esta guarda, uma
+    // cópia adulterada repunha o contador de faturas (ou o marcador da caixa de
+    // entrada) pela porta dos rascunhos. Recusa-se o ficheiro INTEIRO — nada
+    // é escrito, como em qualquer outro erro de forma.
+    seedBusiness();
+    const copia = (await buildBackupPayload()) as Record<string, unknown>;
+    (copia.proposalDrafts as Record<string, unknown>[])[0].key = "invoice-seq-2026";
+    const result = validateBackupFile(copia);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("impossível");
+    expect(result.errors.join(" ")).toMatch(/Rascunhos do Estúdio de Propostas.*registo 0: key/);
   });
 
   it("REPÕE POR SUBSTITUIÇÃO: o que está na base e não está na cópia desaparece", async () => {

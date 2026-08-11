@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { BACKUP_DATASETS, NOT_BACKED_UP } from "./route";
+import { BACKUP_DATASETS, NOT_BACKED_UP, PARTIALLY_BACKED_UP } from "./route";
 
 /**
  * A rede de segurança da cópia de segurança.
@@ -124,6 +124,51 @@ describe("cobertura do backup", () => {
         inventadas,
         `Tabelas declaradas em BACKUP_DATASETS que não existem em db/schema.sql: ${inventadas.join(", ")}`,
       ).toEqual([]);
+    });
+
+    /**
+     * A terceira lista, e a razão de ela existir.
+     *
+     * `app_state` guarda duas coisas de valor oposto: os RASCUNHOS do estúdio
+     * (trabalho de horas que não existe em mais lado nenhum) e os marcadores de
+     * operação (que se refazem sozinhos). A cópia leva os primeiros e não os
+     * segundos, e nenhuma das duas listas antigas sabia dizer isso: em
+     * `NOT_BACKED_UP` era falso, e só em `BACKUP_DATASETS` dava a entender que
+     * a tabela ia inteira. Estas asserções prendem a única saída honesta —
+     * a tabela está na cópia E a parte que fica de fora está escrita.
+     */
+    it("uma tabela que só vai EM PARTE está na cópia e diz, por escrito, o que fica de fora", () => {
+      expect(
+        Object.keys(PARTIALLY_BACKED_UP).length,
+        "a lista das tabelas parciais ficou vazia — se deixou de haver nenhuma, apague-a",
+      ).toBeGreaterThan(0);
+      for (const [table, reason] of Object.entries(PARTIALLY_BACKED_UP)) {
+        expect(schemaTables, `PARTIALLY_BACKED_UP fala de "${table}", que não existe`).toContain(
+          table,
+        );
+        expect(
+          backedUpTables.has(table),
+          `"${table}" é dada como parcialmente copiada mas não vai na cópia — ou entra em BACKUP_DATASETS, ou a explicação passa para NOT_BACKED_UP`,
+        ).toBe(true);
+        expect(
+          table in NOT_BACKED_UP,
+          `"${table}" está ao mesmo tempo excluída e parcialmente copiada`,
+        ).toBe(false);
+        expect(
+          reason.length,
+          `"${table}" vai em parte e não diz QUE parte — o ficheiro fica a dar a entender que leva a tabela toda`,
+        ).toBeGreaterThan(120);
+      }
+    });
+
+    it("o espaço de nomes dos rascunhos é o que a cópia diz que é (não uma frase a envelhecer)", async () => {
+      // A explicação de `app_state` nomeia o prefixo. Se ele mudar em
+      // `proposal-drafts.ts` e a frase ficar, o ficheiro passa a dizer a quem o
+      // abre onde procurar uma coisa que já não está lá.
+      const { DRAFT_PREFIX } = await import("@/lib/proposal-drafts");
+      expect(PARTIALLY_BACKED_UP.app_state).toContain(DRAFT_PREFIX);
+      const rascunhos = BACKUP_DATASETS.find((d) => d.key === "proposalDrafts");
+      expect(rascunhos?.table, "os rascunhos deixaram de vir do app_state").toBe("app_state");
     });
 
     it("as exclusões continuam a fazer sentido (nada obsoleto nem contraditório)", () => {

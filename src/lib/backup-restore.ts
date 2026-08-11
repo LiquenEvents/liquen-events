@@ -36,6 +36,13 @@ import {
   listFotoEtiquetas,
 } from "./biblioteca-foto-etiquetas-store";
 import {
+  mapper as draftsMapper,
+  listProposalDrafts,
+  replaceProposalDrafts,
+  ehChaveDeRascunho,
+  DRAFT_PREFIX,
+} from "./proposal-drafts";
+import {
   BACKUP_SCHEMA_MIN_VERSION,
   BACKUP_SCHEMA_VERSION,
   MAX_RESTORE_ROWS,
@@ -86,6 +93,11 @@ import {
  * Fundir por id daria a ilusão de segurança e deixaria a base num estado que
  * nunca existiu — metade de terça, metade de hoje. A única excepção é o
  * contador de numeração fiscal, pela razão acima.
+ *
+ * Substituir NÃO quer dizer, em todo o caso, "apagar a tabela": os RASCUNHOS do
+ * estúdio partilham a tabela `app_state` com marcadores de operação que não vão
+ * na cópia, e por isso a substituição deles acontece dentro do espaço de nomes
+ * `proposal-draft:` e não toca no resto (ver `RestoreTarget.replace`).
  *
  * ── A conversão é a do `mapper` de cada store ────────────────────────────
  * Os campos no ficheiro estão como a APLICAÇÃO os usa (`quoteId`,
@@ -422,6 +434,38 @@ const bibliotecaFotoEtiquetaSchema = z.object({
   createdAt: z.string().max(64),
 });
 
+/**
+ * Um rascunho do Estúdio de Propostas (uma chave do espaço `proposal-draft:`
+ * dentro do `app_state`).
+ *
+ * A chave é validada CONTRA A FORMA e não só contra o tamanho: é ela que vai
+ * ser escrita, e o `app_state` é uma tabela partilhada com os marcadores de
+ * operação e o contador de faturas de desenvolvimento. Sem esta guarda, um
+ * ficheiro adulterado repunha `invoice-seq-2026` pela porta dos rascunhos. A
+ * regra é a mesma que o `draftKey` aplica ao gravar — vem de lá, não é uma
+ * segunda cópia a envelhecer ao lado.
+ *
+ * O `doc` segue o mesmo desenho do documento das propostas: não se valida campo
+ * a campo (é o modelo do estúdio, em evolução — copiá-lo para aqui faria uma
+ * cópia boa ser recusada a cada campo novo) e exige-se o que importa, que é ser
+ * um objecto e caber no MESMO tecto que a rota do rascunho já impõe ao gravar.
+ */
+const proposalDraftSchema = z.looseObject({
+  key: z
+    .string()
+    .max(300)
+    .refine(ehChaveDeRascunho, {
+      message: `chave fora do espaço de nomes dos rascunhos (\`${DRAFT_PREFIX}<pedido>\`)`,
+    }),
+  doc: z.looseObject({}).refine((d) => JSON.stringify(d).length <= MAX_PROPOSAL_DOC_BYTES, {
+    message: `rascunho acima do limite de ${MAX_PROPOSAL_DOC_BYTES} bytes`,
+  }),
+  // Sem `.min(1)`: um rascunho antigo sem marca de tempo legível chega aqui
+  // como "" (ver o `fromRow`) e não pode fazer a cópia inteira ser recusada.
+  updatedAt: z.string().max(64).default(""),
+  savedBy: text(200),
+});
+
 const counterSchema = z.object({
   year: z.number().int().min(1900).max(9999),
   n: z.number().int().min(0).max(1_000_000),
@@ -461,6 +505,22 @@ export interface RestoreTarget<T = Record<string, unknown>> {
    * coluna que fique de fora.
    */
   extraColumns?: (row: T) => Record<string, unknown>;
+  /**
+   * Escrita à medida, para o conjunto que NÃO é uma tabela inteira.
+   *
+   * O caminho normal (`replaceAll`) apaga a tabela e reinsere, o que só está
+   * certo quando a tabela É o conjunto. Os RASCUNHOS do estúdio não são: vivem
+   * num espaço de nomes dentro do `app_state`, ao lado dos marcadores de
+   * operação (o UID até onde a caixa de entrada já avisou, os fechos do Meta).
+   * Um `delete` por tabela levava-os à frente, e o robô da caixa de entrada
+   * voltava a avisar de emails já avisados no dia da reposição — ruído no dia
+   * em que a atenção tem de estar toda nos dados. Quando isto está definido, é
+   * ele que escreve, e a substituição acontece só dentro do espaço de nomes.
+   *
+   * Continua a valer tudo o resto: lança em caso de falha (o conjunto sai pelo
+   * nome em `failed`) e não é chamado sequer para um conjunto saltado.
+   */
+  replace?: (rows: T[]) => Promise<void>;
   /** Perda conhecida ao repor este conjunto neste ambiente, se houver. */
   lossWarning?: (rows: T[]) => string | null;
   /**
@@ -525,6 +585,29 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     // sem a coluna, as inserções falham TODAS e o `replaceAll` deixava as
     // propostas apagadas. Por isso pergunta-se antes.
     preflight: (rows) => assertProposalDocColumn(rows),
+  }),
+  // Os rascunhos do estúdio: a mesma proposta, num estado anterior — por isso
+  // ficam aqui, a seguir às propostas, que é onde quem lê esta lista os vai
+  // procurar. A POSIÇÃO é livre: não têm chave estrangeira nenhuma (a chave do
+  // `app_state` é texto, e o pedido a que pertencem é parte dela), portanto
+  // entrarem antes ou depois de quem quer que seja não rebenta integridade —
+  // ao contrário das propostas e das anotações da caixa de entrada.
+  //
+  // E a escrita NÃO é a normal: ver `replace`. Apagar a tabela `app_state`
+  // inteira para repor os rascunhos levava à frente os marcadores de operação
+  // que lá vivem ao lado deles.
+  asTarget({
+    key: "proposalDrafts",
+    label: "Rascunhos do Estúdio de Propostas",
+    table: draftsMapper.table,
+    mapper: draftsMapper,
+    schema: proposalDraftSchema,
+    current: listProposalDrafts,
+    // O relógio é o do próprio rascunho — é ele que o estúdio compara com a
+    // cópia local do navegador, e é por ele que se sabe se a cópia de segurança
+    // é mais velha do que o trabalho que está lá agora.
+    stamp: (d) => (typeof d.updatedAt === "string" ? d.updatedAt : ""),
+    replace: replaceProposalDrafts,
   }),
   asTarget({
     key: "contracts",
@@ -1384,6 +1467,24 @@ async function replaceAll(
   target: RestoreTarget<AnyRow>,
   rows: AnyRow[],
 ): Promise<void> {
+  // Sem Supabase: em produção isto é RECUSADO — gravar num ficheiro efémero
+  // apagaria a base e diria que tinha reposto (a mesma recusa de
+  // `FileBackend.assertWritableInProd`). A recusa vem ANTES da escrita à medida
+  // porque vale para as duas: o `setState` dos rascunhos escreve no mesmo
+  // ficheiro volátil e devolveria `gravado: true` com a mesma alegria.
+  if (!sb && process.env.NODE_ENV === "production") {
+    log.error(
+      "restauro: gravação recusada — Supabase não configurado em produção; o fallback para ficheiro é volátil.",
+      undefined,
+      { file: target.mapper.fileName },
+    );
+    throw new Error("Persistence unavailable: Supabase not configured in production");
+  }
+
+  // Um conjunto que não é uma tabela inteira escreve-se à maneira dele. Ver
+  // `RestoreTarget.replace` — hoje só os rascunhos do estúdio.
+  if (target.replace) return target.replace(rows);
+
   if (sb) {
     // PostgREST exige um filtro num delete: `id is not null` é verdade para
     // toda a linha (a coluna é chave primária) e apaga a tabela inteira.
@@ -1403,17 +1504,7 @@ async function replaceAll(
   }
 
   // Sem Supabase: o backend de ficheiro do Repository, que guarda os objetos
-  // de domínio tal e qual. Em produção isto é RECUSADO — gravar num ficheiro
-  // efémero apagaria a base e diria que tinha reposto (a mesma recusa de
-  // `FileBackend.assertWritableInProd`).
-  if (process.env.NODE_ENV === "production") {
-    log.error(
-      "restauro: gravação recusada — Supabase não configurado em produção; o fallback para ficheiro é volátil.",
-      undefined,
-      { file: target.mapper.fileName },
-    );
-    throw new Error("Persistence unavailable: Supabase not configured in production");
-  }
+  // de domínio tal e qual (a recusa em produção já aconteceu no topo).
   const file = path.join(process.cwd(), "data", target.mapper.fileName);
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, JSON.stringify(rows, null, 2));

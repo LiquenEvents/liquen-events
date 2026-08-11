@@ -85,7 +85,13 @@ antiga não reemite números já usados.
 ### 3.3 O que a reposição NÃO recupera
 
 - **As fotografias.** Vivem nos buckets do Supabase Storage e não vão na cópia.
-- **Rascunhos de propostas por enviar.**
+- **Marcadores de funcionamento** (até que email a caixa de entrada já avisou,
+  os fechos já enviados à Meta). É de propósito: repô-los faria o robô voltar a
+  avisar de emails já avisados. Refazem-se sozinhos.
+- Os **rascunhos de propostas por enviar** já VÃO na cópia e voltam com ela —
+  estiveram muito tempo de fora, e foi por aí que se perdeu uma proposta
+  inteira. Voltam sem as fotos (ver o primeiro ponto): os mood boards apontam
+  para imagens que têm de existir no bucket.
 - Não é atómica entre tabelas: se falhar a meio, alguns conjuntos ficam
   repostos e outros não. O ecrã diz quais.
 

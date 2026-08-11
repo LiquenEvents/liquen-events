@@ -69,8 +69,9 @@ alter table public.proposals add column if not exists pdf_bytes integer;
 -- PDF" do link do cliente NUNCA podia aparecer (depende de o `doc` existir ao
 -- reler), e a proposta ENVIADA não tinha cópia nenhuma do lado do servidor — só
 -- o rascunho do estúdio em `app_state`, que a equipa apaga no "Limpar rascunho"
--- e que NÃO vai na cópia de segurança. Perdido esse, a proposta que o cliente
--- recebeu deixava de existir em lado nenhum.
+-- e que, na altura, também NÃO ia na cópia de segurança (hoje vai — ver o
+-- conjunto `proposalDrafts`). Perdido esse, a proposta que o cliente recebeu
+-- deixava de existir em lado nenhum.
 --
 -- TAMANHO (medido com as formas reais): 4,3 KB só com o texto fixo; ~13 KB numa
 -- proposta cheia de 1 mood board; 18,5 KB no tecto de 80 fotos por documento
@@ -182,6 +183,14 @@ create table if not exists public.push_subscriptions (
 );
 
 -- ── Estado operacional (marcadores pequenos, ex.: último email notificado) ──
+--
+-- E, DESDE ENTÃO, mais uma coisa que não é operacional nenhuma: os RASCUNHOS do
+-- Estúdio de Propostas, nas chaves `proposal-draft:<pedido>` (ver
+-- src/lib/proposal-drafts.ts). Uma proposta por acabar — fotos escolhidas, mood
+-- boards, textos — é trabalho de horas que não existe em mais lado nenhum, e é
+-- por isso que a cópia de segurança leva ESTE espaço de nomes e deixa de fora o
+-- resto da tabela (ver PARTIALLY_BACKED_UP em src/app/api/backup/route.ts).
+-- Quem mexer aqui tem as duas naturezas para ter em conta, não uma.
 create table if not exists public.app_state (
   key         text primary key,
   value       jsonb,

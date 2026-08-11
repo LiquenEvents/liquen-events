@@ -24,6 +24,7 @@ import { listFotoEtiquetas } from "@/lib/biblioteca-foto-etiquetas-store";
 import { readOverviewSettings } from "@/lib/overview-settings-store";
 import { listarDefinicoes } from "@/lib/proposta-definicoes-store";
 import { listarServicos } from "@/lib/servicos-catalogo-store";
+import { listProposalDrafts } from "@/lib/proposal-drafts";
 import { getSupabase } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
@@ -151,6 +152,28 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
     table: "service_catalog",
     list: listarServicos,
   },
+  // ── Os rascunhos do Estúdio de Propostas ────────────────────────────────
+  //
+  // O maior bloco de trabalho IRRECUPERÁVEL do sistema, e durante todo este
+  // tempo era precisamente o que a cópia saltava. Uma proposta por acabar —
+  // fotos escolhidas do bucket, mood boards compostos, textos, valores — é
+  // trabalho de horas que não existe em mais lado nenhum: as propostas
+  // ENVIADAS têm a sua coluna `doc` (essa já vem em `proposals`), mas o que
+  // ainda não seguiu vive só aqui.
+  //
+  // ATENÇÃO ao que isto leva da tabela `app_state`: leva o espaço de nomes dos
+  // rascunhos (`proposal-draft:`) e MAIS NADA. Os marcadores de operação da
+  // mesma tabela ficam de fora de propósito — ver `PARTIALLY_BACKED_UP`, que é
+  // onde essa decisão está escrita e onde o ficheiro a vai buscar.
+  //
+  // `listProposalDrafts` LANÇA quando a varredura não se conseguiu fazer
+  // inteira, e é isso que faz este conjunto aparecer em `incomplete` em vez de
+  // sair vazio com ar de "não havia rascunhos nenhuns".
+  {
+    key: "proposalDrafts",
+    table: "app_state",
+    list: listProposalDrafts,
+  },
 ] as const;
 
 /**
@@ -161,10 +184,31 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
 export const NOT_BACKED_UP: Readonly<Record<string, string>> = {
   push_subscriptions:
     "Subscrições Web Push, uma por browser/dispositivo: um endereço de entrega mais duas chaves SECRETAS. São credenciais de browser, caducam sozinhas e são recriadas quando a equipa volta a autorizar as notificações — repô-las não devolve nada e exportá-las era espalhar segredos por um ficheiro que anda de email em email.",
-  app_state:
-    "Marcadores de funcionamento (ex.: até que email o robô da caixa de entrada já avisou). Não são dados do negócio: perdidos, o pior que acontece é um aviso repetido. O contador de faturas que aqui vive é APENAS o de desenvolvimento — em produção a numeração está em `invoice_counters`, essa sim na cópia.",
   passkeys:
     "Os dispositivos registados para entrar sem palavra-passe. São credenciais, não dados do negócio, e ficam de fora por uma razão que vale mais do que a comodidade de as repor: uma reposição escreve por cima do conjunto inteiro, portanto passkeys na cópia significaria que repor um ficheiro de há dois meses RESSUSCITAVA o aparelho de alguém que entretanto saiu da equipa — sem ninguém reparar, porque a atenção estaria toda nos dados. Ficando de fora, a reposição não lhes toca: quem estava registado continua, quem foi removido continua removido. Perder a tabela obriga cada pessoa a registar outra vez o seu aparelho, o que se faz em segundos e sempre com a palavra-passe como caminho alternativo.",
+};
+
+/**
+ * Tabelas que vão na cópia SÓ EM PARTE, e o que fica de fora de cada uma.
+ *
+ * Porque é que isto existe: `app_state` guarda duas coisas com valores
+ * opostos. Guarda os RASCUNHOS do estúdio (`proposal-draft:…`), que são o
+ * maior bloco de trabalho irrecuperável da casa, e guarda os MARCADORES DE
+ * OPERAÇÃO, que não são dados do negócio. A tabela inteira estava em
+ * `NOT_BACKED_UP` com a razão dos marcadores — escrita quando só eles aqui
+ * viviam, e nunca corrigida depois de os rascunhos se lhes juntarem.
+ *
+ * Pôr a tabela em `BACKUP_DATASETS` e mais nada resolvia os rascunhos e criava
+ * outra mentira: o ficheiro passava a dar a entender que leva a tabela toda. E
+ * `NOT_BACKED_UP` não podia ficar com ela — uma tabela ao mesmo tempo excluída
+ * e na cópia é uma contradição que os testes recusam, e com razão.
+ *
+ * Daí esta terceira lista. Não é uma excepção administrativa: é a frase que
+ * falta para o ficheiro dizer a verdade, e vai LÁ DENTRO, em `notIncluded`.
+ */
+export const PARTIALLY_BACKED_UP: Readonly<Record<string, string>> = {
+  app_state:
+    "Desta tabela vai na cópia APENAS o espaço de nomes dos rascunhos do Estúdio de Propostas (chaves `proposal-draft:…`, conjunto `proposalDrafts`): as propostas por acabar são trabalho de horas que não existe em mais lado nenhum. Fica DE FORA todo o resto, que são marcadores de funcionamento — até que email o robô da caixa de entrada já avisou, os fechos já enviados à Meta, e o contador de faturas de DESENVOLVIMENTO (em produção a numeração está em `invoice_counters`, essa sim na cópia, e é a que tem valor legal). Não é esquecimento: repor marcadores de operação de há dois meses faz o robô voltar a avisar de emails já avisados e a Meta receber conversões repetidas — ruído numa reposição em que a atenção tem de estar toda nos dados. Perdidos, refazem-se sozinhos com um aviso repetido, no máximo.",
 };
 
 /**
@@ -180,7 +224,8 @@ export const EXTERNAL_ASSETS: Readonly<Record<string, string>> = {
 
 const README = [
   "Cópia de segurança dos dados de negócio da Líquen Events.",
-  "Inclui pedidos, propostas, faturas (livro completo + contadores de numeração), contratos aceites, fornecedores, tarefas, agenda, inventário, modelos de email, temas, as anotações da caixa de entrada e as notas/meta da Visão Geral.",
+  "Inclui pedidos, propostas, faturas (livro completo + contadores de numeração), contratos aceites, fornecedores, tarefas, agenda, inventário, modelos de email, temas, as anotações da caixa de entrada, as notas/meta da Visão Geral e os RASCUNHOS do Estúdio de Propostas (as propostas por acabar).",
+  "Da tabela `app_state` vêm SÓ os rascunhos: os marcadores de funcionamento que lá vivem ao lado deles ficam de fora de propósito (ver `notIncluded`).",
   "NÃO inclui as fotos (vivem nos buckets listados em `notIncluded`) — sem elas, propostas e temas repõem-se com os caminhos das imagens mas sem as imagens.",
   "PARA REPOR: back office → Backup → Repor cópia (POST /api/backup/restore). Carregar o ficheiro mostra primeiro um ENSAIO — o que aconteceria, sem escrever nada — e a reposição real exige uma frase escrita à mão. Repor SUBSTITUI o conteúdo de cada conjunto e faz antes uma cópia do estado actual, que é entregue para o caso de a reposição ter sido um engano. Os campos aqui estão como a aplicação os usa (`quoteId`, `clientName`), não como as colunas se chamam na base de dados (`quote_id`, `client_name`) — a conversão é a do `mapper` de cada store em src/lib. Guarde este ficheiro fora do computador de trabalho.",
   "Se `incomplete` não estiver vazio, ESTA CÓPIA ESTÁ INCOMPLETA — algum conjunto falhou a leitura e ficou vazio no ficheiro. Repita a exportação (a reposição recusa-se a repor esses conjuntos, para não trocar dados bons por um vazio de avaria).",
@@ -236,7 +281,18 @@ export async function buildBackupPayload(): Promise<{
     readme: README,
     counts,
     incomplete,
-    notIncluded: { ...NOT_BACKED_UP, ...EXTERNAL_ASSETS },
+    // As três razões, numa lista só, porque quem abre o ficheiro tem uma
+    // pergunta só: "o que é que isto NÃO tem?". As tabelas que só vão em parte
+    // aparecem com o sufixo `(parte)` — sem ele, ler `app_state` nesta lista
+    // dava a entender que a tabela ficou toda de fora, que é o contrário do
+    // que acontece.
+    notIncluded: {
+      ...NOT_BACKED_UP,
+      ...Object.fromEntries(
+        Object.entries(PARTIALLY_BACKED_UP).map(([tabela, razao]) => [`${tabela} (parte)`, razao]),
+      ),
+      ...EXTERNAL_ASSETS,
+    },
     ...data,
   };
 }

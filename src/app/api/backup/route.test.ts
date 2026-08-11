@@ -34,6 +34,10 @@ const stores = vi.hoisted(() => ({
   bibliotecaEtiquetas: vi.fn(async () => [] as unknown[]),
   bibliotecaFotos: vi.fn(async () => [] as unknown[]),
   bibliotecaFotoEtiquetas: vi.fn(async () => [] as unknown[]),
+  // Os rascunhos do estúdio não têm store próprio (vivem num espaço de nomes
+  // do `app_state`), mas do ponto de vista da cópia são um conjunto como os
+  // outros — e é assim que entram nas asserções que percorrem `BACKUP_DATASETS`.
+  proposalDrafts: vi.fn(async () => [] as unknown[]),
 }));
 
 /** Estado do cliente Supabase falso que serve os contadores de numeração. */
@@ -82,6 +86,7 @@ vi.mock("@/lib/servicos-catalogo-store", () => ({
 vi.mock("@/lib/overview-settings-store", () => ({
   readOverviewSettings: stores.overviewSettings,
 }));
+vi.mock("@/lib/proposal-drafts", () => ({ listProposalDrafts: stores.proposalDrafts }));
 vi.mock("@/lib/supabase", () => ({
   getSupabase: () =>
     sb.configured
@@ -98,7 +103,7 @@ vi.mock("@/lib/supabase", () => ({
       : null,
 }));
 
-import { GET, BACKUP_DATASETS, NOT_BACKED_UP, EXTERNAL_ASSETS } from "./route";
+import { GET, BACKUP_DATASETS, NOT_BACKED_UP, PARTIALLY_BACKED_UP, EXTERNAL_ASSETS } from "./route";
 
 function get(): NextRequest {
   return new Request("https://liquen.test/api/backup") as unknown as NextRequest;
@@ -179,6 +184,38 @@ describe("GET /api/backup", () => {
     expect(json.contracts[0].termsSnapshot).toBe("…");
   });
 
+  /**
+   * Os rascunhos do estúdio. Foram a maior lacuna desta cópia durante todo o
+   * tempo em que cá estiveram: uma colaboradora montou uma proposta inteira e
+   * noutro computador não estava lá nada. A causa da gravação silenciosa foi
+   * corrigida noutro sítio; isto prende a outra metade — o trabalho por acabar
+   * VAI no ficheiro.
+   */
+  it("os RASCUNHOS do estúdio vão mesmo no ficheiro", async () => {
+    stores.proposalDrafts.mockResolvedValue([
+      {
+        key: "proposal-draft:LIQ-AAA-1",
+        doc: { ref: "PO Casamento Ana Dias", moodBoards: [{ images: ["LIQ-AAA-1/foto-1.jpg"] }] },
+        updatedAt: "2026-03-01T09:00:00.000Z",
+        savedBy: "Catarina",
+      },
+    ]);
+    const json = await (await GET(get())).json();
+    expect(json.proposalDrafts[0].key).toBe("proposal-draft:LIQ-AAA-1");
+    expect(json.proposalDrafts[0].doc.moodBoards[0].images).toEqual(["LIQ-AAA-1/foto-1.jpg"]);
+    expect(json.counts.proposalDrafts).toBe(1);
+  });
+
+  it("uma varredura de rascunhos truncada marca a cópia como INCOMPLETA (não sai vazia calada)", async () => {
+    // `listProposalDrafts` lança quando não conseguiu varrer tudo. Sem isso, um
+    // ficheiro com ar de completo e sem os rascunhos lá dentro — a mentira que
+    // esta funcionalidade existe para não contar.
+    stores.proposalDrafts.mockRejectedValue(new Error("varredura truncada"));
+    const json = await (await GET(get())).json();
+    expect(json.proposalDrafts).toEqual([]);
+    expect(json.incomplete).toEqual(["proposalDrafts"]);
+  });
+
   it("sets a downloadable JSON Content-Disposition/Content-Type", async () => {
     const res = await GET(get());
     expect(res.headers.get("Content-Type")).toContain("application/json");
@@ -238,5 +275,23 @@ describe("GET /api/backup", () => {
     }
     expect(Object.keys(json.notIncluded)).toContain("storage:proposal-assets");
     expect(Object.keys(json.notIncluded)).toContain("storage:theme-assets");
+  });
+
+  it("o ficheiro não dá a entender que leva a `app_state` toda — diz que parte é que fica de fora", async () => {
+    // A tabela dos rascunhos é partilhada com os marcadores de operação. O
+    // ficheiro leva uns e não os outros, e tem de o DIZER: sem esta entrada,
+    // quem o lê daqui a dois anos conclui uma de duas mentiras — ou que a
+    // tabela vai toda, ou (se aparecesse em `notIncluded` sem mais nada) que
+    // não vai nada dela e os rascunhos se perderam.
+    const json = await (await GET(get())).json();
+    const chave = "app_state (parte)";
+    expect(Object.keys(json.notIncluded)).toContain(chave);
+    expect(json.notIncluded[chave]).toBe(PARTIALLY_BACKED_UP.app_state);
+    expect(json.notIncluded[chave]).toMatch(/proposal-draft/);
+    expect(Object.keys(json.notIncluded), "a tabela vai em parte, não fica de fora").not.toContain(
+      "app_state",
+    );
+    // E o README diz a mesma coisa por palavras, para quem não lê listas.
+    expect(json.readme).toMatch(/rascunhos/i);
   });
 });
