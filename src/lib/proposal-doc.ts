@@ -20,7 +20,24 @@ export type ImageData = string;
 export const DEFAULT_VAT_RATE = 0.23;
 
 /** Dias de validade por omissão de uma proposta enviada. */
-export const DEFAULT_VALID_DAYS = 30;
+/**
+ * Validade de uma proposta, em dias.
+ *
+ * Eram 30, e a proposta que a Líquen fazia à mão dizia 60. Decisão dela: fica
+ * 60, o que os casais dela já viram. Continua a poder ser mudado por proposta
+ * (`validUntilDays`) — isto é só o ponto de partida.
+ */
+export const DEFAULT_VALID_DAYS = 60;
+
+/**
+ * Com quantos dias de antecedência o casal tem de fechar o número de pessoas.
+ *
+ * Eram 15 no texto gerado e 25 na proposta feita à mão. Decisão dela: 25 — é o
+ * que lhe dá margem para encomendar flores e material com o número certo. Vive
+ * numa constante e não solto no meio da frase para não haver dois números
+ * diferentes no mesmo documento no dia em que alguém mudar um deles.
+ */
+export const DIAS_PARA_CONFIRMAR_CONVIDADOS = 25;
 
 /** Como interpretar o `totalAmount`: já COM IVA ("incluido") ou o IVA acresce
  *  ao valor indicado ("acrescer", i.e. "+ IVA"). */
@@ -374,7 +391,7 @@ export const DEFAULT_INCLUIDO: string[] = [
 /** "Condições de Reserva" — Não incluído no orçamento. */
 export const DEFAULT_NAO_INCLUIDO: string[] = [
   "Aluguer e/ou outras despesas inerentes ao espaço, como tenda, mobiliário, mobiliário de lounge e palamenta de catering;",
-  "Lembranças, papelaria referentes ao evento como menus, seatting chart, seatting plan.",
+  "Lembranças, papelaria referentes ao evento como menus, seating chart, seating plan.",
 ];
 
 /** "Condições Gerais". `{DATA}` / `{CONVIDADOS}` are substituted from the
@@ -394,7 +411,7 @@ export const DEFAULT_CONDICOES_GERAIS: string[] = [
   "Deve estar contemplada a refeição para os elementos da equipa Líquen que ficam durante todo o evento.",
   "Esta proposta só é válida para o evento a realizar no dia {DATA}.",
   "O orçamento é válido para o número de {CONVIDADOS} convidados; abaixo ou acima deste número o valor da proposta terá de ser revisto.",
-  "A confirmação do número de pessoas tem de ser feita até 15 dias antes da festa. Se o número de participantes que se verificar no dia do evento for inferior ao previsto, será pago o número que foi confirmado. Caso o número de participantes seja superior ao comunicado, terá de ser feito o ajuste dos mesmos, não podendo a Líquen Events ser responsabilizada por falhas ou lacunas que resultem do serviço prestado a um número de participantes superior ao previamente confirmado.",
+  `A confirmação do número de pessoas tem de ser feita até ${DIAS_PARA_CONFIRMAR_CONVIDADOS} dias antes da festa. Se o número de participantes que se verificar no dia do evento for inferior ao previsto, será pago o número que foi confirmado. Caso o número de participantes seja superior ao comunicado, terá de ser feito o ajuste dos mesmos, não podendo a Líquen Events ser responsabilizada por falhas ou lacunas que resultem do serviço prestado a um número de participantes superior ao previamente confirmado.`,
   "A Líquen Events reserva-se ao direito de alterar o preço, caso se verifiquem alterações significativas na conjuntura económica nacional e/ou internacional ou nas premissas estabelecidas aquando da realização desta proposta.",
 ];
 
