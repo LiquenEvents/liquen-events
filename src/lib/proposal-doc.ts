@@ -132,6 +132,37 @@ export interface MoodBoard {
    */
   enquadramento?: "forma-da-foto";
   /**
+   * IDENTIDADE ESTÁVEL da página, para o editor.
+   *
+   * Não é impressa: o PDF só lê o título, as fotos e os textos. Existe porque
+   * há estado do EDITOR que tem de sobreviver a arrastar um board para outro
+   * sítio — hoje, saber quais estão colapsados. Com a identidade a ser a
+   * posição, arrumar a lista trocava as dobras todas de sítio.
+   *
+   * Preenchida a partir da posição quando falta, como a dos serviços — ver
+   * {@link withMoodBoardIds}.
+   */
+  id?: string;
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * ESTA PÁGINA ESTÁ FECHADA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «Marcar um board como concluído: fica bloqueado a
+   * alterações acidentais, visualmente distinto, e desbloqueia-se com um
+   * clique explícito.»
+   *
+   * Numa página com oito boards e quarenta fotos, o que já está decidido está
+   * a metros do que ainda se está a decidir — e o gesto errado (uma tecla numa
+   * caixa de texto, um arrasto que larga no sítio errado) custa trabalho que
+   * ninguém volta a ver que se perdeu.
+   *
+   * Bloqueado, os campos ficam só de leitura e as fotos não se arrastam nem se
+   * removem. Desbloquear é um clique — não é uma pergunta a que se responde sem
+   * ler.
+   */
+  bloqueado?: boolean;
+  /**
    * A FOTO QUE MANDA NA PÁGINA — índice dentro de `images`.
    *
    * Duas das cinco disposições dão a uma caixa muito mais área do que às
@@ -221,6 +252,40 @@ export function withServiceIds(groups: readonly ServiceGroup[]): ServiceGroup[] 
     return { ...g, id: groupId, items };
   });
   return changed ? next : (groups as ServiceGroup[]);
+}
+
+/** Id de uma página de inspiração que ainda não tem nenhum — DERIVADO DA
+ *  POSIÇÃO, como o dos serviços e pelas mesmas razões (ver
+ *  {@link withServiceIds}: um id sorteado faria o mesmo documento serializar
+ *  diferente a cada chamada). */
+export function fallbackMoodBoardId(index: number): string {
+  return `mb${index}`;
+}
+
+/**
+ * Devolve as páginas de inspiração com `id` em todas, preenchendo as que
+ * faltam a partir da posição. Ids repetidos são desempatados com um sufixo,
+ * também determinístico.
+ *
+ * Devolve o MESMO array quando não há nada a preencher, para o editor poder
+ * comparar por identidade e não voltar a desenhar.
+ */
+export function withMoodBoardIds(boards: readonly MoodBoard[]): MoodBoard[] {
+  const usados = new Set<string>();
+  const livre = (base: string): string => {
+    let id = base;
+    for (let n = 2; usados.has(id); n++) id = `${base}_${n}`;
+    usados.add(id);
+    return id;
+  };
+  let mudou = false;
+  const proximos = boards.map((b, i) => {
+    const id = livre(b.id || fallbackMoodBoardId(i));
+    if (id === b.id) return b;
+    mudou = true;
+    return { ...b, id };
+  });
+  return mudou ? proximos : (boards as MoodBoard[]);
 }
 
 /** A timeline phase in the "Cronograma de Organização" (Organização template). */
@@ -839,7 +904,7 @@ export function withProposalDefaults(
     // {@link withServiceIds}), para o editor ter uma identidade estável por
     // linha sem que o documento serialize diferente a cada chamada.
     serviceGroups: withServiceIds(doc.serviceGroups ?? []),
-    moodBoards: doc.moodBoards ?? [],
+    moodBoards: withMoodBoardIds(doc.moodBoards ?? []),
     cronograma: doc.cronograma ?? [],
     budgetItems: doc.budgetItems ?? [],
     budgetExtras: doc.budgetExtras ?? [],

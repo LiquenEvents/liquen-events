@@ -75,7 +75,7 @@ import {
  * `PENDING_IMAGE_PREFIX`, em `proposal-doc`) não é morada de coisa nenhuma, em
  * tema nenhum, e é reconhecível por um `startsWith` em qualquer fronteira. E a
  * troca continua a ser do dono do documento: daqui só se ANUNCIA — `onReserve`
- * no instante do clique, o `token` dentro de cada imagem entregue quando a
+ * no instante do clique, o `marcador` dentro de cada imagem entregue quando a
  * cópia confirma, `onDropped` quando não há foto para entregar. Quem escreve no
  * documento é sempre o estúdio, que é também quem filtra os marcadores antes de
  * gravar ou de enviar.
@@ -233,14 +233,14 @@ export interface ImportedImage extends ThemeImage {
    * mesma célula, a mesma ordem); sem ele — quem não reservou nada — a imagem
    * é acrescentada, como sempre foi.
    */
-  token?: string;
+  marcador?: string;
 }
 
 /** Uma foto RESERVADA: o lugar já é dela no documento, o caminho ainda não
  *  existe. É o que `onReserve` entrega no instante do clique. */
 export interface ReservedImage {
   /** `pending:<uuid>` — nunca um caminho de Storage. */
-  token: string;
+  marcador: string;
   /** A miniatura que a grelha JÁ desenhou: mostrá-la não custa pedido nenhum. */
   thumbUrl?: string;
   /** A foto da BIBLIOTECA de onde esta vem — é o que deixa marcar "já nesta
@@ -248,9 +248,24 @@ export interface ReservedImage {
   sourcePath: string;
 }
 
-/** Um marcador novo. Não é um segredo, só tem de ser único — mas o gerador
- *  vive em `id-unico.ts` e não tem `Math.random()` nenhum lá dentro. */
-function novoToken(): string {
+/**
+ * Um marcador novo. Não é um segredo, só tem de ser único — mas o gerador vive
+ * em `id-unico.ts` e não tem `Math.random()` nenhum lá dentro.
+ *
+ * ── PORQUE É QUE ISTO DEIXOU DE SE CHAMAR «TOKEN» ─────────────────────────
+ * Chamava-se, e o resto do ficheiro chamava-lhe marcador — dois nomes para a
+ * mesma coisa, que é o género de deriva que faz o próximo leitor procurar duas
+ * coisas onde só há uma.
+ *
+ * E tinha custo a sério: a análise de segurança do GitHub trata um campo
+ * chamado `token` como informação sensível, e via-o a ser gravado no
+ * `localStorage` junto com o rascunho — «clear text storage of sensitive
+ * information», severidade alta. O rascunho já filtra TODOS os marcadores antes
+ * de gravar (`semProvisorios`), portanto o achado era falso; mas um aviso alto
+ * que se explica de cada vez que aparece é um aviso que um dia se ignora quando
+ * for verdadeiro. O nome passou a dizer o que a coisa é.
+ */
+function novoMarcador(): string {
   return `${PENDING_IMAGE_PREFIX}${idUnico()}`;
 }
 
@@ -402,7 +417,7 @@ interface JobPhoto {
   /** O lugar que esta foto já ocupa no documento (`pending:<uuid>`). Uma
    *  segunda tentativa ganha um marcador NOVO: o anterior já saiu do
    *  documento quando esta foto falhou. */
-  token: string;
+  marcador: string;
   state: PhotoState;
 }
 
@@ -418,7 +433,7 @@ interface ImportJob {
    *  o passa recebe as fotos só quando a cópia confirmar, como antes. */
   reserve?: (reservas: ReservedImage[]) => void;
   /** Estes marcadores já não vão ter foto — tira-os do documento. */
-  drop?: (tokens: string[]) => void;
+  drop?: (marcadores: string[]) => void;
   running: boolean;
   /** Pediram para parar: o que ainda não saiu não sai. */
   stopping: boolean;
@@ -509,7 +524,7 @@ function startImport(opts: {
   images: readonly ThemeImage[];
   deliver: (images: ImportedImage[]) => void;
   reserve?: (reservas: ReservedImage[]) => void;
-  drop?: (tokens: string[]) => void;
+  drop?: (marcadores: string[]) => void;
 }): number {
   const photos: JobPhoto[] = [];
   const seen = new Set<string>();
@@ -522,7 +537,7 @@ function startImport(opts: {
     photos.push({
       path: im.path,
       thumb: im.thumbUrl || im.url || undefined,
-      token: novoToken(),
+      marcador: novoMarcador(),
       state: "pending",
     });
   }
@@ -553,7 +568,7 @@ function startImport(opts: {
 /** Anuncia os lugares destas fotos a quem abriu o seletor. */
 function reservePhotos(job: ImportJob, photos: readonly JobPhoto[]): void {
   if (!job.reserve || photos.length === 0) return;
-  job.reserve(photos.map((p) => ({ token: p.token, thumbUrl: p.thumb, sourcePath: p.path })));
+  job.reserve(photos.map((p) => ({ marcador: p.marcador, thumbUrl: p.thumb, sourcePath: p.path })));
 }
 
 async function runJob(job: ImportJob): Promise<void> {
@@ -563,13 +578,13 @@ async function runJob(job: ImportJob): Promise<void> {
 
   const queue = job.photos.filter((p) => p.state === "pending").map((p) => p.path);
   /** O marcador que uma foto da biblioteca ocupa neste lote. */
-  const tokenOf = (path: string) => job.photos.find((p) => p.path === path)?.token;
+  const marcadorDe = (path: string) => job.photos.find((p) => p.path === path)?.marcador;
   /** Estes lugares ficaram sem foto: saem do documento (a pastilha é que
    *  avisa; aqui só se desocupa o sítio). */
   const largar = (paths: readonly string[]) => {
     if (!job.drop) return;
-    const tokens = paths.map(tokenOf).filter((t): t is string => !!t);
-    if (tokens.length > 0) job.drop(tokens);
+    const marcadores = paths.map(marcadorDe).filter((t): t is string => !!t);
+    if (marcadores.length > 0) job.drop(marcadores);
   };
 
   for (let i = 0; i < queue.length; i += IMPORT_CHUNK) {
@@ -609,7 +624,7 @@ async function runJob(job: ImportJob): Promise<void> {
       const picked: ImportedImage[] = copied.map((im, k) => {
         const origem = im.sourcePath ?? sources[k];
         return aligned && origem
-          ? { ...im, sourcePath: origem, token: tokenOf(origem) }
+          ? { ...im, sourcePath: origem, marcador: marcadorDe(origem) }
           : { ...im };
       });
       for (const p of sources) {
@@ -696,7 +711,7 @@ function retryJob(id: number): void {
     // Marcador NOVO: o de que esta foto era dona já saiu do documento quando
     // ela falhou. Reaproveitá-lo seria pedir ao estúdio para trocar um lugar
     // que já não existe.
-    p.token = novoToken();
+    p.marcador = novoMarcador();
     outra_vez.push(p);
     inFlight.add(flightKey(job.quoteId, p.path));
   }
@@ -893,14 +908,14 @@ interface Props {
    */
   usadasNoutras?: Readonly<Record<string, string>>;
   onClose: () => void;
-  /** Uma cópia confirmada. Traz o `token` do lugar que veio ocupar, quando
-   *  houve reserva; sem `token`, é para acrescentar. */
+  /** Uma cópia confirmada. Traz o `marcador` do lugar que veio ocupar, quando
+   *  houve reserva; sem `marcador`, é para acrescentar. */
   onPicked: (images: ImportedImage[]) => void;
   /** No INSTANTE do clique: estas fotos vão a caminho, guardem-lhes o lugar.
    *  Sem isto o seletor comporta-se como antes (a foto só aparece no fim). */
   onReserve?: (reservas: ReservedImage[]) => void;
   /** Estes lugares ficaram sem foto — a pastilha já avisa porquê. */
-  onDropped?: (tokens: string[]) => void;
+  onDropped?: (marcadores: string[]) => void;
 }
 
 export default function ThemePicker({

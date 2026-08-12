@@ -106,7 +106,7 @@ const onReserve = vi.fn();
 const onDropped = vi.fn();
 
 /** Todos os marcadores reservados, pela ordem por que o estúdio os recebeu. */
-function reservados(): { token: string; thumbUrl?: string; sourcePath: string }[] {
+function reservados(): { marcador: string; thumbUrl?: string; sourcePath: string }[] {
   return onReserve.mock.calls.flatMap((c) => c[0]);
 }
 
@@ -465,8 +465,8 @@ describe("ThemePicker", () => {
     ]);
     expect(lugares[0].thumbUrl).toBe("https://cdn.test/t1-thumb-1.jpg");
     // Marcadores, não caminhos — e todos diferentes.
-    expect(lugares.every((r) => r.token.startsWith("pending:"))).toBe(true);
-    expect(new Set(lugares.map((r) => r.token)).size).toBe(3);
+    expect(lugares.every((r) => r.marcador.startsWith("pending:"))).toBe(true);
+    expect(new Set(lugares.map((r) => r.marcador)).size).toBe(3);
     expect(onPicked).not.toHaveBeenCalled();
 
     // A cópia confirma e cada foto diz que lugar vem ocupar.
@@ -477,7 +477,7 @@ describe("ThemePicker", () => {
         expect.objectContaining({
           path: `LQ-001/copia-foto-${i + 1}.jpg`,
           sourcePath: r.sourcePath,
-          token: r.token,
+          marcador: r.marcador,
         }),
       ),
     );
@@ -498,9 +498,9 @@ describe("ThemePicker", () => {
 
     // A que falhou larga o lugar; a que entrou fica com o dela.
     await waitFor(() => expect(onDropped).toHaveBeenCalledTimes(1));
-    expect(onDropped.mock.calls[0][0]).toEqual([primeiros[1].token]);
+    expect(onDropped.mock.calls[0][0]).toEqual([primeiros[1].marcador]);
     expect(onPicked.mock.calls[0][0]).toEqual([
-      expect.objectContaining({ sourcePath: "t1/foto-1.jpg", token: primeiros[0].token }),
+      expect.objectContaining({ sourcePath: "t1/foto-1.jpg", marcador: primeiros[0].marcador }),
     ]);
 
     // À segunda vai — com um lugar NOVO, porque o anterior já saiu do documento.
@@ -509,10 +509,10 @@ describe("ThemePicker", () => {
     await waitFor(() => expect(onReserve).toHaveBeenCalledTimes(2));
     const segundo = onReserve.mock.calls[1][0];
     expect(segundo).toEqual([expect.objectContaining({ sourcePath: "t1/foto-2.jpg" })]);
-    expect(segundo[0].token).not.toBe(primeiros[1].token);
+    expect(segundo[0].marcador).not.toBe(primeiros[1].marcador);
     await waitFor(() =>
       expect(onPicked.mock.calls.at(-1)?.[0]).toEqual([
-        expect.objectContaining({ sourcePath: "t1/foto-2.jpg", token: segundo[0].token }),
+        expect.objectContaining({ sourcePath: "t1/foto-2.jpg", marcador: segundo[0].marcador }),
       ]),
     );
   });
@@ -545,7 +545,7 @@ describe("ThemePicker", () => {
     await waitFor(() => expect(onDropped).toHaveBeenCalled());
     await waitFor(() => expect(onDropped.mock.calls.flatMap((c) => c[0])).toHaveLength(20));
     expect(onDropped.mock.calls.flatMap((c) => c[0]).sort()).toEqual(
-      lugares.map((r) => r.token).sort(),
+      lugares.map((r) => r.marcador).sort(),
     );
     expect(onPicked).not.toHaveBeenCalled();
   });

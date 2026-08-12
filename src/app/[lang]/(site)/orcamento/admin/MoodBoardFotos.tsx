@@ -263,10 +263,13 @@ export function CartaoDeBoard({
   bi,
   children,
   className = "",
+  ancora,
 }: {
   bi: number;
   children: (pega: React.HTMLAttributes<HTMLElement>) => ReactNode;
   className?: string;
+  /** `id` no DOM, para o índice lateral poder saltar para aqui. */
+  ancora?: string;
 }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: idDoBoard(bi),
@@ -274,8 +277,11 @@ export function CartaoDeBoard({
   return (
     <div
       ref={setNodeRef}
+      id={ancora}
+      // `scroll-mt`: o back office tem uma barra fixa no topo, e sem margem de
+      // deslocamento o salto do índice deixa o cabeçalho do board por baixo dela.
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`${className} ${isDragging ? "relative z-10 opacity-90 shadow-lg ring-2 ring-[#4d6350]" : ""}`}
+      className={`scroll-mt-24 ${className} ${isDragging ? "relative z-10 opacity-90 shadow-lg ring-2 ring-[#4d6350]" : ""}`}
     >
       {children({ ...attributes, ...listeners })}
     </div>
@@ -315,6 +321,7 @@ export function CelulaDeFoto({
   accoes,
   principal = false,
   seleccionada = false,
+  bloqueada = false,
 }: {
   bi: number;
   ii: number;
@@ -323,9 +330,11 @@ export function CelulaDeFoto({
   /** É a foto que manda na página — ver `proposal-moodboard.ts`. */
   principal?: boolean;
   seleccionada?: boolean;
+  /** O board está fechado: a foto vê-se, não se mexe. */
+  bloqueada?: boolean;
 }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging, isOver } =
-    useSortable({ id: idDaFoto(bi, ii) });
+    useSortable({ id: idDaFoto(bi, ii), disabled: bloqueada });
 
   return (
     <div
@@ -359,15 +368,17 @@ export function CelulaDeFoto({
       {/* A PEGA. Alvo próprio de 44 px no dedo (`alvo-toque`), sempre visível
           onde não há hover nenhum — no telemóvel, uma pega que só aparece ao
           passar o rato é uma pega que não existe. */}
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        aria-label={`Arrastar a fotografia ${ii + 1}`}
-        className="alvo-toque absolute top-1 right-1 z-20 flex h-6 w-6 cursor-grab items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white opacity-0 transition-opacity group-hover/foto:opacity-100 focus-visible:opacity-100 active:cursor-grabbing [@media(hover:none)]:opacity-100"
-      >
-        <span aria-hidden="true">⠿</span>
-      </button>
+      {!bloqueada && (
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label={`Arrastar a fotografia ${ii + 1}`}
+          className="alvo-toque absolute top-1 right-1 z-20 flex h-6 w-6 cursor-grab items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white opacity-0 transition-opacity group-hover/foto:opacity-100 focus-visible:opacity-100 active:cursor-grabbing [@media(hover:none)]:opacity-100"
+        >
+          <span aria-hidden="true">⠿</span>
+        </button>
+      )}
       {accoes}
     </div>
   );

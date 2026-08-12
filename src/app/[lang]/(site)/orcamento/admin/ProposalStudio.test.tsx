@@ -22,14 +22,14 @@ import type { Quote } from "@/lib/orcamento/types";
  *  CONFIRMA (e traz o caminho definitivo), ou FALHA. É por aqui que uma foto
  *  entra num mood board sem passar por um ficheiro real (o carregamento
  *  verdadeiro precisa de canvas/worker, que o jsdom não tem). */
-const seletor = vi.hoisted(() => ({ tokens: [] as string[], n: 0 }));
+const seletor = vi.hoisted(() => ({ marcadores: [] as string[], n: 0 }));
 
 interface FotoImportada {
   path: string;
   url: string;
   thumbUrl?: string;
   sourcePath?: string;
-  token?: string;
+  marcador?: string;
 }
 
 vi.mock("./ThemePicker", () => ({
@@ -39,17 +39,19 @@ vi.mock("./ThemePicker", () => ({
     onDropped,
   }: {
     onPicked: (imgs: FotoImportada[]) => void;
-    onReserve?: (r: { token: string; thumbUrl?: string; sourcePath: string }[]) => void;
-    onDropped?: (tokens: string[]) => void;
+    onReserve?: (r: { marcador: string; thumbUrl?: string; sourcePath: string }[]) => void;
+    onDropped?: (marcadores: string[]) => void;
   }) => (
     <>
       <button
         type="button"
         onClick={() => {
           const n = ++seletor.n;
-          const token = `pending:tok-${n}`;
-          seletor.tokens.push(token);
-          onReserve?.([{ token, thumbUrl: `tema-thumb-${n}`, sourcePath: `t1/origem-${n}.jpg` }]);
+          const marcador = `pending:tok-${n}`;
+          seletor.marcadores.push(marcador);
+          onReserve?.([
+            { marcador, thumbUrl: `tema-thumb-${n}`, sourcePath: `t1/origem-${n}.jpg` },
+          ]);
         }}
       >
         reservar-foto-de-teste
@@ -59,15 +61,15 @@ vi.mock("./ThemePicker", () => ({
         onClick={() => {
           // Confirma a ÚLTIMA reservada — é o que deixa verificar que a troca é
           // no lugar dela, e não no fim da lista.
-          const token = seletor.tokens.pop();
-          const n = token?.replace("pending:tok-", "") ?? "0";
+          const marcador = seletor.marcadores.pop();
+          const n = marcador?.replace("pending:tok-", "") ?? "0";
           onPicked([
             {
               path: `LQ-001/copia-${n}.jpg`,
               url: `u-${n}`,
               thumbUrl: `copia-thumb-${n}`,
               sourcePath: `t1/origem-${n}.jpg`,
-              token,
+              marcador,
             },
           ]);
         }}
@@ -77,8 +79,8 @@ vi.mock("./ThemePicker", () => ({
       <button
         type="button"
         onClick={() => {
-          const token = seletor.tokens.pop();
-          if (token) onDropped?.([token]);
+          const marcador = seletor.marcadores.pop();
+          if (marcador) onDropped?.([marcador]);
         }}
       >
         falhar-foto-de-teste
@@ -235,7 +237,7 @@ function corpos(parte: string, metodo = "PUT"): string[] {
 
 beforeEach(() => {
   localStorage.clear();
-  seletor.tokens.length = 0;
+  seletor.marcadores.length = 0;
   seletor.n = 0;
   pedidos = [];
   propostaDoc = reply({ headers: {}, json: { ok: true, emailed: true } });
