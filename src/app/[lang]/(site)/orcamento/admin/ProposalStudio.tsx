@@ -1067,7 +1067,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const warnedOverwrite = useRef(false);
 
   // ── Restore draft on mount ──
+  //
+  // ════════════════════════════════════════════════════════════════════════
+  // CORRE UMA VEZ SÓ, E O `return` DE CIMA É O QUE O GARANTE
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // As dependências vazias não chegam. Em desenvolvimento o React monta,
+  // limpa e volta a montar cada componente de propósito (`reactStrictMode`),
+  // e este efeito corria as duas vezes — mas a SEGUNDA já não lia o rascunho
+  // dela. Lia o que a gravação automática tinha entretanto escrito por cima.
+  //
+  // A sequência medida, com um rascunho de 2 boards no `localStorage`:
+  //
+  //   1ª passagem   lê 2 boards, põe `setDoc` na fila, `hydrated = true`
+  //   (a limpeza)   `hydrated` já é `true`, portanto a desmontagem simulada
+  //                 grava — e o documento que ela tem à mão ainda é o de
+  //                 ANTES do restauro: escreve 0 boards por cima dos 2
+  //   2ª passagem   lê os 0 boards que acabaram de ser escritos e mete-os
+  //                 na fila também
+  //   fim           as duas actualizações correm por ordem: 0 → 2 → 0
+  //
+  // Resultado: o estúdio abria vazio com o trabalho todo no `localStorage`, e
+  // a gravação seguinte tornava a perda definitiva. Era isto que impedia
+  // qualquer teste de ponta-a-ponta de partir de um rascunho semeado — a
+  // suite das propostas corre contra o servidor de DESENVOLVIMENTO, que é
+  // precisamente onde a segunda passagem existe.
+  //
+  // Um efeito de restauro tem de ser idempotente: correr outra vez não pode
+  // significar ler outra vez. Lido uma vez, fica lido.
   useEffect(() => {
+    if (hydrated.current) return;
     let hadDraft = false;
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -1421,8 +1450,30 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // abaixo) o poder ler: essa corre uma vez só, com as dependências vazias, e
   // portanto ficaria para sempre com o `porGravar` do primeiro desenho.
   const porGravarRef = useRef(false);
+  /**
+   * A montagem NÃO é trabalho por gravar.
+   *
+   * Este efeito também corre no desenho da montagem, e ali o `doc` ainda é o
+   * de antes do restauro — o restauro deixou o `setDoc` na fila e ele só
+   * chega ao desenho seguinte. Marcar «por gravar» já aqui dava à limpeza da
+   * desmontagem (mais abaixo) autorização para gravar esse documento, que é
+   * o documento VAZIO: quem abrisse o estúdio e saísse no mesmo instante
+   * escrevia-o por cima do rascunho guardado.
+   *
+   * Saltar a primeira passagem não adia nada do que interessa: o restauro (ou
+   * o `seedDefaults`, quando não há rascunho) muda o documento e faz este
+   * efeito correr outra vez — aí sim, com a versão boa à mão. E quando o
+   * restauro não muda nada, não há mesmo nada por gravar: é o caso que o
+   * comentário de cima descreve, o de cada troca de separador pagar um PUT
+   * para reescrever o que já lá estava.
+   */
+  const montagem = useRef(true);
   useEffect(() => {
     if (!hydrated.current) return;
+    if (montagem.current) {
+      montagem.current = false;
+      return;
+    }
     porGravarRef.current = true;
     setPorGravar(true);
   }, [doc, assetUrls, themeOrigins, refEdited]);

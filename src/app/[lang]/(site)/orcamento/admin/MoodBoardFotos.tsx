@@ -8,11 +8,14 @@ import {
   MouseSensor,
   TouchSensor,
   closestCenter,
+  type CollisionDetection,
   useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
+  type KeyboardCoordinateGetter,
+  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -81,6 +84,91 @@ function lerIdSimples(id: string, prefixo: string): number | null {
   return Number.isInteger(n) ? n : null;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS SETAS SÓ PARAM ONDE LARGAR FAZ ALGUMA COISA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `sortableKeyboardCoordinates` procura o vizinho na direcção da seta entre
+ * TODAS as zonas de largada. Aqui há três famílias — a foto (`foto:b:i`), a
+ * grelha de um board (`grelha:b`) e o board inteiro (`board:b`) — e as duas
+ * últimas são caixas grandes, que envolvem as fotos. Numa janela estreita a
+ * caixa grande ganha sempre a corrida ao vizinho seguinte: MEDIDO num ecrã de
+ * telemóvel, a seta para baixo a partir da primeira foto ia parar a `grelha:0`
+ * e a seguinte a `board:0` — nunca à segunda foto.
+ *
+ * E `board:0` nem sequer é um destino: o `aoLargar` ignora um board quando o
+ * que vem na mão é uma foto. O teclado andava, portanto, para sítios onde
+ * largar não fazia nada — o gesto completo (Espaço, seta, Espaço) acabava sem
+ * alteração nenhuma e sem uma palavra a dizer porquê. Com o rato isto não se
+ * nota, porque a mão aponta a célula; quem só tem teclado ficava sem forma de
+ * reordenar fotos num ecrã estreito.
+ *
+ * A regra aqui é a MESMA que o `aoLargar` já aplica, dita antes do gesto em
+ * vez de depois:
+ *
+ *  · com uma foto na mão, valem as outras fotos (reordenar, ou mudar de
+ *    board) e as grelhas dos OUTROS boards — que é como se chega a um board
+ *    vazio, o único que não tem fotos sobre que largar. A grelha do próprio
+ *    board não vale: largar uma foto no board onde ela já está é um não-gesto;
+ *  · com um board na mão, valem só os outros boards.
+ */
+function alvosValidosPara(activo: string): (id: string) => boolean {
+  const foto = lerIdDeFoto(activo);
+  const board = lerIdSimples(activo, "board");
+  return (id: string) => {
+    if (foto) {
+      if (lerIdDeFoto(id)) return true;
+      const grelha = lerIdSimples(id, "grelha");
+      return grelha !== null && grelha !== foto.bi;
+    }
+    if (board !== null) return lerIdSimples(id, "board") !== null;
+    return true;
+  };
+}
+
+/**
+ * A MESMA regra, aplicada a quem decide sobre o que se está pousado.
+ *
+ * O `coordinateGetter` só escolhe para onde o teclado MOVE; quem decide o
+ * `over` — e portanto o que acontece ao largar — é a detecção de colisões, e
+ * essa corre sobre todas as zonas outra vez. Filtrar só num dos dois deixava o
+ * teclado a mover-se para cima da segunda foto e o `over` a dizer `board:0`,
+ * que é precisamente o destino que não faz nada.
+ *
+ * Vale para o rato pela mesma razão, e melhora-o: arrastar uma foto para o
+ * espaço vazio do próprio board dava `grelha:0` e um não-gesto; agora encontra
+ * a foto mais próxima, que é o que a mão estava a pedir.
+ */
+export const deteccaoDeColisao: CollisionDetection = (args) => {
+  const vale = alvosValidosPara(String(args.active.id));
+  return closestCenter({
+    ...args,
+    droppableContainers: args.droppableContainers.filter((c) => vale(String(c.id))),
+  });
+};
+
+export const coordenadasDeTeclado: KeyboardCoordinateGetter = (event, args) => {
+  const vale = alvosValidosPara(String(args.context.active?.id ?? ""));
+  const zonas = args.context.droppableContainers;
+  return sortableKeyboardCoordinates(event, {
+    ...args,
+    context: {
+      ...args.context,
+      // DELEGAR, e não copiar. O `DroppableContainers` do dnd-kit é um `Map`,
+      // e um `Map` não sobrevive a um `Object.assign`: a cópia fica com os
+      // métodos e sem os dados, e o `get(active.id)` que o
+      // `sortableKeyboardCoordinates` faz mais à frente devolvia `undefined` —
+      // com o gesto todo a não sair do sítio, em silêncio. Aqui só se
+      // intercepta o `getEnabled`; o `get` vai ao objeto verdadeiro.
+      droppableContainers: {
+        get: (id: UniqueIdentifier) => zonas.get(id),
+        getEnabled: () => zonas.getEnabled().filter((c) => vale(String(c.id))),
+      } as unknown as typeof zonas,
+    },
+  });
+};
+
 /** O que aconteceu quando ela largou. */
 export type LargadaDeFoto =
   | { tipo: "reordenar"; bi: number; de: number; para: number }
@@ -128,7 +216,7 @@ export function ArrastoDosMoodBoards({
   const sensores = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: coordenadasDeTeclado }),
   );
 
   function aoComecar(e: DragStartEvent) {
@@ -194,7 +282,7 @@ export function ArrastoDosMoodBoards({
   return (
     <DndContext
       sensors={sensores}
-      collisionDetection={closestCenter}
+      collisionDetection={deteccaoDeColisao}
       onDragStart={aoComecar}
       onDragEnd={aoLargar}
       onDragCancel={() => onArrastoComeca(null)}

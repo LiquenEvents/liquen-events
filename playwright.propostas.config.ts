@@ -28,7 +28,7 @@ const baseURL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: ["**/proposta-fluxos.spec.ts"],
+  testMatch: ["**/proposta-fluxos.spec.ts", "**/moodboards-arrasto.spec.ts"],
   // Em série: os dois passeios criam pedidos e mexem na mesma lista.
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
