@@ -72,7 +72,7 @@ import {
   linhasDe,
   normalizarValor,
   removerLinha,
-  somaDosItens,
+  somaDosServicos,
   somaDosExtras,
   somaDosExtrasSemIva,
   asDuasFormas,
@@ -1485,7 +1485,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // A soma das linhas e o desvio do total escrito à mão. Os dois vivem aqui em
   // cima porque são lidos em três sítios: ao lado das linhas, no aviso junto ao
   // total, e na barra fixa do fundo.
-  const soma = somaDosItens(doc);
+  const soma = somaDosServicos(doc);
   const desvio = desalinhamento(doc, money.base);
   /** Quantas pessoas, lido do campo do documento ("125 pax" → 125). */
   const convidados = convidadosDoDoc(doc as ProposalDoc);
@@ -3695,15 +3695,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     O total está escrito à mão e difere da soma das linhas em{" "}
                     <strong className="font-semibold">{eur(Math.abs(desvio.diferenca))}</strong>.
                   </span>
+                  {/**
+                   * O BOTÃO ESCREVE A SOMA COM OS ADICIONAIS, e não a soma das
+                   * linhas que está escrita ao lado.
+                   *
+                   * O campo onde ele escreve é o TOTAL, e o total desta casa
+                   * inclui os valores adicionais — é o que o `definirExtras`
+                   * faz quando se acrescenta uma deslocação, e é o que o PDF
+                   * confirma ao subtrai-los para imprimir a linha «Valor
+                   * Total». Escrever aqui a soma dos serviços apagava a
+                   * deslocação do preço final e, com ela, do sinal e da
+                   * factura que sai a seguir.
+                   *
+                   * E por isso o rótulo mostra o número que vai mesmo ser
+                   * escrito: um botão que diz 75 € e escreve 2460 € é pior do
+                   * que não haver botão nenhum.
+                   */}
                   <button
                     type="button"
                     className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
                     onClick={() => {
                       confirmado("totalAmount");
-                      onTotalInput(String(desvio.soma));
+                      onTotalInput(String(desvio.sugerido));
                     }}
                   >
-                    Usar {eur(desvio.soma)}
+                    Usar {eur(desvio.sugerido)}
                   </button>
                 </div>
               )}
