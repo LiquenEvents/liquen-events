@@ -322,6 +322,42 @@ export function juntarParagrafo(linhas: readonly Linha[]): string {
     .trim();
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MARCA DA LISTA, QUANDO ELA VEM MESMO ESCRITA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Nas nossas folhas o pontinho de uma lista é um DESENHO: não chega cá, e por
+ * isso {@link import("./campos").lerLista} tem de descobrir onde acaba cada
+ * item medindo os saltos verticais.
+ *
+ * Numa folha feita em Word é TEXTO. A proposta da Mariana traz 46 linhas
+ * começadas por «•», e as continuações de um item — o resto de uma condição que
+ * ocupa três linhas — não trazem nenhum. Isso é melhor do que qualquer medida:
+ * é a própria folha a dizer onde cada item começa.
+ *
+ * Só contam os glifos que são mesmo marcas de lista. O «·» ficou de fora de
+ * propósito: é o separador da referência do documento («Decoração Casamento
+ * Mariana e João · 5.06.2027»), e o travessão idem — uma frase pode começar por
+ * um.
+ */
+const MARCA_DE_LISTA = /^\s*[•▪◦‣●○]\s*/u;
+
+/** Esta linha começa por uma marca de lista IMPRESSA? */
+export function comecaPorMarca(texto: string): boolean {
+  return MARCA_DE_LISTA.test(texto);
+}
+
+/**
+ * O texto de um item de lista: as suas linhas juntas, sem a marca à cabeça.
+ *
+ * A marca é composição, não é conteúdo — um item que entrasse no estúdio como
+ * «• Seatting Plan» saía impresso com dois pontinhos, o dela e o nosso.
+ */
+export function juntarItem(linhas: readonly Linha[]): string {
+  return juntarParagrafo(linhas).replace(MARCA_DE_LISTA, "");
+}
+
 /** A caixa que engloba um conjunto de linhas — para o ecrã poder desenhar o
  *  rectângulo «isto veio daqui» por cima do PDF. */
 export function caixaDe(linhas: readonly Linha[]): {

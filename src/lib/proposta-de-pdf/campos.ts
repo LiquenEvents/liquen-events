@@ -33,7 +33,9 @@ import { parseMoneyText, detectVatMode } from "@/lib/proposal-doc";
 import {
   caixaDe,
   chaveDeRotulo,
+  comecaPorMarca,
   eRotulo,
+  juntarItem,
   juntarParagrafo,
   linhasDaPagina,
   seguimentoAbaixo,
@@ -80,6 +82,71 @@ const SECCOES_PEQUENAS: Record<string, string> = {
   Contactos: "contactos",
 };
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS MESMAS SECÇÕES, COMO UMA FOLHA DE WORD AS ESCREVE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As duas propostas verdadeiras feitas à mão não têm um único cabeçalho em
+ * corpo 20: têm «1. Apresentação» e «3. Orçamento Proposto» em corpo 10,
+ * «Notas Importantes» em 11, e «INCLUÍDO NA PROPOSTA:», «CONDIÇÕES GERAIS:»,
+ * «FASEAMENTO DO PAGAMENTO:» e «CANCELAMENTO:» em capitulares de corpo 8 — o
+ * mesmo corpo do texto que lhes fica por baixo. Procurar cabeçalhos pelo
+ * TAMANHO devolvia zero em dez, e com eles iam-se as listas todas.
+ *
+ * O que estas folhas têm, e o texto à volta não tem, é uma MARCA: o número de
+ * ordem à cabeça, os dois pontos no fim, ou um corpo maior do que o da página.
+ * É essa marca que separa um cabeçalho de uma frase que por acaso diz o mesmo —
+ * ver {@link nomeDeSeccaoAMao}.
+ *
+ * Alguns destes nomes não têm campo nenhum («Condições de Reserva»,
+ * «CONTACTOS:»): entram na mesma, porque uma secção que não se lê continua a
+ * ser a FRONTEIRA da que vem antes. Sem a de contactos, a lista de cancelamento
+ * da Mariana acabava com o email e o telefone da Líquen lá dentro.
+ */
+const SECCOES_A_MAO: Record<string, string> = {
+  Apresentação: "apresentacao",
+  Serviços: "servicos",
+  "Cronograma de Organização": "cronograma",
+  "Orçamento Proposto": "orcamento",
+  "Notas Importantes": "notas",
+  "Condições de Reserva": "reserva",
+  "Incluído na Proposta": "incluido",
+  "Não Incluído": "naoIncluido",
+  "Não Incluído no Orçamento": "naoIncluido",
+  "Condições Gerais": "condicoes",
+  "Observações Gerais": "observacoes",
+  "Faseamento do Pagamento": "faseamento",
+  Cancelamento: "cancelamento",
+  Contactos: "contactos",
+  "Próximos Passos": "proximos",
+};
+
+/** O número de ordem à cabeça de um cabeçalho («1.», «2)», e o ponto solto que
+ *  o Word deixa antes dele). */
+const ORDINAL_A_CABECA = /^[\s.·]*(?:\d{1,2}\s*[.)])?\s*/;
+
+/**
+ * O nome da secção que este texto é — ou `null`.
+ *
+ * Tira o número de ordem e os dois pontos finais ANTES de comparar, porque é
+ * disso que a folha à mão está cheia: «2. Serviços» e «CONDIÇÕES GERAIS:» são
+ * a mesma secção que «Serviços» e «Condições Gerais», escritas à maneira de
+ * quem numera capítulos no Word.
+ */
+function nomeDeSeccaoAMao(texto: string): string | null {
+  const limpo = texto.replace(ORDINAL_A_CABECA, "").replace(/\s*:\s*$/, "");
+  if (!limpo) return null;
+  const chave = chaveDeRotulo(limpo);
+  return Object.entries(SECCOES_A_MAO).find(([t]) => chaveDeRotulo(t) === chave)?.[1] ?? null;
+}
+
+/** Este texto traz a marca de um cabeçalho escrito à mão — um número de ordem
+ *  à cabeça ou dois pontos no fim? */
+function temMarcaDeCabecalho(texto: string): boolean {
+  return /^[\s.·]*\d{1,2}\s*[.)]\s+\S/.test(texto) || /\S\s*:\s*$/.test(texto);
+}
+
 interface Seccao {
   nome: string;
   /** A linha do cabeçalho. */
@@ -92,6 +159,9 @@ interface Contexto {
   paginas: PaginaLida[];
   linhas: Linha[];
   seccoes: Seccao[];
+  /** As páginas de inspiração de uma folha feita à mão, com o texto que lá
+   *  está — fora de `linhas`, para não entrarem na secção onde calharam. */
+  moodboardsAMao: { pagina: number; linhas: Linha[] }[];
   margem: number;
   /** Largura da página, para saber onde a mancha de texto acaba. */
   largura: number;
@@ -126,23 +196,37 @@ export function camposDoDocumento(paginas: readonly PaginaLida[]): Colheita {
   const alturaPagina = paginas[0]?.altura || 595.28;
   const doCorpo = linhas.filter((l) => l.y > 60 && !ehCabecalhoCorrente(l, linhas, alturaPagina));
 
+  // As páginas de inspiração de uma folha à mão saem do corpo ANTES de haver
+  // secções: o título manuscrito de um mood board no meio da secção dos
+  // serviços seria lido como mais um serviço, e as quatro linhas de descrição
+  // de uma delas como quatro.
+  const paginasAMao = paginasDeInspiracaoAMao(doCorpo);
   const ctx: Contexto = {
     paginas: [...paginas],
-    linhas: doCorpo,
+    linhas: doCorpo.filter((l) => !paginasAMao.has(l.pagina)),
     seccoes: [],
-    margem,
+    moodboardsAMao: [...paginasAMao]
+      .sort((a, b) => a - b)
+      .map((p) => ({ pagina: p, linhas: doCorpo.filter((l) => l.pagina === p) })),
+    margem: 68,
     largura,
     negra: null,
   };
+  // A margem mede-se no que SOBRA: numa proposta feita à mão as páginas de
+  // inspiração são em paisagem e têm títulos a começar em x=7, e com elas na
+  // conta a margem do documento dava 7 — nenhum cabeçalho ficava «encostado à
+  // margem» e não se encontrava secção nenhuma.
+  ctx.margem = ctx.linhas.length ? Math.min(...ctx.linhas.map((l) => l.x)) : margem;
   ctx.seccoes = seccoesDo(ctx);
   ctx.negra = fonteNegra(ctx);
 
   // ── O que se lê fora de qualquer secção ──
-  lerRef(ctx, linhas, campos, porLer);
-  const template = lerTemplate(ctx, campos);
+  const ref = lerRef(ctx, linhas, campos, porLer);
+  const template = lerTemplate(ctx, campos) ?? lerTemplateDaRef(ref, campos);
 
   // ── Secção a secção ──
   lerApresentacao(ctx, campos, porLer);
+  lerDaRef(ref, campos, porLer);
   lerServicos(ctx, campos, porLer);
   lerCronograma(ctx, campos);
   lerMoodboards(ctx, campos, porLer, paginasDeMoodboard);
@@ -152,8 +236,37 @@ export function camposDoDocumento(paginas: readonly PaginaLida[]): Colheita {
   lerListaDeSeccao(ctx, "faseamento", "faseamento", campos, porLer, {});
   lerListaDeSeccao(ctx, "cancelamento", "cancelamento", campos, porLer, {});
   lerValidade(ctx, campos, porLer);
+  lerSinalDoFaseamento(ctx, campos);
 
-  return { campos, porLer, paginasDeMoodboard, template };
+  /**
+   * ── NUMA FOLHA QUE NÃO É NOSSA, NADA É LEITURA DIRECTA ───────────────────
+   *
+   * As regras deste ficheiro descobrem muito numa proposta feita em Word — as
+   * secções pela numeração, os itens pelo pontinho impresso, o quadro pelo
+   * cabeçalho «Item | Preço (€)». Descobrem, e continuam a ser regras nossas
+   * sobre uma folha que ninguém aqui compôs: nunca se sabe se o que ela chama
+   * «CONDIÇÕES GERAIS:» é o que o estúdio chama condições gerais (na proposta
+   * da Mariana, a segunda lista com esse nome é o que aqui se chama
+   * observações). Isso não é «alta» nenhuma — é uma proposta de leitura para
+   * ela conferir.
+   *
+   * A referência é a excepção, e por uma razão: não é interpretada. É a MESMA
+   * linha, no mesmo sítio, em oito páginas, devolvida tal e qual.
+   */
+  const nossa = ctx.seccoes.some((s) => s.cabecalho.tamanho >= 16);
+  const finais = nossa
+    ? campos
+    : campos.map((c) =>
+        c.confianca === "alta" && c.campo !== "ref"
+          ? {
+              ...c,
+              confianca: "media" as Confianca,
+              porque: `${c.porque} Esta folha não é a que o estúdio gera — foi lida por regras que valem para uma proposta escrita à mão, e nenhuma delas dá certeza.`,
+            }
+          : c,
+      );
+
+  return { campos: finais, porLer, paginasDeMoodboard, template };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -250,6 +363,17 @@ function coluna(linhas: readonly Linha[], min: number, max: number): Linha[] {
     out.push({
       ...l,
       corridas: dentro,
+      /**
+       * A base é a DESTA coluna, não a da linha inteira.
+       *
+       * Duas colunas partilham a linha só à tolerância de meio ponto com que se
+       * juntam pedaços, e a base que fica na linha é a do primeiro pedaço a ser
+       * lido — que pode ser o da outra coluna. Herdá-la desalinhava os saltos
+       * verticais em até dois pontos, e é com eles que {@link lerLista} decide
+       * onde acaba um item: era isso que partia a lista do «não incluído» do
+       * nosso próprio orçamento em «…palamenta de» e «catering;».
+       */
+      y: dentro[0].y,
       texto: dentro.map((c) => c.texto).join(" "),
       x: dentro[0].x,
       x2: Math.max(...dentro.map((c) => c.x2)),
@@ -259,29 +383,77 @@ function coluna(linhas: readonly Linha[], min: number, max: number): Linha[] {
   return out;
 }
 
-/** Divide o documento em secções pelos seus cabeçalhos. */
-function seccoesDo(ctx: Contexto): Seccao[] {
-  const perto = (x: number) => Math.abs(x - ctx.margem) <= 4;
+/**
+ * Os cabeçalhos de secção do documento, por ordem de leitura.
+ *
+ * Duas leituras somadas, e não uma:
+ *
+ *   · a NOSSA folha, pelo TAMANHO — corpo 20 encostado à margem para as
+ *     secções grandes, corpo 13 para as pequenas, sempre num vocabulário
+ *     fechado;
+ *   · a folha FEITA À MÃO, pela MARCA — o número de ordem, os dois pontos
+ *     finais, ou um corpo maior do que o do resto da página. Ver
+ *     {@link SECCOES_A_MAO}.
+ *
+ * A segunda leitura mede-se contra a margem DA PÁGINA e não contra a do
+ * documento: a Mariana tem a apresentação a começar em 71 e as condições de
+ * reserva, três páginas à frente, em 107. Sessenta pontos de folga chegam para
+ * essa diferença e continuam a deixar de fora a coluna da direita do NOSSO
+ * orçamento, que está a 490 da margem — sem isso, a rubrica «N Ã O
+ * I N C L U Í D O» partia a secção do orçamento ao meio e levava com ela o
+ * sinal e as três listas de reserva.
+ */
+function cabecalhosDe(linhas: readonly Linha[], margem: number): { nome: string; linha: Linha }[] {
+  const perto = (x: number) => Math.abs(x - margem) <= 4;
   const cabecalhos: { nome: string; linha: Linha }[] = [];
-  for (const l of ctx.linhas) {
-    if (!perto(l.x)) continue;
+  const jaTem = (l: Linha) =>
+    cabecalhos.some((c) => c.linha.pagina === l.pagina && c.linha.y === l.y);
+
+  for (const l of linhas) {
     const chave = chaveDeRotulo(l.texto);
-    if (l.tamanho >= 16) {
+    if (perto(l.x) && l.tamanho >= 16) {
       const nome = Object.entries(SECCOES_GRANDES).find(([t]) => chaveDeRotulo(t) === chave)?.[1];
       if (nome) cabecalhos.push({ nome, linha: l });
-    } else if (l.tamanho >= 11 && l.tamanho < 16) {
+    } else if (perto(l.x) && l.tamanho >= 11 && l.tamanho < 16) {
       // O corpo 13 também é o dos títulos de grupo dos serviços e o das duas
       // rubricas da coluna da direita do orçamento: só entra o que estiver no
       // vocabulário, e só à margem.
       const nome = Object.entries(SECCOES_PEQUENAS).find(([t]) => chaveDeRotulo(t) === chave)?.[1];
       if (nome) cabecalhos.push({ nome, linha: l });
-    } else if (chave === "INSPIRACAO") {
+    } else if (perto(l.x) && chave === "INSPIRACAO") {
       // A página de mood board não tem cabeçalho grande — tem a legenda
       // «Inspiração» e, por baixo dela, o título do board em corpo 24.
       cabecalhos.push({ nome: "moodboard", linha: l });
     }
+    if (jaTem(l)) continue;
+    const nome = nomeDeSeccaoAMao(l.texto);
+    if (!nome) continue;
+    if (l.x > margemDaPagina(linhas, l.pagina) + 60) continue;
+    // A MARCA é o que separa um cabeçalho de uma linha que diz o mesmo. Sem
+    // ela, a legenda «F A S E A M E N T O D O P A G A M E N T O» que o nosso
+    // orçamento desenha por cima do sinal passava a cabeçalho de secção.
+    if (!temMarcaDeCabecalho(l.texto) && l.tamanho < corpoDaPagina(linhas, l.pagina) + 1.5)
+      continue;
+    cabecalhos.push({ nome, linha: l });
   }
-  cabecalhos.sort((a, b) => a.linha.pagina - b.linha.pagina || b.linha.y - a.linha.y);
+  return cabecalhos.sort((a, b) => a.linha.pagina - b.linha.pagina || b.linha.y - a.linha.y);
+}
+
+/** Onde começa o texto desta página — a referência contra a qual se mede se um
+ *  cabeçalho está «encostado», numa folha em que cada página tem a sua margem. */
+function margemDaPagina(linhas: readonly Linha[], pagina: number): number {
+  const xs = linhas.filter((l) => l.pagina === pagina).map((l) => l.x);
+  return xs.length ? Math.min(...xs) : 0;
+}
+
+/** O corpo de letra do texto corrente desta página — o mais repetido. */
+function corpoDaPagina(linhas: readonly Linha[], pagina: number): number {
+  return maisComum(linhas.filter((l) => l.pagina === pagina).map((l) => arred(l.tamanho)));
+}
+
+/** Divide o documento em secções pelos seus cabeçalhos. */
+function seccoesDo(ctx: Contexto): Seccao[] {
+  const cabecalhos = cabecalhosDe(ctx.linhas, ctx.margem);
 
   /**
    * ── UMA SECÇÃO COMEÇA NA LEGENDA, NÃO NO TÍTULO ─────────────────────────
@@ -301,6 +473,16 @@ function seccoesDo(ctx: Contexto): Seccao[] {
    * em corpo pequeno.
    */
   const topoDe = (titulo: Linha): number => {
+    /**
+     * Só as secções GRANDES têm legenda por cima — são as únicas que o gerador
+     * desenha assim. Aplicada a toda a gente, esta regra fazia estragos numa
+     * folha à mão, onde tudo é do mesmo tamanho: a linha «Local: Évora», por
+     * estar onze pontos acima do cabeçalho «2. Serviços» e ser pequena, passava
+     * por legenda dele — e a apresentação da Catarina acabava aí, sem o local
+     * nem o número de convidados. O mesmo tirava as duas linhas do «INCLUÍDO NA
+     * PROPOSTA:» da Mariana, que é uma lista de duas linhas e ficava vazia.
+     */
+    if (titulo.tamanho < 16) return titulo.y;
     const legenda = ctx.linhas.find((l) => {
       // Pela PRIMEIRA corrida, e não pela linha: a legenda partilha a linha de
       // base com o topo da coluna da direita, que é maior do que ela e ficaria
@@ -344,6 +526,66 @@ function seccao(ctx: Contexto, nome: string): Seccao | undefined {
   return ctx.seccoes.find((s) => s.nome === nome);
 }
 
+/**
+ * TODAS as secções com este nome, por ordem de leitura.
+ *
+ * A folha da Mariana tem duas rubricas «CONDIÇÕES GERAIS:» na mesma página —
+ * a segunda é o que o nosso documento chama observações gerais, mas no papel
+ * dela as duas têm o mesmo nome. Ler só a primeira deitava fora cinco
+ * condições; ler as duas devolve o que está escrito, que é o que ela vai rever.
+ */
+function seccoesComNome(ctx: Contexto, nome: string): Seccao[] {
+  return ctx.seccoes.filter((s) => s.nome === nome);
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS PÁGINAS DE INSPIRAÇÃO DE UMA FOLHA QUE NÃO É NOSSA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A nossa folha diz-o: as páginas de mood board trazem a legenda «INSPIRAÇÃO».
+ * As dela não trazem nada — são páginas em paisagem, cheias de fotografias, com
+ * um título escrito numa manuscrita e mais nada. Quatro páginas na proposta da
+ * Mariana, seis na da Catarina; sem as reconhecer, 31 das 32 fotografias ficam
+ * sem destino e o título de cada uma perde-se.
+ *
+ * O que as denuncia não é a forma, é a LETRA. O texto de uma proposta é escrito
+ * com duas ou três fontes, as mesmas de uma ponta à outra; o título de um mood
+ * board é escrito com uma fonte que não aparece em mais nenhum sítio do
+ * documento — foi escolhida para ser diferente. A regra é essa, e é medível:
+ *
+ *   · uma página cujas linhas usam TODAS fontes que nunca aparecem numa página
+ *     com cabeçalho de secção — ou seja, fontes que não são as do corpo;
+ *   · com texto (uma página em branco não é um mood board);
+ *   · e com uma linha grande, que é o título.
+ *
+ * Só se aplica a documentos onde SE ENCONTROU pelo menos uma secção: sem saber
+ * qual é a letra do corpo, isto não distinguiria nada de nada, e uma folha de
+ * Word de uma página só passaria inteira por mood board.
+ */
+function paginasDeInspiracaoAMao(linhas: readonly Linha[]): Set<number> {
+  const out = new Set<number>();
+  const cabecalhos = cabecalhosDe(linhas, linhas.length ? Math.min(...linhas.map((l) => l.x)) : 0);
+  const comCabecalho = new Set(cabecalhos.map((c) => c.linha.pagina));
+  if (!comCabecalho.size) return out;
+
+  const doCorpo = new Set<string>();
+  for (const l of linhas) {
+    if (!comCabecalho.has(l.pagina)) continue;
+    for (const c of l.corridas) doCorpo.add(c.fonte);
+  }
+
+  for (const pagina of new Set(linhas.map((l) => l.pagina))) {
+    if (comCabecalho.has(pagina)) continue;
+    const daPagina = linhas.filter((l) => l.pagina === pagina);
+    if (!daPagina.length) continue;
+    if (daPagina.some((l) => l.corridas.some((c) => doCorpo.has(c.fonte)))) continue;
+    if (!daPagina.some((l) => l.tamanho >= 12)) continue;
+    out.add(pagina);
+  }
+  return out;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    RÓTULO → VALOR
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -375,7 +617,26 @@ function valorDoRotulo(
 
   for (const l of linhas) {
     for (const [i, c] of l.corridas.entries()) {
-      if (!eRotulo(c.texto, rotulo)) continue;
+      const naMesma = rotuloEValorNaMesmaCorrida(c.texto, rotulo);
+      if (!naMesma) continue;
+
+      /**
+       * 0 — o valor a seguir aos dois pontos, DENTRO da mesma corrida.
+       *
+       * É como o Word compõe metade destas linhas, e era o buraco maior: das
+       * oito linhas da apresentação da Mariana, cinco vinham numa corrida só
+       * («Noivos : Mariana e João», «Data do Evento: 5 de junho de 2027») e
+       * nenhuma dessas se lia. As outras três liam-se — não porque fossem
+       * diferentes, mas porque a composição as tinha partido por acaso.
+       */
+      if (naMesma.valor && !pareceCabecalhoDeSeccao(naMesma.valor)) {
+        return {
+          linhas: [comoLinha(l.pagina, c)],
+          texto: naMesma.valor,
+          confianca: "media",
+          porque: `Estava a seguir a «${rotulo}:», na mesma linha e na mesma corrida de texto — é como as folhas feitas à mão costumam ser, não como esta é gerada.`,
+        };
+      }
 
       // 1 — o valor por baixo, na mesma coluna.
       const rotuloComoLinha = comoLinha(l.pagina, c);
@@ -391,7 +652,23 @@ function valorDoRotulo(
       // pontos abaixo, em corpo 11,5: o campo saía «Mariana & João Caros
       // Mariana & João, foi com muito gosto que preparámos…», impresso na capa
       // de uma proposta.
-      const primeira = abaixo.find((v) => v.tamanho > c.tamanho + 1);
+      /**
+       * ── O VALOR É A LINHA A SEGUIR, E SÓ ESSA ────────────────────────────
+       *
+       * Procurar «a primeira linha maior por baixo» sem exigir que seja a
+       * PRIMEIRA linha era o que fazia o pior campo que este motor já
+       * devolveu: na proposta da Catarina, «Noivos:» tem o nome truncado ao
+       * lado e, quatro linhas mais abaixo, o cabeçalho «2. Serviços» — que é
+       * maior. O campo `clientNames` saía «2. Serviços», com ar de lido.
+       *
+       * Uma leitura que salta por cima de quatro linhas não é uma leitura. E o
+       * que estiver por baixo e for um cabeçalho de secção é recusado também,
+       * mesmo estando encostado: um cabeçalho nunca é o valor de nada.
+       */
+      const primeira =
+        abaixo[0] && abaixo[0].tamanho > c.tamanho + 1 && !pareceCabecalhoDeSeccao(abaixo[0].texto)
+          ? abaixo[0]
+          : undefined;
       const abaixoUteis = primeira
         ? abaixo
             .filter((v) => v.y <= primeira.y && Math.abs(v.tamanho - primeira.tamanho) <= 0.6)
@@ -408,7 +685,7 @@ function valorDoRotulo(
 
       // 2 — o valor ao lado, na mesma linha.
       const aoLado = l.corridas[i + 1];
-      if (aoLado && aoLado.x > c.x2) {
+      if (aoLado && aoLado.x > c.x2 && !pareceCabecalhoDeSeccao(aoLado.texto)) {
         return {
           linhas: [comoLinha(l.pagina, aoLado)],
           texto: aoLado.texto,
@@ -425,6 +702,32 @@ function valorDoRotulo(
  *  que um rótulo pertence. */
 function linhasDaColuna(linhas: readonly Linha[], x: number): Linha[] {
   return coluna(linhas, x - 3, x + 3);
+}
+
+/**
+ * Esta corrida é o rótulo `rotulo` — e, se for, o que é que lhe vem a seguir
+ * dentro da própria corrida?
+ *
+ * Devolve `null` quando não é o rótulo, `{ valor: "" }` quando é o rótulo
+ * sozinho (e o valor há-de estar por baixo ou ao lado), e o valor quando os
+ * dois vieram no mesmo pedaço de texto.
+ *
+ * O espaço ANTES dos dois pontos não estorva — «Noivos : Mariana e João» e
+ * «Cerimónia : a saber» estão as duas assim no papel, e a comparação é feita na
+ * forma reduzida, que não vê espaços.
+ */
+function rotuloEValorNaMesmaCorrida(texto: string, rotulo: string): { valor: string } | null {
+  if (eRotulo(texto, rotulo)) return { valor: "" };
+  const dp = texto.indexOf(":");
+  if (dp <= 0) return null;
+  if (!eRotulo(texto.slice(0, dp), rotulo)) return null;
+  return { valor: texto.slice(dp + 1).trim() };
+}
+
+/** Este texto é um cabeçalho de secção? Nunca pode ser o valor de um campo —
+ *  ver o que aconteceu ao nome do casal da Catarina em {@link valorDoRotulo}. */
+function pareceCabecalhoDeSeccao(texto: string): boolean {
+  return nomeDeSeccaoAMao(texto) !== null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -490,13 +793,28 @@ export function lerLista(
   const bimodal = saltos.length > 0 && max - min > 2;
   const limiar = (min + max) / 2;
 
+  /**
+   * ── QUANDO A MARCA VEM ESCRITA, É ELA QUE MANDA ──────────────────────────
+   *
+   * Nas folhas feitas em Word o pontinho é texto, e diz sem margem para dúvida
+   * onde começa cada item: as condições gerais da Mariana são seis itens em
+   * doze linhas, todas à mesma distância umas das outras (10,7 pontos). Sem
+   * isto, a medida não tinha nada por onde decidir e devolvia doze condições,
+   * seis delas a começar a meio de uma frase.
+   *
+   * Só vale quando a lista COMEÇA por uma marca — se a primeira linha não a
+   * tem, o que quer que se siga não é a continuação de nada.
+   */
+  const porMarca = linhas.length > 0 && comecaPorMarca(linhas[0].texto);
+
   const itens: { linhas: Linha[]; confianca: Confianca }[] = [];
   for (const [i, l] of linhas.entries()) {
     const mesmoFluxo = i > 0 && linhas[i - 1].pagina === l.pagina && linhas[i - 1].y > l.y;
     const salto = i === 0 ? Infinity : arred(linhas[i - 1].y - l.y);
     let continua = false;
     if (mesmoFluxo) {
-      if (bimodal) continua = salto < limiar;
+      if (porMarca) continua = !comecaPorMarca(l.texto);
+      else if (bimodal) continua = salto < limiar;
       else if (opcoes.limiteDeQuebra !== undefined) {
         // Folga de uma palavra larga: a última palavra que coube numa linha
         // cheia acaba antes do limite, nunca em cima dele.
@@ -508,7 +826,7 @@ export function lerLista(
       anterior.linhas.push(l);
       // Um item que teve de ser remontado a partir de linhas partidas leva um
       // grau a menos: a junção é uma regra a mais sobre o que estava escrito.
-      if (!bimodal) anterior.confianca = "media";
+      if (!bimodal || porMarca) anterior.confianca = "media";
     } else {
       itens.push({ linhas: [l], confianca: "alta" });
     }
@@ -520,15 +838,29 @@ export function lerLista(
    OS CAMPOS, UM A UM
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/** A referência que corre no topo de todas as páginas de conteúdo. */
+/**
+ * A referência que corre no topo de todas as páginas de conteúdo.
+ *
+ * ── PORQUE É QUE ISTO NÃO VIA O CABEÇALHO DELA ────────────────────────────
+ *
+ * A banda era de 80 pontos e o corpo tinha de ser 10 ou menos. As duas
+ * propostas verdadeiras têm o cabeçalho a 544 numas páginas e a 558 noutras
+ * (num A4 ao baixo de 596 de altura) e em corpo 11 — ficava de fora pelo
+ * corpo, por um ponto. Mede-se agora com a MESMA banda com que o cabeçalho
+ * corrente é excluído do corpo do documento (ver {@link ehCabecalhoCorrente}):
+ * uma linha ou é mobília da folha nos dois sítios, ou não é em nenhum.
+ *
+ * O x não entra na conta de propósito — a referência é encostada à direita e
+ * começa onde o comprimento dela mandar (553 numas páginas, 577 noutras).
+ */
 function lerRef(
   ctx: Contexto,
   todas: readonly Linha[],
   campos: CampoProposto[],
   porLer: CampoPorLer[],
-): void {
+): string | null {
   const altura = ctx.paginas[0]?.altura || 595.28;
-  const noTopo = todas.filter((l) => l.y >= altura - 80 && l.tamanho <= 10);
+  const noTopo = todas.filter((l) => l.y >= altura - 90 && l.tamanho <= 14);
   const contagem = new Map<string, Linha[]>();
   for (const l of noTopo) {
     const t = l.texto.trim();
@@ -544,7 +876,7 @@ function lerRef(
       porque:
         "Não há nenhuma linha repetida no topo das páginas que sirva de referência do documento.",
     });
-    return;
+    return null;
   }
   campos.push(
     novoCampo(
@@ -554,6 +886,104 @@ function lerRef(
       `Estava no topo de ${new Set(repetida[1].map((l) => l.pagina)).size} páginas, sempre igual.`,
       [repetida[1][0]],
     ),
+  );
+  return repetida[0];
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE O CABEÇALHO CORRENTE DIZ, QUANDO MAIS NADA DIZ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «PO Casamento Decoração Mariana e João 5.06.2027» corre no topo de todas as
+ * páginas das duas propostas verdadeiras, e é uma convenção da casa: PO, o tipo
+ * de evento, o modelo, o nome do casal, a data. Dali saem quatro campos sem
+ * custo nenhum — e a proposta da Catarina é a razão de valer a pena: o papel
+ * diz «Noivos: Catarina &» e o resto do nome nunca chegou a ser impresso.
+ *
+ * Isto é a ÚLTIMA tentativa, nunca a primeira: só corre para campos que nenhum
+ * rótulo impresso preencheu, e sai sempre com confiança média. Um nome que
+ * sobra depois de tirar as palavras conhecidas não é um nome LIDO — é o que
+ * ficou, e é ela que confirma.
+ */
+const TIPOS_DE_EVENTO = ["Casamento", "Baptizado", "Batizado", "Aniversário", "Festa"];
+const PALAVRAS_DA_REF = [...TIPOS_DE_EVENTO, "Decoração", "Organização", "Proposta", "PO"];
+
+/** `PO … 5.06.2027` — o miolo e a data, quando a referência é da casa. */
+function partesDaRef(ref: string | null): { miolo: string; data: string } | null {
+  if (!ref) return null;
+  const m = /^\s*PO\b(.*?)(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})[\s.·-]*$/i.exec(ref);
+  if (!m) return null;
+  return { miolo: m[1], data: m[2] };
+}
+
+/** Decoração ou Organização, quando está escrito na referência e não na capa. */
+function lerTemplateDaRef(
+  ref: string | null,
+  campos: CampoProposto[],
+): "decoracao" | "organizacao" | null {
+  const chave = chaveDeRotulo(ref ?? "");
+  const qual = chave.includes("ORGANIZACAO")
+    ? "organizacao"
+    : chave.includes("DECORACAO")
+      ? "decoracao"
+      : null;
+  if (!qual || !campos.length) return null;
+  const origem = campos.find((c) => c.campo === "ref");
+  if (!origem) return null;
+  campos.push({
+    campo: "template",
+    valor: qual,
+    confianca: "media",
+    porque:
+      "A palavra estava na referência que corre no topo das páginas, não na capa — esta folha não tem a capa que o estúdio desenha.",
+    origem: origem.origem,
+  });
+  return qual;
+}
+
+/** O nome do casal, o tipo de evento e a data, tirados da referência — só para
+ *  os campos que ficaram por preencher. */
+function lerDaRef(ref: string | null, campos: CampoProposto[], porLer: CampoPorLer[]): void {
+  const partes = partesDaRef(ref);
+  const origem = campos.find((c) => c.campo === "ref")?.origem;
+  if (!partes || !origem) return;
+  const jaTem = (campo: string) => campos.some((c) => c.campo === campo);
+  const acrescentar = (campo: string, valor: string, porque: string) => {
+    if (jaTem(campo)) return;
+    campos.push({ campo, valor, confianca: "media", porque, origem });
+    const i = porLer.findIndex((p) => p.campo === campo);
+    if (i >= 0) porLer.splice(i, 1);
+  };
+
+  const tipo = TIPOS_DE_EVENTO.find((t) => chaveDeRotulo(partes.miolo).includes(chaveDeRotulo(t)));
+  if (tipo) {
+    acrescentar("eventType", tipo, `A referência do documento diz «${tipo}».`);
+  }
+
+  // O que sobra do miolo depois de tirar as palavras da convenção é o nome. Um
+  // resto vazio, com um número, ou com meia dúzia de palavras não é um nome de
+  // casal e não é devolvido — a referência de outra proposta pode ser escrita
+  // de outra maneira qualquer.
+  const resto = PALAVRAS_DA_REF.reduce(
+    (t, p) => t.replace(new RegExp(`\\b${p}\\b`, "gi"), " "),
+    partes.miolo,
+  )
+    .replace(/[·–—-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const palavras = resto ? resto.split(" ") : [];
+  if (resto.length >= 3 && palavras.length <= 6 && !/\d/.test(resto)) {
+    acrescentar(
+      "clientNames",
+      resto,
+      "Sobrou da referência do topo das páginas depois de tirar o tipo de evento, o modelo e a data — não estava preso a nenhum rótulo, por isso é para confirmar.",
+    );
+  }
+  acrescentar(
+    "eventDate",
+    partes.data,
+    "Era a data escrita na referência do topo das páginas, tal e qual — não há nenhum rótulo «Data» nesta folha.",
   );
 }
 
@@ -626,20 +1056,34 @@ function lerApresentacao(ctx: Contexto, campos: CampoProposto[], porLer: CampoPo
     });
   }
 
-  const faixa: [string, string][] = [
-    ["Evento", "eventType"],
-    ["Data", "eventDate"],
-    ["Local", "location"],
-    ["Convidados", "guests"],
-    ["Cerimónia", "ceremony"],
-    ["Hora", "time"],
-    ["Wedding Planners", "weddingPlanners"],
+  /**
+   * ── O MESMO CAMPO, ESCRITO DE MANEIRAS DIFERENTES ────────────────────────
+   *
+   * A nossa folha escreve «DATA» e «CONVIDADOS» porque a faixa da apresentação
+   * é estreita e as legendas são curtas. Quem escreve a proposta no Word não
+   * tem essa pressa: escreve «Data do Evento», «Data do Casamento», «Número de
+   * Convidados». São o mesmo rótulo, e são procurados por esta ordem — do mais
+   * específico para o mais curto, para que «Data do Evento» nunca chegue a ser
+   * comparado com «Data» e a comparação continue a ser por texto INTEIRO.
+   */
+  const faixa: [string[], string][] = [
+    [["Evento", "Tipo de Evento"], "eventType"],
+    [["Data do Evento", "Data do Casamento", "Data"], "eventDate"],
+    [["Local", "Local do Evento"], "location"],
+    [["Número de Convidados", "N.º de Convidados", "Nº de Convidados", "Convidados"], "guests"],
+    [["Cerimónia", "Cerimonia"], "ceremony"],
+    [["Hora", "Horário"], "time"],
+    [["Wedding Planners", "Wedding Planner"], "weddingPlanners"],
   ];
-  for (const [rotulo, campo] of faixa) {
-    const bruto = valorDoRotulo(onde, rotulo, { passoMaximo: 20, maxLinhas: 2 });
+  for (const [rotulos, campo] of faixa) {
+    let bruto: Achado | null = null;
+    for (const rotulo of rotulos) {
+      bruto = valorDoRotulo(onde, rotulo, { passoMaximo: 20, maxLinhas: 2 });
+      if (bruto) break;
+    }
     const a = bruto ? grau(bruto) : null;
     if (a) campos.push(novoCampo(campo, a.texto, a.confianca, a.porque, a.linhas));
-    else porLer.push({ campo, porque: `Não há nenhum rótulo «${rotulo}» nesta proposta.` });
+    else porLer.push({ campo, porque: `Não há nenhum rótulo «${rotulos[0]}» nesta proposta.` });
   }
 }
 
@@ -651,8 +1095,17 @@ function lerServicos(ctx: Contexto, campos: CampoProposto[], porLer: CampoPorLer
     return;
   }
   const perto = (x: number, alvo: number) => Math.abs(x - alvo) <= 4;
+  /**
+   * Um título de grupo é uma linha encostada à margem que ou está em corpo
+   * maior (a nossa folha) ou traz o MARCADOR ORDINAL impresso (a dela: «a)
+   * Decoração de Casamento», «b) Wedding Coordination», em corpo 8, o mesmo dos
+   * serviços que lhe ficam por baixo). O marcador é o que o estúdio já guarda
+   * em `serviceGroups[].letter` — é um rótulo impresso, não uma forma.
+   */
   const titulos = s.linhas.filter(
-    (l) => perto(l.x, ctx.margem) && l.tamanho >= 11 && l.tamanho < 16,
+    (l) =>
+      perto(l.x, ctx.margem) &&
+      ((l.tamanho >= 11 && l.tamanho < 16) || /^[a-z]\)\s+\S/i.test(l.texto)),
   );
   if (!titulos.length) {
     porLer.push({
@@ -696,12 +1149,20 @@ function lerServicos(ctx: Contexto, campos: CampoProposto[], porLer: CampoPorLer
     const candidatas = doGrupo.filter((l) => l.x > titulo.x + 6 && l.tamanho < 12);
     if (!candidatas.length) return;
     const avanco = maisComum(candidatas.map((l) => arred(l.x)));
-    const doItem = candidatas.filter((l) => perto(l.x, avanco));
+    /**
+     * Quando os itens trazem a marca escrita, é ela que diz quais são — e não
+     * o avanço. Na proposta da Catarina o primeiro serviço de um grupo («•
+     * Igreja») está oito pontos mais à direita do que os outros quatro, e
+     * medir o avanço pelo x mais comum deitava-o fora sem uma palavra.
+     */
+    const doItem = candidatas.some((l) => comecaPorMarca(l.texto))
+      ? candidatas
+      : candidatas.filter((l) => perto(l.x, avanco));
 
     // O limite da mancha: as descrições correm até à margem direita da página.
     const itens = lerLista(doItem, { limiteDeQuebra: ctx.largura - ctx.margem });
     itens.forEach((it, ii) => {
-      const texto = juntarParagrafo(it.linhas);
+      const texto = juntarItem(it.linhas);
       const partido = separarRotuloEDescricao(texto, it.linhas[0], ctx.negra);
       campos.push(
         novoCampo(
@@ -817,7 +1278,17 @@ function lerMoodboards(
   porLer: CampoPorLer[],
   paginas: number[],
 ): void {
-  const boards = ctx.seccoes.filter((s) => s.nome === "moodboard");
+  const comLegenda = ctx.seccoes
+    .filter((s) => s.nome === "moodboard")
+    .map((s) => ({
+      pagina: s.cabecalho.pagina,
+      linhas: s.linhas.filter((l) => l.pagina === s.cabecalho.pagina),
+      legenda: true,
+    }));
+  const boards = [...comLegenda, ...ctx.moodboardsAMao.map((m) => ({ ...m, legenda: false }))].sort(
+    (a, b) => a.pagina - b.pagina,
+  );
+
   if (!boards.length) {
     porLer.push({
       campo: "moodBoards",
@@ -825,46 +1296,76 @@ function lerMoodboards(
         "Não há nenhuma página de inspiração neste documento — ou não tem, ou as suas páginas de fotografias não trazem a legenda que as identifica.",
     });
   }
-  boards.forEach((s, bi) => {
-    paginas.push(s.cabecalho.pagina);
-    const naPagina = s.linhas.filter((l) => l.pagina === s.cabecalho.pagina);
-    // O título é o primeiro corpo grande por baixo da legenda «Inspiração».
-    const titulo = naPagina.find((l) => l.tamanho >= 18);
+  boards.forEach((b, bi) => {
+    paginas.push(b.pagina);
+    const naPagina = b.linhas;
+    /**
+     * ── ONDE ESTÁ O TÍTULO, NUMA FOLHA E NA OUTRA ─────────────────────────
+     *
+     * Na nossa, por baixo da legenda «Inspiração», em corpo 24: é o primeiro
+     * corpo grande da página. Na dela não há legenda nenhuma e o título é
+     * simplesmente a MAIOR linha da página — e nem sequer é a primeira: numa
+     * das páginas da Mariana o parágrafo de descrição está impresso ACIMA do
+     * título, no meio das fotografias.
+     */
+    const titulo = b.legenda
+      ? naPagina.find((l) => l.tamanho >= 18)
+      : [...naPagina].sort((x, y) => y.tamanho - x.tamanho || y.y - x.y)[0];
+    const confianca: Confianca = b.legenda ? "alta" : "media";
+    let sub: Linha | undefined;
     if (titulo) {
       campos.push(
         novoCampo(
           `moodBoards[${bi}].title`,
           titulo.texto,
-          "alta",
-          "Título da página de inspiração.",
+          confianca,
+          b.legenda
+            ? "Título da página de inspiração."
+            : "Era a maior linha de uma página só com fotografias e uma letra que não aparece em mais nenhum sítio do documento.",
           [titulo],
         ),
       );
-      const sub = naPagina.find(
-        (l) => l.y < titulo.y && l.y > titulo.y - 30 && l.tamanho >= 11 && l.tamanho < 18,
+      // O subtítulo vem logo por baixo do título. Na folha à mão a folga é
+      // maior (47 pontos na página do cocktail da Catarina) porque a
+      // composição é feita à vista, não por uma grelha.
+      const folga = b.legenda ? 30 : 50;
+      sub = naPagina.find(
+        (l) =>
+          l.y < titulo.y &&
+          l.y > titulo.y - folga &&
+          l.tamanho >= 11 &&
+          (b.legenda ? l.tamanho < 18 : l.tamanho <= titulo.tamanho),
       );
       if (sub) {
         campos.push(
           novoCampo(
             `moodBoards[${bi}].subtitulo`,
             sub.texto,
-            "alta",
+            confianca,
             "Subtítulo, logo por baixo do título da página.",
             [sub],
           ),
         );
       }
     }
-    // A descrição vive no fundo da página, por baixo das fotos.
-    const rodape = naPagina.filter((l) => l.y < 200 && (!titulo || l.y < titulo.y - 60));
-    if (rodape.length) {
+    // O resto do texto da página. Na nossa folha é a descrição, no fundo, por
+    // baixo das fotos; na dela pode ser isso ou as legendas soltas que ela
+    // escreve ao lado de uma fotografia — que se juntam por ordem de leitura,
+    // porque não há maneira de as distinguir umas das outras, e é preferível
+    // dar-lhe o texto para apagar do que perdê-lo.
+    const resto = b.legenda
+      ? naPagina.filter((l) => l.y < 200 && (!titulo || l.y < titulo.y - 60))
+      : naPagina.filter((l) => l !== titulo && l !== sub);
+    if (resto.length) {
       campos.push(
         novoCampo(
           `moodBoards[${bi}].annotation`,
-          juntarParagrafo(rodape),
-          rodape.length > 1 ? "media" : "alta",
-          "Texto no fundo da página de inspiração, por baixo das fotografias.",
-          rodape,
+          juntarParagrafo(resto),
+          resto.length > 1 || !b.legenda ? "media" : "alta",
+          b.legenda
+            ? "Texto no fundo da página de inspiração, por baixo das fotografias."
+            : "O resto do texto escrito nesta página de fotografias, por ordem de leitura.",
+          resto,
         ),
       );
     }
@@ -995,11 +1496,6 @@ function lerOrcamento(
         ),
       );
     }
-  } else {
-    porLer.push({
-      campo: "totalText",
-      porque: "Não há nenhum valor em destaque na folha do orçamento.",
-    });
   }
 
   // ── As linhas do quadro ──
@@ -1013,8 +1509,20 @@ function lerOrcamento(
     l.pagina > cabecalhoDoQuadro.pagina ||
     (l.pagina === cabecalhoDoQuadro.pagina && l.y < cabecalhoDoQuadro.y);
 
+  /**
+   * ── O CORPO DAS LINHAS DO QUADRO ─────────────────────────────────────────
+   *
+   * Na nossa folha é entre 9 e 12: o número grande é 22 e as rubricas da
+   * direita são 13, e a banda serve para os deixar de fora. Numa folha feita à
+   * mão o quadro inteiro está no mesmo corpo 8 do resto do documento, e a banda
+   * deitava fora as três linhas do orçamento da Mariana e as cinco da Catarina
+   * — o quadro todo. Aí a referência é o cabeçalho da secção: o que é do quadro
+   * é o que não é maior do que ele.
+   */
+  const corpoDoQuadro = (l: Linha) =>
+    grande ? l.tamanho > 9 && l.tamanho < 12 : l.tamanho <= s.cabecalho.tamanho + 0.6;
   const candidatas = esquerda.filter(
-    (l) => acimaDoTotal(l) && abaixoDoCabecalho(l) && l.tamanho > 9 && l.tamanho < 12,
+    (l) => acimaDoTotal(l) && abaixoDoCabecalho(l) && corpoDoQuadro(l),
   );
   // As linhas do quadro estão avançadas (levam marca); os valores adicionais e
   // o subtotal encostam à margem.
@@ -1025,12 +1533,38 @@ function lerOrcamento(
   // quadro, o que está abaixo são os valores adicionais. É a estrutura da
   // proposta feita à mão, e é a mesma nos dois modelos.
   const subtotal = aMargem.find((l) =>
-    l.corridas.some(
-      (c) => eRotulo(c.texto, "Valor Total") || eRotulo(c.texto, "Valor Total Estimado"),
-    ),
+    l.corridas.some((c) => ROTULOS_DE_TOTAL.some((r) => eRotulo(c.texto, r))),
   );
   const antesDoSubtotal = (l: Linha) =>
     !subtotal || l.pagina < subtotal.pagina || (l.pagina === subtotal.pagina && l.y > subtotal.y);
+
+  /**
+   * ── O TOTAL DE UM QUADRO FEITO À MÃO ─────────────────────────────────────
+   *
+   * Sem número em corpo 22 não há «o número grande»: o total é a linha que diz
+   * «Valor Total» com «7890 € + Iva» à direita, exactamente como se escreve um
+   * total desde que há folhas de orçamento. É o mesmo caminho que já se usava
+   * quando não havia folha de orçamento nenhuma — aqui está dentro da secção,
+   * o que é uma garantia a mais, mas a confiança fica na mesma em média: o
+   * rótulo bate certo, a folha é que não é a nossa.
+   */
+  const aMao = !grande ? (subtotal ? totalDaLinha(subtotal) : null) : null;
+  if (!grande) {
+    if (aMao && subtotal) {
+      guardarTotal(
+        subtotal,
+        aMao,
+        campos,
+        organizacao,
+        "Estava à direita de «%s», na mesma linha.",
+      );
+    } else {
+      porLer.push({
+        campo: "totalText",
+        porque: "Não há nenhum valor em destaque na folha do orçamento.",
+      });
+    }
+  }
 
   /**
    * ── ONDE ESTÃO AS LINHAS DO QUADRO, NUM MODELO E NO OUTRO ────────────────
@@ -1045,7 +1579,7 @@ function lerOrcamento(
    * proposta de Organização inteira — o quadro do orçamento desaparecia sem uma
    * palavra, e era o único sítio do documento onde estavam os preços.
    */
-  const quadro = organizacao ? aMargem.filter(antesDoSubtotal) : avancadas;
+  const quadro = organizacao || !grande ? aMargem.filter(antesDoSubtotal) : avancadas;
 
   /**
    * O `budgetOpcional` é um array PARALELO ao `budgetItems`: o índice `i` de um
@@ -1059,7 +1593,24 @@ function lerOrcamento(
    * Ou se anotam todas, ou nenhuma. Numa proposta sem marca nenhuma não se
    * escreve o campo, que é exactamente o que uma proposta sem extras é.
    */
-  const linhasDoQuadro = lerLista(quadro);
+  /**
+   * ── NUM QUADRO, UMA LINHA É UMA LINHA ────────────────────────────────────
+   *
+   * O quadro do nosso orçamento parte os nomes compridos e deixa cinco pontos
+   * a mais entre linhas — daí a medida saber onde acaba cada uma. O quadro
+   * dela não parte nada: são cinco nomes curtos, um por linha, e o espaço
+   * entre eles é o que a mão dela deu (17, 17, 17 e 13 pontos na proposta da
+   * Catarina). Com a medida a mandar, os últimos dois colavam-se num só —
+   * «Design Floral e Decoração Mesas Complementos dos Noivos», uma linha de
+   * orçamento a menos, com ar de lida.
+   *
+   * Num quadro com «Item» e «Preço (€)» impressos por cima, uma linha é uma
+   * linha. Se alguma vier partida, ela junta-a com o cursor; ao contrário,
+   * perdia-se uma rubrica inteira sem dar por isso.
+   */
+  const linhasDoQuadro = grande
+    ? lerLista(quadro)
+    : quadro.map((l) => ({ linhas: [l], confianca: "alta" as Confianca }));
   const haMarcas = linhasDoQuadro.some((it) =>
     it.linhas[0].corridas.some((c) => chaveDeRotulo(c.texto) === "EXTRA"),
   );
@@ -1156,6 +1707,11 @@ function lerOrcamento(
         `budgetExtras[${i}].valueText`,
         valor.texto,
         "alta",
+        // O «+ Iva» de cada linha vai TAL E QUAL dentro do texto do valor, e é
+        // de propósito: é dali que `modoDeIvaDaLinha` (proposal-budget.ts) lê o
+        // regime de cada adicional. Na proposta da Mariana a coordenação diz
+        // «950,50€ +Iva» e a deslocação diz «250,00 €» — duas linhas seguidas,
+        // dois regimes diferentes, e é ela que os escreveu assim.
         "Valor tal como estava escrito, com o «+ IVA» ou sem ele.",
         [comoLinha(it.linhas[0].pagina, valor)],
       ),
@@ -1196,10 +1752,87 @@ function lerOrcamento(
     );
   }
 
-  // ── As três listas da coluna da direita ──
-  lerListaComRubrica(direita, "Notas importantes", "notasImportantes", campos, porLer);
-  lerListaComRubrica(direita, "Incluído na proposta", "incluido", campos, porLer);
-  lerListaComRubrica(direita, "Não incluído", "naoIncluido", campos, porLer);
+  /**
+   * ── AS TRÊS LISTAS DE RESERVA, NUM SÍTIO OU NO OUTRO ─────────────────────
+   *
+   * Na nossa folha são rubricas da coluna da direita do orçamento. Na dela são
+   * secções com o seu próprio cabeçalho («INCLUÍDO NA PROPOSTA:», «NÃO
+   * INCLUÍDO NO ORÇAMENTO:»), às vezes numa página a seguir. Quando a secção
+   * existe é ela que manda: procurar a rubrica numa coluna da direita que não
+   * existe devolvia sempre «não se encontrou».
+   */
+  for (const [rubrica, campo, nome] of [
+    ["Notas importantes", "notasImportantes", "notas"],
+    ["Incluído na proposta", "incluido", "incluido"],
+    ["Não incluído", "naoIncluido", "naoIncluido"],
+  ] as const) {
+    if (seccao(ctx, nome)) lerListaDeSeccao(ctx, nome, campo, campos, porLer, {});
+    else lerListaComRubrica(direita, rubrica, campo, campos, porLer);
+  }
+}
+
+/** Os rótulos com que um total se escreve numa folha de orçamento. */
+const ROTULOS_DE_TOTAL = [
+  "Valor Total",
+  "Total",
+  "Total Geral",
+  "Valor Total Decoração",
+  "Valor Total Estimado",
+  "Investimento Total",
+];
+
+/** Um total escrito numa linha só: o rótulo à esquerda, o valor à direita. */
+function totalDaLinha(l: Linha): { rotulo: Corrida; valor: Corrida; montante: number } | null {
+  for (const [i, c] of l.corridas.entries()) {
+    if (!ROTULOS_DE_TOTAL.some((r) => eRotulo(c.texto, r))) continue;
+    const valor = l.corridas[i + 1];
+    if (!valor || valor.x <= c.x2) continue;
+    const montante = parseMoneyText(valor.texto);
+    if (montante <= 0) continue;
+    return { rotulo: c, valor, montante };
+  }
+  return null;
+}
+
+/** Guarda os quatro campos de um total lido numa linha de rótulo e valor.
+ *  `porque` leva um `%s` no sítio do rótulo que estava impresso. */
+function guardarTotal(
+  l: Linha,
+  achado: { rotulo: Corrida; valor: Corrida; montante: number },
+  campos: CampoProposto[],
+  organizacao: boolean,
+  porque: string,
+): void {
+  const origem = [comoLinha(l.pagina, achado.valor)];
+  const modo = detectVatMode(achado.valor.texto);
+  campos.push(
+    novoCampo(
+      organizacao ? "totalEstimatedText" : "totalText",
+      achado.valor.texto,
+      "media",
+      porque.replace("%s", achado.rotulo.texto),
+      origem,
+    ),
+  );
+  campos.push(
+    novoCampo("totalLabel", achado.rotulo.texto, "media", "Rótulo à esquerda do valor.", [
+      comoLinha(l.pagina, achado.rotulo),
+    ]),
+  );
+  campos.push(
+    novoCampo("totalAmount", achado.montante, "media", "Tirado do número impresso.", origem),
+  );
+  campos.push(
+    novoCampo(
+      "totalVatMode",
+      modo,
+      "media",
+      modo === "acrescer"
+        ? "O número diz «+ IVA», portanto o IVA acresce."
+        : "O número não diz «+ IVA», portanto assume-se que já o inclui.",
+      origem,
+    ),
+  );
 }
 
 /**
@@ -1218,51 +1851,11 @@ function lerTotalDeFolhaDesconhecida(
   campos: CampoProposto[],
   porLer: CampoPorLer[],
 ): void {
-  const ROTULOS = [
-    "Valor Total",
-    "Total",
-    "Total Geral",
-    "Valor Total Decoração",
-    "Investimento Total",
-  ];
   for (const l of ctx.linhas) {
-    for (const [i, c] of l.corridas.entries()) {
-      if (!ROTULOS.some((r) => eRotulo(c.texto, r))) continue;
-      const valor = l.corridas[i + 1];
-      if (!valor || valor.x <= c.x2) continue;
-      const montante = parseMoneyText(valor.texto);
-      if (montante <= 0) continue;
-      const origem = [comoLinha(l.pagina, valor)];
-      campos.push(
-        novoCampo(
-          "totalText",
-          valor.texto,
-          "media",
-          `Estava à direita de «${c.texto}», na mesma linha.`,
-          origem,
-        ),
-      );
-      campos.push(
-        novoCampo("totalLabel", c.texto, "media", "Rótulo à esquerda do valor.", [
-          comoLinha(l.pagina, c),
-        ]),
-      );
-      campos.push(
-        novoCampo("totalAmount", montante, "media", "Tirado do número impresso.", origem),
-      );
-      campos.push(
-        novoCampo(
-          "totalVatMode",
-          detectVatMode(valor.texto),
-          "media",
-          detectVatMode(valor.texto) === "acrescer"
-            ? "O número diz «+ IVA», portanto o IVA acresce."
-            : "O número não diz «+ IVA», portanto assume-se que já o inclui.",
-          origem,
-        ),
-      );
-      return;
-    }
+    const achado = totalDaLinha(l);
+    if (!achado) continue;
+    guardarTotal(l, achado, campos, false, "Estava à direita de «%s», na mesma linha.");
+    return;
   }
   porLer.push({
     campo: "totalText",
@@ -1309,7 +1902,7 @@ function lerListaComRubrica(
     campos.push(
       novoCampo(
         `${campo}[${i}]`,
-        juntarParagrafo(it.linhas),
+        juntarItem(it.linhas),
         it.confianca,
         `Item da lista «${rubrica}».`,
         it.linhas,
@@ -1328,14 +1921,25 @@ function lerListaDeSeccao(
   porLer: CampoPorLer[],
   opcoes: { duasColunas?: boolean },
 ): void {
-  const s = seccao(ctx, nome);
+  const todas = seccoesComNome(ctx, nome);
+  const s = todas[0];
   if (!s) {
     porLer.push({ campo, porque: `Não se encontrou a secção correspondente no documento.` });
     return;
   }
-  // As linhas da lista estão avançadas em relação à margem (a marca fica no
-  // espaço do avanço).
-  const uteis = s.linhas.filter((l) => l.tamanho < s.cabecalho.tamanho - 1);
+  /**
+   * ── O QUE É LISTA E O QUE É CABEÇALHO ────────────────────────────────────
+   *
+   * Na nossa folha o cabeçalho é corpo 13 ou 20 e a lista é 9: exigir um corpo
+   * MENOR do que o do cabeçalho tirava do caminho tudo o que não era lista.
+   * Numa folha à mão o cabeçalho está no mesmo corpo 8 da lista — «CONDIÇÕES
+   * GERAIS:» é uma linha em capitulares do tamanho do texto —, e a mesma
+   * exigência deixava as seis condições da Mariana de fora, todas. O que fecha
+   * a lista é o cabeçalho SEGUINTE, e disso já trata a divisão em secções.
+   */
+  const uteis = todas.flatMap((sec) =>
+    sec.linhas.filter((l) => l.tamanho <= sec.cabecalho.tamanho + 0.6),
+  );
 
   let ordenadas: Linha[];
   if (opcoes.duasColunas) {
@@ -1366,7 +1970,7 @@ function lerListaDeSeccao(
     campos.push(
       novoCampo(
         `${campo}[${i}]`,
-        juntarParagrafo(it.linhas),
+        juntarItem(it.linhas),
         it.confianca,
         "Item da lista desta secção.",
         it.linhas,
@@ -1393,10 +1997,66 @@ function lerValidade(ctx: Contexto, campos: CampoProposto[], porLer: CampoPorLer
     );
     return;
   }
+  /**
+   * ── UMA VALIDADE EM DIAS NÃO É UMA DATA ──────────────────────────────────
+   *
+   * O nosso documento imprime a data («válida até 10 de out. de 2026») porque
+   * a sabe: é a data do envio mais os dias. A folha à mão imprime o PRAZO —
+   * «ESTA PROPOSTA É VÁLIDA POR 60 DIAS» — e transformá-lo numa data era
+   * inventar um dia de envio que não está escrito em lado nenhum. O
+   * `ProposalDoc` tem os dois campos, e este é o outro.
+   */
+  const porDias = /v[áa]lida\s+por\s+(\d{1,3})\s+dias?/i;
+  for (const l of onde) {
+    const m = porDias.exec(l.texto);
+    if (!m) continue;
+    campos.push(
+      novoCampo(
+        "validUntilDays",
+        Number(m[1]),
+        "media",
+        "A folha diz por quantos DIAS a proposta é válida, não até que data — a data depende do dia em que for enviada.",
+        [l],
+      ),
+    );
+    return;
+  }
   porLer.push({
     campo: "validUntil",
     porque: "Não se encontrou nenhuma frase a dizer até quando a proposta é válida.",
   });
+}
+
+/**
+ * A percentagem do sinal, escrita no faseamento de uma folha feita à mão.
+ *
+ * O nosso orçamento imprime «Sinal 30% 2.911,41 €» e é lá que ela é lida. As
+ * folhas à mão não têm essa linha: têm o faseamento em lista — «30% NA
+ * ADJUDICAÇÃO;», «7O% 1 MÊS ANTES;». A adjudicação é o sinal, e essa
+ * percentagem não é decorativa: é a mesma que as rotas de facturação usam para
+ * emitir a factura do sinal.
+ *
+ * Só corre quando o orçamento não a deu, e nunca com confiança alta — quem
+ * escreveu a lista podia ter escrito as duas percentagens por outra ordem.
+ */
+function lerSinalDoFaseamento(ctx: Contexto, campos: CampoProposto[]): void {
+  if (campos.some((c) => c.campo === "depositPercent")) return;
+  const s = seccao(ctx, "faseamento");
+  if (!s) return;
+  for (const l of s.linhas) {
+    const m = /^[\s•▪◦‣●○]*(\d{1,2})\s*%\s+NA\s+ADJUDICA/i.exec(l.texto);
+    if (!m) continue;
+    campos.push(
+      novoCampo(
+        "depositPercent",
+        Number(m[1]),
+        "media",
+        "Era a percentagem que a lista do faseamento diz pagar-se na adjudicação.",
+        [l],
+      ),
+    );
+    return;
+  }
 }
 
 /** O valor que mais vezes aparece — usado para descobrir avanços e colunas a
