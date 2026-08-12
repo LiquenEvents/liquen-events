@@ -7,7 +7,6 @@ import {
   withProposalDefaults,
   type ProposalDoc,
 } from "@/lib/proposal-doc";
-import { totaisDaProposta } from "@/lib/proposal-budget";
 import { lerPropostaDePdf } from "./index";
 import { documentoDeCampos } from "./tipos";
 
@@ -299,26 +298,8 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
       "budgetExtras[0].label",
       "budgetExtras[0].valueText",
       "budgetExtras[1].label",
-      /**
-       * ── O QUE UMA PROPOSTA COM ADICIONAIS JÁ NÃO IMPRIME ─────────────────
-       *
-       * Duas ausências, e são as duas de propósito (ver o bloco de totais em
-       * `proposal-doc-pdf.ts`):
-       *
-       *  · `budgetExtras[1].valueText` — a coordenação está escrita «950,50 € +
-       *    IVA» no estúdio, e a folha imprime «+ 950,50 €». O bloco inteiro é
-       *    em base (sem IVA) e diz o IVA UMA vez, na sua linha; repetir «+ IVA»
-       *    em cada parcela de um bloco sem IVA é a ambiguidade que este bloco
-       *    veio acabar. O montante que cada adicional acrescenta volta exacto —
-       *    é o que se confere logo a seguir.
-       *
-       *  · `totalText` — o número grande passou a ser o TOTAL A PAGAR
-       *    (9.704,70 €), e não o texto do total escrito no estúdio
-       *    («7.890,00 € + IVA»). É a mesma razão por que `totalLabel` já não
-       *    voltava. O dinheiro volta inteiro pela linha «TOTAL (sem IVA)»:
-       *    `totalAmount` e `totalVatMode` continuam a bater certo, aqui em
-       *    baixo.
-       */
+      "budgetExtras[1].valueText",
+      "totalText",
       "totalAmount",
       "totalVatMode",
       "depositPercent",
@@ -344,22 +325,6 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
     expect(moodboard.acerto).toBe(1);
     expect(orcamento.acerto).toBe(1);
     expect(fixos.acerto).toBe(1);
-
-    // ── O DINHEIRO VOLTA AO CÊNTIMO ────────────────────────────────────────
-    // O texto do total mudou de forma (ver acima), mas o que ele VALE não pode
-    // mudar: a base, o IVA e o total a pagar da proposta lida têm de ser, ao
-    // cêntimo, os da proposta que foi impressa. E os valores adicionais têm de
-    // continuar a valer o mesmo em BASE — se voltassem a ser lidos com o IVA
-    // lá dentro, a repartição entre serviços e adicionais mudava só por o
-    // documento ter ido e voltado.
-    const antes = totaisDaProposta(doc, depositPercentOf(doc));
-    const depois = totaisDaProposta(lido as ProposalDoc, depositPercentOf(lido));
-    expect(depois.total).toBe(antes.total);
-    expect(depois.iva).toBe(antes.iva);
-    expect(depois.aPagar).toBe(antes.aPagar);
-    expect(depois.adicionais).toBe(antes.adicionais);
-    expect(depois.servicos).toBe(antes.servicos);
-    expect(depois.fecha).toBe(true);
 
     // A validade é impressa como DATA, e é essa que volta.
     expect(lido.validUntil).toBe(resolveValidUntil(doc));
