@@ -35,6 +35,7 @@ export const mapper: Mapper<Foto> = {
     largura: f.largura ?? null,
     altura: f.altura ?? null,
     lqip: f.lqip || null,
+    cor: f.cor || null,
     created_at: f.createdAt || new Date().toISOString(),
     updated_at: f.updatedAt || new Date().toISOString(),
   }),
@@ -48,6 +49,7 @@ export const mapper: Mapper<Foto> = {
     ...(typeof r.largura === "number" ? { largura: r.largura } : {}),
     ...(typeof r.altura === "number" ? { altura: r.altura } : {}),
     ...(typeof r.lqip === "string" && r.lqip ? { lqip: r.lqip } : {}),
+    ...(typeof r.cor === "string" && r.cor ? { cor: r.cor } : {}),
     createdAt: String(r.created_at ?? new Date().toISOString()),
     updatedAt: String(r.updated_at ?? r.created_at ?? new Date().toISOString()),
   }),
@@ -92,7 +94,7 @@ export async function garantirFoto(
 
 export const updateFoto = (
   path: string,
-  patch: Partial<Pick<Foto, "fingerprint" | "md5" | "largura" | "altura" | "lqip">>,
+  patch: Partial<Pick<Foto, "fingerprint" | "md5" | "largura" | "altura" | "lqip" | "cor">>,
 ): Promise<Foto | null> => repo.update(path, patch);
 
 /**
@@ -131,6 +133,36 @@ export async function lqipsDeCaminhos(paths: readonly string[]): Promise<Map<str
     }
   } catch {
     /* sem placeholders — a grelha desenha-se na mesma */
+  }
+  return saida;
+}
+
+/**
+ * As CORES de um conjunto de caminhos, num pedido só.
+ *
+ * O gémeo do `lqipsDeCaminhos`, e pela mesma razão: isto corre quando o estúdio
+ * abre uma proposta com oito boards e ~40 fotos, e uma consulta por fotografia
+ * seriam quarenta idas à base de dados para desenhar um ecrã.
+ *
+ * Uma foto sem linha, ou sem cor, não entra no mapa — e sem cor não há aviso de
+ * paleta nem arrumação para ela, que é o comportamento de todas as fotos
+ * anteriores a isto existir. Nunca lança: a cor é acessória, e uma base de
+ * dados em baixo não pode esconder as fotografias.
+ */
+export async function coresDeCaminhos(paths: readonly string[]): Promise<Map<string, string>> {
+  const saida = new Map<string, string>();
+  if (paths.length === 0) return saida;
+  const pastas = new Set(paths.map((p) => p.split("/")[0]).filter(Boolean));
+  const querido = new Set(paths);
+  try {
+    const listas = await Promise.all(
+      [...pastas].map((pasta) => repo.where("pasta", pasta, (f) => f.pasta === pasta)),
+    );
+    for (const f of listas.flat()) {
+      if (f.cor && querido.has(f.path)) saida.set(f.path, f.cor);
+    }
+  } catch {
+    /* sem cores — o estúdio comporta-se como antes disto existir */
   }
   return saida;
 }

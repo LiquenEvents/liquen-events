@@ -14,6 +14,8 @@ import { refsDeTemaNoDoc } from "@/lib/theme-materializar";
 import { garantirFormatoImprimivel, motivoDaRecusa } from "@/lib/proposal-image";
 import { recusaDeImagem } from "@/lib/recusa-de-imagem";
 import { isDatabaseConfigured } from "@/lib/supabase";
+import { corNormalizada } from "@/lib/cor";
+import { coresDeCaminhos, garantirFoto, updateFoto } from "@/lib/biblioteca-fotos-store";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -90,7 +92,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     listProposalImages(id),
     fotosDaBibliotecaDoPedido(id),
   ]);
-  return NextResponse.json({ ok: true, images: [...proprias, ...daBiblioteca] });
+  const imagens = [...proprias, ...daBiblioteca];
+  // AS CORES, num pedido só para todas.
+  //
+  // É com elas que o estúdio avisa que uma foto destoa da paleta do board e
+  // arruma as fotos por cor. Vêm daqui — e não de um `canvas` do lado da
+  // proposta — porque estas fotos chegam por URLs assinados de OUTRO domínio:
+  // ler-lhes os píxeis lançaria (ver `cor-dominante.ts`).
+  //
+  // Melhor esforço: sem base de dados, ou com fotos anteriores a isto existir,
+  // o mapa vem vazio e o estúdio comporta-se exactamente como antes.
+  const cores = await coresDeCaminhos(imagens.map((im) => im.path));
+  return NextResponse.json({
+    ok: true,
+    images: imagens.map((im) => {
+      const cor = cores.get(im.path);
+      return cor ? { ...im, cor } : im;
+    }),
+  });
 }
 
 /**
@@ -135,7 +154,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // a grelha cai para o original, que é o comportamento de hoje.
   const thumbs = form.getAll("thumbs").filter((f): f is File => f instanceof File);
 
-  const uploaded: { path: string; url: string; thumbUrl?: string }[] = [];
+  // As CORES dominantes, calculadas no browser (ver `corDe` em
+  // `image-worker.ts`) e emparelhadas pela ordem, como as miniaturas.
+  // Comprimentos diferentes significam que os dois lados discordam sobre o que
+  // está a ser enviado: aí não se adivinha, vão todas a `null` — uma cor na
+  // foto errada faria o aviso de paleta apontar a fotografia inocente.
+  const coresCruas = form.getAll("cores").filter((v): v is string => typeof v === "string");
+  const cores: (string | null)[] =
+    coresCruas.length === files.length ? coresCruas.map(corNormalizada) : files.map(() => null);
+  if (coresCruas.length > 0 && coresCruas.length !== files.length) {
+    log.warn("assets: cores ignoradas (não correspondem aos ficheiros)", {
+      files: files.length,
+      cores: coresCruas.length,
+    });
+  }
+
+  const uploaded: { path: string; url: string; thumbUrl?: string; cor?: string }[] = [];
   for (const [indice, file] of files.entries()) {
     if (!OK_TYPES.test(file.type)) {
       return NextResponse.json(
@@ -198,7 +232,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         thumb.type,
       );
     }
-    uploaded.push(thumbUrl ? { ...res, thumbUrl } : res);
+    // A cor entra na linha da foto. Melhor esforço, como a miniatura: a
+    // fotografia já está guardada, e falhar aqui deixa-a sem cor — exactamente
+    // como estão todas as anteriores a isto existir. Nunca é motivo para
+    // devolver erro de um carregamento que correu bem.
+    const cor = cores[indice];
+    if (cor) {
+      try {
+        await garantirFoto(res.path, { cor });
+        await updateFoto(res.path, { cor });
+      } catch (e) {
+        log.warn("assets: cor não guardada", { path: res.path, erro: String(e) });
+      }
+    }
+    uploaded.push({ ...res, ...(thumbUrl ? { thumbUrl } : {}), ...(cor ? { cor } : {}) });
   }
 
   return NextResponse.json({ ok: true, images: uploaded });

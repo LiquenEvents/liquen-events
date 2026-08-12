@@ -56,6 +56,7 @@ import {
   temLugarDeDestaque,
 } from "@/lib/proposal-moodboard";
 import { corrigirGralha, corrigirTudo, gralhasDoDocumento } from "@/lib/proposal-ortografia";
+import { fotosQueDestoam, ordemPorCor } from "@/lib/cor-dominante";
 import Versoes from "./Versoes";
 import { comoSeDiz, noMesmoEspaco, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
 import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
@@ -949,6 +950,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * seletor já tinham, e que só ao estúdio faltava.
    */
   const [assetOriginais, setAssetOriginais] = useState<Record<string, string>>({});
+  /**
+   * A cor dominante de cada fotografia, `caminho → "#rrggbb"`.
+   *
+   * Vem do servidor (que a leu da linha da foto), e não de um `canvas` daqui:
+   * estas fotos chegam por URLs assinados de OUTRO domínio, e ler-lhes os
+   * píxeis lançaria — ver o cabeçalho de `cor-dominante.ts`. É com isto que se
+   * avisa que uma foto destoa da paleta do board e se arruma um board por cor.
+   *
+   * As fotos anteriores a isto existir não estão no mapa, e não entram em
+   * nenhuma das duas coisas: nunca se inventa uma cor para poder arrumar.
+   */
+  const [assetCores, setAssetCores] = useState<Record<string, string>>({});
   // Foto NESTA proposta → foto da BIBLIOTECA de onde foi copiada.
   //
   // A importação copia os bytes para um uuid novo, por isso o caminho de
@@ -1024,6 +1037,68 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const tempo = useRef<Contagem>(CONTAGEM_VAZIA);
   const [tempoMostrado, setTempoMostrado] = useState(0);
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O TEMPO SOBE PARA O SERVIDOR — E SOBE EM PEDAÇOS, NÃO EM TOTAIS
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A pergunta que motiva tudo isto é «que boards custam mais tempo?», e essa
+   * pergunta atravessa PROPOSTAS e APARELHOS. Guardado no `localStorage`, o
+   * total seria o deste computador — e uma proposta começada no portátil e
+   * acabada no tablet contaria metade em cada sítio.
+   *
+   * Envia-se o INCREMENTO desde o último envio, e o servidor soma. Se se
+   * enviasse o total, dois separadores abertos na mesma proposta escreviam um
+   * por cima do outro e ficava só o do último a falar.
+   *
+   * O que já foi enviado vive numa `ref`: é o ponto de referência do próximo
+   * incremento, e não tem nada que redesenhar o ecrã quando muda.
+   */
+  const tempoEnviado = useRef(0);
+  /**
+   * A secção onde ela está agora, vinda da coluna lateral (que já a calcula).
+   *
+   * Numa `ref` e não em estado: muda a cada scroll, e o número que ela alimenta
+   * só é lido de meio em meio minuto. Em estado, rolar a página redesenhava o
+   * estúdio inteiro para não mudar nada no ecrã.
+   */
+  const seccaoActivaRef = useRef<string | null>(null);
+  const anotarSeccao = useCallback((id: string | null) => {
+    seccaoActivaRef.current = id;
+  }, []);
+  const reportarTempo = useCallback(
+    (total: number, aFechar = false) => {
+      const delta = Math.round(total - tempoEnviado.current);
+      // Menos de um segundo não vale um pedido. A `ref` não avança, portanto
+      // este bocadinho não se perde: vai no envio seguinte.
+      if (delta < 1000) return;
+      tempoEnviado.current = total;
+      const seccao = seccaoActivaRef.current;
+      const corpo = JSON.stringify({ ms: delta, ...(seccao ? { seccao } : {}) });
+      const url = `/api/orcamento/${quote.id}/tempo-activo`;
+      if (aFechar && typeof navigator !== "undefined" && navigator.sendBeacon) {
+        // O beacon sobrevive à página; um `fetch` não.
+        try {
+          navigator.sendBeacon(url, new Blob([corpo], { type: "application/json" }));
+          return;
+        } catch {
+          /* sem beacon — tenta pelo caminho normal, que ainda pode chegar */
+        }
+      }
+      void fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: corpo,
+        keepalive: aFechar,
+      }).catch(() => {
+        // Sem rede o pedaço perde-se, e isso é aceitável: é uma MEDIÇÃO, não
+        // trabalho. Interromper quem está a montar uma proposta para lhe falar
+        // de um número que ela não pediu seria trocar o essencial pelo
+        // acessório.
+      });
+    },
+    [quote.id],
+  );
   useEffect(() => {
     const sinal = (tipo: "vida" | "pausa") => () => {
       tempo.current = comAcontecimento(tempo.current, { tipo, em: Date.now() });
@@ -1039,11 +1114,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     document.addEventListener("visibilitychange", aoMudarDeFoco);
     vivo();
     // Meio minuto: o número mostrado é em minutos, portanto qualquer passo mais
-    // curto seria trabalho para não mudar nada no ecrã.
-    const relogio = setInterval(
-      () => setTempoMostrado(totalAte(tempo.current, Date.now())),
-      30_000,
-    );
+    // curto seria trabalho para não mudar nada no ecrã. É também o passo a que
+    // o tempo sobe para o servidor — o mesmo relógio serve as duas coisas.
+    const relogio = setInterval(() => {
+      const total = totalAte(tempo.current, Date.now());
+      setTempoMostrado(total);
+      reportarTempo(total);
+    }, 30_000);
+    /**
+     * ── AO FECHAR, O QUE FALTAVA ─────────────────────────────────────────
+     *
+     * O passo é de meio minuto, portanto fechar o separador deixava sempre
+     * para trás até meio minuto — e, num dia de trabalho partido em muitas
+     * aberturas curtas, «até meio minuto de cada vez» deixa de ser arredondar
+     * e passa a ser um viés sempre para baixo.
+     *
+     * `sendBeacon` e não `fetch`: um `fetch` disparado no `pagehide` é
+     * cancelado com a página. O beacon é entregue pelo browser depois de o
+     * separador morrer, que é precisamente o que aqui se quer.
+     */
+    const aoFechar = () => reportarTempo(totalAte(tempo.current, Date.now()), true);
+    window.addEventListener("pagehide", aoFechar);
     return () => {
       for (const ev of ["pointerdown", "keydown", "wheel", "scroll"] as const) {
         window.removeEventListener(ev, vivo);
@@ -1051,9 +1142,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       window.removeEventListener("focus", vivo);
       window.removeEventListener("blur", parado);
       document.removeEventListener("visibilitychange", aoMudarDeFoco);
+      window.removeEventListener("pagehide", aoFechar);
       clearInterval(relogio);
+      // Trocar de cliente também fecha esta medição: sem isto, o tempo desde o
+      // último passo ficava por contar em todas as trocas.
+      aoFechar();
     };
-  }, []);
+  }, [reportarTempo]);
 
   /** A vista com as páginas lado a lado está aberta? */
   const [vistaDeConjunto, setVistaDeConjunto] = useState(false);
@@ -1131,6 +1226,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         if (meta?.originais && typeof meta.originais === "object") {
           setAssetOriginais(meta.originais);
         }
+        // Rascunhos guardados antes de as cores existirem não as têm: abrem na
+        // mesma, e a hidratação preenche-as assim que o servidor responder.
+        if (meta?.cores && typeof meta.cores === "object") setAssetCores(meta.cores);
         // Rascunhos guardados antes de isto existir não têm `themeOrigins` —
         // abrem na mesma, só sem as marcas de "já nesta proposta".
         if (meta?.themeOrigins && typeof meta.themeOrigins === "object") {
@@ -1375,11 +1473,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           const res = await fetch(`/api/orcamento/${quote.id}/assets`);
           if (!res.ok) return;
           const data = await res.json().catch(() => null);
-          const imgs: { path: string; url: string; thumbUrl?: string }[] = Array.isArray(
-            data?.images,
-          )
-            ? data.images
-            : [];
+          const imgs: { path: string; url: string; thumbUrl?: string; cor?: string }[] =
+            Array.isArray(data?.images) ? data.images : [];
           if (!vivo() || imgs.length === 0) return;
           setAssetUrls((prev) => {
             const next = { ...prev };
@@ -1403,6 +1498,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             const next = { ...prev };
             for (const im of imgs)
               if (im.path && im.url) next[im.path] = urlAindaBom(next[im.path], im.url);
+            return next;
+          });
+          // As cores não expiram (não são URLs assinados): uma vez conhecidas,
+          // ficam. Uma foto que volte sem cor não apaga a que já se sabia.
+          setAssetCores((prev) => {
+            const next = { ...prev };
+            for (const im of imgs) if (im.path && im.cor) next[im.path] = im.cor;
             return next;
           });
         } catch {
@@ -1543,6 +1645,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             // rede (ou antes de a hidratação responder) deixava as células sem
             // para onde cair — que é exactamente quando mais falta faz.
             originais: semProvisorios(assetOriginais),
+            // As cores viajam com o rascunho pela mesma razão que o plano B:
+            // reabrir sem rede (ou antes de a hidratação responder) deixava o
+            // aviso de paleta mudo justamente quando ele ainda faz falta.
+            cores: semProvisorios(assetCores),
             themeOrigins: semProvisorios(themeOrigins),
             refEdited,
           }),
@@ -1583,6 +1689,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     doc,
     assetUrls,
     assetOriginais,
+    assetCores,
     themeOrigins,
     refEdited,
     DRAFT_KEY,
@@ -2419,6 +2526,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     );
     setAssetUrls({});
     setAssetOriginais({});
+    setAssetCores({});
     setThemeOrigins({});
     setRefEdited(false);
     setConfirmSend(false);
@@ -2446,10 +2554,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   async function uploadOne(
     file: File,
     thumb: File | null,
-  ): Promise<{ path: string; url: string; thumbUrl?: string }> {
+    cor?: string | null,
+  ): Promise<{ path: string; url: string; thumbUrl?: string; cor?: string }> {
     const post = () => {
       const form = new FormData();
       form.append("files", file);
+      // A cor dominante, calculada na mesma descodificação que encolheu a foto
+      // (ver `image-prep`). É aqui que ela pode ser calculada — do lado do
+      // estúdio as fotos já vêm de outro domínio e o `canvas` fica manchado.
+      if (cor) form.append("cores", cor);
       // A miniatura viaja ao lado do original, no mesmo pedido: sai da MESMA
       // descodificação que já se fez para encolher a foto, portanto não custa
       // tempo nenhum, e ~30–60 KB não se notam ao lado de uma foto de 2 MB.
@@ -2474,12 +2587,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             : "Falha ao carregar a imagem."),
       );
     }
-    const im: { path: string; url: string; thumbUrl?: string } | undefined = data?.images?.[0];
+    const im: { path: string; url: string; thumbUrl?: string; cor?: string } | undefined =
+      data?.images?.[0];
     if (!im) throw new Error("Falha ao carregar a imagem.");
     // A grelha desenha pela miniatura quando existe; o original fica para o
     // detalhe e para o PDF.
     setAssetUrls((prev) => ({ ...prev, [im.path]: im.thumbUrl || im.url }));
     setAssetOriginais((prev) => ({ ...prev, [im.path]: im.url }));
+    if (im.cor) setAssetCores((prev) => ({ ...prev, [im.path]: im.cor as string }));
     return im;
   }
 
@@ -2505,7 +2620,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         const f = files[i];
         try {
           const prepared = await prepareImageWithThumb(f, kind);
-          const im = await uploadOne(prepared.file, prepared.thumb);
+          const im = await uploadOne(prepared.file, prepared.thumb, prepared.cor);
           // Guardado pelo ÍNDICE: as vias acabam fora de ordem e a ordem das
           // fotos escolhidas é a que a Catarina vê no documento.
           results[i] = { path: im.path };
@@ -2937,6 +3052,50 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }
 
   /** Reordenar dentro do mesmo board. */
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * ARRUMAR UM BOARD POR COR
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A ordem das fotos É a composição da página (ver `proposal-moodboard.ts`),
+   * e uma página lê-se melhor quando as cores fazem uma transição em vez de
+   * saltarem. Isto arruma-as por parecença — ver `ordemPorCor`, que encadeia
+   * cada foto com a mais próxima da anterior.
+   *
+   * Não é destrutivo nem definitivo: entra no histórico como qualquer outra
+   * alteração, e o Cmd+Z desfaz. Por isso não há caixa de confirmação.
+   *
+   * As fotos sem cor conhecida (as carregadas antes de a cor existir) ficam no
+   * fim, pela ordem em que estavam — nunca se lhes inventa uma cor.
+   */
+  function arrumarPorCor(bi: number) {
+    const board = doc.moodBoards[bi];
+    if (!board) return;
+    const ordem = ordemPorCor(board.images.map((p) => assetCores[p]));
+    if (ordem.every((idx, i) => idx === i)) {
+      toast("Esta página já está arrumada por cor.", "info");
+      return;
+    }
+    setDoc((d) => ({
+      ...d,
+      moodBoards: d.moodBoards.map((b, i) => {
+        if (i !== bi) return b;
+        return {
+          ...b,
+          images: ordem.map((idx) => b.images[idx]),
+          // A foto que manda na página continua a ser a MESMA fotografia, no
+          // sítio novo. Sem isto, arrumar por cor promovia a destaque outra
+          // foto qualquer — a que calhasse cair na posição marcada.
+          principal: marcaDepoisDeMexer(b, (antigo) => {
+            const novo = ordem.indexOf(antigo);
+            return novo < 0 ? antigo : novo;
+          }),
+        };
+      }),
+    }));
+    toast("Fotografias arrumadas por cor. Cmd+Z desfaz.", "success");
+  }
+
   function reordenarFotos(bi: number, de: number, para: number) {
     setDoc((d) => ({
       ...d,
@@ -3885,7 +4044,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         className="flex gap-6"
         style={{ paddingBottom: folgaDaBarra }}
       >
-        <NavEstudio seccoes={seccoes} faltas={faltas} />
+        <NavEstudio seccoes={seccoes} faltas={faltas} onSeccaoActual={anotarSeccao} />
         <div className="min-w-0 flex-1">
           {/* Template selector */}
           <div className="mb-4">
@@ -4346,6 +4505,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                   >
                                     <span aria-hidden="true">{fechado ? "🔒" : "🔓"}</span>
                                   </button>
+                                  {/* ── ARRUMAR POR COR ──────────────────────
+                                      Só aparece quando há mesmo o que arrumar:
+                                      três fotos com cor conhecida. Com menos, o
+                                      botão não teria nada para fazer e seria só
+                                      mais um ícone a ocupar a barra. Fica
+                                      escondido — e não desactivado — porque um
+                                      botão desactivado que nunca se explica é
+                                      pior do que um botão que não está lá. */}
+                                  {b.images.filter((p) => assetCores[p]).length >= 3 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => arrumarPorCor(bi)}
+                                      aria-label={`Arrumar por cor as fotografias do mood board ${pos + 1}`}
+                                      title="Arrumar as fotografias por cor"
+                                      disabled={fechado}
+                                      className="alvo-toque flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-xs text-foreground/35 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/70 disabled:opacity-40"
+                                    >
+                                      <span aria-hidden="true">◑</span>
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => duplicarBoard(bi)}
@@ -4437,6 +4616,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         . Remove fotos ou cria outro mood board.
                                       </p>
                                     )}
+                                    {/* ── A FOTO QUE DESTOA DA PALETA ────────────
+                                        Não é um erro, e por isso não é vermelho:
+                                        uma fotografia de cor diferente pode ser
+                                        exactamente o que se quer. É uma coisa que
+                                        se vê melhor dita do que olhando para uma
+                                        grelha de miniaturas pequenas — e que só
+                                        aparece quando salta à vista mesmo (ver
+                                        `LIMIAR_DE_AVISO` em `cor-dominante.ts`).
+
+                                        Cala-se sozinho quando não há cores que
+                                        cheguem: as fotos carregadas antes de a
+                                        cor existir não entram na conta. */}
+                                    {(() => {
+                                      const fora = fotosQueDestoam(
+                                        b.images.map((p) => assetCores[p]),
+                                      );
+                                      if (fora.length === 0) return null;
+                                      const quais = fora
+                                        .slice(0, 3)
+                                        .sort((x, y) => x - y)
+                                        .map((i) => `${i + 1}.ª`);
+                                      return (
+                                        <p className="mb-2 text-xs leading-relaxed text-foreground/55">
+                                          <span aria-hidden="true">◐ </span>
+                                          {fora.length === 1
+                                            ? `A ${quais[0]} fotografia destoa da paleta desta página.`
+                                            : `A ${quais.slice(0, -1).join(", a ")} e a ${quais[quais.length - 1]} fotografias destoam da paleta desta página.`}{" "}
+                                          Pode ser de propósito — se não for, troca-a ou arruma a
+                                          página por cor.
+                                        </p>
+                                      );
+                                    })()}
                                     <GrelhaDeFotos
                                       bi={bi}
                                       quantas={b.images.length}

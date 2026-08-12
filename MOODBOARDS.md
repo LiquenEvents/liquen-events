@@ -69,19 +69,64 @@ e se já foi para um casamento no mesmo espaço.
 
 Escrito aqui para não se perder, com a razão:
 
-- **Teste Playwright do arrasto** (desktop e telemóvel). O caminho determinista
-  é o sensor de teclado do dnd-kit (Espaço, setas, Espaço), não o rato. Não
-  ficou feito.
 - **Vista de conjunto dos 8 boards** lado a lado, para avaliar a coerência da
   paleta, com reordenação a partir dessa vista.
-- **Aviso de incoerência de paleta** e **«organizar automaticamente» por cor**.
-  Os dois dependem de extrair a cor dominante de cada fotografia. No browser
-  isso faz-se com um `canvas`, mas as fotos vêm de URLs assinados de outro
-  domínio: sem os cabeçalhos de CORS certos, ler os pixéis lança e o resultado
-  seria uma funcionalidade que ora funciona ora não. O sítio certo para isto é o
-  trabalhador que já prepara as imagens (`image-worker.ts`), que as tem em bruto
-  antes de subirem — e isso é uma frente própria.
-- **Registo do tempo activo** por proposta e por secção. É um contador de
-  segundos com a página em foco, mais um sítio onde os acumular entre propostas
-  — servidor, não `localStorage`, senão a resposta a «que boards custam mais
-  tempo?» seria só a deste computador.
+
+## O que passou a estar feito
+
+- **Teste Playwright do arrasto** (computador e telemóvel), em
+  `e2e/moodboards-arrasto.spec.ts`, pelo sensor de teclado do dnd-kit — Espaço,
+  setas, Espaço. É o mesmo `onDragEnd` do rato e é o único caminho determinista;
+  ao prendê-lo pelo teclado prende-se também a acessibilidade do gesto.
+
+  **O que ele encontrou pelo caminho, que valia mais do que ele:** o estúdio
+  abria com 0 boards tendo o rascunho no `localStorage` com a chave certa —
+  comparada a sério, imprimindo o `DRAFT_KEY` do `ProposalStudio` e o `id` que o
+  `POST /api/orcamento` devolve. Batem certo. O defeito era do restauro: o
+  efeito não era idempotente, corria duas vezes em desenvolvimento, e a segunda
+  passagem lia o documento vazio que a gravação automática tinha entretanto
+  escrito por cima. A gravação seguinte tornava a perda definitiva. Está
+  corrigido, e a razão está escrita no `ProposalStudio.tsx`, em «CORRE UMA VEZ
+  SÓ».
+
+  E o telemóvel encontrou um segundo: num ecrã estreito as setas nunca chegavam
+  à foto seguinte — as zonas grandes (a grelha, o cartão do board) ganhavam a
+  corrida ao vizinho, e o cartão do board nem sequer é destino de uma foto. Quem
+  só tem teclado não conseguia reordenar fotos num ecrã estreito. As setas e a
+  detecção de colisões seguem agora a regra que o `onDragEnd` já aplicava: só
+  param onde largar faz alguma coisa.
+
+- **Cor dominante de cada fotografia**, no trabalhador que já as prepara
+  (`image-worker.ts`), do MESMO canvas reduzido que gera a miniatura e o LQIP —
+  sem uma segunda descodificação. É ali porque ali a foto está em bruto, antes
+  de subir: do lado da proposta as fotos chegam por URLs assinados de outro
+  domínio e ler-lhes os píxeis lançaria. A aritmética está em
+  `src/lib/cor-dominante.ts`, pura e testada em Node.
+
+  A cor viaja com o carregamento, é validada à entrada (`src/lib/cor.ts`, uma
+  lista de permitidos curta: `#rrggbb` e mais nada) e fica na linha da foto.
+
+- **Aviso de paleta fora da média.** Por board, e só quando salta à vista: os
+  pesos da distância entre cores foram calibrados contra dois casos que têm de
+  cair de lados opostos — uma página de verdes com uma foto de azul forte (avisa,
+  0,48) e uma página de verdes COM cremes (não avisa, 0,29), que é a paleta mais
+  comum de um casamento. O limiar fica a meio, com folga dos dois lados. Não é
+  vermelho: uma foto de cor diferente pode ser exactamente o que se quer.
+
+- **«Organizar automaticamente» por cor.** Um botão por board, que encadeia as
+  fotos pela mais parecida com a anterior começando pela mais típica da página —
+  não é «ordenar por matiz», que partiria os vermelhos pelas duas pontas.
+  As fotos sem cor conhecida ficam no fim, pela ordem em que estavam: nunca se
+  inventa uma cor para as poder arrumar. Entra no histórico como qualquer outra
+  alteração, e o Cmd+Z desfaz.
+
+- **Registo do tempo activo, acumulado no SERVIDOR.** A contagem já existia e
+  estava testada (`tempo-activo.ts`); o que faltava era o sítio onde os totais
+  sobrevivessem. Está em `tempo-activo-servidor.ts` (na tabela `app_state`, como
+  os rascunhos) e em `POST /api/orcamento/[id]/tempo-activo`.
+
+  O cliente manda o que passou DESDE O ÚLTIMO ENVIO e o servidor soma. Se
+  mandasse o total, dois aparelhos abertos na mesma proposta escreviam um por
+  cima do outro — que é a avaria que trazer isto para o servidor veio resolver.
+  A secção vem da coluna lateral, que já a calculava: é o que responde a «que
+  boards custam mais tempo?» em vez de só «esta proposta levou duas horas».

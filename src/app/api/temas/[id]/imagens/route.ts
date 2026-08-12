@@ -23,6 +23,7 @@ import { isDatabaseConfigured } from "@/lib/supabase";
 import { apagarFotoDaBiblioteca } from "@/lib/theme-materializar";
 import { log } from "@/lib/logger";
 import { lqipAceitavel } from "@/lib/lqip";
+import { corNormalizada } from "@/lib/cor";
 import { garantirFoto, updateFoto } from "@/lib/biblioteca-fotos-store";
 
 export const runtime = "nodejs";
@@ -172,6 +173,26 @@ function pairLqips(files: File[], form: FormData): (string | null)[] {
   return raw.map((v) => (lqipAceitavel(v) ? v : null));
 }
 
+/**
+ * As CORES dominantes, emparelhadas pela ordem — mesma regra do `pairLqips`.
+ *
+ * Comprimentos diferentes significam que o cliente e o servidor discordam sobre
+ * o que está a ser enviado, e uma cor atribuída à foto errada faria o aviso de
+ * paleta apontar a fotografia inocente. Aí não se adivinha: vão todas a `null`.
+ */
+function pairCores(files: File[], form: FormData): (string | null)[] {
+  const raw = form.getAll("cores").filter((v): v is string => typeof v === "string");
+  if (raw.length === 0) return files.map(() => null);
+  if (raw.length !== files.length) {
+    log.warn("temas: cores ignoradas (não correspondem aos ficheiros)", {
+      files: files.length,
+      cores: raw.length,
+    });
+    return files.map(() => null);
+  }
+  return raw.map((v) => corNormalizada(v));
+}
+
 function pairHashes(files: File[], form: FormData): (string | null)[] {
   const raw = form.getAll("hashes").filter((h): h is string => typeof h === "string");
   if (raw.length === 0) return files.map(() => null);
@@ -238,6 +259,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const thumbs = pairThumbs(files, form);
   const hashes = pairHashes(files, form);
   const lqips = pairLqips(files, form);
+  const cores = pairCores(files, form);
   const micros = pairMicros(files, form);
   const force = form.get("force") === "1";
 
@@ -331,17 +353,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // exactamente como estão todas as anteriores a isto existir. Nunca é
     // motivo para devolver erro de um carregamento que correu bem.
     const lqip = lqips[i];
-    if (lqip) {
+    const cor = cores[i];
+    if (lqip || cor) {
       try {
-        await garantirFoto(res.image.path, { lqip });
-        await updateFoto(res.image.path, { lqip });
+        const dados = { ...(lqip ? { lqip } : {}), ...(cor ? { cor } : {}) };
+        await garantirFoto(res.image.path, dados);
+        await updateFoto(res.image.path, dados);
       } catch (e) {
-        log.warn("temas: LQIP não guardado", { path: res.image.path, erro: String(e) });
+        log.warn("temas: LQIP/cor não guardados", { path: res.image.path, erro: String(e) });
       }
     }
-    // Devolvido JÁ na resposta: a célula que acabou de entrar na grelha não
-    // tem de esperar pela próxima listagem para ter placeholder.
-    uploaded.push(lqip ? { ...res.image, lqip } : res.image);
+    // Devolvidos JÁ na resposta: a célula que acabou de entrar na grelha não
+    // tem de esperar pela próxima listagem para ter placeholder nem cor.
+    uploaded.push({ ...res.image, ...(lqip ? { lqip } : {}), ...(cor ? { cor } : {}) });
   }
 
   return NextResponse.json({ ok: true, images: uploaded, duplicates });

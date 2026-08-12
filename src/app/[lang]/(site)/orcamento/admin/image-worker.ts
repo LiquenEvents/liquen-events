@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+import { corDominanteDePixeis } from "@/lib/cor-dominante";
+
 /**
  * Trabalhador que prepara fotos FORA do fio principal.
  *
@@ -42,6 +44,7 @@ export type WorkerResponse =
       thumb: Blob | null;
       micro: Blob | null;
       lqip: string | null;
+      cor: string | null;
     }
   | { id: number; ok: false; reason: string };
 
@@ -119,6 +122,52 @@ export const MICRO_EDGE = 96;
 /** Qualidade da micro. Mais baixa do que a miniatura: a 43 px não se vê. */
 export const MICRO_QUALITY = 0.65;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A COR DOMINANTE — e porque é que ela nasce AQUI
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Duas coisas do estúdio precisam de saber de que cor é cada fotografia: o
+ * aviso de que uma foto destoa da paleta do board, e o «organizar
+ * automaticamente». As duas se resolveriam num `canvas` do lado da proposta —
+ * se as fotos não viessem de URLs assinados de OUTRO domínio. Sem os cabeçalhos
+ * de CORS certos, ler os píxeis lança, e o resultado seria uma funcionalidade
+ * que ora funciona ora não.
+ *
+ * Aqui não há origem cruzada nenhuma: a fotografia está em bruto, no computador
+ * de quem a carrega, antes de subir. E o bitmap JÁ está descodificado para a
+ * miniatura e para o LQIP — a cor sai do MESMO canvas reduzido, sem uma segunda
+ * descodificação. O custo de um lote de 300 fotos não muda.
+ *
+ * A aritmética não está aqui: está em `@/lib/cor-dominante`, que é puro e se
+ * testa em Node. Este ficheiro só lhe entrega os píxeis.
+ *
+ * ── Porque 24 px ───────────────────────────────────────────────────────────
+ * A cor dominante é uma estatística grosseira: 576 píxeis chegam e sobram para
+ * dizer qual é a família de cor que mais aparece. Mais do que isso é ler mais
+ * memória para obter a mesma resposta; a 16 px do LQIP, uma foto com um detalhe
+ * de cor pequeno mas decisivo (um ramo sobre uma parede clara) começa a perdê-lo.
+ */
+export const COR_EDGE = 24;
+
+/**
+ * A cor dominante de um canvas já reduzido. Nunca lança: uma foto sem cor
+ * conhecida é uma foto que não entra no aviso nem na arrumação — que é
+ * exactamente o que acontece hoje a todas.
+ */
+export async function corDe(base: CanvasImageSource, w: number, h: number): Promise<string | null> {
+  try {
+    const t = planResize(w, h, COR_EDGE);
+    const canvas = drawTo(base, t.w, t.h);
+    if (!canvas) return null;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    return corDominanteDePixeis(ctx.getImageData(0, 0, t.w, t.h).data);
+  } catch {
+    return null;
+  }
+}
+
 /** Cópia de `fitWithin` da image-prep (ver nota no cabeçalho). */
 export function planResize(w: number, h: number, maxEdge: number): { w: number; h: number } {
   const scale = Math.min(1, maxEdge / Math.max(w, h, 1));
@@ -187,9 +236,13 @@ export async function lqipDe(
  * LQIP. Descodificar mais do que uma vez duplicaria o custo de um lote de 300
  * fotos, que é exatamente o tamanho para que isto está dimensionado.
  */
-export async function prepareInWorker(
-  req: WorkerRequest,
-): Promise<{ blob: Blob | null; thumb: Blob | null; micro: Blob | null; lqip: string | null }> {
+export async function prepareInWorker(req: WorkerRequest): Promise<{
+  blob: Blob | null;
+  thumb: Blob | null;
+  micro: Blob | null;
+  lqip: string | null;
+  cor: string | null;
+}> {
   const bitmap = await createImageBitmap(req.blob);
   try {
     let blob: Blob | null = null;
@@ -242,8 +295,11 @@ export async function prepareInWorker(
     // miniatura (já pequena) é precisamente uma que continua a precisar de
     // alguma coisa para mostrar enquanto chega.
     const lqip = await lqipDe(base, bw, bh);
+    // Do MESMO canvas, e pela mesma razão: é aqui que os píxeis existem sem
+    // origem cruzada e sem uma segunda descodificação.
+    const cor = await corDe(base, bw, bh);
 
-    return { blob, thumb, micro, lqip };
+    return { blob, thumb, micro, lqip, cor };
   } finally {
     // Só depois de AMBOS os desenhos: fechar a bitmap a seguir ao primeiro
     // deixava a miniatura sem fonte.
@@ -279,8 +335,8 @@ if (
   self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     const req = e.data;
     try {
-      const { blob, thumb, micro, lqip } = await prepareInWorker(req);
-      const res: WorkerResponse = { id: req.id, ok: true, blob, thumb, micro, lqip };
+      const { blob, thumb, micro, lqip, cor } = await prepareInWorker(req);
+      const res: WorkerResponse = { id: req.id, ok: true, blob, thumb, micro, lqip, cor };
       self.postMessage(res);
     } catch (err) {
       const res: WorkerResponse = {

@@ -764,9 +764,18 @@ create table if not exists public.biblioteca_fotos (
   largura     int,
   altura      int,
   lqip        text,                      -- placeholder curto servido inline (nulo até existir)
+  -- A cor dominante, '#rrggbb'. Calculada no NAVEGADOR de quem carrega a foto
+  -- (ver `corDe` em image-worker.ts): do lado da proposta as fotos chegam por
+  -- URLs assinados de outro domínio e ler-lhes os píxeis lançaria. É o que
+  -- alimenta o aviso de paleta e o "arrumar por cor" do estúdio. Nula nas fotos
+  -- anteriores a isto existir — e uma foto sem cor não entra em nenhum dos dois.
+  cor         text,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+
+-- Para instalações que já tinham a tabela antes de a cor existir.
+alter table public.biblioteca_fotos add column if not exists cor text;
 
 create index if not exists biblioteca_fotos_pasta_idx on public.biblioteca_fotos (pasta);
 create index if not exists biblioteca_fotos_md5_idx

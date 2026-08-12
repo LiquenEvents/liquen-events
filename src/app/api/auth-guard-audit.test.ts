@@ -489,6 +489,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // O rascunho é trabalho comercial por publicar (preços, notas internas): ler
   // conta tanto como escrever.
   { path: "./orcamento/[id]/proposta-rascunho/route", methods: ["GET", "PUT", "DELETE"] },
+  // Quanto tempo custou montar esta proposta. Não é dado do cliente, mas é
+  // dado sobre COMO a casa trabalha — e o `POST` escreve na medição de que
+  // depende a resposta a "que boards custam mais tempo?".
+  { path: "./orcamento/[id]/tempo-activo/route", methods: ["GET", "POST"] },
   // O histórico devolve o que se cobrou em cada ronda de negociação, e com
   // `?doc=` devolve um documento inteiro. É a proposta toda, por outra porta.
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },

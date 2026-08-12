@@ -99,6 +99,14 @@ export interface ThemeImage {
    * não correr. Sem ele a célula fica como sempre esteve.
    */
   lqip?: string;
+  /**
+   * A cor dominante da fotografia, em `#rrggbb` — ver `Foto.cor`.
+   *
+   * Serve o aviso de paleta e o «organizar automaticamente» do estúdio.
+   * Ausente nas fotos carregadas antes disto existir; sem ela a fotografia
+   * simplesmente não entra em nenhum dos dois.
+   */
+  cor?: string;
 }
 
 /** O que `GET /api/temas/[id]/imagens?offset=&limit=` devolve. */

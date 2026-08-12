@@ -26,9 +26,21 @@ import type { EstadoSeccao, Impedimento } from "@/lib/proposal-progress";
 interface Props {
   seccoes: EstadoSeccao[];
   faltas: Impedimento[];
+  /**
+   * Onde é que ela está a trabalhar, dito para fora.
+   *
+   * Esta coluna já sabe qual é a secção à vista — é para isso que o observador
+   * existe — e o estúdio precisa da mesma resposta para poder dizer QUE SECÇÃO
+   * custou o tempo que mede (ver `tempo-activo-servidor.ts`). Um segundo
+   * observador lá em cima seria a mesma pergunta feita duas vezes, com duas
+   * respostas a poderem discordar.
+   *
+   * Opcional: quem só quer a coluna não passa nada e nada muda.
+   */
+  onSeccaoActual?: (id: string | null) => void;
 }
 
-export default function NavEstudio({ seccoes, faltas }: Props) {
+export default function NavEstudio({ seccoes, faltas, onSeccaoActual }: Props) {
   const [atual, setAtual] = useState<string | null>(null);
 
   // ── Onde estou ────────────────────────────────────────────────────────
@@ -52,7 +64,11 @@ export default function NavEstudio({ seccoes, faltas }: Props) {
         const visiveis = entradas
           .filter((e) => e.isIntersecting)
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visiveis[0]) setAtual(visiveis[0].target.id.replace("seccao-", ""));
+        if (visiveis[0]) {
+          const id = visiveis[0].target.id.replace("seccao-", "");
+          setAtual(id);
+          onSeccaoActual?.(id);
+        }
       },
       // A margem de topo tira da conta a barra do cabeçalho, para a secção
       // que está por baixo dela não contar como «onde estou».
@@ -60,7 +76,7 @@ export default function NavEstudio({ seccoes, faltas }: Props) {
     );
     alvos.forEach((el) => observador.observe(el));
     return () => observador.disconnect();
-  }, [seccoes]);
+  }, [seccoes, onSeccaoActual]);
 
   function saltarPara(id: string) {
     const el = document.getElementById(`seccao-${id}`);

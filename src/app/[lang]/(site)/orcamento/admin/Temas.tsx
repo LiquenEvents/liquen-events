@@ -1807,7 +1807,7 @@ function ThemeFolder({
             // CAPA, impressa em grande. Guardá-la com 1600 px degradava-a para
             // sempre (o original nunca mais existe). A miniatura sai da MESMA
             // descodificação, para um lote de 300 fotos não custar o dobro.
-            const { file, thumb, micro, lqip } = await prepareImageWithThumb(f, "cover");
+            const { file, thumb, micro, lqip, cor } = await prepareImageWithThumb(f, "cover");
             // A miniatura acabada de fazer é a melhor pré-visualização que há:
             // 400 px, ~25 KB, e já está em memória. As células que ainda não
             // tinham imagem ganham-na aqui; as que já tinham ficam com a que
@@ -1833,6 +1833,10 @@ function ThemeFolder({
             // carregamento, e o carregamento já está a falar com o servidor.
             // Emparelhado pela ORDEM, como o `thumbs` e o `hashes`.
             if (lqip) form.append("lqips", lqip);
+            // A cor dominante, pela mesma boleia e pela mesma razão: é aqui
+            // que a fotografia existe em bruto e sem origem cruzada (ver
+            // `corDe` em `image-worker.ts`). Emparelhada pela ORDEM.
+            if (cor) form.append("cores", cor);
             // O resumo do ficheiro ORIGINAL (não do preparado): é ele que vira
             // o nome no Storage e torna a garantia de "não repetir" atómica.
             const hash = hashOf.get(f);

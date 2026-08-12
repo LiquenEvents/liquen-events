@@ -56,6 +56,18 @@ export interface Foto {
   altura?: number;
   /** Placeholder curto servido inline enquanto a foto não chega (Parte D). */
   lqip?: string;
+  /**
+   * A cor dominante da fotografia, em `#rrggbb`.
+   *
+   * Calculada no NAVEGADOR de quem a carrega, com o ficheiro em bruto (ver
+   * `corDe` em `image-worker.ts`): do lado da proposta as fotos chegam por URLs
+   * assinados de outro domínio e ler-lhes os píxeis lançaria. É o que permite
+   * avisar que uma foto destoa da paleta de um board e arrumá-las por cor.
+   *
+   * Ausente nas fotos carregadas antes disto existir. Sem ela, a foto não entra
+   * no aviso nem na arrumação — nunca se inventa uma cor para a poder arrumar.
+   */
+  cor?: string;
   createdAt: string;
   updatedAt: string;
 }

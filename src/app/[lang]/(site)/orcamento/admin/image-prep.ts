@@ -23,7 +23,15 @@
  */
 
 import type { WorkerRequest, WorkerResponse } from "./image-worker";
-import { LQIP_EDGE, LQIP_MAX_CHARS, LQIP_QUALITY, MICRO_EDGE, MICRO_QUALITY } from "./image-worker";
+import {
+  COR_EDGE,
+  LQIP_EDGE,
+  LQIP_MAX_CHARS,
+  LQIP_QUALITY,
+  MICRO_EDGE,
+  MICRO_QUALITY,
+} from "./image-worker";
+import { corDominanteDePixeis } from "@/lib/cor-dominante";
 // A mesma explicação que o servidor dá, num sítio só. Este módulo não traz nada
 // de servidor atrás — ver `recusa-de-imagem`.
 import { CONSELHO_HEIC, nomeOuTipoDeHeic } from "@/lib/recusa-de-imagem";
@@ -182,6 +190,18 @@ export interface PreparedImage {
    * sem LQIP a célula fica como está hoje, uma caixa à espera.
    */
   lqip: string | null;
+  /**
+   * A cor dominante da fotografia, em `#rrggbb` (ver `corDe` no trabalhador).
+   *
+   * É o que permite ao estúdio avisar que uma foto destoa da paleta do board e
+   * arrumar as fotos por cor. Nasce aqui, com o ficheiro em bruto e sem origem
+   * cruzada, porque do lado da proposta as fotos chegam por URLs assinados de
+   * outro domínio e ler-lhes os píxeis lançaria.
+   *
+   * `null` quando não foi possível calculá-la. Uma foto sem cor conhecida não
+   * entra no aviso nem na arrumação — que é o que acontece hoje a todas.
+   */
+  cor: string | null;
 }
 
 // ── Pool de trabalhadores ──
@@ -305,6 +325,7 @@ async function prepareViaWorker(
   thumb: Blob | null;
   micro: Blob | null;
   lqip: string | null;
+  cor: string | null;
 } | null> {
   const lane = await acquire();
   if (!lane) return null;
@@ -334,7 +355,7 @@ async function prepareViaWorker(
     }
   });
   if (!res || !res.ok) return null;
-  return { blob: res.blob, thumb: res.thumb, micro: res.micro, lqip: res.lqip };
+  return { blob: res.blob, thumb: res.thumb, micro: res.micro, lqip: res.lqip, cor: res.cor };
 }
 
 type Source = ImageBitmap | HTMLImageElement;
@@ -413,6 +434,27 @@ async function lqipNoFioPrincipal(
   }
 }
 
+/**
+ * A cor dominante no fio principal — o gémeo de `corDe` do trabalhador, para os
+ * browsers sem `OffscreenCanvas` e para o caminho do HEIC no Safari.
+ *
+ * A mesma duplicação, pela mesma razão do `lqipNoFioPrincipal`: um trabalhador
+ * não tem DOM. O tamanho vem do trabalhador (`COR_EDGE`) e a aritmética da
+ * `cor-dominante` — o que não pode divergir vive num sítio só.
+ */
+function corNoFioPrincipal(base: CanvasImageSource, w: number, h: number): string | null {
+  try {
+    const t = fitWithin(w, h, COR_EDGE);
+    const canvas = drawTo(base, t.w, t.h);
+    if (!canvas) return null;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    return corDominanteDePixeis(ctx.getImageData(0, 0, t.w, t.h).data);
+  } catch {
+    return null;
+  }
+}
+
 function sizeOf(source: Source): { w: number; h: number } {
   return "naturalWidth" in source
     ? { w: source.naturalWidth, h: source.naturalHeight }
@@ -434,7 +476,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
   const keep = keepOriginal(file.type, file.size, kind);
   // Sem miniatura a pedir, um ficheiro já pequeno e suportado nem sequer é
   // descodificado — é o caminho barato que o estúdio de propostas já usava.
-  if (keep && !wantThumb) return { file, thumb: null, micro: null, lqip: null };
+  if (keep && !wantThumb) return { file, thumb: null, micro: null, lqip: null, cor: null };
 
   // 1ª tentativa: fora do fio principal. Devolve `null` quando este browser não
   // tem `OffscreenCanvas` ou quando o trabalhador não consegue descodificar o
@@ -450,7 +492,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
     const micro = viaWorker.micro
       ? new File([viaWorker.micro], microFileName(file.name), { type: "image/jpeg" })
       : null;
-    return { file: out, thumb, micro, lqip: viaWorker.lqip };
+    return { file: out, thumb, micro, lqip: viaWorker.lqip, cor: viaWorker.cor };
   }
 
   let source: Source;
@@ -461,7 +503,9 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
     // fica sem derivadas (a grelha usa o original). Se não for imprimível, é o
     // servidor que o converte antes de guardar — a porta fecha-se lá, e não
     // aqui, precisamente para casos como este.
-    if (SUPPORTED.test(file.type)) return { file, thumb: null, micro: null, lqip: null };
+    if (SUPPORTED.test(file.type)) {
+      return { file, thumb: null, micro: null, lqip: null, cor: null };
+    }
     /**
      * O caso mais provável tem nome: um HEIC arrastado do telemóvel para o
      * computador e carregado no Chrome, que não sabe descodificá-lo. Aqui é
@@ -529,8 +573,9 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
     // 4) O LQIP, do MESMO canvas — a imagem que a grelha desenha a 0 ms.
     //    Silencioso como a miniatura: sem ele fica a caixa de hoje.
     const lqip = await lqipNoFioPrincipal(base, bw, bh);
+    const cor = corNoFioPrincipal(base, bw, bh);
 
-    return { file: out, thumb, micro, lqip };
+    return { file: out, thumb, micro, lqip, cor };
   } finally {
     // Só depois de AMBOS os desenhos: fechar a bitmap a seguir ao primeiro
     // deixava a miniatura sem fonte.
