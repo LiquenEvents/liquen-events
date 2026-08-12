@@ -21,6 +21,7 @@ import { prepareImageWithThumb } from "./image-prep";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
+import { SugestaoDeNome } from "./SugestaoDeNome";
 
 /**
  * Biblioteca de Temas — o sítio onde o estúdio guarda, uma vez, as fotos de
@@ -902,18 +903,24 @@ export default function Temas() {
       {adding && (
         <Card padding="sm" className="mb-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field
-              label="Nome do tema"
-              required
-              maxLength={MAX_THEME_NAME}
-              value={newName}
-              disabled={saving}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Ex.: Terracotta, Itália, Branco & Verde"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") create();
-              }}
-            />
+            <div>
+              <Field
+                label="Nome do tema"
+                required
+                maxLength={MAX_THEME_NAME}
+                value={newName}
+                disabled={saving}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Ex.: Terracotta, Itália, Branco & Verde"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") create();
+                }}
+              />
+              {/* A sugestão de grafia, no momento em que a atenção já está no
+                  campo. Depois de gravar é tarde: o nome fica no índice por
+                  onde ela procura. */}
+              <SugestaoDeNome valor={newName} onAceitar={setNewName} />
+            </div>
             <Field
               label="Nota (opcional)"
               maxLength={MAX_THEME_NOTES}
@@ -2580,22 +2587,25 @@ function ThemeFolder({
             ← Temas
           </Button>
           {renaming ? (
-            <input
-              autoFocus
-              value={name}
-              maxLength={MAX_THEME_NAME}
-              onChange={(e) => setName(e.target.value)}
-              onBlur={rename}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") rename();
-                if (e.key === "Escape") {
-                  setName(theme.name);
-                  setRenaming(false);
-                }
-              }}
-              aria-label="Nome do tema"
-              className="bo-input px-3 py-1.5 text-sm text-foreground/85"
-            />
+            <div>
+              <input
+                autoFocus
+                value={name}
+                maxLength={MAX_THEME_NAME}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={rename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") rename();
+                  if (e.key === "Escape") {
+                    setName(theme.name);
+                    setRenaming(false);
+                  }
+                }}
+                aria-label="Nome do tema"
+                className="bo-input px-3 py-1.5 text-sm text-foreground/85"
+              />
+              <SugestaoDeNome valor={name} onAceitar={setName} />
+            </div>
           ) : (
             <button
               type="button"

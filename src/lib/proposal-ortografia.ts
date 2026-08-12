@@ -124,6 +124,8 @@ export const PALAVRAS_CERTAS = [
   // Entram pela mesma regra de admissão: «classico» e «mediterranico» não são,
   // eles próprios, palavras portuguesas. Servem os campos impressos e os NOMES
   // DOS TEMAS (ver `tema-nome.ts`), que é onde apareceram primeiro.
+  "simbólico",
+  "simbólica",
   "clássico",
   "clássica",
   "clássicos",
