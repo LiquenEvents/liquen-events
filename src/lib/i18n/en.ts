@@ -102,6 +102,13 @@ export const en: Dict = {
         "Wedding dinner table setting with floral decoration",
       ],
     },
+    // The back office entry screen greeting (see EntradaComFotografia.tsx).
+    // Morning until noon, afternoon until 8pm.
+    entradaAdmin: {
+      bomDia: "Good morning",
+      boaTarde: "Good afternoon",
+      boaNoite: "Good evening",
+    },
   },
 
   meta: {

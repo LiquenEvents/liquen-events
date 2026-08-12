@@ -102,6 +102,13 @@ export const pt = {
         "Mesa posta de jantar de casamento com decoração floral",
       ],
     },
+    // A saudação da página de entrada do back office (ver
+    // EntradaComFotografia.tsx). Manhã até ao meio-dia, tarde até às 20h.
+    entradaAdmin: {
+      bomDia: "Bom dia",
+      boaTarde: "Boa tarde",
+      boaNoite: "Boa noite",
+    },
   },
 
   meta: {
