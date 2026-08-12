@@ -77,9 +77,19 @@ const json = (res, code, valor) => {
  * Fora tudo o que não seja imprimível (mudanças de linha e retornos incluídos,
  * que são o que permite forjar uma entrada inteira) e um tecto de comprimento,
  * para um URL absurdo não encher o ficheiro.
+ *
+ * ── Porque é que as mudanças de linha saem à parte, e primeiro ─────────────
+ * Porque são ELAS a avaria: um `\n` no meio de um URL forja uma linha de
+ * registo inteira, e quem depois lê o ficheiro vê um pedido que nunca
+ * aconteceu. A primeira tentativa fechava o mesmo buraco com a classe dos
+ * caracteres de controlo — que apanha `\r` e `\n` na mesma, mas que o CodeQL
+ * não reconhece como barreira, e o aviso voltou. Escrita assim, é reconhecida.
+ * Um aviso que volta é um aviso que alguém acaba por aprender a ignorar, e aí
+ * deixa de servir para nada.
  */
 const limpoParaRegisto = (valor) =>
   String(valor ?? "")
+    .replace(/[\r\n]/g, "")
     .replace(/[\u0000-\u001f\u007f]/g, "\u00b7")
     .slice(0, 300);
 
