@@ -706,7 +706,7 @@ function textoDoPreco(q: Quote): string {
  * cada um tem uma acção diferente do outro lado.
  */
 function porqueNaoGravou(status: number): string | undefined {
-  if (status === 401 || status === 403) return "A sessão expirou — volte a entrar.";
+  if (status === 401 || status === 403) return "A sessão expirou — volta a entrar.";
   if (status === 413) return "O texto é grande demais para ser guardado assim.";
   if (status === 400) return "O servidor recusou o conteúdo.";
   if (status >= 500) return "O servidor não está a aceitar gravações neste momento.";
@@ -1424,7 +1424,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setView("pedidos");
     const q = await comPedidoInteiro(pedido);
     if (!q) {
-      toast("Não foi possível abrir o pedido. Verifique a ligação e tente de novo.", "error");
+      toast("Não foi possível abrir o pedido. Verifica a ligação e tenta de novo.", "error");
       return;
     }
     setSelected(q);
@@ -1500,7 +1500,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditGuests(String(data.quote.guests ?? ""));
       setEditLocation(data.quote.location ?? "");
       setDetailTab("comunicacao");
-      toast("Pedido duplicado — defina a nova data", "success");
+      toast("Pedido duplicado — define a nova data", "success");
     } catch {
       toast("Não foi possível duplicar o pedido", "error");
     }
@@ -2181,14 +2181,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     // um eyebrow extra aqui era só mais texto.
     overview: "",
     pedidos: "Pedidos de orçamento recebidos",
-    kanban: "Arraste os pedidos entre fases",
+    kanban: "Arrasta os pedidos entre fases",
     clientes: "Histórico por cliente",
-    calendario: "Os seus eventos no tempo",
+    calendario: "Os teus eventos no tempo",
     propostas: "Todas as propostas enviadas",
     acompanhamento: "O que está à espera de resposta, por ordem de urgência",
     definicoes: "Os números com que o estúdio faz contas",
     servicos: "As palavras que vão nas propostas, escritas com tempo",
-    "fazer-proposta": "Escolha o cliente e escreva a proposta",
+    "fazer-proposta": "Escolhe o cliente e escreve a proposta",
     tarefas: "Organização interna da equipa",
     fornecedores: "Parceiros e contactos",
     inventario: "Adereços e materiais de decoração",
@@ -2641,7 +2641,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               do estúdio. Com o mesmo `z-index` quem manda é a ordem no DOM, e a
               barra do estúdio vem depois: passava por cima do cabeçalho. Com o
               fundo a 95% via-se o texto de uma a atravessar a outra, e era isso
-              que fazia "Escolha o cliente e escreva a proposta" aparecer por
+              que fazia "Escolhe o cliente e escreve a proposta" aparecer por
               cima do título.
 
               O fundo passa a OPACO pela mesma razão: 5% de transparência num
@@ -3354,8 +3354,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       }
                       hint={
                         search.trim() || filterStatus !== "all"
-                          ? "Limpe a pesquisa ou o filtro para ver todos os pedidos."
-                          : "Os pedidos de orçamento do site aparecem aqui. Pode também criar um manualmente."
+                          ? "Limpa a pesquisa ou o filtro para ver todos os pedidos."
+                          : "Os pedidos de orçamento do site aparecem aqui. Podes também criar um manualmente."
                       }
                       action={
                         search.trim() || filterStatus !== "all"

@@ -179,7 +179,7 @@ function motivo(err: unknown): string {
   // Um `fetch` que nem chega ao servidor rejeita com TypeError e uma mensagem
   // de programador ("Failed to fetch"); essa não vai para o ecrã dela.
   if (err instanceof Error && err.name !== "TypeError" && err.message) return err.message;
-  return "Não foi possível chegar ao servidor — verifique a ligação.";
+  return "Não foi possível chegar ao servidor — verifica a ligação.";
 }
 
 /**
@@ -369,12 +369,12 @@ function AvisoConflito({
       <p className="text-[#8f4a33] text-xs font-semibold leading-snug">
         {doBrowser
           ? `Havia ${rotulo} guardadas só neste browser, diferentes das que estão no servidor. Nada foi apagado.`
-          : `${rotulo} foram alteradas noutro dispositivo. O que escreveu NÃO foi gravado.`}
+          : `${rotulo} foram alteradas noutro dispositivo. O que escreveste NÃO foi gravado.`}
       </p>
       <div className="grid gap-2 sm:grid-cols-2 mt-2.5">
         <div>
           <p className="text-foreground/35 text-[9px] tracking-[0.15em] uppercase mb-1">
-            {doBrowser ? "Neste browser" : "O que escreveu"}
+            {doBrowser ? "Neste browser" : "O que escreveste"}
           </p>
           <p className="text-foreground/70 text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto bg-white/60 rounded-lg p-2">
             {conflito.meu || "(vazio)"}
@@ -702,7 +702,7 @@ const NotasEquipa = memo(function NotasEquipa({
         estado: "nao-guardado",
         porque:
           estado.tipo === "conflito"
-            ? "Há uma versão mais recente no servidor — escolha qual fica, na Visão Geral."
+            ? "Há uma versão mais recente no servidor — escolhe qual fica, na Visão Geral."
             : "O servidor não aceitou as notas da equipa.",
       };
     },
@@ -1089,7 +1089,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             Ainda sem pedidos por aqui.
           </h3>
           <p className="text-foreground/45 text-sm max-w-sm leading-relaxed mb-6">
-            Este é o seu ponto de partida. Assim que registar o primeiro pedido, a Visão Geral
+            Este é o teu ponto de partida. Assim que registares o primeiro pedido, a Visão Geral
             enche-se de vida — eventos, propostas e receita, tudo num só olhar.
           </p>
           <button
@@ -1444,7 +1444,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
               <div className="text-center py-12 px-6">
                 <p className="text-[#4d6350] text-sm font-medium">Tudo tratado.</p>
                 <p className="text-foreground/35 text-xs mt-1.5 leading-relaxed">
-                  Não há pedidos à espera de si. Bom trabalho — aproveite para preparar os próximos
+                  Não há pedidos à tua espera. Bom trabalho — aproveita para preparar os próximos
                   eventos.
                 </p>
               </div>

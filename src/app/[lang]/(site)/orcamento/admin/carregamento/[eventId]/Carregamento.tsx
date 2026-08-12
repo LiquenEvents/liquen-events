@@ -37,9 +37,7 @@ interface Props {
 }
 
 const idMarca = () =>
-  typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID()
-    : idUnico();
+  typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : idUnico();
 
 export default function Carregamento({ quoteId, eventId, titulo, actor }: Props) {
   const [itens, setItens] = useState<EventMaterialItem[]>([]);
@@ -246,7 +244,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
 
       {itens.length === 0 ? (
         <p className="px-4 py-10 text-center text-sm text-foreground/60">
-          Sem checklist. Gere-a primeiro no pedido, no computador.
+          Sem checklist. Gera-a primeiro no pedido, no computador.
         </p>
       ) : (
         // A lista tem nome próprio: um leitor de ecrã anuncia onde entrou, em

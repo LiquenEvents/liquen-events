@@ -38,7 +38,7 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
       .catch(() => {
         setTags(snapshot);
         onChange(snapshot);
-        toast("Não foi possível guardar as etiquetas. Tente novamente.", "error");
+        toast("Não foi possível guardar as etiquetas. Tenta novamente.", "error");
       });
   }
 

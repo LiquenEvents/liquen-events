@@ -172,7 +172,7 @@ export function ehFalhaPermanente(motivo: MotivoDeFalha | undefined): boolean {
 export function avisoDeSitioEfemero(): string {
   return (
     "Guardado apenas no disco do servidor, que é apagado no próximo deploy. " +
-    "Ligue a base de dados (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY) para o trabalho ficar mesmo guardado."
+    "Liga a base de dados (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY) para o trabalho ficar mesmo guardado."
   );
 }
 

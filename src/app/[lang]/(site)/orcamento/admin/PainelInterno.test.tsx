@@ -43,7 +43,7 @@ function montar(props: Partial<Parameters<typeof PainelInterno>[0]> = {}) {
 }
 
 /** Abre a gaveta — está fechada por omissão, e é isso que a torna discreta. */
-const abrir = () => userEvent.click(screen.getByRole("button", { name: /Só para si/ }));
+const abrir = () => userEvent.click(screen.getByRole("button", { name: /Só para ti/ }));
 
 beforeEach(() => {
   vi.stubGlobal(

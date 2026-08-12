@@ -520,7 +520,7 @@ export default function EmailTemplates() {
         }),
       });
       if (!res.ok) {
-        toast("Não foi possível guardar. Tente novamente.", "error");
+        toast("Não foi possível guardar. Tenta novamente.", "error");
         return;
       }
       const saved: EmailTemplate = await res.json();
@@ -541,7 +541,7 @@ export default function EmailTemplates() {
       });
       toast("Modelo guardado.", "success");
     } catch {
-      toast("Não foi possível guardar. Tente novamente.", "error");
+      toast("Não foi possível guardar. Tenta novamente.", "error");
     } finally {
       setSaving(false);
     }
@@ -683,8 +683,8 @@ export default function EmailTemplates() {
               ))}
             </div>
             <p className="text-[11px] text-foreground/40 mb-4 leading-relaxed">
-              Clique para inserir onde está o cursor — no envio, cada campo é preenchido com os
-              dados reais.
+              Clica para inserir onde está o cursor — no envio, cada campo é preenchido com os dados
+              reais.
             </p>
 
             {/* Body */}
@@ -719,7 +719,7 @@ export default function EmailTemplates() {
                   onFocus={() => (activeFieldRef.current = "visual")}
                 />
                 <p className="text-[11px] text-foreground/40 mt-2 leading-relaxed">
-                  Escreva e formate com a barra acima. À direita vê como o cliente recebe.
+                  Escreve e formata com a barra acima. À direita vês como o cliente recebe.
                 </p>
               </>
             ) : (
@@ -769,7 +769,7 @@ export default function EmailTemplates() {
         </div>
       ) : (
         <div className="bo-card p-8 text-center text-foreground/30 text-sm">
-          Selecione um modelo para editar.
+          Seleciona um modelo para editar.
         </div>
       )}
     </div>

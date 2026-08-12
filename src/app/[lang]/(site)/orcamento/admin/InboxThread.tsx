@@ -105,9 +105,9 @@ export default function InboxThread({
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#4d6350]/[0.08] text-[#4d6350]">
             <IconMailOpen className="h-6 w-6" />
           </div>
-          <p className="text-sm font-medium text-foreground/70">Selecione uma mensagem</p>
+          <p className="text-sm font-medium text-foreground/70">Seleciona uma mensagem</p>
           <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-foreground/45">
-            Abra um e-mail à esquerda para o ler, responder ou ligar a um pedido.
+            Abre um e-mail à esquerda para o ler, responder ou ligar a um pedido.
           </p>
         </div>
       </div>
@@ -210,7 +210,7 @@ export default function InboxThread({
                   variant="ghost"
                   size="sm"
                   onClick={onArchive}
-                  title="Esconder da caixa de entrada. Não apaga nada — pode voltar a mostrá-lo quando quiser"
+                  title="Esconder da caixa de entrada. Não apaga nada — podes voltar a mostrá-lo quando quiseres"
                   iconLeft={<IconArchive className="h-4 w-4" />}
                 >
                   Arquivar
@@ -223,7 +223,7 @@ export default function InboxThread({
         {!canOverlay && (
           <p className="border-t border-foreground/[0.06] px-5 py-2.5 text-[11px] leading-relaxed text-foreground/40">
             Este e-mail chegou sem a marca que o identifica, por isso não é possível pôr etiquetas,
-            fixá-lo no topo, arquivá-lo nem ligá-lo a um pedido. Pode na mesma lê-lo e responder.
+            fixá-lo no topo, arquivá-lo nem ligá-lo a um pedido. Podes na mesma lê-lo e responder.
           </p>
         )}
       </div>
@@ -320,7 +320,7 @@ export default function InboxThread({
           </Button>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-foreground/40">
-          O envio de propostas com ficheiro anexado ainda não está ligado no servidor. Use a
+          O envio de propostas com ficheiro anexado ainda não está ligado no servidor. Usa a
           resposta acima para enviar texto; os anexos chegarão numa próxima atualização.
         </p>
       </div>
@@ -352,7 +352,7 @@ function LabelMenu({ labels, onToggle }: { labels: string[]; onToggle: (label: s
           <div className="absolute left-0 top-full z-20 mt-1 w-60 rounded-xl border border-foreground/10 bg-white p-3 shadow-xl shadow-black/10">
             <p className="bo-eyebrow mb-1">Etiquetas</p>
             <p className="mb-2.5 text-[11px] leading-relaxed text-foreground/45">
-              Toque numa para juntar ou tirar. Ajudam a organizar e a encontrar e-mails depois.
+              Toca numa para juntar ou tirar. Ajudam a organizar e a encontrar e-mails depois.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {Array.from(new Set([...SUGGESTED_LABELS, ...labels])).map((l) => {
@@ -432,12 +432,12 @@ function AssociatePicker({
         <IconLink className="h-3.5 w-3.5" /> Ligar a um pedido
       </p>
       <p className="mb-2 text-[11px] leading-relaxed text-foreground/45">
-        Junte este e-mail ao pedido do cliente para ter tudo no mesmo sítio.
+        Junta este e-mail ao pedido do cliente para ter tudo no mesmo sítio.
       </p>
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Escreva o nome ou o email do cliente…"
+        placeholder="Escreve o nome ou o email do cliente…"
         className="bo-input mb-2 px-3 py-2 text-sm text-foreground/80"
       />
       {matches.length > 0 ? (
@@ -469,7 +469,7 @@ function AssociatePicker({
       )}
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-foreground/[0.06] pt-3">
         <p className="text-[11px] leading-relaxed text-foreground/45">
-          É um contacto novo? Crie já um pedido com os dados deste e-mail.
+          É um contacto novo? Cria já um pedido com os dados deste e-mail.
         </p>
         <Button
           variant="primary"
@@ -528,7 +528,7 @@ function ReplyBox({ to, onReply }: { to: string; onReply: (text: string) => Prom
             rows={4}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Escreva a resposta…"
+            placeholder="Escreve a resposta…"
             className="bo-input mb-3 resize-none px-3 py-2 text-sm text-foreground/80"
           />
           <div className="flex items-center justify-between gap-2">

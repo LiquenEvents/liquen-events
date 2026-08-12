@@ -361,12 +361,12 @@ export default function Faturas({ quotes }: Props) {
 
   async function submit() {
     if (!clientName.trim()) {
-      toast("Indique o nome do cliente", "error");
+      toast("Indica o nome do cliente", "error");
       return;
     }
     const value = parseFloat(amount);
     if (!value || value <= 0) {
-      toast("Indique um valor válido", "error");
+      toast("Indica um valor válido", "error");
       return;
     }
     if (splitBlocked && existingSinal) {
@@ -399,7 +399,7 @@ export default function Faturas({ quotes }: Props) {
        */
       const taxa = vatRate.trim() === "" ? null : parseFloat(vatRate.replace(",", "."));
       if (taxa !== null && (!Number.isFinite(taxa) || taxa < 0 || taxa > 100)) {
-        toast("Indique uma taxa de IVA válida (por exemplo, 23).", "error");
+        toast("Indica uma taxa de IVA válida (por exemplo, 23).", "error");
         setSubmitting(false);
         return;
       }
@@ -632,7 +632,7 @@ export default function Faturas({ quotes }: Props) {
           {/* Mode toggle */}
           <div className="mb-6">
             <Segmented
-              ariaLabel="Como quer faturar"
+              ariaLabel="Como queres faturar"
               value={mode}
               onChange={setMode}
               options={[
@@ -750,12 +750,12 @@ export default function Faturas({ quotes }: Props) {
           {splitBlocked && existingSinal ? (
             <p className="mt-4 text-sm leading-relaxed text-[#8a2a22]">
               Este evento já tem um sinal emitido ({existingSinal.number}). Para não faturar o sinal
-              duas vezes, use “Fatura única” (só o saldo) em vez do split.
+              duas vezes, usa “Fatura única” (só o saldo) em vez do split.
             </p>
           ) : singleBlocked && dupSingle ? (
             <p className="mt-4 text-sm leading-relaxed text-[#8a2a22]">
               Este evento já tem uma fatura de {kind} ({dupSingle.number}). Para não a faturar duas
-              vezes, escolha outro tipo ou anule a existente primeiro.
+              vezes, escolhe outro tipo ou anula a existente primeiro.
             </p>
           ) : (
             mode === "split" &&
@@ -836,8 +836,8 @@ export default function Faturas({ quotes }: Props) {
             title={filter !== "all" ? "Nenhuma fatura neste estado" : "Sem faturas ainda"}
             description={
               filter !== "all"
-                ? "Mude de filtro para ver outras."
-                : "Emita a primeira fatura com o botão “Nova fatura”."
+                ? "Muda de filtro para ver outras."
+                : "Emite a primeira fatura com o botão “Nova fatura”."
             }
             action={
               filter === "all"

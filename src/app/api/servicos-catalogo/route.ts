@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 const NAO_INSTALADO =
   "A biblioteca de serviços ainda não tem tabela na base de dados. No Supabase → SQL Editor, " +
-  "cole e corra o ficheiro db/schema.sql (pode repetir-se sem risco) e tente de novo.";
+  "cola e corre o ficheiro db/schema.sql (pode repetir-se sem risco) e tenta de novo.";
 
 const SEM_BASE_DE_DADOS =
   "A base de dados não está ligada nesta instalação, por isso a biblioteca não pode ser " +

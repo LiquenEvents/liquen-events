@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
 
 const NAO_INSTALADO =
   "As notas da equipa ainda não têm tabela na base de dados. No Supabase → SQL Editor, " +
-  "cole e corra o ficheiro db/schema.sql (pode repetir-se sem risco) e tente de novo.";
+  "cola e corre o ficheiro db/schema.sql (pode repetir-se sem risco) e tenta de novo.";
 
 const SEM_BASE_DE_DADOS =
   "A base de dados não está ligada nesta instalação, por isso as notas não podem ser guardadas " +
@@ -47,7 +47,7 @@ const saveSchema = z.object({
 /** A meta é um número em euros escrito como texto; "" significa "sem meta". */
 function goalError(value: string): string | null {
   if (value === "") return null;
-  if (!/^\d{1,9}([.,]\d{1,2})?$/.test(value)) return "Meta inválida — escreva só o valor em euros.";
+  if (!/^\d{1,9}([.,]\d{1,2})?$/.test(value)) return "Meta inválida — escreve só o valor em euros.";
   if (Number(value.replace(",", ".")) > MAX_GOAL)
     return `Meta demasiado alta (máximo ${MAX_GOAL}).`;
   return null;
@@ -90,8 +90,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Isto foi alterado noutro dispositivo entretanto. O seu texto NÃO foi gravado — " +
-            "compare as duas versões e escolha.",
+            "Isto foi alterado noutro dispositivo entretanto. O teu texto NÃO foi gravado — " +
+            "compara as duas versões e escolhe.",
           current: err.current,
         },
         { status: 409 },

@@ -187,7 +187,7 @@ describe("RestoreDialog", () => {
     const botao = screen.getByRole("button", { name: "Repor definitivamente" });
     expect(botao).toBeDisabled();
 
-    const caixa = screen.getByLabelText(/Para repor, escreva/);
+    const caixa = screen.getByLabelText(/Para repor, escreve/);
     await user.type(caixa, "sim");
     expect(botao).toBeDisabled();
 
@@ -216,7 +216,7 @@ describe("RestoreDialog", () => {
     await carregarFicheiro(user);
     await waitFor(() => expect(screen.getByText("Pedidos")).toBeInTheDocument());
 
-    await user.type(screen.getByLabelText(/Para repor, escreva/), RESTORE_CONFIRM_PHRASE);
+    await user.type(screen.getByLabelText(/Para repor, escreve/), RESTORE_CONFIRM_PHRASE);
     await user.click(screen.getByRole("button", { name: "Repor definitivamente" }));
 
     await waitFor(() => expect(screen.getByText("Cópia reposta.")).toBeInTheDocument());
@@ -250,7 +250,7 @@ describe("RestoreDialog", () => {
     render(<RestoreDialog open onClose={() => {}} />);
     await carregarFicheiro(user);
     await waitFor(() => expect(screen.getByText("Pedidos")).toBeInTheDocument());
-    await user.type(screen.getByLabelText(/Para repor, escreva/), RESTORE_CONFIRM_PHRASE);
+    await user.type(screen.getByLabelText(/Para repor, escreve/), RESTORE_CONFIRM_PHRASE);
     await user.click(screen.getByRole("button", { name: "Repor definitivamente" }));
 
     await waitFor(() => expect(screen.getByText(/Reposição INCOMPLETA/)).toBeInTheDocument());
@@ -300,7 +300,7 @@ describe("RestoreDialog", () => {
     await carregarFicheiro(user);
     await waitFor(() => expect(screen.getByText("Pedidos")).toBeInTheDocument());
 
-    expect(screen.queryByLabelText(/Para repor, escreva/)).toBeNull();
+    expect(screen.queryByLabelText(/Para repor, escreve/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Repor definitivamente" })).toBeNull();
   });
 });

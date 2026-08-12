@@ -210,7 +210,7 @@ export default function PaymentsPanel({
       onContractRef?.(next);
       toast("Nº de contrato guardado", "success");
     } catch {
-      toast("Não foi possível guardar o nº de contrato. Tente novamente.", "error");
+      toast("Não foi possível guardar o nº de contrato. Tenta novamente.", "error");
     } finally {
       setSavingRef(false);
     }
@@ -314,7 +314,7 @@ export default function PaymentsPanel({
         setPayments(snapshot);
         onChange(snapshot);
         setFailed({ id: op.id, next, ghost: op.ghost ?? null, label: op.label });
-        toast("Não foi possível guardar. Use o Repetir na linha marcada.", "error");
+        toast("Não foi possível guardar. Usa o Repetir na linha marcada.", "error");
       });
   }
 
@@ -329,7 +329,7 @@ export default function PaymentsPanel({
     // parseMoney entende "1.500", "1500,50" e "1 500€" — parseFloat lia 1,5 €.
     const a = parseMoney(amount);
     if (!a || a <= 0) {
-      setFormError("Escreva um valor maior que zero.");
+      setFormError("Escreve um valor maior que zero.");
       amountRef.current?.focus();
       return;
     }
@@ -483,7 +483,7 @@ export default function PaymentsPanel({
          * reacção certa — voltar a pedir o PDF, e não reemitir — não é óbvia.
          */
         toast(
-          `${docLabel} ${data.number ? `${data.number} ` : ""}emitido, mas não foi possível gerar o PDF. Tente descarregar outra vez.`,
+          `${docLabel} ${data.number ? `${data.number} ` : ""}emitido, mas não foi possível gerar o PDF. Tenta descarregar outra vez.`,
           "error",
         );
       }
@@ -656,7 +656,7 @@ export default function PaymentsPanel({
               Recebido excede o total contratado ({eur2(headlinePaid)} de {eur2(total)}).
             </p>
             <p className="text-foreground/45 text-[11px] mt-0.5">
-              Verifique os valores registados ou o total do contrato.
+              Verifica os valores registados ou o total do contrato.
             </p>
           </div>
         </div>
@@ -689,7 +689,7 @@ export default function PaymentsPanel({
               {eur2(reconciliation.ledgerPaid)}).
             </p>
             <p className="text-foreground/45 text-[11px] mt-0.5">
-              O livro de faturas é a fonte de verdade — confirme no separador Faturas ou no livro
+              O livro de faturas é a fonte de verdade — confirma no separador Faturas ou no livro
               abaixo.
             </p>
           </div>
@@ -898,7 +898,7 @@ export default function PaymentsPanel({
                   type="button"
                   onClick={() => startEdit(p)}
                   aria-label={`Editar valor de ${KIND_LABEL[p.kind]}, ${eur2(p.amount)}`}
-                  title="Clique para editar o valor"
+                  title="Clica para editar o valor"
                   className={`rounded-md px-1.5 py-1 text-xs font-semibold tabular-nums text-right hover:bg-foreground/[0.06] ${
                     p.paid ? "text-[#4d6350]" : "text-foreground/55"
                   }`}

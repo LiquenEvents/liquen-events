@@ -139,7 +139,7 @@ export default function MaterialRegras() {
             vazio e o React abortava o ecrã todo. Ver `ui/Field`. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field
-            label="Nome (para si)"
+            label="Nome (para ti)"
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             placeholder="Arco floral leva estrutura"

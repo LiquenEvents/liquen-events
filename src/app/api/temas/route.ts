@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
  */
 const NAO_INSTALADO =
   "A Biblioteca de Temas ainda não está criada na base de dados. No Supabase → SQL Editor, " +
-  "cole e corra o ficheiro db/schema.sql (pode repetir-se sem risco) e tente de novo.";
+  "cola e corre o ficheiro db/schema.sql (pode repetir-se sem risco) e tenta de novo.";
 
 /** A base de dados não está sequer ligada — outra instalação incompleta, com
  *  outra resolução (as chaves do Supabase), por isso outra frase. */

@@ -251,7 +251,7 @@ export default function CriarAPartirDe({
           {!aCarregar && linhas.length === 0 && (
             <p className="p-4 text-sm text-foreground/50">
               {procura
-                ? "Nada encontrado. Experimente outro nome ou local."
+                ? "Nada encontrado. Experimenta outro nome ou local."
                 : "Ainda não há propostas anteriores nem modelos guardados. A primeira faz-se do zero; a partir daí é copiar."}
             </p>
           )}
@@ -280,7 +280,7 @@ export default function CriarAPartirDe({
                       <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.08em]">
                         {sugerida && (
                           <span className="rounded-full bg-[#4d6350] px-2 py-0.5 text-white">
-                            já foi seu cliente
+                            já foi teu cliente
                           </span>
                         )}
                         <span className="text-foreground/40">

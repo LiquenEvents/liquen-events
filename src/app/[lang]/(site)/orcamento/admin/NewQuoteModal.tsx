@@ -153,7 +153,7 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
                   registado{duplicates.length !== 1 ? "s" : ""}
                 </p>
                 <p className="text-foreground/50 text-[11px] leading-relaxed">
-                  Pode continuar se for um evento diferente.
+                  Podes continuar se for um evento diferente.
                 </p>
               </div>
             </div>

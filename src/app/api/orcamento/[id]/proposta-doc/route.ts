@@ -272,7 +272,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             {
               error:
                 "Não foi possível guardar a proposta — a base de dados recusou a gravação. " +
-                "Verifique se o db/schema.sql foi corrido nesta base.",
+                "Verifica se o db/schema.sql foi corrido nesta base.",
             },
             { status: 503 },
           );
@@ -280,7 +280,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       } else {
         log.error("proposta-doc: guardar falhou", e, { id });
         return NextResponse.json(
-          { error: "Não foi possível guardar a proposta. Tente novamente." },
+          { error: "Não foi possível guardar a proposta. Tenta novamente." },
           { status: 503 },
         );
       }

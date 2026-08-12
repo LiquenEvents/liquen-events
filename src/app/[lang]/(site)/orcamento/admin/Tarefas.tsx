@@ -227,7 +227,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       if (!res.ok) throw new Error();
     } catch {
       setTasks(snapshot);
-      toast("Não foi possível guardar as alterações. Tente novamente.", "error");
+      toast("Não foi possível guardar as alterações. Tenta novamente.", "error");
     }
   }
 
@@ -256,10 +256,10 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         setArea("");
         setAssignee(defaultAssignee && defaultAssignee !== "Equipa" ? defaultAssignee : "");
       } else {
-        toast("Não foi possível criar a tarefa. Tente novamente.", "error");
+        toast("Não foi possível criar a tarefa. Tenta novamente.", "error");
       }
     } catch {
-      toast("Erro de ligação. Verifique a internet e tente novamente.", "error");
+      toast("Erro de ligação. Verifica a internet e tenta novamente.", "error");
     } finally {
       setAdding(false);
     }
@@ -280,7 +280,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         if (!res.ok) throw new Error();
       } catch {
         setTasks(snapshot);
-        toast("Não foi possível atualizar a tarefa. Tente novamente.", "error");
+        toast("Não foi possível atualizar a tarefa. Tenta novamente.", "error");
       }
     },
     [setTasks, toast],
@@ -298,7 +298,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         if (!res.ok) throw new Error();
       } catch {
         setTasks(snapshot);
-        toast("Não foi possível eliminar a tarefa. Tente novamente.", "error");
+        toast("Não foi possível eliminar a tarefa. Tenta novamente.", "error");
       }
     },
     [setTasks, toast],
@@ -587,7 +587,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
                     </svg>
                   }
                   title="Tudo em dia"
-                  description="Não há tarefas pendentes. Adicione uma acima para começar a organizar a equipa."
+                  description="Não há tarefas pendentes. Adiciona uma acima para começar a organizar a equipa."
                 />
               ) : (
                 open.map(row)

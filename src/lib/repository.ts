@@ -149,8 +149,8 @@ export function isConflictError(err: unknown): err is ConflictError {
  * diz o que fazer a seguir.
  */
 export const MENSAGEM_DE_CONFLITO =
-  "Isto foi alterado por outra pessoa entretanto. O que escreveu NÃO foi gravado — " +
-  "veja a versão que está agora no servidor e volte a aplicar a sua alteração.";
+  "Isto foi alterado por outra pessoa entretanto. O que escreveste NÃO foi gravado — " +
+  "vê a versão que está agora no servidor e volta a aplicar a tua alteração.";
 
 /**
  * A tabela — ou uma COLUNA dela — ainda não existe na base de dados, quase

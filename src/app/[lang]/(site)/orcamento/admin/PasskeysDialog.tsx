@@ -193,15 +193,15 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
 
           {indisponivel && (
             <p className="mb-4 rounded-lg bg-[#fbf7ec] px-3 py-2 text-sm leading-relaxed text-[#6b5720]">
-              A tabela das passkeys ainda não existe na base de dados. Corra o{" "}
-              <code className="text-xs">db/schema.sql</code> no Supabase e volte aqui.
+              A tabela das passkeys ainda não existe na base de dados. Corre o{" "}
+              <code className="text-xs">db/schema.sql</code> no Supabase e volta aqui.
             </p>
           )}
 
           {!suportado ? (
             <p className="text-sm leading-relaxed text-foreground/60">
-              Este browser não sabe trabalhar com passkeys. Continue a entrar com a palavra-passe,
-              ou abra o back office no Safari ou no Chrome do seu telemóvel.
+              Este browser não sabe trabalhar com passkeys. Continua a entrar com a palavra-passe,
+              ou abre o back office no Safari ou no Chrome do teu telemóvel.
             </p>
           ) : (
             <>
@@ -265,7 +265,7 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
               </div>
 
               <p className="mt-5 text-xs leading-relaxed text-foreground/45">
-                Remover o último dispositivo não o tranca fora: a palavra-passe continua a
+                Remover o último dispositivo não te tranca fora: a palavra-passe continua a
                 funcionar. As passkeys registadas noutro endereço — numa pré-visualização, por
                 exemplo — não funcionam aqui, e é assim de propósito.
               </p>

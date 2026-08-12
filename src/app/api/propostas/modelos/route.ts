@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
     if (err instanceof DemasiadosModelos) {
       return NextResponse.json(
-        { error: `Já tem ${MAX_MODELOS} modelos. Apague um antes de guardar outro.` },
+        { error: `Já tens ${MAX_MODELOS} modelos. Apaga um antes de guardar outro.` },
         { status: 409 },
       );
     }

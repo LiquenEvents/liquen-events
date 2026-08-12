@@ -585,7 +585,7 @@ export default function Temas() {
         }
       } catch {
         setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, [campo]: !novo } : x)));
-        toast("Não foi possível guardar. Verifique a ligação.", "error");
+        toast("Não foi possível guardar. Verifica a ligação.", "error");
       }
     },
     [toast],
@@ -646,7 +646,7 @@ export default function Temas() {
       setAdding(false);
       setSearch("");
       setOpenId(created.id);
-      toast(`Tema "${created.name}" criado. Agora carregue as fotos.`, "success");
+      toast(`Tema "${created.name}" criado. Agora carrega as fotos.`, "success");
     } catch {
       toast("Erro de ligação ao criar o tema.", "error");
     } finally {
@@ -810,7 +810,7 @@ export default function Temas() {
             </div>
           ) : (
             <p className="bo-text-muted max-w-xl text-sm leading-relaxed">
-              Guarde aqui as fotos por tema. Depois, no estúdio de propostas, é só escolher o tema e
+              Guarda aqui as fotos por tema. Depois, no estúdio de propostas, é só escolher o tema e
               as fotos entram no mood board.
             </p>
           )
@@ -942,7 +942,7 @@ export default function Temas() {
           <EmptyState
             icon={FolderIcon}
             title="Ainda não há temas"
-            description="Crie um tema por estilo que usa nos casamentos — Itália, Terracotta, Branco & Verde — e carregue lá as fotos de inspiração. Depois é só escolher na proposta."
+            description="Cria um tema por estilo que usas nos casamentos — Itália, Terracotta, Branco & Verde — e carrega lá as fotos de inspiração. Depois é só escolher na proposta."
             // Com o formulário já aberto, este botão seria um segundo "Criar
             // tema" no mesmo ecrã — a apontar para o campo que está mesmo ali.
             action={adding ? undefined : { label: "Criar tema", onClick: () => setAdding(true) }}
@@ -958,7 +958,7 @@ export default function Temas() {
               ? `Nenhum tema com “${search.trim()}” no nome ou na nota.`
               : verArquivados
                 ? "Não há temas arquivados."
-                : "Todos os temas estão arquivados. Abra “Arquivados” para os repor."}
+                : "Todos os temas estão arquivados. Abre “Arquivados” para os repor."}
           </p>
         </Card>
       ) : (
@@ -2007,7 +2007,7 @@ function ThemeFolder({
           }
           data = body;
         } catch {
-          toast("Erro de ligação ao gerar as miniaturas. Pode continuar mais tarde.", "error");
+          toast("Erro de ligação ao gerar as miniaturas. Podes continuar mais tarde.", "error");
           break;
         }
         scanned += data?.scanned ?? 0;
@@ -2019,7 +2019,7 @@ function ThemeFolder({
         badBatches = (data?.generated ?? 0) === 0 && (data?.failed ?? 0) > 0 ? badBatches + 1 : 0;
         if (badBatches >= MAX_BAD_BATCHES) {
           toast(
-            "As miniaturas não estão a ser criadas. Pare por agora e tente mais tarde — as fotos não foram tocadas.",
+            "As miniaturas não estão a ser criadas. Deixa isto por agora e tenta mais tarde — as fotos não foram tocadas.",
             "error",
           );
           break;
@@ -2123,7 +2123,7 @@ function ThemeFolder({
     if (!alive.current) return;
     if (capped) {
       toast(
-        `Foram lidas as primeiras ${MAX_DROP_FILES} fotos da pasta. Carregue as restantes num segundo arrasto.`,
+        `Foram lidas as primeiras ${MAX_DROP_FILES} fotos da pasta. Carrega as restantes num segundo arrasto.`,
         "info",
       );
     }
@@ -2351,7 +2351,7 @@ function ThemeFolder({
     // porquê — senão vê o tema a arrastar-se e não faz ideia da razão.
     if (r.thumbsMissing > 0) {
       toast(
-        `${plural(r.thumbsMissing, "foto chegou", "fotos chegaram")} a "${r.destName}" sem miniatura. Abra esse tema e use "Gerar miniaturas em falta".`,
+        `${plural(r.thumbsMissing, "foto chegou", "fotos chegaram")} a "${r.destName}" sem miniatura. Abre esse tema e usa "Gerar miniaturas em falta".`,
         "info",
       );
     }
@@ -2670,7 +2670,7 @@ function ThemeFolder({
             />
           </div>
           <p className="bo-text-muted mt-2 text-xs">
-            Pode ir fazer outra coisa — enquanto este separador ficar aberto, as fotos continuam a
+            Podes ir fazer outra coisa — enquanto este separador ficar aberto, as fotos continuam a
             subir e vão aparecendo aqui.
           </p>
         </Card>
@@ -2717,7 +2717,7 @@ function ThemeFolder({
                   Parar
                 </Button>
                 <span className="bo-text-muted text-xs">
-                  Pode continuar a trabalhar — e parar a meio não perde nada: da próxima vez
+                  Podes continuar a trabalhar — e parar a meio não perde nada: da próxima vez
                   continua de onde ficou.
                 </span>
               </div>
@@ -2847,7 +2847,7 @@ function ThemeFolder({
           </p>
           <p className="bo-text-muted mt-1 text-xs">
             {copyReport.failed.length > 0
-              ? "Continuam neste tema e ficaram selecionadas — pode tentar outra vez sem as escolher de novo."
+              ? "Continuam neste tema e ficaram selecionadas — podes tentar outra vez sem as escolher de novo."
               : "As que faltavam continuam neste tema."}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -2968,14 +2968,13 @@ function ThemeFolder({
               Não foi possível ler a pasta deste tema agora.
             </p>
             <p className="bo-text-muted mt-1 text-xs">
-              É uma falha temporária — as fotos não desapareceram. Recarregue a página daqui a
-              pouco.
+              É uma falha temporária — as fotos não desapareceram. Recarrega a página daqui a pouco.
             </p>
           </div>
         ) : images.length === 0 && pending.length === 0 ? (
           <div className="py-12 text-center">
             <p className="bo-text-muted text-sm">
-              Arraste para aqui as fotos deste tema — ou uma pasta inteira —, ou use “Adicionar
+              Arrasta para aqui as fotos deste tema — ou uma pasta inteira —, ou usa “Adicionar
               fotos”.
             </p>
             <p className="bo-text-muted mt-1 text-xs">JPG, PNG ou WEBP · também HEIC do iPhone</p>

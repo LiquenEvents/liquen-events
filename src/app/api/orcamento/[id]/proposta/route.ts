@@ -167,7 +167,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     } catch (e) {
       log.error("guardar proposta falhou", e, { id });
       return NextResponse.json(
-        { error: "Não foi possível guardar a proposta. Tente novamente." },
+        { error: "Não foi possível guardar a proposta. Tenta novamente." },
         { status: 503 },
       );
     }
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         : {
             emailError:
               "Este pedido não tem email de cliente — a proposta foi gravada e o link continua a " +
-              "servir, mas não foi enviada a ninguém. Acrescente o email e reenvie.",
+              "servir, mas não foi enviada a ninguém. Acrescenta o email e reenvia.",
           }),
       pdfBase64: pdfBuffer.toString("base64"),
     });

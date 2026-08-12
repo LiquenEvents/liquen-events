@@ -215,7 +215,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(
       {
         error:
-          "Armazenamento indisponível — configure o Supabase (SUPABASE_URL / SERVICE_ROLE_KEY).",
+          "Armazenamento indisponível — configura o Supabase (SUPABASE_URL / SERVICE_ROLE_KEY).",
       },
       { status: 503 },
     );
@@ -246,7 +246,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   for (const [i, file] of files.entries()) {
     if (!OK_TYPES.test(file.type)) {
       return NextResponse.json(
-        { error: `Formato não suportado: ${file.name}. Use JPG, PNG ou WEBP.` },
+        { error: `Formato não suportado: ${file.name}. Usa JPG, PNG ou WEBP.` },
         { status: 415 },
       );
     }
@@ -371,7 +371,7 @@ export async function DELETE(
         {
           error:
             motivo === "referencias"
-              ? "Esta foto é usada por uma proposta e não foi possível guardar lá uma cópia. A foto NÃO foi removida — tente de novo."
+              ? "Esta foto é usada por uma proposta e não foi possível guardar lá uma cópia. A foto NÃO foi removida — tenta de novo."
               : "Falha ao remover a imagem.",
         },
         { status: 502 },

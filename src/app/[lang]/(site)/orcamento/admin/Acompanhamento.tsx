@@ -162,7 +162,7 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
         toast(comoDizer, "success");
       } catch {
         setData(antes);
-        toast("Não foi possível gravar. Verifique a ligação.", "error");
+        toast("Não foi possível gravar. Verifica a ligação.", "error");
       } finally {
         setAGravar(null);
       }

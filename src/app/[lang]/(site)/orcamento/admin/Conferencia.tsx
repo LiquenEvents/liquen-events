@@ -61,7 +61,7 @@ export default function Conferencia({ doc, quote, quotes = [], totalBruto }: Pro
       </h3>
       <p className="mt-1 text-xs leading-relaxed text-foreground/55">
         {reparos
-          ? "Há coisas a que vale a pena olhar. Nenhuma o impede de enviar."
+          ? "Há coisas a que vale a pena olhar. Nenhuma te impede de enviar."
           : "Está tudo de acordo com o pedido original."}
       </p>
 

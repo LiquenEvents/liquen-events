@@ -52,7 +52,7 @@ const COPIA_PARADA = {
     avisar: true,
     diasSem: 9,
     titulo: "Não chega uma cópia de segurança há 9 dias.",
-    oQueFazer: "Confirme a variável CRON_SECRET nas variáveis de ambiente do alojamento.",
+    oQueFazer: "Confirma a variável CRON_SECRET nas variáveis de ambiente do alojamento.",
   },
 };
 

@@ -279,7 +279,7 @@ describe("ThemePicker", () => {
       screen.getByText(`${MAX_IMPORT_BATCH} de ${MAX_IMPORT_BATCH} selecionadas`),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(`Pode adicionar até ${MAX_IMPORT_BATCH} fotos de cada vez.`),
+      screen.getByText(`Podes adicionar até ${MAX_IMPORT_BATCH} fotos de cada vez.`),
     ).toBeInTheDocument();
     expect(photo(TOTAL)).toHaveAttribute("aria-pressed", "false");
     // As que sobram ficam anunciadas como indisponíveis (mas alcançáveis).
@@ -289,7 +289,7 @@ describe("ThemePicker", () => {
     // Tirar uma abre lugar outra vez e o aviso desaparece.
     fireEvent.click(photo(1));
     expect(
-      screen.queryByText(`Pode adicionar até ${MAX_IMPORT_BATCH} fotos de cada vez.`),
+      screen.queryByText(`Podes adicionar até ${MAX_IMPORT_BATCH} fotos de cada vez.`),
     ).not.toBeInTheDocument();
     fireEvent.click(photo(TOTAL));
     expect(photo(TOTAL)).toHaveAttribute("aria-pressed", "true");
@@ -803,7 +803,7 @@ describe("ThemePicker", () => {
 
     // E o Shift+clique ao contrário desmarca o intervalo todo.
     fireEvent.click(photo(1), { shiftKey: true });
-    expect(screen.getByText("Toque nas fotos que quer usar.")).toBeInTheDocument();
+    expect(screen.getByText("Toca nas fotos que queres usar.")).toBeInTheDocument();
   });
 
   it("marca as fotos que já estão nesta proposta", async () => {

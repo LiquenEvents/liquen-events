@@ -59,7 +59,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     } catch {
       setItems(snapshot);
       onChange?.(snapshot);
-      toast("Não foi possível guardar o plano de produção. Tente novamente.", "error");
+      toast("Não foi possível guardar o plano de produção. Tenta novamente.", "error");
     }
   }
 
@@ -143,7 +143,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
             </svg>
           }
           title="Plano de produção por gerar"
-          description="Gere as tarefas de atelier — do sourcing das flores à desmontagem no local — e ajuste-as a este evento."
+          description="Gera as tarefas de atelier — do sourcing das flores à desmontagem no local — e ajusta-as a este evento."
           action={{ label: "Aplicar plano de produção", onClick: applyPlan }}
         />
       ) : (
@@ -259,7 +259,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
         </div>
         {suppliers.length === 0 ? (
           <p className="text-foreground/45 text-xs leading-relaxed">
-            Sem fornecedores atribuídos. Faça a gestão no separador Custos.
+            Sem fornecedores atribuídos. Faz a gestão no separador Custos.
           </p>
         ) : (
           <div className="flex flex-col gap-1.5">

@@ -82,7 +82,8 @@ export default function AvisoDataOcupada({ quote, quotes, onAbrir }: Props) {
               : `Já há ${choques.length} eventos à volta desta data`}
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-foreground/55">
-            Não impede nada — a decisão é sua. Fica aqui para a tomar antes de escrever a proposta.
+            Não impede nada — a decisão é tua. Fica aqui para a tomares antes de escrever a
+            proposta.
           </p>
 
           <ul className="mt-3 flex flex-col gap-2.5">

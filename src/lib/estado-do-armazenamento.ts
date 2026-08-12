@@ -138,34 +138,34 @@ const FRASES: Record<EstadoDoArmazenamento, { titulo: string; oQueFazer: string 
     titulo:
       "O trabalho não está a ser guardado — fica no disco do servidor, que o próximo deploy apaga.",
     oQueFazer:
-      "Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY (a chave service_role, não a anon) nas variáveis de ambiente do alojamento e publique outra vez. Até lá, faça uma cópia do que estiver a montar noutro sítio.",
+      "Define SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY (a chave service_role, não a anon) nas variáveis de ambiente do alojamento e publica outra vez. Até lá, faz uma cópia do que estiveres a montar noutro sítio.",
   },
   "tabela-em-falta": {
     titulo: "A base de dados não tem a tabela onde o trabalho é guardado (app_state).",
     oQueFazer:
-      "Corra o ficheiro db/schema.sql no editor de SQL do Supabase. Leva um minuto, pode ser corrido as vezes que forem precisas e não apaga nada do que já lá está.",
+      "Corre o ficheiro db/schema.sql no editor de SQL do Supabase. Leva um minuto, pode ser corrido as vezes que forem precisas e não apaga nada do que já lá está.",
   },
   "sem-permissao": {
     titulo: "A base de dados está a recusar as gravações por falta de permissões.",
     oQueFazer:
-      "A chave em uso não tem permissões de serviço. Confirme que SUPABASE_SERVICE_ROLE_KEY é mesmo a chave service_role do projeto (a anon não escreve nestas tabelas) e publique outra vez.",
+      "A chave em uso não tem permissões de serviço. Confirma que SUPABASE_SERVICE_ROLE_KEY é mesmo a chave service_role do projeto (a anon não escreve nestas tabelas) e publica outra vez.",
   },
   "escrita-recusada": {
     titulo: "A base de dados não respondeu à gravação de teste.",
     oQueFazer:
-      "Pode ser passageiro: verifique de novo dentro de um minuto. Se continuar, veja no painel do Supabase se o projeto está ativo (os projetos gratuitos são suspensos por inatividade) e confirme SUPABASE_URL.",
+      "Pode ser passageiro: verifica de novo dentro de um minuto. Se continuar, vê no painel do Supabase se o projeto está ativo (os projetos gratuitos são suspensos por inatividade) e confirma SUPABASE_URL.",
   },
   "leitura-nao-confirma": {
     titulo: "A gravação foi aceite mas o que se leu a seguir não é o que se escreveu.",
     oQueFazer:
-      "Confirme que SUPABASE_URL aponta para o projeto certo (duas instalações a apontar para bases diferentes dão exactamente isto) e volte a verificar. Enquanto durar, não conte com o que o ecrã disser sobre gravações.",
+      "Confirma que SUPABASE_URL aponta para o projeto certo (duas instalações a apontar para bases diferentes dão exactamente isto) e volta a verificar. Enquanto durar, não contes com o que o ecrã disser sobre gravações.",
   },
 };
 
 const FOTOS_O_QUE_FAZER: Partial<Record<EstadoDasFotos, string>> = {
   "por-criar":
     "Ainda não há pastas de fotografias — são criadas sozinhas na primeira fotografia carregada. Não é preciso fazer nada.",
-  "sem-resposta": `O Storage do Supabase não respondeu (pastas ${PROPOSAL_BUCKET} e ${THEME_BUCKET}). As fotografias podem não abrir nem carregar. Confirme SUPABASE_URL e que o projeto não está suspenso no painel do Supabase.`,
+  "sem-resposta": `O Storage do Supabase não respondeu (pastas ${PROPOSAL_BUCKET} e ${THEME_BUCKET}). As fotografias podem não abrir nem carregar. Confirma SUPABASE_URL e que o projeto não está suspenso no painel do Supabase.`,
   "sem-base-de-dados":
     "Sem base de dados ligada não há Storage: as fotografias carregadas ficam sem sítio onde viver.",
 };

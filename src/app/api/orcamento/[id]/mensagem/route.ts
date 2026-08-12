@@ -76,7 +76,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const emailError = temDestinatario
       ? undefined
       : "Este pedido não tem email — a mensagem ficou registada, mas não foi enviada. " +
-        "Acrescente o email do cliente para lhe poder escrever daqui.";
+        "Acrescenta o email do cliente para lhe poderes escrever daqui.";
 
     const newMessage: QuoteMessage = { at: new Date().toISOString(), body: message };
     const messages = [...(quote.messages ?? []), newMessage];

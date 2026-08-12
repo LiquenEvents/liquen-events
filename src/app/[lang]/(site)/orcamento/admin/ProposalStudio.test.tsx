@@ -592,7 +592,7 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     expect(
       within(alerta).getByText(/Mood board «Cerimónia»: 2 fotos não entram no PDF/),
     ).toBeTruthy();
-    expect(within(alerta).getByText(/Verifique antes de enviar/)).toBeTruthy();
+    expect(within(alerta).getByText(/Verifica antes de enviar/)).toBeTruthy();
   });
 
   it("o envio avisa das duas perdas ao mesmo tempo, sem as confundir", async () => {

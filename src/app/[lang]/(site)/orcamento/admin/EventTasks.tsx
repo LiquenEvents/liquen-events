@@ -57,7 +57,7 @@ export default function EventTasks({ quote, userName }: Props) {
     }).catch(() => null);
     if (!res?.ok) {
       setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
-      toast("Não foi possível atualizar a tarefa. Tente novamente.", "error");
+      toast("Não foi possível atualizar a tarefa. Tenta novamente.", "error");
     }
   }
 
@@ -88,10 +88,10 @@ export default function EventTasks({ quote, userName }: Props) {
         setNewDue("");
         setAdding(false);
       } else {
-        toast("Não foi possível criar a tarefa. Tente novamente.", "error");
+        toast("Não foi possível criar a tarefa. Tenta novamente.", "error");
       }
     } catch {
-      toast("Erro de ligação. Verifique a internet e tente novamente.", "error");
+      toast("Erro de ligação. Verifica a internet e tenta novamente.", "error");
     } finally {
       setBusy(false);
     }
@@ -107,7 +107,7 @@ export default function EventTasks({ quote, userName }: Props) {
       if (!res.ok) throw new Error();
     } catch {
       setTasks(snapshot);
-      toast("Não foi possível eliminar a tarefa. Tente novamente.", "error");
+      toast("Não foi possível eliminar a tarefa. Tenta novamente.", "error");
     }
   }
 

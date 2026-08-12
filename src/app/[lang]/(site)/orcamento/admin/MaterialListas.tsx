@@ -224,7 +224,7 @@ export default function MaterialListas() {
         <div className="mt-6">
           <EmptyState
             title="Ainda não há listas"
-            description="Comece pelos “Essenciais de carrinha” — o que vai em todos os eventos. Depois crie listas por tipo de montagem."
+            description="Começa pelos “Essenciais de carrinha” — o que vai em todos os eventos. Depois cria listas por tipo de montagem."
           />
         </div>
       ) : (

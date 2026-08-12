@@ -276,7 +276,7 @@ export default function ThemeCopyDialog({
           )}
           {others.length === 0 ? (
             <p className="bo-text-muted py-6 text-center text-sm">
-              Não há outro tema para onde levar estas fotos. Crie um em <strong>Temas</strong>.
+              Não há outro tema para onde levar estas fotos. Cria um em <strong>Temas</strong>.
             </p>
           ) : visible.length === 0 ? (
             <p className="bo-text-muted py-6 text-center text-sm">
@@ -361,7 +361,7 @@ export default function ThemeCopyDialog({
             </p>
             {count > MAX_THEME_COPY_BATCH * 12 && (
               <p className="bo-text-muted mt-1 text-xs">
-                São muitas fotos — pode demorar alguns minutos. Deixe este separador aberto.
+                São muitas fotos — pode demorar alguns minutos. Deixa este separador aberto.
               </p>
             )}
           </div>
@@ -397,7 +397,7 @@ export default function ThemeCopyDialog({
           <div className="border-t border-[#8a2a22]/20 bg-[#f6e6df]/40 px-5 py-3">
             <p className="text-sm text-foreground/80">{error}</p>
             <p className="bo-text-muted mt-0.5 text-xs">
-              As fotos não saíram deste tema. Pode tentar outra vez.
+              As fotos não saíram deste tema. Podes tentar outra vez.
             </p>
           </div>
         )}

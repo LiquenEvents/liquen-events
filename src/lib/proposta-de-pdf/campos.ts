@@ -1473,26 +1473,57 @@ function lerOrcamento(
         );
       }
     }
-    const valor = parseMoneyText(totalTexto);
+    /**
+     * ── A BASE, QUANDO O NÚMERO GRANDE É O «TOTAL A PAGAR» ──────────────────
+     *
+     * Numa proposta com valores adicionais o número grande passou a ser o total
+     * a pagar — com IVA, portanto. Lê-lo como `totalAmount` dava um documento
+     * em modo «IVA incluído» com uma base 23% acima da verdadeira, e os valores
+     * adicionais (que nessa folha estão impressos SEM IVA) passavam a ser lidos
+     * com IVA lá dentro: a repartição entre serviços e adicionais mudava só por
+     * o documento ter ido e voltado.
+     *
+     * A folha diz a base em todas as letras, uma linha acima: «TOTAL (sem IVA)».
+     * É essa que manda quando existe — é o campo estruturado do documento, não
+     * uma dedução a partir do que está impresso.
+     */
+    const daBase = esquerda
+      .filter((l) => l.corridas[0] && eRotulo(l.corridas[0].texto, "TOTAL (sem IVA)"))
+      .map((l) => totalDaLinha(l))
+      .find((t): t is NonNullable<typeof t> => t !== null);
+    const valor = daBase ? daBase.montante : parseMoneyText(totalTexto);
     if (valor > 0) {
       campos.push(
         novoCampo(
           "totalAmount",
           valor,
           "media",
-          "Tirado do número impresso — o documento não traz o valor em separado.",
-          [comoLinha(grande.l.pagina, grande.c)],
+          daBase
+            ? "Estava na linha «TOTAL (sem IVA)», que é a base do documento."
+            : "Tirado do número impresso — o documento não traz o valor em separado.",
+          [
+            daBase
+              ? comoLinha(grande.l.pagina, daBase.valor)
+              : comoLinha(grande.l.pagina, grande.c),
+          ],
         ),
       );
+      const modo = daBase ? "acrescer" : detectVatMode(totalTexto);
       campos.push(
         novoCampo(
           "totalVatMode",
-          detectVatMode(totalTexto),
+          modo,
           "media",
-          detectVatMode(totalTexto) === "acrescer"
-            ? "O número diz «+ IVA», portanto o IVA acresce."
-            : "O número não diz «+ IVA», portanto assume-se que já o inclui.",
-          [comoLinha(grande.l.pagina, grande.c)],
+          daBase
+            ? "A folha traz a linha «TOTAL (sem IVA)» e o IVA em separado, portanto o valor é a base."
+            : modo === "acrescer"
+              ? "O número diz «+ IVA», portanto o IVA acresce."
+              : "O número não diz «+ IVA», portanto assume-se que já o inclui.",
+          [
+            daBase
+              ? comoLinha(grande.l.pagina, daBase.valor)
+              : comoLinha(grande.l.pagina, grande.c),
+          ],
         ),
       );
     }
@@ -1721,7 +1752,11 @@ function lerOrcamento(
     campos.push(
       novoCampo(
         `budgetExtras[${i}].valueText`,
-        valor.texto,
+        // O «+» à frente do valor é COMPOSIÇÃO e não conteúdo: o gerador
+        // escreve-o para dizer que a parcela SOMA ao subtotal. Devolvê-lo dentro
+        // do campo punha-o a ser gravado no documento e a ser reimpresso dentro
+        // do valor («+ + 250,00 €») à segunda volta.
+        valor.texto.replace(/^\+\s*/, ""),
         "alta",
         // O «+ Iva» de cada linha vai TAL E QUAL dentro do texto do valor, e é
         // de propósito: é dali que `modoDeIvaDaLinha` (proposal-budget.ts) lê o
@@ -1795,6 +1830,17 @@ const ROTULOS_DE_TOTAL = [
   "Valor Total Decoração",
   "Valor Total Estimado",
   "Investimento Total",
+  // O rótulo que o nosso gerador passou a escrever quando há valores
+  // adicionais: a linha que aqui se chamava «Valor Total» — o valor dos itens
+  // listados por cima dela — passou a dizer o que é. Sem isto, a linha deixava
+  // de ser encontrada e o quadro inteiro (linhas + adicionais) voltava de uma
+  // importação como se fosse uma linha de orçamento só.
+  "Subtotal dos serviços",
+  "Subtotal dos serviços (estimado)",
+  // A base do bloco de totais. Não pode ser confundida com o subtotal: está
+  // fora da banda de corpo do quadro (ver `corpoDoQuadro`), por isso nunca
+  // entra nas candidatas a linha de orçamento.
+  "TOTAL (sem IVA)",
 ];
 
 /** Um total escrito numa linha só: o rótulo à esquerda, o valor à direita. */

@@ -165,14 +165,14 @@ export default function DefinicoesProposta() {
         </div>
         <p className="mt-1 text-xs leading-relaxed text-foreground/55">
           A deslocação é uma conta: quilómetros de ida e volta a partir de Évora, vezes o custo de
-          cada quilómetro. O gasóleo muda todas as semanas — este número tem de ser seu, não do
+          cada quilómetro. O gasóleo muda todas as semanas — este número tem de ser teu, não do
           programa.
         </p>
 
         {desactualizado && (
           <p className="mt-3 rounded-xl border border-[#c08a3e]/40 bg-[#c08a3e]/[0.06] p-3 text-[11px] leading-relaxed text-[#8a6420]">
             {p.definidoEm.deslocacao?.startsWith("1970")
-              ? "Estes valores nunca foram confirmados — são um ponto de partida escrito por quem não abastece a carrinha. Confirme o preço do gasóleo antes de a próxima proposta o usar."
+              ? "Estes valores nunca foram confirmados — são um ponto de partida escrito por quem não abastece a carrinha. Confirma o preço do gasóleo antes de a próxima proposta o usar."
               : "O preço do gasóleo já tem algumas semanas. Vale a pena confirmá-lo: o desvio já se nota numa viagem ao Porto."}
           </p>
         )}

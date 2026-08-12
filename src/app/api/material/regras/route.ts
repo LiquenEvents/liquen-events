@@ -7,8 +7,8 @@ import { log } from "@/lib/logger";
 import { isMissingTable } from "@/lib/repository";
 
 const NAO_INSTALADO =
-  "O Material ainda não está criado na base de dados. No Supabase → SQL Editor, cole e corra o " +
-  "ficheiro db/schema.sql (pode repetir-se sem risco) e recarregue esta página.";
+  "O Material ainda não está criado na base de dados. No Supabase → SQL Editor, cola e corre o " +
+  "ficheiro db/schema.sql (pode repetir-se sem risco) e recarrega esta página.";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,10 +44,10 @@ export async function POST(request: NextRequest) {
     // Uma regra que não aponta para nada não acrescenta nada, e fica no ecrã a
     // dar a impressão de que faz alguma coisa. Recusa-se à entrada.
     if (action === "add_list" && !body?.listId) {
-      return NextResponse.json({ error: "Escolha a lista a acrescentar." }, { status: 400 });
+      return NextResponse.json({ error: "Escolhe a lista a acrescentar." }, { status: 400 });
     }
     if (action === "add_item" && !body?.itemId) {
-      return NextResponse.json({ error: "Escolha o item a acrescentar." }, { status: 400 });
+      return NextResponse.json({ error: "Escolhe o item a acrescentar." }, { status: 400 });
     }
     if (matchKind !== "sempre" && !String(body?.matchValue ?? "").trim()) {
       return NextResponse.json({ error: "Diga o que procurar." }, { status: 400 });

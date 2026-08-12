@@ -16,7 +16,7 @@ afterEach(cleanup);
 describe("NotasInternas", () => {
   it("diz, no rótulo, que não sai na proposta", () => {
     render(<NotasInternas valor="" onChange={() => {}} />);
-    expect(screen.getByText(/só para si, nunca sai na proposta/)).toBeTruthy();
+    expect(screen.getByText(/só para ti, nunca sai na proposta/)).toBeTruthy();
   });
 
   it("o rótulo aponta para o campo, para quem usa leitor de ecrã", async () => {

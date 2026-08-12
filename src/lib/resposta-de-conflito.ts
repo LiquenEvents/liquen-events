@@ -77,8 +77,8 @@ export function respostaDeMigracaoEmFalta(err: unknown, oQueFalta: string): Next
     {
       error:
         `${oQueFalta} não podem ser gravadas: falta uma actualização na base de dados. ` +
-        "No Supabase → SQL Editor, cole e corra o ficheiro db/schema.sql " +
-        "(pode repetir-se sem risco) e tente de novo.",
+        "No Supabase → SQL Editor, cola e corre o ficheiro db/schema.sql " +
+        "(pode repetir-se sem risco) e tenta de novo.",
     },
     { status: 503 },
   );

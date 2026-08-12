@@ -116,7 +116,7 @@ export default function ClientMessenger({ quote, onSent }: Props) {
         rows={4}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Escreva a mensagem que será enviada por e-mail ao cliente…"
+        placeholder="Escreve a mensagem que será enviada por e-mail ao cliente…"
         className="resize-none"
         containerClassName="mb-3"
       />

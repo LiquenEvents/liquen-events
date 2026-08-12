@@ -57,8 +57,8 @@ export default function AjudaGlossario({ open, onClose }: Props) {
           {/* ── Boas-vindas ── */}
           <p className="text-foreground/55 text-sm leading-relaxed mb-6">
             Bem-vindo(a). Esta janela explica, em poucas palavras, como funciona o back-office e o
-            que significa cada termo que vai encontrar. Pode voltar aqui sempre que precisar — abre
-            com o botão “?” no topo
+            que significa cada termo que vais encontrar. Podes voltar aqui sempre que precisares —
+            abre com o botão “?” no topo
             {/* A tecla e o "Escape" só se dizem a quem os tem. Num telemóvel a
                 frase mandava carregar em teclas que não existem; o botão “?” e
                 o × do canto são o caminho, e esses estão lá sempre. */}
@@ -69,7 +69,7 @@ export default function AjudaGlossario({ open, onClose }: Props) {
                 ?
               </kbd>
             </span>
-            . Feche
+            . Fecha
             <span className="pointer-coarse:hidden"> com Escape ou</span> no × do canto.
           </p>
 

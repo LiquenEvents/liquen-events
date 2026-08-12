@@ -79,7 +79,7 @@ export default function Servicos() {
         toast(comoDizer, "success");
       } catch {
         setServicos(antes);
-        toast("Não foi possível gravar. Verifique a ligação.", "error");
+        toast("Não foi possível gravar. Verifica a ligação.", "error");
       }
     },
     [servicos, toast],
@@ -143,8 +143,8 @@ export default function Servicos() {
           title={mostrarArquivados ? "Nada arquivado" : "A biblioteca está vazia"}
           description={
             mostrarArquivados
-              ? "Os serviços que arquivar aparecem aqui, e continuam nas propostas antigas."
-              : "Escreva os serviços à mão nas propostas e guarde aqui os que valer a pena reutilizar — ou crie um de raiz."
+              ? "Os serviços que arquivares aparecem aqui, e continuam nas propostas antigas."
+              : "Escreve os serviços à mão nas propostas e guarda aqui os que valer a pena reutilizar — ou cria um de raiz."
           }
         />
       ) : (

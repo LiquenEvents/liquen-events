@@ -45,7 +45,7 @@ export function AvisoDeFalha({
     >
       <p className="font-medium text-[#a03a1a]">{titulo}</p>
       <p className="bo-text-muted mt-1">
-        {mensagem || "O servidor não respondeu. Verifique a ligação e tente outra vez."}
+        {mensagem || "O servidor não respondeu. Verifica a ligação e tenta outra vez."}
       </p>
       {aoTentarDeNovo && (
         <div className="mt-3">

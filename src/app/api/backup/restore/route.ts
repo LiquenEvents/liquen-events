@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "O ficheiro não é o mesmo que foi pré-visualizado. Volte a carregá-lo e reveja o ensaio antes de repor. Nada foi alterado.",
+            "O ficheiro não é o mesmo que foi pré-visualizado. Volta a carregá-lo e revê o ensaio antes de repor. Nada foi alterado.",
           fileHash,
           plan,
         },

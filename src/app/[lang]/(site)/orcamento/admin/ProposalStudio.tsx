@@ -433,18 +433,18 @@ export function porqueFalhouOEnvio(status: number): string {
   if (status === 504 || status === 502 || status === 408) {
     return (
       "O servidor demorou demasiado a preparar a proposta e desistiu a meio. " +
-      "Propostas com muitas fotografias demoram mais — tente outra vez; se voltar a " +
-      "acontecer, tire algumas fotos dos mood boards."
+      "Propostas com muitas fotografias demoram mais — tenta outra vez; se voltar a " +
+      "acontecer, tira algumas fotos dos mood boards."
     );
   }
   if (status === 401 || status === 403) {
-    return "A sessão expirou. Volte a entrar e tente de novo — o rascunho está guardado.";
+    return "A sessão expirou. Volta a entrar e tenta de novo — o rascunho está guardado.";
   }
   if (status === 413) {
-    return "A proposta é grande demais para ser guardada. Tire algumas fotos ou encurte os textos.";
+    return "A proposta é grande demais para ser guardada. Tira algumas fotos ou encurta os textos.";
   }
   if (status === 503) {
-    return "O serviço não está disponível neste momento. Tente daqui a pouco.";
+    return "O serviço não está disponível neste momento. Tenta daqui a pouco.";
   }
   return `Não foi possível enviar a proposta (erro ${status}).`;
 }
@@ -1225,8 +1225,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           warnedOverwrite.current = true;
           toast(
             r.previousBy
-              ? `Este rascunho tinha sido alterado por ${r.previousBy} noutro sítio. Ficou a sua versão.`
-              : "Este rascunho tinha sido alterado noutro sítio. Ficou a sua versão.",
+              ? `Este rascunho tinha sido alterado por ${r.previousBy} noutro sítio. Ficou a tua versão.`
+              : "Este rascunho tinha sido alterado noutro sítio. Ficou a tua versão.",
             "info",
           );
         }
@@ -1741,7 +1741,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setConfirmSend(false);
     setSent(false);
     setStep("conteudo");
-    toast("Versão reposta. Pode anular durante 10 segundos.", "info");
+    toast("Versão reposta. Podes anular durante 10 segundos.", "info");
   }
 
   function clearDraft() {
@@ -2163,7 +2163,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       }
     } catch {
       toast(
-        "As fotos deste modelo ficaram na pasta da proposta de origem — volte a escolhê-las se essa proposta for apagada.",
+        "As fotos deste modelo ficaram na pasta da proposta de origem — volta a escolhê-las se essa proposta for apagada.",
         "error",
       );
     }
@@ -2198,7 +2198,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       toast(
         `Este mood board fica com ${total} fotos e a página do PDF mostra ${MOOD_BOARD_MAX_IMAGES}: ` +
           `${sobra === 1 ? "a última não entra" : `as últimas ${sobra} não entram`}. ` +
-          "Remova fotos ou crie outro mood board.",
+          "Remove fotos ou cria outro mood board.",
         "error",
       );
     }
@@ -2436,12 +2436,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const cortes = cortesDoCabecalho(res.headers.get("X-Conteudo-Cortado"));
       const aviso = avisoDeConteudoIncompleto(emFalta, cortes);
       if (aviso) {
-        toast(`PDF gerado, mas ${aviso}. Verifique antes de enviar.`, "error");
+        toast(`PDF gerado, mas ${aviso}. Verifica antes de enviar.`, "error");
       } else if (fotosPorConfirmar > 0) {
         toast(
           fotosPorConfirmar === 1
-            ? "PDF gerado sem 1 foto que ainda está a entrar na proposta. Gere outra vez daqui a pouco."
-            : `PDF gerado sem ${fotosPorConfirmar} fotos que ainda estão a entrar na proposta. Gere outra vez daqui a pouco.`,
+            ? "PDF gerado sem 1 foto que ainda está a entrar na proposta. Gera outra vez daqui a pouco."
+            : `PDF gerado sem ${fotosPorConfirmar} fotos que ainda estão a entrar na proposta. Gera outra vez daqui a pouco.`,
           "info",
         );
       } else {
@@ -2513,7 +2513,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
        */
       const saiu = Boolean(data?.emailed);
       if (aviso) {
-        toast(`No PDF que seguiu, ${aviso}. Verifique a proposta e reenvie.`, "error");
+        toast(`No PDF que seguiu, ${aviso}. Verifica a proposta e reenvia.`, "error");
       } else if (saiu) {
         toast("Proposta enviada ao cliente", "success");
       } else {
@@ -2593,7 +2593,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         ? ` ${e.fotosPartilhadas} foto(s) ficaram na pasta da proposta antiga.`
         : "";
     toast(
-      `Copiado de ${e.nomeDaOrigem}. Confirme o que está marcado.${partilha}`,
+      `Copiado de ${e.nomeDaOrigem}. Confirma o que está marcado.${partilha}`,
       e.fotosPartilhadas > 0 ? "error" : "success",
     );
   }
@@ -2697,7 +2697,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         <div className="min-w-0">
           <p className="bo-eyebrow">Estúdio de propostas (PDF)</p>
           <p className="mt-2 text-sm leading-relaxed text-foreground/55">
-            Monte aqui a proposta em PDF para o cliente. Preencha de cima para baixo; pode
+            Monta aqui a proposta em PDF para o cliente. Preenche de cima para baixo; podes
             pré-visualizar antes de enviar.
           </p>
         </div>
@@ -3138,7 +3138,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
                             ? "a última, marcada «fora do PDF», não é impressa"
                             : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
-                          . Remova fotos ou crie outro mood board.
+                          . Remove fotos ou cria outro mood board.
                         </p>
                       )}
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -3227,7 +3227,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           {cortadas
                             .map(({ perda, i }) => `a ${i + 1}.ª perde ${Math.round(perda * 100)}%`)
                             .join(", ")}
-                          . Ligue «Manter a forma de cada fotografia» para não perder nada.
+                          . Liga «Manter a forma de cada fotografia» para não perder nada.
                         </p>
                       )}
                       <div className="mt-2 flex flex-wrap items-center gap-4">
@@ -3349,10 +3349,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <>
                 <div className="flex flex-col gap-2 mb-3">
                   <p className="text-xs leading-relaxed text-foreground/50">
-                    Os preços por linha são <strong className="font-semibold">só para si</strong>:
+                    Os preços por linha são <strong className="font-semibold">só para ti</strong>:
                     servem para somar e para avisar quando o total já não bate certo. O PDF continua
                     a mostrar as linhas sem preço e um «{doc.totalLabel || "Valor Total"}» único,
-                    como nas suas propostas.
+                    como nas tuas propostas.
                   </p>
                   {linhasDe(doc).map((l, i) => {
                     const escala = escalasDoDoc[i];
@@ -3836,7 +3836,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <span aria-hidden="true">✓</span> Proposta enviada
               </p>
               <p className="text-sm leading-relaxed text-foreground/60">
-                A proposta foi gerada e enviada para {quote.email || "o cliente"}. Não precisa de
+                A proposta foi gerada e enviada para {quote.email || "o cliente"}. Não precisas de
                 fazer mais nada.
               </p>
               <Button
@@ -3853,7 +3853,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           ) : (
             <>
               <p className="text-sm leading-relaxed text-foreground/60">
-                Confirme os dados abaixo. Ao enviar, o cliente recebe a proposta em PDF por email.
+                Confirma os dados abaixo. Ao enviar, o cliente recebe a proposta em PDF por email.
               </p>
               <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
                 <SummaryRow label="Para" value={quote.email || "—"} />
@@ -3908,7 +3908,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
                   <span aria-hidden="true">⚠</span>
                   <span>
-                    Preencha clientes, referência e um total maior que 0 (no passo «Conteúdo») antes
+                    Preenche clientes, referência e um total maior que 0 (no passo «Conteúdo») antes
                     de enviar.
                   </span>
                 </p>
@@ -3972,7 +3972,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </>
               ) : (
                 <span className="hidden sm:inline">
-                  Preencha o conteúdo e avance para pré-visualizar.
+                  Preenche o conteúdo e avança para pré-visualizar.
                 </span>
               )}
               {(gravadoEm || porGravar || soNesteComputador) &&
@@ -4099,7 +4099,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     ? undefined
                     : fotosPorConfirmar > 0
                       ? "Há fotos ainda a entrar na proposta. Falta pouco."
-                      : "Preencha clientes, referência e um total maior que 0 antes de enviar."
+                      : "Preenche clientes, referência e um total maior que 0 antes de enviar."
                 }
                 iconRight={<span aria-hidden="true">→</span>}
                 className="ml-auto"
@@ -4363,7 +4363,7 @@ function PreviewSummary({
   return (
     <Section title="Resumo da proposta">
       <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
-        Esta é a forma da proposta que o cliente vai receber. Para o documento completo, use
+        Esta é a forma da proposta que o cliente vai receber. Para o documento completo, usa
         «Descarregar PDF».
       </p>
 
@@ -4460,7 +4460,7 @@ function PreviewSummary({
           </dl>
         ) : (
           <p className="text-sm text-foreground/50">
-            Ainda sem total. Defina o valor no passo «Conteúdo» → «Total, IVA e validade».
+            Ainda sem total. Define o valor no passo «Conteúdo» → «Total, IVA e validade».
           </p>
         )}
       </div>

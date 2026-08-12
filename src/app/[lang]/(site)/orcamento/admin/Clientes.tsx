@@ -507,7 +507,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
               title={search.trim() || vipOnly ? "Nenhum cliente encontrado" : "Sem clientes ainda"}
               description={
                 search.trim()
-                  ? "Tente procurar por outro nome, email ou empresa."
+                  ? "Tenta procurar por outro nome, email ou empresa."
                   : vipOnly
                     ? "Ainda não há clientes VIP."
                     : "Os clientes formam-se automaticamente a partir dos pedidos recebidos."

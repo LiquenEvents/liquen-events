@@ -109,8 +109,8 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
       {!erro && servicos !== null && lista.length === 0 && (
         <p className="mt-2 text-[11px] leading-relaxed text-foreground/50">
           {procura
-            ? "Nada na biblioteca com esse nome. Escreva à mão e guarde depois."
-            : "A biblioteca ainda está vazia. Escreva os serviços à mão e guarde os que valer a pena reutilizar."}
+            ? "Nada na biblioteca com esse nome. Escreve à mão e guarda depois."
+            : "A biblioteca ainda está vazia. Escreve os serviços à mão e guarda os que valer a pena reutilizar."}
         </p>
       )}
 

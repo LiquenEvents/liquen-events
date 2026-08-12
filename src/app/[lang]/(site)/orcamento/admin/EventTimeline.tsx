@@ -67,7 +67,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
       .catch(() => {
         setItems(snapshot);
         onChange(snapshot);
-        toast("Não foi possível guardar o guião. Tente novamente.", "error");
+        toast("Não foi possível guardar o guião. Tenta novamente.", "error");
       });
   }
 
@@ -168,7 +168,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
             </svg>
           }
           title="Guião do dia por preencher"
-          description="Gere um cronograma-base para um dia de evento típico e adapte os momentos a este evento."
+          description="Gera um cronograma-base para um dia de evento típico e adapta os momentos a este evento."
           action={{ label: "Gerar cronograma-base", onClick: seed }}
         />
       ) : (

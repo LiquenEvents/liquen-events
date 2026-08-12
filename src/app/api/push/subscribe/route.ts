@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Não dá para ligar as notificações nesta instalação: não há base de dados onde guardar a subscrição, e o que ficasse guardado desaparecia no próximo deploy — as notificações pareceriam ligadas e não chegaria nenhuma. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no alojamento e volte a tentar.",
+            "Não dá para ligar as notificações nesta instalação: não há base de dados onde guardar a subscrição, e o que ficasse guardado desaparecia no próximo deploy — as notificações pareceriam ligadas e não chegaria nenhuma. Define SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no alojamento e volta a tentar.",
         },
         { status: 503 },
       );

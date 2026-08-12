@@ -38,7 +38,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
       .catch(() => {
         setItems(snapshot);
         onChange(snapshot);
-        toast("Não foi possível guardar a checklist. Tente novamente.", "error");
+        toast("Não foi possível guardar a checklist. Tenta novamente.", "error");
       });
   }
 
@@ -139,7 +139,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
             </svg>
           }
           title="Sem checklist ainda"
-          description="Comece por um modelo pensado para este tipo de evento e ajuste os itens à vontade."
+          description="Começa por um modelo pensado para este tipo de evento e ajusta os itens à vontade."
           action={{ label: "Gerar checklist do evento", onClick: seed }}
         />
       ) : (

@@ -144,8 +144,8 @@ export async function GET(request: NextRequest) {
         html:
           `<p>A cópia de hoje tem ${MB(comprimido.byteLength)} MB ` +
           `comprimidos e já não cabe num anexo.</p>` +
-          `<p>Descarregue-a no back office, em <b>Definições → Cópia de segurança</b>, ` +
-          `e guarde-a fora do computador de trabalho.</p><p>${linhas}</p>`,
+          `<p>Descarrega-a no back office, em <b>Definições → Cópia de segurança</b>, ` +
+          `e guarda-a fora do computador de trabalho.</p><p>${linhas}</p>`,
         headers: { "Auto-Submitted": "auto-generated" },
       });
       return NextResponse.json({
@@ -185,8 +185,8 @@ export async function GET(request: NextRequest) {
       html:
         (parcial
           ? `<p><b>Atenção:</b> estes conjuntos não puderam ser lidos e vão vazios: ` +
-            `<b>${falhados.join(", ")}</b>. Não reponha esta cópia sem falar com quem a fez.</p>`
-          : `<p>Cópia automática do dia. Guarde-a — é a que serve se alguma coisa se perder.</p>`) +
+            `<b>${falhados.join(", ")}</b>. Não reponhas esta cópia sem falar com quem a fez.</p>`
+          : `<p>Cópia automática do dia. Guarda-a — é a que serve se alguma coisa se perder.</p>`) +
         `<p style="color:#666;font-size:13px">${linhas}</p>` +
         linhaDasFotos,
       attachments: [

@@ -190,7 +190,7 @@ describe("DELETE /api/temas/[id]", () => {
     const res = await DELETE(...deleteReq());
     expect(res.status).toBe(502);
     expect((await res.json()).error).toBe(
-      "Não foi possível apagar as fotos do tema. O tema não foi eliminado — tente de novo.",
+      "Não foi possível apagar as fotos do tema. O tema não foi eliminado — tenta de novo.",
     );
     expect(st.remove).not.toHaveBeenCalled();
   });

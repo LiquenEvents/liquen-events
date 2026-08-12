@@ -91,7 +91,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const bad = types.find((t) => !OK_TYPES.test(t));
     if (bad !== undefined) {
       return NextResponse.json(
-        { error: `Formato não suportado: ${bad || "(vazio)"}. Use JPG, PNG ou WEBP.` },
+        { error: `Formato não suportado: ${bad || "(vazio)"}. Usa JPG, PNG ou WEBP.` },
         { status: 415 },
       );
     }

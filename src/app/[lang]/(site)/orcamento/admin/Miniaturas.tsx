@@ -168,7 +168,7 @@ export default function Miniaturas() {
             />
           </div>
           <p className="mt-1.5 text-[11px] text-foreground/55">
-            Pode fechar esta página — nada se perde, e voltar aqui continua de onde ficou.
+            Podes fechar esta página — nada se perde, e voltar aqui continua de onde ficou.
           </p>
         </div>
       )}

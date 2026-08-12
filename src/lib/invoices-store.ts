@@ -185,7 +185,7 @@ export async function nextInvoiceNumber(): Promise<string> {
         { year },
       );
       throw new Error(
-        "Numeração de faturas indisponível: o contador atómico (next_invoice_seq) falhou. Aplique db/schema.sql.",
+        "Numeração de faturas indisponível: o contador atómico (next_invoice_seq) falhou. Aplica db/schema.sql.",
       );
     }
   }
@@ -210,7 +210,7 @@ export async function nextInvoiceNumber(): Promise<string> {
       { year },
     );
     throw new Error(
-      "Numeração de faturas indisponível: sem base de dados, o contador não sobrevive a um deploy e a numeração fiscal repetir-se-ia. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no alojamento antes de emitir.",
+      "Numeração de faturas indisponível: sem base de dados, o contador não sobrevive a um deploy e a numeração fiscal repetir-se-ia. Define SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no alojamento antes de emitir.",
     );
   }
 

@@ -529,8 +529,8 @@ export default function Inventario() {
             title={items.length === 0 ? "Sem itens no inventário" : "Nenhum item encontrado"}
             description={
               items.length === 0
-                ? "Registe aqui os adereços e materiais de decoração do estúdio."
-                : "Tente outra pesquisa, categoria ou estado."
+                ? "Regista aqui os adereços e materiais de decoração do estúdio."
+                : "Tenta outra pesquisa, categoria ou estado."
             }
             action={
               items.length === 0

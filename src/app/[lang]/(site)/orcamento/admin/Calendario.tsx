@@ -299,7 +299,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
       if (!res.ok) throw new Error();
     } catch {
       setEvents(snapshot);
-      toast("Não foi possível remover. Tente novamente.", "error");
+      toast("Não foi possível remover. Tenta novamente.", "error");
     }
   }
 
@@ -709,7 +709,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
               </span>
             ))}
             <span className="ml-auto hidden sm:inline text-foreground/25 text-[9px] tracking-[0.15em] uppercase">
-              Clique num dia para ver ou adicionar
+              Clica num dia para ver ou adicionar
             </span>
           </div>
 
@@ -807,7 +807,7 @@ export default function Calendario({ quotes, onOpen }: Props) {
                 </svg>
               }
               title="Mês sem eventos"
-              description="Clique num dia do calendário para adicionar uma reunião, uma data fechada ou uma nota."
+              description="Clica num dia do calendário para adicionar uma reunião, uma data fechada ou uma nota."
             />
           )}
         </Card>

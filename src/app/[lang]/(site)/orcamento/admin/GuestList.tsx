@@ -60,7 +60,7 @@ export default function GuestList({ quote, onChange }: Props) {
       .catch(() => {
         setGuests(snapshot);
         onChange(snapshot);
-        toast("Não foi possível guardar a lista de convidados. Tente novamente.", "error");
+        toast("Não foi possível guardar a lista de convidados. Tenta novamente.", "error");
       });
   }
 
@@ -264,7 +264,7 @@ export default function GuestList({ quote, onChange }: Props) {
         </ul>
       ) : (
         <p className="mb-5 rounded-xl bg-foreground/[0.02] px-4 py-6 text-center text-sm leading-relaxed text-foreground/50">
-          Ainda sem convidados. Adicione a primeira pessoa ou família abaixo — o número de
+          Ainda sem convidados. Adiciona a primeira pessoa ou família abaixo — o número de
           confirmados atualiza-se sozinho.
         </p>
       )}

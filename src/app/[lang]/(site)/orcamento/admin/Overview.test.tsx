@@ -81,7 +81,7 @@ function instalarFetch() {
             proximaFalha = null;
             return resposta(
               {
-                error: "Isto foi alterado noutro dispositivo. O seu texto NÃO foi gravado.",
+                error: "Isto foi alterado noutro dispositivo. O teu texto NÃO foi gravado.",
                 current: servidor[corpo.id],
               },
               409,
@@ -404,7 +404,7 @@ describe("quando a gravação falha", () => {
 
     const aviso = await screen.findByRole("alert", {}, { timeout: 3000 });
     expect(aviso).toHaveTextContent(/Não foi possível guardar/);
-    expect(aviso).toHaveTextContent(/verifique a ligação/i);
+    expect(aviso).toHaveTextContent(/verifica a ligação/i);
     expect(screen.getByLabelText("Notas da equipa")).toHaveValue("Isto não pode desaparecer");
     expect(screen.queryByText(/Guardado no servidor às/)).not.toBeInTheDocument();
   });

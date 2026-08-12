@@ -100,7 +100,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
         toast(data?.error || "Não foi possível procurar na biblioteca.", "error");
       }
     } catch {
-      toast("Não foi possível procurar. Verifique a ligação.", "error");
+      toast("Não foi possível procurar. Verifica a ligação.", "error");
     } finally {
       setCarregando(false);
     }

@@ -482,13 +482,13 @@ export function nextAction(
     case "lead":
       return {
         label: "Criar proposta",
-        hint: "Ainda sem proposta enviada — desenhe e envie a proposta.",
+        hint: "Ainda sem proposta enviada — desenha e envia a proposta.",
         kind: "proposta",
       };
     case "proposta_enviada":
       return {
         label: "Abrir portal do cliente",
-        hint: "Proposta enviada — a aguardar aceitação. Acompanhe pelo portal.",
+        hint: "Proposta enviada — a aguardar aceitação. Acompanha pelo portal.",
         kind: "portal",
       };
     case "aceite":
@@ -500,13 +500,13 @@ export function nextAction(
     case "sinal_pago":
       return {
         label: "Iniciar produção",
-        hint: "Sinal pago — dê início ao plano de produção do evento.",
+        hint: "Sinal pago — dá início ao plano de produção do evento.",
         kind: "producao",
       };
     case "em_producao":
       return {
         label: "Gerir produção",
-        hint: "Em produção — acompanhe tarefas, fornecedores e cronograma.",
+        hint: "Em produção — acompanha tarefas, fornecedores e cronograma.",
         kind: "producao",
       };
     case "semana_evento": {
@@ -520,14 +520,14 @@ export function nextAction(
       }
       return {
         label: "Preparar run sheet",
-        hint: "Tudo pago — finalize o cronograma do dia.",
+        hint: "Tudo pago — finaliza o cronograma do dia.",
         kind: "runsheet",
       };
     }
     case "concluido":
       return {
         label: "Arquivar evento",
-        hint: "Evento concluído e liquidado — pode arquivar.",
+        hint: "Evento concluído e liquidado — podes arquivar.",
         kind: "arquivar",
       };
     case "perdido":

@@ -546,8 +546,8 @@ function Catalogo() {
           title={items.length === 0 ? "Catálogo vazio" : "Nada com estes filtros"}
           description={
             items.length === 0
-              ? "Adicione o material à mão, ou importe o inventário de uma vez a partir de um CSV."
-              : "Experimente outra categoria, outro tipo, ou limpe a pesquisa."
+              ? "Adiciona o material à mão, ou importa o inventário de uma vez a partir de um CSV."
+              : "Experimenta outra categoria, outro tipo, ou limpa a pesquisa."
           }
         />
       ) : (

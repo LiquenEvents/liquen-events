@@ -136,7 +136,7 @@ describe("PaymentsPanel — linha única de registo", () => {
     expect(registar).toBeEnabled();
     await user.click(registar);
 
-    expect(await screen.findByText(/Escreva um valor maior que zero/)).toBeInTheDocument();
+    expect(await screen.findByText(/Escreve um valor maior que zero/)).toBeInTheDocument();
     expect(screen.getByLabelText("Valor em euros")).toHaveFocus();
   });
 });

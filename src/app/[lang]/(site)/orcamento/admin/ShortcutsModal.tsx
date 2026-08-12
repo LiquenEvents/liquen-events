@@ -24,7 +24,7 @@ const GROUPS: { title: string; items: { keys: string[]; label: string }[] }[] = 
     ],
   },
   {
-    title: "Navegar — pressione G, depois…",
+    title: "Navegar — pressiona G, depois…",
     items: [
       { keys: ["G", "O"], label: "Visão Geral" },
       { keys: ["G", "P"], label: "Pedidos" },

@@ -147,7 +147,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     term: "Arquivar",
-    def: "Guardar um pedido de lado para deixar de o ver na lista principal, sem o apagar. Fica escondido mas continua tudo lá — pode voltar a mostrá-lo com “Restaurar” quando quiser.",
+    def: "Guardar um pedido de lado para deixar de o ver na lista principal, sem o apagar. Fica escondido mas continua tudo lá — podes voltar a mostrá-lo com “Restaurar” quando quiseres.",
   },
   {
     term: "Apagar",

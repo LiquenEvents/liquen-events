@@ -119,7 +119,7 @@ const README = [
   "Serve para responder a «o que é que se perdeu?»: comparando este ficheiro com o conteúdo do bucket vê-se, com nome, tamanho e data, o que desapareceu.",
   "NÃO inclui as derivadas (miniaturas e capas): essas refazem-se dos originais no back office, em Definições → Miniaturas.",
   "A coluna `soma` é o eTag do Storage. Para ficheiros enviados de uma vez é o MD5 do conteúdo; para envios em partes é uma assinatura composta (sufixo -N) que não se recalcula com um md5sum local.",
-  "Se `completo` for falso, ESTA LISTA ESTÁ INCOMPLETA — ver `avisos`. Não conclua daqui que uma fotografia não existe.",
+  "Se `completo` for falso, ESTA LISTA ESTÁ INCOMPLETA — ver `avisos`. Não concluas daqui que uma fotografia não existe.",
 ].join(" ");
 
 type Cliente = NonNullable<ReturnType<typeof getSupabase>>;

@@ -82,7 +82,7 @@ export default function FinanceZone({ quote, invoices, reconciliation, onQuoteCh
               emitidas ({eur(reconciliation.ledgerPaid)}).
             </p>
             <p className="text-foreground/45 text-[11px] mt-0.5">
-              O livro de faturas é a fonte de verdade — confirme as faturas na secção Faturas.
+              O livro de faturas é a fonte de verdade — confirma as faturas na secção Faturas.
             </p>
           </div>
         </div>

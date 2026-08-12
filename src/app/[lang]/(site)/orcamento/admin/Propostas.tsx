@@ -119,7 +119,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
         body: JSON.stringify({ status, respondedAt: new Date().toISOString() }),
       });
       if (!res.ok) {
-        toast("Não foi possível atualizar a proposta. Tente novamente.", "error");
+        toast("Não foi possível atualizar a proposta. Tenta novamente.", "error");
         return;
       }
       const updated: Proposal = await res.json();
@@ -157,7 +157,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
         toast("Proposta marcada como recusada.", "info");
       }
     } catch {
-      toast("Erro de ligação. Verifique a internet e tente novamente.", "error");
+      toast("Erro de ligação. Verifica a internet e tenta novamente.", "error");
     } finally {
       setActionBusy(null);
     }
@@ -213,7 +213,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
         toast("Proposta apagada.", "success");
       } catch {
         setProposals(snapshot);
-        toast("Não foi possível apagar a proposta. Tente novamente.", "error");
+        toast("Não foi possível apagar a proposta. Tenta novamente.", "error");
       } finally {
         setActionBusy(null);
       }
@@ -307,7 +307,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
             Não foi possível carregar as propostas
           </p>
           <p className="text-foreground/50 text-xs mt-1">
-            Verifique a ligação à internet e tente novamente.
+            Verifica a ligação à internet e tenta novamente.
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={retryLoad}>
@@ -360,7 +360,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
     <div className="flex flex-col gap-6">
       {/* One calm line saying what this screen is for */}
       <p className="text-sm leading-relaxed text-foreground/55">
-        Aqui vê as propostas que enviou aos clientes e acompanha quais foram aceites.
+        Aqui vês as propostas que enviaste aos clientes e acompanhas quais foram aceites.
       </p>
 
       {/* KPIs */}
@@ -447,7 +447,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
             }
             description={
               deferredFilter !== "all"
-                ? "Mude de filtro para ver as restantes."
+                ? "Muda de filtro para ver as restantes."
                 : "As propostas enviadas a partir de um pedido aparecem aqui."
             }
           />

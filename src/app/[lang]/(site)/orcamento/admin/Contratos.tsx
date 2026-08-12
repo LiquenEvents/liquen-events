@@ -254,7 +254,7 @@ export default function Contratos() {
             description={
               contracts.length === 0
                 ? "Os contratos surgem aqui quando um cliente aceita a proposta pelo link público."
-                : "Tente outra pesquisa ou estado."
+                : "Tenta outra pesquisa ou estado."
             }
           />
         ) : (

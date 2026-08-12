@@ -104,7 +104,7 @@ export function CampoData({
       {lida && (
         <p className={cn("text-xs", foraDoEsperado !== null ? "text-[#8a6d2f]" : "bo-text-muted")}>
           {lida.texto}
-          {foraDoEsperado !== null && ` — é uma ${DIAS[foraDoEsperado]}, confirme`}
+          {foraDoEsperado !== null && ` — é uma ${DIAS[foraDoEsperado]}, confirma`}
         </p>
       )}
     </div>

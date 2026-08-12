@@ -541,7 +541,7 @@ describe("DELETE /api/faturas/[id] — apagar só faturas anuladas", () => {
     const res = await DELETE(req, { params });
     expect(res.status).toBe(409);
     const json = await res.json();
-    expect(json.error).toBe("Só é possível apagar faturas anuladas. Anule a fatura primeiro.");
+    expect(json.error).toBe("Só é possível apagar faturas anuladas. Anula a fatura primeiro.");
     expect(deleteInvoice).not.toHaveBeenCalled();
   });
 

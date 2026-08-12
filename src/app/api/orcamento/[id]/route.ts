@@ -58,7 +58,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const limited = await rateLimit(`orcamento-get:${clientIp(request)}`, 20, 60_000);
       if (!limited.ok) {
         return NextResponse.json(
-          { error: "Demasiados pedidos. Tente novamente dentro de momentos." },
+          { error: "Demasiados pedidos. Tenta novamente dentro de momentos." },
           { status: 429, headers: { "Retry-After": String(limited.retryAfter ?? 60) } },
         );
       }

@@ -214,7 +214,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
 
       {itens.length === 0 && (
         <p className="bo-text-muted px-1 py-6 text-sm">
-          Nada nesta lista. Ajuste a procura ou a categoria antes de entrar no modo de carga.
+          Nada nesta lista. Ajusta a procura ou a categoria antes de entrar no modo de carga.
         </p>
       )}
 

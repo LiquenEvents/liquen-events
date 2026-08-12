@@ -79,7 +79,7 @@ describe("quando algo não bate certo", () => {
         totalBruto={12_000}
       />,
     );
-    expect(screen.getByText(/Nenhuma o impede de enviar/)).toBeTruthy();
+    expect(screen.getByText(/Nenhuma te impede de enviar/)).toBeTruthy();
   });
 });
 

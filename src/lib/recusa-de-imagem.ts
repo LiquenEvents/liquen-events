@@ -44,7 +44,7 @@ export type MotivoDeRecusa = "incompleta" | "heic" | "ilegivel";
 export const CONSELHO_HEIC =
   "está em HEIC, o formato da câmara do iPhone, e não o conseguimos abrir. " +
   "No telemóvel: Definições → Câmara → Formatos → «Mais compatível», e as fotos " +
-  "seguintes ficam em JPEG. Para esta, abra-a e exporte como JPEG.";
+  "seguintes ficam em JPEG. Para esta, abre-a e exporta como JPEG.";
 
 /** Isto parece um ficheiro HEIC, pelo nome ou pelo tipo que o browser declara?
  *  Do lado do navegador não há bytes para inspeccionar — há um `File`. */
@@ -57,7 +57,7 @@ export function recusaDeImagem(motivo: MotivoDeRecusa, nome: string): string {
   if (motivo === "incompleta") {
     return (
       `${nome} chegou incompleta — falta-lhe o fim do ficheiro, o que costuma ser a ` +
-      `ligação a falhar a meio. Volte a carregá-la. (Se ficasse guardada assim, ` +
+      `ligação a falhar a meio. Volta a carregá-la. (Se ficasse guardada assim, ` +
       `apareceria meia cinzenta na proposta.)`
     );
   }

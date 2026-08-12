@@ -251,12 +251,12 @@ describe("CampoData", () => {
   it("avisa quando o casamento não cai no dia esperado", () => {
     simularAparelho(DESKTOP);
     render(<CampoData label="Data" value="2027-06-10" onChange={() => {}} diaEsperado={6} />);
-    expect(screen.getByText(/é uma quinta, confirme/)).toBeInTheDocument();
+    expect(screen.getByText(/é uma quinta, confirma/)).toBeInTheDocument();
   });
 
   it("num sábado não avisa nada", () => {
     simularAparelho(DESKTOP);
     render(<CampoData label="Data" value="2027-09-18" onChange={() => {}} diaEsperado={6} />);
-    expect(screen.queryByText(/confirme/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/confirma/)).not.toBeInTheDocument();
   });
 });

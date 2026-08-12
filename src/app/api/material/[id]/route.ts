@@ -6,8 +6,8 @@ import { log } from "@/lib/logger";
 import { isMissingTable } from "@/lib/repository";
 
 const NAO_INSTALADO =
-  "O Material ainda não está criado na base de dados. No Supabase → SQL Editor, cole e corra o " +
-  "ficheiro db/schema.sql (pode repetir-se sem risco) e recarregue esta página.";
+  "O Material ainda não está criado na base de dados. No Supabase → SQL Editor, cola e corre o " +
+  "ficheiro db/schema.sql (pode repetir-se sem risco) e recarrega esta página.";
 
 export const runtime = "nodejs";
 

@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
             aviso:
               `Foi emitida a fatura de sinal ${sinalInv.number} ` +
               `(${sinalInv.amount.toFixed(2)} €), mas ${sobreOSaldo}. ` +
-              `Não volte a emitir o sinal — emita apenas o saldo.`,
+              `Não voltes a emitir o sinal — emite apenas o saldo.`,
           },
           { status: 201 },
         );

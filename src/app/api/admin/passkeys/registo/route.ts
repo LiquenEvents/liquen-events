@@ -43,7 +43,7 @@ export const dynamic = "force-dynamic";
 
 const NAO_INSTALADO =
   "A tabela das passkeys ainda não existe na base de dados. No Supabase → SQL Editor, " +
-  "cole e corra o ficheiro db/schema.sql (pode repetir-se sem risco) e tente de novo.";
+  "cola e corre o ficheiro db/schema.sql (pode repetir-se sem risco) e tenta de novo.";
 
 const SEM_BASE_DE_DADOS =
   "A base de dados não está ligada nesta instalação, por isso não há onde guardar o " +
@@ -56,7 +56,7 @@ function respostaDeAvaria(err: unknown, contexto: string): NextResponse {
     return NextResponse.json({ error: SEM_BASE_DE_DADOS }, { status: 503 });
   log.error(`passkeys: ${contexto}`, { err });
   return NextResponse.json(
-    { error: "Não foi possível concluir. Tente novamente." },
+    { error: "Não foi possível concluir. Tenta novamente." },
     { status: 500 },
   );
 }
@@ -84,8 +84,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          `Já tem ${MAX_PASSKEYS_POR_CONTA} dispositivos registados. ` +
-          `Remova um que já não use antes de acrescentar outro.`,
+          `Já tens ${MAX_PASSKEYS_POR_CONTA} dispositivos registados. ` +
+          `Remove um que já não uses antes de acrescentar outro.`,
       },
       { status: 409 },
     );
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
   const selado = lerDesafio(req.cookies.get(CHALLENGE_COOKIE)?.value, "registo");
   if (!selado) {
     return NextResponse.json(
-      { error: "O pedido de registo expirou. Volte a tentar." },
+      { error: "O pedido de registo expirou. Volta a tentar." },
       { status: 400 },
     );
   }
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
   // — acabaria a prender o aparelho de alguém à conta de outra pessoa.
   if (!mesmaConta(selado.userName, conta)) {
     return NextResponse.json(
-      { error: "A sessão mudou durante o registo. Volte a tentar." },
+      { error: "A sessão mudou durante o registo. Volta a tentar." },
       { status: 400 },
     );
   }

@@ -566,7 +566,7 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           description={
             result.emailed
               ? `Enviada por e-mail para ${quote.email}.`
-              : "Gerada (e-mail não configurado — descarregue e envie manualmente)."
+              : "Gerada (e-mail não configurado — descarrega e envia manualmente)."
           }
           action={{
             label: "Descarregar PDF",
@@ -600,8 +600,8 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           Criar e enviar proposta (PDF)
         </h3>
         <p className="mt-1.5 text-sm leading-relaxed text-foreground/55">
-          Componha as linhas, defina o IVA e envie o PDF ao cliente. O que escrever fica guardado
-          sozinho — pode sair daqui e voltar mais tarde.
+          Compõe as linhas, define o IVA e envia o PDF ao cliente. O que escreveres fica guardado
+          sozinho — podes sair daqui e voltar mais tarde.
         </p>
         {/* O INDICADOR, com as palavras do estúdio.
             Até aqui esta ferramenta não guardava nada e, coerentemente, não

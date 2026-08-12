@@ -33,8 +33,8 @@ function reply(status: number, body: unknown) {
 }
 
 const FALTA_SCHEMA =
-  "O Material ainda não está criado na base de dados. No Supabase → SQL Editor, cole e corra o " +
-  "ficheiro db/schema.sql (pode repetir-se sem risco) e recarregue esta página.";
+  "O Material ainda não está criado na base de dados. No Supabase → SQL Editor, cola e corre o " +
+  "ficheiro db/schema.sql (pode repetir-se sem risco) e recarrega esta página.";
 
 /** Todas as rotas do Material em baixo, como quando falta o `db/schema.sql`. */
 function todasEmBaixo() {
@@ -182,7 +182,7 @@ describe("Material — com dados", () => {
         <MaterialRegras />
       </ToastProvider>,
     );
-    await waitFor(() => expect(screen.getByLabelText("Nome (para si)")).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText("Nome (para ti)")).toBeTruthy());
     expect((screen.getByLabelText("Quando") as HTMLSelectElement).tagName).toBe("SELECT");
   });
 });

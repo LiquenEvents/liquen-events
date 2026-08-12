@@ -18,7 +18,7 @@ const flagsSchema = z
     flagged: z.boolean().optional(),
   })
   .refine((b) => b.seen !== undefined || b.flagged !== undefined, {
-    message: "Indique 'seen' e/ou 'flagged'.",
+    message: "Indica 'seen' e/ou 'flagged'.",
   });
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ uid: string }> }) {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const parsed = flagsSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Indique 'seen' e/ou 'flagged' (booleanos)." },
+      { error: "Indica 'seen' e/ou 'flagged' (booleanos)." },
       {
         status: 400,
       },

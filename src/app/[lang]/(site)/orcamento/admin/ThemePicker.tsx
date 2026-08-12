@@ -608,7 +608,9 @@ async function runJob(job: ImportJob): Promise<void> {
       // é uma proposta errada.
       const picked: ImportedImage[] = copied.map((im, k) => {
         const origem = im.sourcePath ?? sources[k];
-        return aligned && origem ? { ...im, sourcePath: origem, token: tokenOf(origem) } : { ...im };
+        return aligned && origem
+          ? { ...im, sourcePath: origem, token: tokenOf(origem) }
+          : { ...im };
       });
       for (const p of sources) {
         mark(job, p, "done");
@@ -838,7 +840,7 @@ function ImportChip({ job }: { job: ImportJob }) {
         <>
           <p className="bo-text-muted mt-1 text-xs">
             {done > 0 ? `${done} entraram. ` : ""}
-            {job.error && !job.stopped ? job.error : "Continuam por adicionar — pode repetir."}
+            {job.error && !job.stopped ? job.error : "Continuam por adicionar — podes repetir."}
           </p>
           <div className="mt-2 flex items-center gap-2">
             <Button size="sm" variant="secondary" onClick={() => retryJob(job.id)}>
@@ -1651,8 +1653,8 @@ export default function ThemePicker({
             </div>
           ) : themes.length === 0 ? (
             <p className="bo-text-muted text-sm">
-              Ainda não há temas. Crie o primeiro em <strong>Temas</strong>, no menu lateral, e
-              carregue lá as fotos de inspiração.
+              Ainda não há temas. Cria o primeiro em <strong>Temas</strong>, no menu lateral, e
+              carrega lá as fotos de inspiração.
             </p>
           ) : (
             <div className="flex flex-col gap-2">
@@ -1740,12 +1742,12 @@ export default function ThemePicker({
                 Não foi possível ler a pasta deste tema agora.
               </p>
               <p className="bo-text-muted mt-1 text-xs">
-                É uma falha temporária — as fotos não desapareceram. Tente daqui a pouco.
+                É uma falha temporária — as fotos não desapareceram. Tenta daqui a pouco.
               </p>
             </div>
           ) : images.length === 0 ? (
             <p className="bo-text-muted py-8 text-center text-sm">
-              Este tema ainda não tem fotos. Adicione-as em <strong>Temas</strong>.
+              Este tema ainda não tem fotos. Adiciona-as em <strong>Temas</strong>.
             </p>
           ) : (
             <>
@@ -1903,7 +1905,7 @@ export default function ThemePicker({
               {plural(failedPaths.length, "foto não entrou", "fotos não entraram")} na proposta.
             </p>
             <p className="bo-text-muted mt-0.5 text-xs">
-              Continuam selecionadas — pode tentar outra vez sem as escolher de novo.
+              Continuam selecionadas — podes tentar outra vez sem as escolher de novo.
             </p>
             <div className="mt-2 flex items-center gap-2">
               <Button size="sm" variant="secondary" onClick={() => submit(true)}>
@@ -1926,8 +1928,8 @@ export default function ThemePicker({
             <p className="bo-text-muted text-xs">
               {selected.length === 0
                 ? multiple
-                  ? "Toque nas fotos que quer usar."
-                  : "Escolha uma foto."
+                  ? "Toca nas fotos que queres usar."
+                  : "Escolhe uma foto."
                 : multiple && selected.length >= COUNTDOWN_FROM
                   ? `${selected.length} de ${MAX_IMPORT_BATCH} selecionadas`
                   : `${selected.length} ${selected.length === 1 ? "selecionada" : "selecionadas"}`}
@@ -1939,7 +1941,7 @@ export default function ThemePicker({
             )}
             {atLimit && (
               <p className="bo-text-muted mt-0.5 text-xs">
-                Pode adicionar até {MAX_IMPORT_BATCH} fotos de cada vez.
+                Podes adicionar até {MAX_IMPORT_BATCH} fotos de cada vez.
               </p>
             )}
             {pendingSet.size > 0 && (

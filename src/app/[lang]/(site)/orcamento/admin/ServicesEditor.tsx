@@ -938,7 +938,7 @@ function DragHandle({
     <button
       type="button"
       {...rest}
-      aria-label={`${label} (ou use as setas)`}
+      aria-label={`${label} (ou usa as setas)`}
       title="Arrastar para reordenar"
       className="[@media(pointer:coarse)]:hidden inline-flex h-6 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-foreground/45 opacity-0 transition-opacity hover:text-foreground/80 focus-visible:opacity-100 active:cursor-grabbing group-hover/row:opacity-100 group-focus-within/row:opacity-100 [@media(hover:none)]:opacity-100"
     >

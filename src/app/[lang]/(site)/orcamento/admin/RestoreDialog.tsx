@@ -185,7 +185,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
         json = JSON.parse(texto);
       } catch {
         setErros([
-          "O ficheiro não é JSON válido — pode ter ficado cortado a meio do download. Volte a exportar a cópia.",
+          "O ficheiro não é JSON válido — pode ter ficado cortado a meio do download. Volta a exportar a cópia.",
         ]);
         return;
       }
@@ -215,7 +215,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
       setFileHash(dry.fileHash);
       setFase("plano");
     } catch {
-      setErros(["Não foi possível falar com o servidor. Verifique a ligação e tente outra vez."]);
+      setErros(["Não foi possível falar com o servidor. Verifica a ligação e tenta outra vez."]);
     } finally {
       setOcupado(false);
     }
@@ -254,7 +254,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
         aplicado.ok ? "success" : "error",
       );
     } catch {
-      setErros(["Não foi possível falar com o servidor. Verifique se a reposição foi feita."]);
+      setErros(["Não foi possível falar com o servidor. Verifica se a reposição foi feita."]);
       setFase("plano");
     } finally {
       setOcupado(false);
@@ -316,7 +316,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
           {fase === "escolher" && (
             <div>
               <p className="text-sm leading-relaxed text-foreground/75">
-                Escolha o ficheiro <strong>liquen-backup-….json</strong> que descarregou do botão{" "}
+                Escolhe o ficheiro <strong>liquen-backup-….json</strong> que descarregaste do botão{" "}
                 <strong>Backup</strong>. Carregá-lo mostra primeiro um <strong>ensaio</strong>: o
                 que aconteceria a cada conjunto de dados, sem escrever nada.
               </p>
@@ -469,7 +469,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                     htmlFor="restore-frase"
                     className="block text-sm leading-relaxed text-foreground/80"
                   >
-                    Para repor, escreva <strong>{RESTORE_CONFIRM_PHRASE}</strong> aqui. Vai apagar{" "}
+                    Para repor, escreve <strong>{RESTORE_CONFIRM_PHRASE}</strong> aqui. Vai apagar{" "}
                     <strong>{plural(plano.totals.current, "registo", "registos")}</strong> e
                     escrever <strong>{plural(plano.totals.incoming, "registo", "registos")}</strong>{" "}
                     da cópia.
@@ -489,7 +489,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
 
               {fase === "a-repor" && (
                 <p className="text-sm text-foreground/75" role="status">
-                  A repor… não feche este separador.
+                  A repor… não feches este separador.
                 </p>
               )}
             </div>
@@ -512,7 +512,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
                     : `Reposição INCOMPLETA — ${plural(resultado.failed.length, "conjunto ficou por repor", "conjuntos ficaram por repor")}.`}
                 </p>
                 <p className="bo-text-muted mt-1 text-xs">
-                  A cópia do estado ANTERIOR foi descarregada para o seu computador. Guarde-a: é o
+                  A cópia do estado ANTERIOR foi descarregada para o teu computador. Guarda-a: é o
                   caminho de volta se esta reposição foi um engano.
                 </p>
               </div>
@@ -520,7 +520,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
               {copiaPorGuardar != null && (
                 <div className="rounded-xl border border-[#8a2a22]/25 bg-[#f6e6df]/40 px-4 py-3">
                   <p className="text-sm text-foreground/80">
-                    O download automático da cópia anterior não passou. Guarde-a à mão:
+                    O download automático da cópia anterior não passou. Guarda-a à mão:
                   </p>
                   <Button
                     size="sm"
@@ -594,7 +594,7 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
 
               <p className="bo-text-muted text-xs leading-relaxed">{resultado.plan.photosNotice}</p>
               <p className="bo-text-muted text-xs leading-relaxed">
-                Actualize a página para ver os dados repostos.
+                Actualiza a página para ver os dados repostos.
               </p>
             </div>
           )}

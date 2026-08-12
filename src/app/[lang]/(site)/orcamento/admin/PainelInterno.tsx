@@ -173,7 +173,7 @@ export default function PainelInterno({
           {aberto ? "▾" : "▸"}
         </span>
         <span className="text-[11px] font-medium tracking-[0.12em] uppercase text-foreground/60">
-          Só para si
+          Só para ti
         </span>
         <span className="text-[11px] text-foreground/40">
           custos, margem, deslocação — nunca sai no PDF
@@ -313,8 +313,8 @@ export default function PainelInterno({
             <span className="bo-eyebrow">Deslocação</span>
             {deslocacao === null ? (
               <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
-                Não reconheço o local, por isso não calculo os quilómetros. Escreva a terra no campo
-                do local (ex.: &quot;Quinta X, Palmela&quot;) ou ponha o valor à mão nos valores
+                Não reconheço o local, por isso não calculo os quilómetros. Escreve a terra no campo
+                do local (ex.: &quot;Quinta X, Palmela&quot;) ou põe o valor à mão nos valores
                 adicionais.
               </p>
             ) : (
@@ -359,7 +359,7 @@ export default function PainelInterno({
               {quote.guests} pax costuma ficar entre {eur(fora.padrao.min)} e {eur(fora.padrao.max)}
               {fora.padrao.regiao ? ` na zona de ${fora.padrao.regiao}` : " (média do país)"}, com
               mediana de {eur(fora.padrao.mediana)} em {fora.padrao.casos} eventos. Esta está{" "}
-              {fora.lado === "abaixo" ? "abaixo" : "acima"} — confirme que não é um dígito trocado.
+              {fora.lado === "abaixo" ? "abaixo" : "acima"} — confirma que não é um dígito trocado.
             </p>
           )}
         </div>

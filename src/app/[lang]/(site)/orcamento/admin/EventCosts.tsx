@@ -100,7 +100,7 @@ export default function EventCosts({ quote, onChange }: Props) {
       .catch(() => {
         setItems(snapshot);
         onChange(snapshot);
-        toast("Não foi possível guardar o custo. Tente novamente.", "error");
+        toast("Não foi possível guardar o custo. Tenta novamente.", "error");
       });
   }
 
@@ -221,7 +221,7 @@ export default function EventCosts({ quote, onChange }: Props) {
                     background: `${metaFor(STATUS_META, it.status).color}18`,
                     color: metaFor(STATUS_META, it.status).color,
                   }}
-                  title="Clique para mudar o estado"
+                  title="Clica para mudar o estado"
                 >
                   {metaFor(STATUS_META, it.status).label}
                 </button>

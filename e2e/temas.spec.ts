@@ -206,7 +206,7 @@ test.describe("Biblioteca de Temas", () => {
         // Tema acabado de criar: pasta legível e vazia.
         expect(imagesBody.images).toEqual([]);
         expect(imagesBody.total).toBe(0);
-        await expect(page.getByText(/Arraste para aqui as fotos deste tema/i)).toBeVisible();
+        await expect(page.getByText(/Arrasta para aqui as fotos deste tema/i)).toBeVisible();
       } else {
         // A falha de leitura tem de aparecer COMO falha — nunca como "0 fotos",
         // que a Catarina leria como "as minhas fotos desapareceram".

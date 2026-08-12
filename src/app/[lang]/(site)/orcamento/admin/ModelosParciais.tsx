@@ -176,7 +176,7 @@ export default function ModelosParciais({
         <div className="absolute top-full left-0 z-30 mt-1 w-72 rounded-xl border border-foreground/10 bg-background p-1 shadow-lg">
           {modelos.length === 0 ? (
             <p className="px-3 py-2 text-xs text-foreground/50">
-              Ainda não guardou nenhum {ROTULO[tipo].um}. Monte um e carregue em «Guardar como
+              Ainda não guardaste nenhum {ROTULO[tipo].um}. Monta um e carrega em «Guardar como
               modelo».
             </p>
           ) : (

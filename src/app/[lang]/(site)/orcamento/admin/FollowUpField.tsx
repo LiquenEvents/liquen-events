@@ -46,7 +46,7 @@ export default function FollowUpField({ quote, onChange }: Props) {
       .catch(() => {
         setValue(snapshot ?? "");
         onChange(snapshot);
-        toast("Não foi possível guardar o seguimento. Tente novamente.", "error");
+        toast("Não foi possível guardar o seguimento. Tenta novamente.", "error");
       });
   }
 

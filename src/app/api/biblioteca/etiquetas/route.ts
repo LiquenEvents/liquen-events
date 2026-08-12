@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 const NAO_INSTALADO =
   "As etiquetas da biblioteca ainda não estão criadas na base de dados. No Supabase → SQL Editor, " +
-  "cole e corra o ficheiro db/schema.sql (pode repetir-se sem risco) e tente de novo.";
+  "cola e corre o ficheiro db/schema.sql (pode repetir-se sem risco) e tenta de novo.";
 
 const SEM_BASE_DE_DADOS =
   "A base de dados não está ligada nesta instalação, por isso as etiquetas não podem ser guardadas. " +

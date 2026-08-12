@@ -684,7 +684,7 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
 
     expect(screen.getByText("Fotos indisponíveis")).toBeInTheDocument();
     expect(screen.getByText(/Não foi possível ler a pasta/)).toBeInTheDocument();
-    expect(screen.queryByText(/Arraste para aqui/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Arrasta para aqui/)).not.toBeInTheDocument();
   });
 
   it("procura temas por nome e por nota, sem acentos nem maiúsculas", async () => {

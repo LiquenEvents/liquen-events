@@ -465,7 +465,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                     >
                       <path d="M12 5v14M5 12h14" strokeLinecap="round" />
                     </svg>
-                    <p className="text-[10px] text-center px-2">Arraste para aqui</p>
+                    <p className="text-[10px] text-center px-2">Arrasta para aqui</p>
                   </div>
                 )}
               </div>

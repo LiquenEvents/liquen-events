@@ -312,7 +312,7 @@ export async function DELETE(
     if (!invoice) return NextResponse.json({ error: "Não encontrada" }, { status: 404 });
     if (invoice.status !== "anulada") {
       return NextResponse.json(
-        { error: "Só é possível apagar faturas anuladas. Anule a fatura primeiro." },
+        { error: "Só é possível apagar faturas anuladas. Anula a fatura primeiro." },
         { status: 409 },
       );
     }

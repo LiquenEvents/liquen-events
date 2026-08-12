@@ -33,7 +33,7 @@ export default function NotasInternas({
   valor,
   onChange,
   titulo = "Notas internas",
-  placeholder = "O que precisa de lembrar sobre este negócio e nunca vai na proposta.",
+  placeholder = "O que precisas de lembrar sobre este negócio e nunca vai na proposta.",
   compacta = false,
 }: Props) {
   // O textarea cresce com o texto: uma nota de três linhas dentro de uma caixa
@@ -61,7 +61,7 @@ export default function NotasInternas({
         <span aria-hidden="true">✎</span>
         {titulo}
         <span className="font-normal normal-case tracking-normal text-[#7a6420]/70">
-          — só para si, nunca sai na proposta
+          — só para ti, nunca sai na proposta
         </span>
       </label>
       <textarea

@@ -872,7 +872,7 @@ const PHOTOS_NOTICE =
  */
 const SEM_COLUNA_DOC =
   "a cópia traz propostas com o documento do Estúdio (`doc`) e esta base de dados ainda não tem a coluna " +
-  "`proposals.doc` — corra o db/schema.sql e repita. As propostas ficam INTACTAS (repô-las agora apagava-as " +
+  "`proposals.doc` — corre o db/schema.sql e repete. As propostas ficam INTACTAS (repô-las agora apagava-as " +
   "sem conseguir inserir nenhuma).";
 
 async function assertProposalDocColumn(rows: readonly { doc?: unknown }[]): Promise<string | null> {
@@ -994,7 +994,7 @@ export function validateBackupFile(raw: unknown): ValidationResult {
     errors.push("O ficheiro não declara `schemaVersion` — não se sabe que formato é.");
   } else if (version > BACKUP_SCHEMA_VERSION) {
     errors.push(
-      `A cópia é da versão ${version} do formato e esta aplicação só sabe repor até à ${BACKUP_SCHEMA_VERSION}. Atualize a aplicação antes de repor.`,
+      `A cópia é da versão ${version} do formato e esta aplicação só sabe repor até à ${BACKUP_SCHEMA_VERSION}. Atualiza a aplicação antes de repor.`,
     );
   } else if (version < BACKUP_SCHEMA_MIN_VERSION) {
     errors.push(`Versão de formato desconhecida (${version}).`);
@@ -1296,7 +1296,7 @@ export async function planRestore(file: ValidBackup): Promise<RestorePlan> {
         `${gap && gap > 0 ? `, ${gap} dia(s) depois` : ""}. ` +
         (totals.newerThanBackup > 0
           ? `${totals.newerThanBackup} registos criados ou alterados DEPOIS desta cópia vão ser apagados: ${newerBreakdown.join(", ")}.`
-          : "Confirme que é mesmo esta a cópia que quer repor."),
+          : "Confirma que é mesmo esta a cópia que queres repor."),
     });
   }
 

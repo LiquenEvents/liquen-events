@@ -476,7 +476,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
       throw new Error(`"${file.name}" ${CONSELHO_HEIC}`);
     }
     throw new Error(
-      `"${file.name}" não é suportada neste navegador. Converta para JPG e tente de novo.`,
+      `"${file.name}" não é suportada neste navegador. Converte para JPG e tenta de novo.`,
     );
   }
 
@@ -496,7 +496,7 @@ async function prepare(file: File, kind: ImageKind, wantThumb: boolean): Promise
         // Sem canvas não há nada a fazer: um formato suportado ainda pode
         // subir tal e qual; um HEIC, não.
         if (!SUPPORTED.test(file.type)) {
-          throw new Error(`Não foi possível processar "${file.name}". Converta para JPG.`);
+          throw new Error(`Não foi possível processar "${file.name}". Converte para JPG.`);
         }
       } else {
         out = new File([blob], jpegName(file.name), { type: "image/jpeg" });

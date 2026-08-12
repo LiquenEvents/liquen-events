@@ -380,8 +380,8 @@ export default function Fornecedores() {
             }
             description={
               suppliers.length === 0
-                ? "Guarde aqui os contactos de catering, floristas, fotógrafos e outros parceiros de confiança."
-                : "Tente outra pesquisa ou categoria."
+                ? "Guarda aqui os contactos de catering, floristas, fotógrafos e outros parceiros de confiança."
+                : "Tenta outra pesquisa ou categoria."
             }
             action={
               suppliers.length === 0

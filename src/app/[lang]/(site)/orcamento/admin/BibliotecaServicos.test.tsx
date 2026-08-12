@@ -106,6 +106,6 @@ describe("quando corre mal", () => {
 
   it("com a biblioteca vazia, diz o que fazer a seguir", async () => {
     montar([]);
-    await waitFor(() => expect(screen.getByText(/Escreva os serviços à mão/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Escreve os serviços à mão/)).toBeTruthy());
   });
 });

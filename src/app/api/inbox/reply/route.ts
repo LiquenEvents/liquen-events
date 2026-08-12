@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   const limited = await rateLimit(`inbox-reply:${clientIp(request)}`, 20, 60_000);
   if (!limited.ok) {
     return NextResponse.json(
-      { error: "Demasiadas respostas. Tente novamente dentro de momentos." },
+      { error: "Demasiadas respostas. Tenta novamente dentro de momentos." },
       { status: 429, headers: { "Retry-After": String(limited.retryAfter ?? 60) } },
     );
   }

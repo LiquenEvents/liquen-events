@@ -222,8 +222,8 @@ export default function FazerProposta({
           title={procura ? "Ninguém com esse nome" : "Ainda não há pedidos"}
           description={
             procura
-              ? "Tente outro nome, email ou local — ou crie o cliente de raiz."
-              : "Uma proposta é sempre para alguém. Crie o cliente e o estúdio abre a seguir."
+              ? "Tenta outro nome, email ou local — ou cria o cliente de raiz."
+              : "Uma proposta é sempre para alguém. Cria o cliente e o estúdio abre a seguir."
           }
           action={{ label: "Cliente novo", onClick: onNovoPedido }}
         />

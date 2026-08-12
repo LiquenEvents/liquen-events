@@ -93,7 +93,7 @@ export interface EstadoDaCopia {
  * que só diz o que está mal deixa a pessoa sem nada para fazer hoje.
  */
 const O_QUE_FAZER =
-  "A cópia automática corre às 04:00 e chega por email. Quando pára, o suspeito n.º 1 é a variável CRON_SECRET — sem ela a tarefa responde 401 todos os dias, em silêncio. Confirme-a nas variáveis de ambiente do alojamento (Vercel → Settings → Environment Variables) e publique outra vez. Entretanto, descarregue uma cópia à mão em Definições → Cópia de segurança e guarde-a fora do computador de trabalho.";
+  "A cópia automática corre às 04:00 e chega por email. Quando pára, o suspeito n.º 1 é a variável CRON_SECRET — sem ela a tarefa responde 401 todos os dias, em silêncio. Confirma-a nas variáveis de ambiente do alojamento (Vercel → Settings → Environment Variables) e publica outra vez. Entretanto, descarrega uma cópia à mão em Definições → Cópia de segurança e guarda-a fora do computador de trabalho.";
 
 function lerData(valor: unknown): Date | null {
   if (typeof valor !== "string") return null;
