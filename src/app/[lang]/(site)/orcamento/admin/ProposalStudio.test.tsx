@@ -2466,3 +2466,71 @@ describe("o custo de gerar o PDF", () => {
     expect(await screen.findByText(/pode ser recusado pelo servidor de email/)).toBeTruthy();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MARGEM ONDE A DECISÃO SE TOMA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «Falta o número que permite decidir com noção» — dentro do
+ * bloco de Totais.
+ *
+ * A margem já era calculada no painel interno, onde os custos se escrevem. O
+ * que faltava era estar no ecrã onde se decide baixar (ou não) o preço.
+ */
+describe("a margem no bloco dos totais", () => {
+  const comCustos = (custos: (number | null)[], precos: number[]) => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: precos.map((_, i) => `Linha ${i + 1}`),
+        budgetAmounts: precos,
+        budgetCosts: custos,
+        coverImages: ["", ""],
+        totalAmount: precos.reduce((a, b) => a + b, 0),
+        totalVatMode: "acrescer",
+      }),
+    );
+  };
+
+  it("sem custos escritos, não diz nada — zero não é a mesma coisa que «não sei»", async () => {
+    comCustos([null, null], [1000, 2000]);
+    renderStudio();
+    await waitFor(() => expect(screen.getByText("Totais")).toBeTruthy());
+    expect(screen.queryByText("Só para si")).toBeNull();
+  });
+
+  it("com custos, mostra a margem em euros e em percentagem", async () => {
+    comCustos([400, 600], [1000, 1000]);
+    renderStudio();
+    await screen.findByText("Só para si");
+    // 2000 cobrados, 1000 de custos → 1000 € e 50%.
+    expect(screen.getByText(/50%/)).toBeTruthy();
+    expect(screen.getByText(/Não sai no PDF/)).toBeTruthy();
+  });
+
+  /** Uma margem sobre metade dos custos, dita como «a margem», seria uma
+   *  mentira sempre optimista. */
+  it("com custos a meio, diz que a conta é parcial", async () => {
+    comCustos([400, null], [1000, 1000]);
+    renderStudio();
+    await screen.findByText("Só para si");
+    expect(screen.getByText(/1 de 2 linhas que já têm custo/)).toBeTruthy();
+  });
+
+  it("abaixo do limite, avisa — sem impedir nada", async () => {
+    comCustos([900, 900], [1000, 1000]);
+    renderStudio();
+    await screen.findByText("Só para si");
+    expect(await screen.findByText(/Abaixo dos \d+% que definiu/)).toBeTruthy();
+  });
+});

@@ -5,11 +5,8 @@ import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "@/lib/orcamento/types";
 import { custosDe, margemTotal, margensPorLinha } from "@/lib/orcamento/margem";
 import { normalizarValor } from "@/lib/proposal-budget";
-import {
-  PARAMETROS_OMISSAO,
-  sugerirDeslocacao,
-  type ParametrosDeslocacao,
-} from "@/lib/orcamento/deslocacao";
+import { sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
+import { useDefinicoesDaProposta } from "./definicoes-da-proposta";
 import { foraDoPadrao, padraoPara } from "@/lib/orcamento/padrao-de-preco";
 import { chaveDoServico, type Historico, type Omissao } from "@/lib/orcamento/memoria-de-precos";
 import { Button } from "./ui";
@@ -67,31 +64,12 @@ export default function PainelInterno({
   onDeslocacao,
 }: Props) {
   const [aberto, setAberto] = useState(false);
-  const [parametros, setParametros] = useState<ParametrosDeslocacao>(PARAMETROS_OMISSAO);
-  const [margemMinima, setMargemMinima] = useState(35);
+  // As definições da casa — o gasóleo e a margem mínima — lidas uma vez por
+  // página e partilhadas com o bloco dos totais (ver `definicoes-da-proposta`).
+  const { deslocacao: parametros, margemMinima } = useDefinicoesDaProposta();
   const [memoria, setMemoria] = useState<{ historico: Historico[]; habituais: Omissao[] } | null>(
     null,
   );
-
-  // Os números de que a conta depende vivem no servidor (ver
-  // proposta-definicoes-store): o preço do gasóleo muda todas as semanas.
-  useEffect(() => {
-    let vivo = true;
-    fetch("/api/proposta-definicoes")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (!vivo || !j) return;
-        if (j.deslocacao) setParametros(j.deslocacao);
-        if (typeof j.margemMinima === "number") setMargemMinima(j.margemMinima);
-      })
-      .catch(() => {
-        // Sem definições gravadas calcula-se com os valores de partida — que é
-        // exactamente o que o estado inicial já tem.
-      });
-    return () => {
-      vivo = false;
-    };
-  }, []);
 
   // A memória de preços. Vem do servidor porque a conta atravessa TODAS as
   // propostas já enviadas — mandá-las para cá eram três megabytes de números de
