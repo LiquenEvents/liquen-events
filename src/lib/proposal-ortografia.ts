@@ -154,6 +154,45 @@ const POR_CHAVE: ReadonlyMap<string, string> = new Map(
 );
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A GRAFIA DA CASA — as palavras que não são de acento
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A lista de cima resolve os acentos, e há rubricas destas propostas que se
+ * escrevem mal sem ser por acento nenhum. Vêm dos documentos verdadeiros: o
+ * pedido da Catarina Martins traz «Decoração Cocktail / Seatting Plan e Decor
+ * Floral Seatting Plann» — a mesma palavra escrita de duas maneiras erradas na
+ * mesma linha, e ambas saíram impressas.
+ *
+ * Regra de admissão, tão apertada como a de cima: a forma da esquerda não pode
+ * ser uma palavra — nem portuguesa nem inglesa. Não é aqui que se arbitram
+ * sinónimos («copo d'água» e «cocktail» são as duas coisas certas e são a mesma
+ * festa); é aqui que se apanha o que ninguém quis escrever.
+ *
+ * A excepção é `coquetel`, que É uma palavra — a forma brasileira. Entra porque
+ * o catálogo de pontos de decoração, o formulário e o quadro do orçamento
+ * escrevem todos «Cocktail», e um documento que misture as duas lê-se como
+ * dois documentos colados.
+ */
+const GRAFIAS_DA_CASA: ReadonlyArray<readonly [errada: string, certa: string]> = [
+  ["seatting", "seating"],
+  ["seattings", "seatings"],
+  ["plann", "plan"],
+  ["planns", "plans"],
+  ["coquetel", "cocktail"],
+  ["coquetéis", "cocktails"],
+];
+
+const POR_ERRO: ReadonlyMap<string, string> = new Map(
+  GRAFIAS_DA_CASA.map(([errada, certa]) => [errada.toLowerCase(), certa]),
+);
+
+/** A palavra certa para uma escrita, venha ela do acento ou da grafia da casa. */
+function certaPara(palavra: string): string | undefined {
+  return POR_CHAVE.get(semAcentos(palavra)) ?? POR_ERRO.get(palavra.toLowerCase());
+}
+
+/**
  * A palavra certa, com as maiúsculas da que estava escrita.
  *
  * «CERIMONIA» num título em capitulares tem de voltar «CERIMÓNIA», e não
@@ -192,6 +231,69 @@ export type CampoDeTexto =
   | { tipo: "boardNota"; bi: number }
   | { tipo: "linhaDeOrcamento"; i: number }
   | { tipo: "extraRotulo"; i: number };
+
+/**
+ * ── ONDE É QUE ESTE CAMPO ESTÁ NO ECRÃ ────────────────────────────────────
+ *
+ * O aviso dizia qual era a palavra e oferecia-se para a corrigir, e isso chega
+ * quase sempre. Não chega quando a palavra está escrita assim de propósito, ou
+ * quando é a frase à volta dela que está errada: aí é preciso IR AO CAMPO, e
+ * até aqui a única maneira era procurá-lo à mão num documento de catorze
+ * páginas.
+ *
+ * A chave é escrita no `data-campo` do controlo pelo estúdio, e é por ela que
+ * o salto encontra o campo. Um atributo e não um `id`: são catorze famílias de
+ * campo, algumas com índices, e um `id` colide com o que quer que exista no
+ * resto da página.
+ */
+export function chaveDoCampo(c: CampoDeTexto): string {
+  switch (c.tipo) {
+    case "grupoTitulo":
+      return `grupoTitulo:${c.gi}`;
+    case "itemRotulo":
+      return `itemRotulo:${c.gi}:${c.ii}`;
+    case "itemDesc":
+      return `itemDesc:${c.gi}:${c.ii}`;
+    case "boardTitulo":
+    case "boardSubtitulo":
+    case "boardNota":
+      return `${c.tipo}:${c.bi}`;
+    case "linhaDeOrcamento":
+    case "extraRotulo":
+      return `${c.tipo}:${c.i}`;
+    default:
+      return c.tipo;
+  }
+}
+
+/**
+ * A secção do estúdio onde o campo vive — o alvo de RECURSO do salto.
+ *
+ * Nem todos os campos que saem impressos têm um controlo próprio no editor: as
+ * linhas do quadro «3. Orçamento Proposto» são semeadas a partir dos pontos de
+ * decoração do pedido, e o título do cabeçalho é composto. Para esses, o salto
+ * leva à secção — que é onde a resposta está — em vez de não fazer nada.
+ */
+export function seccaoDoCampo(c: CampoDeTexto): string {
+  switch (c.tipo) {
+    case "grupoTitulo":
+    case "itemRotulo":
+    case "itemDesc":
+      return "servicos";
+    case "boardTitulo":
+    case "boardSubtitulo":
+    case "boardNota":
+      return "moodboards";
+    case "linhaDeOrcamento":
+    case "budgetNote":
+      return "orcamento";
+    case "extraRotulo":
+    case "totalLabel":
+      return "total";
+    default:
+      return "evento";
+  }
+}
 
 /** Uma gralha encontrada, pronta a ser mostrada e a ser corrigida. */
 export interface Gralha {
@@ -421,7 +523,7 @@ export function gralhasDoDocumento(doc: Partial<ProposalDoc>): Gralha[] {
     if (!texto || !texto.trim()) continue;
     const jaVistas = new Set<string>();
     for (const palavra of palavrasDe(texto)) {
-      const certa = POR_CHAVE.get(semAcentos(palavra));
+      const certa = certaPara(palavra);
       if (!certa) continue;
       // Já está certa (com ou sem maiúsculas)? Não há nada a dizer.
       if (palavra.toLowerCase() === certa.toLowerCase()) continue;

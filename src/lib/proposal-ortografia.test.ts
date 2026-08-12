@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
+  chaveDoCampo,
   gralhasDoDocumento,
   corrigirGralha,
   corrigirTudo,
   lerCampo,
   escreverCampo,
+  seccaoDoCampo,
+  type CampoDeTexto,
 } from "./proposal-ortografia";
 import type { ProposalDoc } from "./proposal-doc";
 
@@ -217,5 +220,91 @@ describe("ler e escrever um campo pelo caminho", () => {
     const base = doc();
     const depois = escreverCampo(base, { tipo: "boardTitulo", bi: 7 }, "x");
     expect(depois.moodBoards).toEqual([]);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A GRAFIA DA CASA, E O CAMINHO ATÉ AO CAMPO
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+describe("as grafias da casa", () => {
+  /**
+   * A linha verdadeira do pedido da Catarina Martins: «Decoração Cocktail /
+   * Seatting Plan e Decor Floral Seatting Plann». Duas palavras erradas na
+   * mesma linha, as duas impressas.
+   */
+  it("apanha o «Seatting Plann» que veio do pedido a sério", () => {
+    const d = { budgetItems: ["Seatting Plan e Decor Floral Seatting Plann"] };
+    const achados = gralhasDoDocumento(d);
+    expect(achados.map((g) => g.escrita).sort()).toEqual(["Plann", "Seatting"]);
+    expect(corrigirTudo(d).budgetItems![0]).toBe("Seating Plan e Decor Floral Seating Plan");
+  });
+
+  it("uniformiza a grafia do cocktail — a casa escreve-o à inglesa", () => {
+    const d = { budgetItems: ["Decoração Coquetel"] };
+    expect(corrigirTudo(d).budgetItems![0]).toBe("Decoração Cocktail");
+  });
+
+  it("o que já está escrito à maneira da casa não dá aviso nenhum", () => {
+    expect(gralhasDoDocumento({ budgetItems: ["Decoração Cocktail", "Seating Plan"] })).toEqual([]);
+  });
+
+  it("as maiúsculas da palavra escrita mantêm-se", () => {
+    const d = { budgetItems: ["SEATTING PLAN"] };
+    expect(corrigirTudo(d).budgetItems![0]).toBe("SEATING PLAN");
+  });
+});
+
+describe("o caminho até ao campo", () => {
+  const todos: CampoDeTexto[] = [
+    { tipo: "ref" },
+    { tipo: "headerTitle" },
+    { tipo: "servico" },
+    { tipo: "eventType" },
+    { tipo: "totalLabel" },
+    { tipo: "budgetNote" },
+    { tipo: "grupoTitulo", gi: 1 },
+    { tipo: "itemRotulo", gi: 1, ii: 2 },
+    { tipo: "itemDesc", gi: 1, ii: 2 },
+    { tipo: "boardTitulo", bi: 3 },
+    { tipo: "boardSubtitulo", bi: 3 },
+    { tipo: "boardNota", bi: 3 },
+    { tipo: "linhaDeOrcamento", i: 4 },
+    { tipo: "extraRotulo", i: 4 },
+  ];
+
+  /** Duas chaves iguais levariam o salto ao campo errado, calado. */
+  it("cada campo tem uma chave só sua", () => {
+    const chaves = todos.map(chaveDoCampo);
+    expect(new Set(chaves).size).toBe(chaves.length);
+  });
+
+  it("a chave leva os índices, para distinguir a linha 2 da linha 3", () => {
+    expect(chaveDoCampo({ tipo: "itemDesc", gi: 1, ii: 2 })).toBe("itemDesc:1:2");
+    expect(chaveDoCampo({ tipo: "boardNota", bi: 3 })).toBe("boardNota:3");
+  });
+
+  /** O alvo de recurso: os campos sem controlo próprio têm de levar a ALGUM
+   *  sítio, e a secção é onde a resposta está. */
+  it("todos os campos sabem dizer em que secção do estúdio vivem", () => {
+    const seccoes = new Set([
+      "evento",
+      "capas",
+      "servicos",
+      "moodboards",
+      "cronograma",
+      "orcamento",
+      "total",
+    ]);
+    for (const campo of todos) {
+      expect(seccoes.has(seccaoDoCampo(campo)), campo.tipo).toBe(true);
+    }
+  });
+
+  it("um campo de mood board leva à secção dos mood boards", () => {
+    expect(seccaoDoCampo({ tipo: "boardTitulo", bi: 0 })).toBe("moodboards");
+    expect(seccaoDoCampo({ tipo: "itemDesc", gi: 0, ii: 0 })).toBe("servicos");
+    expect(seccaoDoCampo({ tipo: "linhaDeOrcamento", i: 0 })).toBe("orcamento");
   });
 });

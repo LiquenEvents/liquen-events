@@ -28,11 +28,22 @@ export default function Gralhas({
   doc,
   onCorrigir,
   onCorrigirTudo,
+  onIr,
 }: {
   doc: ProposalDoc;
   /** Aplica UMA correcção ao documento do estúdio. */
   onCorrigir: (g: Gralha) => void;
   onCorrigirTudo: () => void;
+  /**
+   * Leva ao campo onde a palavra está escrita.
+   *
+   * «Corrigir» resolve o caso normal — falta um acento, põe-se o acento. Não
+   * resolve os outros dois: a palavra pode estar assim de propósito, ou ser a
+   * frase à volta dela que está errada. Nesses, o que é preciso é chegar ao
+   * campo, e procurá-lo à mão num documento de catorze páginas é o que fazia
+   * este aviso acabar ignorado.
+   */
+  onIr: (g: Gralha) => void;
 }) {
   const gralhas = useMemo(() => gralhasDoDocumento(doc), [doc]);
   if (gralhas.length === 0) return null;
@@ -89,6 +100,15 @@ export default function Gralhas({
               className="alvo-toque rounded-md border border-foreground/15 px-2 py-0.5 text-[11px] font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90"
             >
               Corrigir
+            </button>
+            {/* O caminho para quem não quer a correcção automática: ver a
+                palavra onde ela está escrita, com a frase à volta. */}
+            <button
+              type="button"
+              onClick={() => onIr(g)}
+              className="alvo-toque text-[11px] font-medium text-[#4d6350] underline-offset-2 transition-colors hover:text-[#415440] hover:underline"
+            >
+              Ver no campo
             </button>
           </li>
         ))}

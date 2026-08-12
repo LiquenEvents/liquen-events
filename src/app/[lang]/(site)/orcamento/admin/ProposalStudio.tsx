@@ -56,7 +56,14 @@ import {
   porqueEsteAutomatico,
   temLugarDeDestaque,
 } from "@/lib/proposal-moodboard";
-import { corrigirGralha, corrigirTudo, gralhasDoDocumento } from "@/lib/proposal-ortografia";
+import {
+  chaveDoCampo,
+  corrigirGralha,
+  corrigirTudo,
+  gralhasDoDocumento,
+  seccaoDoCampo,
+  type CampoDeTexto,
+} from "@/lib/proposal-ortografia";
 import { fotosQueDestoam, ordemPorCor } from "@/lib/cor-dominante";
 import Versoes from "./Versoes";
 import { comoSeDiz, noMesmoEspaco, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
@@ -1147,6 +1154,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     };
   }, [reportarTempo]);
 
+  /**
+   * O campo a que o aviso de ortografia mandou ir, à espera de ser desenhado.
+   *
+   * Não se pode saltar no mesmo instante em que se carrega: o aviso vive no
+   * passo do envio e o campo está no do conteúdo, portanto no momento do clique
+   * o controlo ainda não existe no DOM. Guarda-se o alvo e o salto é dado por um
+   * efeito, depois do desenho — que é a única altura em que ele existe.
+   */
+  const [campoAVisitar, setCampoAVisitar] = useState<{
+    campo: CampoDeTexto;
+    /** Contador de pedidos. Carregar duas vezes na mesma palavra tem de saltar
+     *  as duas — e é ele que evita limpar o alvo DENTRO do efeito. */
+    pedido: number;
+  } | null>(null);
   /** A vista com as páginas lado a lado está aberta? */
   const [vistaDeConjunto, setVistaDeConjunto] = useState(false);
   /** As fotos escolhidas para serem movidas em conjunto — chaves `bi:ii`. */
@@ -3270,6 +3291,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     gravarDobrasDeBoards(quote.id, proximas);
   }
 
+  /**
+   * O salto para o campo, DEPOIS de ele estar desenhado.
+   *
+   * O controlo leva a chave num `data-campo`; quando o campo não tem controlo
+   * próprio no editor — as linhas do quadro do orçamento são semeadas a partir
+   * do pedido — cai-se na SECÇÃO, que é onde a resposta está. Não fazer nada
+   * seria a pior das três hipóteses.
+   *
+   * `focus` depois do `scrollIntoView` e com `preventScroll`: o foco sozinho
+   * salta a página de golpe e sem margem nenhuma; assim o campo fica ao centro
+   * e a escrita começa onde ela está a olhar.
+   */
+  useEffect(() => {
+    if (!campoAVisitar) return;
+    const chave = chaveDoCampo(campoAVisitar.campo);
+    const alvo =
+      document.querySelector<HTMLElement>(`[data-campo="${chave}"]`) ??
+      document.getElementById(seccaoDoCampo(campoAVisitar.campo));
+    alvo?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement) {
+      alvo.focus({ preventScroll: true });
+      alvo.select();
+    }
+  }, [campoAVisitar]);
+
   function alternarDobra(id: string) {
     escreverDobras({ ...dobrados, [id]: !dobrados[id] });
   }
@@ -3278,6 +3324,30 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const proximas: Record<string, boolean> = {};
     for (const b of doc.moodBoards) if (b.id) proximas[b.id] = fechar;
     escreverDobras(proximas);
+  }
+
+  /**
+   * ── IR AO CAMPO ONDE A PALAVRA ESTÁ ─────────────────────────────────────
+   *
+   * Do aviso de ortografia (que vive no passo do envio) até ao controlo (que
+   * vive no do conteúdo, e pode estar dentro de um mood board fechado).
+   *
+   * Três coisas antes do salto, e só a última é o salto: voltar ao conteúdo,
+   * abrir a dobra do board se for um campo de board — saltar para dentro de uma
+   * dobra fechada deixava-a a olhar para um cartão que «não abriu» —, e só
+   * então marcar o alvo, para o efeito o encontrar depois de desenhado.
+   */
+  function irParaCampo(campo: CampoDeTexto) {
+    setStep("conteudo");
+    if (
+      campo.tipo === "boardTitulo" ||
+      campo.tipo === "boardSubtitulo" ||
+      campo.tipo === "boardNota"
+    ) {
+      const id = doc.moodBoards[campo.bi]?.id;
+      if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
+    }
+    setCampoAVisitar((antes) => ({ campo, pedido: (antes?.pedido ?? 0) + 1 }));
   }
 
   /**
@@ -4072,6 +4142,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 label="Tipo de evento"
                 value={doc.eventType}
                 onChange={(e) => patch({ eventType: e.target.value })}
+                data-campo="eventType"
                 placeholder="Casamento"
               />
               <Field
@@ -4154,6 +4225,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   setRefEdited(true);
                   patch({ ref: e.target.value });
                 }}
+                data-campo="ref"
                 hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
               />
             </div>
@@ -4442,6 +4514,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
                                     value={b.title}
                                     onChange={(e) => updateBoard(bi, { title: e.target.value })}
+                                    // A pega do aviso de ortografia: é por ela
+                                    // que o «Ver no campo» encontra este
+                                    // controlo (ver `chaveDoCampo`).
+                                    data-campo={`boardTitulo:${bi}`}
                                     placeholder="Decoração Cerimónia"
                                     aria-label="Título do mood board"
                                     readOnly={fechado}
@@ -4457,6 +4533,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
                                     value={b.subtitulo ?? ""}
                                     onChange={(e) => updateBoard(bi, { subtitulo: e.target.value })}
+                                    data-campo={`boardSubtitulo:${bi}`}
                                     placeholder="Subtítulo (opcional) — ex.: Ramo de Noiva (a definir com a Noiva)"
                                     aria-label="Subtítulo do mood board"
                                     readOnly={fechado}
@@ -4570,6 +4647,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       onChange={(e) =>
                                         updateBoard(bi, { annotation: e.target.value })
                                       }
+                                      data-campo={`boardNota:${bi}`}
                                       placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
                                       aria-label="Descrição do mood board"
                                     />
@@ -5265,6 +5343,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     label="Rótulo do total"
                     value={doc.totalLabel}
                     onChange={(e) => patch({ totalLabel: e.target.value })}
+                    data-campo="totalLabel"
                     placeholder="Valor Total Decoração"
                   />
                 </div>
@@ -5301,6 +5380,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             className="bo-input px-2.5 py-2 text-xs text-foreground/75"
                             value={ex.label}
                             onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
+                            data-campo={`extraRotulo:${i}`}
                             placeholder="Deslocação da equipa Líquen"
                             aria-label="Descrição da linha adicional"
                           />
@@ -5423,6 +5503,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     className="resize-none"
                     value={doc.budgetNote ?? ""}
                     onChange={(e) => patch({ budgetNote: e.target.value })}
+                    data-campo="budgetNote"
                     placeholder="Os valores são estimativas e podem ser ajustados…"
                   />
                 </div>
@@ -5857,6 +5938,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <Gralhas
                 doc={doc as ProposalDoc}
                 onCorrigir={(g) => setDoc((d) => corrigirGralha(d, g))}
+                onIr={(g) => irParaCampo(g.campo)}
                 onCorrigirTudo={() => {
                   const quantas = gralhasDoDocumento(doc as ProposalDoc).length;
                   setDoc((d) => corrigirTudo(d));

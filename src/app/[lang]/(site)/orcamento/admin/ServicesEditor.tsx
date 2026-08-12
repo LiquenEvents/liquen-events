@@ -640,6 +640,8 @@ export default function ServicesEditor({
                           className={`${ROW_INPUT} min-w-[12rem] flex-1 font-medium`}
                           value={g.title}
                           onChange={(e) => updateGroup(gi, { title: e.target.value })}
+                          // A pega do aviso de ortografia — ver `chaveDoCampo`.
+                          data-campo={`grupoTitulo:${gi}`}
                           onKeyDown={(e) => onGroupKeyDown(e, gi, "title")}
                           placeholder="Decoração Floral de Casamento"
                           aria-label={`Título do grupo ${gi + 1}`}
@@ -698,6 +700,7 @@ export default function ServicesEditor({
                                         onChange={(e) =>
                                           updateItem(gi, ii, { label: e.target.value })
                                         }
+                                        data-campo={`itemRotulo:${gi}:${ii}`}
                                         onKeyDown={(e) => onItemKeyDown(e, gi, ii, "label")}
                                         onPaste={(e) => {
                                           const text = e.clipboardData.getData("text/plain");
@@ -717,6 +720,7 @@ export default function ServicesEditor({
                                           onChange={(e) =>
                                             updateItem(gi, ii, { desc: e.target.value })
                                           }
+                                          data-campo={`itemDesc:${gi}:${ii}`}
                                           onKeyDown={(e) => onItemKeyDown(e, gi, ii, "desc")}
                                           onPaste={(e) => {
                                             const text = e.clipboardData.getData("text/plain");

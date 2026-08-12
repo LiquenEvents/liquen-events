@@ -2369,3 +2369,45 @@ describe("textoDoTotal", () => {
     expect(parseMoneyText(String(3355.98))).toBe(335598);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * DO AVISO DE ORTOGRAFIA ATÉ AO CAMPO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «Verificação ortográfica automática de todos os campos que
+ * saem no PDF, com aviso e LINK DIRECTO PARA O CAMPO.»
+ *
+ * O aviso vive no passo do envio e o campo no do conteúdo — e pode estar dentro
+ * de um mood board fechado. O caminho tem três degraus e todos podem partir em
+ * silêncio, por isso são medidos aqui: a pega existe no controlo certo, o salto
+ * volta ao conteúdo, e o campo fica com o foco.
+ */
+describe("o «Ver no campo» do aviso de ortografia", () => {
+  it("põe a pega no controlo que a palavra habita", async () => {
+    seedDraft(1, { title: "Decoracao Cerimonia" });
+    renderStudio();
+    const titulo = await screen.findByLabelText("Título do mood board");
+    expect(titulo.getAttribute("data-campo")).toBe("boardTitulo:0");
+  });
+
+  it("leva mesmo lá — volta ao conteúdo e deixa o campo com o foco", async () => {
+    seedDraft(1, { title: "Decoracao Cerimonia" });
+    renderStudio();
+    await screen.findByLabelText("Título do mood board");
+
+    // Até ao passo do envio, que é onde o aviso vive.
+    const utilizador = userEvent.setup();
+    // Pela navegação do estúdio, como ela faz: 2 Pré-visualizar → 3 Enviar.
+    await utilizador.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    await utilizador.click(await screen.findByRole("button", { name: /Rever e enviar/ }));
+
+    const ir = await screen.findAllByRole("button", { name: "Ver no campo" });
+    await act(async () => {
+      ir[0].click();
+    });
+
+    const titulo = await screen.findByLabelText("Título do mood board");
+    expect(document.activeElement, "o campo não ficou com o foco").toBe(titulo);
+  });
+});
