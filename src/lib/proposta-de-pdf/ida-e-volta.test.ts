@@ -61,7 +61,6 @@ async function docCompleto(): Promise<ProposalDoc> {
     guests: "150 pax",
     ceremony: "Civil, simbólica",
     time: "16h30",
-    weddingPlanners: "Equipa AMARA",
     serviceGroups: [
       {
         letter: "a)",
@@ -271,7 +270,9 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
       "guests",
       "ceremony",
       "time",
-      "weddingPlanners",
+      // O «Wedding Planners» saiu do estúdio e do PDF (ver `proposal-doc.ts`),
+      // portanto deixou de haver ida e volta para ele: o que não se imprime
+      // não se pode voltar a ler.
     ]);
     const servicos = confrontar(doc, lido, [
       "serviceGroups[0].letter",

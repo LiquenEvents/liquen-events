@@ -219,7 +219,6 @@ function initialDoc(quote: Quote): StudioDoc {
     // é escrito em português.
     ceremony: ceremonyTypeLabel(quote.ceremonyType),
     time: "",
-    weddingPlanners: "",
     serviceGroups: [],
     moodBoards: [],
     cronograma: [],
@@ -927,10 +926,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * precisava de ser mantido, e um catálogo que ninguém mantém fica pior do
    * que não existir. O que ela usou é, por definição, o que ela usa.
    */
-  const [sugestoes, setSugestoes] = useState<{ locais: string[]; planners: string[] }>({
-    locais: [],
-    planners: [],
-  });
+  const [sugestoes, setSugestoes] = useState<{ locais: string[] }>({ locais: [] });
   // Free-typed mirror of the structured total, so pt-PT formatting ("3.000,00")
   // survives keystrokes. Parsed into `doc.totalAmount` (the money source of truth).
   const [totalInput, setTotalInput] = useState<string>("");
@@ -3732,7 +3728,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         if (Array.isArray(lista)) {
           setSugestoes({
             locais: unicos(lista.map((p: { location?: string }) => p.location)),
-            planners: unicos(lista.map((p: { weddingPlanners?: string }) => p.weddingPlanners)),
           });
         }
         // A validade só se aplica a um documento que ainda NÃO tem uma: mexer
@@ -4123,13 +4118,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     onChange={(e) => patch({ time: e.target.value })}
                     placeholder="A definir"
                   />
-                  <Field
-                    label="Wedding Planners (opcional)"
-                    list="sug-planners"
-                    value={doc.weddingPlanners ?? ""}
-                    onChange={(e) => patch({ weddingPlanners: e.target.value })}
-                    placeholder="Equipa AMARA"
-                  />
                 </>
               )}
             </div>
@@ -4138,11 +4126,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 escrever um espaço novo — a lista ajuda, não fecha a porta. */}
             <datalist id="sug-locais">
               {sugestoes.locais.map((v) => (
-                <option key={v} value={v} />
-              ))}
-            </datalist>
-            <datalist id="sug-planners">
-              {sugestoes.planners.map((v) => (
                 <option key={v} value={v} />
               ))}
             </datalist>

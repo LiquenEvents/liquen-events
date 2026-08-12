@@ -15,6 +15,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   testMatch: [process.env.MEDICAO_SPEC ?? "**/upload-medicao.spec.ts"],
+  grep: process.env.MEDICAO_GREP ? new RegExp(process.env.MEDICAO_GREP) : undefined,
   fullyParallel: false,
   workers: 1,
   retries: 0,

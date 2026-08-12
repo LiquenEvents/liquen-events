@@ -139,7 +139,10 @@ describe("a ordem dos dois caminhos", () => {
     // A cor cheia (`bg-[#4d6350]`) é o peso de primário desta casa; a
     // alternativa fica com o contorno.
     expect(aparelho.className).toContain("bg-[#4d6350]");
-    expect(senha.className).toContain("border-foreground/15");
+    // 28% e não 15%: a 15% o contorno lia-se como DESACTIVADO (o estado
+    // desactivado é este mesmo desenho com `opacity-45` por cima). Ver a nota
+    // no `Button.tsx`.
+    expect(senha.className).toContain("border-foreground/28");
   });
 
   it("sem passkeys no browser, a palavra-passe volta a ser o botão principal", () => {
@@ -264,40 +267,58 @@ describe("o formulário", () => {
 // ── Bloco 6: depois de entrar ──────────────────────────────────────────────
 
 describe("manter a sessão iniciada", () => {
-  it("vem ligada, com a duração escrita por extenso", () => {
+  /**
+   * VEM DESLIGADA, e é isso que este bloco prende.
+   *
+   * A razão está no `MANTER_SESSAO_POR_OMISSAO`, no componente: uma caixa
+   * pré-marcada não é uma escolha, e com a passkey o custo de voltar a entrar
+   * passou a ser um toque. O teste existe para a omissão não voltar a ligar-se
+   * por acidente — numa ferramenta com dados de clientes, isso é uma alteração
+   * de segurança que tem de ser deliberada e não um efeito lateral.
+   */
+  it("vem DESLIGADA, com a duração escrita por extenso", () => {
     montar();
     const caixa = screen.getByRole("checkbox", { name: /Manter a sessão iniciada/i });
-    expect(caixa).toBeChecked();
+    expect(caixa).not.toBeChecked();
     // O número, e não «manter-me com sessão iniciada» — uma promessa sem número
     // é lida por cada pessoa como lhe apetecer.
     expect(screen.getByText(/Manter a sessão iniciada 30 dias/i)).toBeInTheDocument();
   });
 
-  it("desligá-la diz logo o que se passa a ter em troca", async () => {
+  it("explica o que se escolhe, e só isso — a omissão não gasta linhas", async () => {
     const u = userEvent.setup();
     montar();
-    // A consequência só aparece a quem desliga: ligada é o que já acontecia, e
-    // as três linhas a explicá-la empurravam o botão de submeter para baixo da
-    // dobra do telemóvel (medido a 390x844).
-    expect(screen.queryByText(/12 horas/i)).not.toBeInTheDocument();
+    // Desligada é a omissão: não leva explicação nenhuma. As linhas custam
+    // ~36 px, e o botão de submeter está a 831 px de uma dobra de 844 no
+    // telemóvel — ver a nota no componente.
+    expect(screen.queryByText(/um mês é muito tempo/i)).not.toBeInTheDocument();
+    // Ligá-la é a escolha, e é a que tem consequência.
     await u.click(screen.getByRole("checkbox", { name: /Manter a sessão iniciada/i }));
-    expect(screen.getByText(/12 horas/i)).toBeInTheDocument();
+    expect(screen.getByText(/um mês é muito tempo/i)).toBeInTheDocument();
   });
 
-  it("desligá-la vai no pedido de entrada", async () => {
+  it("desligada, é isso que vai no pedido de entrada", async () => {
     const u = userEvent.setup();
     montar();
-    await u.click(screen.getByRole("checkbox", { name: /Manter a sessão iniciada/i }));
     await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
     await u.type(campoDaSenha(), "uma-senha-qualquer{Enter}");
     await waitFor(() => expect(pedidos).toHaveLength(1));
     expect(pedidos[0].body.manterSessao).toBe(false);
   });
 
-  it("e vale também na entrada pelo aparelho", async () => {
+  it("ligá-la vai no pedido de entrada", async () => {
     const u = userEvent.setup();
     montar();
     await u.click(screen.getByRole("checkbox", { name: /Manter a sessão iniciada/i }));
+    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await u.type(campoDaSenha(), "uma-senha-qualquer{Enter}");
+    await waitFor(() => expect(pedidos).toHaveLength(1));
+    expect(pedidos[0].body.manterSessao).toBe(true);
+  });
+
+  it("e vale também na entrada pelo aparelho", async () => {
+    const u = userEvent.setup();
+    montar();
     await u.click(screen.getByRole("button", { name: /Entrar com este dispositivo/i }));
     await waitFor(() => expect(passkeys.entrar).toHaveBeenCalled());
     expect(passkeys.entrar).toHaveBeenCalledWith({ manterSessao: false });

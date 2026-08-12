@@ -1055,7 +1055,6 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         : ([
             ["Cerimónia", doc.ceremony ?? ""],
             ["Hora", doc.time ?? ""],
-            ["Wedding Planners", doc.weddingPlanners ?? ""],
           ] as [string, string][])),
     ];
     // Um «Hora:» seguido de nada não é um campo por preencher: é um erro

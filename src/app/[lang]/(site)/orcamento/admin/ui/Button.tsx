@@ -54,9 +54,19 @@ const BASE =
 const VARIANTS: Record<ButtonVariant, string> = {
   // Moss-dark solid — the affirmative primary action.
   primary: "bg-[#4d6350] text-white shadow-sm hover:bg-[#415440]",
-  // Hairline outline on white — secondary emphasis.
+  // Outline on white — secondary emphasis.
+  //
+  // Era `border-foreground/15` com `text-foreground/80`, e lia-se como
+  // DESACTIVADO: o estado desactivado é este mesmo desenho com `opacity-45`
+  // por cima, e a diferença entre os dois era pequena de mais para se notar.
+  // Na entrada isso é grave — «Entrar com palavra-passe» é o caminho de quem
+  // ainda não tem passkey, e parecia fora de serviço.
+  //
+  // O contorno passa a 28% e o texto a 90% (que dá 12,6:1 sobre branco, contra
+  // os 10,2:1 de antes). Continua a ser claramente secundário ao lado do verde
+  // cheio do passkey — o que muda é ler-se como disponível.
   secondary:
-    "bg-white text-foreground/80 border border-foreground/15 shadow-sm hover:border-foreground/30 hover:text-foreground",
+    "bg-white text-foreground/90 border border-foreground/28 shadow-sm hover:border-foreground/45 hover:bg-foreground/[0.03] hover:text-foreground",
   // Quiet until hovered — for toolbars and low-emphasis rows.
   ghost: "bg-transparent text-foreground/55 hover:bg-foreground/[0.06] hover:text-foreground/80",
   // Soft moss tint — an in-context "yes, this one" without full weight.

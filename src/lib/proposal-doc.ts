@@ -352,7 +352,13 @@ export interface ProposalDoc {
    * «Serviço:» seguido de nada é pior do que não haver linha nenhuma).
    */
   servico?: string;
-  /** Wedding planners a acompanhar o evento, e.g. "Equipa AMARA" (opcional). */
+  /**
+   * @deprecated O campo saiu do estúdio e do PDF (pedido da Catarina).
+   *
+   * A propriedade FICA porque há propostas gravadas com valor lá dentro, e um
+   * documento antigo tem de continuar a poder ser lido, copiado e reaberto sem
+   * dar erro. Não é escrita por nada de novo, e não é impressa.
+   */
   weddingPlanners?: string;
 
   // ── 2. Serviços ──

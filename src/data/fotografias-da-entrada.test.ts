@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import sharp from "sharp";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { FOTOGRAFIAS_DA_ENTRADA, DESFOCADO_NEUTRO } from "./fotografias-da-entrada";
@@ -100,5 +101,54 @@ describe("a entrada vive da escada que a galeria já gera", () => {
       const ordenada = [...escada].sort((a, b) => a - b);
       expect([...escada]).toEqual(ordenada);
     }
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * E NENHUMA DELAS PODE SER A PRETO E BRANCO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «A Líquen é uma empresa de cor» — e esta é a única imagem que a equipa vê
+ * todos os dias. Já aconteceu uma vez: o conjunto tinha um jantar de festa
+ * monocromático e, como a rotação é por dia, um dia em cada quatro a entrada
+ * abria a preto e branco. Ninguém tinha escrito um filtro — a fotografia é que
+ * não tinha cor.
+ *
+ * Isto mede os píxeis do ficheiro que vai mesmo ser servido, e não uma
+ * anotação ao lado dele: uma anotação não impede a troca seguinte.
+ */
+describe("as fotografias da entrada têm cor", () => {
+  /**
+   * Saturação média mínima, em HSV.
+   *
+   * As três que lá estão medem 0,29–0,48; um ficheiro monocromático mede
+   * exactamente 0. O limiar em 0,08 deixa passar uma fotografia
+   * propositadamente dessaturada (um fim de tarde lavado, um interior de
+   * pedra) e trava a que não tem cor NENHUMA, que é o caso que aconteceu.
+   */
+  const SATURACAO_MINIMA = 0.08;
+
+  it.each(FOTOGRAFIAS_DA_ENTRADA.map((f) => f.ficheiro))("%s não é monocromática", async (rel) => {
+    const ficheiro = path.join(ROOT, "public", rel.replace(/^\//, ""));
+    const { data, info } = await sharp(ficheiro)
+      .resize(200, null, { fit: "inside" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    let soma = 0;
+    let n = 0;
+    for (let i = 0; i + 2 < data.length; i += info.channels) {
+      const max = Math.max(data[i], data[i + 1], data[i + 2]);
+      const min = Math.min(data[i], data[i + 1], data[i + 2]);
+      soma += max === 0 ? 0 : (max - min) / max;
+      n += 1;
+    }
+    const saturacao = soma / n;
+    expect(
+      saturacao,
+      `${rel} tem saturação média ${saturacao.toFixed(3)} — está a preto e branco (ou quase). ` +
+        `A entrada do back office é a única imagem que a equipa vê todos os dias.`,
+    ).toBeGreaterThan(SATURACAO_MINIMA);
   });
 });

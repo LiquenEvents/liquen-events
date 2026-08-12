@@ -43,11 +43,46 @@ export interface FotografiaDaEntrada {
   enquadramento: string;
   /** Miniatura de 16 px em base64. Opcional: ver o cabeçalho. */
   desfocado?: string;
+  /**
+   * Onde foi, e quando: «Convento do Espinheiro · 2025».
+   *
+   * Aparece em pequeno por baixo do mote, e é o que transforma a entrada num
+   * portefólio interno em vez de um fundo bonito. OPCIONAL: uma fotografia sem
+   * legenda mostra-se na mesma, só sem a linha.
+   *
+   * Escreve o espaço e o ano, não o nome do casal — esta página é vista por
+   * quem entra ao lado de quem passa, e o nome de um cliente não tem de estar
+   * projectado num ecrã de escritório.
+   */
+  legenda?: string;
 }
 
 /**
- * As quatro escolhidas pela Catarina. A ordem não tem significado nenhum: a
- * rotação percorre-as por dia (ver `EntradaComFotografia.tsx`).
+ * As escolhidas pela Catarina. A ordem não tem significado nenhum: a rotação
+ * percorre-as por dia (ver `EntradaComFotografia.tsx`).
+ *
+ * ── PORQUE É QUE ESTA LISTA TEM TRÊS E NÃO QUATRO ─────────────────────────
+ * Saiu daqui o `DaniGui_JantarFesta_39.jpg`, o jantar a preto e branco.
+ *
+ * A queixa era «a imagem está a preto e branco, e a Líquen é uma empresa de
+ * cor», e a primeira suspeita — um filtro CSS a dessaturar — estava errada:
+ * não há filtro nenhum nesta página, e nunca houve. O que havia era uma
+ * fotografia MONOCROMÁTICA no conjunto. Medido nos píxeis do ficheiro:
+ *
+ *   20_10_2025_0244.jpg          saturação média 0,479
+ *   DaniGui_JantarFesta_39.jpg   saturação média 0,000   ← o ficheiro é p&b
+ *   hd-edited.jpg                saturação média 0,291
+ *   ines-goncalo-282.jpg         saturação média 0,300
+ *
+ * Como a rotação é POR DIA, um dia em cada quatro a equipa entrava num painel
+ * a preto e branco. Não era um erro de renderização: era esta escolha.
+ *
+ * `fotografias-da-entrada.test.ts` volta a medir a saturação de cada ficheiro e
+ * falha se alguma entrar abaixo do limiar — para uma fotografia sem cor não
+ * poder voltar a entrar em silêncio.
+ *
+ * Ficaram três. Se quiseres voltar a quatro, acrescenta a entrada com a foto
+ * que escolheres (e, se puderes, uma `legenda`).
  */
 export const FOTOGRAFIAS_DA_ENTRADA: readonly FotografiaDaEntrada[] = [
   {
@@ -58,15 +93,6 @@ export const FOTOGRAFIAS_DA_ENTRADA: readonly FotografiaDaEntrada[] = [
     enquadramento: "52% 58%",
     desfocado:
       "data:image/webp;base64,UklGRmQAAABXRUJQVlA4IFgAAABQAgCdASoQAAsAA4BaJYgCdAYtzy0pIyVSBAAA/veBsWGSb5DFLjv7z8MRX+esPDCuuUMk7mIfqdxt2xxys5Sb33pZodqaSSdX9xluvCO3biCclR1poAAA",
-  },
-  {
-    // Jantar de festa a preto e branco: a casa ao fundo, os convidados a
-    // acenar. Aguenta o centro, com um passo para a direita para o recorte
-    // apanhar a casa inteira e não a cortar ao meio.
-    ficheiro: "/imagens/DaniGui_JantarFesta_39.jpg",
-    enquadramento: "54% 50%",
-    desfocado:
-      "data:image/webp;base64,UklGRmAAAABXRUJQVlA4IFQAAAAwAgCdASoQAAsAA4BaJaQAD5Gu682I+Ht0AAD+7NsVJ8C6mTLBOcA/o6Yvk+JM9egX6oZBkKu1bzvP/W2saYcj//Oxe/HViw2/blJ0d9dDgn8AAAA=",
   },
   {
     // Jantar ao anoitecer com fios de luzes. É a mais escura das quatro e a que

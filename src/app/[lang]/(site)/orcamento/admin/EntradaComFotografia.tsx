@@ -303,7 +303,20 @@ export function EntradaComFotografia({ children }: { children: ReactNode }) {
     <div
       // `-mt-24`: ver a nota no AdminLogin. Cancela o `pt-24` do `<main>` global
       // logo no primeiro desenho, em vez de esperar por um efeito.
-      className="-mt-24 min-h-screen lg:grid lg:grid-cols-2"
+      /**
+       * 62/38 e não 50/50.
+       *
+       * Com metade a metade, o cartão (max-w-sm, 384 px) flutuava sozinho no
+       * meio de 720 px de branco: 168 px de vazio de cada lado, mais do que a
+       * largura de meio cartão. Dar 62% à fotografia tira esse vazio ao branco
+       * e devolve-o à única imagem que a equipa vê todos os dias — sem tocar no
+       * cartão, que continua a ter a mesma medida de leitura.
+       *
+       * Fica nos 62% e não nos 65: a coluna do formulário tem de aguentar o
+       * cartão de 384 px mais o respiro lateral (`px-4`) sem o apertar num
+       * portátil de 1280 px, onde 38% são 486 px.
+       */
+      className="-mt-24 min-h-screen lg:grid lg:grid-cols-[62fr_38fr]"
     >
       {/* ── O painel da fotografia ─────────────────────────────────────── */}
       {foto && (
@@ -330,13 +343,13 @@ export function EntradaComFotografia({ children }: { children: ReactNode }) {
               media={CORTE_PAINEL}
               type="image/avif"
               srcSet={srcsetDaGaleria(foto.ficheiro, ESCADA_PAINEL, "avif")}
-              sizes="50vw"
+              sizes="62vw"
             />
             <source
               media={CORTE_PAINEL}
               type="image/webp"
               srcSet={srcsetDaGaleria(foto.ficheiro, ESCADA_PAINEL, "webp")}
-              sizes="50vw"
+              sizes="62vw"
             />
             <source
               type="image/avif"
@@ -385,6 +398,20 @@ export function EntradaComFotografia({ children }: { children: ReactNode }) {
             <p className="mt-1 hidden text-sm leading-relaxed text-white/90 sm:block lg:mt-2 lg:text-base">
               {t.footer.sloganLine1} {t.footer.sloganLine2}
             </p>
+            {/* ── ONDE FOI, E QUANDO ────────────────────────────────────────
+                O que transforma isto num portefólio interno em vez de um fundo
+                bonito. Fica DENTRO do véu, com o resto do texto, para não
+                precisar de uma segunda conta de contraste: o `white/70` sobre
+                a faixa medida a 10,88:1 dá 7,6:1, ainda acima do AAA.
+
+                `hidden sm:block` pela mesma razão do mote: na faixa de 160 px
+                do telemóvel esta linha roubava espaço ao formulário, que é
+                quem manda ali. */}
+            {foto.legenda && (
+              <p className="mt-1.5 hidden text-[11px] tracking-[0.14em] uppercase text-white/70 sm:block lg:mt-3 lg:text-xs">
+                {foto.legenda}
+              </p>
+            )}
           </div>
         </div>
       )}

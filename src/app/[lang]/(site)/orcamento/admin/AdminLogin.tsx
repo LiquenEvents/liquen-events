@@ -72,6 +72,45 @@ import {
  *  daqui não se pode seguir (o ecrã está atrás da sessão). */
 const ONDE_SE_REGISTA = "Os meus dispositivos";
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «MANTER A SESSÃO INICIADA» VEM DESLIGADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Vinha ligada, e a razão escrita era honesta: era o que já acontecia, e mudar
+ * punha a equipa a voltar a entrar sem ninguém ter pedido. O que mudou desde
+ * então foi a PASSKEY.
+ *
+ * ── Porque é que a passkey muda a conta ───────────────────────────────────
+ * O custo de uma sessão curta é o de voltar a entrar. Quando isso era escrever
+ * um email e uma palavra-passe várias vezes por semana, 30 dias compravam
+ * qualquer coisa real — e uma sessão curta empurra as pessoas para
+ * palavras-passe fáceis e para as escrever num papel. Com a passkey, voltar a
+ * entrar é um toque no leitor de impressão digital. O preço caiu quase a zero;
+ * o risco não caiu nada.
+ *
+ * ── E o risco é concreto, não teórico ─────────────────────────────────────
+ * Isto é uma ferramenta com dados de clientes — nomes, moradas, preços,
+ * contratos, facturas — e é usada em cima do acontecimento: tablets e
+ * portáteis que andam para quintas e hotéis, e que são precisamente os
+ * aparelhos que se perdem. Uma senha de 30 dias num aparelho perdido é 30 dias
+ * de acesso a tudo.
+ *
+ * ── Ligada por omissão não é uma escolha ──────────────────────────────────
+ * É o argumento que decide. Uma caixa pré-marcada não foi decidida por
+ * ninguém: quem entra todos os dias deixa de a ver ao fim de uma semana. O que
+ * se perde ao desmarcá-la é um toque; o que se ganha é que ficar com sessão
+ * aberta um mês passe a ser um gesto de quem o quer, feito num aparelho que
+ * essa pessoa sabe que é seu.
+ *
+ * ── Como se volta atrás ───────────────────────────────────────────────────
+ * Esta constante, para `true`. Fica num sítio só e com a razão ao lado,
+ * precisamente para a decisão poder ser revista sem se ter de a reconstituir.
+ * Nada mais no ecrã depende dela: o texto explica os dois lados nos dois
+ * estados.
+ */
+const MANTER_SESSAO_POR_OMISSAO = false;
+
 export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
@@ -83,12 +122,7 @@ export default function AdminLogin() {
   /** Bloco 3: escrever às cegas no telemóvel é das coisas mais irritantes. */
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
-  /**
-   * «Manter a sessão iniciada.» Ligada por omissão: era o que já acontecia
-   * (30 dias), e mudar o valor por omissão punha a equipa a voltar a entrar
-   * todos os dias sem ninguém ter pedido nada. Ver `duracaoDaSessao`.
-   */
-  const [manterSessao, setManterSessao] = useState(true);
+  const [manterSessao, setManterSessao] = useState(MANTER_SESSAO_POR_OMISSAO);
   // Recuperação: painel fechado por omissão, para a página continuar a ser uma
   // página de ENTRADA. Só abre a quem o pedir.
   const [aRecuperar, setARecuperar] = useState(false);
@@ -330,7 +364,12 @@ export default function AdminLogin() {
           width={210}
           height={125}
           priority
-          className="h-16 w-auto object-contain"
+          /**
+           * h-24 e não h-16. A marca estava pequena para o espaço que tem: numa
+           * coluna de 486 px, 64 px de altura deixavam-na a boiar no topo. A
+           * proporção é a do ficheiro (`w-auto`), portanto isto é só escala.
+           */
+          className="h-24 w-auto object-contain"
         />
 
         {/* Login card */}
@@ -341,7 +380,10 @@ export default function AdminLogin() {
               Painel de Gestão
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-foreground/55">
-              Bem-vinda. Escolhe como queres entrar.
+              {/* «Bem-vinda» presumia que quem entra é mulher. Hoje é verdade e
+                  amanhã deixa de ser — e a frase não ganha nada com o género:
+                  o que ela faz é dizer o que se segue. */}
+              Bem-vindo de volta. Escolhe como queres entrar.
             </p>
           </div>
 
@@ -557,9 +599,24 @@ export default function AdminLogin() {
               />
               <span className="text-xs leading-relaxed text-foreground/60">
                 Manter a sessão iniciada 30 dias neste aparelho.
-                {!manterSessao && (
+                {/* A CONSEQUÊNCIA APARECE NO ESTADO QUE SE ESCOLHE, não na
+                    omissão — que é a MESMA regra de antes, virada ao contrário
+                    porque a omissão mudou de lado.
+
+                    Antes explicava-se o desligar (a omissão era ligada); agora
+                    explica-se o ligar. E não é só simetria: das duas, é ligar
+                    que tem consequência — um mês de sessão aberta num aparelho
+                    que anda para quintas e hotéis.
+
+                    Que apareça UMA de cada vez também não é estética. Estas
+                    linhas custam ~36 px, e o cabeçalho deste ficheiro mede o
+                    botão de submeter a 831 px de uma dobra de 844 no telemóvel
+                    dela: com as duas explicações sempre à vista, o botão de
+                    entrar caía abaixo da dobra. Foi o que aconteceu à primeira,
+                    e viu-se no retrato a 393 px. */}
+                {manterSessao && (
                   <span className="block text-foreground/45">
-                    Desligada, a sessão dura 12 horas e fecha-se ao fechares o browser.
+                    Um mês é muito tempo num aparelho que ande por aí — marca só se este for teu.
                   </span>
                 )}
               </span>
@@ -660,19 +717,25 @@ export default function AdminLogin() {
               essa a razão de a primeira entrada de cada aparelho ser sempre com
               a palavra-passe — e isso tem de estar escrito aqui, que é onde a
               pessoa está quando faz a pergunta. */}
+          {/* FECHADO POR OMISSÃO. São seis linhas de instruções para uma
+              situação que acontece uma vez por aparelho — e estavam abertas em
+              todas as entradas, todos os dias, por baixo do botão que 99% das
+              vezes é o que se usa. O `<details>` nativo em vez de estado em
+              React: abre sem JavaScript, é focável e anunciável por omissão, e
+              o browser trata do resto. */}
           {temPasskeys && (
-            <div className="mt-5 border-t border-foreground/10 pt-4">
-              <p className="text-xs font-medium text-foreground/70">
+            <details className="group mt-5 border-t border-foreground/10 pt-4">
+              <summary className="cursor-pointer list-none text-xs font-medium text-foreground/60 underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-foreground/85 hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm">
                 Mudaste de telemóvel ou de computador?
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-foreground/50">
+              </summary>
+              <p className="mt-2 text-xs leading-relaxed text-foreground/55">
                 Entra aqui com o email e a palavra-passe. Já dentro, abre{" "}
                 <span className="font-medium text-foreground/70">«{ONDE_SE_REGISTA}»</span>, no
                 fundo da barra lateral, e regista este aparelho. Da próxima vez entras só com o
                 rosto ou a impressão digital. Podes registar mais do que um — e apagar de lá o que
                 já não usas.
               </p>
-            </div>
+            </details>
           )}
         </Card>
 

@@ -13,7 +13,7 @@ interface Props {
 const TEMPLATES: { label: string; text: string }[] = [
   {
     label: "Agradecer pedido",
-    text: "Olá {nome},\n\nObrigada pelo seu pedido! Recebemos os detalhes do seu evento e a nossa equipa vai analisá-los com todo o cuidado. Entraremos em contacto em breve com os próximos passos.\n\nCom os melhores cumprimentos,\nEquipa Líquen Events",
+    text: "Olá {nome},\n\nAgradecemos o seu pedido! Recebemos os detalhes do seu evento e a nossa equipa vai analisá-los com todo o cuidado. Entraremos em contacto em breve com os próximos passos.\n\nCom os melhores cumprimentos,\nEquipa Líquen Events",
   },
   {
     label: "Marcar reunião",
