@@ -20,6 +20,13 @@ import {
   type VatMode,
 } from "@/lib/proposal-doc";
 import { ordemDeSaida, eAOrdemEscrita, aplicarOrdem, ORDEM_EXPLICITA } from "@/lib/proposal-ordem";
+import {
+  CONTAGEM_VAZIA,
+  comAcontecimento,
+  emPalavras,
+  totalAte,
+  type Contagem,
+} from "@/lib/tempo-activo";
 import { ehRefDeTema } from "@/lib/theme-ref";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel, ceremonyTypeLabel } from "@/lib/orcamento/data";
@@ -999,6 +1006,55 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [aArrastar, setAArrastar] = useState<string | null>(null);
   /** A fotografia aberta em grande: o board e a posição. */
   const [lupa, setLupa] = useState<{ bi: number; ii: number } | null>(null);
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O TEMPO QUE ESTA PROPOSTA CUSTOU MESMO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «não relógio de parede: tempo com a página em foco».
+   *
+   * A contagem vive numa `ref` e não em estado: um acontecimento por tecla
+   * escrita a redesenhar o estúdio inteiro seria pagar em fluidez o preço de
+   * medir a fluidez. O ecrã lê-a de meio em meio minuto, que é o passo a que o
+   * número muda.
+   *
+   * A regra do que conta está em `tempo-activo.ts`, com relógio injectado e
+   * testes — incluindo o caso que estraga qualquer medição destas: o ecrã que
+   * ficou aberto enquanto ela foi ao telefone.
+   */
+  const tempo = useRef<Contagem>(CONTAGEM_VAZIA);
+  const [tempoMostrado, setTempoMostrado] = useState(0);
+  useEffect(() => {
+    const sinal = (tipo: "vida" | "pausa") => () => {
+      tempo.current = comAcontecimento(tempo.current, { tipo, em: Date.now() });
+    };
+    const vivo = sinal("vida");
+    const parado = sinal("pausa");
+    const aoMudarDeFoco = () => (document.hidden ? parado() : vivo());
+    for (const ev of ["pointerdown", "keydown", "wheel", "scroll"] as const) {
+      window.addEventListener(ev, vivo, { passive: true });
+    }
+    window.addEventListener("focus", vivo);
+    window.addEventListener("blur", parado);
+    document.addEventListener("visibilitychange", aoMudarDeFoco);
+    vivo();
+    // Meio minuto: o número mostrado é em minutos, portanto qualquer passo mais
+    // curto seria trabalho para não mudar nada no ecrã.
+    const relogio = setInterval(
+      () => setTempoMostrado(totalAte(tempo.current, Date.now())),
+      30_000,
+    );
+    return () => {
+      for (const ev of ["pointerdown", "keydown", "wheel", "scroll"] as const) {
+        window.removeEventListener(ev, vivo);
+      }
+      window.removeEventListener("focus", vivo);
+      window.removeEventListener("blur", parado);
+      document.removeEventListener("visibilitychange", aoMudarDeFoco);
+      clearInterval(relogio);
+    };
+  }, []);
+
   /** A vista com as páginas lado a lado está aberta? */
   const [vistaDeConjunto, setVistaDeConjunto] = useState(false);
   /** As fotos escolhidas para serem movidas em conjunto — chaves `bi:ii`. */
@@ -1801,10 +1857,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const fotosPorBoard = doc.moodBoards.map((b) => b.images.length);
   const totalDeFotos = fotosPorBoard.reduce((a, b) => a + b, 0);
   const paginasDeInspiracao = fotosPorBoard.filter((n) => n > 0).length;
+  const tempoDaProposta = tempoMostrado > 0 ? ` · ${emPalavras(tempoMostrado)} de trabalho` : "";
   const contagemDosBoards =
     `${paginasDeInspiracao} ${paginasDeInspiracao === 1 ? "página" : "páginas"} · ` +
     `${totalDeFotos} ${totalDeFotos === 1 ? "foto" : "fotos"} · ` +
-    `PDF com cerca de ${PAGINAS_FIXAS_DO_PDF + paginasDeInspiracao}`;
+    `PDF com cerca de ${PAGINAS_FIXAS_DO_PDF + paginasDeInspiracao}${tempoDaProposta}`;
 
   /**
    * ════════════════════════════════════════════════════════════════════════
