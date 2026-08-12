@@ -278,6 +278,26 @@ export interface ProposalDoc {
   // ── 2. Serviços ──
   serviceGroups: ServiceGroup[];
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A ORDEM DESTE DOCUMENTO FOI ARRUMADA À MÃO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Sem este campo, o orçamento e os mood boards saem pela ordem da lista de
+   * Serviços — uma correcção que existe porque as três listas são editores
+   * separados e se desalinhavam sozinhas (ver `proposal-ordem.ts`).
+   *
+   * A partir do momento em que ela ARRASTA um mood board ou uma linha do
+   * orçamento, essa sugestão passa a estorvar: ela punha o board no sítio e a
+   * página seguinte devolvia-o ao lugar «certo». Este campo é o interruptor —
+   * presente, a ordem escrita vale sozinha, no editor e no PDF.
+   *
+   * Nasce ausente e só o arrasto (ou o botão «Alinhar pelos Serviços», que
+   * escreve a ordem sugerida no documento) o acende: propostas antigas
+   * continuam a sair exactamente como sempre saíram.
+   */
+  ordemExplicita?: "arrumada-a-mao";
+
   // ── Mood boards (one page each; Decoração template) ──
   moodBoards: MoodBoard[];
 

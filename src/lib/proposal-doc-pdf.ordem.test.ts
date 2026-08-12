@@ -100,6 +100,30 @@ describe("uma só ordem para o documento inteiro", () => {
   });
 
   /**
+   * ── O DOCUMENTO ARRUMADO À MÃO ─────────────────────────────────────────
+   *
+   * A sugestão existe porque as três listas são editores separados e se
+   * desalinham sozinhas. A partir do momento em que ela as arruma — arrastando
+   * um mood board, ou com o botão que fixa a ordem no estúdio — a sugestão
+   * passa a estorvar: punha o board no sítio e a página seguinte devolvia-o ao
+   * lugar «certo».
+   *
+   * Com `ordemExplicita`, o gerador imprime o que está escrito e não anuncia
+   * reordenação nenhuma, porque não fez nenhuma.
+   */
+  it("com a ordem arrumada à mão, o PDF imprime o que está escrito", async () => {
+    const doc = proposta({ ordemExplicita: "arrumada-a-mao" });
+    const { lido, reordenacoes } = await impresso(doc);
+    expect(reordenacoes).toEqual([]);
+    expect(lido.budgetItems).toEqual([
+      "Decor Cerimónia",
+      "Decor Cocktail",
+      "Decor Jantar",
+      "Complementos dos Noivos",
+    ]);
+  });
+
+  /**
    * O caso que mais assusta: uma proposta cujas listas não se conhecem. Nada
    * casa, nada se mexe — sai exactamente como estava escrita.
    */

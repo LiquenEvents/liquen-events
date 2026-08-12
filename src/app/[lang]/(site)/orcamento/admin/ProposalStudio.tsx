@@ -19,6 +19,7 @@ import {
   type MoodBoard,
   type VatMode,
 } from "@/lib/proposal-doc";
+import { ordemDeSaida, eAOrdemEscrita, aplicarOrdem, ORDEM_EXPLICITA } from "@/lib/proposal-ordem";
 import { ehRefDeTema } from "@/lib/theme-ref";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel, ceremonyTypeLabel } from "@/lib/orcamento/data";
@@ -26,6 +27,8 @@ import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
+import Gralhas from "./Gralhas";
+import { corrigirGralha, corrigirTudo, gralhasDoDocumento } from "@/lib/proposal-ortografia";
 import Versoes from "./Versoes";
 import { comoSeDiz, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
 import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
@@ -1697,6 +1700,74 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const extrasDoDoc = opcionaisDe(doc as ProposalDoc);
 
   /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A ORDEM QUE VAI SAIR IMPRESSA, MOSTRADA AQUI
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela, duas vezes: na lista de Serviços é Cerimónia →
+   * Complementos → Cocktail → Jantar, no Orçamento é Cerimónia → Cocktail →
+   * Jantar → Complementos. As mesmas rubricas, duas ordens.
+   *
+   * A regra que as alinha já existia — mas dentro de `proposal-doc-pdf.ts`,
+   * que é `server-only`. O PDF saía certo e o ECRÃ continuava a mostrar a
+   * ordem de escrita, portanto o que ela via era a divergência, sempre. A
+   * regra mudou-se para `proposal-ordem.ts` e é agora a MESMA chamada dos
+   * dois lados: estas duas linhas e as duas do gerador.
+   *
+   * As listas por baixo percorrem estes índices e não `map((_, i) =>`. O
+   * índice que sai daqui é o VERDADEIRO — o do array — e é esse que os
+   * botões recebem: o que muda é a ordem por que se desenham, não onde se
+   * escreve.
+   */
+  const linhasDoOrcamento = linhasDe(doc);
+  const ordemDoOrcamento = ordemDeSaida(doc as ProposalDoc, linhasDoOrcamento, (l) => l.item ?? "");
+  const ordemDosBoards = ordemDeSaida(doc as ProposalDoc, doc.moodBoards, (b) => b.title ?? "");
+  /** Alguma das duas listas sai por ordem diferente da que está escrita? */
+  const ordemSugerida = !eAOrdemEscrita(ordemDoOrcamento) || !eAOrdemEscrita(ordemDosBoards);
+
+  /**
+   * Fixa no documento a ordem que está a ser mostrada.
+   *
+   * Escreve os arrays já ordenados e acende `ordemExplicita` — a partir daí a
+   * sugestão cala-se e a ordem escrita vale sozinha, aqui e no PDF. É o que
+   * torna o arrasto possível: enquanto a sugestão mandasse, arrastar um board
+   * era pô-lo num sítio e vê-lo voltar na página seguinte.
+   *
+   * Os preços, os custos e as escalas são arrays PARALELOS às linhas — viajam
+   * com a mesma permutação ou o orçamento trocava os preços de sítio, que é
+   * um erro que só se vê quando o cliente pergunta.
+   */
+  function arrumadoEExplicito(d: StudioDoc): StudioDoc {
+    const linhas = linhasDe(d);
+    const ordemL = ordemDeSaida(d as ProposalDoc, linhas, (l) => l.item ?? "");
+    const ordemB = ordemDeSaida(d as ProposalDoc, d.moodBoards, (b) => b.title ?? "");
+    const paralelo = <T,>(arr: T[] | undefined) =>
+      arr === undefined ? undefined : aplicarOrdem(arr, ordemL);
+    return {
+      ...d,
+      ordemExplicita: ORDEM_EXPLICITA,
+      budgetItems: aplicarOrdem(d.budgetItems ?? [], ordemL),
+      budgetAmounts: paralelo(d.budgetAmounts),
+      budgetCosts: paralelo(d.budgetCosts),
+      budgetScales: paralelo(d.budgetScales),
+      moodBoards: aplicarOrdem(d.moodBoards, ordemB),
+    };
+  }
+
+  /**
+   * Fixa no documento a ordem que está a ser mostrada.
+   *
+   * AS DUAS LISTAS DE UMA VEZ, sempre. Acender `ordemExplicita` a arrumar só
+   * os mood boards congelava o orçamento na ordem por arrumar — ressuscitava
+   * a divergência que isto veio fechar, e desta vez sem sugestão nenhuma a
+   * corrigi-la.
+   */
+  function fixarOrdem(porque: string) {
+    setDoc(arrumadoEExplicito);
+    toast(porque, "info");
+  }
+
+  /**
    * Trocar o tipo de escala de uma linha.
    *
    * Ao passar a escalonável, o unitário nasce do preço que já lá estava
@@ -2520,8 +2591,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   function removeBoard(bi: number) {
     setDoc((d) => ({ ...d, moodBoards: d.moodBoards.filter((_, i) => i !== bi) }));
   }
-  function moveBoard(bi: number, dir: -1 | 1) {
-    setDoc((d) => ({ ...d, moodBoards: move(d.moodBoards, bi, dir) }));
+  /**
+   * Move o board que está NA POSIÇÃO `pos` do ecrã.
+   *
+   * Recebe a posição visível e não o índice do array porque, enquanto a ordem
+   * vier sugerida pelos Serviços, os dois números são diferentes — e mover
+   * «o terceiro que vejo» tem de mover o terceiro que se vê.
+   *
+   * Arrumar à mão é uma decisão: materializa a ordem mostrada e acende
+   * `ordemExplicita`. Sem isso, ela punha o board no sítio e a sugestão
+   * devolvia-o ao lugar de onde saiu.
+   */
+  function moveBoard(pos: number, dir: -1 | 1) {
+    setDoc((d) => {
+      const arrumado = arrumadoEExplicito(d);
+      return { ...arrumado, moodBoards: move(arrumado.moodBoards, pos, dir) };
+    });
   }
   function addBoardImages(bi: number, paths: string[]) {
     setDoc((d) => ({
@@ -3492,8 +3577,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
                 grupos de imagens de inspiração para o cliente
               </p>
+              <AvisoDeOrdem
+                mostrar={ordemSugerida}
+                onde="As páginas de inspiração"
+                onFixar={() =>
+                  fixarOrdem("Ordem fixada. Daqui para a frente manda a ordem que aqui está.")
+                }
+              />
               <div className="flex flex-col gap-3">
-                {doc.moodBoards.map((b, bi) => {
+                {/* Pela ordem que as páginas vão sair — ver `ordemDosBoards`. */}
+                {ordemDosBoards.map((bi, pos) => {
+                  const b = doc.moodBoards[bi];
                   /**
                    * A FORMA DE CADA FOTO, E DAÍ AS CAIXAS DESTA PÁGINA.
                    *
@@ -3560,11 +3654,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           placeholder="Subtítulo (opcional) — ex.: Ramo de Noiva (a definir com a Noiva)"
                           aria-label="Subtítulo do mood board"
                         />
+                        {/* A POSIÇÃO NO ECRÃ, não o índice do array: ver
+                            `moveBoard`. */}
                         <MoveBtns
-                          onUp={() => moveBoard(bi, -1)}
-                          onDown={() => moveBoard(bi, 1)}
-                          disUp={bi === 0}
-                          disDown={bi === doc.moodBoards.length - 1}
+                          onUp={() => moveBoard(pos, -1)}
+                          onDown={() => moveBoard(pos, 1)}
+                          disUp={pos === 0}
+                          disDown={pos === doc.moodBoards.length - 1}
                         />
                         <button
                           type="button"
@@ -3802,6 +3898,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           <Section title="Orçamento Proposto" id="orcamento">
             {isDeco ? (
               <>
+                <AvisoDeOrdem
+                  mostrar={ordemSugerida}
+                  onde="As linhas do orçamento"
+                  onFixar={() =>
+                    fixarOrdem("Ordem fixada. Daqui para a frente manda a ordem que aqui está.")
+                  }
+                />
                 <div className="flex flex-col gap-2 mb-3">
                   <p className="text-xs leading-relaxed text-foreground/50">
                     Os preços por linha são <strong className="font-semibold">só para ti</strong>:
@@ -3829,7 +3932,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     <span className="w-16 shrink-0 text-center">Extra</span>
                     <span className="w-5 shrink-0" />
                   </div>
-                  {linhasDe(doc).map((l, i) => {
+                  {/* Pela ordem que vai SAIR — ver `ordemDoOrcamento`. O `i`
+                      continua a ser o índice do array, que é o que os campos
+                      escrevem; só a ordem de desenho muda. */}
+                  {ordemDoOrcamento.map((i) => {
+                    const l = linhasDoOrcamento[i];
                     const escala = escalasDoDoc[i];
                     const semPreco = l.preco === null;
                     return (
@@ -4621,6 +4728,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 quotes={quotes}
                 totalBruto={money.gross}
               />
+              {/* Os acentos que faltam nos campos que saem impressos. Aqui, ao
+                  pé da Conferência, e não a meio de escrever: a palavra ainda
+                  está a ser escrita quando o aviso apareceria. */}
+              <Gralhas
+                doc={doc as ProposalDoc}
+                onCorrigir={(g) => setDoc((d) => corrigirGralha(d, g))}
+                onCorrigirTudo={() => {
+                  const quantas = gralhasDoDocumento(doc as ProposalDoc).length;
+                  setDoc((d) => corrigirTudo(d));
+                  toast(
+                    quantas === 1 ? "1 palavra corrigida." : `${quantas} palavras corrigidas.`,
+                    "info",
+                  );
+                }}
+              />
               {/* ── O QUE JÁ SEGUIU ────────────────────────────────────────
                   Depois da conferência (que olha para ESTA proposta) e antes
                   do botão: é aqui que a pergunta "o que é que eles vão ver de
@@ -4944,6 +5066,49 @@ function LinhaDeTotal({
       >
         {valor}
       </dd>
+    </div>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «ISTO NÃO SAI PELA ORDEM QUE AQUI VÊS» — DITO, E COM SAÍDA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Enquanto a ordem vier sugerida pela lista de Serviços, a lista desenhada por
+ * baixo NÃO é a ordem em que os campos estão guardados. É a ordem certa — a
+ * que sai impressa — mas uma lista que se reordena sozinha sem dizer nada é
+ * uma lista em que não se confia.
+ *
+ * A frase diz o que está a acontecer; o botão dá a saída, que é passar a
+ * mandar nela (`ordemExplicita`). Nem sequer é uma acção destrutiva: escreve
+ * exactamente a ordem que já está à vista.
+ */
+function AvisoDeOrdem({
+  mostrar,
+  onde,
+  onFixar,
+}: {
+  mostrar: boolean;
+  /** «As linhas do orçamento», «As páginas de inspiração». */
+  onde: string;
+  onFixar: () => void;
+}) {
+  if (!mostrar) return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-foreground/10 bg-foreground/[0.02] px-3 py-2">
+      <p className="min-w-[16rem] flex-1 text-[11px] leading-relaxed text-foreground/55">
+        {onde} estão pela ordem da lista de <strong className="font-medium">Serviços</strong>, que é
+        a ordem por que o PDF sai — e não pela ordem em que foram escritas. Arruma os Serviços e
+        isto acompanha.
+      </p>
+      <button
+        type="button"
+        onClick={onFixar}
+        className="alvo-toque shrink-0 rounded-lg border border-foreground/15 px-2.5 py-1 text-[11px] font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90"
+      >
+        Arrumar eu
+      </button>
     </div>
   );
 }
