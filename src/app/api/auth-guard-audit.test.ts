@@ -660,6 +660,13 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       // pública guardada, a origem e o domínio — mais o tecto de 20 tentativas
       // por minuto por IP.
       "./admin/passkeys/entrada/route",
+      // A recuperação de palavra-passe. PÚBLICAS pela mesma razão que a
+      // entrada: quem se esqueceu da palavra-passe não tem sessão nenhuma para
+      // mostrar. O que as fecha é o tecto de pedidos, o token de uso único com
+      // 30 minutos de vida (guardado só em resumo) e o facto de a ligação só
+      // sair para um endereço já configurado no ADMIN_USERS.
+      "./admin/recuperar/route",
+      "./admin/recuperar/definir/route",
       "./portal/[token]/proposta-pdf/route",
       "./portal/[token]/contrato-pdf/route",
       "./proposta/[token]/pdf/route",
@@ -753,6 +760,24 @@ describe("PUBLIC routes stay reachable without a session", () => {
     const fn = await handler("./admin/logout/route", "POST");
     const res = await fn(req("POST"), ctx());
     expect(res.status).toBe(200);
+  });
+
+  it("POST /api/admin/recuperar é alcançável sem sessão (corpo mal formado → 400)", async () => {
+    // Se exigisse sessão, quem se esqueceu da palavra-passe não tinha por onde
+    // pedir a ligação — que é exactamente o problema que ela veio resolver.
+    const fn = await handler("./admin/recuperar/route", "POST");
+    const res = await fn(req("POST", "/api/admin/recuperar", "{ not json", {}, true), ctx());
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/admin/recuperar/definir recusa uma ligação inventada — sem 401 por falta de sessão", async () => {
+    const fn = await handler("./admin/recuperar/definir/route", "POST");
+    const res = await fn(
+      req("POST", "/api/admin/recuperar/definir", { token: "inventado", password: "x".repeat(14) }),
+      ctx(),
+    );
+    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(400);
   });
 });
 
