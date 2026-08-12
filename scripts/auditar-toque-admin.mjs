@@ -166,8 +166,8 @@ async function entrar(ctx, page) {
   if (jaDentro) return;
 
   await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
-  await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
-  await page.getByRole("button", { name: /^Entrar$/ }).click();
+  await page.locator('input[name="password"]').fill("liquen2026");
+  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
   try {
     await page
       .getByRole("navigation", { name: /Navegação do back office/i })

@@ -74,8 +74,8 @@ async function entrar(page) {
   const nome = page.getByLabel(/O teu email/i);
   if (await nome.isVisible().catch(() => false)) {
     await nome.fill("catarina@liquen-events.com");
-    await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
-    await page.getByRole("button", { name: /^Entrar$/ }).click();
+    await page.locator('input[name="password"]').fill("liquen2026");
+    await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
     // Dizer o que se passou, em vez de deixar rebentar como "timeout".
     const travado = page.getByText(/Demasiadas tentativas/i);
     if (await travado.isVisible({ timeout: 2500 }).catch(() => false)) {

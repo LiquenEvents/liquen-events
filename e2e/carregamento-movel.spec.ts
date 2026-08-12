@@ -28,8 +28,11 @@ async function login(page: Page): Promise<boolean> {
   const nome = page.getByLabel(/O teu email/i);
   if ((await nome.count()) > 0) {
     await nome.fill("catarina@liquen-events.com");
-    await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
-    await page.getByRole("button", { name: /^Entrar$/ }).click();
+    // Pelo `name` e não pelo rótulo: «Palavra-passe» passou a ser partilhado com
+    // o botão de mostrar/ocultar, e o botão de entrar diz por que caminho se
+    // entra (a passkey passou a ser o primeiro).
+    await page.locator('input[name="password"]').fill("liquen2026");
+    await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
   }
   return page
     .getByRole("navigation", { name: /Navegação do back office/i })
