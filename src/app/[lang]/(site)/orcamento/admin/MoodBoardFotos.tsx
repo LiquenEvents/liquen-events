@@ -322,6 +322,8 @@ export function CelulaDeFoto({
   principal = false,
   seleccionada = false,
   bloqueada = false,
+  historia,
+  origem,
 }: {
   bi: number;
   ii: number;
@@ -332,6 +334,10 @@ export function CelulaDeFoto({
   seleccionada?: boolean;
   /** O board está fechado: a foto vê-se, não se mexe. */
   bloqueada?: boolean;
+  /** Onde é que esta fotografia já esteve — `null` quando não há nada a dizer. */
+  historia?: { texto: string; grave: boolean } | null;
+  /** A foto da biblioteca de onde esta veio, para quem passa o rato saber. */
+  origem?: string;
 }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging, isOver } =
     useSortable({ id: idDaFoto(bi, ii), disabled: bloqueada });
@@ -341,6 +347,9 @@ export function CelulaDeFoto({
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`group/foto relative ${isDragging ? "z-10 opacity-40" : ""}`}
+      // De que tema veio, e o que se sabe dela. É o que a pergunta «esta foto
+      // já não a usei?» quer saber, e chega com o rato em cima.
+      title={[origem, historia?.texto].filter(Boolean).join(" · ") || undefined}
     >
       {/* ── ONDE É QUE ELA VAI CAIR ────────────────────────────────────────
           Uma barra à esquerda da célula sobre que se está a passar. As fotos
@@ -359,6 +368,21 @@ export function CelulaDeFoto({
         }`}
       >
         {children}
+        {/* ── ONDE É QUE ELA JÁ ESTEVE ────────────────────────────────────
+            Uma tira no fundo, e só quando há alguma coisa a dizer. Vermelha
+            para o que é quase sempre engano (a mesma foto duas vezes na
+            proposta) ou o que alguém vai notar (o mesmo espaço); apagada para
+            «já usada», que não é aviso nenhum — a biblioteca existe para ser
+            usada. */}
+        {historia && (
+          <span
+            className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 truncate px-1 py-0.5 text-[8px] leading-tight text-white ${
+              historia.grave ? "bg-[#8a2a22]/85" : "bg-black/55"
+            }`}
+          >
+            {historia.texto}
+          </span>
+        )}
         {principal && (
           <span className="pointer-events-none absolute top-1 left-1 z-10 rounded-full bg-[#4d6350] px-1.5 py-0.5 text-[8px] font-medium tracking-[0.1em] uppercase text-white">
             principal

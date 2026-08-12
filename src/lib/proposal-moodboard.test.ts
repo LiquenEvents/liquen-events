@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  filaDesequilibrada,
   fotoPrincipalDe,
+  porqueEsteAutomatico,
   layoutDoBoard,
   marcaDepoisDeMexer,
   ordemDasFotos,
@@ -145,5 +147,44 @@ describe("a promessa que a geometria tem de cumprir", () => {
       const maior = Math.max(...areas);
       expect(areas[0], `${layout}: a primeira caixa tem de ser a maior`).toBeCloseTo(maior, 6);
     }
+  });
+});
+
+describe("porque é que o automático escolheu aquilo", () => {
+  it("diz uma frase por cada caso da regra, e nomeia o número de fotos", () => {
+    // A regra é `layoutSugerido` e depende só de quantas fotos há. A frase tem
+    // de acompanhar a regra: se um dia mudar uma e não a outra, o ecrã explica
+    // uma escolha que não é a que foi feita.
+    expect(porqueEsteAutomatico(0)).toMatch(/sem fotos/i);
+    expect(porqueEsteAutomatico(1)).toMatch(/uma foto/i);
+    expect(porqueEsteAutomatico(3)).toMatch(/^3 fotos/);
+    expect(porqueEsteAutomatico(5)).toMatch(/^5 fotos/);
+    expect(porqueEsteAutomatico(6)).toMatch(/^6 fotos/);
+    expect(porqueEsteAutomatico(9)).toMatch(/^9 fotos/);
+  });
+});
+
+describe("a última fila desequilibrada", () => {
+  /** Caixas de teste: `y` é o fundo e `h` a altura, como no PDF. */
+  const fila = (quantas: number, y: number, h = 100) =>
+    Array.from({ length: quantas }, () => ({ y, h }));
+
+  it("três em cima e uma em baixo é para avisar", () => {
+    const r = filaDesequilibrada([...fila(3, 200), ...fila(1, 80)]);
+    expect(r).toEqual({ naUltima: 1, nasOutras: 3, sugestao: "acrescentar" });
+  });
+
+  it("uma a menos na última fila é o aspecto normal de uma grelha", () => {
+    // 3 + 2 não merece aviso nenhum: avisar aqui seria ensinar a ignorar.
+    expect(filaDesequilibrada([...fila(3, 200), ...fila(2, 80)])).toBeNull();
+  });
+
+  it("filas cheias, ou uma fila só, não têm nada a dizer", () => {
+    expect(filaDesequilibrada([...fila(3, 200), ...fila(3, 80)])).toBeNull();
+    expect(filaDesequilibrada(fila(5, 200))).toBeNull();
+  });
+
+  it("poucas fotos nunca dão aviso", () => {
+    expect(filaDesequilibrada([...fila(2, 200), ...fila(1, 80)])).toBeNull();
   });
 });

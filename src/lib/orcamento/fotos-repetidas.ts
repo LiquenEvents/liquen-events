@@ -97,3 +97,44 @@ export function comoSeDiz(f: FotoRepetida): string {
   const resto = f.usos.length > 1 ? ` (+${f.usos.length - 1})` : "";
   return [primeiro.cliente, quando].filter(Boolean).join(", ") + resto;
 }
+
+/**
+ * Esta foto já foi a um casamento NO MESMO ESPAÇO?
+ *
+ * Palavras dela: «Se uma foto já foi usada numa proposta enviada a outro casal
+ * que casa no MESMO ESPAÇO, avisa. É a situação em que a repetição é notada.»
+ *
+ * E é notada por gente concreta: a equipa da quinta, o fotógrafo que trabalha
+ * lá todos os meses, os convidados que vão a dois casamentos no mesmo sítio.
+ * Uma repetição a 200 km de distância não a vê ninguém; à mesma mesa, vê-se.
+ *
+ * A comparação é conservadora — sem acentos, sem maiúsculas, sem pontuação, e
+ * por CONTENÇÃO, porque o mesmo sítio aparece escrito de várias maneiras («Monte
+ * da Oliveirinha», «Oliveirinha», «Quinta do Monte da Oliveirinha»). Um espaço
+ * por saber (`local` em falta) não conta como igual: na dúvida, não se avisa.
+ */
+export function noMesmoEspaco(f: FotoRepetida, local: string | undefined): UsoAnterior[] {
+  const alvo = chaveDeEspaco(local);
+  if (!alvo) return [];
+  return f.usos.filter((u) => {
+    const seu = chaveDeEspaco(u.local);
+    if (!seu) return false;
+    return seu === alvo || seu.includes(alvo) || alvo.includes(seu);
+  });
+}
+
+/** O nome de um espaço reduzido ao que o distingue. */
+function chaveDeEspaco(nome: string | undefined): string {
+  return (nome ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter(
+      (t) =>
+        t && !["quinta", "monte", "casa", "herdade", "do", "da", "de", "dos", "das"].includes(t),
+    )
+    .join(" ")
+    .trim();
+}

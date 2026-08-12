@@ -29,6 +29,7 @@ import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
+import PreviaDaPagina from "./PreviaDaPagina";
 import LupaDeFotos from "./LupaDeFotos";
 import {
   ArrastoDosMoodBoards,
@@ -39,14 +40,16 @@ import {
   type LargadaDeFoto,
 } from "./MoodBoardFotos";
 import {
+  filaDesequilibrada,
   fotoPrincipalDe,
   marcaDepoisDeMexer,
   ordemDasFotos,
+  porqueEsteAutomatico,
   temLugarDeDestaque,
 } from "@/lib/proposal-moodboard";
 import { corrigirGralha, corrigirTudo, gralhasDoDocumento } from "@/lib/proposal-ortografia";
 import Versoes from "./Versoes";
-import { comoSeDiz, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
+import { comoSeDiz, noMesmoEspaco, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
 import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { custosDe } from "@/lib/orcamento/margem";
 import {
@@ -990,6 +993,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     { kind: "board"; bi: number; substituir?: number } | { kind: "cover"; idx: number } | null
   >(null);
   /** O que está a ser arrastado agora (identificador do dnd-kit), ou nada. */
+  /** As fotos de biblioteca já usadas noutras propostas, com onde e quando. */
+  const [repetidas, setRepetidas] = useState<FotoRepetida[]>([]);
   const [aArrastar, setAArrastar] = useState<string | null>(null);
   /** A fotografia aberta em grande: o board e a posição. */
   const [lupa, setLupa] = useState<{ bi: number; ii: number } | null>(null);
@@ -1391,6 +1396,32 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         for (const [k, v] of Object.entries(mapa)) if (!isPendingImage(k)) out[k] = v;
         return out;
       };
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * O RASCUNHO FICA NESTE COMPUTADOR — E ISSO É O QUE SE QUER
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * O CodeQL assinala estas linhas com «Clear text storage of sensitive
+       * information», severidade alta. O que ele vê é verdade: o documento tem
+       * o nome do casal e a morada do espaço, e é gravado em claro no
+       * `localStorage` desta máquina.
+       *
+       * É o comportamento pretendido, e a alternativa é pior. Uma proposta
+       * demora horas a montar; a rede de casa dela cai; o portátil vai para a
+       * quinta no dia da montagem. Sem esta cópia, uma gravação falhada ao
+       * servidor é trabalho perdido — e foi exactamente isso que aconteceu
+       * antes de isto existir. Cifrar não resolveria nada: a chave teria de
+       * viver ao lado, no mesmo browser.
+       *
+       * O que NÃO está aqui, e é o que importa: não há segredos nenhuns. Nem
+       * palavra-passe, nem sessão, nem chaves de armazenamento. Os marcadores
+       * provisórios são filtrados acima (`semProvisorios`), e os preços de
+       * custo, que são o único número verdadeiramente interno, nunca saem para
+       * o cliente por outro caminho — ver `proposal-doc-pdf`.
+       *
+       * Quem tem acesso a este `localStorage` já tem acesso à sessão aberta do
+       * back office no mesmo browser, e daí a tudo.
+       */
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(gravavel));
         localStorage.setItem(`${DRAFT_KEY}:at`, String(Date.now()));
@@ -1747,6 +1778,84 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const linhasDoOrcamento = linhasDe(doc);
   const ordemDoOrcamento = ordemDeSaida(doc as ProposalDoc, linhasDoOrcamento, (l) => l.item ?? "");
   const ordemDosBoards = ordemDeSaida(doc as ProposalDoc, doc.moodBoards, (b) => b.title ?? "");
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * QUANTO PESA ESTA PROPOSTA, SEMPRE À VISTA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «Contagem de fotos por board e total da proposta, sempre
+   * visível. Número estimado de páginas do PDF.»
+   *
+   * As páginas de inspiração são exactamente uma por board COM fotos — um board
+   * vazio não imprime nada (o gerador salta-o, para nunca mostrar uma folha em
+   * branco a um cliente).
+   *
+   * O total do PDF é MEDIDO e não estimado a olho: sete páginas fixas (capa,
+   * apresentação, serviços, orçamento, condições, observações, contracapa) mais
+   * uma por página de inspiração. Um texto muito longo pode empurrar uma secção
+   * para a folha seguinte, e é por isso que se diz «cerca de».
+   */
+  const fotosPorBoard = doc.moodBoards.map((b) => b.images.length);
+  const totalDeFotos = fotosPorBoard.reduce((a, b) => a + b, 0);
+  const paginasDeInspiracao = fotosPorBoard.filter((n) => n > 0).length;
+  const contagemDosBoards =
+    `${paginasDeInspiracao} ${paginasDeInspiracao === 1 ? "página" : "páginas"} · ` +
+    `${totalDeFotos} ${totalDeFotos === 1 ? "foto" : "fotos"} · ` +
+    `PDF com cerca de ${PAGINAS_FIXAS_DO_PDF + paginasDeInspiracao}`;
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * ONDE É QUE ESTA FOTOGRAFIA JÁ ESTEVE
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Duas perguntas diferentes, e só uma delas é um aviso:
+   *
+   *  · JÁ ESTÁ NOUTRO BOARD desta proposta — quase sempre um engano, e é o
+   *    único caso em que o casal vê a mesma fotografia duas vezes no mesmo
+   *    documento;
+   *  · JÁ FOI a outra proposta, e, dentro dessas, as que foram para um
+   *    casamento NO MESMO ESPAÇO. É a repetição que alguém nota: a equipa da
+   *    quinta, o fotógrafo da casa, os convidados que vão aos dois.
+   *
+   * As outras repetições — outro casal, outro sítio, outro mês — não são aviso
+   * nenhum: a biblioteca existe para ser usada.
+   */
+  const ondeEstaCadaFoto = useMemo(() => {
+    const contagem = new Map<string, number>();
+    for (const b of doc.moodBoards)
+      for (const p of b.images) {
+        if (p) contagem.set(p, (contagem.get(p) ?? 0) + 1);
+      }
+    return contagem;
+  }, [doc.moodBoards]);
+
+  const repetidasPorOrigem = useMemo(
+    () => new Map(repetidas.map((f) => [f.origem, f])),
+    [repetidas],
+  );
+
+  /** O que dizer sobre uma foto, ou nada. */
+  function historiaDaFoto(caminho: string): { texto: string; grave: boolean } | null {
+    const vezesAqui = ondeEstaCadaFoto.get(caminho) ?? 0;
+    if (vezesAqui > 1) {
+      return {
+        texto: `Esta fotografia está ${vezesAqui} vezes nesta proposta.`,
+        grave: true,
+      };
+    }
+    const origem = themeOrigins[caminho];
+    const f = origem ? repetidasPorOrigem.get(origem) : undefined;
+    if (!f) return null;
+    const mesmoEspaco = noMesmoEspaco(f, quote.location || undefined);
+    if (mesmoEspaco.length > 0) {
+      return {
+        texto: `Já foi para ${mesmoEspaco[0].cliente}, no mesmo espaço.`,
+        grave: true,
+      };
+    }
+    return { texto: `Já usada — ${comoSeDiz(f)}.`, grave: false };
+  }
+
   /** Alguma das duas listas sai por ordem diferente da que está escrita? */
   const ordemSugerida = !eAOrdemEscrita(ordemDoOrcamento) || !eAOrdemEscrita(ordemDosBoards);
 
@@ -2356,6 +2465,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         const data = (await res.json()) as { fotos?: FotoRepetida[] };
         if (!vivo || !Array.isArray(data.fotos)) return;
         setUsadasNoutras(Object.fromEntries(data.fotos.map((f) => [f.origem, comoSeDiz(f)])));
+        // A lista inteira, e não só a frase: é dela que sai o aviso do MESMO
+        // ESPAÇO, que precisa do `local` de cada uso.
+        setRepetidas(data.fotos);
       } catch {
         /* a grelha fica a de antes */
       }
@@ -3896,7 +4008,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Mood boards — decoracao only */}
           {isDeco && (
-            <Section title="Mood boards" id="moodboards">
+            <Section title="Mood boards" id="moodboards" nota={contagemDosBoards}>
               <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
                 grupos de imagens de inspiração para o cliente
               </p>
@@ -3957,9 +4069,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                          * arranjo único e antigo, e mostrava um recorte que a página
                          * já não fazia — a mesma fotografia, cortada noutro sítio.
                          */
-                        const aspectos = b.images
+                        /**
+                         * A ORDEM POR QUE A PÁGINA DESENHA — a mesma função do
+                         * gerador (`ordemDasFotos`). Com uma foto marcada como
+                         * principal, ela troca para a caixa grande.
+                         *
+                         * Vem ANTES dos aspectos porque são os aspectos POR ESTA
+                         * ORDEM que dão as caixas: medir numa ordem e desenhar
+                         * noutra daria à foto marcada a forma da caixa da vizinha.
+                         */
+                        const ordemDeDesenho = ordemDasFotos(b);
+                        const aspectos = ordemDeDesenho
                           .slice(0, MOOD_BOARD_MAX_IMAGES)
-                          .map((p) => aspetosDasFotos[p] ?? ASPETO_POR_OMISSAO);
+                          .map((i) => aspetosDasFotos[b.images[i]] ?? ASPETO_POR_OMISSAO);
                         /**
                          * A escolha desta página: as caixas tomam a FORMA das
                          * fotografias em vez de as recortarem. Viaja daqui para as
@@ -3976,13 +4098,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           undefined,
                           semRecorte,
                         );
-                        /**
-                         * A ORDEM POR QUE A PÁGINA DESENHA — a mesma função do
-                         * gerador (`ordemDasFotos`). Com uma foto marcada como
-                         * principal, ela troca para a caixa grande; sem marca, ou
-                         * numa disposição sem lugar de destaque, é a ordem escrita.
-                         */
-                        const ordemDeDesenho = ordemDasFotos(b);
                         const comDestaque = temLugarDeDestaque(layoutDoBoard);
                         /** Esta página está fechada a alterações? */
                         const fechado = !!b.bloqueado;
@@ -4162,6 +4277,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
                                       aria-label="Descrição do mood board"
                                     />
+                                    {/* ── A PÁGINA ESTÁ A FICAR CHEIA ─────────
+                                        Discreto, e antes do limite: às oito
+                                        fotos a página ainda sai inteira, mas
+                                        cada uma já é pequena. O aviso vermelho
+                                        fica para quando alguma deixa mesmo de
+                                        ser impressa. */}
+                                    {b.images.length >= FOTOS_QUE_ENCHEM_A_PAGINA &&
+                                      b.images.length <= MOOD_BOARD_MAX_IMAGES && (
+                                        <p className="mb-2 text-xs leading-relaxed text-foreground/45">
+                                          {b.images.length} fotos numa página: cada uma fica
+                                          pequena. Duas páginas com metade lêem-se melhor do que uma
+                                          cheia.
+                                        </p>
+                                      )}
                                     {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
                           fotos. As que passam disso ficam marcadas — e ditas por
                           extenso a seguir — em vez de desaparecerem caladas no
@@ -4271,16 +4400,40 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     {/* Sem fotos não há disposição nenhuma para escolher — o
                         selector aparece com a primeira foto, que é quando a
                         pergunta passa a ter resposta. */}
+                                    {/* ── VER ANTES DE GERAR ───────────────────
+                                        A página com as fotos no sítio, ao lado
+                                        das opções. Os diagramas dizem a FORMA
+                                        das caixas; isto diz que fotografia
+                                        fica em qual. */}
                                     {aspectos.length > 0 && (
-                                      <SelectorDeLayout
-                                        valor={b.layout}
-                                        aspectos={aspectos}
-                                        semRecorte={semRecorte}
-                                        // `undefined` APAGA o campo: um mood board sem layout
-                                        // gravado continua sem ele, e uma proposta já enviada
-                                        // não muda de aspecto por causa disto.
-                                        onEscolher={(layout) => updateBoard(bi, { layout })}
-                                      />
+                                      <div className="mt-1 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
+                                        <div className="min-w-0">
+                                          <SelectorDeLayout
+                                            valor={b.layout}
+                                            aspectos={aspectos}
+                                            semRecorte={semRecorte}
+                                            // `undefined` APAGA o campo: um mood board sem
+                                            // layout gravado continua sem ele, e uma proposta
+                                            // já enviada não muda de aspecto por causa disto.
+                                            onEscolher={(layout) => updateBoard(bi, { layout })}
+                                          />
+                                        </div>
+                                        <div className="lg:pt-6">
+                                          <PreviaDaPagina
+                                            layout={layoutDoBoard}
+                                            aspectos={aspectos}
+                                            // Pela ordem de DESENHO, com a principal à frente
+                                            // — a mesma que a página vai usar.
+                                            urls={ordemDeDesenho
+                                              .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                              .map((i) => assetUrls[b.images[i]])}
+                                            semRecorte={semRecorte}
+                                            titulo={b.title}
+                                            subtitulo={b.subtitulo}
+                                            legenda={b.annotation}
+                                          />
+                                        </div>
+                                      </div>
                                     )}
                                     {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
                           Está aqui, por baixo dos diagramas, porque é com eles
@@ -4312,6 +4465,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         </span>
                                       </span>
                                     </label>
+                                    {/* ── A ÚLTIMA FILA ────────────────────────
+                                        Uma última fila com uma foto, quando as
+                                        de cima têm três ou quatro, lê-se como
+                                        um esquecimento. Medido nas caixas que a
+                                        página vai mesmo desenhar. */}
+                                    {(() => {
+                                      const fila = filaDesequilibrada(caixas);
+                                      if (!fila) return null;
+                                      return (
+                                        <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
+                                          A última fila desta página fica com{" "}
+                                          {fila.naUltima === 1
+                                            ? "uma foto só"
+                                            : `${fila.naUltima} fotos`}
+                                          , contra {fila.nasOutras} nas de cima. Com mais{" "}
+                                          {fila.nasOutras - fila.naUltima === 1
+                                            ? "uma foto"
+                                            : `${fila.nasOutras - fila.naUltima} fotos`}{" "}
+                                          a página fecha certa.
+                                        </p>
+                                      );
+                                    })()}
                                     {cortadas.length > 0 && (
                                       <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
                                         Nesta disposição{" "}
@@ -5618,6 +5793,29 @@ const SECOES_KEY = "liquen-estudio-secoes";
  * um casamento não dizem nada sobre as do seguinte. Guardado por `quote.id` +
  * id do board — ver `withMoodBoardIds`.
  */
+/**
+ * As páginas que uma proposta tem SEM contar com a inspiração.
+ *
+ * MEDIDO, não estimado: gerou-se o PDF de um documento com 0, 1 e 3 mood
+ * boards e contaram-se as folhas — 7, 8 e 10. Sete fixas, mais uma por página
+ * de inspiração.
+ *
+ * Um texto muito longo (condições reescritas à mão, uma lista de serviços
+ * enorme) pode empurrar uma secção para a folha seguinte. Daí o «cerca de» na
+ * frase que mostra este número: é um piso honesto, não uma promessa.
+ */
+const PAGINAS_FIXAS_DO_PDF = 7;
+
+/**
+ * A partir de quantas fotos a página começa a ficar apertada.
+ *
+ * O tecto duro são as `MOOD_BOARD_MAX_IMAGES` (10), acima do qual as fotos
+ * deixam de ser impressas e o aviso é vermelho. Este é o degrau ANTES: às oito,
+ * a página sai inteira e cada fotografia já é pequena — que é uma decisão de
+ * composição e não um erro, e por isso diz-se em voz baixa.
+ */
+const FOTOS_QUE_ENCHEM_A_PAGINA = 8;
+
 const BOARDS_KEY = "liquen-estudio-boards";
 
 function lerDobrasDeBoards(quoteId: string): Record<string, boolean> {
@@ -6515,6 +6713,16 @@ function SelectorDeLayout({
     <div className="mt-3">
       <p className="mb-1.5 text-[10px] tracking-[0.14em] uppercase text-foreground/35">
         Disposição na página
+      </p>
+      {/* ── PORQUE É QUE O AUTOMÁTICO ESCOLHEU AQUILO ────────────────────
+          Palavras dela: «sem explicar porquê». A regra é curta — depende só
+          de quantas fotos há — e dizê-la torna óbvio o remédio quando a
+          escolha não serve: tirar uma foto, acrescentar outra, ou escolher à
+          mão nas opções que estão logo ao lado. */}
+      <p className="mb-2 text-[11px] leading-relaxed text-foreground/45">
+        {valor
+          ? `Escolhida à mão: ${NOME_DO_LAYOUT[valor].toLowerCase()}. O «Automático» acompanharia o número de fotos.`
+          : `Automático — ${porqueEsteAutomatico(aspectos.length)}`}
       </p>
       <div
         role="radiogroup"

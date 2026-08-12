@@ -103,3 +103,70 @@ export function marcaDepoisDeMexer(
   const novo = deParaOndeFoi(board.principal as number);
   return novo === null || novo < 0 ? undefined : novo;
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * PORQUE É QUE O «AUTOMÁTICO» ESCOLHEU AQUILO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «O seletor mostra "Automático (fila única)" nuns boards e
+ * "Automático (mosaico)" noutros, sem explicar porquê.»
+ *
+ * A regra é `layoutSugerido`, e é curta: depende só de QUANTAS fotos há. Dizer
+ * isso em voz alta faz duas coisas — tira o mistério, e torna óbvio o remédio
+ * quando a escolha não serve (tirar uma foto, acrescentar outra, ou escolher à
+ * mão, que é para isso que as outras opções estão ao lado).
+ *
+ * Escrito aqui, ao lado da regra que descreve, para as duas não poderem
+ * divergir sem que alguém tropece nas duas ao mesmo tempo.
+ */
+export function porqueEsteAutomatico(quantasFotos: number): string {
+  const n = quantasFotos;
+  if (n <= 0) return "Sem fotos ainda — a disposição escolhe-se com a primeira.";
+  if (n === 1) return "Uma foto só: fica grande, ao lado do texto.";
+  if (n <= 3) return `${n} fotos: uma em destaque e as outras ao lado.`;
+  if (n === 5) return "5 fotos: cabem todas numa fila, sem nenhuma ficar pequena.";
+  if (n === 4 || n === 6) return `${n} fotos: um mosaico, com a primeira maior.`;
+  return `${n} fotos: filas, para nenhuma ficar do tamanho de um selo.`;
+}
+
+/**
+ * A última fila fica desequilibrada?
+ *
+ * Palavras dela: «Aviso se um board tiver um número de fotos que deixe a última
+ * fila desequilibrada, com sugestão de acrescentar ou remover uma.»
+ *
+ * Mede-se nas CAIXAS que a página vai mesmo desenhar, agrupando-as por linha
+ * (mesmo topo, ao ponto). Uma última fila com uma foto só, quando as de cima
+ * têm três ou quatro, lê-se como um esquecimento — e é a única assimetria que
+ * se nota a olho numa página de inspiração.
+ *
+ * Devolve `null` quando está tudo bem, que é o caso normal.
+ */
+export function filaDesequilibrada(
+  caixas: readonly { y: number; h: number }[],
+): { naUltima: number; nasOutras: number; sugestao: "acrescentar" | "remover" } | null {
+  if (caixas.length < 4) return null;
+  // Agrupar por topo: as caixas de uma fila partilham o topo ao ponto.
+  const filas = new Map<number, number>();
+  for (const c of caixas) {
+    const topo = Math.round((c.y + c.h) * 10) / 10;
+    filas.set(topo, (filas.get(topo) ?? 0) + 1);
+  }
+  if (filas.size < 2) return null;
+  // A última fila é a mais BAIXA na página (o y cresce para cima no PDF).
+  const topos = [...filas.keys()].sort((a, b) => b - a);
+  const naUltima = filas.get(topos[topos.length - 1]) ?? 0;
+  const outras = topos.slice(0, -1).map((t) => filas.get(t) ?? 0);
+  const nasOutras = Math.max(...outras);
+  // Duas ou mais de diferença é que se nota. Uma a menos na última fila é o
+  // aspecto normal de uma grelha e não merece aviso nenhum.
+  if (nasOutras - naUltima < 2) return null;
+  return {
+    naUltima,
+    nasOutras,
+    // Acrescentar é quase sempre o gesto mais barato: há mais fotos na
+    // biblioteca do que vontade de tirar uma que já foi escolhida.
+    sugestao: "acrescentar",
+  };
+}

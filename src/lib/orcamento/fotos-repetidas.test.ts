@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Proposal, Quote } from "./types";
-import { comoSeDiz, ondeJaFoi } from "./fotos-repetidas";
+import { comoSeDiz, ondeJaFoi, noMesmoEspaco } from "./fotos-repetidas";
 
 let n = 0;
 function p(quoteId: string, origens: string[], over: Partial<Proposal> = {}): Proposal {
@@ -99,5 +99,50 @@ describe("a frase da marca", () => {
   it("sem data do casamento diz só o casal", () => {
     const [f] = ondeJaFoi("agora", [p("q1", ["temas/arco.jpg"])], [q("q1", { date: "" })]);
     expect(comoSeDiz(f)).toBe("Ana e Rui");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A REPETIÇÃO QUE ALGUÉM NOTA É A DO MESMO ESPAÇO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «É a situação em que a repetição é notada.» E é notada por
+ * gente concreta — a equipa da quinta, o fotógrafo da casa, os convidados que
+ * vão aos dois casamentos.
+ */
+describe("noMesmoEspaco", () => {
+  const foto = (locais: (string | undefined)[]) => ({
+    origem: "t1/foto.jpg",
+    usos: locais.map((local, i) => ({
+      cliente: `Casal ${i + 1}`,
+      local,
+      enviadaEm: "2026-01-01",
+    })),
+  });
+
+  it("o mesmo espaço é assinalado", () => {
+    const r = noMesmoEspaco(foto(["Monte da Oliveirinha"]), "Monte da Oliveirinha");
+    expect(r).toHaveLength(1);
+    expect(r[0].cliente).toBe("Casal 1");
+  });
+
+  it("o mesmo sítio escrito de outra maneira também", () => {
+    // «Quinta do Monte da Oliveirinha» e «Oliveirinha» são o mesmo sítio: as
+    // palavras que não distinguem nada saem da comparação.
+    expect(noMesmoEspaco(foto(["Quinta do Monte da Oliveirinha"]), "Oliveirinha")).toHaveLength(1);
+    expect(noMesmoEspaco(foto(["MONTE DA OLIVEIRINHA"]), "monte da oliveirinha")).toHaveLength(1);
+  });
+
+  it("outro espaço não é aviso nenhum", () => {
+    expect(noMesmoEspaco(foto(["Quinta do Hespanhol"]), "Monte da Oliveirinha")).toEqual([]);
+  });
+
+  it("na dúvida não se avisa: um espaço por saber não conta como igual", () => {
+    expect(noMesmoEspaco(foto([undefined]), "Monte da Oliveirinha")).toEqual([]);
+    expect(noMesmoEspaco(foto(["Monte da Oliveirinha"]), undefined)).toEqual([]);
+    expect(noMesmoEspaco(foto([""]), "")).toEqual([]);
+    // Um nome feito só de palavras que não distinguem nada não casa com tudo.
+    expect(noMesmoEspaco(foto(["Quinta"]), "Monte")).toEqual([]);
   });
 });
