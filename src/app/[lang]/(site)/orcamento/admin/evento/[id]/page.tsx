@@ -10,6 +10,7 @@ import { listInvoicesForQuote } from "@/lib/invoices-store";
 import { createPortalToken } from "@/lib/portal-token";
 import type { DossierData } from "@/lib/orcamento/dossier";
 import DossierClient from "./DossierClient";
+import { entradaCom } from "../../entrada-destino";
 
 /**
  * Dossier do Evento — cockpit de página inteira para UM evento. Este é o único
@@ -37,9 +38,17 @@ export default async function EventoDossierPage({
   // Mesma barreira que a página de administração: sem sessão válida → login.
   // A página admin renderiza <AdminLogin/> na raiz; aqui reencaminhamos para
   // essa raiz (onde o login vive) para não duplicar o formulário.
+  //
+  // O DESTINO VAI COM A PESSOA. Sem isto, quem seguisse o link de um evento sem
+  // sessão entrava e ia parar à lista, tendo de voltar a procurar o evento à
+  // mão — e o link que abriu deixava de servir para o que servia. O que o
+  // `?destino=` aceita é decidido no `entrada-destino.ts`, e só lá: um destino
+  // vindo do URL é escolhido por quem manda o link, não por nós.
   const store = await cookies();
   const session = readSession(store.get(ADMIN_COOKIE)?.value);
-  if (!session) redirect(`/${lang}/orcamento/admin`);
+  if (!session) {
+    redirect(entradaCom(`/${lang}/orcamento/admin`, `/${lang}/orcamento/admin/evento/${id}`));
+  }
 
   const quote = await getQuote(id);
   if (!quote) notFound();

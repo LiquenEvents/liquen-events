@@ -41,10 +41,12 @@ async function ligarAutenticador(page: Page): Promise<string> {
 
 async function entrarComSenha(page: Page): Promise<boolean> {
   await page.goto("/orcamento/admin");
+  // O campo pelo `name` e não pelo rótulo: o rótulo «Palavra-passe» passou a ter
+  // ao lado o botão de mostrar/ocultar, cujo nome acessível também o contém.
   await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
   await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
-  await page.getByLabel(/Palavra-passe/i).fill(SENHA);
-  await page.getByRole("button", { name: /^Entrar$/ }).click();
+  await page.locator('input[name="password"]').fill(SENHA);
+  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
   try {
     await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
       timeout: 8000,
@@ -86,6 +88,16 @@ test.describe("Passkeys", () => {
 
     await expect(dialogo.getByText("Portátil de testes")).toBeVisible({ timeout: 10_000 });
 
+    // ── 1b. Mudar-lhe o nome ───────────────────────────────────────────────
+    // O nome é escolhido no registo, quando só há um aparelho na conta. Ao
+    // terceiro telemóvel, três linhas iguais tornam a lista impossível de ler —
+    // e uma lista que não se lê é uma lista de onde nada se remove.
+    await dialogo.getByRole("button", { name: /^Mudar nome$/ }).click();
+    await dialogo.getByLabel(/Nome do dispositivo/i).fill("Portátil da bancada");
+    await dialogo.getByRole("button", { name: /^Guardar$/ }).click();
+    await expect(dialogo.getByText("Portátil da bancada")).toBeVisible({ timeout: 10_000 });
+    await expect(dialogo.getByText("Portátil de testes")).toHaveCount(0);
+
     // ── 2. Sair ────────────────────────────────────────────────────────────
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: /^Sair$/i }).click();
@@ -102,7 +114,7 @@ test.describe("Passkeys", () => {
     await abrirDispositivos(page);
     page.once("dialog", (d) => d.accept());
     await dialogo.getByRole("button", { name: /^Remover$/ }).click();
-    await expect(dialogo.getByText("Portátil de testes")).toHaveCount(0, { timeout: 10_000 });
+    await expect(dialogo.getByText("Portátil da bancada")).toHaveCount(0, { timeout: 10_000 });
 
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: /^Sair$/i }).click();
@@ -122,6 +134,6 @@ test.describe("Passkeys", () => {
     // aparece; o que se prende aqui é o ecrã sem passkey nenhuma REGISTADA —
     // tentar tem de recusar, e a palavra-passe tem de continuar à vista.
     await page.goto("/orcamento/admin");
-    await expect(page.getByLabel(/Palavra-passe/i)).toBeVisible();
+    await expect(page.locator('input[name="password"]')).toBeVisible();
   });
 });

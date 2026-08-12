@@ -5,7 +5,13 @@ import {
   verifyAuthenticationResponse,
   type VerifyAuthenticationResponseOpts,
 } from "@simplewebauthn/server";
-import { ADMIN_COOKIE, ADMIN_NAME_COOKIE, contaExiste, createSession } from "@/lib/admin-auth";
+import {
+  ADMIN_COOKIE,
+  ADMIN_NAME_COOKIE,
+  contaExiste,
+  createSession,
+  duracaoDaSessao,
+} from "@/lib/admin-auth";
 import { contadorRetrocedeu, getPasskey, marcarUso } from "@/lib/passkeys-store";
 import {
   CHALLENGE_COOKIE,
@@ -61,6 +67,15 @@ export async function GET(req: NextRequest) {
 
 const entradaSchema = z.object({
   response: z.object({ id: z.string().min(1).max(1000) }).passthrough(),
+  /**
+   * A mesma caixa «manter a sessão iniciada» da entrada por palavra-passe. Sem
+   * isto, desligá-la valia numa porta e não valia na outra — e a porta onde não
+   * valia era justamente a mais rápida, ou seja a mais usada.
+   *
+   * Ausente = ligada, para um separador aberto antes deste deploy continuar a
+   * receber os 30 dias de sempre.
+   */
+  manterSessao: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -164,15 +179,18 @@ export async function POST(req: NextRequest) {
     log.error("passkeys: não foi possível marcar a utilização", { err });
   }
 
-  log.info("passkeys: entrada", { ip, conta: credencial.userName });
+  const manterSessao = parsed.data.manterSessao !== false;
+  log.info("passkeys: entrada", { ip, conta: credencial.userName, manterSessao });
   const res = NextResponse.json({ ok: true });
+  // A MESMA duração da entrada por palavra-passe, decidida no mesmo sítio.
+  const { ttlMs, maxAge } = duracaoDaSessao(manterSessao);
   const cookieBase = {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 dias, como na entrada por palavra-passe
+    ...(maxAge === undefined ? {} : { maxAge }),
   };
-  res.cookies.set(ADMIN_COOKIE, createSession(credencial.userName), {
+  res.cookies.set(ADMIN_COOKIE, createSession(credencial.userName, ttlMs), {
     httpOnly: true,
     ...cookieBase,
   });

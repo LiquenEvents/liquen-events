@@ -8,7 +8,9 @@
  */
 
 import {
+  WebAuthnAbortService,
   browserSupportsWebAuthn,
+  browserSupportsWebAuthnAutofill,
   startAuthentication,
   startRegistration,
 } from "@simplewebauthn/browser";
@@ -19,6 +21,32 @@ export function suportaPasskeys(): boolean {
     return browserSupportsWebAuthn();
   } catch {
     return false;
+  }
+}
+
+/**
+ * O browser sabe oferecer a passkey DENTRO do preenchimento automático?
+ *
+ * É a pergunta do «conditional UI»: em vez de a pessoa ter de carregar num
+ * botão, o aparelho propõe a passkey assim que o campo do email ganha o foco,
+ * na mesma lista onde o gestor de palavras-passe já propõe o resto. Safari 16+,
+ * Chrome 108+ e Firefox 122+ sabem; os outros respondem `false` e ficamos com o
+ * botão, que continua lá.
+ */
+export async function suportaAutofillDePasskeys(): Promise<boolean> {
+  try {
+    return await browserSupportsWebAuthnAutofill();
+  } catch {
+    return false;
+  }
+}
+
+/** Cancela a cerimónia em curso (a do autofill, tipicamente). */
+export function cancelarCerimonia(): void {
+  try {
+    WebAuthnAbortService.cancelCeremony();
+  } catch {
+    /* não havia nenhuma a decorrer */
   }
 }
 
@@ -70,18 +98,117 @@ export async function registarDispositivo(deviceLabel: string): Promise<void> {
   });
 }
 
+export interface OpcoesDeEntrada {
+  /**
+   * Propor a passkey pelo preenchimento automático, sem esperar por um clique
+   * (`mediation: "conditional"`). Exige um `<input autocomplete="… webauthn">`
+   * na página — o `startAuthentication` verifica isso e atira se não houver.
+   */
+  autofill?: boolean;
+  /** A caixa «manter a sessão iniciada» do ecrã de entrada. */
+  manterSessao?: boolean;
+}
+
 /**
  * Entra com um aparelho já registado. Sem nome, sem palavra-passe: o aparelho
  * mostra as passkeys que tem para este domínio e a pessoa escolhe.
+ *
+ * ── Com `autofill`, esta promessa fica PENDURADA ──────────────────────────
+ * Em modo condicional o browser não abre janela nenhuma: regista o pedido e
+ * espera, possivelmente para sempre, que a pessoa escolha a passkey na lista do
+ * preenchimento automático. Quem chama tem de tratar isto como uma subscrição e
+ * não como um pedido — e não pode desenhar «a confirmar…» à espera dela.
  */
-export async function entrarComDispositivo(): Promise<void> {
+export async function entrarComDispositivo({
+  autofill = false,
+  manterSessao = true,
+}: OpcoesDeEntrada = {}): Promise<void> {
   const optionsJSON = (await pedirJson("/api/admin/passkeys/entrada")) as Parameters<
     typeof startAuthentication
   >[0]["optionsJSON"];
-  const response = await startAuthentication({ optionsJSON });
+  const response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill });
   await pedirJson("/api/admin/passkeys/entrada", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ response }),
+    body: JSON.stringify({ response, manterSessao }),
   });
+}
+
+/**
+ * De quanto em quanto tempo é que a proposta de passkey do autofill é rearmada.
+ *
+ * ── O número não é um gosto: é o prazo do desafio menos folga ─────────────
+ * O desafio que o servidor emite dura 120 s (ver `passkey-challenge.ts`, e a
+ * razão de ser curto está lá escrita). A proposta do autofill, essa, pode ficar
+ * à espera o tempo que a pessoa demorar a olhar para o ecrã — abre-se o
+ * separador, vai-se buscar um café, volta-se. Sem rearmar, quem escolhesse a
+ * passkey três minutos depois de abrir a página levava com «o pedido expirou»
+ * por uma razão que não é dela.
+ *
+ * 100 s deixa 20 s de folga para a ida e volta ao servidor e para o tempo que a
+ * pessoa leva a pôr o dedo depois de escolher.
+ */
+const REARMAR_AUTOFILL_MS = 100_000;
+
+/**
+ * Deixa a passkey proposta no preenchimento automático enquanto a página
+ * estiver aberta, e devolve como se desliga isso.
+ *
+ * Rearma sozinha (ver `REARMAR_AUTOFILL_MS`) — mas NUNCA enquanto o campo do
+ * autofill está focado: rearmar chama `navigator.credentials.get` outra vez, o
+ * que aborta a cerimónia anterior, e abortá-la com a lista do browser aberta
+ * fecha-a debaixo dos dedos de quem estava a escolher.
+ *
+ * O `aoEntrar` só é chamado quando a entrada ficou MESMO feita. Cancelar não
+ * chega aqui: um autofill abortado (por nós, ao rearmar, ou pela pessoa ao
+ * escrever a palavra-passe) é o funcionamento normal, não uma falha.
+ */
+export function armarEntradaAutomatica(opcoes: {
+  aoEntrar: () => void;
+  aoFalhar?: (erro: unknown) => void;
+  manterSessao?: () => boolean;
+}): () => void {
+  let vivo = true;
+  let temporizador: ReturnType<typeof setTimeout> | undefined;
+
+  /** O campo do autofill está debaixo do cursor? Então não se mexe. */
+  const aEscolher = () => {
+    const activo = document.activeElement as HTMLElement | null;
+    return !!activo?.matches?.("input[autocomplete$='webauthn']");
+  };
+
+  const armar = () => {
+    if (!vivo) return;
+    entrarComDispositivo({ autofill: true, manterSessao: opcoes.manterSessao?.() ?? true })
+      .then(() => {
+        if (!vivo) return;
+        vivo = false;
+        opcoes.aoEntrar();
+      })
+      .catch((err) => {
+        // `AbortError` é o rearmar a substituir-se a si próprio; `NotAllowedError`
+        // é a pessoa a fechar a lista. Nenhum dos dois é para mostrar.
+        if (!vivo) return;
+        const nome = (err as { name?: string })?.name;
+        if (nome !== "AbortError" && nome !== "NotAllowedError") opcoes.aoFalhar?.(err);
+      });
+    temporizador = setTimeout(() => {
+      if (aEscolher()) {
+        // Volta a perguntar daqui a pouco em vez de rearmar por cima da lista
+        // aberta. O desafio pode expirar nessa janela — mas isso é a pessoa a
+        // demorar com a lista aberta, e aí a mensagem de erro é honesta.
+        temporizador = setTimeout(armar, 5_000);
+        return;
+      }
+      armar();
+    }, REARMAR_AUTOFILL_MS);
+  };
+
+  armar();
+
+  return () => {
+    vivo = false;
+    if (temporizador) clearTimeout(temporizador);
+    cancelarCerimonia();
+  };
 }

@@ -351,6 +351,7 @@ vi.mock("@/lib/passkeys-store", async (orig) => ({
   getPasskey: H.afn("passkeys-store.getPasskey", async () => null),
   createPasskey: H.afn("passkeys-store.createPasskey"),
   removePasskeyOwnedBy: H.afn("passkeys-store.removePasskeyOwnedBy", async () => false),
+  renamePasskeyOwnedBy: H.afn("passkeys-store.renamePasskeyOwnedBy", async () => false),
   marcarUso: H.afn("passkeys-store.marcarUso"),
 }));
 // `sharp` é importado no topo da rota das miniaturas; fica de fora da auditoria
@@ -542,7 +543,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // pode ser feito por quem já provou ser quem diz. Sem esta guarda, um estranho
   // registava o aparelho dele e passava a ter porta própria.
   { path: "./admin/passkeys/route", methods: ["GET"] },
-  { path: "./admin/passkeys/[id]/route", methods: ["DELETE"] },
+  // O PATCH é o RENOMEAR, e é tão de sessão como o remover: o nome é a única
+  // coisa que distingue os aparelhos na lista, e quem o pudesse mudar sem
+  // sessão baptizava o aparelho de outra pessoa para ela apagar o dela.
+  { path: "./admin/passkeys/[id]/route", methods: ["DELETE", "PATCH"] },
   { path: "./admin/passkeys/registo/route", methods: ["GET", "POST"] },
 ];
 

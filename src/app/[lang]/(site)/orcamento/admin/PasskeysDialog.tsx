@@ -72,6 +72,8 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
   // Assim quem não quer pensar no nome carrega em Registar e fica com o palpite,
   // e quem quer escrever não tem de apagar texto primeiro.
   const [nome, setNome] = useState("");
+  /** Que dispositivo está a ser renomeado, e para quê. */
+  const [aRenomear, setARenomear] = useState<{ id: string; nome: string } | null>(null);
   // Capacidades do ambiente, não estado: ver a nota igual no AdminLogin.
   const suportado = useSyncExternalStore(
     () => () => {},
@@ -132,6 +134,35 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
       if (msg) setErro(msg);
     } finally {
       setARegistar(false);
+    }
+  }
+
+  /**
+   * Mudar o nome de um aparelho já registado.
+   *
+   * O nome é escolhido no registo, quando ainda só há um aparelho na conta —
+   * e é aí que quase toda a gente aceita o palpite. Ao terceiro telemóvel, três
+   * linhas a dizer «iPhone» tornam a lista inútil: ninguém remove com confiança
+   * uma linha que não sabe qual é, e o aparelho que já não existe fica lá para
+   * sempre. Que é exactamente o risco que esta lista existe para fechar.
+   */
+  async function renomear() {
+    if (!aRenomear) return;
+    const nomeNovo = aRenomear.nome.trim();
+    if (!nomeNovo) return;
+    setErro(null);
+    try {
+      const res = await fetch(`/api/admin/passkeys/${encodeURIComponent(aRenomear.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceLabel: nomeNovo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Não foi possível mudar o nome.");
+      setARenomear(null);
+      await carregar();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível mudar o nome.");
     }
   }
 
@@ -246,18 +277,68 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
                         key={d.id}
                         className="flex items-center justify-between gap-3 rounded-lg border border-foreground/10 px-3 py-2.5"
                       >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm text-foreground/80">{d.deviceLabel}</p>
-                          <p className="text-xs text-foreground/45">
-                            Última entrada: {quando(d.lastUsedAt)}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => remover(d)}
-                          className="shrink-0 rounded-md px-2 py-1 text-xs text-[#8a2a22] transition-colors hover:bg-[#fdf1ef]"
-                        >
-                          Remover
-                        </button>
+                        {aRenomear?.id === d.id ? (
+                          <>
+                            <div className="min-w-0 flex-1">
+                              <Field
+                                label="Nome do dispositivo"
+                                hideLabel
+                                name="nome-novo"
+                                type="text"
+                                maxLength={60}
+                                value={aRenomear.nome}
+                                autoFocus
+                                onChange={(e) => setARenomear({ id: d.id, nome: e.target.value })}
+                                onKeyDown={(e) => {
+                                  // Enter grava, Escape desiste. Isto vive dentro
+                                  // de um diálogo e não de um `<form>`: sem estas
+                                  // duas teclas só se sairia daqui com o rato.
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void renomear();
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setARenomear(null);
+                                  }
+                                }}
+                              />
+                            </div>
+                            <Button type="button" size="sm" onClick={renomear}>
+                              Guardar
+                            </Button>
+                            <button
+                              onClick={() => setARenomear(null)}
+                              className="alvo-toque shrink-0 rounded-md px-2 py-1 text-xs text-foreground/50 hover:text-foreground/80"
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm text-foreground/80">{d.deviceLabel}</p>
+                              <p className="text-xs text-foreground/45">
+                                Última entrada: {quando(d.lastUsedAt)}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                onClick={() => setARenomear({ id: d.id, nome: d.deviceLabel })}
+                                className="alvo-toque rounded-md px-2 py-1 text-xs text-foreground/50 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
+                              >
+                                Mudar nome
+                              </button>
+                              <button
+                                onClick={() => remover(d)}
+                                className="alvo-toque rounded-md px-2 py-1 text-xs text-[#8a2a22] transition-colors hover:bg-[#fdf1ef]"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </li>
                     ))}
                   </ul>

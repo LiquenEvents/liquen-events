@@ -38,6 +38,7 @@ import AjudaGlossario from "./AjudaGlossario";
 import NewQuoteModal from "./NewQuoteModal";
 import RestoreDialog from "./RestoreDialog";
 import PasskeysDialog from "./PasskeysDialog";
+import SessaoExpirada from "./SessaoExpirada";
 import NotificationBell from "./NotificationBell";
 import {
   downloadCsv,
@@ -2226,6 +2227,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           toast={toast}
         />
         <PasskeysDialog open={passkeysOpen} onClose={() => setPasskeysOpen(false)} toast={toast} />
+        {/* Se a sessão cair a meio do trabalho, este painel abre POR CIMA e
+            reautentica sem desmontar nada — ver o cabeçalho do ficheiro. Está
+            aqui, e não numa vista, para valer no back office inteiro. */}
+        <SessaoExpirada />
         <AjudaGlossario open={ajudaOpen} onClose={() => setAjudaOpen(false)} />
         <CommandPalette
           open={paletteOpen}

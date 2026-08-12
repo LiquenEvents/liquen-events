@@ -70,7 +70,34 @@ export const ADMIN_COOKIE =
   process.env.NODE_ENV === "production" ? "__Host-liquen_admin" : "liquen_admin";
 export const ADMIN_NAME_COOKIE = "liquen_user";
 
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+/**
+ * ── QUANTO DURA UMA SESSÃO, E PORQUE SÃO DOIS NÚMEROS ──────────────────────
+ *
+ * Durava sempre 30 dias, sem ninguém escolher nada e sem isso estar escrito em
+ * lado nenhum. São duas coisas diferentes e ambas erradas: quem entra no
+ * portátil do escritório QUER os 30 dias, e quem entra no computador de um
+ * fornecedor a meio de um evento não quer nenhum — e não tinha como o dizer.
+ *
+ * Por isso passam a ser duas durações, escolhidas à entrada com uma caixa que
+ * diz o número em português:
+ *
+ *  · LONGA, 30 dias — o que já acontecia. Continua a ser a opção por omissão,
+ *    porque mudar o valor por omissão punha toda a gente fora ao fim de meio
+ *    dia sem ter pedido nada. O cookie é persistente: fechar o browser não
+ *    fecha a sessão.
+ *  · CURTA, 12 horas — e o cookie é de SESSÃO DO BROWSER (sem `maxAge`),
+ *    portanto fechar o browser fecha-a antes disso. Doze horas é o tecto, não a
+ *    promessa: cobre um dia de trabalho inteiro, incluindo um casamento que
+ *    acabe às três da manhã, e não cobre a manhã seguinte noutra pessoa.
+ *
+ * O número vai DENTRO do token assinado (`exp`) e não só no cookie: um cookie
+ * sem prazo é coisa que o browser guarda e que se pode voltar a mandar à mão, e
+ * a sessão curta deixava de ser curta.
+ */
+export const SESSAO_LONGA_MS = 1000 * 60 * 60 * 24 * 30; // 30 dias
+export const SESSAO_CURTA_MS = 1000 * 60 * 60 * 12; // 12 horas
+
+const SESSION_TTL_MS = SESSAO_LONGA_MS;
 
 // Global session revocation. Tokens embed the version they were minted with;
 // bumping SESSION_VERSION (any new string) invalidates EVERY outstanding
@@ -624,16 +651,42 @@ function sign(body: string): string {
   return createHmac("sha256", sessionKey()).update(body).digest("base64url");
 }
 
-/** Mint a signed, expiring session token for the given user name. */
-export function createSession(name: string): string {
+/**
+ * Mint a signed, expiring session token for the given user name.
+ *
+ * `ttlMs` tem valor por omissão de propósito: quem não escolher continua com os
+ * 30 dias de sempre, e nenhuma sessão já emitida muda de forma por causa disto.
+ */
+export function createSession(name: string, ttlMs: number = SESSION_TTL_MS): string {
   const payload = {
     typ: "session",
     sub: name.slice(0, 40),
-    exp: Date.now() + SESSION_TTL_MS,
+    exp: Date.now() + ttlMs,
     v: sessionVersion(),
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(body)}`;
+}
+
+/**
+ * As duas metades da decisão «manter a sessão iniciada», num sítio só.
+ *
+ * Vive aqui e não em cada rota porque são DUAS portas de entrada — a
+ * palavra-passe e a passkey — e o dia em que uma delas ficasse com o prazo do
+ * token de uma e o `maxAge` do cookie da outra era o dia em que a sessão curta
+ * deixava de ser curta sem ninguém ver.
+ *
+ * `maxAge` ausente é um cookie de sessão do browser: morre ao fechá-lo. É essa
+ * a diferença que se vê no aparelho emprestado.
+ */
+export function duracaoDaSessao(manterSessao: boolean): {
+  ttlMs: number;
+  maxAge: number | undefined;
+} {
+  if (manterSessao) {
+    return { ttlMs: SESSAO_LONGA_MS, maxAge: Math.floor(SESSAO_LONGA_MS / 1000) };
+  }
+  return { ttlMs: SESSAO_CURTA_MS, maxAge: undefined };
 }
 
 /** Validate a session token; returns the user name or null if invalid/expired. */

@@ -3,6 +3,7 @@ import {
   ADMIN_COOKIE,
   ADMIN_NAME_COOKIE,
   createSession,
+  duracaoDaSessao,
   verifyCredentials,
   totpRequired,
   checkTotp,
@@ -79,9 +80,18 @@ export async function POST(request: NextRequest) {
   let password = "";
   let identificador = "";
   let code = "";
+  /**
+   * «Manter a sessão iniciada.» Verdadeiro por omissão de propósito: um
+   * separador aberto antes deste deploy não manda o campo, e a página antiga
+   * também não — e ambos têm de continuar a receber os 30 dias de sempre. Só
+   * quem DESLIGA a caixa é que pede a sessão curta, e isso chega aqui como um
+   * `false` explícito.
+   */
+  let manterSessao = true;
   try {
     const body = await request.json();
     password = String(body.password ?? "");
+    if (body.manterSessao === false) manterSessao = false;
     // `email` é o campo novo; `name` continua a ser lido para que um separador
     // aberto antes do deploy (com a página antiga em memória) não fique a
     // responder «credenciais incorretas» sem razão nenhuma.
@@ -179,15 +189,25 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  log.info("admin login ok", { ip, name: user.name, mfa: totpRequired(chaveDaConta) });
+  log.info("admin login ok", {
+    ip,
+    name: user.name,
+    mfa: totpRequired(chaveDaConta),
+    manterSessao,
+  });
   const res = NextResponse.json({ ok: true });
+  const { ttlMs, maxAge } = duracaoDaSessao(manterSessao);
   const cookieBase = {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 dias
+    // Sem `maxAge` é um cookie de sessão do browser — ver `duracaoDaSessao`.
+    ...(maxAge === undefined ? {} : { maxAge }),
   };
-  res.cookies.set(ADMIN_COOKIE, createSession(user.name), { httpOnly: true, ...cookieBase });
+  res.cookies.set(ADMIN_COOKIE, createSession(user.name, ttlMs), {
+    httpOnly: true,
+    ...cookieBase,
+  });
   // Who is logged in — used to greet the partner and default task ownership.
   res.cookies.set(ADMIN_NAME_COOKIE, user.name, { httpOnly: false, ...cookieBase });
   return res;

@@ -194,4 +194,42 @@ describe("POST /api/admin/login — o tecto por conta não fecha a porta a quem 
     expect(await res.json()).toMatchObject({ needs2fa: true });
     expect(rl.contagens.get(chaveConta("Catarina"))).toBe(1);
   });
+
+  // ── «Manter a sessão iniciada» ────────────────────────────────────────────
+  //
+  // O que se prende aqui não é a caixa do ecrã: é a promessa que a caixa faz.
+  // Uma sessão «curta» que continuasse a durar 30 dias no cookie era pior do
+  // que não haver caixa nenhuma — a pessoa desligava-a no computador do
+  // fornecedor e ia embora descansada.
+
+  it("por omissão a sessão é a de sempre: 30 dias, e o cookie fica gravado", async () => {
+    // Sem o campo no corpo, como manda um separador aberto antes deste deploy.
+    const res = await POST(postReq({ name: "Catarina", password: "liquen2026" }));
+    expect(res.status).toBe(200);
+    const cookie = res.cookies.get(ADMIN_COOKIE)!;
+    expect(cookie.maxAge).toBe(60 * 60 * 24 * 30);
+    expect(prazoDoToken(cookie.value) - Date.now()).toBeGreaterThan(29 * 24 * 3600_000);
+  });
+
+  it("desligá-la dá um cookie de sessão do browser, com prazo de 12 horas", async () => {
+    const res = await POST(
+      postReq({ name: "Catarina", password: "liquen2026", manterSessao: false }),
+    );
+    expect(res.status).toBe(200);
+    const cookie = res.cookies.get(ADMIN_COOKIE)!;
+    // Sem `maxAge` o cookie morre ao fechar o browser — é essa a diferença que
+    // se vê no aparelho emprestado.
+    expect(cookie.maxAge).toBeUndefined();
+    // E o prazo vai DENTRO do token assinado: um cookie sem prazo é coisa que
+    // se pode voltar a mandar à mão, e a sessão curta deixava de ser curta.
+    const restam = prazoDoToken(cookie.value) - Date.now();
+    expect(restam).toBeLessThanOrEqual(12 * 3600_000);
+    expect(restam).toBeGreaterThan(11 * 3600_000);
+  });
 });
+
+/** O `exp` de dentro do token de sessão, sem passar pelo `readSession`. */
+function prazoDoToken(token: string): number {
+  const corpo = token.split(".")[0];
+  return JSON.parse(Buffer.from(corpo, "base64url").toString()).exp as number;
+}

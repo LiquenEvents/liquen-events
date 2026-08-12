@@ -48,6 +48,7 @@ const {
   marcarUso,
   mesmaConta,
   removePasskeyOwnedBy,
+  renamePasskeyOwnedBy,
   mapper,
 } = await import("./passkeys-store");
 type Passkey = import("./passkeys-store").Passkey;
@@ -95,6 +96,37 @@ describe("remover um dispositivo", () => {
 
   it("um id que não existe responde como um id alheio — sem dizer qual é qual", async () => {
     expect(await removePasskeyOwnedBy("cred-inexistente", "Catarina")).toBe(false);
+  });
+});
+
+describe("renomear", () => {
+  it("o dono muda o nome do seu aparelho", async () => {
+    // O nome é escolhido no registo, quando só há um aparelho na conta. Ao
+    // terceiro telemóvel, três linhas a dizer «iPhone» tornam a lista inútil —
+    // e uma lista que não se sabe ler é uma lista onde nada se remove.
+    await createPasskey(passkey());
+    expect(await renamePasskeyOwnedBy("cred-1", "Catarina", "iPhone antigo")).toBe(true);
+    expect((await listPasskeysFor("Catarina"))[0].deviceLabel).toBe("iPhone antigo");
+  });
+
+  it("NINGUÉM renomeia o de outra pessoa", async () => {
+    // Mais discreto do que apagar e não menos sério: baptizar o aparelho de
+    // outra pessoa é montar a armadilha para que ela apague o seu.
+    await createPasskey(passkey());
+    expect(await renamePasskeyOwnedBy("cred-1", "Rui", "Portátil do Rui")).toBe(false);
+    expect((await listPasskeysFor("Catarina"))[0].deviceLabel).toBe("iPhone");
+  });
+
+  it("um nome vazio não apaga o que lá está", async () => {
+    await createPasskey(passkey());
+    expect(await renamePasskeyOwnedBy("cred-1", "Catarina", "   ")).toBe(false);
+    expect((await listPasskeysFor("Catarina"))[0].deviceLabel).toBe("iPhone");
+  });
+
+  it("um nome enorme é cortado, não recusado", async () => {
+    await createPasskey(passkey());
+    await renamePasskeyOwnedBy("cred-1", "Catarina", "x".repeat(500));
+    expect((await listPasskeysFor("Catarina"))[0].deviceLabel).toHaveLength(60);
   });
 });
 

@@ -141,6 +141,33 @@ export async function removePasskeyOwnedBy(id: string, userName: string): Promis
 }
 
 /**
+ * Muda o NOME de um dispositivo — SÓ se pertencer a quem está a pedir.
+ *
+ * A mesma verificação de dono, e pela mesma razão, do `removePasskeyOwnedBy`: o
+ * id vem do cliente. Aqui o estrago seria mais discreto e não menos sério —
+ * baptizar o aparelho de outra pessoa de «iPhone da Catarina» é montar a
+ * armadilha para que ela apague o seu próprio.
+ *
+ * Existe porque o nome é a ÚNICA forma de distinguir aparelhos na lista, e é
+ * escolhido no momento do registo, quando ainda só há um. Ao terceiro telemóvel,
+ * três linhas a dizer «iPhone» não deixam ninguém remover nada com confiança —
+ * e um dispositivo que não se sabe remover fica lá para sempre, que é
+ * exactamente o risco que a lista existe para fechar.
+ */
+export async function renamePasskeyOwnedBy(
+  id: string,
+  userName: string,
+  deviceLabel: string,
+): Promise<boolean> {
+  const nome = deviceLabel.trim().slice(0, MAX_DEVICE_LABEL);
+  if (!nome) return false;
+  const existente = await repo.get(id);
+  if (!existente || !mesmaConta(existente.userName, userName)) return false;
+  await repo.update(id, { deviceLabel: nome });
+  return true;
+}
+
+/**
  * Houve retrocesso no contador de assinaturas?
  *
  * `0 → 0` é o caso normal dos autenticadores sincronizados (iCloud, Google), que

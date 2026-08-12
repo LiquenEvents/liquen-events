@@ -61,8 +61,11 @@ async function login(page: Page): Promise<boolean> {
   await page.goto("/orcamento/admin");
   await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
   await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
-  await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
-  await page.getByRole("button", { name: /^Entrar$/ }).click();
+  // O campo pelo `name`: o rótulo «Palavra-passe» é agora partilhado com o botão
+  // de mostrar/ocultar, e o botão de entrar diz por que caminho se entra (a
+  // passkey passou a ser o primeiro, com o botão principal).
+  await page.locator('input[name="password"]').fill("liquen2026");
+  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
   try {
     await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
       timeout: 8000,
