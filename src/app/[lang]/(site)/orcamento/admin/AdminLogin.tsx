@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card, Field, Button } from "@/app/[lang]/(site)/orcamento/admin/ui";
 import { entrarComDispositivo, mensagemDeErro, suportaPasskeys } from "@/lib/passkeys-cliente";
+import { EntradaComFotografia, RodapeDaEntrada } from "./EntradaComFotografia";
 
 export default function AdminLogin() {
   const [password, setPassword] = useState("");
@@ -129,12 +130,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <div
-      // `-mt-24`: ver a nota em AdminClient — cancela o `pt-24` do `<main>`
-      // global logo no primeiro desenho, em vez de esperar pelo efeito.
-      className="-mt-24 min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: "linear-gradient(180deg, #ffffff 0%, #f4f5f3 100%)" }}
-    >
+    <EntradaComFotografia>
       <div className="w-full max-w-sm flex flex-col items-center gap-8">
         {/* Brand mark — colour logo on the light, calm entry screen */}
         <Image
@@ -359,10 +355,8 @@ export default function AdminLogin() {
           )}
         </Card>
 
-        <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">
-          Líquen Events · Portugal
-        </p>
+        <RodapeDaEntrada />
       </div>
-    </div>
+    </EntradaComFotografia>
   );
 }
