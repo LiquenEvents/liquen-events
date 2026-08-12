@@ -59,6 +59,7 @@ import {
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import BotaoGuardarTudo from "./GuardarTudo";
 import { onIdle } from "@/lib/onIdle";
+import { marcarSaidaDeProposito } from "./entrada-destino";
 import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
 import EmptyState from "./EmptyState";
@@ -1592,6 +1593,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
+    // Sair é uma decisão, e tem de aguentar a chegada ao ecrã de entrada: sem
+    // esta marca, a entrada automática pela passkey voltava a abrir a sessão
+    // sozinha (ver `consumirMarcaDeSaida`).
+    marcarSaidaDeProposito();
     window.location.href = "/orcamento/admin";
   }
 

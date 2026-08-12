@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { PARAM_DESTINO, destinoSeguro, entradaCom } from "./entrada-destino";
+// @vitest-environment jsdom
+import { describe, it, expect, beforeEach } from "vitest";
+import {
+  PARAM_DESTINO,
+  consumirMarcaDeSaida,
+  destinoSeguro,
+  entradaCom,
+  marcarSaidaDeProposito,
+} from "./entrada-destino";
 
 /**
  * O GUARDA DO «VOLTAR À PÁGINA QUE SE TENTAVA ABRIR».
@@ -97,5 +104,51 @@ describe("entradaCom", () => {
     );
     const lido = new URL(url, "https://x.invalid").searchParams.get(PARAM_DESTINO);
     expect(destinoSeguro(lido)).toBe("/pt/orcamento/admin/evento/LQ-1");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUEM CARREGA EM «SAIR» FICA FORA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Medido no percurso de ponta a ponta, com um autenticador de plataforma que
+ * verifica sem pedir nada: entre o clique em «Sair» e o ecrã de entrada
+ * assentar passavam 600 ms, e a sessão estava aberta outra vez — a entrada
+ * automática pela passkey a desfazer o botão de sair.
+ *
+ * A marca vale para UMA chegada à porta. É essa a parte que se prende aqui:
+ * uma marca que não se consumisse desligava a entrada automática para sempre,
+ * e a entrada automática é o que torna entrar num gesto só.
+ */
+describe("a marca de «acabei de sair»", () => {
+  beforeEach(() => sessionStorage.clear());
+
+  it("sem marca, não há nada a consumir", () => {
+    expect(consumirMarcaDeSaida()).toBe(false);
+  });
+
+  it("marcada, responde uma vez — e só uma", () => {
+    marcarSaidaDeProposito();
+    expect(consumirMarcaDeSaida()).toBe(true);
+    // A segunda chegada à porta já é uma chegada normal: a passkey volta a ser
+    // proposta sem se carregar em nada.
+    expect(consumirMarcaDeSaida()).toBe(false);
+  });
+
+  it("sem armazenamento, não rebenta e não inventa uma saída", () => {
+    const real = Object.getOwnPropertyDescriptor(window, "sessionStorage");
+    Object.defineProperty(window, "sessionStorage", {
+      configurable: true,
+      get() {
+        throw new Error("armazenamento desligado por política");
+      },
+    });
+    try {
+      expect(() => marcarSaidaDeProposito()).not.toThrow();
+      expect(consumirMarcaDeSaida()).toBe(false);
+    } finally {
+      if (real) Object.defineProperty(window, "sessionStorage", real);
+    }
   });
 });

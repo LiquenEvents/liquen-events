@@ -13,7 +13,12 @@ import {
   suportaPasskeys,
 } from "@/lib/passkeys-cliente";
 import { EntradaComFotografia, RodapeDaEntrada } from "./EntradaComFotografia";
-import { PARAM_DESTINO, consumirMarcaDeSessao, destinoSeguro } from "./entrada-destino";
+import {
+  PARAM_DESTINO,
+  consumirMarcaDeSaida,
+  consumirMarcaDeSessao,
+  destinoSeguro,
+} from "./entrada-destino";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -204,6 +209,11 @@ export default function AdminLogin() {
    */
   useEffect(() => {
     if (!temPasskeys) return;
+    // QUEM ACABOU DE SAIR FICA FORA. A marca é consumida aqui, uma vez por
+    // chegada à porta — ver `consumirMarcaDeSaida`. Medido: sem isto, entre o
+    // clique em «Sair» e o ecrã de entrada assentar passavam 600 ms e a sessão
+    // estava aberta outra vez, sem um único toque.
+    if (consumirMarcaDeSaida()) return;
     let desarmar: (() => void) | undefined;
     let cancelado = false;
     void suportaAutofillDePasskeys().then((podeAutofill) => {

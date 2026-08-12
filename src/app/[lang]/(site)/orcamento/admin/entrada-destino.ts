@@ -136,3 +136,52 @@ export function limparMarcaDeSessao(): void {
     /* idem */
   }
 }
+
+// ── A marca de «acabei de sair» ────────────────────────────────────────────
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUEM CARREGA EM «SAIR» QUER FICAR FORA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O ecrã de entrada arma a entrada automática pela passkey mal aparece
+ * (`armarEntradaAutomatica`): a chave deste aparelho fica proposta na lista do
+ * preenchimento automático e escolhê-la basta. É o que torna a entrada num
+ * gesto só — e é o que estava certo para quem CHEGA à porta.
+ *
+ * Para quem acabou de sair é o contrário. Medido no percurso de ponta a ponta,
+ * com um autenticador de plataforma que verifica sem pedir nada: entre carregar
+ * em «Sair» e o ecrã de entrada assentar passavam 600 ms, e a sessão estava
+ * aberta outra vez. Sem um clique. O botão de sair não funcionava — e não
+ * funcionava exactamente no caso em que ele importa, que é o computador que se
+ * empresta.
+ *
+ * Em Chrome, a mediação condicional normalmente PROPÕE e espera pela escolha,
+ * portanto isto não se via em todos os aparelhos. Um comportamento correcto não
+ * pode depender do modelo do autenticador.
+ *
+ * A marca vale para UM carregamento de página: consome-se ao ler. Sair, e a
+ * seguir querer entrar pela passkey, continua a ser um clique no botão — que
+ * está lá, é o primeiro, e é uma decisão em vez de uma inércia.
+ */
+const MARCA_DE_SAIDA = "liquen:saiu";
+
+export function marcarSaidaDeProposito(): void {
+  try {
+    sessionStorage.setItem(MARCA_DE_SAIDA, "1");
+  } catch {
+    /* sem armazenamento — volta ao comportamento de sempre */
+  }
+}
+
+/** Acabou de sair de propósito? Lê e LIMPA: vale para esta chegada à porta. */
+export function consumirMarcaDeSaida(): boolean {
+  try {
+    if (typeof sessionStorage === "undefined") return false;
+    const saiu = sessionStorage.getItem(MARCA_DE_SAIDA) !== null;
+    if (saiu) sessionStorage.removeItem(MARCA_DE_SAIDA);
+    return saiu;
+  } catch {
+    return false;
+  }
+}
