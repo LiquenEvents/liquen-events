@@ -252,6 +252,199 @@ export interface DocTruncation {
 /** Regista uma truncagem (ignora `dropped <= 0`, que é o caso normal). */
 type NoteTruncation = (where: string, dropped: number, unit: DocTruncation["unit"]) => void;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   UMA SÓ ORDEM PARA O DOCUMENTO INTEIRO
+   ═══════════════════════════════════════════════════════════════════════════
+
+   ── O QUE FOI PARA A CLIENTE ─────────────────────────────────────────────
+   Na proposta da Tara e do Marty, a lista de Serviços (pág. 02) dizia
+   Cerimónia → Complementos → Cocktail → Jantar e o quadro do Orçamento
+   (pág. 11) dizia Cerimónia → Cocktail → Jantar → Complementos. As mesmas
+   quatro rubricas, o mesmo documento, duas ordens.
+
+   ── PORQUE É QUE DIVERGEM ────────────────────────────────────────────────
+   Porque são DUAS LISTAS ESCRITAS À MÃO, sem nada que as ligue:
+   `serviceGroups` são grupos com itens (rótulo + descrição) e `budgetItems` é
+   um array de nomes soltos — e os mood boards são uma TERCEIRA lista, com os
+   títulos das páginas de inspiração. No estúdio nascem juntas: ao abrir uma
+   proposta, os pontos que o casal marcou no pedido semeiam de uma vez o
+   primeiro grupo de serviços E as linhas do orçamento, pela mesma ordem (ver
+   `seedDefaults`, em ProposalStudio). A partir daí são editores separados:
+   acrescentar uma linha ao orçamento não acrescenta um serviço, e arrastar um
+   serviço não arrasta a linha. Basta uma alteração num dos lados para as duas
+   ordens se separarem — e nada no sistema o dizia.
+
+   ── O QUE SE FAZ AQUI, E O QUE NÃO SE FAZ ────────────────────────────────
+   NÃO se fundem as listas: continuam a ser três, escritas por ela, cada uma
+   com o seu conteúdo. O que passa a haver é uma FONTE ÚNICA DE ORDENAÇÃO —
+   a lista de Serviços, que é a primeira que o casal lê — e o orçamento e os
+   mood boards saem por essa ordem. Ela muda a ordem num sítio (arrastando os
+   serviços) e o documento inteiro segue.
+
+   Três travas, porque isto mexe num documento que vai para clientes:
+
+     · **Sem correspondência, sem mudança.** Uma rubrica que não case com
+       nenhum serviço não é movida: herda o lugar da anterior, ficando colada
+       aos vizinhos com que ela a escreveu. Um documento onde nada case sai
+       exactamente como saía.
+     · **A comparação é conservadora.** Compara-se o nome sem acentos, sem
+       maiúsculas e sem as palavras que não distinguem nada («Decor»,
+       «Decoração», «Design Floral», artigos e preposições): «Decor Cerimónia»,
+       «Decoração Cerimónia» e «Cerimónia» são a mesma rubrica. Se um nome
+       casar com DOIS serviços à mesma distância, não casa com nenhum — na
+       dúvida, não se mexe.
+     · **Diz o que fez.** Toda a reordenação sai no relatório
+       (`reordenacoes`) e nos registos, com as duas ordens à frente uma da
+       outra. Isto não pode acontecer em silêncio.
+
+   ── O QUE FALTA, E NÃO SE PODE FAZER DAQUI ───────────────────────────────
+   Este ficheiro é `server-only`: o estúdio não o pode importar, portanto a
+   lista do editor continua a mostrar a ordem em que ela escreveu as linhas,
+   mesmo quando o PDF as imprime por outra. A correcção de fundo é a mesma que
+   resolveria isto de raiz — as rubricas passarem a ser UMA lista com
+   identidade estável, e o orçamento e os mood boards apontarem para ela — e
+   vive no estúdio (`src/app/**`), fora do alcance desta frente.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Uma lista do documento que saiu por uma ordem diferente daquela em que está
+ * escrita. Estruturada, como as truncagens, para quem mostra escrever a frase.
+ */
+export interface ReordenacaoDoDocumento {
+  /** Onde, em pt-PT: `Orçamento`, `Mood boards`. */
+  onde: string;
+  /** A ordem escrita no documento. */
+  de: string[];
+  /** A ordem impressa — a dos Serviços. */
+  para: string[];
+}
+
+/**
+ * Palavras que não distinguem uma rubrica de outra.
+ *
+ * Saem todas da folha dela: o mesmo capítulo aparece como «Decor Cerimónia» na
+ * lista de serviços, «Decoração Cerimónia» no título do mood board e
+ * «Cerimónia» no quadro do orçamento. Sem as tirar, três nomes do mesmo sítio
+ * não casavam entre si e a ordem não se aplicava a nada.
+ */
+const PALAVRAS_SEM_PESO = new Set([
+  "decor",
+  "decoracao",
+  "decoracoes",
+  "design",
+  "floral",
+  "florais",
+  "flor",
+  "flores",
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "e",
+  "a",
+  "o",
+  "as",
+  "os",
+  "com",
+  "para",
+  "em",
+  "no",
+  "na",
+]);
+
+/** O nome de uma rubrica reduzido ao que a distingue: sem acentos, sem
+ *  maiúsculas, sem pontuação e sem {@link PALAVRAS_SEM_PESO}. */
+function chaveDeRubrica(texto: string): string {
+  return (texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter((t) => t && !PALAVRAS_SEM_PESO.has(t))
+    .join(" ");
+}
+
+/**
+ * A ordem do documento: cada rubrica dos Serviços com o lugar que ocupa.
+ *
+ * Lê os títulos dos grupos E os rótulos dos itens, pela ordem em que estão
+ * escritos — porque nas folhas dela o capítulo tanto é um grupo («Decoração
+ * Cerimónia», com os serviços por baixo) como um item de uma lista corrida.
+ * O primeiro sítio onde um nome aparece é o que vale.
+ */
+function ordemDosCapitulos(doc: ProposalDoc): Map<string, number> {
+  const ordem = new Map<string, number>();
+  let lugar = 0;
+  for (const g of doc.serviceGroups ?? []) {
+    for (const rotulo of [g.title, ...(g.items ?? []).map((it) => it.label)]) {
+      const chave = chaveDeRubrica(rotulo ?? "");
+      lugar++;
+      if (chave && !ordem.has(chave)) ordem.set(chave, lugar);
+    }
+  }
+  return ordem;
+}
+
+/**
+ * O lugar de um nome na ordem do documento, ou `undefined` quando não há
+ * correspondência SEGURA.
+ *
+ * Casa por igualdade da chave e, não havendo, por CONTENÇÃO — «Complementos»
+ * casa com «Complementos dos Noivos», porque um dos nomes é o outro com mais
+ * detalhe. Duas correspondências igualmente boas em lugares diferentes contam
+ * como nenhuma: mover uma linha do orçamento por um palpite é pior do que a
+ * deixar onde ela a escreveu.
+ */
+function lugarNaOrdem(rotulo: string, ordem: Map<string, number>): number | undefined {
+  const chave = chaveDeRubrica(rotulo);
+  if (!chave) return undefined;
+  const exacta = ordem.get(chave);
+  if (exacta !== undefined) return exacta;
+  const meus = new Set(chave.split(" "));
+  let melhor: { lugar: number; comuns: number } | undefined;
+  let empatado = false;
+  for (const [candidata, lugar] of ordem) {
+    const seus = candidata.split(" ");
+    const contida = seus.every((t) => meus.has(t)) || [...meus].every((t) => seus.includes(t));
+    if (!contida) continue;
+    const comuns = seus.filter((t) => meus.has(t)).length;
+    if (!melhor || comuns > melhor.comuns) {
+      melhor = { lugar, comuns };
+      empatado = false;
+    } else if (comuns === melhor.comuns && lugar !== melhor.lugar) {
+      empatado = true;
+    }
+  }
+  return melhor && !empatado ? melhor.lugar : undefined;
+}
+
+/**
+ * Os índices de `itens` pela ordem do documento.
+ *
+ * Quem não casa HERDA o lugar de quem vem antes — é isso que mantém colado o
+ * que ela escreveu junto: o mood board «Corredor Nupcial», que não é uma
+ * rubrica do orçamento, viaja com a «Cerimónia» a que pertence em vez de ir
+ * parar ao fim do documento. A ordenação é estável, portanto empates ficam
+ * pela ordem escrita, e sem correspondência nenhuma devolve a ordem de sempre.
+ */
+function porOrdemDosCapitulos<T>(
+  itens: readonly T[],
+  rotuloDe: (item: T) => string,
+  ordem: Map<string, number>,
+): number[] {
+  const comoEstao = itens.map((_, i) => i);
+  if (ordem.size === 0 || itens.length < 2) return comoEstao;
+  let herdado = -1;
+  const lugares = itens.map((item, i) => {
+    const lugar = lugarNaOrdem(rotuloDe(item), ordem);
+    if (lugar !== undefined) herdado = lugar;
+    return { i, lugar: herdado };
+  });
+  return lugares.sort((a, b) => a.lugar - b.lugar || a.i - b.i).map((l) => l.i);
+}
+
 /**
  * Regista uma foto que CHEGOU inteira ao gerador e que não foi possível
  * DESENHAR (bytes corrompidos, ou um formato que nem o sharp nem o `pdf-lib`
@@ -529,6 +722,10 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
  * - `semRedimensionar` — fotos que FORAM desenhadas, mas pelo caminho de
  *   recurso, com o original embutido. Não faltam ao cliente; o PDF é que sai
  *   pesado a abrir e a percorrer.
+ * - `reordenacoes` — listas que saíram por ordem diferente da que está escrita
+ *   no documento, para o casal não ler duas ordens da mesma coisa (ver
+ *   {@link ReordenacaoDoDocumento}). Vazio é o normal: quer dizer que o
+ *   orçamento e os mood boards já estavam pela ordem dos serviços.
  *
  * As duas últimas não se confundem: uma foto ou não sai (`undrawnImages`) ou
  * sai pesada (`semRedimensionar`) — nunca as duas.
@@ -544,8 +741,12 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
   truncations: DocTruncation[];
   undrawnImages: number;
   semRedimensionar: number;
+  reordenacoes: ReordenacaoDoDocumento[];
 }> {
   const truncations: DocTruncation[] = [];
+  /** As listas que saíram por ordem diferente da escrita — ver o bloco «UMA SÓ
+   *  ORDEM PARA O DOCUMENTO INTEIRO». Vazio é o normal. */
+  const reordenacoes: ReordenacaoDoDocumento[] = [];
   /**
    * Quantas fotos entraram SEM serem redimensionadas.
    *
@@ -1196,8 +1397,32 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     }
   }
 
+  /**
+   * A ORDEM DO DOCUMENTO, uma só, tirada da lista de Serviços — a primeira que
+   * o casal lê. É esta que o quadro do orçamento e as páginas de inspiração
+   * seguem daqui para baixo. Ver o bloco «UMA SÓ ORDEM PARA O DOCUMENTO
+   * INTEIRO», lá em cima, incluindo o que se faz quando não há correspondência.
+   */
+  const ordem = ordemDosCapitulos(doc);
+  /** Anota uma lista que saiu por ordem diferente da que está escrita. */
+  const notaDeOrdem = (onde: string, rotulos: string[], indices: number[]) => {
+    if (indices.every((idx, i) => idx === i)) return;
+    reordenacoes.push({
+      onde,
+      de: [...rotulos],
+      para: indices.map((idx) => rotulos[idx]),
+    });
+  };
+
   // ── Mood board pages (skip empty boards — never show a client a placeholder) ──
-  for (const [bi, mb] of doc.moodBoards.entries()) {
+  const ordemDosBoards = porOrdemDosCapitulos(doc.moodBoards, (b) => b.title ?? "", ordem);
+  notaDeOrdem(
+    "Mood boards",
+    doc.moodBoards.map((b) => b.title ?? ""),
+    ordemDosBoards,
+  );
+  for (const bi of ordemDosBoards) {
+    const mb = doc.moodBoards[bi];
     if (!mb.images || mb.images.length === 0) continue;
     const p = pdf.addPage([W, H]);
     frame(p);
@@ -1215,8 +1440,9 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         color: MUTED,
       });
     }
-    // Como o mood board se chama num aviso. Sem título, vale a posição — é
-    // assim que ele aparece no estúdio, contado a partir de 1.
+    // Como o mood board se chama num aviso. Sem título, vale a posição — a que
+    // ele ocupa NO DOCUMENTO e não a página por que saiu, porque é assim que
+    // ela o encontra no estúdio, contado a partir de 1.
     const boardName = mb.title.trim() ? `«${mb.title.trim()}»` : `${bi + 1}`;
     await drawCollage(
       pdf,
@@ -1328,7 +1554,16 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       // à esquerda de cada linha lê-se como um sumário, não como um orçamento.
       // O cabeçalho e a régua por cima já dizem o que aquilo é.
       const marcas = opcionaisDe(doc);
-      doc.budgetItems.forEach((it, i) => {
+      // ── E PELA ORDEM DOS SERVIÇOS ────────────────────────────────────────
+      // O quadro imprime-se pela ordem da lista de Serviços (pág. 02), que é a
+      // primeira que o casal lê — ver o bloco «UMA SÓ ORDEM PARA O DOCUMENTO
+      // INTEIRO». A marca de «extra» viaja com a linha: é um array PARALELO, e
+      // reordenar um sem o outro trocava as marcas de sítio, que é a única
+      // maneira de isto poder mentir sobre dinheiro.
+      const ordemDasLinhas = porOrdemDosCapitulos(doc.budgetItems, (s) => s, ordem);
+      notaDeOrdem("Orçamento", doc.budgetItems, ordemDasLinhas);
+      ordemDasLinhas.forEach((i) => {
+        const it = doc.budgetItems[i];
         const lines = wrap(f.reg, it, 10.5, boxW - (marcas[i] ? 46 : 0));
         budgetBreak(Math.max(20, lines.length * 15));
         lines.forEach((ln, j) => {
@@ -1986,7 +2221,25 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         "o sharp falhou e usou-se o original. O PDF fica pesado a abrir. " + "Ver PDF-BEFORE.md.",
     });
   }
-  return { bytes: await pdf.save(), truncations, undrawnImages: undrawn.size, semRedimensionar };
+  // Uma reordenação não é um erro — é uma correcção — mas tem de ficar escrita
+  // em algum lado: é conteúdo dela a sair por uma ordem que não é a que ela vê
+  // no editor, e o dia em que isto surpreender alguém tem de haver um registo
+  // com as duas ordens à frente uma da outra.
+  if (reordenacoes.length > 0) {
+    log.info("proposal-doc-pdf: listas alinhadas pela ordem dos Serviços", {
+      ref: doc.ref,
+      reordenacoes: reordenacoes.map(
+        (r) => `${r.onde}: ${r.de.join(" → ")} ⇒ ${r.para.join(" → ")}`,
+      ),
+    });
+  }
+  return {
+    bytes: await pdf.save(),
+    truncations,
+    undrawnImages: undrawn.size,
+    semRedimensionar,
+    reordenacoes,
+  };
 }
 
 // Small helper factory so the collage function can reuse the closures.

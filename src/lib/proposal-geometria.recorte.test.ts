@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  LADO_MINIMO_DA_FOTO,
   PAGINA_H,
   PAGINA_M,
   PAGINA_W,
@@ -238,7 +239,7 @@ describe("sem recorte, e ainda assim alinhado", () => {
           expect(
             menor,
             `${layout}/${n} ${nome}: menor lado ${menor.toFixed(1)} pt`,
-          ).toBeGreaterThan(36);
+          ).toBeGreaterThan(LADO_MINIMO_DA_FOTO);
         }
       }
     }
@@ -285,13 +286,20 @@ describe("os documentos antigos saem como sempre saíram", () => {
     }
   });
 
-  it("o «texto e imagem» com uma foto é a caixa de sempre", () => {
+  /**
+   * A caixa é a mesma ao ponto — mesma coluna, mesma largura, mesma altura, e
+   * o mesmo recorte (ou a falta dele) que sempre teve. O que mudou foi a
+   * ALTURA A QUE ELA ESTÁ: o bloco de imagens de um mood board passou a ficar
+   * ao meio da mancha, com margens equilibradas em cima e em baixo, em vez de
+   * encostado ao topo com o branco todo em baixo. Ver `OCUPACAO_MINIMA`.
+   */
+  it("o «texto e imagem» com uma foto é a caixa de sempre, agora ao centro", () => {
     const a = { x: PAGINA_M, w: PAGINA_W - 2 * PAGINA_M, h: AREA.topo - AREA.base };
     for (const asp of Object.values(FORMAS)) {
       const w = a.w * 0.42;
       const h = Math.min(a.h, w / asp);
       expect(caixasDoMoodboard("texto-e-imagem", [asp])).toEqual([
-        { x: a.x + a.w - w, y: AREA.base + a.h - h, w, h },
+        { x: a.x + a.w - w, y: AREA.base + (a.h - h) / 2, w, h },
       ]);
     }
   });

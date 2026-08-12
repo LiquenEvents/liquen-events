@@ -661,6 +661,191 @@ function mosaicoSemRecorte(aspectos: number[], a: Area): CaixaPdf[] {
   return melhor ? melhor.caixas : [];
 }
 
+// ── A distribuição do espaço na página ─────────────────────────────────────
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O BLOCO NO MEIO DA FOLHA, E O CHÃO DOS 40%
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, a olhar para a proposta da Tara e do Marty: a página das
+ * «Lapelas Noivo» tem «cinco fotos pequenas no terço superior e dois terços de
+ * folha vazios». Medido nessa página, antes disto: o bloco ocupava **31,8%** da
+ * mancha e deixava **226 pontos** de branco por baixo — oito centímetros de
+ * folha em branco entre a última foto e o rodapé. A do «Decor Mesa Buffet», com
+ * as mesmas cinco fotos numa fila, ficava em 30,4%.
+ *
+ * A regra que ela quer, e que estas duas funções cumprem:
+ *
+ *   «o bloco de imagens ocupa a ÁREA CENTRAL da página, com margens
+ *    equilibradas em cima e em baixo. Uma página com menos de 40% de ocupação
+ *    deve AUMENTAR as imagens ou fundir-se com outra.»
+ *
+ * ── PORQUE É QUE ISTO NÃO É ESTICAR ────────────────────────────────────────
+ *
+ * Aumentar uma foto é multiplicá-la; esticá-la é mudar-lhe a forma, e há aqui
+ * uma frente inteira (ver as composições sem recorte, mais acima) que existe
+ * precisamente para nenhuma fotografia ser recortada nem deformada. Nada disto
+ * toca num aspecto: o que muda é o número de FILAS por que as fotos se
+ * repartem. Uma fila só de cinco fotos enche a largura e a altura é o que
+ * sobrar — quanto mais fotos na fila, mais baixa a fila. Repartidas por duas
+ * filas, cada fila tem menos fotos, portanto é mais alta, e o bloco cresce até
+ * encher a mancha. Nas «Lapelas Noivo» isso leva a página dos 31,8% aos 68,3%,
+ * e cada fotografia fica 2,1 vezes maior em área, com a forma que tinha.
+ *
+ * ── E PORQUE É QUE SÓ ABAIXO DE 40% ────────────────────────────────────────
+ *
+ * Porque acima disso a escolha é dela. Uma página em «fila única» com 59% é uma
+ * página composta, e recompô-la seria trocar-lhe a disposição pelas costas. O
+ * chão dos 40% é o número que ela escreveu, e é a fronteira entre «uma
+ * composição arejada» e «uma folha por preencher».
+ *
+ * A outra saída que ela dá — «fundir-se com outra» — não se faz aqui: juntar
+ * dois mood boards numa página é uma decisão editorial (que título fica, que
+ * fotos saem) e pertence ao estúdio, não à geometria.
+ */
+export const OCUPACAO_MINIMA = 0.4;
+
+/**
+ * O lado mais curto que uma fotografia pode ter na página, em pontos.
+ *
+ * 36 pontos são 1,3 cm numa A4: abaixo disso a decoração deixa de se ver, que é
+ * o defeito de origem outra vez (ver o mosaico, que experimenta todas as
+ * árvores precisamente para não fazer selos).
+ *
+ * Aqui é uma TRAVA à regra dos 40%, e é indispensável: encher a folha, por si
+ * só, é um objectivo que se satisfaz mal. Medido com nove panorâmicas 12:5 —
+ * uma fila de oito fotos (33,8 pt de altura cada) por baixo de uma foto enorme
+ * enche 95,8% da mancha, e é uma página com uma fotografia e uma tira de selos.
+ * Com a trava, o mesmo caso sai em três filas com 90,2% e nenhuma foto abaixo
+ * de 71 pontos.
+ */
+export const LADO_MINIMO_DA_FOTO = 36;
+
+/**
+ * Quanto da mancha do mood board é FOTOGRAFIA — de 0 a 1.
+ *
+ * É a medida da regra dela e é a mesma que os testes usam. Conta a área das
+ * caixas, não a envolvente do bloco: um bloco alto cheio de buracos não é uma
+ * página cheia.
+ */
+export function ocupacaoDoMoodboard(caixas: readonly CaixaPdf[], alturaAnotacao = 8): number {
+  const a = areaDoMoodboard(alturaAnotacao);
+  if (a.w <= 0 || a.h <= 0) return 0;
+  const coberto = caixas.reduce((s, c) => s + Math.max(0, c.w) * Math.max(0, c.h), 0);
+  return coberto / (a.w * a.h);
+}
+
+/**
+ * Põe o bloco no meio da mancha: o que sobra fica metade em cima e metade em
+ * baixo, em vez de ir todo para o fim da folha.
+ *
+ * Não mexe em tamanhos nenhuns — é uma translação, e por isso não pode cortar,
+ * deformar nem desalinhar seja o que for. Quando o bloco já enche a altura (o
+ * mosaico, ou qualquer composição que tenha encolhido para caber) o
+ * deslocamento é zero e isto não faz nada.
+ */
+function centrarNaVertical(caixas: CaixaPdf[], a: Area): CaixaPdf[] {
+  if (caixas.length === 0) return caixas;
+  const topo = Math.max(...caixas.map((c) => c.y + c.h));
+  const base = Math.min(...caixas.map((c) => c.y));
+  const sobra = a.h - (topo - base);
+  if (!Number.isFinite(sobra) || sobra <= 0.01) return caixas;
+  const desloca = a.y + sobra / 2 - base;
+  return caixas.map((c) => ({ ...c, y: c.y + desloca }));
+}
+
+/**
+ * A página que não chega aos 40%: reparte as mesmas fotos por outro número de
+ * filas e fica com o arranjo que enche mais.
+ *
+ * As filas são o único arranjo que CRESCE sem cortar — cada fila enche a
+ * largura da mancha e a altura sai dos aspectos —, por isso é para elas que se
+ * recompõe, venha a página de onde vier. Se nenhuma repartição melhorar (é o
+ * caso de uma foto só, que já está no tamanho máximo que a folha lhe dá), fica
+ * exactamente o que estava: isto nunca pode piorar uma página.
+ *
+ * As filas montam-se aqui como COMPOSIÇÃO (`empilhado` de `lado-a-lado`) e não
+ * com {@link filasJustificadas}: é a mesma ideia e os mesmos aspectos, mas o
+ * `dispor` mantém o respiro de 8 pontos igual em toda a página quando o bloco
+ * encolhe, em vez de o encolher também — senão a mesma folha tinha duas medidas
+ * de ar entre fotografias, consoante o bloco tivesse ou não cabido.
+ *
+ * ── PORQUE É QUE SE EXPERIMENTAM TODOS OS CORTES ──────────────────────────
+ *
+ * A repartição equilibrada ({@link repartir}, que é a que as «filas» usam) não
+ * é a que enche mais quando as formas são desiguais. Medido nas «Lapelas
+ * Noivo» — três deitadas e duas ao alto: três-e-duas dá 50,7% (a fila das duas
+ * verticais fica altíssima e obriga o bloco todo a encolher para caber),
+ * duas-e-três dá 68,3% com as mesmas fotos, pela mesma ordem e com as mesmas
+ * formas. Como os cortes são contíguos, a ORDEM que ela escolheu nunca muda —
+ * só muda onde a fila parte. São no máximo 130 arranjos (dez fotos, até quatro
+ * filas) e o resultado é determinístico: a mesma página sai sempre igual.
+ *
+ * O «texto e imagem» está de fora de propósito: nesse arranjo a metade vazia da
+ * folha é onde o texto vai, e enchê-la de fotografias era desfazer a escolha.
+ */
+function crescerAteAoChao(
+  caixas: CaixaPdf[],
+  layout: LayoutDeMoodboard,
+  aspectos: number[],
+  alturaAnotacao: number,
+  a: Area,
+): CaixaPdf[] {
+  const n = aspectos.length;
+  if (layout === "texto-e-imagem" || n <= 1) return caixas;
+  let melhor = caixas;
+  let melhorOcupacao = ocupacaoDoMoodboard(caixas, alturaAnotacao);
+  if (melhorOcupacao >= OCUPACAO_MINIMA) return caixas;
+  // As folhas nascem UMA vez e servem as 130 árvores: a medida de cada
+  // fotografia fica na cache do `medir` em vez de ser recalculada em cada corte
+  // (a mesma razão do mosaico, que reaproveita sub-árvores). Medido com dez
+  // fotos: 2,5 ms → 0,93 ms por página, abaixo do que o mosaico já custa.
+  const folhas = aspectos.map(foto);
+  // Até quatro filas: acima disso as fotos de uma página cheia já são selos, e
+  // o próprio critério da ocupação as recusaria (mais filas ⇒ bloco mais alto
+  // do que a folha ⇒ encolhe tudo ⇒ ocupa menos).
+  for (const corte of reparticoesContiguas(n, Math.min(4, n))) {
+    const grupos: Composicao[] = [];
+    let i = 0;
+    for (const quantas of corte) {
+      const partes = folhas.slice(i, i + quantas);
+      grupos.push(partes.length === 1 ? partes[0] : { tipo: "lado-a-lado", partes });
+      i += quantas;
+    }
+    const alternativa = dispor(
+      grupos.length === 1 ? grupos[0] : { tipo: "empilhado", partes: grupos },
+      a,
+    );
+    if (alternativa.length !== n) continue;
+    // A trava dos selos: ver {@link LADO_MINIMO_DA_FOTO}. Uma página cheia à
+    // custa de uma tira de miniaturas não é uma página cheia.
+    const menorLado = Math.min(...alternativa.map((c) => Math.min(c.w, c.h)));
+    if (menorLado <= LADO_MINIMO_DA_FOTO) continue;
+    const ocupacao = ocupacaoDoMoodboard(alternativa, alturaAnotacao);
+    if (ocupacao > melhorOcupacao + 0.001) {
+      melhor = alternativa;
+      melhorOcupacao = ocupacao;
+    }
+  }
+  return melhor;
+}
+
+/** Todas as maneiras de cortar `n` fotos em 1..`maxFilas` filas CONTÍGUAS —
+ *  cada uma com pelo menos uma foto. Contíguas é o que garante que a ordem
+ *  dela sobrevive: uma fila é sempre um pedaço seguido da lista. */
+function reparticoesContiguas(n: number, maxFilas: number): number[][] {
+  const saida: number[][] = [];
+  const seguir = (restam: number, filas: number, atual: number[]) => {
+    if (filas === 1) {
+      saida.push([...atual, restam]);
+      return;
+    }
+    for (let k = 1; k <= restam - (filas - 1); k++) seguir(restam - k, filas - 1, [...atual, k]);
+  };
+  for (let filas = 1; filas <= maxFilas; filas++) seguir(n, filas, []);
+  return saida;
+}
+
 /**
  * Onde vai cada foto de um mood board, para o layout escolhido.
  *
@@ -673,6 +858,10 @@ function mosaicoSemRecorte(aspectos: number[], a: Area): CaixaPdf[] {
  * (`MoodBoard.enquadramento`) e por omissão é FALSO — não porque seja pior, mas
  * porque uma proposta que já seguiu para um casal é regenerada a cada vez que
  * eles abrem o PDF, e não pode mudar de aspecto por baixo deles.
+ *
+ * O arranjo sai daqui já com a distribuição do espaço resolvida: a página que
+ * não chega ao chão dos 40% é recomposta em filas e o bloco fica no meio da
+ * folha (ver {@link OCUPACAO_MINIMA}).
  */
 export function caixasDoMoodboard(
   layout: LayoutDeMoodboard,
@@ -683,6 +872,21 @@ export function caixasDoMoodboard(
   const n = aspectos.length;
   if (n <= 0) return [];
   const a = areaDoMoodboard(alturaAnotacao);
+  const arranjo = arranjoDoMoodboard(layout, aspectos, alturaAnotacao, semRecorte, a);
+  return centrarNaVertical(crescerAteAoChao(arranjo, layout, aspectos, alturaAnotacao, a), a);
+}
+
+/** O arranjo cru de cada disposição, antes de se olhar para a ocupação da
+ *  folha. Separado de {@link caixasDoMoodboard} para a distribuição do espaço
+ *  ser UMA regra aplicada a todas as disposições, e não cinco cópias dela. */
+function arranjoDoMoodboard(
+  layout: LayoutDeMoodboard,
+  aspectos: number[],
+  alturaAnotacao: number,
+  semRecorte: boolean,
+  a: Area,
+): CaixaPdf[] {
+  const n = aspectos.length;
   switch (layout) {
     case "filas": {
       // Duas filas até dez fotos, como a página das mesas de jantar; três acima
