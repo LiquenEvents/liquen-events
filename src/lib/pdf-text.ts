@@ -43,6 +43,7 @@ export function winAnsiSafe(input: string): string {
   for (const ch of arrumar(input)) {
     const cp = ch.codePointAt(0) ?? 0;
     const ok =
+      cp === 0x0a || // a quebra de linha: ver `RETORNOS` — virava «?» no papel
       (cp >= 0x20 && cp <= 0x7e) || // ASCII imprimível
       (cp >= 0xa0 && cp <= 0xff) || // Latin-1 (acentos PT incluídos)
       WINANSI_EXTRA.has(cp); // pontuação tipográfica do CP1252
@@ -85,8 +86,28 @@ const TRACOS: ReadonlyArray<[RegExp, string]> = [
   [/\u2044/g, "/"], // barra de fracção
 ];
 
+/**
+ * O RETORNO DE CARRETO — o «?» que ela viu, e a razão de ser este e não outro.
+ *
+ * «zona da piscina. ?Arranjo Floral no bar» — o «?» está exactamente onde ela
+ * carregou no Enter. Uma caixa de texto de um navegador devolve as quebras de
+ * linha como `\r\n` (é o que a norma do HTML manda), e o `\r` sozinho não é
+ * imprimível: virava «?» no papel, colado à primeira letra da linha seguinte.
+ * O `\n` ao lado dele fazia o seu trabalho e mudava de linha, o que tornava o
+ * «?» ainda mais estranho de explicar — parecia um caráter a mais do nada.
+ *
+ * Normalizar as três formas (`\r\n`, `\r` sozinho do mundo antigo do Mac, e
+ * `\n`) numa só ANTES de tudo o resto é o que faz o resto do ficheiro poder
+ * tratar de quebras de linha sem pensar nisto outra vez.
+ */
+const RETORNOS = /\r\n?/g;
+
 function arrumar(input: string): string {
-  let s = input.normalize("NFC").replace(INVISIVEIS, "").replace(ESPACOS, " ");
+  let s = input
+    .normalize("NFC")
+    .replace(RETORNOS, "\n")
+    .replace(INVISIVEIS, "")
+    .replace(ESPACOS, " ");
   for (const [de, para] of TRACOS) s = s.replace(de, para);
   return s;
 }

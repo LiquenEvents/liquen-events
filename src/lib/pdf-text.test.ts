@@ -100,3 +100,40 @@ describe("perguntar à fonte em vez de assumir o WinAnsi", () => {
     expect(textoParaFonte(rabugenta, "Decoração")).toBe("");
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ENTER DA CAIXA DE TEXTO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «zona da piscina. ?Arranjo Floral no bar» — o «?» está exactamente onde ela
+ * carregou no Enter. Uma caixa de texto de um navegador devolve `\r\n`; o `\r`
+ * não é imprimível e virava «?», colado à primeira letra da linha seguinte.
+ */
+describe("as quebras de linha escritas no editor", () => {
+  const LATINA2 = fonteQueSabe((cp) => cp < 0x0250);
+  const escrito = "Arranjos na zona da piscina.\r\nArranjo Floral no bar, num dos cantos.";
+
+  it("o retorno de carreto não deixa um «?» no papel", () => {
+    expect(textoParaFonte(LATINA2, escrito)).toBe(
+      "Arranjos na zona da piscina.\nArranjo Floral no bar, num dos cantos.",
+    );
+    expect(textoParaFonte(LATINA2, escrito)).not.toContain("?");
+  });
+
+  it("o mesmo no caminho das fontes-padrão, que a fatura e o contrato usam", () => {
+    expect(winAnsiSafe(escrito)).toBe(
+      "Arranjos na zona da piscina.\nArranjo Floral no bar, num dos cantos.",
+    );
+    expect(winAnsiSafe(escrito)).not.toContain("?");
+  });
+
+  it("o retorno sozinho, do mundo antigo do Mac, também é uma quebra", () => {
+    expect(textoParaFonte(LATINA2, "Primeira\rSegunda")).toBe("Primeira\nSegunda");
+    expect(winAnsiSafe("Primeira\rSegunda")).toBe("Primeira\nSegunda");
+  });
+
+  it("duas quebras seguidas continuam a ser duas — um parágrafo em branco é intenção", () => {
+    expect(textoParaFonte(LATINA2, "Um\r\n\r\nDois")).toBe("Um\n\nDois");
+  });
+});
