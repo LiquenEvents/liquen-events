@@ -595,6 +595,16 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
       clientNames: "Mafalda & Rui",
       eventType: "Casamento",
       eventDate: "12 de setembro de 2027",
+      location: "Herdade do Exemplo, Évora",
+      guests: "120 pax",
+      serviceGroups: [
+        {
+          letter: "a)",
+          title: "Decoração de Casamento",
+          items: [{ label: "Centros de mesa" }],
+        },
+      ],
+      coverImages: [a, ""],
       moodBoards: [
         {
           // Espaço de largura zero em «me​sas», hífen que não quebra em
