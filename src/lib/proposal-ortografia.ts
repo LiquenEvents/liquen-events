@@ -44,7 +44,7 @@ import type { ProposalDoc } from "./proposal-doc";
  * Regra de admissão, e não é negociável: a forma SEM acentos não pode ser uma
  * palavra portuguesa com sentido próprio. Ver o cabeçalho.
  */
-const PALAVRAS_CERTAS = [
+export const PALAVRAS_CERTAS = [
   // ── As rubricas destas propostas ──
   "cerimónia",
   "cerimónias",
@@ -120,6 +120,20 @@ const PALAVRAS_CERTAS = [
   "morada",
   "família",
   "famílias",
+  // ── Estilos, que dão nome a temas da biblioteca ──
+  // Entram pela mesma regra de admissão: «classico» e «mediterranico» não são,
+  // eles próprios, palavras portuguesas. Servem os campos impressos e os NOMES
+  // DOS TEMAS (ver `tema-nome.ts`), que é onde apareceram primeiro.
+  "clássico",
+  "clássica",
+  "clássicos",
+  "clássicas",
+  "mediterrânico",
+  "mediterrânica",
+  "rústico",
+  "rústica",
+  "romântico",
+  "romântica",
   // ── A marca ──
   "líquen",
 ] as const;
