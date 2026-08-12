@@ -251,8 +251,16 @@ describe("o orçamento com valores adicionais", () => {
     expect(texto).toMatch(/7\.?890,00/);
   });
 
-  it("fecha com «Total a pagar» na soma de tudo", async () => {
+  it("por omissão NÃO fecha com «Total a pagar» — a folha antiga não o tem", async () => {
     const texto = await textoDoPdf(proposta(comExtras));
+    expect(texto).not.toContain("Total a pagar");
+    // As parcelas continuam todas lá: o que sai é o quadro dela, sem o todo.
+    expect(texto).toMatch(/7\.?890,00/);
+    expect(texto).toContain("Serviço de coordenação");
+  });
+
+  it("ligada, fecha com «Total a pagar» na soma de tudo", async () => {
+    const texto = await textoDoPdf(proposta({ ...comExtras, mostrarTotalAPagar: true }));
     expect(texto).toContain("Total a pagar");
     expect(texto).toMatch(/9\.?090,50/);
   });
@@ -271,11 +279,11 @@ describe("o orçamento com valores adicionais", () => {
   });
 
   /**
-   * A folha dela não tinha a linha da soma. Quem preferir a folha tal e qual
-   * desliga-a — e aí o documento fica com as parcelas e sem o todo, em vez de
-   * um número grande a repetir só uma das parcelas.
+   * A folha dela não tinha a linha da soma, e é essa a omissão. Desligada à
+   * mão dá no mesmo — e é isso que este teste fixa: o documento fica com as
+   * parcelas e sem o todo, em vez de um número grande a repetir só uma delas.
    */
-  it("desligada, não desenha um total grande com o número errado", async () => {
+  it("desligada à mão, não desenha um total grande com o número errado", async () => {
     const texto = await textoDoPdf(proposta({ ...comExtras, mostrarTotalAPagar: false }));
     expect(texto).not.toContain("Total a pagar");
     expect(texto).toMatch(/7\.?890,00/);

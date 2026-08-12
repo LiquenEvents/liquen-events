@@ -368,10 +368,24 @@ export interface ProposalDoc {
   /**
    * Desenhar a linha «Total a pagar» a fechar o orçamento.
    *
-   * Ligada por omissão: com cada valor adicional a poder ter o seu próprio IVA,
-   * a soma deixa de ser trivial, e uma proposta não deve pedir contas de cabeça
-   * a quem a lê. A proposta feita à mão não a tinha — quem preferir a folha tal
-   * e qual desliga-a, e o documento fica com as parcelas e sem o todo.
+   * DESLIGADA POR OMISSÃO. Esteve ligada, com o argumento de que a soma dos
+   * adicionais — cada um com o seu próprio IVA — não é trivial e não se deve
+   * pedir de cabeça a quem lê. O argumento continua de pé; o que ele não pesou
+   * foi a folha de referência.
+   *
+   * A proposta feita à mão fecha o quadro em «Valor Total», com a coordenação e
+   * a deslocação por baixo, e mais nada. Ela abriu uma proposta gerada, viu um
+   * bloco «Total a pagar» em corpo 22 que a folha dela não tem, e disse que não
+   * estava igual. Num documento que ela envia há anos, um número grande a mais é
+   * um número que ninguém lhe pediu.
+   *
+   * Continua a poder ligar-se — é uma linha por proposta, e nas propostas com
+   * muitos adicionais é ela que responde ao «então quanto é ao todo?». Só deixou
+   * de ser o que sai sem ninguém escolher.
+   *
+   * Nota: só governa o total de FECHO, o que soma os adicionais. Uma proposta
+   * sem adicionais nenhuns continua a fechar no total de sempre, com o rótulo
+   * escrito no estúdio — que é a linha «Valor Total» da folha antiga.
    */
   mostrarTotalAPagar?: boolean;
   // Organização template: per-item estimated values.

@@ -1579,7 +1579,23 @@ function lerOrcamento(
    * proposta de Organização inteira — o quadro do orçamento desaparecia sem uma
    * palavra, e era o único sítio do documento onde estavam os preços.
    */
-  const quadro = organizacao || !grande ? aMargem.filter(antesDoSubtotal) : avancadas;
+  /**
+   * ── E O QUADRO DA DECORAÇÃO TAMBÉM DEIXOU DE TER MARCA ───────────────────
+   *
+   * O parágrafo acima descreve o que era verdade até a folha do orçamento ser
+   * refeita à imagem da proposta feita à mão: no modelo Decoração cada linha
+   * levava um pontinho e estava avançada. Deixou de levar — na folha dela as
+   * rubricas do quadro são nomes encostados à margem, debaixo do cabeçalho
+   * «Item / Preço (€)», exactamente como no modelo Organização.
+   *
+   * Um PDF gerado antes dessa mudança continua a ter as linhas avançadas, e
+   * continua a ter de se ler: por isso as marcadas ficam como RECURSO, e não
+   * como alternativa. Primeiro procura-se à margem — que é onde elas estão
+   * hoje, nos dois modelos e nas folhas à mão —, e só um quadro vazio faz
+   * voltar atrás.
+   */
+  const aMargemDoQuadro = aMargem.filter(antesDoSubtotal);
+  const quadro = organizacao || !grande || aMargemDoQuadro.length ? aMargemDoQuadro : avancadas;
 
   /**
    * O `budgetOpcional` é um array PARALELO ao `budgetItems`: o índice `i` de um

@@ -708,8 +708,8 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
 
   // Quiet uppercase eyebrow/label — pale grey by default so it whispers rather
   // than shouts. The one consistent "voice" for small labels across the document.
-  const eyebrow = (p: PDFPage, s: string, x: number, y: number, color = FAINT) => {
-    const sz = T_CAPTION;
+  const eyebrow = (p: PDFPage, s: string, x: number, y: number, color = FAINT, size?: number) => {
+    const sz = size ?? T_CAPTION;
     let cx = x;
     for (const ch of winAnsiSafe(s.toUpperCase())) {
       p.drawText(ch, { x: cx, y, font: f.bold, size: sz, color });
@@ -1091,7 +1091,6 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     // with no priced rows must never fall into the Decoração reserva wording.
     const orgT = doc.template === "organizacao";
     let p = pdf.addPage([W, H]);
-    const firstBudgetPage = p;
     frame(p);
     let y = H - M - 64;
     y = sectionHeader(p, "O investimento", "Orçamento Proposto", y);
@@ -1135,9 +1134,17 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     p.drawLine({ start: { x: M, y }, end: { x: M + boxW, y }, thickness: 0.5, color: LINE });
     y -= 22;
 
-    // Start a fresh page when the next row (or block) won't fit above the footer.
+    /**
+     * Muda de página quando o que vem a seguir não cabe acima do chão da mancha.
+     *
+     * O chão é o {@link CHAO} de toda a gente. Era `M + 30` só aqui — vinte e
+     * quatro pontos de folha que esta secção não usava e as outras usavam, sem
+     * nada que o justificasse. E não era inofensivo: são precisamente esses 24
+     * pontos que decidiam se as notas e as condições de reserva cabiam atrás do
+     * quadro ou empurravam uma folha inteira só para elas.
+     */
     const budgetBreak = (need: number) => {
-      if (y - need < M + 30) {
+      if (y - need < CHAO) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
@@ -1165,13 +1172,19 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       // direita e não uma segunda lista: partir o orçamento em dois quadros
       // fazia parecer duas propostas, que é precisamente o que isto vem
       // substituir. Ver `orcamento/versoes-da-proposta.ts`.
+      // ── SEM MARCADORES ────────────────────────────────────────────────────
+      // A folha antiga escreve as três rubricas do quadro como nomes, um por
+      // linha, por baixo do cabeçalho «Item / Preço (€)»: «Design Floral e
+      // Decor Jantar», «Decor Mesa Buffet», «Bouquet da Noiva». Não são uma
+      // lista de tópicos, são as linhas de um quadro — e um quadro com pontinhos
+      // à esquerda de cada linha lê-se como um sumário, não como um orçamento.
+      // O cabeçalho e a régua por cima já dizem o que aquilo é.
       const marcas = opcionaisDe(doc);
       doc.budgetItems.forEach((it, i) => {
-        const lines = wrap(f.reg, it, 10.5, boxW - 14 - (marcas[i] ? 46 : 0));
+        const lines = wrap(f.reg, it, 10.5, boxW - (marcas[i] ? 46 : 0));
         budgetBreak(Math.max(20, lines.length * 15));
-        p.drawCircle({ x: M + 3, y: y + 3, size: 1.2, color: FAINT });
         lines.forEach((ln, j) => {
-          text(p, ln, M + 14, y, { size: 10.5, color: INK });
+          text(p, ln, M, y, { size: 10.5, color: INK });
           if (j === 0 && marcas[i]) {
             textRight(p, "extra", M + boxW, y, { size: 9, color: MUTED });
           }
@@ -1223,7 +1236,9 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     const extras = (doc.budgetExtras ?? []).filter(
       (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
     );
-    const mostrarSoma = doc.mostrarTotalAPagar !== false;
+    // Desligado por omissão — ver `mostrarTotalAPagar` em `proposal-doc.ts`: a
+    // folha de referência fecha em «Valor Total» e não tem bloco de soma.
+    const mostrarSoma = doc.mostrarTotalAPagar === true;
 
     if (extras.length) {
       // Na unidade em que o total está impresso: líquida quando o documento diz
@@ -1276,15 +1291,23 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     }
 
     if (extras.length && !mostrarSoma) {
-      // Ela desligou a soma: o documento fica com as parcelas e sem o todo, que
-      // é como a proposta antiga era. Não se desenha um total grande a repetir
-      // só uma das parcelas — seria o número errado em corpo 22.
-      y -= 8;
+      // Sem soma: o documento fica com as parcelas e sem o todo, que é como a
+      // proposta antiga é. Não se desenha um total grande a repetir só uma das
+      // parcelas — seria o número errado em corpo 22.
+      //
+      // E não se deixa cá ar nenhum: o que vem a seguir é a cauda das notas, e
+      // ela traz o seu próprio (o `AR`). Oito pontos a mais aqui eram oito
+      // pontos a menos para as condições de reserva caberem nesta folha.
     } else {
       budgetBreak(boxH + 24);
-      y -= 16;
+      y -= 12;
       drawTotal(p, y, extras.length ? "Total a pagar" : undefined);
-      y -= boxH + 20;
+      // `boxH` (50) já é folgado: a tinta do bloco — a régua dourada, o rótulo e
+      // o número em corpo 22 — acaba treze pontos acima dele. Os vinte que aqui
+      // estavam eram ar em cima de ar, e numa proposta SEM valores adicionais
+      // (onde este bloco custa oitenta e seis pontos) eram eles que empurravam
+      // as condições de reserva para uma segunda folha.
+      y -= boxH + 6;
     }
 
     // ── A versão SEM os extras ─────────────────────────────────────────────
@@ -1332,41 +1355,10 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       y -= 22;
     }
 
-    // ── O faseamento, com os valores a sério ───────────────────────────────
-    // A clareza que o cliente quer logo por baixo do total. Os montantes saem
-    // do mesmo resolvedor de dinheiro que a facturação usa, para nunca
-    // discordarem.
-    //
-    // A PERCENTAGEM TAMBÉM. Estava escrita à letra — «Sinal 30%» / «Saldo 70%»
-    // — mas há uma caixa editável no estúdio (`depositPercent`) e são as rotas
-    // de facturação que a lêem quando emitem o sinal e o saldo. Numa proposta
-    // de 50% o documento dizia «Sinal 30% 3.000,00 €» num total de 10.000 €, o
-    // casal aceitava, e a factura do sinal saía a 5.000 €: o documento
-    // assinado e a factura emitida a discordarem em 2.000 €.
-    if (money.gross > 0) {
-      const pctSinal = depositPercentOf(doc);
-      const { sinal, saldo } = splitSinal(money.gross, pctSinal);
-      budgetBreak(58);
-      eyebrow(p, "Faseamento do pagamento", M, y);
-      y -= 18;
-      text(p, `Sinal ${pctSinal}%   ${eurDoc(sinal)}`, M, y, {
-        font: f.serif,
-        size: 12,
-        color: INK,
-      });
-      textRight(p, "na adjudicação, para reservar a data", M + boxW, y, {
-        size: 9.5,
-        color: MUTED,
-      });
-      y -= 17;
-      text(p, `Saldo ${100 - pctSinal}%   ${eurDoc(saldo)}`, M, y, {
-        font: f.serif,
-        size: 12,
-        color: INK,
-      });
-      textRight(p, "até 1 mês antes do evento", M + boxW, y, { size: 9.5, color: MUTED });
-      y -= 20;
-    }
+    // O FASEAMENTO SAIU DESTA PÁGINA. Está agora com as condições gerais, na
+    // secção «Faseamento do Pagamento» — que é onde a folha antiga o tem, e onde
+    // já vivia a lista com as mesmas percentagens escritas por extenso. Ver lá o
+    // porquê da percentagem sair de `depositPercentOf` e não de um «30%» à letra.
 
     if (doc.budgetNote) {
       budgetBreak(30);
@@ -1376,26 +1368,169 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       }
     }
 
-    // Reservation notes — a right-hand column, anchored on the FIRST budget page
-    // (independent of how far the left list paginated). Shown for both templates.
-    let ry = H - M - 64;
-    const rx = M + 490;
-    const rW = W - M - rx;
-    const rHead = (t: string) => {
-      text(firstBudgetPage, t, rx, ry, { font: f.serifB, size: T_SUB, color: INK });
-      ry -= 22;
+    /* ═══════════════════════════════════════════════════════════════════════
+       AS NOTAS E AS CONDIÇÕES DE RESERVA — POR BAIXO DO QUADRO, NUMA COLUNA
+       ═══════════════════════════════════════════════════════════════════════
+
+       Estavam numa coluna estreita à direita do orçamento, ancorada no topo da
+       primeira página. Ela abriu uma proposta gerada e disse que não estava
+       igual à folha que envia há anos — e não estava: a folha dela é uma coluna
+       de cima para baixo, «Notas Importantes» e «Condições de Reserva» POR
+       BAIXO do quadro, por esta ordem (ver a página 7 da proposta de
+       referência: x71 y312 e x71 y197, ambas encostadas à margem).
+
+       A coluna da direita tinha 216 pontos de largura para texto de corpo 8,5 —
+       nada era cortado (a quebra media a coluna certa), mas cabiam 45
+       caracteres por linha, e uma nota de duas linhas passava a quatro. Pior:
+       `bullets` desce o `y` e não conhece o chão da página. Medido, com listas
+       longas: o «NÃO INCLUÍDO» a ser desenhado POR CIMA do rodapé e o resto a
+       sair pela folha fora, sem erro e sem aviso — a mesma avaria que o
+       cronograma tinha.
+
+       Agora: uma coluna só, à largura do texto corrido, e cada bloco medido
+       ANTES de ser desenhado. Um bloco ou cabe onde está, ou começa na página
+       seguinte INTEIRO — nunca a meio de uma lista.
+
+       ── PORQUE NÃO A LARGURA TODA DA FOLHA ─────────────────────────────────
+       A folha é A4 ao baixo: entre margens são 706 pontos, que a corpo 9 dão
+       ~155 caracteres por linha — o dobro do que se lê sem perder a linha, e o
+       maior sinal de folha feita à pressa que este documento tem (ver MEASURE).
+       550 pontos dão ~110 e chegam para a nota mais comprida da casa caber numa
+       linha só. A folha antiga, essa, mede 480 pontos de mancha em A4 ao alto —
+       está mais perto de 550 do que de 706. */
+    const NOTAS_W = MEASURE + 120;
+    const NOTAS_SIZE = 9;
+    /**
+     * A legenda de uma sub-rubrica NUNCA É MENOR DO QUE A SUA LISTA.
+     *
+     * Era: legenda de 7,5 com itens de 8,5 por baixo — uma rubrica mais pequena
+     * do que aquilo que encabeça, que só passava despercebido porque estava
+     * numa coluna estreita ao lado. Na folha antiga as duas são do mesmo corpo
+     * (t8 e t8). Aqui a legenda fica meio ponto acima da lista: lê-se como
+     * cabeçalho, e quem lê o documento de volta — que separa a lista da rubrica
+     * pelo corpo — não perde as duas listas de condições de reserva.
+     */
+    const NOTAS_OLHO = NOTAS_SIZE + 0.5;
+    /* ── O AR ENTRE BLOCOS É O QUE PAGA A FOLHA ─────────────────────────────
+       Estes quatro números decidem, sozinhos, se a cauda cabe atrás do quadro
+       no CASO DA CASA — as três notas, os dois incluídos e os dois não
+       incluídos que vêm por omissão, que são os mesmos da proposta dela.
+
+       Medido: com 18 de ar e 22 de avanço, a tinta da cauda ocupava 176 pontos
+       e começava em y=230; acabava em y=54, vinte abaixo do chão da mancha. A
+       folha partia-se em duas, cada uma com menos de metade cheia. Com estes
+       números ocupa 156 e acaba em y=84 — dez pontos acima do chão.
+
+       O que se aperta é o ar ENTRE secções, e só esse: o corpo da letra, a
+       entrelinha e a medida do texto ficam onde estavam. Uma folha um pouco
+       mais cerrada continua a ler-se como desenho; duas a meio gás, não.
+       (A folha dela dá-se ao luxo de 64 e 73 pontos entre as rubricas porque o
+       quadro dela, todo em corpo 8, acaba 107 pontos mais acima do que o
+       nosso.) */
+    const H_RUBRICA = 18; // avanço depois de uma rubrica em serifa (corpo 13)
+    const H_OLHO = 12; // avanço depois de uma legenda em capitulares
+    const AR = 6; // ar entre blocos (soma-se ao que a lista anterior já deixou)
+    const AR_OLHOS = 4; // ar entre as duas legendas das condições de reserva
+
+    /** O que `bullets` desce no `y` ao desenhar esta lista — medido com a MESMA
+     *  quebra com que desenha. Medir num sítio e desenhar noutro é como a
+     *  coluna da direita passava por cima do rodapé. */
+    const avancoDaLista = (itens: readonly string[]) =>
+      itens.reduce(
+        (h, it) => h + wrap(f.reg, it, NOTAS_SIZE, NOTAS_W - 12).length * (NOTAS_SIZE + 3) + 3,
+        0,
+      );
+    /**
+     * O avanço que sobra DEPOIS da última tinta de uma lista: a descida da
+     * última linha, mais o ar que a separaria de um item seguinte que não
+     * existe. Não é tinta e não tem de caber na folha.
+     *
+     * Contá-lo custava quinze pontos por lista. É pouco, e foi o que bastou:
+     * a cauda pedia uma folha nova por causa de um espaço em branco que ninguém
+     * ia ver.
+     */
+    const FIM_MORTO = NOTAS_SIZE + 3 + 3;
+    /** A altura de TINTA de uma lista — o que tem mesmo de caber acima do chão. */
+    const alturaDeMarcadores = (itens: readonly string[]) =>
+      Math.max(0, avancoDaLista(itens) - FIM_MORTO);
+    /** A altura útil de uma página de orçamento — o tecto do que se pode exigir
+     *  a uma quebra. Sem isto, uma lista maior do que uma página pedia uma
+     *  página nova para sempre. */
+    const COLUNA_ORC = H - M - 64 - CHAO;
+    /** Este bloco cabe aqui, ou começa na página seguinte. */
+    const bloco = (altura: number) => budgetBreak(Math.min(altura, COLUNA_ORC));
+    const rubrica = (t: string) => {
+      text(p, t, M, y, { font: f.serifB, size: T_SUB, color: INK });
+      y -= H_RUBRICA;
     };
-    rHead("Notas importantes");
-    ry = bullets(firstBudgetPage, doc.notasImportantes, rx, ry, rW, f, 8.5);
-    ry -= 16;
-    rHead("Condições de reserva");
-    eyebrow(firstBudgetPage, "Incluído na proposta", rx, ry);
-    ry -= 14;
-    ry = bullets(firstBudgetPage, doc.incluido, rx, ry, rW, f, 8.5);
-    ry -= 10;
-    eyebrow(firstBudgetPage, "Não incluído", rx, ry);
-    ry -= 14;
-    bullets(firstBudgetPage, doc.naoIncluido, rx, ry, rW, f, 8.5);
+    /** A legenda em capitulares LEVA DOIS PONTOS, como na folha antiga
+     *  («INCLUÍDO NA PROPOSTA:», «NÃO INCLUÍDO NO ORÇAMENTO:»). Não é enfeite:
+     *  são os dois pontos que dizem que aquilo é um cabeçalho e não uma frase —
+     *  é assim que o leitor de propostas antigas as distingue, e agora a nossa
+     *  folha diz o mesmo da mesma maneira. */
+    const olho = (t: string) => {
+      eyebrow(p, t, M, y, MUTED, NOTAS_OLHO);
+      y -= H_OLHO;
+    };
+
+    const temNotas = doc.notasImportantes.length > 0;
+    const temReserva = doc.incluido.length > 0 || doc.naoIncluido.length > 0;
+
+    /* ── AS DUAS RUBRICAS VIAJAM JUNTAS ────────────────────────────────────
+       A folha antiga mete o quadro, as «Notas Importantes» e as «Condições de
+       Reserva» na MESMA página — e é A4 AO BAIXO, 842 × 595, exactamente a
+       nossa folha (medido no ficheiro dela: «Page size: 842.04 x 595.56 pts»).
+       Não há altura nenhuma a menos a justificar uma segunda folha: o caso da
+       casa tem de caber, e cabe — ver o ar apertado aqui em cima.
+
+       Quando não cabe mesmo (listas engordadas à mão), a cauda passa INTEIRA
+       para a folha seguinte em vez de partir no meio: uma folha com o fim das
+       notas e outra com o resto são duas a meio gás. E se nem numa folha
+       inteira couber, os `bloco` de baixo partem-na por rubricas — nunca a meio
+       de uma lista. */
+    // Os avanços de todos os blocos, menos o fim morto do último: é a TINTA da
+    // cauda inteira, do primeiro título à base da última linha.
+    const conjunto =
+      (temNotas ? AR + H_RUBRICA + avancoDaLista(doc.notasImportantes) : 0) +
+      (temReserva
+        ? AR +
+          H_RUBRICA +
+          (doc.incluido.length ? H_OLHO + avancoDaLista(doc.incluido) : 0) +
+          (doc.naoIncluido.length ? AR_OLHOS + H_OLHO + avancoDaLista(doc.naoIncluido) : 0)
+        : 0);
+    if (conjunto > 0) bloco(conjunto - FIM_MORTO);
+
+    if (temNotas) {
+      y -= AR;
+      bloco(H_RUBRICA + alturaDeMarcadores(doc.notasImportantes));
+      rubrica("Notas importantes");
+      y = bullets(p, doc.notasImportantes, M, y, NOTAS_W, f, NOTAS_SIZE);
+    }
+
+    if (temReserva) {
+      y -= AR;
+      // O título «Condições de reserva» viaja com a primeira legenda e com a
+      // primeira lista: um título sozinho no fundo de uma folha não é conteúdo.
+      bloco(
+        H_RUBRICA +
+          (doc.incluido.length
+            ? H_OLHO + alturaDeMarcadores(doc.incluido)
+            : H_OLHO + alturaDeMarcadores(doc.naoIncluido)),
+      );
+      rubrica("Condições de reserva");
+      if (doc.incluido.length) {
+        olho("Incluído na proposta:");
+        y = bullets(p, doc.incluido, M, y, NOTAS_W, f, NOTAS_SIZE);
+      }
+      if (doc.naoIncluido.length) {
+        if (doc.incluido.length) {
+          y -= AR_OLHOS;
+          bloco(H_OLHO + alturaDeMarcadores(doc.naoIncluido));
+        }
+        olho("Não incluído no orçamento:");
+        y = bullets(p, doc.naoIncluido, M, y, NOTAS_W, f, NOTAS_SIZE);
+      }
+    }
   }
 
   // ── Condições Gerais (two columns for a comfortable reading measure) ──
@@ -1438,8 +1573,14 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     frame(p);
     let y = H - M - 64;
     const maxW = MEASURE; // capped reading measure
-    const subHead = (title: string) => {
-      if (y - 40 < M + 24) {
+    /** A altura útil desta página — o tecto do que se pode exigir a uma quebra. */
+    const COLUNA_FECHO = H - M - 64 - (M + 24);
+    /** `altura` é o BLOCO que vem a seguir ao título, e não os 40 pontos de
+     *  «o título e uma linha» que aqui estavam: um título no fundo de uma folha
+     *  com a sua lista na seguinte é o mesmo defeito dos serviços, um capítulo
+     *  mais à frente do ficheiro. */
+    const subHead = (title: string, altura = 16) => {
+      if (y - 24 - Math.min(altura, COLUNA_FECHO) < M + 24) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
@@ -1447,8 +1588,19 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       text(p, title, M, y, { font: f.serifB, size: T_SUB, color: INK });
       y -= 24;
     };
-    const section = (title: string, items: string[], size = 9) => {
-      subHead(title);
+    /** A altura de uma lista desta página, medida como vai ser desenhada. */
+    const alturaDaLista = (items: readonly string[], size: number) =>
+      items.reduce((h, it) => h + wrap(f.reg, it, size, maxW - 16).length * 12 + 6, 0);
+    /** `remate` é desenhado ainda DENTRO da secção, antes do ar que a fecha —
+     *  ver o faseamento, que junta os valores em euros à lista de percentagens
+     *  sem os deixar a pairar entre duas rubricas. */
+    const section = (
+      title: string,
+      items: string[],
+      size = 9,
+      remate?: { altura: number; desenhar: () => void },
+    ) => {
+      subHead(title, alturaDaLista(items, size) + (remate?.altura ?? 0));
       for (const it of items) {
         const lines = wrap(f.reg, it, size, maxW - 16);
         if (y - lines.length * 12 < M + 24) {
@@ -1463,6 +1615,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         }
         y -= 6;
       }
+      remate?.desenhar();
       y -= 18;
     };
 
@@ -1485,7 +1638,52 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     y -= 18;
 
     section("Observações Gerais", doc.observacoesGerais);
-    section("Faseamento do Pagamento", doc.faseamento);
+    /* ═════════════════════════════════════════════════════════════════════════
+       O FASEAMENTO, COM OS VALORES A SÉRIO — AQUI, E NÃO NA FOLHA DO ORÇAMENTO
+       ═════════════════════════════════════════════════════════════════════════
+
+       Estes dois números estavam por baixo do total, na página do orçamento. Na
+       folha antiga o faseamento não está lá: está com as condições, em
+       «FASEAMENTO DO PAGAMENTO:» (página 9 da proposta de referência), que é
+       exactamente esta rubrica — a mesma que já trazia as percentagens escritas
+       por extenso, e só as percentagens.
+
+       Mudaram de página, não se perderam: quanto é o sinal EM EUROS é a
+       informação que a folha antiga não dá e que evita o telefonema a perguntar.
+       Ficam onde a lista já falava deles, logo por baixo dela.
+
+       A PERCENTAGEM SAI DE `depositPercentOf`, e não de um «30%» escrito à
+       letra: há uma caixa editável no estúdio e são as rotas de facturação que a
+       lêem quando emitem o sinal e o saldo. Numa proposta de 50% o documento
+       dizia «Sinal 30% 3.000,00 €» num total de 10.000 €, o casal aceitava, e a
+       factura do sinal saía a 5.000 € — o documento assinado e a factura emitida
+       a discordarem em 2.000 €. Os montantes saem do mesmo resolvedor de
+       dinheiro que a facturação usa, pela mesma razão. */
+    const dinheiro = resolveProposalMoney(doc);
+    const comValores = dinheiro.gross > 0;
+    section("Faseamento do Pagamento", doc.faseamento, 9, {
+      // As duas linhas viajam com a rubrica: são medidas ANTES de o título ser
+      // desenhado, e não depois da lista — de outro modo apareciam sozinhas no
+      // topo da folha seguinte, longe do cabeçalho que lhes dá sentido.
+      altura: comValores ? 34 : 0,
+      desenhar: () => {
+        if (!comValores) return;
+        const pctSinal = depositPercentOf(doc);
+        const { sinal, saldo } = splitSinal(dinheiro.gross, pctSinal);
+        for (const [rotulo, valor, quando] of [
+          [`Sinal ${pctSinal}%`, sinal, "na adjudicação, para reservar a data"],
+          [`Saldo ${100 - pctSinal}%`, saldo, "até 1 mês antes do evento"],
+        ] as const) {
+          text(p, `${rotulo}   ${eurDoc(valor)}`, M + 14, y, {
+            font: f.serif,
+            size: 10.5,
+            color: INK,
+          });
+          textRight(p, quando, M + maxW, y, { size: 9, color: MUTED });
+          y -= 17;
+        }
+      },
+    });
     section("Cancelamento", doc.cancelamento);
 
     // Contactos
