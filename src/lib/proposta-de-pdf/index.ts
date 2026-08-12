@@ -43,7 +43,7 @@ import type { Aviso, FotoDoPdf, RascunhoDePdf } from "./tipos";
  * `documentoDeCampos` e não puxa nada do servidor.
  */
 export { MAX_PDF_BYTES, MAX_PAGINAS, ORCAMENTO_MS } from "./leitura";
-export { MAX_FOTOS } from "./imagens";
+export { MAX_BYTES_DE_FOTOS } from "./imagens";
 export * from "./tipos";
 export type { Linha, PedacoDeTexto, PaginaLida } from "./linhas";
 
@@ -138,9 +138,11 @@ export async function lerPropostaDePdf(
 }
 
 /**
- * Diz onde é que cada fotografia parecia pertencer.
+ * ════════════════════════════════════════════════════════════════════════════
+ * ONDE É QUE CADA FOTOGRAFIA PERTENCE
+ * ════════════════════════════════════════════════════════════════════════════
  *
- * Não é uma adivinha sobre o conteúdo da foto: é onde ela estava DESENHADA. Uma
+ * Não é uma adivinha sobre o CONTEÚDO da foto: é onde ela estava DESENHADA. Uma
  * imagem que ocupa a altura toda da primeira página é uma foto de capa, e o
  * lado onde estava impressa é o lado onde vai voltar a ser impressa — foi essa
  * exacta simetria que fez o gerador guardar as capas por posição e nunca as
@@ -150,26 +152,102 @@ export async function lerPropostaDePdf(
  * O que não cair em nenhuma das duas fica com `destino: null`, e o ecrã mostra-a
  * na mesma: uma foto sem sítio é melhor do que uma foto arrumada no sítio
  * errado, que é o género de coisa que só se descobre com a proposta impressa.
+ *
+ * ── AS PÁGINAS DE INSPIRAÇÃO QUE NINGUÉM ROTULOU ──────────────────────────
+ *
+ * `paginasDeMoodboard` é o que `camposDoDocumento` conseguiu identificar pela
+ * LEGENDA. Numa proposta nossa vem cheio e é a palavra final. Numa proposta
+ * feita à mão em Word pode vir vazio — e vinha: na proposta de dez páginas do
+ * acervo, 31 das 32 fotografias saíam daqui com `destino: null`, ou seja, uma
+ * tarde a arrastar trinta fotografias à mão, que é precisamente a tarde que
+ * este motor existe para poupar.
+ *
+ * Então, para as páginas que a legenda não cobre, pergunta-se à própria
+ * página: uma folha com DUAS ou mais fotografias é uma mancha de inspiração;
+ * uma folha de texto com uma fotografia ao lado não é. Duas é o número que
+ * separa as quatro páginas de inspiração daquela proposta (10, 6, 5 e 10
+ * fotografias) de uma folha de Word com uma única imagem — e o preço de errar
+ * para o lado seguro é uma foto com `destino: null`, que se arrasta uma vez.
+ *
+ * Os índices das páginas que vieram rotuladas NÃO se mexem: são o contrato com
+ * `campos.ts`, onde `moodBoards[i]` é a i-ésima entrada desta lista. As
+ * inferidas entram a seguir, por ordem de página.
  */
+
+/** Quantas fotografias uma página precisa de ter para se INFERIR que é uma
+ *  página de inspiração. Não se aplica às que vêm rotuladas: essas mandam,
+ *  mesmo com uma fotografia só (e há um mood board assim nos nossos testes). */
+const FOTOS_PARA_SER_MOODBOARD = 2;
+
+/** Fracção da altura da página a partir da qual uma imagem é uma capa. */
+const ALTURA_DE_CAPA = 0.9;
+
+/**
+ * Fracção da largura a partir da qual a capa é UMA só, a sangrar de lado a lado.
+ *
+ * A nossa capa são duas fotografias a ladear uma faixa central escura, cada uma
+ * com uns 47% da folha. A da proposta verdadeira PARECE igual — duas fotos e um
+ * bloco preto ao meio — mas por dentro é uma única imagem achatada de 795 × 559
+ * pontos numa página de 842 × 596, ou seja 94% da largura. Distinguir os dois
+ * casos é o que evita mandar uma capa inteira para o lado esquerdo do gerador.
+ */
+const LARGURA_DE_CAPA_INTEIRA = 0.6;
+
 function arrumarFotos(
   fotos: readonly FotoDoPdf[],
   paginas: readonly { numero: number; largura: number; altura: number }[],
   paginasDeMoodboard: readonly number[],
 ): FotoDoPdf[] {
   const daPagina = (n: number) => paginas.find((p) => p.numero === n);
-  let capas = 0;
-  return fotos.map((f) => {
+  const primeira = paginas[0]?.numero ?? 1;
+  const ultima = paginas[paginas.length - 1]?.numero ?? primeira;
+
+  // ── As capas ──
+  // Só na primeira e na última página. Antes valia em qualquer uma, e bastava
+  // uma fotografia alta a meio do documento para gastar um lugar de capa que a
+  // capa verdadeira já não apanhava.
+  const destinos = new Map<FotoDoPdf, string>();
+  const ocupado: (FotoDoPdf | undefined)[] = [];
+  for (const f of fotos) {
+    if (f.origem.pagina !== primeira && f.origem.pagina !== ultima) continue;
     const pagina = daPagina(f.origem.pagina);
-    const altura = pagina?.altura ?? 0;
-    const deCapa = altura > 0 && f.origem.altura >= altura * 0.9;
-    if (deCapa && capas < 2) {
-      // O lado onde estava é o lado onde volta a ser impressa.
-      const meio = f.origem.x + f.origem.largura / 2;
-      const lado = meio < (pagina?.largura ?? 0) / 2 ? 0 : 1;
-      capas += 1;
-      return { ...f, destino: `coverImages[${lado}]` };
-    }
-    const board = paginasDeMoodboard.indexOf(f.origem.pagina);
+    if (!pagina || pagina.altura <= 0 || pagina.largura <= 0) continue;
+    if (f.origem.altura < pagina.altura * ALTURA_DE_CAPA) continue;
+
+    // O lado onde estava é o lado onde volta a ser impressa; uma capa que
+    // atravessa a folha toda não tem lado e fica com o primeiro lugar.
+    const meio = f.origem.x + f.origem.largura / 2;
+    const preferido =
+      f.origem.largura >= pagina.largura * LARGURA_DE_CAPA_INTEIRA
+        ? 0
+        : meio < pagina.largura / 2
+          ? 0
+          : 1;
+    // Duas fotografias do mesmo lado (uma contracapa que não coincide com a
+    // capa) não podem escrever as duas em `coverImages[0]`.
+    const lugar = !ocupado[preferido] ? preferido : !ocupado[1 - preferido] ? 1 - preferido : -1;
+    if (lugar < 0) continue;
+    ocupado[lugar] = f;
+    destinos.set(f, `coverImages[${lugar}]`);
+  }
+
+  // ── As páginas de inspiração ──
+  const fotosPorPagina = new Map<number, number>();
+  for (const f of fotos) {
+    if (destinos.has(f)) continue;
+    fotosPorPagina.set(f.origem.pagina, (fotosPorPagina.get(f.origem.pagina) ?? 0) + 1);
+  }
+  const boards = [...paginasDeMoodboard];
+  for (const pagina of [...fotosPorPagina.keys()].sort((a, b) => a - b)) {
+    if (boards.includes(pagina)) continue;
+    if ((fotosPorPagina.get(pagina) ?? 0) < FOTOS_PARA_SER_MOODBOARD) continue;
+    boards.push(pagina);
+  }
+
+  return fotos.map((f) => {
+    const capa = destinos.get(f);
+    if (capa) return { ...f, destino: capa };
+    const board = boards.indexOf(f.origem.pagina);
     if (board >= 0) return { ...f, destino: `moodBoards[${board}].images` };
     return { ...f, destino: null };
   });
