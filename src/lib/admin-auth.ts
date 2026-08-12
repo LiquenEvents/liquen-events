@@ -485,10 +485,25 @@ export async function pedirRecuperacao(email: string): Promise<ResultadoDoPedido
   limparExpirados(registo, agora);
 
   const conta = contaPorEmail(email);
-  const chave = normalizarIdentificador(email);
+  /**
+   * A CHAVE VEM DA CONTA CONFIGURADA, e nunca do que foi escrito no formulário.
+   *
+   * As duas dão a mesma cadeia — `contaPorEmail` só devolve uma conta quando o
+   * que foi escrito corresponde ao endereço dela, e a comparação já passa pela
+   * mesma normalização. Mas «dão a mesma cadeia» é uma conclusão que só se tira
+   * lendo três funções, e a diferença conta no dia em que uma delas mudar: o
+   * nome de uma propriedade onde se ESCREVE não deve depender de texto vindo de
+   * fora, ponto final.
+   *
+   * Foi isto que a análise de segurança marcou como grave, e continuou a marcar
+   * depois de as tabelas passarem a não ter herança nenhuma
+   * (`admin-recuperacao.ts`) — e bem: aquilo fechou a CONSEQUÊNCIA (contaminar
+   * o que todos os objectos herdam), não a origem. Agora o valor que dá o nome
+   * à propriedade nasce da configuração da casa.
+   */
   const token = conta ? novoToken() : null;
-  if (conta && token) {
-    registo.pedidos[chave] = {
+  if (conta?.email && token) {
+    registo.pedidos[normalizarIdentificador(conta.email)] = {
       resumo: resumoDoToken(token),
       expiraEm: agora + VALIDADE_MS,
       pedidoEm: agora,
