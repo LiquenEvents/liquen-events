@@ -572,4 +572,56 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
     // No modelo Organização o cliente vem debaixo de «Cliente», não de «Noivos».
     expect(lido.clientNames).toBe("Ana & Rui");
   }, 200_000);
+
+  /**
+   * ── A LEGENDA COLADA, QUE VOLTAVA COM PONTOS DE INTERROGAÇÃO ─────────────
+   *
+   * Ela abriu uma proposta e viu «?» nos textos por baixo das imagens dos mood
+   * boards. O texto que ela escreveu estava certo — quem o estragava era o
+   * gerador: passava tudo por um filtro do WinAnsi (a codificação das
+   * fontes-PADRÃO do pdf-lib) quando este documento embebe a SUA própria fonte,
+   * que desenha muito mais do que isso. E o texto COLADO do Word ou do Canva
+   * traz passageiros invisíveis — espaços estreitos, espaços de largura zero, a
+   * marca de ordem de bytes, hífenes que não quebram — que viravam um «?» cada.
+   *
+   * Este passeio é a prova pelo papel: imprime-se com a legenda tal como ela a
+   * colaria, lê-se o PDF de volta, e o que volta não pode ter um único «?».
+   */
+  it("uma legenda colada volta sem pontos de interrogação", async () => {
+    const a = await foto(900, 600, { r: 150, g: 120, b: 90 });
+    const doc = withProposalDefaults({
+      template: "decoracao",
+      ref: "PO Decoração — Mafalda & Rui · 12.09.2027",
+      clientNames: "Mafalda & Rui",
+      eventType: "Casamento",
+      eventDate: "12 de setembro de 2027",
+      moodBoards: [
+        {
+          // Espaço de largura zero em «me​sas», hífen que não quebra em
+          // «t‑lights», espaço estreito antes de «com», e a marca de ordem de
+          // bytes à cabeça — exactamente o que sai de um copiar-colar.
+          title: "\uFEFFDecoração das Me\u200Bsas",
+          subtitulo: "Tons terrosos\u2009e bordeaux",
+          images: [a],
+          annotation:
+            "Apontamentos florais em jarras e taças,\u2009com t\u2011lights e castiçais\u200B.",
+        },
+      ],
+      budgetItems: ["Decoração das mesas"],
+      totalLabel: "Valor Total",
+      totalText: "3.200,00 € + IVA",
+      totalAmount: 3200,
+      totalVatMode: "acrescer",
+    });
+
+    const { lido } = await idaEVolta(doc);
+
+    const legenda = `${lido.moodBoards?.[0]?.title ?? ""} ${lido.moodBoards?.[0]?.subtitulo ?? ""} ${lido.moodBoards?.[0]?.annotation ?? ""}`;
+    expect(legenda).not.toContain("?");
+    expect(lido.moodBoards?.[0]?.title).toBe("Decoração das Mesas");
+    expect(lido.moodBoards?.[0]?.subtitulo).toBe("Tons terrosos e bordeaux");
+    expect(lido.moodBoards?.[0]?.annotation).toBe(
+      "Apontamentos florais em jarras e taças, com t-lights e castiçais.",
+    );
+  }, 200_000);
 });

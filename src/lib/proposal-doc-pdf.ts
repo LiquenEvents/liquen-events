@@ -40,7 +40,7 @@ import {
   CARLITO_ITALIC_TTF_B64,
 } from "@/lib/proposal-fonts";
 import { opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
-import { winAnsiSafe } from "@/lib/pdf-text";
+import { textoParaFonte } from "@/lib/pdf-text";
 import {
   ASPETO_POR_OMISSAO,
   caixasDoMoodboard,
@@ -451,7 +451,7 @@ async function drawCoverImage(
 function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
   // Sanitiza para WinAnsi antes de medir/quebrar — descrições e notas do
   // documento podem trazer caracteres que a Helvetica não codifica.
-  const text = winAnsiSafe(rawText);
+  const text = textoParaFonte(font, rawText);
   const out: string[] = [];
   for (const paragraph of text.split("\n")) {
     const words = paragraph.split(/\s+/).filter(Boolean);
@@ -608,7 +608,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     y: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) =>
-    p.drawText(winAnsiSafe(s), {
+    p.drawText(textoParaFonte(o.font ?? f.reg, s), {
       x,
       y,
       font: o.font ?? f.reg,
@@ -623,8 +623,8 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     y: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) => {
-    const safe = winAnsiSafe(s);
     const fn = o.font ?? f.reg;
+    const safe = textoParaFonte(fn, s);
     const sz = o.size ?? 10;
     p.drawText(safe, {
       x: xR - fn.widthOfTextAtSize(safe, sz),
@@ -643,8 +643,8 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     y: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb>; tracking?: number } = {},
   ) => {
-    const safe = winAnsiSafe(s);
     const fn = o.font ?? f.reg;
+    const safe = textoParaFonte(fn, s);
     const sz = o.size ?? 10;
     if (o.tracking) {
       // Letter-spaced small caps (eyebrows) — draw glyph by glyph.
@@ -711,7 +711,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
   const eyebrow = (p: PDFPage, s: string, x: number, y: number, color = FAINT, size?: number) => {
     const sz = size ?? T_CAPTION;
     let cx = x;
-    for (const ch of winAnsiSafe(s.toUpperCase())) {
+    for (const ch of textoParaFonte(f.bold, s.toUpperCase())) {
       p.drawText(ch, { x: cx, y, font: f.bold, size: sz, color });
       cx += f.bold.widthOfTextAtSize(ch, sz) + 2;
     }
@@ -777,7 +777,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     // Sanitiza para WinAnsi ANTES de medir: widthOfTextAtSize lança em glifos
     // fora do WinAnsi (emoji/CJK num nome de cliente), o que rebentaria o PDF
     // inteiro aqui na capa em vez de degradar graciosamente.
-    const names = winAnsiSafe(doc.clientNames || "");
+    const names = textoParaFonte(f.serif, doc.clientNames || "");
     const maxNameW = (hasImgs ? W * 0.34 : W * 0.72) - 16;
     let nameSize = 52;
     while (nameSize > 26 && f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) nameSize -= 2;
@@ -924,7 +924,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       if (!it.desc) return { lab: "", dx: DESC_X, lines: [it.label] };
       // Sanitiza aqui também: `lab` é medido diretamente com
       // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
-      const lab = winAnsiSafe(`${it.label}: `);
+      const lab = textoParaFonte(f.bold, `${it.label}: `);
       const dx = DESC_X + f.bold.widthOfTextAtSize(lab, descSize);
       return { lab, dx, lines: wrap(f.reg, it.desc, descSize, W - M - dx) };
     };
@@ -976,7 +976,9 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       );
       // Group title in serif; the ordinal marker stays quiet grey, not coloured.
       if (g.letter) text(p, g.letter, M, y, { font: f.serifB, size: T_SUB, color: MUTED });
-      const letterW = g.letter ? f.serifB.widthOfTextAtSize(winAnsiSafe(g.letter) + " ", T_SUB) : 0;
+      const letterW = g.letter
+        ? f.serifB.widthOfTextAtSize(textoParaFonte(f.serifB, g.letter) + " ", T_SUB)
+        : 0;
       text(p, g.title, M + letterW, y, {
         font: f.serifB,
         size: T_SUB,
@@ -1113,8 +1115,9 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       // estúdio (que usa o mesmo `eur` que nós) vem com espaço inquebrável, e
       // ficaria a discordar dos números que desenhamos por baixo dele.
       const amount = milharesComPonto(totalStr || "—");
-      pg.drawText(winAnsiSafe(amount), {
-        x: M + boxW - f.serifB.widthOfTextAtSize(winAnsiSafe(amount), 22),
+      const amountSafe = textoParaFonte(f.serifB, amount);
+      pg.drawText(amountSafe, {
+        x: M + boxW - f.serifB.widthOfTextAtSize(amountSafe, 22),
         y: ty - 32,
         font: f.serifB,
         size: 22,
