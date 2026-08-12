@@ -143,9 +143,16 @@ export function porqueEsteAutomatico(quantasFotos: number): string {
  *
  * Devolve `null` quando está tudo bem, que é o caso normal.
  */
-export function filaDesequilibrada(
-  caixas: readonly { y: number; h: number }[],
-): { naUltima: number; nasOutras: number; sugestao: "acrescentar" | "remover" } | null {
+export function filaDesequilibrada(caixas: readonly { y: number; h: number }[]): {
+  naUltima: number;
+  nasOutras: number;
+  /** Quantas fotos faltam para a última fila fechar certa. */
+  aAcrescentar: number;
+  /** Quantas há a mais na última fila — tirá-las fecha a página igual. */
+  aRemover: number;
+  /** O gesto MAIS BARATO dos dois. */
+  sugestao: "acrescentar" | "remover";
+} | null {
   if (caixas.length < 4) return null;
   // Agrupar por topo: as caixas de uma fila partilham o topo ao ponto.
   const filas = new Map<number, number>();
@@ -162,11 +169,21 @@ export function filaDesequilibrada(
   // Duas ou mais de diferença é que se nota. Uma a menos na última fila é o
   // aspecto normal de uma grelha e não merece aviso nenhum.
   if (nasOutras - naUltima < 2) return null;
+  const aAcrescentar = nasOutras - naUltima;
+  const aRemover = naUltima;
   return {
     naUltima,
     nasOutras,
-    // Acrescentar é quase sempre o gesto mais barato: há mais fotos na
-    // biblioteca do que vontade de tirar uma que já foi escolhida.
-    sugestao: "acrescentar",
+    aAcrescentar,
+    aRemover,
+    /**
+     * Os dois remédios fecham a página igual, e o que se sugere é o MAIS
+     * BARATO em fotografias mexidas: quatro em cima e uma em baixo pede que se
+     * tire uma (um gesto), não que se acrescentem três.
+     *
+     * Empate a favor de acrescentar: há mais fotos na biblioteca do que
+     * vontade de tirar uma que já foi escolhida a dedo.
+     */
+    sugestao: aRemover < aAcrescentar ? "remover" : "acrescentar",
   };
 }

@@ -4708,23 +4708,41 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           />
                                         </CelulaDeFoto>
                                       ))}
-                                      {/* Num board fechado não há caixa de adicionar:
-                                  o gesto de largar uma foto é exactamente o
-                                  engano contra o qual o fecho existe. */}
-                                      {!fechado && (
+                                    </GrelhaDeFotos>
+                                    {/* ── A CAIXA DE ACRESCENTAR, FORA DA GRELHA ────────
+                                        Estava DENTRO da grelha, como se fosse
+                                        mais uma fotografia — uma célula quadrada
+                                        tracejada entre fotos que têm a forma da
+                                        caixa que vão ocupar na página. Num board
+                                        de cinco fotos numa grelha de quatro
+                                        colunas, ela caía a meio da segunda fila,
+                                        e lia-se como um buraco: uma foto que
+                                        faltava, não um botão.
+
+                                        Fora da grelha e a toda a largura, é o
+                                        que é — a acção que vem A SEGUIR às
+                                        fotografias. E nunca mais pode aparecer
+                                        no meio delas, porque já não é uma
+                                        célula.
+
+                                        Num board fechado não existe: o gesto de
+                                        largar uma foto é exactamente o engano
+                                        contra o qual o fecho existe. */}
+                                    {!fechado && (
+                                      <div className="mt-2">
                                         <UploadArea
                                           label="+ Imagens"
                                           busy={!!uploading[`board-${bi}`]}
                                           multiple
-                                          compact
+                                          faixa
                                           onFiles={(files) =>
                                             handleUpload(`board-${bi}`, files, (paths) =>
                                               addBoardImages(bi, paths),
                                             )
                                           }
                                         />
-                                      )}
-                                    </GrelhaDeFotos>
+                                      </div>
+                                    )}
                                     {/* Sem fotos não há disposição nenhuma para escolher — o
                         selector aparece com a primeira foto, que é quando a
                         pergunta passa a ter resposta. */}
@@ -4808,17 +4826,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     {(() => {
                                       const fila = filaDesequilibrada(caixas);
                                       if (!fila) return null;
+                                      const fotos = (n: number) =>
+                                        n === 1 ? "uma foto" : `${n} fotos`;
+                                      // Os dois remédios, com o mais barato à
+                                      // frente: quatro em cima e uma em baixo
+                                      // pede que se tire uma, não que se
+                                      // acrescentem três.
+                                      const acrescentar = `com mais ${fotos(fila.aAcrescentar)}`;
+                                      const remover = `tirando ${fila.aRemover === 1 ? "a que lá está" : `as ${fila.aRemover} que lá estão`}`;
                                       return (
                                         <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
                                           A última fila desta página fica com{" "}
                                           {fila.naUltima === 1
                                             ? "uma foto só"
                                             : `${fila.naUltima} fotos`}
-                                          , contra {fila.nasOutras} nas de cima. Com mais{" "}
-                                          {fila.nasOutras - fila.naUltima === 1
-                                            ? "uma foto"
-                                            : `${fila.nasOutras - fila.naUltima} fotos`}{" "}
-                                          a página fecha certa.
+                                          , contra {fila.nasOutras} nas de cima. A página fecha
+                                          certa{" "}
+                                          {fila.sugestao === "remover"
+                                            ? `${remover} — ou ${acrescentar}`
+                                            : `${acrescentar} — ou ${remover}`}
+                                          .
                                         </p>
                                       );
                                     })()}
@@ -7290,6 +7317,7 @@ function UploadArea({
   multiple,
   compact = false,
   curto = false,
+  faixa = false,
   onFiles,
 }: {
   label: string;
@@ -7305,6 +7333,15 @@ function UploadArea({
    * a miniatura é que traz a proporção de volta.
    */
   curto?: boolean;
+  /**
+   * Uma FAIXA por baixo da grelha, e não uma célula dentro dela.
+   *
+   * É a forma que a caixa de acrescentar fotos tem num mood board. Como célula
+   * quadrada, caía a meio de uma fila e lia-se como uma foto em falta; a toda a
+   * largura e baixa, lê-se pelo que é: o que se faz A SEGUIR às que já lá
+   * estão.
+   */
+  faixa?: boolean;
   onFiles: (files: File[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -7335,8 +7372,18 @@ function UploadArea({
         setDrag(false);
         pick(e.dataTransfer.files);
       }}
-      className={`flex w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
-        curto ? "h-24 p-2" : compact ? "aspect-square p-2" : "aspect-[4/3] p-3"
+      // `flex-row`/`flex-col` e `gap` são escolhidos AQUI, e não acrescentados
+      // por cima: duas utilidades da mesma propriedade decidem-se pela ordem na
+      // folha de estilo e não pela ordem na string, e um `flex-col` de base
+      // ganharia ao `flex-row` da faixa sem nada o denunciar.
+      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
+        faixa
+          ? "h-14 flex-row gap-2 p-2"
+          : curto
+            ? "h-24 flex-col gap-1 p-2"
+            : compact
+              ? "aspect-square flex-col gap-1 p-2"
+              : "aspect-[4/3] flex-col gap-1 p-3"
       } ${
         drag
           ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"

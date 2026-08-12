@@ -43,7 +43,6 @@ import {
 import { opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
 import { textoParaFonte } from "@/lib/pdf-text";
 import {
-  ASPETO_POR_OMISSAO,
   alturaDaLegenda,
   caixasDoMoodboard,
   layoutSugerido,
@@ -2196,7 +2195,6 @@ async function drawCollage(
   const ordemDelas = ordemDasFotos(mb);
   const imgs = ordemDelas.slice(0, MOOD_BOARD_MAX_IMAGES).map((i) => mb.images[i]);
   note(`Mood board ${boardName}`, mb.images.length - MOOD_BOARD_MAX_IMAGES, "fotos");
-  const n = imgs.length;
 
   // Draw one framed image into a box (cover-cropped, thin hairline frame).
   //
@@ -2235,28 +2233,48 @@ async function drawCollage(
    * recortada ao mesmo rectângulo das outras, e é a diferença entre uma página
    * de inspiração e uma folha de contactos. Ver `proposal-geometria.ts`.
    *
-   * Uma foto que não se consiga medir entra com {@link ASPETO_POR_OMISSAO}, o
-   * formato mais comum de uma máquina fotográfica: perde-se a forma dela e não
-   * se perde a foto. É a MESMA omissão que o estúdio usa quando ainda não
-   * mediu a miniatura, para o diagrama e a página partirem do mesmo sítio.
-   *
    * O layout GUARDADO no documento manda sempre. Só quando não há nenhum é que
    * se usa o que o número de fotos sugere — uma sugestão que mudasse com o
    * código reescrevia páginas de propostas já enviadas.
+   *
+   * ── UMA FOTO QUE NÃO ABRE NÃO PODE OCUPAR LUGAR ─────────────────────────
+   *
+   * Medir era também a maneira de saber se a fotografia SERVE: são os mesmos
+   * bytes que o desenho vai abrir a seguir, e o que não se consegue medir não
+   * se consegue desenhar. Antes, essa entrava na composição com o aspecto por
+   * omissão — a geometria dava-lhe uma caixa, o desenho falhava, e a página
+   * saía com um buraco do tamanho de uma fotografia no meio da fila. A moldura
+   * já tinha deixado de ser desenhada; o BURACO ficava.
+   *
+   * Agora sai da lista antes de a composição existir: as que ficam ocupam a
+   * página toda, como se a outra nunca tivesse sido escolhida. E é CONTADA,
+   * para o estúdio avisar antes de a proposta seguir — o que não pode
+   * acontecer é desaparecer calada.
    */
-  const aspectos = await Promise.all(
+  const medidas = await Promise.all(
     imgs.map(async (b64) => {
       try {
         const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
-        return (await aspetoDaImagem(Buffer.from(raw, "base64"))) ?? ASPETO_POR_OMISSAO;
+        return await aspetoDaImagem(Buffer.from(raw, "base64"));
       } catch {
-        return ASPETO_POR_OMISSAO;
+        return null;
       }
     }),
   );
-  const layout = mb.layout ?? layoutSugerido(n);
+  const desenhaveis: string[] = [];
+  const aspectos: number[] = [];
+  for (const [i, medida] of medidas.entries()) {
+    if (medida == null) {
+      noteUndrawn(imgs[i]);
+      continue;
+    }
+    desenhaveis.push(imgs[i]);
+    aspectos.push(medida);
+  }
+  // A disposição é escolhida para as fotos que a página vai MESMO ter.
+  const layout = mb.layout ?? layoutSugerido(desenhaveis.length);
   const caixas = caixasDoMoodboard(layout, aspectos, annH, mb.enquadramento === "forma-da-foto");
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < desenhaveis.length; i++) {
     const c = caixas[i];
     // Uma foto sem caixa não pode sair da página em silêncio. Hoje a geometria
     // devolve sempre uma caixa por foto — mas era ela que devolvia UMA só no
@@ -2264,10 +2282,10 @@ async function drawCollage(
     // dar por isso. Se voltar a acontecer, conta como foto por desenhar e o
     // estúdio avisa antes de a proposta seguir.
     if (!c) {
-      noteUndrawn(imgs[i]);
+      noteUndrawn(desenhaveis[i]);
       continue;
     }
-    await place(imgs[i], c.x, c.y, c.w, c.h);
+    await place(desenhaveis[i], c.x, c.y, c.w, c.h);
   }
 
   if (annLines.length) {

@@ -171,7 +171,33 @@ describe("a última fila desequilibrada", () => {
 
   it("três em cima e uma em baixo é para avisar", () => {
     const r = filaDesequilibrada([...fila(3, 200), ...fila(1, 80)]);
-    expect(r).toEqual({ naUltima: 1, nasOutras: 3, sugestao: "acrescentar" });
+    // Os dois remédios fecham a página igual: acrescentar duas, ou tirar a que
+    // ficou sozinha. Sugere-se o mais barato — tirar uma é um gesto, e chegar
+    // às duas que faltam são dois.
+    expect(r).toEqual({
+      naUltima: 1,
+      nasOutras: 3,
+      aAcrescentar: 2,
+      aRemover: 1,
+      sugestao: "remover",
+    });
+  });
+
+  /** Cinco em cima e uma em baixo: tirar uma continua a ser o gesto curto. */
+  it("com filas largas, tirar a que sobra é sempre mais barato", () => {
+    const r = filaDesequilibrada([...fila(5, 200), ...fila(1, 80)]);
+    expect(r?.sugestao).toBe("remover");
+    expect(r?.aAcrescentar).toBe(4);
+  });
+
+  /**
+   * Quatro em cima e duas em baixo: acrescentar duas ou tirar duas custa o
+   * mesmo, e o empate é a favor de acrescentar — há mais fotos na biblioteca
+   * do que vontade de tirar uma que já foi escolhida a dedo.
+   */
+  it("em empate, sugere acrescentar", () => {
+    const r = filaDesequilibrada([...fila(4, 200), ...fila(2, 80)]);
+    expect(r).toMatchObject({ aAcrescentar: 2, aRemover: 2, sugestao: "acrescentar" });
   });
 
   it("uma a menos na última fila é o aspecto normal de uma grelha", () => {
