@@ -3,7 +3,8 @@ import {
   normalizarValor,
   precosDe,
   linhasDe,
-  somaDosItens,
+  somaDosServicos,
+  somaDosServicosEAdicionais,
   somaDosExtras,
   desalinhamento,
   sinalESaldo,
@@ -14,7 +15,8 @@ import {
   definirPreco,
   somaDosExtrasSemIva,
 } from "./proposal-budget";
-import type { ProposalDoc } from "./proposal-doc";
+import { round2 } from "./money";
+import { resolveProposalMoney, type ProposalDoc } from "./proposal-doc";
 
 /** As cinco linhas da proposta da Catarina, com preços plausíveis. */
 const DOC = {
@@ -72,29 +74,22 @@ describe("normalizarValor", () => {
   });
 });
 
-describe("somaDosItens", () => {
+describe("somaDosServicos", () => {
   it("soma as linhas", () => {
-    expect(somaDosItens(DOC)).toBe(6875);
+    expect(somaDosServicos(DOC)).toBe(6875);
   });
 
-  it("junta os valores adicionais, que são texto livre no PDF", () => {
-    /**
-     * ── O ADICIONAL ENTRA NA SOMA NA MESMA UNIDADE DAS LINHAS ───────────────
-     *
-     * O DOC não declara modo de IVA nenhum, e um documento calado lê-se com o
-     * IVA INCLUÍDO — é a regra de `detectVatMode`, e é a leitura que o casal
-     * faz de um «896,00 €» impresso sem mais nada ao lado.
-     *
-     * Logo, esses 896 € são o que ele PAGA, e valem 728,46 € de base. As
-     * linhas do orçamento são todas base (são campos numéricos, sem IVA
-     * escrito ao lado), e é com a BASE da proposta que esta soma vai ser
-     * comparada. Somar 896 crus punha a soma 167,54 € acima do que devia — e o
-     * aviso «o total não bate com a soma das linhas» acendia numa proposta que
-     * estava certa.
-     *
-     * Numa proposta que diga «+ IVA» — no documento ou na própria linha — os
-     * 896 são base e entram inteiros. Está pinado logo a seguir.
-     */
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * OS VALORES ADICIONAIS NÃO ENTRAM NA SOMA DOS SERVIÇOS
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A regra dela, e é textual: «os valores adicionais não entram na soma de
+   * comparação com o total dos serviços». Entravam — e um «896,00 €» de
+   * deslocação enchia a linha «Soma das linhas» de um número que não é a soma
+   * de linha nenhuma.
+   */
+  it("os adicionais não entram — a soma é a mesma com eles e sem eles", () => {
     const comExtras = {
       ...DOC,
       budgetExtras: [
@@ -102,27 +97,7 @@ describe("somaDosItens", () => {
         { label: "Wedding Coordinator", valueText: "a definir" },
       ],
     } as unknown as ProposalDoc;
-    // O "a definir" não conta — não é um número.
-    expect(somaDosItens(comExtras)).toBe(7603.46); // 6875 + 896/1,23
-  });
-
-  it("num documento que diz «+ IVA», o mesmo adicional entra inteiro", () => {
-    const acresce = {
-      ...DOC,
-      totalVatMode: "acrescer",
-      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "896,00 €" }],
-    } as unknown as ProposalDoc;
-    expect(somaDosItens(acresce)).toBe(7771);
-  });
-
-  it("e o que a própria linha declara ganha ao modo do documento", () => {
-    // «896,00 € + IVA» é base, esteja o documento no modo que estiver. É a
-    // intenção de quem a escreveu, e está impressa no PDF ao lado do valor.
-    const linhaDiz = {
-      ...DOC,
-      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "896,00 € + IVA" }],
-    } as unknown as ProposalDoc;
-    expect(somaDosItens(linhaDiz)).toBe(7771);
+    expect(somaDosServicos(comExtras)).toBe(6875);
   });
 
   /**
@@ -134,7 +109,25 @@ describe("somaDosItens", () => {
    */
   it("sem preços nenhuns não soma zero: não soma nada", () => {
     const semPrecos = { ...DOC, budgetAmounts: [] } as unknown as ProposalDoc;
-    expect(somaDosItens(semPrecos)).toBeNull();
+    expect(somaDosServicos(semPrecos)).toBeNull();
+  });
+
+  /**
+   * O CASO EXACTO QUE ELA VIU, DO LADO DA SOMA.
+   *
+   * Quatro serviços sem preço e uma deslocação de 75,00 €. A soma antiga dizia
+   * 75,00 € — e o aviso comparava-a com os 2.460 € do total, acusando 2.385 €
+   * de erro numa proposta que estava certa. Um adicional legível já não faz
+   * soma nenhuma: sem serviços com preço, não há soma.
+   */
+  it("um adicional legível não faz soma nenhuma se nenhum serviço tiver preço", () => {
+    const soDeslocacao = {
+      budgetItems: ["Cerimónia", "Cocktail", "Jantar", "Complementos"],
+      budgetAmounts: [null, null, null, null],
+      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "75,00 €" }],
+      totalAmount: 2460,
+    } as unknown as ProposalDoc;
+    expect(somaDosServicos(soDeslocacao)).toBeNull();
   });
 
   it("uma linha a zero é um preço, e conta", () => {
@@ -143,7 +136,7 @@ describe("somaDosItens", () => {
       ...DOC,
       budgetAmounts: [0, null, null, null, null],
     } as unknown as ProposalDoc;
-    expect(somaDosItens(comZero)).toBe(0);
+    expect(somaDosServicos(comZero)).toBe(0);
   });
 
   it("não devolve o lixo da vírgula flutuante", () => {
@@ -151,7 +144,69 @@ describe("somaDosItens", () => {
       budgetItems: ["a", "b", "c"],
       budgetAmounts: [1083.33, 1083.33, 1083.34],
     } as unknown as ProposalDoc;
-    expect(somaDosItens(doc)).toBe(3250);
+    expect(somaDosServicos(doc)).toBe(3250);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A OUTRA PERGUNTA: QUE NÚMERO DEVIA ESTAR NO CAMPO DO TOTAL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O campo do total é o preço final do pedido — dele saem a factura, o sinal e o
+ * saldo —, e mexer num adicional já o mexe. Por isso ESTA soma leva os
+ * adicionais, e é ela que o botão «Usar X» oferece.
+ */
+describe("somaDosServicosEAdicionais", () => {
+  it("sem adicionais é a soma dos serviços", () => {
+    expect(somaDosServicosEAdicionais(DOC)).toBe(6875);
+  });
+
+  it("o adicional entra na mesma unidade das linhas: base", () => {
+    /**
+     * O DOC não declara modo de IVA nenhum, e um documento calado lê-se com o
+     * IVA INCLUÍDO — é a regra de `detectVatMode`, e é a leitura que o casal
+     * faz de um «896,00 €» impresso sem mais nada ao lado. Logo esses 896 € são
+     * o que ele PAGA, e valem 728,46 € de base. As linhas são todas base
+     * (campos numéricos, sem IVA escrito ao lado), e o campo do total também.
+     */
+    const comExtras = {
+      ...DOC,
+      budgetExtras: [
+        { label: "Deslocação da equipa Líquen", valueText: "896,00 €" },
+        { label: "Wedding Coordinator", valueText: "a definir" },
+      ],
+    } as unknown as ProposalDoc;
+    // O "a definir" não conta — não é um número.
+    expect(somaDosServicosEAdicionais(comExtras)).toBe(7603.46); // 6875 + 896/1,23
+  });
+
+  it("num documento que diz «+ IVA», o mesmo adicional entra inteiro", () => {
+    const acresce = {
+      ...DOC,
+      totalVatMode: "acrescer",
+      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "896,00 €" }],
+    } as unknown as ProposalDoc;
+    expect(somaDosServicosEAdicionais(acresce)).toBe(7771);
+  });
+
+  it("e o que a própria linha declara ganha ao modo do documento", () => {
+    // «896,00 € + IVA» é base, esteja o documento no modo que estiver. É a
+    // intenção de quem a escreveu, e está impressa no PDF ao lado do valor.
+    const linhaDiz = {
+      ...DOC,
+      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "896,00 € + IVA" }],
+    } as unknown as ProposalDoc;
+    expect(somaDosServicosEAdicionais(linhaDiz)).toBe(7771);
+  });
+
+  it("sem serviços com preço não há total nenhum a sugerir", () => {
+    const soDeslocacao = {
+      budgetItems: ["a", "b"],
+      budgetAmounts: [null, null],
+      budgetExtras: [{ label: "Deslocação", valueText: "75,00 €" }],
+    } as unknown as ProposalDoc;
+    expect(somaDosServicosEAdicionais(soDeslocacao)).toBeNull();
   });
 });
 
@@ -163,7 +218,7 @@ describe("desalinhamento", () => {
   it("avisa quando o total foi escrito à mão e já não bate", () => {
     // É exactamente o caso que ela descreveu: alterar um item e esquecer o total.
     const d = desalinhamento(DOC, 7500);
-    expect(d).toEqual({ soma: 6875, total: 7500, diferenca: 625 });
+    expect(d).toEqual({ soma: 6875, total: 7500, diferenca: 625, sugerido: 6875 });
   });
 
   it("cala-se quando ainda não há preços", () => {
@@ -174,6 +229,85 @@ describe("desalinhamento", () => {
   it("um cêntimo de diferença não é um aviso", () => {
     // A soma é feita em vírgula flutuante e o total foi escrito por uma pessoa.
     expect(desalinhamento(DOC, 6875.01)).toBeNull();
+  });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O CASO QUE ELA ABRIU — E QUE NÃO PODE VOLTAR A ACENDER
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Quatro serviços por orçamentar (o «900» a cinzento é o placeholder do
+   * campo, não um preço), uma deslocação de 75,00 €, total escrito 2.460,00 €.
+   * O aviso dizia «o total está escrito à mão e difere da soma das linhas em
+   * 2.385,00 €» — estava a comparar 2.460 € com 75 €.
+   */
+  it("quatro serviços sem preço + deslocação de 75 € + total 2460 € = nenhum aviso", () => {
+    const oCasoDela = {
+      budgetItems: [
+        "Decoração Cerimónia",
+        "Decoração Cocktail",
+        "Design Floral e Decoração Mesas",
+        "Complementos dos Noivos",
+      ],
+      budgetAmounts: [null, null, null, null],
+      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "75,00 €" }],
+      totalAmount: 2460,
+    } as unknown as ProposalDoc;
+    expect(desalinhamento(oCasoDela, 2000)).toBeNull();
+    // E em nenhuma leitura do total: bruta, base, ou o número cru escrito.
+    for (const total of [0, 75, 2000, 2460, 3025.8]) {
+      expect(desalinhamento(oCasoDela, total)).toBeNull();
+    }
+  });
+
+  /**
+   * O AVISO FALSO QUE SE TROCARIA PELO OUTRO, SE SÓ A SOMA PERDESSE OS
+   * ADICIONAIS.
+   *
+   * O total escrito já traz os adicionais lá dentro (mexer num adicional mexe
+   * no total — ver `definirExtras` no estúdio). Serviços a 2.385 € e uma
+   * deslocação de 75 € dão um total de 2.460 €: comparar 2.460 com 2.385
+   * acusaria 75,00 € de erro — um aviso falso novo, em TODAS as propostas com
+   * deslocação. Tira-se o mesmo dos dois lados, e o aviso cala-se.
+   */
+  it("uma proposta certa COM adicionais não acende o aviso", () => {
+    const comDeslocacao = {
+      budgetItems: ["Cerimónia", "Jantar"],
+      budgetAmounts: [1385, 1000],
+      // «+ IVA» ⇒ os 75 são base, e o total de base é 2.385 + 75.
+      budgetExtras: [{ label: "Deslocação", valueText: "75,00 € + IVA" }],
+      totalVatMode: "acrescer",
+      totalAmount: 2460,
+    } as unknown as ProposalDoc;
+    expect(desalinhamento(comDeslocacao, 2460)).toBeNull();
+  });
+
+  /**
+   * E o que o botão «Usar X» escreve no campo do total TEM de levar os
+   * adicionais: escrever lá a soma dos serviços apagava a deslocação do preço
+   * final, e com ela do sinal e da factura.
+   */
+  it("o total sugerido leva os adicionais; a soma mostrada, não", () => {
+    const torto = {
+      budgetItems: ["Cerimónia", "Jantar"],
+      budgetAmounts: [1385, 1000],
+      budgetExtras: [{ label: "Deslocação", valueText: "75,00 € + IVA" }],
+      totalVatMode: "acrescer",
+      totalAmount: 3000,
+    } as unknown as ProposalDoc;
+    const d = desalinhamento(torto, 3000);
+    expect(d).toEqual({
+      // O que se MOSTRA como «soma das linhas»: só os serviços.
+      soma: 2385,
+      // A parte do total que cabe aos serviços — o mesmo número que o PDF
+      // imprime na linha «Valor Total».
+      total: 2925,
+      diferenca: 540,
+      // O que o botão escreve no campo: serviços + adicionais.
+      sugerido: 2460,
+    });
+    // Escrever o sugerido cala o aviso.
+    expect(desalinhamento(torto, d!.sugerido)).toBeNull();
   });
 });
 
@@ -201,6 +335,52 @@ describe("sinalESaldo", () => {
     expect(sinalESaldo(1000, 150).sinal).toBe(1000);
     expect(sinalESaldo(1000, -20).sinal).toBe(0);
   });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O SINAL E O SALDO FECHAM O TOTAL — EM TODAS AS PERCENTAGENS, NÃO SÓ 30%
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Os 30% da casa são só o valor por omissão: a percentagem é configurável no
+   * documento (`depositPercentOf`) e o sinal que o estúdio mostra é o sinal que
+   * a factura emite. Uma percentagem qualquer que deixasse um cêntimo entre as
+   * parcelas seria uma factura que não fecha — e ninguém dava por ela até um
+   * cliente perguntar.
+   *
+   * Varrimento medido: 15 totais × 201 percentagens (0 a 100 de meio em meio) =
+   * 3.015 combinações, zero cêntimos perdidos ou inventados.
+   */
+  it("nenhum cêntimo se perde nem se inventa, em nenhuma percentagem", () => {
+    const totais = [
+      0, 0.01, 0.02, 0.03, 0.05, 1, 7.77, 1999.99, 2460, 2461, 3333.33, 6875, 7771, 12_345.67,
+      99_999_999.99,
+    ];
+    const falhas: string[] = [];
+    for (const total of totais) {
+      for (let pct = 0; pct <= 100; pct += 0.5) {
+        const { sinal, saldo } = sinalESaldo(total, pct);
+        // As parcelas são cêntimos inteiros...
+        if (sinal !== round2(sinal) || saldo !== round2(saldo)) {
+          falhas.push(`${total} @ ${pct}%: parcelas com mais de duas casas (${sinal}/${saldo})`);
+        }
+        // ...e somam EXACTAMENTE o total, sem tolerância nenhuma.
+        if (round2(sinal + saldo) !== round2(total)) {
+          falhas.push(`${total} @ ${pct}%: ${sinal} + ${saldo} ≠ ${total}`);
+        }
+        // Nenhuma das duas é negativa: uma factura de valor negativo não existe.
+        if (sinal < 0 || saldo < 0) falhas.push(`${total} @ ${pct}%: parcela negativa`);
+      }
+    }
+    expect(falhas).toEqual([]);
+  });
+
+  it("um cêntimo dividido a meio dá tudo a uma das parcelas, e nada se perde", () => {
+    // 0,005 € não existe. Com o meio cêntimo a subir, o sinal fica com o
+    // cêntimo inteiro e o saldo com zero — e as duas continuam a somar 0,01 €.
+    expect(sinalESaldo(0.01, 50)).toEqual({ sinal: 0.01, saldo: 0 });
+    expect(sinalESaldo(0.01, 30)).toEqual({ sinal: 0, saldo: 0.01 });
+    expect(sinalESaldo(0, 30)).toEqual({ sinal: 0, saldo: 0 });
+  });
 });
 
 describe("asDuasFormas", () => {
@@ -218,6 +398,158 @@ describe("asDuasFormas", () => {
     const { incluido } = asDuasFormas(6875, 0.23);
     expect(Math.round((incluido.base + incluido.iva) * 100) / 100).toBe(incluido.total);
   });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O IVA AO CÊNTIMO, EM VALORES QUE NÃO SÃO REDONDOS
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A caixa de comparação diz «base 2.000,00 € · IVA 460,00 € · o cliente paga
+   * 2.460,00 €», e bate certo — mas 2.460 / 1,23 = 2.000 exacto é uma
+   * coincidência rara. Estes são os vizinhos: um euro ao lado, um valor com
+   * cêntimos periódicos, e um cêntimo abaixo dos dois mil.
+   */
+  it("2461, 3333,33 e 1999,99 fecham ao cêntimo nos dois modos", () => {
+    // 2.461 €: em «incluído» a base já não é redonda — 2.000,81 €.
+    expect(asDuasFormas(2461, 0.23)).toEqual({
+      acrescer: { base: 2461, iva: 566.03, total: 3027.03 },
+      incluido: { base: 2000.81, iva: 460.19, total: 2461 },
+    });
+    // 3.333,33 €: o IVA de 766,6659 arredonda para cima e o total dá 4.100 €
+    // certos — o cêntimo que faltava veio do arredondamento, não do nada.
+    expect(asDuasFormas(3333.33, 0.23)).toEqual({
+      acrescer: { base: 3333.33, iva: 766.67, total: 4100 },
+      incluido: { base: 2710.02, iva: 623.31, total: 3333.33 },
+    });
+    // 1.999,99 €: um cêntimo abaixo do caso «bonito», e o IVA que «acresce» dá
+    // os mesmos 460,00 € — 1.999,99 × 0,23 = 459,9977.
+    expect(asDuasFormas(1999.99, 0.23)).toEqual({
+      acrescer: { base: 1999.99, iva: 460, total: 2459.99 },
+      incluido: { base: 1626.01, iva: 373.98, total: 1999.99 },
+    });
+    // E o caso que ela viu, para ficar pinado: 2.460 lido «com IVA» é mesmo
+    // 2.000 de base e 460 de IVA.
+    expect(asDuasFormas(2460, 0.23).incluido).toEqual({ base: 2000, iva: 460, total: 2460 });
+  });
+
+  /**
+   * A BATERIA. As três parcelas TÊM de fechar, nos dois modos e em todas as
+   * taxas — sem cêntimos perdidos nem inventados.
+   *
+   * Varrimento medido: 21 valores × 5 taxas = 105 combinações × 2 modos.
+   */
+  it("base + IVA = total, sempre, nos dois modos e em todas as taxas", () => {
+    const valores = [
+      0, 0.01, 0.02, 0.03, 1, 1.01, 7.775, 8.615, 99.99, 1000, 1999.99, 2000, 2460, 2461, 3333.33,
+      6875, 7771, 12_345.67, 999_999.99, 12_345_678.91, 99_999_999.99,
+    ];
+    const taxas = [0, 0.06, 0.13, 0.23, 1];
+    const falhas: string[] = [];
+    for (const v of valores) {
+      for (const taxa of taxas) {
+        const r = asDuasFormas(v, taxa);
+        for (const [nome, m] of Object.entries(r)) {
+          if (round2(m.base + m.iva) !== m.total) {
+            falhas.push(`${v} @ ${taxa}: ${nome} ${m.base} + ${m.iva} ≠ ${m.total}`);
+          }
+          // Cêntimos inteiros nas três, e nada negativo.
+          if (m.base !== round2(m.base) || m.iva !== round2(m.iva) || m.total !== round2(m.total)) {
+            falhas.push(`${v} @ ${taxa}: ${nome} tem mais de duas casas`);
+          }
+          if (m.iva < 0) falhas.push(`${v} @ ${taxa}: ${nome} com IVA negativo`);
+        }
+        // O número escrito é sempre uma das três: a base em «acresce», o total
+        // em «incluído». É o que a caixa promete a quem a lê.
+        if (r.acrescer.base !== round2(v) || r.incluido.total !== round2(v)) {
+          falhas.push(`${v} @ ${taxa}: o número escrito desapareceu do quadro`);
+        }
+        // Taxa 0 é IVA nenhum, e não uma leitura diferente do mesmo número.
+        if (taxa === 0 && (r.acrescer.iva !== 0 || r.incluido.iva !== 0)) {
+          falhas.push(`${v} @ 0%: inventou IVA`);
+        }
+      }
+    }
+    expect(falhas).toEqual([]);
+  });
+
+  /**
+   * O MEIO CÊNTIMO CONTINUA A SUBIR — E NENHUM CAMINHO NOVO O CONTORNA.
+   *
+   * `round2` já foi corrigido uma vez por causa disto: `Math.round(1.005*100)`
+   * dá 100, porque 1,005 é 1,00499999999999989 em vírgula flutuante. Um IVA de
+   * 1,005 € facturado a 1,00 € é um cêntimo a menos entregue ao Estado.
+   *
+   * O quadro arredonda o valor escrito ANTES de o multiplicar, e não depois: um
+   * total com mais de dois decimais mostrava um IVA que não era o da base
+   * mostrada ao lado (medido: `round2(x·0,23)` e `round2(round2(x)·0,23)`
+   * divergem em 11.500 de 200.000 valores). Um valor em euros tem cêntimos e
+   * mais nada.
+   */
+  it("o quadro arredonda o valor escrito antes de o multiplicar", () => {
+    // 1,005 € escrito é 1,01 € de base — e o IVA é o de 1,01, não o de 1,005.
+    const r = asDuasFormas(1.005, 0.23);
+    expect(r.acrescer.base).toBe(1.01);
+    expect(r.acrescer.iva).toBe(round2(1.01 * 0.23));
+    expect(round2(r.acrescer.base + r.acrescer.iva)).toBe(r.acrescer.total);
+    // E o meio cêntimo do próprio IVA sobe: 4,37 × 0,23 = 1,0051.
+    expect(asDuasFormas(4.37, 0.23).acrescer.iva).toBe(1.01);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O QUE ALIMENTA O QUADRO: O TOTAL ESCRITO À MÃO
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * `asDuasFormas` recebe `money.base`, e essa base vem de `resolveProposalMoney`
+ * a ler o que ela escreveu. Se a leitura já vier com cêntimos a mais ou a
+ * menos, o quadro fecha em si e mente na mesma.
+ */
+describe("o total escrito à mão chega ao quadro sem perder cêntimos", () => {
+  it("um total que não é um número não vira um número inventado", () => {
+    // «a combinar», «sob consulta», um campo vazio: não há valor nenhum, e a
+    // leitura tem de dar zero — nunca NaN, que se propaga por tudo em silêncio
+    // e sai impresso como «NaN €».
+    for (const texto of ["a combinar", "sob consulta", "", "€", "—"]) {
+      const m = resolveProposalMoney({ totalText: texto } as ProposalDoc);
+      expect(m.base).toBe(0);
+      expect(m.vat).toBe(0);
+      expect(m.gross).toBe(0);
+      expect(Number.isNaN(m.base)).toBe(false);
+    }
+    // E o quadro de comparação sobre esse zero é três zeros, não um erro.
+    expect(asDuasFormas(0, 0.23)).toEqual({
+      acrescer: { base: 0, iva: 0, total: 0 },
+      incluido: { base: 0, iva: 0, total: 0 },
+    });
+  });
+
+  it("base, IVA e bruto fecham em todas as taxas e nos dois modos", () => {
+    const valores = [0.01, 1999.99, 2460, 2461, 3333.33, 6875, 99_999_999.99];
+    const falhas: string[] = [];
+    for (const totalAmount of valores) {
+      for (const totalVatMode of ["acrescer", "incluido"] as const) {
+        for (const vatRate of [0, 0.06, 0.13, 0.23]) {
+          const m = resolveProposalMoney({
+            totalAmount,
+            totalVatMode,
+            vatRate,
+          } as ProposalDoc);
+          if (round2(m.base + m.vat) !== m.gross) {
+            falhas.push(
+              `${totalAmount} ${totalVatMode} @${vatRate}: ${m.base}+${m.vat}≠${m.gross}`,
+            );
+          }
+          // O sinal e o saldo saem do BRUTO, e têm de o fechar ao cêntimo.
+          const { sinal, saldo } = sinalESaldo(m.gross, 30);
+          if (round2(sinal + saldo) !== m.gross) {
+            falhas.push(`${totalAmount} ${totalVatMode} @${vatRate}: sinal+saldo ≠ bruto`);
+          }
+        }
+      }
+    }
+    expect(falhas).toEqual([]);
+  });
 });
 
 describe("linhas e preços andam sempre a par", () => {
@@ -234,7 +566,7 @@ describe("linhas e preços andam sempre a par", () => {
     expect(d.budgetItems).toHaveLength(4);
     expect(d.budgetAmounts).toEqual([900, 650, 3600, 525]);
     expect(linhasDe(d).map((l) => l.preco)).toEqual([900, 650, 3600, 525]);
-    expect(somaDosItens(d)).toBe(5675);
+    expect(somaDosServicos(d)).toBe(5675);
   });
 
   it("acrescentar uma linha acrescenta um preço vazio", () => {
@@ -243,7 +575,7 @@ describe("linhas e preços andam sempre a par", () => {
     expect(d.budgetAmounts).toHaveLength(6);
     expect(d.budgetAmounts?.[5]).toBeNull();
     // Uma linha sem preço não muda a soma.
-    expect(somaDosItens(d)).toBe(6875);
+    expect(somaDosServicos(d)).toBe(6875);
   });
 
   it("mudar o nome de uma linha não mexe no preço", () => {
@@ -255,10 +587,10 @@ describe("linhas e preços andam sempre a par", () => {
     // Todas as propostas já gravadas estão neste estado.
     const antigo = { budgetItems: ["a", "b"] } as unknown as ProposalDoc;
     expect(precosDe(antigo)).toEqual([null, null]);
-    expect(somaDosItens(antigo)).toBeNull();
+    expect(somaDosServicos(antigo)).toBeNull();
     const d = definirPreco(antigo, 1, 500);
     expect(d.budgetAmounts).toEqual([null, 500]);
-    expect(somaDosItens(d)).toBe(500);
+    expect(somaDosServicos(d)).toBe(500);
   });
 
   it("um array de preços mais curto do que as linhas normaliza-se", () => {
@@ -274,7 +606,7 @@ describe("linhas e preços andam sempre a par", () => {
       budgetAmounts: [10, 20, 30],
     } as unknown as ProposalDoc;
     expect(precosDe(torto)).toEqual([10]);
-    expect(somaDosItens(torto)).toBe(10);
+    expect(somaDosServicos(torto)).toBe(10);
   });
 });
 

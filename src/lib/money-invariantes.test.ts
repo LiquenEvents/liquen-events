@@ -8,7 +8,12 @@ import {
   type ProposalDoc,
   type VatMode,
 } from "./proposal-doc";
-import { somaDosItens, desalinhamento, sinalESaldo, somaDosExtrasSemIva } from "./proposal-budget";
+import {
+  somaDosServicosEAdicionais,
+  desalinhamento,
+  sinalESaldo,
+  somaDosExtrasSemIva,
+} from "./proposal-budget";
 import { totaisDasVersoes } from "./orcamento/versoes-da-proposta";
 import { contractedAmounts, computeEventMetrics, type DossierData } from "./orcamento/dossier";
 import { calculatePrice } from "./orcamento/pricing";
@@ -385,7 +390,12 @@ describe("invariante: as linhas e os adicionais somam o total, na mesma base", (
     }
   });
 
-  it("`somaDosItens` e `desalinhamento` respondem sobre a mesma base", () => {
+  /**
+   * O aviso mostra `soma` (só serviços) e o botão escreve `sugerido` (serviços
+   * + adicionais). Os dois vêm do mesmo sítio e TÊM de fechar: a diferença que
+   * o aviso anuncia é exactamente o que falta ao total para ser o sugerido.
+   */
+  it("`somaDosServicosEAdicionais` e `desalinhamento` respondem sobre a mesma base", () => {
     const falhas: string[] = [];
     for (const taxa of TAXAS) {
       for (const modo of MODOS) {
@@ -395,13 +405,94 @@ describe("invariante: as linhas e os adicionais somam o total, na mesma base", (
           budgetExtras: [{ label: "Deslocação", valueText: "1.550,00 €" }],
           ...docDeTotal(amountParaBase(2000, modo, taxa), modo, taxa),
         } as unknown as ProposalDoc;
-        const soma = somaDosItens(doc);
+        const soma = somaDosServicosEAdicionais(doc);
         const base = resolveProposalMoney(doc).base;
         const desvio = desalinhamento(doc, base);
         const esperado = round2(base - (soma ?? 0));
         const dito = desvio === null ? 0 : desvio.diferenca;
         if (Math.abs(esperado) > 0.01 && dito !== esperado) {
           falhas.push(`@ ${taxa * 100}% (${modo}): soma ${soma}, base ${base}, diz ${dito}`);
+        }
+        // E o sugerido É essa soma: escrevê-lo no campo do total cala o aviso.
+        if (desvio !== null && desvio.sugerido !== soma) {
+          falhas.push(`@ ${taxa * 100}% (${modo}): sugerido ${desvio.sugerido} ≠ soma ${soma}`);
+        }
+        if (desvio !== null && desalinhamento(doc, desvio.sugerido) !== null) {
+          falhas.push(`@ ${taxa * 100}% (${modo}): escrever o sugerido não cala o aviso`);
+        }
+      }
+    }
+    expect(falhas).toEqual([]);
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O AVISO NÃO DISPARA EM FALSO — AS REGRAS DELA, PELO NÚMERO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * «Um aviso que dispara em condições normais é um aviso que se aprende a
+   * ignorar.» O caso que ela abriu: quatro serviços por orçamentar, uma
+   * deslocação de 75,00 €, total escrito 2.460,00 €. O aviso acusava 2.385,00 €
+   * de erro — comparava 2.460 € com os 75 € da deslocação, a única coisa
+   * legível no orçamento inteiro.
+   */
+  it("sem NENHUM serviço com preço, não há aviso — em taxa e modo nenhuns", () => {
+    const falhas: string[] = [];
+    for (const taxa of TAXAS) {
+      for (const modo of MODOS) {
+        const doc = {
+          budgetItems: ["Cerimónia", "Cocktail", "Mesas", "Complementos"],
+          budgetAmounts: [null, null, null, null],
+          budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "75,00 €" }],
+          ...docDeTotal(amountParaBase(2000, modo, taxa), modo, taxa),
+        } as unknown as ProposalDoc;
+        const base = resolveProposalMoney(doc).base;
+        if (desalinhamento(doc, base) !== null) {
+          falhas.push(`@ ${taxa * 100}% (${modo}): avisou`);
+        }
+        // Nem com o total lido de outra maneira qualquer.
+        for (const total of [0, 75, 2000, 2460, 3025.8]) {
+          if (desalinhamento(doc, total) !== null) {
+            falhas.push(`@ ${taxa * 100}% (${modo}) com total ${total}: avisou`);
+          }
+        }
+      }
+    }
+    expect(falhas).toEqual([]);
+  });
+
+  /**
+   * O OUTRO LADO DA MESMA REGRA: um serviço com preço e o total certo continuam
+   * a não avisar, MESMO com adicionais lá dentro — e um total errado continua a
+   * avisar. Sem isto, tirar os adicionais da soma trocava um aviso falso por
+   * outro: em todas as propostas com deslocação, a diferença passaria a ser
+   * exactamente o valor da deslocação.
+   */
+  it("com adicionais, o total certo cala-se e o total errado avisa", () => {
+    const falhas: string[] = [];
+    for (const taxa of TAXAS) {
+      for (const modo of MODOS) {
+        const extra = { label: "Deslocação", valueText: "1.550,00 €" };
+        const extraBase = somaDosExtrasSemIva([extra], { mode: modo, vatRate: taxa });
+        const base = round2(2100 + extraBase);
+        const doc = {
+          budgetItems: ["a", "b"],
+          budgetAmounts: [900, 1200],
+          budgetExtras: [extra],
+          ...docDeTotal(amountParaBase(base, modo, taxa), modo, taxa),
+        } as unknown as ProposalDoc;
+        if (desalinhamento(doc, resolveProposalMoney(doc).base) !== null) {
+          falhas.push(`@ ${taxa * 100}% (${modo}): avisou numa proposta certa`);
+        }
+        // Mais 500 € escritos à mão no total: aí o aviso TEM de aparecer, e
+        // tem de dizer 500,00 €.
+        const errado = {
+          ...doc,
+          ...docDeTotal(amountParaBase(base + 500, modo, taxa), modo, taxa),
+        };
+        const d = desalinhamento(errado, resolveProposalMoney(errado).base);
+        if (d === null || d.diferenca !== 500) {
+          falhas.push(`@ ${taxa * 100}% (${modo}): diz ${d?.diferenca ?? "nada"}, devia dizer 500`);
         }
       }
     }

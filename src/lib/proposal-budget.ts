@@ -212,68 +212,120 @@ export function somaDosExtrasSemIva(
 }
 
 /**
- * A soma dos itens mais os valores adicionais.
- *
- * `null` quando NÃO HÁ NENHUM preço — que é diferente de somar zero. Sem esta
- * distinção, uma proposta ainda por orçamentar dizia «a soma dos itens é
- * 0,00 €» e o aviso de desalinhamento aparecia sempre, em todas as propostas,
- * desde o primeiro segundo. Um aviso que toca sempre deixa de ser lido.
- *
  * ════════════════════════════════════════════════════════════════════════════
- * A SOMA É SEM IVA, PORQUE É COM A BASE QUE ELA VAI SER COMPARADA
+ * A SOMA DOS SERVIÇOS — E SÓ DELES. OS ADICIONAIS NÃO ENTRAM AQUI.
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Os preços por LINHA são sempre líquidos — são campos numéricos, sem IVA
- * nenhum escrito ao lado. Os ADICIONAIS não: são texto livre, e nas propostas
- * verdadeiras aparecem «895,00 € + IVA» e «895,00 €», que querem dizer coisas
- * diferentes. Esta soma pegava nos dois e somava-os tal e qual.
+ * Esta é a resposta a UMA pergunta: «quanto valem os serviços que estão
+ * listados no orçamento?». É a soma que o rótulo «Soma das linhas» promete, e é
+ * o lado esquerdo da comparação com o total.
  *
- * O estrago aparecia do outro lado: quem lê esta soma compara-a com a BASE da
- * proposta (`desalinhamento`, o painel de progresso, o aviso ao lado das
- * linhas). Numa proposta que se lê COM IVA, uma deslocação escrita «1.550,00 €»
- * entrava na soma por 1.550 de líquido quando o casal só paga 1.550 no total —
- * 1.260,16 de base. A soma ficava 289,84 € acima da base e o aviso «o total não
- * bate com a soma das linhas» acendia numa proposta que estava certa.
+ * ── PORQUE É QUE OS ADICIONAIS SAÍRAM DAQUI ───────────────────────────────
+ * Entravam. E a dona do negócio abriu uma proposta que estava certa — quatro
+ * serviços ainda por orçamentar, uma deslocação de 75,00 €, total escrito
+ * 2.460,00 € — e leu «o total está escrito à mão e difere da soma das linhas em
+ * 2.385,00 €». O aviso estava a comparar 2.460 € com 75 €: os quatro serviços
+ * não tinham preço nenhum (o «900» a cinzento é um placeholder do campo) e a
+ * única coisa legível no orçamento inteiro era a deslocação. Chamar 75,00 € «a
+ * soma das linhas» num documento de 2.460 € é dizer um número que não existe.
  *
- * Agora o adicional passa por {@link somaDosExtrasSemIva}, que lê o que a
- * própria linha declara e, quando ela está calada, segue o modo do DOCUMENTO.
- * Os dois lados da comparação ficam na mesma unidade — que é a única maneira de
- * a comparação querer dizer alguma coisa.
+ * A pergunta «os adicionais entram na soma?» esteve em aberto com ela (fim de
+ * `PROPOSTAS-O-QUE-MELHORAR.md`) e está respondida: NÃO entram. Palavras dela —
+ * «um aviso que dispara em condições normais é um aviso que se aprende a
+ * ignorar».
  *
- * O que NÃO se decide aqui: se os adicionais estão DENTRO do total ou ACRESCEM
- * a ele. Continuam a entrar na soma, exactamente como entravam. Essa pergunta
- * está em aberto com a dona do negócio (fim de `PROPOSTAS-O-QUE-MELHORAR.md`) e
- * não é um problema de aritmética.
+ * ── E O `null` ────────────────────────────────────────────────────────────
+ * `null` quando NENHUM serviço tem preço — que é diferente de somar zero. Sem
+ * esta distinção, uma proposta ainda por orçamentar dizia «a soma das linhas é
+ * 0,00 €» e o aviso aparecia em todas as propostas desde o primeiro segundo.
+ * Note-se que a condição é sobre os SERVIÇOS: um adicional legível já não chega
+ * para haver soma, e é exactamente isso que cala o aviso no caso acima.
+ *
+ * Os preços por linha são sempre líquidos — são campos numéricos, sem IVA
+ * nenhum escrito ao lado —, por isso esta soma é BASE e compara-se com base.
  */
-export function somaDosItens(doc: DocComLinhasETotal): number | null {
-  const dosItens = precosDe(doc).filter((p): p is number => p !== null);
-  const extrasLegiveis = valoresDosExtras(doc.budgetExtras);
-  if (dosItens.length === 0 && extrasLegiveis.length === 0) return null;
-
-  // O mesmo modo e a mesma taxa por que o total é lido — sem isso, os dois
-  // lados da comparação saem de leituras diferentes do mesmo documento.
-  const { mode, vatRate } = resolveProposalMoney(doc);
-  const dosExtras = somaDosExtrasSemIva(doc.budgetExtras, { mode, vatRate });
+export function somaDosServicos(
+  doc: Pick<ProposalDoc, "budgetItems" | "budgetAmounts">,
+): number | null {
+  const dosServicos = precosDe(doc).filter((p): p is number => p !== null);
+  if (dosServicos.length === 0) return null;
   // Arredondar ao cêntimo: somar floats dá 3249.9999999999995.
-  return round2(dosItens.reduce((a, b) => a + b, 0) + dosExtras);
+  return round2(dosServicos.reduce((a, b) => a + b, 0));
 }
 
 /**
- * O total está desalinhado da soma?
+ * @deprecated O nome não diz de que «itens» se trata, e a resposta certa
+ * depende disso. Use {@link somaDosServicos} (só os serviços, para comparar com
+ * o total) ou {@link somaDosServicosEAdicionais} (o que o campo do total devia
+ * dizer). Fica só porque ainda é lido em `ProposalStudio.tsx`.
+ */
+export const somaDosItens = somaDosServicos;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE O CAMPO DO TOTAL DEVIA DIZER — AÍ SIM, COM OS ADICIONAIS
+ * ════════════════════════════════════════════════════════════════════════════
  *
- * Devolve `null` quando não há nada a dizer — sem preços nenhuns, ou quando o
- * total bate certo. A tolerância de um cêntimo existe porque a soma é feita em
+ * Outra pergunta, outra função — de propósito, e não a de cima com uma
+ * bandeira. Aqui a pergunta é «que número devia estar escrito no Preço final?»,
+ * e a resposta TEM de incluir os adicionais: o campo do total é também o preço
+ * final do pedido, e é dele que saem a factura, o sinal e o saldo. Mexer num
+ * adicional já mexe no total (ver `definirExtras` no estúdio); esta função é o
+ * mesmo número visto do outro lado, para o botão «Usar X» poder oferecer um
+ * total que não deixa a deslocação de fora.
+ *
+ * Os adicionais passam por {@link somaDosExtrasSemIva} e não pelo número cru:
+ * são texto livre, e «895,00 € + IVA» e «895,00 €» querem dizer coisas
+ * diferentes. Numa proposta que se lê COM IVA, somar 1.550 crus a um campo que
+ * é base promete 1.550 na linha e cobra 1.906,50 ao casal.
+ *
+ * `null` na mesma condição da soma dos serviços — sem serviços com preço não há
+ * total nenhum a sugerir.
+ */
+export function somaDosServicosEAdicionais(doc: DocComLinhasETotal): number | null {
+  const dosServicos = somaDosServicos(doc);
+  if (dosServicos === null) return null;
+  // O mesmo modo e a mesma taxa por que o total é lido — sem isso, os dois
+  // lados da comparação saem de leituras diferentes do mesmo documento.
+  const { mode, vatRate } = resolveProposalMoney(doc);
+  return round2(dosServicos + somaDosExtrasSemIva(doc.budgetExtras, { mode, vatRate }));
+}
+
+/**
+ * O total está desalinhado da soma dos serviços?
+ *
+ * Devolve `null` quando não há nada a dizer, e são três casos: nenhum serviço
+ * com preço (não há soma para comparar), o total a bater certo, ou a diferença
+ * a caber na tolerância de um cêntimo — que existe porque a soma é feita em
  * vírgula flutuante e o total foi escrito por uma pessoa.
+ *
+ * ── OS DOIS LADOS SÃO «SÓ SERVIÇOS» ───────────────────────────────────────
+ * `base` é o total ESCRITO, e esse já traz os adicionais lá dentro (mexer num
+ * adicional mexe no total). Se só a soma perdesse os adicionais, uma proposta
+ * certa com uma deslocação de 1.550 € passava a acusar 1.550 € de diferença —
+ * trocava-se um aviso falso por outro. Por isso tira-se o mesmo dos dois lados:
+ * `total` é a parte do total que cabe aos serviços, que é exactamente o número
+ * que o PDF imprime na linha «Valor Total» (ver `proposal-doc-pdf.ts`).
+ *
+ * A diferença dá o mesmo dos dois modos de olhar — `(base − adicionais) −
+ * serviços` é `base − (serviços + adicionais)` —, e é isso que permite oferecer
+ * `sugerido` sem contradizer o que está escrito ao lado.
  */
 export function desalinhamento(
   doc: DocComLinhasETotal,
   base: number,
-): { soma: number; total: number; diferenca: number } | null {
-  const soma = somaDosItens(doc);
+): { soma: number; total: number; diferenca: number; sugerido: number } | null {
+  const soma = somaDosServicos(doc);
   if (soma === null) return null;
-  const diferenca = round2(base - soma);
+  const { mode, vatRate } = resolveProposalMoney(doc);
+  const dosAdicionais = somaDosExtrasSemIva(doc.budgetExtras, { mode, vatRate });
+  const total = round2(base - dosAdicionais);
+  const diferenca = round2(total - soma);
   if (Math.abs(diferenca) <= 0.01) return null;
-  return { soma, total: base, diferenca };
+  // `sugerido` e não `soma`: quem carrega em «Usar X» escreve no campo do
+  // total, e esse campo inclui os adicionais. Oferecer a soma dos serviços
+  // apagava a deslocação do preço final — e com ela do sinal e da factura.
+  return { soma, total, diferenca, sugerido: round2(soma + dosAdicionais) };
 }
 
 /**
@@ -302,16 +354,22 @@ export function asDuasFormas(
   incluido: { base: number; iva: number; total: number };
 } {
   const cent = round2;
+  // O valor escrito primeiro ao cêntimo, e só depois multiplicado. Com uma base
+  // a chegar com mais de dois decimais (1,005 €), `cent(base × taxa)` e
+  // `cent(cent(base) × taxa)` divergem em cerca de 6% dos valores medidos
+  // (11.500 em 200.000) — e o quadro mostrava um IVA que não é o da base que
+  // mostra ao lado. Um valor em euros tem cêntimos e mais nada.
+  const b = cent(base);
   // "acresce": o número escrito é a base e o IVA soma-se por cima.
-  const ivaAcrescer = cent(base * taxa);
+  const ivaAcrescer = cent(b * taxa);
   // "incluído": o número escrito JÁ traz o IVA lá dentro, e a base extrai-se.
-  const baseIncluido = cent(base / (1 + taxa));
+  const baseIncluido = cent(b / (1 + taxa));
   // Nos dois casos o IVA sai por SUBTRACÇÃO ou o total por SOMA das parcelas
   // já arredondadas — nunca as três por sua conta. É o que garante que estas
   // duas leituras, que existem para ela comparar, fecham cada uma em si.
   return {
-    acrescer: { base: cent(base), iva: ivaAcrescer, total: cent(cent(base) + ivaAcrescer) },
-    incluido: { base: baseIncluido, iva: cent(cent(base) - baseIncluido), total: cent(base) },
+    acrescer: { base: b, iva: ivaAcrescer, total: cent(b + ivaAcrescer) },
+    incluido: { base: baseIncluido, iva: cent(b - baseIncluido), total: b },
   };
 }
 
