@@ -80,8 +80,6 @@ export interface RegistoDeRecuperacao {
   senhas: Record<string, SenhaRedefinida>;
 }
 
-const VAZIO: RegistoDeRecuperacao = { pedidos: {}, senhas: {} };
-
 /** 32 bytes de aleatoriedade criptográfica — 43 caracteres seguros num URL. */
 export function novoToken(): string {
   return randomBytes(32).toString("base64url");
@@ -105,12 +103,52 @@ export function resumoIgual(a: string, b: string): boolean {
   return timingSafeEqual(ba, bb);
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS DUAS TABELAS NÃO HERDAM NADA — e porquê
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * `pedidos` e `senhas` são tabelas indexadas por um endereço de email, e o
+ * endereço vem de fora. Um objecto normal de JavaScript traz, de nascença,
+ * propriedades que não estão lá escritas: `__proto__`, `constructor`,
+ * `toString`. Escrever ou ler nessas chaves não mexe numa entrada da tabela —
+ * mexe no que TODOS os objectos do processo herdam.
+ *
+ * Hoje o único caminho de escrita já está fechado por outra razão (só se grava
+ * um pedido quando o endereço corresponde a uma conta configurada, e nenhuma
+ * conta se chama `__proto__`), mas essa defesa é acidental: vive noutro
+ * ficheiro, e a próxima pessoa que acrescente um caminho de escrita aqui não
+ * tem como saber que ela existe. A análise de segurança apontou exactamente
+ * para isto, e tinha razão a apontar.
+ *
+ * `Object.create(null)` faz tabelas SEM herança nenhuma: `pedidos["__proto__"]`
+ * passa a ser uma entrada como outra qualquer, que não pode contaminar nada. O
+ * JSON não guarda o prototype, portanto a reconstrução tem de ser feita aqui, a
+ * cada leitura — que é o único sítio por onde o conteúdo guardado entra.
+ *
+ * As chaves perigosas são copiadas na mesma, e é de propósito: apagá-las em
+ * silêncio esconderia um registo estragado em vez de o mostrar. O que muda é
+ * que deixam de significar o que significavam.
+ */
+function tabelaSemHeranca<T>(origem: unknown): Record<string, T> {
+  const limpa = Object.create(null) as Record<string, T>;
+  if (!origem || typeof origem !== "object") return limpa;
+  for (const [chave, valor] of Object.entries(origem as Record<string, T>)) {
+    limpa[chave] = valor;
+  }
+  return limpa;
+}
+
+export function registoVazio(): RegistoDeRecuperacao {
+  return { pedidos: tabelaSemHeranca(null), senhas: tabelaSemHeranca(null) };
+}
+
 export async function lerRegisto(): Promise<RegistoDeRecuperacao> {
   const guardado = await getState<Partial<RegistoDeRecuperacao>>(CHAVE_ESTADO);
-  if (!guardado || typeof guardado !== "object") return { ...VAZIO };
+  if (!guardado || typeof guardado !== "object") return registoVazio();
   return {
-    pedidos: (guardado.pedidos ?? {}) as Record<string, PedidoDeRecuperacao>,
-    senhas: (guardado.senhas ?? {}) as Record<string, SenhaRedefinida>,
+    pedidos: tabelaSemHeranca<PedidoDeRecuperacao>(guardado.pedidos),
+    senhas: tabelaSemHeranca<SenhaRedefinida>(guardado.senhas),
   };
 }
 
