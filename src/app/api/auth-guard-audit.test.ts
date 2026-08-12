@@ -492,6 +492,9 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // Quanto tempo custou montar esta proposta. Não é dado do cliente, mas é
   // dado sobre COMO a casa trabalha — e o `POST` escreve na medição de que
   // depende a resposta a "que boards custam mais tempo?".
+  // A biblioteca é o activo principal: ler o ensaio já diz o que lá está, e o
+  // POST escreve etiquetas em ~200 fotos.
+  { path: "./biblioteca/paletas/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/tempo-activo/route", methods: ["GET", "POST"] },
   // O histórico devolve o que se cobrou em cada ronda de negociação, e com
   // `?doc=` devolve um documento inteiro. É a proposta toda, por outra porta.
