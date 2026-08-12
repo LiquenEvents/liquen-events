@@ -191,8 +191,21 @@ export const NUNCA_NO_PDF: Readonly<Record<string, string>> = {
   fotosDeBiblioteca: "a origem das fotos na biblioteca não é impressa.",
   vatRate: "a taxa de IVA não é impressa em lado nenhum; só o «+ IVA» que diz se acresce.",
   headerTitle: "o título de cabeçalho não chega a ser desenhado pelo gerador.",
+};
+
+/**
+ * Campos que o NOSSO gerador não imprime, mas que uma folha feita à mão pode
+ * trazer — e que por isso não podem estar na lista de cima.
+ *
+ * `validUntilDays` era o caso: o nosso documento imprime a DATA de validade
+ * («válida até 10 de out. de 2026») porque a sabe, e daí a nota de que só se
+ * recupera `validUntil`. As propostas escritas em Word dizem o PRAZO — «ESTA
+ * PROPOSTA É VÁLIDA POR 60 DIAS» —, que é outro campo do documento e é lido
+ * como tal. Transformá-lo numa data obrigava a inventar um dia de envio.
+ */
+export const SO_NAS_FEITAS_A_MAO: Readonly<Record<string, string>> = {
   validUntilDays:
-    "o documento imprime a DATA de validade, não o número de dias — o que se recupera é `validUntil`.",
+    "o nosso documento imprime a data de validade e não o prazo; uma folha feita à mão costuma dizer «válida por N dias», e aí é este o campo que se lê.",
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
