@@ -3784,6 +3784,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }
   }
 
+  /**
+   * Há destinatário para esta proposta?
+   *
+   * A MESMA regra do servidor (ver a rota do envio): um endereço com arroba e
+   * um ponto no domínio. Não é uma validação a sério — é a que distingue «não
+   * há email nenhum» de «há». Se as duas discordassem, o ecrã dizia que ia
+   * seguir e o servidor não o mandava.
+   */
+  const emailDoCliente = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(quote.email ?? "");
+
   // Sugestões e a validade por omissão. Uma leitura só, ao abrir; se falhar,
   // o estúdio funciona como antes — nenhuma destas coisas é indispensável.
   useEffect(() => {
@@ -5925,6 +5935,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <p className="text-sm leading-relaxed text-foreground/60">
                 Confirma os dados abaixo. Ao enviar, o cliente recebe a proposta em PDF por email.
               </p>
+              {/* ── SEM DESTINATÁRIO, DIZ-SE AQUI E NÃO DEPOIS ──────────────
+                  Um pedido que entrou por telefone não tem email. Até aqui só
+                  se sabia DEPOIS de carregar em Enviar: a proposta ficava
+                  gravada, o email não saía, e o aviso vinha a seguir ao gesto.
+
+                  Agora está antes do dedo, e diz ONDE se resolve — no painel do
+                  pedido, que passou a deixar corrigir os contactos. */}
+              {!emailDoCliente && (
+                <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70">
+                  <span aria-hidden="true">⚠</span>
+                  <span>
+                    Este pedido não tem email de cliente. A proposta é gravada e o link continua a
+                    servir, mas não segue para ninguém — acrescenta o email nos{" "}
+                    <strong className="font-medium">contactos do pedido</strong>, em Detalhes.
+                  </span>
+                </p>
+              )}
               <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
                 <SummaryRow label="Para" value={quote.email || "—"} />
                 <SummaryRow label="Clientes" value={doc.clientNames || "—"} />

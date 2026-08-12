@@ -765,6 +765,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [editDate, setEditDate] = useState("");
   const [editGuests, setEditGuests] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  /**
+   * ── OS DADOS DE CONTACTO, EDITÁVEIS ─────────────────────────────────────
+   *
+   * Palavras dela: «se criarmos um pedido novo e não colocarmos um email,
+   * depois quando quisermos alterar para colocar o email para enviarmos a
+   * proposta, não conseguimos editar».
+   *
+   * Um pedido nascido de um telefonema entra sem email, e é a rota do envio
+   * que dá pela falta: grava a proposta, não a manda a ninguém, e responde
+   * «acrescenta o email e reenvia». Não havia por onde. Estes três campos são
+   * esse «por onde», e gravam pelo mesmo botão que o resto do painel.
+   */
+  const [editNome, setEditNome] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editTelefone, setEditTelefone] = useState("");
   // Which tools section of the detail panel is showing. Everything is visible
   // at once now — the management form always renders; only the heavier tool
   // groups (Produção / Financeiro / Comunicação) are tabbed for organisation.
@@ -858,7 +873,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       (motivoVaiComADecisao && editLostReason !== (selected.lostReason ?? "")) ||
       editDate !== (selected.date ?? "") ||
       editGuests !== String(selected.guests ?? "") ||
-      editLocation !== (selected.location ?? ""));
+      editLocation !== (selected.location ?? "") ||
+      editNome !== (selected.name ?? "") ||
+      editEmail !== (selected.email ?? "") ||
+      editTelefone !== (selected.phone ?? ""));
 
   /** O que se escreve e ainda não está igual ao que o servidor tem. */
   const escritoPorGravar =
@@ -947,6 +965,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditDate((v) => (v === (antes.date ?? "") ? (updated.date ?? "") : v));
     setEditGuests((v) => (v === String(antes.guests ?? "") ? String(updated.guests ?? "") : v));
     setEditLocation((v) => (v === (antes.location ?? "") ? (updated.location ?? "") : v));
+    setEditNome((v) => (v === (antes.name ?? "") ? (updated.name ?? "") : v));
+    setEditEmail((v) => (v === (antes.email ?? "") ? (updated.email ?? "") : v));
+    setEditTelefone((v) => (v === (antes.phone ?? "") ? (updated.phone ?? "") : v));
   }, []);
 
   /**
@@ -1448,6 +1469,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditDate(q.date ?? "");
     setEditGuests(String(q.guests ?? ""));
     setEditLocation(q.location ?? "");
+    setEditNome(q.name ?? "");
+    setEditEmail(q.email ?? "");
+    setEditTelefone(q.phone ?? "");
     // Open on the tools tab that matches where this pedido is in its lifecycle.
     const target = detailNextAction(q).tab;
     setDetailTab(target === "gestao" ? "comunicacao" : target);
@@ -1501,6 +1525,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditDate(data.quote.date ?? "");
       setEditGuests(String(data.quote.guests ?? ""));
       setEditLocation(data.quote.location ?? "");
+      setEditNome(data.quote.name ?? "");
+      setEditEmail(data.quote.email ?? "");
+      setEditTelefone(data.quote.phone ?? "");
       setDetailTab("comunicacao");
       toast("Pedido duplicado — define a nova data", "success");
     } catch {
@@ -1712,6 +1739,42 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       }
 
       /**
+       * O que mudou nos contactos fica no registo, como tudo o resto que se
+       * altera à mão. Acrescentar um email é a diferença entre uma proposta que
+       * chega e uma que fica gravada sem destinatário — e daqui a três meses
+       * ninguém se lembra de quem o acrescentou.
+       */
+      if (editEmail.trim() !== (selected.email ?? "")) {
+        const novo = editEmail.trim();
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "note_added",
+          actor: userName,
+          summary: novo ? `Email do cliente: ${novo}` : "Email do cliente removido",
+        });
+      }
+      if (editTelefone.trim() !== (selected.phone ?? "")) {
+        const novo = editTelefone.trim();
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "note_added",
+          actor: userName,
+          summary: novo ? `Telefone do cliente: ${novo}` : "Telefone do cliente removido",
+        });
+      }
+      if (editNome.trim() !== (selected.name ?? "") && editNome.trim()) {
+        newEntries.push({
+          id: randomId(),
+          at: now,
+          kind: "note_added",
+          actor: userName,
+          summary: `Nome do cliente: ${selected.name} → ${editNome.trim()}`,
+        });
+      }
+
+      /**
        * ── SÓ O QUE FOI TOCADO ─────────────────────────────────────────────
        *
        * Isto mandava os oito campos em todas as gravações, com os valores que
@@ -1741,6 +1804,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       if (editDate !== (selected.date ?? "")) body.date = editDate;
       if (newGuests !== selected.guests) body.guests = newGuests;
       if (newLocation !== (selected.location ?? "")) body.location = newLocation;
+      // Os contactos vão TRIMADOS e sempre que mudarem — incluindo para vazio:
+      // apagar um email errado tem de gravar, e um `undefined` desaparecia no
+      // JSON e deixava o antigo no lugar.
+      if (editNome.trim() !== (selected.name ?? "")) body.name = editNome.trim();
+      if (editEmail.trim() !== (selected.email ?? "")) body.email = editEmail.trim();
+      if (editTelefone.trim() !== (selected.phone ?? "")) body.phone = editTelefone.trim();
       if (newEntries.length > 0) {
         // Append server-side (nunca o array completo) — ver appendActivity.
         body.activityLogAppend = newEntries;
@@ -1772,6 +1841,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditDate(updated.date ?? "");
       setEditGuests(String(updated.guests ?? ""));
       setEditLocation(updated.location ?? "");
+      setEditNome(updated.name ?? "");
+      setEditEmail(updated.email ?? "");
+      setEditTelefone(updated.phone ?? "");
       // A linha de base da gravação automática move-se com este clique: sem
       // isto, a gravação adiada que estivesse a caminho reenviava o texto que o
       // botão acabou de gravar.
@@ -3932,6 +4004,68 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   value={editLocation}
                                   onChange={(e) => setEditLocation(e.target.value)}
                                   placeholder="Local do evento…"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                />
+                              </div>
+                            </div>
+
+                            {/* ── OS CONTACTOS, QUE ATÉ AQUI ERAM DEFINITIVOS ──
+                                Palavras dela: «se criarmos um pedido novo e não
+                                colocarmos um email, depois quando quisermos
+                                colocar o email para enviarmos a proposta, não
+                                conseguimos editar».
+
+                                Um pedido nascido de um telefonema entra sem
+                                email — o formulário público aceita «email OU
+                                telefone», e o back office nem isso exige. Quem
+                                dava pela falta era a rota do envio: gravava a
+                                proposta, não a mandava a ninguém, e respondia
+                                «acrescenta o email e reenvia». Não havia por
+                                onde.
+
+                                Ficam num bloco próprio e por baixo: são os
+                                dados de QUEM, e o que está em cima é o QUÊ. */}
+                            <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-3">
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">Nome do cliente</label>
+                                <input
+                                  value={editNome}
+                                  onChange={(e) => setEditNome(e.target.value)}
+                                  placeholder="Quem pediu…"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                />
+                              </div>
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">Email</label>
+                                <input
+                                  type="email"
+                                  inputMode="email"
+                                  autoComplete="off"
+                                  value={editEmail}
+                                  onChange={(e) => setEditEmail(e.target.value)}
+                                  placeholder="para onde a proposta segue…"
+                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                />
+                                {/* O aviso aparece só quando falta MESMO, e diz
+                                    a consequência em vez de dizer «campo
+                                    obrigatório» — porque não é: há pedidos que
+                                    só têm telefone, e isso é legítimo. */}
+                                {!editEmail.trim() && (
+                                  <p className="mt-1 text-[10px] leading-relaxed text-[#b5654a]">
+                                    Sem email, a proposta é gravada e o link continua a servir, mas
+                                    não é enviada a ninguém.
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="bo-eyebrow block mb-1.5">Telefone</label>
+                                <input
+                                  type="tel"
+                                  inputMode="tel"
+                                  autoComplete="off"
+                                  value={editTelefone}
+                                  onChange={(e) => setEditTelefone(e.target.value)}
+                                  placeholder="+351…"
                                   className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                 />
                               </div>

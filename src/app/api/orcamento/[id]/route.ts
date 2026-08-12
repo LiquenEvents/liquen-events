@@ -156,6 +156,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "date",
     "guests",
     "location",
+    // Os dados de contacto: um pedido que entrou por telefone não tem email, e
+    // sem isto não havia por onde o acrescentar — nem sequer depois de o envio
+    // responder «acrescenta o email e reenvia». Ver `quoteUpdateSchema`.
+    "name",
+    "email",
+    "phone",
     "contractRef",
     "archived",
   ];

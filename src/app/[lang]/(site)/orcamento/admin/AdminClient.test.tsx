@@ -494,3 +494,57 @@ describe("Pedidos — cartões no telemóvel, tabela no computador", () => {
     expect(screen.getByText(/1 selecionado/)).toBeInTheDocument();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS CONTACTOS DO PEDIDO, CORRIGÍVEIS DEPOIS DE O PEDIDO EXISTIR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «se criarmos um pedido novo e não colocarmos um email, depois
+ * quando quisermos alterar para colocar o email para enviarmos a proposta, não
+ * conseguimos editar».
+ *
+ * Um pedido nascido de um telefonema entra sem email. Quem dava pela falta era
+ * a rota do envio — gravava a proposta, não a mandava a ninguém, e respondia
+ * «acrescenta o email e reenvia». Não havia por onde.
+ */
+describe("os contactos do pedido", () => {
+  const abrir = async (over: Partial<Quote> = {}) => {
+    const quote = makeQuote({ id: "LQ-900", name: "Rui Costa", email: "", phone: "", ...over });
+    renderAdmin([quote]);
+    navTo(/Pedidos/);
+    fireEvent.click(screen.getByText("Rui Costa"));
+    await screen.findByRole("button", { name: "Fechar" });
+    return quote;
+  };
+
+  it("um pedido sem email diz o que isso custa, em vez de não dizer nada", async () => {
+    await abrir();
+    expect(
+      screen.getByText(/não é enviada a ninguém/i),
+      "o painel não avisa que a proposta não vai seguir",
+    ).toBeInTheDocument();
+  });
+
+  it("o email escreve-se e grava-se — era isto que não havia", async () => {
+    await abrir();
+    const campo = screen.getByPlaceholderText("para onde a proposta segue…");
+    fireEvent.change(campo, { target: { value: "rui@example.pt" } });
+
+    const guardar = screen.getByRole("button", { name: /^Guardar alterações$/ });
+    fireEvent.click(guardar);
+
+    await waitFor(() => {
+      const chamada = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
+        (c) => String(c[0]) === "/api/orcamento/LQ-900" && c[1]?.method === "PATCH",
+      );
+      expect(chamada, "não foi gravado nada").toBeTruthy();
+      expect(JSON.parse(String(chamada![1].body)).email).toBe("rui@example.pt");
+    });
+  });
+
+  it("com email, o aviso desaparece", async () => {
+    await abrir({ email: "ja@tenho.pt" });
+    expect(screen.queryByText(/não é enviada a ninguém/i)).not.toBeInTheDocument();
+  });
+});

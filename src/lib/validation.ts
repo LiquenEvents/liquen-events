@@ -255,6 +255,24 @@ export const quoteUpdateSchema = z
     date: shortDate,
     guests: z.number().int().min(0).max(100000),
     location: trimmed(300),
+    /**
+     * ── OS DADOS DE CONTACTO, QUE ATÉ AQUI NÃO SE PODIAM CORRIGIR ──────────
+     *
+     * Um pedido nascido de um telefonema entra sem email — é o caso normal, e
+     * a regra «email OU telefone» do formulário público diz que é legítimo. O
+     * que não era legítimo era o que vinha a seguir: a rota do envio recusa-se
+     * a enviar sem destinatário e responde «acrescenta o email e reenvia», e
+     * não havia por onde o acrescentar. O pedido ficava para sempre sem
+     * caminho até ao cliente.
+     *
+     * O email pode ser VAZIO de propósito (o telefone é que é o contacto), por
+     * isso é `email` ou `""` — como nos fornecedores. O nome não: é por ele que
+     * o pedido se reconhece em todas as listas, e um pedido sem nome é um
+     * pedido perdido.
+     */
+    name: trimmed(120).min(1),
+    email: z.union([z.email().max(160), z.literal("")]),
+    phone: trimmed(40),
     contractRef: trimmed(100).nullish(),
     archived: z.boolean(),
   })

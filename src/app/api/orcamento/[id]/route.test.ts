@@ -169,11 +169,46 @@ describe("PATCH /api/orcamento/[id]", () => {
 
   it("only persists allow-listed fields (blocks mass-assignment)", async () => {
     authed.ok = true;
+    await PATCH(req("PATCH", { status: "cotado", quotedPrice: 5000, id: "evil" }), ctx("LIQ-1"));
+    expect(store.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado", quotedPrice: 5000 });
+  });
+
+  /**
+   * ── OS CONTACTOS PASSARAM A SER EDITÁVEIS, E ISSO FOI UMA DECISÃO ────────
+   *
+   * Estavam nesta lista de «nunca escrever». A razão pela qual saíram não é
+   * segurança a ceder: é que um pedido nascido de um telefonema entra sem
+   * email, a rota do envio responde «acrescenta o email e reenvia», e não havia
+   * por onde o acrescentar. A rota é só para quem tem sessão de administração.
+   *
+   * O que continua fechado é o que nunca é escrito à mão: a identidade do
+   * registo, a hora de submissão, o cálculo do preço e o carimbo de alteração.
+   */
+  it("aceita os dados de contacto, que são o que ela corrige à mão", async () => {
+    authed.ok = true;
     await PATCH(
-      req("PATCH", { status: "cotado", quotedPrice: 5000, email: "hacker@x.com", id: "evil" }),
+      req("PATCH", { name: "Maria Silva", email: "maria@example.pt", phone: "+351 912 345 678" }),
       ctx("LIQ-1"),
     );
-    expect(store.update).toHaveBeenCalledWith("LIQ-1", { status: "cotado", quotedPrice: 5000 });
+    expect(store.update).toHaveBeenCalledWith("LIQ-1", {
+      name: "Maria Silva",
+      email: "maria@example.pt",
+      phone: "+351 912 345 678",
+    });
+  });
+
+  it("recusa um email mal formado em vez de o gravar", async () => {
+    authed.ok = true;
+    const res = await PATCH(req("PATCH", { email: "isto-não-é-um-email" }), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  /** Vazio é legítimo: há pedidos cujo contacto é o telefone. */
+  it("aceita apagar o email", async () => {
+    authed.ok = true;
+    await PATCH(req("PATCH", { email: "" }), ctx("LIQ-1"));
+    expect(store.update).toHaveBeenCalledWith("LIQ-1", { email: "" });
   });
 
   it("drops non-allowlisted privileged fields (deep mass-assignment guard)", async () => {
@@ -182,11 +217,9 @@ describe("PATCH /api/orcamento/[id]", () => {
       req("PATCH", {
         status: "cotado",
         // None of these may be client-writable: identity, submission time, the
-        // computed price breakdown, personal contact data, the reference id.
+        // computed price breakdown, the reference id, the update stamp.
         submittedAt: "1999-01-01T00:00:00.000Z",
         priceBreakdown: { total: 0 },
-        name: "Attacker",
-        phone: "000",
         id: "evil",
         lastUpdated: "spoofed",
       }),
