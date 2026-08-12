@@ -30,6 +30,7 @@ import Conferencia from "./Conferencia";
 import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
 import PreviaDaPagina from "./PreviaDaPagina";
+import VistaDeConjunto from "./VistaDeConjunto";
 import LupaDeFotos from "./LupaDeFotos";
 import {
   ArrastoDosMoodBoards,
@@ -998,6 +999,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [aArrastar, setAArrastar] = useState<string | null>(null);
   /** A fotografia aberta em grande: o board e a posição. */
   const [lupa, setLupa] = useState<{ bi: number; ii: number } | null>(null);
+  /** A vista com as páginas lado a lado está aberta? */
+  const [vistaDeConjunto, setVistaDeConjunto] = useState(false);
   /** As fotos escolhidas para serem movidas em conjunto — chaves `bi:ii`. */
   const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
   const hydrated = useRef(false);
@@ -4030,6 +4033,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   tira que se percorre por cima da lista — a 390 px, uma coluna
                   lateral roubava metade da grelha das fotos. */}
               <div className="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-5">
+                {/* ── AS PÁGINAS LADO A LADO ────────────────────────────────
+                  A pergunta que o editor não deixa fazer — «isto parece tudo
+                  do mesmo casamento?» — só se responde com as folhas todas à
+                  mesma distância dos olhos. */}
+                {vistaDeConjunto && (
+                  <VistaDeConjunto
+                    boards={doc.moodBoards}
+                    ordem={ordemDosBoards}
+                    urls={assetUrls}
+                    aspetos={aspetosDasFotos}
+                    onMover={(de, para) => moverBoardParaPosicao(de, para)}
+                    onSaltar={(bi) => {
+                      const id = doc.moodBoards[bi]?.id;
+                      if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
+                      document
+                        .getElementById(`mood-board-${bi}`)
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    onFechar={() => setVistaDeConjunto(false)}
+                  />
+                )}
                 <MoodBoardIndice
                   boards={doc.moodBoards}
                   ordem={ordemDosBoards}
@@ -4554,6 +4578,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     interruptor teria de mentir sobre o conjunto. */}
                     {doc.moodBoards.length > 1 && (
                       <>
+                        {/* As oito páginas à mesma distância dos olhos — a única
+                            maneira de ver se parecem todas do mesmo casamento. */}
+                        <button
+                          type="button"
+                          className={ADD_BTN}
+                          onClick={() => setVistaDeConjunto((v) => !v)}
+                          aria-pressed={vistaDeConjunto}
+                        >
+                          {vistaDeConjunto
+                            ? "Fechar a vista de conjunto"
+                            : "Ver as páginas lado a lado"}
+                        </button>
                         <button type="button" className={ADD_BTN} onClick={() => dobrarTodos(true)}>
                           Fechar todos
                         </button>
