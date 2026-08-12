@@ -9,7 +9,15 @@ import {
   THEME_PAGE_SIZE,
 } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
-import Temas, { desdeQuando, mergePage, moveItem, ordenarTemas, reinsertAt } from "./Temas";
+import Temas, {
+  contarFotosDaBiblioteca,
+  desdeQuando,
+  mergePage,
+  moveItem,
+  ordenarTemas,
+  reinsertAt,
+  temPoucasFotos,
+} from "./Temas";
 
 /**
  * Rede de segurança da Biblioteca de Temas.
@@ -1647,5 +1655,47 @@ describe("desdeQuando", () => {
   it("sem data, ou com lixo, não diz nada", () => {
     expect(desdeQuando(undefined, agora)).toBe("");
     expect(desdeQuando("ontem à tarde", agora)).toBe("");
+  });
+});
+
+// ── Bloco 9: os números da biblioteca ──────────────────────────────────────
+
+describe("contarFotosDaBiblioteca", () => {
+  const t = (imageCount: number | null) => ({ imageCount }) as never;
+
+  it("soma as fotos e conta os temas", () => {
+    expect(contarFotosDaBiblioteca([t(10), t(4), t(0)])).toEqual({
+      fotos: 14,
+      temas: 3,
+      ilegiveis: 0,
+    });
+  });
+
+  it("uma pasta ilegível NÃO conta como zero — conta como desconhecida", () => {
+    // Somá-la a zero em silêncio dava uma biblioteca mais pequena do que é, e
+    // é assim que alguém conclui que faltam fotos e as volta a carregar.
+    expect(contarFotosDaBiblioteca([t(10), t(null), t(4)])).toEqual({
+      fotos: 14,
+      temas: 3,
+      ilegiveis: 1,
+    });
+  });
+
+  it("aguenta uma biblioteca vazia", () => {
+    expect(contarFotosDaBiblioteca([])).toEqual({ fotos: 0, temas: 0, ilegiveis: 0 });
+  });
+});
+
+describe("temPoucasFotos", () => {
+  it("avisa abaixo de três — o que não chega para ESCOLHER", () => {
+    expect(temPoucasFotos({ imageCount: 0 })).toBe(true);
+    expect(temPoucasFotos({ imageCount: 2 })).toBe(true);
+    expect(temPoucasFotos({ imageCount: 3 })).toBe(false);
+    expect(temPoucasFotos({ imageCount: 40 })).toBe(false);
+  });
+
+  it("cala-se quando não se sabe quantas são", () => {
+    // Um aviso a partir do que não se sabe é um aviso errado.
+    expect(temPoucasFotos({ imageCount: null })).toBe(false);
   });
 });

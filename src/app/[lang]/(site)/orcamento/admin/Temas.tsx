@@ -230,6 +230,49 @@ export function ordenarTemas(temas: readonly ThemeSummary[], ordem: Ordem): Them
   return [...temas].sort((a, b) => Number(!!b.favorito) - Number(!!a.favorito) || porOrdem(a, b));
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS NÚMEROS DA BIBLIOTECA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A biblioteca é o activo mais valioso do back office e não dizia o seu próprio
+ * tamanho: era preciso somar 18 cartões à mão para responder a «quantas fotos
+ * temos?».
+ *
+ * Uma pasta ILEGÍVEL (`imageCount: null`) não conta como zero — conta como
+ * desconhecida, e o total di-lo. Somar zero calado transformava uma falha de
+ * leitura numa biblioteca mais pequena do que é, que é a maneira mais fácil de
+ * alguém concluir que faltam fotos e ir carregá-las outra vez.
+ */
+export function contarFotosDaBiblioteca(temas: readonly ThemeSummary[]): {
+  fotos: number;
+  temas: number;
+  ilegiveis: number;
+} {
+  let fotos = 0;
+  let ilegiveis = 0;
+  for (const t of temas) {
+    if (typeof t.imageCount === "number") fotos += t.imageCount;
+    else ilegiveis += 1;
+  }
+  return { fotos, temas: temas.length, ilegiveis };
+}
+
+/**
+ * Abaixo de quantas fotos um tema não serve para montar uma página.
+ *
+ * Um mood board enche-se com 6 a 8 fotografias (ver `proposal-moodboard.ts`).
+ * Um tema com menos de três não dá para escolher: dá para usar o que lá está,
+ * que é outra coisa. O aviso não julga o tema — diz que ele ainda está a meio.
+ */
+export const POUCAS_FOTOS = 3;
+
+/** O tema tem poucas fotos para o que serve? `null` (ilegível) não é «poucas»:
+ *  não se sabe, e um aviso a partir do que não se sabe é um aviso errado. */
+export function temPoucasFotos(t: Pick<ThemeSummary, "imageCount">): boolean {
+  return typeof t.imageCount === "number" && t.imageCount < POUCAS_FOTOS;
+}
+
 /** Quão apertada é a grelha de temas. */
 export type Densidade = "confortavel" | "compacto";
 
@@ -556,6 +599,18 @@ export default function Temas() {
   // temas é o que os põe todos no ecrã sem scroll — que é o pedido de origem.
   const [densidade, setDensidade] = useState<Densidade>("compacto");
   const [ordem, setOrdem] = useState<Ordem>("alfabetica");
+  /**
+   * «204 fotos em 18 temas» — e, quando alguma pasta não se deixou ler, di-lo
+   * em vez de a somar como zero. Um total calado que encolhe é a maneira mais
+   * fácil de alguém concluir que faltam fotos e as voltar a carregar.
+   */
+  const resumoDaBiblioteca = useMemo(() => {
+    const { fotos, temas, ilegiveis } = contarFotosDaBiblioteca(themes);
+    const base = `${plural(fotos, "foto", "fotos")} em ${plural(temas, "tema", "temas")}`;
+    return ilegiveis > 0
+      ? `${base} · ${plural(ilegiveis, "pasta não se deixou ler", "pastas não se deixaram ler")}`
+      : base;
+  }, [themes]);
   const [verArquivados, setVerArquivados] = useState(false);
   const [revendo, setRevendo] = useState(false);
   // Lidas depois do primeiro desenho, e não durante: o servidor não tem
@@ -808,6 +863,10 @@ export default function Temas() {
                 aria-label="Procurar tema por nome ou nota"
                 className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
               />
+              {/* O TAMANHO DA BIBLIOTECA, dito por ela própria. Era preciso
+                  somar os cartões à mão para responder a «quantas fotos
+                  temos?» — e este é o activo mais valioso do back office. */}
+              <p className="bo-text-muted mt-1.5 text-xs">{resumoDaBiblioteca}</p>
             </div>
           ) : (
             <p className="bo-text-muted max-w-xl text-sm leading-relaxed">
@@ -838,7 +897,12 @@ export default function Temas() {
                 </select>
               </label>
             )}
-            <Button variant="secondary" size="sm" onClick={() => setRevendo(true)}>
+            {/* MANUTENÇÃO, não acção principal. Estava em `secondary`, ao lado
+                do «Novo tema» em verde cheio, e os dois competiam no topo — um
+                é o que se faz todos os dias, o outro é o que se faz de vez em
+                quando. Passa a `ghost`: continua à mão de quem o procura, sem
+                disputar o olhar com a acção que traz alguém a este ecrã. */}
+            <Button variant="ghost" size="sm" onClick={() => setRevendo(true)}>
               Rever etiquetas
             </Button>
             {/* Só aparece quando há mesmo alguma coisa arquivada — senão seria
@@ -1085,6 +1149,16 @@ export default function Temas() {
                       ? ` · ${desdeQuando(t.updatedAt)}`
                       : ""}
                   </p>
+                  {/* AINDA A MEIO, e não «mau». Um mood board enche-se com 6 a
+                      8 fotografias: um tema com menos de três não dá para
+                      ESCOLHER, dá para usar o que lá está. Dito em texto
+                      apagado e sem ícone de erro — é uma nota de curadoria, não
+                      uma avaria. */}
+                  {temPoucasFotos(t) && (
+                    <p className="mt-0.5 truncate text-xs text-[#8a6d3b]">
+                      Ainda com poucas fotos para escolher
+                    </p>
+                  )}
                   {t.notes ? (
                     <p className="bo-text-muted mt-0.5 truncate text-xs opacity-70">{t.notes}</p>
                   ) : null}
