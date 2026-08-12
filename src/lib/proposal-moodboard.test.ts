@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  contagemDosEstados,
+  diagnosticoDoBoard,
   filaDesequilibrada,
   fotoPrincipalDe,
   porqueEsteAutomatico,
@@ -212,5 +214,73 @@ describe("a última fila desequilibrada", () => {
 
   it("poucas fotos nunca dão aviso", () => {
     expect(filaDesequilibrada([...fila(2, 200), ...fila(1, 80)])).toBeNull();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE FALTA A CADA PÁGINA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O índice dizia «vazio», e vazio é o caso fácil. O que se perdia era o meio: a
+ * página com fotos e sem título, a que ficou sem descrição, a que tem nove
+ * fotos quando a folha desenha seis. Nenhuma dessas se vê a passar os olhos por
+ * uma lista de oito.
+ */
+describe("o estado de uma página de inspiração", () => {
+  const MAX = 6;
+  const cheia = { title: "Cerimónia", annotation: "Verdes e brancos.", images: ["a", "b"] };
+
+  it("com título, fotos e descrição está pronta", () => {
+    expect(diagnosticoDoBoard(cheia, MAX)).toEqual({ estado: "pronto", falta: [] });
+  });
+
+  it("sem fotos é VAZIA, e diz também o resto do que falta", () => {
+    const d = diagnosticoDoBoard({ title: "", annotation: "", images: [] }, MAX);
+    expect(d.estado).toBe("vazio");
+    expect(d.falta).toEqual(["sem fotografias", "sem título", "sem descrição"]);
+  });
+
+  /** O caso que passava por pronto: fotos escolhidas, página sem nome. */
+  it("com fotos e sem título está POR ACABAR", () => {
+    const d = diagnosticoDoBoard({ ...cheia, title: "   " }, MAX);
+    expect(d.estado).toBe("por-acabar");
+    expect(d.falta).toEqual(["sem título"]);
+  });
+
+  it("com fotos e sem descrição está por acabar", () => {
+    expect(diagnosticoDoBoard({ ...cheia, annotation: undefined }, MAX).falta).toEqual([
+      "sem descrição",
+    ]);
+  });
+
+  /** São fotos escolhidas que o casal não vai ver — e quais ficam é decisão
+   *  dela, não do desenho. */
+  it("fotos a mais do que a folha desenha contam como trabalho por fazer", () => {
+    const d = diagnosticoDoBoard({ ...cheia, images: ["a", "b", "c", "d", "e", "f", "g"] }, MAX);
+    expect(d.estado).toBe("por-acabar");
+    expect(d.falta).toEqual(["1 fotografia não é impressa"]);
+  });
+
+  it("um board que não existe não rebenta a contagem", () => {
+    expect(diagnosticoDoBoard({}, MAX).estado).toBe("vazio");
+  });
+});
+
+describe("a contagem das páginas", () => {
+  it("conta as três famílias, e só as três", () => {
+    const c = contagemDosEstados(
+      [
+        { title: "a", annotation: "x", images: ["1"] },
+        { title: "", annotation: "", images: ["1"] },
+        { title: "c", annotation: "y", images: [] },
+      ],
+      6,
+    );
+    expect(c).toEqual({ pronto: 1, "por-acabar": 1, vazio: 1 });
+  });
+
+  it("sem páginas nenhumas, tudo a zero", () => {
+    expect(contagemDosEstados([], 6)).toEqual({ pronto: 0, "por-acabar": 0, vazio: 0 });
   });
 });

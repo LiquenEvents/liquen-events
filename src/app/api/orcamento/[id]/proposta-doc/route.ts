@@ -419,6 +419,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       emailError,
       missingImages,
       truncations,
+      // Quanto pesou este documento. O estúdio guarda-o com o tempo que a
+      // geração demorou, e é dessas medições que sai a estimativa que aparece
+      // antes do botão — incluindo o aviso de que o anexo passa do que um
+      // email leva. Na pré-visualização isto sabe-se do próprio blob; no envio
+      // o PDF não passa pelo browser, e sem esta linha o envio não ensinava
+      // nada à estimativa.
+      pdfBytes: pdfBuffer.byteLength,
       // Só viaja quando NÃO foi guardado: uma resposta normal não ganha nada
       // com um `docSaved:true` a mais, e quem falha tem de sair pelo nome.
       ...(docSaved ? {} : { docSaved, docError }),

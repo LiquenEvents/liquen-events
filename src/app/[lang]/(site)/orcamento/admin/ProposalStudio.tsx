@@ -65,6 +65,15 @@ import {
   type CampoDeTexto,
 } from "@/lib/proposal-ortografia";
 import { fotosQueDestoam, ordemPorCor } from "@/lib/cor-dominante";
+import {
+  comNovaAmostra,
+  passaDoAnexo,
+  tamanhoEmPalavras,
+  tamanhoEstimado,
+  tempoEmPalavras,
+  tempoEstimado,
+  type AmostraDeGeracao,
+} from "@/lib/custo-do-pdf";
 import Versoes from "./Versoes";
 import { comoSeDiz, noMesmoEspaco, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
 import { marcarExtra, opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
@@ -801,6 +810,39 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const { toast } = useToast();
   const DRAFT_KEY = `liquen-proposal-studio-${quote.id}`;
   const SIDE_KEY = `${DRAFT_KEY}:meta`;
+
+  /**
+   * ── O QUE AS GERAÇÕES ANTERIORES ENSINARAM ──────────────────────────────
+   *
+   * Cada PDF gerado deixa uma amostra `{fotos, ms, bytes}`, e é dela que sai a
+   * estimativa que aparece antes do botão. Vive fora do rascunho e SEM o id do
+   * pedido: o que se aprende com uma proposta serve para a seguinte — é a
+   * mesma máquina, a mesma ligação e o mesmo servidor.
+   */
+  const [amostras, setAmostras] = useState<AmostraDeGeracao[]>([]);
+  useEffect(() => {
+    try {
+      const cru = localStorage.getItem(AMOSTRAS_KEY);
+      const lidas = cru ? JSON.parse(cru) : null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (Array.isArray(lidas)) setAmostras(lidas.filter((x) => x && typeof x.ms === "number"));
+    } catch {
+      /* sem amostras — a estimativa usa o modelo de arranque */
+    }
+  }, []);
+
+  /** Aponta uma geração e guarda-a para a próxima estimativa. */
+  const apontarGeracao = useCallback((fotos: number, ms: number, bytes: number) => {
+    setAmostras((antes) => {
+      const proximas = comNovaAmostra(antes, { fotos, ms, bytes });
+      try {
+        localStorage.setItem(AMOSTRAS_KEY, JSON.stringify(proximas));
+      } catch {
+        /* sem espaço: a estimativa desta sessão continua a valer */
+      }
+      return proximas;
+    });
+  }, []);
 
   const [doc, setDoc] = useState<StudioDoc>(() => initialDoc(quote));
   const [copiarAberto, setCopiarAberto] = useState(false);
@@ -3652,6 +3694,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   async function preview() {
     if (busy) return;
     setBusy("preview");
+    // De ponta a ponta, que é o que ela espera — e não o que o servidor demora
+    // a desenhar. É esta a medida que faz a estimativa valer alguma coisa.
+    const comecou = Date.now();
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
         method: "POST",
@@ -3663,6 +3708,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         throw new Error(err?.error || "Não foi possível gerar a pré-visualização.");
       }
       const blob = await res.blob();
+      // A geração que acabou de acontecer ensina a próxima estimativa: quantas
+      // fotos, quanto tempo, quantos bytes. Medido, não estimado.
+      apontarGeracao(totalDeFotos, Date.now() - comecou, blob.size);
       // Descarregar o PDF (anexo) em vez de abrir numa aba nova: a CSP do site
       // (object-src 'none', sem frame-src) bloqueia mostrar um blob:PDF numa aba
       // ou iframe, o que fazia "não acontecer nada". Um download nunca é
@@ -3720,6 +3768,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setBusy("send");
     setConfirmSend(false);
     try {
+      const comecou = Date.now();
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3734,6 +3783,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || porqueFalhouOEnvio(res.status));
+      // O envio também ensina a estimativa. Os bytes vêm do servidor: o PDF do
+      // envio não passa pelo browser (segue em anexo), portanto sem esta linha
+      // metade das gerações não ensinava nada.
+      if (typeof data?.pdfBytes === "number") {
+        apontarGeracao(totalDeFotos, Date.now() - comecou, data.pdfBytes);
+      }
       // A proposta ficou guardada em qualquer caso; a mensagem distingue enviada
       // por email vs guardada-mas-sem-email, para a equipa saber o que fazer.
       // O DOCUMENTO INCOMPLETO É O AVISO MAIS IMPORTANTE DOS TRÊS, por isso é o
@@ -4392,6 +4447,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   boards={doc.moodBoards}
                   ordem={ordemDosBoards}
                   bloqueados={doc.moodBoards.map((b) => !!b.bloqueado)}
+                  // A MESMA acção dos cartões e da vista de conjunto: três
+                  // sítios onde se reordena, uma só maneira de reordenar.
+                  onMover={(de, para) => moverBoardParaPosicao(de, para)}
                   onSaltar={(bi) => {
                     // Abrir a dobra ANTES de saltar: saltar para um board
                     // fechado deixava-a a olhar para uma linha de miniaturas
@@ -5904,6 +5962,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             split={split}
             pctSinal={pctSinal}
           />
+          <CustoDaGeracao fotos={totalDeFotos} amostras={amostras} />
         </div>
       )}
 
@@ -6321,6 +6380,15 @@ const SECOES_KEY = "liquen-estudio-secoes";
  * frase que mostra este número: é um piso honesto, não uma promessa.
  */
 const PAGINAS_FIXAS_DO_PDF = 7;
+
+/**
+ * As medições das gerações de PDF, partilhadas por TODAS as propostas.
+ *
+ * Sem o id do pedido de propósito: o que se aprende numa proposta serve para a
+ * seguinte — é a mesma máquina, a mesma ligação e o mesmo servidor. Preso à
+ * proposta, a primeira geração de cada uma seria sempre uma adivinha.
+ */
+const AMOSTRAS_KEY = "liquen-proposal-studio:geracoes";
 
 /**
  * A partir de quantas fotos a página começa a ficar apertada.
@@ -6835,6 +6903,55 @@ function PreviewThumb({
 
 /** Resumo em página: a "forma" da proposta (capa, serviços, total sem IVA/IVA/
  *  com IVA, sinal/saldo) sem ter de descarregar o PDF. */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANTO VAI DEMORAR, E SE O EMAIL AGUENTA O ANEXO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «tempo estimado de geração do PDF, calculado a partir do
+ * número de fotos e de gerações anteriores» e «aviso se o PDF ultrapassar o
+ * limite de anexo de email (8 MB)».
+ *
+ * Sem número nenhum, dez segundos e sessenta são a mesma coisa — uma barra a
+ * rodar — e não há como distinguir «está a demorar» de «isto encravou». Com
+ * número, ela decide se espera.
+ *
+ * O aviso do anexo é o mais valioso dos dois, porque a alternativa é descobrir
+ * pelo casal: o servidor de email do cliente recusa a mensagem, e do lado dela
+ * o envio parece ter corrido bem. A sugestão é a que resolve mesmo — menos
+ * fotografias nas páginas mais pesadas — e diz-se também o que NÃO se perde: o
+ * link da proposta serve na mesma, com o PDF inteiro do outro lado.
+ */
+function CustoDaGeracao({ fotos, amostras }: { fotos: number; amostras: AmostraDeGeracao[] }) {
+  if (fotos === 0) return null;
+  const ms = tempoEstimado(fotos, amostras);
+  const bytes = tamanhoEstimado(fotos, amostras);
+  const pesado = passaDoAnexo(bytes);
+  // Com medições, diz-se que são medições — «cerca de» com uma amostra atrás é
+  // outra coisa do que «cerca de» com um modelo por omissão.
+  const medido = amostras.length >= 2;
+
+  return (
+    <div className="mt-3">
+      <p className="text-xs leading-relaxed text-foreground/50">
+        Gerar este PDF demora {tempoEmPalavras(ms)} e dá um ficheiro de {tamanhoEmPalavras(bytes)}
+        {medido ? ", pelas últimas gerações neste computador" : ""}.
+      </p>
+      {pesado && (
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70">
+          <span aria-hidden="true">⚠</span>
+          <span>
+            Um anexo deste tamanho pode ser recusado pelo servidor de email do cliente — muitos
+            param nos 8 MB, e o anexo viaja ~33% maior do que o ficheiro. Tira algumas fotografias
+            das páginas mais cheias. O link da proposta continua a servir na mesma, com o PDF
+            inteiro do outro lado.
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 function PreviewSummary({
   doc,
   assetUrls,

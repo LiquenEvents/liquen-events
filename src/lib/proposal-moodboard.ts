@@ -187,3 +187,78 @@ export function filaDesequilibrada(caixas: readonly { y: number; h: number }[]):
     sugestao: aRemover < aAcrescentar ? "remover" : "acrescentar",
   };
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE FALTA A UMA PÁGINA DE INSPIRAÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «Assinalar visualmente os boards INCOMPLETOS ou VAZIOS (sem
+ * fotos, sem legenda, ou com caixas por preencher).»
+ *
+ * O índice já dizia quais estavam vazios, e vazio é o caso fácil. O que faltava
+ * era o meio: a página com fotos e sem título, a que ficou sem descrição, a que
+ * tem nove fotos quando a folha desenha seis. Nenhuma dessas se vê a passar os
+ * olhos por uma lista de oito — vê-se abrindo as oito, que é exactamente o que
+ * o índice existe para não ser preciso.
+ *
+ * ── PORQUE É QUE ISTO É UMA FUNÇÃO PURA ───────────────────────────────────
+ * Porque a mesma pergunta é feita em dois sítios com dois desenhos diferentes —
+ * a marca de cada entrada e o contador do cabeçalho — e uma segunda cópia da
+ * regra acabaria, num dia qualquer, a dizer «pronto» num sítio e «falta» no
+ * outro. Aqui é uma resposta só, medida sem ecrã nenhum.
+ *
+ * ── O QUE NÃO ENTRA ───────────────────────────────────────────────────────
+ * A última fila desequilibrada NÃO entra. É um aviso de composição — a página
+ * sai bem na mesma, e muitas vezes é a escolha dela — e misturá-lo com «falta
+ * conteúdo» tornava o contador uma queixa permanente, que é como se ensina
+ * alguém a ignorar um contador.
+ */
+export type EstadoDoBoard = "vazio" | "por-acabar" | "pronto";
+
+export interface DiagnosticoDoBoard {
+  estado: EstadoDoBoard;
+  /** O que falta, por palavras, pela ordem por que se resolve. Vazio = pronto. */
+  falta: string[];
+}
+
+/**
+ * O estado de uma página, e o que lhe falta.
+ *
+ * `maxFotos` é o número de fotografias que a folha desenha
+ * ({@link MOOD_BOARD_MAX_IMAGES}, dado por quem chama para este módulo não
+ * depender do documento).
+ */
+export function diagnosticoDoBoard(
+  board: Partial<Pick<MoodBoard, "title" | "annotation" | "images">>,
+  maxFotos: number,
+): DiagnosticoDoBoard {
+  const fotos = board.images?.length ?? 0;
+  const falta: string[] = [];
+  if (fotos === 0) falta.push("sem fotografias");
+  if (!board.title?.trim()) falta.push("sem título");
+  if (!board.annotation?.trim()) falta.push("sem descrição");
+  // Fotos a mais é «por acabar» e não um aviso à parte: são fotos escolhidas
+  // que o casal não vai ver, e a decisão de quais ficam é dela.
+  if (fotos > maxFotos) {
+    const aMais = fotos - maxFotos;
+    falta.push(
+      aMais === 1 ? "1 fotografia não é impressa" : `${aMais} fotografias não são impressas`,
+    );
+  }
+
+  return {
+    estado: fotos === 0 ? "vazio" : falta.length === 0 ? "pronto" : "por-acabar",
+    falta,
+  };
+}
+
+/** Quantas páginas estão prontas, por acabar e vazias. */
+export function contagemDosEstados(
+  boards: readonly Partial<Pick<MoodBoard, "title" | "annotation" | "images">>[],
+  maxFotos: number,
+): Record<EstadoDoBoard, number> {
+  const contagem: Record<EstadoDoBoard, number> = { pronto: 0, "por-acabar": 0, vazio: 0 };
+  for (const b of boards) contagem[diagnosticoDoBoard(b, maxFotos).estado] += 1;
+  return contagem;
+}

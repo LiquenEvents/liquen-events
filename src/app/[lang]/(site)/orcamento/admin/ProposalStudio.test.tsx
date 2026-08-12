@@ -2411,3 +2411,58 @@ describe("o «Ver no campo» do aviso de ortografia", () => {
     expect(document.activeElement, "o campo não ficou com o foco").toBe(titulo);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CUSTO DA GERAÇÃO, ANTES DO BOTÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «tempo estimado de geração do PDF» e «aviso se o PDF
+ * ultrapassar o limite de anexo de email (8 MB)».
+ *
+ * Sem número nenhum, dez segundos e sessenta são a mesma coisa: uma barra a
+ * rodar, sem forma de distinguir «está a demorar» de «isto encravou».
+ */
+describe("o custo de gerar o PDF", () => {
+  const irAoPasso2 = async () => {
+    const utilizador = userEvent.setup();
+    await utilizador.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+  };
+
+  it("diz quanto demora e quanto pesa, com as fotos que a proposta tem", async () => {
+    seedDraft(3);
+    renderStudio();
+    await screen.findByLabelText("Título do mood board");
+    await irAoPasso2();
+    expect(await screen.findByText(/Gerar este PDF demora/)).toBeTruthy();
+  });
+
+  /** Uma proposta sem fotografias não tem custo nenhum que valha a pena dizer. */
+  it("sem fotos, não diz nada", async () => {
+    seedDraft(0);
+    renderStudio();
+    await irAoPasso2();
+    expect(screen.queryByText(/Gerar este PDF demora/)).toBeNull();
+  });
+
+  /**
+   * O aviso que evita o pior desfecho: o servidor de email do cliente recusa a
+   * mensagem e, do lado dela, o envio parece ter corrido bem.
+   */
+  it("com gerações pesadas medidas, avisa que o anexo pode ser recusado", async () => {
+    // Duas medições anteriores: ~1,5 MB por fotografia. Com 20 fotos a
+    // estimativa passa dos 8 MB — e é isso que o aviso tem de apanhar.
+    localStorage.setItem(
+      "liquen-proposal-studio:geracoes",
+      JSON.stringify([
+        { fotos: 4, ms: 4000, bytes: 6_500_000 },
+        { fotos: 8, ms: 6000, bytes: 12_500_000 },
+      ]),
+    );
+    seedDraft(20);
+    renderStudio();
+    await screen.findByLabelText("Título do mood board");
+    await irAoPasso2();
+    expect(await screen.findByText(/pode ser recusado pelo servidor de email/)).toBeTruthy();
+  });
+});
