@@ -121,7 +121,20 @@ export default function AdminLogin() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
-              placeholder="Ex.: Catarina"
+              /**
+               * SEM EXEMPLO, e é de propósito.
+               *
+               * Estava aqui «Ex.: Catarina» — o nome verdadeiro de quem
+               * trabalha na empresa, numa página de entrada que qualquer
+               * pessoa na internet consegue abrir. Quem tenta entrar sem ser
+               * convidado precisa de duas coisas: um identificador válido e
+               * uma palavra-passe. Nós dávamos a primeira.
+               *
+               * Um campo de identificação não precisa de exemplo nenhum: a
+               * etiqueta já diz o que lá vai. Exemplos ficam para campos onde
+               * o FORMATO não é óbvio (uma unidade, uma referência), e mesmo
+               * aí nunca com dados de pessoas verdadeiras.
+               */
             />
 
             <Field

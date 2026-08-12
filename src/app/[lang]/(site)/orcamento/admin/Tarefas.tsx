@@ -480,7 +480,9 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
               label="Responsável"
               value={assignee}
               onChange={(e) => setAssignee(e.target.value)}
-              placeholder="Ex.: Catarina"
+              // Um cargo, não uma pessoa: o nome de uma colega verdadeira num
+              // exemplo acaba por sair daqui para sítios onde não devia estar.
+              placeholder="Ex.: quem fica responsável"
             />
             <Field as="select" label="Área" value={area} onChange={(e) => setArea(e.target.value)}>
               <option value="">Sem área</option>
