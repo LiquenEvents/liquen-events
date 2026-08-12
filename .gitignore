@@ -99,3 +99,8 @@ instagram-export/
 # `npm run test:e2e` noutra frente para as apagar. São artefactos, geram-se
 # outra vez a correr o script.
 /medicoes/
+
+# As fotografias de teste do upload (~300 MB, geradas por scripts/gerar-fotos-de-teste.mjs)
+/e2e/fotos-de-teste/
+/e2e/fotos-poucas/
+/e2e/medicoes/
