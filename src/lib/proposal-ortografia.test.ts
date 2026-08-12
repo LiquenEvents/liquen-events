@@ -154,6 +154,23 @@ describe("as gralhas dos campos que saem impressos", () => {
     expect(depois.budgetItems).toEqual(["áreas comuns", "área"]);
   });
 
+  it("no mesmo campo, corrigir o singular não toca no plural", () => {
+    // As duas palavras lado a lado, uma prefixo da outra. Cada gralha só mexe
+    // na sua, e as duas juntas deixam a frase certa.
+    const d = { budgetItems: ["area e areas"] };
+    const [g] = gralhasDoDocumento(d);
+    expect(g.escrita).toBe("area");
+    expect(corrigirGralha(d, g).budgetItems![0]).toBe("área e areas");
+    expect(corrigirTudo(d).budgetItems![0]).toBe("área e áreas");
+  });
+
+  it("uma palavra com caracteres de expressão regular não é um caso especial", () => {
+    // Antes isto era interpolado numa `RegExp` construída na altura. Agora é
+    // uma procura por texto, e o `(` deixou de ter significado nenhum.
+    const d = { budgetItems: ["Cerimonia (civil)"] };
+    expect(corrigirTudo(d).budgetItems![0]).toBe("Cerimónia (civil)");
+  });
+
   it("campos vazios, ausentes ou só com espaços não produzem nada", () => {
     expect(gralhasDoDocumento({})).toEqual([]);
     expect(gralhasDoDocumento({ ref: "   ", servico: "" })).toEqual([]);

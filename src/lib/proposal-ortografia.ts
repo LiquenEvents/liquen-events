@@ -393,19 +393,50 @@ export function gralhasDoDocumento(doc: Partial<ProposalDoc>): Gralha[] {
   return achados;
 }
 
+/** Uma letra ou um algarismo — o que faz de uma palavra a continuação de
+ *  outra. Constante, e é isso que interessa: ver {@link substituirPalavra}. */
+const LETRA_OU_NUMERO = /[\p{L}\p{N}]/u;
+
+/**
+ * Substitui uma palavra INTEIRA, todas as vezes que aparecer.
+ *
+ * ── PORQUE É QUE ISTO NÃO É UMA EXPRESSÃO REGULAR ─────────────────────────
+ * Era. A palavra vinha do texto do documento e era interpolada numa `RegExp`
+ * construída na altura — com escape, mas construída à mesma a partir de texto
+ * que alguém escreveu. A análise de segurança do GitHub apontou-lhe o dedo, e
+ * apontou bem: uma expressão regular montada com conteúdo de fora é uma
+ * categoria de defeito inteira (`js/regex-injection`), e o escape é uma defesa
+ * que se perde na primeira vez que alguém mexer na linha sem reparar.
+ *
+ * Uma procura por texto não tem essa categoria de defeito nenhuma. E as
+ * fronteiras têm de ser olhadas à mão de qualquer maneira: o `\b` do JavaScript
+ * não conhece letras acentuadas, portanto «área» seria encontrada dentro de
+ * «áreas» e a palavra saía partida ao meio.
+ */
+function substituirPalavra(texto: string, de: string, para: string): string {
+  if (!de) return texto;
+  const eParteDePalavra = (c: string | undefined) => !!c && LETRA_OU_NUMERO.test(c);
+  let saida = "";
+  let i = 0;
+  for (;;) {
+    const j = texto.indexOf(de, i);
+    if (j < 0) return saida + texto.slice(i);
+    const sozinha = !eParteDePalavra(texto[j - 1]) && !eParteDePalavra(texto[j + de.length]);
+    saida += texto.slice(i, j) + (sozinha ? para : de);
+    i = j + de.length;
+  }
+}
+
 /**
  * O documento com uma gralha corrigida.
  *
- * Substitui a palavra INTEIRA e só naquele campo. As fronteiras são olhadas à
- * mão (`(?<![\p{L}])`) porque `\b` do JavaScript não conhece letras acentuadas:
- * com `\b`, corrigir «área» dentro de «áreas» partia a palavra ao meio.
+ * A palavra inteira, e só naquele campo — o caminho estruturado é o que evita
+ * andar à procura de texto pelo documento fora.
  */
 export function corrigirGralha<T extends Partial<ProposalDoc>>(doc: T, g: Gralha): T {
   const texto = lerCampo(doc, g.campo);
   if (texto === undefined) return doc;
-  const escapada = g.escrita.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapada}(?![\\p{L}\\p{N}])`, "gu");
-  const novo = texto.replace(re, g.sugerida);
+  const novo = substituirPalavra(texto, g.escrita, g.sugerida);
   if (novo === texto) return doc;
   return escreverCampo(doc, g.campo, novo);
 }
