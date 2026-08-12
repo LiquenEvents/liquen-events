@@ -5,9 +5,16 @@ import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import ProposalStudio, {
   avisoDeConteudoIncompleto,
+  contagemDePrecos,
   cortesDoCabecalho,
+  modoDoAdicional,
   porqueFalhouOEnvio,
+  textoDoAdicional,
+  textoDoTotal,
 } from "./ProposalStudio";
+import { totaisDaProposta } from "@/lib/proposal-budget";
+import { parseMoneyText } from "@/lib/proposal-doc";
+import { eur } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
 
 /** O runtime de importação do seletor, reduzido aos três momentos que o estúdio
@@ -356,12 +363,66 @@ describe("total desalinhado da soma das linhas", () => {
     );
   }
 
-  it("mostra a soma das linhas ao lado do botão de acrescentar", async () => {
+  /**
+   * ── O CONTADOR, NO LUGAR DA SOMA ──────────────────────────────────────
+   * «Soma das linhas: 3.250,00 €» saiu daqui: era uma das TRÊS somas que
+   * apareciam ao mesmo tempo no ecrã, e a soma verdadeira vive agora no bloco
+   * de totais. O que fica é o que só este sítio pode responder — quantas destas
+   * caixas estão mesmo preenchidas —, que é a outra metade da resposta ao
+   * `placeholder="900"`: tirar o número falso e dizer o número verdadeiro.
+   */
+  it("conta quantas linhas têm preço, em vez de repetir a soma", async () => {
     seedComPrecos(3250);
     renderStudio();
-    // O `^` não é preciosismo: "Bate certo com a soma das linhas" também
-    // contém a frase, e sem a âncora o teste apanhava as duas.
-    expect(await screen.findByText(/^Soma das linhas:/)).toBeTruthy();
+    expect(await screen.findByText("2 de 2 linhas com preço")).toBeTruthy();
+    expect(screen.queryByText(/^Soma das linhas:/)).toBeNull();
+  });
+
+  it("com umas linhas por orçamentar, diz que a soma está incompleta", async () => {
+    // Duas linhas, uma só com preço: o caso em que a soma dá um número
+    // plausível e errado por baixo.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: ["Decor Cerimónia", "Decor Jantar"],
+        budgetAmounts: [900, null],
+        coverImages: ["", ""],
+        totalAmount: 900,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    renderStudio();
+    expect(await screen.findByText("1 de 2 linhas com preço")).toBeTruthy();
+    expect(await screen.findByText(/a soma dos serviços está incompleta/i)).toBeTruthy();
+  });
+
+  it("com todas as linhas orçamentadas, não avisa de soma incompleta", async () => {
+    seedComPrecos(3250);
+    renderStudio();
+    await screen.findByText("2 de 2 linhas com preço");
+    expect(screen.queryByText(/a soma dos serviços está incompleta/i)).toBeNull();
+  });
+
+  /**
+   * O `placeholder="900"` era a mentira que fazia quatro campos vazios
+   * parecerem preenchidos. Palavras dela: «mais cedo ou mais tarde alguém pensa
+   * que já está preenchido».
+   */
+  it("um campo de preço vazio não sugere um número", async () => {
+    seedComPrecos(3250);
+    renderStudio();
+    const campo = await screen.findByLabelText(/^Preço de Decor Cerimónia/);
+    expect(campo.getAttribute("placeholder")).toBe("sem preço");
   });
 
   it("avisa quando o total escrito à mão já não bate certo", async () => {
@@ -374,17 +435,114 @@ describe("total desalinhado da soma das linhas", () => {
   it("cala-se quando o total bate certo", async () => {
     seedComPrecos(3250);
     renderStudio();
-    await screen.findByText(/^Soma das linhas:/);
+    await screen.findByText("2 de 2 linhas com preço");
     expect(screen.queryByText(/difere da soma das linhas/i)).toBeNull();
   });
 
-  it("o botão do aviso arruma o total", async () => {
-    // Dizer que está errado sem dar o gesto que o corrige é meio trabalho.
+  /**
+   * ── «USAR X €» É UM BOTÃO PERIGOSO ────────────────────────────────────
+   * Palavras dela. Escrevia o número novo por cima do preço final — o valor de
+   * que saem a fatura, o sinal e o saldo — sem mostrar o que ia desaparecer.
+   * Estes três testes prendem as três coisas que passou a fazer: perguntar com
+   * os dois valores, deixar anular, e ficar no histórico do pedido.
+   */
+  it("o botão do aviso pergunta primeiro, com os dois valores à vista", async () => {
     seedComPrecos(4000);
     renderStudio();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Usar/ }));
+    const pergunta = await screen.findByText(/Substituir o total de/i);
+    expect(pergunta.textContent).toMatch(/4\s?000,00/);
+    expect(pergunta.textContent).toMatch(/3\s?250,00/);
+    // E ainda não escreveu nada.
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("4000");
+  });
+
+  it("confirmado, arruma o total e deixa dez segundos para anular", async () => {
+    seedComPrecos(4000);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Usar/ }));
+    await user.click(await screen.findByRole("button", { name: /^Substituir$/ }));
     expect(screen.queryByText(/difere da soma das linhas/i)).toBeNull();
+    expect(await screen.findByText(/Pode anular durante/i)).toBeTruthy();
+    await user.click(await screen.findByRole("button", { name: /^Anular$/ }));
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("4000");
+  });
+
+  it("e fica escrito no histórico do pedido", async () => {
+    seedComPrecos(4000);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Usar/ }));
+    await user.click(await screen.findByRole("button", { name: /^Substituir$/ }));
+    const registos = fetchMock.mock.calls.filter(([, init]) =>
+      String(init?.body ?? "").includes("activityLogAppend"),
+    );
+    expect(registos.length).toBeGreaterThan(0);
+    const corpo = JSON.parse(String(registos.at(-1)?.[1]?.body));
+    expect(corpo.activityLogAppend[0].kind).toBe("price_set");
+    expect(corpo.activityLogAppend[0].summary).toMatch(/3\s?250,00/);
+  });
+
+  /**
+   * A pergunta guarda o gesto que a vai aplicar, composto com os números
+   * daquele instante. Escrever entretanto no formulário torna-a uma pergunta
+   * sobre um documento que já não existe — e aplicá-la escrevia por cima do
+   * que se acabou de escrever.
+   */
+  it("a pergunta caduca se o documento mudar entretanto", async () => {
+    seedComPrecos(4000);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Usar/ }));
+    await screen.findByText(/Substituir o total de/i);
+    await user.type(await screen.findByLabelText("Clientes"), "!");
+    await waitFor(() => expect(screen.queryByText(/Substituir o total de/i)).toBeNull());
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("4000");
+  });
+
+  it("cancelado, não mexe no total nem escreve no histórico", async () => {
+    seedComPrecos(4000);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Usar/ }));
+    await user.click(await screen.findByRole("button", { name: /^Cancelar$/ }));
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("4000");
+    expect(await screen.findByText(/difere da soma das linhas/i)).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.filter(([, init]) =>
+        String(init?.body ?? "").includes("activityLogAppend"),
+      ),
+    ).toHaveLength(0);
+  });
+
+  /**
+   * ── O BLOCO DE TOTAIS BATE CERTO COM `totaisDaProposta` ────────────────
+   * É a razão de ser do bloco: os números do ecrã e os do papel saem da MESMA
+   * função. Este teste compara linha a linha com o que a biblioteca devolve —
+   * se alguém voltar a fazer contas na marcação, falha aqui antes de falhar
+   * numa proposta.
+   */
+  it("o bloco de totais mostra exactamente o que `totaisDaProposta` devolve", async () => {
+    seedComPrecos(4000);
+    renderStudio();
+    const doc = JSON.parse(localStorage.getItem(DRAFT_KEY)!);
+    const esperado = totaisDaProposta(doc, 30);
+    const bloco = (await screen.findByText("Totais")).parentElement!;
+    for (const [rotulo, valor] of [
+      ["Subtotal dos serviços", esperado.servicos],
+      ["Valores adicionais", esperado.adicionais],
+      ["Total sem IVA", esperado.total],
+      ["Total a pagar", esperado.aPagar],
+      ["Saldo 70%", esperado.saldo],
+    ] as const) {
+      const dt = within(bloco).getByText(rotulo);
+      expect(dt.nextElementSibling?.textContent).toBe(eur(valor));
+    }
+    expect(within(bloco).getByText(`IVA (23%)`).nextElementSibling?.textContent).toBe(
+      eur(esperado.iva),
+    );
   });
 
   it("mostra as duas leituras do IVA lado a lado", async () => {
@@ -1092,11 +1250,18 @@ describe("os valores adicionais somam ao total", () => {
       </ToastProvider>,
     );
 
+  /**
+   * O campo do valor de um adicional passou a ser NUMÉRICO e a normalizar-se ao
+   * sair (`defaultValue` + `onBlur`, como o preço de uma linha): normalizar a
+   * cada tecla apagava o que ela estava a escrever a meio. Escrever aqui é
+   * portanto escrever E sair do campo.
+   */
   async function escreverExtra(valor: string) {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
-    const campo = await screen.findByLabelText(/Valor da linha adicional/i);
+    const campo = await screen.findByLabelText(/^Valor de /i);
     await user.type(campo, valor);
+    await user.tab();
     return user;
   }
 
@@ -1117,12 +1282,32 @@ describe("os valores adicionais somam ao total", () => {
     expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("1100");
   });
 
-  it("apagar o valor adicional devolve o total ao que era", async () => {
+  /**
+   * Apagar um adicional TIRA-O do total — e portanto do sinal e da fatura. Por
+   * isso passou a pedir confirmação com os dois números à vista, como o «Usar
+   * X €»: era o mesmo estrago atrás de um «×» de doze pixéis.
+   */
+  it("apagar o valor adicional devolve o total ao que era — depois de confirmar", async () => {
     desenhar(comPreco(6875));
     const user = await escreverExtra("1550");
     expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("8425");
     await user.click(await screen.findByRole("button", { name: /Remover linha adicional/i }));
+    // A pergunta traz os DOIS valores, e o total ainda não mudou.
+    const pergunta = await screen.findByText(/Substituir o total de/i);
+    expect(pergunta.textContent).toMatch(/8\s?425,00/);
+    expect(pergunta.textContent).toMatch(/6\s?875,00/);
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("8425");
+    await user.click(await screen.findByRole("button", { name: /^Substituir$/ }));
     expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("6875");
+  });
+
+  it("e cancelar deixa o total exactamente como estava", async () => {
+    desenhar(comPreco(6875));
+    const user = await escreverExtra("1550");
+    await user.click(await screen.findByRole("button", { name: /Remover linha adicional/i }));
+    await user.click(await screen.findByRole("button", { name: /^Cancelar$/ }));
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("8425");
+    expect(screen.queryByText(/Substituir o total de/i)).toBeNull();
   });
 
   it("um valor sem número («a definir») não mexe no total", async () => {
@@ -1131,18 +1316,33 @@ describe("os valores adicionais somam ao total", () => {
     expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("6875");
   });
 
-  it("a conta fica à vista, para não ter de ser feita de cabeça", async () => {
+  /**
+   * O «Somado ao total: X» saiu daqui: era a terceira soma no mesmo ecrã. A
+   * conta continua à vista, agora no BLOCO DE TOTAIS, na linha que o PDF também
+   * imprime — e é a mesma `totaisDaProposta` a dizê-la nos dois sítios.
+   */
+  it("a conta fica à vista no bloco de totais, não numa segunda soma", async () => {
     desenhar(comPreco(6875));
     await escreverExtra("1550");
-    expect(await screen.findByText(/Somado ao total:/i)).toBeTruthy();
+    expect(screen.queryByText(/Somado ao total:/i)).toBeNull();
+    // A do bloco de totais é a que está num `dt` — a outra é o cabeçalho da
+    // secção onde os adicionais se escrevem.
+    const bloco = (await screen.findByText("Totais")).parentElement!;
+    expect(within(bloco).getByText("Valores adicionais").nextElementSibling?.textContent).toMatch(
+      /1\s?550,00/,
+    );
   });
 
-  it("e chega ao PREÇO FINAL do pedido — é dele que sai a factura", async () => {
+  it("e chega ao PREÇO FINAL do pedido — é dele que sai a fatura", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     desenhar(comPreco(6875));
     await escreverExtra("1550");
     await vi.advanceTimersByTimeAsync(800);
-    const gravacoes = fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
+    const gravacoes = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === "PATCH")
+      // O histórico do pedido também entra por PATCH (`activityLogAppend`); o
+      // que este teste verifica é a gravação do PREÇO.
+      .filter(([, init]) => String(init?.body).includes("quotedPrice"));
     expect(JSON.parse(String(gravacoes.at(-1)?.[1]?.body))).toMatchObject({ quotedPrice: 8425 });
     vi.useRealTimers();
   });
@@ -1780,19 +1980,24 @@ describe("o rascunho preso neste navegador é reenviado ao abrir", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * O BOTÃO «GUARDAR AGORA»
+ * FORÇAR A GRAVAÇÃO — O ⌘S, E O BOTÃO QUE SÓ APARECE QUANDO É PRECISO
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Palavras dela: «quero que haja um botão para guardar onde se ficou». O
- * estúdio já grava sozinho ao fim de 800 ms — e isso é INVISÍVEL. O botão não
- * substitui o automático: é o gesto de quem se vai levantar da secretária e
- * quer ter a certeza antes de fechar o portátil.
+ * O botão «Guardar agora» estava SEMPRE na barra, ao lado de «Tudo guardado».
+ * Palavras dela: «é redundante e contraditório». É — e a gravação automática
+ * cobre mesmo o que ele cobria, porque é a MESMA função (`flushDraft.current`)
+ * que os dois chamam.
  *
- * E por ser esse o gesto, é o botão que MAIS não pode mentir de toda a página:
- * quem carrega nele e lê «guardado» fecha o portátil. Por isso são três os
- * casos aqui — guardou, não chegou ao servidor, e não havia nada por guardar.
+ * O que não é redundante é o caso em que o servidor RECUSA: aí a cópia local
+ * já apagou o «por gravar» e o temporizador só volta a correr à tecla seguinte
+ * — carregar era a única forma de tentar outra vez. Por isso o botão fica, mas
+ * só nesse estado e com o nome do que faz.
+ *
+ * Estes testes prendem as duas metades: o gesto de forçar continua a existir
+ * (⌘S), e continua a não poder mentir sobre o que aconteceu — quem lê
+ * «guardado» fecha o portátil.
  */
-describe("o botão «Guardar agora»", () => {
+describe("forçar a gravação do rascunho", () => {
   const naoGuardou = () =>
     reply({
       ok: false,
@@ -1817,7 +2022,37 @@ describe("o botão «Guardar agora»", () => {
     };
   }
 
-  const botao = () => screen.getByRole("button", { name: /guardar agora/i });
+  /** O gesto de forçar. É o ⌘S: o botão de sempre saiu da barra. */
+  const forcar = (user: ReturnType<typeof userEvent.setup>) =>
+    user.keyboard("{Control>}s{/Control}");
+
+  it("ao lado de «tudo guardado» já não há botão nenhum", async () => {
+    jaSincronizado();
+    renderStudio();
+    await screen.findByLabelText("Clientes");
+    expect(screen.queryByRole("button", { name: /guardar agora/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /tentar outra vez/i })).toBeNull();
+  });
+
+  /** O único caso em que o botão não era redundante: com o servidor a recusar,
+   *  era a única forma de voltar a tentar. */
+  it("com o servidor a recusar, aparece o «Tentar outra vez»", async () => {
+    gravacaoDoRascunho = naoGuardou;
+    jaSincronizado();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Clientes"), "!");
+    const botaoDeRepetir = await screen.findByRole(
+      "button",
+      { name: /tentar outra vez/i },
+      { timeout: 3000 },
+    );
+    const antes = corpos("proposta-rascunho").length;
+    await user.click(botaoDeRepetir);
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(antes), {
+      timeout: 1000,
+    });
+  });
 
   it("grava JÁ o que estava por gravar, sem esperar pelos 800 ms", async () => {
     jaSincronizado();
@@ -1825,7 +2060,7 @@ describe("o botão «Guardar agora»", () => {
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText("Clientes"), "Beatriz e Nuno");
     const antes = corpos("proposta-rascunho").length;
-    await user.click(botao());
+    await forcar(user);
     // O tecto de 500 ms é a prova: o travão da gravação automática são 800 ms,
     // portanto uma gravação que aparece aqui só pode ter vindo do botão.
     await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(antes), {
@@ -1839,7 +2074,7 @@ describe("o botão «Guardar agora»", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText("Clientes"), "!");
-    await user.click(botao());
+    await forcar(user);
     expect(
       await screen.findAllByText(/rascunho guardado no servidor/i, undefined, { timeout: 3000 }),
     ).not.toEqual([]);
@@ -1851,7 +2086,7 @@ describe("o botão «Guardar agora»", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText("Clientes"), "!");
-    await user.click(botao());
+    await forcar(user);
     // As MESMAS palavras do indicador. Ela não pode ter de aprender duas
     // linguagens no mesmo back office.
     expect(
@@ -1868,10 +2103,10 @@ describe("o botão «Guardar agora»", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText("Clientes"), "!");
-    await user.click(botao());
+    await forcar(user);
     await screen.findAllByText(/só neste computador/i, undefined, { timeout: 3000 });
     await user.type(await screen.findByLabelText("Clientes"), "?");
-    await user.click(botao());
+    await forcar(user);
     await waitFor(
       () => expect(screen.queryAllByText(/rascunho guardado no servidor/i)).toEqual([]),
       { timeout: 1000 },
@@ -1888,25 +2123,10 @@ describe("o botão «Guardar agora»", () => {
     await waitFor(() => expect(localStorage.getItem(DRAFT_KEY) ?? "").toContain("!"), {
       timeout: 3000,
     });
-    await user.click(botao());
+    await forcar(user);
     expect(
       await screen.findAllByText(/não havia nada por gravar/i, undefined, { timeout: 3000 }),
     ).not.toEqual([]);
-  });
-
-  /** O atalho existe para quem trabalha com as mãos no teclado, e faz o MESMO
-   *  que o botão — não uma segunda gravação com outras regras. */
-  it("⌘/Ctrl+S faz o mesmo que o botão", async () => {
-    jaSincronizado();
-    renderStudio();
-    const user = userEvent.setup();
-    await user.type(await screen.findByLabelText("Clientes"), "Beatriz e Nuno");
-    const antes = corpos("proposta-rascunho").length;
-    await user.keyboard("{Control>}s{/Control}");
-    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(antes), {
-      timeout: 500,
-    });
-    expect(corpos("proposta-rascunho").at(-1) ?? "").toContain("Beatriz e Nuno");
   });
 });
 
@@ -2023,5 +2243,121 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
     expect(
       await screen.findByText(/perde \d+% da área/i, undefined, { timeout: 3000 }),
     ).toBeTruthy();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O CONTADOR DE PREÇOS, EM SI
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A regra que interessa é a do meio: nenhuma linha com preço é «ainda não
+ * orçamentei» e não avisa de nada; todas com preço é uma soma verdadeira. Só
+ * o meio — umas sim, outras não — dá um número plausível que está errado por
+ * baixo, e é esse que tem de falar.
+ */
+describe("contagemDePrecos", () => {
+  it("conta as que têm preço e diz a frase por extenso", () => {
+    expect(contagemDePrecos([900, null, 1500, null])).toMatchObject({
+      comPreco: 2,
+      semPreco: 2,
+      total: 4,
+      incompleta: true,
+      frase: "2 de 4 linhas com preço",
+    });
+  });
+
+  it("com uma linha só, fala no singular", () => {
+    expect(contagemDePrecos([900]).frase).toBe("1 de 1 linha com preço");
+  });
+
+  it("nenhuma com preço não é uma soma incompleta — é uma proposta por orçamentar", () => {
+    expect(contagemDePrecos([null, null]).incompleta).toBe(false);
+  });
+
+  it("todas com preço não é uma soma incompleta", () => {
+    expect(contagemDePrecos([900, 1500]).incompleta).toBe(false);
+  });
+
+  it("zero é um preço, e não a falta dele", () => {
+    // Uma linha oferecida custa zero. Contá-la como «sem preço» mandava
+    // procurar um campo que está preenchido de propósito.
+    expect(contagemDePrecos([0, 900])).toMatchObject({ comPreco: 2, incompleta: false });
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O IVA QUE UM VALOR ADICIONAL DECLARA, LIDO DE VOLTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O campo passou a numérico e o «+ IVA» passou a ser um selector — mas o que
+ * se GRAVA continua a ser o texto que o PDF imprime. Estes testes prendem as
+ * duas metades: que o texto sai bem composto, e que o selector lê de volta
+ * exactamente o que a soma vai entender.
+ */
+describe("o valor de uma linha adicional", () => {
+  const TAXA = 0.23;
+
+  it("normaliza «1.500», «1500» e «1 500 €» no mesmo número", () => {
+    for (const escrito of ["1.500", "1500", "1 500 €", "1500,00"]) {
+      expect(textoDoAdicional(escrito, "documento")).toBe(eur(1500));
+    }
+  });
+
+  it("não perde o «+ IVA» — escreve-o no texto que vai para o PDF", () => {
+    expect(textoDoAdicional("895", "acrescer")).toBe(`${eur(895)} + IVA`);
+    expect(textoDoAdicional("895", "incluido")).toBe(`${eur(895)} (IVA incluído)`);
+  });
+
+  it("um texto sem número («a definir») fica exactamente como foi escrito", () => {
+    // É uma frase que o casal tem de ver na proposta, não um número.
+    expect(textoDoAdicional("a definir", "acrescer")).toBe("a definir");
+    expect(textoDoAdicional("sob consulta", "documento")).toBe("sob consulta");
+  });
+
+  it("o texto composto volta a ser lido com o mesmo sentido", () => {
+    for (const modo of ["documento", "acrescer", "incluido"] as const) {
+      expect(modoDoAdicional(textoDoAdicional("895", modo), TAXA)).toBe(modo);
+    }
+  });
+
+  it("lê as propostas antigas pelo que elas escreveram", () => {
+    expect(modoDoAdicional("895,00 € + IVA", TAXA)).toBe("acrescer");
+    expect(modoDoAdicional("896,00 €", TAXA)).toBe("documento");
+    expect(modoDoAdicional("1.550,00 € c/ IVA", TAXA)).toBe("incluido");
+    expect(modoDoAdicional("a definir", TAXA)).toBe("documento");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O CAMPO DO TOTAL ESCRITO POR CÓDIGO — CEM VEZES MAIS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O campo do total é texto e relê-se com `parseMoneyText`, que segue o
+ * português: o ponto separa MILHARES. Quem lá escrevia por código usava
+ * `String(n)`, e o JavaScript escreve os decimais com PONTO —
+ * `String(3355.98)` dava «3355.98», relido como 335 598.
+ *
+ * Não era teórico: o botão «Usar X €» numa proposta de 2.460,00 € com uma
+ * deslocação de 75,00 € lida com IVA incluído sugere 3.355,98 €, e o campo
+ * ficava com 335.598,00 € — que é o número que seguia para o preço final do
+ * pedido, para o sinal e para a fatura.
+ */
+describe("textoDoTotal", () => {
+  it("um valor com cêntimos volta a ser lido pelo mesmo número", () => {
+    for (const n of [3355.98, 8425.5, 2520.98, 0.99, 1500.05]) {
+      expect(parseMoneyText(textoDoTotal(n))).toBe(n);
+    }
+  });
+
+  it("um inteiro continua a aparecer como sempre apareceu", () => {
+    expect(textoDoTotal(2460)).toBe("2460");
+    expect(parseMoneyText(textoDoTotal(2460))).toBe(2460);
+  });
+
+  it("é o `String(n)` que estava lá que falha — é essa a razão desta função", () => {
+    expect(parseMoneyText(String(3355.98))).toBe(335598);
   });
 });

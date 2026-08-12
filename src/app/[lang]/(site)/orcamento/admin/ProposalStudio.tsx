@@ -71,14 +71,15 @@ import {
   desalinhamento,
   linhasDe,
   normalizarValor,
+  precosDe,
   removerLinha,
-  somaDosServicos,
-  somaDosExtras,
   somaDosExtrasSemIva,
+  totaisDaProposta,
   asDuasFormas,
 } from "@/lib/proposal-budget";
-import { eur, splitSinal } from "@/lib/money";
-import type { Quote } from "@/lib/orcamento/types";
+import { eur } from "@/lib/money";
+import { randomId } from "./util";
+import type { ActivityEntry, Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
 import ThemePicker, { type ImportedImage, type ReservedImage } from "./ThemePicker";
 import ServicesEditor, { MoveBtns } from "./ServicesEditor";
@@ -517,6 +518,138 @@ export function textoDaGravacao(
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
+ * QUANTAS LINHAS JÁ TÊM PREÇO — E PORQUE É QUE ISSO PRECISA DE SER DITO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre o `placeholder="900"` que estava no campo do preço: «um
+ * número redondo e plausível como placeholder num campo de preço é perigoso —
+ * mais cedo ou mais tarde alguém pensa que já está preenchido». Tinha razão, e
+ * o caso já tinha acontecido: uma proposta de 2.460,00 € com QUATRO serviços
+ * sem preço nenhum mostrava «900» a cinzento em todos eles, e a única coisa
+ * legível no orçamento inteiro era uma deslocação de 75,00 €.
+ *
+ * O placeholder saiu. Mas tirar a mentira não chega — é preciso dizer a
+ * verdade, e a verdade é um número: quantas das linhas têm mesmo preço. Um
+ * contador responde à pergunta de uma vez, sem obrigar a percorrer o formulário
+ * a contar caixas vazias.
+ *
+ * `incompleta` é o caso que faz uma soma mentir sem parecer: UMAS linhas com
+ * preço e outras sem. Nem tudo por orçamentar (aí não há soma nenhuma, e a
+ * biblioteca devolve `null`), nem tudo orçamentado — o meio, que é onde a soma
+ * dá um número plausível que está errado por baixo.
+ */
+export function contagemDePrecos(precos: (number | null)[]): {
+  comPreco: number;
+  total: number;
+  semPreco: number;
+  incompleta: boolean;
+  frase: string;
+} {
+  const total = precos.length;
+  const comPreco = precos.filter((p) => p !== null).length;
+  const semPreco = total - comPreco;
+  return {
+    comPreco,
+    total,
+    semPreco,
+    // Só há soma incompleta quando há mesmo uma soma a fazer: zero linhas com
+    // preço é «ainda não orçamentei», não «orçamentei mal».
+    incompleta: comPreco > 0 && semPreco > 0,
+    frase: `${comPreco} de ${total} ${total === 1 ? "linha" : "linhas"} com preço`,
+  };
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O IVA QUE UM VALOR ADICIONAL DECLARA — PERGUNTADO À BIBLIOTECA, NÃO ADIVINHADO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Os valores adicionais são texto («896,00 €», «895,00 € + IVA») e esse texto é
+ * impresso no PDF tal e qual. Quem decide o que ele quer dizer é
+ * `somaDosExtrasSemIva`, em `proposal-budget.ts`: uma linha que diz «+ IVA» é
+ * líquida, uma que diz «IVA incluído» é bruta, e uma calada segue o modo do
+ * documento.
+ *
+ * Para o ecrã poder mostrar essa escolha num selector é preciso LER de volta o
+ * que a linha declara — e isso podia ser feito com uma cópia da expressão
+ * regular que está lá dentro. Não é: uma segunda cópia diverge no dia em que
+ * alguém acrescentar uma forma de escrever «sem IVA», e o selector passaria a
+ * mostrar uma coisa e a soma a fazer outra, em silêncio.
+ *
+ * Em vez disso pergunta-se à própria função, duas vezes, com contextos
+ * opostos. Uma linha CALADA responde de maneira diferente conforme o contexto
+ * (é essa a definição de calada); uma linha que declara responde o mesmo às
+ * duas. E o valor devolvido diz qual das duas declarações é.
+ */
+export type ModoDeIvaDoAdicional = "documento" | "acrescer" | "incluido";
+
+export function modoDoAdicional(valueText: string, vatRate: number): ModoDeIvaDoAdicional {
+  const cru = normalizarValor(valueText);
+  // Sem número legível («a definir») não há IVA nenhum a declarar.
+  if (cru === null || cru === 0) return "documento";
+  const linha = [{ label: "", valueText }];
+  const comoLiquido = somaDosExtrasSemIva(linha, { mode: "acrescer", vatRate });
+  const comoBruto = somaDosExtrasSemIva(linha, { mode: "incluido", vatRate });
+  if (comoLiquido !== comoBruto) return "documento";
+  // Responde o mesmo aos dois contextos: a linha declara. Se o que responde é
+  // o próprio número escrito, declarou-se líquida («+ IVA»); se responde menos,
+  // declarou-se bruta e a função converteu-a («IVA incluído»).
+  return Math.abs(comoLiquido - cru) < 0.005 ? "acrescer" : "incluido";
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O NÚMERO ESCRITO NO CAMPO DO TOTAL — COM VÍRGULA, SEMPRE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O campo do total é TEXTO (aceita «1.500» e «1 500 €» a meio de serem
+ * escritos) e é relido com `parseMoneyText`, que segue o português: o ponto é
+ * separador de MILHARES, a vírgula é o decimal.
+ *
+ * Quem escrevia neste campo por código usava `String(n)`, e o JavaScript
+ * escreve os decimais com PONTO. `String(3355.98)` dava «3355.98», que
+ * `parseMoneyText` relê como 335 598 — cem vezes mais. Media-se assim:
+ *
+ *     parseMoneyText(String(3355.98))  →  335598
+ *     parseMoneyText("3355,98")        →  3355.98
+ *
+ * Aconteceu de verdade no botão «Usar X €»: com uma proposta de 2.460,00 € e
+ * uma deslocação de 75,00 € lida com IVA incluído, a sugestão é 3.355,98 € e o
+ * campo ficava com 335.598,00 € — e esse número seguia para o preço final do
+ * pedido, para o sinal e para a fatura. O mesmo valia para qualquer total com
+ * cêntimos escrito por um valor adicional, por uma versão reposta ou por uma
+ * proposta copiada.
+ *
+ * Um número inteiro sai como sempre saiu («2460»), para não mudar o que ela vê
+ * no caso normal.
+ */
+export function textoDoTotal(base: number): string {
+  return Number.isInteger(base) ? String(base) : String(base).replace(".", ",");
+}
+
+/**
+ * O texto que fica GRAVADO num valor adicional — o mesmo que o PDF imprime.
+ *
+ * O campo do valor passou a ser numérico (ela escrevia «1.500», «1500» e
+ * «1 500 €» conforme a pressa, e as três tinham de dar o mesmo número), mas o
+ * documento continua a guardar TEXTO: é o que o gerador desenha, e é lá que
+ * mora a informação de «+ IVA» que não se pode perder. Este é o único sítio
+ * onde os dois se juntam.
+ *
+ * Um valor que não se consegue ler («a definir», «sob consulta») fica exactamente
+ * como foi escrito: é uma frase que o casal tem de ver na proposta, não um
+ * número que se possa formatar.
+ */
+export function textoDoAdicional(escrito: string, modo: ModoDeIvaDoAdicional): string {
+  const valor = normalizarValor(escrito);
+  if (valor === null) return escrito;
+  if (modo === "acrescer") return `${eur(valor)} + IVA`;
+  if (modo === "incluido") return `${eur(valor)} (IVA incluído)`;
+  return eur(valor);
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
  * O RASCUNHO NO SERVIDOR — E O QUE SE FAZ QUANDO ELE NÃO LÁ CHEGA
  * ════════════════════════════════════════════════════════════════════════════
  *
@@ -696,6 +829,47 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     motivo: string;
   } | null>(null);
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * UMA ACÇÃO QUE MEXE NO DINHEIRO PERGUNTA COM OS DOIS NÚMEROS À VISTA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela sobre o «Usar X €»: «é um botão perigoso». E era: um clique
+   * substituía o preço final da proposta — o número de que saem a fatura, o
+   * sinal e o saldo — sem dizer o que ia sair dali para fora. O rótulo mostrava
+   * o valor NOVO; o valor que se perdia não estava escrito em lado nenhum.
+   *
+   * A pergunta traz os DOIS: «Substituir 2.460,00 € por 2.535,00 €?». É a única
+   * forma de a resposta ser uma decisão em vez de um reflexo — e é diferente de
+   * um «tem a certeza?», que se responde sem ler porque não acrescenta
+   * informação nenhuma.
+   *
+   * Depois de aplicada, a anulação de dez segundos (a mesma do «Limpar») fica
+   * disponível: a confirmação protege de carregar por engano, a anulação
+   * protege de confirmar por engano.
+   */
+  const [confirmacaoDeDinheiro, setConfirmacaoDeDinheiro] = useState<{
+    /** O que aparece na pergunta, já composto. */
+    pergunta: string;
+    /** O que fica no histórico do pedido quando for aplicada. */
+    registo: string;
+    /** O que a anulação dirá que foi desfeito. */
+    motivo: string;
+    /**
+     * O documento no instante em que a pergunta foi feita.
+     *
+     * A pergunta guarda o gesto que a vai aplicar, e esse gesto foi composto
+     * com os números desse instante. Se entretanto se escrever no formulário,
+     * «substituir 2.460,00 € por 2.535,00 €» passa a falar de um documento que
+     * já não existe — e aplicá-la escrevia por cima do que se acabou de
+     * escrever. Por isso a pergunta só se DESENHA enquanto o documento for este
+     * (ver a marcação); caducada, desaparece, e volta a perguntar-se se for
+     * preciso. Comparado por identidade porque o documento é imutável: cada
+     * alteração devolve um objecto novo.
+     */
+    docNoMomento: StudioDoc;
+    aplicar: () => void;
+  } | null>(null);
+  /**
    * Histórico para o Cmd+Z. Guardado num `ref` e não em estado: crescer o
    * histórico não pode redesenhar a página, ou escrever numa caixa de texto
    * passava a redesenhar o formulário inteiro a cada tecla.
@@ -824,7 +998,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           });
           // A BASE, não o `totalAmount` cru — ver `baseDoDoc`.
           const base = baseDoDoc(parsed);
-          if (base != null) setTotalInput(String(base));
+          if (base != null) setTotalInput(textoDoTotal(base));
         }
       }
       const rawMeta = localStorage.getItem(SIDE_KEY);
@@ -859,7 +1033,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const doPedido = quote.quotedPrice;
     if (typeof doPedido === "number" && doPedido > 0) {
       precoEnviado.current = doPedido;
-      setTotalInput(String(doPedido));
+      setTotalInput(textoDoTotal(doPedido));
       setDoc((d) => aplicarBase(d, doPedido));
     } else if (hadDraft) {
       // O pedido ainda não tem preço mas o rascunho tem um valor escrito antes
@@ -1056,7 +1230,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         return mandaOPedido ? aplicarBase(limpo, doPedido) : limpo;
       });
       const base = mandaOPedido ? doPedido : baseDoDoc(doDoServidor);
-      if (base != null) setTotalInput(String(base));
+      if (base != null) setTotalInput(textoDoTotal(base));
     })();
     return () => {
       active = false;
@@ -1481,12 +1655,42 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // Sem isso, a proposta dizia 40% e a factura saía a 30% — que é pior do que
   // não a poder mudar de todo.
   const pctSinal = depositPercentOf(doc as ProposalDoc);
-  const split = splitSinal(money.gross, pctSinal);
-  // A soma das linhas e o desvio do total escrito à mão. Os dois vivem aqui em
-  // cima porque são lidos em três sítios: ao lado das linhas, no aviso junto ao
-  // total, e na barra fixa do fundo.
-  const soma = somaDosServicos(doc);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS NÚMEROS DO ECRÃ SÃO OS NÚMEROS DO PAPEL — A MESMA FUNÇÃO, UMA VEZ SÓ
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «um bloco de totais inequívoco». O ecrã mostrava TRÊS somas
+   * ao mesmo tempo — «Soma das linhas: 2.400,00 €», «Somado ao total: 970,00 €»
+   * e, na barra do fundo, «Total 2.460,00 € · o cliente paga 3.025,80 € · soma
+   * das linhas 2.400,00 €» — e nenhuma delas era o quadro que o casal recebe.
+   * Três números a competir pela mesma pergunta ensinam a não confiar em
+   * nenhum.
+   *
+   * Agora há um bloco só, pela ordem do PDF, e sai de `totaisDaProposta` — a
+   * MESMA chamada que `proposal-doc-pdf.ts` faz para desenhar o quadro
+   * (`totaisDaProposta(doc, depositPercentOf(doc))`). Enquanto o ecrã fizesse
+   * as suas contas e o gerador as dele, o dia em que divergissem chegava — foi
+   * exactamente assim que a proposta da Tara e do Marty saiu com o sinal e o
+   * saldo a somarem 3.025,80 € e o «Valor Total» a dizer 2.950,79 €.
+   */
+  const totais = totaisDaProposta(doc, pctSinal);
+  // O sinal e o saldo saem daí também, e não de uma segunda chamada a
+  // `splitSinal`: eram a mesma divisão feita em dois sítios, e duas
+  // implementações da mesma divisão podem arredondar para lados diferentes.
+  const split = { sinal: totais.sinal, saldo: totais.saldo };
+  // O desvio do total escrito à mão. Vive aqui em cima porque é lido em dois
+  // sítios: na dica do campo e no aviso com o botão que o arruma.
   const desvio = desalinhamento(doc, money.base);
+  /**
+   * Quantas linhas do orçamento já têm preço.
+   *
+   * Sai de `precosDe` e não de contar campos no ecrã: os preços são um array
+   * paralelo às linhas, e é a biblioteca que garante que os dois têm o mesmo
+   * comprimento.
+   */
+  const precos = precosDe(doc);
+  const contagem = contagemDePrecos(precos);
   /** Quantas pessoas, lido do campo do documento ("125 pax" → 125). */
   const convidados = convidadosDoDoc(doc as ProposalDoc);
   const escalasDoDoc = escalasDe(doc as ProposalDoc);
@@ -1542,7 +1746,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const doPedido = quote.quotedPrice;
     if (doPedido === precoEnviado.current) return;
     precoEnviado.current = doPedido;
-    setTotalInput(typeof doPedido === "number" && doPedido > 0 ? String(doPedido) : "");
+    setTotalInput(typeof doPedido === "number" && doPedido > 0 ? textoDoTotal(doPedido) : "");
     setDoc((d) => {
       const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
       const amount =
@@ -1589,7 +1793,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // por isso tem de acompanhar — senão desfazer devolvia o documento antigo
     // e deixava o valor novo na caixa.
     const base = baseDoDoc(anterior);
-    setTotalInput(base === undefined ? "" : String(base));
+    setTotalInput(base === undefined ? "" : textoDoTotal(base));
     return true;
   }
 
@@ -1653,6 +1857,43 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     aquecerFotosEmSegundoPlano();
   }, []);
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A FOLGA POR BAIXO DO FORMULÁRIO É A ALTURA MEDIDA DA BARRA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Ver o comentário ao lado do `paddingBottom`, na marcação. O que aqui se
+   * mede são duas coisas somadas: a altura da barra e a distância a que ela
+   * está do fundo do ecrã (o `bottom-[calc(56px+…)]` que a levanta por cima da
+   * navegação do telemóvel). Sem a segunda, a folga era curta exactamente nos
+   * ecrãs onde a barra está mais alta.
+   *
+   * Começa em 80 px — o número que aqui estava escrito à mão — para o primeiro
+   * desenho não ficar sem folga nenhuma antes de a medição correr.
+   */
+  const barraDeBaixo = useRef<HTMLDivElement | null>(null);
+  const [folgaDaBarra, setFolgaDaBarra] = useState(80);
+  useEffect(() => {
+    const el = barraDeBaixo.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const medir = () => {
+      const r = el.getBoundingClientRect();
+      // `innerHeight - r.bottom` é o que sobra por baixo da barra quando ela
+      // está encostada — os 56 px da navegação, mais a área segura do iPhone.
+      const porBaixo = Math.max(0, window.innerHeight - r.bottom);
+      setFolgaDaBarra(Math.ceil(r.height + porBaixo + 12));
+    };
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(el);
+    window.addEventListener("resize", medir);
+    return () => {
+      observador.disconnect();
+      window.removeEventListener("resize", medir);
+    };
+    // O passo muda o conteúdo da barra (e portanto a altura); remedir aí.
+  }, [step]);
+
   // ── Aviso ao sair com trabalho por gravar ─────────────────────────────
   // A janela é estreita (a gravação é a 800ms), mas existe: fechar o
   // separador logo a seguir a escrever perdia essas últimas palavras.
@@ -1703,6 +1944,81 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }
 
   /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O QUE MEXE EM DINHEIRO FICA ESCRITO NO HISTÓRICO DO PEDIDO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O mesmo sítio onde já ficam o estado, os pagamentos e as propostas
+   * enviadas — o `activityLog` que o `ActivityLog.tsx` desenha. Nada de um
+   * registo novo só para o estúdio: dois históricos sobre o mesmo negócio são
+   * dois sítios onde procurar, e o segundo é sempre o que ninguém abre.
+   *
+   * `activityLogAppend` e não `activityLog`: o servidor junta a entrada ao
+   * registo FRESCO (ver a rota `PATCH /api/orcamento/[id]`). Mandar o array
+   * inteiro fazia duas ferramentas a gravar ao mesmo tempo apagarem as
+   * entradas uma da outra.
+   *
+   * `price_set` porque é disso que se trata em todas elas: o número que muda é
+   * o preço final do pedido. Falhar não interrompe nada — perde-se uma linha
+   * de histórico, não o trabalho. A resposta NÃO é propagada com
+   * `onQuoteUpdated`: pode cruzar-se com a gravação do preço (que tem o seu
+   * próprio travão de 600 ms) e devolver um valor já velho.
+   */
+  function registarNoHistorico(summary: string) {
+    const entrada: ActivityEntry = {
+      id: randomId(),
+      at: new Date().toISOString(),
+      kind: "price_set",
+      summary,
+    };
+    void fetch(`/api/orcamento/${quote.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activityLogAppend: [entrada] }),
+    }).catch(() => {
+      /* sem rede: a alteração vale na mesma, fica é sem linha no histórico */
+    });
+  }
+
+  /**
+   * Pede a confirmação de uma alteração drástica ao dinheiro, com os dois
+   * valores à vista — e, aplicada, deixa dez segundos para a anular.
+   *
+   * Um só caminho para todas elas (ver `confirmacaoDeDinheiro`): enquanto cada
+   * botão tivesse a sua maneira de perguntar, cada um respondia por si e
+   * nenhum ficava no histórico.
+   */
+  function pedirConfirmacaoDeDinheiro(p: {
+    de: number;
+    para: number;
+    /** O que se está a substituir, em palavras («o total», «a deslocação»). */
+    oQue: string;
+    registo: string;
+    motivo: string;
+    aplicar: () => void;
+  }) {
+    setConfirmacaoDeDinheiro({
+      pergunta: `Substituir ${p.oQue} de ${eur(p.de)} por ${eur(p.para)}?`,
+      registo: p.registo,
+      motivo: p.motivo,
+      docNoMomento: doc,
+      aplicar: p.aplicar,
+    });
+  }
+
+  /** Aplica o que estava por confirmar: escreve, regista e abre a anulação. */
+  function confirmarDinheiro() {
+    const c = confirmacaoDeDinheiro;
+    // A pergunta caducada não se aplica — nem sequer está desenhada.
+    if (!c || c.docNoMomento !== doc) return;
+    // A fotografia é tirada ANTES de aplicar — é ela que a anulação repõe.
+    setLimpo({ doc, total: totalInput, segundos: 10, motivo: c.motivo });
+    c.aplicar();
+    registarNoHistorico(c.registo);
+    setConfirmacaoDeDinheiro(null);
+  }
+
+  /**
    * Repõe no estúdio uma versão que já tinha sido enviada.
    *
    * Passa pela MESMA anulação de dez segundos do "Limpar", e pela mesma razão:
@@ -1712,6 +2028,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *
    * Não envia nada. Fica um rascunho igual ao que seguiu naquele dia, para se
    * mexer e voltar a passar pelo Enviar.
+   *
+   * ── PORQUE É QUE ESTA NÃO GANHOU CAIXA DE CONFIRMAÇÃO ──────────────────
+   * É uma das acções que mudam o preço final, e portanto entra na lista das
+   * que têm de ser reversíveis e ficar no histórico — e ficam as duas coisas.
+   * O que não ganha é a PERGUNTA: a razão está escrita três linhas acima e não
+   * mudou. Perguntar antes de repor uma versão que ela acabou de escolher numa
+   * lista, pelo nome e pela data, era pedir para confirmar a leitura.
    */
   function restaurarVersao(antiga: ProposalDoc) {
     setLimpo({
@@ -1726,7 +2049,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // graça do documento: deriva-se a base do que foi reposto, senão ficava com
     // o número da versão que se acabou de substituir.
     const base = baseDoDoc(reposto);
-    setTotalInput(typeof base === "number" && base > 0 ? String(base) : "");
+    setTotalInput(typeof base === "number" && base > 0 ? textoDoTotal(base) : "");
     // E GRAVA-SE no pedido. Escrever no campo do valor já gravava — é a
     // promessa que está escrita ao lado dele, «Há um número só» — e repor uma
     // versão trocava o documento inteiro, valor incluído, sem gravar nada. O
@@ -1741,6 +2064,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setConfirmSend(false);
     setSent(false);
     setStep("conteudo");
+    // Só se o preço tiver MESMO mudado: repor uma versão com o mesmo valor não
+    // é um acontecimento do dinheiro, e uma linha por cada não-mudança ensina a
+    // saltar o histórico todo.
+    const anterior = parseMoneyText(totalInput);
+    const novo = typeof base === "number" && base > 0 ? base : 0;
+    if (Math.abs(novo - anterior) > 0.01) {
+      registarNoHistorico(
+        `Versão anterior reposta no estúdio: preço final de ${eur(anterior)} para ${eur(novo)}.`,
+      );
+    }
     toast("Versão reposta. Podes anular durante 10 segundos.", "info");
   }
 
@@ -1765,7 +2098,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setDoc(seedDefaults(initialDoc(quote), quote));
     setTotalInput(
       typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
-        ? String(quote.quotedPrice)
+        ? textoDoTotal(quote.quotedPrice)
         : "",
     );
     setAssetUrls({});
@@ -1775,6 +2108,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setConfirmSend(false);
     setSent(false);
     setStep("conteudo");
+    // Limpar deita o total fora com o resto — e o total é o preço do pedido.
+    // Fica no histórico pela mesma razão que o «Usar X €»: um preço que muda
+    // sozinho, visto três semanas depois, tem de ter um sítio onde se explique.
+    const anterior = parseMoneyText(totalInput);
+    const doPedido = typeof quote.quotedPrice === "number" ? quote.quotedPrice : 0;
+    if (Math.abs(doPedido - anterior) > 0.01) {
+      registarNoHistorico(
+        `Rascunho da proposta limpo: preço final de ${eur(anterior)} para ${eur(doPedido)}.`,
+      );
+    }
     toast("Rascunho limpo", "info");
   }
 
@@ -2353,7 +2696,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     if (delta === 0) return;
     // Um total não pode ficar negativo por causa de um extra apagado.
     const base = Math.max(0, Math.round((parseMoneyText(totalInput) + delta) * 100) / 100);
-    setTotalInput(base > 0 ? String(base) : "");
+    setTotalInput(base > 0 ? textoDoTotal(base) : "");
     writeTotal(base > 0 ? amountParaBase(base, vatMode) : undefined, vatMode);
     persistirPreco(base > 0 ? base : undefined);
   }
@@ -2366,8 +2709,55 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   function updateBudgetExtra(i: number, p: Partial<{ label: string; valueText: string }>) {
     definirExtras((doc.budgetExtras ?? []).map((r, j) => (j === i ? { ...r, ...p } : r)));
   }
+  /**
+   * O valor escrito no campo numérico, já normalizado e com o IVA da linha.
+   *
+   * «1.500», «1500» e «1 500 €» dão os três 1500 — é o que a missão pede e é o
+   * que `normalizarValor` já sabia fazer para os preços das linhas. O que se
+   * GRAVA continua a ser texto, porque é ele que o PDF imprime; ver
+   * `textoDoAdicional`.
+   */
+  function definirValorDoAdicional(i: number, escrito: string) {
+    const linha = (doc.budgetExtras ?? [])[i];
+    if (!linha) return;
+    const modo = modoDoAdicional(linha.valueText ?? "", doc.vatRate ?? DEFAULT_VAT_RATE);
+    updateBudgetExtra(i, { valueText: textoDoAdicional(escrito, modo) });
+  }
+  /** Troca o IVA que a linha declara, mantendo o número que lá está. */
+  function definirIvaDoAdicional(i: number, modo: ModoDeIvaDoAdicional) {
+    const linha = (doc.budgetExtras ?? [])[i];
+    if (!linha) return;
+    updateBudgetExtra(i, { valueText: textoDoAdicional(linha.valueText ?? "", modo) });
+  }
+  /**
+   * Apagar um valor adicional TIRA-O do total — e portanto do sinal e da
+   * fatura. Uma deslocação de 1.550 € desaparecia do preço final com um clique
+   * num «×» de doze pixéis, sem pergunta e sem volta atrás; é exactamente o
+   * mesmo estrago do «Usar X €» e leva o mesmo tratamento.
+   *
+   * Uma linha sem valor legível (a que se acabou de acrescentar, ou uma que
+   * diga «a definir») sai sem perguntar: não mexe em dinheiro nenhum, e
+   * perguntar aí seria ensinar a responder que sim sem ler.
+   */
   function removeBudgetExtra(i: number) {
-    definirExtras((doc.budgetExtras ?? []).filter((_, j) => j !== i));
+    const linha = (doc.budgetExtras ?? [])[i];
+    const contexto = { mode: vatMode, vatRate: doc.vatRate };
+    const vale = linha ? somaDosExtrasSemIva([linha], contexto) : 0;
+    const apagar = () => definirExtras((doc.budgetExtras ?? []).filter((_, j) => j !== i));
+    if (!linha || vale === 0) {
+      apagar();
+      return;
+    }
+    const base = parseMoneyText(totalInput);
+    const nome = linha.label?.trim() || "esta linha";
+    pedirConfirmacaoDeDinheiro({
+      oQue: "o total",
+      de: base,
+      para: Math.max(0, Math.round((base - vale) * 100) / 100),
+      registo: `«${nome}» removida dos valores adicionais no estúdio: preço final de ${eur(base)} para ${eur(Math.max(0, base - vale))}.`,
+      motivo: `«${nome}» removida dos valores adicionais.`,
+      aplicar: apagar,
+    });
   }
 
   // ── Budget: organizacao (per-item rows) ──
@@ -2572,8 +2962,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }, []);
 
   /** O documento copiado passa a ser este, com os campos a confirmar marcados. */
+  /**
+   * Copiar uma proposta antiga para cima desta.
+   *
+   * Também mexe no preço final, e por isso também tem de ser reversível e
+   * ficar no histórico. A PERGUNTA já existe e é melhor do que uma caixa: o
+   * `CriarAPartirDe` mostra de quem é a proposta a copiar antes de a aplicar, e
+   * os cinco campos que mudam de casamento para casamento ficam marcados a
+   * laranja até ela lhes tocar (ver `porConfirmar`). Duas perguntas sobre o
+   * mesmo gesto seriam uma a mais.
+   */
   function aplicarCopia(e: Escolha) {
+    const anterior = parseMoneyText(totalInput);
     const copiado = e.doc as StudioDoc;
+    setLimpo({
+      doc,
+      total: totalInput,
+      segundos: 10,
+      motivo: `Proposta copiada de ${e.nomeDaOrigem}.`,
+    });
     setDoc(copiado);
     // O campo do valor é estado à parte (aceita texto a meio de ser escrito),
     // por isso não acompanha o documento de graça: ficava a mostrar o número
@@ -2582,7 +2989,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // número e a Gestão do pedido, o Kanban e o dossier diziam outro.
     const base = baseDoDoc(copiado);
     const temValor = typeof base === "number" && base > 0;
-    setTotalInput(temValor ? String(base) : "");
+    setTotalInput(temValor ? textoDoTotal(base!) : "");
     persistirPreco(temValor ? base : undefined);
     setPorConfirmar(new Set(e.camposAMudar));
     // O título interno volta a gerar-se sozinho: a cópia esvaziou-o de
@@ -2592,6 +2999,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       e.fotosPartilhadas > 0
         ? ` ${e.fotosPartilhadas} foto(s) ficaram na pasta da proposta antiga.`
         : "";
+    if (Math.abs((temValor ? base! : 0) - anterior) > 0.01) {
+      registarNoHistorico(
+        `Proposta copiada de ${e.nomeDaOrigem} no estúdio: preço final de ${eur(anterior)} para ${eur(temValor ? base! : 0)}.`,
+      );
+    }
     toast(
       `Copiado de ${e.nomeDaOrigem}. Confirma o que está marcado.${partilha}`,
       e.fotosPartilhadas > 0 ? "error" : "success",
@@ -2750,6 +3162,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         </div>
       )}
 
+      {/* ── A PERGUNTA COM OS DOIS NÚMEROS À VISTA ─────────────────────────
+          Fica no topo do estúdio e não ao lado do botão que a levantou: as
+          acções que mexem no dinheiro estão espalhadas por três secções (o
+          «Usar X €», a deslocação do painel interno, o «×» de um valor
+          adicional) e uma pergunta que aparece cada vez noutro sítio é uma
+          pergunta que se responde sem procurar o que ela diz. Aqui é sempre
+          o mesmo sítio, e é o primeiro que se vê.
+
+          `assertive` porque interrompe mesmo: é uma pergunta, e ficar à espera
+          de resposta sem ser anunciada seria deixar quem usa leitor de ecrã a
+          carregar num botão que não fez nada. */}
+      {confirmacaoDeDinheiro && confirmacaoDeDinheiro.docNoMomento === doc && (
+        <div
+          role="alertdialog"
+          aria-live="assertive"
+          aria-label="Confirmar alteração ao valor"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+        >
+          <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-foreground/80">
+            {confirmacaoDeDinheiro.pergunta}
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setConfirmacaoDeDinheiro(null)}>
+            Cancelar
+          </Button>
+          <Button size="sm" onClick={confirmarDinheiro}>
+            Substituir
+          </Button>
+        </div>
+      )}
+
       {nomeModelo !== null && (
         <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-foreground/10 bg-foreground/[0.02] p-3">
           <label className="flex-1 min-w-[14rem]">
@@ -2793,12 +3235,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       <StepNav step={step} onSelect={setStep} sent={sent} />
 
       {/* ══════════ PASSO 1 · Conteúdo ══════════ */}
-      {/* `pb-20`: a barra do fundo é `sticky`, e sem folga por baixo do
-          conteúdo ela desenha-se POR CIMA do último campo. Estava a tapar o
-          "Título interno" antes desta missão (ficou anotado na Fase 0) e, com
-          o total lá dentro, passou a tapar o "Valor (sem IVA)" — logo o campo
-          que a barra existe para acompanhar. */}
-      <div hidden={step !== "conteudo"} className="flex gap-6 pb-20">
+      {/* ── A FOLGA POR BAIXO É A ALTURA MEDIDA DA BARRA, NÃO UM NÚMERO ─────
+          Era `pb-20` — 80 px escritos à mão. A barra do fundo é `sticky` e
+          desenha-se POR CIMA do conteúdo; sem folga suficiente, o que fica por
+          baixo dela não se lê nem se toca. E ela NÃO tem 80 px: cresce com o
+          que lhe está dentro (o total embrulha, o botão de tentar outra vez
+          aparece) e cresce outra vez no telemóvel, onde a barra de navegação do
+          back office lhe soma mais 56 px por baixo. Medido na captura desta
+          missão: 66 px de barra num ecrã largo, mais os 56 da navegação — 122,
+          contra os 80 reservados. A linha do Sinal ficava debaixo dela.
+
+          Agora a folga sai de `getBoundingClientRect` da própria barra, mais o
+          que a separa do fundo do ecrã, e volta a ser medida sempre que a barra
+          muda de tamanho (`ResizeObserver`). Um número que se mede não pode
+          ficar desactualizado por alguém acrescentar um botão. */}
+      <div
+        hidden={step !== "conteudo"}
+        className="flex gap-6"
+        style={{ paddingBottom: folgaDaBarra }}
+      >
         <NavEstudio seccoes={seccoes} faltas={faltas} />
         <div className="min-w-0 flex-1">
           {/* Template selector */}
@@ -3354,8 +3809,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     a mostrar as linhas sem preço e um «{doc.totalLabel || "Valor Total"}» único,
                     como nas tuas propostas.
                   </p>
+                  {/* ── OS CABEÇALHOS DAS COLUNAS ────────────────────────────
+                      A caixa do fim não tinha nome nenhum: uma quadrícula com a
+                      palavra «extra» ao lado, sem cabeçalho e sem uma frase que
+                      dissesse o que faz. Palavras dela: «a caixa "extra" não
+                      está explicada».
+
+                      As larguras são as MESMAS das dos campos por baixo
+                      (`w-32`, `w-28`, `w-16`) — é isso, e só isso, que faz um
+                      cabeçalho apontar para a coluna certa. O campo do preço
+                      unitário passou para a segunda linha de cada item, ao pé
+                      da fórmula a que pertence: enquanto esteve no meio da
+                      linha, aparecia só nas linhas que escalam e empurrava as
+                      colunas dessas para fora do cabeçalho. */}
+                  <div className="hidden items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-foreground/25 sm:flex">
+                    <span className="flex-1">Item</span>
+                    <span className="w-32 shrink-0">Como escala</span>
+                    <span className="w-28 shrink-0 text-right">Preço (sem IVA)</span>
+                    <span className="w-16 shrink-0 text-center">Extra</span>
+                    <span className="w-5 shrink-0" />
+                  </div>
                   {linhasDe(doc).map((l, i) => {
                     const escala = escalasDoDoc[i];
+                    const semPreco = l.preco === null;
                     return (
                       <div key={i} className="flex flex-wrap items-center gap-2">
                         <input
@@ -3380,47 +3856,55 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           <option value="por-convidado">Por convidado</option>
                           <option value="por-mesa">Por mesa</option>
                         </select>
-                        {escala && (
-                          <span className="w-24 shrink-0">
-                            <input
-                              className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
-                              defaultValue={String(escala.unitario)}
-                              onBlur={(e) => definirUnitario(i, e.target.value)}
-                              placeholder="45"
-                              inputMode="decimal"
-                              aria-label={`Preço por ${escala.tipo === "por-mesa" ? "mesa" : "convidado"} de ${l.item || "linha sem nome"}`}
-                            />
-                          </span>
-                        )}
                         {/* A largura vai no invólucro e não no campo: `.bo-input`
                         tem `width: 100%` escrito em CSS, que ganha a um
                         `w-28` do Tailwind. Sem isto o preço comia a linha
                         toda e o nome ficava numa caixa de trinta pixels — foi
                         o que a captura de ecrã mostrou. */}
                         <span className="w-28 shrink-0">
+                          {/* ── PREENCHIDO E POR PREENCHER, INCONFUNDÍVEIS ──
+                              Tinha aqui `placeholder="900"`. Palavras dela: «um
+                              número redondo e plausível como placeholder num
+                              campo de preço é perigoso — mais cedo ou mais
+                              tarde alguém pensa que já está preenchido». E
+                              tinha acontecido: quatro serviços por orçamentar
+                              mostravam «900» a cinzento cada um.
+
+                              O placeholder saiu, e as duas caixas passaram a
+                              ser diferentes ao olhar, não só ao ler: a que tem
+                              preço é sólida e escura, a que não tem é
+                              tracejada, lavada, e diz «sem preço» — três
+                              palavras que ninguém confunde com euros. */}
                           <input
-                            className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
+                            className={`bo-input px-2.5 py-2 text-right text-xs ${
+                              semPreco
+                                ? "border-dashed bg-foreground/[0.02] text-foreground/40 placeholder:text-foreground/30 placeholder:italic"
+                                : "font-medium text-foreground/90"
+                            }`}
                             defaultValue={l.preco === null ? "" : String(l.preco)}
                             // `onBlur` e não `onChange`: normalizar a cada tecla
                             // apagava o que ela estava a escrever a meio ("1." vira
                             // 1, e o "500" seguinte já não tinha onde entrar).
                             onBlur={(e) => updateBudgetPrice(i, e.target.value)}
-                            placeholder="900"
+                            placeholder="sem preço"
                             inputMode="decimal"
                             aria-label={`Preço de ${l.item || "linha sem nome"}`}
                           />
                         </span>
                         {/* EXTRA OU NÃO. Uma caixa e não um menu: a pergunta é
                           de sim ou não, e um menu de duas entradas custa duas
-                          carregadas para responder a uma pergunta de uma. */}
-                        <label className="alvo-toque flex shrink-0 items-center gap-1.5 text-[11px] text-foreground/50">
+                          carregadas para responder a uma pergunta de uma.
+                          A palavra «extra» some a partir de `sm`, onde o
+                          cabeçalho da coluna já a diz — e fica no telemóvel,
+                          onde não há cabeçalho nenhum. */}
+                        <label className="alvo-toque flex w-16 shrink-0 items-center justify-center gap-1.5 text-[11px] text-foreground/50">
                           <input
                             type="checkbox"
                             checked={extrasDoDoc[i] ?? false}
                             onChange={(e) => updateBudgetExtraFlag(i, e.target.checked)}
                             aria-label={`${l.item || "Linha sem nome"} é um extra opcional`}
                           />
-                          extra
+                          <span className="sm:hidden">extra</span>
                         </label>
                         <button
                           type="button"
@@ -3432,21 +3916,34 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         </button>
                         {/* A fórmula ao lado do número: um total que muda sozinho
                           e não explica porquê é um total em que se deixa de
-                          confiar à primeira surpresa. */}
+                          confiar à primeira surpresa. E o preço UNITÁRIO ao pé
+                          dela, que é a única coisa da fórmula que se edita. */}
                         {escala && (
-                          <span className="w-full pl-1 text-[10px] text-foreground/40">
-                            {`${formulaDaLinha(
-                              escala,
-                              convidados,
-                              doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
-                            )} = ${eur(
-                              totalDaLinha(
+                          <div className="flex w-full flex-wrap items-center gap-2 pl-1">
+                            <span className="w-24 shrink-0">
+                              <input
+                                className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
+                                defaultValue={String(escala.unitario)}
+                                onBlur={(e) => definirUnitario(i, e.target.value)}
+                                placeholder="45"
+                                inputMode="decimal"
+                                aria-label={`Preço por ${escala.tipo === "por-mesa" ? "mesa" : "convidado"} de ${l.item || "linha sem nome"}`}
+                              />
+                            </span>
+                            <span className="text-[10px] text-foreground/40">
+                              {`${formulaDaLinha(
                                 escala,
                                 convidados,
                                 doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
-                              ) ?? 0,
-                            )}`}
-                          </span>
+                              )} = ${eur(
+                                totalDaLinha(
+                                  escala,
+                                  convidados,
+                                  doc.convidadosPorMesa ?? CONVIDADOS_POR_MESA_OMISSAO,
+                                ) ?? 0,
+                              )}`}
+                            </span>
+                          </div>
                         )}
                       </div>
                     );
@@ -3455,13 +3952,45 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     <button type="button" className={ADD_BTN} onClick={addBudgetItem}>
                       + Adicionar item
                     </button>
-                    {soma !== null && (
-                      <span className="text-xs text-foreground/55">
-                        Soma das linhas: <strong className="font-semibold">{eur(soma)}</strong>
-                      </span>
+                    {/* O CONTADOR, no lugar onde estava «Soma das linhas».
+                        A soma mudou-se para o bloco de totais (que a mostra
+                        pela ordem do PDF); aqui fica a única coisa que este
+                        sítio pode responder melhor do que ele — quantas destas
+                        caixas estão mesmo preenchidas. */}
+                    {contagem.total > 0 && (
+                      <span className="text-xs text-foreground/55">{contagem.frase}</span>
                     )}
                   </div>
+                  {/* ── UMAS COM PREÇO, OUTRAS SEM: A SOMA ESTÁ INCOMPLETA ──
+                      É o caso que mente sem parecer. Nenhuma linha com preço é
+                      «ainda não orçamentei» e não soma nada; TODAS com preço é
+                      uma soma verdadeira. O meio dá um número plausível que
+                      está errado por baixo — e é a partir dele que o aviso de
+                      desalinhamento e o botão que arruma o total falam. */}
+                  {contagem.incompleta && (
+                    <p className="flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70">
+                      <span aria-hidden="true">⚠</span>
+                      <span>
+                        {contagem.semPreco === 1
+                          ? "1 linha ainda não tem preço"
+                          : `${contagem.semPreco} linhas ainda não têm preço`}
+                        , por isso a soma dos serviços está incompleta — o que aparece nos totais
+                        conta só as {contagem.comPreco} que têm.
+                      </span>
+                    </p>
+                  )}
 
+                  {/* ── O QUE A CAIXA «EXTRA» FAZ, ANTES DE SE LHE TOCAR ────
+                      Estava sem cabeçalho e sem explicação: uma quadrícula que
+                      mudava o PDF e o discurso da proposta, sem uma palavra a
+                      dizê-lo. A frase fica SEMPRE (é a explicação); o impacto
+                      só aparece quando há mesmo linhas marcadas. */}
+                  <p className="text-[11px] leading-relaxed text-foreground/45">
+                    <strong className="font-semibold text-foreground/60">Extra</strong> marca uma
+                    linha como opcional: ela sai assinalada no quadro do PDF e, por baixo do total,
+                    a proposta passa a mostrar também o valor <em>sem</em> essa linha. Uma proposta
+                    só, com as duas versões lá dentro — em vez de dois documentos a divergir.
+                  </p>
                   {/* ── AS DUAS VERSÕES, SEM SEREM DUAS PROPOSTAS ──────────
                       Assim que uma linha é marcada como extra, esta proposta
                       passa a responder ao "e sem isso, quanto fica?" — e o PDF
@@ -3478,13 +4007,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     if (!v) return null;
                     return (
                       <div className="mt-1 rounded-xl border border-foreground/10 bg-foreground/[0.02] px-3 py-2.5">
+                        {/* O IMPACTO, na frase que ela pediu: quantos estão
+                            marcados, e quanto vale a proposta com eles. */}
                         <p className="text-xs leading-relaxed text-foreground/70">
-                          {`Versão base ${eur(v.comoOTotal.base)} · com extras ${eur(v.comoOTotal.comExtras)}`}
-                        </p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-foreground/45">
-                          {v.linhasExtra === 1
-                            ? "A linha marcada como extra sai assinalada no PDF, com o valor sem ela por baixo do total."
-                            : `As ${v.linhasExtra} linhas marcadas como extra saem assinaladas no PDF, com o valor sem elas por baixo do total.`}
+                          {`${v.linhasExtra} ${v.linhasExtra === 1 ? "item marcado" : "itens marcados"} como extra · versão com extras: `}
+                          <strong className="font-semibold text-foreground/85">
+                            {eur(v.comoOTotal.comExtras)}
+                          </strong>
+                          {" · versão base: "}
+                          <strong className="font-semibold text-foreground/85">
+                            {eur(v.comoOTotal.base)}
+                          </strong>
                         </p>
                         {v.extrasSemPreco > 0 && (
                           <p className="mt-0.5 text-[11px] leading-relaxed text-[#8a6420]">
@@ -3514,57 +4047,100 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
                     Linhas mostradas na proposta antes do total (ex.: deslocação, coordenação,
                     tecidos). <strong className="font-semibold">Somam ao total</strong> — e portanto
-                    ao sinal e à factura.
+                    ao sinal e à fatura.
                   </p>
                   <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                    <div className="grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
                       <span>Descrição</span>
-                      <span className="text-right">Valor (texto)</span>
+                      <span className="text-right">Valor (€)</span>
+                      <span>IVA da linha</span>
                       <span className="w-5" />
                     </div>
-                    {(doc.budgetExtras ?? []).map((ex, i) => (
-                      <div
-                        key={i}
-                        className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
-                      >
-                        <input
-                          className="bo-input px-2.5 py-2 text-xs text-foreground/75"
-                          value={ex.label}
-                          onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
-                          placeholder="Deslocação da equipa Líquen"
-                          aria-label="Descrição da linha adicional"
-                        />
-                        <input
-                          className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
-                          value={ex.valueText}
-                          onChange={(e) => updateBudgetExtra(i, { valueText: e.target.value })}
-                          placeholder="896,00 €"
-                          aria-label="Valor da linha adicional"
-                        />
-                        <button
-                          type="button"
-                          className={REMOVE_BTN}
-                          onClick={() => removeBudgetExtra(i)}
-                          aria-label="Remover linha adicional"
+                    {(doc.budgetExtras ?? []).map((ex, i) => {
+                      const modo = modoDoAdicional(
+                        ex.valueText ?? "",
+                        doc.vatRate ?? DEFAULT_VAT_RATE,
+                      );
+                      const numero = normalizarValor(ex.valueText);
+                      return (
+                        <div
+                          key={i}
+                          className="grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
                         >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    {/* A conta à vista. Sem isto ela tinha de a fazer de
-                        cabeça para saber se o total já a incluía — que é
-                        exactamente o que a fez descobrir que não incluía. */}
-                    {somaDosExtras(doc.budgetExtras) > 0 && (
-                      <p className="text-xs text-foreground/55">
-                        Somado ao total:{" "}
-                        <strong className="font-semibold text-foreground/75">
-                          {eur(somaDosExtras(doc.budgetExtras))}
-                        </strong>
-                      </p>
-                    )}
+                          <input
+                            className="bo-input px-2.5 py-2 text-xs text-foreground/75"
+                            value={ex.label}
+                            onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
+                            placeholder="Deslocação da equipa Líquen"
+                            aria-label="Descrição da linha adicional"
+                          />
+                          {/* ── UM CAMPO DE DINHEIRO, NÃO UM CAMPO DE TEXTO ──
+                              Chamava-se «Valor (texto)» e aceitava o que lhe
+                              escrevessem — que é o que se pede a um campo cujo
+                              conteúdo é impresso no PDF tal e qual. O preço
+                              disso era «1.500» a valer mil e quinhentos ou um e
+                              meio conforme quem o lê.
+
+                              Agora entra um NÚMERO («1.500», «1500», «1 500 €»
+                              dão os três 1500, por `normalizarValor`) e o «+
+                              IVA» — que era a informação que vinha escondida no
+                              texto — passou a ser o selector ao lado. O que se
+                              grava continua a ser a frase que o PDF imprime;
+                              ver `textoDoAdicional`.
+
+                              `defaultValue` + `onBlur`, como no preço da linha:
+                              normalizar a cada tecla apagava o que ela estava a
+                              escrever a meio. O `key` traz o valor gravado de
+                              volta ao campo quando ele muda por outra via (o
+                              selector do IVA, a deslocação calculada, o anular). */}
+                          <input
+                            key={`${i}:${ex.valueText}`}
+                            className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
+                            defaultValue={numero === null ? (ex.valueText ?? "") : String(numero)}
+                            onBlur={(e) => definirValorDoAdicional(i, e.target.value)}
+                            placeholder="896"
+                            inputMode="decimal"
+                            aria-label={`Valor de ${ex.label?.trim() || "linha adicional sem nome"}`}
+                          />
+                          <select
+                            className="bo-input px-2 py-2 text-xs text-foreground/75"
+                            value={modo}
+                            onChange={(e) =>
+                              definirIvaDoAdicional(i, e.target.value as ModoDeIvaDoAdicional)
+                            }
+                            aria-label={`IVA de ${ex.label?.trim() || "linha adicional sem nome"}`}
+                          >
+                            <option value="documento">Como o total</option>
+                            <option value="acrescer">+ IVA</option>
+                            <option value="incluido">IVA incluído</option>
+                          </select>
+                          <button
+                            type="button"
+                            className={REMOVE_BTN}
+                            onClick={() => removeBudgetExtra(i)}
+                            aria-label="Remover linha adicional"
+                          >
+                            ×
+                          </button>
+                          {/* O que fica escrito na proposta, à letra. É a única
+                              forma de ela ver que «1500» e «+ IVA» viram
+                              «1 500,00 € + IVA» no papel — e de um texto livre
+                              antigo («a definir») se ver que continua lá. */}
+                          {(ex.valueText ?? "").trim() !== "" && (
+                            <span className="col-span-full pl-1 text-[10px] text-foreground/35">
+                              {`No PDF: ${ex.valueText}`}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                     <button type="button" className={ADD_BTN} onClick={addBudgetExtra}>
                       + Adicionar valor adicional
                     </button>
+                    {/* O «Somado ao total: X» que aqui estava saiu para o bloco
+                        de totais, onde é a linha «Valores adicionais». A conta
+                        continua à vista — deixou é de ser a terceira soma
+                        diferente no mesmo ecrã. */}
                   </div>
                 </div>
               </>
@@ -3656,7 +4232,39 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               const i = extras.findIndex((e) => /desloca/i.test(e.label ?? ""));
               if (i >= 0) extras[i] = { ...extras[i], label, valueText };
               else extras.push({ label, valueText });
-              definirExtras(extras);
+              /**
+               * ── E PERGUNTA-SE, COM OS DOIS NÚMEROS À VISTA ────────────────
+               * «Pôr nos valores adicionais» é a segunda acção do editor que
+               * muda o preço final de uma só carregada: a deslocação calculada
+               * SOMA-SE ao total, e portanto ao sinal e à fatura. Levava
+               * nenhuma pergunta e nenhuma volta atrás — o mesmo desenho do
+               * «Usar X €», e por isso o mesmo tratamento.
+               */
+              const contexto = { mode: vatMode, vatRate: doc.vatRate };
+              const antes = parseMoneyText(totalInput);
+              const depois = Math.max(
+                0,
+                Math.round(
+                  (antes +
+                    somaDosExtrasSemIva(extras, contexto) -
+                    somaDosExtrasSemIva(doc.budgetExtras ?? [], contexto)) *
+                    100,
+                ) / 100,
+              );
+              // Sem diferença nenhuma no dinheiro (a mesma deslocação outra
+              // vez) não há nada a confirmar: aplica-se e cala-se.
+              if (Math.abs(depois - antes) <= 0.01) {
+                definirExtras(extras);
+                return;
+              }
+              pedirConfirmacaoDeDinheiro({
+                oQue: "o total",
+                de: antes,
+                para: depois,
+                registo: `Deslocação calculada (${valueText}) posta nos valores adicionais no estúdio: preço final de ${eur(antes)} para ${eur(depois)}.`,
+                motivo: "Deslocação posta nos valores adicionais.",
+                aplicar: () => definirExtras(extras),
+              });
             }}
           />
 
@@ -3681,9 +4289,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 containerClassName={realce("totalAmount")}
                 hint={
                   desvio
-                    ? `Total manual — a soma das linhas é ${eur(desvio.soma)}`
-                    : soma !== null
-                      ? "Bate certo com a soma das linhas."
+                    ? `Escrito à mão — a soma dos serviços com preço é ${eur(desvio.soma)}`
+                    : contagem.comPreco > 0
+                      ? "Bate certo com a soma dos serviços com preço."
                       : undefined
                 }
               />
@@ -3710,66 +4318,112 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                    * E por isso o rótulo mostra o número que vai mesmo ser
                    * escrito: um botão que diz 75 € e escreve 2460 € é pior do
                    * que não haver botão nenhum.
+                   *
+                   * ── E PERGUNTA ANTES DE ESCREVER ─────────────────────────
+                   * Palavras dela: «é um botão perigoso». Escrevia o número
+                   * novo por cima do preço final — o valor de que saem a
+                   * fatura, o sinal e o saldo — sem mostrar o que ia
+                   * desaparecer. A pergunta traz OS DOIS, e depois de aplicada
+                   * ficam dez segundos para a anular. Ver
+                   * `pedirConfirmacaoDeDinheiro`.
                    */}
                   <button
                     type="button"
-                    className="text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
-                    onClick={() => {
-                      confirmado("totalAmount");
-                      onTotalInput(String(desvio.sugerido));
-                    }}
+                    className="alvo-toque -my-1 py-2 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+                    onClick={() =>
+                      pedirConfirmacaoDeDinheiro({
+                        oQue: "o total",
+                        de: money.base,
+                        para: desvio.sugerido,
+                        registo: `Total alinhado com a soma das linhas no estúdio: preço final de ${eur(money.base)} para ${eur(desvio.sugerido)}.`,
+                        motivo: "Total alinhado com a soma das linhas.",
+                        aplicar: () => {
+                          confirmado("totalAmount");
+                          onTotalInput(textoDoTotal(desvio.sugerido));
+                        },
+                      })
+                    }
                   >
                     Usar {eur(desvio.sugerido)}
                   </button>
                 </div>
               )}
+              {/* ══════════════════════════════════════════════════════════════
+                  O SELECTOR DO IVA — UM SÓ, E O ESCOLHIDO É O QUE DÁ NAS VISTAS
+                  ══════════════════════════════════════════════════════════════
+
+                  Eram duas coisas: um selector de dois botões e, por baixo, dois
+                  cartões com as mesmas duas leituras. Palavras dela: «o selector
+                  tem o não-seleccionado mais visível do que o seleccionado».
+                  Tinha — o segmento escolhido ficava BRANCO sobre um cartão que
+                  também é branco (é assim que o `Segmented` do back office
+                  marca a escolha, e funciona sobre fundos lavados, não sobre
+                  este), enquanto o outro ficava recortado na calha cinzenta.
+
+                  Passou a haver UM controlo: os dois cartões É que se carregam.
+                  O escolhido leva moldura de dois pixéis, fundo de musgo, texto
+                  a cheio e a palavra «escolhido»; o outro é uma linha fina e
+                  cinzenta. Não há como trocá-los, e desaparece a repetição —
+                  eram dois sítios a dizer «IVA incluído» a um palmo um do outro.
+
+                  `radiogroup` + `radio` e não botões: é o que faz as setas
+                  andarem entre as duas opções e o leitor de ecrã anunciar «1 de
+                  2, escolhido». A marca nunca é só a cor (moldura, negrito e
+                  palavra), como manda o `DESIGN-TOKENS.md`. */}
               <div className="flex flex-col gap-1.5">
                 <span className="bo-eyebrow">IVA</span>
-                <Segmented
-                  ariaLabel="Modo de IVA"
-                  value={vatMode}
-                  onChange={setVatMode}
-                  options={[
-                    { value: "incluido", label: "IVA incluído" },
-                    { value: "acrescer", label: "+ IVA (acresce)" },
-                  ]}
-                />
+                <div
+                  role="radiogroup"
+                  aria-label="Modo de IVA"
+                  className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2"
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                    e.preventDefault();
+                    setVatMode(vatMode === "acrescer" ? "incluido" : "acrescer");
+                  }}
+                >
+                  {(["acrescer", "incluido"] as const).map((modo) => {
+                    const v = duasFormas[modo];
+                    const ativa = vatMode === modo;
+                    return (
+                      <button
+                        key={modo}
+                        type="button"
+                        role="radio"
+                        aria-checked={ativa}
+                        tabIndex={ativa ? 0 : -1}
+                        onClick={() => setVatMode(modo)}
+                        className={`alvo-toque !justify-start rounded-xl border px-3 py-2.5 text-left motion-safe:transition-colors ${
+                          ativa
+                            ? "border-2 border-[#4d6350] bg-[#4d6350]/[0.09] text-foreground/90"
+                            : "border border-foreground/12 text-foreground/45 hover:border-foreground/25 hover:text-foreground/65"
+                        }`}
+                      >
+                        <span className="block">
+                          <span className={`block ${ativa ? "font-semibold" : "font-medium"}`}>
+                            {modo === "acrescer" ? "+ IVA (acresce)" : "IVA incluído"}
+                            {ativa && " · escolhido"}
+                          </span>
+                          {money.base > 0 && (
+                            <>
+                              <span className="mt-0.5 block">
+                                base {eur(v.base)} · IVA {eur(v.iva)}
+                              </span>
+                              <span className="block">
+                                o cliente paga{" "}
+                                <strong className="font-semibold">{eur(v.total)}</strong>
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
                 <p className="text-xs leading-relaxed text-foreground/45">
                   Muda o que o cliente vê no PDF: «+ IVA» mostra o valor e soma o IVA por cima;
                   «incluído» mostra já a soma. O valor acima é sempre sem IVA.
                 </p>
-                {/* As duas leituras lado a lado, para ela ver o que o cliente vai
-                  ver antes de decidir. A escolhida fica marcada; a outra está
-                  lá para comparar, não para confundir. */}
-                {money.base > 0 && (
-                  <div className="mt-1 grid grid-cols-2 gap-2 text-[11px]">
-                    {(["acrescer", "incluido"] as const).map((modo) => {
-                      const v = duasFormas[modo];
-                      const ativa = vatMode === modo;
-                      return (
-                        <div
-                          key={modo}
-                          className={`rounded-lg border px-2.5 py-2 ${
-                            ativa
-                              ? "border-[#4d6350]/40 bg-[#4d6350]/[0.06]"
-                              : "border-foreground/10 text-foreground/45"
-                          }`}
-                        >
-                          <span className="block font-medium">
-                            {modo === "acrescer" ? "+ IVA" : "IVA incluído"}
-                            {ativa && " · escolhido"}
-                          </span>
-                          <span className="mt-0.5 block">
-                            base {eur(v.base)} · IVA {eur(v.iva)}
-                          </span>
-                          <span className="block">
-                            o cliente paga <strong className="font-semibold">{eur(v.total)}</strong>
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
               <Field
                 label="Validade (dias)"
@@ -3799,27 +4453,73 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 }
               />
             </div>
-            {/* Prévia do desdobramento — o que será efetivamente faturado. */}
+            {/* ══════════════════════════════════════════════════════════════
+                O BLOCO DE TOTAIS — UM SÓ, PELA ORDEM DO PAPEL
+                ══════════════════════════════════════════════════════════════
+
+                Substitui as três somas que apareciam ao mesmo tempo («Soma das
+                linhas», «Somado ao total» e o resumo desta caixa) e segue a
+                ordem exacta em que o PDF as imprime: subtotal dos serviços →
+                valores adicionais → total sem IVA → IVA → total a pagar →
+                sinal e saldo.
+
+                Os números NÃO são calculados aqui. Saem de `totais`, que é
+                `totaisDaProposta(doc, pctSinal)` — a mesma chamada que
+                `proposal-doc-pdf.ts` faz. É essa a razão de este bloco existir
+                assim: enquanto o ecrã tivesse a sua conta e o gerador a dele,
+                divergiam, e já divergiram (ver `proposal-budget.ts`). */}
             {money.gross > 0 && (
-              <p className="mt-4 text-xs leading-relaxed text-foreground/55">
-                Base {eur(money.base)} · IVA ({Math.round(money.vatRate * 100)}%) {eur(money.vat)} ·{" "}
-                <span className="text-foreground/80">Total {eur(money.gross)}</span>
-                <br />
-                Sinal{" "}
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={pctSinal}
-                  onChange={(e) => {
-                    const n = Number.parseInt(e.target.value, 10);
-                    patch({ depositPercent: Number.isFinite(n) ? n : undefined });
-                  }}
-                  aria-label="Percentagem do sinal"
-                  className="bo-input mx-0.5 w-14 px-1.5 py-0.5 text-center text-xs"
-                />
-                %: {eur(split.sinal)} · Saldo {100 - pctSinal}%: {eur(split.saldo)}
-              </p>
+              <div className="mt-5 rounded-2xl border border-foreground/10 bg-foreground/[0.015] p-4">
+                <span className="bo-eyebrow">Totais</span>
+                <dl className="mt-2.5 flex flex-col gap-1.5 text-xs">
+                  <LinhaDeTotal rotulo="Subtotal dos serviços" valor={eur(totais.servicos)} />
+                  <LinhaDeTotal rotulo="Valores adicionais" valor={eur(totais.adicionais)} />
+                  {/* A régua separa as parcelas dos resultados: é a mesma
+                      leitura que a folha em papel dá, e sem ela as seis linhas
+                      lêem-se como uma lista em que tudo tem o mesmo peso. */}
+                  <LinhaDeTotal rotulo="Total sem IVA" valor={eur(totais.total)} forte regua />
+                  <LinhaDeTotal
+                    rotulo={`IVA (${Math.round(totais.taxa * 100)}%)`}
+                    valor={eur(totais.iva)}
+                  />
+                  <LinhaDeTotal rotulo="Total a pagar" valor={eur(totais.aPagar)} forte />
+                  <LinhaDeTotal
+                    regua
+                    rotulo={
+                      <span className="inline-flex items-center gap-1">
+                        Sinal
+                        <input
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={pctSinal}
+                          onChange={(e) => {
+                            const n = Number.parseInt(e.target.value, 10);
+                            patch({ depositPercent: Number.isFinite(n) ? n : undefined });
+                          }}
+                          aria-label="Percentagem do sinal"
+                          className="bo-input w-16 px-1.5 py-0.5 text-center text-xs"
+                        />
+                        %
+                      </span>
+                    }
+                    valor={eur(totais.sinal)}
+                  />
+                  <LinhaDeTotal rotulo={`Saldo ${100 - pctSinal}%`} valor={eur(totais.saldo)} />
+                </dl>
+                {/* ── QUANDO AS SOMAS NÃO FECHAM ────────────────────────────
+                    Por construção fecham sempre. Este aviso é a rede para o dia
+                    em que deixarem de fechar — e nesse dia tem de se ver antes
+                    de o PDF sair, não depois de o casal perguntar. As frases
+                    vêm feitas de `totaisDaProposta`. */}
+                {!totais.fecha && (
+                  <ul className="mt-3 flex flex-col gap-1 rounded-xl border border-[#c0392b]/35 bg-[#c0392b]/[0.06] px-3 py-2 text-[11px] leading-relaxed text-[#a03123]">
+                    {totais.porQueNaoFecha.map((porque) => (
+                      <li key={porque}>⚠ As contas não fecham: {porque}.</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
           </Section>
         </div>
@@ -3878,7 +4578,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   label="Total (com IVA)"
                   value={money.gross > 0 ? eur(money.gross) : "—"}
                 />
-                <SummaryRow label="Sinal 30%" value={money.gross > 0 ? eur(split.sinal) : "—"} />
+                {/* A percentagem é a do DOCUMENTO e não um «30%» à letra: uma
+                    proposta a 40% dizia aqui 30% e mostrava o valor de 40%. */}
+                <SummaryRow
+                  label={`Sinal ${pctSinal}%`}
+                  value={money.gross > 0 ? eur(split.sinal) : "—"}
+                />
               </dl>
               {/* As fotos a caminho têm a sua própria linha, e não a genérica
                   dos campos por preencher: aqui não há nada a fazer senão
@@ -3936,7 +4641,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
       {/* Ação principal — muda conforme o passo, para haver sempre UMA próxima
           ação óbvia. */}
-      <div // `z-20` não é enfeite: sem ele os cartões das secções — que criam o seu
+      <div
+        ref={barraDeBaixo}
+        // `z-20` não é enfeite: sem ele os cartões das secções — que criam o seu
         // próprio contexto de empilhamento — desenham-se POR CIMA desta barra, e o
         // texto do total aparecia misturado com o do campo por baixo. Vê-se na
         // captura de ecrã antes desta linha existir; nenhum teste apanhava.
@@ -3968,23 +4675,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 O "guardado às 12:34" vira um visto: é uma confirmação, e um
                 visto confirma tão bem como a frase, num décimo do espaço.
                 A hora continua lá para quem a procurar, no `title`. */}
+            {/* ── SÓ O ESSENCIAL ───────────────────────────────────────────
+                Havia aqui uma TERCEIRA soma — «soma das linhas: 2.400,00 €»
+                numa etiqueta cor de laranja — ao lado de um total de 2.460,00 €
+                e de um «o cliente paga 3.025,80 €». Três números diferentes na
+                mesma linha de rodapé, e nenhum deles a explicar-se: a barra
+                existe para responder a «quanto vai a proposta», não para abrir
+                a discussão que o bloco de totais já resolve.
+                Ficam o total sem IVA, o total a pagar e o estado de guardado. */}
             <p className="mr-auto min-w-0 truncate text-xs text-foreground/55">
               {money.base > 0 ? (
                 <>
                   <span className="text-foreground/45">Total</span>{" "}
                   <strong className="font-semibold text-foreground/85">
-                    <span className="sm:hidden">{eur(money.gross)}</span>
-                    <span className="hidden sm:inline">{eur(money.base)}</span>
+                    <span className="sm:hidden">{eur(totais.aPagar)}</span>
+                    <span className="hidden sm:inline">{eur(totais.total)}</span>
                   </strong>{" "}
                   <span className="hidden text-foreground/45 sm:inline">
-                    sem IVA · o cliente paga {eur(money.gross)}
+                    sem IVA · a pagar {eur(totais.aPagar)}
                   </span>
-                  {desvio && (
-                    <span className="ml-2 rounded-full bg-[#c98a2e]/15 px-2 py-0.5 text-[10px] text-[#8a5d13]">
-                      <span className="hidden sm:inline">soma das linhas: </span>
-                      {eur(desvio.soma)}
-                    </span>
-                  )}
                 </>
               ) : (
                 <span className="hidden sm:inline">
@@ -4031,24 +4740,42 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   );
                 })()}
             </p>
-            {/* O BOTÃO FICA COLADO AO INDICADOR, e não lá em cima ao pé do
-                «Limpar rascunho».
+            {/* ══════════════════════════════════════════════════════════════
+                O «GUARDAR AGORA» SAIU — MENOS NO ÚNICO CASO EM QUE ERA A ÚNICA
+                MANEIRA DE GRAVAR
+                ══════════════════════════════════════════════════════════════
 
-                Quem carrega aqui quer saber o que aconteceu, e o que aconteceu
-                está escrito no indicador que está mesmo ao lado — «guardado às
-                14:32» ou «guardado só neste computador». Separá-los obrigava a
-                procurar a resposta no outro extremo da página. Esta barra é
-                fixa, portanto acompanha-a por todo o formulário: no momento em
-                que ela decide levantar-se da secretária, o botão está à mão,
-                onde quer que esteja a escrever. */}
-            <Button
-              variant="secondary"
-              onClick={guardarAgora}
-              loading={aGuardarAgora}
-              title="Guardar agora (⌘S)"
-            >
-              Guardar agora
-            </Button>
+                Palavras dela: «"Guardar agora" ao lado de "Tudo guardado" é
+                redundante e contraditório». É, e a gravação automática cobre
+                MESMO o que o botão cobria — não é uma suposição: `guardarAgora`
+                chama `flushDraft.current()`, que é exactamente a mesma função
+                `save` que o temporizador de 800 ms chama. Botão e automático
+                gravavam pelo mesmo caminho, com as mesmas regras. Além disso a
+                desmontagem grava o que faltasse, e o registo do back office
+                trava a saída da página com trabalho por gravar.
+
+                ── O CASO EM QUE O BOTÃO NÃO ERA REDUNDANTE ──────────────────
+                Quando o servidor RECUSA: a cópia local é síncrona e apaga o
+                «por gravar», e o temporizador só volta a correr à tecla
+                seguinte. Nesse estado — o mesmo em que uma proposta inteira já
+                se perdeu — carregar aqui era a única forma de voltar a tentar.
+                Tirar o botão por inteiro era tirar isso.
+
+                Por isso ele fica, mas SÓ nesse estado, e com o nome do que faz
+                nele: «Tentar guardar outra vez». Ao lado de «Tudo guardado» já
+                não há botão nenhum — há o indicador, e mais nada. O ⌘S continua
+                a valer sempre, para quem se levanta da secretária e quer a
+                certeza sem esperar pelos 800 ms. */}
+            {soNesteComputador && (
+              <Button
+                variant="secondary"
+                onClick={guardarAgora}
+                loading={aGuardarAgora}
+                title="Tentar guardar outra vez no servidor (⌘S)"
+              >
+                Tentar outra vez
+              </Button>
+            )}
             <Button
               variant="primary"
               onClick={() => setStep("prever")}
@@ -4170,6 +4897,45 @@ function lerFechadas(): Record<string, boolean> {
   } catch {
     return {};
   }
+}
+
+/**
+ * Uma linha do bloco de totais: o nome à esquerda, o número à direita.
+ *
+ * `dt`/`dd` e não duas `span`: são pares de rótulo e valor, e é isso que faz um
+ * leitor de ecrã ler «Total a pagar, 3.025,80 €» em vez de duas coisas soltas.
+ * Os números vão com `tabular-nums` para as vírgulas ficarem uma por baixo da
+ * outra — num quadro de dinheiro, colunas desalinhadas leem-se como erros.
+ */
+function LinhaDeTotal({
+  rotulo,
+  valor,
+  /** O resultado de uma soma, e não uma parcela. */
+  forte,
+  /** Traço por cima, a separar as parcelas do que elas dão. */
+  regua,
+}: {
+  rotulo: React.ReactNode;
+  valor: string;
+  forte?: boolean;
+  regua?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 ${
+        regua ? "border-t border-foreground/10 pt-1.5" : ""
+      }`}
+    >
+      <dt className={forte ? "text-foreground/75" : "text-foreground/55"}>{rotulo}</dt>
+      <dd
+        className={`tabular-nums ${
+          forte ? "text-sm font-semibold text-foreground/90" : "text-foreground/70"
+        }`}
+      >
+        {valor}
+      </dd>
+    </div>
+  );
 }
 
 function Section({
@@ -4366,7 +5132,8 @@ function PreviewSummary({
   /** O ORIGINAL de cada foto — o plano B das células. */
   assetOriginais: Record<string, string>;
   money: ReturnType<typeof resolveProposalMoney>;
-  split: ReturnType<typeof splitSinal>;
+  /** O sinal e o saldo, tal como `totaisDaProposta` os devolve. */
+  split: { sinal: number; saldo: number };
 }) {
   const covers = (doc.coverImages ?? []).filter(Boolean) as string[];
   const porConfirmar = countPendingImages(doc);
