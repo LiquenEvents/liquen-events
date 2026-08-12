@@ -14,39 +14,25 @@ import {
  * A PÁGINA DE ENTRADA DO BACK OFFICE, COM UMA FOTOGRAFIA VERDADEIRA
  * ════════════════════════════════════════════════════════════════════════════
  *
- * ── ONDE PENDURAR ISTO ────────────────────────────────────────────────────
- * Isto NÃO está pendurado em ecrã nenhum, de propósito: o `AdminLogin.tsx`
- * está a ser mexido noutra frente (email como identificador, recuperação de
- * palavra-passe) e um segundo par de mãos no mesmo ficheiro só daria conflito.
- * Fica pronto a pendurar, em três gestos, quando essa frente assentar.
+ * ── ONDE ISTO ESTÁ PENDURADO ──────────────────────────────────────────────
+ * No `AdminLogin.tsx`, e é o único sítio. Envolve a coluna inteira do cartão:
  *
- * 1) O import, no topo do `AdminLogin.tsx`:
+ *     import { EntradaComFotografia, RodapeDaEntrada } from "./EntradaComFotografia";
+ *     …
+ *     <EntradaComFotografia>
+ *       <div className="w-full max-w-sm flex flex-col items-center gap-8">
+ *         … logótipo, cartão, campos, passkeys — tal e qual …
+ *         <RodapeDaEntrada />
+ *       </div>
+ *     </EntradaComFotografia>
  *
- *        import { EntradaComFotografia, RodapeDaEntrada } from "./EntradaComFotografia";
+ * O `-mt-24`, o `min-h-screen`, a centragem e o gradiente do fundo vivem TODOS
+ * aqui dentro — o `AdminLogin` não os repete. Quem lá mexer não precisa de
+ * saber mais do que isto; o resto deste cabeçalho é o PORQUÊ das escolhas, que
+ * é o que não se consegue reconstituir a olhar para o código.
  *
- * 2) No `return`, trocar o `<div>` EXTERIOR — o que hoje tem
- *
- *        className="-mt-24 min-h-screen flex items-center justify-center px-4 py-12"
- *        style={{ background: "linear-gradient(180deg, #ffffff 0%, #f4f5f3 100%)" }}
- *
- *    (e a sua etiqueta de fecho) por `<EntradaComFotografia>` … `</EntradaComFotografia>`.
- *    O `-mt-24`, o `min-h-screen`, a centragem e o gradiente passam todos a
- *    viver cá dentro; não os repitas lá fora. O `<div>` de dentro
- *    (`w-full max-w-sm flex flex-col items-center gap-8`) e tudo o que ele tem
- *    — logótipo, cartão, campos, passkeys — fica TAL E QUAL, como `children`.
- *
- * 3) A última linha desse bloco, a assinatura
- *
- *        <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">
- *          Líquen Events · Portugal
- *        </p>
- *
- *    passa a ser `<RodapeDaEntrada />`. Mesma frase, mesma tipografia; o que
- *    muda é a cor — ver a nota desse componente, com os números.
- *
- * Para ver o resultado sem esperar por nada, `/orcamento/admin/previsualizacao`
- * desenha exactamente esta composição (ficheiro temporário, para apagar quando
- * o componente for pendurado a sério).
+ * Para medir, `node scripts/medir-entrada-admin.mjs` aponta por omissão a
+ * `/orcamento/admin`, que é esta página.
  *
  * ── PORQUÊ METADE DO ECRÃ, E NÃO O CARTÃO A FLUTUAR SOBRE A FOTO INTEIRA ──
  * As duas hipóteses foram desenhadas; esta ganha por causa dos números do véu.

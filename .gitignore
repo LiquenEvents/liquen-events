@@ -93,3 +93,9 @@ instagram-export/
 # grandes, gerados a pedido a partir de um build — nao ha razao para os
 # versionar.
 /video-galeria/
+
+# Medições e capturas de scripts/medir-*.mjs. Ficavam em test-results/, que o
+# Playwright apaga inteira no arranque de cada corrida — bastava um
+# `npm run test:e2e` noutra frente para as apagar. São artefactos, geram-se
+# outra vez a correr o script.
+/medicoes/

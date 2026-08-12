@@ -6,6 +6,13 @@
  *   npm run build && npx next start -p 3177
  *   node scripts/medir-entrada-admin.mjs --etiqueta=depois
  *
+ * ATENÇÃO ao servidor: com `output: "standalone"` no next.config.ts o
+ * `next start` recusa-se a arrancar («does not work with output: standalone») e
+ * é preciso `node .next/standalone/server.js` — que, nessa forma, também
+ * precisa que lhe copiem `.next/static` e `public/_img` para dentro, senão
+ * responde 500 aos chunks e 404 às fotografias. Se o servidor não estiver bom,
+ * isto NÃO imprime números a fingir: o `confirmarQueEAEntrada` rebenta.
+ *
  * PORQUE EXISTE. A página de entrada passou a ter uma fotografia de casamento
  * em metade do ecrã. Uma fotografia grande numa página de entrada é a maneira
  * mais fácil de estragar duas coisas ao mesmo tempo: o tempo até a página
@@ -57,7 +64,22 @@ const CAMINHO = opt("caminho", "/orcamento/admin");
  * várias, a comparação antes/depois passa a dizer alguma coisa.
  */
 const REPETICOES = Number(opt("repeticoes", "5"));
-const SAIDA = path.join(process.cwd(), "test-results", "entrada-admin");
+/**
+ * ── PORQUE É QUE ISTO NÃO ESCREVE EM `test-results/` ──────────────────────
+ * Escrevia, e as capturas desapareciam. `test-results/` é a pasta de saída do
+ * Playwright (`playwright.config.ts` não define `outputDir`, portanto é a de
+ * omissão) e o Playwright APAGA-A INTEIRA no arranque de cada corrida. Ou seja:
+ * bastava alguém correr `npm run test:e2e` — noutra frente, noutro terminal,
+ * sem nada a ver com isto — para as capturas que se acabaram de tirar deixarem
+ * de existir. Aconteceu duas vezes, e da segunda já depois de terem sido dadas
+ * como entregues.
+ *
+ * Uma medição serve para se olhar para ela mais tarde; guardá-la na pasta de
+ * rascunho de outra ferramenta é guardá-la em cima da mesa da cozinha. Estas
+ * ficam em `medicoes/`, que é só desta família de scripts (e está no
+ * .gitignore: são artefactos, não código).
+ */
+const SAIDA = path.join(process.cwd(), "medicoes", "entrada-admin");
 
 /** Perfil de rede próximo de 4G lento, o mesmo que o Lighthouse mobile usa. */
 const REDE_LENTA = {
