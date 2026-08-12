@@ -9,10 +9,18 @@ import { DEFAULT_VALID_DAYS } from "./proposal-doc";
  * valor por omissão configurável, para eu não escrever 30 sempre».
  *
  * ── Porque é que não é uma constante ──────────────────────────────────────
- * `DEFAULT_VALID_DAYS` é 30 e está no código. Mudar a política da casa para 45
- * dias obrigava a um commit e a um deploy — o que quer dizer que, na prática,
- * nunca mudava, e ela continuava a corrigir o campo à mão em todas as
- * propostas.
+ * `DEFAULT_VALID_DAYS` está no código, e hoje vale 60 — a decisão dela, que é
+ * o que as propostas feitas à mão diziam aos casais («esta proposta é válida
+ * por 60 dias»). Mudar a política da casa para outro número não pode obrigar a
+ * um commit e a um deploy: na prática nunca mudaria, e ela continuaria a
+ * corrigir o campo à mão em todas as propostas. Daí a preferência guardada,
+ * que ganha à constante.
+ *
+ * A par desta decisão ficou a outra do mesmo documento: a confirmação do
+ * número de convidados é pedida até **25 dias** antes da festa
+ * (`DIAS_PARA_CONFIRMAR_CONVIDADOS`, em `proposal-doc.ts`). As duas vinham da
+ * mesma folha e são as duas dela — ficam ditas juntas para não voltarem a
+ * divergir.
  *
  * ── Onde ficam ────────────────────────────────────────────────────────────
  * Em `app_state`, como os rascunhos e os modelos, pela mesma razão: é uma
