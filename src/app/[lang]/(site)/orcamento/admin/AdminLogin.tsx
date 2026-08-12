@@ -8,12 +8,21 @@ import { entrarComDispositivo, mensagemDeErro, suportaPasskeys } from "@/lib/pas
 
 export default function AdminLogin() {
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [needs2fa, setNeeds2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [aEntrarComDispositivo, setAEntrarComDispositivo] = useState(false);
+  // Recuperação: painel fechado por omissão, para a página continuar a ser uma
+  // página de ENTRADA. Só abre a quem o pedir.
+  const [aRecuperar, setARecuperar] = useState(false);
+  const [emailRecuperacao, setEmailRecuperacao] = useState("");
+  const [aEnviarLigacao, setAEnviarLigacao] = useState(false);
+  const [respostaRecuperacao, setRespostaRecuperacao] = useState<{
+    tipo: "ok" | "erro";
+    texto: string;
+  } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -62,7 +71,7 @@ export default function AdminLogin() {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password, name, code }),
+        body: JSON.stringify({ password, email, code }),
       });
       if (res.ok) {
         router.refresh();
@@ -71,15 +80,52 @@ export default function AdminLogin() {
       const data = await res.json().catch(() => ({}));
       if (data?.needs2fa) {
         setNeeds2fa(true);
-        setError(code ? "Código de verificação inválido." : "Introduza o código de verificação.");
+        setError(code ? "Código de verificação inválido." : "Introduz o código de verificação.");
       } else {
-        setError(data?.error ?? "Palavra-passe incorreta.");
+        // A frase vem do servidor e é a MESMA para «esta conta não existe» e
+        // «a palavra-passe está errada». O plano B nunca pode ser mais
+        // específico do que ela — era por aí que voltava a distinção.
+        setError(data?.error ?? "Credenciais incorretas.");
       }
       setLoading(false);
     } catch {
-      setError("Erro de ligação. Tente novamente.");
+      setError("Erro de ligação. Tenta novamente.");
       setLoading(false);
     }
+  }
+
+  /**
+   * Pedir a ligação para definir uma palavra-passe nova.
+   *
+   * A resposta do servidor é NEUTRA de propósito — não diz se o endereço
+   * existe — e é essa frase que se mostra, tal e qual. Escrever aqui um
+   * «enviámos!» mais simpático transformava esta caixa num verificador de
+   * endereços da equipa.
+   */
+  async function pedirLigacao(e: React.FormEvent) {
+    e.preventDefault();
+    if (aEnviarLigacao) return;
+    setAEnviarLigacao(true);
+    setRespostaRecuperacao(null);
+    try {
+      const res = await fetch("/api/admin/recuperar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailRecuperacao }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setRespostaRecuperacao(
+        res.ok
+          ? { tipo: "ok", texto: data?.mensagem ?? "Pedido registado." }
+          : {
+              tipo: "erro",
+              texto: data?.error ?? "Não foi possível tratar o pedido. Tenta daqui a bocado.",
+            },
+      );
+    } catch {
+      setRespostaRecuperacao({ tipo: "erro", texto: "Erro de ligação. Tenta novamente." });
+    }
+    setAEnviarLigacao(false);
   }
 
   return (
@@ -108,33 +154,44 @@ export default function AdminLogin() {
               Painel de Gestão
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-foreground/55">
-              Bem-vindo. Introduza as suas credenciais para continuar.
+              Bem-vinda. Entra com o teu email para continuares.
             </p>
           </div>
 
           <form onSubmit={submit} className="flex flex-col gap-4">
             <Field
-              label="O teu nome"
-              name="name"
-              type="text"
-              autoComplete="username"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
+              label="O teu email"
+              name="email"
               /**
-               * SEM EXEMPLO, e é de propósito.
+               * ── PORQUE É QUE ISTO É UM EMAIL E NÃO UM NOME ─────────────
                *
-               * Estava aqui «Ex.: Catarina» — o nome verdadeiro de quem
-               * trabalha na empresa, numa página de entrada que qualquer
-               * pessoa na internet consegue abrir. Quem tenta entrar sem ser
-               * convidado precisa de duas coisas: um identificador válido e
-               * uma palavra-passe. Nós dávamos a primeira.
+               * Um nome próprio é curto, está escrito no site, colide assim
+               * que a equipa cresça, e nenhum gestor de palavras-passe o sabe
+               * guardar — o que empurra toda a gente para palavras-passe
+               * repetidas e decoradas. O email resolve as quatro coisas.
                *
-               * Um campo de identificação não precisa de exemplo nenhum: a
-               * etiqueta já diz o que lá vai. Exemplos ficam para campos onde
-               * o FORMATO não é óbvio (uma unidade, uma referência), e mesmo
-               * aí nunca com dados de pessoas verdadeiras.
+               * `type="email"` traz o teclado com o @ no telemóvel;
+               * `autoComplete="username"` é o par que os gestores de
+               * palavras-passe esperam encontrar ao lado do
+               * `current-password` — sem ele, muitos não oferecem nada.
+               * `spellCheck={false}` e `autoCapitalize="none"` evitam o
+               * «Catarina@…» que o teclado de iOS faz sozinho.
+               *
+               * SEM EXEMPLO, e é de propósito: estava aqui o nome verdadeiro
+               * de quem trabalha na empresa, numa página que qualquer pessoa
+               * na internet consegue abrir. Quem tenta entrar sem ser
+               * convidado precisa de um identificador válido e de uma
+               * palavra-passe — e nós dávamos a primeira metade.
                */
+              type="email"
+              inputMode="email"
+              autoComplete="username"
+              spellCheck={false}
+              autoCapitalize="none"
+              autoCorrect="off"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoFocus
             />
 
             <Field
@@ -159,7 +216,7 @@ export default function AdminLogin() {
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                 autoFocus
-                hint="Introduza o código de 6 dígitos da sua aplicação de autenticação."
+                hint="Escreve o código de 6 dígitos da tua aplicação de autenticação."
                 placeholder="000000"
                 className="text-center text-lg tracking-[0.4em]"
               />
@@ -187,6 +244,77 @@ export default function AdminLogin() {
               {loading ? "A verificar…" : needs2fa ? "Verificar" : "Entrar"}
             </Button>
           </form>
+
+          {/* ── Recuperação ────────────────────────────────────────────────
+              Fica FORA do <form> de entrada: dois formulários encaixados são
+              HTML inválido, e o Enter dentro do painel submetia a entrada. */}
+          {!aRecuperar ? (
+            <button
+              type="button"
+              onClick={() => {
+                setARecuperar(true);
+                // Leva o que já estava escrito: quem chegou aqui é porque a
+                // palavra-passe falhou, e reescrever o email é atrito a mais.
+                setEmailRecuperacao(email);
+              }}
+              className="mt-4 w-full text-center text-xs text-foreground/50 underline underline-offset-4 hover:text-foreground/75"
+            >
+              Esqueceste-te da palavra-passe?
+            </button>
+          ) : (
+            <form
+              onSubmit={pedirLigacao}
+              className="mt-5 flex flex-col gap-3 border-t border-foreground/10 pt-5"
+            >
+              <p className="text-xs leading-relaxed text-foreground/55">
+                Escreve o teu email e enviamos-te uma ligação para definires uma palavra-passe nova.
+                A ligação serve uma vez e dura 30 minutos.
+              </p>
+              <Field
+                label="Email da tua conta"
+                name="email-recuperacao"
+                type="email"
+                inputMode="email"
+                autoComplete="username"
+                spellCheck={false}
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={emailRecuperacao}
+                onChange={(e) => setEmailRecuperacao(e.target.value)}
+                required
+                autoFocus
+              />
+              {respostaRecuperacao && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className={
+                    respostaRecuperacao.tipo === "ok"
+                      ? "text-xs leading-relaxed text-foreground/70"
+                      : "flex items-start gap-1.5 text-xs leading-relaxed text-[#8a2a22]"
+                  }
+                >
+                  {respostaRecuperacao.tipo === "erro" && <span aria-hidden="true">⚠</span>}
+                  <span>{respostaRecuperacao.texto}</span>
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <Button type="submit" variant="secondary" size="sm" loading={aEnviarLigacao}>
+                  {aEnviarLigacao ? "A enviar…" : "Enviar ligação"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setARecuperar(false);
+                    setRespostaRecuperacao(null);
+                  }}
+                  className="text-xs text-foreground/50 underline underline-offset-4 hover:text-foreground/75"
+                >
+                  Voltar
+                </button>
+              </div>
+            </form>
+          )}
 
           {temPasskeys && (
             <>
@@ -225,7 +353,7 @@ export default function AdminLogin() {
 
               <p className="mt-3 text-center text-xs leading-relaxed text-foreground/45">
                 Usa o rosto, a impressão digital ou o PIN deste aparelho. Só funciona em
-                dispositivos que já tenha registado aqui dentro.
+                dispositivos que já tenhas registado aqui dentro.
               </p>
             </>
           )}

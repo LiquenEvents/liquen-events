@@ -25,9 +25,9 @@ test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true
 
 async function login(page: Page): Promise<boolean> {
   await page.goto("/orcamento/admin", { waitUntil: "domcontentloaded" });
-  const nome = page.getByLabel(/O teu nome/i);
+  const nome = page.getByLabel(/O teu email/i);
   if ((await nome.count()) > 0) {
-    await nome.fill("Catarina");
+    await nome.fill("catarina@liquen-events.com");
     await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
     await page.getByRole("button", { name: /^Entrar$/ }).click();
   }

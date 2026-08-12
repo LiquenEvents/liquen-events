@@ -71,9 +71,9 @@ const SESSAO = `${PASTA}/sessao.json`;
 
 async function entrar(page) {
   await page.goto(`${BASE}/orcamento/admin`, { waitUntil: "domcontentloaded" });
-  const nome = page.getByLabel(/O teu nome/i);
+  const nome = page.getByLabel(/O teu email/i);
   if (await nome.isVisible().catch(() => false)) {
-    await nome.fill("Catarina");
+    await nome.fill("catarina@liquen-events.com");
     await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
     await page.getByRole("button", { name: /^Entrar$/ }).click();
     // Dizer o que se passou, em vez de deixar rebentar como "timeout".

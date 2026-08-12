@@ -22,7 +22,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 async function login(page: Page): Promise<boolean> {
   await page.goto("/orcamento/admin");
-  await page.getByLabel(/O teu nome/i).fill("Catarina");
+  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
   await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
   await page.getByRole("button", { name: /^Entrar$/ }).click();
   try {
