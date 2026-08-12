@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach } from "vitest";
-import { useFotoComPlanoB } from "./ProposalStudio";
+import { useFotoComPlanoB } from "./useFotoComPlanoB";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -26,9 +26,7 @@ import { useFotoComPlanoB } from "./ProposalStudio";
 /** Mostra o estado do hook em texto, para o teste o poder ler. */
 function Sonda({ url, planoB }: { url?: string; planoB?: string }) {
   const { alvo, desistiu, aoFalhar } = useFotoComPlanoB(url, planoB);
-  return (
-    <button onClick={aoFalhar}>{desistiu ? "desistiu" : (alvo ?? "sem-alvo")}</button>
-  );
+  return <button onClick={aoFalhar}>{desistiu ? "desistiu" : (alvo ?? "sem-alvo")}</button>;
 }
 
 const estado = () => screen.getByRole("button").textContent;

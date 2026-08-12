@@ -44,6 +44,7 @@ import { opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-propos
 import { textoParaFonte } from "@/lib/pdf-text";
 import {
   ASPETO_POR_OMISSAO,
+  alturaDaLegenda,
   caixasDoMoodboard,
   layoutSugerido,
   caixasDaCapa,
@@ -51,6 +52,7 @@ import {
   PAGINA_W,
   PAGINA_H,
   PAGINA_M,
+  TEXTO_DO_MOODBOARD as TXT,
   type CaixaPdf,
 } from "@/lib/proposal-geometria";
 import { log } from "@/lib/logger";
@@ -202,7 +204,9 @@ interface Fonts {
 // Por isso é contada — mas SEPARADA de `missingImages`, porque a causa e a
 // correcção são outras: em falta = avaria, tenta-se de novo; cortado = escolha
 // editorial, tira-se uma foto ou encurta-se o texto.
-const MAX_ANNOTATION_LINES = 5; // descrição sob o collage
+// Descrição sob o collage. O tecto vive na geometria, com o resto das medidas
+// da página — a pré-visualização do estúdio corta no mesmo sítio.
+const MAX_ANNOTATION_LINES = TXT.legenda.maxLinhas;
 
 /* ═══════════════════════════════════════════════════════════════════════════
    A GEOMETRIA DO COLLAGE, SEPARADA DO DESENHO
@@ -1315,17 +1319,24 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     if (!mb.images || mb.images.length === 0) continue;
     const p = pdf.addPage([W, H]);
     frame(p);
-    eyebrow(p, "Inspiração", M, H - M - 48);
-    text(p, mb.title, M, H - M - 76, { font: f.serifIt, size: 24, color: INK });
+    // As medidas vêm de `proposal-geometria` — as mesmas que a
+    // pré-visualização do estúdio lê. Escritas aqui à mão, a miniatura que ela
+    // vê e a página que sai divergiam sem ninguém dar por isso.
+    eyebrow(p, TXT.sobretitulo.texto, M, TXT.sobretitulo.base, undefined, TXT.sobretitulo.tamanho);
+    text(p, mb.title, M, TXT.titulo.base, {
+      font: f.serifIt,
+      size: TXT.titulo.tamanho,
+      color: INK,
+    });
     // O subtítulo, quando existe. Na proposta feita à mão é o «Ramo de Noiva (a
     // definir com a Noiva)» por baixo de «Complementos dos Noivos»: o título diz
     // o capítulo, o subtítulo diz o que aquelas fotos são e o que ainda está por
     // decidir. Na mesma serifa da marca — a manuscrita da folha antiga não se
     // replica.
     if (mb.subtitulo?.trim()) {
-      text(p, mb.subtitulo.trim(), M, H - M - 96, {
+      text(p, mb.subtitulo.trim(), M, TXT.subtitulo.base, {
         font: f.serifIt,
-        size: 13,
+        size: TXT.subtitulo.tamanho,
         color: MUTED,
       });
     }
@@ -2158,10 +2169,12 @@ async function drawCollage(
   // up front so the collage reserves exactly the height the caption needs. Capped
   // at 5 lines so a very long note never crowds out the photos — o que passa
   // disso é anotado, não desaparece calado.
-  const annAll = mb.annotation ? wrap(f.serifIt, mb.annotation, 11, W - 2 * M) : [];
+  const annAll = mb.annotation
+    ? wrap(f.serifIt, mb.annotation, TXT.legenda.tamanho, W - 2 * M)
+    : [];
   note(`Descrição do mood board ${boardName}`, annAll.length - MAX_ANNOTATION_LINES, "linhas");
   const annLines = annAll.slice(0, MAX_ANNOTATION_LINES);
-  const annH = annLines.length ? annLines.length * 15 + 12 : 8;
+  const annH = alturaDaLegenda(annLines.length);
   const bottom = M + annH;
   // O collage tem lugar para MOOD_BOARD_MAX_IMAGES fotos. As restantes JÁ
   // FORAM descarregadas do armazenamento com sucesso e mesmo assim não são
@@ -2258,10 +2271,10 @@ async function drawCollage(
   }
 
   if (annLines.length) {
-    let ay = bottom - 15;
+    let ay = bottom - TXT.legenda.entrelinha;
     for (const ln of annLines) {
-      fns.text(p, ln, M, ay, { font: f.serifIt, size: 11, color: MUTED });
-      ay -= 15;
+      fns.text(p, ln, M, ay, { font: f.serifIt, size: TXT.legenda.tamanho, color: MUTED });
+      ay -= TXT.legenda.entrelinha;
     }
   }
 }

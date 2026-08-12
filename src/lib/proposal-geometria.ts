@@ -194,6 +194,99 @@ function aspetoSeguro(a: number | undefined): number {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TEXTO DA PÁGINA DE MOOD BOARD — TAMBÉM EM PONTOS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As caixas das fotos já vinham daqui; o título, o subtítulo e a legenda
+ * estavam escritos à mão dentro do gerador do PDF, e outra vez, com outros
+ * números, dentro da pré-visualização do estúdio. O resultado era o previsível:
+ * a miniatura mostrava o título 34 pontos acima de onde ele sai e a legenda
+ * colada ao fundo da folha, e não havia como descobri-lo sem pôr as duas coisas
+ * lado a lado.
+ *
+ * Uma pré-visualização que não é fiel é pior do que não existir — mostra uma
+ * página que ninguém vai receber. Por isso estas medidas passam a estar no
+ * mesmo sítio que as das fotografias, e os dois lados leem-nas daqui.
+ *
+ * `base` é a LINHA DE BASE do texto em coordenadas de PDF (medida a partir do
+ * fundo da página), que é como o `drawText` a recebe.
+ */
+export const TEXTO_DO_MOODBOARD = {
+  /** «INSPIRAÇÃO», em maiúsculas espaçadas, por cima do título. */
+  sobretitulo: {
+    texto: "Inspiração",
+    base: PAGINA_H - PAGINA_M - 48,
+    tamanho: 7.5,
+    /** O espaço acrescentado a cada letra — o desenho é letra a letra. */
+    espacamento: 2,
+  },
+  titulo: { base: PAGINA_H - PAGINA_M - 76, tamanho: 24 },
+  subtitulo: { base: PAGINA_H - PAGINA_M - 96, tamanho: 13 },
+  legenda: {
+    tamanho: 11,
+    entrelinha: 15,
+    /** O que passa disto é anotado como cortado, não desaparece calado. */
+    maxLinhas: 5,
+    /** O ar entre a última linha e a margem de baixo. */
+    folga: 12,
+    /** Sem legenda continua a reservar-se um fio, para as fotos não colarem. */
+    reservaSemLegenda: 8,
+  },
+} as const;
+
+/**
+ * A altura que a legenda reserva por baixo das fotografias, em pontos.
+ *
+ * É o `alturaAnotacao` que {@link caixasDoMoodboard} recebe: dá-lhe as fotos
+ * mais baixas quando a descrição é comprida, que é exactamente o que acontece
+ * na página. Uma legenda de cinco linhas come 87 pontos — 15% da altura da
+ * folha —, e a miniatura que assumisse uma linha mostrava as fotos maiores do
+ * que vão sair.
+ */
+export function alturaDaLegenda(linhas: number): number {
+  const L = TEXTO_DO_MOODBOARD.legenda;
+  return linhas > 0 ? linhas * L.entrelinha + L.folga : L.reservaSemLegenda;
+}
+
+/**
+ * Quantas linhas ocupa uma legenda — POR ESTIMATIVA, para quem não tem a fonte.
+ *
+ * O gerador do PDF mede com a Carlito e parte por palavras (ver `wrap`). O
+ * browser não tem essa fonte carregada e medir com outra daria um número
+ * diferente com ar de exacto. Aqui parte-se pelas mesmas palavras, com uma
+ * largura média de caractere: erra uma linha num texto que caia mesmo em cima
+ * do limite, e acerta no resto — que é o que separa «as fotos estão à altura
+ * certa» de «a legenda vai empurrá-las e a miniatura não avisou».
+ *
+ * Vem com o mesmo tecto do desenho: mais do que {@link TEXTO_DO_MOODBOARD}
+ * `.legenda.maxLinhas` não é impresso.
+ */
+export function linhasDaLegendaAprox(texto: string | undefined): number {
+  const L = TEXTO_DO_MOODBOARD.legenda;
+  const limpo = (texto ?? "").trim();
+  if (!limpo) return 0;
+  // 0,5 em por caractere: a média de um texto em caixa mista na Carlito, que é
+  // uma fonte de largura Calibri. Não se finge mais precisão do que esta.
+  const porLinha = Math.max(1, Math.floor((PAGINA_W - 2 * PAGINA_M) / (L.tamanho * 0.5)));
+  let linhas = 0;
+  for (const paragrafo of limpo.split("\n")) {
+    let atual = 0;
+    linhas += 1;
+    for (const palavra of paragrafo.split(/\s+/).filter(Boolean)) {
+      const teste = atual === 0 ? palavra.length : atual + 1 + palavra.length;
+      if (teste > porLinha && atual > 0) {
+        linhas += 1;
+        atual = palavra.length;
+      } else {
+        atual = teste;
+      }
+    }
+  }
+  return Math.min(L.maxLinhas, linhas);
+}
+
+/**
  * Reparte `n` fotos por `filas`, o mais equilibrado possível e SEM trocar a
  * ordem — a ordem é a que ela escolheu no estúdio, e uma foto que salta de sítio
  * ao acrescentar outra é a maneira certa de perder a confiança na

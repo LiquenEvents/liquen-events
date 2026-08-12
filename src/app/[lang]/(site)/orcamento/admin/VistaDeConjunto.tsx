@@ -35,6 +35,7 @@ export default function VistaDeConjunto({
   boards,
   ordem,
   urls,
+  originais = {},
   aspetos,
   onMover,
   onSaltar,
@@ -44,6 +45,8 @@ export default function VistaDeConjunto({
   /** Índices reais, pela ordem em que as páginas saem. */
   ordem: readonly number[];
   urls: Record<string, string>;
+  /** O original de cada foto, para quando a miniatura não existir. */
+  originais?: Record<string, string>;
   /** A forma medida de cada foto, por caminho. */
   aspetos: Record<string, number>;
   /** Mover a página que está NA POSIÇÃO `de` para a posição `para`. */
@@ -93,6 +96,7 @@ export default function VistaDeConjunto({
                     layout={layoutDoBoard(b)}
                     aspectos={desenho.map((i) => aspetos[b.images[i]] ?? ASPETO_POR_OMISSAO)}
                     urls={desenho.map((i) => urls[b.images[i]])}
+                    originais={desenho.map((i) => originais[b.images[i]])}
                     semRecorte={b.enquadramento === "forma-da-foto"}
                     titulo={b.title}
                     subtitulo={b.subtitulo}
