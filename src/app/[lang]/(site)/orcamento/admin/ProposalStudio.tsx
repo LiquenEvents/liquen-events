@@ -28,6 +28,21 @@ import { relatarFalhaDeImagem } from "./relatar-falha";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import Gralhas from "./Gralhas";
+import LupaDeFotos from "./LupaDeFotos";
+import {
+  ArrastoDosMoodBoards,
+  CartaoDeBoard,
+  CelulaDeFoto,
+  GrelhaDeFotos,
+  ListaDeBoards,
+  type LargadaDeFoto,
+} from "./MoodBoardFotos";
+import {
+  fotoPrincipalDe,
+  marcaDepoisDeMexer,
+  ordemDasFotos,
+  temLugarDeDestaque,
+} from "@/lib/proposal-moodboard";
 import { corrigirGralha, corrigirTudo, gralhasDoDocumento } from "@/lib/proposal-ortografia";
 import Versoes from "./Versoes";
 import { comoSeDiz, type FotoRepetida } from "@/lib/orcamento/fotos-repetidas";
@@ -968,8 +983,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [step, setStep] = useState<Step>("conteudo");
   // Qual o destino das fotos escolhidas na biblioteca de temas (null = fechado).
   const [picker, setPicker] = useState<
-    { kind: "board"; bi: number } | { kind: "cover"; idx: number } | null
+    // `substituir` é a posição a TROCAR no lugar: a foto escolhida entra ali em
+    // vez de ir para o fim. Sem isto, trocar uma foto era removê-la, escolher
+    // outra, e arrastá-la de volta ao sítio onde a primeira estava.
+    { kind: "board"; bi: number; substituir?: number } | { kind: "cover"; idx: number } | null
   >(null);
+  /** O que está a ser arrastado agora (identificador do dnd-kit), ou nada. */
+  const [aArrastar, setAArrastar] = useState<string | null>(null);
+  /** A fotografia aberta em grande: o board e a posição. */
+  const [lupa, setLupa] = useState<{ bi: number; ii: number } | null>(null);
+  /** As fotos escolhidas para serem movidas em conjunto — chaves `bi:ii`. */
+  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
   const hydrated = useRef(false);
   /** `updatedAt` do rascunho do servidor tal como o lemos — é com isto que o
    *  servidor deteta que alguém gravou por cima entretanto. */
@@ -2379,7 +2403,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       for (const r of reservas) if (r.sourcePath) next[r.token] = r.sourcePath;
       return next;
     });
-    if (picker?.kind === "board") {
+    if (picker?.kind === "board" && picker.substituir !== undefined) {
+      substituirFotoDoBoard(picker.bi, picker.substituir, reservas[0].token);
+    } else if (picker?.kind === "board") {
       addBoardImages(
         picker.bi,
         reservas.map((r) => r.token),
@@ -2440,7 +2466,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       setDoc((d) => mapImagePaths(d, (p) => trocas.get(p) ?? p));
     }
     if (novas.length === 0) return;
-    if (picker?.kind === "board") {
+    if (picker?.kind === "board" && picker.substituir !== undefined) {
+      substituirFotoDoBoard(picker.bi, picker.substituir, novas[0].path);
+    } else if (picker?.kind === "board") {
       addBoardImages(
         picker.bi,
         novas.map((im) => im.path),
@@ -2631,11 +2659,232 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       );
     }
   }
-  function removeBoardImage(bi: number, path: string) {
+  /**
+   * Remover uma foto — PELA POSIÇÃO, e com dez segundos para voltar atrás.
+   *
+   * Era por caminho (`filter((p) => p !== path)`), e a mesma fotografia pode
+   * estar duas vezes no mesmo board: remover uma removia as duas. Com a grelha
+   * a poder ser reordenada e a receber fotos de outros boards, a posição passou
+   * a ser a única coisa que identifica uma célula.
+   *
+   * A anulação é a mesma dos dez segundos do «Limpar» (`setLimpo`): guarda o
+   * documento inteiro antes de mexer. Sem diálogo a perguntar — é a regra desta
+   * casa, e uma pergunta antes de tirar uma foto de uma grelha de quarenta
+   * seria respondida sem ser lida.
+   */
+  function removeBoardImageAt(bi: number, ii: number) {
+    setLimpo({ doc, total: totalInput, segundos: 10, motivo: "Fotografia removida." });
     setDoc((d) => ({
       ...d,
       moodBoards: d.moodBoards.map((b, i) =>
-        i === bi ? { ...b, images: b.images.filter((p) => p !== path) } : b,
+        i === bi
+          ? {
+              ...b,
+              images: b.images.filter((_, j) => j !== ii),
+              // A marca da principal acompanha: sem isto, tirar a foto de cima
+              // fazia «a principal» passar a ser a que calhou àquele índice.
+              principal: marcaDepoisDeMexer(b, (antigo) =>
+                antigo === ii ? null : antigo > ii ? antigo - 1 : antigo,
+              ),
+            }
+          : b,
+      ),
+    }));
+  }
+
+  /**
+   * Trocar UMA fotografia no lugar.
+   *
+   * Palavras dela: «Substituir uma foto sem a apagar primeiro: abre a
+   * biblioteca e troca no lugar.» Sem isto, trocar era remover (perdendo a
+   * posição), escolher outra — que ia para o fim — e arrastá-la de volta.
+   *
+   * A marca da principal não se toca: o lugar continua a ser o mesmo, e quem
+   * troca a foto que manda na página quer que a nova mande na mesma.
+   */
+  function substituirFotoDoBoard(bi: number, ii: number, path: string) {
+    setDoc((d) => ({
+      ...d,
+      moodBoards: d.moodBoards.map((b, i) =>
+        i === bi ? { ...b, images: b.images.map((p, j) => (j === ii ? path : p)) } : b,
+      ),
+    }));
+    setPicker(null);
+  }
+
+  /** Reordenar dentro do mesmo board. */
+  function reordenarFotos(bi: number, de: number, para: number) {
+    setDoc((d) => ({
+      ...d,
+      moodBoards: d.moodBoards.map((b, i) => {
+        if (i !== bi) return b;
+        const imagens = [...b.images];
+        const [foto] = imagens.splice(de, 1);
+        if (foto === undefined) return b;
+        imagens.splice(para, 0, foto);
+        return {
+          ...b,
+          images: imagens,
+          principal: marcaDepoisDeMexer(b, (antigo) => {
+            if (antigo === de) return para;
+            // As que ficam entre o sítio de onde saiu e aquele para onde foi
+            // deslizam uma posição — para que lado depende da direcção.
+            if (de < antigo && antigo <= para) return antigo - 1;
+            if (para <= antigo && antigo < de) return antigo + 1;
+            return antigo;
+          }),
+        };
+      }),
+    }));
+  }
+
+  /**
+   * Mover uma foto de um board para outro.
+   *
+   * `paraIndice = -1` quer dizer «no fim» — é o que chega de uma largada na
+   * grelha em vez de sobre uma foto, que é o único caminho possível quando o
+   * board de destino está vazio.
+   */
+  function moverFotoDeBoard(
+    deBoard: number,
+    deIndice: number,
+    paraBoard: number,
+    paraIndice: number,
+  ) {
+    setDoc((d) => {
+      const origem = d.moodBoards[deBoard];
+      const foto = origem?.images[deIndice];
+      if (foto === undefined) return d;
+      return {
+        ...d,
+        moodBoards: d.moodBoards.map((b, i) => {
+          if (i === deBoard) {
+            return {
+              ...b,
+              images: b.images.filter((_, j) => j !== deIndice),
+              principal: marcaDepoisDeMexer(b, (antigo) =>
+                antigo === deIndice ? null : antigo > deIndice ? antigo - 1 : antigo,
+              ),
+            };
+          }
+          if (i === paraBoard) {
+            const imagens = [...b.images];
+            const onde = paraIndice < 0 ? imagens.length : Math.min(paraIndice, imagens.length);
+            imagens.splice(onde, 0, foto);
+            return {
+              ...b,
+              images: imagens,
+              principal: marcaDepoisDeMexer(b, (antigo) => (antigo >= onde ? antigo + 1 : antigo)),
+            };
+          }
+          return b;
+        }),
+      };
+    });
+  }
+
+  /** Mover VÁRIAS de uma vez — a selecção múltipla, sem passar pela biblioteca. */
+  function moverSeleccaoParaBoard(paraBoard: number) {
+    const escolhidas = [...seleccionadas]
+      .map((k) => {
+        const [b, i] = k.split(":").map(Number);
+        return { bi: b, ii: i };
+      })
+      .filter((s) => s.bi !== paraBoard);
+    if (escolhidas.length === 0) {
+      setSeleccionadas(new Set());
+      return;
+    }
+    setLimpo({ doc, total: totalInput, segundos: 10, motivo: "Fotografias movidas." });
+    setDoc((d) => {
+      // Os caminhos são lidos ANTES de mexer em nada: mover uma foto muda os
+      // índices das outras, e uma lista de índices lida a meio do caminho
+      // apanharia as fotos erradas.
+      const caminhos = escolhidas
+        .map(({ bi, ii }) => ({ bi, ii, path: d.moodBoards[bi]?.images[ii] }))
+        .filter((c): c is { bi: number; ii: number; path: string } => typeof c.path === "string");
+      const aTirar = new Map<number, Set<number>>();
+      for (const c of caminhos) {
+        if (!aTirar.has(c.bi)) aTirar.set(c.bi, new Set());
+        aTirar.get(c.bi)!.add(c.ii);
+      }
+      return {
+        ...d,
+        moodBoards: d.moodBoards.map((b, i) => {
+          const tirar = aTirar.get(i);
+          const semAsQueSaem = tirar
+            ? {
+                ...b,
+                images: b.images.filter((_, j) => !tirar.has(j)),
+                principal: marcaDepoisDeMexer(b, (antigo) =>
+                  tirar.has(antigo) ? null : antigo - [...tirar].filter((j) => j < antigo).length,
+                ),
+              }
+            : b;
+          if (i !== paraBoard) return semAsQueSaem;
+          return {
+            ...semAsQueSaem,
+            images: [...semAsQueSaem.images, ...caminhos.map((c) => c.path)],
+          };
+        }),
+      };
+    });
+    setSeleccionadas(new Set());
+    toast(
+      escolhidas.length === 1
+        ? "Fotografia movida. Podes anular durante 10 segundos."
+        : `${escolhidas.length} fotografias movidas. Podes anular durante 10 segundos.`,
+      "info",
+    );
+  }
+
+  /**
+   * Uma foto foi largada — dentro do board ou noutro.
+   *
+   * Um só sítio a decidir, e é aqui e não dentro do contexto de arrasto: o
+   * `MoodBoardFotos.tsx` sabe de gestos e de identificadores, não sabe o que é
+   * um documento de proposta.
+   */
+  function aoLargarFoto(largada: LargadaDeFoto) {
+    if (largada.tipo === "reordenar") {
+      reordenarFotos(largada.bi, largada.de, largada.para);
+      return;
+    }
+    moverFotoDeBoard(largada.deBoard, largada.deIndice, largada.paraBoard, largada.paraIndice);
+  }
+
+  /** Um mood board largado noutra POSIÇÃO do ecrã — ver `moveBoard`. */
+  function moverBoardParaPosicao(de: number, para: number) {
+    setDoc((d) => {
+      const arrumado = arrumadoEExplicito(d);
+      const boards = [...arrumado.moodBoards];
+      const [board] = boards.splice(de, 1);
+      if (board === undefined) return d;
+      boards.splice(para, 0, board);
+      return { ...arrumado, moodBoards: boards };
+    });
+  }
+
+  /** Escolher (ou desescolher) uma foto para o conjunto que se move de uma vez. */
+  function alternarSeleccao(bi: number, ii: number) {
+    setSeleccionadas((antes) => {
+      const proxima = new Set(antes);
+      const chave = `${bi}:${ii}`;
+      if (proxima.has(chave)) proxima.delete(chave);
+      else proxima.add(chave);
+      return proxima;
+    });
+  }
+
+  /** A foto que manda na página — ver `proposal-moodboard.ts`. */
+  function marcarPrincipal(bi: number, ii: number) {
+    setDoc((d) => ({
+      ...d,
+      moodBoards: d.moodBoards.map((b, i) =>
+        // Voltar a carregar na que já é principal DESMARCA: sem isso, marcar
+        // seria uma porta de sentido único e a única saída era marcar a
+        // primeira à mão.
+        i === bi ? { ...b, principal: b.principal === ii ? undefined : ii } : b,
       ),
     }));
   }
@@ -3584,163 +3833,246 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   fixarOrdem("Ordem fixada. Daqui para a frente manda a ordem que aqui está.")
                 }
               />
-              <div className="flex flex-col gap-3">
-                {/* Pela ordem que as páginas vão sair — ver `ordemDosBoards`. */}
-                {ordemDosBoards.map((bi, pos) => {
-                  const b = doc.moodBoards[bi];
-                  /**
-                   * A FORMA DE CADA FOTO, E DAÍ AS CAIXAS DESTA PÁGINA.
-                   *
-                   * As medidas vêm das miniaturas que já estão no ecrã (ver
-                   * `aspetosDasFotos`); o que ainda não se mediu entra com a
-                   * omissão, que é a mesma do gerador. Daqui saem as duas
-                   * coisas que têm de concordar: os diagramas do selector e a
-                   * forma de cada célula da grelha. Antes a célula usava o
-                   * arranjo único e antigo, e mostrava um recorte que a página
-                   * já não fazia — a mesma fotografia, cortada noutro sítio.
-                   */
-                  const aspectos = b.images
-                    .slice(0, MOOD_BOARD_MAX_IMAGES)
-                    .map((p) => aspetosDasFotos[p] ?? ASPETO_POR_OMISSAO);
-                  /**
-                   * A escolha desta página: as caixas tomam a FORMA das
-                   * fotografias em vez de as recortarem. Viaja daqui para as
-                   * três coisas que têm de concordar — a forma de cada célula
-                   * da grelha, os diagramas do selector, e a página do PDF.
-                   * Se uma delas ficasse para trás, ela escolhia por um
-                   * desenho e recebia outro.
-                   */
-                  const semRecorte = b.enquadramento === "forma-da-foto";
-                  const layoutDoBoard = b.layout ?? layoutSugerido(aspectos.length);
-                  const caixas = caixasDoMoodboard(layoutDoBoard, aspectos, undefined, semRecorte);
-                  /**
-                   * Quanto é que cada fotografia perde, uma a uma.
-                   *
-                   * Por fotografia e não por disposição: na mesma página, uma
-                   * panorâmica perde 5% e uma vertical 69%. Um aviso por página
-                   * obrigava-a a adivinhar qual é que era o problema — e a
-                   * resposta a «qual delas?» é a única coisa que torna o aviso
-                   * accionável (trocar aquela foto, ou ligar o interruptor).
-                   */
-                  const cortadas = semRecorte
-                    ? []
-                    : perdasDoMoodboard(layoutDoBoard, aspectos)
-                        .map((perda, i) => ({ perda, i }))
-                        .filter(({ perda }) => perda > PERDA_QUE_SE_AVISA);
-                  return (
-                    <div
-                      key={bi}
-                      className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
-                    >
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <input
-                          className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                          value={b.title}
-                          onChange={(e) => updateBoard(bi, { title: e.target.value })}
-                          placeholder="Decoração Cerimónia"
-                          aria-label="Título do mood board"
-                        />
-                        {/* O SEGUNDO andar do cabeçalho da página.
+              <BarraDaSeleccao
+                quantas={seleccionadas.size}
+                boards={doc.moodBoards}
+                onMover={moverSeleccaoParaBoard}
+                onLimpar={() => setSeleccionadas(new Set())}
+              />
+              <ArrastoDosMoodBoards
+                ordemDosBoards={ordemDosBoards}
+                aArrastar={aArrastar}
+                onArrastoComeca={setAArrastar}
+                fantasma={<FantasmaDaFoto id={aArrastar} doc={doc} urls={assetUrls} />}
+                onLargarBoard={(de, para) => moverBoardParaPosicao(de, para)}
+                onLargarFoto={aoLargarFoto}
+              >
+                <ListaDeBoards ordem={ordemDosBoards} className="flex flex-col gap-3">
+                  {/* Pela ordem que as páginas vão sair — ver `ordemDosBoards`. */}
+                  {ordemDosBoards.map((bi, pos) => {
+                    const b = doc.moodBoards[bi];
+                    /**
+                     * A FORMA DE CADA FOTO, E DAÍ AS CAIXAS DESTA PÁGINA.
+                     *
+                     * As medidas vêm das miniaturas que já estão no ecrã (ver
+                     * `aspetosDasFotos`); o que ainda não se mediu entra com a
+                     * omissão, que é a mesma do gerador. Daqui saem as duas
+                     * coisas que têm de concordar: os diagramas do selector e a
+                     * forma de cada célula da grelha. Antes a célula usava o
+                     * arranjo único e antigo, e mostrava um recorte que a página
+                     * já não fazia — a mesma fotografia, cortada noutro sítio.
+                     */
+                    const aspectos = b.images
+                      .slice(0, MOOD_BOARD_MAX_IMAGES)
+                      .map((p) => aspetosDasFotos[p] ?? ASPETO_POR_OMISSAO);
+                    /**
+                     * A escolha desta página: as caixas tomam a FORMA das
+                     * fotografias em vez de as recortarem. Viaja daqui para as
+                     * três coisas que têm de concordar — a forma de cada célula
+                     * da grelha, os diagramas do selector, e a página do PDF.
+                     * Se uma delas ficasse para trás, ela escolhia por um
+                     * desenho e recebia outro.
+                     */
+                    const semRecorte = b.enquadramento === "forma-da-foto";
+                    const layoutDoBoard = b.layout ?? layoutSugerido(aspectos.length);
+                    const caixas = caixasDoMoodboard(
+                      layoutDoBoard,
+                      aspectos,
+                      undefined,
+                      semRecorte,
+                    );
+                    /**
+                     * A ORDEM POR QUE A PÁGINA DESENHA — a mesma função do
+                     * gerador (`ordemDasFotos`). Com uma foto marcada como
+                     * principal, ela troca para a caixa grande; sem marca, ou
+                     * numa disposição sem lugar de destaque, é a ordem escrita.
+                     */
+                    const ordemDeDesenho = ordemDasFotos(b);
+                    const comDestaque = temLugarDeDestaque(layoutDoBoard);
+                    /**
+                     * Quanto é que cada fotografia perde, uma a uma.
+                     *
+                     * Por fotografia e não por disposição: na mesma página, uma
+                     * panorâmica perde 5% e uma vertical 69%. Um aviso por página
+                     * obrigava-a a adivinhar qual é que era o problema — e a
+                     * resposta a «qual delas?» é a única coisa que torna o aviso
+                     * accionável (trocar aquela foto, ou ligar o interruptor).
+                     */
+                    const cortadas = semRecorte
+                      ? []
+                      : perdasDoMoodboard(layoutDoBoard, aspectos)
+                          .map((perda, i) => ({ perda, i }))
+                          .filter(({ perda }) => perda > PERDA_QUE_SE_AVISA);
+                    return (
+                      <CartaoDeBoard
+                        key={bi}
+                        bi={bi}
+                        className="rounded-2xl border border-foreground/[0.08] bg-foreground/[0.015] p-4"
+                      >
+                        {(pega) => (
+                          <>
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              {/* A PEGA DO CARTÃO. Alvo próprio, sempre visível ao
+                            toque: com oito boards, levar o último ao topo eram
+                            sete cliques nas setas. */}
+                              <button
+                                type="button"
+                                {...pega}
+                                aria-label={`Arrastar o mood board ${pos + 1}`}
+                                className="alvo-toque flex h-8 w-6 shrink-0 cursor-grab items-center justify-center rounded-md text-foreground/35 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/70 active:cursor-grabbing"
+                              >
+                                <span aria-hidden="true">⠿</span>
+                              </button>
+                              <input
+                                className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                                value={b.title}
+                                onChange={(e) => updateBoard(bi, { title: e.target.value })}
+                                placeholder="Decoração Cerimónia"
+                                aria-label="Título do mood board"
+                              />
+                              {/* O SEGUNDO andar do cabeçalho da página.
                             A proposta feita à mão tem «Complementos dos Noivos»
                             e, por baixo, «Ramo de Noiva (a definir com a
                             Noiva)»: o primeiro diz o capítulo, o segundo diz o
                             que aquelas fotos são e o que ainda está por
                             decidir. Sem campo, ou se perdia a segunda frase ou
                             se enfiava tudo num título com parênteses. */}
-                        <input
-                          className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
-                          value={b.subtitulo ?? ""}
-                          onChange={(e) => updateBoard(bi, { subtitulo: e.target.value })}
-                          placeholder="Subtítulo (opcional) — ex.: Ramo de Noiva (a definir com a Noiva)"
-                          aria-label="Subtítulo do mood board"
-                        />
-                        {/* A POSIÇÃO NO ECRÃ, não o índice do array: ver
+                              <input
+                                className="bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75"
+                                value={b.subtitulo ?? ""}
+                                onChange={(e) => updateBoard(bi, { subtitulo: e.target.value })}
+                                placeholder="Subtítulo (opcional) — ex.: Ramo de Noiva (a definir com a Noiva)"
+                                aria-label="Subtítulo do mood board"
+                              />
+                              {/* A POSIÇÃO NO ECRÃ, não o índice do array: ver
                             `moveBoard`. */}
-                        <MoveBtns
-                          onUp={() => moveBoard(pos, -1)}
-                          onDown={() => moveBoard(pos, 1)}
-                          disUp={pos === 0}
-                          disDown={pos === doc.moodBoards.length - 1}
-                        />
-                        <button
-                          type="button"
-                          className={REMOVE_BTN}
-                          onClick={() => removeBoard(bi)}
-                          aria-label="Remover mood board"
-                        >
-                          ×
-                        </button>
-                      </div>
-                      <textarea
-                        className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
-                        rows={2}
-                        value={b.annotation ?? ""}
-                        onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
-                        placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
-                        aria-label="Descrição do mood board"
-                      />
-                      {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
+                              <MoveBtns
+                                onUp={() => moveBoard(pos, -1)}
+                                onDown={() => moveBoard(pos, 1)}
+                                disUp={pos === 0}
+                                disDown={pos === doc.moodBoards.length - 1}
+                              />
+                              <button
+                                type="button"
+                                className={REMOVE_BTN}
+                                onClick={() => removeBoard(bi)}
+                                aria-label="Remover mood board"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <textarea
+                              className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
+                              rows={2}
+                              value={b.annotation ?? ""}
+                              onChange={(e) => updateBoard(bi, { annotation: e.target.value })}
+                              placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
+                              aria-label="Descrição do mood board"
+                            />
+                            {/* A página deste mood board desenha MOOD_BOARD_MAX_IMAGES
                           fotos. As que passam disso ficam marcadas — e ditas por
                           extenso a seguir — em vez de desaparecerem caladas no
                           PDF. */}
-                      {b.images.length > MOOD_BOARD_MAX_IMAGES && (
-                        <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
-                          A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES} fotos:{" "}
-                          {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
-                            ? "a última, marcada «fora do PDF», não é impressa"
-                            : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
-                          . Remove fotos ou cria outro mood board.
-                        </p>
-                      )}
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {b.images.map((path, ii) => (
-                          <Thumb
-                            // A chave é a POSIÇÃO, não o caminho: quando o
-                            // marcador provisório dá lugar ao caminho definitivo,
-                            // uma chave com o caminho faria o React desmontar a
-                            // célula e a foto piscava a meio da troca.
-                            key={ii}
-                            url={assetUrls[path]}
-                            planoB={assetOriginais[path]}
-                            onde="mood-board"
-                            refDoc={path}
-                            onRemove={() => removeBoardImage(bi, path)}
-                            onMedida={(a) => registarAspeto(path, a)}
-                            // A forma da célula que ESTA foto vai ocupar na
-                            // página — sai da caixa que a disposição escolhida
-                            // lhe dá, e muda com ela e com o número de fotos.
-                            // Nenhuma delas é quadrada. As que já não são
-                            // impressas ficam quadradas: não têm caixa nenhuma.
-                            aspeto={aspetoDaCaixa(caixas[ii])}
-                            foraDoPdf={ii >= MOOD_BOARD_MAX_IMAGES}
-                            pendente={isPendingImage(path)}
-                          />
-                        ))}
-                        <UploadArea
-                          label="+ Imagens"
-                          busy={!!uploading[`board-${bi}`]}
-                          multiple
-                          compact
-                          onFiles={(files) =>
-                            handleUpload(`board-${bi}`, files, (paths) => addBoardImages(bi, paths))
-                          }
-                        />
-                      </div>
-                      {/* Sem fotos não há disposição nenhuma para escolher — o
+                            {b.images.length > MOOD_BOARD_MAX_IMAGES && (
+                              <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
+                                A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES} fotos:{" "}
+                                {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
+                                  ? "a última, marcada «fora do PDF», não é impressa"
+                                  : `as ${b.images.length - MOOD_BOARD_MAX_IMAGES} últimas, marcadas «fora do PDF», não são impressas`}
+                                . Remove fotos ou cria outro mood board.
+                              </p>
+                            )}
+                            <GrelhaDeFotos
+                              bi={bi}
+                              quantas={b.images.length}
+                              className="grid grid-cols-3 sm:grid-cols-4 gap-2"
+                            >
+                              {b.images.map((path, ii) => (
+                                <CelulaDeFoto
+                                  // A chave é a POSIÇÃO, não o caminho: quando o
+                                  // marcador provisório dá lugar ao caminho definitivo,
+                                  // uma chave com o caminho faria o React desmontar a
+                                  // célula e a foto piscava a meio da troca.
+                                  key={ii}
+                                  bi={bi}
+                                  ii={ii}
+                                  principal={comDestaque && fotoPrincipalDe(b) === ii}
+                                  seleccionada={seleccionadas.has(`${bi}:${ii}`)}
+                                  accoes={
+                                    <AccoesDaFoto
+                                      podeRecuar={ii > 0}
+                                      podeAvancar={ii < b.images.length - 1}
+                                      seleccionada={seleccionadas.has(`${bi}:${ii}`)}
+                                      principal={
+                                        comDestaque ? fotoPrincipalDe(b) === ii : undefined
+                                      }
+                                      onRecuar={() => reordenarFotos(bi, ii, ii - 1)}
+                                      onAvancar={() => reordenarFotos(bi, ii, ii + 1)}
+                                      onAmpliar={() => setLupa({ bi, ii })}
+                                      onSubstituir={() =>
+                                        setPicker({ kind: "board", bi, substituir: ii })
+                                      }
+                                      onPrincipal={() => marcarPrincipal(bi, ii)}
+                                      onSeleccionar={() => alternarSeleccao(bi, ii)}
+                                      onRemover={() => removeBoardImageAt(bi, ii)}
+                                    />
+                                  }
+                                >
+                                  <Thumb
+                                    url={assetUrls[path]}
+                                    planoB={assetOriginais[path]}
+                                    onde="mood-board"
+                                    refDoc={path}
+                                    // A remoção mudou-se para a barra de acções, que
+                                    // é visível ao toque — o × só aparecia em hover, e
+                                    // num telemóvel isso é um botão que não existe.
+                                    semRemover
+                                    onRemove={() => removeBoardImageAt(bi, ii)}
+                                    onMedida={(a) => registarAspeto(path, a)}
+                                    // A forma da célula que ESTA foto vai ocupar na
+                                    // página — sai da caixa que a disposição escolhida
+                                    // lhe dá, e muda com ela e com o número de fotos.
+                                    // Nenhuma delas é quadrada. As que já não são
+                                    // impressas ficam quadradas: não têm caixa nenhuma.
+                                    //
+                                    // Pela ORDEM DE DESENHO e não pela posição no
+                                    // array: com uma foto marcada como principal, a
+                                    // página troca-a para a caixa grande, e a célula
+                                    // tem de mostrar a forma dessa caixa (ver
+                                    // `ordemDasFotos`).
+                                    aspeto={aspetoDaCaixa(caixas[ordemDeDesenho.indexOf(ii)])}
+                                    foraDoPdf={ordemDeDesenho.indexOf(ii) >= MOOD_BOARD_MAX_IMAGES}
+                                    pendente={isPendingImage(path)}
+                                  />
+                                </CelulaDeFoto>
+                              ))}
+                              <UploadArea
+                                label="+ Imagens"
+                                busy={!!uploading[`board-${bi}`]}
+                                multiple
+                                compact
+                                onFiles={(files) =>
+                                  handleUpload(`board-${bi}`, files, (paths) =>
+                                    addBoardImages(bi, paths),
+                                  )
+                                }
+                              />
+                            </GrelhaDeFotos>
+                            {/* Sem fotos não há disposição nenhuma para escolher — o
                         selector aparece com a primeira foto, que é quando a
                         pergunta passa a ter resposta. */}
-                      {aspectos.length > 0 && (
-                        <SelectorDeLayout
-                          valor={b.layout}
-                          aspectos={aspectos}
-                          semRecorte={semRecorte}
-                          // `undefined` APAGA o campo: um mood board sem layout
-                          // gravado continua sem ele, e uma proposta já enviada
-                          // não muda de aspecto por causa disto.
-                          onEscolher={(layout) => updateBoard(bi, { layout })}
-                        />
-                      )}
-                      {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
+                            {aspectos.length > 0 && (
+                              <SelectorDeLayout
+                                valor={b.layout}
+                                aspectos={aspectos}
+                                semRecorte={semRecorte}
+                                // `undefined` APAGA o campo: um mood board sem layout
+                                // gravado continua sem ele, e uma proposta já enviada
+                                // não muda de aspecto por causa disto.
+                                onEscolher={(layout) => updateBoard(bi, { layout })}
+                              />
+                            )}
+                            {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
                           Está aqui, por baixo dos diagramas, porque é com eles
                           que se percebe o que ele faz: liga-se e as caixas
                           mudam de forma à frente dela.
@@ -3749,50 +4081,53 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           mood board que nunca teve a escolha tem de continuar
                           sem ela, para uma proposta já enviada sair como
                           sempre saiu. */}
-                      <label className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-foreground/65">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
-                          checked={semRecorte}
-                          onChange={(e) =>
-                            updateBoard(bi, {
-                              enquadramento: e.target.checked ? "forma-da-foto" : undefined,
-                            })
-                          }
-                        />
-                        <span>
-                          Manter a forma de cada fotografia (não corta)
-                          <span className="block text-[11px] text-foreground/40">
-                            Desligado, as fotografias são recortadas para encher as caixas da
-                            disposição — como saía antes.
-                          </span>
-                        </span>
-                      </label>
-                      {cortadas.length > 0 && (
-                        <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
-                          Nesta disposição{" "}
-                          {cortadas.length === 1
-                            ? "1 fotografia é cortada"
-                            : `${cortadas.length} fotografias são cortadas`}
-                          :{" "}
-                          {cortadas
-                            .map(({ perda, i }) => `a ${i + 1}.ª perde ${Math.round(perda * 100)}%`)
-                            .join(", ")}
-                          . Liga «Manter a forma de cada fotografia» para não perder nada.
-                        </p>
-                      )}
-                      <div className="mt-2 flex flex-wrap items-center gap-4">
-                        <button
-                          type="button"
-                          className={ADD_BTN}
-                          onClick={() => setPicker({ kind: "board", bi })}
-                          onPointerEnter={aquecerBiblioteca}
-                          onFocus={aquecerBiblioteca}
-                          onTouchStart={aquecerBiblioteca}
-                        >
-                          Escolher da biblioteca de temas
-                        </button>
-                        {/* GUARDAR ESTE, e não «o primeiro com título».
+                            <label className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-foreground/65">
+                              <input
+                                type="checkbox"
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
+                                checked={semRecorte}
+                                onChange={(e) =>
+                                  updateBoard(bi, {
+                                    enquadramento: e.target.checked ? "forma-da-foto" : undefined,
+                                  })
+                                }
+                              />
+                              <span>
+                                Manter a forma de cada fotografia (não corta)
+                                <span className="block text-[11px] text-foreground/40">
+                                  Desligado, as fotografias são recortadas para encher as caixas da
+                                  disposição — como saía antes.
+                                </span>
+                              </span>
+                            </label>
+                            {cortadas.length > 0 && (
+                              <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
+                                Nesta disposição{" "}
+                                {cortadas.length === 1
+                                  ? "1 fotografia é cortada"
+                                  : `${cortadas.length} fotografias são cortadas`}
+                                :{" "}
+                                {cortadas
+                                  .map(
+                                    ({ perda, i }) =>
+                                      `a ${i + 1}.ª perde ${Math.round(perda * 100)}%`,
+                                  )
+                                  .join(", ")}
+                                . Liga «Manter a forma de cada fotografia» para não perder nada.
+                              </p>
+                            )}
+                            <div className="mt-2 flex flex-wrap items-center gap-4">
+                              <button
+                                type="button"
+                                className={ADD_BTN}
+                                onClick={() => setPicker({ kind: "board", bi })}
+                                onPointerEnter={aquecerBiblioteca}
+                                onFocus={aquecerBiblioteca}
+                                onTouchStart={aquecerBiblioteca}
+                              >
+                                Escolher da biblioteca de temas
+                              </button>
+                              {/* GUARDAR ESTE, e não «o primeiro com título».
                           O controlo era único para a secção inteira e recebia
                           `doc.moodBoards.find(…)` — portanto guardava sempre o
                           PRIMEIRO mood board com título. Ela montava o
@@ -3801,20 +4136,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           maneira nenhuma. Agora o botão vive ao lado do bloco
                           a que se refere, que é a única forma de a pergunta
                           "qual deles?" não ter de ser respondida por adivinha. */}
-                        {(b.title ?? "").trim() && (
-                          <ModelosParciais
-                            tipo="moodboard"
-                            mostrar="guardar"
-                            toast={toast}
-                            paraGuardar={b}
-                            nomeSugerido={b.title}
-                          />
+                              {(b.title ?? "").trim() && (
+                                <ModelosParciais
+                                  tipo="moodboard"
+                                  mostrar="guardar"
+                                  toast={toast}
+                                  paraGuardar={b}
+                                  nomeSugerido={b.title}
+                                />
+                              )}
+                            </div>
+                          </>
                         )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                      </CartaoDeBoard>
+                    );
+                  })}
+                </ListaDeBoards>
+              </ArrastoDosMoodBoards>
               <div className="mt-3 flex flex-wrap items-center gap-4">
                 <button type="button" className={ADD_BTN} onClick={addBoard}>
                   + Adicionar mood board
@@ -4992,10 +5330,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         )}
       </div>
 
+      {/* A fotografia em grande, com as setas a percorrer as deste board. */}
+      {lupa && (
+        <LupaDeFotos
+          aberta
+          titulo={doc.moodBoards[lupa.bi]?.title ?? ""}
+          urls={(doc.moodBoards[lupa.bi]?.images ?? []).map(
+            (p) => assetOriginais[p] ?? assetUrls[p],
+          )}
+          indice={lupa.ii}
+          onFechar={() => setLupa(null)}
+          onMudar={(ii) => setLupa((l) => (l ? { ...l, ii } : l))}
+        />
+      )}
+
       {picker && (
         <ThemePicker
           quoteId={quote.id}
-          multiple={picker.kind === "board"}
+          // A trocar UMA foto no lugar, escolher várias não faz sentido: as
+          // outras iriam para o fim e a troca deixava de ser uma troca.
+          multiple={picker.kind === "board" && picker.substituir === undefined}
           usedThemePaths={usedThemePaths}
           usadasNoutras={usadasNoutras}
           onClose={() => setPicker(null)}
@@ -5084,6 +5438,215 @@ function LinhaDeTotal({
  * mandar nela (`ordemExplicita`). Nem sequer é uma acção destrutiva: escreve
  * exactamente a ordem que já está à vista.
  */
+/**
+ * A fotografia que vai na mão, enquanto se arrasta.
+ *
+ * Sem isto, arrastar de um board para outro é mover um buraco: a célula de
+ * origem esvazia-se e não há nada a acompanhar o cursor até ao destino — o que
+ * numa página com oito boards quer dizer largar às cegas.
+ */
+function FantasmaDaFoto({
+  id,
+  doc,
+  urls,
+}: {
+  id: string | null;
+  doc: StudioDoc;
+  urls: Record<string, string>;
+}) {
+  if (!id) return null;
+  const partes = id.split(":");
+  if (partes[0] !== "foto") return null;
+  const caminho = doc.moodBoards[Number(partes[1])]?.images[Number(partes[2])];
+  const url = caminho ? urls[caminho] : undefined;
+  return (
+    <div className="h-24 w-24 overflow-hidden rounded-lg border border-white/40 bg-foreground/10 shadow-xl">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A barra do conjunto: «3 fotografias escolhidas → mover para…».
+ *
+ * Palavras dela: «Também com seleção múltipla, para mover várias de uma vez.»
+ * Arrastar uma a uma resolve o engano de uma foto; quando um board inteiro foi
+ * parar ao sítio errado — o que acontece ao colar uma pasta da biblioteca —,
+ * são vinte gestos.
+ *
+ * Só aparece quando há alguma coisa escolhida: uma barra permanentemente ali é
+ * uma linha de ruído em todas as outras vezes.
+ */
+function BarraDaSeleccao({
+  quantas,
+  boards,
+  onMover,
+  onLimpar,
+}: {
+  quantas: number;
+  boards: StudioDoc["moodBoards"];
+  onMover: (paraBoard: number) => void;
+  onLimpar: () => void;
+}) {
+  if (quantas === 0) return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#4d6350]/35 bg-[#4d6350]/[0.06] px-3 py-2">
+      <p className="text-xs font-medium text-foreground/75">
+        {quantas === 1 ? "1 fotografia escolhida" : `${quantas} fotografias escolhidas`}
+      </p>
+      <label className="flex items-center gap-1.5 text-xs text-foreground/60">
+        Mover para
+        <select
+          // Volta sempre a «—» depois de mover: é uma acção, não um estado, e
+          // um selector que ficasse a mostrar o último destino leria como se a
+          // selecção ainda lá estivesse.
+          value=""
+          onChange={(e) => {
+            const bi = Number(e.target.value);
+            if (Number.isInteger(bi)) onMover(bi);
+          }}
+          className="bo-input w-44 px-2 py-1 text-xs"
+          aria-label="Mover as fotografias escolhidas para outro mood board"
+        >
+          <option value="">—</option>
+          {boards.map((b, bi) => (
+            <option key={bi} value={bi}>
+              {b.title?.trim() || `Mood board ${bi + 1}`}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button
+        type="button"
+        onClick={onLimpar}
+        className="alvo-toque text-xs font-medium text-foreground/55 transition-colors hover:text-foreground/80"
+      >
+        Limpar
+      </button>
+    </div>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE SE PODE FAZER A UMA FOTOGRAFIA, SEM A TIRAR DE LÁ PRIMEIRO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Antes havia um botão só, o × de remover, e só aparecia ao passar o rato.
+ * Num telemóvel — que é onde metade deste trabalho é feito — isso é um botão
+ * que não existe; e no computador era a única resposta para «esta foto está no
+ * sítio errado», o que fazia de remover a ferramenta para tudo.
+ *
+ * ── PORQUE É QUE ESTÁ SEMPRE VISÍVEL AO TOQUE ─────────────────────────────
+ * `[@media(hover:none)]:opacity-100`. Onde há rato, a barra aparece ao passar
+ * por cima e a grelha fica limpa; onde não há, está lá. A alternativa —
+ * revelá-la com um toque longo — obrigava a descobrir que o toque longo existe.
+ *
+ * ── AS SETAS NÃO SÃO UM ADORNO ────────────────────────────────────────────
+ * São o caminho do teclado (e do dedo trémulo). Arrastar exige apontar, mover e
+ * largar sem falhar; mover uma foto uma casa é um toque, e é o gesto que se faz
+ * dez vezes seguidas ao afinar uma página.
+ */
+function AccoesDaFoto({
+  podeRecuar,
+  podeAvancar,
+  principal,
+  seleccionada,
+  onRecuar,
+  onAvancar,
+  onAmpliar,
+  onSubstituir,
+  onPrincipal,
+  onSeleccionar,
+  onRemover,
+}: {
+  podeRecuar: boolean;
+  podeAvancar: boolean;
+  /** `undefined` = esta disposição não tem lugar de destaque; o botão não aparece. */
+  principal?: boolean;
+  seleccionada: boolean;
+  onRecuar: () => void;
+  onAvancar: () => void;
+  onAmpliar: () => void;
+  onSubstituir: () => void;
+  onPrincipal: () => void;
+  onSeleccionar: () => void;
+  onRemover: () => void;
+}) {
+  const botao =
+    "alvo-toque flex h-6 w-6 items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white transition-colors hover:bg-black/75 disabled:opacity-30";
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 transition-opacity group-hover/foto:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+      <span className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5">
+        <button
+          type="button"
+          className={botao}
+          onClick={onRecuar}
+          disabled={!podeRecuar}
+          aria-label="Mover para trás"
+        >
+          <span aria-hidden="true">←</span>
+        </button>
+        <button
+          type="button"
+          className={botao}
+          onClick={onAvancar}
+          disabled={!podeAvancar}
+          aria-label="Mover para a frente"
+        >
+          <span aria-hidden="true">→</span>
+        </button>
+        <button type="button" className={botao} onClick={onAmpliar} aria-label="Ver em grande">
+          <span aria-hidden="true">⤢</span>
+        </button>
+        <button
+          type="button"
+          className={botao}
+          onClick={onSubstituir}
+          aria-label="Trocar por outra fotografia"
+        >
+          <span aria-hidden="true">⇄</span>
+        </button>
+        {principal !== undefined && (
+          <button
+            type="button"
+            className={`${botao} ${principal ? "bg-[#4d6350]" : ""}`}
+            onClick={onPrincipal}
+            aria-pressed={principal}
+            aria-label={
+              principal
+                ? "Deixar de ser a fotografia principal"
+                : "Fotografia principal desta página"
+            }
+          >
+            <span aria-hidden="true">★</span>
+          </button>
+        )}
+        <button
+          type="button"
+          className={`${botao} ${seleccionada ? "bg-[#4d6350]" : ""}`}
+          onClick={onSeleccionar}
+          aria-pressed={seleccionada}
+          aria-label={seleccionada ? "Retirar da selecção" : "Escolher para mover em conjunto"}
+        >
+          <span aria-hidden="true">✓</span>
+        </button>
+        <button
+          type="button"
+          className={`${botao} hover:bg-[#8a2a22]`}
+          onClick={onRemover}
+          aria-label="Remover fotografia"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </span>
+    </div>
+  );
+}
+
 function AvisoDeOrdem({
   mostrar,
   onde,
@@ -5314,7 +5877,6 @@ function PreviewSummary({
   pctSinal: number;
 }) {
   const covers = (doc.coverImages ?? []).filter(Boolean) as string[];
-  const porConfirmar = countPendingImages(doc);
   const groups = doc.serviceGroups.filter((g) => (g.title ?? "").trim() || g.items.length > 0);
   const extras = (doc.budgetExtras ?? []).filter(
     (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
@@ -5764,6 +6326,7 @@ function Thumb({
   onMedida,
   foraDoPdf = false,
   pendente = false,
+  semRemover = false,
   onde = "estúdio",
   // `refDoc` e não `ref`: o React trata `ref` como prop especial, e uma string
   // ali dentro é o padrão antigo das string refs, que ele recusa.
@@ -5810,6 +6373,15 @@ function Thumb({
   onde?: string;
   /** O caminho no documento — o que se procura no Storage quando isto falha. */
   refDoc?: string;
+  /**
+   * Não desenhar o × desta célula.
+   *
+   * Nas grelhas dos mood boards a remoção passou para a barra de acções, que é
+   * visível ao toque; o × da miniatura só aparecia em hover, e num telemóvel um
+   * botão que só aparece em hover é um botão que não existe. As capas continuam
+   * com ele — ali há duas células e nenhuma barra.
+   */
+  semRemover?: boolean;
 }) {
   const {
     alvo,
@@ -5864,6 +6436,11 @@ function Thumb({
       // saber na mesma que esta foto ainda está a entrar (a pastilha «X a
       // caminho» diz o total, isto diz QUAL).
       aria-busy={pendente || undefined}
+      // A PEGA DOS TESTES. Uma célula de foto identificava-se pelo seu «×» —
+      // e o × saiu daqui para a barra de acções, que é visível ao toque. Um
+      // atributo próprio diz o que a célula É, em vez de a fazer depender de
+      // que botões calha ter naquele sítio.
+      data-foto=""
       // `self-start` com o aspecto: dentro de uma grelha, sem isto a célula
       // esticava-se à altura da linha e o `aspect-ratio` era ignorado — que é
       // exactamente o contrário do que se quer aqui.
@@ -5937,14 +6514,16 @@ function Thumb({
           fora do PDF
         </span>
       )}
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label="Remover imagem"
-        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white text-xs leading-none opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-      >
-        ×
-      </button>
+      {!semRemover && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Remover imagem"
+          className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white text-xs leading-none opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+        >
+          ×
+        </button>
+      )}
     </div>
   );
 }

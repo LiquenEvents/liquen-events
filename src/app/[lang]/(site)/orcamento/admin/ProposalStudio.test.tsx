@@ -795,9 +795,16 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
  *     PDF do cliente.
  */
 describe("fotos da biblioteca em estado provisório", () => {
-  /** As células de foto do documento, por ordem no DOM (cada uma tem o seu «×»). */
-  const celulas = () =>
-    screen.queryAllByRole("button", { name: "Remover imagem" }).map((b) => b.parentElement!);
+  /**
+   * As células de foto do documento, por ordem no DOM.
+   *
+   * Era `queryAllByRole("button", { name: "Remover imagem" })` + `parentElement`:
+   * uma célula identificava-se pelo × que tinha lá dentro. O × das grelhas dos
+   * mood boards mudou-se para a barra de acções (visível ao toque, que é onde
+   * um botão só-com-hover não existe), e o teste passou a não encontrar
+   * célula nenhuma. `[data-foto]` diz o que a célula É.
+   */
+  const celulas = () => Array.from(document.querySelectorAll<HTMLElement>("[data-foto]"));
   const estados = () => celulas().map((c) => c.getAttribute("aria-busy"));
 
   async function abrirBiblioteca(user: ReturnType<typeof userEvent.setup>) {
@@ -1194,11 +1201,10 @@ describe("uma célula que não conseguiu desenhar a foto", () => {
    * Os dois testes abaixo são o defeito, um de cada vez.
    */
 
-  /** A célula da capa, e o `<img>` lá dentro. */
+  /** A primeira célula de foto do documento, e o `<img>` lá dentro. */
   const imagemDaCapa = () =>
-    screen
-      .queryAllByRole("button", { name: "Remover imagem" })
-      .map((b) => b.parentElement!.querySelector("img"))
+    Array.from(document.querySelectorAll<HTMLElement>("[data-foto]"))
+      .map((c) => c.querySelector("img"))
       .filter(Boolean)[0] as HTMLImageElement | undefined;
 
   const avisoDeFalha = () => screen.queryByText(/não foi possível pré-visualizar/i);

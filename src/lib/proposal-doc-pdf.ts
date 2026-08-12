@@ -31,6 +31,7 @@ import {
   resolveValidUntil,
 } from "@/lib/proposal-doc";
 import { ordemDeSaida, eAOrdemEscrita } from "@/lib/proposal-ordem";
+import { ordemDasFotos } from "@/lib/proposal-moodboard";
 import { round2 } from "@/lib/money";
 import { normalizarValor, somaDosExtrasSemIva, totaisDaProposta } from "@/lib/proposal-budget";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
@@ -2166,7 +2167,22 @@ async function drawCollage(
   // O collage tem lugar para MOOD_BOARD_MAX_IMAGES fotos. As restantes JÁ
   // FORAM descarregadas do armazenamento com sucesso e mesmo assim não são
   // desenhadas — é a perda que este aviso existe para tornar visível.
-  const imgs = mb.images.slice(0, MOOD_BOARD_MAX_IMAGES);
+  /**
+   * ── A FOTO QUE MANDA NA PÁGINA VEM PRIMEIRO ─────────────────────────────
+   *
+   * `ordemDasFotos` põe a foto marcada como principal na primeira posição —
+   * que é a caixa grande nas duas disposições que têm uma (o «destaque» e o
+   * «mosaico»). Nas outras devolve a ordem escrita e não mexe em nada.
+   *
+   * A permutação é feita ANTES do corte às `MOOD_BOARD_MAX_IMAGES`: uma foto
+   * marcada como principal na décima primeira posição tem de entrar na página,
+   * não ser cortada por causa da ordem em que foi carregada.
+   *
+   * É a mesma função que o estúdio chama para desenhar a grelha. Se fossem
+   * duas, ela marcava uma foto e recebia outra em grande.
+   */
+  const ordemDelas = ordemDasFotos(mb);
+  const imgs = ordemDelas.slice(0, MOOD_BOARD_MAX_IMAGES).map((i) => mb.images[i]);
   note(`Mood board ${boardName}`, mb.images.length - MOOD_BOARD_MAX_IMAGES, "fotos");
   const n = imgs.length;
 

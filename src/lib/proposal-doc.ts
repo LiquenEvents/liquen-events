@@ -131,6 +131,21 @@ export interface MoodBoard {
    * foto a forma dela, e é medido: 0% de perda antes e depois.
    */
   enquadramento?: "forma-da-foto";
+  /**
+   * A FOTO QUE MANDA NA PÁGINA — índice dentro de `images`.
+   *
+   * Duas das cinco disposições dão a uma caixa muito mais área do que às
+   * outras: o «destaque», por definição, e o «mosaico», cuja primeira célula é
+   * a maior. Nessas, quem estivesse na primeira posição ficava grande — e essa
+   * posição era, até aqui, a ordem por que as fotos foram carregadas.
+   *
+   * É uma MARCA e não uma reordenação: a ordem das fotos é dela e tem sentido
+   * próprio nas outras disposições. A permutação faz-se ao desenhar, com a
+   * mesma função dos dois lados (ver `proposal-moodboard.ts`).
+   *
+   * Ausente = a primeira, como sempre foi.
+   */
+  principal?: number;
 }
 
 export interface ServiceItem {
