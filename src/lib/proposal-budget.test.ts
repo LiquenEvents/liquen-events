@@ -14,6 +14,7 @@ import {
   definirItem,
   definirPreco,
   somaDosExtrasSemIva,
+  totaisDaProposta,
 } from "./proposal-budget";
 import { round2 } from "./money";
 import { resolveProposalMoney, type ProposalDoc } from "./proposal-doc";
@@ -712,5 +713,154 @@ describe("somaDosExtrasSemIva", () => {
         IVA,
       ),
     ).toBe(1500);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS SEIS NÚMEROS DO BLOCO DE TOTAIS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Estes testes são a rede da dupla conversão. O caso da Tara e do Marty está
+ * aqui com os números exactos do PDF que foi para a cliente — é o único caso
+ * deste ficheiro que se pode conferir contra papel impresso.
+ */
+describe("totaisDaProposta — o bloco que tem de fechar", () => {
+  const doc = (over: Partial<ProposalDoc> = {}) =>
+    ({
+      budgetItems: ["Decoração Cerimónia", "Decoração Copo d'Água"],
+      budgetAmounts: [],
+      budgetExtras: [],
+      ...over,
+    }) as Parameters<typeof totaisDaProposta>[0];
+
+  /**
+   * ── O CASO MEDIDO ─────────────────────────────────────────────────────────
+   * Total 2.460,00 € de base, IVA incluído no valor guardado (3.025,80 €), uma
+   * deslocação de 75,00 €. O gerador imprimia 2.950,79 € — (3.025,80 − 75) ÷
+   * 1,23 × 1,23, com um arredondamento pelo meio — quando 3.025,80 − 75,00 =
+   * 2.950,80. O cêntimo perdido fazia o documento não fechar.
+   */
+  it("Tara e Marty: uma conversão só, e as três somas ao cêntimo", () => {
+    const t = totaisDaProposta(
+      doc({
+        totalAmount: 3025.8,
+        totalVatMode: "incluido",
+        budgetExtras: [{ label: "Deslocação da Equipa Líquen", valueText: "75,00 €" }],
+      }),
+      30,
+    );
+    expect(t.total).toBe(2460);
+    expect(t.adicionais).toBe(60.98); // 75 ÷ 1,23
+    expect(t.servicos).toBe(2399.02);
+    expect(round2(t.servicos + t.adicionais)).toBe(t.total);
+    expect(t.iva).toBe(565.8);
+    expect(t.aPagar).toBe(3025.8);
+    expect(round2(t.total + t.iva)).toBe(t.aPagar);
+    expect(t.sinal).toBe(907.74);
+    expect(t.saldo).toBe(2118.06);
+    expect(round2(t.sinal + t.saldo)).toBe(t.aPagar);
+    expect(t.fecha).toBe(true);
+  });
+
+  it("os mesmos serviços, o mesmo total a pagar, nos dois modos de IVA", () => {
+    // A mesma proposta escrita das duas maneiras: base 2.460 em «acresce» e
+    // 3.025,80 em «IVA incluído». O que o casal transfere é o mesmo número, e
+    // as duas leituras têm de o dizer.
+    const acresce = totaisDaProposta(
+      doc({
+        totalAmount: 2460,
+        totalVatMode: "acrescer",
+        budgetExtras: [{ label: "Deslocação", valueText: "75,00 € + IVA" }],
+      }),
+      30,
+    );
+    const incluido = totaisDaProposta(
+      doc({
+        totalAmount: 3025.8,
+        totalVatMode: "incluido",
+        budgetExtras: [{ label: "Deslocação", valueText: "92,25 €" }], // 75 × 1,23
+      }),
+      30,
+    );
+    expect(acresce.aPagar).toBe(incluido.aPagar);
+    expect(acresce.total).toBe(incluido.total);
+    expect(acresce.adicionais).toBe(incluido.adicionais);
+    expect(acresce.servicos).toBe(incluido.servicos);
+    expect(acresce.sinal).toBe(incluido.sinal);
+  });
+
+  it("a percentagem do sinal é a que lhe for dada, e o saldo é o resto", () => {
+    const t = totaisDaProposta(doc({ totalAmount: 10000, totalVatMode: "acrescer" }), 50);
+    expect(t.aPagar).toBe(12300);
+    expect(t.percentagemSinal).toBe(50);
+    expect(t.sinal).toBe(6150);
+    expect(t.saldo).toBe(6150);
+  });
+
+  it("sem valores adicionais, o subtotal é o total", () => {
+    const t = totaisDaProposta(doc({ totalAmount: 7890, totalVatMode: "acrescer" }), 30);
+    expect(t.adicionais).toBe(0);
+    expect(t.servicos).toBe(7890);
+    expect(t.total).toBe(7890);
+    expect(t.fecha).toBe(true);
+  });
+
+  /**
+   * ── QUANDO O TOTAL FICOU POR ACTUALIZAR ──────────────────────────────────
+   *
+   * Havia aqui um `Math.max(0, …)` que punha o subtotal a zero e deixava a
+   * folha a dizer «0,00 € + 1.550,00 € = 1.000,00 €». O número estranho passa a
+   * ver-se, e quem gera a proposta é AVISADO — não bloqueado: uma proposta que
+   * não sai é pior do que uma proposta com um aviso.
+   */
+  it("adicionais maiores do que o total: sai negativo, fecha, e avisa", () => {
+    const t = totaisDaProposta(
+      doc({
+        totalAmount: 1000,
+        totalVatMode: "acrescer",
+        budgetExtras: [{ label: "Deslocação", valueText: "1.550,00 € + IVA" }],
+      }),
+      30,
+    );
+    expect(t.servicos).toBe(-550);
+    expect(round2(t.servicos + t.adicionais)).toBe(t.total);
+    expect(t.fecha).toBe(false);
+    expect(t.porQueNaoFecha.join(" ")).toMatch(/negativo/);
+  });
+
+  it("uma taxa reduzida atravessa o bloco inteiro", () => {
+    const t = totaisDaProposta(
+      doc({ totalAmount: 10000, totalVatMode: "acrescer", vatRate: 0.06 }),
+      30,
+    );
+    expect(t.taxa).toBe(0.06);
+    expect(t.iva).toBe(600);
+    expect(t.aPagar).toBe(10600);
+    expect(round2(t.sinal + t.saldo)).toBe(t.aPagar);
+    expect(t.fecha).toBe(true);
+  });
+
+  /**
+   * A rede da regra: NUNCA ARREDONDAR DUAS VEZES. Duzentos mil documentos com
+   * cêntimos por todo o lado, e nenhum pode deixar de fechar.
+   */
+  it("com cêntimos por todo o lado, as três somas fecham sempre", () => {
+    for (let i = 0; i < 20000; i += 1) {
+      const base = round2(500 + (i % 4517) + (i % 97) / 100);
+      const extra = round2((i % 313) + (i % 89) / 100);
+      const modo = i % 2 === 0 ? "acrescer" : "incluido";
+      const t = totaisDaProposta(
+        doc({
+          totalAmount: base,
+          totalVatMode: modo,
+          budgetExtras: [{ label: "Deslocação", valueText: `${extra}` }],
+        }),
+        (i % 98) + 1,
+      );
+      expect(round2(t.servicos + t.adicionais), `${i}`).toBe(t.total);
+      expect(round2(t.total + t.iva), `${i}`).toBe(t.aPagar);
+      expect(round2(t.sinal + t.saldo), `${i}`).toBe(t.aPagar);
+    }
   });
 });

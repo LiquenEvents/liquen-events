@@ -28,11 +28,10 @@ import {
   type MoodBoard,
   MOOD_BOARD_MAX_IMAGES,
   depositPercentOf,
-  resolveProposalMoney,
   resolveValidUntil,
 } from "@/lib/proposal-doc";
-import { splitSinal, eur, round2 } from "@/lib/money";
-import { somaDosExtrasSemIva } from "@/lib/proposal-budget";
+import { round2 } from "@/lib/money";
+import { normalizarValor, somaDosExtrasSemIva, totaisDaProposta } from "@/lib/proposal-budget";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
 import {
   CARLITO_REGULAR_TTF_B64,
@@ -54,27 +53,41 @@ import {
 } from "@/lib/proposal-geometria";
 import { log } from "@/lib/logger";
 
-const PT_MONTHS_SHORT = [
-  "jan.",
-  "fev.",
-  "mar.",
-  "abr.",
-  "mai.",
-  "jun.",
-  "jul.",
-  "ago.",
-  "set.",
-  "out.",
-  "nov.",
-  "dez.",
+/**
+ * OS MESES POR EXTENSO — porque o resto do documento os escreve assim.
+ *
+ * Eram abreviados («out.»), e a única data do documento que passa por aqui é a
+ * validade da proposta: «Esta proposta é válida até 11 de out. de 2026». Três
+ * linhas acima, nas Condições Gerais, o mesmo documento escreve «Esta proposta
+ * só é válida para o evento a realizar no dia 29 de maio de 2027» — porque a
+ * data do evento é texto dela, e ela escreve os meses por extenso. Duas datas
+ * na mesma folha com dois formatos diferentes é a marca de duas mãos a escrever
+ * o mesmo papel.
+ *
+ * O motor de leitura aceita as duas formas (`[a-zç]{3,10}` em `campos.ts`),
+ * portanto a ida e volta continua a devolver a data.
+ */
+const PT_MESES = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
 ];
-/** "2026-09-12" → "12 de set. de 2026"; passes through anything unexpected. */
+/** "2026-09-12" → "12 de setembro de 2026"; passes through anything unexpected. */
 function prettyDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) return iso;
   const mo = Number(m[2]);
   if (mo < 1 || mo > 12) return iso;
-  return `${Number(m[3])} de ${PT_MONTHS_SHORT[mo - 1]} de ${m[1]}`;
+  return `${Number(m[3])} de ${PT_MESES[mo - 1]} de ${m[1]}`;
 }
 
 /**
@@ -96,8 +109,37 @@ function milharesComPonto(texto: string): string {
   return texto.replace(/\u00A0(?=\d{3}(?:\D|$))/g, ".");
 }
 
-/** Euros como o resto da folha os escreve. */
-const eurDoc = (n: number): string => milharesComPonto(eur(n));
+/**
+ * Euros como o resto da folha os escreve.
+ *
+ * \u2500\u2500 PORQUE \u00C9 QUE N\u00C3O \u00C9 O `eur` PARTILHADO \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+ * O `Intl` de pt-PT s\u00F3 agrupa a partir de CINCO d\u00EDgitos: 30 750 sai \u00AB30 750,00 \u20AC\u00BB
+ * e 2 460 sai \u00AB2460,00 \u20AC\u00BB, sem separador nenhum. Numa proposta de decora\u00E7\u00E3o os
+ * valores vivem quase todos nos milhares, e o quadro ficava a dizer \u00AB2460,00 \u20AC\u00BB
+ * numa linha e \u00AB7.890,00 \u20AC\u00BB na outra \u2014 o n\u00FAmero dela com ponto, o nosso sem
+ * nada, na mesma coluna. `always` agrupa sempre, e o `milharesComPonto` troca
+ * depois o espa\u00E7o inquebr\u00E1vel pelo ponto que ela escreve.
+ */
+const eurDoc = (n: number): string =>
+  milharesComPonto(
+    new Intl.NumberFormat("pt-PT", {
+      style: "currency",
+      currency: "EUR",
+      maximumFractionDigits: 2,
+      useGrouping: "always",
+    }).format(n || 0),
+  );
+
+/**
+ * A taxa de IVA como se escreve ao lado do valor: 0,23 → «23%», 0,06 → «6%».
+ *
+ * Com casas decimais quando as tem (0,235 → «23,5%»), e com a vírgula do
+ * português. O rótulo diz a taxa de propósito: «IVA» sozinho obriga quem lê a
+ * saber qual foi aplicada, e uma proposta com taxa reduzida deixava de se poder
+ * conferir a partir do papel.
+ */
+const percentagemDoIva = (taxa: number): string =>
+  `${new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 2 }).format(round2(taxa * 100))}%`;
 
 // ── Landscape A4 ── (a fonte é `proposal-geometria`, partilhada com o estúdio)
 const W = PAGINA_W;
@@ -734,6 +776,45 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
   let seccoesNumeradas = 0;
   const numerada = (titulo: string) => `${++seccoesNumeradas}. ${titulo}`;
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O DINHEIRO DO DOCUMENTO — CALCULADO UMA VEZ, PARA AS DUAS FOLHAS
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A folha do orçamento e a folha do fecho falavam do mesmo dinheiro e
+   * calculavam-no cada uma por sua conta — uma em base, a outra em bruto —, e
+   * foi assim que a proposta da Tara e do Marty saiu a dizer 2.950,79 € numa
+   * página e 3.025,80 € (907,74 + 2.118,06) na outra. Agora é um só objecto,
+   * lido duas vezes e calculado nenhuma: ver `totaisDaProposta`.
+   */
+  const totais = totaisDaProposta(doc, depositPercentOf(doc));
+
+  /**
+   * ── A VERIFICAÇÃO ANTES DE GERAR (avisa, não bloqueia) ────────────────────
+   *
+   * Palavras dela: «uma proposta que não sai é pior do que uma proposta com um
+   * aviso». Por isso isto não deita nada abaixo — regista, e o PDF sai na mesma.
+   * O que se verifica é o que falhou a sério: que o subtotal e os adicionais
+   * somam o TOTAL, que o TOTAL e o IVA somam o total a pagar, e que o sinal e o
+   * saldo somam o total a pagar. Se um dia voltar a haver uma conversão a mais
+   * pelo caminho, o cêntimo aparece aqui e não no PDF da cliente.
+   */
+  if (!totais.fecha) {
+    log.error("proposal-doc-pdf: as somas do documento não fecham", null, {
+      ref: doc.ref,
+      porque: totais.porQueNaoFecha.join("; "),
+      totais: {
+        servicos: totais.servicos,
+        adicionais: totais.adicionais,
+        total: totais.total,
+        iva: totais.iva,
+        aPagar: totais.aPagar,
+        sinal: totais.sinal,
+        saldo: totais.saldo,
+      },
+    });
+  }
+
   // Section header: a small quiet eyebrow, the serif title, and a very thin, short
   // pale hairline. No colour, no weight — the title alone carries the section.
   const sectionHeader = (p: PDFPage, kicker: string, title: string, y: number): number => {
@@ -1167,7 +1248,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     const boxH = 50;
     // Flat, typographic total: a single thin gold hairline (the one accent moment
     // in the interior), a quiet grey label and the amount in serif ink. No fill.
-    const drawTotal = (pg: PDFPage, ty: number, rotulo?: string) => {
+    const drawTotal = (pg: PDFPage, ty: number, rotulo?: string, valor?: string) => {
       pg.drawLine({
         start: { x: M, y: ty },
         end: { x: M + boxW, y: ty },
@@ -1178,7 +1259,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       // O total também passa pelo normalizador: quando o texto foi GERADO pelo
       // estúdio (que usa o mesmo `eur` que nós) vem com espaço inquebrável, e
       // ficaria a discordar dos números que desenhamos por baixo dele.
-      const amount = milharesComPonto(totalStr || "—");
+      const amount = milharesComPonto(valor ?? (totalStr || "—"));
       const amountSafe = textoParaFonte(f.serifB, amount);
       pg.drawText(amountSafe, {
         x: M + boxW - f.serifB.widthOfTextAtSize(amountSafe, 22),
@@ -1261,114 +1342,171 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       });
     }
 
-    // O desdobramento do total (base, IVA, bruto) é preciso já aqui: a linha
-    // «Valor Total» é o que sobra depois de tirar os adicionais, e essa conta
-    // tem de ser feita na mesma unidade em que o número está impresso.
-    const money = resolveProposalMoney(doc);
     /**
      * ════════════════════════════════════════════════════════════════════════
-     * COMO NA PROPOSTA FEITA À MÃO: O VALOR DOS ITENS, OS ADICIONAIS, A SOMA
+     * O BLOCO DE TOTAIS — SEIS NÚMEROS, UMA SÓ UNIDADE, E TUDO A FECHAR
      * ════════════════════════════════════════════════════════════════════════
      *
-     * A proposta da Mariana e do João diz, por esta ordem:
+     * ── O QUE FOI PARA A CLIENTE ────────────────────────────────────────────
+     * Na proposta da Tara e do Marty, catorze páginas, esta folha dizia
      *
-     *     Valor Total                   7890 € + Iva
-     *     Serviço de coordenação         950,50€ + Iva
-     *     Deslocação da Equipa Líquen    250,00 €
+     *     Valor Total                   2.950,79 €
+     *     Deslocação da Equipa Líquen       75,00 €
      *
-     * O «Valor Total» são os 7.890 da decoração — os itens listados acima dele.
-     * A coordenação e a deslocação vêm DEPOIS, e não estão lá dentro. É a
-     * estrutura dela, e é a que se replica.
+     * e a folha do fecho dizia «Sinal 30% 907,74 €» e «Saldo 70% 2.118,06 €»,
+     * que somam 3.025,80 €. Três números em três unidades diferentes: o «Valor
+     * Total» saiu com o IVA lá dentro (daí ter-lhe desaparecido o «+ IVA» ao
+     * lado) mas sem a deslocação, o sinal e o saldo saíram sobre o valor com
+     * IVA e com ela, e nada disto estava escrito em lado nenhum. Pior: o
+     * 2.950,79 tinha um cêntimo a menos — 2.950,79 + 75,00 = 3.025,79 ≠
+     * 3.025,80 —, resto de uma dupla conversão que aqui se fazia (bruto ÷ 1,23
+     * para tirar os adicionais, e o que sobrava × 1,23 outra vez para imprimir).
      *
-     * ── PORQUE É QUE ISTO PARECIA UMA CONTRADIÇÃO E NÃO ERA ─────────────────
+     * A conta mudou de sítio: vive agora em `totaisDaProposta`, faz-se uma vez,
+     * e o gerador não converte nada — só desenha. Ver lá o porquê ao cêntimo.
      *
-     * Ela pediu duas coisas que pareciam opostas: primeiro «o back office tem
-     * de somar a deslocação ao total», depois «os adicionais parecem incluídos
-     * no total e não estão». As duas são verdade ao mesmo tempo, e o conflito
-     * era do código, que tinha UM número para DUAS coisas:
+     * ── A ORDEM É A DELA ────────────────────────────────────────────────────
+     * Palavras dela, sobre o que quer ver: «subtotal dos serviços; valores
+     * adicionais, com indicação explícita de que somam; TOTAL, a base sobre a
+     * qual tudo é calculado; IVA; total a pagar». É esta a ordem, e cada linha
+     * diz a unidade em que está — nenhum número desta folha aparece sozinho a
+     * poder ser lido como preço final quando não é.
      *
-     *   · o que se COBRA — e é sobre isso que saem a factura, o sinal e o saldo;
-     *   · o que se IMPRIME na linha «Valor Total» — que são só os itens.
+     * ── PORQUE É QUE «TOTAL A PAGAR» DEIXOU DE SER OPCIONAL ────────────────
+     * Esteve desligado por omissão (ver `mostrarTotalAPagar`), com o argumento
+     * de que a folha feita à mão fecha em «Valor Total» e não tem bloco de
+     * soma. O argumento caiu com esta proposta: a folha feita à mão também não
+     * tinha o sinal em euros, e sem o «Total a pagar» impresso o casal não tem
+     * como ligar os 2.950,79 desta página aos 3.025,80 da última. A soma que
+     * ninguém escreve é a soma que o casal faz de cabeça — e faz mal.
      *
-     * `totalAmount` continua a ser o que se cobra, e por isso nada muda a
-     * jusante. O que muda é o desenho: a linha «Valor Total» passa a mostrar o
-     * que sobra depois de tirar os adicionais, eles aparecem por baixo com o
-     * seu próprio IVA, e o número grande passa a chamar-se «Total a pagar»,
-     * porque é o que o casal vai pagar e é a única conta que ninguém deve ter
-     * de fazer de cabeça.
-     *
-     * Sem adicionais nenhuns não há nada a separar: fica o total de sempre, com
-     * o rótulo de sempre.
+     * ── E SEM VALORES ADICIONAIS ───────────────────────────────────────────
+     * Fica a folha de sempre: o número grande com o rótulo dela («Valor Total
+     * Decoração»), o valor tal como o estúdio o compôs. É a folha que ela envia
+     * há anos e que tem de caber numa página só — por isso as linhas do
+     * subtotal e dos adicionais, que aí não teriam nada para dizer, não se
+     * desenham. O que se garante nesse caso é o «+ IVA»: ver `comIvaDito`.
      */
     const extras = (doc.budgetExtras ?? []).filter(
       (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
     );
-    // Desligado por omissão — ver `mostrarTotalAPagar` em `proposal-doc.ts`: a
-    // folha de referência fecha em «Valor Total» e não tem bloco de soma.
-    const mostrarSoma = doc.mostrarTotalAPagar === true;
-
-    if (extras.length) {
-      // Na unidade em que o total está impresso: líquida quando o documento diz
-      // «+ IVA», bruta quando diz «IVA incluído». Somar em unidades diferentes é
-      // o erro que já custou 460 € num PDF — ver o bloco das versões, abaixo.
-      const extrasBase = somaDosExtrasSemIva(doc.budgetExtras, {
-        mode: money.mode,
-        vatRate: money.vatRate,
-      });
-      const paraAUnidadeImpressa = (base: number) =>
-        money.mode === "acrescer" ? base : round2(base * (1 + money.vatRate));
-      const dosItens = Math.max(0, round2(money.base - extrasBase));
-      const maisIva = money.mode === "acrescer" ? " + IVA" : "";
-
-      budgetBreak(30 + (extras.length + 1) * 18);
-      // A linha do valor dos itens, com o peso de uma linha de orçamento e não
-      // de um total — o total é o de baixo.
-      text(p, orgT ? "Valor Total Estimado" : "Valor Total", M, y, {
-        font: f.serifB,
-        size: 11,
+    /**
+     * As linhas do bloco.
+     *
+     * ── PORQUE É QUE O SUBTOTAL É 11 E A SOMA É 12,5 ──────────────────────
+     * Não é só peso tipográfico: o «Subtotal dos serviços» é a última linha do
+     * QUADRO (é o total das linhas listadas por cima dele) e as duas de baixo
+     * são a SOMA do documento. Quem lê o PDF de volta separa-os exactamente
+     * assim — pela banda de corpo 9 a 12 em que o quadro vive (ver
+     * `proposta-de-pdf/campos.ts`: «o número grande é 22 e as rubricas são 13, e
+     * a banda serve para os deixar de fora»). Com as três no mesmo corpo, o
+     * «TOTAL (sem IVA)» e o «IVA» voltavam de uma importação como se fossem dois
+     * valores adicionais a mais, e a proposta importada ganhava 3.025,80 € de
+     * deslocação.
+     */
+    const linhaDeTotal = (rotulo: string, valor: string, size: number, forte = false) => {
+      text(p, rotulo, M, y, {
+        font: forte ? f.serifB : f.reg,
+        size,
         color: INK,
       });
-      textRight(
-        p,
-        `${milharesComPonto(eur(paraAUnidadeImpressa(dosItens)))}${maisIva}`,
-        M + boxW,
-        y,
-        {
-          font: f.serifB,
-          size: 11,
-          color: INK,
-        },
-      );
-      y -= 20;
+      textRight(p, valor, M + boxW, y, {
+        font: forte ? f.serifB : f.reg,
+        size,
+        color: INK,
+      });
+      y -= 18;
+    };
+    /** A régua fina que separa as parcelas da soma. */
+    const reguaDeSoma = () => {
+      p.drawLine({
+        start: { x: M + boxW - 200, y: y + 10 },
+        end: { x: M + boxW, y: y + 10 },
+        thickness: 0.5,
+        color: LINE,
+      });
+      y -= 6;
+    };
+    /**
+     * O «+ IVA» que TEM de chegar ao PDF.
+     *
+     * O texto do total é escrito pelo estúdio a partir do modo em vigor, e em
+     * «acresce» vem sempre com o «+ IVA» — mas é texto livre, e uma proposta
+     * antiga (ou um total escrito à mão) pode não o trazer. Sem ele, um valor
+     * de base lê-se como preço final: foi exactamente isso que aconteceu na
+     * proposta da Tara e do Marty, e são 23% de diferença no que o casal
+     * pensa que vai transferir.
+     */
+    const comIvaDito = (texto: string) =>
+      totais.modo === "acrescer" && !/\+\s*iva/i.test(texto) ? `${texto} + IVA` : texto;
 
+    if (extras.length) {
+      budgetBreak(30 + (extras.length + 4) * 18 + boxH);
+      linhaDeTotal(
+        orgT ? "Subtotal dos serviços (estimado)" : "Subtotal dos serviços",
+        eurDoc(totais.servicos),
+        11,
+        true,
+      );
+      // ── OS ADICIONAIS, NA UNIDADE DO BLOCO ────────────────────────────────
+      // O valor impresso é o que o adicional acrescenta à BASE, e não o número
+      // cru que ela escreveu: «75,00 €» numa proposta que se lê com IVA vale
+      // 60,98 € de base, e imprimir 75,00 aqui era pôr uma parcela que não soma
+      // com as outras — o mesmo erro de unidades, uma linha mais abaixo.
+      //
+      // O que ela escreveu não se perde: quando o número cru é outro, vai entre
+      // parênteses ao lado do nome. É lá que a informação pertence — a dizer o
+      // que aquele valor era, não a fingir que é uma parcela desta soma.
       for (const ex of extras) {
-        const lines = wrap(f.reg, ex.label, 10.5, boxW - PRICE_COL);
+        const cru = normalizarValor(ex.valueText);
+        const base = somaDosExtrasSemIva([ex], { mode: totais.modo, vatRate: totais.taxa });
+        const dito =
+          cru !== null && round2(cru) !== base
+            ? `${ex.label} (${milharesComPonto(ex.valueText.trim())})`
+            : ex.label;
+        const lines = wrap(f.reg, dito, 10.5, boxW - PRICE_COL);
         budgetBreak(Math.max(18, lines.length * 14));
         lines.forEach((ln, i) => {
           text(p, ln, M, y, { size: 10.5, color: INK });
-          // O valor sai TAL COMO ELA O ESCREVEU, com o «+ IVA» ou sem ele. É
-          // por linha de propósito: na proposta antiga a deslocação não leva
-          // IVA e a coordenação leva, e essa diferença é dela para dizer.
-          if (i === 0) textRight(p, ex.valueText, M + boxW, y, { size: 10.5, color: INK });
+          // O «+» à frente do valor é a «indicação explícita de que somam» que
+          // ela pediu: sem ele, uma parcela por baixo de um subtotal tanto pode
+          // somar como descontar, e nada na folha o dizia.
+          if (i === 0) {
+            textRight(p, cru === null ? "—" : `+ ${eurDoc(base)}`, M + boxW, y, {
+              size: 10.5,
+              color: INK,
+            });
+          }
           y -= 14;
         });
         y -= 4;
       }
-      y -= 8;
-    }
-
-    if (extras.length && !mostrarSoma) {
-      // Sem soma: o documento fica com as parcelas e sem o todo, que é como a
-      // proposta antiga é. Não se desenha um total grande a repetir só uma das
-      // parcelas — seria o número errado em corpo 22.
-      //
-      // E não se deixa cá ar nenhum: o que vem a seguir é a cauda das notas, e
-      // ela traz o seu próprio (o `AR`). Oito pontos a mais aqui eram oito
-      // pontos a menos para as condições de reserva caberem nesta folha.
-    } else {
+      y -= 4;
+      reguaDeSoma();
+      // O TOTAL: a base sobre a qual o IVA, o sinal e o saldo são calculados.
+      linhaDeTotal("TOTAL (sem IVA)", eurDoc(totais.total), 12.5, true);
+      linhaDeTotal(`IVA (${percentagemDoIva(totais.taxa)})`, eurDoc(totais.iva), 12.5);
       budgetBreak(boxH + 24);
+      y -= 6;
+      // O número grande é o que o casal transfere — e é o mesmo, ao cêntimo,
+      // que a folha do fecho parte em sinal e saldo.
+      drawTotal(p, y, "Total a pagar", eurDoc(totais.aPagar));
+      /* ── O QUE ESTE BLOCO CUSTA, MEDIDO ────────────────────────────────────
+         Setenta pontos a mais do que o quadro que aqui estava (o «Valor Total»,
+         os adicionais, e nada mais). Numa proposta COM valores adicionais isso
+         chega para a cauda — as «Notas importantes» e as «Condições de reserva»
+         — passar inteira para a folha seguinte: na proposta da Tara e do Marty
+         faltavam sessenta e sete pontos, e não há ar nenhum nesta folha para os
+         dar (o caso da casa fecha com 1,3 pontos de folga).
+         Não se aperta o bloco para os arranjar: um documento em que as contas
+         não se vêem é o defeito que isto vem corrigir, e a cauda passa INTEIRA,
+         que é a regra de quebra desta folha. A folha SEM adicionais — a que ela
+         envia há anos e compara com a dela — continua a caber numa página. */
+      y -= boxH + 6;
+    } else {
+      budgetBreak(boxH + 24 + 18);
       y -= 12;
-      drawTotal(p, y, extras.length ? "Total a pagar" : undefined);
+      drawTotal(p, y, undefined, comIvaDito(totalStr || "—"));
       // `boxH` (50) já é folgado: a tinta do bloco — a régua dourada, o rótulo e
       // o número em corpo 22 — acaba treze pontos acima dele. Os vinte que aqui
       // estavam eram ar em cima de ar, e numa proposta SEM valores adicionais
@@ -1401,7 +1539,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     // uma vez só, partilhada com o estúdio.
     const versoes = totaisDasVersoes(doc);
     if (versoes && versoes.comoOTotal.base > 0 && versoes.extras > 0) {
-      const maisIva = money.mode === "acrescer" ? " + IVA" : "";
+      const maisIva = totais.modo === "acrescer" ? " + IVA" : "";
       budgetBreak(40);
       text(p, "Sem os extras assinalados", M, y, { size: 10.5, color: MUTED });
       textRight(p, `${eurDoc(versoes.comoOTotal.base)}${maisIva}`, M + boxW, y, {
@@ -1731,20 +1869,20 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
        factura do sinal saía a 5.000 € — o documento assinado e a factura emitida
        a discordarem em 2.000 €. Os montantes saem do mesmo resolvedor de
        dinheiro que a facturação usa, pela mesma razão. */
-    const dinheiro = resolveProposalMoney(doc);
-    const comValores = dinheiro.gross > 0;
+    const comValores = totais.aPagar > 0;
     section("Faseamento do Pagamento", doc.faseamento, 9, {
       // As duas linhas viajam com a rubrica: são medidas ANTES de o título ser
       // desenhado, e não depois da lista — de outro modo apareciam sozinhas no
-      // topo da folha seguinte, longe do cabeçalho que lhes dá sentido.
-      altura: comValores ? 34 : 0,
+      // topo da folha seguinte, longe do cabeçalho que lhes dá sentido. A
+      // terceira, a que diz a base, viaja com elas pela mesma razão: um sinal
+      // sem a base de que saiu é meio número.
+      altura: comValores ? 51 : 0,
       desenhar: () => {
         if (!comValores) return;
-        const pctSinal = depositPercentOf(doc);
-        const { sinal, saldo } = splitSinal(dinheiro.gross, pctSinal);
+        const pct = totais.percentagemSinal;
         for (const [rotulo, valor, quando] of [
-          [`Sinal ${pctSinal}%`, sinal, "na adjudicação, para reservar a data"],
-          [`Saldo ${100 - pctSinal}%`, saldo, "até 1 mês antes do evento"],
+          [`Sinal ${pct}%`, totais.sinal, "na adjudicação, para reservar a data"],
+          [`Saldo ${100 - pct}%`, totais.saldo, "até 1 mês antes do evento"],
         ] as const) {
           text(p, `${rotulo}   ${eurDoc(valor)}`, M + 14, y, {
             font: f.serif,
@@ -1754,6 +1892,25 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
           textRight(p, quando, M + maxW, y, { size: 9, color: MUTED });
           y -= 17;
         }
+        /**
+         * ── A BASE DE CÁLCULO, DITA ────────────────────────────────────────
+         *
+         * Estas duas linhas estavam sozinhas. Na proposta da Tara e do Marty
+         * somavam 3.025,80 € — o total COM IVA e COM a deslocação — enquanto a
+         * folha do orçamento dizia «Valor Total 2.950,79 €». Dois números
+         * legítimos, nenhum deles explicado, e nada no documento a ligá-los.
+         *
+         * A frase diz de onde saem, e diz o número: é a mesma palavra («total a
+         * pagar») e o mesmo valor, ao cêntimo, que fecha o quadro do orçamento.
+         */
+        text(
+          p,
+          `Calculados sobre o total a pagar — ${eurDoc(totais.aPagar)}, com IVA incluído.`,
+          M + 14,
+          y,
+          { size: 9, color: MUTED },
+        );
+        y -= 17;
       },
     });
     section("Cancelamento", doc.cancelamento);

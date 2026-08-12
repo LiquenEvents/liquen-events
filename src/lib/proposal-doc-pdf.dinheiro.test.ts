@@ -9,7 +9,7 @@ import {
   type PDFObject,
 } from "pdf-lib";
 import { renderProposalDocPdf } from "./proposal-doc-pdf";
-import { withProposalDefaults, type ProposalDoc } from "./proposal-doc";
+import { resolveValidUntil, withProposalDefaults, type ProposalDoc } from "./proposal-doc";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -216,7 +216,7 @@ describe("«sem os extras» está na mesma unidade do total grande", () => {
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O ORÇAMENTO COMO ESTÁ NA PROPOSTA FEITA À MÃO
+ * O BLOCO DE TOTAIS — OS SEIS NÚMEROS, E O DOCUMENTO A FECHAR
  * ════════════════════════════════════════════════════════════════════════════
  *
  * A proposta da Mariana e do João diz, por esta ordem:
@@ -225,17 +225,21 @@ describe("«sem os extras» está na mesma unidade do total grande", () => {
  *     Serviço de coordenação         950,50€ + Iva
  *     Deslocação da Equipa Líquen    250,00 €
  *
- * O «Valor Total» são os 7.890 da decoração; a coordenação e a deslocação vêm
- * depois e NÃO estão lá dentro. O que se cobra — e é sobre isso que saem a
- * factura e o sinal — é a soma, e é ela que fecha o quadro.
+ * e mais nada. É essa folha que a Tara e o Marty receberam — o «Valor Total»
+ * dos itens, os adicionais por baixo, e o casal a somar de cabeça. O que eles
+ * leram foi «Valor Total 2.950,79 €» na página 11 e, na 14, um sinal e um saldo
+ * que somavam 3.025,80 €: três números em três unidades, e nem sequer a fechar
+ * (2.950,79 + 75,00 = 3.025,79).
+ *
+ * O quadro dela fica; o que se acrescenta é o fecho, na ordem que ela pediu —
+ * subtotal, adicionais (a somar), TOTAL, IVA, total a pagar. Cada linha diz a
+ * unidade em que está, e as somas fecham ao cêntimo nos dois modos de IVA.
  */
-describe("o orçamento com valores adicionais", () => {
+describe("o bloco de totais do orçamento", () => {
   const comExtras = {
-    // 7890 + 950,50 + 250 = 9090,50 — é o que se cobra.
+    // 7890 + 950,50 + 250 = 9090,50 — é o que se cobra, e é o que o campo do
+    // total guarda (ver `somaDosServicosEAdicionais`).
     totalAmount: 9090.5,
-    // O texto é escrito pelo estúdio a partir do montante — aqui é posto à mão
-    // porque o número grande é o que está ESCRITO no documento, e é ele que o
-    // casal lê.
     totalText: "9.090,50 € + IVA",
     totalVatMode: "acrescer" as const,
     budgetItems: ["Design Floral e Decor Jantar", "Decor Mesa Buffet", "Bouquet da Noiva"],
@@ -245,47 +249,269 @@ describe("o orçamento com valores adicionais", () => {
     ],
   };
 
-  it("o «Valor Total» é só o dos itens, sem os adicionais", async () => {
+  it("as seis linhas saem pela ordem dela", async () => {
     const texto = await textoDoPdf(proposta(comExtras));
-    expect(texto).toMatch(/Valor Total/);
-    expect(texto).toMatch(/7\.?890,00/);
+    const ordem = [
+      "Subtotal dos serviços",
+      "Serviço de coordenação",
+      "Deslocação da Equipa Líquen",
+      "TOTAL (sem IVA)",
+      "IVA (23%)",
+      "Total a pagar",
+    ];
+    let cursor = -1;
+    for (const rotulo of ordem) {
+      const i = texto.indexOf(rotulo, cursor + 1);
+      expect(i, `«${rotulo}» não está na folha, ou está fora de ordem`).toBeGreaterThan(cursor);
+      cursor = i;
+    }
   });
 
-  it("por omissão NÃO fecha com «Total a pagar» — a folha antiga não o tem", async () => {
+  it("o subtotal é o dos itens, e os adicionais somam-lhe até ao TOTAL", async () => {
     const texto = await textoDoPdf(proposta(comExtras));
-    expect(texto).not.toContain("Total a pagar");
-    // As parcelas continuam todas lá: o que sai é o quadro dela, sem o todo.
-    expect(texto).toMatch(/7\.?890,00/);
-    expect(texto).toContain("Serviço de coordenação");
+    // 9.090,50 − 950,50 − 250 = 7.890,00 de serviços.
+    expect(texto).toMatch(/Subtotal dos serviços\s*7\.?890,00/);
+    // O «+» é a indicação explícita de que a parcela SOMA — sem ele, um valor
+    // por baixo de um subtotal tanto pode somar como descontar.
+    expect(texto).toMatch(/Serviço de coordenação\s*\+\s*950,50/);
+    expect(texto).toMatch(/Deslocação da Equipa Líquen\s*\+\s*250,00/);
+    expect(texto).toMatch(/TOTAL \(sem IVA\)\s*9\.?090,50/);
   });
 
-  it("ligada, fecha com «Total a pagar» na soma de tudo", async () => {
-    const texto = await textoDoPdf(proposta({ ...comExtras, mostrarTotalAPagar: true }));
-    expect(texto).toContain("Total a pagar");
-    expect(texto).toMatch(/9\.?090,50/);
+  it("o «Total a pagar» é o que o casal transfere, e fecha com o IVA", async () => {
+    const texto = await textoDoPdf(proposta(comExtras));
+    // 9.090,50 × 23% = 2.090,82; 9.090,50 + 2.090,82 = 11.181,32.
+    expect(texto).toMatch(/IVA \(23%\)\s*2\.?090,82/);
+    expect(texto).toMatch(/Total a pagar\s*11\.?181,32/);
   });
 
-  it("cada adicional sai com o IVA que ela lhe escreveu, e só esse", async () => {
+  /**
+   * ── DEFEITO 5 — A DUPLA CONVERSÃO, MEDIDA NO PDF DA CLIENTE ──────────────
+   *
+   * Os números da proposta da Tara e do Marty, tal e qual: total 2.460,00 € de
+   * base, uma deslocação de 75,00 €, IVA incluído. O «Valor Total» saía
+   * 2.950,79 € — bruto ÷ 1,23 para tirar a deslocação, e o resto × 1,23 outra
+   * vez para imprimir — quando 3.025,80 − 75,00 = 2.950,80. Um cêntimo, e com
+   * ele o documento a não fechar.
+   */
+  it("BUG-GUARD: os números da Tara e do Marty fecham ao cêntimo", async () => {
+    const texto = await textoDoPdf(
+      proposta({
+        totalAmount: 3025.8,
+        totalText: "3.025,80 €",
+        totalVatMode: "incluido",
+        budgetItems: ["Decoração Cerimónia", "Decoração Copo d'Água"],
+        budgetExtras: [{ label: "Deslocação da Equipa Líquen", valueText: "75,00 €" }],
+      }),
+    );
+    // A deslocação vale 60,98 € de base (75 ÷ 1,23) e o subtotal é o que sobra.
+    expect(texto).toMatch(/Subtotal dos serviços\s*2\.?399,02/);
+    expect(texto).toMatch(/Deslocação da Equipa Líquen \(75,00 €\)\s*\+\s*60,98/);
+    // 2.399,02 + 60,98 = 2.460,00 exacto. O 2.950,79 não pode existir em lado
+    // nenhum da folha.
+    expect(texto).toMatch(/TOTAL \(sem IVA\)\s*2\.?460,00/);
+    expect(texto).not.toContain("2950,79");
+    expect(texto).not.toContain("2.950,79");
+    // E o número grande é, ao cêntimo, o que o sinal e o saldo somam.
+    expect(texto).toMatch(/Total a pagar\s*3\.?025,80/);
+    expect(texto).toMatch(/Sinal 30%\s*907,74/);
+    expect(texto).toMatch(/Saldo 70%\s*2\.?118,06/);
+  });
+
+  it("cada adicional continua a valer o que ela lhe escreveu", async () => {
     const texto = await textoDoPdf(proposta(comExtras));
-    expect(texto).toContain("Serviço de coordenação");
-    expect(texto).toContain("Deslocação da Equipa Líquen");
-    // A deslocação não leva IVA na proposta dela, e não pode ganhar um aqui.
-    expect(texto).toMatch(/Deslocação da Equipa Líquen\s*250,00 €/);
+    // Em «acresce», o que ela escreveu já é base: os números saem intactos, e é
+    // o bloco inteiro que diz o IVA uma vez só.
+    expect(texto).toMatch(/Serviço de coordenação\s*\+\s*950,50/);
+    expect(texto).toMatch(/Deslocação da Equipa Líquen\s*\+\s*250,00/);
+    // O que ela escreveu não se perde quando o número impresso é outro: numa
+    // proposta que se lê COM IVA, a deslocação de 75,00 € vale 60,98 € de base,
+    // e a folha diz as duas coisas.
+    const comIva = await textoDoPdf(
+      proposta({
+        totalAmount: 3025.8,
+        totalText: "3.025,80 €",
+        totalVatMode: "incluido",
+        budgetExtras: [{ label: "Deslocação da Equipa Líquen", valueText: "75,00 €" }],
+      }),
+    );
+    expect(comIva).toContain("Deslocação da Equipa Líquen (75,00 €)");
   });
 
   it("sem adicionais nenhuns, fica o total de sempre com o rótulo de sempre", async () => {
     const texto = await textoDoPdf(proposta({ totalAmount: 7890, totalVatMode: "acrescer" }));
+    // A folha que ela envia há anos: o número grande com o rótulo dela, e nada
+    // mais — não há adicionais para separar do total, e é ela que tem de caber
+    // numa folha só com as notas e as condições de reserva.
     expect(texto).not.toContain("Total a pagar");
+    expect(texto).not.toContain("Subtotal dos serviços");
+    expect(texto).toContain("Valor Total Decoração");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O «+ IVA» TEM DE CHEGAR AO PDF (3.2)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O documento da Tara e do Marty tinha o editor em «+ IVA (acresce)» e imprimiu
+ * o valor sozinho, sem anotação nenhuma — e um número sem «+ IVA» ao lado lê-se
+ * como preço final. São 23% de diferença naquilo que o casal pensa que vai
+ * transferir.
+ */
+describe("a definição de IVA do estúdio chega ao papel", () => {
+  it("em «acresce», o número grande nunca aparece sozinho", async () => {
+    // Um total escrito à mão, sem o «+ IVA» que o estúdio compõe: o desenho
+    // acrescenta-o, porque é o modo do DOCUMENTO que manda.
+    const texto = await textoDoPdf(
+      proposta({ totalAmount: 7890, totalVatMode: "acrescer", totalText: "7.890,00 €" }),
+    );
+    expect(texto).toMatch(/7\.?890,00 € \+ IVA/);
   });
 
-  /**
-   * A folha dela não tinha a linha da soma, e é essa a omissão. Desligada à
-   * mão dá no mesmo — e é isso que este teste fixa: o documento fica com as
-   * parcelas e sem o todo, em vez de um número grande a repetir só uma delas.
-   */
-  it("desligada à mão, não desenha um total grande com o número errado", async () => {
-    const texto = await textoDoPdf(proposta({ ...comExtras, mostrarTotalAPagar: false }));
-    expect(texto).not.toContain("Total a pagar");
-    expect(texto).toMatch(/7\.?890,00/);
+  it("não duplica o «+ IVA» quando ele já lá está", async () => {
+    const texto = await textoDoPdf(proposta({ totalAmount: 7890, totalVatMode: "acrescer" }));
+    expect(texto).toMatch(/10\.?000,00 € \+ IVA/);
+    expect(texto).not.toContain("+ IVA + IVA");
+  });
+
+  it("em «IVA incluído» o bloco diz quanto do total é imposto", async () => {
+    const texto = await textoDoPdf(
+      proposta({
+        totalAmount: 12300,
+        totalText: "12.300,00 €",
+        totalVatMode: "incluido",
+        budgetExtras: [{ label: "Deslocação da Equipa Líquen", valueText: "300,00 €" }],
+      }),
+    );
+    // 12.300 ÷ 1,23 = 10.000 de base, 2.300 de IVA.
+    expect(texto).toMatch(/TOTAL \(sem IVA\)\s*10\.?000,00/);
+    expect(texto).toMatch(/IVA \(23%\)\s*2\.?300,00/);
+    expect(texto).toMatch(/Total a pagar\s*12\.?300,00/);
+    // E o número já traz o imposto: não pode aparecer um «+ IVA» a dizer o
+    // contrário.
+    expect(texto).not.toContain("12.300,00 € + IVA");
+  });
+
+  it("uma taxa reduzida sai escrita, e não um «23%» à letra", async () => {
+    const texto = await textoDoPdf(
+      proposta({
+        vatRate: 0.06,
+        totalAmount: 10000,
+        totalVatMode: "acrescer",
+        budgetExtras: [{ label: "Deslocação da Equipa Líquen", valueText: "500,00 €" }],
+      }),
+    );
+    expect(texto).toMatch(/IVA \(6%\)\s*600,00/);
+    expect(texto).not.toContain("IVA (23%)");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * SINAL + SALDO = O TOTAL APRESENTADO (3.4)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A conta que o casal faz é esta, e tem de dar. Na proposta da Tara e do Marty
+ * dava — sobre um número que a folha do orçamento não mostrava em lado nenhum.
+ */
+describe("o sinal e o saldo fecham o total apresentado", () => {
+  const casos = [
+    {
+      nome: "com adicionais, em «acresce»",
+      over: {
+        totalAmount: 9090.5,
+        totalText: "9.090,50 € + IVA",
+        totalVatMode: "acrescer" as const,
+        budgetExtras: [
+          { label: "Serviço de coordenação", valueText: "950,50 € + IVA" },
+          { label: "Deslocação da Equipa Líquen", valueText: "250,00 €" },
+        ],
+      },
+      aPagar: /11\.?181,32/,
+      sinal: /Sinal 30%\s*3\.?354,40/,
+      saldo: /Saldo 70%\s*7\.?826,92/,
+    },
+    {
+      nome: "com adicionais, em «IVA incluído»",
+      over: {
+        totalAmount: 3025.8,
+        totalText: "3.025,80 €",
+        totalVatMode: "incluido" as const,
+        budgetExtras: [{ label: "Deslocação da Equipa Líquen", valueText: "75,00 €" }],
+      },
+      aPagar: /3\.?025,80/,
+      sinal: /Sinal 30%\s*907,74/,
+      saldo: /Saldo 70%\s*2\.?118,06/,
+    },
+  ];
+
+  for (const caso of casos) {
+    it(`${caso.nome}: as duas parcelas somam o total a pagar`, async () => {
+      const texto = await textoDoPdf(proposta(caso.over));
+      expect(texto).toMatch(caso.sinal);
+      expect(texto).toMatch(caso.saldo);
+      expect(texto).toMatch(new RegExp(`Total a pagar\\s*${caso.aPagar.source}`));
+    });
+  }
+
+  it("a base do sinal está dita por palavras, e é a mesma da folha do orçamento", async () => {
+    const texto = await textoDoPdf(
+      proposta({
+        totalAmount: 3025.8,
+        totalText: "3.025,80 €",
+        totalVatMode: "incluido",
+        budgetExtras: [{ label: "Deslocação da Equipa Líquen", valueText: "75,00 €" }],
+      }),
+    );
+    // Sem esta frase, os 907,74 € e os 2.118,06 € da última folha eram dois
+    // números sem origem — e a origem não estava impressa em lado nenhum.
+    expect(texto).toMatch(/Calculados sobre o total a pagar — 3\.?025,80\s€, com IVA incluído\./);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DATA DE VALIDADE — POR EXTENSO, E A 60 DIAS DA EMISSÃO (bloco 4)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «Esta proposta é válida até 11 de out. de 2026» num documento que três linhas
+ * abaixo escreve «29 de maio de 2027» são duas mãos a escrever o mesmo papel. A
+ * data estava certa — 60 dias a contar da emissão —, o formato é que não era o
+ * da casa.
+ */
+describe("a data de validade", () => {
+  it("sai por extenso, como o resto do documento", async () => {
+    const texto = await textoDoPdf(proposta({ validUntil: "2026-10-11" }));
+    expect(texto).toContain("Esta proposta é válida até 11 de outubro de 2026.");
+    expect(texto).not.toContain("out. de 2026");
+  });
+
+  it("são os 60 dias configurados, contados da emissão", async () => {
+    // Sem `validUntil` explícita, a data sai de hoje + `validUntilDays`. 60 é a
+    // omissão da casa (DEFAULT_VALID_DAYS), e é o que a folha promete.
+    const emitida = new Date();
+    const limite = new Date(emitida);
+    limite.setDate(limite.getDate() + 60);
+    const iso = limite.toISOString().slice(0, 10);
+    expect(iso).toBe(resolveValidUntil(proposta()));
+
+    const texto = await textoDoPdf(proposta());
+    const meses = [
+      "janeiro",
+      "fevereiro",
+      "março",
+      "abril",
+      "maio",
+      "junho",
+      "julho",
+      "agosto",
+      "setembro",
+      "outubro",
+      "novembro",
+      "dezembro",
+    ];
+    const esperado = `${limite.getUTCDate()} de ${meses[limite.getUTCMonth()]} de ${limite.getUTCFullYear()}`;
+    expect(texto).toContain(`Esta proposta é válida até ${esperado}.`);
   });
 });

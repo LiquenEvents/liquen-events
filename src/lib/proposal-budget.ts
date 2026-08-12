@@ -1,4 +1,9 @@
-import { DEFAULT_VAT_RATE, resolveProposalMoney, type ProposalDoc } from "./proposal-doc";
+import {
+  DEFAULT_VAT_RATE,
+  resolveProposalMoney,
+  type ProposalDoc,
+  type VatMode,
+} from "./proposal-doc";
 import { round2, splitSinal } from "./money";
 
 /**
@@ -370,6 +375,147 @@ export function asDuasFormas(
   return {
     acrescer: { base: b, iva: ivaAcrescer, total: cent(b + ivaAcrescer) },
     incluido: { base: baseIncluido, iva: cent(b - baseIncluido), total: b },
+  };
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS SEIS NÚMEROS DO BLOCO DE TOTAIS — CALCULADOS UMA VEZ, TODOS DA MESMA BASE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * ── O que estava errado, medido na proposta da Tara e do Marty (14 páginas) ─
+ * O documento que foi para a cliente dizia, em três folhas diferentes:
+ *
+ *     página 11   Valor Total                  2.950,79 €
+ *     página 11   Deslocação da Equipa Líquen      75,00 €
+ *     página 14   Sinal 30%                       907,74 €
+ *     página 14   Saldo 70%                     2.118,06 €
+ *
+ * O sinal e o saldo somam 3.025,80 € — que é 2.460,00 × 1,23, ou seja o total
+ * COM IVA. O «Valor Total» saiu também com IVA (daí ter desaparecido o «+ IVA»
+ * ao lado dele) mas SEM a deslocação, e ainda por cima com um cêntimo a menos:
+ * 2.950,79 + 75,00 = 3.025,79 ≠ 3.025,80. O documento não fechava.
+ *
+ * O cêntimo perdia-se numa DUPLA CONVERSÃO feita no gerador: pegava-se no
+ * bruto guardado (3.025,80), dividia-se por 1,23 para obter a base (2.460,00),
+ * tirava-se a deslocação já convertida à parte (75 ÷ 1,23 = 60,98, arredondada
+ * ali), e o que sobrava (2.399,02) era MULTIPLICADO outra vez por 1,23 para ser
+ * impresso — 2.950,79 em vez de 2.950,80. Duas conversões e dois
+ * arredondamentos para chegar a um número que se obtém por uma subtracção.
+ *
+ * ── A regra ───────────────────────────────────────────────────────────────
+ * Uma conversão de unidade por número, feita UMA vez, a partir do valor
+ * guardado. Aqui só há uma: a que {@link resolveProposalMoney} faz entre
+ * `totalAmount` e o par base/bruto. Tudo o resto são somas e subtracções DENTRO
+ * da base — e o bruto sai de `base + IVA`, nunca de multiplicar um número que
+ * já foi impresso.
+ *
+ * ── Porque é que os seis saem juntos ──────────────────────────────────────
+ * Palavras dela: «um bloco de totais inequívoco». Os seis números são um só
+ * raciocínio, e enquanto foram seis contas espalhadas por duas páginas do
+ * gerador puderam — e chegaram a — sair em unidades diferentes. Saem daqui, de
+ * uma vez, e quem os desenha não faz contas nenhumas.
+ */
+export interface TotaisDaProposta {
+  /** Subtotal dos serviços listados, SEM IVA. É o total menos os adicionais. */
+  servicos: number;
+  /** O que os valores adicionais acrescentam à base — ver {@link somaDosExtrasSemIva}. */
+  adicionais: number;
+  /** O TOTAL: a base sobre a qual tudo o resto é calculado. */
+  total: number;
+  iva: number;
+  /** O que o casal transfere ao todo: `total + iva`. */
+  aPagar: number;
+  sinal: number;
+  saldo: number;
+  /** A percentagem do sinal, tal como foi pedida. */
+  percentagemSinal: number;
+  taxa: number;
+  modo: VatMode;
+  /**
+   * As somas do documento fecham ao cêntimo?
+   *
+   * Por construção fecham sempre — é essa a razão de ser deste objecto. Fica
+   * verificado à mesma porque o dia em que deixar de fechar é o dia em que
+   * alguém volta a converter um número já impresso, e esse dia não pode passar
+   * despercebido. Ver {@link porQueNaoFecha}.
+   */
+  fecha: boolean;
+  /** O que não fecha, em pt-PT, para quem gera a proposta poder ser avisado.
+   *  Vazio quando está tudo bem, que é o caso normal. */
+  porQueNaoFecha: string[];
+}
+
+/**
+ * Os seis números do bloco de totais, mais o sinal e o saldo.
+ *
+ * `percentagemSinal` vem de fora (`depositPercentOf`) de propósito: é ela que a
+ * facturação lê, e as duas leituras têm de ser a mesma — o sinal impresso no
+ * documento que o casal aceita é o sinal que a factura emite.
+ *
+ * ── O SUBTOTAL DOS SERVIÇOS NÃO É A SOMA DAS LINHAS ───────────────────────
+ * As propostas verdadeiras da Líquen mostram o quadro com a coluna de preço EM
+ * BRANCO (ver o cabeçalho deste ficheiro): os preços por linha são internos e
+ * na maioria das propostas nem existem. O subtotal é, por isso, o que SOBRA do
+ * total depois de tirar os adicionais — que é exactamente o que a folha feita à
+ * mão chama «Valor Total» e põe por cima da deslocação.
+ *
+ * Pode dar NEGATIVO, e sai negativo: acontece quando os adicionais escritos
+ * valem mais do que o total, ou seja quando o total ficou por actualizar. Havia
+ * aqui um `Math.max(0, …)` que o escondia, e escondê-lo custava o fecho do
+ * bloco — o subtotal e os adicionais deixavam de somar o total, em silêncio.
+ * Um número estranho que se vê e se avisa corrige-se; uma soma que não fecha
+ * chega ao casal.
+ */
+export function totaisDaProposta(
+  doc: DocComLinhasETotal,
+  percentagemSinal: number,
+): TotaisDaProposta {
+  const money = resolveProposalMoney(doc);
+  const adicionais = somaDosExtrasSemIva(doc.budgetExtras, {
+    mode: money.mode,
+    vatRate: money.vatRate,
+  });
+  // Uma subtracção dentro da base. Não há aqui conversão nenhuma: a única que o
+  // documento faz é a que já veio feita em `money`.
+  const servicos = round2(money.base - adicionais);
+  const { sinal, saldo } = splitSinal(money.gross, percentagemSinal);
+
+  const porQueNaoFecha: string[] = [];
+  if (round2(servicos + adicionais) !== money.base) {
+    porQueNaoFecha.push(
+      `o subtotal dos serviços e os valores adicionais não somam o total (${servicos} + ${adicionais} ≠ ${money.base})`,
+    );
+  }
+  if (round2(money.base + money.vat) !== money.gross) {
+    porQueNaoFecha.push(
+      `o total e o IVA não somam o total a pagar (${money.base} + ${money.vat} ≠ ${money.gross})`,
+    );
+  }
+  if (round2(sinal + saldo) !== money.gross) {
+    porQueNaoFecha.push(
+      `o sinal e o saldo não somam o total a pagar (${sinal} + ${saldo} ≠ ${money.gross})`,
+    );
+  }
+  if (servicos < 0) {
+    porQueNaoFecha.push(
+      `os valores adicionais (${adicionais}) valem mais do que o total (${money.base}), e o subtotal dos serviços sai negativo`,
+    );
+  }
+
+  return {
+    servicos,
+    adicionais,
+    total: money.base,
+    iva: money.vat,
+    aPagar: money.gross,
+    sinal,
+    saldo,
+    percentagemSinal,
+    taxa: money.vatRate,
+    modo: money.mode,
+    fecha: porQueNaoFecha.length === 0,
+    porQueNaoFecha,
   };
 }
 
