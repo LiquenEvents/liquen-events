@@ -63,7 +63,7 @@ beforeEach(() => {
   for (const k of KEYS) guardado[k] = process.env[k];
   delete process.env.ADMIN_PASSWORD_HASH;
   delete process.env.ADMIN_TOTP_SECRET;
-  process.env.SESSION_SECRET = "escada-test-secret-1234567890";
+  process.env.SESSION_SECRET = "escada-test-secret-1234567890"; // gitleaks:allow — segredo de teste, gerado aqui e sem valor fora daqui
   process.env.ADMIN_USERS = JSON.stringify([
     {
       name: "Catarina",

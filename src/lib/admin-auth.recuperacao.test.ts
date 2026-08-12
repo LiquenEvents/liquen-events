@@ -81,7 +81,7 @@ const CONTAS = [
 beforeEach(() => {
   guardado = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
   for (const k of ENV_KEYS) delete process.env[k];
-  process.env.SESSION_SECRET = "recuperacao-test-secret-1234567890";
+  process.env.SESSION_SECRET = "recuperacao-test-secret-1234567890"; // gitleaks:allow — segredo de teste, gerado aqui e sem valor fora daqui
   estado.mapa.clear();
   estado.escritas = 0;
   estado.recusaEscrita = false;

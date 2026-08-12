@@ -53,7 +53,7 @@ beforeEach(() => {
   estado.mapa.clear();
   estado.recusaEscrita = false;
   for (const k of KEYS) guardado[k] = process.env[k];
-  process.env.SESSION_SECRET = "definir-rota-secret-1234567890";
+  process.env.SESSION_SECRET = "definir-rota-secret-1234567890"; // gitleaks:allow — segredo de teste, gerado aqui e sem valor fora daqui
   process.env.ADMIN_USERS = JSON.stringify([
     {
       name: "Catarina",
