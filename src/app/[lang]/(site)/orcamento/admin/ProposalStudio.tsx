@@ -4507,6 +4507,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   />
                   <LinhaDeTotal rotulo={`Saldo ${100 - pctSinal}%`} valor={eur(totais.saldo)} />
                 </dl>
+                {/* ── A BASE, DITA AQUI TAMBÉM ──────────────────────────────
+                    A mesma frase que o PDF imprime no faseamento. Está aqui
+                    porque é aqui que ela mexe na percentagem: com o cursor
+                    dentro da caixa, «30%» de que é a pergunta óbvia, e a
+                    resposta não pode obrigar a abrir o PDF para a confirmar. */}
+                <p className="mt-2.5 text-[11px] leading-relaxed text-foreground/45">
+                  Sinal e saldo são calculados sobre o total a pagar ({eur(totais.aPagar)}), com IVA
+                  incluído — é essa a base que a factura usa.
+                </p>
                 {/* ── QUANDO AS SOMAS NÃO FECHAM ────────────────────────────
                     Por construção fecham sempre. Este aviso é a rede para o dia
                     em que deixarem de fechar — e nesse dia tem de se ver antes
@@ -4539,6 +4548,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             assetOriginais={assetOriginais}
             money={money}
             split={split}
+            pctSinal={pctSinal}
           />
         </div>
       )}
@@ -5126,6 +5136,7 @@ function PreviewSummary({
   assetOriginais,
   money,
   split,
+  pctSinal,
 }: {
   doc: StudioDoc;
   assetUrls: Record<string, string>;
@@ -5134,6 +5145,8 @@ function PreviewSummary({
   money: ReturnType<typeof resolveProposalMoney>;
   /** O sinal e o saldo, tal como `totaisDaProposta` os devolve. */
   split: { sinal: number; saldo: number };
+  /** A percentagem do sinal DESTA proposta (`depositPercentOf`), não um 30 fixo. */
+  pctSinal: number;
 }) {
   const covers = (doc.coverImages ?? []).filter(Boolean) as string[];
   const porConfirmar = countPendingImages(doc);
@@ -5232,14 +5245,21 @@ function PreviewSummary({
               <dt className="font-medium text-foreground/70">Com IVA</dt>
               <dd className="font-display text-base text-foreground/90">{eur(money.gross)}</dd>
             </div>
+            {/* A PERCENTAGEM É A DO DOCUMENTO. Este resumo dizia «Sinal 30%»
+                escrito à letra ao lado do valor certo: numa proposta a 40%
+                mostrava 30% e o número de 40% — o mesmo defeito que o PDF e o
+                portal já tinham corrigido, deixado para trás aqui. */}
             <div className="mt-1 flex items-baseline justify-between text-xs text-foreground/50">
-              <dt>Sinal 30%</dt>
+              <dt>Sinal {pctSinal}%</dt>
               <dd>{eur(split.sinal)}</dd>
             </div>
             <div className="flex items-baseline justify-between text-xs text-foreground/50">
-              <dt>Saldo 70%</dt>
+              <dt>Saldo {100 - pctSinal}%</dt>
               <dd>{eur(split.saldo)}</dd>
             </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-foreground/40">
+              Sobre o valor com IVA.
+            </p>
           </dl>
         ) : (
           <p className="text-sm text-foreground/50">

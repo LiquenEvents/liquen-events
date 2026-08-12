@@ -48,6 +48,24 @@ describe("contract-terms — DEFAULT_TERMS invariants", () => {
   it("uses a stable, dated TERMS_VERSION", () => {
     expect(TERMS_VERSION).toMatch(/^\d{4}-\d{2}$/);
   });
+
+  /**
+   * ── O PONTO 3 TEM DE DIZER SOBRE QUE VALOR É O SINAL ─────────────────────
+   *
+   * Decisão dela, 12/08/2026: o sinal é calculado sobre o total COM IVA. É o
+   * que o sistema sempre facturou (`splitSinal(proposal.total, …)` sobre o
+   * bruto), e é agora o que o contrato diz — porque enquanto não dizia, o
+   * ponto 2 («aos valores apresentados acresce o IVA») empurrava a leitura
+   * para a outra base, e as duas diferem em 169,74 € numa proposta de 2.460 €.
+   *
+   * Isto não guarda a frase à letra — guarda a obrigação de a haver.
+   */
+  it("says, in the payment section, that the deposit is calculated on the VAT-inclusive total", () => {
+    const pagamento = DEFAULT_TERMS.find((s) => /^3\./.test(s.heading));
+    expect(pagamento, "a secção de pagamento tem de existir").toBeDefined();
+    expect(pagamento!.body).toMatch(/sinal de \d{1,2}%/i);
+    expect(pagamento!.body).toMatch(/com IVA inclu/i);
+  });
 });
 
 describe("contract-terms — termsToPlainText", () => {

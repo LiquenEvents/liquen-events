@@ -864,3 +864,63 @@ describe("totaisDaProposta — o bloco que tem de fechar", () => {
     }
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A BASE DO SINAL É O TOTAL COM IVA — DECISÃO DELA, 12/08/2026
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A pergunta esteve em aberto e tinha duas respostas defensáveis: 30% da base
+ * (738,00 €) ou 30% do que o casal transfere (907,74 €). Ficou a segunda.
+ *
+ * Não é uma preferência de escrita: é o número que sai numa factura com um
+ * número fiscal gasto. Enquanto foi tácito, era o género de coisa que alguém
+ * «arruma» a olhar só para uma das folhas — e nesse dia o documento assinado e
+ * a factura emitida passam a discordar em 169,74 €.
+ *
+ * Este teste prende a decisão nos dois sítios onde ela vive, e verifica que são
+ * o MESMO número: o bloco de totais (que o estúdio mostra e o PDF imprime) e o
+ * caminho da facturação (`splitSinal` sobre `Proposal.total`, que é o bruto
+ * gravado por `/api/orcamento/[id]/proposta-doc`).
+ */
+describe("o sinal é calculado sobre o total COM IVA", () => {
+  const proposta = {
+    budgetItems: ["Decoração Cerimónia"],
+    budgetAmounts: [],
+    budgetExtras: [],
+    totalAmount: 2460,
+    totalVatMode: "acrescer",
+  } as unknown as ProposalDoc;
+
+  it("30% de 3.025,80 € e não de 2.460,00 €", () => {
+    const t = totaisDaProposta(proposta, 30);
+    expect(t.total).toBe(2460); // a base
+    expect(t.aPagar).toBe(3025.8); // o que o casal transfere
+    expect(t.sinal).toBe(907.74);
+    // A outra leitura, a que ficou de fora, escrita para não voltar por
+    // distracção: 30% da base seriam 738,00 €.
+    expect(t.sinal).not.toBe(738);
+    expect(round2(t.total * 0.3)).toBe(738);
+  });
+
+  it("o sinal do documento é, ao cêntimo, o que a facturação emite", () => {
+    // `Proposal.total` é `resolveProposalMoney(doc).gross` — ver
+    // `src/app/api/orcamento/[id]/proposta-doc/route.ts`. As rotas de
+    // facturação fazem `splitSinal(proposal.total, pct)`.
+    for (const [totalAmount, modo] of [
+      [2460, "acrescer"],
+      [3025.8, "incluido"],
+      [7890.55, "acrescer"],
+      [12_345.67, "incluido"],
+    ] as const) {
+      for (const pct of [20, 30, 40, 50]) {
+        const doc = { ...proposta, totalAmount, totalVatMode: modo } as ProposalDoc;
+        const totalGravado = resolveProposalMoney(doc).gross;
+        expect(sinalESaldo(totalGravado, pct)).toEqual({
+          sinal: totaisDaProposta(doc, pct).sinal,
+          saldo: totaisDaProposta(doc, pct).saldo,
+        });
+      }
+    }
+  });
+});

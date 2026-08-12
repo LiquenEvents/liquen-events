@@ -801,8 +801,14 @@ export const pt = {
     },
     pagamentos: {
       title: "Pagamentos",
+      // A BASE DITA. As percentagens sem a base de que saem obrigam a uma
+      // conta — e à conta errada: numa proposta escrita como «2.460,00 € +
+      // IVA», 30% do número que se lê são 738,00 €, e a factura que chega diz
+      // 907,74 €. É esta a página onde o cliente confirma o valor antes de
+      // transferir. A mesma frase está no PDF («total a pagar») e no ponto 3
+      // das condições.
       intro:
-        "O pagamento é faseado: {sinal}% de sinal para reservar a data e {saldo}% de saldo antes do evento.",
+        "O pagamento é faseado: {sinal}% de sinal para reservar a data e {saldo}% de saldo antes do evento, calculados sobre o total a pagar (com IVA incluído).",
       scheduleTitle: "Plano previsto",
       // As percentagens vêm preenchidas (`fill`) com as da PROPOSTA — é
       // editável por proposta e é a mesma que as facturas usam.

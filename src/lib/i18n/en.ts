@@ -764,8 +764,9 @@ export const en: Dict = {
     },
     pagamentos: {
       title: "Payments",
+      // The base, stated — see the pt dictionary for why.
       intro:
-        "Payment is staged: a {sinal}% deposit to reserve the date and the {saldo}% balance before the event.",
+        "Payment is staged: a {sinal}% deposit to reserve the date and the {saldo}% balance before the event, both calculated on the total payable (VAT included).",
       scheduleTitle: "Expected schedule",
       // Percentages are filled in from the PROPOSAL — see the pt dictionary.
       sinal: "Deposit ({sinal}%)",
