@@ -24,6 +24,8 @@ import { apagarFotoDaBiblioteca } from "@/lib/theme-materializar";
 import { log } from "@/lib/logger";
 import { lqipAceitavel } from "@/lib/lqip";
 import { corNormalizada } from "@/lib/cor";
+import { idDaPaleta, paletaDaCor } from "@/lib/paleta-da-cor";
+import { etiquetar } from "@/lib/biblioteca-foto-etiquetas-store";
 import { garantirFoto, updateFoto } from "@/lib/biblioteca-fotos-store";
 
 export const runtime = "nodejs";
@@ -361,6 +363,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         await updateFoto(res.image.path, dados);
       } catch (e) {
         log.warn("temas: LQIP/cor não guardados", { path: res.image.path, erro: String(e) });
+      }
+    }
+    // ── A ETIQUETA DE PALETA, DE GRAÇA ────────────────────────────────────
+    //
+    // A cor acabou de ser guardada; traduzi-la para o vocabulário da
+    // biblioteca não custa uma consulta nem um cêntimo, e é o que faz
+    // «paleta:terracotta» devolver alguma coisa. `origem: "upload"` para a
+    // revisão em lote saber que foi a máquina a pô-la e não uma pessoa.
+    //
+    // Melhor esforço, como o resto deste bloco: a fotografia já está guardada,
+    // e uma etiqueta que falhe deixa-a como estão todas as anteriores a isto
+    // existir. Nunca é motivo para devolver erro de um carregamento que correu
+    // bem.
+    if (cor) {
+      const paleta = paletaDaCor(cor);
+      if (paleta) {
+        try {
+          await etiquetar(res.image.path, idDaPaleta(paleta), "upload");
+        } catch (e) {
+          log.warn("temas: paleta não etiquetada", { path: res.image.path, erro: String(e) });
+        }
       }
     }
     // Devolvidos JÁ na resposta: a célula que acabou de entrar na grelha não
