@@ -55,7 +55,12 @@ interface Medicao {
   pedidosDeEscrita: number;
   longTasks: { quantas: number; msTotal: number; msMaior: number };
   nosNoDom: { antes: number; durante: number; depois: number };
-  contasDoStorage: unknown;
+  contasDoStorage: {
+    escritas: number;
+    bytesEscritos: number;
+    bilhetes: number;
+    escritasDirectas: number;
+  };
 }
 
 async function login(page: Page): Promise<boolean> {
@@ -286,7 +291,25 @@ async function medir(
   page.off("requestfinished", aoResponder);
   page.off("requestfailed", aoResponder);
 
-  const contas = await (await fetch("http://localhost:54321/__contas")).json();
+  // ── OS CONTADORES DO STORAGE, LIDOS E NARROWED ──────────────────────────
+  //
+  // O que vem da rede não vai para o ficheiro tal e qual. O CodeQL assinala
+  // isso («network data written to file») e tem razão em princípio: este JSON é
+  // depois lido por quem escreve o relatório, e um campo inesperado lá dentro
+  // seria dado de fora a passar por medição.
+  //
+  // Aqui só passam os quatro números que este instrumento conhece, cada um
+  // coagido a número. É também melhor medição: o ficheiro passa a ter uma forma
+  // fixa em vez de «o que o servidor calhou devolver».
+  const cru: unknown = await (await fetch("http://localhost:54321/__contas")).json();
+  const numero = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const bruto = (cru ?? {}) as Record<string, unknown>;
+  const contas = {
+    escritas: numero(bruto.escritas),
+    bytesEscritos: numero(bruto.bytesEscritos),
+    bilhetes: numero(bruto.bilhetes),
+    escritasDirectas: numero(bruto.escritasDirectas),
+  };
 
   return {
     etiqueta,
@@ -312,7 +335,11 @@ async function medir(
 
 test("mede o carregamento de 49 fotografias @medicao", async ({ page, browser }) => {
   test.setTimeout(60 * 60_000);
-  const etiqueta = process.env.MEDICAO_ETIQUETA ?? "antes";
+  // A etiqueta vira o NOME de um ficheiro. Fica só com letras, dígitos, hífen e
+  // underscore: um `../` numa variável de ambiente não tem de poder escolher
+  // onde é que a medição é escrita.
+  const etiqueta =
+    (process.env.MEDICAO_ETIQUETA ?? "antes").replace(/[^a-zA-Z0-9_-]/g, "") || "antes";
 
   await instrumentar(page);
   const entrou = await login(page);

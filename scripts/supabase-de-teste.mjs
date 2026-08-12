@@ -71,6 +71,18 @@ const json = (res, code, valor) => {
   res.end(texto);
 };
 
+/**
+ * Texto vindo de um pedido, seguro para ir parar a uma linha de registo.
+ *
+ * Fora tudo o que não seja imprimível (mudanças de linha e retornos incluídos,
+ * que são o que permite forjar uma entrada inteira) e um tecto de comprimento,
+ * para um URL absurdo não encher o ficheiro.
+ */
+const limpoParaRegisto = (valor) =>
+  String(valor ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, "\u00b7")
+    .slice(0, 300);
+
 /** `md5` do conteúdo, que é o que o Storage devolve como eTag. */
 async function etag(bytes) {
   const { createHash } = await import("node:crypto");
@@ -246,7 +258,15 @@ const servidor = createServer(async (req, res) => {
   // Isto guarda linhas em memória e percebe o pedaço do PostgREST que o
   // `repository.ts` usa: `col=eq.valor`, `order`, `limit`, `offset`.
   if (p.startsWith("/rest/v1/")) {
-    if (process.env.SB_VERBOSO) console.log(`[rest] ${req.method} ${req.url}`);
+    // O método e o caminho saem LIMPOS para o registo.
+    //
+    // O CodeQL assinala isto como «log injection», e tem razão mesmo sendo isto
+    // uma ferramenta local: o `req.url` vem de quem faz o pedido, e uma mudança
+    // de linha lá dentro forja uma entrada de registo inteira — quem depois lê o
+    // ficheiro vê um pedido que nunca aconteceu. É barato de fechar e não vale a
+    // pena discutir: tira-se o que não é imprimível e corta-se o comprimento.
+    if (process.env.SB_VERBOSO)
+      console.log(`[rest] ${limpoParaRegisto(req.method)} ${limpoParaRegisto(req.url)}`);
     const tabela = p.slice("/rest/v1/".length).split("?")[0];
     if (!tabelas.has(tabela)) tabelas.set(tabela, []);
     const linhas = tabelas.get(tabela);
