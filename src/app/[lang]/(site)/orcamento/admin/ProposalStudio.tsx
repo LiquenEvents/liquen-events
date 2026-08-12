@@ -123,7 +123,7 @@ import { prepareImageWithThumb, type ImageKind } from "./image-prep";
 import ThemePicker, { type ImportedImage, type ReservedImage } from "./ThemePicker";
 import ServicesEditor, { MoveBtns } from "./ServicesEditor";
 import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
-import { Button, Card, Field, Segmented } from "./ui";
+import { Ajuda, Button, Card, Field, Segmented } from "./ui";
 
 /**
  * Visual editor for the studio's multi-page proposal PDF. Produces a
@@ -4875,27 +4875,35 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           mood board que nunca teve a escolha tem de continuar
                           sem ela, para uma proposta já enviada sair como
                           sempre saiu. */}
-                                    <label className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-foreground/65">
-                                      <input
-                                        type="checkbox"
-                                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
-                                        checked={semRecorte}
-                                        onChange={(e) =>
-                                          updateBoard(bi, {
-                                            enquadramento: e.target.checked
-                                              ? "forma-da-foto"
-                                              : undefined,
-                                          })
-                                        }
-                                      />
-                                      <span>
-                                        Manter a forma de cada fotografia (não corta)
-                                        <span className="block text-[11px] text-foreground/40">
-                                          Desligado, as fotografias são recortadas para encher as
-                                          caixas da disposição — como saía antes.
-                                        </span>
-                                      </span>
-                                    </label>
+                                    <div className="mt-2 flex items-center gap-1.5">
+                                      <label className="flex items-start gap-2 text-xs leading-relaxed text-foreground/65">
+                                        <input
+                                          type="checkbox"
+                                          className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
+                                          checked={semRecorte}
+                                          onChange={(e) =>
+                                            updateBoard(bi, {
+                                              enquadramento: e.target.checked
+                                                ? "forma-da-foto"
+                                                : undefined,
+                                            })
+                                          }
+                                        />
+                                        <span>Manter a forma de cada fotografia (não corta)</span>
+                                      </label>
+                                      {/* FORA do `<label>`, e é por uma razão: um
+                                          botão lá dentro ligava e desligava a
+                                          opção ao ser carregado.
+
+                                          O que ele explica é a consequência de
+                                          DESLIGAR — a parte que ninguém precisa
+                                          de reler à quinquagésima página. */}
+                                      <Ajuda sobre="o que muda ao manter a forma das fotografias">
+                                        Desligado, as fotografias são recortadas para encher as
+                                        caixas da disposição — como saía antes. Ligado, cada uma
+                                        entra inteira e as caixas é que se ajustam à forma dela.
+                                      </Ajuda>
+                                    </div>
                                     {/* ── A ÚLTIMA FILA ────────────────────────
                                         Uma última fila com uma foto, quando as
                                         de cima têm três ou quatro, lê-se como
@@ -5107,12 +5115,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   }
                 />
                 <div className="flex flex-col gap-2 mb-3">
-                  <p className="text-xs leading-relaxed text-foreground/50">
-                    Os preços por linha são <strong className="font-semibold">só para ti</strong>:
-                    servem para somar e para avisar quando o total já não bate certo. O PDF continua
-                    a mostrar as linhas sem preço e um «{doc.totalLabel || "Valor Total"}» único,
-                    como nas tuas propostas.
-                  </p>
                   {/* ── OS CABEÇALHOS DAS COLUNAS ────────────────────────────
                       A caixa do fim não tinha nome nenhum: uma quadrícula com a
                       palavra «extra» ao lado, sem cabeçalho e sem uma frase que
@@ -5129,8 +5131,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   <div className="hidden items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-foreground/25 sm:flex">
                     <span className="flex-1">Item</span>
                     <span className="w-32 shrink-0">Como escala</span>
-                    <span className="w-28 shrink-0 text-right">Preço (sem IVA)</span>
-                    <span className="w-16 shrink-0 text-center">Extra</span>
+                    <span className="flex w-28 shrink-0 items-center justify-end gap-1">
+                      Preço (sem IVA)
+                      <Ajuda sobre="para que servem os preços por linha">
+                        Os preços por linha são{" "}
+                        <strong className="font-semibold text-foreground/85">só para ti</strong>:
+                        servem para somar e para avisar quando o total já não bate certo. O PDF
+                        continua a mostrar as linhas sem preço e um «
+                        {doc.totalLabel || "Valor Total"}» único, como nas tuas propostas.
+                      </Ajuda>
+                    </span>
+                    {/* ── A EXPLICAÇÃO, AO PÉ DO CABEÇALHO E A PEDIDO ──────
+                        Eram três linhas sempre visíveis por baixo das linhas do
+                        orçamento. Palavras dela: «ocupa três linhas sempre
+                        visíveis». Úteis na primeira vez, ruído a partir da
+                        segunda — e a ocupar o espaço onde deviam estar as
+                        linhas. Agora está onde a pergunta se faz: em cima da
+                        coluna, atrás de um «?». */}
+                    <span className="flex w-16 shrink-0 items-center justify-center gap-1">
+                      Extra
+                      <Ajuda sobre="o que faz a caixa Extra">
+                        <strong className="font-semibold text-foreground/85">Extra</strong> marca
+                        uma linha como opcional: ela sai assinalada no quadro do PDF e, por baixo do
+                        total, a proposta passa a mostrar também o valor <em>sem</em> essa linha.
+                        Uma proposta só, com as duas versões lá dentro — em vez de dois documentos a
+                        divergir.
+                      </Ajuda>
+                    </span>
                     <span className="w-5 shrink-0" />
                   </div>
                   {/* Pela ordem que vai SAIR — ver `ordemDoOrcamento`. O `i`
@@ -5214,6 +5241,23 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           />
                           <span className="sm:hidden">extra</span>
                         </label>
+                        {/* No telemóvel não há cabeçalho de coluna, e portanto
+                            não há onde pendurar o «?». Fica na PRIMEIRA linha,
+                            que é o equivalente móvel do cabeçalho — e só nela:
+                            um ponto de interrogação por linha seriam oito
+                            botões a explicar a mesma coisa.
+
+                            Fora do `<label>`: um botão lá dentro carregaria a
+                            quadrícula ao ser carregado. */}
+                        {ordemDoOrcamento[0] === i && (
+                          <Ajuda className="sm:hidden" sobre="o que faz a caixa Extra">
+                            <strong className="font-semibold text-foreground/85">Extra</strong>{" "}
+                            marca uma linha como opcional: ela sai assinalada no quadro do PDF e,
+                            por baixo do total, a proposta passa a mostrar também o valor{" "}
+                            <em>sem</em> essa linha. Uma proposta só, com as duas versões lá dentro
+                            — em vez de dois documentos a divergir.
+                          </Ajuda>
+                        )}
                         <button
                           type="button"
                           className={REMOVE_BTN}
@@ -5288,17 +5332,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     </p>
                   )}
 
-                  {/* ── O QUE A CAIXA «EXTRA» FAZ, ANTES DE SE LHE TOCAR ────
-                      Estava sem cabeçalho e sem explicação: uma quadrícula que
-                      mudava o PDF e o discurso da proposta, sem uma palavra a
-                      dizê-lo. A frase fica SEMPRE (é a explicação); o impacto
-                      só aparece quando há mesmo linhas marcadas. */}
-                  <p className="text-[11px] leading-relaxed text-foreground/45">
-                    <strong className="font-semibold text-foreground/60">Extra</strong> marca uma
-                    linha como opcional: ela sai assinalada no quadro do PDF e, por baixo do total,
-                    a proposta passa a mostrar também o valor <em>sem</em> essa linha. Uma proposta
-                    só, com as duas versões lá dentro — em vez de dois documentos a divergir.
-                  </p>
                   {/* ── AS DUAS VERSÕES, SEM SEREM DUAS PROPOSTAS ──────────
                       Assim que uma linha é marcada como extra, esta proposta
                       passa a responder ao "e sem isso, quanto fica?" — e o PDF

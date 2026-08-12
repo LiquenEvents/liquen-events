@@ -15,6 +15,8 @@ export type { ButtonProps, ButtonVariant, ButtonSize } from "./Button";
 export { Card, SectionCard } from "./Card";
 export type { CardProps, CardPadding, SectionCardProps } from "./Card";
 
+export { Ajuda } from "./Ajuda";
+
 export { Field } from "./Field";
 export type { FieldProps } from "./Field";
 
