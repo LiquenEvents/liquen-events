@@ -1,7 +1,18 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { PDFDocument, PDFPage } from "pdf-lib";
 import { renderProposalDocPdf } from "./proposal-doc-pdf";
 import { withProposalDefaults } from "./proposal-doc";
+
+/**
+ * Cada teste deste ficheiro DESENHA um documento inteiro — fontes embutidas,
+ * oito a dez páginas —, e alguns desenham três. Com a rede toda a correr em
+ * paralelo isso passa dos 5 segundos por omissão do vitest e o teste falha por
+ * relógio, não por composição: um falso vermelho que só aparece na máquina
+ * carregada e nunca quando se corre o ficheiro sozinho. Trinta segundos é folga
+ * que chega para a máquina mais lenta e continua a apanhar uma composição que
+ * entre em ciclo.
+ */
+vi.setConfig({ testTimeout: 30_000 });
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -99,11 +110,27 @@ function porPagina(escritas: Escrita[]): Escrita[][] {
 }
 
 /**
+ * Os cabeçalhos de secção passaram a ser NUMERADOS («1. Apresentação»,
+ * «2. Serviços», …), como na folha que ela envia há anos.
+ *
+ * Estes testes procuram-nos pelo NOME e não pelo número: o número depende das
+ * secções que o modelo tem — a proposta de Organização traz um cronograma pelo
+ * meio — e não é isso que aqui se está a medir. O número em si, esse, tem o seu
+ * próprio teste («as secções são numeradas…»), que é onde ele deve partir se
+ * alguém lhe mexer.
+ */
+const CABECALHO = (titulo: string) => new RegExp(`^\\d+\\.\\s+${titulo}$`);
+const ehCabecalho = (e: Escrita, titulo: string) => CABECALHO(titulo).test(e.texto);
+
+/**
  * Três serviços com descrições reais, do comprimento das que ela escreve.
  *
- * O `clientNames` longo não é decoração: é o gatilho. Empurra o parágrafo de
- * boas-vindas de três para quatro linhas, e é isso que faz o cabeçalho
- * «Serviços» cair no fundo da página — o caso que ela fotografou.
+ * O `clientNames` longo era o gatilho original: empurrava o parágrafo de
+ * boas-vindas de três para quatro linhas, e era isso que fazia o cabeçalho
+ * «Serviços» cair no fundo da página — o caso que ela fotografou. O parágrafo
+ * saiu (a folha dela não o tem), mas o nome comprido fica: agora é a linha
+ * «Noivos:» da lista da apresentação que ele estica, e a garantia a medir é a
+ * mesma.
  */
 function propostaDeTresServicos(nomes = "Maria Margarida & José Francisco") {
   return withProposalDefaults({
@@ -193,8 +220,8 @@ describe("os serviços não partem a meio de uma frase", () => {
    * ar de erro.
    */
   it("o cabeçalho «Serviços» nunca fica sozinho no fundo da página", async () => {
-    // Vários comprimentos de nome: o que empurra o cabeçalho para o fundo é o
-    // número de linhas do parágrafo de boas-vindas, e isso varia com o nome.
+    // Vários comprimentos de nome: um nome que peça duas linhas na lista da
+    // apresentação empurra tudo o que vem a seguir folha abaixo.
     for (const nomes of [
       "Ana & Zé",
       "Maria Margarida & José Francisco",
@@ -202,7 +229,7 @@ describe("os serviços não partem a meio de uma frase", () => {
     ]) {
       const paginas = porPagina(await desenhar(propostaDeTresServicos(nomes)));
       for (const [i, pagina] of paginas.entries()) {
-        const idx = pagina.findIndex((e) => e.texto === "Serviços");
+        const idx = pagina.findIndex((e) => ehCabecalho(e, "Serviços"));
         if (idx === -1) continue;
         // Depois do cabeçalho tem de vir conteúdo NA MESMA página: o título do
         // primeiro grupo e, pelo menos, o começo do primeiro serviço.
@@ -351,6 +378,11 @@ function onde(escritas: Escrita[], texto: string): Escrita | undefined {
   return escritas.find((e) => e.texto === texto);
 }
 
+/** O mesmo, para um cabeçalho de secção — que hoje vai numerado. */
+function ondeCabecalho(escritas: Escrita[], titulo: string): Escrita | undefined {
+  return escritas.find((e) => ehCabecalho(e, titulo));
+}
+
 /** `a` vem depois de `b` na folha: numa página seguinte, ou mais abaixo na
  *  mesma. É a ordem de leitura de uma coluna. */
 function vemDepoisDe(a: Escrita, b: Escrita): boolean {
@@ -396,7 +428,7 @@ describe("a folha do orçamento é uma coluna", () => {
     const quadro = onde(escritas, "Bouquet da Noiva")!;
     const notas = onde(escritas, "Notas importantes")!;
     const reserva = onde(escritas, "Condições de reserva")!;
-    const gerais = onde(escritas, "Condições Gerais")!;
+    const gerais = ondeCabecalho(escritas, "Condições Gerais")!;
 
     expect(notas.pagina, "as «Notas importantes» saíram da folha do quadro").toBe(quadro.pagina);
     expect(reserva.pagina, "as «Condições de reserva» saíram da folha do quadro").toBe(
@@ -438,8 +470,8 @@ describe("a folha do orçamento é uma coluna", () => {
       const escritas = corpo(await desenhar(doc));
       // Só as folhas do orçamento: a capa tem texto centrado, e centrado a meio
       // de uma folha ao baixo é para lá dos 498 sem que nada esteja errado.
-      const daPrimeira = onde(escritas, "Orçamento Proposto")!.pagina;
-      const daSeguinte = onde(escritas, "Condições Gerais")!.pagina;
+      const daPrimeira = ondeCabecalho(escritas, "Orçamento Proposto")!.pagina;
+      const daSeguinte = ondeCabecalho(escritas, "Condições Gerais")!.pagina;
       const daFolha = escritas.filter(
         // Fora o rodapé (marca à esquerda, e-mail encostado à direita, em M-26),
         // que é desenhado em todas as páginas e não é conteúdo desta.
@@ -532,3 +564,194 @@ function propostaDeOrcamentoGorda() {
     naoIncluido: [...base.naoIncluido, ...mais(5, "Item não incluído adicional no orçamento")],
   };
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A PRIMEIRA FOLHA É A DELA: APRESENTAÇÃO E SERVIÇOS, UMA POR CIMA DA OUTRA
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Ela mandou a página 1 de uma proposta verdadeira («Proposta Decoração
+   Casamento Inês & Gonçalo 7.08.2027») e disse: «eu quero esta parte assim na
+   proposta do back office dos serviços igualzinha.»
+
+   Nessa folha, de cima para baixo e TUDO na mesma página: «1. Apresentação»,
+   sete linhas de «Rótulo: valor», e «2. Serviços» com o grupo e os seus cinco
+   serviços. Aqui fixa-se o que isso quer dizer em medidas — a ordem dos
+   campos, as duas secções na mesma folha, e o que acontece quando não cabe. */
+
+/** A folha dela, campo a campo. */
+function propostaComoADela(over: Record<string, unknown> = {}) {
+  return withProposalDefaults({
+    template: "decoracao",
+    ref: "Proposta Decoração Casamento Inês & Gonçalo 7.08.2027",
+    clientNames: "Inês e Gonçalo",
+    eventType: "Casamento",
+    eventDate: "7 de agosto de 2027",
+    location: "Colina dos Piscos",
+    guests: "190 pax",
+    servico: "Decor e decoração Floral",
+    ceremony: "Religiosa",
+    moodBoards: [],
+    coverImages: [],
+    serviceGroups: [
+      {
+        letter: "a)",
+        title: "Decoração do Casamento",
+        items: [
+          {
+            label: "Tema e decoração",
+            desc: "Desenvolvimento de um conceito visual e estético único que reflita a personalidade do casal.",
+          },
+          { label: "Cocktail", desc: "arranjos florais mesas bistro," },
+          { label: "Almoço e Jantar", desc: "Decoração floral e decor das mesas do jantar" },
+          { label: "Decor Mesas Buffet" },
+          { label: "Complementos dos Noivos", desc: "Ramo da Noiva, raminhos de lapela" },
+        ],
+      },
+    ],
+    budgetItems: ["Decoração Floral Cocktail", "Decor Mesas Buffet"],
+    totalLabel: "Valor Total",
+    totalText: "4.750,00 € + IVA",
+    totalAmount: 4750,
+    totalVatMode: "acrescer" as const,
+    ...over,
+  } as Parameters<typeof withProposalDefaults>[0]);
+}
+
+/** Os rótulos da apresentação, na ordem em que foram desenhados. */
+function rotulosDaApresentacao(escritas: Escrita[]): string[] {
+  const cab = ondeCabecalho(escritas, "Apresentação")!;
+  const seguinte = ondeCabecalho(escritas, "Serviços");
+  return escritas
+    .filter(
+      (e) =>
+        e.x === M &&
+        e.texto.endsWith(":") &&
+        vemDepoisDe(e, cab) &&
+        (!seguinte || vemDepoisDe(seguinte, e)),
+    )
+    .map((e) => e.texto);
+}
+
+describe("a apresentação é a lista dela", () => {
+  it("os campos saem pela ordem da folha dela, um por linha", async () => {
+    const escritas = corpo(await desenhar(propostaComoADela()));
+    expect(rotulosDaApresentacao(escritas)).toEqual([
+      "Noivos:",
+      "Evento:",
+      "Data do Evento:",
+      "Local:",
+      "Número de Convidados:",
+      "Serviço:",
+      "Cerimónia:",
+    ]);
+  });
+
+  /**
+   * «Hora:» seguido de nada não é um campo por preencher — é um erro impresso
+   * numa folha que vai para o cliente. Todos os campos desta secção são
+   * opcionais na prática, e o que não está preenchido não existe na folha.
+   */
+  it("um campo vazio não desenha o rótulo", async () => {
+    const escritas = corpo(
+      await desenhar(propostaComoADela({ ceremony: "", servico: "", time: "" })),
+    );
+    const rotulos = rotulosDaApresentacao(escritas);
+    expect(rotulos).not.toContain("Cerimónia:");
+    expect(rotulos).not.toContain("Serviço:");
+    expect(rotulos).not.toContain("Hora:");
+    // E os que estão preenchidos continuam lá, pela mesma ordem.
+    expect(rotulos).toEqual([
+      "Noivos:",
+      "Evento:",
+      "Data do Evento:",
+      "Local:",
+      "Número de Convidados:",
+    ]);
+  });
+
+  it("o valor sai na MESMA linha do rótulo, à direita dele", async () => {
+    const escritas = corpo(await desenhar(propostaComoADela()));
+    const rotulo = escritas.find((e) => e.texto === "Local:")!;
+    // O local também está impresso na CAPA, que é outra página: o valor que
+    // interessa é o da folha do rótulo.
+    const valor = escritas.find(
+      (e) => e.texto === "Colina dos Piscos" && e.pagina === rotulo.pagina,
+    )!;
+    expect(valor.y).toBe(rotulo.y);
+    expect(valor.x).toBeGreaterThan(rotulo.x);
+  });
+
+  /** O caso dela, que é o normal: as duas secções na mesma folha, por esta
+   *  ordem. Era isto que o parágrafo de boas-vindas e a grelha de quatro
+   *  colunas impediam — a apresentação enchia uma folha inteira sozinha. */
+  it("a apresentação e os serviços ficam na mesma folha, por esta ordem", async () => {
+    const escritas = corpo(await desenhar(propostaComoADela()));
+    const apresentacao = ondeCabecalho(escritas, "Apresentação")!;
+    const servicos = ondeCabecalho(escritas, "Serviços")!;
+    const ultimoServico = onde(escritas, "Complementos dos Noivos: ")!;
+
+    expect(servicos.pagina, "os serviços saíram da folha da apresentação").toBe(
+      apresentacao.pagina,
+    );
+    expect(vemDepoisDe(servicos, apresentacao), "os serviços não vêm por baixo").toBe(true);
+    expect(ultimoServico.pagina, "o grupo não coube inteiro na folha").toBe(servicos.pagina);
+  });
+
+  /**
+   * ── A NUMERAÇÃO ─────────────────────────────────────────────────────────
+   * «1. Apresentação», «2. Serviços», «3. Orçamento Proposto», «4. Condições
+   * Gerais». A folha antiga tem «2. Serviços» seguido de «2. Serviços
+   * Disponibilizados» — dois capítulos com o mesmo número na mesma página. É
+   * um erro dela, e é dos que não se copiam.
+   */
+  it("as secções são numeradas por ordem, sem repetir nenhum número", async () => {
+    const escritas = corpo(await desenhar(propostaComoADela()));
+    const cabecalhos = ["Apresentação", "Serviços", "Orçamento Proposto", "Condições Gerais"].map(
+      (t) => ondeCabecalho(escritas, t)?.texto,
+    );
+    expect(cabecalhos).toEqual([
+      "1. Apresentação",
+      "2. Serviços",
+      "3. Orçamento Proposto",
+      "4. Condições Gerais",
+    ]);
+  });
+});
+
+/** Muitos grupos, todos do mesmo tamanho: obriga a secção a partir. */
+function propostaDeMuitosGrupos() {
+  return propostaComoADela({
+    serviceGroups: Array.from({ length: 6 }, (_, g) => ({
+      letter: `${String.fromCharCode(97 + g)})`,
+      title: `Grupo de serviços número ${g + 1}`,
+      items: Array.from({ length: 5 }, (_, i) => ({
+        label: `Serviço ${g + 1}.${i + 1}`,
+        desc: "Descrição do comprimento das que ela escreve, com material, montagem e desmontagem incluídos.",
+      })),
+    })),
+  });
+}
+
+describe("os serviços partem por grupos inteiros", () => {
+  it("nenhum grupo fica com metade dos serviços numa folha e metade noutra", async () => {
+    const escritas = corpo(await desenhar(propostaDeMuitosGrupos()));
+    for (let g = 0; g < 6; g++) {
+      const titulo = onde(escritas, `Grupo de serviços número ${g + 1}`);
+      expect(titulo, `não se encontrou o grupo ${g + 1}`).toBeDefined();
+      for (let i = 0; i < 5; i++) {
+        const item = onde(escritas, `Serviço ${g + 1}.${i + 1}: `);
+        expect(item, `não se encontrou o serviço ${g + 1}.${i + 1}`).toBeDefined();
+        expect(
+          item!.pagina,
+          `o grupo ${g + 1} partiu-se: o serviço ${i + 1} caiu noutra folha`,
+        ).toBe(titulo!.pagina);
+      }
+    }
+  });
+
+  it("nenhuma página do documento fica vazia, nem com muitos grupos", async () => {
+    for (const [i, pagina] of porPagina(await desenhar(propostaDeMuitosGrupos())).entries()) {
+      expect(pagina.length, `a página ${i + 1} não tem nada desenhado`).toBeGreaterThan(0);
+    }
+  });
+});

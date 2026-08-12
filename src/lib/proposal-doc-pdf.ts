@@ -716,6 +716,24 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       cx += f.bold.widthOfTextAtSize(ch, sz) + 2;
     }
   };
+  /**
+   * ── AS SECÇÕES SÃO NUMERADAS, COMO NA FOLHA DELA ──────────────────────────
+   *
+   * «1. Apresentação», «2. Serviços», «3. Orçamento Proposto». É assim que a
+   * proposta que ela envia há anos numera os capítulos, e é o que dá ao casal
+   * uma maneira de falar do documento ao telefone («no ponto 3…»).
+   *
+   * O número é CONTADO e não escrito: as secções que existem variam com o
+   * modelo — a de Organização tem cronograma e a de Decoração não —, e dois
+   * números escritos à mão davam, mais cedo ou mais tarde, o defeito que a
+   * folha antiga tem e que não se copia: «2. Serviços» seguido de «2. Serviços
+   * Disponibilizados», duas secções com o mesmo número na mesma página.
+   *
+   * Conta-se por ORDEM DE DESENHO, que é a ordem por que se lê.
+   */
+  let seccoesNumeradas = 0;
+  const numerada = (titulo: string) => `${++seccoesNumeradas}. ${titulo}`;
+
   // Section header: a small quiet eyebrow, the serif title, and a very thin, short
   // pale hairline. No colour, no weight — the title alone carries the section.
   const sectionHeader = (p: PDFPage, kicker: string, title: string, y: number): number => {
@@ -818,66 +836,83 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         y = H - M - 64;
       }
     };
-    y = sectionHeader(p, "A Proposta", "Apresentação", y);
+    y = sectionHeader(p, "A Proposta", numerada("Apresentação"), y);
 
-    // Client / couple name in serif — the personal headline of the document.
-    eyebrow(p, org ? "Cliente" : "Noivos", M, y);
-    text(p, doc.clientNames, M, y - 24, { font: f.serif, size: T_DISPLAY, color: INK });
-    y -= 52;
+    /* ═══════════════════════════════════════════════════════════════════════
+       A APRESENTAÇÃO É UMA LISTA, E A LISTA É A DELA
+       ═══════════════════════════════════════════════════════════════════════
 
-    // Warm opening — a short, personalised welcome sets the tone before the facts.
-    // Kept to a comfortable measure so it never runs edge to edge.
-    const evento = (doc.eventType || "evento").toLowerCase();
-    const nomes = doc.clientNames || (org ? "Cliente" : "Noivos");
-    const welcome =
-      `Caros ${nomes}, foi com muito gosto que preparámos esta proposta para o vosso ${evento}. ` +
-      "Reunimos aqui a nossa visão, pensada ao pormenor para tornar este momento único. " +
-      "Estamos ao vosso lado em cada passo.";
-    for (const ln of wrap(f.serifIt, welcome, 11.5, MEASURE)) {
-      text(p, ln, M, y, { font: f.serifIt, size: 11.5, color: MUTED });
-      y -= 17;
-    }
-    y -= 26;
+       Era uma folha inteira: o nome do casal em corpo 20, um parágrafo de
+       boas-vindas e os campos numa GRELHA de quatro colunas com as legendas em
+       capitulares espaçadas. A folha dela é outra coisa — uma linha por campo,
+       «Rótulo: valor», o rótulo a negro e o valor em texto normal, tudo por
+       cima dos serviços NA MESMA PÁGINA.
 
-    // Event details as a calm tinted band of labelled columns.
-    const details: [string, string][] = [
-      ...(!org && doc.eventType ? ([["Evento", doc.eventType]] as [string, string][]) : []),
-      ...(doc.eventDate ? ([["Data", doc.eventDate]] as [string, string][]) : []),
-      ...(doc.location ? ([["Local", doc.location]] as [string, string][]) : []),
-      ...(doc.guests ? ([["Convidados", doc.guests]] as [string, string][]) : []),
-      ...(!org && doc.ceremony ? ([["Cerimónia", doc.ceremony]] as [string, string][]) : []),
-      ...(!org && doc.time ? ([["Hora", doc.time]] as [string, string][]) : []),
-      ...(!org && doc.weddingPlanners
-        ? ([["Wedding Planners", doc.weddingPlanners]] as [string, string][])
-        : []),
+       ── O PARÁGRAFO DE BOAS-VINDAS SAIU ────────────────────────────────────
+       Não existe na folha dela, e era ele que pagava a segunda folha: medido,
+       quatro linhas de 17 pontos mais 26 de ar — 94 pontos, quando o que
+       faltava para a secção dos Serviços caber aqui eram 40. E não se perde
+       nenhuma palavra ao casal: o e-mail que leva a proposta já abre com ela
+       («Foi um gosto conhecer a sua visão. Preparámos uma proposta à medida do
+       seu evento», em `email-templates-store.ts`) e a contracapa fecha com a
+       mesma voz («Por nos deixarem fazer parte deste momento»). Duas
+       boas-vindas na mesma proposta eram uma a mais; a que sai é a que a folha
+       de referência não tem.
+
+       ── OS CAMPOS SÃO TODOS OPCIONAIS ──────────────────────────────────────
+       Uma proposta sem hora não pode desenhar «Hora:» seguido de nada. A ordem
+       é a dela; a hora e os wedding planners, que a folha dela não tem, vêm no
+       fim, ao pé da cerimónia, que é a família a que pertencem. */
+    const CAMPO_CORPO = 11;
+    /** Avanço de uma linha para a seguinte. Com 16 e o ar de baixo, os oito
+     *  campos do caso mais cheio deixam os Serviços a caber nesta folha. */
+    const CAMPO_AVANCO = 16;
+    /** A entrelinha de um campo que precisou de duas linhas. */
+    const CAMPO_ENTRELINHA = CAMPO_CORPO + 3;
+    /** O ar entre o último campo e a legenda dos Serviços. */
+    const AR_ENTRE_SECCOES = 26;
+    /** A medida da lista — a mesma das notas do orçamento (550), e não a folha
+     *  toda: um «Local:» com o nome de uma herdade e a morada não tem de correr
+     *  706 pontos até à margem direita para se ler. */
+    const CAMPO_MEDIDA = MEASURE + 120;
+
+    const campos: [string, string][] = [
+      [org ? "Cliente" : "Noivos", doc.clientNames],
+      ...(org ? [] : ([["Evento", doc.eventType]] as [string, string][])),
+      ["Data do Evento", doc.eventDate],
+      ["Local", doc.location],
+      ["Número de Convidados", doc.guests],
+      ["Serviço", doc.servico ?? ""],
+      ...(org
+        ? []
+        : ([
+            ["Cerimónia", doc.ceremony ?? ""],
+            ["Hora", doc.time ?? ""],
+            ["Wedding Planners", doc.weddingPlanners ?? ""],
+          ] as [string, string][])),
     ];
-    if (details.length) {
-      // Flat, borderless key–value row: tiny grey label over a quiet serif value,
-      // generously spaced, framed by a single pale hairline above. No fill, no bar.
-      const cols = Math.min(4, details.length);
-      const rows = Math.ceil(details.length / cols);
-      const colW = (W - 2 * M) / cols;
-      const rowH = 48;
-      p.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.5, color: LINE });
-      const top = y - 24;
-      details.forEach(([k, v], i) => {
-        const r = Math.floor(i / cols);
-        const c = i % cols;
-        const cxp = M + c * colW;
-        const cyp = top - r * rowH;
-        eyebrow(p, k, cxp, cyp);
-        // Duas linhas por campo — um local com nome comprido ("Herdade da …,
-        // Reguengos de Monsaraz") pede três e perdia o resto.
-        for (const [j, ln] of clampLines(
-          wrap(f.reg, v, 11, colW - 16),
-          MAX_EVENT_FIELD_LINES,
-          `Campo «${k}»`,
-        ).entries()) {
-          text(p, ln, cxp, cyp - 16 - j * 13, { font: f.serif, size: 11.5, color: INK });
-        }
+    // Um «Hora:» seguido de nada não é um campo por preencher: é um erro
+    // impresso numa folha que vai para o cliente.
+    const details = campos.filter(([, v]) => (v ?? "").trim().length > 0);
+
+    for (const [rotulo, valor] of details) {
+      const marca = `${rotulo}:`;
+      const vx = M + f.bold.widthOfTextAtSize(textoParaFonte(f.bold, `${marca} `), CAMPO_CORPO);
+      // Duas linhas por campo — um local com nome comprido ("Herdade da …,
+      // Reguengos de Monsaraz") pede três e perdia o resto.
+      const linhas = clampLines(
+        wrap(f.reg, valor, CAMPO_CORPO, M + CAMPO_MEDIDA - vx),
+        MAX_EVENT_FIELD_LINES,
+        `Campo «${rotulo}»`,
+      );
+      ensure(CAMPO_AVANCO + (linhas.length - 1) * CAMPO_ENTRELINHA);
+      text(p, marca, M, y, { font: f.bold, size: CAMPO_CORPO, color: INK });
+      linhas.forEach((ln, j) => {
+        text(p, ln, vx, y - j * CAMPO_ENTRELINHA, { size: CAMPO_CORPO, color: INK });
       });
-      y = top - (rows - 1) * rowH - 42;
+      y -= CAMPO_AVANCO + (linhas.length - 1) * CAMPO_ENTRELINHA;
     }
+    if (details.length) y -= AR_ENTRE_SECCOES;
 
     /* ═══════════════════════════════════════════════════════════════════════
        ONDE A PÁGINA PARTE — E ONDE NÃO PODE PARTIR
@@ -938,7 +973,19 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
 
     const desenharItem = (it: { label: string; desc?: string }) => {
       const { lab, dx, lines } = medirItem(it);
-      p.drawCircle({ x: M + 12, y: y + 3, size: 1.2, color: FAINT });
+      /**
+       * O marcador desta lista é o DELA: um ponto redondo cheio, que se vê.
+       *
+       * Era um ponto de 1,2 de raio na cor mais pálida da paleta — 2,4 pontos
+       * de tinta clara ao lado de um rótulo a negro de corpo 10, que à vista
+       * desaparecia e no papel desaparece de vez. Na folha dela o marcador é um
+       * disco escuro do tamanho de um «o». 1,5 e o cinzento do texto secundário
+       * ficam a meio caminho: lê-se como lista sem competir com o rótulo.
+       *
+       * Só nesta lista, e de propósito: as listas de corpo 9 do fecho (notas,
+       * condições) continuam com o ponto pequeno, que é o que lhes assenta.
+       */
+      p.drawCircle({ x: M + 12, y: y + 3, size: 1.5, color: MUTED });
       if (lab) text(p, lab, DESC_X, y, { font: f.bold, size: descSize });
       text(p, lines[0] ?? "", lab ? dx : DESC_X, y, { size: descSize });
       y -= AVANCO_1;
@@ -956,23 +1003,40 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     };
 
     /**
-     * O cabeçalho «Serviços» viaja com o título do primeiro grupo e com o
+     * A altura de um GRUPO INTEIRO — o título e todos os seus serviços.
+     *
+     * É esta a unidade por que a secção parte: ela pediu que, quando não caiba
+     * tudo numa folha, se parta «por grupos inteiros, nunca a meio de uma
+     * lista». Um grupo com cinco serviços partido ao terceiro lê-se como um
+     * descuido; o mesmo grupo inteiro na folha seguinte lê-se como um capítulo.
+     *
+     * O ar que se deixa DEPOIS do grupo (os 8 pontos lá em baixo) não entra na
+     * conta: não é tinta e não tem de caber na folha — o mesmo raciocínio do
+     * `FIM_MORTO` da cauda do orçamento.
+     */
+    const alturaDoGrupo = (g: { title: string; items: { label: string; desc?: string }[] }) =>
+      ALTURA_TITULO + g.items.reduce((h, it) => h + alturaItem(medirItem(it).lines.length), 0);
+
+    /**
+     * O cabeçalho «Serviços» viaja com o primeiro grupo INTEIRO — e, quando o
+     * primeiro grupo é maior do que uma folha, pelo menos com o título dele e o
      * primeiro serviço. Um cabeçalho no fundo de uma página não é conteúdo — é
      * uma página desperdiçada com ar de erro.
      */
     const primeiroGrupo = doc.serviceGroups[0];
-    const primeiroItem = primeiroGrupo?.items[0];
-    const alturaDoPrimeiro = primeiroItem
-      ? Math.min(alturaItem(medirItem(primeiroItem).lines.length), COLUNA)
-      : 0;
-    ensure(ALTURA_CABECALHO + (primeiroGrupo ? ALTURA_TITULO + alturaDoPrimeiro : 0));
-    y = sectionHeader(p, "O que propomos", "Serviços", y);
+    ensure(ALTURA_CABECALHO + (primeiroGrupo ? Math.min(alturaDoGrupo(primeiroGrupo), COLUNA) : 0));
+    y = sectionHeader(p, "O que propomos", numerada("Serviços"), y);
 
     for (const g of doc.serviceGroups) {
-      // O título do grupo viaja com o seu primeiro serviço, pela mesma razão.
+      // O grupo ou cabe onde está, ou começa INTEIRO na página seguinte. Só um
+      // grupo maior do que uma folha se parte — e mesmo esse leva o título com
+      // o primeiro serviço.
       const abre = g.items[0];
+      const todo = alturaDoGrupo(g);
       ensure(
-        ALTURA_TITULO + (abre ? Math.min(alturaItem(medirItem(abre).lines.length), COLUNA) : 0),
+        todo <= COLUNA
+          ? todo
+          : ALTURA_TITULO + (abre ? Math.min(alturaItem(medirItem(abre).lines.length), COLUNA) : 0),
       );
       // Group title in serif; the ordinal marker stays quiet grey, not coloured.
       if (g.letter) text(p, g.letter, M, y, { font: f.serifB, size: T_SUB, color: MUTED });
@@ -1027,7 +1091,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     const COLUNA = H - M - 64 - CHAO;
     const linhasDa = (it: string) => wrap(f.reg, it, T_BODY, MEASURE + 120);
 
-    y = sectionHeader(p, "Como avançamos", "Cronograma de Organização", y);
+    y = sectionHeader(p, "Como avançamos", numerada("Cronograma de Organização"), y);
     for (const phase of doc.cronograma) {
       const abre = phase.items[0];
       ensure(20 + (abre ? Math.min(linhasDa(abre).length * 15, COLUNA) : 0));
@@ -1095,7 +1159,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     let p = pdf.addPage([W, H]);
     frame(p);
     let y = H - M - 64;
-    y = sectionHeader(p, "O investimento", "Orçamento Proposto", y);
+    y = sectionHeader(p, "O investimento", numerada("Orçamento Proposto"), y);
 
     const totalStr = orgT ? (doc.totalEstimatedText ?? "") : doc.totalText;
     const totalLbl = orgT ? "Total Estimado" : doc.totalLabel;
@@ -1540,7 +1604,12 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
   {
     let p = pdf.addPage([W, H]);
     frame(p);
-    const yTop = sectionHeader(p, "Para sua tranquilidade", "Condições Gerais", H - M - 64);
+    const yTop = sectionHeader(
+      p,
+      "Para sua tranquilidade",
+      numerada("Condições Gerais"),
+      H - M - 64,
+    );
     const gutter = 34;
     const colW = (W - 2 * M - gutter) / 2;
     const colX = [M, M + colW + gutter];

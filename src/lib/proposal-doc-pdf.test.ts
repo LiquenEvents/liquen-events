@@ -28,6 +28,14 @@ import { renderProposalDocPdf, renderProposalDocPdfWithReport } from "./proposal
 import { withProposalDefaults, MOOD_BOARD_MAX_IMAGES, type ProposalDoc } from "@/lib/proposal-doc";
 
 /**
+ * Desenhar um documento inteiro passa dos 5 segundos por omissão do vitest
+ * quando a rede toda corre em paralelo — e passava só nesses casos, o que dava
+ * um vermelho que desaparecia mal se corresse o ficheiro sozinho. Metade destes
+ * testes já trazia `30_000` à mão, um a um; fica um número só, para o ficheiro.
+ */
+vi.setConfig({ testTimeout: 30_000 });
+
+/**
  * Smoke/golden do documento-proposta multi-página (landscape). Sem imagens reais
  * (mood boards vazios caem no placeholder do collage, sem tocar no sharp), o que
  * mantém o teste rápido e determinístico. Carregamos os bytes com
@@ -474,11 +482,21 @@ describe("relatório de conteúdo CORTADO pelo desenho", () => {
   }, 30_000);
 
   it("um campo do evento com nome comprido é cortado a 2 linhas — e dito", async () => {
-    // Um local a sério, com nome comprido: pede 3 linhas, a faixa desenha 2.
+    /**
+     * A apresentação deixou de ser uma grelha de quatro colunas e passou a ser
+     * a lista da folha dela («Local: …», tudo na mesma linha): cada valor
+     * ganhou a medida das notas do orçamento — 550 pontos menos o rótulo, à
+     * volta de 100 caracteres por linha, quando na coluna cabiam 30.
+     *
+     * O corte a duas linhas ficou onde estava, e continua a ser DITO: o que
+     * mudou é quanto é preciso escrever para lá chegar. Este local tem 280
+     * caracteres — três linhas cheias — e é o género de coisa que só aparece
+     * quando alguém cola a morada inteira no campo errado.
+     */
     const doc = {
       ...decoracaoDoc(),
       location:
-        "Herdade da Quinta do Casal Novo de São Lourenço do Barrocal, Reguengos de Monsaraz, Alentejo",
+        "Herdade da Quinta do Casal Novo de São Lourenço do Barrocal, Estrada Nacional 255, ao quilómetro doze, Reguengos de Monsaraz, distrito de Évora, Alentejo, com entrada pelo portão sul junto à capela antiga e estacionamento na eira, a norte da adega velha da herdade",
     };
     const { truncations } = await renderProposalDocPdfWithReport(doc);
     expect(truncations).toContainEqual({ where: "Campo «Local»", dropped: 1, unit: "linhas" });

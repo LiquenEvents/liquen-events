@@ -258,6 +258,20 @@ export interface ProposalDoc {
   guests: string; // "150 pax"
   ceremony?: string; // "Civil, simbólica"
   time?: string; // "A definir"
+  /**
+   * O QUE ESTA PROPOSTA É, numa linha — «Decor e decoração Floral».
+   *
+   * Existe na folha que ela envia há anos («Serviço: Decor e decoração Floral»,
+   * entre o número de convidados e a cerimónia) e não existia aqui. Sem ele, a
+   * apresentação diz onde e para quantos, e não diz o que se vai fazer — que é
+   * o que distingue uma proposta de decoração de uma de organização quando as
+   * duas chegam ao mesmo casal na mesma semana.
+   *
+   * Texto LIVRE e opcional, como todos os campos desta secção: uma proposta que
+   * o não tenha preenchido não desenha o rótulo (ver `proposal-doc-pdf.ts` — um
+   * «Serviço:» seguido de nada é pior do que não haver linha nenhuma).
+   */
+  servico?: string;
   /** Wedding planners a acompanhar o evento, e.g. "Equipa AMARA" (opcional). */
   weddingPlanners?: string;
 
