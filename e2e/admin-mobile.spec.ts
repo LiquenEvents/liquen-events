@@ -130,6 +130,22 @@ async function garantirUmPedido(page: Page): Promise<void> {
    * voltarem a correr onde não se pode gravar, o dizem à primeira e por
    * palavras suas.
    */
+  /**
+   * O TECTO DE PEDIDOS NÃO É UMA FALHA — e esta linha é a diferença entre uma
+   * corrida vermelha e uma verde.
+   *
+   * `POST /api/orcamento` aceita 5 pedidos por minuto por IP (é um formulário
+   * público, e o tecto existe por boas razões). Este ficheiro tem quatro
+   * passeios, cada um cria o seu pedido, e uma repetição por falha cria mais um
+   * — ao sexto, o servidor responde 429 e o passeio seguinte morria a dizer que
+   * não conseguiu criar o pedido de que precisa.
+   *
+   * Só que, nesse ponto, JÁ HÁ pedidos na lista: os que os passeios anteriores
+   * criaram, no mesmo servidor, que dura toda a corrida. O 429 quer dizer
+   * «chega», não «não há».
+   */
+  if (r.status() === 429) return;
+
   if (!r.ok()) {
     throw new Error(
       `Não se conseguiu criar o pedido de que este passeio precisa: ` +
@@ -530,6 +546,14 @@ test.describe("Back office — mobile", () => {
         };
       });
 
+    // O TOPO MEDE-SE NO TOPO. A página de entrada é alta (a fotografia ocupa o
+    // ecrã) e o browser guarda a posição do scroll quando o conteúdo é
+    // substituído no lugar — media-se «no topo» um cabeçalho que já estava
+    // encolhido a 66 px de altura de scroll. A aplicação passou a voltar ao
+    // topo ao entrar; isto garante que o teste não depende disso para medir a
+    // coisa certa.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(300);
     const topo = await medir();
     expect(
       topo.altura,
@@ -546,7 +570,29 @@ test.describe("Back office — mobile", () => {
 
     // E encolhe mesmo ao descer — senão o "encolhe ao scroll" é só uma boa
     // intenção escrita no código.
+    /**
+     * DESCE-SE, E ESPERA-SE PELA ANIMAÇÃO.
+     *
+     * O site tem `scroll-behavior: smooth`, portanto `window.scrollTo` NÃO põe
+     * o scroll onde se pede — começa uma animação. Ler o `scrollY` a seguir dá
+     * zero, e um teste que leia assim acusa o código de não fazer uma coisa que
+     * ele faz. (Foi o que me aconteceu a mim ao endurecer este teste.)
+     *
+     * O `useDesceu` acende aos 24 px; medido nesta vista, o cabeçalho passa de
+     * 65 px no topo para 57 depois de descer.
+     */
     await page.evaluate(() => window.scrollTo(0, 400));
+    await page
+      .waitForFunction(() => window.scrollY > 24, undefined, { timeout: 5000 })
+      .catch(() => {});
+    const rolou = await page.evaluate(() => window.scrollY);
+    expect(
+      rolou,
+      `A vista só rolou ${rolou}px, abaixo dos 24 do useDesceu — não há como o ` +
+        `cabeçalho encolher. Ou a página não tem altura para rolar, ou entrou-se ` +
+        `já rolado: a página de entrada é alta e o browser guarda a posição do ` +
+        `scroll (ver o scrollTo(0, 0) do AdminLogin).`,
+    ).toBeGreaterThan(24);
     await page.waitForTimeout(400);
     const descido = await medir();
     expect(

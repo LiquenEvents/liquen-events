@@ -146,6 +146,19 @@ export default function AdminLogin() {
 
   /** Depois de a sessão estar aberta: ou se vai ao sítio pedido, ou se fica. */
   const entrou = useCallback(() => {
+    /**
+     * VOLTA-SE AO TOPO ANTES DE ENTRAR.
+     *
+     * Esta página passou a ser alta — a fotografia ocupa o ecrã inteiro — e o
+     * browser guarda a posição do scroll quando o conteúdo é substituído no
+     * lugar (`router.refresh()`). Resultado medido num ecrã de 375×568: quem
+     * entrava caía no back office já a 66 px do topo, com o cabeçalho a
+     * aparecer encolhido, como se a página já tivesse sido lida.
+     *
+     * Foi o passeio móvel que o apanhou, e apanhou-o bem: media o cabeçalho
+     * «no topo» quando ele já não estava no topo.
+     */
+    window.scrollTo(0, 0);
     if (destino && destino !== window.location.pathname + window.location.search) {
       router.replace(destino);
       return;
