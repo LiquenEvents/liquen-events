@@ -255,9 +255,21 @@ export function escreverCampo<T extends Partial<ProposalDoc>>(
           i === campo.gi ? { ...g, title: texto } : g,
         ),
       };
+    /**
+     * ── CADA CAMPO ESCRITO PELO NOME, À LETRA ──────────────────────────────
+     *
+     * Estas quatro linhas eram duas, com a chave a sair de um `? :` e a escrita
+     * a ser feita com `{ ...it, [chave]: texto }`. Lê-se melhor — e é uma
+     * escrita com chave CALCULADA num objecto que veio de fora, que é a forma
+     * exacta de um defeito que a análise do GitHub procura («remote property
+     * injection») e que esta casa já apanhou uma vez.
+     *
+     * As chaves eram literais e o alcance era nenhum. Não interessa: uma defesa
+     * que depende de o próximo leitor perceber que aquele ternário só devolve
+     * dois literais é uma defesa que se perde. Escrito assim não há nada a
+     * perceber.
+     */
     case "itemRotulo":
-    case "itemDesc": {
-      const chave = campo.tipo === "itemRotulo" ? "label" : "desc";
       return {
         ...doc,
         serviceGroups: (doc.serviceGroups ?? []).map((g, i) =>
@@ -265,29 +277,47 @@ export function escreverCampo<T extends Partial<ProposalDoc>>(
             ? {
                 ...g,
                 items: (g.items ?? []).map((it, j) =>
-                  j === campo.ii ? { ...it, [chave]: texto } : it,
+                  j === campo.ii ? { ...it, label: texto } : it,
                 ),
               }
             : g,
         ),
       };
-    }
+    case "itemDesc":
+      return {
+        ...doc,
+        serviceGroups: (doc.serviceGroups ?? []).map((g, i) =>
+          i === campo.gi
+            ? {
+                ...g,
+                items: (g.items ?? []).map((it, j) =>
+                  j === campo.ii ? { ...it, desc: texto } : it,
+                ),
+              }
+            : g,
+        ),
+      };
     case "boardTitulo":
-    case "boardSubtitulo":
-    case "boardNota": {
-      const chave =
-        campo.tipo === "boardTitulo"
-          ? "title"
-          : campo.tipo === "boardSubtitulo"
-            ? "subtitulo"
-            : "annotation";
       return {
         ...doc,
         moodBoards: (doc.moodBoards ?? []).map((b, i) =>
-          i === campo.bi ? { ...b, [chave]: texto } : b,
+          i === campo.bi ? { ...b, title: texto } : b,
         ),
       };
-    }
+    case "boardSubtitulo":
+      return {
+        ...doc,
+        moodBoards: (doc.moodBoards ?? []).map((b, i) =>
+          i === campo.bi ? { ...b, subtitulo: texto } : b,
+        ),
+      };
+    case "boardNota":
+      return {
+        ...doc,
+        moodBoards: (doc.moodBoards ?? []).map((b, i) =>
+          i === campo.bi ? { ...b, annotation: texto } : b,
+        ),
+      };
     case "linhaDeOrcamento":
       return {
         ...doc,
