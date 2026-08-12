@@ -19,6 +19,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:passkeys": "playwright test --config playwright.passkeys.config.ts",
     "test:e2e:propostas": "playwright test --config playwright.propostas.config.ts",
+    "test:e2e:movel": "playwright test --config playwright.movel.config.ts",
     "measure:fluidity": "playwright test fluidity",
     "lh": "lhci autorun --config=lighthouserc.json",
     "lh:mobile": "lhci autorun --config=lighthouserc.mobile.json",

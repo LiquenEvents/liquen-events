@@ -96,7 +96,7 @@ async function garantirUmPedido(page: Page): Promise<void> {
   // depois disso não aparece; e a consulta que diria «já há» exige sessão, que
   // ainda não existe. Criar um a mais não custa nada — o armazenamento do CI
   // morre com o processo.
-  await page.request.post("/api/orcamento", {
+  const r = await page.request.post("/api/orcamento", {
     data: {
       form: {
         name: "Rita e Tomás",
@@ -113,6 +113,29 @@ async function garantirUmPedido(page: Page): Promise<void> {
       submissionId: `e2e-movel-${Date.now().toString(36)}`,
     },
   });
+
+  /**
+   * A RESPOSTA VERIFICA-SE, e é a linha mais importante desta função.
+   *
+   * Sem ela, esta chamada já falhou uma corrida inteira em silêncio: contra o
+   * servidor de PRODUÇÃO que o `playwright.config.ts` arranca em CI, o
+   * `Repository` recusa escritas sem Supabase e isto respondia 500. O pedido
+   * não existia, a lista ficava vazia, e a falha só aparecia trinta linhas à
+   * frente — «main li button» não encontrado — a apontar para o sítio errado.
+   * É por isso que estes passeios passaram a ter servidor próprio
+   * (playwright.movel.config.ts); esta asserção é o que garante que, se
+   * voltarem a correr onde não se pode gravar, o dizem à primeira e por
+   * palavras suas.
+   */
+  if (!r.ok()) {
+    throw new Error(
+      `Não se conseguiu criar o pedido de que este passeio precisa: ` +
+        `POST /api/orcamento devolveu ${r.status()}. ` +
+        `Se for 500, o servidor está em modo de produção sem Supabase e recusa gravar — ` +
+        `corra com \`npm run test:e2e:movel\`, que arranca o servidor certo.\n` +
+        (await r.text()).slice(0, 300),
+    );
+  }
 }
 
 /**

@@ -202,8 +202,14 @@ jobs:
         env:
           CI: "true"
 
+      # Config própria porque estes passeios CRIAM um pedido — precisam de um
+      # cliente na lista para chegar ao estúdio — e o servidor de produção do
+      # CI recusa escritas sem Supabase. Com o servidor de produção, o pedido
+      # não chegava a gravar e a falha aparecia disfarçada de outra coisa
+      # («main li button» não encontrado, trinta linhas à frente). A razão
+      # está escrita em playwright.movel.config.ts.
       - name: Ergonomia táctil no telemóvel (bloqueante)
-        run: npx playwright test --grep "@movel"
+        run: npm run test:e2e:movel
         env:
           CI: "true"
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"

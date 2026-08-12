@@ -34,9 +34,18 @@ export default function EmptyState({ icon, title, hint, action }: Props) {
       <p className="text-foreground/55 text-sm font-medium">{title}</p>
       {hint && <p className="text-foreground/30 text-xs mt-1.5 max-w-xs">{hint}</p>}
       {action && (
+        /**
+         * `alvo-toque` porque este botão é escrito à mão e não passa pelo
+         * `ui/Button.tsx`, que é onde vive o piso de 44 px do dedo. Media 101×32
+         * num iPhone SE — e é o botão de uma folha VAZIA, ou seja, o primeiro
+         * que alguém encontra numa instalação nova e o único caminho para sair
+         * dali. A rede do CI só o apanhou quando a lista de pedidos passou a
+         * poder estar mesmo vazia durante o passeio; até aí, o ecrã que este
+         * botão habita nunca chegava a ser medido.
+         */
         <button
           onClick={action.onClick}
-          className="mt-5 px-4 py-2 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors shadow-sm"
+          className="alvo-toque mt-5 px-4 py-2 rounded-xl bg-[#1b2119] text-white/90 text-[10px] tracking-[0.15em] uppercase hover:bg-[#2a3227] transition-colors shadow-sm"
         >
           {action.label}
         </button>
