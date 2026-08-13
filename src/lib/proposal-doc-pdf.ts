@@ -1037,11 +1037,18 @@ export async function renderProposalDocPdfWithReport(
       textCenter(p, names, cx, 262, { font: f.serif, size: nameSize, color: CREAM });
     }
 
-    const sub = [evento.eventType, evento.eventDate].filter(Boolean).join("   ·   ");
+    // `.trim()` nas três linhas, e não a caixa em bruto: um campo com um espaço
+    // lá dentro é «verdadeiro» para o `if` — foi assim que o «Note:» sozinho
+    // chegou ao fundo do orçamento. Aqui o «·» entre o tipo e a data ficaria a
+    // separar coisa nenhuma, no meio da capa.
+    const sub = [evento.eventType, evento.eventDate]
+      .map((s) => (s ?? "").trim())
+      .filter(Boolean)
+      .join("   ·   ");
     if (sub)
       textCenter(p, sub, cx, 214, { font: f.reg, size: 11, color: CREAM_DIM, tracking: 1.4 });
-    if (doc.location)
-      textCenter(p, doc.location, cx, 194, { font: f.serifIt, size: 11, color: FAINT });
+    if ((doc.location ?? "").trim())
+      textCenter(p, doc.location.trim(), cx, 194, { font: f.serifIt, size: 11, color: FAINT });
   }
 
   // ── Page 2 — Apresentação + Serviços ──
@@ -1182,14 +1189,33 @@ export async function renderProposalDocPdfWithReport(
      * medida que as quebrou — sobra-lhes largura, nunca falta. Conservador de
      * propósito: transbordar seria pior do que uma linha curta.)
      */
-    const medirItem = (it: { label: string; desc?: string }) => {
-      if (!it.desc) return { lab: "", dx: DESC_X, lines: [it.label] };
+    const medirItem = (it: { label?: string; desc?: string }) => {
+      /**
+       * ── UM SERVIÇO SEM RÓTULO NÃO PODE DEITAR ABAIXO A GERAÇÃO ───────────
+       *
+       * `label` é obrigatório no tipo e o estúdio escreve-o sempre. Mas o que
+       * chega a esta função não vem do tipo: vem do `doc` que o corpo do pedido
+       * traz (`/api/orcamento/[id]/proposta-doc` valida a `ref` e os nomes, e
+       * mais nada), de um rascunho antigo do `localStorage`, de uma cópia de
+       * segurança restaurada ou de um documento relido de um PDF. Sem rótulo,
+       * o `it.label.trim()` daqui de baixo atirava um `TypeError` — e o que ela
+       * via era «Erro ao gerar a proposta: Cannot read properties of undefined
+       * (reading 'trim')».
+       *
+       * É a MESMA avaria que o `withProposalDefaults` já contorna um degrau
+       * acima, e com a mesma nota escrita: «a missing array would throw
+       * "undefined is not iterable" → generic 500 "erro ao gerar"». Aqui é um
+       * campo em vez de um array; a regra é a mesma — o que falta lê-se como
+       * vazio, e o vazio já tem caminho.
+       */
+      const rotulo = (it.label ?? "").trim();
+      if (!it.desc) return { lab: "", dx: DESC_X, lines: [it.label ?? ""] };
       // SEM RÓTULO NÃO HÁ DOIS PONTOS. Uma linha de serviço só com descrição
       // desenhava o separador à mesma e saía «: Floral arch.» — uma frase a
       // começar por dois pontos, que se lê como software estragado. O rótulo é
       // opcional (ela escreve linhas que são só uma frase), a pontuação que o
       // acompanha é que não pode sobreviver-lhe.
-      if (!it.label.trim()) {
+      if (!rotulo) {
         return { lab: "", dx: DESC_X, lines: wrap(f.reg, it.desc, descSize, W - M - DESC_X) };
       }
       // Sanitiza aqui também: `lab` é medido diretamente com
@@ -1249,8 +1275,23 @@ export async function renderProposalDocPdfWithReport(
      * conta: não é tinta e não tem de caber na folha — o mesmo raciocínio do
      * `FIM_MORTO` da cauda do orçamento.
      */
-    const alturaDoGrupo = (g: { title: string; items: { label: string; desc?: string }[] }) =>
-      ALTURA_TITULO + g.items.reduce((h, it) => h + alturaItem(medirItem(it).lines.length), 0);
+    /** Um grupo sem título não gasta a linha do título — ver `tituloDoGrupo`. */
+    const alturaDoGrupo = (g: {
+      letter?: string;
+      title?: string;
+      items: { label?: string; desc?: string }[];
+    }) =>
+      (tituloDoGrupo(g) ? ALTURA_TITULO : 0) +
+      g.items.reduce((h, it) => h + alturaItem(medirItem(it).lines.length), 0);
+    /**
+     * A linha de título de um grupo existe? Nem sempre: ela escreve grupos sem
+     * nome, com os serviços a seguir uns aos outros. Sem isto, o desenho gastava
+     * a linha à mesma — vinte e dois pontos de branco entre dois serviços, no
+     * meio da lista, sem nada escrito.
+     */
+    function tituloDoGrupo(g: { letter?: string; title?: string }): boolean {
+      return !!((g.letter ?? "").trim() || (g.title ?? "").trim());
+    }
 
     /**
      * O cabeçalho «Serviços» viaja com o primeiro grupo INTEIRO — e, quando o
@@ -1258,11 +1299,39 @@ export async function renderProposalDocPdfWithReport(
      * primeiro serviço. Um cabeçalho no fundo de uma página não é conteúdo — é
      * uma página desperdiçada com ar de erro.
      */
-    const primeiroGrupo = doc.serviceGroups[0];
+    /**
+     * ── UM GRUPO SEM SERVIÇOS NÃO É UM CAPÍTULO, É UM TÍTULO SOLTO ─────────
+     *
+     * O estúdio deixa acrescentar um grupo e passar à frente sem lhe pôr nada
+     * dentro (o mesmo gesto que deixa uma rubrica em branco). Aqui isso saía
+     * como um cabeçalho em serifa, sozinho, com trinta pontos de branco por
+     * baixo e mais nada — a mesma coisa que o «Note:» sem nota e a linha a
+     * começar por dois pontos, uma secção acima.
+     *
+     * É a regra que os mood boards já seguem («skip empty boards — never show a
+     * client a placeholder»): sem conteúdo, não há página, não há cabeçalho.
+     * O que se guarda para o papel é o que tem alguma coisa por baixo.
+     */
+    /** Um serviço tem alguma coisa para dizer? Sem rótulo nem descrição, o
+     *  desenho punha um marcador redondo e uma linha em branco ao lado dele. */
+    const temTexto = (it: { label?: string; desc?: string }) =>
+      !!((it?.label ?? "").trim() || (it?.desc ?? "").trim());
+    /**
+     * Os grupos como vão ser DESENHADOS — já sem o que está em branco.
+     *
+     * Filtra-se ANTES de medir e não no meio do desenho, porque é a altura
+     * medida que decide onde a página parte: medir um grupo com cinco serviços
+     * e desenhar três é como as notas do orçamento acabavam por cima do rodapé.
+     */
+    const grupos = doc.serviceGroups
+      .map((g) => ({ ...g, items: (g.items ?? []).filter(temTexto) }))
+      .filter((g) => g.items.length > 0);
+
+    const primeiroGrupo = grupos[0];
     ensure(ALTURA_CABECALHO + (primeiroGrupo ? Math.min(alturaDoGrupo(primeiroGrupo), COLUNA) : 0));
     y = sectionHeader(p, t.sobretituloServicos, numerada(t.tituloServicos), y);
 
-    for (const g of doc.serviceGroups) {
+    for (const g of grupos) {
       // O grupo ou cabe onde está, ou começa INTEIRO na página seguinte. Só um
       // grupo maior do que uma folha se parte — e mesmo esse leva o título com
       // o primeiro serviço.
@@ -1274,16 +1343,18 @@ export async function renderProposalDocPdfWithReport(
           : ALTURA_TITULO + (abre ? Math.min(alturaItem(medirItem(abre).lines.length), COLUNA) : 0),
       );
       // Group title in serif; the ordinal marker stays quiet grey, not coloured.
-      if (g.letter) text(p, g.letter, M, y, { font: f.serifB, size: T_SUB, color: MUTED });
-      const letterW = g.letter
-        ? f.serifB.widthOfTextAtSize(textoParaFonte(f.serifB, g.letter) + " ", T_SUB)
-        : 0;
-      text(p, g.title, M + letterW, y, {
-        font: f.serifB,
-        size: T_SUB,
-        color: INK,
-      });
-      y -= ALTURA_TITULO;
+      if (tituloDoGrupo(g)) {
+        if (g.letter) text(p, g.letter, M, y, { font: f.serifB, size: T_SUB, color: MUTED });
+        const letterW = g.letter
+          ? f.serifB.widthOfTextAtSize(textoParaFonte(f.serifB, g.letter) + " ", T_SUB)
+          : 0;
+        text(p, g.title, M + letterW, y, {
+          font: f.serifB,
+          size: T_SUB,
+          color: INK,
+        });
+        y -= ALTURA_TITULO;
+      }
       for (const it of g.items) {
         const altura = alturaItem(medirItem(it).lines.length);
         // Cabe inteiro? Então ou fica onde está, ou muda de página INTEIRO.
@@ -1295,7 +1366,22 @@ export async function renderProposalDocPdfWithReport(
   }
 
   // ── Cronograma de Organização (Organização template) ──
-  if (doc.cronograma && doc.cronograma.length) {
+  /**
+   * ── UMA FASE SEM TAREFAS É UM TÍTULO SOZINHO ────────────────────────────
+   *
+   * Mesma regra dos grupos de serviços, uma secção acima, e pela mesma razão:
+   * «6-12 meses antes do casamento» com nada por baixo lê-se como um erro
+   * nosso, não como uma fase por planear. E uma tarefa em branco punha um
+   * marcador redondo com uma linha vazia ao lado.
+   *
+   * Filtra-se AQUI, antes de a página existir: um cronograma inteiro em branco
+   * abria uma folha nova só com o cabeçalho «Cronograma» e mais nada — que é a
+   * versão grande do mesmo defeito.
+   */
+  const fasesDoCronograma = (doc.cronograma ?? [])
+    .map((fase) => ({ ...fase, items: (fase.items ?? []).filter((it) => (it ?? "").trim()) }))
+    .filter((fase) => fase.items.length > 0);
+  if (fasesDoCronograma.length) {
     let p = pdf.addPage([W, H]);
     frame(p);
     let y = H - M - 64;
@@ -1327,11 +1413,16 @@ export async function renderProposalDocPdfWithReport(
     const linhasDa = (it: string) => wrap(f.reg, it, T_BODY, MEASURE + 120);
 
     y = sectionHeader(p, t.sobretituloCronograma, numerada(t.tituloCronograma), y);
-    for (const phase of doc.cronograma) {
+    for (const phase of fasesDoCronograma) {
       const abre = phase.items[0];
-      ensure(20 + (abre ? Math.min(linhasDa(abre).length * 15, COLUNA) : 0));
-      text(p, phase.title, M, y, { font: f.serifB, size: T_SUB, color: INK });
-      y -= 20;
+      // Uma fase sem nome não gasta a linha do nome: eram vinte pontos de
+      // branco a separar tarefas, com nada escrito lá dentro.
+      const comTitulo = !!(phase.title ?? "").trim();
+      ensure((comTitulo ? 20 : 0) + (abre ? Math.min(linhasDa(abre).length * 15, COLUNA) : 0));
+      if (comTitulo) {
+        text(p, phase.title, M, y, { font: f.serifB, size: T_SUB, color: INK });
+        y -= 20;
+      }
       for (const it of phase.items) {
         const lines = linhasDa(it);
         const altura = lines.length * 15;
@@ -1542,11 +1633,63 @@ export async function renderProposalDocPdfWithReport(
     const PRICE_COL = 120;
     if (orgT) {
       for (const r of doc.budgetRows ?? []) {
-        const lines = wrap(f.reg, r.item, 10.5, boxW - PRICE_COL);
+        /**
+         * ── A COLUNA DE PREÇO É A MESMA COLUNA DOS TOTAIS ──────────────────
+         *
+         * Esta é a única coluna do documento em que um valor ESCRITO POR ELA é
+         * impresso linha a linha, e por baixo dela — à mesma direita, a vinte
+         * pontos — vêm as nossas contas: «TOTAL (sem IVA)», «IVA», «Total a
+         * pagar». Estava a sair em bruto, e isso dava as duas incoerências que
+         * o `money.ts` inteiro existe para não haver:
+         *
+         *   · em PORTUGUÊS, «7890,00 €» (o que o `Intl` compõe nos milhares
+         *     baixos, sem separador nenhum) por cima de «10.390,00 €»;
+         *   · em INGLÊS, «2.500,00 €» por cima de «€10,390.00» — as duas
+         *     convenções na mesma coluna do mesmo quadro, que é exactamente o
+         *     que a nota de `montantesEmIngles` diz ser «pior do que não
+         *     converter nada».
+         *
+         * Passa pelo `dinheiro` como tudo o resto que é montante nesta folha.
+         *
+         * ── E O MARCADOR CAI NO MESMO TRAÇO QUE O TOTAL ────────────────────
+         *
+         * «[Valor]» é o que o estúdio semeia numa linha por orçamentar. O total
+         * já se defendia dele (ver `semMarcador`, dez linhas acima, com a razão
+         * escrita); esta coluna não, e é a mesma folha a chegar ao mesmo casal
+         * com um modelo por preencher impresso.
+         *
+         * O marcador cai no MESMO «—» que o total já desenha — que é o que diz
+         * «ainda não há preço» sem dizer ao cliente que recebeu um modelo. Uma
+         * célula genuinamente VAZIA continua vazia: é assim que esta folha sai
+         * há anos, e encher todas as linhas por orçamentar com traços era mudar
+         * o desenho de um documento que ninguém pediu para mudar.
+         */
+        const escrito = (r.price ?? "").trim();
+        const preco = semMarcador(escrito).trim();
+        /**
+         * ── E O NOME DA RUBRICA CEDE-LHE A LARGURA QUE ELE PRECISAR ────────
+         *
+         * Os 120 pontos reservados à direita cobrem «12.500,00 € + IVA» (74
+         * pontos, medido na Carlito a corpo 10,5) e mais nada: o valor é TEXTO
+         * LIVRE, e «12.500,00 € + IVA (a confirmar)» mede 132 — doze pontos por
+         * cima do nome da rubrica, se o nome for comprido ao ponto de encher a
+         * sua coluna. Duas frases uma por cima da outra, num quadro de dinheiro.
+         *
+         * Mede-se o que VAI mesmo ser desenhado, com a fonte com que vai ser
+         * desenhado, e é essa a largura que se tira ao nome. O caso normal não
+         * muda um ponto — só um preço acima dos 120 aperta a coluna da esquerda.
+         */
+        const impresso = escrito ? (preco ? dinheiro(preco) : "—") : "";
+        const larguraDoPreco = impresso
+          ? f.reg.widthOfTextAtSize(textoParaFonte(f.reg, impresso), 10.5) + 12
+          : 0;
+        const lines = wrap(f.reg, r.item, 10.5, boxW - Math.max(PRICE_COL, larguraDoPreco));
         budgetBreak(Math.max(20, lines.length * 15));
         lines.forEach((ln, i) => {
           text(p, ln, M, y, { size: 10.5, color: INK });
-          if (i === 0) textRight(p, r.price, M + boxW, y, { size: 10.5, color: MUTED });
+          if (i === 0 && impresso) {
+            textRight(p, impresso, M + boxW, y, { size: 10.5, color: MUTED });
+          }
           y -= 15;
         });
         y -= 5;
@@ -1575,6 +1718,21 @@ export async function renderProposalDocPdfWithReport(
       notaDeOrdem("Orçamento", docPt.budgetItems, ordemDasLinhas);
       ordemDasLinhas.forEach((i) => {
         const it = doc.budgetItems[i];
+        /**
+         * ── UMA RUBRICA EM BRANCO NÃO É UMA LINHA DO QUADRO ────────────────
+         *
+         * O estúdio deixa acrescentar uma linha e passar à frente sem lhe pôr
+         * nome (é o mesmo gesto que deixa um grupo de serviços vazio). No papel
+         * isso saía como vinte pontos de nada no meio do quadro — e, se a linha
+         * estivesse assinalada como extra, saía a palavra «extra» à direita de
+         * um nome que não existe. O casal lê uma linha de orçamento sem
+         * rubrica; ninguém sabe o que ela custa nem o que é.
+         *
+         * `return` e não um `filter` sobre a lista: as marcas (`marcas[i]`)
+         * são um ARRAY PARALELO, e mexer nos índices é a única maneira de este
+         * quadro poder mentir sobre dinheiro — está escrito aqui em cima.
+         */
+        if (!(it ?? "").trim()) return;
         // Os 46 pontos reservados à direita são a largura da marca mais o ar
         // que a separa do nome — a marca é curta nas duas línguas («extra»), e
         // o teste de transbordos confirma-o.
