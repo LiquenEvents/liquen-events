@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
+import { EM_ABERTO } from "@/lib/orcamento/proposta-estado";
 import { getProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import {
@@ -70,12 +71,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, status: proposal.status, already: true });
     }
 
-    // Effective revocation: only a live, still-open proposal can be answered.
-    // A signed link lives in the client's inbox for 14 days and is forwardable,
-    // so without this a draft (never really offered) or one the team superseded/
-    // withdrew in the back office (status moved off "enviada") could still be
-    // accepted at a stale price. Reject anything that isn't currently "enviada".
-    if (proposal.status !== "enviada") {
+    /**
+     * Effective revocation: only a live, still-open proposal can be answered.
+     * A signed link lives in the client's inbox for 14 days and is forwardable,
+     * so without this a draft (never really offered) or one the team superseded/
+     * withdrew in the back office could still be accepted at a stale price.
+     *
+     * ── QUAIS SÃO AS VIVAS: `EM_ABERTO`, E NÃO SÓ «ENVIADA» ──────────────────
+     * Isto exigia exactamente `"enviada"`, e por isso recusava o
+     * `em_negociacao` — que é, nas palavras do próprio tipo, «o estado que
+     * descreve a maior parte do tempo real: a proposta seguiu, houve resposta,
+     * e está a discutir-se». O back office marca-o depois de um telefonema (o
+     * Acompanhamento chama-lhe «Houve resposta, está a discutir-se») e o portal
+     * do cliente já o tratava como equivalente a «enviada». Só esta rota
+     * discordava: o casal preenchia o nome, aceitava as condições, carregava em
+     * aceitar — e recebia «Esta proposta já não está disponível» sobre uma
+     * proposta perfeitamente de pé. E é precisamente o estado em que a maioria
+     * está no momento em que o cliente decide.
+     *
+     * A guarda fica, e continua a proteger o que veio proteger: o rascunho
+     * nunca oferecido e o que já foi respondido. Quem decide o que está vivo é
+     * o `EM_ABERTO`, que é a mesma lista que o resto do produto lê.
+     */
+    if (!EM_ABERTO.includes(proposal.status)) {
       return NextResponse.json(
         { error: "Esta proposta já não está disponível. Contacte-nos para uma atualizada." },
         { status: 409 },

@@ -362,6 +362,53 @@ describe("POST /api/proposta", () => {
     }
   });
 
+  /**
+   * ── «EM NEGOCIAÇÃO» É UMA PROPOSTA VIVA, E É QUANDO SE DIZ QUE SIM ────────
+   *
+   * O `em_negociacao` é, nas palavras do próprio tipo, «o estado que descreve a
+   * maior parte do tempo real: a proposta seguiu, houve resposta, e está a
+   * discutir-se». O back office marca-o depois de um telefonema — o
+   * Acompanhamento chama-lhe «Houve resposta, está a discutir-se» — e o portal
+   * do cliente trata-o como equivalente a «enviada».
+   *
+   * Só esta rota discordava: exigia exactamente `"enviada"`. O casal preenchia
+   * o nome, aceitava as condições, carregava em aceitar — e apanhava «Esta
+   * proposta já não está disponível. Contacte-nos para uma atualizada.» sobre
+   * uma proposta que estava perfeitamente de pé. Pior: é o estado em que a
+   * maioria das propostas está no momento exacto em que o cliente decide.
+   *
+   * A guarda continua a existir e continua a valer — o que ela protege é o
+   * rascunho nunca oferecido e a proposta retirada. É `EM_ABERTO` que diz quais
+   * são as vivas, e é essa a lista que manda.
+   */
+  it("aceita uma proposta EM NEGOCIAÇÃO — é o estado normal quando o cliente diz que sim", async () => {
+    seedProposal("p-neg", { status: "em_negociacao" });
+    const res = await POST(
+      postReq({ token: createProposalToken("p-neg"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    expect(proposalsDb.store.get("p-neg")?.status).toBe("aceite");
+    expect(createContract).toHaveBeenCalled();
+  });
+
+  it("recusar uma proposta em negociação também é uma resposta legítima", async () => {
+    seedProposal("p-neg2", { status: "em_negociacao" });
+    const res = await POST(postReq({ token: createProposalToken("p-neg2"), action: "recusar" }));
+    expect(res.status).toBe(200);
+    expect(proposalsDb.store.get("p-neg2")?.status).toBe("rejeitada");
+  });
+
+  it("um RASCUNHO nunca oferecido continua a não poder ser aceite (409)", async () => {
+    // A guarda não desapareceu: o que ela protege é isto.
+    seedProposal("p-rasc", { status: "rascunho" });
+    const res = await POST(
+      postReq({ token: createProposalToken("p-rasc"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(409);
+    expect(proposalsDb.store.get("p-rasc")?.status).toBe("rascunho");
+    expect(createContract).not.toHaveBeenCalled();
+  });
+
   it("rejects accepting a SUPERSEDED (not-newest) proposal with 409 and mutates nothing", async () => {
     // Duas propostas enviadas para o mesmo pedido: a equipa reviu o preço. O link
     // antigo (mais barato) ainda vive na caixa do cliente. Aceitá-lo vincularia a
