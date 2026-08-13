@@ -15,6 +15,11 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { eur } from "@/lib/money";
 import { createProposal } from "@/lib/proposals-store";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
+import {
+  ehIdiomaDaProposta,
+  IDIOMA_POR_OMISSAO,
+  type IdiomaDaProposta,
+} from "@/lib/proposal-doc-textos";
 import { createProposalToken } from "@/lib/proposal-token";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { SITE } from "@/lib/site";
@@ -62,11 +67,52 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const body = (await request.json().catch(() => null)) as {
       mode?: "preview" | "send";
       doc?: ProposalDoc;
+      idioma?: unknown;
     } | null;
     const raw = body?.doc;
     const mode = body?.mode === "send" ? "send" : "preview";
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * A LÍNGUA É DE QUEM GERA, NÃO DO DOCUMENTO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O documento guardado continua a ser um só, em português. A língua entra
+     * aqui, no pedido, como o tamanho da página entraria: é um parâmetro de
+     * DESENHO. Ver o cabeçalho de `proposal-doc-textos`.
+     *
+     * ── PORQUE É QUE UM VALOR ESTRANHO NÃO É UM 400 ───────────────────────
+     *
+     * Cai em português, que é a mesma escolha que esta rota já faz com o
+     * `mode`: o que não se reconhece vale o valor por omissão. As razões, por
+     * ordem de peso:
+     *
+     * · O português é a língua em que a proposta foi ESCRITA. Cair nele é cair
+     *   no documento que sempre saiu — nada fica mal traduzido, no máximo fica
+     *   por traduzir, e ela vê isso no PDF que abre a seguir.
+     * · Recusar transformava um erro de quem chama em «não dá para gerar a
+     *   proposta» — exactamente a avaria que o cabeçalho deste ficheiro conta.
+     *   Uma moldura em português nunca vale um negócio parado.
+     * · Um valor estranho só pode vir de um cliente avariado (o estúdio manda
+     *   sempre "pt" ou "en"), e por isso fica REGISTADO: cair calado seria
+     *   esconder essa avaria para sempre.
+     *
+     * Um pedido SEM o campo não é um valor estranho — é o caminho de sempre, e
+     * não regista nada.
+     */
     if (!raw || !raw.ref || !raw.clientNames) {
       return NextResponse.json({ error: "Proposta incompleta." }, { status: 400 });
+    }
+    let idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO;
+    if (body?.idioma !== undefined) {
+      if (ehIdiomaDaProposta(body.idioma)) {
+        idioma = body.idioma;
+      } else {
+        log.warn("proposta-doc: idioma desconhecido, a desenhar em português", {
+          id,
+          recebido: String(body.idioma),
+        });
+      }
     }
     // Fill the studio's fixed boilerplate (condições, observações, faseamento,
     // cancelamento) + event-token substitution so the UI only sends what varies.
@@ -88,7 +134,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Shared pipeline (resolve Storage images → render) — the exact same helper
     // the public portal PDF route uses, so both emit an identical document.
-    let relatorio = await renderStoredProposalDocPdfWithReport(doc);
+    let relatorio = await renderStoredProposalDocPdfWithReport(doc, idioma);
 
     /**
      * ════════════════════════════════════════════════════════════════════════
@@ -126,7 +172,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         id,
         emFalta: relatorio.missingImages,
       });
-      const segunda = await renderStoredProposalDocPdfWithReport(doc);
+      // A segunda tentativa é o MESMO documento na MESMA língua: repetir é para
+      // apanhar uma foto que não resolveu, não para mudar o que sai.
+      const segunda = await renderStoredProposalDocPdfWithReport(doc, idioma);
       if (segunda.missingImages < relatorio.missingImages) relatorio = segunda;
       if (relatorio.missingImages > 0) {
         log.error("proposta-doc: a proposta segue com fotos a menos", null, {
@@ -142,7 +190,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return new NextResponse(pdfBuffer, {
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": 'inline; filename="proposta-preview.pdf"',
+          // O nome do ficheiro segue a língua pedida. Quem descarrega pelo
+          // estúdio nem chega a ver este nome (o botão escolhe o seu), mas quem
+          // chamar a rota à mão fica com dois PDF distinguíveis na pasta em vez
+          // de `proposta-preview (1).pdf`.
+          "Content-Disposition": `inline; filename="${
+            idioma === "en" ? "proposal-preview" : "proposta-preview"
+          }.pdf"`,
           // Quantas fotos não entraram. O gerador salta a que não resolve, por
           // isso sem este cabeçalho o PDF sai com fotos a menos e o estúdio não
           // tem como saber. É lido em ProposalStudio para avisar antes de enviar.

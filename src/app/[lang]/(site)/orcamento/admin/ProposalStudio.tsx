@@ -19,6 +19,7 @@ import {
   type MoodBoard,
   type VatMode,
 } from "@/lib/proposal-doc";
+import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { ordemDeSaida, eAOrdemEscrita, aplicarOrdem, ORDEM_EXPLICITA } from "@/lib/proposal-ordem";
 import {
   CONTAGEM_VAZIA,
@@ -1049,6 +1050,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [refEdited, setRefEdited] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<null | "preview" | "send">(null);
+  /**
+   * ── A LÍNGUA ESCOLHE-SE AO GERAR ──────────────────────────────────────────
+   *
+   * Não entra no `doc` e não é gravada no rascunho, de propósito: o documento
+   * guardado é UM só, em português, e a língua é uma decisão que se toma sobre
+   * ESTE clique — como escolher a impressora. Guardá-la era passar a ter uma
+   * proposta com uma língua colada, que ninguém voltaria a rever.
+   */
+  const [idiomaDoPdf, setIdiomaDoPdf] = useState<IdiomaDaProposta>(IDIOMA_POR_OMISSAO);
   const [confirmSend, setConfirmSend] = useState(false);
   // Depois de um envio bem-sucedido, o formulário NÃO fica pronto a re-disparar:
   // mostra um estado de confirmação e exige uma escolha consciente para reenviar.
@@ -3726,7 +3736,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const res = await fetch(`/api/orcamento/${quote.id}/proposta-doc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "preview", doc: stripPendingImages(doc) }),
+        // `idioma` vai SEMPRE, mesmo quando é o português. O servidor tem o
+        // português por omissão para os chamadores antigos, mas quem tem um
+        // botão para escolher diz o que escolheu — senão «pt» seria só a
+        // ausência de um campo, e o dia em que a omissão mudar de lado leva
+        // esta chamada atrás sem ninguém dar por isso.
+        body: JSON.stringify({
+          mode: "preview",
+          idioma: idiomaDoPdf,
+          doc: stripPendingImages(doc),
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
@@ -3743,7 +3762,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `proposta-${quote.name || quote.id}.pdf`;
+      // O nome do ficheiro diz a língua. Gerar as duas versões é coisa que
+      // acontece — ela manda a portuguesa aos pais e a inglesa ao casal — e com
+      // o mesmo nome a segunda ficava «proposta-Ana (1).pdf» na pasta de
+      // transferências, sem forma de saber qual é qual sem abrir as duas.
+      a.download = `${idiomaDoPdf === "en" ? "proposal" : "proposta"}-${quote.name || quote.id}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -6337,15 +6360,73 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <Button variant="ghost" onClick={() => setStep("conteudo")}>
               ← Conteúdo
             </Button>
-            <Button
-              variant="secondary"
-              onClick={preview}
-              disabled={busy !== null}
-              loading={busy === "preview"}
-              className="ml-auto"
-            >
-              {busy === "preview" ? "A gerar…" : "Descarregar PDF"}
-            </Button>
+            {/* ══════════════════════════════════════════════════════════════
+                A LÍNGUA ESCOLHE-SE EM CIMA DO BOTÃO QUE GERA
+                ══════════════════════════════════════════════════════════════
+
+                Palavras dela: «na parte de descarregar ou gerar, um botão para
+                escolher gerar em inglês».
+
+                Fica encostado ao «Descarregar PDF» e À VISTA — não num menu,
+                não nas definições da proposta. A escolha é sobre ESTE clique:
+                a mesma proposta sai agora em português e daqui a um minuto em
+                inglês, sem nada mudar no documento. Escondida, seria
+                descoberta depois de o PDF já ter saído na língua errada — e
+                gerar outra vez é um minuto de espera com fotografias a sério.
+
+                ── E A ESCOLHA TEM DE DIZER O QUE FAZ ──────────────────────
+                Só a MOLDURA é traduzida: rótulos, texto padrão da casa, datas
+                e dinheiro. Os títulos dos serviços, as descrições e as
+                legendas que ela escreveu saem tal e qual — foi decisão
+                explícita, e está escrita no cabeçalho de
+                `proposal-doc-textos`. Sem esta linha, quem carrega em «Inglês»
+                abre um PDF meio inglês e conclui que está avariado; com ela,
+                sabe que o remédio é escrever esses campos em inglês.
+
+                A linha está sempre no ecrã, e não só depois de escolher: serve
+                para DECIDIR, não para explicar um arrependimento. */}
+            <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1.5">
+              <Segmented
+                size="sm"
+                ariaLabel="Idioma do PDF"
+                value={idiomaDoPdf}
+                onChange={setIdiomaDoPdf}
+                options={[
+                  { value: "pt", label: "Português" },
+                  {
+                    value: "en",
+                    label: "Inglês",
+                    // Quem ouve o controlo em vez de o ver leva a mesma
+                    // ressalva que está escrita por baixo — o aviso não pode
+                    // viver só nos pixéis. Começa por «Inglês», que é o rótulo
+                    // visível, para o nome falado e o nome escrito não
+                    // divergirem.
+                    ariaLabel:
+                      "Inglês — sai a moldura do documento em inglês; o que escreveste fica na língua em que o escreveste",
+                  },
+                ]}
+              />
+              <Button
+                variant="secondary"
+                onClick={preview}
+                disabled={busy !== null}
+                loading={busy === "preview"}
+              >
+                {busy === "preview"
+                  ? // Enquanto roda, o botão diz em que língua está a desenhar.
+                    // São dezenas de segundos numa proposta cheia, e é tempo
+                    // que chega para deixar de haver a certeza do que se
+                    // escolheu — o português cala-se porque é o de sempre.
+                    idiomaDoPdf === "en"
+                    ? "A gerar em inglês…"
+                    : "A gerar…"
+                  : "Descarregar PDF"}
+              </Button>
+              <p className="w-full text-right text-[11px] leading-snug text-foreground/50">
+                Em inglês sai a moldura do documento — rótulos, textos da casa, datas e valores. O
+                que escreveste fica na língua em que o escreveste.
+              </p>
+            </div>
             <Button
               variant="primary"
               onClick={() => setStep("enviar")}

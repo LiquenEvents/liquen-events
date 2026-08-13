@@ -117,6 +117,19 @@ function previewReq(doc: Record<string, unknown>): NextRequest {
   }) as unknown as NextRequest;
 }
 
+/**
+ * Um pedido com o corpo escrito à mão — é preciso poder pôr no `idioma` coisas
+ * que o tipo não deixa escrever (um `"fr"`, um número, um `null`), porque é
+ * exactamente disso que a rota se tem de defender.
+ */
+function req(corpo: Record<string, unknown>): NextRequest {
+  return new Request("https://liquen.test/api/orcamento/q1/proposta-doc", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(corpo),
+  }) as unknown as NextRequest;
+}
+
 const params = Promise.resolve({ id: "q1" });
 
 beforeEach(() => {
@@ -561,5 +574,159 @@ describe("POST /api/orcamento/[id]/proposta-doc — o estado nunca anda para tr�
     expect(log).toHaveLength(1);
     expect(log[0].actor).toBe("Sistema");
     expect(log[0].summary).toContain("Proposta enviada");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MESMA PROPOSTA, NA LÍNGUA DO CASAL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Pedido dela: preparar a proposta em português e, ao gerar, poder escolher que
+ * o PDF saia em inglês. A língua é um parâmetro de DESENHO — entra no pedido,
+ * nunca no documento guardado (ver o cabeçalho de `proposal-doc-textos`).
+ *
+ * O que estes testes guardam, por esta ordem de importância:
+ *
+ *  1. Um pedido SEM o campo tem de sair exactamente como saía. É todo o código
+ *     que existia antes desta funcionalidade — e uma proposta antiga, reaberta.
+ *  2. Um valor que não é uma língua NÃO deita a geração abaixo: cai no
+ *     português. Este ficheiro existe por causa de «não dá para mandar a
+ *     proposta para o cliente»; uma moldura por traduzir nunca vale um 400.
+ *  3. O que vai ao gerador é o que veio no pedido, e nada mais.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — a língua com que se desenha", () => {
+  beforeEach(() => {
+    renderMock.missing = 0;
+    renderMock.truncations = [];
+    renderMock.sequencia = [];
+    renderMock.chamadas = 0;
+    // Os blocos acima deixam `createProposal` a atirar, e `mockImplementation`
+    // sobrevive ao `clearAllMocks`.
+    vi.mocked(createProposal).mockImplementation(async (p: Proposal) => {
+      created.last = p;
+    });
+  });
+
+  /**
+   * A língua com que o gerador foi chamado à `n`-ésima vez.
+   *
+   * Lê os argumentos como `unknown[]` de propósito: a assinatura do gerador
+   * está a ganhar o segundo parâmetro no módulo ao lado, e este teste não pode
+   * depender de qual das duas versões está no disco — o que ele guarda é que a
+   * rota PASSA a língua, não a forma exacta do tipo.
+   */
+  function idiomaDaChamada(n = 0): unknown {
+    const chamada = vi.mocked(renderStoredProposalDocPdfWithReport).mock.calls[n] as unknown[];
+    const segundo = chamada?.[1];
+    // Aceita as duas formas — `(doc, "en")` e `(doc, { idioma: "en" })` — porque
+    // o que este teste guarda é que a rota PASSA a língua, não a forma exacta
+    // com que o módulo ao lado a recebe.
+    return typeof segundo === "string" ? segundo : (segundo as { idioma?: unknown })?.idioma;
+  }
+
+  it("com «en», é em inglês que o documento é desenhado", async () => {
+    const res = await POST(req({ mode: "preview", idioma: "en", doc: baseDoc() }), { params });
+    expect(res.status).toBe(200);
+    expect(idiomaDaChamada()).toBe("en");
+  });
+
+  it("sem o campo, é português — o caminho de sempre não muda", async () => {
+    const res = await POST(previewReq(baseDoc()), { params });
+    expect(res.status).toBe(200);
+    expect(idiomaDaChamada()).toBe("pt");
+    // E o resto da resposta continua a ser o que era.
+    expect(res.headers.get("Content-Type")).toBe("application/pdf");
+    expect(res.headers.get("X-Fotos-Em-Falta")).toBe("0");
+  });
+
+  it("com «pt» explícito dá exactamente o mesmo que sem o campo", async () => {
+    // É o que o botão manda no caminho por omissão: dizer a escolha em vez de a
+    // deixar implícita na ausência do campo.
+    const comCampo = await POST(req({ mode: "preview", idioma: "pt", doc: baseDoc() }), { params });
+    expect(idiomaDaChamada()).toBe("pt");
+    expect(comCampo.headers.get("Content-Disposition")).toBe(
+      'inline; filename="proposta-preview.pdf"',
+    );
+  });
+
+  /**
+   * ── PORQUE É QUE ISTO NÃO É UM 400 ────────────────────────────────────────
+   *
+   * Cair em português é cair na língua em que a proposta foi ESCRITA: no pior
+   * caso a moldura fica por traduzir, o que é o documento que sempre saiu, e ela
+   * vê-o no PDF que abre a seguir. Recusar transformava o engano de um cliente
+   * numa proposta que não sai — a avaria que o cabeçalho da rota conta.
+   *
+   * Não é silêncio: a rota regista o valor que recebeu, senão um cliente
+   * avariado ficava escondido para sempre.
+   */
+  it.each([["fr"], [""], ["PT"], ["en-GB"]])(
+    "um idioma que não existe (%j) cai no português em vez de recusar",
+    async (mau) => {
+      const res = await POST(req({ mode: "preview", idioma: mau, doc: baseDoc() }), { params });
+      expect(res.status).toBe(200);
+      expect(idiomaDaChamada()).toBe("pt");
+    },
+  );
+
+  it.each([[42], [null], [{ idioma: "en" }], [["en"]]])(
+    "e o mesmo quando nem sequer é texto (%j)",
+    async (lixo) => {
+      const res = await POST(req({ mode: "preview", idioma: lixo, doc: baseDoc() }), { params });
+      expect(res.status).toBe(200);
+      expect(idiomaDaChamada()).toBe("pt");
+    },
+  );
+
+  it("o nome do ficheiro da pré-visualização segue a língua", async () => {
+    // Duas versões da mesma proposta na pasta de transferências têm de se
+    // distinguir sem as abrir.
+    const en = await POST(req({ mode: "preview", idioma: "en", doc: baseDoc() }), { params });
+    expect(en.headers.get("Content-Disposition")).toBe('inline; filename="proposal-preview.pdf"');
+    const pt = await POST(previewReq(baseDoc()), { params });
+    expect(pt.headers.get("Content-Disposition")).toBe('inline; filename="proposta-preview.pdf"');
+  });
+
+  it("a segunda tentativa do envio repete na MESMA língua", async () => {
+    // Repetir é para apanhar uma foto que não resolveu. Se a repetição mudasse
+    // de língua, o casal recebia a versão que ninguém escolheu — e só na vez em
+    // que alguma coisa correu mal, que é quando ninguém está a olhar.
+    renderMock.sequencia = [2, 0];
+    const res = await POST(
+      req({ mode: "send", idioma: "en", doc: baseDoc({ totalAmount: 3000 }) }),
+      {
+        params,
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(2);
+    expect(idiomaDaChamada(0)).toBe("en");
+    expect(idiomaDaChamada(1)).toBe("en");
+  });
+
+  /**
+   * A ROTA aceita a língua no envio; o ESTÚDIO é que ainda não a manda.
+   *
+   * A decisão de produto é que o email ao cliente fica em português por agora —
+   * o corpo do email, o assunto e o nome do anexo são todos portugueses, e um
+   * PDF inglês dentro de um email português seria pior do que os dois em
+   * português. Mas a rota não tem de saber disso: recebe a língua e desenha com
+   * ela, para o dia em que o resto do envio acompanhar não ser preciso mexer
+   * aqui outra vez.
+   */
+  it("o envio já sabe receber a língua — falta o email à volta dela", async () => {
+    const res = await POST(
+      req({ mode: "send", idioma: "en", doc: baseDoc({ totalAmount: 3000 }) }),
+      {
+        params,
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(idiomaDaChamada()).toBe("en");
+    // E o documento guardado continua a ser UM só, sem língua colada: o que fica
+    // na base é o que ela escreveu, em português.
+    expect(created.last!.doc).toBeTruthy();
+    expect(created.last!.doc).not.toHaveProperty("idioma");
   });
 });

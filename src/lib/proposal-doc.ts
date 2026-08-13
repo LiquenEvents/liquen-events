@@ -619,6 +619,23 @@ export const DEFAULT_OBSERVACOES_GERAIS: string[] = [
 ];
 
 /**
+ * Preenche os marcadores das Condições Gerais com os dados do evento.
+ *
+ * Vive aqui, e não solto dentro do {@link withProposalDefaults}, porque há
+ * agora um SEGUNDO leitor: o dicionário de idiomas, que precisa de reconhecer o
+ * texto da casa já preenchido (para saber se ela lhe mexeu) e de preencher a
+ * versão inglesa exactamente da mesma maneira. Duas substituições escritas em
+ * dois sítios divergiriam, e o sintoma seria uma proposta em inglês a dizer
+ * «{DATA}» ao cliente.
+ */
+export function preencherMarcadores(
+  texto: string,
+  doc: Pick<ProposalDoc, "eventDate" | "guests">,
+): string {
+  return texto.replace("{DATA}", doc.eventDate || "—").replace("{CONVIDADOS}", doc.guests || "—");
+}
+
+/**
  * "Faseamento do Pagamento" — as duas primeiras linhas seguem a percentagem.
  *
  * Era um array fixo a dizer «30% na adjudicação; 70% 1 mês antes». Assim que a
@@ -949,8 +966,7 @@ export function withProposalDefaults(
       >
     >,
 ): ProposalDoc {
-  const fill = (s: string) =>
-    s.replace("{DATA}", doc.eventDate || "—").replace("{CONVIDADOS}", doc.guests || "—");
+  const fill = (s: string) => preencherMarcadores(s, doc);
   return {
     ...doc,
     // Coerce the editor's variable arrays to [] — a corrupt/old localStorage

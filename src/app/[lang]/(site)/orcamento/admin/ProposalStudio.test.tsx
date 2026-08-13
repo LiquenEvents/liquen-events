@@ -2855,3 +2855,208 @@ describe("ver as páginas lado a lado", () => {
     expect(grelha!.contains(vista)).toBe(false);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MESMA PROPOSTA, NA LÍNGUA DO CASAL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «preparamos a proposta em português e, na parte de descarregar
+ * ou gerar, um botão para escolher gerar em inglês».
+ *
+ * A escolha vive ao lado do «Descarregar PDF» e não num menu: é uma decisão
+ * sobre AQUELE clique, e o documento guardado continua a ser um só, em
+ * português. O que estes testes prendem:
+ *
+ *  1. o caminho por omissão — português, tal e qual como era;
+ *  2. a escolha viaja mesmo até ao servidor;
+ *  3. a ressalva está no ecrã ANTES de se carregar, e também para quem ouve o
+ *     controlo em vez de o ver. Sem ela, um PDF meio inglês parece avariado.
+ */
+describe("gerar a proposta em inglês", () => {
+  /** O duplo do `fetch` deste ficheiro, para o repor: um teste daqui troca-o
+   *  por uma resposta que nunca chega, e `mockClear` não desfaz isso. */
+  const fetchDeSempre = fetchMock.getMockImplementation()!;
+  /** O espião do descarregamento, quando algum teste o põe. */
+  let espiaoDoClique: { mockRestore: () => void } | null = null;
+
+  afterEach(() => {
+    fetchMock.mockImplementation(fetchDeSempre);
+    espiaoDoClique?.mockRestore();
+    espiaoDoClique = null;
+  });
+
+  /** Chega ao passo onde se descarrega o PDF. */
+  async function irParaPrever(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    return await screen.findByRole("button", { name: /Descarregar PDF/ });
+  }
+
+  /** O `idioma` do último POST à rota da proposta. */
+  function idiomaEnviado(): unknown {
+    const corpo = corpos("proposta-doc", "POST").at(-1) ?? "";
+    return JSON.parse(corpo || "{}").idioma;
+  }
+
+  /** Os nomes com que os ficheiros foram descarregados, pela ordem. O estúdio
+   *  descarrega por uma âncora fabricada à mão — é ali que o nome se lê. */
+  function espiarDescarregamentos(): string[] {
+    const nomes: string[] = [];
+    espiaoDoClique = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      nomes.push(this.download);
+    });
+    return nomes;
+  }
+
+  it("por omissão é português — e a barra diz que língua vai sair", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+
+    const grupo = screen.getByRole("radiogroup", { name: "Idioma do PDF" });
+    expect(within(grupo).getByRole("radio", { name: "Português" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(within(grupo).getByRole("radio", { name: /^Inglês/ })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+  });
+
+  it("o caminho por omissão fica intacto: «pt», e o ficheiro chama-se proposta-…", async () => {
+    seedDraft(1);
+    const nomes = espiarDescarregamentos();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await irParaPrever(user));
+
+    await waitFor(() => expect(corpos("proposta-doc", "POST")).toHaveLength(1));
+    expect(idiomaEnviado()).toBe("pt");
+    expect(nomes).toEqual(["proposta-Maria & Zé.pdf"]);
+  });
+
+  it("escolher inglês manda «en» e o ficheiro sai com outro nome", async () => {
+    seedDraft(1);
+    const nomes = espiarDescarregamentos();
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+
+    await user.click(screen.getByRole("radio", { name: /^Inglês/ }));
+    await user.click(screen.getByRole("button", { name: /Descarregar PDF/ }));
+
+    await waitFor(() => expect(corpos("proposta-doc", "POST")).toHaveLength(1));
+    expect(idiomaEnviado()).toBe("en");
+    // Duas versões da mesma proposta na pasta de transferências têm de se
+    // distinguir sem as abrir.
+    expect(nomes).toEqual(["proposal-Maria & Zé.pdf"]);
+  });
+
+  it("a escolha alcança-se pelo teclado, com as setas", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+
+    // O grupo é UMA paragem de tabulação (foco andante); a seta é que escolhe.
+    screen.getByRole("radio", { name: "Português" }).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("radio", { name: /^Inglês/ })).toHaveAttribute("aria-checked", "true");
+
+    await user.click(screen.getByRole("button", { name: /Descarregar PDF/ }));
+    await waitFor(() => expect(idiomaEnviado()).toBe("en"));
+  });
+
+  /**
+   * ── A ESCOLHA TEM DE DIZER O QUE FAZ ──────────────────────────────────────
+   *
+   * Só a MOLDURA é traduzida; os títulos, as descrições e as legendas que ela
+   * escreveu saem tal e qual. Quem carrega em «Inglês» sem saber disto abre um
+   * PDF meio inglês e conclui que está avariado.
+   */
+  it("diz, antes do clique, que só a moldura muda de língua", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+
+    // Está no ecrã ANTES de se escolher fosse o que fosse.
+    expect(
+      screen.getByText(
+        /Em inglês sai a moldura do documento[\s\S]*O que escreveste fica na língua em que o escreveste/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("e diz o mesmo a quem ouve o controlo em vez de o ver", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+
+    const ingles = screen.getByRole("radio", { name: /^Inglês/ });
+    // Começa pelo rótulo visível — o nome falado e o escrito não podem divergir.
+    expect(ingles.getAttribute("aria-label")).toMatch(
+      /^Inglês — sai a moldura do documento em inglês; o que escreveste fica na língua em que o escreveste$/,
+    );
+  });
+
+  it("«A gerar…» diz em que língua está a desenhar", async () => {
+    seedDraft(1);
+    // A resposta da rota fica PENDURADA: o estado que se quer ver é o do meio,
+    // e sem isto o botão volta a «Descarregar PDF» antes de se poder olhar.
+    let libertar: (r: Response) => void = () => {};
+    const pendurada = new Promise<Response>((r) => {
+      libertar = r;
+    });
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("proposta-doc")) {
+        pedidos.push({ url: String(input), init });
+        return pendurada;
+      }
+      return fetchDeSempre(input, init);
+    });
+
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+    await user.click(screen.getByRole("radio", { name: /^Inglês/ }));
+    await user.click(screen.getByRole("button", { name: /Descarregar PDF/ }));
+
+    // Dezenas de segundos numa proposta com fotografias a sério — tempo que
+    // chega para deixar de haver a certeza do que se escolheu.
+    expect(await screen.findByRole("button", { name: /A gerar em inglês…/ })).toBeInTheDocument();
+    await act(async () => {
+      libertar(reply({ headers: {} }));
+    });
+  });
+
+  /**
+   * O ENVIO ao cliente fica em português por agora: o corpo do email, o assunto
+   * e o nome do anexo são todos portugueses, e um PDF inglês dentro de um email
+   * português seria pior do que os dois em português. A rota já sabe receber a
+   * língua — o estúdio é que ainda não a manda por este caminho.
+   */
+  it("o envio ao cliente continua a não mandar língua nenhuma", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    // Escolher inglês na pré-visualização não pode transbordar para o envio.
+    await irParaPrever(user);
+    await user.click(screen.getByRole("radio", { name: /^Inglês/ }));
+
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+
+    await waitFor(() => {
+      const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
+      expect(enviados.some((c) => c.mode === "send")).toBe(true);
+      expect(enviados.find((c) => c.mode === "send")).not.toHaveProperty("idioma");
+    });
+  });
+});

@@ -33,6 +33,7 @@ import {
   type TargetPixels,
 } from "@/lib/proposal-image";
 import { log } from "@/lib/logger";
+import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 
 /**
  * Lado maior das miniaturas que o navegador fabrica no carregamento
@@ -410,8 +411,11 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
  * Shared by the admin generate/preview route and the public portal PDF route so
  * both produce byte-for-byte the same document from the same stored doc.
  */
-export async function renderStoredProposalDocPdf(doc: ProposalDoc): Promise<Buffer<ArrayBuffer>> {
-  return (await renderStoredProposalDocPdfWithReport(doc)).pdf;
+export async function renderStoredProposalDocPdf(
+  doc: ProposalDoc,
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): Promise<Buffer<ArrayBuffer>> {
+  return (await renderStoredProposalDocPdfWithReport(doc, idioma)).pdf;
 }
 
 /**
@@ -434,6 +438,15 @@ export async function renderStoredProposalDocPdf(doc: ProposalDoc): Promise<Buff
  */
 export async function renderStoredProposalDocPdfWithReport(
   doc: ProposalDoc,
+  /**
+   * A língua em que o DOCUMENTO fala — só atravessa daqui para o gerador.
+   *
+   * Este ficheiro resolve FOTOS, e as fotos não têm língua: a resolução, os
+   * tamanhos pedidos ao armazenamento e a contagem do que falta são exactamente
+   * os mesmos nas duas línguas. O valor por omissão é o do gerador, e é o mesmo
+   * pela mesma razão — quem já chamava isto continua a receber o que recebia.
+   */
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
 ): Promise<{ pdf: Buffer<ArrayBuffer>; missingImages: number; truncations: DocTruncation[] }> {
   // Fill the studio's fixed boilerplate (condições, observações, faseamento,
   // cancelamento) + event-token substitution so the caller only supplies what
@@ -447,7 +460,7 @@ export async function renderStoredProposalDocPdfWithReport(
     bytes: pdfBytes,
     truncations,
     undrawnImages,
-  } = await renderProposalDocPdfWithReport(resolved);
+  } = await renderProposalDocPdfWithReport(resolved, idioma);
   // A foto que RESOLVEU e que o gerador não conseguiu desenhar (um WebP antigo
   // da biblioteca, bytes corrompidos) some-se aqui às que nem chegaram: para
   // quem vai enviar a proposta é a mesma coisa — uma foto que o cliente devia

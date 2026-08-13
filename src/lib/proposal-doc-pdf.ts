@@ -55,43 +55,29 @@ import {
   type CaixaPdf,
 } from "@/lib/proposal-geometria";
 import { log } from "@/lib/logger";
+import {
+  blocosFixosNaLingua,
+  textosDaProposta,
+  IDIOMA_POR_OMISSAO,
+  type CampoDoEvento,
+  type IdiomaDaProposta,
+} from "@/lib/proposal-doc-textos";
 
 /**
- * OS MESES POR EXTENSO — porque o resto do documento os escreve assim.
+ * A DATA POR EXTENSO mudou-se para `proposal-doc-textos.ts`, com o resto do que
+ * o documento diz por si.
  *
- * Eram abreviados («out.»), e a única data do documento que passa por aqui é a
- * validade da proposta: «Esta proposta é válida até 11 de out. de 2026». Três
- * linhas acima, nas Condições Gerais, o mesmo documento escreve «Esta proposta
- * só é válida para o evento a realizar no dia 29 de maio de 2027» — porque a
- * data do evento é texto dela, e ela escreve os meses por extenso. Duas datas
- * na mesma folha com dois formatos diferentes é a marca de duas mãos a escrever
- * o mesmo papel.
+ * Os meses eram abreviados («out.») e passaram a por extenso porque a única
+ * data que passa por aqui é a validade da proposta — «Esta proposta é válida
+ * até 11 de outubro de 2026» — e três linhas acima, nas Condições Gerais, o
+ * mesmo documento escreve «no dia 29 de maio de 2027», que é texto dela. Duas
+ * datas na mesma folha com dois formatos diferentes é a marca de duas mãos a
+ * escrever o mesmo papel; e é por isso, também, que a forma inglesa põe o dia à
+ * frente (ver lá o porquê).
  *
  * O motor de leitura aceita as duas formas (`[a-zç]{3,10}` em `campos.ts`),
- * portanto a ida e volta continua a devolver a data.
+ * portanto a ida e volta em português continua a devolver a data.
  */
-const PT_MESES = [
-  "janeiro",
-  "fevereiro",
-  "março",
-  "abril",
-  "maio",
-  "junho",
-  "julho",
-  "agosto",
-  "setembro",
-  "outubro",
-  "novembro",
-  "dezembro",
-];
-/** "2026-09-12" → "12 de setembro de 2026"; passes through anything unexpected. */
-function prettyDate(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return iso;
-  const mo = Number(m[2]);
-  if (mo < 1 || mo > 12) return iso;
-  return `${Number(m[3])} de ${PT_MESES[mo - 1]} de ${m[1]}`;
-}
 
 /**
  * O SEPARADOR DE MILHARES DESTA FOLHA É O PONTO.
@@ -595,8 +581,11 @@ function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): s
 
 /** Como {@link renderProposalDocPdfWithReport}, mas só os bytes — para quem não
  *  tem a quem dar o relatório (a pré-visualização de desenvolvimento). */
-export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array> {
-  return (await renderProposalDocPdfWithReport(doc)).bytes;
+export async function renderProposalDocPdf(
+  doc: ProposalDoc,
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): Promise<Uint8Array> {
+  return (await renderProposalDocPdfWithReport(doc, idioma)).bytes;
 }
 
 /**
@@ -624,13 +613,36 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
  * consegue embutir. Calculá-lo noutro sítio era garantir que um dia deixava de
  * coincidir com o que sai impresso.
  */
-export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<{
+export async function renderProposalDocPdfWithReport(
+  doc: ProposalDoc,
+  /**
+   * A língua em que o DOCUMENTO fala — a moldura, não o conteúdo dela.
+   *
+   * Por omissão português: quem já chamava isto continua a desenhar exactamente
+   * o que desenhava. Ver `proposal-doc-textos.ts` para o que se traduz e o que
+   * sai tal e qual.
+   */
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): Promise<{
   bytes: Uint8Array;
   truncations: DocTruncation[];
   undrawnImages: number;
   semRedimensionar: number;
   reordenacoes: ReordenacaoDoDocumento[];
 }> {
+  /** O que o documento diz por si, na língua pedida. */
+  const t = textosDaProposta(idioma);
+  /**
+   * Os mesmos textos em português — para os AVISOS.
+   *
+   * O relatório de truncagens e de reordenações é lido no estúdio, que é
+   * português, e não pode mudar de língua porque o PDF de um casal saiu em
+   * inglês: «Campo «Venue» cortado» manda quem lê procurar um rótulo que não
+   * existe no editor.
+   */
+  const pt = textosDaProposta("pt");
+  /** As notas, condições e observações — traduzidas só quando são as da casa. */
+  const fixos = blocosFixosNaLingua(doc, idioma);
   const truncations: DocTruncation[] = [];
   /** As listas que saíram por ordem diferente da escrita — ver o bloco «UMA SÓ
    *  ORDEM PARA O DOCUMENTO INTEIRO». Vazio é o normal. */
@@ -950,8 +962,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     p.drawImage(logoWhite, { x: cx - lw / 2, y: H - 150, width: lw, height: lh });
 
     // Eyebrow (gold small-caps) + gold rule.
-    const kicker =
-      doc.template === "organizacao" ? "Proposta · Organização" : "Proposta · Decoração";
+    const kicker = doc.template === "organizacao" ? t.capaOrganizacao : t.capaDecoracao;
     textCenter(p, kicker.toUpperCase(), cx, 336, {
       font: f.bold,
       size: 9,
@@ -1006,7 +1017,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         y = H - M - 64;
       }
     };
-    y = sectionHeader(p, "A Proposta", numerada("Apresentação"), y);
+    y = sectionHeader(p, t.sobretituloApresentacao, numerada(t.tituloApresentacao), y);
 
     /* ═══════════════════════════════════════════════════════════════════════
        A APRESENTAÇÃO É UMA LISTA, E A LISTA É A DELA
@@ -1046,33 +1057,36 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
      *  706 pontos até à margem direita para se ler. */
     const CAMPO_MEDIDA = MEASURE + 120;
 
-    const campos: [string, string][] = [
-      [org ? "Cliente" : "Noivos", doc.clientNames],
-      ...(org ? [] : ([["Evento", doc.eventType]] as [string, string][])),
-      ["Data do Evento", doc.eventDate],
-      ["Local", doc.location],
-      ["Número de Convidados", doc.guests],
-      ["Serviço", doc.servico ?? ""],
+    /** Cada campo é a sua CHAVE e o seu valor: o rótulo impresso sai do
+     *  dicionário da língua, e o aviso de truncagem do português (ver `pt`). */
+    type Campo = [chave: CampoDoEvento, valor: string];
+    const campos: Campo[] = [
+      [org ? "cliente" : "noivos", doc.clientNames],
+      ...(org ? [] : ([["evento", doc.eventType]] as Campo[])),
+      ["data", doc.eventDate],
+      ["local", doc.location],
+      ["convidados", doc.guests],
+      ["servico", doc.servico ?? ""],
       ...(org
         ? []
         : ([
-            ["Cerimónia", doc.ceremony ?? ""],
-            ["Hora", doc.time ?? ""],
-          ] as [string, string][])),
+            ["cerimonia", doc.ceremony ?? ""],
+            ["hora", doc.time ?? ""],
+          ] as Campo[])),
     ];
     // Um «Hora:» seguido de nada não é um campo por preencher: é um erro
     // impresso numa folha que vai para o cliente.
     const details = campos.filter(([, v]) => (v ?? "").trim().length > 0);
 
-    for (const [rotulo, valor] of details) {
-      const marca = `${rotulo}:`;
+    for (const [chave, valor] of details) {
+      const marca = `${t.campos[chave]}:`;
       const vx = M + f.bold.widthOfTextAtSize(textoParaFonte(f.bold, `${marca} `), CAMPO_CORPO);
       // Duas linhas por campo — um local com nome comprido ("Herdade da …,
       // Reguengos de Monsaraz") pede três e perdia o resto.
       const linhas = clampLines(
         wrap(f.reg, valor, CAMPO_CORPO, M + CAMPO_MEDIDA - vx),
         MAX_EVENT_FIELD_LINES,
-        `Campo «${rotulo}»`,
+        `Campo «${pt.campos[chave]}»`,
       );
       ensure(CAMPO_AVANCO + (linhas.length - 1) * CAMPO_ENTRELINHA);
       text(p, marca, M, y, { font: f.bold, size: CAMPO_CORPO, color: INK });
@@ -1194,7 +1208,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
      */
     const primeiroGrupo = doc.serviceGroups[0];
     ensure(ALTURA_CABECALHO + (primeiroGrupo ? Math.min(alturaDoGrupo(primeiroGrupo), COLUNA) : 0));
-    y = sectionHeader(p, "O que propomos", numerada("Serviços"), y);
+    y = sectionHeader(p, t.sobretituloServicos, numerada(t.tituloServicos), y);
 
     for (const g of doc.serviceGroups) {
       // O grupo ou cabe onde está, ou começa INTEIRO na página seguinte. Só um
@@ -1260,7 +1274,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     const COLUNA = H - M - 64 - CHAO;
     const linhasDa = (it: string) => wrap(f.reg, it, T_BODY, MEASURE + 120);
 
-    y = sectionHeader(p, "Como avançamos", numerada("Cronograma de Organização"), y);
+    y = sectionHeader(p, t.sobretituloCronograma, numerada(t.tituloCronograma), y);
     for (const phase of doc.cronograma) {
       const abre = phase.items[0];
       ensure(20 + (abre ? Math.min(linhasDa(abre).length * 15, COLUNA) : 0));
@@ -1321,7 +1335,16 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     // As medidas vêm de `proposal-geometria` — as mesmas que a
     // pré-visualização do estúdio lê. Escritas aqui à mão, a miniatura que ela
     // vê e a página que sai divergiam sem ninguém dar por isso.
-    eyebrow(p, TXT.sobretitulo.texto, M, TXT.sobretitulo.base, undefined, TXT.sobretitulo.tamanho);
+    // Em português a palavra é a da geometria — é lá que ela vive, ao lado da
+    // medida a que é desenhada, e é de lá que a pré-visualização do estúdio a lê.
+    eyebrow(
+      p,
+      t.sobretituloInspiracao ?? TXT.sobretitulo.texto,
+      M,
+      TXT.sobretitulo.base,
+      undefined,
+      TXT.sobretitulo.tamanho,
+    );
     text(p, mb.title, M, TXT.titulo.base, {
       font: f.serifIt,
       size: TXT.titulo.tamanho,
@@ -1365,10 +1388,12 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     let p = pdf.addPage([W, H]);
     frame(p);
     let y = H - M - 64;
-    y = sectionHeader(p, "O investimento", numerada("Orçamento Proposto"), y);
+    y = sectionHeader(p, t.sobretituloOrcamento, numerada(t.tituloOrcamento), y);
 
     const totalStr = orgT ? (doc.totalEstimatedText ?? "") : doc.totalText;
-    const totalLbl = orgT ? "Total Estimado" : doc.totalLabel;
+    // O rótulo do total de Decoração é ESCRITO POR ELA («Valor Total
+    // Decoração») e sai tal e qual, como o resto do que ela escreve.
+    const totalLbl = orgT ? t.totalEstimado : doc.totalLabel;
     const boxW = MEASURE;
     const boxH = 50;
     // Flat, typographic total: a single thin gold hairline (the one accent moment
@@ -1397,8 +1422,8 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
 
     // Column header row — bold sentence-case (matching the studio's sample
     // proposals: "Item" / "Preço Estimado (€)"), one pale rule underneath.
-    text(p, "Item", M, y, { font: f.serifB, size: 11, color: INK });
-    textRight(p, orgT ? "Preço Estimado (€)" : "Preço (€)", M + boxW, y, {
+    text(p, t.colunaItem, M, y, { font: f.serifB, size: 11, color: INK });
+    textRight(p, orgT ? t.colunaPrecoEstimado : t.colunaPreco, M + boxW, y, {
       font: f.serifB,
       size: 11,
       color: INK,
@@ -1463,12 +1488,15 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       notaDeOrdem("Orçamento", doc.budgetItems, ordemDasLinhas);
       ordemDasLinhas.forEach((i) => {
         const it = doc.budgetItems[i];
+        // Os 46 pontos reservados à direita são a largura da marca mais o ar
+        // que a separa do nome — a marca é curta nas duas línguas («extra»), e
+        // o teste de transbordos confirma-o.
         const lines = wrap(f.reg, it, 10.5, boxW - (marcas[i] ? 46 : 0));
         budgetBreak(Math.max(20, lines.length * 15));
         lines.forEach((ln, j) => {
           text(p, ln, M, y, { size: 10.5, color: INK });
           if (j === 0 && marcas[i]) {
-            textRight(p, "extra", M + boxW, y, { size: 9, color: MUTED });
+            textRight(p, t.marcaExtra, M + boxW, y, { size: 9, color: MUTED });
           }
           y -= 15;
         });
@@ -1571,13 +1599,19 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
      * proposta da Tara e do Marty, e são 23% de diferença no que o casal
      * pensa que vai transferir.
      */
+    // A detecção continua a aceitar o «+ IVA» português mesmo quando o
+    // documento sai em inglês: o texto do total é DELA, e ela escreve-o em
+    // português. Um «+ VAT» acrescentado a um total que já dizia «+ IVA» era o
+    // mesmo aviso duas vezes, em duas línguas, na mesma linha.
     const comIvaDito = (texto: string) =>
-      totais.modo === "acrescer" && !/\+\s*iva/i.test(texto) ? `${texto} + IVA` : texto;
+      totais.modo === "acrescer" && !/\+\s*(iva|vat)/i.test(texto)
+        ? `${texto} ${t.maisIva}`
+        : texto;
 
     if (extras.length) {
       budgetBreak(30 + (extras.length + 4) * 18 + boxH);
       linhaDeTotal(
-        orgT ? "Subtotal dos serviços (estimado)" : "Subtotal dos serviços",
+        orgT ? t.subtotalServicosEstimado : t.subtotalServicos,
         eurDoc(totais.servicos),
         11,
         true,
@@ -1618,13 +1652,13 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       y -= 4;
       reguaDeSoma();
       // O TOTAL: a base sobre a qual o IVA, o sinal e o saldo são calculados.
-      linhaDeTotal("TOTAL (sem IVA)", eurDoc(totais.total), 12.5, true);
-      linhaDeTotal(`IVA (${percentagemDoIva(totais.taxa)})`, eurDoc(totais.iva), 12.5);
+      linhaDeTotal(t.totalSemIva, eurDoc(totais.total), 12.5, true);
+      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDoc(totais.iva), 12.5);
       budgetBreak(boxH + 24);
       y -= 6;
       // O número grande é o que o casal transfere — e é o mesmo, ao cêntimo,
       // que a folha do fecho parte em sinal e saldo.
-      drawTotal(p, y, "Total a pagar", eurDoc(totais.aPagar));
+      drawTotal(p, y, t.totalAPagar, eurDoc(totais.aPagar));
       /* ── O QUE ESTE BLOCO CUSTA, MEDIDO ────────────────────────────────────
          Setenta pontos a mais do que o quadro que aqui estava (o «Valor Total»,
          os adicionais, e nada mais). Numa proposta COM valores adicionais isso
@@ -1670,10 +1704,10 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       // pontos de tinta a dizer «o que vem acima somou-se», numa folha onde
       // nada somou. E cada ponto conta — ver a nota da paginação mais abaixo.
       budgetBreak(30 + 3 * 18 + boxH);
-      linhaDeTotal("TOTAL (sem IVA)", eurDoc(totais.total), 12.5, true);
-      linhaDeTotal(`IVA (${percentagemDoIva(totais.taxa)})`, eurDoc(totais.iva), 12.5);
+      linhaDeTotal(t.totalSemIva, eurDoc(totais.total), 12.5, true);
+      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDoc(totais.iva), 12.5);
       budgetBreak(boxH + 24);
-      drawTotal(p, y, "Total a pagar", eurDoc(totais.aPagar));
+      drawTotal(p, y, t.totalAPagar, eurDoc(totais.aPagar));
       y -= boxH + 6;
     } else {
       budgetBreak(boxH + 24 + 18);
@@ -1711,9 +1745,9 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     // uma vez só, partilhada com o estúdio.
     const versoes = totaisDasVersoes(doc);
     if (versoes && versoes.comoOTotal.base > 0 && versoes.extras > 0) {
-      const maisIva = totais.modo === "acrescer" ? " + IVA" : "";
+      const maisIva = totais.modo === "acrescer" ? ` ${t.maisIva}` : "";
       budgetBreak(40);
-      text(p, "Sem os extras assinalados", M, y, { size: 10.5, color: MUTED });
+      text(p, t.semOsExtras, M, y, { size: 10.5, color: MUTED });
       textRight(p, `${eurDoc(versoes.comoOTotal.base)}${maisIva}`, M + boxW, y, {
         font: f.serif,
         size: 13,
@@ -1722,9 +1756,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       y -= 16;
       text(
         p,
-        versoes.linhasExtra === 1
-          ? "A linha assinalada com «extra» é opcional e pode ser retirada."
-          : `As ${versoes.linhasExtra} linhas assinaladas com «extra» são opcionais e podem ser retiradas.`,
+        versoes.linhasExtra === 1 ? t.umaLinhaExtra : t.variasLinhasExtra(versoes.linhasExtra),
         M,
         y,
         { size: 9, color: MUTED },
@@ -1739,7 +1771,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
 
     if (doc.budgetNote) {
       budgetBreak(30);
-      for (const ln of wrap(f.reg, `Nota: ${doc.budgetNote}`, 9, boxW)) {
+      for (const ln of wrap(f.reg, t.nota(doc.budgetNote), 9, boxW)) {
         text(p, ln, M, y, { size: 9, color: MUTED });
         y -= 13;
       }
@@ -1850,8 +1882,8 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       y -= H_OLHO;
     };
 
-    const temNotas = doc.notasImportantes.length > 0;
-    const temReserva = doc.incluido.length > 0 || doc.naoIncluido.length > 0;
+    const temNotas = fixos.notasImportantes.length > 0;
+    const temReserva = fixos.incluido.length > 0 || fixos.naoIncluido.length > 0;
 
     /* ── AS DUAS RUBRICAS VIAJAM JUNTAS ────────────────────────────────────
        A folha antiga mete o quadro, as «Notas Importantes» e as «Condições de
@@ -1868,20 +1900,20 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     // Os avanços de todos os blocos, menos o fim morto do último: é a TINTA da
     // cauda inteira, do primeiro título à base da última linha.
     const conjunto =
-      (temNotas ? AR + H_RUBRICA + avancoDaLista(doc.notasImportantes) : 0) +
+      (temNotas ? AR + H_RUBRICA + avancoDaLista(fixos.notasImportantes) : 0) +
       (temReserva
         ? AR +
           H_RUBRICA +
-          (doc.incluido.length ? H_OLHO + avancoDaLista(doc.incluido) : 0) +
-          (doc.naoIncluido.length ? AR_OLHOS + H_OLHO + avancoDaLista(doc.naoIncluido) : 0)
+          (fixos.incluido.length ? H_OLHO + avancoDaLista(fixos.incluido) : 0) +
+          (fixos.naoIncluido.length ? AR_OLHOS + H_OLHO + avancoDaLista(fixos.naoIncluido) : 0)
         : 0);
     if (conjunto > 0) bloco(conjunto - FIM_MORTO);
 
     if (temNotas) {
       y -= AR;
-      bloco(H_RUBRICA + alturaDeMarcadores(doc.notasImportantes));
-      rubrica("Notas importantes");
-      y = bullets(p, doc.notasImportantes, M, y, NOTAS_W, f, NOTAS_SIZE);
+      bloco(H_RUBRICA + alturaDeMarcadores(fixos.notasImportantes));
+      rubrica(t.notasImportantes);
+      y = bullets(p, fixos.notasImportantes, M, y, NOTAS_W, f, NOTAS_SIZE);
     }
 
     if (temReserva) {
@@ -1890,22 +1922,22 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
       // primeira lista: um título sozinho no fundo de uma folha não é conteúdo.
       bloco(
         H_RUBRICA +
-          (doc.incluido.length
-            ? H_OLHO + alturaDeMarcadores(doc.incluido)
-            : H_OLHO + alturaDeMarcadores(doc.naoIncluido)),
+          (fixos.incluido.length
+            ? H_OLHO + alturaDeMarcadores(fixos.incluido)
+            : H_OLHO + alturaDeMarcadores(fixos.naoIncluido)),
       );
-      rubrica("Condições de reserva");
-      if (doc.incluido.length) {
-        olho("Incluído na proposta:");
-        y = bullets(p, doc.incluido, M, y, NOTAS_W, f, NOTAS_SIZE);
+      rubrica(t.condicoesDeReserva);
+      if (fixos.incluido.length) {
+        olho(t.incluidoNaProposta);
+        y = bullets(p, fixos.incluido, M, y, NOTAS_W, f, NOTAS_SIZE);
       }
-      if (doc.naoIncluido.length) {
-        if (doc.incluido.length) {
+      if (fixos.naoIncluido.length) {
+        if (fixos.incluido.length) {
           y -= AR_OLHOS;
-          bloco(H_OLHO + alturaDeMarcadores(doc.naoIncluido));
+          bloco(H_OLHO + alturaDeMarcadores(fixos.naoIncluido));
         }
-        olho("Não incluído no orçamento:");
-        y = bullets(p, doc.naoIncluido, M, y, NOTAS_W, f, NOTAS_SIZE);
+        olho(t.naoIncluidoNoOrcamento);
+        y = bullets(p, fixos.naoIncluido, M, y, NOTAS_W, f, NOTAS_SIZE);
       }
     }
   }
@@ -1914,18 +1946,13 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
   {
     let p = pdf.addPage([W, H]);
     frame(p);
-    const yTop = sectionHeader(
-      p,
-      "Para sua tranquilidade",
-      numerada("Condições Gerais"),
-      H - M - 64,
-    );
+    const yTop = sectionHeader(p, t.sobretituloCondicoes, numerada(t.tituloCondicoes), H - M - 64);
     const gutter = 34;
     const colW = (W - 2 * M - gutter) / 2;
     const colX = [M, M + colW + gutter];
     let col = 0;
     let y = yTop;
-    for (const c of doc.condicoesGerais) {
+    for (const c of fixos.condicoesGerais) {
       const lines = wrap(f.reg, c, 9, colW - 14);
       if (y - lines.length * 12 - 6 < M + 4) {
         // Column full → next column, or a new page after the second column.
@@ -2002,13 +2029,9 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     };
 
     // Próximos passos — the clear "what happens next", with the validity date.
-    const validUntil = prettyDate(resolveValidUntil(doc));
-    subHead("Próximos Passos");
-    for (const line of [
-      "Para confirmar esta proposta, basta aceitá-la online através da ligação enviada no e-mail, ou responder-nos diretamente.",
-      "A reserva da data só fica garantida após o pagamento do sinal.",
-      `Esta proposta é válida até ${validUntil}.`,
-    ]) {
+    const validUntil = t.data(resolveValidUntil(doc));
+    subHead(t.proximosPassos);
+    for (const line of [t.passoAceitar, t.passoSinal, t.passoValidade(validUntil)]) {
       const lines = wrap(f.reg, line, 10, maxW - 16);
       p.drawCircle({ x: M + 3, y: y + 3, size: 1.2, color: FAINT });
       for (const ln of lines) {
@@ -2019,7 +2042,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     }
     y -= 18;
 
-    section("Observações Gerais", doc.observacoesGerais);
+    section(t.observacoesGerais, fixos.observacoesGerais);
     /* ═════════════════════════════════════════════════════════════════════════
        O FASEAMENTO, COM OS VALORES A SÉRIO — AQUI, E NÃO NA FOLHA DO ORÇAMENTO
        ═════════════════════════════════════════════════════════════════════════
@@ -2042,7 +2065,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
        a discordarem em 2.000 €. Os montantes saem do mesmo resolvedor de
        dinheiro que a facturação usa, pela mesma razão. */
     const comValores = totais.aPagar > 0;
-    section("Faseamento do Pagamento", doc.faseamento, 9, {
+    section(t.faseamentoDoPagamento, fixos.faseamento, 9, {
       // As duas linhas viajam com a rubrica: são medidas ANTES de o título ser
       // desenhado, e não depois da lista — de outro modo apareciam sozinhas no
       // topo da folha seguinte, longe do cabeçalho que lhes dá sentido. A
@@ -2053,8 +2076,8 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
         if (!comValores) return;
         const pct = totais.percentagemSinal;
         for (const [rotulo, valor, quando] of [
-          [`Sinal ${pct}%`, totais.sinal, "na adjudicação, para reservar a data"],
-          [`Saldo ${100 - pct}%`, totais.saldo, "até 1 mês antes do evento"],
+          [t.sinal(pct), totais.sinal, t.quandoSinal],
+          [t.saldo(100 - pct), totais.saldo, t.quandoSaldo],
         ] as const) {
           text(p, `${rotulo}   ${eurDoc(valor)}`, M + 14, y, {
             font: f.serif,
@@ -2075,24 +2098,18 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
          * A frase diz de onde saem, e diz o número: é a mesma palavra («total a
          * pagar») e o mesmo valor, ao cêntimo, que fecha o quadro do orçamento.
          */
-        text(
-          p,
-          `Calculados sobre o total a pagar — ${eurDoc(totais.aPagar)}, com IVA incluído.`,
-          M + 14,
-          y,
-          { size: 9, color: MUTED },
-        );
+        text(p, t.baseDoCalculo(eurDoc(totais.aPagar)), M + 14, y, { size: 9, color: MUTED });
         y -= 17;
       },
     });
-    section("Cancelamento", doc.cancelamento);
+    section(t.cancelamento, fixos.cancelamento);
 
     // Contactos
-    subHead("Contactos");
-    eyebrow(p, "Email", M, y);
+    subHead(t.contactos);
+    eyebrow(p, t.email, M, y);
     text(p, SITE.email, M + 70, y, { size: 10.5, color: INK });
     y -= 18;
-    eyebrow(p, "Telefone", M, y);
+    eyebrow(p, t.telefone, M, y);
     text(p, SITE.phoneDisplay, M + 70, y, { size: 10.5, color: INK });
   }
 
@@ -2126,14 +2143,14 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     // Keep every line inside the centre band so text never spills onto the
     // photos; wrap to the band width when images flank the page.
     const bandW = (hasImgs ? W * 0.34 : W * 0.72) - 24;
-    textCenter(p, "OBRIGADA", cx, H * 0.62, {
+    textCenter(p, t.obrigada, cx, H * 0.62, {
       font: f.bold,
       size: 9,
       color: rgb(0.72, 0.6, 0.34),
       tracking: 3,
     });
     let my = H * 0.56;
-    for (const ln of wrap(f.serifIt, "Por nos deixarem fazer parte deste momento.", 13, bandW)) {
+    for (const ln of wrap(f.serifIt, t.agradecimento, 13, bandW)) {
       textCenter(p, ln, cx, my, { font: f.serifIt, size: 13, color: CREAM });
       my -= 13 * 1.3;
     }
@@ -2141,7 +2158,7 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
     const lh = (logoWhite.height / logoWhite.width) * lw;
     p.drawImage(logoWhite, { x: cx - lw / 2, y: H * 0.3, width: lw, height: lh });
     let sy = H * 0.3 - 18;
-    for (const ln of wrap(f.serifIt, SITE.slogan, 10.5, bandW)) {
+    for (const ln of wrap(f.serifIt, t.slogan ?? SITE.slogan, 10.5, bandW)) {
       textCenter(p, ln, cx, sy, { font: f.serifIt, size: 10.5, color: CREAM_DIM });
       sy -= 10.5 * 1.3;
     }
