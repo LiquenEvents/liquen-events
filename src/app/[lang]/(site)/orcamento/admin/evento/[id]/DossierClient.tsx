@@ -79,26 +79,64 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
    * O servidor já tinha o caminho seguro — `activityLogAppend`, que junta ao
    * registo FRESCO — e a gaveta do back office já o usava, com o comentário a
    * explicar porquê. Este ecrã e o Quadro eram os dois que faltavam.
+   *
+   * ── E UMA RECUSA NÃO PODE PASSAR POR REGISTADA ────────────────────────────
+   *
+   * O `catch` estava vazio e o `if (res.ok)` não tinha o outro ramo: a linha
+   * ficava no ecrã, o formulário do registo fechava-se e limpava-se, e nada
+   * dizia que aquilo não existia em lado nenhum. Uma sessão que expira a meio
+   * da manhã — 401, o caso de todos os dias — dava exactamente a imagem de uma
+   * chamada registada, e só ao recarregar a página, muito depois, é que ela
+   * desaparecia.
+   *
+   * O que fica: a linha continua à vista (é o único sítio de onde o texto se
+   * pode voltar a copiar, porque o formulário já se fechou), com um aviso que a
+   * NOMEIA e um gesto para voltar a tentar. É a mesma regra do resto da casa —
+   * «guardado» é uma palavra que só o servidor autoriza.
    */
-  const appendActivity = useCallback(
-    async (entry: ActivityEntry) => {
-      setQuote((prev) => ({ ...prev, activityLog: [...(prev.activityLog ?? []), entry] }));
+  const [recusadas, setRecusadas] = useState<ActivityEntry[]>([]);
+  const [aTentar, setATentar] = useState(false);
+
+  const gravarEntradas = useCallback(
+    async (entries: ActivityEntry[]): Promise<boolean> => {
       try {
         const res = await fetch(`/api/orcamento/${quote.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ activityLogAppend: [entry] }),
+          body: JSON.stringify({ activityLogAppend: entries }),
         });
-        if (res.ok) {
-          const updated: Quote = await res.json();
-          setQuote(updated);
-        }
+        // Um 401 responde com um objecto de erro, não com o pedido: aceitá-lo
+        // aqui era pôr `{ error: … }` no lugar da quote e levar o ecrã atrás.
+        if (!res.ok) return false;
+        const updated: Quote = await res.json();
+        setQuote(updated);
+        return true;
       } catch {
-        /* best-effort — o espelho local já reflete a entrada */
+        return false;
       }
     },
-    [quote.activityLog, quote.id],
+    [quote.id],
   );
+
+  const appendActivity = useCallback(
+    async (entry: ActivityEntry) => {
+      setQuote((prev) => ({ ...prev, activityLog: [...(prev.activityLog ?? []), entry] }));
+      if (!(await gravarEntradas([entry]))) setRecusadas((prev) => [...prev, entry]);
+    },
+    [gravarEntradas],
+  );
+
+  const tentarGravarDeNovo = useCallback(async () => {
+    if (recusadas.length === 0 || aTentar) return;
+    setATentar(true);
+    try {
+      // Todas de uma vez: a rota junta o que lhe mandarem ao registo FRESCO, e
+      // uma por uma seriam várias leituras do mesmo registo a competir.
+      if (await gravarEntradas(recusadas)) setRecusadas([]);
+    } finally {
+      setATentar(false);
+    }
+  }, [recusadas, aTentar, gravarEntradas]);
 
   const scrollTo = useCallback((id: string) => {
     const el = document.getElementById(id);
@@ -120,6 +158,38 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
       />
 
       <main className="flex-1 px-4 sm:px-6 lg:px-10 py-6 lg:py-8 flex flex-col gap-6">
+        {recusadas.length > 0 && (
+          <div
+            role="alert"
+            className="rounded-xl border border-[#b5654a]/40 bg-[#b5654a]/[0.07] px-4 py-3"
+          >
+            <p className="text-[#8a4632] text-xs font-medium leading-snug">
+              {recusadas.length === 1
+                ? "Esta entrada do registo não ficou guardada no servidor:"
+                : `Estas ${recusadas.length} entradas do registo não ficaram guardadas no servidor:`}
+            </p>
+            <ul className="mt-1.5 flex flex-col gap-1">
+              {recusadas.map((e) => (
+                <li key={e.id} className="text-foreground/60 text-[11px] leading-snug">
+                  «{e.summary}»
+                </li>
+              ))}
+            </ul>
+            <p className="text-foreground/45 text-[11px] mt-1.5">
+              Estão só neste ecrã e desaparecem se recarregares a página. Se a sessão tiver
+              expirado, volta a entrar antes de tentar.
+            </p>
+            <button
+              type="button"
+              onClick={tentarGravarDeNovo}
+              disabled={aTentar}
+              className="alvo-toque mt-2.5 rounded-lg border border-[#b5654a]/40 px-3 py-1.5 text-[11px] font-medium text-[#8a4632] transition-colors hover:bg-[#b5654a]/10 disabled:opacity-45"
+            >
+              {aTentar ? "A tentar…" : "Tentar de novo"}
+            </button>
+          </div>
+        )}
+
         <MetricStrip metrics={metrics} />
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem] gap-6 items-start">

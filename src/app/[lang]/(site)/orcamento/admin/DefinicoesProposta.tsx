@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ParametrosDeslocacao } from "@/lib/orcamento/deslocacao";
 import { custoPorKm, sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
 import { Button, Card } from "./ui";
@@ -52,6 +52,9 @@ function velho(iso: string | undefined): boolean {
   return Number.isNaN(dias) || dias > 42;
 }
 
+/** O número como ela o escreve: vírgula decimal. */
+const comVirgula = (n: number) => String(n).replace(".", ",");
+
 /** Um campo numérico com unidade, que aceita vírgula como decimal. */
 function Numero({
   label,
@@ -68,8 +71,28 @@ function Numero({
 }) {
   // O estado local é TEXTO: com número, escrever "1," apagava a vírgula ao
   // reformatar e era impossível chegar a "1,72".
-  const [texto, setTexto] = useState(String(valor).replace(".", ","));
-  useEffect(() => setTexto(String(valor).replace(".", ",")), [valor]);
+  const [texto, setTexto] = useState(() => comVirgula(valor));
+  /**
+   * ── O TEXTO SÓ SE REESCREVE QUANDO O NÚMERO VEM DE FORA ───────────────────
+   *
+   * O estado local de texto não chegava sozinho: o efeito reescrevia-o a partir
+   * do `valor` que ele PRÓPRIO acabava de provocar. E `Number("1,")` é 1 — por
+   * isso apagar o "5" de "1,65" punha o formulário a 1, o efeito devolvia "1"
+   * ao campo, e a vírgula desaparecia debaixo dos dedos. O "8" seguinte colava-
+   * se ao "1": 18 €/litro, dez vezes o preço do gasóleo, na deslocação de todas
+   * as propostas seguintes.
+   *
+   * Guardando o último número que este campo emitiu, distingue-se o eco da
+   * própria escrita (não se toca no texto) de um número que veio de fora — a
+   * leitura inicial, ou a resposta de uma gravação —, que é a única altura em
+   * que o campo tem mesmo de ser reescrito.
+   */
+  const emitido = useRef(valor);
+  useEffect(() => {
+    if (valor === emitido.current) return;
+    emitido.current = valor;
+    setTexto(comVirgula(valor));
+  }, [valor]);
   return (
     <label className="flex flex-col gap-1">
       <span className="text-[10px] tracking-[0.1em] uppercase text-foreground/50">{label}</span>
@@ -79,9 +102,16 @@ function Numero({
           inputMode="decimal"
           value={texto}
           onChange={(e) => {
-            setTexto(e.target.value);
-            const n = Number(e.target.value.replace(",", "."));
-            if (Number.isFinite(n) && n >= 0) onChange(n);
+            const escrito = e.target.value;
+            setTexto(escrito);
+            const n = Number(escrito.replace(",", "."));
+            // Um campo vazio é um campo a meio de ser escrito, e não zero.
+            // `Number("")` é 0, e era esse 0 que ficava nos parâmetros: um
+            // clique em «Guardar» a seguir tirava o combustível da conta da
+            // deslocação de todas as propostas, sem ninguém o ter pedido.
+            if (escrito.trim() === "" || !Number.isFinite(n) || n < 0) return;
+            emitido.current = n;
+            onChange(n);
           }}
           className="bo-input w-24 px-2.5 py-2 text-xs"
         />

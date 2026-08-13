@@ -77,12 +77,20 @@ export default function FinanceZone({ quote, invoices, reconciliation, onQuoteCh
             />
           </svg>
           <div className="min-w-0">
+            {/* PAGAS, e não «emitidas»: o número do lado do livro é o das
+                faturas com estado «paga» (ver `ledgerPaidTotal`). O caso banal
+                é a fatura do sinal emitida, o cliente a pagar, o pagamento
+                registado à mão e a fatura por marcar — e a legenda «emitidas»
+                punha um 0,00 € por cima de uma fatura emitida que está na
+                tabela aqui em baixo. Quem lê fica a discutir com o ecrã em vez
+                de ir fazer a única coisa que falta. */}
             <p className="text-gold-text text-xs font-medium leading-snug">
-              Pagamentos registados ({eur(reconciliation.informalPaid)}) não batem com faturas
-              emitidas ({eur(reconciliation.ledgerPaid)}).
+              Pagamentos registados ({eur(reconciliation.informalPaid)}) não batem com faturas pagas
+              ({eur(reconciliation.ledgerPaid)}).
             </p>
             <p className="text-foreground/45 text-[11px] mt-0.5">
-              O livro de faturas é a fonte de verdade — confirma as faturas na secção Faturas.
+              O livro de faturas é a fonte de verdade — confirma na secção Faturas o que está mesmo
+              pago.
             </p>
           </div>
         </div>

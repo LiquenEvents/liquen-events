@@ -100,6 +100,49 @@ describe("o efeito dos números", () => {
     await userEvent.type(campo, "1,7");
     expect(campo.value).toBe("1,7");
   });
+
+  /**
+   * ── CORRIGIR UM PREÇO É APAGAR O ÚLTIMO ALGARISMO ─────────────────────────
+   *
+   * Ninguém limpa o campo para escrever 1,80: apaga-se o 5 de 1,65 e escreve-se
+   * o 8. Era aí que rebentava. `Number("1,")` é 1, o valor do formulário passava
+   * a 1, o efeito de sincronização reescrevia o campo a partir dele — e a
+   * vírgula desaparecia debaixo dos dedos. O 8 seguinte colava-se ao 1 e ficava
+   * 18 €/litro: dez vezes o preço do gasóleo, na conta da deslocação de todas
+   * as propostas seguintes.
+   */
+  it("apagar o último algarismo não come a vírgula — 1,65 corrige-se para 1,8", async () => {
+    montar();
+    const campo = (await screen.findByLabelText(/Preço do gasóleo/)) as HTMLInputElement;
+    expect(campo.value).toBe("1,65");
+
+    await userEvent.click(campo);
+    await userEvent.keyboard("{End}{Backspace}{Backspace}");
+    expect(campo.value).toBe("1,");
+
+    await userEvent.keyboard("8");
+    expect(campo.value).toBe("1,8");
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar deslocação" }));
+    await waitFor(() => expect(enviados).toHaveLength(1));
+    expect(enviados[0].body.valor).toMatchObject({ precoLitro: 1.8 });
+  });
+
+  /**
+   * Um campo vazio é um campo a meio de ser escrito, não zero. O campo saltava
+   * para "0" e punha 0 €/litro nos parâmetros — e um clique em «Guardar
+   * deslocação» tirava o combustível da conta de todas as propostas.
+   */
+  it("limpar o campo não grava 0 €/litro", async () => {
+    montar();
+    const campo = (await screen.findByLabelText(/Preço do gasóleo/)) as HTMLInputElement;
+    await userEvent.clear(campo);
+    expect(campo.value).toBe("");
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar deslocação" }));
+    await waitFor(() => expect(enviados).toHaveLength(1));
+    expect(enviados[0].body.valor).toMatchObject({ precoLitro: 1.65 });
+  });
 });
 
 describe("a idade do número", () => {

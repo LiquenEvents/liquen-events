@@ -140,6 +140,8 @@ export function esquecerEstadoDoArmazenamento(): void {
 export function AvisoDeArmazenamento() {
   const [estado, setEstado] = useState<EstadoDoArmazenamentoLido | null>(cache);
   const [aVerificar, setAVerificar] = useState(false);
+  /** A última verificação PEDIDA por ela não chegou ao servidor. */
+  const [naoDeuParaVerificar, setNaoDeuParaVerificar] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -151,10 +153,26 @@ export function AvisoDeArmazenamento() {
     };
   }, []);
 
+  /**
+   * ── UMA VERIFICAÇÃO QUE FALHA NÃO APAGA O QUE SE SABIA ────────────────────
+   *
+   * Isto fazia `setEstado(await perguntar(true))` e escrevia o `null` da falha
+   * por cima do aviso — e este painel só tem uma maneira de dizer «está tudo
+   * bem»: desaparecer. O gesto é o de quem acabou de correr o `schema.sql` e
+   * quer confirmar; uma sessão expirada a meio da manhã dava-lhe exactamente a
+   * imagem da confirmação, com a tabela a continuar a não existir.
+   *
+   * «Não se sabe» é diferente de «está mal» — é a razão de o painel se calar
+   * quando a pergunta falha à abertura — e é igualmente diferente de «está
+   * bem». Aqui já se sabe alguma coisa: fica o que se sabia, com uma linha a
+   * dizer que a verificação é que não se fez.
+   */
   const verificarDeNovo = useCallback(async () => {
     setAVerificar(true);
     try {
-      setEstado(await perguntar(true));
+      const r = await perguntar(true);
+      if (r) setEstado(r);
+      setNaoDeuParaVerificar(r === null);
     } finally {
       setAVerificar(false);
     }
@@ -200,6 +218,12 @@ export function AvisoDeArmazenamento() {
           </p>
           <p className="bo-text-muted mt-1">{estado.copia.oQueFazer}</p>
         </>
+      )}
+      {naoDeuParaVerificar && (
+        <p className="bo-text-muted mt-3">
+          Não foi possível verificar agora — o que está aqui em cima é a última resposta que chegou.
+          Se a sessão tiver expirado, volta a entrar e tenta outra vez.
+        </p>
       )}
       <div className="mt-3">
         <Button size="sm" variant="ghost" onClick={verificarDeNovo} disabled={aVerificar}>

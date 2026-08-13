@@ -115,4 +115,30 @@ describe("AvisoDeArmazenamento", () => {
     // de há trinta segundos e o aviso ficava lá.
     expect(pedidos[pedidos.length - 1]).toMatch(/forcar=1/);
   });
+
+  /**
+   * ── O AVISO NÃO SAI POR A PERGUNTA NÃO TER CHEGADO ────────────────────────
+   *
+   * «Não se sabe é diferente de está mal» — e é diferente de está bem. Uma
+   * verificação que não chega ao servidor (sessão expirada a meio da manhã,
+   * rede em baixo) fazia o painel desaparecer, que é a única maneira que ele
+   * tem de dizer «está tudo bem». O gesto é literalmente o de quem acabou de
+   * correr o `schema.sql` e quer confirmar: ela lê o desaparecimento como
+   * confirmação, e a tabela continua a não existir.
+   */
+  it("uma verificação que não chega ao servidor não faz o aviso desaparecer", async () => {
+    servir(TABELA_EM_FALTA);
+    render(<AvisoDeArmazenamento />);
+    await screen.findByRole("alert");
+
+    servir({ error: "Não autorizado" }, 401);
+    await userEvent.click(screen.getByRole("button", { name: /verificar de novo/i }));
+
+    const aviso = await screen.findByRole("alert");
+    // O que se sabia continua dito: nada mudou, porque nada foi verificado.
+    expect(aviso).toHaveTextContent(/app_state/);
+    // E diz-se que a verificação não se fez, senão o botão parece não ter feito
+    // nada — e carregar outra vez é a única resposta que sobra.
+    expect(aviso).toHaveTextContent(/não foi possível verificar/i);
+  });
 });
