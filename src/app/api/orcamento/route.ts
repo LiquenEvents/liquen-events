@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import type { ZodError } from "zod";
 import type { Quote, QuoteFormData, PriceBreakdown } from "@/lib/orcamento/types";
 import {
   CATEGORIES,
@@ -13,6 +14,8 @@ import { guestRangeLabel, ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcame
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
+import type { Locale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n";
 import {
   createQuote,
   listQuotes,
@@ -25,7 +28,7 @@ import { isAuthed } from "@/lib/admin-auth";
 import { jsonWithEtag } from "@/lib/api-cache";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
-import { quotePayloadSchema, firstError } from "@/lib/validation";
+import { quotePayloadSchema } from "@/lib/validation";
 import { log } from "@/lib/logger";
 import { eur0 as eur } from "@/lib/money";
 import { enviarEventos, ipDoPedido } from "@/lib/meta/capi";
@@ -33,6 +36,122 @@ import { EVENTOS as EVENTOS_META } from "@/lib/meta/eventos";
 import { desserializar as desserializarMeta } from "@/lib/meta/click-id";
 
 export const maxDuration = 30;
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O QUE SE LÊ QUANDO O ENVIO É RECUSADO
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O `error` que estas respostas trazem vai DIREITO para o ecrã: os três
+ * formulários públicos (OrcamentoForm, PedidoRapido, PedidoRelampago) mostram-no
+ * tal e qual o receberam, e é a única frase que a pessoa tem para perceber o que
+ * fazer a seguir.
+ *
+ * Duas coisas estavam mal, e as duas custam pedidos:
+ *
+ *  1. o 400 devolvia a frase INTERNA do zod. Quem colasse uma morada comprida no
+ *     «Local / região» — campo sem tecto nenhum no ecrã — carregava em Enviar e
+ *     lia «Too big: expected string to have <=300 characters». Em inglês, sem
+ *     dizer de que campo se fala, e sem nada para corrigir à vista. O pedido não
+ *     seguia, e o passo seguinte dessa pessoa é fechar a página;
+ *
+ *  2. tudo isto só sabia falar português, numa rota que já lê a língua de quem
+ *     escreveu para escolher a língua do email de confirmação. Quem está a ler o
+ *     site em inglês recebia a recusa em português — pior do que o genérico que o
+ *     próprio formulário mostraria se o servidor não dissesse nada.
+ *
+ * As frases passam a ser escritas AQUI, na língua da pessoa, e a nomear o campo
+ * com o mesmo rótulo que ela tem à frente — vindo do dicionário, para não haver
+ * dois nomes para o mesmo campo.
+ */
+
+/** O rótulo do campo, tal como está escrito no formulário. `null` para os
+ *  campos que a pessoa nunca vê (identificadores de anúncios, taxonomias). */
+function rotuloDoCampo(caminho: PropertyKey[], locale: Locale): string | null {
+  const to = getDictionary(locale).orcamento;
+  const campo = String(caminho[caminho.length - 1] ?? "");
+  const rotulos: Record<string, string> = {
+    name: to.labelNome,
+    email: to.labelEmail,
+    phone: to.labelTelefone,
+    location: to.labelLocal,
+    notes: to.labelMensagem,
+    guests: to.labelPessoas,
+    date: to.labelData,
+  };
+  return rotulos[campo] ?? null;
+}
+
+function mensagemDeValidacao(err: ZodError, locale: Locale): string {
+  const to = getDictionary(locale).orcamento;
+  const en = locale === "en";
+  const issue = err.issues[0];
+  const campo = issue ? String(issue.path[issue.path.length - 1] ?? "") : "";
+  const rotulo = issue ? rotuloDoCampo(issue.path, locale) : null;
+
+  // As duas recusas com nome próprio, ditas com a MESMA frase que o formulário
+  // já mostra ao lado do campo — ver o erro duas vezes escrito de duas maneiras
+  // faz duvidar de que seja o mesmo erro.
+  if (campo === "name" && issue?.code === "too_small") return to.errNome;
+  if (campo === "email" && issue?.code === "invalid_format") return to.errEmail;
+
+  // A regra "email OU telefone": a única invariante do esquema que não é sobre
+  // um campo isolado, e por isso a única cuja frase não pode nomear um.
+  if (issue?.code === "custom") {
+    return en
+      ? "Please leave us an email or a phone number so we can get back to you."
+      : "Indique um email ou um telemóvel para lhe podermos responder.";
+  }
+
+  if (issue?.code === "too_big" && typeof issue.maximum === "number") {
+    const max = issue.maximum;
+    if (rotulo) {
+      return en
+        ? `“${rotulo}” is too long. Please shorten it to ${max} characters or fewer.`
+        : `O campo «${rotulo}» é demasiado longo. Encurte-o para ${max} caracteres ou menos.`;
+    }
+    return en
+      ? `One of the fields is too long (maximum ${max} characters).`
+      : `Um dos campos é demasiado longo (máximo ${max} caracteres).`;
+  }
+
+  if (rotulo) {
+    return en ? `Please check the “${rotulo}” field.` : `Verifique o campo «${rotulo}».`;
+  }
+  return en
+    ? "We couldn't read your request. Please check the fields and try again."
+    : "Não foi possível ler o seu pedido. Verifique os campos e tente novamente.";
+}
+
+/**
+ * O tecto de tentativas conta por ENDEREÇO, e um endereço não é uma pessoa: o
+ * escritório, o espaço de eventos com wi-fi partilhado e a rede móvel do
+ * operador põem muita gente atrás do mesmo. Quem for recusado por causa do
+ * vizinho não fez nada de errado — e a frase dizia-lhe «dentro de momentos»,
+ * que tanto podia ser cinco segundos como um minuto inteiro. O servidor SABE
+ * quanto falta (é o que já vai no `Retry-After`); passa a dizê-lo.
+ */
+function mensagemDeLimite(segundos: number, locale: Locale): string {
+  const en = locale === "en";
+  const minutos = Math.ceil(segundos / 60);
+  const quanto =
+    segundos < 60
+      ? en
+        ? `${segundos} seconds`
+        : `${segundos} segundos`
+      : en
+        ? `${minutos} minute${minutos === 1 ? "" : "s"}`
+        : `${minutos} minuto${minutos === 1 ? "" : "s"}`;
+  return en
+    ? `Too many requests from this connection. Please try again in ${quanto}, or send us a message on WhatsApp.`
+    : `Demasiados pedidos a partir desta ligação. Tente novamente daqui a ${quanto}, ou fale connosco pelo WhatsApp.`;
+}
+
+function mensagemSemRegisto(locale: Locale): string {
+  return locale === "en"
+    ? "We couldn't record your request. Please try again in a moment, or contact us directly."
+    : "Não foi possível registar o seu pedido. Tente novamente dentro de momentos ou contacte-nos diretamente.";
+}
 
 /**
  * Não há email do cliente, logo não há confirmação a enviar.
@@ -480,14 +599,113 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   return { subject, html, text };
 }
 
+/**
+ * A confirmação ao cliente, na língua em que ele escreveu (best-effort).
+ *
+ * Vive numa função à parte porque corre DEPOIS da resposta (ver o `after` no
+ * POST): lá dentro é a última coisa que a pessoa recebe, mas já não é nada que
+ * o ecrã dela esteja à espera.
+ */
+async function confirmarAoCliente(id: string, form: QuoteFormData, locale: Locale): Promise<void> {
+  // Só existe quando o cliente deu email. Um pedido que chega só com
+  // telemóvel — o caso normal nas variantes sociais — não tem para onde
+  // mandar a confirmação, e é a EQUIPA que responde por WhatsApp. Não é uma
+  // degradação silenciosa: o email à equipa traz o botão de WhatsApp já
+  // pré-preenchido, que é o caminho mais rápido de qualquer forma.
+  try {
+    if (!form.email) throw new NadaParaConfirmar();
+    // Feed the builder what the client actually told us, so the email mirrors
+    // their event back in prose instead of being a generic acknowledgement.
+    // Only the free-text `location` is passed — never the internal pricing
+    // bucket (LOCATION_LABELS), which would read as "your venue is a rural
+    // area". Weddings/christenings are organised by a couple → plural register.
+    const confirmation = buildClientConfirmation({
+      locale,
+      name: form.name,
+      referenceId: id,
+      event: {
+        // The client's OWN word first. The taxonomy label is a plural bucket
+        // ("Casamentos"), which this email drops into a singular sentence —
+        // "o vosso pedido para o casamentos de 25 de janeiro".
+        typeLabel:
+          form.eventName?.trim() ||
+          (form.category && form.eventType
+            ? EVENT_TYPES_BY_CATEGORY[form.category]?.find((e) => e.id === form.eventType)?.label
+            : undefined) ||
+          (form.category ? CATEGORIES.find((c) => c.id === form.category)?.label : undefined) ||
+          undefined,
+        date: form.date,
+        guests: form.guests || undefined,
+        // Sem número, devolve-se a ordem de grandeza que ELA escolheu — em
+        // vez de calar a linha e deixá-la a pensar que não ficou registada.
+        guestsRange: form.guests ? undefined : guestRangeLabel(form.guestsRange, locale),
+        location: form.location?.trim() || undefined,
+        plural: form.eventType === "casamentos" || form.eventType === "batizados",
+        // Na língua do email, não na da equipa: quem escreveu em inglês
+        // recebe "Ceremony · Dinner tables", não "Cerimónia · Mesas".
+        decor: rotularPontos(form.decorPoints ?? [], locale),
+        // Na língua do email, como tudo o resto deste resumo.
+        ceremony: ceremonyTypeLabel(form.ceremonyType, locale),
+        space: spaceTypeLabel(form.spaceType, locale),
+      },
+    });
+    // Per-recipient daily cap: this email goes to a user-SUPPLIED address, so
+    // without a ceiling the endpoint could be abused to bombard a victim's
+    // inbox from Líquen's sender reputation (a mail-bomb amplifier). 5/day per
+    // address is far above any real client's needs; over it we skip the
+    // confirmation — the lead is already persisted and the team notified.
+    const emailKey = `confirm:${form.email.trim().toLowerCase()}`;
+    if ((await rateLimit(emailKey, 5, 24 * 60 * 60_000)).ok) {
+      const sentRes = await sendMail({
+        to: form.email,
+        // The body invites a reply ("basta responder a este email"), so point
+        // replies explicitly at the monitored inbox. Without this they only
+        // land correctly by coincidence — because MAIL_FROM happens to equal
+        // MAIL_TO today — and a hot lead's reply would vanish the moment a
+        // separate sending identity is configured.
+        replyTo: MAIL_TO,
+        headers: {
+          "Auto-Submitted": "auto-generated", // RFC 3834 — don't auto-reply to us
+          "X-Auto-Response-Suppress": "OOF, AutoReply", // Exchange/Outlook
+        },
+        attachments: [emailLogoAttachment()],
+        ...confirmation,
+      });
+      // sendMail resolves {sent:false} (no throw) when SMTP is unconfigured,
+      // so without this the client silently gets nothing and nobody knows.
+      if (!sentRes.sent) {
+        log.error("orcamento: confirmação ao cliente NÃO enviada — verificar SMTP", undefined, {
+          id,
+        });
+      }
+    } else {
+      log.warn("orcamento: cap diário do email de confirmação atingido — não reenviado", { id });
+    }
+  } catch (mailErr) {
+    // `NadaParaConfirmar` não é uma falha: é o caso previsto de um pedido
+    // que chegou só com telemóvel. Registar isso como erro encheria o
+    // fan-out de alertas com o funcionamento normal das páginas sociais, e
+    // um alerta que toca sempre deixa de ser lido.
+    if (mailErr instanceof NadaParaConfirmar) {
+      log.info("orcamento: pedido sem email — confirmação ao cliente não se aplica", { id });
+    } else {
+      log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
+  // A língua em que esta pessoa está a ler, lida ANTES de tudo o resto: é a
+  // língua de todas as respostas desta rota, incluindo as que recusam o pedido.
+  const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
   try {
     sweep();
     const limited = await rateLimit(`orcamento:${clientIp(request)}`, 5, 60_000);
     if (!limited.ok) {
+      const segundos = Math.max(1, Math.ceil(limited.retryAfter ?? 60));
       return NextResponse.json(
-        { error: "Demasiados pedidos. Tente novamente dentro de momentos." },
-        { status: 429, headers: { "Retry-After": String(limited.retryAfter ?? 60) } },
+        { error: mensagemDeLimite(segundos, locale) },
+        { status: 429, headers: { "Retry-After": String(segundos) } },
       );
     }
 
@@ -509,7 +727,10 @@ export async function POST(request: NextRequest) {
     }
     const parsed = quotePayloadSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
+      return NextResponse.json(
+        { error: mensagemDeValidacao(parsed.error, locale) },
+        { status: 400 },
+      );
     }
     const { form, breakdown } = parsed.data as unknown as {
       form: QuoteFormData;
@@ -546,7 +767,7 @@ export async function POST(request: NextRequest) {
       // a língua do email de confirmação e deitava-se fora a seguir; guardada,
       // permite meses depois saber que aquele casal escreveu em inglês — e a
       // proposta do estúdio sai em português.
-      locale: normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value),
+      locale,
     };
 
     // ── Durable delivery FIRST ──────────────────────────────────────────────
@@ -566,170 +787,139 @@ export async function POST(request: NextRequest) {
     // Notify the team by email (a second, independent delivery path). `sendMail`
     // never throws — it returns { sent:false } when SMTP isn't configured — so we
     // read `sent` to know whether the lead actually reached the team's inbox.
-    let emailed = false;
-    try {
-      const email = buildEmail(id, form, breakdown);
-      const res = await sendMail({
-        subject: email.subject,
-        html: email.html,
-        text: email.text,
-        // Sem email do cliente não há a quem responder: omite-se o cabeçalho
-        // em vez de o enviar vazio, que faria alguns servidores recusar a
-        // mensagem inteira e perder a notificação do lead.
-        replyTo: form.email || undefined,
-        attachments: [emailLogoAttachment()],
-      });
-      emailed = res.sent;
-    } catch (mailErr) {
-      log.error("orcamento: email falhou", mailErr, { id });
-    }
-
-    // If the lead reached NEITHER a durable store NOR the team inbox, it is lost.
-    // Return a real error so the visitor can retry or contact us directly, instead
-    // of a false "success" screen over a dropped enquiry.
-    if (!persisted && !emailed) {
-      log.error("orcamento: lead não registada nem enviada — a devolver erro", undefined, { id });
-      return NextResponse.json(
-        {
-          error:
-            "Não foi possível registar o seu pedido. Tente novamente dentro de momentos ou contacte-nos diretamente.",
-        },
-        { status: 503 },
-      );
-    }
-
-    // Partial success: the lead is safely in the store but the team's email
-    // didn't go out (e.g. SMTP unset/misconfigured in prod). The visitor still
-    // sees success — the lead isn't lost — but nobody was actively notified, so
-    // it can sit unseen in the dashboard. Log at ERROR so it reaches the alert
-    // fan-out (Sentry/webhook), turning a silent notification gap into a signal.
-    if (persisted && !emailed) {
-      log.error(
-        "orcamento: lead registada mas email à equipa NÃO enviado — verificar SMTP",
-        undefined,
-        { id },
-      );
-    }
-
-    // Confirmation to the client, in the language they were browsing in (best-effort).
-    // Só existe quando o cliente deu email. Um pedido que chega só com
-    // telemóvel — o caso normal nas variantes sociais — não tem para onde
-    // mandar a confirmação, e é a EQUIPA que responde por WhatsApp. Não é uma
-    // degradação silenciosa: o email à equipa traz o botão de WhatsApp já
-    // pré-preenchido, que é o caminho mais rápido de qualquer forma.
-    try {
-      if (!form.email) throw new NadaParaConfirmar();
-      const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
-      // Feed the builder what the client actually told us, so the email mirrors
-      // their event back in prose instead of being a generic acknowledgement.
-      // Only the free-text `location` is passed — never the internal pricing
-      // bucket (LOCATION_LABELS), which would read as "your venue is a rural
-      // area". Weddings/christenings are organised by a couple → plural register.
-      const confirmation = buildClientConfirmation({
-        locale,
-        name: form.name,
-        referenceId: id,
-        event: {
-          // The client's OWN word first. The taxonomy label is a plural bucket
-          // ("Casamentos"), which this email drops into a singular sentence —
-          // "o vosso pedido para o casamentos de 25 de janeiro".
-          typeLabel:
-            form.eventName?.trim() ||
-            (form.category && form.eventType
-              ? EVENT_TYPES_BY_CATEGORY[form.category]?.find((e) => e.id === form.eventType)?.label
-              : undefined) ||
-            (form.category ? CATEGORIES.find((c) => c.id === form.category)?.label : undefined) ||
-            undefined,
-          date: form.date,
-          guests: form.guests || undefined,
-          // Sem número, devolve-se a ordem de grandeza que ELA escolheu — em
-          // vez de calar a linha e deixá-la a pensar que não ficou registada.
-          guestsRange: form.guests ? undefined : guestRangeLabel(form.guestsRange, locale),
-          location: form.location?.trim() || undefined,
-          plural: form.eventType === "casamentos" || form.eventType === "batizados",
-          // Na língua do email, não na da equipa: quem escreveu em inglês
-          // recebe "Ceremony · Dinner tables", não "Cerimónia · Mesas".
-          decor: rotularPontos(form.decorPoints ?? [], locale),
-          // Na língua do email, como tudo o resto deste resumo.
-          ceremony: ceremonyTypeLabel(form.ceremonyType, locale),
-          space: spaceTypeLabel(form.spaceType, locale),
-        },
-      });
-      // Per-recipient daily cap: this email goes to a user-SUPPLIED address, so
-      // without a ceiling the endpoint could be abused to bombard a victim's
-      // inbox from Líquen's sender reputation (a mail-bomb amplifier). 5/day per
-      // address is far above any real client's needs; over it we skip the
-      // confirmation — the lead is already persisted and the team notified.
-      const emailKey = `confirm:${form.email.trim().toLowerCase()}`;
-      if ((await rateLimit(emailKey, 5, 24 * 60 * 60_000)).ok) {
-        const sentRes = await sendMail({
-          to: form.email,
-          // The body invites a reply ("basta responder a este email"), so point
-          // replies explicitly at the monitored inbox. Without this they only
-          // land correctly by coincidence — because MAIL_FROM happens to equal
-          // MAIL_TO today — and a hot lead's reply would vanish the moment a
-          // separate sending identity is configured.
-          replyTo: MAIL_TO,
-          headers: {
-            "Auto-Submitted": "auto-generated", // RFC 3834 — don't auto-reply to us
-            "X-Auto-Response-Suppress": "OOF, AutoReply", // Exchange/Outlook
-          },
+    const avisarEquipa = async (): Promise<boolean> => {
+      try {
+        const email = buildEmail(id, form, breakdown);
+        const res = await sendMail({
+          subject: email.subject,
+          html: email.html,
+          text: email.text,
+          // Sem email do cliente não há a quem responder: omite-se o cabeçalho
+          // em vez de o enviar vazio, que faria alguns servidores recusar a
+          // mensagem inteira e perder a notificação do lead.
+          replyTo: form.email || undefined,
           attachments: [emailLogoAttachment()],
-          ...confirmation,
         });
-        // sendMail resolves {sent:false} (no throw) when SMTP is unconfigured,
-        // so without this the client silently gets nothing and nobody knows.
-        if (!sentRes.sent) {
-          log.error("orcamento: confirmação ao cliente NÃO enviada — verificar SMTP", undefined, {
-            id,
-          });
-        }
-      } else {
-        log.warn("orcamento: cap diário do email de confirmação atingido — não reenviado", { id });
+        return res.sent;
+      } catch (mailErr) {
+        log.error("orcamento: email falhou", mailErr, { id });
+        return false;
       }
-    } catch (mailErr) {
-      // `NadaParaConfirmar` não é uma falha: é o caso previsto de um pedido
-      // que chegou só com telemóvel. Registar isso como erro encheria o
-      // fan-out de alertas com o funcionamento normal das páginas sociais, e
-      // um alerta que toca sempre deixa de ser lido.
-      if (mailErr instanceof NadaParaConfirmar) {
-        log.info("orcamento: pedido sem email — confirmação ao cliente não se aplica", { id });
-      } else {
-        log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
+    };
+
+    /**
+     * ── QUANDO É QUE O EMAIL À EQUIPA TEM DE SAIR ANTES DA RESPOSTA ────────
+     *
+     * Só quando a gravação falhou. Aí o email deixa de ser um aviso e passa a
+     * ser a ÚNICA cópia do pedido, e é ele que decide entre um «recebemos»
+     * verdadeiro e um 503 honesto — não se pode responder sem saber se saiu.
+     *
+     * Com a gravação feita, o pedido já está seguro: esperar pelo SMTP para
+     * responder era pendurar o ecrã de quem enviou num serviço que nada tem que
+     * ver com a pergunta que ele está a fazer («chegou?»). E o nodemailer sabe
+     * esperar 8 s pela ligação, 8 s pela saudação e 20 s pela transferência —
+     * somado ao resto, isso passava dos 25 s em que os três formulários cortam
+     * o pedido. O desfecho: a pessoa lia «não foi possível enviar» sobre um
+     * pedido que estava gravado e já a caminho da caixa de correio da equipa.
+     */
+    let avisada = false;
+    if (!persisted) {
+      avisada = await avisarEquipa();
+      // If the lead reached NEITHER a durable store NOR the team inbox, it is lost.
+      // Return a real error so the visitor can retry or contact us directly, instead
+      // of a false "success" screen over a dropped enquiry.
+      if (!avisada) {
+        log.error("orcamento: lead não registada nem enviada — a devolver erro", undefined, { id });
+        return NextResponse.json({ error: mensagemSemRegisto(locale) }, { status: 503 });
       }
+      // Partial success ao contrário: a equipa foi avisada, mas o pedido não
+      // ficou em lado nenhum — não aparece no painel, e a referência que o
+      // cliente leva não corresponde a nada. Fica no fan-out de alertas.
+      log.error("orcamento: lead NÃO gravada — só existe no email à equipa", undefined, { id });
     }
 
-    // ── A Meta, pelo servidor ───────────────────────────────────────────────
-    // O browser já disparou o `Lead` para o pixel com um `event_id`, e enviou-o
-    // aqui dentro do formulário. Reenvia-se o MESMO identificador pela
-    // Conversions API: a Meta reconhece os dois como um acontecimento só, e o
-    // envio do servidor é o que sobrevive ao ITP do Safari e aos bloqueadores.
-    //
-    // Sem `leadEventId` não se envia NADA. Um `event_id` inventado aqui nunca
-    // encontraria o par do browser e a conversão passaria a contar a dobrar —
-    // que é exactamente a avaria que a deduplicação existe para evitar.
-    try {
-      await reenviarLeadParaMeta(request, id, form);
-    } catch (metaErr) {
-      log.error("orcamento: reenvio do Lead para a Meta falhou", metaErr, { id });
-    }
+    /**
+     * ── O QUE FICA PARA DEPOIS DA RESPOSTA ────────────────────────────────
+     *
+     * `after` e não um `void` solto: a plataforma mantém a função viva até isto
+     * acabar (na Vercel, o `waitUntil`). Um `void` fazia o contrário — o
+     * contentor pode congelar assim que a resposta sai, e o email de confirmação,
+     * o `Lead` da Meta e o push desapareciam sem deixar rasto. A diferença entre
+     * os dois só se vê em produção, que é o pior sítio para a descobrir.
+     *
+     * Nada do que está aqui dentro muda a verdade do que já foi respondido: o
+     * pedido está gravado (ou, no caso acima, já na caixa de correio da equipa)
+     * antes de esta linha correr.
+     */
+    const depoisDaResposta = async () => {
+      // Partial success: the lead is safely in the store but the team's email
+      // didn't go out (e.g. SMTP unset/misconfigured in prod). The visitor still
+      // sees success — the lead isn't lost — but nobody was actively notified, so
+      // it can sit unseen in the dashboard. Log at ERROR so it reaches the alert
+      // fan-out (Sentry/webhook), turning a silent notification gap into a signal.
+      if (!avisada && !(await avisarEquipa())) {
+        log.error(
+          "orcamento: lead registada mas email à equipa NÃO enviado — verificar SMTP",
+          undefined,
+          { id },
+        );
+      }
 
-    // Push notification to the team's devices (best-effort).
+      // Confirmation to the client, in the language they were browsing in (best-effort).
+      await confirmarAoCliente(id, form, locale);
+
+      // ── A Meta, pelo servidor ─────────────────────────────────────────────
+      // O browser já disparou o `Lead` para o pixel com um `event_id`, e enviou-o
+      // aqui dentro do formulário. Reenvia-se o MESMO identificador pela
+      // Conversions API: a Meta reconhece os dois como um acontecimento só, e o
+      // envio do servidor é o que sobrevive ao ITP do Safari e aos bloqueadores.
+      //
+      // Sem `leadEventId` não se envia NADA. Um `event_id` inventado aqui nunca
+      // encontraria o par do browser e a conversão passaria a contar a dobrar —
+      // que é exactamente a avaria que a deduplicação existe para evitar.
+      try {
+        await reenviarLeadParaMeta(request, id, form);
+      } catch (metaErr) {
+        log.error("orcamento: reenvio do Lead para a Meta falhou", metaErr, { id });
+      }
+
+      // Push notification to the team's devices (best-effort).
+      try {
+        await sendPushToAll({
+          title: "Novo pedido de orçamento",
+          body: `${form.name}${form.guests ? ` · ${form.guests} convidados` : ""}`,
+          url: "/orcamento/admin",
+          tag: "novo-orcamento",
+        });
+      } catch (pushErr) {
+        log.error("orcamento: push falhou", pushErr, { id });
+      }
+    };
+
+    /**
+     * O `after` LANÇA quando é chamado fora de um pedido. Se isso acontecer, o
+     * que não pode acontecer é nenhuma das duas coisas que vinham a seguir: nem
+     * este trabalho desaparecer, nem uma resposta JÁ DECIDIDA — o pedido está
+     * gravado — virar um 500 que diz a quem enviou que não conseguiu. Faz-se ali
+     * mesmo, à moda antiga: mais lento, e verdadeiro.
+     */
     try {
-      await sendPushToAll({
-        title: "Novo pedido de orçamento",
-        body: `${form.name}${form.guests ? ` · ${form.guests} convidados` : ""}`,
-        url: "/orcamento/admin",
-        tag: "novo-orcamento",
+      after(depoisDaResposta);
+    } catch (semContexto) {
+      log.warn("orcamento: sem contexto para o `after` — a notificar dentro da resposta", {
+        id,
+        motivo: String(semContexto),
       });
-    } catch (pushErr) {
-      log.error("orcamento: push falhou", pushErr, { id });
+      await depoisDaResposta();
     }
 
     return NextResponse.json({ id, status: "ok" });
   } catch (err) {
     log.error("orcamento POST falhou", err);
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+    // "Erro interno" não diz nada a quem está do outro lado, e dizia-o só em
+    // português. Uma frase que admite a avaria e aponta o caminho alternativo
+    // vale mais do que o nome técnico do que correu mal.
+    return NextResponse.json({ error: mensagemSemRegisto(locale) }, { status: 500 });
   }
 }
 
