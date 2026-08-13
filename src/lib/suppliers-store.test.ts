@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { promises as fs } from "fs";
+import path from "path";
 import type { Mapper } from "./repository";
 import type { Supplier } from "@/lib/orcamento/types";
 
@@ -134,13 +136,25 @@ describe("suppliers mapper (camelCase ↔ snake_case)", () => {
     expect(back.createdAt).toBeTruthy();
   });
 
-  // KNOWN SCHEMA GAP (documented, not a store bug): the `Supplier` type and the
-  // fornecedores PATCH route accept `rating`/`preferred`, but the DB `suppliers`
-  // table (db/schema.sql) has no such columns, so the mapper deliberately omits
-  // them — adding them to toRow would make every Supabase insert fail on an
-  // unknown column. This test pins that intentional omission so it can't drift
-  // silently; wiring the feature requires a migration first.
-  it("does not project rating/preferred onto the DB row (no column yet)", () => {
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * AS ESTRELAS E O «PREFERIDO» TÊM DE CHEGAR À BASE DE DADOS
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Aqui esteve um teste a prender a OMISSÃO destes dois campos, com a lacuna
+   * do schema escrita como se fosse uma decisão. Não era: o tipo `Supplier`, a
+   * rota PATCH e o `supplierUpdateSchema` aceitavam-nos, o ecrã de Fornecedores
+   * ordena e filtra por eles — e o mapper deitava-os fora ao gravar.
+   *
+   * Em desenvolvimento (backend de ficheiro, que guarda o objecto tal e qual)
+   * nunca se via. Com Supabase, avaliar uma florista com 5 estrelas respondia
+   * 200, pintava as estrelas, e no recarregamento seguinte elas tinham
+   * desaparecido — sem erro nenhum, que é a pior maneira de perder trabalho.
+   *
+   * A correcção são as duas metades juntas: a coluna em `db/schema.sql` e a
+   * projecção aqui. Os dois testes abaixo prendem uma metade cada.
+   */
+  it("projecta rating/preferred na linha da base de dados", () => {
     const row = mapper.toRow({
       id: "s4",
       name: "Preferido",
@@ -149,7 +163,64 @@ describe("suppliers mapper (camelCase ↔ snake_case)", () => {
       rating: 5,
       preferred: true,
     });
-    expect(row).not.toHaveProperty("rating");
-    expect(row).not.toHaveProperty("preferred");
+    expect(row.rating).toBe(5);
+    expect(row.preferred).toBe(true);
+
+    const back = mapper.fromRow({ ...row, created_at: "2026-01-01T00:00:00.000Z" });
+    expect(back.rating).toBe(5);
+    expect(back.preferred).toBe(true);
+  });
+
+  it("sem avaliação grava nulo e lê-se como indefinido (não como zero estrelas)", () => {
+    const row = mapper.toRow({
+      id: "s5",
+      name: "Por avaliar",
+      category: "Flores",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    expect(row.rating).toBeNull();
+    expect(row.preferred).toBe(false);
+
+    const back = mapper.fromRow({ ...row, created_at: "2026-01-01T00:00:00.000Z" });
+    expect(back.rating).toBeUndefined();
+    expect(back.preferred).toBeFalsy();
+  });
+
+  it("tirar a avaliação (null vindo da rota) apaga-a em vez de a manter", () => {
+    const row = mapper.toRow({
+      id: "s6",
+      name: "Desavaliado",
+      category: "Flores",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      rating: undefined,
+      preferred: false,
+    });
+    expect(row.rating).toBeNull();
+    expect(row.preferred).toBe(false);
+  });
+});
+
+// ── A outra metade: a coluna existe mesmo em db/schema.sql ────────────────
+// Projectar uma coluna que a base não tem não é meia funcionalidade: faz TODAS
+// as escritas da tabela falharem com `column ... does not exist`. Este teste lê
+// o ficheiro a sério, como o `bloqueio-optimista.test.ts` faz para o
+// `updated_at`, e prende a coluna a quem a escreve.
+describe("db/schema.sql garante as colunas que o mapper de fornecedores escreve", () => {
+  it.each(["rating", "preferred"])("coluna %s", async (coluna) => {
+    const sql = await fs.readFile(path.join(process.cwd(), "db", "schema.sql"), "utf-8");
+
+    // Ou a coluna nasce com a tabela…
+    const criacao = /create table if not exists public\.suppliers\s*\(([\s\S]*?)\n\);/i.exec(sql);
+    const nasceCom = !!criacao && new RegExp(`\\b${coluna}\\b`).test(criacao[1]);
+    // …ou chega por migração idempotente a uma instalação que já existia.
+    const porMigracao = new RegExp(
+      `alter table public\\.suppliers\\s+add column if not exists\\s+${coluna}\\b`,
+      "i",
+    ).test(sql);
+
+    expect(
+      nasceCom && porMigracao,
+      `suppliers.${coluna} é gravado pelo mapper mas db/schema.sql não garante a coluna`,
+    ).toBe(true);
   });
 });

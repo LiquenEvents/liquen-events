@@ -96,13 +96,72 @@ export function collectAttachments(node?: MessageStructureObject): InboxAttachme
 }
 
 /**
+ * Quantos Message-IDs do `References:` se guardam, e o comprimento máximo de
+ * cada um.
+ *
+ * O cabeçalho é escrito por quem envia e não tem tecto nenhum — e este é pedido
+ * para TODAS as mensagens da listagem (ver `LIST_QUERY`), o que faz dele o
+ * único campo aqui em que um remetente sozinho multiplica o tamanho da resposta
+ * da caixa inteira: umas centenas de KB de `<...>` numa mensagem viravam
+ * milhares de identificadores por linha, em JSON, num campo que o ecrã nem
+ * sequer mostra. Cinquenta chegam de sobra para encadear uma conversa (o
+ * RFC 5322 §3.6.4 conta com que as implementações cortem), e 998 é o limite de
+ * linha do próprio RFC — um identificador maior do que isso não é um
+ * identificador.
+ */
+const MAX_REFERENCIAS = 50;
+const MAX_ID_REFERENCIA = 998;
+
+/**
  * Parse a References header buffer into an ordered list of Message-IDs. We only
  * ever fetch the References header into this buffer, so pulling every `<...>`
  * token out is safe (and folded/continued lines just work).
+ *
+ * Cortar pelo meio e não pelo fim: o que serve para encadear é a RAIZ da
+ * conversa (o primeiro) e a linhagem imediata (os últimos). O meio é o que se
+ * pode perder sem perder o fio.
  */
 export function parseReferences(headers?: Buffer): string[] {
   if (!headers) return [];
-  return headers.toString("utf8").match(/<[^>]+>/g) ?? [];
+  const todos = (headers.toString("utf8").match(/<[^>]+>/g) ?? []).filter(
+    (id) => id.length <= MAX_ID_REFERENCIA,
+  );
+  if (todos.length <= MAX_REFERENCIAS) return todos;
+  return [todos[0], ...todos.slice(-(MAX_REFERENCIAS - 1))];
+}
+
+/**
+ * A data do envelope → ISO, ou "" quando não há data utilizável.
+ *
+ * O cabeçalho `Date:` é escrito por quem envia e não há nada que o obrigue a
+ * ser uma data. Quando não a consegue ler, o imapflow devolve a STRING CRUA do
+ * cabeçalho em `envelope.date` — apesar de o tipo prometer um `Date` (ver
+ * `imapflow/lib/tools.js`, «if (date.toString() === 'Invalid Date')»). O
+ * `(env.date ?? new Date()).toISOString()` que aqui estava rebentava com um
+ * TypeError, e o erro não ficava na linha: subia pelo `listInbox` e a caixa
+ * INTEIRA respondia 500 por causa de uma mensagem só — que qualquer remetente
+ * consegue lá pôr de propósito.
+ *
+ * Devolve "" e não a hora da leitura porque carimbar `new Date()` punha uma
+ * mensagem sem data no topo da lista a cada recarregamento: uma mentira mais
+ * difícil de apanhar do que um espaço vazio. O `fmtDate` do ecrã já não mostra
+ * nada para uma data que não se lê, e a ordenação abaixo manda-as para o fim.
+ */
+function toIsoDate(value: unknown): string {
+  if (value instanceof Date) return Number.isNaN(+value) ? "" : value.toISOString();
+  if (typeof value === "string" && value.trim()) {
+    const parsed = new Date(value);
+    // O texto do cabeçalho ainda pode ser uma data perfeitamente legível que só
+    // o imapflow recusou — aproveita-se em vez de a deitar fora.
+    return Number.isNaN(+parsed) ? "" : parsed.toISOString();
+  }
+  return "";
+}
+
+/** Ordenação: sem data legível vai para o fim, e nunca devolve NaN ao `sort`. */
+function tempoDaMensagem(item: InboxItem): number {
+  const t = +new Date(item.date);
+  return Number.isNaN(t) ? 0 : t;
 }
 
 const LIST_QUERY: FetchQueryObject = {
@@ -120,7 +179,7 @@ function toInboxItem(msg: FetchMessageObject): InboxItem {
     from: f?.name || f?.address || "—",
     fromAddress: f?.address || "",
     subject: env?.subject || "(sem assunto)",
-    date: (env?.date ?? new Date()).toISOString(),
+    date: toIsoDate(env?.date),
     seen: msg.flags?.has("\\Seen") ?? false,
     messageId: env?.messageId || "",
     inReplyTo: env?.inReplyTo || undefined,
@@ -150,6 +209,12 @@ export async function listInbox(arg: number | ListInboxOptions = 30): Promise<In
   const q = opts.q?.trim();
   const before = opts.before;
 
+  // `before` é "o que está ABAIXO desta UID". Em 1 não está nada — e como o
+  // intervalo `1:0` não existe em IMAP, o pedido acabava por ser `1:1` e o
+  // "carregar mais" do fundo da caixa devolvia outra vez a mensagem mais
+  // antiga, repetida na lista a cada clique. Não há nada para perguntar.
+  if (before != null && before <= 1) return [];
+
   const client = await makeClient();
   await client.connect();
   try {
@@ -165,7 +230,7 @@ export async function listInbox(arg: number | ListInboxOptions = 30): Promise<In
         // fetch the newest `limit` of them.
         const criteria: SearchObject = {};
         if (q) criteria.or = [{ subject: q }, { from: q }, { text: q }];
-        if (before != null) criteria.uid = `1:${Math.max(1, before - 1)}`;
+        if (before != null) criteria.uid = `1:${before - 1}`;
         const found = await client.search(criteria, { uid: true });
         const uids = (found || []).slice(-limit);
         if (!uids.length) return [];
@@ -178,7 +243,7 @@ export async function listInbox(arg: number | ListInboxOptions = 30): Promise<In
           items.push(toInboxItem(msg));
         }
       }
-      items.sort((a, b) => +new Date(b.date) - +new Date(a.date));
+      items.sort((a, b) => tempoDaMensagem(b) - tempoDaMensagem(a));
       return items;
     } finally {
       lock.release();
@@ -203,9 +268,11 @@ export async function getInboxMessage(uid: number): Promise<InboxMessage | null>
       let text = "";
       const dl = await client.download(String(uid), undefined, { uid: true });
       if (dl) {
-        const { simpleParser } = await import("mailparser");
-        const parsed = await simpleParser(dl.content);
-        text = parsed.text || (parsed.html ? stripHtml(parsed.html) : "");
+        // O corpo é input NÃO CONFIÁVEL: qualquer pessoa consegue escrever para
+        // esta caixa. Descarregamos com tecto de bytes e extraímos o texto de
+        // forma que nunca rebenta a leitura da mensagem.
+        const raw = await readCapped(dl.content, MAX_RAW_BYTES);
+        text = clampBody(await extractBody(raw));
       }
       // Reading the message marks it \Seen on the server (download is not a peek).
       return { ...base, seen: true, text };
@@ -254,10 +321,137 @@ export async function setFlags(
   }
 }
 
+// ── Corpo da mensagem: extração defensiva ───────────────────────────────────
+// Tudo aqui trata o email recebido como hostil. As três constantes limitam,
+// por ordem, o que descarregamos, o que analisamos e o que devolvemos.
+
+/**
+ * Tecto de bytes descarregados de UMA mensagem. Sem isto, um email de dezenas
+ * de MB era inteiramente carregado em memória por pedido. O corpo de texto vive
+ * sempre nas primeiras partes MIME (os clientes põem os anexos a seguir), e os
+ * anexos aqui nem sequer são usados — a lista deles vem do BODYSTRUCTURE —, por
+ * isso cortar a cauda não tira nada ao que é mostrado.
+ */
+const MAX_RAW_BYTES = 12 * 1024 * 1024;
+
+/** Tecto de HTML que aceitamos analisar/varrer (o que o mailparser já usava). */
+const MAX_HTML_PARSE = 2_000_000;
+
+/**
+ * Tecto de caracteres do corpo devolvido ao back office. Uma mensagem é lida
+ * por uma pessoa: 200 000 caracteres estão muito acima de qualquer email real e
+ * impedem que um corpo hostil de vários MB atravesse o JSON até ao browser (que
+ * o renderiza num único parágrafo e bloqueava o separador).
+ */
+const MAX_BODY_CHARS = 200_000;
+
+/**
+ * Lê um stream até ao tecto de bytes e descarta o resto, fechando a torneira em
+ * vez de deixar a ligação IMAP escorrer a mensagem toda.
+ */
+async function readCapped(
+  source: NodeJS.ReadableStream | Buffer,
+  maxBytes: number,
+): Promise<Buffer> {
+  // O imapflow devolve um stream; aceitamos também um Buffer já materializado.
+  if (Buffer.isBuffer(source)) return source.subarray(0, maxBytes);
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of source) {
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+    if (total + buf.length >= maxBytes) {
+      chunks.push(buf.subarray(0, maxBytes - total));
+      total = maxBytes;
+      break;
+    }
+    chunks.push(buf);
+    total += buf.length;
+  }
+  (source as { destroy?: () => void }).destroy?.();
+  return Buffer.concat(chunks, total);
+}
+
+/** Corta o corpo no tecto, deixando marca visível de que foi cortado. */
+export function clampBody(body: string): string {
+  if (body.length <= MAX_BODY_CHARS) return body;
+  return `${body.slice(0, MAX_BODY_CHARS)}\n\n[…] Mensagem demasiado longa — mostrada apenas a primeira parte.`;
+}
+
+/**
+ * Extrai o texto legível de uma mensagem crua. NUNCA lança: o back office tem
+ * de conseguir abrir qualquer email, por pior que ele seja.
+ */
+async function extractBody(raw: Buffer): Promise<string> {
+  const { simpleParser } = await import("mailparser");
+  const base = { skipImageLinks: true, maxHtmlLengthToParse: MAX_HTML_PARSE };
+  const pick = (p: { text?: string; html?: string | false }) =>
+    p.text || (p.html ? stripHtml(p.html) : "");
+
+  try {
+    // Caminho normal: deixamos o mailparser converter HTML→texto, que dá muito
+    // melhor formatação (parágrafos, URLs das ligações) do que o nosso varrimento.
+    return pick(await simpleParser(raw, { ...base, skipHtmlToText: false }));
+  } catch {
+    // O mailparser emite 'error' — e o simpleParser rejeita a leitura INTEIRA —
+    // quando o HTML passa o tecto de análise ou não é analisável. Isso deixava a
+    // mensagem permanentemente ilegível (502 no back office): qualquer remetente
+    // o provocava de propósito, e newsletters legítimas passam o tecto à vontade.
+    // Segunda tentativa sem a conversão HTML→texto (é esse o ramo que rebenta),
+    // extraindo o texto por nós.
+    try {
+      return pick(await simpleParser(raw, { ...base, skipHtmlToText: true }));
+    } catch {
+      return "(não foi possível ler o conteúdo desta mensagem)";
+    }
+  }
+}
+
+/**
+ * Reduz HTML a texto simples. Não é um sanitizador — é uma extração: o
+ * resultado é sempre entregue como TEXTO (o React escapa-o ao renderizar), e
+ * nenhum HTML de um email chega a ser interpretado pelo browser. Os conteúdos
+ * de <script>/<style> são deitados fora inteiros para não aparecerem como
+ * "corpo" da mensagem.
+ */
+/** Bloco `<script>`/`<style>` inteiro, com o fecho tolerante. */
+const BLOCO_EXECUTAVEL = /<(script|style)\b[^>]*>[\s\S]*?<\/\1[^>]*>/gi;
+/** Qualquer etiqueta, incluindo uma que fique por fechar no fim da string. */
+const ETIQUETA = /<[^>]*>|<[^>]*$/g;
+
+/**
+ * HTML → TEXTO SIMPLES. Não é um sanitizador de HTML, e a distinção importa.
+ *
+ * O que sai daqui vai para o campo `text` de uma `InboxMessage` e é desenhado
+ * pelo React como nó de texto, que escapa tudo. **A barreira de segurança é
+ * essa**; esta função existe para o corpo do email ser LEGÍVEL — sem folhas de
+ * estilo nem código a encher o ecrã. Se algum dia o resultado for parar a
+ * `dangerouslySetInnerHTML`, isto não chega, nem de perto: aí é preciso um
+ * sanitizador a sério.
+ *
+ * Mesmo assim vale a pena ser robusto, e o CodeQL apontou duas fraquezas reais
+ * na primeira versão:
+ *
+ *  · `<\/script>` não casa com `</script >` nem com `</script\ncorpo>` — o HTML
+ *    permite espaços e atributos na etiqueta de fecho, e um remetente que os
+ *    use fazia o corpo do `<script>` sobreviver ao filtro e aparecer como texto.
+ *  · uma passagem única não basta: `<scr<script>ipt>` volta a formar
+ *    `<script>` depois de a etiqueta do meio ser removida.
+ *
+ * Daí o ciclo até estabilizar. O tecto de voltas evita que uma entrada
+ * construída de propósito nos ponha a iterar sem fim — e chegar ao tecto é
+ * irrelevante para a segurança, porque o React escapa o que sobrar.
+ */
+/** Só para testes: o `stripHtml` é interno, mas as fraquezas que o CodeQL
+ *  apontou têm de ficar fixadas por teste, e testá-las através de um servidor
+ *  IMAP falso seria testar o mailparser, não isto. */
+export const __stripHtmlParaTestes = (html: string) => stripHtml(html);
+
 function stripHtml(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  let texto = html.slice(0, MAX_HTML_PARSE);
+  for (let volta = 0; volta < 8; volta++) {
+    const antes = texto;
+    texto = texto.replace(BLOCO_EXECUTAVEL, " ").replace(ETIQUETA, " ");
+    if (texto === antes) break;
+  }
+  return texto.replace(/\s+/g, " ").trim();
 }

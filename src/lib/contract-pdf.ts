@@ -70,12 +70,34 @@ export function wrap(font: PDFFont, rawText: string, size: number, maxWidth: num
   return out;
 }
 
-/** ISO → "18 de julho de 2026, 14:32" (data + hora; o aceite é pontual). */
+/**
+ * O fuso em que este documento é lido, e por isso o único em que pode ser
+ * escrito. Mesmo valor e mesma razão do `FUSO` da rota dos lembretes e do módulo
+ * das conversões offline.
+ */
+const FUSO = "Europe/Lisbon";
+
+/**
+ * ISO → "18 de julho de 2026 às 14:32" (data + hora; o aceite é pontual).
+ *
+ * ── PORQUE É QUE O FUSO ESTÁ ESCRITO À MÃO ──────────────────────────────────
+ *
+ * Sem ele, o `toLocaleString` usa o fuso da MÁQUINA que gerou o PDF — que no
+ * alojamento é UTC. Portugal é UTC+1 no Verão, por isso um aceite registado às
+ * 23:32 de 2 de julho saía impresso como «02 de julho de 2026 às 23:32» quando
+ * o cliente carregou no botão já a 3 de julho, 00:32. Num contrato, o momento
+ * do aceite é a data em que ele passa a vincular: errar o DIA não é um pormenor
+ * de apresentação, é o documento a dizer outra coisa do que aconteceu.
+ *
+ * E há o outro lado, mais insidioso: sem fuso fixo, o mesmo contrato descarregado
+ * do portal e regerado noutra máquina traz datas diferentes.
+ */
 function fmtDateTime(iso?: string): string {
   if (!iso) return "—";
   const dt = new Date(iso);
   if (Number.isNaN(dt.getTime())) return iso;
   return dt.toLocaleString("pt-PT", {
+    timeZone: FUSO,
     day: "2-digit",
     month: "long",
     year: "numeric",
@@ -160,16 +182,13 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
       thickness: 0.7,
       color: LINE,
     });
-    p.drawText(
-      `${SITE.name}   ·   ${SITE.email}   ·   ${SITE.phoneDisplay}   ·   ${SITE.region}, Portugal`,
-      {
-        x: MARGIN,
-        y: MARGIN - 16,
-        font,
-        size: 7.5,
-        color: MUTED,
-      },
-    );
+    p.drawText(`${SITE.name}   ·   ${SITE.email}   ·   ${SITE.phoneDisplay}   ·   Portugal`, {
+      x: MARGIN,
+      y: MARGIN - 16,
+      font,
+      size: 7.5,
+      color: MUTED,
+    });
   };
 
   // Abre uma nova página de continuação (logótipo discreto + referência),
@@ -206,7 +225,7 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
   // ── Título ──
   const titleLines = wrap(
     bold,
-    "Contrato de Prestação de Serviços — Decoração de Eventos",
+    "Contrato de Prestação de Serviços de Decoração de Eventos",
     15,
     maxW,
   );
@@ -223,7 +242,7 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
   y -= 13;
   text(`${SITE.email}  ·  ${SITE.phoneDisplay}`, MARGIN, y, { size: 9, color: MUTED });
   y -= 12;
-  text(`${SITE.city}, ${SITE.region} — Portugal  ·  ${SITE.url}`, MARGIN, y, {
+  text(`${SITE.city}, ${SITE.region}, Portugal  ·  ${SITE.url}`, MARGIN, y, {
     size: 9,
     color: MUTED,
   });
@@ -310,7 +329,34 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
       y,
       { size: 8.5, color: MUTED },
     );
-    y -= 16;
+    y -= 14;
+    /**
+     * ── O SELO DO DOCUMENTO ACEITE ─────────────────────────────────────────
+     *
+     * Impresso, e não só guardado na base de dados: um selo que ninguém vê é um
+     * selo que ninguém invoca. Assim ele viaja com o contrato, chega ao casal e
+     * ao contabilista, e numa discussão de dentro de dois anos ela pode apontar
+     * para a linha em vez de ir buscar registos.
+     *
+     * Doze caracteres chegam: são 48 bits, e a probabilidade de dois PDFs
+     * diferentes coincidirem neles é indistinguível de zero para esta escala. O
+     * valor inteiro fica guardado, para quem quiser conferir a sério.
+     *
+     * Ausente nos contratos anteriores a esta mudança — e nesses não se imprime
+     * linha nenhuma, em vez de se imprimir um "—" que daria a entender que o
+     * documento não tinha selo por alguma razão.
+     */
+    if (contract.propostaPdfSha256) {
+      text(
+        `Documento aceite: ${contract.propostaPdfSha256.slice(0, 12)}` +
+          (contract.propostaPdfBytes ? `  ·  ${contract.propostaPdfBytes} bytes` : ""),
+        MARGIN,
+        y,
+        { size: 8.5, color: MUTED },
+      );
+      y -= 14;
+    }
+    y -= 2;
     text(
       "Aceitação registada por via eletrónica, com valor probatório equivalente a assinatura.",
       MARGIN,

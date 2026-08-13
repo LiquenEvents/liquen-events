@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { saveSubscription, removeSubscription, pushConfigured } from "@/lib/push";
+import { isPersistenceUnavailable } from "@/lib/repository";
 import { pushSubscriptionSchema } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
@@ -26,6 +27,27 @@ export async function POST(request: NextRequest) {
     await saveSubscription(parsed.data);
     return NextResponse.json({ ok: true });
   } catch (err) {
+    /**
+     * A INSTALAÇÃO NÃO TEM ONDE GUARDAR — e isso não é uma avaria.
+     *
+     * Sem base de dados em produção, `saveSubscription` recusa de propósito:
+     * guardar no disco da função fazia as notificações ficarem ACTIVAS no
+     * telemóvel e não chegar nenhuma, sem sintoma nenhum (ver `lib/push.ts`).
+     *
+     * Um 500 «Erro» aqui punha alguém a tentar outra vez, a mudar de browser e
+     * a escrever a alguém — tudo menos a definir a variável que falta. 503 com
+     * a frase certa é a diferença entre um problema resolúvel e um mistério.
+     */
+    if (isPersistenceUnavailable(err)) {
+      log.warn("push subscribe recusado: sem base de dados em produção");
+      return NextResponse.json(
+        {
+          error:
+            "Não dá para ligar as notificações nesta instalação: não há base de dados onde guardar a subscrição, e o que ficasse guardado desaparecia no próximo deploy — as notificações pareceriam ligadas e não chegaria nenhuma. Define SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no alojamento e volta a tentar.",
+        },
+        { status: 503 },
+      );
+    }
     log.error("push subscribe falhou", err);
     return NextResponse.json({ error: "Erro" }, { status: 500 });
   }

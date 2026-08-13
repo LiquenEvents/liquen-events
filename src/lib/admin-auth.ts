@@ -1,8 +1,12 @@
 import "server-only";
-import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 import type { NextRequest } from "next/server";
-import { verifyTotp } from "./totp";
+import { verifyTotpOnce } from "./totp";
 import { log } from "./logger";
+// Só o TIPO: a implementação entra por `import()` tardio (ver
+// `lerSenhasRedefinidas`), para o Supabase não vir atrás deste módulo nos
+// caminhos que só querem o `isAuthed`.
+import type { SenhaRedefinida } from "./admin-recuperacao";
 
 /**
  * Admin authentication for the internal dashboard.
@@ -19,8 +23,44 @@ import { log } from "./logger";
  * Env:
  *  - SESSION_SECRET     HMAC key for sessions (required in production).
  *  - ADMIN_USERS        JSON array of individual accounts:
- *                       [{"name":"Catarina","passwordHash":"$2b$10$..."}]
+ *                       [{"email":"catarina@…","name":"Catarina","passwordHash":"$2b$12$…"}]
  *  - ADMIN_PASSWORD_HASH bcrypt hash for the shared-password fallback.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * O IDENTIFICADOR DE ENTRADA É O EMAIL — E O NOME CONTINUA A SERVIR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Entrava-se com o nome próprio. Um nome próprio é curto, está no site, colide
+ * mal a equipa cresça (duas Anas) e nenhum gestor de palavras-passe o sabe
+ * guardar — o que empurra as pessoas para palavras-passe repetidas. O email
+ * resolve as quatro coisas de uma vez.
+ *
+ * O que NÃO mudou, de propósito:
+ *
+ *  • o `name` continua a existir e continua a ser o que se ESCREVE no ecrã
+ *    («Bem-vinda, Catarina») e o que fica no `sub` da sessão. Trocar o `sub`
+ *    por um email punha um endereço a saudar quem entra e mudava o dono das
+ *    tarefas já atribuídas;
+ *  • por isso mesmo, uma sessão emitida ANTES desta mudança continua válida:
+ *    o corpo assinado não mudou de forma, a chave não mudou, e o
+ *    `SESSION_VERSION` não foi tocado. Ninguém a meio de uma proposta é posto
+ *    fora por causa desta alteração;
+ *  • as passkeys guardam o `name` da conta e continuam a ser resolvidas por ele
+ *    (ver `contaExiste`), portanto os aparelhos já registados continuam a abrir
+ *    a porta.
+ *
+ * ── Fase de transição: o NOME ainda é aceite à entrada ──────────────────────
+ * Enquanto o `ADMIN_USERS` de produção não tiver `email` em todas as contas,
+ * recusar o nome fechava a porta a toda a gente no primeiro deploy. Por isso o
+ * nome continua a ser aceite como identificador, e cada uso desse caminho fica
+ * registado (`auth: entrada pelo NOME`) para se poder ver quando deixa de
+ * acontecer.
+ *
+ * CAMINHO ANTIGO — marcado em 2026-08-12. A remover quando (e só quando) todas
+ * as contas tiverem `email` e os registos deixarem de mostrar entradas por
+ * nome. Não tem data automática de fim de propósito: uma constante que expira
+ * sozinha põe o back office fechado num sábado de manhã sem ninguém ter mexido
+ * em nada.
  */
 // In production the session cookie uses the __Host- prefix: the browser then
 // guarantees it was set with Secure, Path=/ and no Domain — preventing cookie
@@ -30,7 +70,34 @@ export const ADMIN_COOKIE =
   process.env.NODE_ENV === "production" ? "__Host-liquen_admin" : "liquen_admin";
 export const ADMIN_NAME_COOKIE = "liquen_user";
 
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+/**
+ * ── QUANTO DURA UMA SESSÃO, E PORQUE SÃO DOIS NÚMEROS ──────────────────────
+ *
+ * Durava sempre 30 dias, sem ninguém escolher nada e sem isso estar escrito em
+ * lado nenhum. São duas coisas diferentes e ambas erradas: quem entra no
+ * portátil do escritório QUER os 30 dias, e quem entra no computador de um
+ * fornecedor a meio de um evento não quer nenhum — e não tinha como o dizer.
+ *
+ * Por isso passam a ser duas durações, escolhidas à entrada com uma caixa que
+ * diz o número em português:
+ *
+ *  · LONGA, 30 dias — o que já acontecia. Continua a ser a opção por omissão,
+ *    porque mudar o valor por omissão punha toda a gente fora ao fim de meio
+ *    dia sem ter pedido nada. O cookie é persistente: fechar o browser não
+ *    fecha a sessão.
+ *  · CURTA, 12 horas — e o cookie é de SESSÃO DO BROWSER (sem `maxAge`),
+ *    portanto fechar o browser fecha-a antes disso. Doze horas é o tecto, não a
+ *    promessa: cobre um dia de trabalho inteiro, incluindo um casamento que
+ *    acabe às três da manhã, e não cobre a manhã seguinte noutra pessoa.
+ *
+ * O número vai DENTRO do token assinado (`exp`) e não só no cookie: um cookie
+ * sem prazo é coisa que o browser guarda e que se pode voltar a mandar à mão, e
+ * a sessão curta deixava de ser curta.
+ */
+export const SESSAO_LONGA_MS = 1000 * 60 * 60 * 24 * 30; // 30 dias
+export const SESSAO_CURTA_MS = 1000 * 60 * 60 * 12; // 12 horas
+
+const SESSION_TTL_MS = SESSAO_LONGA_MS;
 
 // Global session revocation. Tokens embed the version they were minted with;
 // bumping SESSION_VERSION (any new string) invalidates EVERY outstanding
@@ -52,7 +119,7 @@ let randomFallbackSecret: string | null = null;
 
 function sessionSecret(): string {
   const s = process.env.SESSION_SECRET ?? process.env.ADMIN_SESSION_SECRET;
-  if (s && s.length >= 16) return s;
+  if (s && s.length >= 32) return s;
   if (process.env.NODE_ENV === "production") {
     const hash = process.env.ADMIN_PASSWORD_HASH;
     if (hash) {
@@ -80,9 +147,50 @@ function sessionSecret(): string {
 
 // --- Accounts -------------------------------------------------------------
 interface AdminUser {
+  /** Nome visível — saudação, dono de tarefas, `sub` da sessão. */
   name: string;
+  /** Identificador de entrada. Opcional só durante a transição (ver topo). */
+  email?: string;
   passwordHash: string;
   totpSecret?: string;
+}
+
+/** O que a entrada devolve: quem entrou, e por que endereço (quando o tem). */
+export interface ContaAutenticada {
+  name: string;
+  email?: string;
+}
+
+/**
+ * O identificador tal como se COMPARA: sem espaços à volta e em minúsculas.
+ *
+ * O tecto de 160 caracteres é o do endereço mais longo que a norma admite
+ * (254) cortado por baixo do que a caixa de correio real usa — serve para não
+ * andar a passear cadeias de megabytes vindas do corpo do pedido por dentro do
+ * hash e do limitador.
+ */
+export function normalizarIdentificador(v: string): string {
+  return v.trim().toLowerCase().slice(0, 160);
+}
+
+/**
+ * Comparação de identificadores em TEMPO CONSTANTE.
+ *
+ * O `bcrypt` já garante isso para a palavra-passe; para o identificador não
+ * garantia nada — um `===` de cadeias sai no primeiro carácter diferente, e o
+ * tempo passa a dizer quantos caracteres do princípio estavam certos. Sozinho é
+ * um sinal minúsculo e ruidoso; junto com uma rota que responde depressa a um
+ * endereço inexistente, é o que transforma «adivinhar um email» em «confirmar
+ * um email letra a letra».
+ *
+ * Compara-se o RESUMO e não a cadeia: assim os dois lados têm sempre 32 bytes e
+ * o `timingSafeEqual` nunca vê comprimentos diferentes (que ele próprio recusa,
+ * e a recusa seria o oráculo de volta pela porta do lado).
+ */
+export function identificadorIgual(a: string, b: string): boolean {
+  const ha = createHash("sha256").update(a, "utf8").digest();
+  const hb = createHash("sha256").update(b, "utf8").digest();
+  return timingSafeEqual(ha, hb);
 }
 
 function configuredUsers(): AdminUser[] | null {
@@ -93,7 +201,15 @@ function configuredUsers(): AdminUser[] | null {
     if (
       Array.isArray(parsed) &&
       parsed.length > 0 &&
-      parsed.every((u) => typeof u?.name === "string" && typeof u?.passwordHash === "string")
+      parsed.every(
+        (u) =>
+          typeof u?.name === "string" &&
+          typeof u?.passwordHash === "string" &&
+          // `email` é opcional durante a transição, mas se vier tem de ser
+          // texto: um `email: 123` calado transformava-se em «esta conta não
+          // tem endereço» e a recuperação dela desaparecia sem aviso.
+          (u.email === undefined || typeof u.email === "string"),
+      )
     ) {
       return parsed;
     }
@@ -121,11 +237,102 @@ function sharedHash(): string | null {
   return DEV_SHARED_HASH;
 }
 
+/**
+ * A conta ainda existe?
+ *
+ * Com `ADMIN_USERS` configurado, só as contas listadas contam. É isto que faz
+ * com que tirar alguém de lá revogue TAMBÉM as passkeys dessa pessoa: uma
+ * chave presa a um aparelho não passa por `verifyCredentials`, portanto sem
+ * esta verificação um aparelho registado continuava a abrir a porta muito
+ * depois de a conta ter deixado de existir.
+ *
+ * Sem `ADMIN_USERS` (palavra-passe partilhada) não há lista de contas para
+ * consultar, e qualquer nome é aceite — como já acontece na entrada normal.
+ * Nesse modo, a alavanca para pôr alguém fora é o `SESSION_VERSION` mais a
+ * remoção do dispositivo na lista.
+ */
+export function contaExiste(name: string): boolean {
+  const users = configuredUsers();
+  if (!users) return true;
+  return encontrarConta(users, name) !== null;
+}
+
+/**
+ * A conta que corresponde a um identificador — email primeiro, nome depois.
+ *
+ * ── Porque é que a lista é percorrida ATÉ AO FIM ──────────────────────────
+ * Sair no primeiro acerto fazia o tempo depender da POSIÇÃO da conta na lista:
+ * a primeira respondia mais depressa do que a última, e isso, repetido, ordena
+ * as contas de quem tenta. São microssegundos, mas custa nada não os dar.
+ *
+ * O email tem precedência sobre o nome para que uma conta cujo NOME seja igual
+ * ao EMAIL de outra (improvável, não impossível) nunca abra a porta errada.
+ */
+interface ContaEncontrada {
+  user: AdminUser;
+  /** `false` quando bateu pelo nome — o caminho antigo (ver topo do ficheiro). */
+  porEmail: boolean;
+}
+
+function encontrarConta(users: AdminUser[], identificador: string): ContaEncontrada | null {
+  const alvo = normalizarIdentificador(identificador);
+  if (!alvo) return null;
+
+  let porEmail: AdminUser | null = null;
+  let porNome: AdminUser | null = null;
+  for (const u of users) {
+    if (u.email && identificadorIgual(normalizarIdentificador(u.email), alvo) && !porEmail) {
+      porEmail = u;
+    }
+    if (identificadorIgual(normalizarIdentificador(u.name), alvo) && !porNome) {
+      porNome = u;
+    }
+  }
+  if (porEmail) return { user: porEmail, porEmail: true };
+  if (porNome) return { user: porNome, porEmail: false };
+  return null;
+}
+
+/** A conta com este email, para a recuperação. Null quando não existe. */
+function contaPorEmail(email: string): AdminUser | null {
+  const users = configuredUsers();
+  if (!users) return null;
+  const achada = encontrarConta(users, email);
+  return achada?.porEmail ? achada.user : null;
+}
+
+/**
+ * O nome a MOSTRAR a partir do que a pessoa escreveu à entrada.
+ *
+ * Só serve o modo de palavra-passe partilhada, onde não há lista de contas e
+ * portanto não há nome nenhum guardado. Sem isto, quem entrasse com
+ * `catarina@…` era saudada com o endereço inteiro e as tarefas ficavam
+ * atribuídas a «catarina@…» — o email é bom identificador e mau nome próprio.
+ */
+export function nomeVisivel(identificador: string): string {
+  const limpo = identificador.trim();
+  if (!limpo) return "Equipa";
+  const arroba = limpo.indexOf("@");
+  if (arroba <= 0) return limpo.slice(0, 40);
+  const local = limpo
+    .slice(0, arroba)
+    .replace(/[._+-]+/g, " ")
+    .trim();
+  if (!local) return "Equipa";
+  return local
+    .split(/\s+/)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ")
+    .slice(0, 40);
+}
+
 // ── Two-factor (TOTP) ──────────────────────────────────────────────────────
 function totpSecretFor(name: string): string | null {
   const users = configuredUsers();
   if (users) {
-    const u = users.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+    // Aceita email OU nome: quem chama aqui tanto traz o `name` da sessão
+    // (rota de entrada, passkeys) como o endereço escrito à entrada.
+    const u = encontrarConta(users, name)?.user;
     if (u?.totpSecret) return u.totpSecret;
   }
   return process.env.ADMIN_TOTP_SECRET || null;
@@ -136,11 +343,16 @@ export function totpRequired(name: string): boolean {
   return totpSecretFor(name) !== null;
 }
 
-/** Verify a 2FA code for the user. Returns true when no 2FA is configured. */
+/**
+ * Verify a 2FA code for the user. Returns true when no 2FA is configured.
+ *
+ * Usa `verifyTotpOnce` e não `verifyTotp`: o código é GASTO ao ser aceite, para
+ * que não sirva uma segunda vez dentro dos ~60 s da janela (RFC 6238 §5.2).
+ */
 export function checkTotp(name: string, code: string): boolean {
   const secret = totpSecretFor(name);
   if (!secret) return true;
-  return verifyTotp(secret, code);
+  return verifyTotpOnce(secret, code);
 }
 
 /**
@@ -155,28 +367,256 @@ export function checkTotp(name: string, code: string): boolean {
 // from here. Keeping bcryptjs out of the top-level import means those paths no
 // longer pay to load it; the login route (the sole caller) absorbs one await.
 export async function verifyCredentials(
-  name: string,
+  identificador: string,
   password: string,
-): Promise<{ name: string } | null> {
+): Promise<ContaAutenticada | null> {
   if (!password) return null;
-  const cleanName = name.trim().slice(0, 40);
   const { compareSync } = (await import("bcryptjs")).default;
 
   const users = configuredUsers();
   if (users) {
-    const u = users.find((x) => x.name.toLowerCase() === cleanName.toLowerCase());
-    if (u && compareSync(password, u.passwordHash)) return { name: u.name };
-    // Unknown name: still run one bcrypt compare so the response time doesn't
-    // reveal whether the admin display-name exists (username enumeration).
-    if (!u) compareSync(password, DEV_SHARED_HASH);
+    // As palavras-passe redefinidas pela recuperação. Lidas SEMPRE, antes de
+    // se saber se a conta existe: uma leitura que só acontecesse para contas
+    // reais dizia, pelo tempo, quais os endereços que existem.
+    const senhas = await lerSenhasRedefinidas();
+    const achada = encontrarConta(users, identificador);
+    const u = achada?.user;
+    if (u && compareSync(password, hashEfectivo(u, senhas))) {
+      if (!achada!.porEmail && u.email) {
+        // CAMINHO ANTIGO (marcado em 2026-08-12): entrou com o nome tendo a
+        // conta email. Fica no registo para se poder ver quando é que este
+        // caminho deixa de ser usado e pode ser removido.
+        log.warn("auth: entrada pelo NOME — caminho antigo, usar o email", { conta: u.name });
+      }
+      return u.email ? { name: u.name, email: u.email } : { name: u.name };
+    }
+    // Nome desconhecido: corre-se na mesma UM compare de bcrypt para que o tempo
+    // de resposta não diga se a conta existe (enumeração de utilizadores).
+    //
+    // O compare-fantasma tem de usar um hash com o MESMO factor de custo dos
+    // hashes reais, senão não iguala coisa nenhuma — é ele próprio o oráculo.
+    // Antes usava-se o DEV_SHARED_HASH, que está fixo em custo 10: com contas
+    // configuradas a custo 12 (o recomendado) uma conta existente demorava
+    // ~349 ms e uma inexistente ~86 ms, um rácio de 4x, medível à distância de
+    // um pedido. Comparar contra o hash de uma conta REAL faz o trabalho passar
+    // pelo mesmo custo, seja o nome válido ou não.
+    //
+    // Resta uma diferença se as contas do ADMIN_USERS forem geradas com custos
+    // DIFERENTES entre si — aí o tempo separa a primeira conta das outras. Gere
+    // todos os hashes com o mesmo factor (12) e não sobra sinal nenhum.
+    if (!u) {
+      try {
+        compareSync(password, hashEfectivo(users[0], senhas));
+      } catch {
+        // Hash configurado malformado: o compare atira, mas o caminho tem de
+        // terminar em recusa na mesma — nunca em excepção para quem chama.
+      }
+    }
     return null;
   }
 
   const hash = sharedHash();
   if (hash && compareSync(password, hash)) {
-    return { name: cleanName || "Equipa" };
+    return { name: nomeVisivel(identificador) };
   }
   return null;
+}
+
+// --- Recuperação de palavra-passe -----------------------------------------
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PALAVRA-PASSE VIVE NO AMBIENTE — E O AMBIENTE NÃO SE ESCREVE EM MARCHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As contas estão no `ADMIN_USERS`, que é uma variável de ambiente. Uma função
+ * em Vercel NÃO pode reescrever as suas próprias variáveis: uma recuperação que
+ * só mudasse o ambiente era um ecrã bonito que não mudava nada.
+ *
+ * Por isso a palavra-passe redefinida fica GUARDADA (bcrypt, no `app_state`) e
+ * o `verifyCredentials` prefere-a à do ambiente — mas só enquanto o hash do
+ * ambiente for exactamente o que estava lá quando ela foi definida
+ * (`substituiu`). Assim:
+ *
+ *  • a recuperação funciona sem ninguém ir ao painel da Vercel;
+ *  • e mudar o `ADMIN_USERS` continua a MANDAR: no instante em que a dona roda
+ *    um hash, a redefinição correspondente deixa de valer. É a diferença entre
+ *    uma funcionalidade e uma porta das traseiras permanente.
+ */
+async function lerSenhasRedefinidas(): Promise<Record<string, SenhaRedefinida>> {
+  try {
+    // Import tardio pela MESMA razão do bcryptjs: este módulo é carregado em
+    // caminhos quentes e sem sessão, e o `admin-recuperacao` traz o Supabase
+    // consigo. Só a entrada paga por isto.
+    const { lerRegisto } = await import("./admin-recuperacao");
+    return (await lerRegisto()).senhas;
+  } catch (err) {
+    // Uma leitura falhada não pode ser uma porta aberta nem uma porta fechada
+    // ao engano: sem redefinições conhecidas, vale o que está no ambiente.
+    log.error("auth: não foi possível ler as palavras-passe redefinidas", err);
+    return {};
+  }
+}
+
+function hashEfectivo(u: AdminUser, senhas: Record<string, SenhaRedefinida>): string {
+  const email = u.email ? normalizarIdentificador(u.email) : "";
+  const guardada = email ? senhas[email] : undefined;
+  if (!guardada?.hash) return u.passwordHash;
+  if (guardada.substituiu !== u.passwordHash) return u.passwordHash;
+  return guardada.hash;
+}
+
+/**
+ * Comprimento mínimo da palavra-passe nova: 12 caracteres.
+ *
+ * Sem regras de composição (maiúsculas, dígitos, símbolos), que é o que as
+ * normas modernas recomendam — as regras produzem `Liquen2026!` em toda a
+ * gente, que é curto e adivinhável na mesma. O comprimento é o que conta.
+ */
+export const MINIMO_PALAVRA_PASSE = 12;
+const MAXIMO_PALAVRA_PASSE = 200;
+
+export type ResultadoDoPedido =
+  | { estado: "emitido"; token: string; conta: { name: string; email: string } }
+  /** O endereço não é de ninguém. Quem chama responde EXACTAMENTE o mesmo que a "emitido". */
+  | { estado: "sem-conta" }
+  /** Não há contas com email nesta instalação — a recuperação não está montada. */
+  | { estado: "sem-recuperacao" }
+  /** Havia o que gravar e não houve onde. Não se pode prometer um email. */
+  | { estado: "sem-persistencia" };
+
+/**
+ * Emite (ou substitui) a ligação de recuperação de uma conta.
+ *
+ * ── O que aqui é deliberado ───────────────────────────────────────────────
+ *  • O pedido NOVO substitui o anterior no mesmo lugar: pedir outra ligação
+ *    invalida a que tinha sido enviada antes. Duas ligações vivas para a mesma
+ *    conta seriam duas janelas abertas em vez de uma.
+ *  • A ESCRITA ACONTECE SEMPRE, mesmo quando o endereço não é de ninguém. Não é
+ *    desperdício: é o que faz uma instalação sem gravação responder o mesmo aos
+ *    dois casos. Se só se gravasse para contas reais, o 503 de «não consegui
+ *    gravar» aparecia só nos endereços verdadeiros — e passava a ser, ele
+ *    próprio, a resposta que diz quais os endereços que existem.
+ */
+export async function pedirRecuperacao(email: string): Promise<ResultadoDoPedido> {
+  const users = configuredUsers();
+  // Sem contas individuais não há a quem recuperar o quê: o modo de
+  // palavra-passe partilhada não tem endereços. Dizer isto não revela nada
+  // sobre ninguém — é uma característica da instalação, não de uma pessoa.
+  if (!users || !users.some((u) => u.email)) return { estado: "sem-recuperacao" };
+
+  const { lerRegisto, gravarRegisto, limparExpirados, novoToken, resumoDoToken, VALIDADE_MS } =
+    await import("./admin-recuperacao");
+
+  const registo = await lerRegisto();
+  const agora = Date.now();
+  limparExpirados(registo, agora);
+
+  const conta = contaPorEmail(email);
+  /**
+   * A CHAVE VEM DA CONTA CONFIGURADA, e nunca do que foi escrito no formulário.
+   *
+   * As duas dão a mesma cadeia — `contaPorEmail` só devolve uma conta quando o
+   * que foi escrito corresponde ao endereço dela, e a comparação já passa pela
+   * mesma normalização. Mas «dão a mesma cadeia» é uma conclusão que só se tira
+   * lendo três funções, e a diferença conta no dia em que uma delas mudar: o
+   * nome de uma propriedade onde se ESCREVE não deve depender de texto vindo de
+   * fora, ponto final.
+   *
+   * Foi isto que a análise de segurança marcou como grave, e continuou a marcar
+   * depois de as tabelas passarem a não ter herança nenhuma
+   * (`admin-recuperacao.ts`) — e bem: aquilo fechou a CONSEQUÊNCIA (contaminar
+   * o que todos os objectos herdam), não a origem. Agora o valor que dá o nome
+   * à propriedade nasce da configuração da casa.
+   */
+  const token = conta ? novoToken() : null;
+  if (conta?.email && token) {
+    registo.pedidos[normalizarIdentificador(conta.email)] = {
+      resumo: resumoDoToken(token),
+      expiraEm: agora + VALIDADE_MS,
+      pedidoEm: agora,
+    };
+  }
+
+  const escrita = await gravarRegisto(registo);
+  if (!escrita.gravado || !escrita.duradouro) {
+    log.error("recuperação: não foi possível guardar o pedido", undefined, {
+      onde: escrita.onde,
+      motivo: escrita.motivo,
+    });
+    return { estado: "sem-persistencia" };
+  }
+
+  if (!conta || !token) return { estado: "sem-conta" };
+  return { estado: "emitido", token, conta: { name: conta.name, email: conta.email! } };
+}
+
+export type ResultadoDaDefinicao =
+  | { estado: "definida"; conta: { name: string; email: string } }
+  /** Ligação inválida, já usada, expirada, ou de uma conta que já não existe. */
+  | { estado: "ligacao-invalida" }
+  | { estado: "fraca" }
+  | { estado: "sem-persistencia" };
+
+/**
+ * Gasta a ligação e grava a palavra-passe nova.
+ *
+ * O token é de USO ÚNICO: o pedido é apagado no mesmo movimento em que a senha
+ * é escrita, portanto a segunda tentativa com a mesma ligação já não encontra
+ * nada. E só se responde «definida» depois de a gravação ter ficado num sítio
+ * que DURA — dizer que sim e a pessoa não conseguir entrar a seguir era a pior
+ * das respostas possíveis.
+ */
+export async function definirPalavraPasseComToken(
+  token: string,
+  nova: string,
+): Promise<ResultadoDaDefinicao> {
+  if (nova.length < MINIMO_PALAVRA_PASSE || nova.length > MAXIMO_PALAVRA_PASSE) {
+    return { estado: "fraca" };
+  }
+  const users = configuredUsers();
+  if (!users) return { estado: "ligacao-invalida" };
+
+  const { lerRegisto, gravarRegisto, limparExpirados, emailDoToken } =
+    await import("./admin-recuperacao");
+
+  const registo = await lerRegisto();
+  const agora = Date.now();
+  limparExpirados(registo, agora);
+
+  const email = emailDoToken(registo, token, agora);
+  if (!email) return { estado: "ligacao-invalida" };
+
+  const conta = contaPorEmail(email);
+  if (!conta?.email) {
+    // A conta saiu do ADMIN_USERS entre o pedido e o clique. O pedido morre com
+    // ela — nada de deixar uma ligação viva para uma conta que já não existe.
+    delete registo.pedidos[email];
+    await gravarRegisto(registo);
+    return { estado: "ligacao-invalida" };
+  }
+
+  const { hashSync } = (await import("bcryptjs")).default;
+  // Factor 12 — o mesmo que o `ENTRADA.md` manda usar para gerar os hashes do
+  // ADMIN_USERS. Custos diferentes entre contas medem-se pelo tempo de resposta
+  // (ver o compare-fantasma acima), por isso não se mistura.
+  registo.senhas[normalizarIdentificador(conta.email)] = {
+    hash: hashSync(nova, 12),
+    definidaEm: agora,
+    substituiu: conta.passwordHash,
+  };
+  delete registo.pedidos[email];
+
+  const escrita = await gravarRegisto(registo);
+  if (!escrita.gravado || !escrita.duradouro) {
+    log.error("recuperação: não foi possível guardar a palavra-passe nova", undefined, {
+      onde: escrita.onde,
+      motivo: escrita.motivo,
+    });
+    return { estado: "sem-persistencia" };
+  }
+
+  log.info("recuperação: palavra-passe redefinida", { conta: conta.name });
+  return { estado: "definida", conta: { name: conta.name, email: conta.email } };
 }
 
 // --- Sessions -------------------------------------------------------------
@@ -190,23 +630,63 @@ export async function verifyCredentials(
 // payload shape. (Proposal tokens keep signing with the raw base secret, so
 // already-sent accept links keep working; only the session key moves.)
 function sessionKey(): Buffer {
-  return createHmac("sha256", sessionSecret()).update("liquen.admin-session.v1").digest();
+  return subKey("liquen.admin-session.v1");
+}
+
+/**
+ * Sub-chave HMAC para um fim NOMEADO, derivada do mesmo segredo base.
+ *
+ * Existe para que cada uso tenha a sua chave: uma assinatura feita para um fim
+ * não pode satisfazer a verificação de outro, mesmo que o corpo assinado
+ * calhasse ser idêntico. Foi a separação que fechou o caso em que um token de
+ * proposta pública era aceite como cookie de sessão de admin.
+ *
+ * Quem acrescentar um fim novo escolhe um rótulo novo — nunca reutiliza um.
+ */
+export function subKey(label: string): Buffer {
+  return createHmac("sha256", sessionSecret()).update(label).digest();
 }
 
 function sign(body: string): string {
   return createHmac("sha256", sessionKey()).update(body).digest("base64url");
 }
 
-/** Mint a signed, expiring session token for the given user name. */
-export function createSession(name: string): string {
+/**
+ * Mint a signed, expiring session token for the given user name.
+ *
+ * `ttlMs` tem valor por omissão de propósito: quem não escolher continua com os
+ * 30 dias de sempre, e nenhuma sessão já emitida muda de forma por causa disto.
+ */
+export function createSession(name: string, ttlMs: number = SESSION_TTL_MS): string {
   const payload = {
     typ: "session",
     sub: name.slice(0, 40),
-    exp: Date.now() + SESSION_TTL_MS,
+    exp: Date.now() + ttlMs,
     v: sessionVersion(),
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${body}.${sign(body)}`;
+}
+
+/**
+ * As duas metades da decisão «manter a sessão iniciada», num sítio só.
+ *
+ * Vive aqui e não em cada rota porque são DUAS portas de entrada — a
+ * palavra-passe e a passkey — e o dia em que uma delas ficasse com o prazo do
+ * token de uma e o `maxAge` do cookie da outra era o dia em que a sessão curta
+ * deixava de ser curta sem ninguém ver.
+ *
+ * `maxAge` ausente é um cookie de sessão do browser: morre ao fechá-lo. É essa
+ * a diferença que se vê no aparelho emprestado.
+ */
+export function duracaoDaSessao(manterSessao: boolean): {
+  ttlMs: number;
+  maxAge: number | undefined;
+} {
+  if (manterSessao) {
+    return { ttlMs: SESSAO_LONGA_MS, maxAge: Math.floor(SESSAO_LONGA_MS / 1000) };
+  }
+  return { ttlMs: SESSAO_CURTA_MS, maxAge: undefined };
 }
 
 /** Validate a session token; returns the user name or null if invalid/expired. */

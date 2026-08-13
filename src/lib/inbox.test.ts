@@ -70,6 +70,33 @@ describe("parseReferences", () => {
     expect(parseReferences(undefined)).toEqual([]);
     expect(parseReferences(Buffer.from(""))).toEqual([]);
   });
+
+  /**
+   * O `References:` é escrito por quem envia e não tem tecto nenhum. Este
+   * cabeçalho é pedido para TODAS as mensagens da listagem (ver `LIST_QUERY`),
+   * por isso um remetente com um cabeçalho de umas centenas de KB multiplicava
+   * a resposta da caixa por si próprio — 20 000 identificadores por linha, num
+   * campo que o ecrã nem sequer mostra.
+   */
+  it("não deixa um cabeçalho hostil crescer sem tecto", () => {
+    const enormes = Array.from({ length: 20_000 }, (_, i) => `<m${i}@evil.com>`);
+    const out = parseReferences(Buffer.from(`References: ${enormes.join(" ")}\r\n`));
+    expect(out.length).toBeLessThanOrEqual(50);
+    // O que se guarda é o que serve para encadear: a raiz da conversa e o fim
+    // da linhagem. É o meio que se pode deitar fora.
+    expect(out[0]).toBe("<m0@evil.com>");
+    expect(out.at(-1)).toBe("<m19999@evil.com>");
+  });
+
+  it("um identificador absurdamente longo não passa", () => {
+    const out = parseReferences(Buffer.from(`References: <${"a".repeat(5_000)}@x> <bom@x>`));
+    expect(out).toEqual(["<bom@x>"]);
+  });
+
+  it("uma conversa longa mas normal passa intacta", () => {
+    const ids = Array.from({ length: 40 }, (_, i) => `<m${i}@cliente.pt>`);
+    expect(parseReferences(Buffer.from(`References: ${ids.join(" ")}`))).toEqual(ids);
+  });
 });
 
 describe("collectAttachments", () => {
@@ -252,6 +279,46 @@ describe("listInbox — surfaces durable metadata", () => {
     expect(imap.lastFetchOptions).toMatchObject({ uid: true });
   });
 
+  /**
+   * O cabeçalho `Date:` é escrito por quem envia, e não há nada que obrigue a
+   * que seja uma data. Quando o imapflow não a consegue ler, devolve a STRING
+   * crua do cabeçalho em `envelope.date` (ver `lib/tools.js`: `if (date
+   * .toString() === 'Invalid Date') envelope.date = getStrValue(...)`) — apesar
+   * de o tipo dizer `Date`. Uma só mensagem assim deitava abaixo a LISTAGEM
+   * INTEIRA, não só aquela linha.
+   */
+  it("uma data ilegível não deita abaixo a caixa toda", async () => {
+    imap.fixtures = [
+      fakeMsg({
+        uid: 1,
+        envelope: { subject: "data partida", date: "ontem à tarde", messageId: "<mau@x>" },
+      }),
+      fakeMsg({ uid: 2, envelope: { subject: "normal", date: new Date("2026-06-01T00:00:00Z") } }),
+    ];
+    const { listInbox } = await loadInbox();
+    const items = await listInbox();
+    // As duas mensagens continuam a chegar ao back office.
+    expect(items.map((i) => i.subject).sort()).toEqual(["data partida", "normal"]);
+    // A que não tem data legível fica sem data, em vez de inventar uma.
+    expect(items.find((i) => i.subject === "data partida")!.date).toBe("");
+  });
+
+  it("recupera uma data que veio como texto mas é legível", async () => {
+    imap.fixtures = [
+      fakeMsg({ envelope: { subject: "texto", date: "Tue, 07 Jul 2026 10:00:00 +0000" } }),
+    ];
+    const { listInbox } = await loadInbox();
+    const [item] = await listInbox();
+    expect(item.date).toBe("2026-07-07T10:00:00.000Z");
+  });
+
+  it("uma mensagem sem cabeçalho Date fica sem data (não passa por recente)", async () => {
+    imap.fixtures = [fakeMsg({ envelope: { subject: "sem data" } })];
+    const { listInbox } = await loadInbox();
+    const [item] = await listInbox();
+    expect(item.date).toBe("");
+  });
+
   it("with before, constrains the UID range and returns [] when nothing matches", async () => {
     imap.fixtures = [fakeMsg()]; // mailbox non-empty, but the search matches nothing
     imap.searchResult = [];
@@ -259,6 +326,30 @@ describe("listInbox — surfaces durable metadata", () => {
     const items = await listInbox({ before: 100 });
     expect(items).toEqual([]);
     expect(imap.lastSearch).toMatchObject({ uid: "1:99" });
+  });
+
+  /**
+   * O «carregar mais» do fundo da caixa pede o que está ABAIXO da última linha
+   * que já tem. Quando essa última linha é a UID 1, não há nada abaixo — e o
+   * intervalo `1:0` não existe em IMAP, por isso o `Math.max(1, …)` transformava
+   * o pedido em `1:1`: a mensagem mais antiga voltava, e aparecia duas vezes na
+   * lista a cada clique. Não há nada a perguntar ao servidor neste caso.
+   */
+  it("no fundo da caixa não repete a mensagem mais antiga", async () => {
+    imap.fixtures = [fakeMsg({ uid: 1 })];
+    imap.searchResult = [1];
+    const { listInbox } = await loadInbox();
+    expect(await listInbox({ before: 1 })).toEqual([]);
+    // E nem sequer chega a ir ao servidor buscá-la.
+    expect(imap.lastSearch).toBeUndefined();
+  });
+
+  it("ainda pede ao servidor quando há mensagens abaixo (before: 2)", async () => {
+    imap.fixtures = [fakeMsg({ uid: 1 })];
+    imap.searchResult = [1];
+    const { listInbox } = await loadInbox();
+    expect(await listInbox({ before: 2 })).toHaveLength(1);
+    expect(imap.lastSearch).toMatchObject({ uid: "1:1" });
   });
 });
 

@@ -1,5 +1,6 @@
 import "server-only";
 import type { Proposal } from "@/lib/orcamento/types";
+import { ehIdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { createRepository, type Mapper } from "./repository";
 
 export const mapper: Mapper<Proposal> = {
@@ -22,6 +23,29 @@ export const mapper: Mapper<Proposal> = {
     status: p.status,
     sent_at: p.sentAt || null,
     responded_at: p.respondedAt || null,
+    follow_up_at: p.followUpAt || null,
+    follow_up_note: p.followUpNote || null,
+    lost_reason: p.lostReason || null,
+    lost_note: p.lostNote || null,
+    chosen_version: p.versaoEscolhida || null,
+    // O documento do Estúdio (jsonb `proposals.doc`) só entra na linha quando a
+    // proposta o TEM. Duas razões, ambas concretas:
+    //  · uma proposta de linhas (criada em /api/propostas) nunca teve `doc` e
+    //    não passa a escrever uma coluna a null por causa disto;
+    //  · numa base onde o `alter table` de db/schema.sql ainda não correu, a
+    //    coluna não existe — escrevê-la sempre partia tudo, até um simples
+    //    "aceitar proposta". Assim só quem GRAVA um documento é que apanha o
+    //    erro de coluna em falta, e a rota do estúdio trata-o (isMissingTable).
+    ...(p.doc !== undefined ? { doc: p.doc } : {}),
+    // Mesmo cuidado do `doc`: só entram na linha quando existem, para uma base
+    // onde o `alter table` ainda não correu continuar a aceitar tudo o resto.
+    ...(p.pdfSha256 !== undefined ? { pdf_sha256: p.pdfSha256 } : {}),
+    ...(p.pdfBytes !== undefined ? { pdf_bytes: p.pdfBytes } : {}),
+    // A língua em que a proposta foi apresentada ao casal, pelo mesmo cuidado
+    // do `doc`: só entra na linha quando existe. Uma proposta de linhas
+    // (/api/propostas) e todas as que são anteriores a este campo continuam a
+    // gravar-se numa base onde o `alter table` ainda não correu.
+    ...(p.idioma !== undefined ? { idioma: p.idioma } : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -40,9 +64,44 @@ export const mapper: Mapper<Proposal> = {
     createdAt: String(r.created_at ?? new Date().toISOString()),
     sentAt: (r.sent_at as string) ?? undefined,
     respondedAt: (r.responded_at as string) ?? undefined,
+    followUpAt: (r.follow_up_at as string) ?? undefined,
+    followUpNote: (r.follow_up_note as string) ?? undefined,
+    lostReason: (r.lost_reason as Proposal["lostReason"]) ?? undefined,
+    lostNote: (r.lost_note as string) ?? undefined,
+    versaoEscolhida: (r.chosen_version as Proposal["versaoEscolhida"]) ?? undefined,
+    // Simétrico do `toRow`: sem documento gravado (proposta antiga, proposta de
+    // linhas, ou coluna ainda por criar) a propriedade nem aparece — é o que
+    // mantém `getProposal` a devolver exatamente o que devolvia antes desta
+    // coluna existir, e o portal do cliente a esconder o botão do PDF em vez de
+    // oferecer um documento que não há.
+    ...(r.doc && typeof r.doc === "object" ? { doc: r.doc as Proposal["doc"] } : {}),
+    ...(r.pdf_sha256 ? { pdfSha256: String(r.pdf_sha256) } : {}),
+    ...(r.pdf_bytes != null ? { pdfBytes: Number(r.pdf_bytes) } : {}),
+    // Simétrico do `toRow`, com uma exigência a mais: só se lê o que é MESMO
+    // uma língua que se sabe desenhar. A coluna tem um `check`, mas a aplicação
+    // não pode depender de ele existir numa base antiga — e um valor estranho a
+    // entrar aqui espalhava-se pelo email, pela página do aceite e pelo PDF.
+    // O que não é língua vale o mesmo que a ausência, e a ausência é português.
+    ...(ehIdiomaDaProposta(r.idioma) ? { idioma: r.idioma } : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+  /**
+   * Compare-and-set sobre o `updated_at` (ver `SupabaseBackend.persist`).
+   *
+   * A coluna já existia em `db/schema.sql` desde o primeiro dia e nunca foi
+   * escrita nem lida — a protecção estava montada e desligada. O que corria sem
+   * ela: a proposta é o documento que seguiu para o casal, e há pelo menos três
+   * caminhos a escrevê-la ao mesmo tempo — o Estúdio a gravar o `doc`, a rota
+   * `/api/propostas/[id]` a mudar o estado ou a pôr um motivo de perda, e o
+   * portal do cliente a registar o aceite (`/api/proposta`). Cada um manda um
+   * patch pequeno, mas o `update` reescreve a LINHA INTEIRA a partir da leitura
+   * que fez: quem tivesse aberto a proposta antes do aceite repunha o estado em
+   * «enviada» ao gravar uma nota, e o aceite do casal desaparecia sem erro
+   * nenhum. Agora essa escrita é recusada, o `updateWith` relê e volta a
+   * aplicar o patch por cima do aceite — sobrevivem os dois.
+   */
+  touch: true,
 };
 
 const repo = createRepository(mapper);

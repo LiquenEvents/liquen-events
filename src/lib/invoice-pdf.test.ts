@@ -29,6 +29,17 @@ describe("winAnsiSafe", () => {
     expect(winAnsiSafe("💐")).toBe("?");
   });
 
+  it("acentos DECOMPOSTOS chegam inteiros — a mesma palavra, a outra forma", () => {
+    // A regressão: "Decoração" com o til e a cedilha em pontos de código
+    // separados (macOS, alguns teclados, texto colado) saía "Decorac?a?o" —
+    // as marcas combinatórias não vivem no Latin-1 e a letra base ficava só.
+    // São a MESMA palavra que a forma composta; o PDF não pode distingui-las.
+    const decomposto = "Decoração Floral".normalize("NFD");
+    expect(decomposto).not.toBe("Decoração Floral"); // são mesmo formas diferentes
+    expect(winAnsiSafe(decomposto)).toBe("Decoração Floral");
+    expect(winAnsiSafe("Ação São João".normalize("NFD"))).toBe("Ação São João");
+  });
+
   it("never throws and returns a string for any input", () => {
     expect(typeof winAnsiSafe("")).toBe("string");
     expect(typeof winAnsiSafe("𝕏 𝟙 ℝ")).toBe("string");

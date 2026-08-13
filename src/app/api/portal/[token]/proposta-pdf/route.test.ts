@@ -13,6 +13,8 @@ const db = vi.hoisted(() => ({
   newestByQuote: new Map<string, Record<string, unknown>>(),
   acceptedContractByQuote: new Map<string, Record<string, unknown>>(),
   rendered: [] as unknown[],
+  /** Fotos que o gerador não conseguiu meter no documento. */
+  emFalta: 0,
 }));
 
 vi.mock("@/lib/portal-token", () => ({
@@ -35,29 +37,53 @@ vi.mock("@/lib/proposal-doc-render", () => ({
     db.rendered.push(doc);
     return new Uint8Array([1, 2, 3]);
   }),
+  /**
+   * A cache do PDF passou a pedir o RELATÓRIO e não só os bytes: é assim que
+   * uma proposta com fotos a menos deixa de sair calada para o cliente. O
+   * `emFalta` é regulável por caso para se poder exercitar a recusa.
+   */
+  renderStoredProposalDocPdfWithReport: vi.fn(async (doc: unknown) => {
+    db.rendered.push(doc);
+    return { pdf: new Uint8Array([1, 2, 3]), missingImages: db.emFalta ?? 0, truncations: [] };
+  }),
 }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { GET } from "./route";
+import { esvaziarCachePdf } from "@/lib/proposal-pdf-cache";
+import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 
 function call(token = "good") {
   return GET(new Request("http://x"), { params: Promise.resolve({ token }) });
 }
 
 beforeEach(() => {
+  // A rota serve de uma cache por processo (`proposal-pdf-cache`): sem
+  // esvaziar, o segundo caso deste ficheiro receberia o PDF que o primeiro
+  // desenhou e nunca chegaria a exercitar o que diz exercitar.
+  esvaziarCachePdf();
   db.quotes.clear();
   db.proposalsById.clear();
   db.newestByQuote.clear();
   db.acceptedContractByQuote.clear();
   db.rendered = [];
+  db.emFalta = 0;
   db.quotes.set("q-1", { id: "q-1", name: "Cliente" });
   vi.clearAllMocks();
 });
 
 describe("portal proposta-pdf — serves the accepted proposal's document", () => {
   it("renders the ACCEPTED proposal doc even when a newer draft exists", async () => {
-    db.proposalsById.set("p-acc", { id: "p-acc", doc: { which: "accepted" } });
-    db.newestByQuote.set("q-1", { id: "p-new", doc: { which: "draft-revision" } });
+    db.proposalsById.set("p-acc", {
+      id: "p-acc",
+      quoteId: "q-1",
+      doc: { which: "accepted" },
+    });
+    db.newestByQuote.set("q-1", {
+      id: "p-new",
+      quoteId: "q-1",
+      doc: { which: "draft-revision" },
+    });
     db.acceptedContractByQuote.set("q-1", { proposalId: "p-acc", status: "aceite" });
 
     const res = await call();
@@ -67,7 +93,7 @@ describe("portal proposta-pdf — serves the accepted proposal's document", () =
   });
 
   it("falls back to the newest proposal when there is no accepted contract", async () => {
-    db.newestByQuote.set("q-1", { id: "p-open", doc: { which: "open" } });
+    db.newestByQuote.set("q-1", { id: "p-open", quoteId: "q-1", doc: { which: "open" } });
 
     const res = await call();
     expect(res.status).toBe(200);
@@ -81,10 +107,128 @@ describe("portal proposta-pdf — serves the accepted proposal's document", () =
   });
 
   it("404s when the accepted proposal has no stored doc", async () => {
-    db.proposalsById.set("p-acc", { id: "p-acc", doc: null });
+    db.proposalsById.set("p-acc", { id: "p-acc", quoteId: "q-1", doc: null });
     db.acceptedContractByQuote.set("q-1", { proposalId: "p-acc", status: "aceite" });
 
     const res = await call();
     expect(res.status).toBe(404);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * UM PDF COM BURACOS NÃO SAI PARA O CASAL
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Esta rota serve o documento ao CLIENTE. Até aqui deitava fora o relatório do
+ * gerador: uma fotografia que não resolvesse desaparecia da proposta e o
+ * ficheiro seguia na mesma, bonito e incompleto. Ninguém dava por nada — a
+ * moldura não fica vazia, simplesmente não existe.
+ */
+describe("portal proposta-pdf — fotos em falta", () => {
+  it("tenta SEGUNDA vez antes de desistir: a falha mais comum é passageira", async () => {
+    db.newestByQuote.set("q-1", { id: "p", quoteId: "q-1", doc: { which: "x" } });
+    db.emFalta = 2;
+    // A segunda passagem corre com o Storage a responder.
+    // `Buffer` e não `Uint8Array`: a assinatura devolve `Buffer<ArrayBuffer>`, e
+    // um mock com o tipo errado é um mock que não prova nada sobre o real.
+    const bytes = () => Buffer.from([1, 2, 3]) as Buffer<ArrayBuffer>;
+    vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async (doc) => {
+      db.rendered.push(doc);
+      return { pdf: bytes(), missingImages: 2, truncations: [] };
+    });
+    vi.mocked(renderStoredProposalDocPdfWithReport).mockImplementationOnce(async (doc) => {
+      db.rendered.push(doc);
+      return { pdf: bytes(), missingImages: 0, truncations: [] };
+    });
+
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(2);
+  });
+
+  it("503 quando à segunda continuam a faltar — e NADA é servido", async () => {
+    db.newestByQuote.set("q-1", { id: "p", quoteId: "q-1", doc: { which: "x" } });
+    db.emFalta = 1;
+
+    const res = await call();
+    expect(res.status).toBe(503);
+    // 503 e não 500: isto tem conserto e é temporário.
+    expect(res.headers.get("Retry-After")).toBe("30");
+    expect(await res.text()).toBe("");
+  });
+
+  /**
+   * O ERRO QUE ISTO IMPEDE: guardar a falha em cache.
+   *
+   * A falha é passageira por definição. Guardá-la fixava-a até ao próximo
+   * arranque a frio — é o mesmo "gravar uma falha como se fosse um facto" que
+   * já apareceu na cache de fotografias e na célula do estúdio.
+   */
+  it("uma recusa não fica em cache: a chamada seguinte volta a desenhar", async () => {
+    db.newestByQuote.set("q-1", { id: "p", quoteId: "q-1", doc: { which: "x" } });
+    db.emFalta = 1;
+    expect((await call()).status).toBe(503);
+
+    db.emFalta = 0;
+    const res = await call();
+    expect(res.status).toBe(200);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PORTAL DÁ O DOCUMENTO NA LÍNGUA EM QUE A PROPOSTA FOI FEITA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A mesma exigência do link do casal, e pelo mesmo motivo: este botão redesenha
+ * o documento a partir do `doc`, e sem a língua gravada caía sempre em
+ * português. Um casal que aceitou uma proposta inglesa voltava ao portal meses
+ * depois — para reler o que combinou — e descarregava outro documento.
+ *
+ * A língua é a da proposta que o portal SERVE (a aceite, quando há aceite), e
+ * não a do visitante nem a do segmento da rota.
+ */
+describe("portal proposta-pdf — a língua da proposta", () => {
+  it("uma proposta INGLESA volta a sair em inglês, e com o nome do email", async () => {
+    db.newestByQuote.set("q-1", {
+      id: "p-open",
+      quoteId: "q-1",
+      idioma: "en",
+      doc: { which: "open" },
+    });
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ which: "open" }, "en");
+    expect(res.headers.get("Content-Disposition")).toContain("Proposal-Liquen-q-1.pdf");
+  });
+
+  it("a língua é a da proposta ACEITE, não a da revisão mais recente", async () => {
+    // O portal serve o documento que o casal aceitou; a língua tem de vir do
+    // mesmo sítio, senão o ficheiro sai desenhado com a moldura de uma proposta
+    // que o cliente nunca viu.
+    db.proposalsById.set("p-acc", {
+      id: "p-acc",
+      quoteId: "q-1",
+      idioma: "en",
+      doc: { which: "accepted" },
+    });
+    db.newestByQuote.set("q-1", {
+      id: "p-new",
+      quoteId: "q-1",
+      idioma: "pt",
+      doc: { which: "draft-revision" },
+    });
+    db.acceptedContractByQuote.set("q-1", { proposalId: "p-acc", status: "aceite" });
+
+    await call();
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ which: "accepted" }, "en");
+  });
+
+  it("uma proposta ANTIGA, sem língua gravada, continua portuguesa", async () => {
+    db.newestByQuote.set("q-1", { id: "p-open", quoteId: "q-1", doc: { which: "open" } });
+    const res = await call();
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ which: "open" }, "pt");
+    expect(res.headers.get("Content-Disposition")).toContain("Proposta-Liquen-q-1.pdf");
   });
 });

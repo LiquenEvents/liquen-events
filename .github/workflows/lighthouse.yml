@@ -19,7 +19,25 @@ jobs:
     runs-on: ubuntu-latest
     # Informational: surfaces scores on every PR without blocking the merge.
     continue-on-error: true
-    timeout-minutes: 15
+    # Era 15, e o job passou a bater nele: duas tentativas seguidas no mesmo
+    # commit foram canceladas aos 15m19s e 15m15s, depois de todo o dia a correr
+    # em ~14m30s. Não é uma regressão de desempenho do site — é o job a crescer
+    # (instalação + build + DUAS passagens do Lighthouse, secretária e
+    # telemóvel), e um cancelamento não distingue "lento" de "avariado".
+    #
+    # 25 dá folga sem esconder crescimento: os orçamentos que reprovam a
+    # qualidade continuam a ser os do lighthouserc, que não mexem aqui.
+    #
+    # ── E DEPOIS 25 TAMBÉM DEIXOU DE CHEGAR ───────────────────────────────────
+    # O AVIF da galeria acrescentou ~13 minutos de encode ao `npm run build`, e
+    # este job foi cancelado aos 25m14s. Pus a cache do pré-gerador nos dois
+    # jobs do `ci.yml` e ESQUECI-ME deste — que também compila. É o mesmo
+    # defeito, no terceiro sítio.
+    #
+    # 40 cobre uma corrida de cache fria (as três compilações do mesmo commit
+    # arrancam juntas, portanto na primeira depois de mexer nas fotos nenhuma
+    # tem cache) sem deixar de mostrar crescimento.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -32,12 +50,28 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
+      # A MESMA CHAVE dos jobs do `ci.yml`, de propósito: as três compilações do
+      # mesmo commit partilham o resultado do encode em vez de o repetirem. A
+      # chave inclui os parâmetros de encode (via `scripts/pregen-gallery.mjs`)
+      # porque mudá-los TEM de invalidar a cache — senão voltavam ficheiros da
+      # qualidade anterior sem ninguém dar por isso.
+      - name: Cache das miniaturas pré-geradas
+        uses: actions/cache@v4
+        with:
+          path: .next/cache/pregen-gallery
+          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs') }}
+          restore-keys: |
+            pregen-${{ runner.os }}-
+
       - name: Build
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
-      - name: Run Lighthouse CI
+      - name: Run Lighthouse CI (desktop)
         run: |
           npm install -g @lhci/cli@0.14.x
-          lhci autorun
+          lhci autorun --config=lighthouserc.json
+
+      - name: Run Lighthouse CI (mobile)
+        run: lhci autorun --config=lighthouserc.mobile.json

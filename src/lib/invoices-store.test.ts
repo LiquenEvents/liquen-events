@@ -171,6 +171,66 @@ describe("nextInvoiceNumber — sequential ledger invariants (fallback path)", (
   });
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CONTADOR FISCAL NÃO PODE VOLTAR AO PRINCÍPIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O caminho atómico (a RPC `next_invoice_seq`) só existe com Supabase. Sem
+ * Supabase, o contador cai no `app_state` — e em produção o `app_state` sem
+ * base de dados é um ficheiro no disco da função, que o deploy seguinte apaga.
+ *
+ * O percurso, por extenso: emite-se até FT 2026/0031; sai um deploy; o disco é
+ * substituído; a factura seguinte é FT 2026/0001 — um número JÁ USADO, noutro
+ * cliente e noutro valor. Numa contabilidade portuguesa isso não é um incómodo
+ * de software, é numeração fiscal repetida: dois documentos com o mesmo número,
+ * e o problema passa a ser com a Autoridade Tributária.
+ *
+ * Já existe a decisão certa para o caso vizinho (Supabase configurado + RPC a
+ * falhar: RECUSA emitir). Este é o mesmo raciocínio para o caso que faltava, e
+ * é a única regra desta ronda que PODE impedir alguém de trabalhar — de
+ * propósito: emitir com um número errado é pior do que não emitir.
+ */
+describe("nextInvoiceNumber — em produção sem Supabase, RECUSA emitir", () => {
+  it("não emite a partir de um contador que o deploy apaga", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    sb.client = null;
+    await expect(nextInvoiceNumber()).rejects.toThrow(/Numeração de faturas indisponível/);
+    vi.unstubAllEnvs();
+  });
+
+  it("a recusa diz o que falta — nomeia as variáveis, não «erro interno»", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    sb.client = null;
+    await nextInvoiceNumber().then(
+      () => expect.unreachable("devia ter recusado"),
+      (err: Error) => expect(err.message).toMatch(/SUPABASE_SERVICE_ROLE_KEY/),
+    );
+    vi.unstubAllEnvs();
+  });
+
+  it("e não deixa o contador andar — recusar não pode queimar um número", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    sb.client = null;
+    await expect(nextInvoiceNumber()).rejects.toThrow();
+    const { setState } = await import("./app-state");
+    expect(setState).not.toHaveBeenCalled();
+    expect(state.store.size).toBe(0);
+    vi.unstubAllEnvs();
+  });
+
+  /** Na máquina de alguém o contador de ficheiro é o desenho e continua a
+   *  servir — fechá-lo seria partir o desenvolvimento por causa de produção. */
+  it("fora de produção continua a emitir pelo ficheiro, como sempre", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    sb.client = null;
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-02T10:00:00Z"));
+    expect(await nextInvoiceNumber()).toBe("FT 2026/0001");
+    vi.unstubAllEnvs();
+  });
+});
+
 describe("isUniqueViolation — the 23505 backstop recogniser", () => {
   it("recognises the Postgres unique-violation SQLSTATE (23505)", () => {
     expect(isUniqueViolation({ code: "23505" })).toBe(true);

@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 
-const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter?: number } }));
+const rl = vi.hoisted(() => ({
+  result: { ok: true } as { ok: boolean; retryAfter?: number },
+  /** Grava POR QUE CHAVE (e com que tecto) a rota limita — um duplo que deitasse
+   *  fora os argumentos deixava passar um balde partilhado por toda a gente. */
+  limit: vi.fn(async (_chave: string, _max: number, _janelaMs: number) => rl.result),
+}));
 const logger = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
 vi.mock("@/lib/logger", () => ({ log: logger }));
 vi.mock("@/lib/rate-limit", () => ({
-  rateLimit: vi.fn(async () => rl.result),
+  rateLimit: rl.limit,
   clientIp: () => "test-ip",
   sweep: () => {},
 }));
@@ -128,11 +133,45 @@ describe("POST /api/security/csp-report", () => {
     expect(res.status).toBe(204);
   });
 
+  /**
+   * O balde é POR ORIGEM. Um balde único para o endereço inteiro seria pior do
+   * que não ter limite nenhum: bastava um browser em ciclo para calar os
+   * relatórios de toda a gente — que é exactamente a altura em que eles
+   * interessam.
+   */
+  it("limita por origem, com o tecto de 30 por minuto", async () => {
+    await POST(post(JSON.stringify({ "csp-report": {} })));
+    expect(rl.limit).toHaveBeenCalledWith("csp:test-ip", 30, 60_000);
+  });
+
   it("rate-limited callers get 429 and are not logged", async () => {
     rl.result = { ok: false, retryAfter: 5 };
     const res = await POST(post(JSON.stringify({ "csp-report": {} })));
     expect(res.status).toBe(429);
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  /**
+   * O endereço é público por necessidade (é o browser que escreve aqui). O
+   * limite de pedidos por minuto já cá estava; o que faltava era o tecto DENTRO
+   * do pedido — um único POST com mil relatórios enchia os registos.
+   */
+  it("regista no máximo 20 relatórios por pedido", async () => {
+    const muitos = Array.from({ length: 200 }, (_, i) => ({
+      type: "csp-violation",
+      body: { documentURL: `https://liquen.pt/${i}`, blockedURL: "https://evil.example/x" },
+    }));
+    const res = await POST(post(JSON.stringify(muitos), "application/reports+json"));
+    expect(res.status).toBe(204);
+    expect(logger.warn).toHaveBeenCalledTimes(20);
+  });
+
+  it("corta cada campo antes de o registar", async () => {
+    const enorme = "https://evil.example/" + "a".repeat(50_000);
+    const res = await POST(post(JSON.stringify({ "csp-report": { "blocked-uri": enorme } })));
+    expect(res.status).toBe(204);
+    const registado = logger.warn.mock.calls[0][1] as { blockedUri?: string };
+    expect(registado.blockedUri!.length).toBe(300);
   });
 
   it("never echoes report content back in the response body", async () => {

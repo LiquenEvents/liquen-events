@@ -1,0 +1,254 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+
+/**
+ * A PÁGINA ONDE O CASAL DECIDE.
+ *
+ * O PDF da proposta seguia em anexo no email e mais nada: quem arquivasse a
+ * mensagem, ou abrisse o link no telemóvel de outra pessoa, tinha de decidir
+ * gastar milhares de euros a olhar para um total e um IVA. O botão para rever
+ * o documento vive agora aqui — e só pode existir porque o documento passou a
+ * ser GUARDADO com a proposta (coluna `proposals.doc`).
+ *
+ * O que se prende: com documento, o botão aponta para o PDF desta proposta;
+ * sem documento (propostas anteriores à coluna, propostas de linhas do back
+ * office) a página abre exatamente como abria, sem botão nenhum e sem partir.
+ */
+const db = vi.hoisted(() => ({ proposal: null as Record<string, unknown> | null }));
+
+vi.mock("@/lib/proposal-token", () => ({
+  readProposalToken: vi.fn((t: string) => (t === "bom" ? { proposalId: "p1" } : null)),
+}));
+vi.mock("@/lib/proposals-store", () => ({
+  getProposal: vi.fn(async () => db.proposal),
+}));
+vi.mock("next/image", () => ({ default: () => null }));
+// O bloco de resposta é um Client Component com estado próprio e testes seus;
+// aqui interessa a página, por isso entra como um marcador.
+vi.mock("./ProposalResponse", () => ({ default: () => <div data-testid="resposta" /> }));
+/**
+ * O dicionário do duplo DEPENDE da língua, ao contrário do que estava aqui
+ * antes (devolvia sempre o português). Sem isso, um teste sobre «esta página
+ * segue a língua da proposta» passava sem a página fazer nada: as duas línguas
+ * eram a mesma folha de texto.
+ */
+vi.mock("@/lib/i18n", () => ({
+  normalizeLocale: (l: string) => (l === "en" ? "en" : "pt"),
+  htmlLang: (l: string) => (l === "en" ? "en" : "pt-PT"),
+  getDictionary: (locale: string) => ({
+    proposta:
+      locale === "en"
+        ? {
+            linkInvalidTitle: "Invalid link",
+            linkInvalidBody: "…",
+            notFoundTitle: "Not found",
+            notFoundBody: "…",
+            eyebrow: "Proposal",
+            greeting: "Hello",
+            intro: "…",
+            tableDescricao: "Description",
+            tableQt: "Qty",
+            tableValor: "Amount",
+            subtotal: "Subtotal",
+            iva: "VAT",
+            total: "Total",
+            validoAte: "Valid until",
+            verPdf: "View the full proposal (PDF)",
+            footerNote: "…",
+            dateLocale: "en-GB",
+          }
+        : {
+            linkInvalidTitle: "Link inválido",
+            linkInvalidBody: "…",
+            notFoundTitle: "Não encontrada",
+            notFoundBody: "…",
+            eyebrow: "Proposta",
+            greeting: "Olá",
+            intro: "…",
+            tableDescricao: "Descrição",
+            tableQt: "Qt",
+            tableValor: "Valor",
+            subtotal: "Subtotal",
+            iva: "IVA",
+            total: "Total",
+            validoAte: "Válida até",
+            verPdf: "Ver a proposta completa (PDF)",
+            footerNote: "…",
+            dateLocale: "pt-PT",
+          },
+  }),
+}));
+
+import ProposalPage, * as pagina from "./page";
+
+const proposta = (over: Record<string, unknown> = {}) => ({
+  id: "p1",
+  quoteId: "LIQ-AAA-1",
+  clientName: "Ana Dias",
+  clientEmail: "ana@exemplo.pt",
+  currency: "EUR",
+  lineItems: [],
+  vatRate: 0.23,
+  subtotal: 10000,
+  vat: 2300,
+  total: 12300,
+  status: "enviada",
+  createdAt: "2026-03-01T09:00:00.000Z",
+  validUntil: "2099-12-31",
+  ...over,
+});
+
+async function abrir(token = "bom", lang = "pt") {
+  render(await ProposalPage({ params: Promise.resolve({ lang, token }) }));
+}
+
+beforeEach(() => {
+  db.proposal = null;
+  vi.clearAllMocks();
+});
+afterEach(cleanup);
+
+describe("página pública da proposta — o botão do PDF", () => {
+  it("mostra o botão quando a proposta tem documento guardado", async () => {
+    db.proposal = proposta({ doc: { ref: "PO Decoração" } });
+    await abrir();
+    const botao = screen.getByRole("link", { name: /proposta completa \(PDF\)/i });
+    expect(botao).toHaveAttribute("href", "/api/proposta/bom/pdf");
+    // Abre noutro separador: quem está a meio de aceitar não perde a página.
+    expect(botao).toHaveAttribute("target", "_blank");
+    expect(botao).toHaveAttribute("rel", expect.stringContaining("noopener"));
+  });
+
+  it("NÃO mostra botão nenhum numa proposta sem documento (as antigas)", async () => {
+    db.proposal = proposta();
+    await abrir();
+    expect(screen.queryByRole("link", { name: /PDF/i })).toBeNull();
+    // E a página continua a servir para o que serve: rever o valor e responder.
+    expect(screen.getByTestId("resposta")).toBeTruthy();
+  });
+
+  it("um token inválido não chega sequer a mostrar uma proposta", async () => {
+    await abrir("mau");
+    expect(screen.queryByRole("link", { name: /PDF/i })).toBeNull();
+    expect(screen.getByText("Link inválido")).toBeTruthy();
+  });
+});
+
+/**
+ * ESTA PÁGINA NÃO PODE SER CONGELADA NUM CACHE.
+ *
+ * `[token]` não tem `generateStaticParams`, e nada aqui usa uma API de pedido
+ * (o idioma vem do segmento da rota, de propósito — ver o cabeçalho de
+ * src/proxy.ts). Para o Next isso é uma rota ESTÁTICA: renderiza à primeira
+ * visita e guarda o HTML no Full Route Cache, sem revalidação nenhuma, até ao
+ * próximo deploy.
+ *
+ * O que isso fazia, em concreto, com o estado que esta página lê da base de
+ * dados a cada visita:
+ *
+ *   · o casal aceita, volta ao link (reencaminham-no, reabrem-no do email) e
+ *     encontra outra vez o formulário de aceitar, como se nada tivesse
+ *     acontecido — e o «Já tínhamos registado a sua resposta» nunca aparece;
+ *   · a proposta expira ou o estúdio retira-a, e a página continua a oferecer
+ *     um aceite que a rota vai recusar com um 409/410;
+ *   · a validade (`expired`) é calculada uma única vez, no dia da primeira
+ *     visita, e fica congelada nesse dia.
+ *
+ * `force-dynamic` também é o que põe `Cache-Control: private, no-store` na
+ * resposta — numa página cujo URL é a própria credencial, não é detalhe.
+ */
+describe("página pública da proposta — nunca servida de um cache", () => {
+  it("é renderizada a pedido, a cada visita", () => {
+    expect((pagina as { dynamic?: string }).dynamic).toBe("force-dynamic");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PÁGINA SEGUE A LÍNGUA DA PROPOSTA, NÃO A DO VISITANTE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta página é servida no segmento `[lang]`, e a língua desse segmento vem do
+ * COOKIE de quem visita (ver src/proxy.ts): um casal inglês que carregue no
+ * botão do email a partir de um computador onde alguém leu o site em português
+ * caía numa página portuguesa — para responder a uma proposta inglesa.
+ *
+ * O contrário também: quem tenha o site em inglês e receba uma proposta
+ * portuguesa via a moldura inglesa por cima de um documento português.
+ *
+ * A proposta é que manda. Não se redirecciona (o português canónico é o
+ * caminho SEM prefixo, que volta a ser reescrito pelo cookie — seria um ciclo):
+ * escolhe-se o dicionário e marca-se a língua no elemento, para quem lê com um
+ * leitor de ecrã ouvir o texto com a pronúncia certa.
+ */
+describe("página pública da proposta — a língua é a da proposta", () => {
+  it("uma proposta INGLESA abre em inglês, mesmo num visitante português", async () => {
+    db.proposal = proposta({ idioma: "en", doc: { ref: "PO" } });
+    await abrir("bom", "pt");
+    expect(screen.getByText(/Hello/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /View the full proposal/i })).toBeTruthy();
+    expect(screen.queryByText(/Olá/)).toBeNull();
+  });
+
+  it("uma proposta PORTUGUESA abre em português, mesmo num visitante inglês", async () => {
+    db.proposal = proposta({ idioma: "pt", doc: { ref: "PO" } });
+    await abrir("bom", "en");
+    expect(screen.getByText(/Olá/)).toBeTruthy();
+    expect(screen.queryByText(/Hello/)).toBeNull();
+  });
+
+  it("uma proposta ANTIGA (sem língua) é portuguesa", async () => {
+    db.proposal = proposta({ doc: { ref: "PO" } });
+    await abrir("bom", "en");
+    expect(screen.getByText(/Olá/)).toBeTruthy();
+  });
+
+  it("marca a língua no elemento, para quem ouve a página", async () => {
+    db.proposal = proposta({ idioma: "en", doc: { ref: "PO" } });
+    const { container } = render(
+      await ProposalPage({ params: Promise.resolve({ lang: "pt", token: "bom" }) }),
+    );
+    expect(container.querySelector("[lang]")?.getAttribute("lang")).toBe("en");
+  });
+
+  it("sem proposta nenhuma, é o visitante que manda — não há outra língua a seguir", async () => {
+    // Um token forjado ou uma proposta apagada: aqui não há proposta de onde
+    // tirar língua nenhuma, e a página de erro é para quem está a olhar.
+    await abrir("mau", "en");
+    expect(screen.getByText("Invalid link")).toBeTruthy();
+  });
+});
+
+/**
+ * O TÍTULO DO SEPARADOR TAMBÉM É O DA PROPOSTA.
+ *
+ * É o que aparece na lista de separadores e no histórico do navegador. Um
+ * casal inglês com «A sua proposta | Líquen Events» no separador está a ler a
+ * primeira coisa do produto na língua errada.
+ */
+describe("página pública da proposta — o título do separador", () => {
+  it("segue a língua da proposta", async () => {
+    db.proposal = proposta({ idioma: "en" });
+    const meta = await pagina.generateMetadata({
+      params: Promise.resolve({ lang: "pt", token: "bom" }),
+    });
+    expect(meta.title).toBe("Your proposal | Líquen Events");
+  });
+
+  it("e continua a não ser indexado, em língua nenhuma", async () => {
+    db.proposal = proposta({ idioma: "en" });
+    const meta = await pagina.generateMetadata({
+      params: Promise.resolve({ lang: "pt", token: "bom" }),
+    });
+    expect(meta.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("sem proposta, cai na língua do visitante", async () => {
+    db.proposal = null;
+    const meta = await pagina.generateMetadata({
+      params: Promise.resolve({ lang: "en", token: "mau" }),
+    });
+    expect(meta.title).toBe("Your proposal | Líquen Events");
+  });
+});

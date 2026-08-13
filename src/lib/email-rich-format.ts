@@ -299,21 +299,36 @@ export function renderRichInnerHtml(doc: RichDoc, opts: RenderOpts = {}): string
 
 /**
  * Build the full stored/sent email HTML from the model: a hidden `rich` marker
- * carrying the exact model, then the on-brand container with the blocks and the
- * shared footer. Deterministic, so re-opening a template is not falsely "dirty".
+ * carrying the exact model, then the on-brand container with the blocks.
+ * Deterministic, so re-opening a template is not falsely "dirty".
+ *
+ * ── SEM RODAPÉ, E ISTO MERECE A EXPLICAÇÃO ────────────────────────────────
+ *
+ * Aqui escrevia-se um risco e «Líquen Events · Portugal» no fim de cada corpo.
+ * Fazia sentido enquanto um modelo era um rascunho que ninguém enviava. Agora
+ * que os modelos SÃO o email que sai (ver `email-modelos.ts`), e que todo o
+ * correio ao cliente fecha com a assinatura da casa (`email-assinatura.ts` —
+ * Catarina Gaspar, cargo, contactos, logótipo), o que o cliente recebia era:
+ *
+ *     Líquen Events · Portugal      ← rodapé escrito aqui
+ *     --
+ *     Catarina Gaspar               ← assinatura da casa
+ *     Manager
+ *
+ * Dois fechos colados, o segundo a desmentir o primeiro sobre quem escreveu.
+ * É o mesmo defeito que se corrigiu nos modelos de resposta rápida do
+ * mensageiro, e a regra é a mesma: **quem escreve o corpo escreve só o que
+ * aquele email tem de particular, e não volta a assiná-lo.**
+ *
+ * Os corpos que ela JÁ GUARDOU trazem o rodapé lá dentro e não se lhes pode
+ * mexer sem lhe apagar trabalho — desses trata o `desmoldurar` no envio. Isto
+ * é a outra metade: um modelo novo já não nasce com ele.
  */
 export function buildRichEmailHtml(doc: RichDoc): string {
   const normalized = normalizeDoc(doc);
   const marker = `<!-- liquen:rich:v1:${toBase64(JSON.stringify(normalized))} -->`;
   const body = normalized.blocks.map((b) => renderBlock(b, {})).join("\n");
-  return [
-    marker,
-    `<div style="${S.container}">`,
-    body,
-    `  <hr style="border:none;border-top:1px solid #eee;margin:20px 0 12px">`,
-    `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
-    `</div>`,
-  ]
+  return [marker, `<div style="${S.container}">`, body, `</div>`]
     .filter((line) => line.length > 0)
     .join("\n");
 }

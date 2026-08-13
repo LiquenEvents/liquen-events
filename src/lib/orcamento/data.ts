@@ -25,6 +25,153 @@ export const CATEGORIES: {
   },
 ];
 
+/**
+ * The six choices the public quote form offers, in display order.
+ *
+ * Shared with the confirmation page: the stored `eventType` is looked up here
+ * to get an INDEX, and the index reads the visitor's own language out of
+ * `orcamento.eventTypeLabels`. Without this an English visitor was shown the
+ * Portuguese label from EVENT_TYPES_BY_CATEGORY.
+ *
+ * Keep in step with `orcamento.eventTypeLabels` in both dictionaries — same
+ * length, same order.
+ */
+export const QUOTE_EVENT_OPTIONS: {
+  label: string;
+  category: EventCategory | null;
+  eventType: EventType | null;
+}[] = [
+  { label: "Casamento", category: "particulares", eventType: "casamentos" },
+  { label: "Corporativo", category: "empresas", eventType: "conferencias" },
+  { label: "Aniversário", category: "particulares", eventType: "aniversarios" },
+  { label: "Batizado / Comunhão", category: "particulares", eventType: "batizados" },
+  { label: "Jantar de Gala", category: "particulares", eventType: "jantares_gala" },
+  { label: "Outro", category: null, eventType: null },
+];
+
+/** Weddings and christenings are organised by a couple/a family → plural
+ *  register ("o vosso pedido"). Everything else stays singular formal. */
+export function isPluralRegister(eventType: string | null | undefined): boolean {
+  return eventType === "casamentos" || eventType === "batizados";
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM RÓTULO DE LISTA NÃO É UM SUBSTANTIVO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Os rótulos aqui em cima — e os de `EVENT_TYPES_BY_CATEGORY` — existem para
+ * uma LISTA de opções. Vêm no plural («Casamentos»), com barras («Batizado /
+ * Comunhão»), e um deles é a ausência de tipo («Outro»). Servem para quem
+ * escolhe; não servem para «o vosso pedido para o ___».
+ *
+ * Postos dentro de uma frase saíram exactamente como se esperaria, e saíram
+ * para clientes verdadeiros: «É um gosto receber o vosso pedido PARA O
+ * CASAMENTOS de 25 de janeiro», «para o OUTRO de 15 de maio», «para o BATIZADO
+ * / COMUNHÃO de 3 de maio» — a barra de uma lista pendente a meio de uma frase.
+ *
+ * A separação é feita AQUI, na origem, e não em cada sítio que escreve uma
+ * frase, porque eram cinco a remendar e o sexto nascia com o defeito:
+ *
+ *   • `QUOTE_EVENT_OPTIONS[].label` e os `label` da taxonomia — rótulos de
+ *     LISTA. Só para desenhar a lista.
+ *   • {@link eventTypeName} — o NOME do tipo, singular, sem barras, na língua
+ *     de quem lê. É uma ETIQUETA («Evento: Casamento», «Wedding · 12 June»),
+ *     nunca o sujeito de uma frase que precise de artigo.
+ *   • {@link isQuoteOptionLabel} — reconhece um rótulo de lista guardado onde
+ *     devia estar um nome, que é o que a base de dados tem de trás.
+ *
+ * E NENHUMA frase para o cliente depende de um artigo colado ao tipo. Não há
+ * pluralizador nem tabela de géneros (nem os haverá: «Conferência» é feminino,
+ * «Casamento» masculino, e «Outro» não tem salvação nenhuma como substantivo).
+ * As frases foram reescritas para não precisarem — a mesma decisão que o email
+ * à equipa já tinha tomado, em `api/orcamento/route.ts`.
+ */
+
+/**
+ * O NOME de cada tipo de evento, nas duas línguas.
+ *
+ * Guardado fica só o `eventType`: um identificador estável, que não muda com a
+ * língua de quem preencheu nem com a redacção de um rótulo. A tradução é da
+ * LEITURA — como já acontece com a cerimónia e o espaço, mais abaixo. Era o
+ * contrário que punha «Event: Casamento» num email inglês: a língua tinha sido
+ * decidida na ESCRITA, e ficou lá gravada.
+ */
+export const EVENT_TYPE_NAMES: Record<EventType, { pt: string; en: string }> = {
+  casamentos: { pt: "Casamento", en: "Wedding" },
+  batizados: { pt: "Batizado", en: "Christening" },
+  aniversarios: { pt: "Aniversário", en: "Birthday" },
+  jantares_gala: { pt: "Jantar de Gala", en: "Gala Dinner" },
+  conferencias: { pt: "Conferência", en: "Conference" },
+  teambuilding: { pt: "Teambuilding", en: "Team Building" },
+  lancamentos: { pt: "Lançamento de Produto", en: "Product Launch" },
+  jantares_empresa: { pt: "Jantar de Empresa", en: "Company Dinner" },
+};
+
+/** O nome do tipo de evento, na língua de quem lê. Vazio quando não há tipo
+ *  (é o que o «Outro» do formulário grava) ou quando não o conhecemos — e uma
+ *  etiqueta vazia é uma linha que não se escreve, não um espaço em branco. */
+export function eventTypeName(eventType: unknown, locale = "pt"): string {
+  const nome = typeof eventType === "string" ? EVENT_TYPE_NAMES[eventType as EventType] : undefined;
+  if (!nome) return "";
+  return locale.startsWith("en") ? nome.en : nome.pt;
+}
+
+/** Só para comparar rótulos: sem espaços a mais, sem caixa, sem acentos.
+ *
+ *  Exportada porque há um segundo leitor com o mesmo problema: o dicionário de
+ *  idiomas da proposta, que precisa de reconhecer um rótulo NOSSO guardado num
+ *  campo do documento («Casamento», «Civil», «100 a 150») para o poder escrever
+ *  na língua do casal. Duas normalizações escritas em dois sítios divergiriam, e
+ *  o sintoma seria um campo que se traduz aqui e não se traduz ali. */
+export function chaveDeRotulo(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Isto que está guardado como «nome do evento» é, afinal, um rótulo de lista?
+ *
+ * O `eventName` devia ser o nome que o cliente deu ao evento dele («Casamento
+ * da Ana e do João»), e é por isso que vale a pena preferi-lo ao tipo. Mas o
+ * formulário público gravou lá durante muito tempo o rótulo da LISTA — sempre
+ * em português, mesmo nos pedidos feitos em inglês —, e a base de dados está
+ * cheia deles. Reconhecê-los é o que impede que voltem a passar por nome: no
+ * portal apareciam ao lado do tipo, «Casamento · Casamento · 15 de maio», e
+ * num pedido inglês «Wedding · Casamento».
+ */
+export function isQuoteOptionLabel(value: unknown): boolean {
+  const chave = chaveDeRotulo(value);
+  if (!chave) return false;
+  const rotulos = [
+    ...QUOTE_EVENT_OPTIONS.map((o) => o.label),
+    ...Object.values(EVENT_TYPES_BY_CATEGORY).flatMap((tipos) => tipos.map((t) => t.label)),
+  ];
+  return rotulos.some((r) => chaveDeRotulo(r) === chave);
+}
+
+/**
+ * A ETIQUETA do evento, na língua de quem lê: o nome que o cliente lhe deu, ou
+ * o tipo que escolheu. Vazia quando não há nem um nem outro — e uma etiqueta
+ * vazia não se escreve.
+ *
+ * Etiqueta é tudo o que isto é: entra depois de um «·» ou de um «Evento:»,
+ * onde nunca há concordância para discordar. Não é para se lhe colar um artigo
+ * à frente.
+ */
+export function eventTagLabel(
+  quote: { eventName?: string | null; eventType?: string | null },
+  locale = "pt",
+): string {
+  const proprio = String(quote.eventName ?? "").trim();
+  if (proprio && !isQuoteOptionLabel(proprio)) return proprio;
+  return eventTypeName(quote.eventType, locale);
+}
+
 export const EVENT_TYPES_BY_CATEGORY: Record<
   EventCategory,
   {
@@ -606,6 +753,102 @@ export const LOCATION_LABELS: Record<LocationType, string> = {
   pequena_cidade: "Cidade Pequena / Zona Rural",
   internacional: "Internacional / Destino",
 };
+
+/**
+ * ORDENS DE GRANDEZA PARA QUEM AINDA NÃO SABE O NÚMERO EXACTO.
+ *
+ * Marcar «ainda a definir» dizia à equipa apenas que não havia número — e um
+ * casamento de 40 pessoas e um de 300 não são o mesmo trabalho nem o mesmo
+ * orçamento. Quase toda a gente que ainda não fechou a lista sabe a ordem de
+ * grandeza, e é isso que estes intervalos pedem.
+ *
+ * Os cortes seguem os limites reais dos eventos dela (`minGuests`/`maxGuests`
+ * em EVENT_TYPES_BY_CATEGORY): os casamentos vão de 30 a 500.
+ */
+export const GUEST_RANGES: { id: string; label: string; en: string }[] = [
+  { id: "ate-50", label: "Até 50", en: "Up to 50" },
+  { id: "50-100", label: "50 a 100", en: "50 to 100" },
+  { id: "100-150", label: "100 a 150", en: "100 to 150" },
+  { id: "150-200", label: "150 a 200", en: "150 to 200" },
+  { id: "200-300", label: "200 a 300", en: "200 to 300" },
+  { id: "mais-300", label: "Mais de 300", en: "More than 300" },
+];
+
+/** O rótulo de um intervalo, na língua do pedido. Vazio se não o conhecermos. */
+export function guestRangeLabel(id: unknown, locale = "pt"): string {
+  const r = GUEST_RANGES.find((x) => x.id === id);
+  if (!r) return "";
+  return locale.startsWith("en") ? r.en : r.label;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * TIPO DE CERIMÓNIA — civil, religiosa, ou as duas
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Muda o trabalho antes de mudar o preço. Uma cerimónia religiosa acontece
+ * numa igreja que não é o espaço do copo de água: é um segundo sítio para
+ * decorar, com regras próprias (o que a paróquia deixa pôr, a que horas se
+ * pode montar) e uma deslocação da equipa a meio do dia. Uma cerimónia civil
+ * costuma acontecer no próprio espaço, e aí a decoração da cerimónia e a do
+ * cocktail são a mesma montagem.
+ *
+ * Saber isto no PEDIDO evita a pergunta na primeira chamada — e evita orçamentar
+ * uma montagem quando eram duas, que é a maneira mais cara de descobrir.
+ *
+ * ── PORQUE É QUE SÃO QUATRO E NÃO DUAS ───────────────────────────────────
+ *
+ * Ela pediu «civil ou religiosa». Em Portugal, muitos casais fazem as duas (o
+ * registo civil antes, a igreja no dia), e há quem faça uma cerimónia simbólica
+ * com celebrante — sem valor legal, mas com arco, cadeiras e passadeira, que
+ * para quem decora é uma cerimónia a sério. Com duas opções só, esses casais
+ * escolheriam a errada, e uma resposta errada é pior do que uma em branco.
+ *
+ * Não há opção «ainda não sei» de propósito: o campo é OPCIONAL e as opções
+ * desmarcam-se, portanto não responder já é a resposta «ainda não sabemos».
+ */
+export const CEREMONY_TYPES: { id: string; label: string; en: string }[] = [
+  { id: "civil", label: "Civil", en: "Civil" },
+  { id: "religiosa", label: "Religiosa", en: "Religious" },
+  { id: "civil-religiosa", label: "Civil e religiosa", en: "Civil and religious" },
+  { id: "simbolica", label: "Simbólica", en: "Symbolic" },
+];
+
+/** O rótulo do tipo de cerimónia, na língua do pedido. Vazio se não o conhecermos. */
+export function ceremonyTypeLabel(id: unknown, locale = "pt"): string {
+  const c = CEREMONY_TYPES.find((x) => x.id === id);
+  if (!c) return "";
+  return locale.startsWith("en") ? c.en : c.label;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * INTERIOR OU EXTERIOR — a pergunta que decide o plano B
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É a diferença entre pôr um arranjo numa mesa e pôr o mesmo arranjo onde ele
+ * tem de aguentar vento, sol de agosto e a hipótese de chover. Ao ar livre há
+ * flores que não sobrevivem à tarde, velas que não ficam acesas, estruturas que
+ * precisam de peso, e há sempre uma montagem alternativa a preparar para o caso
+ * de o tempo virar — trabalho que existe ou não existe consoante esta resposta,
+ * e que ninguém consegue orçamentar sem ela.
+ *
+ * Ao contrário do tipo de cerimónia, esta pergunta aparece em TODOS os eventos:
+ * um aniversário no jardim e um jantar de empresa numa sala têm exactamente o
+ * mesmo problema.
+ */
+export const SPACE_TYPES: { id: string; label: string; en: string }[] = [
+  { id: "interior", label: "Interior", en: "Indoors" },
+  { id: "exterior", label: "Exterior", en: "Outdoors" },
+  { id: "interior-exterior", label: "Interior e exterior", en: "Indoors and outdoors" },
+];
+
+/** O rótulo do tipo de espaço, na língua do pedido. Vazio se não o conhecermos. */
+export function spaceTypeLabel(id: unknown, locale = "pt"): string {
+  const s = SPACE_TYPES.find((x) => x.id === id);
+  if (!s) return "";
+  return locale.startsWith("en") ? s.en : s.label;
+}
 
 export const BUDGET_RANGES: { id: string; label: string }[] = [
   { id: "ate_5k", label: "Até €5.000" },

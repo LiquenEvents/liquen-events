@@ -78,6 +78,36 @@ describe("PATCH /api/propostas/[id]", () => {
     expect(store.update).not.toHaveBeenCalled();
   });
 
+  /**
+   * O `respondedAt` é um `timestamptz` na base (ver db/schema.sql) e estava ao
+   * lado de quatro campos validados, sem verificação nenhuma: uma string
+   * qualquer fazia a escrita rebentar lá dentro e sair daqui um 500.
+   */
+  it("recusa uma data de resposta que não é uma data", async () => {
+    authed.ok = true;
+    const res = await PATCH(req({ respondedAt: "logo à tarde" }), ctx("p1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("aceita uma data de resposta real, e o vazio continua a limpar", async () => {
+    authed.ok = true;
+    expect((await PATCH(req({ respondedAt: "2026-07-20T10:00:00.000Z" }), ctx("p1"))).status).toBe(
+      200,
+    );
+    expect((await PATCH(req({ respondedAt: "" }), ctx("p1"))).status).toBe(200);
+  });
+
+  it("as notas são texto, e com tecto — não um objecto de 50 MB", async () => {
+    authed.ok = true;
+    const mau = await PATCH(req({ followUpNote: { nao: "é texto" } }), ctx("p1"));
+    expect(mau.status).toBe(400);
+
+    await PATCH(req({ lostNote: "x".repeat(9000) }), ctx("p1"));
+    const patch = store.update.mock.calls.at(-1)![1] as Record<string, string>;
+    expect(patch.lostNote.length).toBe(2000);
+  });
+
   it("returns 404 when the proposal does not exist", async () => {
     authed.ok = true;
     store.update.mockResolvedValueOnce(null);

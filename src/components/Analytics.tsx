@@ -1,4 +1,9 @@
+"use client";
+
 import Script from "next/script";
+import { usePathname } from "next/navigation";
+import PlausibleTracker from "./PlausibleTracker";
+import { isTokenRoute } from "@/lib/safe-path";
 
 /**
  * Privacy-friendly analytics (Plausible) — cookieless, no consent banner needed,
@@ -16,8 +21,13 @@ import Script from "next/script";
  *      and add that host to the CSP `script-src` in next.config.ts.
  */
 export default function Analytics() {
+  const pathname = usePathname();
   const domain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
   if (!domain) return null;
+  // Nas rotas com token o Plausible reportaria o caminho da página — que ali É
+  // o segredo do cliente — para o plausible.io. Cookieless não quer dizer
+  // inofensivo: o token seguiria na mesma para fora. Não se monta ali.
+  if (isTokenRoute(pathname)) return null;
   const src = process.env.NEXT_PUBLIC_PLAUSIBLE_SRC || "https://plausible.io/js/script.js";
   let origin = "";
   try {
@@ -32,8 +42,9 @@ export default function Analytics() {
           browser idle time (`lazyOnload`) so it never competes with first-paint
           hydration. `defer` keeps it non-blocking as well. Early events are not
           lost — the queue stub below runs `afterInteractive` and buffers them
-          until this script loads and flushes `window.plausible.q`. */}
-      <Script defer data-domain={domain} src={src} strategy="lazyOnload" />
+          until this script loads and flushes `window.plausible.q`. Wrapped so a
+          Speculation-Rules prerender never fires a phantom pageview. */}
+      <PlausibleTracker src={src} domain={domain} />
       {/* Custom-events queue stub: makes `window.plausible(...)` callable (and
           buffered) before the script finishes loading, so early CTA/form events
           aren't dropped. Kept `afterInteractive` so the queue exists as early as

@@ -23,7 +23,7 @@ export const pt = {
       name: "Stephanie & Mizio",
       role: "Evento Privado",
       quote:
-        "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
+        "Estava tudo exatamente como tínhamos imaginado, criaram um espaço lindíssimo para nós!",
     },
     {
       name: "Teresinha Malta",
@@ -74,58 +74,66 @@ export const pt = {
     retomar: "Retomar rotação dos testemunhos",
     pausarLogos: "Pausar desfile de logótipos",
     retomarLogos: "Retomar desfile de logótipos",
-    whatsappPrefill: "Olá, gostaria de saber mais sobre a decoração de eventos.",
+    whatsappPrefill:
+      "Olá! Gostaria de saber mais sobre a decoração e organização de eventos da Líquen Events e como podem ajudar-me a planear o meu.",
     // Localized alt text for the shared marketing imagery (served on both
     // languages — a hardcoded PT alt would leave EN pages untranslated).
     imageAlt: {
-      homeHero: "Líquen Events — evento aéreo no Alentejo",
-      homeWedding: "Casamento ao pôr do sol numa herdade no Alentejo",
-      contactoHero: "Vista aérea de uma herdade preparada para um evento no Alentejo",
-      sobrePortrait: "Momento de casamento decorado pela Líquen Events no Alentejo",
-      sobreGolden: "Celebração de casamento à luz dourada no Alentejo",
-      sobreOutdoor: "Casamento ao ar livre decorado pela Líquen Events no Alentejo",
+      homeHero: "Líquen Events: vista aérea de um evento",
+      homeWedding: "Casamento ao pôr do sol numa herdade",
+      contactoHero: "Vista aérea de uma herdade preparada para um evento",
+      sobrePortrait: "Momento de casamento decorado pela Líquen Events",
+      sobreGolden: "Celebração de casamento à luz dourada",
+      sobreOutdoor: "Casamento ao ar livre decorado pela Líquen Events",
       clientesAerial: "Vista aérea de evento Líquen Events",
-      servicosCeremony: "Cerimónia ao ar livre organizada pela Líquen Events no Alentejo",
-      servicosEvening: "Casamento celebrado ao anoitecer numa quinta no Alentejo",
+      servicosCeremony: "Cerimónia ao ar livre organizada pela Líquen Events",
+      servicosEvening: "Casamento celebrado ao anoitecer numa quinta",
       orcamentoPanel: "Jantar de festa com mesa posta e decoração à luz de velas",
-      galeriaHeader: "Galeria de casamentos e eventos decorados pela Líquen Events no Alentejo",
+      galeriaHeader: "Galeria de casamentos e eventos decorados pela Líquen Events",
       galeriaInstagram: "Eventos decorados pela Líquen Events no Instagram",
-      sobreCelebration: "Celebração de casamento decorada pela Líquen Events no Alentejo",
-      sobreFounder: "Catarina Gaspar — Fundadora & CEO da Líquen Events",
-      clientesCorporate: "Evento corporativo decorado pela Líquen Events em Évora",
+      sobreCelebration: "Celebração de casamento decorada pela Líquen Events",
+      sobreFounder: "Catarina Gaspar, Fundadora & CEO da Líquen Events",
+      clientesCorporate: "Evento corporativo decorado pela Líquen Events",
       clientesDinner: "Jantar de evento decorado pela Líquen Events",
       servicosEndOfDay: "Evento decorado pela Líquen Events ao final do dia",
       contactoBand: [
-        "Cerimónia de casamento ao ar livre no Alentejo",
-        "Casamento ao pôr do sol numa herdade alentejana",
+        "Cerimónia de casamento ao ar livre",
+        "Casamento ao pôr do sol numa herdade",
         "Mesa posta de jantar de casamento com decoração floral",
       ],
+    },
+    // A saudação da página de entrada do back office (ver
+    // EntradaComFotografia.tsx). Manhã até ao meio-dia, tarde até às 20h.
+    entradaAdmin: {
+      bomDia: "Bom dia",
+      boaTarde: "Boa tarde",
+      boaNoite: "Boa noite",
     },
   },
 
   meta: {
     ogLocale: "pt_PT",
-    homeTitle: "Decoração de Eventos e Casamentos em Évora | Líquen Events",
+    homeTitle: "Decoração de Casamentos e Eventos | Líquen Events",
     homeDescription:
-      "Decoração de casamentos, eventos corporativos e celebrações em Évora, no Alentejo e em Portugal. Do conceito ao último detalhe — peça orçamento.",
-    sobreTitle: "Empresa de Decoração de Eventos no Alentejo",
+      "A Líquen Events decora e coordena casamentos, eventos de empresa e celebrações privadas. Mais de 100 eventos desde 2018.",
+    sobreTitle: "Empresa de Decoração e Coordenação de Eventos",
     sobreDescription:
-      "Líquen Events, empresa de decoração de eventos em Évora. Mais de 100 casamentos e celebrações decorados no Alentejo e em todo o Portugal desde 2018.",
-    servicosTitle: "Decoração de Casamentos e Eventos no Alentejo",
+      "Líquen Events, empresa de decoração e coordenação de eventos. Mais de 100 casamentos e celebrações decorados desde 2018.",
+    servicosTitle: "Decoração de Casamentos e Eventos",
     servicosDescription:
-      "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas em Évora, no Alentejo e em Portugal.",
-    galeriaTitle: "Galeria de Casamentos e Eventos — Alentejo",
+      "Decoração e coordenação de casamentos e decoração de eventos corporativos, jantares de gala e festas privadas.",
+    galeriaTitle: "Galeria de Casamentos e Eventos",
     galeriaDescription:
-      "Galeria de fotografias de eventos decorados pela Líquen Events no Alentejo e em Portugal — casamentos, eventos corporativos, conferências e celebrações.",
+      "Galeria de fotografias de eventos decorados pela Líquen Events: casamentos, eventos corporativos, conferências e celebrações.",
     clientesTitle: "Empresas e Instituições que Confiam em Nós",
     clientesDescription:
-      "Empresas e instituições que confiam na Líquen Events: Universidade de Évora, Câmara Municipal de Évora, José de Mello, Aernnova, Mainova e muitas mais.",
-    contactoTitle: "Contacto — Peça o Seu Orçamento de Evento",
+      "Empresas e instituições que confiam na Líquen Events: universidades, câmaras municipais, José de Mello, Aernnova, Mainova e muitas mais.",
+    contactoTitle: "Contacto: Peça o Seu Orçamento de Evento",
     contactoDescription:
-      "Contacte a Líquen Events para organizar o seu evento em Évora, no Alentejo ou em todo o Portugal. Resposta em menos de 24 horas úteis com proposta à medida.",
-    orcamentoTitle: "Pedir Orçamento — Casamentos e Eventos",
+      "Contacte a Líquen Events para decorar o seu evento, onde quer que aconteça. Receba uma proposta à medida.",
+    orcamentoTitle: "Pedir Orçamento: Casamentos e Eventos",
     orcamentoDescription:
-      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas — respondemos com uma proposta à medida em 24 horas úteis.",
+      "Peça o seu orçamento à Líquen Events. Diga-nos o tipo de evento, a data e o número de pessoas, e receba uma proposta à medida.",
   },
 
   // JSON-LD structured data (StructuredData.tsx) — kept in the dictionary so
@@ -140,7 +148,7 @@ export const pt = {
     ],
     servicosServiceName: "Decoração de eventos e coordenação de casamentos",
     servicosServiceDescription:
-      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e celebrações. Com base em Évora, no Alentejo, para todo o Portugal.",
+      "Decoração e coordenação de casamentos, e decoração de eventos corporativos, conferências e celebrações.",
   },
 
   home: {
@@ -161,8 +169,7 @@ export const pt = {
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Tem um evento",
     ctaTitleLine2: "em mente?",
-    ctaText:
-      "Conte-nos a sua ideia. Sem compromisso — respondemos com uma proposta à medida em menos de 24 horas úteis.",
+    ctaText: "Conte-nos a sua ideia. Ouvimos a sua visão e respondemos com uma proposta à medida.",
   },
 
   sobre: {
@@ -173,9 +180,9 @@ export const pt = {
     manifestoEyebrow: "A nossa essência",
     manifestoTitleLine1: "Decoramos eventos.",
     manifestoTitleLine2: "Eternizamos memórias.",
-    manifestoText: "Desde 2018 que transformamos espaços em experiências — em todo o Portugal.",
+    manifestoText: "Mais de 100 eventos desde 2018.",
     // Legenda de canto (idioma-capítulo) sobre a fotografia do manifesto.
-    manifestoImageCaption: "Évora · Alentejo",
+    manifestoImageCaption: "Eventos · desde 2018",
     statementLead: "Não decoramos apenas espaços.",
     statementRest: " Desenhamos experiências que ficam para sempre.",
     founderEyebrow: "As pessoas",
@@ -185,21 +192,21 @@ export const pt = {
     ctaEyebrow: "Vamos criar juntos",
     ctaTitleLine1: "Vamos trabalhar",
     ctaTitleMoss: "juntos?",
-    ctaText: "Da primeira conversa ao último brinde, tratamos de cada detalhe do seu evento.",
+    ctaText: "Da primeira conversa ao último brinde, o evento fica connosco.",
     galleryAlt: [
-      "Cerimónia de casamento ao ar livre numa herdade do Alentejo",
+      "Cerimónia de casamento ao ar livre numa herdade",
       "Festa de casamento sob luzes suspensas ao anoitecer",
       "Noivos abraçados durante a celebração do casamento",
       "Mesa posta de casamento com flores e velas",
-      "Casamento ao entardecer ao ar livre no Alentejo",
-      "Decoração floral de cerimónia de casamento no Alentejo",
+      "Casamento ao entardecer ao ar livre",
+      "Decoração floral de cerimónia de casamento",
     ],
   },
 
   galeria: {
     headerLabel: "Os nossos momentos",
     headerTitle: "Galeria",
-    headerDesc: "Casamentos, eventos corporativos e celebrações — capturados ao pormenor.",
+    headerDesc: "Casamentos, eventos corporativos e celebrações, capturados ao pormenor.",
     instaEyebrow: "Redes sociais",
     instaTitle: "Siga-nos no Instagram",
     instaText: "Partilhamos os bastidores dos nossos eventos e inspirações diárias.",
@@ -214,11 +221,11 @@ export const pt = {
       Evento: "Evento",
     },
     alt: {
-      Casamento: "Casamento decorado pela Líquen Events no Alentejo",
+      Casamento: "Casamento decorado pela Líquen Events",
       Corporativo: "Evento corporativo organizado pela Líquen Events",
       Conferência: "Conferência organizada pela Líquen Events",
       Aéreo: "Vista aérea de evento da Líquen Events",
-      Evento: "Evento organizado pela Líquen Events em Portugal",
+      Evento: "Evento organizado pela Líquen Events",
     },
     lbGallery: "Galeria",
     lbPhoto: "foto",
@@ -233,6 +240,9 @@ export const pt = {
     photosLabel: "fotos",
     keyboardHint: "← → navegar · esc fechar · deslize no telemóvel",
     backToTop: "Voltar ao topo",
+    gridLabel: "Galeria de fotografias",
+    gridHint: "Use as setas para percorrer as fotos e Enter para abrir.",
+    photoUnavailable: "Foto indisponível",
   },
 
   clientes: {
@@ -240,10 +250,10 @@ export const pt = {
     heroTitleLine1: "Os Nossos",
     heroTitleMoss: "Clientes",
     heroLead:
-      "Empresas, instituições e famílias que nos escolheram para os seus momentos mais especiais — e que nos honram com a sua confiança.",
+      "Empresas, instituições e famílias que nos escolheram para os seus momentos mais especiais, e que nos honram com a sua confiança.",
     scroll: "Scroll",
     leadPre:
-      "De grandes empresas a celebrações de família, são dezenas os que confiam à Líquen Events os seus momentos mais importantes — e a essa confiança respondemos com ",
+      "De grandes empresas a celebrações de família, são inúmeros os que nos confiam os seus momentos mais importantes. A essa confiança respondemos com ",
     leadMoss: "rigor, criatividade e dedicação",
     leadPost: " em cada detalhe.",
     desde: "Desde",
@@ -264,7 +274,7 @@ export const pt = {
       },
       {
         name: "Stephanie & Mizio",
-        text: "Estava tudo exatamente como tínhamos imaginado — criaram um espaço lindíssimo para nós!",
+        text: "Estava tudo exatamente como tínhamos imaginado, criaram um espaço lindíssimo para nós!",
         event: "Evento Privado",
       },
       {
@@ -291,13 +301,12 @@ export const pt = {
     ctaEyebrow: "Próximo evento",
     ctaTitleLine1: "Junte-se aos",
     ctaTitleLine2: "nossos clientes",
-    ctaText:
-      "Conte-nos a sua ideia e mostramos-lhe como a podemos transformar num evento memorável.",
+    ctaText: "Conte-nos a sua ideia e dizemos-lhe o que é preciso para a pôr de pé.",
     galleryAlt: [
-      "Receção de evento corporativo num pátio em Évora",
-      "Casamento com decoração floral numa herdade do Alentejo",
-      "Jantar de gala à luz de velas num evento no Alentejo",
-      "Casamento ao ar livre com mesa posta e arranjos florais no Alentejo",
+      "Receção de evento corporativo num pátio",
+      "Casamento com decoração floral numa herdade",
+      "Jantar de gala à luz de velas",
+      "Casamento ao ar livre com mesa posta e arranjos florais",
       "Jantar de gala com mesa posta e velas",
       "Gala corporativa num salão decorado à noite",
       "Evento institucional com palco e plateia",
@@ -310,7 +319,7 @@ export const pt = {
       ctaTitleLine1: "Peça o seu",
       ctaTitleMoss: "orçamento.",
       ctaText:
-        "Conte-nos sobre o seu evento — respondemos com uma proposta à medida em menos de 24 horas úteis. Para uma pergunta rápida, use um dos canais diretos.",
+        "Conte-nos sobre o seu evento e respondemos com uma proposta à medida. Para uma pergunta rápida, use um dos canais diretos.",
       ctaButton: "Pedir orçamento",
     },
     testimonialsEyebrow: "O que dizem os nossos clientes",
@@ -320,7 +329,7 @@ export const pt = {
         title: "Recebemos o seu pedido",
         desc: "Analisamos o seu pedido e preparamos uma resposta à medida.",
       },
-      { title: "Entramos em contacto", desc: "Em menos de 24 horas úteis, marcamos uma conversa." },
+      { title: "Entramos em contacto", desc: "Marcamos uma conversa para conhecer a sua visão." },
       { title: "Proposta à medida", desc: "Proposta detalhada, com orçamento transparente." },
       { title: "Começamos a criar", desc: "Tratamos de cada detalhe para um evento inesquecível." },
     ],
@@ -338,18 +347,17 @@ export const pt = {
       heroTitleMoss: "extraordinário",
       infoEyebrow: "Encontre-nos",
       emailLabel: "E-mail",
-      emailSub: "Respondemos em menos de 24 horas úteis",
+      emailSub: "Respondemos a cada pedido com atenção",
       phoneLabel: "Telefone",
       phoneSub: "Ligue ou envie mensagem",
       locationLabel: "Localização",
-      locationValue: "Évora, Alentejo — em todo o Portugal",
+      locationValue: "Onde o seu evento acontecer",
       locationSub: "Reuniões presenciais disponíveis",
       quoteLink: "Pedir orçamento para o seu evento",
       whatsappLink: "Falar pelo WhatsApp",
       googleLink: "Ver no Google · Deixar avaliação",
-      promise:
-        "Respondemos a todos os pedidos em menos de 24 horas úteis, com uma proposta personalizada.",
-      promiseSign: "— Equipa Líquen Events",
+      promise: "Respondemos a todos os pedidos com uma proposta personalizada.",
+      promiseSign: "Equipa Líquen Events",
       stepLabels: ["Evento", "Dados", "Detalhes", "Mensagem"],
       eventCards: [
         { value: "Corporativo", desc: "Conferências, teambuildings, jantares" },
@@ -388,7 +396,7 @@ export const pt = {
       voltar: "Voltar",
       enviar: "Enviar Pedido",
       enviando: "A enviar…",
-      resposta24: "Resposta em 24h",
+      resposta24: "Proposta à medida",
       errNome: "Indique o seu nome",
       errEmail: "E-mail inválido",
       error: "Não foi possível enviar. Tente novamente ou contacte-nos pelo WhatsApp.",
@@ -398,8 +406,8 @@ export const pt = {
       successThanks: "Obrigado",
       successText: ". Em breve entraremos em contacto para avançarmos juntos no seu evento.",
       successSteps: [
-        { n: "01", t: "Analisamos o seu pedido", d: "Nas próximas horas" },
-        { n: "02", t: "Entramos em contacto", d: "Em menos de 24 horas úteis" },
+        { n: "01", t: "Analisamos o seu pedido", d: "Com toda a atenção" },
+        { n: "02", t: "Entramos em contacto", d: "Em breve" },
         { n: "03", t: "Enviamos proposta à medida", d: "Personalizada para si" },
       ],
       successWhatsApp: "Acompanhar pelo WhatsApp",
@@ -410,16 +418,16 @@ export const pt = {
         a: "Para casamentos recomendamos pelo menos 12 meses de antecedência. Para eventos corporativos, 3 a 6 meses é o ideal. Para celebrações mais simples, 4 a 8 semanas é geralmente suficiente.",
       },
       {
-        q: "Trabalham em todo o território nacional?",
-        a: "Sim. Trabalhamos em todo o Portugal continental e ilhas. Temos uma vasta rede de fornecedores e parceiros em diversas regiões.",
+        q: "Deslocam-se ao local do evento?",
+        a: "Sim. Deslocamo-nos ao local do seu evento. Temos uma vasta rede de fornecedores e parceiros de confiança.",
       },
       {
         q: "Podem assumir apenas parte da organização?",
-        a: "Absolutamente. Podemos tratar de tudo — da conceção à execução — ou assumir apenas áreas específicas como decoração, coordenação do dia, catering ou audiovisual. Adaptamos o serviço ao que precisa.",
+        a: "Absolutamente. O que fazemos é decoração e coordenação: podemos desenhar e executar toda a decoração do evento e coordenar o dia, ou entrar apenas numa parte, só o conceito, só a decoração floral, só a coordenação. Adaptamos o serviço ao que precisa.",
       },
       {
         q: "Como funciona o processo de orçamentação?",
-        a: "Após o primeiro contacto e uma conversa inicial (sem compromisso), preparamos uma proposta detalhada com orçamento transparente. Não há surpresas nem custos escondidos.",
+        a: "Após o primeiro contacto e uma conversa inicial, preparamos uma proposta detalhada com orçamento transparente. Não há surpresas nem custos escondidos.",
       },
       {
         q: "Trabalham com diferentes orçamentos?",
@@ -437,8 +445,8 @@ export const pt = {
     eyebrow: "Pedido de orçamento",
     titleLine1: "Conte-nos",
     titleMoss: "a sua ideia",
-    lead: "Sem compromisso. Respondemos com uma proposta à medida em menos de 24 horas úteis.",
-    processHint: "Pedido → Proposta em 24h → Reunião",
+    lead: "Ouvimos a sua visão e respondemos com uma proposta à medida para o seu evento.",
+    processHint: "Pedido → Proposta → Reunião",
     eventTypeLabels: [
       "Casamento",
       "Corporativo",
@@ -448,29 +456,110 @@ export const pt = {
       "Outro",
     ],
     labelTipo: "Tipo de evento",
+    // Só aparece no casamento. Perguntado como uma conversa, não como uma
+    // lista de compras: o que se quer saber é ONDE querem decoração.
+    labelDecor: "Onde quer decoração?",
+    hintDecor: "Diga-nos onde quer a decoração do seu casamento.",
+    // Só aparece no casamento. A pergunta é feita pelo que ela muda no trabalho
+    // — uma cerimónia religiosa é um segundo sítio para decorar — e não como
+    // uma curiosidade sobre a vida de quem preenche.
+    labelCerimonia: "Que tipo de cerimónia?",
+    hintCerimonia: "Se for na igreja, é mais um espaço para decorar além do da festa.",
+    // Aparece em todos os tipos de evento.
+    labelEspaco: "O espaço é interior ou exterior?",
+    hintEspaco: "Diga-nos apenas se vai ser num espaço interior ou ao ar livre.",
     labelData: "Data do evento",
     dateFlexibleLabel: "Data ainda a definir",
+    guestsFlexibleLabel: "Ainda a definir",
+    hintPessoasAprox:
+      "Mais ou menos quantas? Uma estimativa chega, e ajuda-nos a preparar a proposta.",
     labelPessoas: "Nº de pessoas",
     labelLocal: "Local / região",
     labelNome: "Nome",
     labelEmail: "E-mail",
     labelTelefone: "Telefone",
-    labelMensagem: "Mensagem",
+    // The one field that decides whether the proposal can be designed or only
+    // priced. Asked as a question, not a form label.
+    labelMensagem: "Como imagina o seu evento?",
     phPessoas: "Ex.: 120",
-    phLocal: "Ex.: Évora, Alentejo…",
+    /**
+     * ── DOIS NOMES, SEM PRESUMIR QUEM SÃO ─────────────────────────────────
+     *
+     * Dizia "Nome do noivo" e "Nome da noiva". Para dois homens ou duas
+     * mulheres, o formulário estava a dizer-lhes que não contava com eles —
+     * logo no primeiro contacto, e num pedido de orçamento de casamento, que é
+     * o momento em que menos se quer que isso aconteça.
+     *
+     * Os dois campos passam a ser IGUAIS, "Nome" e "Nome", debaixo de "Nomes do
+     * casal". Não é uma solução tímida: é a única que não tem de escolher uma
+     * ordem nem um género. Quem distingue os campos é o rótulo acessível
+     * (`aria-label`), que diz "uma das pessoas" e "a outra pessoa" — para quem
+     * ouve o formulário em vez de o ver não ficar com dois campos "Nome"
+     * indistinguíveis.
+     *
+     * Os dados já estavam certos: o servidor guarda `partnerA`/`partnerB`
+     * desde sempre. Era só o texto.
+     */
+    labelNoivos: "Nomes do casal",
+    phNoivo: "Nome",
+    phNoiva: "Nome",
+    ariaNoivoA: "Nome de uma das pessoas do casal",
+    ariaNoivoB: "Nome da outra pessoa do casal",
+    hintNoivos: "Aparecem na proposta.",
+    phLocal: "Ex.: cidade ou espaço do evento…",
     phNome: "O seu nome",
     phEmail: "email@exemplo.com",
+    /**
+     * O email continua a ser PEDIDO, deixou é de ser exigido a quem dá o
+     * telemóvel. A dica diz as duas coisas por ordem: qual preferimos, e o que
+     * se perde ao não o deixar. Fica debaixo do campo, e não numa nota
+     * genérica lá em cima, porque é ali que a decisão se toma.
+     */
+    hintEmail: "Preferimos o email: é por lá que segue a confirmação do pedido.",
     phTelefone: "+351 9XX XXX XXX",
-    phMensagem: "Conte-nos o que imagina para o seu evento — local, ambiente, detalhes especiais…",
+    phMensagem: "Estilo, cores, ambiente, inspirações que guardou…",
+    hintMensagem:
+      "Quanto mais nos contar sobre o estilo que tem em mente, as cores, o ambiente, referências que guardou, mais à medida sai a proposta. É por aqui que a começamos a desenhar.",
     errNome: "Indique o seu nome",
     errEmail: "E-mail inválido",
+    /**
+     * ── A FRASE DA REGRA «EMAIL OU TELEMÓVEL», NUM SÓ SÍTIO ────────────────
+     *
+     * A invariante é do SERVIDOR (`quoteFormSchema`, em src/lib/validation.ts):
+     * tem de haver pelo menos uma forma de responder. A rota devolve esta frase
+     * quando a recusa vem de lá (`mensagemDeValidacao`, em
+     * src/app/api/orcamento/route.ts, que a lê daqui) e o formulário mostra-a
+     * ao lado do campo antes de chegar a enviar. É de propósito que é a MESMA:
+     * ler o mesmo erro escrito de duas maneiras faz duvidar de que seja o mesmo
+     * erro.
+     */
+    errContacto: "Indique um email ou um telemóvel para lhe podermos responder.",
     errTipo: "Selecione o tipo de evento.",
+    errData: "Indique a data, ou marque \u201cData ainda a definir\u201d.",
+    errPessoas: "Indique quantas pessoas, ou marque \u201cAinda a definir\u201d.",
+    errLocal: "Indique o local ou a região.",
+    errTelefone: "Indique um telefone com 9 dígitos.",
+    errMensagem: "Conte-nos como imagina o evento. É o que nos permite preparar a proposta.",
     enviar: "Enviar pedido",
     enviando: "A enviar…",
     ouWhatsApp: "ou pelo WhatsApp",
     error: "Não foi possível enviar. Tente novamente ou fale connosco pelo WhatsApp.",
-    requiredNote: "Os campos marcados com * são obrigatórios.",
-    submitReassure: "Sem compromisso · Resposta em menos de 24 horas úteis.",
+    /**
+     * Dizia «Todos os campos são obrigatórios.» e passou a ser falso no dia em
+     * que o contacto deixou de exigir os dois. Uma chave de campos obrigatórios
+     * que mente é pior do que não existir: manda preencher o que não é preciso,
+     * e quem só tem telemóvel para dar lê ali que não pode enviar.
+     */
+    requiredNote: "Todos os campos são obrigatórios, exceto o contacto: basta um dos dois.",
+    /**
+     * O que acontece A SEGUIR a quem envia sem email, dito ANTES de enviar.
+     * A confirmação automática vai por email; sem email não vai a lado nenhum,
+     * e deixar a pessoa à espera de uma coisa que nunca chega é o mesmo que
+     * lhe mentir devagar.
+     */
+    avisoSemEmail:
+      "Sem email não recebe a confirmação por escrito. Respondemos-lhe pelo telemóvel que nos deixar.",
+    submitReassure: "Uma proposta à medida, pensada ao detalhe.",
     privacyPre: "Ao enviar, aceita a nossa ",
     privacyLinkLabel: "Política de Privacidade",
     privacyPost: ". Não partilhamos os seus dados.",
@@ -480,10 +569,10 @@ export const pt = {
     heroEyebrow: "O que oferecemos",
     heroTitle: ["Cada evento,", "uma história", "por contar"],
     heroLead:
-      "Especializados em casamentos, eventos corporativos e celebrações privadas — soluções personalizadas adaptadas ao seu estilo, gosto e orçamento.",
+      "Casamentos, eventos de empresa e celebrações privadas. Desenhamos a decoração à volta do que tem em mente e do orçamento com que conta.",
     nav: ["Celebrações", "Empresas"],
     interludeEyebrow: "Líquen Events",
-    interludeTitle: "De Évora para todo o Portugal — mais de 100 eventos desde 2018.",
+    interludeTitle: "Mais de 100 eventos desde 2018.",
     verMais: "Ver mais",
     verDetalhes: "Ver detalhes",
     philoEyebrow: "A nossa assinatura",
@@ -491,7 +580,7 @@ export const pt = {
     philoPillars: [
       {
         title: "Decoração",
-        text: "Conceito, flores e cenografia à medida — cada evento com uma identidade própria.",
+        text: "Conceito, flores e cenografia à medida, cada evento com uma identidade própria.",
       },
       {
         title: "Coordenação",
@@ -510,11 +599,7 @@ export const pt = {
         services: [
           {
             title: "Casamentos",
-            desc: "O vosso dia mais especial — coordenação, decoração, fotografia e catering. Tratamos de tudo para só terem de o viver.",
-          },
-          {
-            title: "Aluguer de Viaturas Clássicas",
-            desc: "Carros clássicos com motorista para uma chegada de sonho — da entrada da noiva ao transporte dos convidados.",
+            desc: "O vosso dia mais especial: conceito, decoração floral, cenografia e coordenação no dia. Tratamos de cada detalhe para só terem de o viver.",
           },
           {
             title: "Batizados & Comunhões",
@@ -523,6 +608,10 @@ export const pt = {
           {
             title: "Festas de Aniversário",
             desc: "Festas temáticas ou clássicas para todas as idades. Cada aniversário é uma história.",
+          },
+          {
+            title: "Aluguer de Viaturas Clássicas",
+            desc: "Carros clássicos com motorista para uma chegada de sonho, da entrada da noiva ao transporte dos convidados.",
           },
         ],
       },
@@ -533,28 +622,27 @@ export const pt = {
         services: [
           {
             title: "Eventos Corporativos",
-            desc: "Decoração e cenografia à medida da sua marca — de conferências e lançamentos a jantares de empresa.",
+            desc: "Decoração e cenografia à medida da sua marca, de conferências e lançamentos a jantares de empresa.",
           },
         ],
       },
     ],
     seoEyebrow: "Onde atuamos",
-    seoTitle: "De Évora para Portugal",
+    seoTitle: "Vamos ter consigo",
     seoText:
-      "Casamentos, eventos corporativos e celebrações — do conceito à execução. Com base em Évora, no coração do Alentejo, levamos a nossa equipa e a nossa rede de fornecedores a todo o país.",
+      "Casamentos, eventos corporativos e celebrações, do conceito à execução. Onde quer que seja o seu evento, levamos connosco a nossa equipa e a nossa rede de fornecedores.",
     ctaEyebrow: "Próximo passo",
     ctaTitleLine1: "Vamos dar vida",
     ctaTitleMoss: "à sua ideia?",
-    ctaText:
-      "Fale connosco. Sem compromisso, sem custo. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
+    ctaText: "Fale connosco. Ouvimos a sua ideia e apresentamos uma proposta à sua medida.",
     ctaGaleria: "Ver a galeria",
     galleryAlt: [
-      "Casamento ao ar livre decorado pela Líquen Events no Alentejo",
+      "Casamento ao ar livre decorado pela Líquen Events",
       "Jantar de celebração com decoração elegante à luz de velas",
-      "Vista aérea de um evento numa herdade do Alentejo",
-      "Receção de evento ao final da tarde no Alentejo",
-      "Receção de casamento ao ar livre ao pôr do sol no Alentejo",
-      "Retrato dos noivos durante um casamento no Alentejo",
+      "Vista aérea de um evento numa herdade",
+      "Receção de evento ao final da tarde",
+      "Receção de casamento ao ar livre ao pôr do sol",
+      "Retrato dos noivos durante um casamento",
     ],
   },
 
@@ -569,8 +657,16 @@ export const pt = {
     },
     successEyebrow: "Pedido enviado com sucesso",
     titleLine1: "Recebemos o",
-    titleMoss: "vosso pedido.",
-    lead: "A nossa equipa irá analisar o pedido e entrar em contacto em menos de 24 horas úteis com uma proposta personalizada.",
+    // Register follows the event: plural for a couple/family (casamentos,
+    // batizados), singular formal otherwise — the same rule as the email.
+    titleMoss: "seu pedido.",
+    titleMossPlural: "vosso pedido.",
+    lead: "Vamos ler tudo com atenção, confirmar a disponibilidade da data e pensar no que faz sentido para este evento, antes de responder. O que se segue não é um preço automático, é o princípio de uma proposta feita à medida.",
+    countdown: "Faltam {days} dias para a data do evento.",
+    highSeasonNote:
+      "De maio a outubro as melhores quintas fecham agenda com muita antecedência. Vale a pena não deixar arrastar.",
+    recapTitle: "O que nos contou",
+    recapTitlePlural: "O que nos contaram",
     refLabel: "Referência do Pedido",
     categoria: "Categoria",
     tipo: "Tipo",
@@ -578,19 +674,52 @@ export const pt = {
     convidados: "Convidados",
     data: "Data",
     local: "Local",
+    cerimonia: "Cerimónia",
+    espaco: "Espaço",
+    decoracao: "Decoração",
     mensagem: "Mensagem",
     adicionais: "Serviços Adicionais",
+    openDate: "Ainda a definir",
+    openDateNote:
+      "Sem data fechada temos margem para sugerir fins de semana com melhor disponibilidade e, muitas vezes, melhor preço.",
     noDataNote:
       "Guarde a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto consigo brevemente.",
+    noDataNotePlural:
+      "Guardem a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto convosco brevemente.",
     footerNote: "Proposta formal enviada após análise do pedido pela nossa equipa.",
+    /**
+     * ── QUEM ENVIOU SEM EMAIL TEM DE SABER O QUE NÃO VAI RECEBER ──────────
+     *
+     * O pedido pode chegar só com telemóvel (a regra do servidor é "email OU
+     * telemóvel"). A confirmação automática vai por email, e sem email não vai
+     * a lado nenhum. Sem esta nota, esta página diz "Recebemos o seu pedido" e
+     * a lista de passos promete uma proposta "por email", e a pessoa fica a
+     * vigiar uma caixa de correio onde nunca chega nada.
+     */
+    semEmailNota:
+      "Não nos deixou um email, por isso não recebe esta confirmação por escrito. Guarde a referência acima: respondemos-lhe pelo telemóvel que nos deixou.",
+    semEmailNotaPlural:
+      "Não nos deixaram um email, por isso não recebem esta confirmação por escrito. Guardem a referência acima: respondemos-vos pelo telemóvel que nos deixaram.",
+    /** O passo 2 sem a promessa que não se pode cumprir. Escrito sem tratamento
+     *  para servir os dois registos, como os restantes passos. */
+    stepPropostaSemEmail:
+      "Combinamos a melhor forma de a fazer chegar, por WhatsApp ou por email, se entretanto houver um.",
     proximosPassos: "Próximos passos",
     steps: [
       { label: "Análise do pedido", desc: "A nossa equipa analisa todos os detalhes." },
       { label: "Proposta personalizada", desc: "Enviamos uma proposta detalhada por email." },
       { label: "Reunião de briefing", desc: "Marcamos uma reunião para alinhar a visão." },
-      { label: "Produção do evento", desc: "Tomamos conta de tudo para si." },
+      { label: "Produção do evento", desc: "Tomamos conta de tudo, do início ao fim." },
     ],
     contactIntro: "Para qualquer questão, pode contactar-nos diretamente:",
+    contactIntroPlural: "Para qualquer questão, podem contactar-nos diretamente:",
+    contactWhatsapp: "Falar por WhatsApp",
+    contactWhatsappSub: "O caminho mais rápido até nós.",
+    notFoundTitle: "Não encontrámos este pedido",
+    // No quote here, so the register is unknown — singular formal is the safe
+    // form for an anonymous visitor.
+    notFoundBody:
+      "A ligação pode estar incompleta ou já não ser válida. Se enviou um pedido e não recebeu a nossa confirmação por email, fale connosco e resolvemos no próprio dia.",
     voltarInicio: "Voltar ao Início",
     novoPedido: "Novo Pedido",
     dateLocale: "pt-PT",
@@ -598,8 +727,10 @@ export const pt = {
     signOff: "Com carinho,",
     signName: "Catarina & a equipa Líquen",
     saveDate: "Guardar a data no calendário",
-    whileTitle: "Enquanto preparamos a vossa proposta",
-    whileLead: "Fiquem à vontade para conhecer um pouco do nosso mundo.",
+    whileTitle: "Enquanto preparamos a sua proposta",
+    whileTitlePlural: "Enquanto preparamos a vossa proposta",
+    whileLead: "Fique à vontade para conhecer um pouco do nosso mundo.",
+    whileLeadPlural: "Fiquem à vontade para conhecer um pouco do nosso mundo.",
     exploreGaleria: "Ver a galeria",
     exploreGaleriaSub: "Casamentos e eventos que criámos",
     exploreInsta: "Seguir no Instagram",
@@ -619,7 +750,7 @@ export const pt = {
     viaturasEyebrow: "Serviço exclusivo",
     viaturasTitle: "Aluguer de Viaturas Clássicas",
     viaturasText:
-      "Para uma chegada de sonho — da entrada da noiva ao transporte dos noivos e convidados. Carros clássicos com motorista e todo o cuidado.",
+      "Para uma chegada de sonho, da entrada da noiva ao transporte dos noivos e convidados. Carros clássicos com motorista e todo o cuidado.",
   },
 
   proposta: {
@@ -632,7 +763,7 @@ export const pt = {
     eyebrow: "Proposta para o seu evento",
     greeting: "Olá",
     intro:
-      "Preparámos esta proposta com todo o cuidado para o seu evento. Reveja os detalhes e responda-nos aqui mesmo — será um prazer avançar consigo.",
+      "Preparámos esta proposta com todo o cuidado para o seu evento. Reveja os detalhes e responda-nos aqui mesmo, será um prazer avançar consigo.",
     tableDescricao: "Descrição",
     tableQt: "Qt",
     tableValor: "Valor",
@@ -640,12 +771,13 @@ export const pt = {
     iva: "IVA",
     total: "Total",
     validoAte: "Válida até",
-    footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos —",
+    verPdf: "Ver a proposta completa (PDF)",
+    footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos:",
     dateLocale: "pt-PT",
     response: {
       confirmRecusar: "Tem a certeza que pretende recusar a proposta?",
       confirmAceitar: "Confirma que pretende aceitar esta proposta?",
-      aceiteTitle: "Proposta aceite — obrigado!",
+      aceiteTitle: "Proposta aceite. Obrigado!",
       aceiteBody:
         "Que alegria avançar consigo. A nossa equipa entra em contacto em breve com os próximos passos.",
       rejeitadaTitle: "Resposta registada.",
@@ -674,24 +806,17 @@ export const pt = {
   },
 
   portal: {
-    title: "Portal do Cliente — Líquen Events",
+    title: "Portal do Cliente da Líquen Events",
     eyebrow: "Portal do Cliente",
     greeting: "Olá",
     intro:
       "Aqui reúne, num só lugar, tudo o que diz respeito ao seu evento connosco: a proposta, as condições, os pagamentos e os próximos passos.",
     dateLocale: "pt-PT",
-    // Rótulos amigáveis por tipo de evento (o Portal só lê dados; a substituição
-    // é feita no servidor e enviada como texto simples).
-    eventTypes: {
-      casamentos: "Casamento",
-      batizados: "Batizado",
-      aniversarios: "Aniversário",
-      jantares_gala: "Jantar de Gala",
-      conferencias: "Conferência",
-      teambuilding: "Teambuilding",
-      lancamentos: "Lançamento de Produto",
-      jantares_empresa: "Jantar de Empresa",
-    },
+    // O NOME de cada tipo de evento não está aqui: está em
+    // `orcamento/data.ts` (`EVENT_TYPE_NAMES`), ao lado da taxonomia que o
+    // gera, e é lido de lá pelo portal e pelo email de confirmação. Eram estas
+    // oito palavras escritas duas vezes — e duas listas da mesma coisa acabam
+    // sempre por divergir. Só o que sobra quando NÃO há tipo é copy:
     eventFallbackEmpresa: "Evento Corporativo",
     eventFallbackParticular: "Evento",
     semData: "Data a definir",
@@ -701,7 +826,7 @@ export const pt = {
       statusLabel: "Estado",
       status: {
         rascunho: "Em preparação",
-        enviada: "Enviada — a aguardar a sua resposta",
+        enviada: "Enviada, a aguardar a sua resposta",
         aceite: "Aceite",
         rejeitada: "Recusada",
       },
@@ -719,11 +844,19 @@ export const pt = {
     },
     pagamentos: {
       title: "Pagamentos",
+      // A BASE DITA. As percentagens sem a base de que saem obrigam a uma
+      // conta — e à conta errada: numa proposta escrita como «2.460,00 € +
+      // IVA», 30% do número que se lê são 738,00 €, e a factura que chega diz
+      // 907,74 €. É esta a página onde o cliente confirma o valor antes de
+      // transferir. A mesma frase está no PDF («total a pagar») e no ponto 3
+      // das condições.
       intro:
-        "O pagamento é faseado: 30% de sinal para reservar a data e 70% de saldo antes do evento.",
+        "O pagamento é faseado: {sinal}% de sinal para reservar a data e {saldo}% de saldo antes do evento, calculados sobre o total a pagar (com IVA incluído).",
       scheduleTitle: "Plano previsto",
-      sinal: "Sinal (30%)",
-      saldo: "Saldo (70%)",
+      // As percentagens vêm preenchidas (`fill`) com as da PROPOSTA — é
+      // editável por proposta e é a mesma que as facturas usam.
+      sinal: "Sinal ({sinal}%)",
+      saldo: "Saldo ({saldo}%)",
       faturasTitle: "Faturas",
       thNumero: "Nº",
       thTipo: "Tipo",
@@ -761,7 +894,7 @@ export const pt = {
     errorEyebrow: "Algo correu mal",
     errorTitle: "Ocorreu um erro inesperado.",
     errorText:
-      "Pedimos desculpa pelo incómodo. Tente novamente — se o problema persistir, contacte-nos diretamente e teremos todo o gosto em ajudar.",
+      "Pedimos desculpa pelo incómodo. Tente novamente. Se o problema persistir, contacte-nos diretamente e teremos todo o gosto em ajudar.",
     retry: "Tentar novamente",
     loading: "A carregar",
   },
@@ -772,14 +905,17 @@ export const pt = {
     disponivel: "Disponível para novos eventos",
     paginas: "Páginas",
     servicosTitulo: "Serviços",
+    // Emparelhados por ÍNDICE com `serviceSlugs`, em Footer.tsx. A ordem é a do
+    // catálogo (`SERVICES`), para que acrescentar um serviço seja acrescentar
+    // uma linha no fim de cada uma das três listas.
     serviceLinks: [
       "Decoração de Casamentos",
       "Aluguer de Viaturas Clássicas",
       "Eventos Corporativos",
       "Festas e Aniversários",
+      "Batizados e Comunhões",
     ],
     contacto: "Contacto",
-    country: "Évora, Alentejo, Portugal",
     pedirOrcamento: "Pedir orçamento",
     rights: "Todos os direitos reservados",
     legal: "Legal",

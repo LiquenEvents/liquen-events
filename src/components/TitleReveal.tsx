@@ -3,13 +3,14 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { observeOnceInView } from "@/lib/motion/observeInView";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
+import { WORD_STAGGER_MS, wordStaggerMs } from "@/lib/motion/tokens";
 
 interface Props {
   text: string;
   className?: string;
   /** Element rendered around the words (defaults to span, so it can live inside any heading). */
   as?: "h1" | "h2" | "h3" | "p" | "span";
-  /** ms between consecutive words. */
+  /** ms between consecutive words. Por omissão, o passo de palavra do sítio. */
   step?: number;
   /** ms before the first word starts. */
   delay?: number;
@@ -26,7 +27,10 @@ export default function TitleReveal({
   text,
   className = "",
   as = "span",
-  step = 60,
+  // Era 60 — um valor por omissão que nunca chegou a correr, porque os dois
+  // únicos usos (ambos no /sobre) passavam 50. O sítio tinha três omissões
+  // diferentes para o mesmo gesto de palavra; fica a que está em produção.
+  step = WORD_STAGGER_MS,
   delay = 0,
 }: Props) {
   const ref = useRef<HTMLElement>(null);
@@ -69,7 +73,12 @@ export default function TitleReveal({
           >
             <span
               className={`inline-block ${visible ? "word-rise" : "opacity-0"}`}
-              style={{ "--word-delay": `${delay + i * step}ms` } as React.CSSProperties}
+              // Com tecto (ver `wordStaggerMs`): num título longo as últimas
+              // palavras deixam de acumular atraso, para quem lê não ficar à
+              // espera do fim de uma frase que já começou a levantar-se.
+              style={
+                { "--word-delay": `${delay + wordStaggerMs(i, step)}ms` } as React.CSSProperties
+              }
             >
               {word}
             </span>

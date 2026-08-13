@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     clientNames: "Sofia & Miguel",
     eventType: "Casamento",
     eventDate: "12 de setembro de 2026",
-    location: "Herdade dos Templários, Évora",
+    location: "Herdade dos Templários",
     guests: "150 pax",
     coverImages: [pool[0], pool[4]],
   };

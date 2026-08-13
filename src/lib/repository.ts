@@ -36,6 +36,25 @@ export interface Mapper<T> {
   fileName: string;
   /** Stable identity of an entity. */
   getId(entity: T): string;
+  /**
+   * A COLUNA onde essa identidade vive na base de dados. Omissão: `"id"`.
+   *
+   * ── PORQUE É QUE ISTO TEVE DE EXISTIR ─────────────────────────────────
+   * Estava escrito `"id"` à mão em quatro sítios deste ficheiro. Onze das doze
+   * tabelas chamam-lhe mesmo `id` — o `email-templates-store` até guarda o
+   * slug nessa coluna de propósito, com a razão escrita — e a décima segunda,
+   * `biblioteca_fotos`, tem `path text primary key` e NENHUMA coluna `id`.
+   *
+   * O resultado era invisível em desenvolvimento e total em produção: o
+   * backend de ficheiro usa o `getId` e funciona; o do Supabase perguntava
+   * `where id = '<caminho>'`, o Postgres respondia `42703 — column does not
+   * exist`, e o `isMissingTable` traduzia isso para «a funcionalidade não está
+   * instalada». Etiquetar uma foto respondia 503 a mandar correr um
+   * `db/schema.sql` que já estava certo, e a LQIP e a COR de cada fotografia
+   * nunca chegavam a ser gravadas — em silêncio, porque quem as escreve
+   * envolve-as num `try/catch` de melhor esforço.
+   */
+  idColumn?: string;
   /** Domain object → database row (snake_case columns). */
   toRow(entity: T): Record<string, unknown>;
   /** Database row → domain object. */
@@ -44,7 +63,26 @@ export interface Mapper<T> {
   selectColumns?: string;
   /** Default ordering applied to lists. */
   order?: { column: string; ascending: boolean };
-  /** Upper bound on an unpaginated `list()` read (defaults to DEFAULT_LIST_LIMIT). */
+  /**
+   * Tecto de linhas para um `list()` sem paginação.
+   *
+   * Por OMISSÃO NÃO HÁ TECTO: um `list()` traz a tabela inteira. O comentário
+   * aqui dizia "defaults to DEFAULT_LIST_LIMIT" e essa constante nunca existiu
+   * — quem lesse ficava a pensar que havia uma rede que não há. Hoje nenhum dos
+   * 12 stores define este campo, portanto TODAS as leituras são sem tecto.
+   *
+   * E é de propósito, apesar de parecer o contrário. Um tecto por omissão
+   * ESCONDE dados: numa lista de facturas ou de contratos, devolver as
+   * primeiras N linhas em silêncio é pior do que devolver muitas — a página
+   * fica bonita e falta lá dinheiro. Por isso a truncagem é sempre por adesão
+   * explícita e nunca calada (ver o aviso no `list()` abaixo).
+   *
+   * Quando vale a pena pôr um tecto: numa tabela que cresça sem relação com o
+   * número de eventos (registos de auditoria, telemetria), ou quando uma página
+   * ganhar paginação a sério. Aí define-se aqui, e o aviso do `list()` avisa
+   * quando a página fica cheia — que é o sinal de que a paginação passou a ser
+   * mesmo necessária.
+   */
   listLimit?: number;
   /** Comparator mirroring `order` for the file backend. */
   fileCompare?: (a: T, b: T) => number;
@@ -70,12 +108,135 @@ export interface Backend<T> {
   remove(id: string): Promise<void>;
 }
 
-/** A concurrent write happened between read and write; the caller should re-read and retry. */
-export class ConflictError extends Error {
-  constructor(id: string) {
+/**
+ * Houve uma escrita concorrente entre a leitura e a escrita: quem chama tem de
+ * reler e voltar a tentar. O `updateWith` faz isso sozinho três vezes; se ainda
+ * assim não resolver, este erro sai para fora — e é aí que ele tem de trazer
+ * matéria com que se fale a uma pessoa.
+ *
+ * ── PORQUE É QUE O ERRO TRANSPORTA AS DUAS VERSÕES ────────────────────────
+ * Uma colisão não pode acabar em silêncio (o último a gravar apaga o outro) nem
+ * em erro cru ("Erro interno", que é o mesmo que silêncio com barulho). Quem
+ * gravou tem direito a ver o que o servidor tem AGORA (`current`) ao lado do que
+ * ela estava a gravar (`attempted`) e a escolher — que é exactamente o que a
+ * rota da Visão Geral já faz com o `StaleWriteError` (409 com a versão do
+ * servidor no corpo, ver `src/app/api/visao-geral/route.ts`).
+ *
+ * O `attempted` é a parte que não se pode cortar: sem ele, a resposta de erro é
+ * o sítio onde o trabalho da pessoa desaparece. Com ele, o que ela escreveu
+ * continua recuperável mesmo tendo a gravação sido recusada.
+ */
+export class ConflictError<T = Record<string, unknown>> extends Error {
+  /** A linha em causa. */
+  readonly id: string;
+  /** A tabela, quando quem lançou o erro a conhece — para o registo dizer onde. */
+  readonly table?: string;
+  /** O que o servidor tem agora. É a versão a mostrar ao lado da da pessoa. */
+  readonly current?: T;
+  /** O que esta escrita queria gravar. Não pode perder-se com a recusa. */
+  readonly attempted?: T;
+
+  constructor(id: string, detalhes?: { table?: string; current?: T; attempted?: T }) {
     super(`Concurrent update on "${id}" — stale read`);
     this.name = "ConflictError";
+    this.id = id;
+    this.table = detalhes?.table;
+    this.current = detalhes?.current;
+    this.attempted = detalhes?.attempted;
   }
+}
+
+/**
+ * O `instanceof` sozinho não chega. Em Next o mesmo módulo pode ser carregado
+ * mais do que uma vez (bundles diferentes para rotas, testes que reimportam), e
+ * aí `err instanceof ConflictError` dá falso para um erro que É um
+ * ConflictError — a colisão voltava a sair como 500 "Erro interno" numa rota e
+ * como 409 noutra, consoante o bundle. Reconhecer também pelo `name` é a mesma
+ * defesa que `isMissingTable` e `isUniqueViolation` já fazem por código.
+ */
+export function isConflictError(err: unknown): err is ConflictError {
+  return (
+    err instanceof ConflictError ||
+    (!!err && typeof err === "object" && (err as { name?: unknown }).name === "ConflictError")
+  );
+}
+
+/**
+ * A frase a mostrar quando a repetição não resolveu. Escrita para a pessoa que
+ * está a olhar para o ecrã, não para quem lê registos: diz o que aconteceu, diz
+ * que o texto dela NÃO ficou gravado (o pior seria deixá-la supor que ficou) e
+ * diz o que fazer a seguir.
+ */
+export const MENSAGEM_DE_CONFLITO =
+  "Isto foi alterado por outra pessoa entretanto. O que escreveste NÃO foi gravado — " +
+  "vê a versão que está agora no servidor e volta a aplicar a tua alteração.";
+
+/**
+ * A tabela — ou uma COLUNA dela — ainda não existe na base de dados, quase
+ * sempre porque uma funcionalidade nova foi publicada sem se correr o
+ * `db/schema.sql`.
+ *
+ * Vale a pena distinguir isto de uma avaria: é a diferença entre dizer à equipa
+ * "Erro interno" (que não indica caminho nenhum) e "falta correr o schema no
+ * Supabase, leva um minuto". O Postgres devolve 42P01 (tabela) e 42703
+ * (coluna); o PostgREST responde PGRST205 quando a tabela não está na cache do
+ * esquema e PGRST204 quando é a coluna que lá não está.
+ *
+ * As colunas contam porque o schema cresce por `alter table ... add column if
+ * not exists` (ex.: `proposal_themes.cover_path`): quem publicou o código sem
+ * correr o ficheiro tem exatamente o mesmo problema e exatamente a mesma
+ * solução — e o resto da funcionalidade continua a funcionar sem a coluna.
+ */
+export function isMissingTable(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = (err as { code?: unknown }).code;
+  if (code === "42P01" || code === "PGRST205" || code === "42703" || code === "PGRST204") {
+    return true;
+  }
+  const msg = (err as { message?: unknown }).message;
+  return (
+    typeof msg === "string" &&
+    /relation .* does not exist|column .* does not exist|could not find the table|could not find the .* column|schema cache/i.test(
+      msg,
+    )
+  );
+}
+
+/**
+ * A escrita foi RECUSADA por não haver base de dados ligada em produção (ver
+ * `assertWritableInProd`): gravar num ficheiro efémero seria perder os dados no
+ * deploy seguinte e dizer à equipa que ficaram guardados.
+ *
+ * Tal como a tabela em falta, isto não é uma avaria — é uma instalação
+ * incompleta, e quem está do outro lado merece ouvir isso em vez de "Erro
+ * interno".
+ */
+export function isPersistenceUnavailable(err: unknown): boolean {
+  return (
+    !!err &&
+    typeof err === "object" &&
+    typeof (err as { message?: unknown }).message === "string" &&
+    (err as { message: string }).message.startsWith("Persistence unavailable")
+  );
+}
+
+/**
+ * Erro de chave duplicada com a FORMA do que o Postgres devolve (SQLSTATE
+ * 23505), para o backend de ficheiro poder recusar um id repetido tal como a
+ * chave primária o recusa no Supabase.
+ *
+ * A forma importa: quem chama não olha para o backend, olha para o erro.
+ * `saveOverviewField` decide pelo `isUniqueViolation` se aquilo foi um conflito
+ * (dois dispositivos a estrear o campo) ou uma avaria; `createContractIfAbsent`
+ * conta com o insert a perder a corrida para não emitir um segundo sinal. Se o
+ * ficheiro deixasse passar o duplicado, essas decisões mudavam consoante o
+ * backend — e é precisamente isso que aqui não pode acontecer.
+ */
+function duplicateKeyError(table: string, id: string): Error {
+  return Object.assign(
+    new Error(`duplicate key value violates unique constraint "${table}_pkey" — id "${id}"`),
+    { code: "23505" },
+  );
 }
 
 // ── Supabase backend ──────────────────────────────────────────────────────
@@ -93,6 +254,11 @@ export class SupabaseBackend<T> implements Backend<T> {
   private get colsWithStamp() {
     if (!this.m.touch || this.cols === "*") return this.cols;
     return `${this.cols}, updated_at`;
+  }
+
+  /** A coluna da chave — a do mapper, ou `id` como sempre. Ver `idColumn`. */
+  private get idCol() {
+    return this.m.idColumn ?? "id";
   }
 
   // updated_at as of the read, keyed by the entity object `get` returned.
@@ -125,7 +291,7 @@ export class SupabaseBackend<T> implements Backend<T> {
     const { data, error } = await this.sb
       .from(this.m.table)
       .select(this.colsWithStamp)
-      .eq("id", id)
+      .eq(this.idCol, id)
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
@@ -160,20 +326,20 @@ export class SupabaseBackend<T> implements Backend<T> {
     // we read. Zero rows updated ⇒ someone else wrote in between ⇒ conflict.
     const stamp = cas && typeof cas === "object" ? this.stamps.get(cas as object) : undefined;
     if (stamp !== undefined) {
-      const base = this.sb.from(this.m.table).update(row).eq("id", id);
+      const base = this.sb.from(this.m.table).update(row).eq(this.idCol, id);
       const guarded = stamp === null ? base.is("updated_at", null) : base.eq("updated_at", stamp);
-      const { data, error } = await guarded.select("id");
+      const { data, error } = await guarded.select(this.idCol);
       if (error) throw error;
-      if (!data?.length) throw new ConflictError(id);
+      if (!data?.length) throw new ConflictError<T>(id, { table: this.m.table, attempted: merged });
       return;
     }
 
-    const { error } = await this.sb.from(this.m.table).update(row).eq("id", id);
+    const { error } = await this.sb.from(this.m.table).update(row).eq(this.idCol, id);
     if (error) throw error;
   }
 
   async remove(id: string): Promise<void> {
-    const { error } = await this.sb.from(this.m.table).delete().eq("id", id);
+    const { error } = await this.sb.from(this.m.table).delete().eq(this.idCol, id);
     if (error) throw error;
   }
 }
@@ -185,7 +351,16 @@ export class FileBackend<T> implements Backend<T> {
   // middle, so two concurrent inserts would both read the pre-write array and the
   // second write would clobber the first (lost update). Chaining them through this
   // tail makes read-modify-write atomic within the process.
+  //
+  // A fila vive na INSTÂNCIA, por isso só serializa quem partilha a instância:
+  // ver `createRepository`, que guarda um único FileBackend por repositório
+  // exactamente por causa disto.
   private tail: Promise<unknown> = Promise.resolve();
+  // Instantâneo de cada linha tal como o `get` a devolveu, indexado pela própria
+  // entidade. É o que o `updated_at` é para o backend Supabase — aqui a linha
+  // inteira, porque o ficheiro não tem coluna de versão. WeakMap: as entradas
+  // desaparecem com as entidades, não há nada para limpar.
+  private snapshots = new WeakMap<object, string>();
 
   constructor(
     private readonly m: Mapper<T>,
@@ -239,7 +414,13 @@ export class FileBackend<T> implements Backend<T> {
   }
 
   async get(id: string): Promise<T | null> {
-    return (await this.read()).find((e) => this.m.getId(e) === id) ?? null;
+    const found = (await this.read()).find((e) => this.m.getId(e) === id) ?? null;
+    // Guarda a linha como estava nesta leitura, para o `persist` poder recusar
+    // escrever por cima de uma versão que entretanto mudou.
+    if (found && typeof found === "object") {
+      this.snapshots.set(found as object, JSON.stringify(found));
+    }
+    return found;
   }
 
   async query(_column: string, _value: unknown, predicate: (e: T) => boolean): Promise<T[]> {
@@ -249,19 +430,37 @@ export class FileBackend<T> implements Backend<T> {
 
   async insert(entity: T): Promise<void> {
     this.assertWritableInProd();
+    const id = this.m.getId(entity);
     return this.serialize(async () => {
       const all = await this.read();
+      // A chave primária que o Supabase impõe tem de valer aqui também: sem
+      // esta guarda, dois aceites em corrida punham DOIS contratos na mesma
+      // proposta (e dois sinais a caminho do cliente), porque o `insert` de
+      // ficheiro nunca perdia a corrida que o índice único faz perder.
+      if (all.some((e) => this.m.getId(e) === id)) throw duplicateKeyError(this.m.table, id);
       all.push(entity);
       await this.write(all);
     });
   }
 
-  async persist(id: string, merged: T): Promise<void> {
+  async persist(id: string, merged: T, cas?: T): Promise<void> {
     this.assertWritableInProd();
+    const expected = cas && typeof cas === "object" ? this.snapshots.get(cas as object) : undefined;
     return this.serialize(async () => {
       const all = await this.read();
       const idx = all.findIndex((e) => this.m.getId(e) === id);
       if (idx === -1) return;
+      // Bloqueio optimista, o mesmo que o backend Supabase faz sobre o
+      // `updated_at`: se a linha já não é a que foi lida, alguém escreveu no
+      // meio e o `updateWith` tem de reler e voltar a aplicar a alteração —
+      // sobrepor aqui apagaria o trabalho dessa pessoa sem ninguém dar por isso.
+      if (expected !== undefined && JSON.stringify(all[idx]) !== expected) {
+        throw new ConflictError<T>(id, {
+          table: this.m.table,
+          current: all[idx],
+          attempted: merged,
+        });
+      }
       all[idx] = merged;
       await this.write(all);
     });
@@ -325,7 +524,31 @@ export class Repository<T> {
         await backend.persist(id, merged, current);
         return merged;
       } catch (err) {
-        if (!(err instanceof ConflictError) || attempt >= MAX_ATTEMPTS) throw err;
+        if (!isConflictError(err)) throw err;
+        if (attempt >= MAX_ATTEMPTS) {
+          // Três voltas e o registo continua a mudar debaixo dos pés. Isto já
+          // não é uma corrida entre dois cliques — é gente a trabalhar sobre a
+          // mesma linha ao mesmo tempo, e a resposta certa é dizê-lo, não
+          // insistir até uma das versões vencer por sorte.
+          //
+          // Relemos de propósito antes de desistir: o `current` desta volta já
+          // é velho (foi por isso que a escrita falhou), e quem vai mostrar as
+          // duas versões lado a lado precisa da do servidor, não de uma
+          // terceira. Se a releitura falhar, vale a que temos — nunca ficamos
+          // sem `current`.
+          const doServidor = await backend.get(id).catch(() => null);
+          throw new ConflictError<T>(id, {
+            table: this.mapper.table,
+            current: doServidor ?? current,
+            attempted: merged,
+          });
+        }
+        // Uma pausa curta e desigual entre tentativas. Sem ela as três voltas
+        // acontecem no mesmo instante e disputam a mesma janela: quem perdeu a
+        // primeira perde as três, e o conflito sobe sem ter havido repetição
+        // nenhuma na prática. O acaso separa duas escritas que arrancaram
+        // juntas (dois separadores, dois telemóveis na mesma checklist).
+        await new Promise((r) => setTimeout(r, attempt * 5 + Math.random() * 10));
       }
     }
   }
@@ -338,8 +561,19 @@ export class Repository<T> {
 /** Build a repository that targets Supabase when configured, else the dev file. */
 export function createRepository<T>(mapper: Mapper<T>): Repository<T> {
   const baseDir = path.join(process.cwd(), "data");
+  // UM só FileBackend por repositório. A fila de escrita e os instantâneos do
+  // bloqueio optimista vivem na instância: dar uma instância nova a cada
+  // chamada — como se fazia aqui — dava a cada operação uma fila vazia e uma
+  // memória em branco, e as duas protecções ficavam a não fazer nada. Duas
+  // criações em simultâneo liam ambas o mesmo array e a segunda escrita
+  // apagava a primeira, que é precisamente o que a fila existe para impedir.
+  //
+  // A ESCOLHA do backend continua a ser feita a cada chamada: o Supabase pode
+  // passar a estar configurado a meio da vida do processo.
+  let fileBackend: FileBackend<T> | null = null;
   return new Repository<T>(mapper, () => {
     const sb = getSupabase();
-    return sb ? new SupabaseBackend<T>(mapper, sb) : new FileBackend<T>(mapper, baseDir);
+    if (sb) return new SupabaseBackend<T>(mapper, sb);
+    return (fileBackend ??= new FileBackend<T>(mapper, baseDir));
   });
 }

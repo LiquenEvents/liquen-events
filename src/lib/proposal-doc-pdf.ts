@@ -1,7 +1,6 @@
 import "server-only";
 import {
   PDFDocument,
-  StandardFonts,
   rgb,
   pushGraphicsState,
   popGraphicsState,
@@ -14,61 +13,140 @@ import {
   type PDFPage,
   type PDFImage,
 } from "pdf-lib";
-import sharp from "sharp";
+import fontkit from "@pdf-lib/fontkit";
 import { SITE } from "@/lib/site";
+import {
+  achatarLogotipo,
+  aspetoDaImagem,
+  imageContentKey,
+  resizeToBox,
+  transcodificarParaJpeg,
+  type ImagePlacement,
+} from "@/lib/proposal-image";
 import {
   type ProposalDoc,
   type MoodBoard,
-  resolveProposalMoney,
+  MOOD_BOARD_MAX_IMAGES,
+  depositPercentOf,
   resolveValidUntil,
 } from "@/lib/proposal-doc";
-import { splitThirtySeventy, eur } from "@/lib/money";
+import { ordemDeSaida, eAOrdemEscrita } from "@/lib/proposal-ordem";
+import { ordemDasFotos } from "@/lib/proposal-moodboard";
+import { eurDocumento, milharesComPonto, round2 } from "@/lib/money";
+import { normalizarValor, somaDosExtrasSemIva, totaisDaProposta } from "@/lib/proposal-budget";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
-import { winAnsiSafe } from "@/lib/pdf-text";
+import {
+  CARLITO_REGULAR_TTF_B64,
+  CARLITO_BOLD_TTF_B64,
+  CARLITO_ITALIC_TTF_B64,
+} from "@/lib/proposal-fonts";
+import { opcionaisDe, totaisDasVersoes } from "@/lib/orcamento/versoes-da-proposta";
+import { textoParaFonte } from "@/lib/pdf-text";
+import {
+  alturaDaLegenda,
+  caixasDoMoodboard,
+  layoutSugerido,
+  caixasDaCapa,
+  caixasDoCollage,
+  PAGINA_W,
+  PAGINA_H,
+  PAGINA_M,
+  TEXTO_DO_MOODBOARD as TXT,
+  type CaixaPdf,
+} from "@/lib/proposal-geometria";
+import { log } from "@/lib/logger";
+import {
+  blocosFixosNaLingua,
+  camposDoEventoNaLingua,
+  referenciaNaLingua,
+  rotuloDoTotalNaLingua,
+  textosDaProposta,
+  IDIOMA_POR_OMISSAO,
+  type CampoDoEvento,
+  type IdiomaDaProposta,
+} from "@/lib/proposal-doc-textos";
+import { docNaLingua } from "@/lib/proposal-doc-bilingue";
 
-const PT_MONTHS_SHORT = [
-  "jan.",
-  "fev.",
-  "mar.",
-  "abr.",
-  "mai.",
-  "jun.",
-  "jul.",
-  "ago.",
-  "set.",
-  "out.",
-  "nov.",
-  "dez.",
-];
-/** "2026-09-12" → "12 de set. de 2026"; passes through anything unexpected. */
-function prettyDate(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return iso;
-  const mo = Number(m[2]);
-  if (mo < 1 || mo > 12) return iso;
-  return `${Number(m[3])} de ${PT_MONTHS_SHORT[mo - 1]} de ${m[1]}`;
-}
+/**
+ * A DATA POR EXTENSO mudou-se para `proposal-doc-textos.ts`, com o resto do que
+ * o documento diz por si.
+ *
+ * Os meses eram abreviados («out.») e passaram a por extenso porque a única
+ * data que passa por aqui é a validade da proposta — «Esta proposta é válida
+ * até 11 de outubro de 2026» — e três linhas acima, nas Condições Gerais, o
+ * mesmo documento escreve «no dia 29 de maio de 2027», que é texto dela. Duas
+ * datas na mesma folha com dois formatos diferentes é a marca de duas mãos a
+ * escrever o mesmo papel; e é por isso, também, que a forma inglesa põe o dia à
+ * frente (ver lá o porquê).
+ *
+ * O motor de leitura aceita as duas formas (`[a-zç]{3,10}` em `campos.ts`),
+ * portanto a ida e volta em português continua a devolver a data.
+ */
 
-// ── Landscape A4 ──
-const W = 841.89;
-const H = 595.28;
-const M = 56; // page margin — generous editorial whitespace
+/**
+ * O SEPARADOR DE MILHARES DESTA FOLHA É O PONTO — e hoje o de todas.
+ *
+ * O `eurDoc` e o `milharesComPonto` nasceram aqui, privados, porque o problema
+ * era desta folha: o «Valor Total» é texto escrito por ela, e ela escreve-o
+ * como toda a gente escreve em Portugal («12.300,00 €»), enquanto o `Intl` de
+ * pt-PT escrevia «12 300,00 €» — ou «2460,00 €», sem separador nenhum, porque
+ * só agrupa a partir de cinco dígitos. Os dois lado a lado, no mesmo quadro.
+ *
+ * O mesmo defeito estava, sem ninguém dar por ele, na factura (base com espaço,
+ * IVA sem nada, total com espaço — TUDO na mesma coluna) e no email que leva
+ * esta proposta em anexo («7.890,00 €» no PDF, «7890,00 €» no email). Por isso
+ * o formatador mudou-se para o `money.ts`, ao lado do `eur`, e passou a ser o
+ * de todos os artefactos que o cliente lê. A decisão continua a ser a mesma —
+ * o que mudou foi o âmbito; o raciocínio inteiro está escrito lá.
+ *
+ * O `milharesComPonto` continua a ser usado À PARTE do `eurDocumento` nos
+ * sítios em que o valor é TEXTO DELA (o «Valor Total» escrito à mão, o valor
+ * de um adicional): aí não há número nenhum para formatar, só pontuação para
+ * acertar com a do resto da folha.
+ */
+
+/**
+ * A taxa de IVA como se escreve ao lado do valor: 0,23 → «23%», 0,06 → «6%».
+ *
+ * Com casas decimais quando as tem (0,235 → «23,5%»), e com a vírgula do
+ * português. O rótulo diz a taxa de propósito: «IVA» sozinho obriga quem lê a
+ * saber qual foi aplicada, e uma proposta com taxa reduzida deixava de se poder
+ * conferir a partir do papel.
+ */
+const percentagemDoIva = (taxa: number): string =>
+  `${new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 2 }).format(round2(taxa * 100))}%`;
+
+// ── Landscape A4 ── (a fonte é `proposal-geometria`, partilhada com o estúdio)
+const W = PAGINA_W;
+const H = PAGINA_H;
+const M = PAGINA_M; // page margin — generous editorial whitespace, let the page breathe
+/**
+ * O CHÃO DA MANCHA — abaixo disto não se escreve.
+ *
+ * Um número só, para todas as secções. Era `M + 6` numas e `M + 24` noutras, e
+ * havia secções (o cronograma) onde simplesmente não havia chão nenhum: o texto
+ * continuava a ser desenhado para baixo, para fora da folha, sem erro e sem
+ * aviso. O rodapé é desenhado em `M - 26`; isto fica bem acima dele.
+ */
+const CHAO = M + 6;
 // Max text measure: long lines (~120+ chars edge-to-edge) are the biggest "DIY"
 // tell. Cap body copy near the 45–75 char ideal.
 const MEASURE = 430;
 
-// ── Image rendering quality knobs ──
-// Point boxes are drawn at 72pt/inch; we rasterise at DENSITY× that (= DENSITY·72
-// dpi) so photos stay crisp on screen and in print. Cover strips are large and
-// prominent → 3× (216 dpi). Mood-board cells are many and smaller → 2.5× (180 dpi)
-// keeps the PDF lean. Capped at MAX_IMG_PX so we never upscale-and-bloat past the
-// source (the client caps cover uploads at 3000px, boards at 1600px).
-const COVER_DENSITY = 3;
-const COLLAGE_DENSITY = 2.5;
-const MAX_IMG_PX = 3000;
+// ── Type scale (one display, one subtitle, one body, one caption) ──
+const T_DISPLAY = 20; // section titles (serif)
+const T_SUB = 13; // sub-section / group titles (serif)
+const T_BODY = 10; // body copy
+const T_CAPTION = 7.5; // eyebrows / captions (uppercase)
+
+// ── Qualidade das imagens ──
+// O orçamento de pixéis por sítio (capa vs célula de mood board) e o encode
+// vivem em `@/lib/proposal-image`, com o raciocínio de DPI. Aqui só se diz ONDE
+// cada foto é desenhada; quantos pixéis isso vale é decidido lá.
 
 // ── Brand palette ──
-const MOSS = rgb(0.388, 0.478, 0.373); // #637a5f
+// Moss/gold are deliberately rare now — quiet ink & grey type on white carry the
+// interior; a single gold hairline marks the one accent moment (the total).
 const INK = rgb(0.165, 0.149, 0.125); // #2a2620
 const MUTED = rgb(0.42, 0.4, 0.36);
 const FAINT = rgb(0.55, 0.53, 0.49);
@@ -83,6 +161,167 @@ interface Fonts {
   serifIt: PDFFont;
 }
 
+// ── O que o DESENHO deixa de fora ──
+//
+// O documento tem limites de composição: a página de mood board desenha 6
+// fotos, a descrição do mood board 5 linhas, cada campo do evento 2 linhas, o
+// nome na capa 2 linhas. Até aqui, o que passava desses limites desaparecia sem
+// deixar rasto: as fotos tinham sido carregadas, tinham sido descarregadas do
+// armazenamento com sucesso, e simplesmente não eram desenhadas.
+//
+// É a MESMA perda que a contagem de "fotos em falta" foi criada para apanhar
+// (uma proposta seguiu para um noivo com fotos a menos e ninguém deu por isso),
+// só que por outro caminho: ali a foto não chegou, aqui chegou e não coube.
+// Por isso é contada — mas SEPARADA de `missingImages`, porque a causa e a
+// correcção são outras: em falta = avaria, tenta-se de novo; cortado = escolha
+// editorial, tira-se uma foto ou encurta-se o texto.
+// Descrição sob o collage. O tecto vive na geometria, com o resto das medidas
+// da página — a pré-visualização do estúdio corta no mesmo sítio.
+const MAX_ANNOTATION_LINES = TXT.legenda.maxLinhas;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A GEOMETRIA DO COLLAGE, SEPARADA DO DESENHO
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Estas duas funções não desenham nada: dizem apenas ONDE, e com que tamanho,
+   cada fotografia vai ser posta na página. Estavam dentro do `drawCollage`, em
+   linha com o desenho.
+
+   Saíram de lá por uma razão concreta. Quem vai BUSCAR as fotos ao
+   armazenamento (`proposal-doc-render.ts`) precisa de saber o tamanho da caixa
+   ANTES de descarregar seja o que for — é isso que lhe permite pedir a
+   miniatura de 400 px para uma célula de 266 px em vez do original de 2200 px
+   e 576 KB. Sem isto, a única forma de saber o tamanho era desenhar, e a
+   única forma de desenhar era já ter descarregado tudo.
+
+   Ter a geometria em DOIS sítios (uma cópia aqui, outra no resolvedor) seria
+   pior do que não a ter: divergiriam, e o sintoma seria uma fotografia
+   ampliada e desfocada numa proposta, meses depois, sem ninguém perceber
+   porquê. Por isso é uma função só, e é esta que o desenho usa.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * A geometria mudou-se para `@/lib/proposal-geometria` — o mesmo raciocínio de
+ * cima, com um terceiro leitor: o ESTÚDIO, no browser, que precisa de mostrar
+ * cada foto com a forma que ela vai ter no documento. Este ficheiro é
+ * `server-only`, portanto nada do lado do cliente lhe pode tocar; a geometria
+ * não é, e continua a ser uma função só.
+ *
+ * Reexportado aqui para que quem já importava daqui — e os testes que substituem
+ * este módulo — continue a funcionar sem saber que a casa mudou.
+ */
+export { caixasDaCapa, caixasDoCollage, type CaixaPdf };
+const MAX_EVENT_FIELD_LINES = 2; // cada campo da faixa de detalhes
+const MAX_COVER_NAME_LINES = 2; // nome do casal na capa
+
+/** Uma perda por COMPOSIÇÃO: o conteúdo chegou inteiro ao gerador e o desenho
+ *  não o mostra todo. Estruturada (e não uma frase feita) para o estúdio poder
+ *  escrever a mensagem no idioma da interface e somar o que quiser. */
+export interface DocTruncation {
+  /** Onde, em pt-PT, como aparece ao utilizador: `Mood board «Cerimónia»`. */
+  where: string;
+  /** Quantas unidades ficaram por desenhar (nunca 0 — o que cabe não se anota). */
+  dropped: number;
+  /** O que se perdeu, para a frase concordar em número e género. */
+  unit: "fotos" | "linhas";
+}
+
+/** Regista uma truncagem (ignora `dropped <= 0`, que é o caso normal). */
+type NoteTruncation = (where: string, dropped: number, unit: DocTruncation["unit"]) => void;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UMA SÓ ORDEM PARA O DOCUMENTO INTEIRO
+   ═══════════════════════════════════════════════════════════════════════════
+
+   ── O QUE FOI PARA A CLIENTE ─────────────────────────────────────────────
+   Na proposta da Tara e do Marty, a lista de Serviços (pág. 02) dizia
+   Cerimónia → Complementos → Cocktail → Jantar e o quadro do Orçamento
+   (pág. 11) dizia Cerimónia → Cocktail → Jantar → Complementos. As mesmas
+   quatro rubricas, o mesmo documento, duas ordens.
+
+   ── PORQUE É QUE DIVERGEM ────────────────────────────────────────────────
+   Porque são DUAS LISTAS ESCRITAS À MÃO, sem nada que as ligue:
+   `serviceGroups` são grupos com itens (rótulo + descrição) e `budgetItems` é
+   um array de nomes soltos — e os mood boards são uma TERCEIRA lista, com os
+   títulos das páginas de inspiração. No estúdio nascem juntas: ao abrir uma
+   proposta, os pontos que o casal marcou no pedido semeiam de uma vez o
+   primeiro grupo de serviços E as linhas do orçamento, pela mesma ordem (ver
+   `seedDefaults`, em ProposalStudio). A partir daí são editores separados:
+   acrescentar uma linha ao orçamento não acrescenta um serviço, e arrastar um
+   serviço não arrasta a linha. Basta uma alteração num dos lados para as duas
+   ordens se separarem — e nada no sistema o dizia.
+
+   ── O QUE SE FAZ AQUI, E O QUE NÃO SE FAZ ────────────────────────────────
+   NÃO se fundem as listas: continuam a ser três, escritas por ela, cada uma
+   com o seu conteúdo. O que passa a haver é uma FONTE ÚNICA DE ORDENAÇÃO —
+   a lista de Serviços, que é a primeira que o casal lê — e o orçamento e os
+   mood boards saem por essa ordem. Ela muda a ordem num sítio (arrastando os
+   serviços) e o documento inteiro segue.
+
+   Três travas, porque isto mexe num documento que vai para clientes:
+
+     · **Sem correspondência, sem mudança.** Uma rubrica que não case com
+       nenhum serviço não é movida: herda o lugar da anterior, ficando colada
+       aos vizinhos com que ela a escreveu. Um documento onde nada case sai
+       exactamente como saía.
+     · **A comparação é conservadora.** Compara-se o nome sem acentos, sem
+       maiúsculas e sem as palavras que não distinguem nada («Decor»,
+       «Decoração», «Design Floral», artigos e preposições): «Decor Cerimónia»,
+       «Decoração Cerimónia» e «Cerimónia» são a mesma rubrica. Se um nome
+       casar com DOIS serviços à mesma distância, não casa com nenhum — na
+       dúvida, não se mexe.
+     · **Diz o que fez.** Toda a reordenação sai no relatório
+       (`reordenacoes`) e nos registos, com as duas ordens à frente uma da
+       outra. Isto não pode acontecer em silêncio.
+
+   ── O QUE FALTA, E NÃO SE PODE FAZER DAQUI ───────────────────────────────
+   Este ficheiro é `server-only`: o estúdio não o pode importar, portanto a
+   lista do editor continua a mostrar a ordem em que ela escreveu as linhas,
+   mesmo quando o PDF as imprime por outra. A correcção de fundo é a mesma que
+   resolveria isto de raiz — as rubricas passarem a ser UMA lista com
+   identidade estável, e o orçamento e os mood boards apontarem para ela — e
+   vive no estúdio (`src/app/**`), fora do alcance desta frente.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Uma lista do documento que saiu por uma ordem diferente daquela em que está
+ * escrita. Estruturada, como as truncagens, para quem mostra escrever a frase.
+ */
+export interface ReordenacaoDoDocumento {
+  /** Onde, em pt-PT: `Orçamento`, `Mood boards`. */
+  onde: string;
+  /** A ordem escrita no documento. */
+  de: string[];
+  /** A ordem impressa — a dos Serviços. */
+  para: string[];
+}
+
+/* As quatro peças da ordenação — `chaveDeRubrica`, `ordemDosCapitulos`,
+   `lugarNaOrdem` e `porOrdemDosCapitulos` — viviam aqui e mudaram-se para
+   `proposal-ordem.ts`. Este ficheiro é `server-only`, e enquanto a regra
+   morou cá dentro o estúdio não a podia ler: o editor mostrava a ordem
+   escrita, o PDF imprimia a dos Serviços, e a divergência que ela reportou
+   continuou a ver-se no ecrã onde se trabalha. A regra é a mesma, sem uma
+   linha de lógica alterada; o que mudou foi o sítio, para os dois lados a
+   lerem. Ver o cabeçalho de lá. */
+
+/**
+ * Regista uma foto que CHEGOU inteira ao gerador e que não foi possível
+ * DESENHAR (bytes corrompidos, ou um formato que nem o sharp nem o `pdf-lib`
+ * aceitam).
+ *
+ * Não é uma truncagem: não há aqui escolha de composição nenhuma a morder o
+ * conteúdo — é uma AVARIA, exactamente da mesma família da foto que não resolve
+ * do armazenamento, e a correcção é a mesma (voltar a tentar, ou recarregar a
+ * foto). Por isso soma-se às FOTOS EM FALTA e não ao conteúdo cortado.
+ *
+ * Recebe o base64 da foto para as contar por CONTEÚDO: a mesma foto escolhida
+ * para os dois lados da capa é desenhada quatro vezes (capa + contracapa) e
+ * falharia quatro vezes — dizer "4 fotos em falta" quando é uma só seria mandar
+ * o estúdio procurar fotos que não existem.
+ */
+type NoteUndrawn = (b64: string) => void;
+
 // ── Refined palette additions for the redesign ──
 const CREAM = rgb(0.968, 0.957, 0.933); // #f7f4ee — warm off-white on the dark cover
 const GOLD = rgb(0.541, 0.416, 0.114); // #8a6a1d — accent hairlines / eyebrows on light
@@ -91,8 +330,29 @@ const CREAM_DIM = rgb(0.72, 0.74, 0.71); // muted cream/sage for sub-text on dar
 /** Embed image bytes into the PDF, trying JPEG then PNG by their magic bytes and
  *  never throwing. Returns null when the bytes are neither (so a bad image is
  *  simply omitted instead of failing the whole document). `embedJpg`/`embedPng`
- *  are awaited so a rejection (e.g. "SOI not found in JPEG") is caught here. */
-async function embedImage(doc: PDFDocument, bytes: Buffer): Promise<PDFImage | null> {
+ *  are awaited so a rejection (e.g. "SOI not found in JPEG") is caught here.
+ *
+ *  Último recurso: bytes que não são JPEG nem PNG são CONVERTIDOS para JPEG
+ *  pelo sharp e embutidos assim. O `pdf-lib` só sabe embutir estes dois
+ *  formatos, e a biblioteca do estúdio tem WebP a sério lá dentro (as fotos do
+ *  Pinterest) — sem esta conversão, essas fotos não eram desenhadas de todo e
+ *  ficava um buraco na página de inspiração. */
+async function embedImage(doc: PDFDocument, cru: Buffer): Promise<PDFImage | null> {
+  /**
+   * UM `Buffer` DO NODE NEM SEMPRE COMEÇA NO PRINCÍPIO DA SUA MEMÓRIA.
+   *
+   * Abaixo de 4 KB, o `Buffer.from` serve-se de uma reserva partilhada: o
+   * conteúdo é o esperado, mas vive a meio de um bloco maior — `byteOffset` não
+   * é zero. O `JpegEmbedder` do `pdf-lib` faz `new DataView(bytes.buffer)` e
+   * ignora esse deslocamento, portanto lê o princípio do BLOCO em vez do
+   * princípio da imagem e recusa-a com «SOI not found in JPEG».
+   *
+   * Copiar para um `Uint8Array` que começa onde a imagem começa custa uns
+   * poucos KB e fecha a porta. Atinge só ficheiros pequenos — o caminho
+   * principal vem do sharp, que devolve sempre deslocamento zero — mas uma foto
+   * pequena que desaparece é uma foto que desaparece.
+   */
+  const bytes = new Uint8Array(cru);
   const isJpg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8;
   const isPng = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e;
   if (isJpg) {
@@ -113,12 +373,23 @@ async function embedImage(doc: PDFDocument, bytes: Buffer): Promise<PDFImage | n
   try {
     return await doc.embedJpg(bytes);
   } catch {
-    try {
-      return await doc.embedPng(bytes);
-    } catch {
-      return null;
-    }
+    /* fall through */
   }
+  try {
+    return await doc.embedPng(bytes);
+  } catch {
+    /* fall through */
+  }
+  // Nem JPEG nem PNG: o sharp lê WebP, AVIF, TIFF, GIF… — converte-se para
+  // JPEG baseline e embute-se isso. Guardado como tudo o resto: uma foto que
+  // nem assim entra é omitida, nunca deita abaixo o documento.
+  try {
+    const jpeg = await transcodificarParaJpeg(cru);
+    if (jpeg) return await doc.embedJpg(jpeg);
+  } catch {
+    /* segue para o `null` */
+  }
+  return null;
 }
 
 /** Draw `img` to COVER the box (x,y,w,h) — the same visual result as CSS
@@ -154,16 +425,44 @@ function drawImageCover(
   page.pushOperators(popGraphicsState());
 }
 
-/** Cover-crop a base64 image into the point box (x,y,w,h) on `page` and draw it.
+/**
+ * Cache de imagens JÁ EMBUTIDAS neste documento, por CONTEÚDO + caixa de
+ * destino. A capa é desenhada duas vezes (página 1 e contracapa) e a mesma foto
+ * pode ser escolhida para os dois lados: sem isto, a mesma fotografia era
+ * redimensionada pelo sharp e escrita no PDF até quatro vezes. Guarda-se a
+ * Promise (não o resultado) para que dois desenhos simultâneos da mesma foto
+ * partilhem o mesmo trabalho.
+ */
+type EmbedCache = Map<string, Promise<PDFImage | null>>;
+
+/** Corre `make` uma só vez por `key` dentro deste documento. */
+function once(cache: EmbedCache, key: string, make: () => Promise<PDFImage | null>) {
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const pending = make();
+  cache.set(key, pending);
+  return pending;
+}
+
+/** Recorta uma imagem base64 para a caixa (x,y,w,h) de `page` e desenha-a.
  *
- *  Primary path: sharp smart-crops to the box's EXACT aspect at `density`× and
- *  re-encodes as high-quality JPEG (mozjpeg, full 4:4:4 chroma); drawing that at
- *  the box dims cannot distort. Fallback (sharp unavailable/failed): the ORIGINAL
- *  image is embedded and drawn via `drawImageCover`, which preserves aspect ratio
- *  through clipping — so it looks like the sharp path and STILL cannot be
- *  stretched (fixing the "fotos esticadas" the studio saw on the fallback path).
- *  Any hard failure (bad bytes, non-image) draws nothing: the caller's hairline
- *  frame remains and the PDF is always produced. Never throws. */
+ *  Caminho principal: `resizeToBox` recorta ao aspeto EXATO da caixa, com os
+ *  pixéis que o sítio (`placement`) justifica, e reencoda em JPEG baseline —
+ *  desenhar isso às medidas da caixa não pode distorcer. Recurso (sharp
+ *  indisponível/falhado): embute-se o ORIGINAL e desenha-se com `drawImageCover`,
+ *  que preserva o aspeto por recorte — parece igual e continua a não poder
+ *  esticar (era o bug das "fotos esticadas"). Nunca lança.
+ *
+ *  DEVOLVE se desenhou mesmo. Quem chama TEM de usar isto: a moldura fina do
+ *  collage só pode ser desenhada por cima de uma foto que exista, e uma foto que
+ *  não se consegue desenhar tem de ser contada como foto em falta. Um rectângulo
+ *  de contorno vazio num PDF que vai para o cliente é pior do que não haver
+ *  caixa nenhuma — foi assim que uma proposta seguiu com 6 molduras e 2 fotos.
+ *
+ *  As duas coisas são distintas e ambas contam: uma foto que sai pelo CAMINHO
+ *  DE RECURSO foi desenhada (devolve `true`, leva moldura) e avisa
+ *  `aoUsarRecurso` — saiu, apenas saiu pesada; só a foto que não se consegue
+ *  desenhar de todo devolve `false`, e essa não avisa ninguém por aqui. */
 async function drawCoverImage(
   doc: PDFDocument,
   page: PDFPage,
@@ -172,55 +471,82 @@ async function drawCoverImage(
   y: number,
   w: number,
   h: number,
-  density: number,
-): Promise<void> {
+  placement: ImagePlacement,
+  cache: EmbedCache,
+  /** Chamado quando esta foto entra pelo caminho de recurso (sem redimensionar). */
+  aoUsarRecurso?: () => void,
+): Promise<boolean> {
   const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
   let input: Buffer;
   try {
     input = Buffer.from(raw, "base64");
   } catch {
-    return;
+    return false;
   }
-  if (input.length < 32) return;
+  if (input.length < 32) return false;
 
-  // Target pixels = density× the point box, capped at MAX_IMG_PX so we never
-  // upscale past the source. Both dims scale together → the cover aspect (w:h)
-  // is preserved, so drawing the result at the box dims cannot stretch it.
-  let tw = Math.max(1, Math.round(w * density));
-  let th = Math.max(1, Math.round(h * density));
-  const over = Math.max(tw, th) / MAX_IMG_PX;
-  if (over > 1) {
-    tw = Math.max(1, Math.round(tw / over));
-    th = Math.max(1, Math.round(th / over));
+  // A chave inclui a caixa: a mesma foto na capa e numa célula de mood board
+  // são embutidas com resoluções diferentes, logo são objetos diferentes.
+  const content = imageContentKey(input);
+  const box = `${Math.round(w)}x${Math.round(h)}:${placement}`;
+
+  const img = await once(cache, `${content}@${box}`, async () => {
+    const cropped = await resizeToBox(input, w, h, placement);
+    return cropped ? await embedImage(doc, cropped) : null;
+  });
+  if (img) {
+    // Recortada ao aspeto exato da caixa — desenhar às medidas dela não estica.
+    page.drawImage(img, { x, y, width: w, height: h });
+    return true;
   }
 
-  // Primary: sharp smart cover-crop → high-quality JPEG.
-  try {
-    const cropped = await sharp(input)
-      .rotate() // bake EXIF orientation so phone photos aren't sideways
-      .resize(tw, th, { fit: "cover", position: "attention", kernel: "lanczos3" })
-      .jpeg({ quality: 90, mozjpeg: true, chromaSubsampling: "4:4:4" })
-      .toBuffer();
-    const img = await embedImage(doc, cropped);
-    if (img) {
-      // Cropped to the exact box aspect — drawing at box dims cannot stretch.
-      page.drawImage(img, { x, y, width: w, height: h });
-      return;
+  // Recurso: embutir o ORIGINAL e ajustar por recorte (nunca esticar). Também
+  // vai a cache — sem isto, uma foto que o sharp não consiga tratar era escrita
+  // por inteiro no ficheiro tantas vezes quantas fosse desenhada.
+  //
+  // ── ISTO TEM DE SE VER ────────────────────────────────────────────────────
+  // Este caminho foi desenhado para o PDF sair sempre, e cumpre — cumpre até
+  // demais: um PDF verdadeiro de 3,31 MB chegou com as fotos a 266–576 DPI
+  // quando o `PLACEMENT_DPI` manda 130–160, porque TODAS entraram por aqui e
+  // ninguém deu por nada. Medido: com este código, as caixas produzem
+  // exactamente 130 e 160 (ver PDF-BEFORE.md).
+  //
+  // Falhar em silêncio é o defeito. Contar não corrige a causa, mas põe-na à
+  // vista: quem gerar uma proposta passa a saber que ela saiu pesada, e o
+  // registo diz porquê.
+  //
+  // ── E TEM DE PASSAR PELO SHARP, NEM QUE SEJA SÓ PARA RODAR ────────────────
+  // O `pdf-lib` lê o tamanho de um JPEG no marcador SOF e não faz ideia do que
+  // seja a orientação EXIF. Uma foto tirada com o telemóvel ao alto vem
+  // guardada deitada, com uma etiqueta a dizer «roda-me» — e por este caminho
+  // era embutida tal como está: DEITADA na página, e recortada contra o eixo
+  // errado, que é a segunda maneira de uma foto sair «desconfigurada».
+  //
+  // `transcodificarParaJpeg` faz `.rotate()` (e achata a transparência), e é
+  // barato comparado com o que se está a evitar. Só se ISSO falhar é que se
+  // embute o original em bruto — o último dos últimos recursos.
+  aoUsarRecurso?.();
+  const orig = await once(cache, `${content}@original`, async () => {
+    const direito = await transcodificarParaJpeg(input);
+    if (direito) {
+      const img = await embedImage(doc, direito);
+      if (img) return img;
     }
-  } catch {
-    /* sharp unavailable/failed — fall through to the aspect-safe clip path */
+    return embedImage(doc, input);
+  });
+  if (orig) {
+    drawImageCover(page, orig, x, y, w, h);
+    return true;
   }
-
-  // Fallback: embed the ORIGINAL bytes and cover-fit with clipping (never stretch).
-  const orig = await embedImage(doc, input);
-  if (orig) drawImageCover(page, orig, x, y, w, h);
-  // else: draw nothing — the caller's hairline frame still renders.
+  // Não há foto nenhuma para esta caixa. Quem chamou não desenha a moldura e
+  // conta-a como em falta.
+  return false;
 }
 
 function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
   // Sanitiza para WinAnsi antes de medir/quebrar — descrições e notas do
   // documento podem trazer caracteres que a Helvetica não codifica.
-  const text = winAnsiSafe(rawText);
+  const text = textoParaFonte(font, rawText);
   const out: string[] = [];
   for (const paragraph of text.split("\n")) {
     const words = paragraph.split(/\s+/).filter(Boolean);
@@ -239,16 +565,210 @@ function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): s
   return out;
 }
 
-export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array> {
-  const pdf = await PDFDocument.create();
-  const f: Fonts = {
-    reg: await pdf.embedFont(StandardFonts.Helvetica),
-    bold: await pdf.embedFont(StandardFonts.HelveticaBold),
-    serif: await pdf.embedFont(StandardFonts.TimesRoman),
-    serifB: await pdf.embedFont(StandardFonts.TimesRomanBold),
-    serifIt: await pdf.embedFont(StandardFonts.TimesRomanItalic),
+/** Como {@link renderProposalDocPdfWithReport}, mas só os bytes — para quem não
+ *  tem a quem dar o relatório (a pré-visualização de desenvolvimento). */
+export async function renderProposalDocPdf(
+  doc: ProposalDoc,
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): Promise<Uint8Array> {
+  return (await renderProposalDocPdfWithReport(doc, idioma)).bytes;
+}
+
+/**
+ * Gera o PDF E diz o que o desenho deixou de fora:
+ *
+ * - `truncations` — conteúdo que chegou inteiro e que a COMPOSIÇÃO não mostra
+ *   todo (ver {@link DocTruncation}).
+ * - `undrawnImages` — fotos distintas que chegaram e que não foi possível
+ *   desenhar (ver {@link NoteUndrawn}). São fotos EM FALTA, e quem chama
+ *   soma-as à contagem que já existe.
+ * - `semRedimensionar` — fotos que FORAM desenhadas, mas pelo caminho de
+ *   recurso, com o original embutido. Não faltam ao cliente; o PDF é que sai
+ *   pesado a abrir e a percorrer.
+ * - `reordenacoes` — listas que saíram por ordem diferente da que está escrita
+ *   no documento, para o casal não ler duas ordens da mesma coisa (ver
+ *   {@link ReordenacaoDoDocumento}). Vazio é o normal: quer dizer que o
+ *   orçamento e os mood boards já estavam pela ordem dos serviços.
+ *
+ * As duas últimas não se confundem: uma foto ou não sai (`undrawnImages`) ou
+ * sai pesada (`semRedimensionar`) — nunca as duas.
+ *
+ * O relatório sai daqui, e não de uma contagem feita por fora, porque só aqui
+ * se sabe: as linhas dependem das métricas da fonte embutida e da largura da
+ * caixa onde o texto é desenhado, e só aqui se descobre que uma foto não se
+ * consegue embutir. Calculá-lo noutro sítio era garantir que um dia deixava de
+ * coincidir com o que sai impresso.
+ */
+export async function renderProposalDocPdfWithReport(
+  doc: ProposalDoc,
+  /**
+   * A língua em que o DOCUMENTO fala — a moldura, não o conteúdo dela.
+   *
+   * Por omissão português: quem já chamava isto continua a desenhar exactamente
+   * o que desenhava. Ver `proposal-doc-textos.ts` para o que se traduz e o que
+   * sai tal e qual.
+   */
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): Promise<{
+  bytes: Uint8Array;
+  truncations: DocTruncation[];
+  undrawnImages: number;
+  semRedimensionar: number;
+  reordenacoes: ReordenacaoDoDocumento[];
+}> {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O DOCUMENTO PORTUGUÊS — GUARDADO ANTES DE MAIS NADA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * É o documento como ela o escreveu, e é ele que manda em duas coisas que a
+   * projecção não pode tocar:
+   *
+   *  1. A ORDEM. Ver o bloco «UMA SÓ ORDEM PARA O DOCUMENTO INTEIRO» — a ordem
+   *     é calculada pelos NOMES dos serviços, e uma rubrica traduzida deixa de
+   *     casar com o serviço português. Calculada sobre o documento inglês, um
+   *     documento meio traduzido saía com o orçamento e os mood boards por
+   *     outra ordem, em silêncio, e só no PDF do casal inglês.
+   *  2. OS AVISOS. O relatório de truncagens e de reordenações é lido no
+   *     estúdio, que é português — pela mesma razão que o `pt` aqui em baixo
+   *     existe.
+   */
+  const docPt = doc;
+  /**
+   * A prosa dela na língua pedida — o que ela traduziu entra no lugar do
+   * português, o que não traduziu fica como está, sem marca nenhuma no papel.
+   *
+   * A projecção é AQUI e não em cada rota: são cinco os caminhos que desenham
+   * (a pré-visualização do estúdio, o envio, o link do casal, o portal e a
+   * pré-visualização de desenvolvimento), e projectar em cada um era garantir
+   * que um dia um deles se esquecia. É o mesmo ponto onde a língua já entra
+   * para os blocos fixos.
+   *
+   * Em português devolve o MESMO objecto, por referência: o caminho de omissão
+   * não faz cópia nenhuma nem desenha nada de diferente.
+   */
+  doc = docNaLingua(doc, idioma);
+  /** O que o documento diz por si, na língua pedida. */
+  const t = textosDaProposta(idioma);
+  /**
+   * Os mesmos textos em português — para os AVISOS.
+   *
+   * O relatório de truncagens e de reordenações é lido no estúdio, que é
+   * português, e não pode mudar de língua porque o PDF de um casal saiu em
+   * inglês: «Campo «Venue» cortado» manda quem lê procurar um rótulo que não
+   * existe no editor.
+   */
+  const pt = textosDaProposta("pt");
+  /** As notas, condições e observações — traduzidas só quando são as da casa. */
+  const fixos = blocosFixosNaLingua(doc, idioma);
+  /**
+   * A data, o tipo, a cerimónia e o número de convidados — traduzidos só quando
+   * ainda são o que o estúdio lá pôs (ver `proposal-doc-textos.ts`).
+   *
+   * Não substituem o `doc`: os avisos e os registos continuam a citar a proposta
+   * pelos campos em que ela foi escrita, que são os que ela vê no editor.
+   */
+  const evento = camposDoEventoNaLingua(doc, idioma);
+  /** A referência que corre no topo — na língua do documento se foi o estúdio a
+   *  compô-la, tal e qual se foi ela a escrevê-la. */
+  const refImpressa = referenciaNaLingua(doc, idioma);
+  const truncations: DocTruncation[] = [];
+  /** As listas que saíram por ordem diferente da escrita — ver o bloco «UMA SÓ
+   *  ORDEM PARA O DOCUMENTO INTEIRO». Vazio é o normal. */
+  const reordenacoes: ReordenacaoDoDocumento[] = [];
+  /**
+   * Quantas fotos entraram SEM serem redimensionadas.
+   *
+   * Zero é o normal. Qualquer outro número quer dizer que o `sharp` falhou e
+   * que o PDF saiu com as fotos em tamanho de armazenamento — pesado a abrir e
+   * a percorrer. Era exactamente isto que estava a acontecer sem ninguém saber.
+   */
+  let semRedimensionar = 0;
+  const contarRecurso = () => {
+    semRedimensionar++;
   };
-  const logoDark = await pdf.embedPng(Buffer.from(LOGO_DARK_PNG_B64, "base64"));
+  const note: NoteTruncation = (where, dropped, unit) => {
+    if (dropped > 0) truncations.push({ where, dropped, unit });
+  };
+  // Por CONTEÚDO: a mesma foto que falha em vários sítios é uma foto, não
+  // várias (ver NoteUndrawn).
+  const undrawn = new Set<string>();
+  const noteUndrawn: NoteUndrawn = (b64) => {
+    undrawn.add(b64);
+  };
+  /** Corta a `max` linhas E DIZ quantas ficaram de fora. Usar sempre isto em
+   *  vez de `.slice(0, max)`: o `.slice` é mudo, este não. */
+  const clampLines = (lines: string[], max: number, where: string): string[] => {
+    note(where, lines.length - max, "linhas");
+    return lines.slice(0, max);
+  };
+
+  const pdf = await PDFDocument.create();
+  // Uma foto = um redimensionamento e um objeto no ficheiro, por muitas vezes
+  // que seja desenhada (ver EmbedCache). Vive só durante este documento.
+  const images: EmbedCache = new Map();
+  /** Desenha uma foto do documento E conta-a nas duas contagens: quando não sai
+   *  de todo (`noteUndrawn`) e quando sai pelo caminho de recurso, sem
+   *  redimensionar (`contarRecurso`). Usar sempre isto em vez de
+   *  `drawCoverImage` direto: é o que garante que uma foto que não se desenha
+   *  nunca fica invisível para quem vai enviar a proposta, e que um PDF que
+   *  saiu pesado o diz. */
+  const photo = async (
+    p: PDFPage,
+    b64: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    placement: ImagePlacement,
+  ): Promise<boolean> => {
+    const drawn = await drawCoverImage(pdf, p, b64, x, y, w, h, placement, images, contarRecurso);
+    if (!drawn) noteUndrawn(b64);
+    return drawn;
+  };
+  pdf.registerFontkit(fontkit);
+  // Carlito — a free, metric-compatible twin of Microsoft Calibri, the font the
+  // studio's real "PO Decoração" sample proposals are set in. Embedding it (from
+  // base64 WOFF, like the logos) means the generated PDF matches those samples
+  // instead of mixing Helvetica + Times (neither of which appears in the
+  // samples). One family, used everywhere; subset:true keeps only drawn glyphs.
+  const carlito = (b64: string) => pdf.embedFont(Buffer.from(b64, "base64"), { subset: true });
+  const reg = await carlito(CARLITO_REGULAR_TTF_B64);
+  const bold = await carlito(CARLITO_BOLD_TTF_B64);
+  const italic = await carlito(CARLITO_ITALIC_TTF_B64);
+  // The layout still names "serif"/"serifB"/"serifIt" slots for its elegant
+  // moments; in the sample proposals those are simply Calibri regular/bold/
+  // italic, so every slot now resolves to Carlito — one consistent typeface.
+  const f: Fonts = { reg, bold, serif: reg, serifB: bold, serifIt: italic };
+  /**
+   * O logótipo das PÁGINAS DE CONTEÚDO entra achatado contra branco, sem canal
+   * alfa, e à resolução a que é desenhado.
+   *
+   * Antes disto ia como PNG com máscara alfa, composto em todas as páginas e a
+   * 720 DPI — a única transparência do documento e a única coisa em resolução
+   * absurda (as fotografias vão a 130–160). Compor transparência é das
+   * operações mais caras num visualizador de PDF, e estava a ser paga uma vez
+   * por página para desenhar uma marca que assenta sobre branco chapado.
+   *
+   * ── Porque é que só esta, e não a da capa ────────────────────────────────
+   * O `sharp` compõe em luz linear, e o resultado sai um nível abaixo da cor
+   * pedida: medido no ficheiro, a caixa do logótipo dava 11,13,10 onde o painel
+   * escuro da capa dá 12,14,11. Contra o verde-escuro isso desenhava um
+   * RECTÂNGULO visível à volta da marca; contra BRANCO PURO não há desvio
+   * nenhum, porque 255 não tem para onde subir.
+   *
+   * Por isso achata-se a das páginas de conteúdo — que são 10 das 12
+   * utilizações, e portanto quase todo o ganho — e deixa-se a da capa com o
+   * canal alfa. Duas composições de transparência em vez de doze, e a capa
+   * continua exactamente com o aspecto que ela aprovou.
+   *
+   * Se o `sharp` falhar, volta-se ao PNG original: o documento sai na mesma,
+   * apenas sem esta melhoria.
+   */
+  const logoDarkPng = Buffer.from(LOGO_DARK_PNG_B64, "base64");
+  const logoDarkChato = await achatarLogotipo(logoDarkPng, { r: 255, g: 255, b: 255 }, 72);
+  const logoDark = await pdf.embedPng(logoDarkChato ?? logoDarkPng);
+  // A da capa mantém a transparência, pela razão acima.
   const logoWhite = await pdf.embedPng(Buffer.from(LOGO_WHITE_PNG_B64, "base64"));
 
   // Sanitiza no ponto de desenho: campos do documento (nomes, descrições…) podem
@@ -260,7 +780,7 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     y: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) =>
-    p.drawText(winAnsiSafe(s), {
+    p.drawText(textoParaFonte(o.font ?? f.reg, s), {
       x,
       y,
       font: o.font ?? f.reg,
@@ -275,8 +795,8 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     y: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb> } = {},
   ) => {
-    const safe = winAnsiSafe(s);
     const fn = o.font ?? f.reg;
+    const safe = textoParaFonte(fn, s);
     const sz = o.size ?? 10;
     p.drawText(safe, {
       x: xR - fn.widthOfTextAtSize(safe, sz),
@@ -295,8 +815,8 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     y: number,
     o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb>; tracking?: number } = {},
   ) => {
-    const safe = winAnsiSafe(s);
     const fn = o.font ?? f.reg;
+    const safe = textoParaFonte(fn, s);
     const sz = o.size ?? 10;
     if (o.tracking) {
       // Letter-spaced small caps (eyebrows) — draw glyph by glyph.
@@ -319,31 +839,32 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     });
   };
 
-  // Content-page header: colour logo top-left, running ref top-right.
+  // Content-page header: small colour logo top-left, running ref top-right — kept
+  // light and quiet so it never competes with the page's content.
   const header = (p: PDFPage) => {
-    const lw = 84;
+    const lw = 72;
     const lh = (logoDark.height / logoDark.width) * lw;
     p.drawImage(logoDark, { x: M, y: H - M - lh + 6, width: lw, height: lh });
-    textRight(p, doc.ref, W - M, H - M - 4, { size: 8.5, color: FAINT });
+    textRight(p, refImpressa, W - M, H - M - 2, { size: 8, color: FAINT });
   };
 
-  // Slim footer: hairline + brand + centred page number. Called on every content
-  // page so the document reads as one considered, paginated piece.
+  // Calm footer: a pale hairline, quiet brand + email, plain page number. Called
+  // on every content page so the document reads as one considered, paginated piece.
   const footer = (p: PDFPage, pageNum: number) => {
     p.drawLine({
-      start: { x: M, y: M - 6 },
-      end: { x: W - M, y: M - 6 },
-      thickness: 0.6,
+      start: { x: M, y: M - 12 },
+      end: { x: W - M, y: M - 12 },
+      thickness: 0.5,
       color: LINE,
     });
     let bx = M;
     for (const ch of "LÍQUEN EVENTS") {
-      p.drawText(ch, { x: bx, y: M - 20, font: f.bold, size: 7, color: FAINT });
-      bx += f.bold.widthOfTextAtSize(ch, 7) + 1.2;
+      p.drawText(ch, { x: bx, y: M - 26, font: f.bold, size: 6.5, color: FAINT });
+      bx += f.bold.widthOfTextAtSize(ch, 6.5) + 1.4;
     }
-    textRight(p, SITE.email, W - M, M - 20, { size: 7.5, color: FAINT });
-    textCenter(p, `— ${String(pageNum).padStart(2, "0")} —`, W / 2, M - 20, {
-      size: 8,
+    textRight(p, SITE.email, W - M, M - 26, { size: 7, color: FAINT });
+    textCenter(p, String(pageNum).padStart(2, "0"), W / 2, M - 26, {
+      size: 7.5,
       color: FAINT,
     });
   };
@@ -354,24 +875,88 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     pageNo += 1;
     header(p);
     footer(p, pageNo);
-    return H - M - 78;
+    return H - M - 84;
   };
 
-  // Section header: gold eyebrow (letter-spaced) + serif title + a short moss
-  // rule. The one consistent "voice" for every section start.
-  const eyebrow = (p: PDFPage, s: string, x: number, y: number, color = GOLD) => {
-    const sz = 8;
+  // Quiet uppercase eyebrow/label — pale grey by default so it whispers rather
+  // than shouts. The one consistent "voice" for small labels across the document.
+  const eyebrow = (p: PDFPage, s: string, x: number, y: number, color = FAINT, size?: number) => {
+    const sz = size ?? T_CAPTION;
     let cx = x;
-    for (const ch of winAnsiSafe(s.toUpperCase())) {
+    for (const ch of textoParaFonte(f.bold, s.toUpperCase())) {
       p.drawText(ch, { x: cx, y, font: f.bold, size: sz, color });
-      cx += f.bold.widthOfTextAtSize(ch, sz) + 1.6;
+      cx += f.bold.widthOfTextAtSize(ch, sz) + 2;
     }
   };
+  /**
+   * ── AS SECÇÕES SÃO NUMERADAS, COMO NA FOLHA DELA ──────────────────────────
+   *
+   * «1. Apresentação», «2. Serviços», «3. Orçamento Proposto». É assim que a
+   * proposta que ela envia há anos numera os capítulos, e é o que dá ao casal
+   * uma maneira de falar do documento ao telefone («no ponto 3…»).
+   *
+   * O número é CONTADO e não escrito: as secções que existem variam com o
+   * modelo — a de Organização tem cronograma e a de Decoração não —, e dois
+   * números escritos à mão davam, mais cedo ou mais tarde, o defeito que a
+   * folha antiga tem e que não se copia: «2. Serviços» seguido de «2. Serviços
+   * Disponibilizados», duas secções com o mesmo número na mesma página.
+   *
+   * Conta-se por ORDEM DE DESENHO, que é a ordem por que se lê.
+   */
+  let seccoesNumeradas = 0;
+  const numerada = (titulo: string) => `${++seccoesNumeradas}. ${titulo}`;
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O DINHEIRO DO DOCUMENTO — CALCULADO UMA VEZ, PARA AS DUAS FOLHAS
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A folha do orçamento e a folha do fecho falavam do mesmo dinheiro e
+   * calculavam-no cada uma por sua conta — uma em base, a outra em bruto —, e
+   * foi assim que a proposta da Tara e do Marty saiu a dizer 2.950,79 € numa
+   * página e 3.025,80 € (907,74 + 2.118,06) na outra. Agora é um só objecto,
+   * lido duas vezes e calculado nenhuma: ver `totaisDaProposta`.
+   */
+  const totais = totaisDaProposta(doc, depositPercentOf(doc));
+
+  /**
+   * ── A VERIFICAÇÃO ANTES DE GERAR (avisa, não bloqueia) ────────────────────
+   *
+   * Palavras dela: «uma proposta que não sai é pior do que uma proposta com um
+   * aviso». Por isso isto não deita nada abaixo — regista, e o PDF sai na mesma.
+   * O que se verifica é o que falhou a sério: que o subtotal e os adicionais
+   * somam o TOTAL, que o TOTAL e o IVA somam o total a pagar, e que o sinal e o
+   * saldo somam o total a pagar. Se um dia voltar a haver uma conversão a mais
+   * pelo caminho, o cêntimo aparece aqui e não no PDF da cliente.
+   */
+  if (!totais.fecha) {
+    log.error("proposal-doc-pdf: as somas do documento não fecham", null, {
+      ref: doc.ref,
+      porque: totais.porQueNaoFecha.join("; "),
+      totais: {
+        servicos: totais.servicos,
+        adicionais: totais.adicionais,
+        total: totais.total,
+        iva: totais.iva,
+        aPagar: totais.aPagar,
+        sinal: totais.sinal,
+        saldo: totais.saldo,
+      },
+    });
+  }
+
+  // Section header: a small quiet eyebrow, the serif title, and a very thin, short
+  // pale hairline. No colour, no weight — the title alone carries the section.
   const sectionHeader = (p: PDFPage, kicker: string, title: string, y: number): number => {
     eyebrow(p, kicker, M, y);
-    text(p, title, M, y - 22, { font: f.serifB, size: 21, color: INK });
-    p.drawRectangle({ x: M, y: y - 34, width: 46, height: 2, color: MOSS });
-    return y - 52;
+    text(p, title, M, y - 24, { font: f.serifB, size: T_DISPLAY, color: INK });
+    p.drawLine({
+      start: { x: M, y: y - 36 },
+      end: { x: M + 32, y: y - 36 },
+      thickness: 0.6,
+      color: LINE,
+    });
+    return y - 58;
   };
 
   // ── Page 1 — Cover ──
@@ -386,24 +971,19 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       const sideW = (W - panelW) / 2;
       const left = doc.coverImages[0];
       const right = doc.coverImages[1];
-      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, COVER_DENSITY);
-      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, COVER_DENSITY);
+      // A capa não leva moldura (foi retirada a pedido), por isso uma foto que
+      // não saia não deixa cá rectângulo nenhum — mas continua a ser uma foto
+      // que o cliente devia ter visto e não vê, logo é contada. E o `photo`
+      // encaminha também a contagem do caminho de recurso: a capa é a maior
+      // caixa do documento, é a que mais pesa quando entra sem redimensionar.
+      if (left) await photo(p, left, 0, 0, sideW, H, "cover");
+      if (right) await photo(p, right, sideW + panelW, 0, sideW, H, "cover");
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
     const cx = W / 2;
-    // Thin cream frame inset from the trim — a quiet mark of craft. Border only:
-    // a DARK fill here would repaint the whole interior and hide the two side
-    // photos, leaving just the centre band showing.
-    const inset = 22;
-    p.drawRectangle({
-      x: inset,
-      y: inset,
-      width: W - 2 * inset,
-      height: H - 2 * inset,
-      borderColor: rgb(0.32, 0.34, 0.31),
-      borderWidth: 0.6,
-    });
+    // No border frame around the cover — removed on request for a cleaner,
+    // edge-to-edge look (the two side photos run to the trim).
 
     // White logo, upper area.
     const lw = 148;
@@ -411,8 +991,7 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     p.drawImage(logoWhite, { x: cx - lw / 2, y: H - 150, width: lw, height: lh });
 
     // Eyebrow (gold small-caps) + gold rule.
-    const kicker =
-      doc.template === "organizacao" ? "Proposta · Organização" : "Proposta · Decoração";
+    const kicker = doc.template === "organizacao" ? t.capaOrganizacao : t.capaDecoracao;
     textCenter(p, kicker.toUpperCase(), cx, 336, {
       font: f.bold,
       size: 9,
@@ -426,12 +1005,18 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     // Sanitiza para WinAnsi ANTES de medir: widthOfTextAtSize lança em glifos
     // fora do WinAnsi (emoji/CJK num nome de cliente), o que rebentaria o PDF
     // inteiro aqui na capa em vez de degradar graciosamente.
-    const names = winAnsiSafe(doc.clientNames || "");
+    const names = textoParaFonte(f.serif, doc.clientNames || "");
     const maxNameW = (hasImgs ? W * 0.34 : W * 0.72) - 16;
     let nameSize = 52;
     while (nameSize > 26 && f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) nameSize -= 2;
     if (f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) {
-      const nl = wrap(f.serif, names, nameSize, maxNameW).slice(0, 2);
+      // Duas linhas é o que a capa comporta; um nome que peça mais é cortado —
+      // e um nome cortado na capa é a primeira coisa que o cliente vê.
+      const nl = clampLines(
+        wrap(f.serif, names, nameSize, maxNameW),
+        MAX_COVER_NAME_LINES,
+        "Nome na capa",
+      );
       let ny = 278;
       for (const ln of nl) {
         textCenter(p, ln, cx, ny, { font: f.serif, size: nameSize, color: CREAM });
@@ -441,7 +1026,7 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       textCenter(p, names, cx, 262, { font: f.serif, size: nameSize, color: CREAM });
     }
 
-    const sub = [doc.eventType, doc.eventDate].filter(Boolean).join("   ·   ");
+    const sub = [evento.eventType, evento.eventDate].filter(Boolean).join("   ·   ");
     if (sub)
       textCenter(p, sub, cx, 214, { font: f.reg, size: 11, color: CREAM_DIM, tracking: 1.4 });
     if (doc.location)
@@ -455,104 +1040,244 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     frame(p);
     let y = H - M - 64;
     const ensure = (need: number) => {
-      if (y - need < M + 6) {
+      if (y - need < CHAO) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
       }
     };
-    y = sectionHeader(p, "A Proposta", "Apresentação", y);
+    y = sectionHeader(p, t.sobretituloApresentacao, numerada(t.tituloApresentacao), y);
 
-    // Client / couple name in serif — the personal headline of the document.
-    text(p, org ? "Cliente" : "Noivos", M, y, { font: f.bold, size: 8, color: GOLD });
-    text(p, doc.clientNames, M, y - 22, { font: f.serif, size: 22, color: INK });
-    y -= 48;
+    /* ═══════════════════════════════════════════════════════════════════════
+       A APRESENTAÇÃO É UMA LISTA, E A LISTA É A DELA
+       ═══════════════════════════════════════════════════════════════════════
 
-    // Warm opening — a short, personalised welcome sets the tone before the facts.
-    const evento = (doc.eventType || "evento").toLowerCase();
-    const nomes = doc.clientNames || (org ? "Cliente" : "Noivos");
-    const welcome =
-      `Caros ${nomes}, foi com muito gosto que preparámos esta proposta para o vosso ${evento}. ` +
-      "Reunimos aqui a nossa visão, pensada ao pormenor para tornar este momento único. " +
-      "Estamos ao vosso lado em cada passo.";
-    for (const ln of wrap(f.serifIt, welcome, 11.5, MEASURE + 90)) {
-      text(p, ln, M, y, { font: f.serifIt, size: 11.5, color: MUTED });
-      y -= 16;
-    }
-    y -= 18;
+       Era uma folha inteira: o nome do casal em corpo 20, um parágrafo de
+       boas-vindas e os campos numa GRELHA de quatro colunas com as legendas em
+       capitulares espaçadas. A folha dela é outra coisa — uma linha por campo,
+       «Rótulo: valor», o rótulo a negro e o valor em texto normal, tudo por
+       cima dos serviços NA MESMA PÁGINA.
 
-    // Event details as a calm tinted band of labelled columns.
-    const details: [string, string][] = [
-      ...(!org && doc.eventType ? ([["Evento", doc.eventType]] as [string, string][]) : []),
-      ...(doc.eventDate ? ([["Data", doc.eventDate]] as [string, string][]) : []),
-      ...(doc.location ? ([["Local", doc.location]] as [string, string][]) : []),
-      ...(doc.guests ? ([["Convidados", doc.guests]] as [string, string][]) : []),
-      ...(!org && doc.ceremony ? ([["Cerimónia", doc.ceremony]] as [string, string][]) : []),
-      ...(!org && doc.time ? ([["Hora", doc.time]] as [string, string][]) : []),
+       ── O PARÁGRAFO DE BOAS-VINDAS SAIU ────────────────────────────────────
+       Não existe na folha dela, e era ele que pagava a segunda folha: medido,
+       quatro linhas de 17 pontos mais 26 de ar — 94 pontos, quando o que
+       faltava para a secção dos Serviços caber aqui eram 40. E não se perde
+       nenhuma palavra ao casal: o e-mail que leva a proposta já abre com ela
+       («Foi um gosto conhecer a sua visão. Preparámos uma proposta à medida do
+       seu evento», em `email-templates-store.ts`) e a contracapa fecha com a
+       mesma voz («Por nos deixarem fazer parte deste momento»). Duas
+       boas-vindas na mesma proposta eram uma a mais; a que sai é a que a folha
+       de referência não tem.
+
+       ── OS CAMPOS SÃO TODOS OPCIONAIS ──────────────────────────────────────
+       Uma proposta sem hora não pode desenhar «Hora:» seguido de nada. A ordem
+       é a dela; a hora e os wedding planners, que a folha dela não tem, vêm no
+       fim, ao pé da cerimónia, que é a família a que pertencem. */
+    const CAMPO_CORPO = 11;
+    /** Avanço de uma linha para a seguinte. Com 16 e o ar de baixo, os oito
+     *  campos do caso mais cheio deixam os Serviços a caber nesta folha. */
+    const CAMPO_AVANCO = 16;
+    /** A entrelinha de um campo que precisou de duas linhas. */
+    const CAMPO_ENTRELINHA = CAMPO_CORPO + 3;
+    /** O ar entre o último campo e a legenda dos Serviços. */
+    const AR_ENTRE_SECCOES = 26;
+    /** A medida da lista — a mesma das notas do orçamento (550), e não a folha
+     *  toda: um «Local:» com o nome de uma herdade e a morada não tem de correr
+     *  706 pontos até à margem direita para se ler. */
+    const CAMPO_MEDIDA = MEASURE + 120;
+
+    /** Cada campo é a sua CHAVE e o seu valor: o rótulo impresso sai do
+     *  dicionário da língua, e o aviso de truncagem do português (ver `pt`). */
+    type Campo = [chave: CampoDoEvento, valor: string];
+    const campos: Campo[] = [
+      [org ? "cliente" : "noivos", doc.clientNames],
+      ...(org ? [] : ([["evento", evento.eventType]] as Campo[])),
+      ["data", evento.eventDate],
+      ["local", doc.location],
+      ["convidados", evento.guests],
+      ["servico", doc.servico ?? ""],
+      ...(org
+        ? []
+        : ([
+            ["cerimonia", evento.ceremony ?? ""],
+            // `evento.time` e não `doc.time`: a hora também se traduz («16h00»
+            // → «4 p.m.»), e era o último pedaço de português que ficava numa
+            // proposta inglesa. O que não for um relógio vem de lá como ela o
+            // escreveu — ver `horaEmIngles`.
+            ["hora", evento.time ?? ""],
+          ] as Campo[])),
     ];
-    if (details.length) {
-      const cols = Math.min(3, details.length);
-      const rows = Math.ceil(details.length / cols);
-      const pad = 16;
-      const bandH = rows * 40 + pad;
-      p.drawRectangle({
-        x: M,
-        y: y - bandH,
-        width: W - 2 * M,
-        height: bandH,
-        color: rgb(0.973, 0.968, 0.957),
-      });
-      p.drawRectangle({ x: M, y: y - bandH, width: 2.5, height: bandH, color: MOSS });
-      const colW = (W - 2 * M - pad * 2) / cols;
-      details.forEach(([k, v], i) => {
-        const r = Math.floor(i / cols);
-        const c = i % cols;
-        const cxp = M + pad + c * colW;
-        const cyp = y - pad - r * 40;
-        eyebrow(p, k, cxp, cyp - 8);
-        for (const [j, ln] of wrap(f.reg, v, 10.5, colW - 10)
-          .slice(0, 2)
-          .entries()) {
-          text(p, ln, cxp, cyp - 24 - j * 12, { font: f.serif, size: 11.5, color: INK });
-        }
-      });
-      y -= bandH + 26;
-    }
+    // Um «Hora:» seguido de nada não é um campo por preencher: é um erro
+    // impresso numa folha que vai para o cliente.
+    const details = campos.filter(([, v]) => (v ?? "").trim().length > 0);
 
-    y = sectionHeader(p, "O que propomos", "Serviços", y);
-    const descSize = org ? 9.5 : 10;
+    for (const [chave, valor] of details) {
+      const marca = `${t.campos[chave]}:`;
+      const vx = M + f.bold.widthOfTextAtSize(textoParaFonte(f.bold, `${marca} `), CAMPO_CORPO);
+      // Duas linhas por campo — um local com nome comprido ("Herdade da …,
+      // Reguengos de Monsaraz") pede três e perdia o resto.
+      const linhas = clampLines(
+        wrap(f.reg, valor, CAMPO_CORPO, M + CAMPO_MEDIDA - vx),
+        MAX_EVENT_FIELD_LINES,
+        `Campo «${pt.campos[chave]}»`,
+      );
+      ensure(CAMPO_AVANCO + (linhas.length - 1) * CAMPO_ENTRELINHA);
+      text(p, marca, M, y, { font: f.bold, size: CAMPO_CORPO, color: INK });
+      linhas.forEach((ln, j) => {
+        text(p, ln, vx, y - j * CAMPO_ENTRELINHA, { size: CAMPO_CORPO, color: INK });
+      });
+      y -= CAMPO_AVANCO + (linhas.length - 1) * CAMPO_ENTRELINHA;
+    }
+    if (details.length) y -= AR_ENTRE_SECCOES;
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       ONDE A PÁGINA PARTE — E ONDE NÃO PODE PARTIR
+       ═══════════════════════════════════════════════════════════════════════
+
+       Ela abriu uma proposta de três serviços e encontrou o cabeçalho
+       «Serviços» sozinho no fundo de uma página, sem nada por baixo; e, mais à
+       frente, uma página do corpo com UMA frase e mais nada.
+
+       A causa era sempre a mesma: decidia-se mudar de página com uma medida
+       MENOR do que aquilo que se ia desenhar a seguir.
+
+         · o cabeçalho da secção era desenhado sem verificação nenhuma;
+         · o título do grupo reservava 30 pt — o título e uma linha;
+         · a descrição partia LINHA A LINHA, portanto podia deixar uma sozinha.
+
+       A regra passa a ser uma só, e é a que a secção «Condições Gerais» deste
+       mesmo ficheiro já usava: MEDIR O BLOCO INTEIRO ANTES DE O DESENHAR. Um
+       serviço ou cabe onde está, ou começa na página seguinte — nunca metade.
+
+       O preço é algum espaço em branco no fundo de algumas páginas. É o preço
+       certo: um pouco mais de branco lê-se como desenho, uma frase órfã lê-se
+       como erro. */
+    const descSize = org ? 9.5 : T_BODY;
+    const DESC_X = M + 24;
+    const AVANCO_1 = descSize + 6; // avanço depois da primeira linha de um item
+    const AVANCO_N = descSize + 5; // avanço depois de cada linha seguinte
+    const ALTURA_TITULO = 22; // avanço depois do título de um grupo
+    /** Nunca menos de duas linhas de cada lado de uma quebra. */
+    const MIN_LINHAS = 2;
+
+    /**
+     * As linhas de um item, medidas EXACTAMENTE como vão ser desenhadas.
+     *
+     * É a única função que quebra o texto: a altura que se mede é a altura que
+     * se desenha, por construção. Medir num sítio e desenhar noutro é como isto
+     * se estragou da primeira vez.
+     *
+     * (As linhas seguintes são desenhadas em `DESC_X`, mais à esquerda do que a
+     * medida que as quebrou — sobra-lhes largura, nunca falta. Conservador de
+     * propósito: transbordar seria pior do que uma linha curta.)
+     */
+    const medirItem = (it: { label: string; desc?: string }) => {
+      if (!it.desc) return { lab: "", dx: DESC_X, lines: [it.label] };
+      // SEM RÓTULO NÃO HÁ DOIS PONTOS. Uma linha de serviço só com descrição
+      // desenhava o separador à mesma e saía «: Floral arch.» — uma frase a
+      // começar por dois pontos, que se lê como software estragado. O rótulo é
+      // opcional (ela escreve linhas que são só uma frase), a pontuação que o
+      // acompanha é que não pode sobreviver-lhe.
+      if (!it.label.trim()) {
+        return { lab: "", dx: DESC_X, lines: wrap(f.reg, it.desc, descSize, W - M - DESC_X) };
+      }
+      // Sanitiza aqui também: `lab` é medido diretamente com
+      // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
+      const lab = textoParaFonte(f.bold, `${it.label}: `);
+      const dx = DESC_X + f.bold.widthOfTextAtSize(lab, descSize);
+      return { lab, dx, lines: wrap(f.reg, it.desc, descSize, W - M - dx) };
+    };
+    const alturaItem = (n: number) => AVANCO_1 + Math.max(0, n - 1) * AVANCO_N;
+    /** A altura de uma página inteira de corpo — o tecto do que se pode exigir
+     *  a um `ensure`. Sem isto, um item mais alto do que uma página pedia uma
+     *  página nova para sempre. */
+    const COLUNA = H - M - 64 - CHAO;
+    /** O que o `sectionHeader` consome antes de devolver o `y` do corpo. */
+    const ALTURA_CABECALHO = 58;
+
+    const desenharItem = (it: { label: string; desc?: string }) => {
+      const { lab, dx, lines } = medirItem(it);
+      /**
+       * O marcador desta lista é o DELA: um ponto redondo cheio, que se vê.
+       *
+       * Era um ponto de 1,2 de raio na cor mais pálida da paleta — 2,4 pontos
+       * de tinta clara ao lado de um rótulo a negro de corpo 10, que à vista
+       * desaparecia e no papel desaparece de vez. Na folha dela o marcador é um
+       * disco escuro do tamanho de um «o». 1,5 e o cinzento do texto secundário
+       * ficam a meio caminho: lê-se como lista sem competir com o rótulo.
+       *
+       * Só nesta lista, e de propósito: as listas de corpo 9 do fecho (notas,
+       * condições) continuam com o ponto pequeno, que é o que lhes assenta.
+       */
+      p.drawCircle({ x: M + 12, y: y + 3, size: 1.5, color: MUTED });
+      if (lab) text(p, lab, DESC_X, y, { font: f.bold, size: descSize });
+      text(p, lines[0] ?? "", lab ? dx : DESC_X, y, { size: descSize });
+      y -= AVANCO_1;
+      for (let i = 1; i < lines.length; i++) {
+        /**
+         * Só chega aqui um item mais alto do que uma página inteira — raro, mas
+         * possível numa descrição muito longa. Reserva-se espaço para DUAS
+         * linhas enquanto houver duas por escrever: assim a quebra nunca deixa
+         * uma linha sozinha à espera das outras na página seguinte.
+         */
+        ensure(AVANCO_N * Math.min(lines.length - i, MIN_LINHAS));
+        text(p, lines[i], DESC_X, y, { size: descSize });
+        y -= AVANCO_N;
+      }
+    };
+
+    /**
+     * A altura de um GRUPO INTEIRO — o título e todos os seus serviços.
+     *
+     * É esta a unidade por que a secção parte: ela pediu que, quando não caiba
+     * tudo numa folha, se parta «por grupos inteiros, nunca a meio de uma
+     * lista». Um grupo com cinco serviços partido ao terceiro lê-se como um
+     * descuido; o mesmo grupo inteiro na folha seguinte lê-se como um capítulo.
+     *
+     * O ar que se deixa DEPOIS do grupo (os 8 pontos lá em baixo) não entra na
+     * conta: não é tinta e não tem de caber na folha — o mesmo raciocínio do
+     * `FIM_MORTO` da cauda do orçamento.
+     */
+    const alturaDoGrupo = (g: { title: string; items: { label: string; desc?: string }[] }) =>
+      ALTURA_TITULO + g.items.reduce((h, it) => h + alturaItem(medirItem(it).lines.length), 0);
+
+    /**
+     * O cabeçalho «Serviços» viaja com o primeiro grupo INTEIRO — e, quando o
+     * primeiro grupo é maior do que uma folha, pelo menos com o título dele e o
+     * primeiro serviço. Um cabeçalho no fundo de uma página não é conteúdo — é
+     * uma página desperdiçada com ar de erro.
+     */
+    const primeiroGrupo = doc.serviceGroups[0];
+    ensure(ALTURA_CABECALHO + (primeiroGrupo ? Math.min(alturaDoGrupo(primeiroGrupo), COLUNA) : 0));
+    y = sectionHeader(p, t.sobretituloServicos, numerada(t.tituloServicos), y);
+
     for (const g of doc.serviceGroups) {
-      ensure(30);
-      // Group title in serif with a moss ordinal marker for a designed feel.
-      if (g.letter) text(p, g.letter, M, y, { font: f.serifB, size: 12, color: MOSS });
-      const letterW = g.letter ? f.serifB.widthOfTextAtSize(winAnsiSafe(g.letter) + " ", 12) : 0;
+      // O grupo ou cabe onde está, ou começa INTEIRO na página seguinte. Só um
+      // grupo maior do que uma folha se parte — e mesmo esse leva o título com
+      // o primeiro serviço.
+      const abre = g.items[0];
+      const todo = alturaDoGrupo(g);
+      ensure(
+        todo <= COLUNA
+          ? todo
+          : ALTURA_TITULO + (abre ? Math.min(alturaItem(medirItem(abre).lines.length), COLUNA) : 0),
+      );
+      // Group title in serif; the ordinal marker stays quiet grey, not coloured.
+      if (g.letter) text(p, g.letter, M, y, { font: f.serifB, size: T_SUB, color: MUTED });
+      const letterW = g.letter
+        ? f.serifB.widthOfTextAtSize(textoParaFonte(f.serifB, g.letter) + " ", T_SUB)
+        : 0;
       text(p, g.title, M + letterW, y, {
         font: f.serifB,
-        size: 12,
+        size: T_SUB,
         color: INK,
       });
-      y -= 20;
+      y -= ALTURA_TITULO;
       for (const it of g.items) {
-        p.drawCircle({ x: M + 12, y: y + 3, size: 1.4, color: MOSS });
-        if (it.desc) {
-          // Sanitiza aqui também: `lab` é medido diretamente com
-          // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
-          const lab = winAnsiSafe(`${it.label}: `);
-          text(p, lab, M + 24, y, { font: f.bold, size: descSize });
-          const dx = M + 24 + f.bold.widthOfTextAtSize(lab, descSize);
-          const lines = wrap(f.reg, it.desc, descSize, W - M - dx);
-          text(p, lines[0] ?? "", dx, y, { size: descSize });
-          y -= descSize + 6;
-          for (let i = 1; i < lines.length; i++) {
-            ensure(descSize + 4);
-            text(p, lines[i], M + 24, y, { size: descSize });
-            y -= descSize + 5;
-          }
-        } else {
-          text(p, it.label, M + 24, y, { size: descSize });
-          y -= descSize + 6;
-        }
-        ensure(descSize + 8);
+        const altura = alturaItem(medirItem(it).lines.length);
+        // Cabe inteiro? Então ou fica onde está, ou muda de página INTEIRO.
+        if (altura <= COLUNA) ensure(altura);
+        desenharItem(it);
       }
       y -= 8;
     }
@@ -563,35 +1288,156 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     let p = pdf.addPage([W, H]);
     frame(p);
     let y = H - M - 64;
-    y = sectionHeader(p, "Como avançamos", "Cronograma de Organização", y);
-    for (const phase of doc.cronograma) {
-      if (y - 24 < M) {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * O CRONOGRAMA ESCREVIA PARA FORA DA FOLHA
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * A única verificação era por FASE, e media só o título. Dentro do ciclo
+     * das tarefas — e dentro do ciclo das linhas de cada tarefa — não havia
+     * nenhuma: o `y` descia e o desenho continuava. Medido numa fase com 40
+     * tarefas: doze delas desenhadas ABAIXO do rodapé, a última em `y = -664`.
+     *
+     * Não saíam cortadas nem davam erro. Desapareciam. E a contagem de
+     * truncagens, que existe precisamente para dizer o que a composição não
+     * mostra, não as via — porque ninguém lhe tinha dito que isto acontecia.
+     *
+     * É a mesma regra dos serviços aqui em cima: mede-se o bloco antes de o
+     * desenhar, e o título de uma fase viaja com a primeira tarefa.
+     */
+    const ensure = (need: number) => {
+      if (y - need < CHAO) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
       }
-      text(p, phase.title, M, y, { font: f.serifB, size: 12, color: INK });
-      y -= 18;
+    };
+    const COLUNA = H - M - 64 - CHAO;
+    const linhasDa = (it: string) => wrap(f.reg, it, T_BODY, MEASURE + 120);
+
+    y = sectionHeader(p, t.sobretituloCronograma, numerada(t.tituloCronograma), y);
+    for (const phase of doc.cronograma) {
+      const abre = phase.items[0];
+      ensure(20 + (abre ? Math.min(linhasDa(abre).length * 15, COLUNA) : 0));
+      text(p, phase.title, M, y, { font: f.serifB, size: T_SUB, color: INK });
+      y -= 20;
       for (const it of phase.items) {
-        const lines = wrap(f.reg, it, 10, W - 2 * M - 24);
-        p.drawCircle({ x: M + 12, y: y + 3, size: 1.4, color: INK });
-        for (const ln of lines) {
-          text(p, ln, M + 24, y, { size: 10 });
+        const lines = linhasDa(it);
+        const altura = lines.length * 15;
+        // Uma tarefa não se parte a meio se couber inteira numa página.
+        if (altura <= COLUNA) ensure(altura);
+        p.drawCircle({ x: M + 12, y: y + 3, size: 1.2, color: FAINT });
+        for (const [i, ln] of lines.entries()) {
+          // Só para a tarefa gigante que não cabe numa página: nunca deixa uma
+          // linha sozinha à espera das outras na página seguinte.
+          if (i > 0) ensure(15 * Math.min(lines.length - i, 2));
+          text(p, ln, M + 24, y, { size: T_BODY });
           y -= 15;
         }
       }
-      y -= 10;
+      y -= 14;
     }
   }
 
+  /**
+   * A ORDEM DO DOCUMENTO, uma só, tirada da lista de Serviços — a primeira que
+   * o casal lê. É esta que o quadro do orçamento e as páginas de inspiração
+   * seguem daqui para baixo. Ver `proposal-ordem.ts`, incluindo o que se faz
+   * quando não há correspondência.
+   *
+   * `ordemDeSaida` é a mesma função que o estúdio chama para desenhar as duas
+   * listas no ecrã — é isso, e só isso, que garante que o que ela arruma é o
+   * que sai impresso. Num documento que ela já arrumou à mão
+   * (`ordemExplicita`), devolve a ordem escrita e não toca em nada.
+   *
+   * ── E CALCULA-SE SOBRE O DOCUMENTO PORTUGUÊS ──────────────────────────
+   * `docPt` e não `doc`: a ordem é dada pelos NOMES, e numa proposta bilingue
+   * metade dos nomes pode estar traduzida e a outra metade não. Sobre o
+   * documento inglês, as chaves deixavam de casar, o «sem correspondência não
+   * se mexe» entrava, e o orçamento e os mood boards saíam por outra ordem só
+   * no PDF inglês — que ninguém confere, porque quem confere lê o português.
+   *
+   * Os índices servem os dois documentos porque `docNaLingua` nunca
+   * acrescenta, remove nem reordena: só troca strings no sítio. Esse invariante
+   * está pinado em `proposal-doc-bilingue.test.ts`, e é o que torna estas duas
+   * linhas seguras.
+   */
+  const ordemDosBoards = ordemDeSaida(docPt, docPt.moodBoards, (b) => b.title ?? "");
+  const ordemDasLinhasDoOrcamento = ordemDeSaida(docPt, docPt.budgetItems, (s) => s);
+  /** Anota uma lista que saiu por ordem diferente da que está escrita. */
+  const notaDeOrdem = (onde: string, rotulos: string[], indices: number[]) => {
+    if (eAOrdemEscrita(indices)) return;
+    reordenacoes.push({
+      onde,
+      de: [...rotulos],
+      para: indices.map((idx) => rotulos[idx]),
+    });
+  };
+
   // ── Mood board pages (skip empty boards — never show a client a placeholder) ──
-  for (const mb of doc.moodBoards) {
+  // Os rótulos do relatório saem do documento PORTUGUÊS: quem o lê é o estúdio,
+  // e é lá que ela vai procurar o board pelo nome que lhe deu.
+  notaDeOrdem(
+    "Mood boards",
+    docPt.moodBoards.map((b) => b.title ?? ""),
+    ordemDosBoards,
+  );
+  for (const bi of ordemDosBoards) {
+    const mb = doc.moodBoards[bi];
     if (!mb.images || mb.images.length === 0) continue;
     const p = pdf.addPage([W, H]);
     frame(p);
-    eyebrow(p, "Inspiração", M, H - M - 44);
-    text(p, mb.title, M, H - M - 72, { font: f.serifIt, size: 26, color: INK });
-    await drawCollage(pdf, p, mb, f, textFns(text, textRight));
+    // As medidas vêm de `proposal-geometria` — as mesmas que a
+    // pré-visualização do estúdio lê. Escritas aqui à mão, a miniatura que ela
+    // vê e a página que sai divergiam sem ninguém dar por isso.
+    // Em português a palavra é a da geometria — é lá que ela vive, ao lado da
+    // medida a que é desenhada, e é de lá que a pré-visualização do estúdio a lê.
+    eyebrow(
+      p,
+      t.sobretituloInspiracao ?? TXT.sobretitulo.texto,
+      M,
+      TXT.sobretitulo.base,
+      undefined,
+      TXT.sobretitulo.tamanho,
+    );
+    text(p, mb.title, M, TXT.titulo.base, {
+      font: f.serifIt,
+      size: TXT.titulo.tamanho,
+      color: INK,
+    });
+    // O subtítulo, quando existe. Na proposta feita à mão é o «Ramo de Noiva (a
+    // definir com a Noiva)» por baixo de «Complementos dos Noivos»: o título diz
+    // o capítulo, o subtítulo diz o que aquelas fotos são e o que ainda está por
+    // decidir. Na mesma serifa da marca — a manuscrita da folha antiga não se
+    // replica.
+    if (mb.subtitulo?.trim()) {
+      text(p, mb.subtitulo.trim(), M, TXT.subtitulo.base, {
+        font: f.serifIt,
+        size: TXT.subtitulo.tamanho,
+        color: MUTED,
+      });
+    }
+    // Como o mood board se chama num aviso. Sem título, vale a posição — a que
+    // ele ocupa NO DOCUMENTO e não a página por que saiu, porque é assim que
+    // ela o encontra no estúdio, contado a partir de 1.
+    //
+    // Pelo título PORTUGUÊS, mesmo num PDF inglês: o aviso é lido no estúdio, e
+    // «Ceremony Decoration cortado» manda-a procurar um board que ali não
+    // existe com esse nome.
+    const tituloPt = (docPt.moodBoards[bi]?.title ?? "").trim();
+    const boardName = tituloPt ? `«${tituloPt}»` : `${bi + 1}`;
+    await drawCollage(
+      pdf,
+      p,
+      mb,
+      f,
+      textFns(text, textRight),
+      images,
+      boardName,
+      note,
+      noteUndrawn,
+      contarRecurso,
+    );
   }
 
   // ── Orçamento ──
@@ -600,136 +1446,593 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     // with no priced rows must never fall into the Decoração reserva wording.
     const orgT = doc.template === "organizacao";
     let p = pdf.addPage([W, H]);
-    const firstBudgetPage = p;
     frame(p);
     let y = H - M - 64;
-    y = sectionHeader(p, "O investimento", "Orçamento Proposto", y);
+    y = sectionHeader(p, t.sobretituloOrcamento, numerada(t.tituloOrcamento), y);
 
-    const totalStr = orgT ? (doc.totalEstimatedText ?? "") : doc.totalText;
-    const totalLbl = orgT ? "Total Estimado" : doc.totalLabel;
+    /**
+     * UM MARCADOR POR SUBSTITUIR NÃO É UM VALOR.
+     *
+     * «[Valor Total]» é o que o estúdio semeia no campo enquanto a proposta não
+     * tem preço. A Conferência já o procura antes do envio — mas o aviso é a
+     * montante e é dispensável: quem gerar o PDF sem passar por ela levava o
+     * marcador para o papel, e numa proposta INGLESA chegava em português por
+     * cima. Entre a Conferência e a folha não havia mais nada.
+     *
+     * Cai no mesmo «—» que um total vazio já desenha: é o que diz «ainda não há
+     * preço» sem dizer ao cliente que recebeu um modelo por preencher. Só o
+     * marcador INTEIRO conta — um valor que ela escreva com parênteses rectos
+     * lá dentro continua a sair como o escreveu.
+     */
+    const semMarcador = (v: string) => (/^\[[^\]]*\]$/.test(v.trim()) ? "" : v);
+    const totalStr = semMarcador(orgT ? (doc.totalEstimatedText ?? "") : doc.totalText);
+    // O rótulo do total de Decoração é um campo do estúdio, e nasce preenchido
+    // («Valor Total Decoração»): traduz-se enquanto for o que lá nasceu, e sai
+    // tal e qual assim que ela lhe mexer (ver `rotuloDoTotalNaLingua`).
+    const totalLbl = orgT ? t.totalEstimado : rotuloDoTotalNaLingua(doc, idioma);
     const boxW = MEASURE;
-    const boxH = 58;
-    const drawTotalBox = (pg: PDFPage, ty: number) => {
-      pg.drawRectangle({ x: M, y: ty - boxH, width: boxW, height: boxH, color: DARK });
-      pg.drawRectangle({ x: M, y: ty - boxH, width: 3, height: boxH, color: MOSS });
-      let lx = M + 22;
-      for (const ch of winAnsiSafe(totalLbl.toUpperCase())) {
-        pg.drawText(ch, { x: lx, y: ty - 24, font: f.bold, size: 8, color: rgb(0.72, 0.6, 0.34) });
-        lx += f.bold.widthOfTextAtSize(ch, 8) + 1.6;
-      }
-      const amount = totalStr || "—";
-      pg.drawText(winAnsiSafe(amount), {
-        x: M + boxW - 22 - f.serifB.widthOfTextAtSize(winAnsiSafe(amount), 23),
-        y: ty - 38,
+    const boxH = 50;
+    // Flat, typographic total: a single thin gold hairline (the one accent moment
+    // in the interior), a quiet grey label and the amount in serif ink. No fill.
+    const drawTotal = (pg: PDFPage, ty: number, rotulo?: string, valor?: string) => {
+      pg.drawLine({
+        start: { x: M, y: ty },
+        end: { x: M + boxW, y: ty },
+        thickness: 1,
+        color: GOLD,
+      });
+      text(pg, rotulo ?? totalLbl, M, ty - 26, { font: f.serifB, size: 13, color: INK });
+      // O total também passa pelo normalizador: quando o texto foi GERADO pelo
+      // estúdio (que usa o mesmo `eur` que nós) vem com espaço inquebrável, e
+      // ficaria a discordar dos números que desenhamos por baixo dele.
+      const amount = milharesComPonto(valor ?? (totalStr || "—"));
+      const amountSafe = textoParaFonte(f.serifB, amount);
+      pg.drawText(amountSafe, {
+        x: M + boxW - f.serifB.widthOfTextAtSize(amountSafe, 22),
+        y: ty - 32,
         font: f.serifB,
-        size: 23,
-        color: CREAM,
+        size: 22,
+        color: INK,
       });
     };
 
-    // Column header row.
-    eyebrow(p, "Item", M, y);
-    textRight(p, orgT ? "Preço Estimado" : "Preço", M + boxW, y, {
-      font: f.bold,
-      size: 8,
-      color: GOLD,
+    // Column header row — bold sentence-case (matching the studio's sample
+    // proposals: "Item" / "Preço Estimado (€)"), one pale rule underneath.
+    text(p, t.colunaItem, M, y, { font: f.serifB, size: 11, color: INK });
+    textRight(p, orgT ? t.colunaPrecoEstimado : t.colunaPreco, M + boxW, y, {
+      font: f.serifB,
+      size: 11,
+      color: INK,
     });
-    y -= 10;
+    y -= 14;
     p.drawLine({ start: { x: M, y }, end: { x: M + boxW, y }, thickness: 0.5, color: LINE });
-    y -= 20;
+    y -= 22;
 
-    // Start a fresh page when the next row (or block) won't fit above the footer.
+    /**
+     * Muda de página quando o que vem a seguir não cabe acima do chão da mancha.
+     *
+     * O chão é o {@link CHAO} de toda a gente. Era `M + 30` só aqui — vinte e
+     * quatro pontos de folha que esta secção não usava e as outras usavam, sem
+     * nada que o justificasse. E não era inofensivo: são precisamente esses 24
+     * pontos que decidiam se as notas e as condições de reserva cabiam atrás do
+     * quadro ou empurravam uma folha inteira só para elas.
+     */
     const budgetBreak = (need: number) => {
-      if (y - need < M + 30) {
+      if (y - need < CHAO) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
       }
     };
 
+    // Reserve room on the right of each row for the price/value column so a long
+    // item name wraps onto extra lines instead of running through the amount (and
+    // on into the "Notas importantes" column). ~120pt covers "12.500,00 € + IVA".
+    const PRICE_COL = 120;
     if (orgT) {
       for (const r of doc.budgetRows ?? []) {
-        budgetBreak(20);
-        text(p, r.item, M, y, { size: 10.5, color: INK });
-        textRight(p, r.price, M + boxW, y, { size: 10.5, color: MUTED });
-        y -= 20;
+        const lines = wrap(f.reg, r.item, 10.5, boxW - PRICE_COL);
+        budgetBreak(Math.max(20, lines.length * 15));
+        lines.forEach((ln, i) => {
+          text(p, ln, M, y, { size: 10.5, color: INK });
+          if (i === 0) textRight(p, r.price, M + boxW, y, { size: 10.5, color: MUTED });
+          y -= 15;
+        });
+        y -= 5;
       }
     } else {
-      for (const it of doc.budgetItems) {
-        budgetBreak(19);
-        p.drawCircle({ x: M + 3, y: y + 3, size: 1.3, color: MOSS });
-        text(p, it, M + 14, y, { size: 10.5, color: INK });
-        y -= 19;
-      }
-    }
-
-    budgetBreak(boxH + 24);
-    y -= 12;
-    drawTotalBox(p, y);
-    y -= boxH + 20;
-
-    // Payment schedule with the actual amounts (30% sinal / 70% saldo) — the
-    // clarity a client wants right under the total. Amounts come from the same
-    // money resolver the invoicing uses, so they always agree.
-    const money = resolveProposalMoney(doc);
-    if (money.gross > 0) {
-      const { sinal, saldo } = splitThirtySeventy(money.gross);
-      budgetBreak(58);
-      eyebrow(p, "Faseamento do pagamento", M, y);
-      y -= 18;
-      text(p, `Sinal 30%   ${eur(sinal)}`, M, y, { font: f.serif, size: 12, color: INK });
-      textRight(p, "na adjudicação, para reservar a data", M + boxW, y, {
-        size: 9.5,
-        color: MUTED,
+      // As linhas assinaladas como EXTRA saem marcadas, para o casal poder ler
+      // a proposta uma vez e ver as duas versões nela. A marca é uma palavra à
+      // direita e não uma segunda lista: partir o orçamento em dois quadros
+      // fazia parecer duas propostas, que é precisamente o que isto vem
+      // substituir. Ver `orcamento/versoes-da-proposta.ts`.
+      // ── SEM MARCADORES ────────────────────────────────────────────────────
+      // A folha antiga escreve as três rubricas do quadro como nomes, um por
+      // linha, por baixo do cabeçalho «Item / Preço (€)»: «Design Floral e
+      // Decor Jantar», «Decor Mesa Buffet», «Bouquet da Noiva». Não são uma
+      // lista de tópicos, são as linhas de um quadro — e um quadro com pontinhos
+      // à esquerda de cada linha lê-se como um sumário, não como um orçamento.
+      // O cabeçalho e a régua por cima já dizem o que aquilo é.
+      const marcas = opcionaisDe(doc);
+      // ── E PELA ORDEM DOS SERVIÇOS ────────────────────────────────────────
+      // O quadro imprime-se pela ordem da lista de Serviços (pág. 02), que é a
+      // primeira que o casal lê — ver o bloco «UMA SÓ ORDEM PARA O DOCUMENTO
+      // INTEIRO». A marca de «extra» viaja com a linha: é um array PARALELO, e
+      // reordenar um sem o outro trocava as marcas de sítio, que é a única
+      // maneira de isto poder mentir sobre dinheiro.
+      const ordemDasLinhas = ordemDasLinhasDoOrcamento;
+      notaDeOrdem("Orçamento", docPt.budgetItems, ordemDasLinhas);
+      ordemDasLinhas.forEach((i) => {
+        const it = doc.budgetItems[i];
+        // Os 46 pontos reservados à direita são a largura da marca mais o ar
+        // que a separa do nome — a marca é curta nas duas línguas («extra»), e
+        // o teste de transbordos confirma-o.
+        const lines = wrap(f.reg, it, 10.5, boxW - (marcas[i] ? 46 : 0));
+        budgetBreak(Math.max(20, lines.length * 15));
+        lines.forEach((ln, j) => {
+          text(p, ln, M, y, { size: 10.5, color: INK });
+          if (j === 0 && marcas[i]) {
+            textRight(p, t.marcaExtra, M + boxW, y, { size: 9, color: MUTED });
+          }
+          y -= 15;
+        });
+        y -= 5;
       });
-      y -= 17;
-      text(p, `Saldo 70%   ${eur(saldo)}`, M, y, { font: f.serif, size: 12, color: INK });
-      textRight(p, "até 1 mês antes do evento", M + boxW, y, { size: 9.5, color: MUTED });
-      y -= 20;
     }
 
-    if (doc.budgetNote) {
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * O BLOCO DE TOTAIS — SEIS NÚMEROS, UMA SÓ UNIDADE, E TUDO A FECHAR
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * ── O QUE FOI PARA A CLIENTE ────────────────────────────────────────────
+     * Na proposta da Tara e do Marty, catorze páginas, esta folha dizia
+     *
+     *     Valor Total                   2.950,79 €
+     *     Deslocação da Equipa Líquen       75,00 €
+     *
+     * e a folha do fecho dizia «Sinal 30% 907,74 €» e «Saldo 70% 2.118,06 €»,
+     * que somam 3.025,80 €. Três números em três unidades diferentes: o «Valor
+     * Total» saiu com o IVA lá dentro (daí ter-lhe desaparecido o «+ IVA» ao
+     * lado) mas sem a deslocação, o sinal e o saldo saíram sobre o valor com
+     * IVA e com ela, e nada disto estava escrito em lado nenhum. Pior: o
+     * 2.950,79 tinha um cêntimo a menos — 2.950,79 + 75,00 = 3.025,79 ≠
+     * 3.025,80 —, resto de uma dupla conversão que aqui se fazia (bruto ÷ 1,23
+     * para tirar os adicionais, e o que sobrava × 1,23 outra vez para imprimir).
+     *
+     * A conta mudou de sítio: vive agora em `totaisDaProposta`, faz-se uma vez,
+     * e o gerador não converte nada — só desenha. Ver lá o porquê ao cêntimo.
+     *
+     * ── A ORDEM É A DELA ────────────────────────────────────────────────────
+     * Palavras dela, sobre o que quer ver: «subtotal dos serviços; valores
+     * adicionais, com indicação explícita de que somam; TOTAL, a base sobre a
+     * qual tudo é calculado; IVA; total a pagar». É esta a ordem, e cada linha
+     * diz a unidade em que está — nenhum número desta folha aparece sozinho a
+     * poder ser lido como preço final quando não é.
+     *
+     * ── PORQUE É QUE «TOTAL A PAGAR» DEIXOU DE SER OPCIONAL ────────────────
+     * Esteve desligado por omissão (ver `mostrarTotalAPagar`), com o argumento
+     * de que a folha feita à mão fecha em «Valor Total» e não tem bloco de
+     * soma. O argumento caiu com esta proposta: a folha feita à mão também não
+     * tinha o sinal em euros, e sem o «Total a pagar» impresso o casal não tem
+     * como ligar os 2.950,79 desta página aos 3.025,80 da última. A soma que
+     * ninguém escreve é a soma que o casal faz de cabeça — e faz mal.
+     *
+     * ── E SEM VALORES ADICIONAIS ───────────────────────────────────────────
+     * Fica a folha de sempre: o número grande com o rótulo dela («Valor Total
+     * Decoração»), o valor tal como o estúdio o compôs. É a folha que ela envia
+     * há anos e que tem de caber numa página só — por isso as linhas do
+     * subtotal e dos adicionais, que aí não teriam nada para dizer, não se
+     * desenham. O que se garante nesse caso é o «+ IVA»: ver `comIvaDito`.
+     */
+    const extras = (doc.budgetExtras ?? []).filter(
+      (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
+    );
+    /**
+     * As linhas do bloco.
+     *
+     * ── PORQUE É QUE O SUBTOTAL É 11 E A SOMA É 12,5 ──────────────────────
+     * Não é só peso tipográfico: o «Subtotal dos serviços» é a última linha do
+     * QUADRO (é o total das linhas listadas por cima dele) e as duas de baixo
+     * são a SOMA do documento. Quem lê o PDF de volta separa-os exactamente
+     * assim — pela banda de corpo 9 a 12 em que o quadro vive (ver
+     * `proposta-de-pdf/campos.ts`: «o número grande é 22 e as rubricas são 13, e
+     * a banda serve para os deixar de fora»). Com as três no mesmo corpo, o
+     * «TOTAL (sem IVA)» e o «IVA» voltavam de uma importação como se fossem dois
+     * valores adicionais a mais, e a proposta importada ganhava 3.025,80 € de
+     * deslocação.
+     */
+    const linhaDeTotal = (rotulo: string, valor: string, size: number, forte = false) => {
+      text(p, rotulo, M, y, {
+        font: forte ? f.serifB : f.reg,
+        size,
+        color: INK,
+      });
+      textRight(p, valor, M + boxW, y, {
+        font: forte ? f.serifB : f.reg,
+        size,
+        color: INK,
+      });
+      y -= 18;
+    };
+    /** A régua fina que separa as parcelas da soma. */
+    const reguaDeSoma = () => {
+      p.drawLine({
+        start: { x: M + boxW - 200, y: y + 10 },
+        end: { x: M + boxW, y: y + 10 },
+        thickness: 0.5,
+        color: LINE,
+      });
+      y -= 6;
+    };
+    /**
+     * O «+ IVA» que TEM de chegar ao PDF.
+     *
+     * O texto do total é escrito pelo estúdio a partir do modo em vigor, e em
+     * «acresce» vem sempre com o «+ IVA» — mas é texto livre, e uma proposta
+     * antiga (ou um total escrito à mão) pode não o trazer. Sem ele, um valor
+     * de base lê-se como preço final: foi exactamente isso que aconteceu na
+     * proposta da Tara e do Marty, e são 23% de diferença no que o casal
+     * pensa que vai transferir.
+     */
+    // A detecção continua a aceitar o «+ IVA» português mesmo quando o
+    // documento sai em inglês: o texto do total é DELA, e ela escreve-o em
+    // português. Um «+ VAT» acrescentado a um total que já dizia «+ IVA» era o
+    // mesmo aviso duas vezes, em duas línguas, na mesma linha.
+    const comIvaDito = (texto: string) =>
+      totais.modo === "acrescer" && !/\+\s*(iva|vat)/i.test(texto)
+        ? `${texto} ${t.maisIva}`
+        : texto;
+
+    if (extras.length) {
+      budgetBreak(30 + (extras.length + 4) * 18 + boxH);
+      linhaDeTotal(
+        orgT ? t.subtotalServicosEstimado : t.subtotalServicos,
+        eurDocumento(totais.servicos),
+        11,
+        true,
+      );
+      // ── OS ADICIONAIS, NA UNIDADE DO BLOCO ────────────────────────────────
+      // O valor impresso é o que o adicional acrescenta à BASE, e não o número
+      // cru que ela escreveu: «75,00 €» numa proposta que se lê com IVA vale
+      // 60,98 € de base, e imprimir 75,00 aqui era pôr uma parcela que não soma
+      // com as outras — o mesmo erro de unidades, uma linha mais abaixo.
+      //
+      // O que ela escreveu não se perde: quando o número cru é outro, vai entre
+      // parênteses ao lado do nome. É lá que a informação pertence — a dizer o
+      // que aquele valor era, não a fingir que é uma parcela desta soma.
+      for (const ex of extras) {
+        const cru = normalizarValor(ex.valueText);
+        const base = somaDosExtrasSemIva([ex], { mode: totais.modo, vatRate: totais.taxa });
+        const dito =
+          cru !== null && round2(cru) !== base
+            ? `${ex.label} (${milharesComPonto(ex.valueText.trim())})`
+            : ex.label;
+        const lines = wrap(f.reg, dito, 10.5, boxW - PRICE_COL);
+        budgetBreak(Math.max(18, lines.length * 14));
+        lines.forEach((ln, i) => {
+          text(p, ln, M, y, { size: 10.5, color: INK });
+          // O «+» à frente do valor é a «indicação explícita de que somam» que
+          // ela pediu: sem ele, uma parcela por baixo de um subtotal tanto pode
+          // somar como descontar, e nada na folha o dizia.
+          if (i === 0) {
+            textRight(p, cru === null ? "—" : `+ ${eurDocumento(base)}`, M + boxW, y, {
+              size: 10.5,
+              color: INK,
+            });
+          }
+          y -= 14;
+        });
+        y -= 4;
+      }
+      y -= 4;
+      reguaDeSoma();
+      // O TOTAL: a base sobre a qual o IVA, o sinal e o saldo são calculados.
+      linhaDeTotal(t.totalSemIva, eurDocumento(totais.total), 12.5, true);
+      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDocumento(totais.iva), 12.5);
+      budgetBreak(boxH + 24);
+      y -= 6;
+      // O número grande é o que o casal transfere — e é o mesmo, ao cêntimo,
+      // que a folha do fecho parte em sinal e saldo.
+      drawTotal(p, y, t.totalAPagar, eurDocumento(totais.aPagar));
+      /* ── O QUE ESTE BLOCO CUSTA, MEDIDO ────────────────────────────────────
+         Setenta pontos a mais do que o quadro que aqui estava (o «Valor Total»,
+         os adicionais, e nada mais). Numa proposta COM valores adicionais isso
+         chega para a cauda — as «Notas importantes» e as «Condições de reserva»
+         — passar inteira para a folha seguinte: na proposta da Tara e do Marty
+         faltavam sessenta e sete pontos, e não há ar nenhum nesta folha para os
+         dar (o caso da casa fecha com 1,3 pontos de folga).
+         Não se aperta o bloco para os arranjar: um documento em que as contas
+         não se vêem é o defeito que isto vem corrigir, e a cauda passa INTEIRA,
+         que é a regra de quebra desta folha. A folha SEM adicionais — a que ela
+         envia há anos e compara com a dela — continua a caber numa página. */
+      y -= boxH + 6;
+    } else if (totais.aPagar > 0) {
+      /**
+       * ── SEM VALORES ADICIONAIS, A MESMA FOLHA ────────────────────────────
+       *
+       * Pedido dela, com a proposta da Mariana e do João à frente: «quero
+       * sempre que nas propostas apareça assim na parte do orçamento». Assim é
+       * a escada — TOTAL (sem IVA), IVA, Total a pagar — e não um número
+       * grande sozinho, que era o que saía a qualquer proposta sem deslocação
+       * nem outros adicionais.
+       *
+       * O que estava antes deixava o casal com UM número e a unidade dele
+       * escrita ao lado em texto livre («2.460,00 € + IVA»). Quem lê isso tem
+       * de fazer os 23% de cabeça para saber o que vai transferir — e a folha
+       * do fecho, essa, parte o valor COM IVA em sinal e saldo. Eram duas
+       * páginas do mesmo documento a falar em unidades diferentes, que é o
+       * defeito que este bloco já tinha vindo corrigir do outro lado.
+       *
+       * ── O SUBTOTAL NÃO ENTRA AQUI, E É DE PROPÓSITO ──────────────────────
+       * «Subtotal dos serviços» é o total das linhas listadas por cima dele.
+       * Sem adicionais, esse subtotal É o TOTAL: imprimir os dois era pôr o
+       * mesmo número duas vezes, em duas linhas seguidas, com rótulos
+       * diferentes — que é como se ensina alguém a desconfiar de uma conta.
+       * A escada fica com os três degraus que dizem coisas diferentes.
+       *
+       * ── E QUANDO NÃO HÁ NÚMERO ───────────────────────────────────────────
+       * Uma proposta a meio, ou com o total escrito «a definir», não tem euros
+       * para somar (`aPagar` fica a zero). Aí não se inventa uma escada de
+       * zeros: cai no ramo de baixo, que imprime o que o estúdio escreveu.
+       */
+      // Sem parcelas por cima, a régua de soma não separa nada: seriam doze
+      // pontos de tinta a dizer «o que vem acima somou-se», numa folha onde
+      // nada somou. E cada ponto conta — ver a nota da paginação mais abaixo.
+      budgetBreak(30 + 3 * 18 + boxH);
+      linhaDeTotal(t.totalSemIva, eurDocumento(totais.total), 12.5, true);
+      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDocumento(totais.iva), 12.5);
+      budgetBreak(boxH + 24);
+      drawTotal(p, y, t.totalAPagar, eurDocumento(totais.aPagar));
+      y -= boxH + 6;
+    } else {
+      budgetBreak(boxH + 24 + 18);
+      y -= 12;
+      drawTotal(p, y, undefined, comIvaDito(totalStr || "—"));
+      // `boxH` (50) já é folgado: a tinta do bloco — a régua dourada, o rótulo e
+      // o número em corpo 22 — acaba treze pontos acima dele. Os vinte que aqui
+      // estavam eram ar em cima de ar, e numa proposta SEM valores adicionais
+      // (onde este bloco custa oitenta e seis pontos) eram eles que empurravam
+      // as condições de reserva para uma segunda folha.
+      y -= boxH + 6;
+    }
+
+    // ── A versão SEM os extras ─────────────────────────────────────────────
+    // O total grande é a proposta inteira; por baixo dele, e só quando há
+    // linhas assinaladas, a mesma proposta sem elas. É o que permite responder
+    // ao "e sem isso, quanto fica?" sem uma segunda proposta a divergir desta.
+    //
+    // Um extra sem preço não se desconta, e nesse caso os dois números sairiam
+    // iguais — melhor não desenhar nada do que desenhar duas vezes o mesmo
+    // número com rótulos diferentes.
+    //
+    // ── O SEGUNDO NÚMERO TEM DE ESTAR NA UNIDADE DO PRIMEIRO ──────────────
+    // Isto era `totaisDasVersoes(doc, doc.totalAmount ?? 0)`, e o `totalAmount`
+    // só é a BASE em modo «acrescer»; em «IVA incluído» é o BRUTO. Como os
+    // preços das linhas são sempre líquidos, a subtracção cruzava duas
+    // unidades: numa proposta de base 10.000 € (total 12.300 €) com uma linha
+    // extra de 2.000 €, saía «Sem os extras assinalados 10.300 €» quando o
+    // correcto são 9.840 €. São 460 € oferecidos ao casal — impressos no PDF,
+    // no número por que ele vai pedir o desconto, sem nada que o denunciasse.
+    //
+    // `comoOTotal` é a leitura na MESMA unidade em que o total grande está
+    // impresso — líquida quando o documento diz «+ IVA», bruta quando diz «IVA
+    // incluído». Ver `orcamento/versoes-da-proposta.ts`: é lá que a conta vive,
+    // uma vez só, partilhada com o estúdio.
+    const versoes = totaisDasVersoes(doc);
+    if (versoes && versoes.comoOTotal.base > 0 && versoes.extras > 0) {
+      const maisIva = totais.modo === "acrescer" ? ` ${t.maisIva}` : "";
+      budgetBreak(40);
+      text(p, t.semOsExtras, M, y, { size: 10.5, color: MUTED });
+      textRight(p, `${eurDocumento(versoes.comoOTotal.base)}${maisIva}`, M + boxW, y, {
+        font: f.serif,
+        size: 13,
+        color: INK,
+      });
+      y -= 16;
+      text(
+        p,
+        versoes.linhasExtra === 1 ? t.umaLinhaExtra : t.variasLinhasExtra(versoes.linhasExtra),
+        M,
+        y,
+        { size: 9, color: MUTED },
+      );
+      y -= 22;
+    }
+
+    // O FASEAMENTO SAIU DESTA PÁGINA. Está agora com as condições gerais, na
+    // secção «Faseamento do Pagamento» — que é onde a folha antiga o tem, e onde
+    // já vivia a lista com as mesmas percentagens escritas por extenso. Ver lá o
+    // porquê da percentagem sair de `depositPercentOf` e não de um «30%» à letra.
+
+    // `.trim()` e não a caixa em bruto: uma nota com um espaço lá dentro é
+    // «verdadeira» para o `if`, e saía «Note:» sozinho no fundo do orçamento —
+    // um rótulo sem nada à frente numa folha que vai para o cliente. Acontece
+    // nas duas línguas; apanhou-o o passeio do PDF inglês.
+    if (doc.budgetNote?.trim()) {
       budgetBreak(30);
-      for (const ln of wrap(f.reg, `Nota: ${doc.budgetNote}`, 9, boxW)) {
+      for (const ln of wrap(f.reg, t.nota(doc.budgetNote), 9, boxW)) {
         text(p, ln, M, y, { size: 9, color: MUTED });
         y -= 13;
       }
     }
 
-    // Reservation notes — a right-hand column, anchored on the FIRST budget page
-    // (independent of how far the left list paginated). Shown for both templates.
-    let ry = H - M - 64;
-    const rx = M + 490;
-    const rW = W - M - rx;
-    const rHead = (t: string) => {
-      text(firstBudgetPage, t, rx, ry, { font: f.serifB, size: 12, color: INK });
-      firstBudgetPage.drawRectangle({ x: rx, y: ry - 7, width: 26, height: 1.5, color: MOSS });
-      ry -= 22;
+    /* ═══════════════════════════════════════════════════════════════════════
+       AS NOTAS E AS CONDIÇÕES DE RESERVA — POR BAIXO DO QUADRO, NUMA COLUNA
+       ═══════════════════════════════════════════════════════════════════════
+
+       Estavam numa coluna estreita à direita do orçamento, ancorada no topo da
+       primeira página. Ela abriu uma proposta gerada e disse que não estava
+       igual à folha que envia há anos — e não estava: a folha dela é uma coluna
+       de cima para baixo, «Notas Importantes» e «Condições de Reserva» POR
+       BAIXO do quadro, por esta ordem (ver a página 7 da proposta de
+       referência: x71 y312 e x71 y197, ambas encostadas à margem).
+
+       A coluna da direita tinha 216 pontos de largura para texto de corpo 8,5 —
+       nada era cortado (a quebra media a coluna certa), mas cabiam 45
+       caracteres por linha, e uma nota de duas linhas passava a quatro. Pior:
+       `bullets` desce o `y` e não conhece o chão da página. Medido, com listas
+       longas: o «NÃO INCLUÍDO» a ser desenhado POR CIMA do rodapé e o resto a
+       sair pela folha fora, sem erro e sem aviso — a mesma avaria que o
+       cronograma tinha.
+
+       Agora: uma coluna só, à largura do texto corrido, e cada bloco medido
+       ANTES de ser desenhado. Um bloco ou cabe onde está, ou começa na página
+       seguinte INTEIRO — nunca a meio de uma lista.
+
+       ── PORQUE NÃO A LARGURA TODA DA FOLHA ─────────────────────────────────
+       A folha é A4 ao baixo: entre margens são 706 pontos, que a corpo 9 dão
+       ~155 caracteres por linha — o dobro do que se lê sem perder a linha, e o
+       maior sinal de folha feita à pressa que este documento tem (ver MEASURE).
+       550 pontos dão ~110 e chegam para a nota mais comprida da casa caber numa
+       linha só. A folha antiga, essa, mede 480 pontos de mancha em A4 ao alto —
+       está mais perto de 550 do que de 706. */
+    const NOTAS_W = MEASURE + 120;
+    const NOTAS_SIZE = 9;
+    /**
+     * A legenda de uma sub-rubrica NUNCA É MENOR DO QUE A SUA LISTA.
+     *
+     * Era: legenda de 7,5 com itens de 8,5 por baixo — uma rubrica mais pequena
+     * do que aquilo que encabeça, que só passava despercebido porque estava
+     * numa coluna estreita ao lado. Na folha antiga as duas são do mesmo corpo
+     * (t8 e t8). Aqui a legenda fica meio ponto acima da lista: lê-se como
+     * cabeçalho, e quem lê o documento de volta — que separa a lista da rubrica
+     * pelo corpo — não perde as duas listas de condições de reserva.
+     */
+    const NOTAS_OLHO = NOTAS_SIZE + 0.5;
+    /* ── O AR ENTRE BLOCOS É O QUE PAGA A FOLHA ─────────────────────────────
+       Estes quatro números decidem, sozinhos, se a cauda cabe atrás do quadro
+       no CASO DA CASA — as três notas, os dois incluídos e os dois não
+       incluídos que vêm por omissão, que são os mesmos da proposta dela.
+
+       Medido: com 18 de ar e 22 de avanço, a tinta da cauda ocupava 176 pontos
+       e começava em y=230; acabava em y=54, vinte abaixo do chão da mancha. A
+       folha partia-se em duas, cada uma com menos de metade cheia. Com estes
+       números ocupa 156 e acaba em y=84 — dez pontos acima do chão.
+
+       O que se aperta é o ar ENTRE secções, e só esse: o corpo da letra, a
+       entrelinha e a medida do texto ficam onde estavam. Uma folha um pouco
+       mais cerrada continua a ler-se como desenho; duas a meio gás, não.
+       (A folha dela dá-se ao luxo de 64 e 73 pontos entre as rubricas porque o
+       quadro dela, todo em corpo 8, acaba 107 pontos mais acima do que o
+       nosso.) */
+    const H_RUBRICA = 18; // avanço depois de uma rubrica em serifa (corpo 13)
+    const H_OLHO = 12; // avanço depois de uma legenda em capitulares
+    const AR = 6; // ar entre blocos (soma-se ao que a lista anterior já deixou)
+    const AR_OLHOS = 4; // ar entre as duas legendas das condições de reserva
+
+    /** O que `bullets` desce no `y` ao desenhar esta lista — medido com a MESMA
+     *  quebra com que desenha. Medir num sítio e desenhar noutro é como a
+     *  coluna da direita passava por cima do rodapé. */
+    const avancoDaLista = (itens: readonly string[]) =>
+      itens.reduce(
+        (h, it) => h + wrap(f.reg, it, NOTAS_SIZE, NOTAS_W - 12).length * (NOTAS_SIZE + 3) + 3,
+        0,
+      );
+    /**
+     * O avanço que sobra DEPOIS da última tinta de uma lista: a descida da
+     * última linha, mais o ar que a separaria de um item seguinte que não
+     * existe. Não é tinta e não tem de caber na folha.
+     *
+     * Contá-lo custava quinze pontos por lista. É pouco, e foi o que bastou:
+     * a cauda pedia uma folha nova por causa de um espaço em branco que ninguém
+     * ia ver.
+     */
+    const FIM_MORTO = NOTAS_SIZE + 3 + 3;
+    /** A altura de TINTA de uma lista — o que tem mesmo de caber acima do chão. */
+    const alturaDeMarcadores = (itens: readonly string[]) =>
+      Math.max(0, avancoDaLista(itens) - FIM_MORTO);
+    /** A altura útil de uma página de orçamento — o tecto do que se pode exigir
+     *  a uma quebra. Sem isto, uma lista maior do que uma página pedia uma
+     *  página nova para sempre. */
+    const COLUNA_ORC = H - M - 64 - CHAO;
+    /** Este bloco cabe aqui, ou começa na página seguinte. */
+    const bloco = (altura: number) => budgetBreak(Math.min(altura, COLUNA_ORC));
+    const rubrica = (t: string) => {
+      text(p, t, M, y, { font: f.serifB, size: T_SUB, color: INK });
+      y -= H_RUBRICA;
     };
-    rHead("Notas importantes");
-    ry = bullets(firstBudgetPage, doc.notasImportantes, rx, ry, rW, f, 8.5);
-    ry -= 14;
-    rHead("Condições de reserva");
-    text(firstBudgetPage, "Incluído na proposta", rx, ry, { font: f.bold, size: 7.5, color: GOLD });
-    ry -= 13;
-    ry = bullets(firstBudgetPage, doc.incluido, rx, ry, rW, f, 8.5);
-    ry -= 8;
-    text(firstBudgetPage, "Não incluído", rx, ry, { font: f.bold, size: 7.5, color: GOLD });
-    ry -= 13;
-    bullets(firstBudgetPage, doc.naoIncluido, rx, ry, rW, f, 8.5);
+    /** A legenda em capitulares LEVA DOIS PONTOS, como na folha antiga
+     *  («INCLUÍDO NA PROPOSTA:», «NÃO INCLUÍDO NO ORÇAMENTO:»). Não é enfeite:
+     *  são os dois pontos que dizem que aquilo é um cabeçalho e não uma frase —
+     *  é assim que o leitor de propostas antigas as distingue, e agora a nossa
+     *  folha diz o mesmo da mesma maneira. */
+    const olho = (t: string) => {
+      eyebrow(p, t, M, y, MUTED, NOTAS_OLHO);
+      y -= H_OLHO;
+    };
+
+    const temNotas = fixos.notasImportantes.length > 0;
+    const temReserva = fixos.incluido.length > 0 || fixos.naoIncluido.length > 0;
+
+    /* ── AS DUAS RUBRICAS VIAJAM JUNTAS ────────────────────────────────────
+       A folha antiga mete o quadro, as «Notas Importantes» e as «Condições de
+       Reserva» na MESMA página — e é A4 AO BAIXO, 842 × 595, exactamente a
+       nossa folha (medido no ficheiro dela: «Page size: 842.04 x 595.56 pts»).
+       Não há altura nenhuma a menos a justificar uma segunda folha: o caso da
+       casa tem de caber, e cabe — ver o ar apertado aqui em cima.
+
+       Quando não cabe mesmo (listas engordadas à mão), a cauda passa INTEIRA
+       para a folha seguinte em vez de partir no meio: uma folha com o fim das
+       notas e outra com o resto são duas a meio gás. E se nem numa folha
+       inteira couber, os `bloco` de baixo partem-na por rubricas — nunca a meio
+       de uma lista. */
+    // Os avanços de todos os blocos, menos o fim morto do último: é a TINTA da
+    // cauda inteira, do primeiro título à base da última linha.
+    const conjunto =
+      (temNotas ? AR + H_RUBRICA + avancoDaLista(fixos.notasImportantes) : 0) +
+      (temReserva
+        ? AR +
+          H_RUBRICA +
+          (fixos.incluido.length ? H_OLHO + avancoDaLista(fixos.incluido) : 0) +
+          (fixos.naoIncluido.length ? AR_OLHOS + H_OLHO + avancoDaLista(fixos.naoIncluido) : 0)
+        : 0);
+    if (conjunto > 0) bloco(conjunto - FIM_MORTO);
+
+    if (temNotas) {
+      y -= AR;
+      bloco(H_RUBRICA + alturaDeMarcadores(fixos.notasImportantes));
+      rubrica(t.notasImportantes);
+      y = bullets(p, fixos.notasImportantes, M, y, NOTAS_W, f, NOTAS_SIZE);
+    }
+
+    if (temReserva) {
+      y -= AR;
+      // O título «Condições de reserva» viaja com a primeira legenda e com a
+      // primeira lista: um título sozinho no fundo de uma folha não é conteúdo.
+      bloco(
+        H_RUBRICA +
+          (fixos.incluido.length
+            ? H_OLHO + alturaDeMarcadores(fixos.incluido)
+            : H_OLHO + alturaDeMarcadores(fixos.naoIncluido)),
+      );
+      rubrica(t.condicoesDeReserva);
+      if (fixos.incluido.length) {
+        olho(t.incluidoNaProposta);
+        y = bullets(p, fixos.incluido, M, y, NOTAS_W, f, NOTAS_SIZE);
+      }
+      if (fixos.naoIncluido.length) {
+        if (fixos.incluido.length) {
+          y -= AR_OLHOS;
+          bloco(H_OLHO + alturaDeMarcadores(fixos.naoIncluido));
+        }
+        olho(t.naoIncluidoNoOrcamento);
+        y = bullets(p, fixos.naoIncluido, M, y, NOTAS_W, f, NOTAS_SIZE);
+      }
+    }
   }
 
   // ── Condições Gerais (two columns for a comfortable reading measure) ──
   {
     let p = pdf.addPage([W, H]);
     frame(p);
-    const yTop = sectionHeader(p, "Para sua tranquilidade", "Condições Gerais", H - M - 64);
+    const yTop = sectionHeader(p, t.sobretituloCondicoes, numerada(t.tituloCondicoes), H - M - 64);
     const gutter = 34;
     const colW = (W - 2 * M - gutter) / 2;
     const colX = [M, M + colW + gutter];
     let col = 0;
     let y = yTop;
-    for (const c of doc.condicoesGerais) {
+    for (const c of fixos.condicoesGerais) {
       const lines = wrap(f.reg, c, 9, colW - 14);
       if (y - lines.length * 12 - 6 < M + 4) {
         // Column full → next column, or a new page after the second column.
@@ -744,12 +2047,12 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
         }
       }
       const x = colX[col];
-      p.drawCircle({ x: x + 3, y: y + 3, size: 1.3, color: MOSS });
+      p.drawCircle({ x: x + 3, y: y + 3, size: 1.2, color: FAINT });
       for (const ln of lines) {
         text(p, ln, x + 14, y, { size: 9 });
         y -= 12;
       }
-      y -= 6;
+      y -= 8;
     }
   }
 
@@ -759,63 +2062,134 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     frame(p);
     let y = H - M - 64;
     const maxW = MEASURE; // capped reading measure
-    const subHead = (title: string) => {
-      if (y - 40 < M) {
+    /** A altura útil desta página — o tecto do que se pode exigir a uma quebra. */
+    const COLUNA_FECHO = H - M - 64 - (M + 24);
+    /** `altura` é o BLOCO que vem a seguir ao título, e não os 40 pontos de
+     *  «o título e uma linha» que aqui estavam: um título no fundo de uma folha
+     *  com a sua lista na seguinte é o mesmo defeito dos serviços, um capítulo
+     *  mais à frente do ficheiro. */
+    const subHead = (title: string, altura = 16) => {
+      if (y - 24 - Math.min(altura, COLUNA_FECHO) < M + 24) {
         p = pdf.addPage([W, H]);
         frame(p);
         y = H - M - 64;
       }
-      text(p, title, M, y, { font: f.serifB, size: 15, color: INK });
-      p.drawRectangle({ x: M, y: y - 8, width: 32, height: 1.5, color: MOSS });
-      y -= 26;
+      text(p, title, M, y, { font: f.serifB, size: T_SUB, color: INK });
+      y -= 24;
     };
-    const section = (title: string, items: string[], size = 9) => {
-      subHead(title);
+    /** A altura de uma lista desta página, medida como vai ser desenhada. */
+    const alturaDaLista = (items: readonly string[], size: number) =>
+      items.reduce((h, it) => h + wrap(f.reg, it, size, maxW - 16).length * 12 + 6, 0);
+    /** `remate` é desenhado ainda DENTRO da secção, antes do ar que a fecha —
+     *  ver o faseamento, que junta os valores em euros à lista de percentagens
+     *  sem os deixar a pairar entre duas rubricas. */
+    const section = (
+      title: string,
+      items: string[],
+      size = 9,
+      remate?: { altura: number; desenhar: () => void },
+    ) => {
+      subHead(title, alturaDaLista(items, size) + (remate?.altura ?? 0));
       for (const it of items) {
         const lines = wrap(f.reg, it, size, maxW - 16);
-        if (y - lines.length * 12 < M + 10) {
+        if (y - lines.length * 12 < M + 24) {
           p = pdf.addPage([W, H]);
           frame(p);
           y = H - M - 64;
         }
-        p.drawCircle({ x: M + 3, y: y + 3, size: 1.3, color: MOSS });
+        p.drawCircle({ x: M + 3, y: y + 3, size: 1.2, color: FAINT });
         for (const ln of lines) {
           text(p, ln, M + 14, y, { size });
           y -= 12;
         }
-        y -= 5;
+        y -= 6;
       }
-      y -= 14;
+      remate?.desenhar();
+      y -= 18;
     };
 
     // Próximos passos — the clear "what happens next", with the validity date.
-    const validUntil = prettyDate(resolveValidUntil(doc));
-    subHead("Próximos Passos");
-    for (const line of [
-      "Para confirmar esta proposta, basta aceitá-la online através da ligação enviada no e-mail, ou responder-nos diretamente.",
-      "A reserva da data só fica garantida após o pagamento do sinal.",
-      `Esta proposta é válida até ${validUntil}.`,
-    ]) {
+    const validUntil = t.data(resolveValidUntil(doc));
+    subHead(t.proximosPassos);
+    for (const line of [t.passoAceitar, t.passoSinal, t.passoValidade(validUntil)]) {
       const lines = wrap(f.reg, line, 10, maxW - 16);
-      p.drawCircle({ x: M + 3, y: y + 3, size: 1.3, color: MOSS });
+      p.drawCircle({ x: M + 3, y: y + 3, size: 1.2, color: FAINT });
       for (const ln of lines) {
         text(p, ln, M + 14, y, { size: 10 });
         y -= 14;
       }
       y -= 4;
     }
-    y -= 14;
+    y -= 18;
 
-    section("Observações Gerais", doc.observacoesGerais);
-    section("Faseamento do Pagamento", doc.faseamento);
-    section("Cancelamento", doc.cancelamento);
+    section(t.observacoesGerais, fixos.observacoesGerais);
+    /* ═════════════════════════════════════════════════════════════════════════
+       O FASEAMENTO, COM OS VALORES A SÉRIO — AQUI, E NÃO NA FOLHA DO ORÇAMENTO
+       ═════════════════════════════════════════════════════════════════════════
+
+       Estes dois números estavam por baixo do total, na página do orçamento. Na
+       folha antiga o faseamento não está lá: está com as condições, em
+       «FASEAMENTO DO PAGAMENTO:» (página 9 da proposta de referência), que é
+       exactamente esta rubrica — a mesma que já trazia as percentagens escritas
+       por extenso, e só as percentagens.
+
+       Mudaram de página, não se perderam: quanto é o sinal EM EUROS é a
+       informação que a folha antiga não dá e que evita o telefonema a perguntar.
+       Ficam onde a lista já falava deles, logo por baixo dela.
+
+       A PERCENTAGEM SAI DE `depositPercentOf`, e não de um «30%» escrito à
+       letra: há uma caixa editável no estúdio e são as rotas de facturação que a
+       lêem quando emitem o sinal e o saldo. Numa proposta de 50% o documento
+       dizia «Sinal 30% 3.000,00 €» num total de 10.000 €, o casal aceitava, e a
+       factura do sinal saía a 5.000 € — o documento assinado e a factura emitida
+       a discordarem em 2.000 €. Os montantes saem do mesmo resolvedor de
+       dinheiro que a facturação usa, pela mesma razão. */
+    const comValores = totais.aPagar > 0;
+    section(t.faseamentoDoPagamento, fixos.faseamento, 9, {
+      // As duas linhas viajam com a rubrica: são medidas ANTES de o título ser
+      // desenhado, e não depois da lista — de outro modo apareciam sozinhas no
+      // topo da folha seguinte, longe do cabeçalho que lhes dá sentido. A
+      // terceira, a que diz a base, viaja com elas pela mesma razão: um sinal
+      // sem a base de que saiu é meio número.
+      altura: comValores ? 51 : 0,
+      desenhar: () => {
+        if (!comValores) return;
+        const pct = totais.percentagemSinal;
+        for (const [rotulo, valor, quando] of [
+          [t.sinal(pct), totais.sinal, t.quandoSinal],
+          [t.saldo(100 - pct), totais.saldo, t.quandoSaldo],
+        ] as const) {
+          text(p, `${rotulo}   ${eurDocumento(valor)}`, M + 14, y, {
+            font: f.serif,
+            size: 10.5,
+            color: INK,
+          });
+          textRight(p, quando, M + maxW, y, { size: 9, color: MUTED });
+          y -= 17;
+        }
+        /**
+         * ── A BASE DE CÁLCULO, DITA ────────────────────────────────────────
+         *
+         * Estas duas linhas estavam sozinhas. Na proposta da Tara e do Marty
+         * somavam 3.025,80 € — o total COM IVA e COM a deslocação — enquanto a
+         * folha do orçamento dizia «Valor Total 2.950,79 €». Dois números
+         * legítimos, nenhum deles explicado, e nada no documento a ligá-los.
+         *
+         * A frase diz de onde saem, e diz o número: é a mesma palavra («total a
+         * pagar») e o mesmo valor, ao cêntimo, que fecha o quadro do orçamento.
+         */
+        text(p, t.baseDoCalculo(eurDocumento(totais.aPagar)), M + 14, y, { size: 9, color: MUTED });
+        y -= 17;
+      },
+    });
+    section(t.cancelamento, fixos.cancelamento);
 
     // Contactos
-    subHead("Contactos");
-    eyebrow(p, "Email", M, y);
+    subHead(t.contactos);
+    eyebrow(p, t.email, M, y);
     text(p, SITE.email, M + 70, y, { size: 10.5, color: INK });
     y -= 18;
-    eyebrow(p, "Telefone", M, y);
+    eyebrow(p, t.telefone, M, y);
     text(p, SITE.phoneDisplay, M + 70, y, { size: 10.5, color: INK });
   }
 
@@ -833,35 +2207,30 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
       const sideW = (W - panelW) / 2;
       const left = doc.coverImages[0];
       const right = doc.coverImages[1];
-      if (left) await drawCoverImage(pdf, p, left, 0, 0, sideW, H, COVER_DENSITY);
-      if (right) await drawCoverImage(pdf, p, right, sideW + panelW, 0, sideW, H, COVER_DENSITY);
+      // A capa não leva moldura (foi retirada a pedido), por isso uma foto que
+      // não saia não deixa cá rectângulo nenhum — mas continua a ser uma foto
+      // que o cliente devia ter visto e não vê, logo é contada. E o `photo`
+      // encaminha também a contagem do caminho de recurso: a capa é a maior
+      // caixa do documento, é a que mais pesa quando entra sem redimensionar.
+      if (left) await photo(p, left, 0, 0, sideW, H, "cover");
+      if (right) await photo(p, right, sideW + panelW, 0, sideW, H, "cover");
       p.drawRectangle({ x: sideW, y: 0, width: panelW, height: H, color: DARK });
     }
 
-    // Border only — a DARK fill here would repaint the interior and hide the
-    // side photos, exactly as on the front cover.
-    const inset = 22;
-    p.drawRectangle({
-      x: inset,
-      y: inset,
-      width: W - 2 * inset,
-      height: H - 2 * inset,
-      borderColor: rgb(0.32, 0.34, 0.31),
-      borderWidth: 0.6,
-    });
+    // No border frame — removed on request, matching the front cover.
 
     const cx = W / 2;
     // Keep every line inside the centre band so text never spills onto the
     // photos; wrap to the band width when images flank the page.
     const bandW = (hasImgs ? W * 0.34 : W * 0.72) - 24;
-    textCenter(p, "OBRIGADA", cx, H * 0.62, {
+    textCenter(p, t.obrigada, cx, H * 0.62, {
       font: f.bold,
       size: 9,
       color: rgb(0.72, 0.6, 0.34),
       tracking: 3,
     });
     let my = H * 0.56;
-    for (const ln of wrap(f.serifIt, "Por nos deixarem fazer parte deste momento.", 13, bandW)) {
+    for (const ln of wrap(f.serifIt, t.agradecimento, 13, bandW)) {
       textCenter(p, ln, cx, my, { font: f.serifIt, size: 13, color: CREAM });
       my -= 13 * 1.3;
     }
@@ -869,13 +2238,42 @@ export async function renderProposalDocPdf(doc: ProposalDoc): Promise<Uint8Array
     const lh = (logoWhite.height / logoWhite.width) * lw;
     p.drawImage(logoWhite, { x: cx - lw / 2, y: H * 0.3, width: lw, height: lh });
     let sy = H * 0.3 - 18;
-    for (const ln of wrap(f.serifIt, SITE.slogan, 10.5, bandW)) {
+    for (const ln of wrap(f.serifIt, t.slogan ?? SITE.slogan, 10.5, bandW)) {
       textCenter(p, ln, cx, sy, { font: f.serifIt, size: 10.5, color: CREAM_DIM });
       sy -= 10.5 * 1.3;
     }
   }
 
-  return pdf.save();
+  if (semRedimensionar > 0) {
+    // ERRO e não aviso: o PDF sai, mas sai pesado a abrir e a percorrer, e até
+    // aqui isso acontecia sem deixar rasto nenhum. Um PDF verdadeiro de
+    // 3,31 MB chegou com as fotos a 266–576 DPI por este caminho.
+    log.error("proposal-doc-pdf: fotos embutidas SEM redimensionar", null, {
+      quantas: semRedimensionar,
+      ref: doc.ref,
+      porque:
+        "o sharp falhou e usou-se o original. O PDF fica pesado a abrir. " + "Ver PDF-BEFORE.md.",
+    });
+  }
+  // Uma reordenação não é um erro — é uma correcção — mas tem de ficar escrita
+  // em algum lado: é conteúdo dela a sair por uma ordem que não é a que ela vê
+  // no editor, e o dia em que isto surpreender alguém tem de haver um registo
+  // com as duas ordens à frente uma da outra.
+  if (reordenacoes.length > 0) {
+    log.info("proposal-doc-pdf: listas alinhadas pela ordem dos Serviços", {
+      ref: doc.ref,
+      reordenacoes: reordenacoes.map(
+        (r) => `${r.onde}: ${r.de.join(" → ")} ⇒ ${r.para.join(" → ")}`,
+      ),
+    });
+  }
+  return {
+    bytes: await pdf.save(),
+    truncations,
+    undrawnImages: undrawn.size,
+    semRedimensionar,
+    reordenacoes,
+  };
 }
 
 // Small helper factory so the collage function can reuse the closures.
@@ -893,49 +2291,144 @@ async function drawCollage(
   mb: MoodBoard,
   f: Fonts,
   fns: ReturnType<typeof textFns>,
+  cache: EmbedCache,
+  boardName: string,
+  note: NoteTruncation,
+  noteUndrawn: NoteUndrawn,
+  /** Ver `renderProposalDocPdfWithReport`: conta as fotos que entram sem
+   *  serem redimensionadas, para a proposta poder dizer que saiu pesada. */
+  contarRecurso: () => void,
 ) {
-  const top = H - M - 112;
-  const bottom = M + (mb.annotation ? 40 : 8);
-  const areaW = W - 2 * M;
-  const areaH = top - bottom;
-  const imgs = mb.images.slice(0, 6);
-  const n = imgs.length;
-  const gap = 8;
+  // Wrap the annotation (description + optional flower list) to the page measure
+  // up front so the collage reserves exactly the height the caption needs. Capped
+  // at 5 lines so a very long note never crowds out the photos — o que passa
+  // disso é anotado, não desaparece calado.
+  const annAll = mb.annotation
+    ? wrap(f.serifIt, mb.annotation, TXT.legenda.tamanho, W - 2 * M)
+    : [];
+  note(`Descrição do mood board ${boardName}`, annAll.length - MAX_ANNOTATION_LINES, "linhas");
+  const annLines = annAll.slice(0, MAX_ANNOTATION_LINES);
+  const annH = alturaDaLegenda(annLines.length);
+  const bottom = M + annH;
+  // O collage tem lugar para MOOD_BOARD_MAX_IMAGES fotos. As restantes JÁ
+  // FORAM descarregadas do armazenamento com sucesso e mesmo assim não são
+  // desenhadas — é a perda que este aviso existe para tornar visível.
+  /**
+   * ── A FOTO QUE MANDA NA PÁGINA VEM PRIMEIRO ─────────────────────────────
+   *
+   * `ordemDasFotos` põe a foto marcada como principal na primeira posição —
+   * que é a caixa grande nas duas disposições que têm uma (o «destaque» e o
+   * «mosaico»). Nas outras devolve a ordem escrita e não mexe em nada.
+   *
+   * A permutação é feita ANTES do corte às `MOOD_BOARD_MAX_IMAGES`: uma foto
+   * marcada como principal na décima primeira posição tem de entrar na página,
+   * não ser cortada por causa da ordem em que foi carregada.
+   *
+   * É a mesma função que o estúdio chama para desenhar a grelha. Se fossem
+   * duas, ela marcava uma foto e recebia outra em grande.
+   */
+  const ordemDelas = ordemDasFotos(mb);
+  const imgs = ordemDelas.slice(0, MOOD_BOARD_MAX_IMAGES).map((i) => mb.images[i]);
+  note(`Mood board ${boardName}`, mb.images.length - MOOD_BOARD_MAX_IMAGES, "fotos");
 
   // Draw one framed image into a box (cover-cropped, thin hairline frame).
+  //
+  // A MOLDURA SÓ EXISTE SE A FOTO EXISTIR. Era isto que faltava: o contorno era
+  // desenhado sempre, mesmo quando o desenho da foto falhava, e a página saía
+  // com rectângulos vazios (seis molduras, duas fotos, numa proposta que já
+  // tinha seguido para o cliente). Uma caixa vazia num documento que o cliente
+  // vê é pior do que não haver caixa — o collage não tem lugares fixos, o resto
+  // das fotos ocupa a página na mesma. E a foto que não saiu é CONTADA, para o
+  // estúdio ser avisado antes de enviar.
   const place = async (b64: string, x: number, yBottom: number, w: number, h: number) => {
-    await drawCoverImage(pdf, p, b64, x, yBottom, w, h, COLLAGE_DENSITY);
+    const drawn = await drawCoverImage(
+      pdf,
+      p,
+      b64,
+      x,
+      yBottom,
+      w,
+      h,
+      "collage",
+      cache,
+      contarRecurso,
+    );
+    if (!drawn) {
+      noteUndrawn(b64);
+      return;
+    }
     p.drawRectangle({ x, y: yBottom, width: w, height: h, borderColor: LINE, borderWidth: 0.5 });
   };
 
-  if (n === 1) {
-    await place(imgs[0], M, bottom, areaW, areaH);
-  } else if (n === 2) {
-    const cw = (areaW - gap) / 2;
-    await place(imgs[0], M, bottom, cw, areaH);
-    await place(imgs[1], M + cw + gap, bottom, cw, areaH);
-  } else {
-    // Feature layout: a large left image + the rest as a grid on the right.
-    const featW = areaW * 0.56;
-    await place(imgs[0], M, bottom, featW, areaH);
-    const rest = imgs.slice(1);
-    const rx = M + featW + gap;
-    const rW = areaW - featW - gap;
-    const rCols = rest.length <= 2 ? 1 : 2;
-    const rRows = Math.ceil(rest.length / rCols);
-    const cw = (rW - gap * (rCols - 1)) / rCols;
-    const ch = (areaH - gap * (rRows - 1)) / rRows;
-    for (let i = 0; i < rest.length; i++) {
-      const r = Math.floor(i / rCols);
-      const c = i % rCols;
-      const x = rx + c * (cw + gap);
-      const yTop = top - r * (ch + gap);
-      await place(rest[i], x, yTop - ch, cw, ch);
+  /**
+   * ── AS FOTOS COM A FORMA QUE TÊM ────────────────────────────────────────
+   *
+   * A geometria vem de `caixasDoMoodboard`, que precisa de saber a FORMA de
+   * cada fotografia — é isso que faz uma vertical sair vertical em vez de ser
+   * recortada ao mesmo rectângulo das outras, e é a diferença entre uma página
+   * de inspiração e uma folha de contactos. Ver `proposal-geometria.ts`.
+   *
+   * O layout GUARDADO no documento manda sempre. Só quando não há nenhum é que
+   * se usa o que o número de fotos sugere — uma sugestão que mudasse com o
+   * código reescrevia páginas de propostas já enviadas.
+   *
+   * ── UMA FOTO QUE NÃO ABRE NÃO PODE OCUPAR LUGAR ─────────────────────────
+   *
+   * Medir era também a maneira de saber se a fotografia SERVE: são os mesmos
+   * bytes que o desenho vai abrir a seguir, e o que não se consegue medir não
+   * se consegue desenhar. Antes, essa entrava na composição com o aspecto por
+   * omissão — a geometria dava-lhe uma caixa, o desenho falhava, e a página
+   * saía com um buraco do tamanho de uma fotografia no meio da fila. A moldura
+   * já tinha deixado de ser desenhada; o BURACO ficava.
+   *
+   * Agora sai da lista antes de a composição existir: as que ficam ocupam a
+   * página toda, como se a outra nunca tivesse sido escolhida. E é CONTADA,
+   * para o estúdio avisar antes de a proposta seguir — o que não pode
+   * acontecer é desaparecer calada.
+   */
+  const medidas = await Promise.all(
+    imgs.map(async (b64) => {
+      try {
+        const raw = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+        return await aspetoDaImagem(Buffer.from(raw, "base64"));
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const desenhaveis: string[] = [];
+  const aspectos: number[] = [];
+  for (const [i, medida] of medidas.entries()) {
+    if (medida == null) {
+      noteUndrawn(imgs[i]);
+      continue;
     }
+    desenhaveis.push(imgs[i]);
+    aspectos.push(medida);
+  }
+  // A disposição é escolhida para as fotos que a página vai MESMO ter.
+  const layout = mb.layout ?? layoutSugerido(desenhaveis.length);
+  const caixas = caixasDoMoodboard(layout, aspectos, annH, mb.enquadramento === "forma-da-foto");
+  for (let i = 0; i < desenhaveis.length; i++) {
+    const c = caixas[i];
+    // Uma foto sem caixa não pode sair da página em silêncio. Hoje a geometria
+    // devolve sempre uma caixa por foto — mas era ela que devolvia UMA só no
+    // arranjo «texto e imagem», e as outras desapareciam sem nada nem ninguém
+    // dar por isso. Se voltar a acontecer, conta como foto por desenhar e o
+    // estúdio avisa antes de a proposta seguir.
+    if (!c) {
+      noteUndrawn(desenhaveis[i]);
+      continue;
+    }
+    await place(desenhaveis[i], c.x, c.y, c.w, c.h);
   }
 
-  if (mb.annotation) {
-    fns.text(p, mb.annotation, M, M + 14, { font: f.serifIt, size: 12, color: MUTED });
+  if (annLines.length) {
+    let ay = bottom - TXT.legenda.entrelinha;
+    for (const ln of annLines) {
+      fns.text(p, ln, M, ay, { font: f.serifIt, size: TXT.legenda.tamanho, color: MUTED });
+      ay -= TXT.legenda.entrelinha;
+    }
   }
 }
 
@@ -950,7 +2443,7 @@ function bullets(
 ): number {
   for (const it of items) {
     const lines = wrap(f.reg, it, size, maxW - 12);
-    p.drawCircle({ x: x + 2, y: y + 3, size: 1.2, color: INK });
+    p.drawCircle({ x: x + 2, y: y + 3, size: 1.1, color: FAINT });
     for (const ln of lines) {
       p.drawText(ln, { x: x + 11, y, font: f.reg, size, color: INK });
       y -= size + 3;

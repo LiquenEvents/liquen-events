@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
     // Bound every free-text field (defense-in-depth against storage abuse), the
     // same way the public quote schema does — admin-only, but still validated.
     const str = (v: unknown, max: number) => String(v ?? "").slice(0, max);
+    // Same bound as `str` but also strips CR/LF — for values that end up in an
+    // email header (the recipient address) or that were previously unbounded.
+    const strLine = (v: unknown, max: number) =>
+      str(v, max)
+        .replace(/[\r\n]+/g, " ")
+        .trim();
     const name = str(b.name, 120).trim();
     if (!name) {
       return NextResponse.json({ error: "O nome é obrigatório." }, { status: 400 });
@@ -56,8 +62,14 @@ export async function POST(request: NextRequest) {
     const id = generateQuoteId();
     const quote: Quote = {
       // QuoteFormData defaults
-      category: b.category ?? null,
-      eventType: b.eventType ?? null,
+      //
+      // Com o `?? null` sozinho, estes dois eram os ÚNICOS campos do objecto
+      // sem `str(...)`: um objecto, um número ou uma string de 10 MB entravam
+      // tal e qual no jsonb do pedido e daí para a cópia de segurança. Passam
+      // agora pelo mesmo tratamento que os vizinhos; vazio continua a ser
+      // `null`, que é o que "Outro" grava (ver `QUOTE_EVENT_OPTIONS`).
+      category: (str(b.category, 40) || null) as Quote["category"],
+      eventType: (str(b.eventType, 60) || null) as Quote["eventType"],
       eventName: str(b.eventName, 160),
       date: str(b.date, 40),
       endDate: "",
@@ -73,7 +85,7 @@ export async function POST(request: NextRequest) {
       notes: str(b.notes, 5000),
       referralSource: str(b.referralSource, 120) || "Contacto direto",
       name,
-      email: str(b.email, 200),
+      email: strLine(b.email, 200),
       phone: str(b.phone, 40),
       company: str(b.company, 160),
       nif: "",

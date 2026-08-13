@@ -40,6 +40,28 @@ export const mapper: Mapper<EmailTemplate> = {
   }),
   order: { column: "id", ascending: true },
   fileCompare: (a, b) => a.key.localeCompare(b.key),
+  /**
+   * SEM `touch`, e isto merece explicação porque a tabela É do tipo que se
+   * perde: o corpo de um modelo é texto escrito por uma pessoa, exactamente a
+   * classe de trabalho que o bloqueio optimista existe para salvar.
+   *
+   * A razão é que aqui ele não salvava nada. O compare-and-set do Repository só
+   * evita perdas quando a escrita é um PATCH PARCIAL fundido sobre uma leitura
+   * velha — é aí que a repetição do `updateWith` relê e volta a aplicar o
+   * patch por cima do que a outra pessoa gravou. O `upsertTemplate` escreve a
+   * LINHA INTEIRA (`name`, `subject`, `body`, todos vindos do formulário), por
+   * isso a repetição reaplicaria a substituição completa e o resultado final
+   * seria byte a byte o mesmo: o último a gravar continua a ganhar. Ligar a
+   * comparação daria uma ida-e-volta a mais e a sensação de estar protegido.
+   *
+   * O que resolve isto de verdade é o desenho que a Visão Geral já usa (ver
+   * `overview-settings-store` + `src/app/api/visao-geral/route.ts`): quem grava
+   * DIZ sobre que versão escreveu, e se já não for a actual a escrita é
+   * recusada com 409 e a versão do servidor no corpo, para o ecrã mostrar as
+   * duas. Isso precisa de um `baseUpdatedAt` vindo do cliente — meia dúzia de
+   * linhas aqui, na rota, e no editor. A coluna `updated_at` desta tabela já
+   * existe e já é escrita, portanto a base para isso está pronta.
+   */
 };
 
 const repo = createRepository(mapper);
@@ -63,7 +85,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
   {
     key: "proposta-enviada",
     name: "Proposta enviada",
-    subject: "A sua proposta — Líquen Events",
+    subject: "A sua proposta | Líquen Events",
     updatedAt: "1970-01-01T00:00:00.000Z",
     body: [
       `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">`,
@@ -71,16 +93,16 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 12px">Olá {nome},</p>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Foi um gosto conhecer a sua visão. Preparámos uma proposta à medida do seu evento, com todo o cuidado que ele merece.</p>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 20px">Pode consultá-la aqui: <a href="{link}" style="color:#7c854b">{link}</a></p>`,
-      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Ficamos a aguardar o seu feedback — qualquer ajuste é bem-vindo. Basta responder a este email.</p>`,
+      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Ficamos a aguardar o seu feedback e qualquer ajuste é bem-vindo. Basta responder a este email.</p>`,
       `  <hr style="border:none;border-top:1px solid #eee;margin:0 0 12px">`,
-      `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
+      `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Portugal</p>`,
       `</div>`,
     ].join("\n"),
   },
   {
     key: "sinal-recebido",
     name: "Sinal recebido",
-    subject: "Sinal recebido — reserva confirmada",
+    subject: "Sinal recebido, reserva confirmada",
     updatedAt: "1970-01-01T00:00:00.000Z",
     body: [
       `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">`,
@@ -88,25 +110,25 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 12px">Olá {nome},</p>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Confirmamos a receção do sinal de <strong style="color:#7c854b">{valor}</strong>. A sua data está oficialmente reservada e podemos avançar com a preparação.</p>`,
       `  <p style="font-size:13px;margin:0 0 16px;color:#555">Data do evento: <strong>{data_evento}</strong></p>`,
-      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Nas próximas semanas iremos afinar cada detalhe consigo. Para já, pode descansar — o mais importante já está garantido.</p>`,
+      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Nas próximas semanas iremos afinar cada detalhe consigo. Para já, pode descansar, o mais importante já está garantido.</p>`,
       `  <hr style="border:none;border-top:1px solid #eee;margin:0 0 12px">`,
-      `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
+      `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Portugal</p>`,
       `</div>`,
     ].join("\n"),
   },
   {
     key: "semana-evento",
     name: "Falta uma semana",
-    subject: "Falta uma semana — {data_evento}",
+    subject: "Falta uma semana para {data_evento}",
     updatedAt: "1970-01-01T00:00:00.000Z",
     body: [
       `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">`,
       `  <h2 style="font-size:18px;margin:0 0 16px;color:#1b2119">A contagem decrescente começou</h2>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 12px">Olá {nome},</p>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Falta apenas uma semana para o grande dia. Está tudo alinhado da nossa parte e mal podemos esperar por o receber em <strong>{local}</strong>.</p>`,
-      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Se surgir alguma questão de última hora, estamos a um email de distância. Aproveite estes dias com tranquilidade — o resto é connosco.</p>`,
+      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Se surgir alguma questão de última hora, estamos a um email de distância. Aproveite estes dias com tranquilidade, o resto é connosco.</p>`,
       `  <hr style="border:none;border-top:1px solid #eee;margin:0 0 12px">`,
-      `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
+      `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Portugal</p>`,
       `</div>`,
     ].join("\n"),
   },
@@ -122,7 +144,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Obrigado por nos ter confiado um dia tão especial. Foi um privilégio fazer parte dele e ver tudo ganhar vida.</p>`,
       `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Se guardou fotografias ou quiser partilhar uma palavra sobre a experiência, teríamos muito gosto em ouvi-lo. Até uma próxima celebração!</p>`,
       `  <hr style="border:none;border-top:1px solid #eee;margin:0 0 12px">`,
-      `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
+      `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Portugal</p>`,
       `</div>`,
     ].join("\n"),
   },
@@ -168,14 +190,28 @@ export async function upsertTemplate(
 
 /**
  * Resolve `{key}` placeholders in the subject and body against `vars`. Every
- * placeholder is replaced (missing keys → empty string); values are
- * HTML-escaped so merge data can't inject markup into the email body.
+ * placeholder is replaced (missing keys → empty string).
+ *
+ * O CORPO É ESCAPADO, O ASSUNTO NÃO — e a diferença não é um descuido.
+ *
+ * O corpo é HTML e vai para dentro do email como markup: escapar os valores é
+ * o que impede que os dados de um cliente lá metam etiquetas. O assunto é um
+ * cabeçalho RFC 5322, texto de uma ponta à outra, e quem o codifica é o
+ * nodemailer no envio; passá-lo pelo `esc` não protegia coisa nenhuma e só se
+ * via — uma «Marta & João» recebia um email endereçado a «Marta &amp; João»,
+ * com o nome dela mal escrito na única linha que ela lê antes de abrir.
+ *
+ * A pré-visualização do back office faz esta mesma distinção
+ * (`renderPreview` / `renderPreviewSubject` em `email-template-format.ts`).
+ * As duas andam sempre juntas: mudar uma sem a outra faz o ecrã mentir.
  */
 export function renderTemplate(
   t: EmailTemplate,
   vars: Record<string, string>,
 ): { subject: string; body: string } {
-  const replace = (s: string): string =>
-    s.replace(/\{(\w+)\}/g, (_m, key: string) => (key in vars ? esc(vars[key]) : ""));
-  return { subject: replace(t.subject), body: replace(t.body) };
+  const replace = (s: string, escapar: boolean): string =>
+    s.replace(/\{(\w+)\}/g, (_m, key: string) =>
+      key in vars ? (escapar ? esc(vars[key]) : String(vars[key] ?? "")) : "",
+    );
+  return { subject: replace(t.subject, false), body: replace(t.body, true) };
 }

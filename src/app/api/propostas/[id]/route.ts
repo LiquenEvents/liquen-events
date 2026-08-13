@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { deleteProposal, updateProposal } from "@/lib/proposals-store";
+import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -15,19 +16,79 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
     }
-    const VALID_STATUS = ["rascunho", "enviada", "aceite", "rejeitada"];
+    const VALID_STATUS = ["rascunho", "enviada", "em_negociacao", "aceite", "rejeitada"];
     if ("status" in body && !VALID_STATUS.includes(body.status)) {
       return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
     }
-    const allowed = ["status", "respondedAt"] as const;
+    // Lista fechada e contável — a razão está em `MotivoDeRecusa`. Aceitar
+    // texto livre aqui esvaziava a única pergunta que isto serve para
+    // responder: perdemos por preço quantas vezes?
+    const VALID_MOTIVO = ["preco", "data", "escolheram-outro", "sem-resposta", "outro"];
+    if ("lostReason" in body && body.lostReason && !VALID_MOTIVO.includes(body.lostReason)) {
+      return NextResponse.json({ error: "Motivo inválido" }, { status: 400 });
+    }
+    // O seguimento é uma data do calendário, não um carimbo de tempo. Uma
+    // string qualquer aqui ia parar à base e voltava como `NaN` dias no painel.
+    if ("followUpAt" in body && body.followUpAt && !/^\d{4}-\d{2}-\d{2}$/.test(body.followUpAt)) {
+      return NextResponse.json({ error: "Data de seguimento inválida" }, { status: 400 });
+    }
+    // Lista fechada, como os motivos e pela mesma razão: o que isto serve
+    // para responder é "os extras vendem-se?", e uma coluna que se conta com
+    // texto livre lá dentro é uma coluna que nunca mais se conta.
+    if (
+      "versaoEscolhida" in body &&
+      body.versaoEscolhida &&
+      !["base", "extras"].includes(body.versaoEscolhida)
+    ) {
+      return NextResponse.json({ error: "Versão inválida" }, { status: 400 });
+    }
+    // A resposta do cliente é um `timestamptz` na base (ver db/schema.sql): uma
+    // string qualquer fazia a escrita rebentar lá dentro e sair daqui um 500 a
+    // meio de um gesto trivial. Vazio é limpar, e isso continua a valer.
+    if ("respondedAt" in body && body.respondedAt) {
+      const t = typeof body.respondedAt === "string" ? Date.parse(body.respondedAt) : Number.NaN;
+      if (!Number.isFinite(t)) {
+        return NextResponse.json({ error: "Data de resposta inválida" }, { status: 400 });
+      }
+    }
+    // As duas notas são texto livre — o único campo por onde entra texto sem
+    // forma. Limitadas pela mesma razão que tudo o resto: o que fica gravado
+    // acaba na cópia de segurança, que tem tecto.
+    const MAX_NOTA = 2000;
+    for (const k of ["followUpNote", "lostNote"] as const) {
+      if (k in body && body[k] !== null && typeof body[k] !== "string") {
+        return NextResponse.json({ error: "Nota inválida" }, { status: 400 });
+      }
+    }
+    const allowed = [
+      "status",
+      "respondedAt",
+      "followUpAt",
+      "followUpNote",
+      "lostReason",
+      "lostNote",
+      "versaoEscolhida",
+    ] as const;
     const patch: Record<string, unknown> = {};
     for (const k of allowed) {
-      if (k in body) patch[k] = body[k];
+      if (!(k in body)) continue;
+      patch[k] =
+        (k === "followUpNote" || k === "lostNote") && typeof body[k] === "string"
+          ? body[k].slice(0, MAX_NOTA)
+          : body[k];
     }
     const updated = await updateProposal(id, patch);
     if (!updated) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     return NextResponse.json(updated);
   } catch (err) {
+    // A proposta é o documento que seguiu para o casal e tem vários donos ao
+    // mesmo tempo: o Estúdio a gravar, esta rota a mudar o estado, o portal do
+    // cliente a registar o aceite. Quando as releituras não resolvem, quem
+    // gravou tem de ver o que o servidor tem — não "Erro interno".
+    const conflito = respostaDeConflito(err);
+    if (conflito) return conflito;
+    const migracao = respostaDeMigracaoEmFalta(err, "As propostas");
+    if (migracao) return migracao;
     log.error("propostas PATCH falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }

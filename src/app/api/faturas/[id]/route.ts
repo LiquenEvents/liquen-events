@@ -8,14 +8,17 @@ import {
   createInvoice,
   newInvoiceId,
   nextInvoiceNumber,
-  splitThirtySeventy,
   isUniqueViolation,
   type Invoice,
 } from "@/lib/invoices-store";
 import { getProposalByQuote } from "@/lib/proposals-store";
-import { round2 } from "@/lib/money";
+import { splitSinal, saldoAPartirDoSinal, eur } from "@/lib/money";
+import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
+import { depositPercentOf, hojeNoEstudio, somarDias, type ProposalDoc } from "@/lib/proposal-doc";
 import { log } from "@/lib/logger";
 import { invoiceUpdateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
+import { dataIso } from "@/lib/validation";
+import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 
 export const runtime = "nodejs";
 
@@ -47,20 +50,26 @@ async function maybeAutoIssueSaldo(sinal: Invoice): Promise<Invoice | null> {
     //    proposta mais recente pode ter sido revista após o aceite e NUNCA
     //    sobrepõe o sinal já cobrado.
     //
-    //    Preferimos o saldo EXACTO `total − sinal` (via splitThirtySeventy) quando
-    //    existe uma proposta cujo sinal 30% ainda BATE CERTO com o sinal faturado
+    //    Preferimos o saldo EXACTO `total − sinal` (via splitSinal) quando
+    //    existe uma proposta cujo sinal ainda BATE CERTO com o sinal faturado
     //    (i.e. não foi revista): isso fecha o total ao cêntimo mesmo em totais NÃO
     //    inteiros (ex.: €1000,01 → sinal €300,00 + saldo €700,01). O fallback
-    //    `sinal/3×7` só perde 1 cêntimo em totais de cêntimo ímpar; para totais em
+    //    derivado do sinal só perde 1 cêntimo em totais de cêntimo ímpar; para totais em
     //    euros inteiros (o que o pipeline de propostas emite) é idêntico, por isso
     //    o fluxo normal não muda. Se a proposta divergir (revista após aceite, o
-    //    seu 30% ≠ sinal), mantemos o valor derivado do sinal e só registamos — a
+    //    seu sinal ≠ sinal facturado), mantemos o valor derivado e só registamos — a
     //    proposta nunca o sobrepõe.
-    let amount = round2((sinal.amount / 3) * 7);
+    // A percentagem sai da PROPOSTA quando há uma; sem proposta fica a da
+    // casa, que é o que este cálculo assumia à mão em `sinal / 3 × 7`. Ler a
+    // proposta ANTES de derivar é a diferença entre uma conta certa e uma
+    // conta que era certa enquanto o sinal foi sempre 30%.
+    const propostaDoSaldo = await getProposalByQuote(sinal.quoteId).catch(() => null);
+    const pctSinal = depositPercentOf(propostaDoSaldo?.doc as ProposalDoc | undefined);
+    let amount = saldoAPartirDoSinal(sinal.amount, pctSinal);
     try {
-      const proposal = await getProposalByQuote(sinal.quoteId);
+      const proposal = propostaDoSaldo;
       if (proposal && proposal.total > 0) {
-        const split = splitThirtySeventy(proposal.total);
+        const split = splitSinal(proposal.total, pctSinal);
         if (Math.abs(split.sinal - sinal.amount) < 0.005) {
           // Proposta coerente com o sinal → saldo exacto = total − sinal.
           amount = split.saldo;
@@ -76,13 +85,17 @@ async function maybeAutoIssueSaldo(sinal: Invoice): Promise<Invoice | null> {
       /* cross-check é opcional — nunca afeta o valor faturado nem o fluxo */
     }
 
-    const issuedAt = new Date().toISOString().slice(0, 10);
-    // Vencimento por omissão: hoje + 30 dias. A data do evento não é conhecida
-    // aqui (não vive na fatura), por isso usamos um prazo padrão de pagamento —
-    // a equipa pode ajustá-lo no back office se necessário.
-    const dueAt = new Date(Date.now() + SALDO_DUE_DAYS * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
+    // O dia de LISBOA, não o de Greenwich (ver `hojeNoEstudio`): este saldo é
+    // um documento fiscal emitido sozinho, e à 00:30 de um dia de Verão nascia
+    // datado de ontem.
+    const issuedAt = hojeNoEstudio();
+    // Vencimento por omissão: 30 dias depois da EMISSÃO. A data do evento não é
+    // conhecida aqui (não vive na fatura), por isso usamos um prazo padrão de
+    // pagamento — a equipa pode ajustá-lo no back office se necessário. Conta-se
+    // sobre a data e não sobre o instante: somar 30 × 24 h ao relógio trazia de
+    // volta, pela porta do lado, o dia trocado que o `issuedAt` acabou de
+    // corrigir (e uma mudança de hora pelo meio ainda lhe roubava uma hora).
+    const dueAt = somarDias(issuedAt, SALDO_DUE_DAYS);
 
     const saldo: Invoice = {
       id: newInvoiceId(),
@@ -191,16 +204,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       patch.status = body.status;
       // Keep paidAt in lockstep with the status unless the caller set it
       // explicitly: marking paga stamps today, un-paying (or annulling) clears it.
+      // «Hoje» é o dia de Lisboa — ver `hojeNoEstudio`.
       if (body.status === "paga" && !("paidAt" in body)) {
-        patch.paidAt = new Date().toISOString().slice(0, 10);
+        patch.paidAt = hojeNoEstudio();
       } else if (body.status !== "paga") {
         patch.paidAt = undefined;
       }
     }
 
     if ("paidAt" in body) {
-      const s = String(body.paidAt ?? "").slice(0, 10);
-      patch.paidAt = /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : undefined;
+      // A mesma regra de todas as outras datas do livro — ver `dataIso`.
+      patch.paidAt = dataIso(body.paidAt) || undefined;
     }
     if ("note" in body) {
       patch.note = body.note
@@ -230,11 +244,54 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const saldo = becamePaid ? await maybeAutoIssueSaldo(updated) : null;
     const saldoAnnulled = revertedFromPaid ? await maybeAnnulOrphanSaldo(updated) : null;
 
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * DINHEIRO RECEBIDO É O SINAL MAIS FORTE DE TODOS
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Marcar uma factura como paga não tocava no pedido. É a acção que menos
+     * ambiguidade tem em todo o back office — entrou dinheiro — e era a que
+     * menos consequências tinha no quadro.
+     *
+     * `becamePaid` acima é estreito de propósito (só o SINAL, para emitir o
+     * saldo); aqui interessa QUALQUER espécie: um saldo pago, um pagamento
+     * avulso pago, tudo diz a mesma coisa sobre o pedido.
+     *
+     * ── O QUE ISTO NÃO FAZ ────────────────────────────────────────────────
+     *
+     * Não desfaz nada. Reverter uma factura de `paga` para `emitida`, ou anulá-la,
+     * NÃO puxa o pedido para trás — o estado nunca anda para trás sozinho, e
+     * uma factura anulada por engano de digitação não pode desfechar um
+     * casamento no quadro. Se o trabalho se perdeu mesmo, quem o marca como
+     * perdido é uma pessoa.
+     */
+    const ficouPaga = updated.status === "paga" && prior.status !== "paga";
+    if (ficouPaga) {
+      await registarAcontecimento(
+        updated.quoteId,
+        "pagamento_recebido",
+        `${updated.number} · ${eur(updated.amount)}`,
+      );
+    }
+
     // Incluímos o saldo criado/anulado (quando há) para a UI refrescar sem refetch.
     if (saldo) return NextResponse.json({ ...updated, saldoAutoIssued: saldo });
     if (saldoAnnulled) return NextResponse.json({ ...updated, saldoAnnulled });
     return NextResponse.json(updated);
   } catch (err) {
+    // Colisão: outra pessoa gravou esta fatura entre a nossa leitura e a nossa
+    // escrita, e as três releituras do `updateWith` não chegaram. Um 500 aqui
+    // seria o pior desfecho possível — ela concluiria que falhou, gravava outra
+    // vez e à segunda passava por cima do que a colega escreveu. 409 com as
+    // duas versões: o livro fiscal não perde uma escrita nem por descuido.
+    const conflito = respostaDeConflito(err);
+    if (conflito) return conflito;
+    // A comparação apoia-se na coluna `updated_at` das faturas. Sem o
+    // `db/schema.sql` corrido ela não existe e TODAS as edições falhariam com
+    // "Erro interno" — que num livro fiscal é a mensagem mais assustadora
+    // possível para uma instalação a que só falta um minuto de SQL.
+    const migracao = respostaDeMigracaoEmFalta(err, "As faturas");
+    if (migracao) return migracao;
     log.error("faturas PATCH falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
@@ -261,7 +318,7 @@ export async function DELETE(
     if (!invoice) return NextResponse.json({ error: "Não encontrada" }, { status: 404 });
     if (invoice.status !== "anulada") {
       return NextResponse.json(
-        { error: "Só é possível apagar faturas anuladas. Anule a fatura primeiro." },
+        { error: "Só é possível apagar faturas anuladas. Anula a fatura primeiro." },
         { status: 409 },
       );
     }

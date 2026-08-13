@@ -2,27 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import type { Proposal } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
-import { getQuote, updateQuote } from "@/lib/quotes-store";
-import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
+import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
+import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
+import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { emailAoCliente } from "@/lib/email-assinatura";
+import { marcadoresDoPedido, modeloParaEnvioAutomatico } from "@/lib/email-modelos";
 import { SITE } from "@/lib/site";
 import { createProposalToken } from "@/lib/proposal-token";
 import { isAuthed } from "@/lib/admin-auth";
-import { proposalCreateSchema, firstError } from "@/lib/validation";
+import { proposalCreateSchema, firstError, dataIso } from "@/lib/validation";
 import { log } from "@/lib/logger";
+/**
+ * O MESMO NÚMERO NO EMAIL E NO PDF QUE ELE LEVA EM ANEXO — e dois formatadores.
+ *
+ * Aqui vivia uma QUARTA cópia do `Intl` de pt-PT, escrita à mão nesta rota — e
+ * com ela o email dizia «7890,00 €» enquanto o PDF anexo, gerado no mesmo POST,
+ * dizia «7.890,00 €»: o `Intl` só agrupa milhares a partir de cinco dígitos, e
+ * agrupa-os com espaço inquebrável em vez do ponto português. Dois números para
+ * o mesmo valor, a um clique de distância um do outro.
+ *
+ * O `eurDocumento` é o formatador de tudo o que sai para o CLIENTE; o porquê
+ * inteiro está no `money.ts`. O `eur` fica na linha do HISTÓRICO, que só é lida
+ * no painel — mudá-la aqui deixava-a a discordar das linhas que as rotas irmãs
+ * escrevem para o mesmo pedido.
+ */
+import { eur, eurDocumento } from "@/lib/money";
 
 export const runtime = "nodejs";
+/** O POST desenha o PDF da proposta e ainda fala com o SMTP com o anexo
+ *  colado; os 10 s por omissão do alojamento matavam a função a meio do envio
+ *  e o estúdio ficava sem saber se a proposta chegou ao casal. */
+export const maxDuration = 60;
 
 function authorized(request: NextRequest): boolean {
   return isAuthed(request);
 }
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2,
-  }).format(n || 0);
 
 // List existing proposals for a quote (admin)
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -83,11 +98,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       subtotal,
       vat,
       total,
-      validUntil: parsed.data.validUntil || undefined,
+      // Passa pelo `dataIso` mesmo já tendo passado pelo esquema: esta data é
+      // lida em TRÊS sítios (o HTML, o texto simples e o PDF anexo), todos com
+      // `new Date(... + "T12:00:00")`, e o que ali não é uma data imprime
+      // «Válida até Invalid Date» ao cliente. Uma proposta sem validade é uma
+      // proposta sem prazo; uma proposta com uma validade ilegível é um erro
+      // nosso na mão dele.
+      validUntil: dataIso(parsed.data.validUntil) || undefined,
       notes: parsed.data.notes || undefined,
-      status: "enviada",
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * «ENVIADA» É UM FACTO, E AINDA NÃO ACONTECEU AQUI
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Dizia `status: "enviada"` com `sentAt` a acompanhar — as duas coisas
+       * escritas ANTES de se falar com o servidor de correio, e nenhuma delas
+       * desfeita quando ele não aceitava a mensagem. Com o SMTP em baixo, ou um
+       * pedido sem email (o caso que está contado mais abaixo), ficava gravada
+       * uma proposta «Enviada, à espera de resposta» que nunca saiu de casa: o
+       * quadro «Propostas» mostrava-a à espera, o Acompanhamento contava-lhe os
+       * dias, e a resposta não podia chegar.
+       *
+       * Nasce por enviar; sobe a «enviada» a seguir ao envio, e só se ele
+       * correr bem. É a mesma correcção, com a mesma razão, da rota do estúdio
+       * (`proposta-doc`) — que é onde vive o botão que ela usa todos os dias, e
+       * onde está também o reaproveitamento da proposta por enviar no reenvio.
+       */
+      status: "rascunho",
       createdAt: new Date().toISOString(),
-      sentAt: new Date().toISOString(),
     };
 
     // Event metadata for the PDF header
@@ -112,14 +150,65 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Signed link so the client can accept/decline the proposal online.
     const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
 
-    // Email the client with the PDF attached.
-    const clientHtml = `
-    <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
-      <h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
-      <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(quote.name)},</p>
+    // Email the client with the PDF attached. Só o corpo se escreve aqui — a
+    // moldura, a assinatura e os anexos da marca vêm do `email-assinatura`,
+    // que é a mesma assinatura de todo o correio que sai para um cliente.
+    //
+    // A alternativa em TEXTO simples (`texto`) anda sempre com o HTML: um
+    // multipart/alternative passa melhor pelos filtros de spam e é o que se lê
+    // num cliente só de texto ou num leitor de ecrã. Valores em bruto (sem
+    // `esc`): escapar é uma preocupação de HTML; o texto leva-os tal e qual.
+    /**
+     * A saudação é pelo PRIMEIRO nome. O `quote.name` é o que a pessoa escreveu
+     * no formulário, e há quem lá ponha o nome legal inteiro — saiu mesmo assim
+     * noutro email da casa, «Olá Francisco Maria Carrelhas Das Neves Da Palma
+     * Gaspar,», que ninguém escreveria a falar com um cliente.
+     *
+     * Só aqui: o email do recibo saúda pelo `invoice.clientName`, que é o nome
+     * FISCAL e pode ser uma empresa — cortá-lo pelo primeiro espaço daria «Olá
+     * Torre,» a um hotel. É a mesma forma que o mensageiro já usa.
+     */
+    const primeiroNome = String(quote.name ?? "")
+      .trim()
+      .split(/\s+/)[0];
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O MODELO DELA, E O TEXTO DA CASA COMO RECURSO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O ecrã «Modelos de email» prometia, por baixo do «Proposta enviada»,
+     * «Enviado ao cliente quando a proposta segue». Era falso: o
+     * `renderTemplate` não tinha um único chamador de produção e o que saía
+     * era o HTML que está aqui em baixo. Passa a ser verdade.
+     *
+     * ── O RECURSO NÃO É ZELO ──────────────────────────────────────────────
+     *
+     * `modeloParaEnvioAutomatico` devolve `null` — e regista porquê — sempre
+     * que o modelo guardado não sirva: não existe, está vazio, ou cita um
+     * marcador que este pedido não sabe preencher. Aí sai o texto de sempre,
+     * que não tem marcadores nenhuns e por isso nunca tem buracos. Um email
+     * em branco, ou com «no » a meio de uma frase, é pior do que não ter
+     * modelo nenhum — e não há aqui ninguém para ler um erro e corrigir.
+     *
+     * Note-se que o `null` é também o estado de quem NUNCA abriu o ecrã: a
+     * semente que ele mostra é um exemplo, não uma decisão dela, e adoptá-la
+     * calava o VALOR TOTAL e a VALIDADE que este texto diz. Nada muda até ela
+     * guardar; a partir daí é o dela que sai.
+     */
+    const doModelo = await modeloParaEnvioAutomatico(
+      "proposta-enviada",
+      marcadoresDoPedido(quote, { link: acceptUrl, valor: eurDocumento(total) }),
+    );
+
+    const email = doModelo
+      ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto })
+      : emailAoCliente({
+          html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
+      <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(primeiroNome)},</p>
       <p style="font-size:14px;line-height:1.6;color:#333">
         Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento,
-        no valor total de <strong style="color:#7c854b">${eur(total)}</strong> (IVA incluído).
+        no valor total de <strong style="color:#7c854b">${eurDocumento(total)}</strong> (IVA incluído).
       </p>
       ${proposal.validUntil ? `<p style="font-size:13px;color:#777">Válida até ${esc(new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT"))}.</p>` : ""}
       <p style="margin:24px 0">
@@ -127,35 +216,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       </p>
       <p style="font-size:14px;line-height:1.6;color:#333">
         Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.
-      </p>
-      <p style="font-size:13px;color:#777;margin-top:20px">
-        Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}
-      </p>
-    </div>`;
-
-    // Plain-text alternative for the same email. A multipart/alternative message
-    // (html + text) is less likely to be flagged by spam filters and is readable
-    // by text-only / screen-reader mail clients — the two highest-value emails
-    // (this proposal + the receipt) were HTML-only. Raw values here (no esc):
-    // escaping is an HTML concern; plain text takes them verbatim.
-    const clientText = [
-      "A sua proposta — Líquen Events",
-      "",
-      `Olá ${quote.name},`,
-      "",
-      `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eur(total)} (IVA incluído).`,
-      proposal.validUntil
-        ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
-        : "",
-      "",
-      `Ver e responder à proposta online: ${acceptUrl}`,
-      "",
-      "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
-      "",
-      `Líquen Events · ${MAIL_TO} · ${SITE.phoneDisplay}`,
-    ]
-      .filter((line) => line !== "")
-      .join("\n");
+      </p>`,
+          texto: [
+            "A sua proposta — Líquen Events",
+            "",
+            `Olá ${primeiroNome},`,
+            "",
+            `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eurDocumento(total)} (IVA incluído).`,
+            proposal.validUntil
+              ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
+              : "",
+            "",
+            `Ver e responder à proposta online: ${acceptUrl}`,
+            "",
+            "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
+          ]
+            .filter((line) => line !== "")
+            .join("\n"),
+        });
 
     // Persist the proposal BEFORE emailing. The email carries a signed accept
     // link; sending it before the proposal exists means that link 404s the moment
@@ -166,29 +244,121 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     } catch (e) {
       log.error("guardar proposta falhou", e, { id });
       return NextResponse.json(
-        { error: "Não foi possível guardar a proposta. Tente novamente." },
+        { error: "Não foi possível guardar a proposta. Tenta novamente." },
         { status: 503 },
       );
     }
 
-    const mail = await sendMail({
-      to: quote.email,
-      replyTo: MAIL_TO,
-      subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
-      html: clientHtml,
-      text: clientText,
-      attachments: [
-        {
-          filename: `Proposta-Liquen-${id}.pdf`,
-          content: pdfBuffer,
-          contentType: "application/pdf",
-        },
-      ],
-    });
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * SEM EMAIL, O ENVIO CRIAVA PROPOSTAS FANTASMA
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Um pedido criado a partir de um telefonema tem `email: ""`. O servidor
+     * de correio recusa um destinatário vazio, o envio atirava, e o `catch` de
+     * topo devolvia 500 — mas a proposta JÁ TINHA SIDO GRAVADA, com um
+     * identificador novo, e o estado do pedido nunca chegava a avançar.
+     *
+     * Cada nova tentativa gravava MAIS UMA proposta. Três tentativas eram três
+     * propostas «enviada» na lista, no Acompanhamento, nas contagens e na
+     * Análise — nenhuma delas enviada a ninguém.
+     *
+     * Agora sem destinatário não se tenta enviar: a proposta fica gravada (o
+     * link continua a servir), o estado avança, e a resposta diz que o email
+     * não saiu e porquê. Uma proposta por enviar é um negócio parado; três
+     * propostas fantasma são um negócio confuso.
+     */
+    const temDestinatario = !!quote.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(quote.email);
+    const mail = temDestinatario
+      ? await sendMail({
+          to: quote.email,
+          replyTo: MAIL_TO,
+          // Sem identificador nenhum. Levava `proposal.id.slice(0, 8)` — oito
+          // caracteres do `randomUUID()` da nossa base, que o casal lia como
+          // «(3f2b1c9a)» na caixa de correio: não é a referência da casa (essa é
+          // a `LIQ-…` que a confirmação lhe mandou guardar), não diz nada a
+          // ninguém, e num telemóvel come os caracteres do assunto que ainda se
+          // veem. O que junta esta conversa na caixa dele são os cabeçalhos
+          // `In-Reply-To`/`References`, nunca o assunto.
+          //
+          // O assunto vem do MODELO quando é o modelo que sai: o corpo é dela e
+          // a linha que o cliente lê antes de abrir também tem de ser — dois
+          // assuntos para o mesmo email era o ecrã dos modelos a mentir outra
+          // vez, agora só a meio.
+          subject: doModelo?.assunto ?? "Proposta para o seu evento — Líquen Events",
+          html: email.html,
+          text: email.text,
+          // O PDF JUNTA-SE aos anexos da assinatura, não os substitui:
+          // substituí-los deixava o logótipo de fora e punha uma cruz vermelha
+          // no email mais importante que sai daqui.
+          attachments: [
+            ...email.attachments,
+            {
+              filename: `Proposta-Liquen-${id}.pdf`,
+              content: pdfBuffer,
+              contentType: "application/pdf",
+            },
+          ],
+        })
+      : { sent: false as const };
+
+    /**
+     * Seguiu: agora sim, «enviada» — com a hora a que saiu.
+     *
+     * Segunda escrita de propósito, pela razão da primeira: o link assinado vai
+     * dentro do email e tem de encontrar a proposta se o casal carregar nele no
+     * segundo seguinte. Se esta falhar, a proposta seguiu e fica marcada como
+     * por enviar — erro para o lado seguro, mas registado, porque o link do
+     * cliente só aceita uma proposta em aberto.
+     */
+    if (mail.sent) {
+      const sentAt = new Date().toISOString();
+      try {
+        await updateProposal(proposal.id, { status: "enviada", sentAt });
+      } catch (e) {
+        log.error("proposta: o email saiu mas a proposta ficou por marcar como enviada", e, {
+          id,
+          proposta: proposal.id,
+        });
+      }
+    }
 
     // Advance the quote status (best-effort — the proposal is already saved & sent).
     try {
-      await updateQuote(id, { status: "cotado", quotedPrice: total });
+      // `subtotal` (SEM IVA) e não `total`. Ver a nota extensa na rota irmã
+      // proposta-doc: o campo chama-se "Preço final (sem IVA)", quem o escreve
+      // à mão escreve-o líquido, e o `contractedAmounts` multiplica-o pela taxa
+      // para obter o valor com IVA. Gravar aqui o total inflacionava a margem
+      // do evento em cerca de 23%.
+      //
+      // O ESTADO passa pela decisão única (`@/lib/orcamento/estado-do-pedido`)
+      // em vez de ser escrito a seco: escrever "cotado" incondicionalmente
+      // fazia recuar um pedido já ganho a quem se reenviasse uma proposta
+      // revista. O preço grava-se nos dois casos — ver a nota longa na rota
+      // irmã, que tem exactamente o mesmo problema e a mesma solução.
+      //
+      // E, pela mesma razão do estado da proposta, a transição só acontece
+      // quando o email SAIU: «Proposta enviada» no Quadro é a mesma afirmação,
+      // vista do outro lado. O preço não depende disso.
+      await updateQuoteWith(id, (actual) => {
+        const transicao = mail.sent
+          ? transicaoDoPedido({
+              acontecimento: "proposta_enviada",
+              estadoActual: actual.status,
+              detalhe: eur(total),
+            })
+          : null;
+        return {
+          ...actual,
+          quotedPrice: subtotal,
+          ...(transicao
+            ? {
+                status: transicao.status,
+                activityLog: [...(actual.activityLog ?? []), transicao.entrada],
+              }
+            : {}),
+        };
+      });
     } catch (e) {
       log.error("actualizar pedido falhou", e);
     }
@@ -198,6 +368,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       id: proposal.id,
       total,
       emailed: mail.sent,
+      ...(temDestinatario
+        ? {}
+        : {
+            emailError:
+              "Este pedido não tem email de cliente — a proposta foi gravada e o link continua a " +
+              "servir, mas não foi enviada a ninguém. Acrescenta o email e reenvia.",
+          }),
       pdfBase64: pdfBuffer.toString("base64"),
     });
   } catch (err) {

@@ -1,18 +1,34 @@
 import { describe, it, expect } from "vitest";
-import { splitThirtySeventy, eur, eur0, round2 } from "./money";
+import {
+  splitThirtySeventy,
+  eur,
+  eur0,
+  eurDocumento,
+  milharesComPonto,
+  round2,
+  splitSinal,
+  saldoAPartirDoSinal,
+} from "./money";
+import { winAnsiSafe } from "./pdf-text";
 
 describe("round2", () => {
-  it("rounds to two decimals (half-up on exact .xx5 representable values)", () => {
+  it("arredonda aos cêntimos com o meio cêntimo a SUBIR, como manda a factura", () => {
     expect(round2(1.234)).toBe(1.23);
-    expect(round2(1.235)).toBe(1.24); // 1.235*100 = 123.5 → 124
-    expect(round2(2.675)).toBe(2.68); // 2.675*100 = 267.5000…06 → 268
-    expect(round2(1.005)).toBe(1); // classic float: 1.005*100 = 100.4999… → 100
+    expect(round2(1.235)).toBe(1.24);
+    expect(round2(2.675)).toBe(2.68);
+    // Este era o caso que dava 1,00. Ver a nota em `money.ts`: 1,005 não existe
+    // em vírgula flutuante e o que lá está arredonda mesmo para baixo. Um IVA
+    // de 1,005 € facturado a 1,00 € é um cêntimo a menos entregue ao Estado.
+    expect(round2(1.005)).toBe(1.01);
     expect(round2(0)).toBe(0);
     expect(round2(100)).toBe(100);
   });
 
-  it("handles negatives and large magnitudes", () => {
-    expect(round2(-1.005)).toBe(-1); // -1.005*100 = -100.49… → -100
+  it("nos negativos o meio cêntimo afasta-se do zero, como no simétrico", () => {
+    // Uma margem de −1,005 € arredonda para −1,01, e não para −1,00. Sem isto,
+    // `round2` não era simétrico e um prejuízo era sempre um cêntimo menor do
+    // que o lucro equivalente.
+    expect(round2(-1.005)).toBe(-1.01);
     expect(round2(-2.5)).toBe(-2.5);
     expect(round2(1_000_000.019)).toBe(1_000_000.02);
   });
@@ -85,25 +101,27 @@ describe("splitThirtySeventy", () => {
   });
 });
 
-describe("round2 — rounding mode is half-up on the FLOATING product (not decimal half-up / not bankers')", () => {
-  it("an EXACTLY-representable .xx5 half rounds UP (half-up, not half-even)", () => {
-    // 0.125 is exactly representable; 0.125*100 === 12.5 exactly → Math.round → 13.
-    // Bankers' (half-even) rounding would give 0.12 — this pins that money.ts is half-up.
+describe("round2 — o modo de arredondamento é o comercial: meio cêntimo afasta-se do zero", () => {
+  it("um .xx5 exactamente representável sobe (meio para cima, não «meio para o par»)", () => {
+    // 0,125 é exactamente representável. O arredondamento bancário (half-even)
+    // daria 0,12; a regra comercial, que é a da factura, dá 0,13.
     expect(round2(0.125)).toBe(0.13);
-    expect(round2(2.5)).toBe(2.5); // already 2dp, unchanged
+    expect(round2(2.5)).toBe(2.5); // já tem duas casas, não muda
   });
 
-  it("negative halves round toward +Infinity (Math.round), so |round2| is NOT symmetric", () => {
-    // -0.125*100 === -12.5 → Math.round(-12.5) === -12 → -0.12, while +0.125 → +0.13.
-    // Invoices are non-negative so this never bites in practice; pinned as documentation.
-    expect(round2(-0.125)).toBe(-0.12);
+  it("o simétrico arredonda para o simétrico", () => {
+    // Era −0,12 contra +0,13: o `Math.round` puxa os meios negativos para o
+    // +Infinito. As facturas não são negativas, mas as MARGENS são, e uma
+    // margem de −0,125 € valia um cêntimo a menos do que o lucro de +0,125 €.
+    expect(round2(-0.125)).toBe(-0.13);
     expect(round2(0.125)).toBe(0.13);
   });
 
-  it("a .xx5 that is NOT exactly representable can round DOWN (float, not decimal, half-up)", () => {
-    // 0.145*100 === 14.499999999999998 (< 14.5) → 14 → 0.14, even though decimal
-    // half-up would say 0.15. This is inherent to float *100 rounding.
-    expect(round2(0.145)).toBe(0.14);
+  it("um .xx5 que NÃO é exactamente representável sobe na mesma", () => {
+    // 0,145 × 100 é 14,499999999999998 em vírgula flutuante e arredondava para
+    // 0,14. Em decimal é meio cêntimo e sobe. Era este o caso que fazia o IVA
+    // de certas bases sair um cêntimo abaixo do que a factura diz.
+    expect(round2(0.145)).toBe(0.15);
   });
 
   it("propagates non-finite inputs (NaN/Infinity) unguarded — unlike eur()", () => {
@@ -186,5 +204,191 @@ describe("eur / eur0 formatters", () => {
   it("both coerce falsy/NaN to 0", () => {
     expect(norm(eur(NaN))).toMatch(/^0,00\s€$/);
     expect(norm(eur0(NaN))).toMatch(/^0\s€$/);
+  });
+});
+
+describe("eurDocumento — o dinheiro como o CLIENTE o lê", () => {
+  /**
+   * Os seis valores que apanham o defeito e a sua fronteira.
+   *
+   * O `eur` partilhado herda a regra do `Intl` de pt-PT, que só agrupa a partir
+   * de CINCO dígitos: 4 600 e 7 890 saíam sem separador nenhum, ao lado de
+   * 24 600 que saía com um espaço inquebrável. Na mesma coluna da factura, e
+   * entre o PDF da proposta e o email que o transporta.
+   *
+   * O 999 está aqui para a regra não passar a ser «mete lá um ponto»: três
+   * dígitos NÃO levam separador em português nenhum.
+   *
+   * ── E O ESPAÇO ANTES DO «€» ESCREVE-SE \u00A0, NÃO À LETRA ─────────────
+   * É um espaço INQUEBRÁVEL, e num ficheiro de texto é indistinguível de um
+   * espaço normal a olho nu. Escrito à letra, uma expectativa com o espaço
+   * errado passava a documentar exactamente o contrário do que se quer.
+   */
+  const EURO = "\u00A0€";
+
+  it("agrupa os milhares com PONTO a partir de quatro dígitos", () => {
+    expect(eurDocumento(4600)).toBe(`4.600,00${EURO}`);
+    expect(eurDocumento(24600)).toBe(`24.600,00${EURO}`);
+    expect(eurDocumento(7890)).toBe(`7.890,00${EURO}`);
+    expect(eurDocumento(1234567)).toBe(`1.234.567,00${EURO}`);
+  });
+
+  it("três dígitos não levam separador", () => {
+    expect(eurDocumento(999)).toBe(`999,00${EURO}`);
+  });
+
+  it("os cêntimos ficam com a vírgula do português", () => {
+    expect(eurDocumento(1234.56)).toBe(`1.234,56${EURO}`);
+    expect(eurDocumento(24600.75)).toBe(`24.600,75${EURO}`);
+  });
+
+  /**
+   * O ESPAÇO ANTES DO «€» É INQUEBRÁVEL, E TEM DE CONTINUAR A SER.
+   *
+   * É o que impede o símbolo de cair sozinho para a linha seguinte num email
+   * estreito. Só o separador de MILHARES vira ponto; o do símbolo fica.
+   */
+  it("mantém o espaço inquebrável antes do símbolo e não põe pontos a mais", () => {
+    expect(eurDocumento(24600)).toContain(EURO);
+    // Um espaço NORMAL antes do «€» seria o mesmo defeito ao contrário.
+    expect(eurDocumento(24600)).not.toContain(" €");
+    expect(eurDocumento(24600).match(/\./g)).toHaveLength(1);
+    expect(eurDocumento(999)).not.toContain(".");
+    // E não pode sobrar espaço inquebrável nenhum onde já está o ponto.
+    expect(eurDocumento(1234567).match(/\u00A0/g)).toHaveLength(1);
+  });
+
+  it("coage o que não é número a zero, como o `eur`", () => {
+    expect(eurDocumento(NaN)).toBe(`0,00${EURO}`);
+    expect(eurDocumento(0)).toBe(`0,00${EURO}`);
+  });
+
+  /**
+   * Só caracteres que as fontes-PADRÃO do pdf-lib sabem codificar.
+   *
+   * A factura e a proposta antiga desenham-se em Helvetica/WinAnsi, e o
+   * `drawText` LANÇA no que essa codificação não tem. O ponto é ASCII, o
+   * espaço inquebrável é 0xA0 (Latin-1) e o «€» é 0x80 no CP1252 — os três
+   * passam. Um separador «bonito» (U+2009, U+202F) rebentava o PDF.
+   */
+  it("escreve-se todo em WinAnsi — o PDF da factura desenha-o sem lançar", () => {
+    for (const n of [4600, 24600, 7890, 999, 1234567, 1234.56]) {
+      expect(winAnsiSafe(eurDocumento(n))).toBe(eurDocumento(n));
+    }
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * O VALOR QUE NÃO É NOSSO — o «Valor Total» que ELA escreve à mão
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * O quadro do orçamento tem duas origens de dinheiro na mesma folha: as linhas
+ * que NÓS calculamos (e formatamos com o `eurDocumento`) e o «Valor Total», que
+ * é TEXTO — escrito à mão por ela, ou gerado pelo estúdio a partir do preço do
+ * pedido, e guardado tal e qual no documento.
+ *
+ * Esse texto não passa por formatador nenhum na altura de desenhar: passa pelo
+ * `milharesComPonto`, que só sabia trocar o espaço inquebrável do `Intl` pelo
+ * ponto. Ora o `Intl` NÃO PÕE espaço nenhum abaixo de cinco dígitos — logo um
+ * total de 7 890 € gravado como «7890,00 €» chegava ao PDF exactamente assim,
+ * por cima de linhas que diziam «7.890,00 €». O mesmo quadro, duas pontuações.
+ *
+ * Corrige-se AQUI, no desenho, e não em quem grava: as propostas já guardadas
+ * têm o texto antigo lá dentro, e um casal que reabra a sua proposta de janeiro
+ * tem de a ver bem escrita sem que ninguém volte a gravá-la.
+ *
+ * O reconhecimento é pelo «€», e é isso que o torna seguro: um ano, um número
+ * de telefone ou uma referência de documento não têm um símbolo de euro colado
+ * a seguir. O que não parece dinheiro não é tocado.
+ */
+describe("milharesComPonto — o dinheiro que vem escrito à mão", () => {
+  const EURO = "\u00A0€";
+
+  it("põe ponto num montante escrito sem separador nenhum", () => {
+    expect(milharesComPonto(`7890,00${EURO}`)).toBe(`7.890,00${EURO}`);
+    expect(milharesComPonto(`4600,00${EURO}`)).toBe(`4.600,00${EURO}`);
+    expect(milharesComPonto(`1234567,00${EURO}`)).toBe(`1.234.567,00${EURO}`);
+  });
+
+  it("continua a trocar o espaço inquebrável do Intl pelo ponto", () => {
+    expect(milharesComPonto(`24\u00A0600,00${EURO}`)).toBe(`24.600,00${EURO}`);
+    expect(milharesComPonto(`1\u00A0234\u00A0567,00${EURO}`)).toBe(`1.234.567,00${EURO}`);
+  });
+
+  it("não mexe no que já está bem escrito", () => {
+    expect(milharesComPonto(`12.300,00${EURO}`)).toBe(`12.300,00${EURO}`);
+    expect(milharesComPonto(`999,00${EURO}`)).toBe(`999,00${EURO}`);
+    expect(milharesComPonto(`0,00${EURO}`)).toBe(`0,00${EURO}`);
+  });
+
+  it("respeita o resto da frase dela — o «+ IVA», o espaço normal, o sem cêntimos", () => {
+    expect(milharesComPonto("8456,25 € + IVA")).toBe("8.456,25 € + IVA");
+    expect(milharesComPonto("2500 €")).toBe("2.500 €");
+    expect(milharesComPonto("a definir")).toBe("a definir");
+    expect(milharesComPonto("Sob consulta")).toBe("Sob consulta");
+  });
+
+  /**
+   * O QUE NÃO TEM «€» AO LADO NÃO É DINHEIRO.
+   *
+   * Sem esta âncora, a regra «quatro dígitos seguidos levam ponto» estragava
+   * anos («2026» → «2.026»), números de documento e contagens de convidados —
+   * e o `milharesComPonto` corre sobre TEXTO DELA, não sobre um número nosso.
+   */
+  it("não toca em números que não são dinheiro", () => {
+    expect(milharesComPonto("Válido até 2026")).toBe("Válido até 2026");
+    expect(milharesComPonto("FT 2026/0007")).toBe("FT 2026/0007");
+    expect(milharesComPonto("1500 convidados")).toBe("1500 convidados");
+    expect(milharesComPonto("+351 919 259 820")).toBe("+351 919 259 820");
+  });
+});
+describe("sinal com percentagem configurável", () => {
+  /**
+   * A GENERALIZAÇÃO NÃO PODE MUDAR O QUE JÁ ESTÁ FACTURADO.
+   *
+   * Todas as propostas existentes são 30/70. Se `splitSinal(total, 30)` desse
+   * um cêntimo diferente de `splitThirtySeventy(total)`, uma reemissão de
+   * saldo passava a fechar noutro número — e isso é uma correcção fiscal, não
+   * uma melhoria de interface.
+   */
+  it("com 30% dá exactamente o mesmo que dava antes", () => {
+    for (const total of [0, 0.01, 1000, 1000.01, 6875, 8456.25, 12500.33]) {
+      expect(splitSinal(total, 30)).toEqual(splitThirtySeventy(total));
+    }
+  });
+
+  it("as duas parcelas fecham sempre o total", () => {
+    for (const total of [6875, 3333.33, 1000.01, 0.05, 99999.99]) {
+      for (const pct of [10, 30, 40, 50, 70, 99]) {
+        const { sinal, saldo } = splitSinal(total, pct);
+        expect(round2(sinal + saldo)).toBe(round2(Math.max(0, total)));
+      }
+    }
+  });
+
+  it("uma percentagem impossível fica dentro dos limites", () => {
+    expect(splitSinal(1000, 150).sinal).toBe(1000);
+    expect(splitSinal(1000, -20).sinal).toBe(0);
+  });
+
+  describe("saldoAPartirDoSinal", () => {
+    it("com 30% é o mesmo que o `sinal / 3 × 7` que estava escrito à mão", () => {
+      for (const sinal of [300, 2062.5, 1500, 0]) {
+        expect(saldoAPartirDoSinal(sinal, 30)).toBe(round2((sinal / 3) * 7));
+      }
+    });
+
+    it("acompanha a percentagem", () => {
+      // 40% de 10.000 são 4.000; o saldo tem de ser 6.000.
+      expect(saldoAPartirDoSinal(4000, 40)).toBe(6000);
+      expect(saldoAPartirDoSinal(5000, 50)).toBe(5000);
+    });
+
+    it("uma percentagem de zero não faz uma divisão por zero", () => {
+      // Não devia acontecer (o esquema limita), mas um Infinity numa factura
+      // seria muito pior do que um número grande.
+      expect(Number.isFinite(saldoAPartirDoSinal(1000, 0))).toBe(true);
+    });
   });
 });

@@ -1,0 +1,358 @@
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CONTRATO DA FLUIDEZ — que propriedades o movimento do sítio pode animar
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * PORQUE EXISTE. Um browser tem três maneiras de responder a uma mudança de
+ * estilo, e custam ordens de grandeza diferentes:
+ *
+ *   · COMPOSITOR — `transform` e `opacity`. A camada já está rasterizada; o
+ *     compositor só a volta a colar noutro sítio ou com outra transparência.
+ *     Corre FORA da linha principal, por isso continua fluido mesmo com a
+ *     linha principal ocupada. É isto que se quer.
+ *   · PINTURA — `color`, `background-color`, `background-position`,
+ *     `background-size`, `box-shadow`, `filter`, `clip-path`, `stroke-*`. A
+ *     camada tem de ser redesenhada a cada frame. Aceitável num botão pequeno
+ *     ao passar o rato; caro numa superfície grande que esteja no ecrã durante
+ *     o scroll.
+ *   · LAYOUT — `width`, `height`, `top/left/right/bottom`, `margin`, `padding`,
+ *     `gap`, `font-size`. O browser tem de voltar a CALCULAR a geometria antes
+ *     de desenhar seja o que for, e isso é sempre na linha principal, no
+ *     caminho crítico do frame. É a categoria que engasga o scroll.
+ *
+ * O QUE FOI MEDIDO (Pixel 7 emulado, cópia isolada do repositório, travessia de
+ * 12 gestos a descer + 12 a subir na página inicial, `Performance.getMetrics`
+ * do CDP):
+ *
+ *   · Com o sítio como está: 76–78 passagens de layout por travessia.
+ *   · Com as transições de ALTURA da barra de navegação desligadas: 18–19.
+ *
+ * Ou seja: uma única transição — `transition-[height]` na barra e no logótipo,
+ * quando o scroll passa os 30 px — responde por ~76% de todo o layout que o
+ * sítio faz enquanto se desce a página. É a ÚNICA animação de layout que resta.
+ *
+ * PORQUE NÃO FOI REMOVIDA. Porque medir o custo não é o mesmo que ele ser
+ * sentido. No A/B emparelhado (`e2e/scroll-emparelhado.mjs`, 20 pares, ordem
+ * ABBA, uma só compilação), com a travessia curta que CONCENTRA o efeito — 3
+ * gestos, em que os dois cruzamentos do limiar ocupam ~40% do tempo em vez de
+ * ~7% — a diferença emparelhada foi de +12 ms medianos num jank de base de
+ * 179 ms (~7%), com o pior par a A em 13 de 20 (teste do sinal p = 0,26) e uma
+ * MDE de 210 ms. Abaixo da MDE a resposta honesta é NÃO SEI, e não "não há
+ * diferença" — mas também não há aqui nada que justifique redesenhar a barra e
+ * arriscar mudar o aspecto. Fica inventariada, medida, e em paz.
+ *
+ * O QUE ESTE FICHEIRO GARANTE. Que não aparece uma SEGUNDA. O inventário acima
+ * só vale enquanto for verdade, e a maneira de deixar de o ser é alguém
+ * escrever `transition-all` ou `transition-[width]` num sítio qualquer sem
+ * reparar. As excepções abaixo estão nomeadas uma a uma, com a razão; qualquer
+ * animação de layout NOVA — no CSS global ou na cromagem pública, que é a que
+ * está no ecrã durante o scroll — põe este teste vermelho.
+ */
+
+const RAIZ = process.cwd();
+/** Prosa não é código: metade deste ficheiro são comentários que FALAM de
+ *  curvas e de propriedades, e um extractor ingénuo lê-os como declarações.
+ *  (Só `/* … *​/` — em CSS `//` não é comentário e apagá-lo partiria os `url()`.) */
+const semComentarios = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "");
+const css = semComentarios(readFileSync(join(RAIZ, "src/app/globals.css"), "utf8"));
+
+/** Propriedades cuja animação OBRIGA a recalcular geometria. */
+const LAYOUT = [
+  "width",
+  "height",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "inset",
+  "margin",
+  "padding",
+  "gap",
+  "row-gap",
+  "column-gap",
+  "font-size",
+  "line-height",
+  "flex-basis",
+  "grid-template-rows",
+  "grid-template-columns",
+  "border-width",
+];
+
+/** `transition: all` conta como layout: promete animar tudo, layout incluído. */
+const eLayout = (prop: string) => {
+  const p = prop.trim().toLowerCase();
+  if (p === "all") return true;
+  return LAYOUT.some(
+    (l) => p === l || p.startsWith(`${l}-`) || p.startsWith(`max-${l}`) || p.startsWith(`min-${l}`),
+  );
+};
+
+/**
+ * As excepções. Cada uma tem de trazer a razão — e as duas primeiras têm os
+ * números do cabeçalho por trás. Acrescentar uma linha aqui é uma decisão
+ * consciente, que é exactamente o que se pretende.
+ */
+const PERDOADAS_NO_CSS = new Set<string>([
+  // `.field-line` desenha o filete de foco do formulário de orçamento com
+  // background-size — é PINTURA, não layout, mas o nome `size` cai na rede.
+  // Corre uma vez ao focar um campo, num elemento de ~40 px de altura.
+  "background-size",
+]);
+
+/** Ficheiros que estão SEMPRE montados e no ecrã enquanto se faz scroll. */
+const CROMAGEM_PUBLICA = [
+  "src/components/Navbar.tsx",
+  "src/components/StickyCTA.tsx",
+  "src/components/ScrollProgress.tsx",
+  "src/components/WhatsAppButton.tsx",
+  "src/components/Footer.tsx",
+];
+
+/**
+ * As excepções na cromagem, por ficheiro e classe literal. São as que existiam
+ * quando o inventário foi feito e medido; a rede é contra as PRÓXIMAS.
+ */
+const PERDOADAS_NA_CROMAGEM = new Map<string, string[]>([
+  [
+    "src/components/Navbar.tsx",
+    [
+      // Medida: 58 das 76 passagens de layout por travessia. Ver o cabeçalho —
+      // fica por decisão, não por distracção.
+      "transition-[height]",
+      // Só correm ao abrir/fechar o menu mobile (o hambúrguer a virar cruz, o
+      // filete do item activo a crescer). Nunca durante o scroll.
+      "transition-all",
+    ],
+  ],
+  [
+    "src/components/WhatsAppButton.tsx",
+    [
+      // O hover do botão muda cor de fundo, sombra E escala ao mesmo tempo;
+      // `all` aqui é o conjunto que se quer mesmo animar. Só em ponteiro fino,
+      // e só enquanto o rato está em cima.
+      "transition-all",
+    ],
+  ],
+  [
+    "src/components/StickyCTA.tsx",
+    [
+      // MEDIDO antes de perdoar, e não assumido. `transition-all` num elemento
+      // fixo que atravessa o scroll inteiro parecia o suspeito óbvio; a sonda de
+      // `transitionrun` mostrou que no instante em que o CTA aparece arrancam
+      // nele exactamente DUAS transições — `opacity` e `translate` —, porque uma
+      // transição só arranca nas propriedades que MUDAM mesmo. As duas são de
+      // compositor. Estreitar a lista não tiraria trabalho nenhum ao browser,
+      // por isso não se mexe: uma alteração sem número a favor é ruído no diff.
+      "transition-all",
+    ],
+  ],
+]);
+
+/** Extrai as propriedades listadas em `transition:` / `transition-property:`. */
+function propriedadesDeTransicao(bloco: string): string[] {
+  const fora: string[] = [];
+  for (const m of bloco.matchAll(/transition-property:\s*([^;}]+)/g)) {
+    fora.push(...m[1].split(",").map((s) => s.trim()));
+  }
+  for (const m of bloco.matchAll(/transition:\s*([^;}]+)/g)) {
+    for (const parte of m[1].split(",")) {
+      // A propriedade é a primeira palavra da abreviatura: `transform 0.3s ease`.
+      const primeira = parte.trim().split(/\s+/)[0];
+      if (primeira && !/^\d/.test(primeira) && primeira !== "none") fora.push(primeira);
+    }
+  }
+  return fora;
+}
+
+/**
+ * O CORPO de cada bloco aberto por `re` — contando chavetas, não partindo a
+ * string. A versão ingénua (`css.split(re)`) devolvia tudo o que vinha DEPOIS
+ * do bloco, e por isso dava por cumprida qualquer guarda cujo selector
+ * aparecesse mais abaixo no ficheiro por outra razão qualquer: passava sempre.
+ */
+function blocosDe(fonte: string, re: RegExp): string[] {
+  const fora: string[] = [];
+  re.lastIndex = 0;
+  while (re.exec(fonte) !== null) {
+    let i = re.lastIndex;
+    let nivel = 1;
+    while (i < fonte.length && nivel > 0) {
+      if (fonte[i] === "{") nivel++;
+      else if (fonte[i] === "}") nivel--;
+      i++;
+    }
+    fora.push(fonte.slice(re.lastIndex, i - 1));
+  }
+  return fora;
+}
+
+/** Extrai as propriedades declaradas dentro de cada bloco `@keyframes`. */
+function propriedadesDeKeyframes(fonte: string): { nome: string; props: string[] }[] {
+  const fora: { nome: string; props: string[] }[] = [];
+  // `@keyframes nome { ... }` — apanha o corpo contando chavetas, porque os
+  // keyframes têm blocos aninhados (`from { … }`).
+  const re = /@keyframes\s+([\w-]+)\s*\{/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(fonte))) {
+    let i = re.lastIndex;
+    let nivel = 1;
+    while (i < fonte.length && nivel > 0) {
+      if (fonte[i] === "{") nivel++;
+      else if (fonte[i] === "}") nivel--;
+      i++;
+    }
+    const corpo = fonte.slice(re.lastIndex, i - 1);
+    const props = [...corpo.matchAll(/(^|[{;\s])([a-z-]+)\s*:/g)].map((p) => p[2]);
+    fora.push({ nome: m[1], props });
+  }
+  return fora;
+}
+
+describe("contrato da fluidez: o movimento anima o compositor, não a geometria", () => {
+  it("nenhuma transição do globals.css anima uma propriedade de layout", () => {
+    const infractoras = propriedadesDeTransicao(css)
+      .filter((p) => eLayout(p))
+      .filter((p) => !PERDOADAS_NO_CSS.has(p.toLowerCase()));
+
+    expect(
+      [...new Set(infractoras)],
+      "animar geometria põe o recálculo de layout no caminho crítico de cada frame. Anima `transform`/`opacity`; se não der, mede primeiro (e2e/scroll-emparelhado.mjs) e escreve aqui a excepção com o número.",
+    ).toEqual([]);
+  });
+
+  it("nenhum @keyframes do globals.css anima uma propriedade de layout", () => {
+    const infractores = propriedadesDeKeyframes(css)
+      .map(({ nome, props }) => ({ nome, maus: props.filter((p) => eLayout(p)) }))
+      .filter(({ maus }) => maus.length > 0)
+      .map(({ nome, maus }) => `@keyframes ${nome} :: ${[...new Set(maus)].join(", ")}`);
+
+    expect(
+      infractores,
+      "um keyframe que mexe em geometria corre na linha principal do princípio ao fim, e o scroll paga-o inteiro",
+    ).toEqual([]);
+  });
+
+  it("a cromagem pública não ganha animações de layout novas", () => {
+    const infractores: string[] = [];
+    for (const rel of CROMAGEM_PUBLICA) {
+      const fonte = readFileSync(join(RAIZ, rel), "utf8");
+      const perdoadas = PERDOADAS_NA_CROMAGEM.get(rel) ?? [];
+      // `transition-all` e `transition-[…]` com uma propriedade de layout lá
+      // dentro, tal como se escrevem no Tailwind.
+      for (const m of fonte.matchAll(/\btransition-(all|\[[^\]]+\])/g)) {
+        const classe = `transition-${m[1]}`;
+        if (perdoadas.includes(classe)) continue;
+        const props = m[1] === "all" ? ["all"] : m[1].slice(1, -1).split(",");
+        if (props.some((p) => eLayout(p))) infractores.push(`${rel} :: ${classe}`);
+      }
+    }
+    expect(
+      infractores,
+      "estes componentes estão no ecrã durante TODO o scroll — uma transição de geometria aqui é paga em cada travessia. Mede antes de a acrescentar.",
+    ).toEqual([]);
+  });
+
+  it("a curva POR OMISSÃO das transições é a curva de assinatura", () => {
+    // Isto é a outra metade do trabalho de fluidez, e a que mais se sente.
+    // O sítio tem uma curva de assinatura (`--ease-out`) — mas cerca de 300 dos
+    // ~322 utilitários `transition-*` nunca a pediam, e caíam na omissão do
+    // Tailwind (`cubic-bezier(0.4, 0, 0.2, 1)`, quase simétrica). Medido no
+    // sítio a correr: na MESMA barra de navegação, no MESMO instante, o <nav> e
+    // o link do CTA desaceleravam na assinatura enquanto a linha da barra, o
+    // botão de idioma e o CTA flutuante desaceleravam na curva do Tailwind.
+    // Duas linguagens de movimento na mesma peça.
+    //
+    // A correcção é uma linha no `@theme`. Se alguém a tirar — ou afinar uma das
+    // duas curvas sem a outra —, o sítio volta a ter duas desacelerações e este
+    // teste diz porquê, em vez de ficar por descobrir a olho.
+    const omissao = /--default-transition-timing-function:\s*([^;]+);/.exec(css)?.[1];
+    const assinatura = /--ease-out:\s*([^;]+);/.exec(css)?.[1];
+    expect(
+      omissao,
+      "sem `--default-transition-timing-function` no @theme, ~300 transições voltam à curva simétrica do Tailwind",
+    ).toBeTruthy();
+    expect(assinatura, "o `--ease-out` desapareceu do :root").toBeTruthy();
+    const norm = (v: string) => v.replace(/\s+/g, "").toLowerCase();
+    expect(
+      norm(omissao!),
+      "a omissão e a assinatura têm de ser a MESMA curva — se divergirem, o sítio volta a ter duas",
+    ).toBe(norm(assinatura!));
+  });
+
+  it("as transições escritas à mão leem o token, não uma cópia da curva", () => {
+    // O `@theme` só alimenta os UTILITÁRIOS do Tailwind: as regras deste
+    // ficheiro não o vêem. Eram 9 cópias literais da assinatura dentro de
+    // `transition:` — cada uma um sítio onde a curva pode divergir em silêncio
+    // (já aconteceu uma vez, ver tokens.coerencia.test.ts). Agora leem todas
+    // `var(--ease-out)`. As ANIMAÇÕES ficam de fora de propósito: há curvas
+    // deliberadamente diferentes (o `linear` do marquee e das barras, o
+    // `cubic-bezier(0.33,0,0.2,1)` do Ken Burns) e são outro eixo.
+    const declaracoes = css.match(/transition:[^;]+;/g) ?? [];
+    const comLiteral = declaracoes.filter((d) => /cubic-bezier\(\s*0\.16/.test(d));
+    expect(
+      comLiteral,
+      "escreve `var(--ease-out)` — um literal aqui é uma cópia nova da curva de assinatura",
+    ).toEqual([]);
+  });
+
+  it("as transições de hover/foco têm guarda de movimento reduzido", () => {
+    // Não é gosto, é acessibilidade: quem pede movimento reduzido pediu-o.
+    // Estas quatro eram as que faltavam — o filete dos links (10 usos), a subida
+    // dos CTAs, o filete dos campos do orçamento e o zoom das fotografias.
+    // O estado continua a MUDAR (a cor, o filete a aparecer, que é informação);
+    // o que desaparece é o deslocamento.
+    const dentroDeReduce = blocosDe(
+      css,
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{/g,
+    ).join("\n");
+    for (const seletor of [
+      ".link-line::after",
+      ".lift",
+      ".field-line",
+      ".group-hover\\:scale-\\[1\\.06\\]",
+      ":focus-visible",
+    ]) {
+      expect(dentroDeReduce, `${seletor} sem guarda de movimento reduzido`).toContain(seletor);
+    }
+  });
+
+  it("o anel de foco cresce com a curva do sítio, e depressa", () => {
+    // Acrescentado por mim depois de verificar os dentes dos outros: tirar esta
+    // transição do `globals.css` não fazia falhar teste nenhum. O teste da
+    // guarda acima procura `:focus-visible` DENTRO do bloco de movimento
+    // reduzido, portanto continuava a passar com a transição apagada — a
+    // guarda sobrevivia à coisa que ela guarda.
+    //
+    // Duas propriedades, e a segunda é a que interessa mesmo:
+    //  1. o anel anima com a curva de assinatura, como o resto;
+    //  2. anima DEPRESSA. As WCAG (2.4.7) querem o indicador de foco visível,
+    //     e uma transição longa atrasaria a sua leitura para quem navega por
+    //     teclado — trocaria um defeito de movimento por um de acessibilidade,
+    //     que é pior. O tecto é explícito para que ninguém o suba por engano.
+    const blocos = blocosDe(css, /:focus-visible\s*\{/g).join("\n");
+    const m = /transition:\s*box-shadow\s+(\d+)ms\s+var\(--ease-out\)/.exec(blocos);
+    expect(m, "o `:focus-visible` deixou de animar o box-shadow com o token").toBeTruthy();
+    expect(Number(m![1]), "o anel de foco demora demasiado a ficar legível").toBeLessThanOrEqual(
+      200,
+    );
+  });
+
+  it("a rede está mesmo armada (não passa por vacuidade)", () => {
+    // A falha mais estúpida possível: os extractores deixarem de encontrar seja
+    // o que for e os três testes acima passarem sobre listas vazias.
+    expect(propriedadesDeTransicao(css).length).toBeGreaterThan(15);
+    expect(propriedadesDeKeyframes(css).length).toBeGreaterThan(15);
+    // E o classificador tem de reconhecer o que já lá está: a excepção medida da
+    // barra de navegação continua a ser detectada como animação de layout.
+    expect(eLayout("height")).toBe(true);
+    expect(eLayout("all")).toBe(true);
+    expect(eLayout("transform")).toBe(false);
+    expect(eLayout("opacity")).toBe(false);
+    const navbar = readFileSync(join(RAIZ, "src/components/Navbar.tsx"), "utf8");
+    expect(navbar).toContain("transition-[height]");
+  });
+});

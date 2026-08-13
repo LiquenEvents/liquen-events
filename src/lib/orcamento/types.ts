@@ -64,11 +64,86 @@ export interface QuoteFormData {
   isMultiDay: boolean;
   packageTier: PackageTier;
   addons: SelectedAddon[];
+  /**
+   * Pontos de decoração escolhidos pelo casal no pedido (ver
+   * `src/lib/orcamento/decoracao.ts`). Só aparece nos casamentos; vazio em
+   * todos os outros tipos de evento e em todos os pedidos anteriores a este
+   * campo existir — por isso é opcional e nunca se pode assumir presente.
+   */
+  decorPoints?: string[];
+  /**
+   * Os nomes dos noivos, quando o pedido é um casamento e o casal os quis dar.
+   * O `name` continua a ser o de QUEM ESCREVEU — pode ser a mãe da noiva, uma
+   * wedding planner, um dos dois. São coisas diferentes e não se podem
+   * sobrepor: é a este par que a proposta e o contrato se dirigem, e é aquele
+   * que se trata por tu ao responder ao email.
+   *
+   * Opcionais em todos os sentidos: não existem fora dos casamentos, não
+   * existem nos pedidos anteriores a este campo, e não existem quando o casal
+   * preferiu não os escrever. Nunca assumir presentes.
+   */
+  partnerA?: string;
+  partnerB?: string;
+  /**
+   * Ordem de grandeza dos convidados, quando o número exacto ainda não existe
+   * (ver `GUEST_RANGES`). Vazio quando `guests` traz um número a sério — os
+   * dois nunca convivem, e é o número que manda.
+   */
+  guestsRange?: string;
+  /**
+   * Civil, religiosa, as duas ou simbólica (ver `CEREMONY_TYPES`). Só existe
+   * nos casamentos — noutro tipo de evento não há cerimónia nenhuma a
+   * qualificar — e é sempre OPCIONAL: muitos casais pedem orçamento antes de
+   * terem isso decidido. Vazio em todos os pedidos anteriores a este campo.
+   *
+   * Guardado como identificador livre (e não como um enum fechado) pela mesma
+   * razão dos pontos de decoração: acrescentar uma opção ao catálogo não pode
+   * exigir uma alteração coordenada no validador do servidor.
+   */
+  ceremonyType?: string;
+  /**
+   * Interior, exterior ou os dois (ver `SPACE_TYPES`). Ao contrário do tipo de
+   * cerimónia, aplica-se a QUALQUER evento — e é o que diz se há uma montagem
+   * alternativa a preparar para o caso de chover. Opcional e vazio nos pedidos
+   * anteriores a este campo.
+   */
+  spaceType?: string;
   budgetRange: BudgetRange | null;
   urgency: Urgency;
   notes: string;
   referralSource: string;
+  /**
+   * Identificador do clique pago que trouxe esta pessoa, na forma compacta
+   * "gclid:VALOR@2026-03-01T10:00:00.000Z" (ver src/lib/ads/click-id.ts).
+   * Vazio quando o pedido não veio de um anúncio — que é o caso da maioria.
+   *
+   * É o que permite devolver ao Google Ads o valor REAL do casamento quando
+   * ele fecha, em vez de deixar a Google a optimizar para formulários
+   * preenchidos. Ver /ads-output/medicao.md e a rota de exportação de
+   * conversões offline.
+   */
+  adClick?: string;
+  /**
+   * Identificadores da Meta, na forma compacta "fbp=…;fbc=…" (ver
+   * src/lib/meta/click-id.ts). O equivalente do `adClick` para o Instagram e
+   * o Facebook: é o que permite devolver à Meta o valor REAL do casamento
+   * quando ele fecha. Vazio na maioria dos pedidos.
+   */
+  metaClick?: string;
+  /**
+   * O `event_id` do evento `Lead` que o browser já disparou para o pixel.
+   * O servidor reenvia o MESMO identificador pela Conversions API, e é assim
+   * que a Meta reconhece os dois como um só acontecimento em vez de contar a
+   * conversão duas vezes. Ver src/lib/meta/eventos.ts.
+   */
+  leadEventId?: string;
   name: string;
+  /**
+   * PODE SER VAZIO desde que haja `phone` — a regra "email ou telefone" está
+   * no `quoteFormSchema`. O formulário das variantes sociais tem um campo de
+   * contacto só, e quem chega de um anúncio do Instagram escreve o número.
+   * Todo o código que envia email para o cliente TEM de verificar isto.
+   */
   email: string;
   phone: string;
   company: string;
@@ -226,7 +301,66 @@ export interface Quote extends QuoteFormData {
   assignedTo?: string;
   /** Reason the deal was lost — filled when status → rejeitado. */
   lostReason?: string;
+  /**
+   * O idioma em que a pessoa fez o pedido ("pt" ou "en"), lido do site no
+   * momento em que o formulário foi submetido.
+   *
+   * Já se usava para escolher a língua do email de confirmação, mas era
+   * deitado fora a seguir. Guardá-lo permite, meses depois, saber que aquele
+   * casal escreveu em inglês — e a proposta do estúdio é escrita em português.
+   * Ausente em todos os pedidos anteriores a este campo: nunca assumir "pt".
+   */
+  locale?: string;
 }
+
+/**
+ * ── AS COLECÇÕES QUE SÓ O PEDIDO ABERTO LÊ ─────────────────────────────────
+ *
+ * O painel de administração recebe a tabela de pedidos INTEIRA no HTML da
+ * página (ver `orcamento/admin/page.tsx`), e um pedido já trabalhado é um blob
+ * grande: medido sobre um casamento com 150 convidados, a lista de convidados
+ * sozinha é 47% dos bytes do pedido, e com a checklist, o plano de produção e
+ * o cronograma passa dos 68%.
+ *
+ * Estes quatro campos — mais os pontos de decoração — têm uma coisa em comum
+ * que os outros não têm: NENHUMA vista de conjunto os lê. Só aparecem dentro
+ * de um pedido aberto (GuestList, EventChecklist, ProductionPlan,
+ * EventTimeline, e as impressões do dossier), e esses painéis recebem o pedido
+ * ABERTO, não a lista. Por isso podem viajar mais tarde, quando um pedido é
+ * aberto, em vez de viajarem 300 vezes no primeiro byte da página.
+ *
+ * O QUE **NÃO** ESTÁ AQUI, e porquê — cada um destes é lido sobre a lista
+ * inteira e tirá-lo mudaria números no ecrã sem ninguém dar por isso:
+ *   · `payments`        — Overview, Reminders, Agenda, StatsDashboard e o CSV
+ *                         da tesouraria somam-nos em todos os pedidos.
+ *   · `messages`        — Reminders ("já respondemos?") e o tempo de resposta
+ *                         das Estatísticas.
+ *   · `activityLog`     — o painel de Propostas ACRESCENTA-LHE uma entrada ao
+ *                         aceitar uma proposta; sem o histórico, gravava por
+ *                         cima dele com uma linha só.
+ *   · `eventSuppliers`  — a margem por evento nas Estatísticas.
+ *   · `adminNotes`      — abrir um pedido copia-o para a caixa de notas e
+ *                         gravar escreve a caixa de volta: se chegasse vazio,
+ *                         gravar apagava as notas internas.
+ */
+export const CAMPOS_SO_DO_DETALHE = [
+  "guestList",
+  "checklist",
+  "productionPlan",
+  "timeline",
+  "decorPoints",
+] as const;
+
+/**
+ * Um pedido como a LISTA o precisa: tudo menos {@link CAMPOS_SO_DO_DETALHE}.
+ *
+ * Continua a ser um `Quote` válido para o TypeScript — os campos omitidos são
+ * todos opcionais —, e é de propósito: as doze vistas que recebem a lista
+ * continuam a escrever `Quote[]` sem uma única alteração. O que a distinção
+ * serve é dizer a quem lê ONDE é que a diferença existe, e obrigar quem abrir
+ * um pedido a ir buscar o resto (ver `openQuote` em AdminClient).
+ */
+export type QuoteSummary = Omit<Quote, (typeof CAMPOS_SO_DO_DETALHE)[number]>;
 
 /** Standalone calendar entry (reunião, marcação, bloqueio…) not tied to a quote. */
 export type CalendarEventKind = "reuniao" | "evento" | "bloqueio" | "nota";
@@ -257,7 +391,30 @@ export interface Supplier {
 }
 
 // ── Propostas (criadas internamente, enviadas em PDF ao cliente) ──
-export type ProposalStatus = "rascunho" | "enviada" | "aceite" | "rejeitada";
+/**
+ * O estado interno de uma proposta, marcado por ela.
+ *
+ * "em_negociacao" é o estado que faltava e que descreve a maior parte do tempo
+ * real: a proposta seguiu, houve resposta, e está a discutir-se. Sem ele, uma
+ * proposta em terceira ronda de conversa era indistinguível de uma que ninguém
+ * abriu — e é justamente essa distinção que decide quem se contacta amanhã.
+ *
+ * NÃO existe aqui um estado "expirada". A validade é uma data; um estado
+ * gravado que diga "expirou" fica errado no minuto seguinte ao da gravação, e
+ * corrigi-lo exigiria alguém (ou algo) a passar por todas as propostas todos os
+ * dias. Deriva-se de `validUntil` — ver `estaExpirada` em proposta-estado.ts.
+ */
+export type ProposalStatus = "rascunho" | "enviada" | "em_negociacao" | "aceite" | "rejeitada";
+
+/**
+ * Porque é que se perdeu.
+ *
+ * Uma lista curta e fechada, porque o objetivo é poder CONTAR: "perdi seis por
+ * preço este semestre" é uma frase que muda decisões, e não se chega lá com
+ * texto livre. O `outro` existe para quem não cabe na lista não ser forçado a
+ * mentir numa das quatro — e leva nota à parte.
+ */
+export type MotivoDeRecusa = "preco" | "data" | "escolheram-outro" | "sem-resposta" | "outro";
 
 export interface ProposalLineItem {
   description: string;
@@ -283,8 +440,80 @@ export interface Proposal {
   sentAt?: string;
   /** When the client accepted/declined via the public link. */
   respondedAt?: string;
+  /**
+   * Quando voltar a falar com esta pessoa (yyyy-mm-dd), escolhido por ela.
+   *
+   * Não dispara nada para o cliente — não há email automático, não há aviso do
+   * lado de lá. É um lembrete do lado de cá, e é isso que o painel de
+   * acompanhamento ordena.
+   */
+  followUpAt?: string;
+  /** O que fica por dizer no próximo contacto ("mandar fotos do arco"). */
+  followUpNote?: string;
+  /** Porque é que se perdeu — preenchido ao marcar como recusada. */
+  lostReason?: MotivoDeRecusa;
+  /** O detalhe, quando o motivo sozinho não chega. */
+  lostNote?: string;
+  /**
+   * Qual das duas versões o casal ficou — quando a proposta tinha extras.
+   *
+   * Preenchido POR ELA ao registar a resposta, não pelo cliente e não por
+   * dedução: quem responde responde por email ou ao telefone, e adivinhar a
+   * partir do valor facturado dava a versão errada em todas as propostas em que
+   * se negociou um desconto depois.
+   *
+   * Serve para uma pergunta só, e é a que interessa: os extras vendem-se?
+   */
+  versaoEscolhida?: import("./versoes-da-proposta").VersaoEscolhida;
+  /**
+   * ── O SELO DO DOCUMENTO ───────────────────────────────────────────────────
+   *
+   * A impressão digital (SHA-256, em hexadecimal) do PDF EXACTO que seguiu para
+   * o casal, e o tamanho dele em bytes. Calculados no envio, onde os bytes já
+   * estão em memória — não custa um milissegundo a mais nem um pedido extra.
+   *
+   * O aceite já guarda o nome escrito, a hora, o IP e o texto congelado dos
+   * termos. Faltava provar QUAL documento foi aceite: um PDF é reconstruído a
+   * partir do `doc`, e uma mudança no código do desenho (uma fonte, uma
+   * margem, uma fotografia que entretanto mudou) dá um ficheiro diferente do
+   * que o casal viu. Com o selo, comparar é uma linha de comando; sem ele, é a
+   * palavra de um contra a do outro.
+   *
+   * ── E O SELO DEPENDE DA LÍNGUA ────────────────────────────────────────────
+   *
+   * O mesmo `doc` tem dois desenhos possíveis (ver `idioma`, aqui em baixo), e
+   * são ficheiros diferentes com resumos diferentes. Isto NÃO se remendou com
+   * dois selos: continua a haver um só, o do PDF que seguiu — o que mudou é que
+   * a proposta passou a dizer em que língua foi desenhado. É o que torna o selo
+   * VERIFICÁVEL: enquanto a língua morria no fim do pedido, um PDF inglês
+   * selado no envio não podia ser reproduzido por ninguém (quem o redesenhasse
+   * obtinha o português, e outro resumo). Ver o comentário do selo na rota.
+   */
+  pdfSha256?: string;
+  pdfBytes?: number;
   /** Rich multi-page proposal document (Proposal Studio). Stored so the studio
    *  can re-open and re-edit a sent proposal. Image fields hold Storage paths,
    *  not bytes. Optional — legacy line-item proposals don't set it. */
   doc?: import("@/lib/proposal-doc").ProposalDoc;
+  /**
+   * ── A LÍNGUA EM QUE ESTA PROPOSTA FOI FEITA ───────────────────────────────
+   *
+   * "pt" ou "en", escolhido no estúdio no momento em que a proposta é gerada e
+   * gravado COM ela. Não pertence ao `doc`: o documento continua a ser um só,
+   * escrito em português, e a língua é a forma como ele foi APRESENTADO ao
+   * casal — o mesmo documento, desenhado noutra moldura.
+   *
+   * É gravado porque tudo o que vem DEPOIS do envio precisa de saber a
+   * resposta: o email que transporta a proposta, a página onde o casal a
+   * aceita, o portal do cliente e a segunda descarga do PDF (pelo link ou pelo
+   * portal). Enquanto isto era só um parâmetro do pedido, uma proposta inglesa
+   * chegava dentro de um email português e voltava a descarregar-se em
+   * português.
+   *
+   * AUSENTE em todas as propostas anteriores a este campo — e ausente é
+   * PORTUGUÊS, que é o que essas propostas sempre foram. Nunca se assume o
+   * contrário, e ninguém escreve "pt" por cima delas: ver `idiomaDaProposta`
+   * em `@/lib/proposta-idioma`, que é o único sítio onde essa leitura se faz.
+   */
+  idioma?: import("@/lib/proposal-doc-textos").IdiomaDaProposta;
 }

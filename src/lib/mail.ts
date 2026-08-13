@@ -28,6 +28,30 @@ function getTransport() {
     port,
     secure: port === 465,
     auth: { user, pass },
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O EMAIL NÃO PODE FICAR COM A FUNÇÃO INTEIRA NA MÃO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Por omissão o nodemailer espera DOIS MINUTOS pela ligação, trinta
+     * segundos pela saudação do servidor e DEZ MINUTOS pelo resto. São
+     * valores pensados para um processo que vive para sempre — e aqui isto
+     * corre dentro de uma função que tem 60 segundos no total.
+     *
+     * O envio da proposta grava PRIMEIRO e manda o email a seguir. Se o
+     * servidor de correio estiver lento (uma limitação do Gmail, um porto
+     * 465 a arrastar-se), a função morre a meio do SMTP: a proposta fica
+     * gravada, ninguém sabe se o email saiu, e o ecrã mostra um erro
+     * genérico. É a pior das combinações — parece que falhou tudo, e não se
+     * sabe o que falhou.
+     *
+     * Com estes limites, um servidor lento devolve `sent: false` a tempo, e
+     * aí a resposta diz o que aconteceu: a proposta ficou guardada e o email
+     * não saiu. Uma frase verdadeira em vez de uma função morta.
+     */
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 20000,
   });
 }
 
@@ -45,10 +69,16 @@ function fromAddress(): string {
   return `${FROM_NAME} <${process.env.SMTP_USER}>`;
 }
 
-interface Attachment {
+// Exportada porque a assinatura (`email-assinatura.ts`) também devolve anexos:
+// com o tipo cá fora, um anexo mal formado parte na compilação e não na caixa
+// de correio de um cliente.
+export interface Attachment {
   filename: string;
   content: Buffer | Uint8Array;
   contentType?: string;
+  /** Set to reference the part from the HTML as <img src="cid:…">. Inline
+   *  images render even when the client blocks remote ones. */
+  cid?: string;
 }
 
 interface SendArgs {
@@ -58,6 +88,8 @@ interface SendArgs {
   replyTo?: string;
   to?: string; // overrides the default MAIL_TO (e.g. send to the client)
   attachments?: Attachment[];
+  /** Extra RFC-5322 headers (e.g. Auto-Submitted on an auto-reply). */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -71,6 +103,7 @@ export async function sendMail({
   replyTo,
   to,
   attachments,
+  headers,
 }: SendArgs): Promise<{ sent: boolean }> {
   const transport = getTransport();
   if (!transport) {
@@ -90,6 +123,7 @@ export async function sendMail({
     filename: a.filename,
     content: Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content),
     contentType: a.contentType,
+    cid: a.cid,
   }));
   await transport.sendMail({
     from,
@@ -99,6 +133,7 @@ export async function sendMail({
     text,
     replyTo,
     attachments: attach,
+    headers,
   });
   return { sent: true };
 }
@@ -109,5 +144,6 @@ export function esc(value: unknown): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

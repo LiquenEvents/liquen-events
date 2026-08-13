@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { listItems, createItem, PROP_CATEGORIES, type PropItem } from "@/lib/inventory-store";
+import { jsonWithEtag } from "@/lib/api-cache";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ function str(v: unknown, max: number): string {
 export async function GET(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
-    return NextResponse.json(await listItems());
+    return jsonWithEtag(request, await listItems());
   } catch (err) {
     log.error("inventario GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

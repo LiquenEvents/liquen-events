@@ -12,9 +12,18 @@ export const SITE = {
   email: "liquen.alentejo@gmail.com",
   phone: "+351919259820",
   phoneDisplay: "+351 919 259 820",
-  // Physical base — a specific municipality (not just the region) sharpens the
-  // LocalBusiness signal for "… em Évora" searches. Service area stays national
-  // (see AREAS_SERVED + areaServed in StructuredData).
+  /**
+   * ── A MORADA DE REGISTO SÓ EXISTE ONDE É OBRIGATÓRIA ────────────────────
+   *
+   * Fica para o papel timbrado dos contratos, que é um documento legal e tem
+   * de dizer onde a empresa está. NÃO sai daqui para mais lado nenhum: nem
+   * para texto, nem para metadados, nem para os dados estruturados.
+   *
+   * Antes alimentava o `PostalAddress` do schema.org. Deixou de o fazer: um
+   * `addressRegion: "Alentejo"` é a mesma afirmação que se tirou do texto,
+   * escrita numa linguagem que só as máquinas leem. O que se lê é diferente;
+   * o que se diz é igual.
+   */
   city: "Évora",
   region: "Alentejo",
   country: "PT",
@@ -30,6 +39,12 @@ export const SITE = {
   reviews: { rating: 5, count: 56 },
   instagram: "https://www.instagram.com/liquen.events",
   facebook: "https://www.facebook.com/liquen.events",
+  // Ainda não há perfil. Fica VAZIO em vez de não existir: a assinatura dos
+  // emails (`email-assinatura.ts`) percorre as redes e salta as que estão sem
+  // endereço, portanto o dia em que este campo tiver um URL é o dia em que o
+  // LinkedIn aparece nos emails — sem tocar em mais nada. Um ícone social a
+  // apontar para lado nenhum é pior do que não haver ícone.
+  linkedin: "",
   // Google Business Profile (share link) — powers local pack/Maps ranking and
   // lets Google reconcile the site with the profile (sameAs + hasMap).
   googleBusiness: "https://share.google/4Qcuop16TDkYaowsU",
@@ -40,46 +55,47 @@ export const SITE = {
   ogImage: "/og-liquen.jpg",
 } as const;
 
-/** Cities/areas served — ordered by SEO priority (home city Évora first,
- *  then the region and the rest of the country). */
-export const AREAS_SERVED = [
-  "Évora",
-  "Alentejo",
-  "Lisboa",
-  "Portugal",
-  "Estremoz",
-  "Beja",
-  "Setúbal",
-  "Cascais",
-  "Sintra",
-  "Comporta",
-] as const;
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A ÁREA DE SERVIÇO DEIXOU DE SER DECLARADA — e é de propósito
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Havia aqui um `AREAS_SERVED` com Portugal à cabeça e seis cidades a seguir,
+ * emitido como `areaServed` no nó da empresa e em cada serviço. Era a mesma
+ * frase que estava no ecrã — "trabalhamos em todo o Portugal" — dita ao Google
+ * em vez de à pessoa.
+ *
+ * Ela quis a geografia fora do site, e isso inclui o que não se vê: um
+ * `areaServed` continua a dizer aos motores de busca que isto é um fornecedor
+ * português, com os mesmos efeitos sobre quem o site atrai.
+ *
+ * O que se perde, dito com todas as letras: sem `areaServed`, sem `address` e
+ * sem `geo`, o nó deixa de poder ser `LocalBusiness` (o schema.org exige
+ * morada) e passa a `Organization` + `ProfessionalService`. Isso custa a
+ * elegibilidade para os resultados locais do Google — o pacote de mapas. As
+ * estrelas e o Perfil de Empresa continuam a existir e a ser ligados por
+ * `sameAs`/`hasMap`; o que se perde é o site reivindicar sozinho um sítio.
+ *
+ * As regiões que a operação de anúncios VENDE continuam em `src/lib/ads/`,
+ * onde cada uma tem a sua página e o seu público. Aí a geografia é o produto;
+ * aqui era só uma etiqueta.
+ */
 
-/** Default keyword set, location-weighted toward Alentejo. */
+/** Default keyword set for the SITE-WIDE metadata. National only — no
+ *  region-locked terms here: these ride on every page, and a regional term on
+ *  every page is what frames the studio as a local vendor. Region-targeted
+ *  keywords belong to the individual polo pages and to the Ads campaigns
+ *  (src/lib/ads/), where they are matched to a specific landing page. */
 export const SITE_KEYWORDS = [
-  "decoração de eventos Évora",
-  "decoração de eventos Alentejo",
-  "decoração de casamentos Alentejo",
-  "casamentos Évora",
-  "casamentos Alentejo",
-  "coordenação de casamentos Alentejo",
-  "decoração de eventos corporativos",
+  "decoração de eventos",
+  "coordenação de casamentos",
   "empresa de decoração de eventos",
-  "decoração de eventos Lisboa",
-  "decoração de eventos Portugal",
-  "empresa de eventos Alentejo",
+  "decoração de eventos corporativos",
+  "decoração de casamentos",
+  "decoração de eventos de empresa",
+  "empresa de eventos",
   "Líquen Events",
 ] as const;
-
-/** schema.org `areaServed` array with each place correctly typed — Portugal is
- *  a Country, the Alentejo an AdministrativeArea (region), the rest Cities.
- *  Shared by the Organization node and per-Service JSON-LD so both stay
- *  consistent and Évora-first. */
-export function areaServedSchema(): { "@type": string; name: string }[] {
-  const areaType = (name: string) =>
-    name === "Portugal" ? "Country" : name === "Alentejo" ? "AdministrativeArea" : "City";
-  return AREAS_SERVED.map((name) => ({ "@type": areaType(name), name }));
-}
 
 /** Absolute URL helper for canonical/OG links. */
 export function abs(path = ""): string {

@@ -4,7 +4,12 @@ import {
   DEFAULT_VAT_RATE,
   DEFAULT_CONDICOES_GERAIS,
   DEFAULT_NOTAS_IMPORTANTES,
+  COVER_SLOTS,
+  countPendingImages,
   detectVatMode,
+  isPendingImage,
+  stripPendingImages,
+  normaliseCoverImages,
   parseMoneyText,
   resolveProposalMoney,
   resolveValidUntil,
@@ -192,6 +197,34 @@ describe("proposal-doc — resolveValidUntil", () => {
       "2026-02-09",
     );
   });
+
+  /**
+   * ── OS DIAS CONTAM-SE A PARTIR DO DIA DE QUEM ENVIA ──────────────────────
+   *
+   * A validade é um DIA DO CALENDÁRIO, e o calendário do estúdio é o de
+   * Portugal. Entre a meia-noite e a 01:00 do Verão, Lisboa já virou o dia e
+   * Greenwich ainda não — e a conta partia do dia de Greenwich, portanto de
+   * ONTEM. A proposta enviada às 00:30 de 13 de Agosto saía «válida até 11 de
+   * Outubro» em vez de 12: um dia a menos do que os 60 prometidos, e o dia que
+   * falta é o último, que é justamente aquele em que os casais decidem.
+   *
+   * As datas destes testes são instantes ABSOLUTOS de propósito: o resultado
+   * tem de ser o mesmo com o processo em UTC (é onde correm os servidores e o
+   * runner) ou em Lisboa.
+   */
+  it("conta os dias a partir do dia civil PORTUGUÊS e não do de Greenwich", () => {
+    // 13/08/2026 00:30 em Lisboa (WEST, UTC+1) — ainda 12/08 em UTC.
+    const madrugadaDeVerao = new Date("2026-08-12T23:30:00Z");
+    expect(resolveValidUntil({ validUntilDays: 60 }, madrugadaDeVerao)).toBe("2026-10-12");
+    expect(resolveValidUntil({}, madrugadaDeVerao)).toBe("2026-10-12");
+  });
+
+  it("no Inverno (Lisboa == UTC) a mesma hora dá o mesmo dia de sempre", () => {
+    // 12/01/2026 23:30 em Lisboa (WET, UTC+0): aqui os dois calendários batem
+    // certo, e o resultado não pode mudar com a correcção acima.
+    const madrugadaDeInverno = new Date("2026-01-12T23:30:00Z");
+    expect(resolveValidUntil({ validUntilDays: 60 }, madrugadaDeInverno)).toBe("2026-03-13");
+  });
 });
 
 describe("proposal-doc — withProposalDefaults", () => {
@@ -240,8 +273,39 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(doc.moodBoards).toEqual([]);
     expect(doc.cronograma).toEqual([]);
     expect(doc.budgetItems).toEqual([]);
+    expect(doc.budgetExtras).toEqual([]);
     expect(doc.budgetRows).toEqual([]);
-    expect(doc.coverImages).toEqual([]);
+    // A capa sai sempre com as duas POSIÇÕES, vazias mas presentes.
+    expect(doc.coverImages).toEqual(["", ""]);
+  });
+
+  it("BUG-GUARD: os ids dos serviços vêm da POSIÇÃO, nunca sorteados", () => {
+    // Isto corre a cada pré-visualização e a cada envio. Um id sorteado aqui
+    // faria o MESMO documento serializar diferente de cada vez — rascunho a
+    // "mudar" sozinho, gravações e comparações a acordar sem motivo.
+    const partida = base({
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+    });
+    const uma = withProposalDefaults(partida);
+    const outra = withProposalDefaults(partida);
+    expect(JSON.stringify(uma.serviceGroups)).toBe(JSON.stringify(outra.serviceGroups));
+    expect(uma.serviceGroups[0].id).toBe("g0");
+    expect(uma.serviceGroups[0].items[0].id).toBe("g0~i0");
+  });
+
+  it("respeita os ids que o editor já atribuiu (e desempata repetidos)", () => {
+    const doc = withProposalDefaults(
+      base({
+        serviceGroups: [
+          { id: "sA", title: "Um", items: [{ id: "sX", label: "L" }] },
+          { id: "sA", title: "Dois", items: [] },
+        ],
+      }),
+    );
+    expect(doc.serviceGroups[0].id).toBe("sA");
+    expect(doc.serviceGroups[0].items[0].id).toBe("sX");
+    // Um rascunho estragado com o id repetido não pode dar duas chaves iguais.
+    expect(doc.serviceGroups[1].id).toBe("sA_2");
   });
 
   it("substitutes {DATA} and {CONVIDADOS} in the general conditions", () => {
@@ -254,12 +318,56 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(joined).not.toContain("{CONVIDADOS}");
   });
 
-  it("uses an em dash when eventDate / guests are empty strings", () => {
+  /**
+   * ── SEM DATA E SEM NÚMERO, A CLÁUSULA CONTINUA A SER UMA FRASE ────────────
+   *
+   * «Data flexível» é o caso NORMAL de quem ainda anda a escolher o dia — o
+   * formulário grava `date: ""` e o estúdio semeia `eventDate: ""`. O que o
+   * casal lia nas Condições Gerais era «Esta proposta só é válida para o evento
+   * a realizar no dia —.»: um marcador de folha de cálculo no meio de uma
+   * CLÁUSULA CONTRATUAL, que é a folha que ganha uma discussão meses depois.
+   *
+   * O padrão certo é o do email de confirmação, que no mesmo caso escreve «Data:
+   * ainda a definir» — palavras, não símbolos.
+   */
+  it("sem data e sem número, as Condições Gerais continuam frases inteiras", () => {
     const doc = withProposalDefaults(base({ eventDate: "", guests: "" }));
     const joined = doc.condicoesGerais.join("\n");
     expect(joined).not.toContain("{DATA}");
     expect(joined).not.toContain("{CONVIDADOS}");
-    expect(joined).toContain("—");
+    // Nem marcador, nem o travessão que lá estava a fazer de data.
+    expect(joined).not.toContain("—");
+    expect(joined).toContain(
+      "Esta proposta só é válida para a data do evento que vier a ser confirmada por escrito.",
+    );
+    expect(joined).toContain(
+      "O orçamento é válido para o número de convidados que vier a ser confirmado por escrito;" +
+        " abaixo ou acima desse número o valor da proposta terá de ser revisto.",
+    );
+  });
+
+  it("com data mas sem número, só a cláusula do número é reescrita", () => {
+    const doc = withProposalDefaults(base({ guests: "" }));
+    const joined = doc.condicoesGerais.join("\n");
+    expect(joined).toContain("a realizar no dia 3 de julho de 2027.");
+    expect(joined).toContain("o número de convidados que vier a ser confirmado por escrito");
+    expect(joined).not.toContain("—");
+  });
+
+  /**
+   * `String.replace` com uma string troca só a PRIMEIRA ocorrência: uma condição
+   * editada à mão com o marcador repetido saía com o segundo literal — «{DATA}»
+   * impresso no PDF do cliente.
+   */
+  it("uma condição editada à mão com o marcador REPETIDO fica toda preenchida", () => {
+    const doc = withProposalDefaults(
+      base({
+        condicoesGerais: ["De {DATA} a {DATA}, para {CONVIDADOS} e não mais de {CONVIDADOS}."],
+      }),
+    );
+    expect(doc.condicoesGerais[0]).toBe(
+      "De 3 de julho de 2027 a 3 de julho de 2027, para 150 pax e não mais de 150 pax.",
+    );
   });
 
   it("still runs token substitution over a CUSTOM condicoesGerais array", () => {
@@ -281,5 +389,103 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(DEFAULT_CONDICOES_GERAIS).toEqual(snapshot);
     // The template still carries the raw tokens for the next caller.
     expect(DEFAULT_CONDICOES_GERAIS.some((s) => s.includes("{DATA}"))).toBe(true);
+  });
+
+  it("as condições cobram deslocação E alojamento — são custos diferentes", () => {
+    // A deslocação já lá estava. O ALOJAMENTO não: um casamento a quatro horas
+    // de Évora obriga a equipa a dormir lá, e esse custo não era dito ao
+    // cliente nem cobrado — ficava com a Líquen.
+    const doc = withProposalDefaults(base());
+    const texto = doc.condicoesGerais.join("\n");
+    expect(texto).toMatch(/deslocação/i);
+    expect(texto).toMatch(/pernoitar/i);
+    expect(texto).toMatch(/alojamento/i);
+  });
+
+  it("uma proposta já gravada NÃO é reescrita pelas condições novas", () => {
+    // A regra que torna seguro afinar os textos: mudar o modelo não pode
+    // alterar o que já foi enviado a um cliente, porque isso mudava um
+    // documento que ele já tem na mão.
+    const proprias = ["Só isto foi acordado com este cliente."];
+    const doc = withProposalDefaults(base({ condicoesGerais: proprias }));
+    expect(doc.condicoesGerais).toEqual(proprias);
+  });
+
+  it("BUG-GUARD: normalises the cover to two POSITIONS so a right-slot photo stays right", () => {
+    // Draft antigo com um buraco à esquerda: a foto tem de continuar na posição 1.
+    const doc = withProposalDefaults(
+      base({ coverImages: [null, "storage/direita.jpg"] as unknown as string[] }),
+    );
+    expect(doc.coverImages).toEqual(["", "storage/direita.jpg"]);
+  });
+});
+
+describe("proposal-doc — normaliseCoverImages", () => {
+  it("always emits exactly COVER_SLOTS positions", () => {
+    expect(COVER_SLOTS).toBe(2);
+    expect(normaliseCoverImages()).toEqual(["", ""]);
+    expect(normaliseCoverImages(null)).toEqual(["", ""]);
+    expect(normaliseCoverImages([])).toEqual(["", ""]);
+    expect(normaliseCoverImages(["a", "b"])).toEqual(["a", "b"]);
+  });
+
+  it("keeps legacy sparse / short drafts on the side they were chosen for", () => {
+    // `[null, "b"]` e `[undefined, "b"]` — o que ficava no localStorage depois
+    // de escolher só a capa da direita, ou de remover a da esquerda.
+    expect(normaliseCoverImages([null, "b"])).toEqual(["", "b"]);
+    expect(normaliseCoverImages([undefined, "b"])).toEqual(["", "b"]);
+    // Curto: só a esquerda estava preenchida.
+    expect(normaliseCoverImages(["a"])).toEqual(["a", ""]);
+  });
+
+  it("ignores anything past the two slots and never returns a hole", () => {
+    expect(normaliseCoverImages(["a", "b", "c"])).toEqual(["a", "b"]);
+    expect(normaliseCoverImages(["a", "b"]).every((s) => typeof s === "string")).toBe(true);
+  });
+
+  it("returns a fresh array (callers write into it)", () => {
+    const input = ["a", "b"];
+    const out = normaliseCoverImages(input);
+    out[0] = "z";
+    expect(input[0]).toBe("a");
+  });
+});
+
+describe("proposal-doc — marcadores provisórios de foto", () => {
+  const doc = {
+    coverImages: ["pending:a", "capa/direita.jpg"],
+    moodBoards: [
+      { title: "Cerimónia", images: ["b/1.jpg", "pending:b", "b/2.jpg"] },
+      { title: "Copo", images: ["b/3.jpg"] },
+    ],
+  };
+
+  it("reconhece o marcador e nunca confunde um caminho com ele", () => {
+    expect(isPendingImage("pending:abc")).toBe(true);
+    // Um caminho de Storage é `<uuid>/<ficheiro>` — nunca tem o prefixo.
+    expect(isPendingImage("LQ-001/pending-foto.jpg")).toBe(false);
+    expect(isPendingImage("")).toBe(false);
+    expect(isPendingImage(undefined)).toBe(false);
+  });
+
+  it("conta as fotos que ainda são promessas, nas capas e nos mood boards", () => {
+    expect(countPendingImages(doc)).toBe(2);
+    expect(countPendingImages({})).toBe(0);
+  });
+
+  it("na CAPA o marcador vira vazio e a posição não encolhe", () => {
+    // Compactar aqui mandava a foto da direita imprimir à esquerda.
+    expect(stripPendingImages(doc).coverImages).toEqual(["", "capa/direita.jpg"]);
+  });
+
+  it("no mood board o marcador sai da lista, sem mexer na ordem das outras", () => {
+    expect(stripPendingImages(doc).moodBoards[0].images).toEqual(["b/1.jpg", "b/2.jpg"]);
+    // O board que não tinha nenhum sai intacto (a MESMA referência).
+    expect(stripPendingImages(doc).moodBoards[1]).toBe(doc.moodBoards[1]);
+  });
+
+  it("devolve o MESMO objeto quando não há nada a filtrar", () => {
+    const limpo = { coverImages: ["a", "b"], moodBoards: [{ title: "t", images: ["c"] }] };
+    expect(stripPendingImages(limpo)).toBe(limpo);
   });
 });

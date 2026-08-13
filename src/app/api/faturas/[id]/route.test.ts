@@ -5,8 +5,27 @@ import type { NextRequest } from "next/server";
 const invoicesDb = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
 const proposalsDb = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
 
+/**
+ * Os pedidos, em memória. Dar uma factura por paga passou a EMPURRAR o estado
+ * do pedido para «Ganho» (ver `@/lib/orcamento/estado-do-pedido`) — sem este
+ * duplo, a rota ia bater no repositório a sério a meio de um teste de unidade.
+ */
+const pedidos = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
+
 const authState = vi.hoisted(() => ({ authed: true }));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authState.authed }));
+
+vi.mock("@/lib/quotes-store", () => ({
+  updateQuoteWith: vi.fn(
+    async (id: string, mutar: (q: Record<string, unknown>) => Record<string, unknown>) => {
+      const actual = pedidos.store.get(id);
+      if (!actual) return null;
+      const proximo = mutar(actual);
+      pedidos.store.set(id, proximo);
+      return proximo;
+    },
+  ),
+}));
 
 vi.mock("@/lib/invoices-store", () => ({
   getInvoice: vi.fn(async (id: string) => invoicesDb.store.get(id) ?? null),
@@ -39,7 +58,10 @@ vi.mock("@/lib/proposals-store", () => ({
   getProposalByQuote: vi.fn(async (quoteId: string) => proposalsDb.store.get(quoteId) ?? null),
 }));
 
-vi.mock("@/lib/money", () => ({ round2: (n: number) => Math.round(n * 100) / 100 }));
+// A matemática do dinheiro é REAL: este ficheiro testa o VALOR do saldo, e
+// um duplo que só traz `round2` deixa `splitSinal`/`saldoAPartirDoSinal`
+// indefinidos — a rota rebenta e o teste lê-se como "não emitiu saldo".
+vi.mock("@/lib/money", async () => await vi.importActual("@/lib/money"));
 
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
@@ -72,6 +94,9 @@ function rawPatchReq(
 }
 
 function seedSinal(id: string, over: Record<string, unknown> = {}) {
+  // O pedido a que a factura pertence, no estado em que estaria: a proposta
+  // seguiu, o cliente ainda não está marcado como ganho no quadro.
+  pedidos.store.set(`q-${id}`, { id: `q-${id}`, name: "Cliente Teste", status: "cotado" });
   invoicesDb.store.set(id, {
     id,
     number: "FT 2026/0001",
@@ -97,11 +122,108 @@ function delReq(id: string): { req: NextRequest; params: Promise<{ id: string }>
 beforeEach(() => {
   invoicesDb.store.clear();
   proposalsDb.store.clear();
+  pedidos.store.clear();
   authState.authed = true;
   vi.clearAllMocks();
 });
 
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * DINHEIRO RECEBIDO É O SINAL MAIS FORTE DE TODOS
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Marcar uma factura como paga não tocava no pedido. É a acção que menos
+ * ambiguidade tem em todo o back office — entrou dinheiro — e era a que menos
+ * consequências tinha no quadro: ela dava o sinal por recebido, a data ficava
+ * reservada, e o pedido continuava a dizer «Proposta enviada».
+ *
+ * A regra está guardada nos testes de `@/lib/orcamento/estado-do-pedido`; o que
+ * estes prendem é a ligação, e sobretudo o que ela NÃO faz ao voltar atrás.
+ */
+describe("PATCH /api/faturas/[id] — o estado do pedido segue o dinheiro", () => {
+  it("dar o sinal por pago passa o pedido a «Ganho»", async () => {
+    seedSinal("f1");
+    const { req, params } = patchReq("f1", { status: "paga" });
+    await PATCH(req, { params });
+    expect(pedidos.store.get("q-f1")).toMatchObject({ status: "aceite" });
+  });
+
+  it("deixa no histórico a fatura e o valor que causaram a mudança", async () => {
+    seedSinal("f1");
+    const { req, params } = patchReq("f1", { status: "paga" });
+    await PATCH(req, { params });
+    const log = (pedidos.store.get("q-f1")?.activityLog ?? []) as {
+      actor?: string;
+      summary: string;
+    }[];
+    expect(log).toHaveLength(1);
+    expect(log[0].actor).toBe("Sistema");
+    expect(log[0].summary).toContain("FT 2026/0001");
+  });
+
+  /**
+   * O não-recuo, do lado que mais custa: uma factura anulada por engano de
+   * digitação não pode desfechar um casamento no quadro. Se o trabalho se
+   * perdeu mesmo, quem o marca como perdido é uma pessoa.
+   */
+  it("reverter ou anular a fatura NÃO puxa o pedido para trás", async () => {
+    seedSinal("f1");
+    await PATCH(patchReq("f1", { status: "paga" }).req, {
+      params: Promise.resolve({ id: "f1" }),
+    });
+    expect(pedidos.store.get("q-f1")).toMatchObject({ status: "aceite" });
+
+    for (const estado of ["emitida", "anulada"]) {
+      await PATCH(patchReq("f1", { status: estado }).req, {
+        params: Promise.resolve({ id: "f1" }),
+      });
+      expect(pedidos.store.get("q-f1")).toMatchObject({ status: "aceite" });
+    }
+  });
+
+  it("uma edição que não seja o pagamento não mexe no pedido", async () => {
+    seedSinal("f1");
+    const { req, params } = patchReq("f1", { note: "a rever com a cliente" });
+    await PATCH(req, { params });
+    expect(pedidos.store.get("q-f1")).toMatchObject({ status: "cotado" });
+  });
+
+  it("regravar uma fatura JÁ paga não volta a escrever no histórico", async () => {
+    seedSinal("f1", { status: "paga", paidAt: "2026-07-02" });
+    const { req, params } = patchReq("f1", { status: "paga" });
+    await PATCH(req, { params });
+    expect(pedidos.store.get("q-f1")?.activityLog).toBeUndefined();
+  });
+});
+
 describe("PATCH /api/faturas/[id] — auto-saldo on sinal paid", () => {
+  /**
+   * A PERCENTAGEM DO SINAL VEM DA PROPOSTA.
+   *
+   * Era 30% escrito em dois sítios: `splitThirtySeventy` e um `sinal / 3 × 7`
+   * à mão, aqui nesta rota. Uma proposta a dizer 40% com uma factura a sair a
+   * 30% é pior do que não poder mudar a percentagem de todo — e o erro só se
+   * descobre quando o cliente recebe o saldo errado.
+   */
+  it("o saldo segue a percentagem da proposta, não os 30% de sempre", async () => {
+    // 40% de 12.500 são 5.000; o saldo tem de ser 7.500.
+    seedSinal("s40", { amount: 5000 });
+    proposalsDb.store.set("q-s40", { total: 12500, doc: { depositPercent: 40 } });
+
+    const { req, params } = patchReq("s40", { status: "paga" });
+    const res = await PATCH(req, { params });
+    expect(res.status).toBe(200);
+    expect((await res.json()).saldoAutoIssued).toMatchObject({ kind: "saldo", amount: 7500 });
+  });
+
+  it("sem proposta, deriva do sinal pela percentagem da casa", async () => {
+    // É o caminho que antes estava escrito como `sinal / 3 × 7`.
+    seedSinal("s-sem", { amount: 3750 });
+    const { req, params } = patchReq("s-sem", { status: "paga" });
+    const res = await PATCH(req, { params });
+    expect((await res.json()).saldoAutoIssued).toMatchObject({ amount: 8750 });
+  });
+
   it("marking a sinal paga auto-issues a saldo (kind + amount from the proposal total)", async () => {
     seedSinal("s1");
     proposalsDb.store.set("q-s1", { total: 12500 });
@@ -419,7 +541,7 @@ describe("DELETE /api/faturas/[id] — apagar só faturas anuladas", () => {
     const res = await DELETE(req, { params });
     expect(res.status).toBe(409);
     const json = await res.json();
-    expect(json.error).toBe("Só é possível apagar faturas anuladas. Anule a fatura primeiro.");
+    expect(json.error).toBe("Só é possível apagar faturas anuladas. Anula a fatura primeiro.");
     expect(deleteInvoice).not.toHaveBeenCalled();
   });
 
@@ -441,5 +563,43 @@ describe("DELETE /api/faturas/[id] — apagar só faturas anuladas", () => {
     expect(deleteInvoice).toHaveBeenCalledTimes(1);
     expect(deleteInvoice).toHaveBeenCalledWith("d3");
     expect(invoicesDb.store.has("d3")).toBe(false);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * AS DATAS DO LIVRO SÃO O DIA DE LISBOA, NÃO O DE GREENWICH
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * `new Date().toISOString()` é UTC. No Verão em Portugal (UTC+1), entre a
+ * meia-noite e a uma da manhã dá o dia ANTERIOR — e aqui isso carimba o dia em
+ * que o dinheiro entrou, a data de emissão do saldo (documento fiscal) e o seu
+ * vencimento.
+ *
+ * A hora fica FIXA, e o processo em UTC como o alojamento onde isto corre.
+ */
+describe("PATCH /api/faturas/[id] — as datas de um pagamento à meia-noite", () => {
+  it("dar por paga às 00:30 de agosto carimba HOJE, e o saldo nasce com o mesmo dia", async () => {
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    // 14 de agosto de 2026, 00:30 em Lisboa (UTC+1) — 13 de agosto, 23:30 UTC.
+    vi.setSystemTime(new Date("2026-08-13T23:30:00Z"));
+    try {
+      seedSinal("s-noite");
+      proposalsDb.store.set("q-s-noite", { total: 12500 });
+      const { req, params } = patchReq("s-noite", { status: "paga" });
+      const res = await PATCH(req, { params });
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.paidAt).toBe("2026-08-14");
+      expect(json.saldoAutoIssued).toMatchObject({
+        issuedAt: "2026-08-14",
+        // O vencimento conta-se a partir do dia da emissão: 30 dias depois.
+        dueAt: "2026-09-13",
+      });
+    } finally {
+      vi.useRealTimers();
+      delete process.env.TZ;
+    }
   });
 });

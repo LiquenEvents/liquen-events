@@ -70,21 +70,18 @@ describe("/api/inbox/[uid]", () => {
     expect((await res.json()).error).toBeTruthy();
   });
 
-  it("coerces a non-numeric uid to NaN and resolves to 404, never crashing", async () => {
+  /**
+   * O UID é um número de sequência do IMAP. Um "abc" (ou um -5, ou um 3.5)
+   * chegava lá como `NaN` e o servidor recusava o comando — a rota devolvia
+   * 502, «erro ao ler a mensagem», como se o correio estivesse em baixo. É um
+   * endereço errado, e diz-se assim. Mesmo guarda da rota irmã `flags`.
+   */
+  it("um uid que não é um número inteiro positivo é 400, e o IMAP nem é chamado", async () => {
     authed.ok = true;
-    imap.getInboxMessage.mockResolvedValueOnce(null);
-    const res = await call("abc");
-    expect(res.status).toBe(404);
-    // Pinning current behaviour: the route passes Number("abc") === NaN through.
-    const arg = imap.getInboxMessage.mock.calls[0][0];
-    expect(Number.isNaN(arg)).toBe(true);
-  });
-
-  it("passes a negative uid through as a negative number (no crash)", async () => {
-    authed.ok = true;
-    imap.getInboxMessage.mockResolvedValueOnce(null);
-    const res = await call("-5");
-    expect(res.status).toBe(404);
-    expect(imap.getInboxMessage).toHaveBeenCalledWith(-5);
+    for (const mau of ["abc", "-5", "0", "3.5", ""]) {
+      const res = await call(mau);
+      expect(res.status, mau).toBe(400);
+    }
+    expect(imap.getInboxMessage).not.toHaveBeenCalled();
   });
 });

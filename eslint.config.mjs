@@ -69,6 +69,15 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Qualquer OUTRA pasta de compilação do Next, não só a `.next`.
+    //
+    // O `next build --distDir` cria pastas com outro nome, e uma medição de
+    // antes/depois cria-as normalmente duas. Sem esta linha o ESLint tenta
+    // analisar o produto da compilação: aconteceu, e o resultado foi 1780 de
+    // ~1843 ficheiros com problemas — o `npm run lint` deixou de servir para
+    // nada em todo o repositório, e chegou a rebentar com ENOENT por estar a
+    // ler uma pasta que ainda estava a ser escrita.
+    ".next-*/**",
   ]),
 ]);
 

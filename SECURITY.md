@@ -38,8 +38,17 @@ open public issues for security reports.
 - The cron endpoint is protected by a `CRON_SECRET` bearer token.
 
 ### CSRF
-- `SameSite=Lax` session cookie, plus an **edge middleware** (`src/middleware.ts`)
-  that rejects cross-origin state-changing API requests (POST/PUT/PATCH/DELETE).
+- `SameSite=Lax` session cookie, plus an **edge proxy** (`src/proxy.ts`) that
+  rejects cross-origin state-changing API requests (POST/PUT/PATCH/DELETE).
+  Verified live during the July 2026 audit: `Origin: https://evil.com` → 403;
+  same-origin passes through to the route's own 401.
+  <!-- The path here read `src/middleware.ts` until that audit, and no such
+       file has ever existed in this repository. Next 16 renamed the convention
+       (see node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md,
+       "Migrate from deprecated `middleware` convention to `proxy`"), and this
+       document was not updated. The control is real — only the filename was
+       wrong. Worth knowing which, because a security document naming a file
+       that does not exist reads as a control that does not exist. -->
 
 ### Output / XSS
 - React escapes all rendered values by default.

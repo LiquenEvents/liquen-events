@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes, createHmac } from "node:crypto";
-import type { Quote } from "@/lib/orcamento/types";
+import type { Quote, QuoteSummary } from "@/lib/orcamento/types";
+import { CAMPOS_SO_DO_DETALHE } from "@/lib/orcamento/types";
 import { createRepository, type Mapper } from "./repository";
 
 /**
@@ -54,6 +55,34 @@ const repo = createRepository(mapper);
 
 export const createQuote = (quote: Quote): Promise<void> => repo.create(quote);
 export const listQuotes = (): Promise<Quote[]> => repo.list();
+
+/**
+ * O mesmo pedido sem as colecções que só o pedido ABERTO mostra — ver
+ * {@link CAMPOS_SO_DO_DETALHE}, que explica campo a campo o que sai e,
+ * sobretudo, o que NÃO pode sair.
+ *
+ * Apaga em vez de escolher: uma lista de campos a MANTER ficava a dever um
+ * campo novo cada vez que alguém acrescentasse um a `Quote`, e o defeito era
+ * silencioso (um campo que simplesmente não chegava à lista). Assim, o que é
+ * novo viaja por omissão e só sai daqui quem for escrito nesta lista.
+ */
+export function resumirQuote(quote: Quote): QuoteSummary {
+  const resumo: Quote = { ...quote };
+  for (const campo of CAMPOS_SO_DO_DETALHE) delete resumo[campo];
+  return resumo;
+}
+
+/**
+ * A lista de pedidos para o ECRÃ DE LISTA.
+ *
+ * O que isto poupa é a viagem, não a leitura: o pedido inteiro vive numa só
+ * coluna `data` (jsonb), por isso a base de dados devolve na mesma o blob todo
+ * e o corte é feito aqui. O que deixa de acontecer é o blob todo ser
+ * SERIALIZADO para dentro do HTML da página de administração — que é onde os
+ * megabytes se pagam, uma vez por carregamento e antes de haver ecrã.
+ */
+export const listQuoteSummaries = async (): Promise<QuoteSummary[]> =>
+  (await repo.list()).map(resumirQuote);
 export const getQuote = (id: string): Promise<Quote | null> => repo.get(id);
 export const updateQuote = (id: string, updates: Partial<Quote>): Promise<Quote | null> =>
   repo.update(id, updates);

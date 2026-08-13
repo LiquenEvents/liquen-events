@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { capturarClique } from "@/lib/ads/click-id";
 
 /** sessionStorage key holding the visitor's first-touch acquisition source. */
 export const LEAD_SOURCE_KEY = "liquen-lead-source";
@@ -19,6 +20,18 @@ export const LEAD_SOURCE_KEY = "liquen-lead-source";
  */
 export default function LeadSourceCapture() {
   useEffect(() => {
+    // O identificador do clique pago é guardado SEMPRE, e antes de tudo o
+    // resto: vive em localStorage com a janela de 90 dias da Google, e não em
+    // sessionStorage como a atribuição acima. São coisas diferentes com prazos
+    // diferentes — a atribuição serve para a equipa perceber de onde vêm os
+    // pedidos, o identificador serve para devolver o valor real do casamento
+    // à Google. O `return` de primeiro-toque abaixo não pode saltar isto.
+    try {
+      capturarClique(window.location.search, window.location.pathname);
+    } catch {
+      /* nunca deixar a medição impedir o resto da captura */
+    }
+
     try {
       if (sessionStorage.getItem(LEAD_SOURCE_KEY)) return; // first touch already recorded
       const params = new URLSearchParams(window.location.search);
@@ -33,7 +46,14 @@ export default function LeadSourceCapture() {
       if (document.referrer) {
         try {
           const host = new URL(document.referrer).hostname;
-          if (host && host !== window.location.hostname) ref = `ref:${host}`;
+          // Skip our own infrastructure. A visit that came from the Vercel
+          // dashboard or a preview URL isn't attribution — it's us — and it
+          // reached the team's inbox as "Origem: ref:vercel.com".
+          const ours =
+            host === window.location.hostname ||
+            /(^|\.)(vercel\.app|vercel\.com|liquen-events\.com)$/i.test(host) ||
+            host === "localhost";
+          if (host && !ours) ref = `ref:${host}`;
         } catch {
           /* malformed referrer — ignore */
         }

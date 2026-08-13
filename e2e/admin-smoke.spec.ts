@@ -25,6 +25,10 @@ const IGNORED_CONSOLE = [
   /\[Fast Refresh\]/i,
   /favicon/i,
   /Failed to load resource: the server responded with a status of 404/i,
+  // Recursos de terceiros (analytics) inalcançáveis na rede onde o teste corre
+  // — condição do ambiente, não defeito da aplicação. Um erro lançado pelo
+  // nosso próprio código continua a falhar o passeio.
+  /net::ERR_(TUNNEL_CONNECTION_FAILED|CONNECTION_|NAME_NOT_RESOLVED|PROXY_)/i,
 ];
 
 function isIgnored(text: string): boolean {
@@ -55,9 +59,12 @@ function collectErrors(page: Page) {
 async function login(page: Page): Promise<boolean> {
   await page.goto("/orcamento/admin");
   await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
-  await page.getByLabel(/O teu nome/i).fill("Catarina");
-  await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
-  await page.getByRole("button", { name: /Entrar/i }).click();
+  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
+  // Pelo `name` e não pelo rótulo: «Palavra-passe» passou a ser partilhado com
+  // o botão de mostrar/ocultar, e o botão de entrar diz por que caminho se
+  // entra (a passkey passou a ser o primeiro).
+  await page.locator('input[name="password"]').fill("liquen2026");
+  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
   // The back-office landmark only exists once authenticated.
   try {
     await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
@@ -78,12 +85,14 @@ async function login(page: Page): Promise<boolean> {
 // header shows for that view (AdminClient's VIEW_TITLES).
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
-  { nav: /^Pedidos$/, heading: /^Pedidos$/ },
+  // O «Pedidos» leva o contador de quem espera resposta no nome acessível —
+  // «Pedidos, 4 por responder». Ancorado só no princípio, portanto: com o
+  // `$` no fim, este smoke passava num estúdio vazio e falhava assim que
+  // houvesse trabalho, que é o estado normal.
+  { nav: /^Pedidos\b/, heading: /^Pedidos$/ },
   { nav: /^Propostas$/, heading: /^Propostas$/ },
-  { nav: /^Faturas$/, heading: /^Faturas$/ },
-  { nav: /^Contratos$/, heading: /^Contratos$/ },
-  { nav: /^Mensagens$/, heading: /^Mensagens$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
+  { nav: /^Tarefas$/, heading: /^Tarefas$/ },
 ];
 
 test.describe("Back office — smoke", () => {

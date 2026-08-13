@@ -10,7 +10,27 @@ const ledger = vi.hoisted(() => ({
   numSeq: 0,
 }));
 
+/**
+ * Os pedidos, em memória. Emitir uma factura passou a EMPURRAR o estado do
+ * pedido (ver `@/lib/orcamento/estado-do-pedido`): sem este duplo, a rota ia
+ * bater no repositório a sério a meio de um teste de unidade.
+ */
+const pedidos = vi.hoisted(() => ({
+  store: new Map<string, Record<string, unknown>>(),
+}));
+
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
+vi.mock("@/lib/quotes-store", () => ({
+  updateQuoteWith: vi.fn(
+    async (id: string, mutar: (q: Record<string, unknown>) => Record<string, unknown>) => {
+      const actual = pedidos.store.get(id);
+      if (!actual) return null;
+      const proximo = mutar(actual);
+      pedidos.store.set(id, proximo);
+      return proximo;
+    },
+  ),
+}));
 vi.mock("@/lib/invoices-store", () => ({
   listInvoices: vi.fn(async () => ledger.rows),
   listInvoicesForQuote: vi.fn(async (quoteId: string) =>
@@ -34,6 +54,7 @@ vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.
 
 import { POST } from "./route";
 import { createInvoice, nextInvoiceNumber } from "@/lib/invoices-store";
+import { updateQuoteWith } from "@/lib/quotes-store";
 
 function req(body: unknown): NextRequest {
   return new Request("https://liquen.test/api/faturas", {
@@ -69,6 +90,8 @@ beforeEach(() => {
   ledger.rows = [];
   ledger.idSeq = 0;
   ledger.numSeq = 0;
+  pedidos.store.clear();
+  pedidos.store.set("q-1", { id: "q-1", name: "Ana", status: "cotado" });
   vi.clearAllMocks();
 });
 
@@ -305,5 +328,176 @@ describe("POST /api/faturas — input validation (400s, never 500 / bad data)", 
     const json = await res.json();
     expect(json.invoices[0].amount).toBe(3000);
     expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * EMITIR A FACTURA PASSA O PEDIDO A «GANHO»
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta rota não tocava no pedido. Ela emitia o sinal daqui — que é a reserva da
+ * data, o momento em que o trabalho fica mesmo dela — e o quadro continuava a
+ * dizer «Proposta enviada». O negócio ganho, e a única vista que serve para
+ * saber o que falta fazer a não saber.
+ *
+ * A regra em si está guardada nos testes de `@/lib/orcamento/estado-do-pedido`.
+ * O que ESTES testes prendem é a ligação: que esta rota a chama, com o
+ * acontecimento certo, depois de a factura estar mesmo no livro.
+ */
+describe("POST /api/faturas — o estado do pedido segue a emissão", () => {
+  it("o par sinal + saldo dá o pedido por ganho", async () => {
+    const res = await POST(req({ split: true, quoteId: "q-1", clientName: "Ana", total: 10000 }));
+    expect(res.status).toBe(201);
+    expect(pedidos.store.get("q-1")).toMatchObject({ status: "aceite" });
+  });
+
+  it("uma fatura avulsa também o dá por ganho", async () => {
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(res.status).toBe(201);
+    expect(pedidos.store.get("q-1")).toMatchObject({ status: "aceite" });
+  });
+
+  /** Ela vê a coluna mudar sozinha; tem de poder ir ver porquê. */
+  it("deixa no histórico o número da fatura que causou a mudança", async () => {
+    await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    const log = (pedidos.store.get("q-1")?.activityLog ?? []) as {
+      actor?: string;
+      summary: string;
+    }[];
+    expect(log).toHaveLength(1);
+    expect(log[0].actor).toBe("Sistema");
+    expect(log[0].summary).toContain("FT 2026/");
+  });
+
+  /**
+   * Um trabalho perdido é uma decisão de uma pessoa, e uma factura de
+   * cancelamento não o ressuscita no quadro.
+   */
+  it("não tira de «Perdido» um pedido que alguém deu por perdido", async () => {
+    pedidos.store.set("q-1", { id: "q-1", name: "Ana", status: "rejeitado" });
+    await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 500, kind: "total" }));
+    expect(pedidos.store.get("q-1")).toMatchObject({ status: "rejeitado" });
+  });
+
+  /**
+   * A factura fica emitida mesmo que o pedido já não exista (foi apagado à
+   * mão depois de o link ter saído) ou que a gravação do estado rebente. Uma
+   * factura EMITIDA não pode virar "Erro ao criar a fatura" por causa da cor
+   * de uma coluna: ela lê "erro", tenta outra vez, e leva com o 409 da guarda
+   * de duplicação.
+   */
+  it("a fatura sai na mesma quando o pedido já não existe", async () => {
+    const res = await POST(
+      req({ quoteId: "fantasma", clientName: "Ana", amount: 3000, kind: "total" }),
+    );
+    expect(res.status).toBe(201);
+    expect(createInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("uma fatura sem pedido associado não tenta mexer em pedido nenhum", async () => {
+    const res = await POST(req({ clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(res.status).toBe(201);
+    expect(updateQuoteWith).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANDO A NUMERAÇÃO NÃO ESTÁ DISPONÍVEL, ISSO TEM DE SE PERCEBER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * `nextInvoiceNumber` recusa emitir em dois casos, ambos fiscais: com Supabase
+ * configurado e a RPC atómica em baixo (migração por correr), e em produção sem
+ * Supabase nenhum (o contador viveria num ficheiro que o deploy apaga e a
+ * numeração recomeçaria em 0001, repetindo números já emitidos).
+ *
+ * A recusa estava a sair daqui como «Erro ao criar a fatura», 500. Isso é o
+ * pior dos dois mundos: impede-se a emissão — que é a decisão certa — e não se
+ * diz porquê, portanto ela tenta outra vez, e outra, e acaba a escrever a
+ * alguém. A recusa só vale se trouxer o que fazer a seguir.
+ */
+describe("POST /api/faturas — a numeração fiscal indisponível é uma resposta, não um erro", () => {
+  it("responde 503 com a frase que diz o que falta", async () => {
+    vi.mocked(nextInvoiceNumber).mockRejectedValueOnce(
+      new Error(
+        "Numeração de faturas indisponível: sem base de dados, o contador não sobrevive a um deploy e a numeração fiscal repetir-se-ia. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no alojamento antes de emitir.",
+      ),
+    );
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toMatch(/Numeração de faturas indisponível/);
+  });
+
+  it("e não cria factura nenhuma", async () => {
+    vi.mocked(nextInvoiceNumber).mockRejectedValueOnce(
+      new Error("Numeração de faturas indisponível: o contador atómico falhou."),
+    );
+    await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  /** Qualquer outra avaria continua a ser um 500 genérico: não se põe o texto
+   *  interno de um erro desconhecido à frente de quem está a trabalhar. */
+  it("uma avaria qualquer continua a ser 500", async () => {
+    vi.mocked(nextInvoiceNumber).mockRejectedValueOnce(new Error("ligação perdida"));
+    const res = await POST(req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }));
+    expect(res.status).toBe(500);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * A DATA DE EMISSÃO É O DIA DE LISBOA, NÃO O DE GREENWICH
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * `new Date().toISOString()` é UTC. No Verão em Portugal (UTC+1), entre a
+ * meia-noite e a uma da manhã isso dá o dia ANTERIOR — e esta é a data que sai
+ * impressa no documento fiscal e que decide o período de IVA.
+ *
+ * A hora fica FIXA (e o processo em UTC, como o alojamento onde isto corre):
+ * um teste que só falhasse durante essa hora não guardava nada.
+ */
+describe("POST /api/faturas — a data de emissão por omissão", () => {
+  it("à 00:30 de um dia de agosto emite com a data de HOJE em Lisboa", async () => {
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    // 14 de agosto de 2026, 00:30 em Lisboa (UTC+1) — 13 de agosto, 23:30 UTC.
+    vi.setSystemTime(new Date("2026-08-13T23:30:00Z"));
+    try {
+      const res = await POST(
+        req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }),
+      );
+      expect(res.status).toBe(201);
+      expect(createInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ issuedAt: "2026-08-14" }),
+      );
+    } finally {
+      vi.useRealTimers();
+      delete process.env.TZ;
+    }
+  });
+
+  it("uma data escrita à mão continua a mandar", async () => {
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-13T23:30:00Z"));
+    try {
+      await POST(
+        req({
+          quoteId: "q-1",
+          clientName: "Ana",
+          amount: 3000,
+          kind: "total",
+          issuedAt: "2026-07-01",
+        }),
+      );
+      expect(createInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ issuedAt: "2026-07-01" }),
+      );
+    } finally {
+      vi.useRealTimers();
+      delete process.env.TZ;
+    }
   });
 });

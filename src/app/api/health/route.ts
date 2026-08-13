@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { getSupabase } from "@/lib/supabase";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,17 @@ async function probeDatabase(): Promise<"ok" | "down" | "fallback"> {
  * authenticated admin — for a public probe it's needless fingerprinting.
  */
 export async function GET(request: NextRequest) {
+  // The DB probe is a real query, so cap how often one IP can trigger it. When
+  // exceeded we return a lightweight liveness 200 WITHOUT probing the database,
+  // so abuse can't pound the DB while legitimate uptime monitors still get 200.
+  const limited = await rateLimit(`health:${clientIp(request)}`, 30, 60_000);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { status: "ok", time: new Date().toISOString(), uptime: Math.round(process.uptime()) },
+      { status: 200, headers: { "Cache-Control": "no-store, max-age=0" } },
+    );
+  }
+
   const database = await probeDatabase();
   const healthy = database !== "down";
   const body = {

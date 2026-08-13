@@ -1,0 +1,83 @@
+# Regras de análise estática para este projecto.
+#
+# NÃO são regras genéricas de Next/Supabase copiadas de um catálogo. Cada uma
+# corresponde a um defeito que a auditoria de Julho de 2026 encontrou MESMO
+# neste repositório — a ideia é que o mesmo erro não volte por outro caminho.
+# Uma regra que nunca disparou sobre código real é ruído à espera de acontecer.
+rules:
+  - id: guarda-de-posse-que-falha-aberta
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Comparação de posse com um `&&` antes: se o campo for vazio, a guarda é
+      SALTADA e serve-se o recurso de outra pessoa. Foi assim que a proposta de
+      um cliente foi servida a outro (`proposals.quote_id` é `on delete set
+      null`, e um pedido apagado deixa-o vazio). Compara sempre de forma
+      estrita — sem posse provada, não há recurso.
+    patterns:
+      - pattern-either:
+          - pattern: $X.quoteId && $X.quoteId !== $Y
+          - pattern: $X.proposalId && $X.proposalId !== $Y
+          - pattern: $X.quoteId && $Y !== $X.quoteId
+
+  - id: caminho-com-token-em-telemetria
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Um caminho de URL vai para telemetria ou para os registos sem passar por
+      `sanitizeTelemetryPath` (src/lib/safe-path.ts). As rotas `/portal/…` e
+      `/proposta/…` levam um token que AUTORIZA aceitar uma proposta — e isso
+      cria contrato e factura. Já foi parar à Google e aos registos de
+      produção.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              { ..., path: location.pathname, ... }
+          - pattern: |
+              { ..., page_location: $W.location.href, ... }
+      - pattern-not-inside: sanitizeTelemetryPath(...)
+
+  - id: fecho-de-etiqueta-html-intolerante
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Expressão regular a filtrar HTML com um fecho rígido (`</script>`): o HTML
+      permite `</script >` e `</script foo>`, e uma só passagem não desfaz
+      `<scr<script>ipt>`. O CodeQL apanhou exactamente isto aqui. Se for para
+      obter TEXTO, itera até estabilizar e diz no comentário que não é um
+      sanitizador.
+    patterns:
+      - pattern-regex: '<\\?/\(script\|style\)>'
+
+  - id: chave-de-tecto-com-endereco-quando-devia-ser-por-conta
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Chave de limitação que mistura endereço e conta. Um tecto por endereço
+      não protege um segundo factor: rodar endereços é barato e cada um compra
+      tentativas novas. O contador da conta tem de ser o MESMO para todos os
+      endereços.
+    patterns:
+      - pattern-regex: 'rateLimit\(`[^`]*conta[^`]*\$\{ip\}'
+
+  # REGRA RETIRADA: "rota de admin sem guarda de sessão".
+  #
+  # Escrevi-a, não a consegui experimentar (o semgrep não está instalado no
+  # ambiente de auditoria e a rede não deixava instalá-lo), e o CI mostrou que
+  # o padrão `... isAuthed(...) ...` não é TypeScript válido:
+  #
+  #   [ERROR] Rule parse error in rule rota-de-admin-sem-guarda-de-sessao:
+  #    Invalid pattern for TypeScript: Stdlib.Parsing.Parse_error
+  #
+  # E o mais importante: **o semgrep saiu com SUCESSO na mesma.** O `--error`
+  # só falha perante achados, não perante regras que não compilam. Um portão
+  # verde que não guarda nada é pior do que portão nenhum — é precisamente a
+  # família de defeito que esta auditoria inteira andou a encontrar. Daí o
+  # `--strict` no workflow, que passa a fazer disto um erro.
+  #
+  # Não a reescrevi porque esta invariante JÁ TEM um guarda melhor e provado:
+  # o teste de completude em `src/app/api/auth-guard-audit.test.ts` percorre
+  # `src/app/api` no disco e reprova qualquer rota não classificada. Foi
+  # verificado a sério — retirando `visao-geral` da tabela fica vermelho com
+  # `rotas sem classificação: ./visao-geral/route`. Uma segunda versão pior da
+  # mesma rede, que eu não consigo experimentar, não acrescenta nada.

@@ -98,3 +98,83 @@ describe("log — error webhook alerting", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ALERTA TEM DE SOBREVIVER AO FIM DO PEDIDO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Em serverless, o contentor é CONGELADO assim que a resposta sai. Um
+ * `void fetch(...)` que ainda não tenha ligado morre aí: o `log.error` escreve
+ * a linha na consola e o Sentry / o webhook do Slack NUNCA recebem nada. É o
+ * mesmo defeito que já se corrigiu no `/api/backup` e no `/api/orcamento`, e
+ * é pior aqui: o que se perde é precisamente o aviso de que alguma coisa
+ * correu mal — a falha apaga o seu próprio alarme.
+ *
+ * A cura ali foi o `after()` do `next/server`. Aqui não pode ser: o `logger` é
+ * importado por componentes de CLIENTE (o sino das notificações, o
+ * `error.tsx`, o `global-error.tsx`) e um `import` estático de `next/server`
+ * arrastava código de servidor para o pacote do browser.
+ *
+ * Usa-se o mesmo mecanismo por baixo do `after`, que a documentação do Next
+ * descreve como o contrato para quem implementa plataformas
+ * (`node_modules/next/dist/docs/01-app/03-api-reference/04-functions/after.md`,
+ * secção «supporting `after` for serverless platforms»):
+ *
+ *   globalThis[Symbol.for("@next/request-context")].get().waitUntil
+ *
+ * Um símbolo global não é um `import`: no browser não existe e o registo
+ * degrada exactamente para o que fazia antes.
+ */
+describe("log.error — o alerta é prendido ao pedido (waitUntil)", () => {
+  const SIMBOLO = Symbol.for("@next/request-context");
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let waitUntil: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock = vi.fn(() => Promise.resolve({ ok: true } as Response));
+    vi.stubGlobal("fetch", fetchMock);
+    waitUntil = vi.fn();
+    (globalThis as Record<symbol, unknown>)[SIMBOLO] = { get: () => ({ waitUntil }) };
+    vi.stubEnv("NODE_ENV", "production");
+  });
+  afterEach(() => {
+    delete (globalThis as Record<symbol, unknown>)[SIMBOLO];
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    delete process.env.ERROR_WEBHOOK_URL;
+    delete process.env.SENTRY_DSN;
+  });
+
+  it("entrega o POST do webhook ao waitUntil do pedido", () => {
+    process.env.ERROR_WEBHOOK_URL = "https://hooks.example.com/abc";
+    log.error("webhook-waituntil-case");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    expect(waitUntil.mock.calls[0][0]).toBeInstanceOf(Promise);
+  });
+
+  it("entrega também o envelope do Sentry", () => {
+    process.env.SENTRY_DSN = "https://chave@sentry.example.com/42";
+    log.error("sentry-waituntil-case");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+  });
+
+  it("a promessa entregue nunca rejeita — um webhook em baixo não pode derrubar a invocação", async () => {
+    fetchMock.mockImplementation(() => Promise.reject(new Error("ECONNREFUSED")));
+    process.env.ERROR_WEBHOOK_URL = "https://hooks.example.com/abc";
+    log.error("webhook-em-baixo");
+    await expect(waitUntil.mock.calls[0][0]).resolves.toBeUndefined();
+  });
+
+  it("sem contexto de pedido (browser, script, teste) continua a disparar e não rebenta", () => {
+    delete (globalThis as Record<symbol, unknown>)[SIMBOLO];
+    process.env.ERROR_WEBHOOK_URL = "https://hooks.example.com/abc";
+    expect(() => log.error("sem-contexto-case")).not.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

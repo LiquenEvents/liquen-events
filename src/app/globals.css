@@ -26,6 +26,34 @@
      is loaded and applied. */
   --font-sans: var(--font-inter);
   --font-display: var(--font-playfair);
+
+  /* ── A curva por omissão de TODAS as transições ──────────────────────────
+     O sítio tem uma curva de assinatura (`--ease-out`, no :root logo abaixo):
+     uma desaceleração forte, que arranca depressa e assenta devagar. Só que
+     essa curva estava a ser pedida À MÃO, e ~300 dos ~322 utilitários
+     `transition-*` do sítio não a pediam — herdavam a omissão do Tailwind,
+     `cubic-bezier(0.4, 0, 0.2, 1)`, que é praticamente simétrica.
+
+     O resultado media-se a olho: passar o rato num link e ver um bloco entrar
+     ao scroll eram, na mesma página, duas linguagens de movimento diferentes.
+     Não é um defeito de nenhuma delas — é a falta de uma.
+
+     Esta linha muda a OMISSÃO, e com ela as ~300 transições que nunca pediram
+     curva nenhuma. Nada muda de posição, de tamanho ou de cor: muda como
+     acelera. Quem quiser outra curva continua a poder pedi-la (`ease-linear`,
+     `.ease-expo`, um `ease-[…]` próprio) — o marquee e as barras de progresso
+     são `linear` de propósito e ficam como estão.
+
+     NOTA para quem vier a seguir: esta variável só alimenta os UTILITÁRIOS do
+     Tailwind. As regras escritas à mão neste ficheiro não a vêem — uma
+     `transition: opacity 0.5s ease` continua em `ease` até alguém lá ir. Por
+     isso as que partilham um gesto com a assinatura foram convergidas à mão
+     (`.lift`, `.field-line`, `.ff-label`, `.cl-black`, `.cl-moss`, `.bo-input`).
+
+     O valor está escrito por extenso porque o `@theme` é lido antes do :root —
+     `var(--ease-out)` aqui não resolveria. `tokens.coerencia.test.ts` guarda a
+     outra ponta (o `--ease-out` ↔ a ficha de JS). */
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Hero type scale — single source of truth for the marketing page heroes.
@@ -126,19 +154,20 @@ body.admin-mode {
   --bo-lh-body: 1.6;
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
 
-  /* SpaceX-style engineered look: the back office uses the technical Archivo
-     grotesque everywhere (loaded via next/font as --font-spacex). Redefining
-     --font-playfair INSIDE .admin-mode means both the `font-display` class and
-     any inline `var(--font-playfair)` resolve to it too — the public marketing
-     site (outside .admin-mode) keeps Playfair/Inter untouched. */
+  /* Calm "ChatGPT-app" look: the back office uses one clean humanist sans
+     (Inter, already loaded via next/font) for BOTH working text and headings.
+     Redefining --font-playfair INSIDE .admin-mode means the `font-display`
+     class and any inline `var(--font-playfair)` resolve to Inter too, so the
+     display titles read as a quiet modern sans instead of a serif or the old
+     technical grotesque — the public marketing site (outside .admin-mode)
+     keeps Playfair/Inter untouched. */
   --font-playfair:
-    var(--font-spacex), var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
 
-  /* Technical grotesque for all working admin text; system-ui stack behind it so
+  /* Clean humanist sans for all working admin text; system-ui stack behind it so
      there is never a network dependency. */
   font-family:
-    var(--font-spacex),
     var(--font-inter),
     ui-sans-serif,
     system-ui,
@@ -149,24 +178,37 @@ body.admin-mode {
     Arial,
     sans-serif;
   line-height: var(--bo-lh-body);
-  /* Uppercase, mission-control aesthetic across the whole interface. Positive
-     tracking so caps breathe (never the cramped negative tracking used for
-     lowercase UI text). Data the team TYPES or reads literally (inputs, emails,
-     phone numbers, the ref id) is exempted below so nothing is mangled. */
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  /* Sentence case, quiet. A hair of negative tracking gives UI text the crisp,
+     modern feel of a product app (ChatGPT/Linear) — NOT the shouty uppercase
+     mission-control look this interface used to force on every element. */
+  letter-spacing: var(--bo-tracking-tight);
 }
 
-/* Display / working headings: slightly wider tracking now that they're caps. */
+/* Display / working headings: tighter tracking for the calm modern-sans look. */
 body.admin-mode :is(h1, h2, h3, h4),
 body.admin-mode .font-display {
-  letter-spacing: 0.015em;
+  letter-spacing: -0.02em;
 }
 
-/* Keep real DATA in its true case — uppercasing an email, a client's name mid-
-   typing, a phone number or a reference id reads as broken, not premium. These
-   opt out of the global uppercase (the SpaceX look stays on all the chrome:
-   labels, headings, buttons, menus, values). */
+/* ── ChatGPT-calm typography ──────────────────────────────────────────────
+   The back office used to SHOUT: besides the old global uppercase (removed
+   above), individual buttons, labels and eyebrows STILL request `uppercase`
+   and wide `tracking-*` inline, across ~15 screens. Rather than edit every
+   call site, neutralise it here — scoped to .admin-mode, so the public
+   marketing site keeps its editorial caps. Every admin screen now reads in
+   calm sentence case with quiet spacing, like a modern product app (ChatGPT/
+   Linear). Data fields keep their true case via the block below. */
+body.admin-mode .uppercase,
+body.admin-mode .bo-eyebrow,
+body.admin-mode .eyebrow {
+  text-transform: none;
+  letter-spacing: 0.005em;
+}
+
+/* Keep real DATA in its true case — an email, a client's name mid-typing, a
+   phone number or a reference id must never be transformed. (Now that the
+   interface is sentence case this is mostly redundant, but it also resets the
+   letter-spacing on typed fields, so it stays.) */
 body.admin-mode input,
 body.admin-mode textarea,
 body.admin-mode select,
@@ -227,7 +269,45 @@ body.admin-mode .bo-text-faint {
     0 0 0 2px var(--color-surface),
     0 0 0 4px rgba(76, 97, 80, 0.95);
   border-radius: 2px;
+  /* O anel era o único estado do sítio inteiro sem movimento nenhum: aparecia e
+     desaparecia de repente, num sítio onde tudo o resto assenta. E é o estado
+     MAIS visto por quem navega por teclado.
+     ── 150 ms é um TECTO, não um gosto. As WCAG (2.4.7/2.4.11) pedem um
+     indicador de foco visível, e atrasar o seu APARECIMENTO trocaria um defeito
+     de estilo por um de acessibilidade. A 150 ms com a curva de assinatura, o
+     anel já está com ~70% do tamanho ao fim de dois quadros (~33 ms): lê-se como
+     imediato, e só o CRESCIMENTO é que assenta. Não subir daqui.
+     ── A transição é só à ENTRADA, e de graça: esta declaração vive dentro do
+     `:focus-visible`, portanto quando o foco sai o selector deixa de casar, a
+     transição desaparece com ele e o anel apaga-se no mesmo instante — que é o
+     que se quer (ninguém precisa de ver um anel a encolher num sítio onde já
+     não está o foco). */
+  transition: box-shadow 150ms var(--ease-out);
 }
+@media (prefers-reduced-motion: reduce) {
+  :focus-visible {
+    transition: none;
+  }
+}
+/* The quote confirmation is the one public page whose ground is cream
+   (#f7f4ee) rather than white. That single step down drops the at-rest navbar's
+   moss links from 4.69:1 to 4.27:1 — under WCAG AA for their 11px size. Rebind
+   the moss token INSIDE the header on that page only, so the nav deepens to
+   moss-dark (6.1:1) as one coherent set (links, borders, the CTA outline) while
+   every white page keeps the navbar exactly as it was. */
+body:has([data-cream-page]) [data-public-nav] {
+  --color-moss: var(--color-moss-dark);
+}
+
+/* Opt-out for elements focused PROGRAMMATICALLY as a screen-reader landing
+   point — a heading moved into focus after a route change is not a control, and
+   the ring above drew a hard box around it for every visitor. Needed as a real
+   rule (not a Tailwind utility) because the base rule above is unlayered, and
+   unlayered styles beat anything in Tailwind's `utilities` layer. */
+.focus-quiet:focus-visible {
+  box-shadow: none;
+}
+
 /* Windows High Contrast / forced-colors mode strips box-shadows, so the ring
    above disappears and keyboard focus becomes invisible. Restore a real system
    outline there (CanvasText adapts to the user's chosen contrast theme). */
@@ -267,14 +347,99 @@ body {
 }
 
 /* Cleaner line breaks everywhere: balanced multi-line headings and
-   paragraphs without ugly orphan words. Gracefully ignored where unsupported. */
-h1,
-h2,
-h3 {
-  text-wrap: balance;
+   paragraphs without ugly orphan words. Gracefully ignored where unsupported.
+
+   EM `@layer base`, E NÃO SOLTO. `text-wrap` é um atalho: `text-wrap: balance`
+   escreve também o `text-wrap-mode`, que é metade do `white-space`. Fora de
+   camadas isso ganhava ao `white-space: nowrap` do `.truncate` do Tailwind —
+   e um `<h1 class="truncate">` continuava a partir em duas linhas, com o
+   `getComputedStyle` a dizer `white-space: normal` e o código a dizer o
+   contrário. Foi o que manteve "Visão / Geral" em duas linhas no cabeçalho do
+   telemóvel depois de o `truncate` já lá estar.
+
+   `base` é a camada certa para regras que vestem ELEMENTOS: é declarada antes
+   de `utilities`, portanto continua a valer onde ninguém pede nada e deixa de
+   ganhar a quem pede. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
 }
-p {
-  text-wrap: pretty;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SEM JAVASCRIPT, A PÁGINA INTEIRA FICAVA NA GAVETA
+   ═══════════════════════════════════════════════════════════════════════════
+
+   O QUE SE VIA, MEDIDO em `/orcamento` com o JS desligado, num Chromium sobre
+   o `next build`: o cabeçalho, um ponto a pulsar a meio do ecrã, e mais nada. O
+   formulário ESTAVA no HTML — `<form>`, dez campos, o botão de enviar — a medir
+   0×0 px.
+
+   PORQUÊ, e não é o que parece. Não é animação de entrada nenhuma (essa é a
+   segunda fechadura da mesma porta, e está tratada no `orc-field-in` mais
+   abaixo): é a renderização em streaming do React. O grupo (site) tem um
+   `loading.tsx`, e um `loading.tsx` é uma fronteira `<Suspense>`. O React manda
+   primeiro a casca com o ecrã de espera lá dentro e o conteúdo a sério vai a
+   seguir, no fim do `<body>`, dentro de
+
+       <div hidden id="S:0">…a página toda…</div>
+
+   com um `<script>` atrás que o tira de lá e o mete no sítio. Esse script é a
+   ÚNICA coisa que faz a troca. Sem JS nunca corre: o conteúdo fica na gaveta e
+   o ecrã de espera fica para sempre. Isto valia para o sítio TODO — só que nas
+   outras páginas ainda se via o rodapé (está fora da fronteira) e a
+   `/orcamento` esconde o rodapé de propósito. Daí ser a única literalmente
+   branca, e é a que dá dinheiro.
+
+   O QUE ESTAS REGRAS FAZEM: devolvem a gaveta ao fluxo, com as medidas do
+   `<main>` que ela substitui (`flex-1 pt-24`) e antes do rodapé (`order`, que
+   no DOM ela vem depois), e escondem o ecrã de espera. O conteúdo passa a estar
+   visível POR OMISSÃO e o script do React passa a ser um acrescento — que é a
+   ordem certa das coisas.
+
+   PORQUE É `html:not(.com-javascript)` E NÃO UM `<noscript>`. Um `<noscript>`
+   com uma folha lá dentro foi a primeira tentativa e NÃO FUNCIONA aqui, por
+   causa das camadas: o `[hidden]` do Tailwind é `display: none !important`
+   dentro de `@layer base`, e — regra do CSS — a ordem das camadas INVERTE-SE
+   para as declarações `!important`, o que faz uma regra `!important` SEM camada
+   perder para uma `!important` que esteja em qualquer camada. Medido: o
+   `<main>` escondia-se (essa regra não disputava nada) e a gaveta continuava a
+   `display: none`. Aqui dentro de `@layer base`, e com mais especificidade,
+   ganha. A marca `com-javascript` é posta no `<html>` pelo mesmo script em
+   linha do `<head>` que decide o aviso de cookies — antes da primeira pintura,
+   e muito antes de a gaveta sequer existir no documento, portanto não há
+   nenhum instante em que isto pisque.
+
+   NÃO É PARA O CASO DO PEDAÇO QUE FALHA A CARREGAR, e vale a pena dizê-lo: esse
+   `<script>` da troca vem EM LINHA no HTML, portanto corre na mesma quando um
+   chunk não chega. O que se perde nesse caso é a hidratação, não o conteúdo.
+
+   O PREÇO: sem JS não há landmark `<main>` (é ele que leva o ecrã de espera e é
+   ele que se esconde). Um conteúdo sem landmark é pior do que um conteúdo com
+   landmark, e é muito melhor do que nenhum conteúdo.
+
+   `div[hidden][id^="S:"]` é o nome que o React 19 dá a estas gavetas. Se um dia
+   mudar, isto deixa de fazer efeito em silêncio — daí `e2e/sem-javascript.spec.ts`,
+   que abre a página sem JS e mede a altura do formulário. */
+@layer base {
+  html:not(.com-javascript) body > main:has(> .ecra-de-espera) {
+    display: none !important;
+  }
+  html:not(.com-javascript) body > div[hidden][id^="S:"] {
+    display: block !important;
+    flex: 1 1 auto;
+    /* o `pt-24` do <main> que esta gaveta passa a substituir */
+    padding-top: 6rem;
+    order: 0;
+  }
+  html:not(.com-javascript) body > footer {
+    order: 1;
+  }
 }
 
 /* ── Mobile base ── */
@@ -287,19 +452,90 @@ body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
-/* Stop iOS Safari from auto-zooming when a form field is focused (it zooms
-   whenever the font is < 16px). Only bump on small screens so the desktop
-   look is untouched. */
-@media (max-width: 640px) {
+/* Impede o Safari do iOS de AMPLIAR a página quando um campo recebe o foco —
+   coisa que ele faz sempre que a letra do campo é menor que 16px, e que depois
+   não desfaz: fica-se com o ecrã descentrado a meio de preencher um
+   formulário.
+
+   ── Porque é que a condição é `(pointer: coarse)` e não uma largura ───────
+   Estava em `max-width: 640px`, e isso deixava o iPad de FORA. Medido: num
+   iPad em retrato (768px), a lista de pedidos serve o campo de procurar a
+   14px e os dois menus de filtro a 12px — os três ampliam ao serem tocados.
+   A largura nunca foi a pergunta certa: o zoom depende de o aparelho ter um
+   ecrã táctil, não de o ecrã ser estreito.
+
+   `(pointer: coarse)` é exactamente essa pergunta. Apanha o iPad, apanha um
+   telemóvel deitado (que passa dos 640px e também estava de fora), e deixa
+   de fora uma janela de portátil encolhida para 500px — que estava a levar
+   com o aumento sem precisar, porque com rato não há zoom nenhum. */
+@media (pointer: coarse) {
   input,
   textarea,
   select {
     font-size: 16px;
   }
+  /* E a mesma altura mínima dos outros alvos. Um campo de texto é uma coisa em
+     que se TOCA para começar a escrever, e os do back office ficavam em 37–40 px
+     — abaixo dos 44. Fora os que não são caixas de escrever: um checkbox tem o
+     seu quadrado desenhado e quem cresce é o rótulo à volta (ver `.alvo-toque`
+     no rótulo da lista de pedidos), e um campo escondido não tem tamanho. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select {
+    min-height: 44px;
+  }
 }
 /* Safe-area helper for fixed / edge elements (notch). */
 .pt-safe {
   padding-top: env(safe-area-inset-top);
+}
+/* ── Alvo de toque de 44 px ────────────────────────────────────────────────
+   Põe um alvo no mínimo das Human Interface Guidelines (44×44 px) SEM mexer no
+   aspecto: só cresce onde se toca com o dedo.
+
+   Porquê 44: a polpa do dedo cobre ~10 mm de ecrã e o telemóvel não sabe onde
+   está o centro dela. Abaixo disto acerta-se ao lado — e no back office o que
+   está ao lado é muitas vezes outra acção.
+
+   Porquê só no dedo: com rato o ponteiro tem um pixel de precisão, e as
+   alturas de 28–40 px são o que dá a densidade calma que este back office quer
+   no portátil. `(pointer: coarse)` é verdade no telemóvel e no tablet, falso
+   com rato — portanto o portátil fica exactamente como está.
+
+   `inline-flex` + centragem porque quase todos estes alvos são botões de ícone
+   com o rótulo em maiúsculas pequenas: sem isto o conteúdo colava-se ao topo
+   da caixa mais alta.
+
+   Nos botões que passam por `ui/Button.tsx` e `ui/Segmented.tsx` isto já vem de
+   lá (`pointer-coarse:h-11`); esta classe é para os que são escritos à mão. */
+/* O TAMANHO MÍNIMO fica fora de camadas, de propósito: é a razão de esta classe
+   existir, e um `h-8` escrito por distracção não a pode desligar. */
+@media (pointer: coarse) {
+  .alvo-toque {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+/* O `display` é outra história, e tem de estar NUMA CAMADA.
+   ─────────────────────────────────────────────────────────────────────────
+   Fora de camadas, este `inline-flex` ganhava a QUALQUER utilitário de
+   `display` do Tailwind — incluindo `pointer-coarse:hidden`. O sintoma: o botão
+   "Atalhos" da gaveta, marcado `alvo-toque pointer-coarse:hidden` para não
+   aparecer num ecrã de toque, continuava lá. Medido: `display: flex` com
+   `(pointer: coarse)` verdadeiro. É a mesma armadilha do `width` do
+   `.bo-input`, e por isso a correcção é a mesma.
+
+   A rede que aqui estava (`.alvo-toque.hidden { display: none }`) só apanhava
+   o `hidden` sem variante; qualquer `sm:hidden`, `lg:flex` ou
+   `pointer-coarse:hidden` continuava calado. Dentro de `@layer components` já
+   não é preciso rede nenhuma: a cascata resolve todos os casos de uma vez. */
+@layer components {
+  @media (pointer: coarse) {
+    .alvo-toque {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
 }
 /* Subtle scrim behind white text that sits over the near-transparent MIDDLE of
    a hero veil (vertically-centered statements/CTAs). It lifts contrast to AA on
@@ -334,11 +570,52 @@ body::before {
   background-size: 300px 300px;
   opacity: 0.022;
 }
+/* The grain is imperceptible on dense phone screens, and a top-most full-viewport
+   fixed layer can defeat mobile partial-invalidation fast paths on scroll — drop
+   it on touch, mirroring how Parallax/WebGL are disabled on coarse pointers. */
+@media (pointer: coarse) {
+  body::before {
+    display: none;
+  }
+}
 
 /* ── Underline slide animation ── */
 .link-line {
   position: relative;
   display: inline-block;
+}
+/* MEDIDO, e é a mesma armadilha da cascata que este ficheiro já documenta duas
+   vezes (a largura do `.bo-input`, o `display` do `.alvo-toque`).
+   ─────────────────────────────────────────────────────────────────────────
+   `.link-line` está FORA de camadas; o `display: inline-flex` do `.alvo-toque`
+   está dentro de `@layer components` — e uma regra sem camada ganha sempre a
+   uma com camada, aconteça o que acontecer à especificidade. Resultado, num
+   link do rodapé marcado `link-line alvo-toque` e medido a 375 px com toque
+   emulado: `min-height: 44px` aplicava-se (essa parte é sem camada) mas o
+   `display` continuava `inline-block`. A caixa crescia para 44 px e o texto
+   ficava COLADO AO TOPO dela, com 29 px de vazio por baixo — quatro links do
+   rodapé com um buraco cada, que é pior de ver do que o defeito que se veio
+   corrigir.
+
+   Não chega pôr `pointer-coarse:inline-flex` no elemento: os utilitários do
+   Tailwind também vivem numa camada, e perdem pela mesma razão (verificado).
+   Também não serve mudar `.alvo-toque` de camada — está lá de propósito, para
+   que um `pointer-coarse:hidden` lhe possa ganhar.
+
+   Fica esta regra, com os dois nomes, no mesmo sítio onde vive `.link-line`:
+   quando um link é as duas coisas, é o alvo de toque que manda no `display`.
+
+   SEM `justify-content`, ao contrário do `.alvo-toque` original — e é de
+   propósito. A centragem HORIZONTAL não é precisa aqui (uma caixa que encolhe
+   para o conteúdo não tem para onde centrar) e, num link que seja item de flex
+   e por isso esticado, passava a mandar ela em vez do `text-align` herdado —
+   que é quem alinha estes links hoje, ao centro no telemóvel e à direita a
+   partir de `sm`. Ficaria tudo ao meio numa coluna alinhada à direita. */
+@media (pointer: coarse) {
+  .link-line.alvo-toque {
+    display: inline-flex;
+    align-items: center;
+  }
 }
 .link-line::after {
   content: "";
@@ -354,9 +631,25 @@ body::before {
      underline lagged the colour by ~150ms). */
   transition: transform 0.3s var(--ease-out);
 }
-.link-line:hover::after {
-  transform-origin: left;
-  transform: scaleX(1);
+/* Gated to real hover devices: without this, tapping a link on a phone latches
+   the :hover state (underline stays drawn) until you tap elsewhere — reads as
+   stuck UI. Tailwind's hover: utilities are already (hover:hover)-gated; these
+   hand-written rules must match. Zero change on desktop. */
+@media (hover: hover) {
+  .link-line:hover::after {
+    transform-origin: left;
+    transform: scaleX(1);
+  }
+}
+/* Movimento reduzido: o filete continua a APARECER (é informação — diz que o
+   link está sob o cursor), mas deixa de se DESENHAR da direita para a esquerda.
+   Mesma decisão já tomada no `.cl-cell` mais abaixo: um estado que muda não é
+   movimento; um traço a correr no ecrã é. São 10 usos (navegação e rodapé), e
+   eram a maior lacuna de `prefers-reduced-motion` que restava no ficheiro. */
+@media (prefers-reduced-motion: reduce) {
+  .link-line::after {
+    transition: none;
+  }
 }
 
 /* Active nav link — permanent moss underline */
@@ -425,6 +718,24 @@ body::before {
 }
 .lb-photo-in {
   animation: lb-photo-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Opening a photo: a slightly deeper zoom-in than the between-photos lb-photo-in,
+   so the photo visibly "grows" as it opens. Transform + opacity only → fully
+   GPU-composited, no snapshot (this replaced the View Transition morph, which
+   snapshotted the whole full-screen layer and stuttered). */
+@keyframes lb-open-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.lb-open-in {
+  animation: lb-open-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ── Lightbox cinematográfico — slideshow ── */
@@ -556,13 +867,215 @@ body:has([data-orcamento-mode]) .scroll-progress {
   display: none !important;
 }
 
+/* ── Orçamento form: refined, ultra-minimal field + entrance details ──
+   A hairline moss underline that DRAWS IN left→right on focus (over the resting
+   border), and a subtle staggered fade/rise for the fields on load. Motion is
+   opacity/transform + a 2px background line only — no layout shift, negligible
+   cost — and the entrance is gated behind prefers-reduced-motion. */
+.field-line {
+  background-image: linear-gradient(var(--color-moss), var(--color-moss));
+  background-repeat: no-repeat;
+  background-position: left bottom;
+  background-size: 0% 2px;
+  /* Mesma avaria do `.lift`: o filete desenhava-se na assinatura e a borda
+     acompanhava em `ease`. Duas curvas no mesmo gesto de focar um campo. */
+  transition:
+    background-size 0.4s var(--ease-out),
+    border-color 0.3s var(--ease-out);
+}
+.field-line:focus {
+  background-size: 100% 2px;
+}
+/* Movimento reduzido: o filete continua a APARECER a toda a largura — é um
+   indicador de foco e nunca pode desaparecer (WCAG 2.4.7) —, só deixa de se
+   desenhar da esquerda para a direita. */
+@media (prefers-reduced-motion: reduce) {
+  .field-line {
+    transition: none;
+  }
+}
+
+/* ── Floating labels (orçamento) ──
+   The label rests inside the field like a placeholder, then floats up + shrinks
+   to the small uppercase micro-label on focus or once the field has a value
+   (detected with :placeholder-shown via :has). The real example placeholder is
+   hidden until focus so it never collides with the resting label. `.ff--float`
+   forces the floated state for controls where :placeholder-shown is unreliable
+   (the native date input). Transform/opacity only — cheap, no layout shift. */
+.ff {
+  position: relative;
+}
+.ff-input {
+  padding-top: 1.3rem;
+  padding-bottom: 0.35rem;
+}
+.ff-label {
+  position: absolute;
+  left: 0;
+  top: 1.3rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-foreground) 42%, transparent);
+  pointer-events: none;
+  transform-origin: left center;
+  white-space: nowrap;
+  /* A etiqueta sobe na assinatura; a cor acompanhava em `ease`. Convergidas. */
+  transition:
+    transform 0.3s var(--ease-out),
+    color 0.3s var(--ease-out);
+}
+.ff:has(.ff-input:focus) .ff-label,
+.ff:has(.ff-input:not(:placeholder-shown)) .ff-label,
+.ff--float .ff-label {
+  /* Small, quiet, gray micro-label (Apple-like) — the moss accent stays on the
+     underline, not the label. */
+  transform: translateY(-1.3rem) scale(0.7);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-foreground) 50%, transparent);
+}
+/* Hide the example placeholder until focus so only the resting label shows. */
+.ff-input::placeholder {
+  color: transparent;
+}
+.ff-input:focus::placeholder {
+  color: color-mix(in srgb, var(--color-foreground) 40%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-label {
+    transition: none;
+  }
+}
+
+/* ── A entrada dos campos do orçamento: SUBIDA, nunca opacidade ──
+   Isto era `from { opacity: 0 }` com `animation-fill-mode: both`, e é a mesma
+   decisão que a `.g-reveal` do masonry já tinha tomado por outra razão: **um
+   estado de repouso invisível faz da animação a CONDIÇÃO de o conteúdo
+   existir**, e não um acrescento.
+
+   Aqui não era teórico. Com o JavaScript indisponível, os dez campos deste
+   formulário ficavam a `opacity: 0` com a animação eternamente por começar
+   (`animation-play-state: running`, mas dentro de um antepassado
+   `display: none` — nada avança lá dentro). A causa dessa página vazia era
+   outra, e está escrita no `<noscript>` do layout de raiz; isto era a segunda
+   fechadura da mesma porta — destrancar a primeira sem destrancar esta deixava
+   o formulário revelado e na mesma invisível.
+
+   Um `transform` que não corre deixa o campo 8 px abaixo do sítio, o que
+   ninguém nota. Uma opacidade que não corre deixa-o inexistente. É toda a
+   diferença, e é a razão por que a opacidade saiu daqui. */
+@media (prefers-reduced-motion: no-preference) {
+  .orc-reveal > * {
+    animation: orc-field-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .orc-reveal > *:nth-child(1) {
+    animation-delay: 0.02s;
+  }
+  .orc-reveal > *:nth-child(2) {
+    animation-delay: 0.05s;
+  }
+  .orc-reveal > *:nth-child(3) {
+    animation-delay: 0.08s;
+  }
+  .orc-reveal > *:nth-child(4) {
+    animation-delay: 0.13s;
+  }
+  .orc-reveal > *:nth-child(5) {
+    animation-delay: 0.18s;
+  }
+  .orc-reveal > *:nth-child(6) {
+    animation-delay: 0.23s;
+  }
+  .orc-reveal > *:nth-child(7) {
+    animation-delay: 0.28s;
+  }
+  .orc-reveal > *:nth-child(8) {
+    animation-delay: 0.33s;
+  }
+  .orc-reveal > *:nth-child(9) {
+    animation-delay: 0.38s;
+  }
+  .orc-reveal > *:nth-child(n + 10) {
+    animation-delay: 0.42s;
+  }
+  @keyframes orc-field-in {
+    from {
+      transform: translateY(8px);
+    }
+    to {
+      transform: none;
+    }
+  }
+}
+
+/* ── Hero parallax drift, driven on the compositor ──
+   Opt-in via <Parallax drift>. Where scroll-driven animations exist (and motion
+   is welcome), the hero layer drifts as its section scrolls through the viewport
+   — tied to the element's own view() timeline, so it runs on the compositor with
+   NO scroll listener and NO main-thread work (unlike the old JS parallax, which
+   is why that one was retired). A small scale(1.06) gives 3% headroom each side
+   so the ±2.4% drift never exposes an edge. Unsupported browsers / reduced-
+   motion show the static image.
+
+   Timeline is scroll(root) — NOT view() — on purpose: the hero sits inside an
+   overflow-hidden section, which is itself a scroll container, so view() would
+   resolve against that non-scrolling ancestor and never advance. scroll(root)
+   binds to the document scroller directly; every page's hero is its first
+   section, so a 0 → 100vh range covers the hero's passage on all of them. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .parallax-drift {
+      transform: scale(1.06);
+      will-change: transform;
+      animation: parallax-drift-kf linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 100vh;
+    }
+    @keyframes parallax-drift-kf {
+      from {
+        transform: scale(1.06) translateY(-2.4%);
+      }
+      to {
+        transform: scale(1.06) translateY(2.4%);
+      }
+    }
+  }
+}
+
+/* ── Scroll progress bar driven on the compositor ──
+   Where scroll-driven animations exist, the bar's fill is tied straight to the
+   document scroll timeline — no scroll listener, no rAF, no main-thread work; it
+   runs on the compositor. ScrollProgress.tsx feature-detects support, sets
+   data-css-driven, and skips its JS path entirely. Unsupported browsers keep
+   that JS fallback (transform written once per rAF). */
+@supports (animation-timeline: scroll()) {
+  .scroll-progress-bar[data-css-driven="true"] {
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: none;
+    animation: scroll-progress-grow linear both;
+    animation-timeline: scroll(root block);
+  }
+  @keyframes scroll-progress-grow {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
 /* ── Back-office: full-screen tool surface (clean & minimal) ── */
 body.admin-mode nav[data-public-nav] {
   display: none !important;
 }
-body.admin-mode main {
-  padding-top: 0 !important;
-}
+/* O `padding-top: 0` do `<main>` VIVIA AQUI, e era um salto de 0,128 de CLS.
+   A classe `admin-mode` só entra num `useEffect`, portanto o browser desenhava
+   primeiro os 96 px de padding do `<main>` público e só depois os tirava — o
+   back office inteiro saltava para cima, medido, em todas as entradas.
+   Passou para o `className` de cada raiz do back office (`-mt-24`), que vai no
+   HTML do servidor. O que fica nesta classe é só o que NÃO mexe no layout. */
 /* Drop the film grain inside the tool for a crisper, calmer surface */
 body.admin-mode::before {
   display: none !important;
@@ -598,10 +1111,7 @@ body[data-menu-open] .whatsapp-fixed {
   pointer-events: none;
 }
 
-/* ── Hero Ken Burns: a slow cinematic settle from a tighter crop. Pair with
-      Parallax (translate on the wrapper) — separate elements, so the two
-      transforms never fight. `both` keeps the final scale as the resting
-      state, preserving drift headroom for the parallax. ── */
+/* ── Hero Ken Burns: a slow cinematic settle from a tighter crop. ── */
 @keyframes hero-settle {
   from {
     transform: scale(1.14);
@@ -610,8 +1120,20 @@ body[data-menu-open] .whatsapp-fixed {
     transform: scale(1.06);
   }
 }
+/* Resting (settled) state is the DEFAULT — no animation. The 2.2s scale only
+   PLAYS on the very first page load (html:not([data-navigated]), stamped by
+   PageTransition on the first client navigation). Client-to-client navigations
+   then arrive already settled, so the Ken-Burns scale never re-runs on top of
+   the incoming hero's decode + the route fade — that overlap was a real
+   per-navigation jank source, and hero-settle's old Parallax partner is now
+   disabled so it had been running solo on every nav. */
 .hero-settle {
-  animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform: scale(1.06);
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-navigated]) .hero-settle {
+    animation: hero-settle 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 }
 
 /* ── Word-rise hero animation ── */
@@ -629,90 +1151,70 @@ body[data-menu-open] .whatsapp-fixed {
   animation: word-rise 0.85s cubic-bezier(0.16, 1, 0.3, 1) var(--word-delay, 0ms) both;
 }
 
-/* ── Route transition (Pixel-Matters-style page reveal) ── */
+/* ── Route transition — the ONLY page-change animation (View Transitions API is
+   off; see PageTransition.tsx). A single opacity fade on the incoming page:
+   OPACITY-ONLY (no translateY) so there's zero transform — nothing to create a
+   containing block for fixed overlays, and the browser composites the fade on
+   its own layer, so it stays 60fps even while the new route is still hydrating
+   and decoding its hero. This is the cheapest possible page transition. ── */
 @keyframes route-fade {
+  /* TRANSFORM-ONLY (no opacity): the incoming page eases from a hair over-scaled
+     to rest — a gentle "settle in". Because opacity stays 1 the whole time, the
+     page is always opaque, so the light background is never revealed → no white
+     flash (that was the problem with a fade-in). Starting ABOVE 1 (1.015, not
+     below) means the page slightly overflows rather than leaving a sub-pixel gap
+     that would flash the background at the edges. */
   from {
-    opacity: 0;
-    transform: translateY(14px);
+    transform: scale(1.015);
   }
   to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: scale(1);
   }
 }
 .route-fade {
-  /* `backwards` (not `both`): applies the start state before the animation but
-     does NOT leave a lingering transform afterwards — a persistent transform
-     would create a containing block and break position:fixed overlays inside. */
-  animation: route-fade 0.42s var(--ease-out) backwards;
+  /* No will-change here: the class lingers on the page container for the whole
+     visit, so a static will-change would pin a full-page compositor layer the
+     entire time (hurting scroll). Browsers already auto-promote an animating
+     transform to its own layer for the run, which is exactly the duration we
+     want. `backwards` drops the transform once the run ends, so no containing
+     block lingers for any fixed child. */
+  animation: route-fade 0.4s var(--ease-out) backwards;
 }
 
 /* ── View Transitions (rotas + morph da galeria) ──
-   .vt-page       navegação sem direção: o conteúdo antigo sobe/desvanece,
-                  o novo chega de baixo (assimétrico: sair rápido, chegar calmo)
-   .vt-page-fwd/bwd  deslize direcional conforme a ordem do menu
+   .vt-page / .vt-page-fwd / .vt-page-bwd  todas as navegações usam UM cross-fade
+                  curto só de opacidade — ver nota de fluidez abaixo.
    .gallery-morph  par thumbnail→lightbox (blur a meio esconde interpolação) */
-::view-transition-old(.vt-page) {
-  animation: 200ms cubic-bezier(0.4, 0, 0.2, 1) both vt-depart;
+
+/* Fluidez da entrada de página: a API de View Transitions tira um "snapshot" da
+   página inteira (no /sobre, um herói full-bleed de 100svh) e anima-o. Animar
+   TRANSFORM nesse snapshot gigante — o antigo deslize direcional de translateX
+   56px, ou o translateY do departing — obriga o compositor a mover um raster do
+   tamanho do ecrã ao mesmo tempo que a página nova hidrata, descodifica o herói
+   e corre os seus próprios reveals: é aí que "trava". Uma animação SÓ de opacity
+   é o trabalho mais barato que o compositor tem (alpha, sem re-layout nem mexer
+   geometria), por isso todas as rotas passam a um cross-fade curto de opacidade.
+   Sem translateX/translateY nos snapshots, janela de sobreposição mínima → a
+   entrada fica fluida em qualquer página. (Recuperar o deslize direcional:
+   devolver translateX aos keyframes vt-in-* / vt-out-* e apontá-los aqui.) */
+::view-transition-old(.vt-page),
+::view-transition-old(.vt-page-fwd),
+::view-transition-old(.vt-page-bwd) {
+  animation: 140ms linear both vt-fade-out;
 }
-::view-transition-new(.vt-page) {
-  /* Shorter arrive (was 480ms + 90ms ≈ 570ms) so navigation feels immediate
-     rather than heavy. No incoming delay — dead time before anything moves reads
-     as lag. The old page still departs quickly (200ms). */
-  animation: 360ms var(--ease-out) both vt-arrive;
-}
-@keyframes vt-depart {
-  to {
-    opacity: 0;
-    transform: translateY(-14px);
-  }
+::view-transition-new(.vt-page),
+::view-transition-new(.vt-page-fwd),
+::view-transition-new(.vt-page-bwd) {
+  animation: 280ms var(--ease-out) both vt-arrive;
 }
 @keyframes vt-arrive {
-  /* Pure fade — no translateY. The incoming page's own reveals (AnimateIn /
-     Reveal) already rise the hero caption ~28px; when the whole route ALSO rose
-     22px at a different duration the two stacked and read "mushy" at the moment
-     the new page should feel crisp. The fade now hands off cleanly to the
-     on-page rise. (Directional vt-page-fwd/bwd keep their translateX — different
-     axis, no clash.) */
+  /* Pure fade — no translateY/translateX. The incoming page's own reveals
+     (AnimateIn / Reveal) already rise/zoom the hero content; a transform on the
+     whole-page snapshot on top of that both stacked ("mushy") and cost a
+     full-viewport composited move. Opacity-only hands off cleanly to the on-page
+     reveals and stays 60fps. */
   from {
     opacity: 0;
-  }
-}
-
-::view-transition-old(.vt-page-fwd) {
-  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-left;
-}
-::view-transition-new(.vt-page-fwd) {
-  animation: 380ms var(--ease-out) both vt-in-right;
-}
-::view-transition-old(.vt-page-bwd) {
-  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both vt-out-right;
-}
-::view-transition-new(.vt-page-bwd) {
-  animation: 380ms var(--ease-out) both vt-in-left;
-}
-@keyframes vt-out-left {
-  to {
-    opacity: 0;
-    transform: translateX(-56px);
-  }
-}
-@keyframes vt-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(56px);
-  }
-}
-@keyframes vt-out-right {
-  to {
-    opacity: 0;
-    transform: translateX(56px);
-  }
-}
-@keyframes vt-in-left {
-  from {
-    opacity: 0;
-    transform: translateX(-56px);
   }
 }
 
@@ -728,16 +1230,14 @@ body[data-menu-open] .whatsapp-fixed {
 }
 
 ::view-transition-group(.gallery-morph) {
-  animation-duration: 420ms;
+  /* Only the group animates — a composited transform of the thumbnail→fullscreen
+     box (position + size), plus the default GPU cross-fade of the image pair.
+     The previous `vt-morph-blur` animated filter: blur(2px) on the image pair,
+     which forced a full-frame REPAINT of a large photo every frame — the reason
+     opening a photo stuttered. Dropping it keeps the expand-morph but makes it
+     60fps. Slightly shorter, too, so it feels snappier. */
+  animation-duration: 340ms;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-::view-transition-image-pair(.gallery-morph) {
-  animation-name: vt-morph-blur;
-}
-@keyframes vt-morph-blur {
-  30% {
-    filter: blur(2px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -751,12 +1251,30 @@ body[data-menu-open] .whatsapp-fixed {
 
 /* ── Magnetic / hover lift used across CTAs ── */
 .lift {
+  /* O `box-shadow` estava em `ease` enquanto o `transform` estava na
+     assinatura: duas curvas a mover A MESMA COISA, no mesmo gesto — a peça
+     subia com uma desaceleração e a sombra acompanhava-a com outra. Convergidas.
+     (A linha nova do `@theme` não chega aqui: só alimenta os utilitários do
+     Tailwind, não as regras escritas à mão deste ficheiro.) */
   transition:
-    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.4s ease;
+    transform 0.4s var(--ease-out),
+    box-shadow 0.4s var(--ease-out);
 }
-.lift:hover {
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-2px);
+  }
+}
+/* Movimento reduzido: sem transição E sem subida. Os 2 px de deslocamento são
+   movimento, não estado — ao contrário da cor de um link, não dizem nada que já
+   não estivesse dito pelo cursor. Mesmo critério do `.cl-cell:hover .cl-logo`. */
+@media (prefers-reduced-motion: reduce) {
+  .lift {
+    transition: none;
+  }
+  .lift:hover {
+    transform: none;
+  }
 }
 
 /* ── Light sweep on primary CTAs — subtle premium shimmer on hover ── */
@@ -777,10 +1295,16 @@ body[data-menu-open] .whatsapp-fixed {
     transparent 68%
   );
   transform: translateX(-130%);
-  transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.75s var(--ease-out);
   pointer-events: none;
 }
-.btn-shine:hover::after,
+/* :focus-visible stays ungated (keyboard users get the sweep on any device);
+   only :hover is gated so it doesn't latch on tap. */
+@media (hover: hover) {
+  .btn-shine:hover::after {
+    transform: translateX(130%);
+  }
+}
 .btn-shine:focus-visible::after {
   transform: translateX(130%);
 }
@@ -820,9 +1344,36 @@ body[data-menu-open] .whatsapp-fixed {
   border-radius: var(--bo-radius-lg, 1rem);
   box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
 }
+/* A LARGURA POR OMISSÃO DE UM CAMPO, E SÓ ELA, VIVE NUMA CAMADA.
+   ─────────────────────────────────────────────────────────────────────────
+   O `width: 100%` estava aqui em baixo, no meio da regra. Parece inofensivo e
+   não é: neste ficheiro TODO o CSS escrito à mão está FORA de camadas, e no
+   Tailwind v4 o que está fora de camadas ganha SEMPRE a `@layer utilities`.
+   Ou seja, `class="bo-input w-12"` dava um campo de 100%, e o `w-12` era
+   ignorado em silêncio — não há aviso nenhum, o campo simplesmente ocupa a
+   linha inteira e empurra o vizinho para fora.
+
+   Estava a acontecer em toda a parte: a letra do grupo no estúdio (`w-12`), as
+   quantidades do inventário (`w-24`, `w-20`), as horas do alinhamento
+   (`w-[100px]`), a mesa na lista de convidados (`w-14`), o filtro de categoria
+   (`sm:w-44`). No telemóvel o efeito é o pior possível — o campo largo come a
+   linha e o campo a seguir fica com 22 px, que é onde isto se apanhou.
+
+   A correcção é pôr SÓ esta declaração numa camada. `components` é declarada
+   pelo `@import "tailwindcss"` antes de `utilities`, portanto qualquer `w-*`
+   passa a ganhar. Fica a valer 100% onde ninguém pede largura (que é a
+   esmagadora maioria dos campos) e deixa de mentir onde alguém pede.
+
+   O resto da regra fica onde estava de propósito: o que se queria arrumar era
+   a largura, não a aparência. */
+@layer components {
+  .bo-input {
+    width: 100%;
+  }
+}
+
 /* Input / select fields inside the back office */
 .bo-input {
-  width: 100%;
   background: var(--bo-surface, #ffffff);
   /* ≥3:1 non-text contrast so the field boundary is identifiable (WCAG 1.4.11). */
   border: 1px solid var(--bo-control-border, rgba(42, 38, 32, 0.5));
@@ -830,7 +1381,7 @@ body[data-menu-open] .whatsapp-fixed {
   box-shadow: var(--bo-shadow-sm, 0 1px 2px rgba(42, 38, 32, 0.04));
   /* Keep the focus transition to border only: the global :focus-visible moss
      ring stays the keyboard focus indicator (not overridden here). */
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s var(--ease-out);
 }
 .bo-input:focus {
   outline: none;
@@ -839,9 +1390,19 @@ body[data-menu-open] .whatsapp-fixed {
 }
 /* Eyebrow label used atop panels and as the Field <label> — bumped to ~5:1 on
    white (0.66 alpha) so it clears AA as a real label, with a calmer, more
-   contemporary tracking than the old wide-spaced micro-caps (WCAG 1.4.3). */
+   contemporary tracking than the old wide-spaced micro-caps (WCAG 1.4.3).
+
+   O CINZENTO É NEUTRO, e não o castanho quente que aqui estava
+   (rgba(42, 38, 32, .66)). O back office foi todo passado para o neutro
+   `rgba(13, 13, 13, …)` — a navegação, o texto de apoio, os `--bo-*` — e esta
+   regra ficou para trás. Numa página com fundo creme, um castanho quente ao
+   lado de cinzentos neutros lê-se como uma cor com significado, e as etiquetas
+   não têm significado nenhum: são o andaime. Ver DESIGN-TOKENS.md.
+
+   O contraste MELHORA com a troca (#0d0d0d a 64% é mais escuro do que
+   #2a2620 a 66% sobre branco), por isso a garantia de AA mantém-se. */
 .bo-eyebrow {
-  color: rgba(42, 38, 32, 0.66);
+  color: rgba(13, 13, 13, 0.64);
   font-size: 0.6875rem; /* 11px — a touch more legible than 10px */
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -850,28 +1411,32 @@ body[data-menu-open] .whatsapp-fixed {
 }
 
 /* Skeleton loader — a soft shimmering placeholder block. Used while a view or
-   its data is still loading, so the layout settles instead of flashing text. */
+   its data is still loading, so the layout settles instead of flashing text.
+   The sweep is a pseudo-element stripe moved with transform: translateX
+   (GPU-composited), NOT an animated background-position (which is not
+   compositor-animatable and repaints the skeleton every frame — costly when
+   many skeletons show during an admin load). */
 @keyframes bo-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
   100% {
-    background-position: 200% 0;
+    transform: translateX(100%);
   }
 }
 .bo-skeleton {
+  position: relative;
+  overflow: hidden;
   border-radius: 0.5rem;
-  background: linear-gradient(
-    90deg,
-    rgba(42, 38, 32, 0.05) 25%,
-    rgba(42, 38, 32, 0.09) 37%,
-    rgba(42, 38, 32, 0.05) 63%
-  );
-  background-size: 200% 100%;
+  background: rgba(42, 38, 32, 0.06);
+}
+.bo-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(42, 38, 32, 0.07) 50%, transparent 100%);
+  transform: translateX(-100%);
   animation: bo-shimmer 1.4s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .bo-skeleton {
+  .bo-skeleton::after {
     animation: none;
   }
 }
@@ -919,7 +1484,8 @@ body:has([data-orcamento-mode]) .eyebrow {
     animation: none;
     transform: scale(1.06);
   }
-  .lb-photo-in {
+  .lb-photo-in,
+  .lb-open-in {
     animation: none;
   }
   .lb-kenburns {
@@ -946,18 +1512,276 @@ body:has([data-orcamento-mode]) .eyebrow {
    dropped and the boxes take their full height). Keeping opacity at 1 means each
    tile always shows its blur placeholder, so there is never a dark gap; the tile
    just slides up into place. */
+/* O `will-change` vive SÓ enquanto a transição corre.
+   Estava no estado de REPOUSO, ou seja, em todos os mosaicos montados e ainda
+   não revelados. Com a antecipação a montar até seis ecrãs à frente do dedo,
+   isso são ~100 mosaicos a segurar uma camada de composição cada um, ao mesmo
+   tempo, sem nada a animar — e uma camada custa memória de vídeo e trabalho de
+   composição por frame, mesmo parada.
+
+   Pô-lo no `.in` é a leitura correcta da propriedade: ela serve para avisar o
+   browser do que VAI mudar, e o que vai mudar é a transição que a classe `.in`
+   acabou de começar. O `.done` volta a largá-lo. */
 .g-reveal {
   transform: translateY(20px);
-  will-change: transform;
 }
 .g-reveal.in {
   transform: none;
-  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.7s var(--ease-out);
   transition-delay: var(--reveal-delay, 0ms);
+  will-change: transform;
 }
-/* Após revelar, larga o will-change (poupa memória de composição). */
 .g-reveal.done {
   will-change: auto;
+}
+
+/* ── Painéis de ecrã inteiro que saltam a renderização fora do ecrã ──────────
+   `content-visibility: auto` só é seguro se o espaço RESERVADO for igual à
+   altura REAL. Quando não é, a página encolhe (ou cresce) por baixo do dedo à
+   medida que se desce, e o visitante vê o conteúdo saltar.
+
+   Estava a acontecer, medido: a banda de serviço reservava a altura de
+   computador (`clamp(480px,60vh,680px)` ≈ 503 px) num telemóvel onde mede
+   `46svh` ≈ 386 px — 117 px a mais por banda, oito bandas — e o `/servicos`
+   encolhia 576 px na primeira descida (o `/` encolhia 224 px). O `auto` do
+   `contain-intrinsic-size` NÃO evita isto: só se lembra do tamanho depois de
+   renderizar a secção uma vez, portanto a correcção inteira é paga
+   precisamente na primeira vez que se desce a página. No Chromium a âncora de
+   scroll absorve o encolhimento; o Safari do iPhone não tem âncora nenhuma, e
+   é lá que se vê.
+
+   A defesa é estrutural, não é disciplina: a altura mínima e o tamanho
+   reservado LÊEM A MESMA VARIÁVEL, com a mesma reserva de recurso. Ficarem
+   diferentes deixa de ser possível — teria de se escrever duas vezes o mesmo
+   sítio.
+
+   DUAS REGRAS para quem usar isto:
+     1. Definir `--cv-h` (à mão ou por utilitário, ex. `[--cv-h:46svh]`), com um
+        valor por cada ecrã em que a altura muda.
+     2. NADA de padding vertical NESTE elemento. O `contain-intrinsic-size` é o
+        tamanho da CAIXA DE CONTEÚDO: com `py-28`, a caixa saltada media
+        560+224 px e a desenhada 560 px — 224 px de diferença. O padding vai
+        num filho. (`Paineis.contrato.test.ts` obriga às duas.) */
+.cv-panel {
+  min-height: var(--cv-h, clamp(480px, 60vh, 680px));
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--cv-h, clamp(480px, 60vh, 680px));
+  /* ── «A SUBIR, AS FOTOS PISCAM BRANCAS» ─────────────────────────────────
+     O `content-visibility: auto` salta o CONTEÚDO, não o elemento: o painel
+     continua a existir e a pintar o FUNDO DELE PRÓPRIO. Sem fundo nenhum, o
+     que se via enquanto a fotografia não voltava a desenhar era o corpo do
+     sítio — que é #ffffff. Daí o branco.
+
+     A descida disfarça-o (a secção entra pela borda de baixo e há tempo até
+     chegar ao meio do ecrã); a subida não, porque a secção entra já quase
+     inteira. Medido com `e2e/piscar-subida.mjs` num Chromium com o CPU
+     abrandado 4×: na subida, 19 blocos de 20×20 com mais de 90% de píxeis
+     quase-brancos e 5 frames a mudar com a página PARADA. Nas capturas de
+     ecrã do telemóvel vê-se o painel inteiro em branco por cima da
+     fotografia seguinte.
+
+     É a mesma defesa que a `.g-tile` da galeria já usava, e pela mesma razão
+     escrita lá («a regressão do buraco escuro»): um fundo que a caixa saltada
+     também pinta. O tom por omissão é o verde-quase-preto das fotografias
+     destes painéis, portanto o pior caso passa a ser a fotografia a aparecer
+     sobre a sua própria sombra em vez de sobre um flash branco. Um painel de
+     fundo claro sobrepõe com `[--cv-bg:…]`, como já faz com `--cv-h`. */
+  background-color: var(--cv-bg, #12160f);
+}
+
+/* ── O aviso de cookies de quem já respondeu ──
+   A barra vem SEMPRE no HTML do servidor (a razão está no `[lang]/layout.tsx`:
+   ela era o elemento de LCP e só nascia na hidratação, aos ~2 s). Quem já
+   escolheu não a pode ver, e quem decide isso é um script em linha no `<head>`
+   que marca o `<html>` aos ~11 ms — antes da primeira pintura.
+
+   `display: none` e não `opacity`/`visibility`: além de invisível, tem de sair
+   da árvore de acessibilidade e deixar de ocupar espaço; e assim também não
+   pode ser candidata a LCP para quem já respondeu. Segundos depois o React
+   tira-a mesmo do DOM. */
+html.consentimento-decidido .barra-consentimento {
+  display: none;
+}
+
+/* E a barra espera pelas fontes — não pelo JavaScript da aplicação.
+   MEDIDO: com o tipo de letra de recurso o texto ocupa 5 linhas (181 px) e com
+   o Inter ocupa 4 (161 px). Ancorada em baixo, essa diferença faz o topo saltar
+   20 px e vale um CLS de 0,0605 no telemóvel. Aparecer 200 ms mais tarde, já na
+   forma final, custa zero no LCP (ele estava a ser marcado exactamente no
+   instante da troca de tipo de letra) e devolve o CLS a zero.
+
+   A marca é sempre retirada — pelas fontes ou por um temporizador de 2,5 s —
+   porque um aviso de cookies que não aparece é pior do que um que salta. */
+html.fontes-por-assentar .barra-consentimento {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A BARRA DE COOKIES RESERVA O ESPAÇO QUE OCUPA — NÃO O ROUBA
+   ═══════════════════════════════════════════════════════════════════════════
+
+   O QUE ESTAVA MAL, MEDIDO com `document.elementFromPoint` no CENTRO de cada
+   alvo, num 390×844 e sem escolha feita: a barra media 191 px (23% do ecrã) e
+   estava por cima de QUATRO acções, todas visíveis e todas mortas —
+
+     · «Pedir orçamento →» do herói  → no ponto do clique estava <a>Saber mais
+     · «Ver galeria →»               → estava o <p> do aviso
+     · «PEDIR ORÇAMENTO →» fixo      → estava o <button>Recusar
+     · botão flutuante de WhatsApp   → estava a caixa dos dois botões
+
+   No computador (1440×900) eram 74 px e dois alvos: o CTA fixo e o WhatsApp.
+
+   PORQUE NÃO SE RESOLVE A METER A BARRA NO FLUXO. Ela é `fixed` e tem de
+   continuar a sê-lo. Duas linhas acima está escrito porquê: a barra aparece
+   depois das fontes assentarem, e uma barra em fluxo a aparecer nesse instante
+   empurra a página inteira — CLS, que já custou 0,0605 uma vez.
+
+   O QUE SE FAZ EM VEZ DISSO. Uma RESERVA: uma constante por medida, declarada
+   aqui, que existe desde a primeira pintura e que o resto do sítio consome
+   para se afastar do fundo do ecrã. Ninguém mede a barra em JavaScript — medir
+   significaria escrever a reserva DEPOIS da primeira pintura, e isso é
+   exactamente o refluxo que se está a evitar. É o mesmo desenho do
+   `ALTURA_BARRA_FIXA_PX` da barra social (src/lib/meta/barra.ts): uma altura
+   declarada, com um teste que a obriga a bater certo com a desenhada.
+
+   A REGRA DE OURO: a reserva tem de ser MAIOR OU IGUAL à altura real da barra.
+   Os valores saíram de uma medição, com toque emulado, em nove larguras e nas
+   duas línguas:
+
+     · 320 e 360 px → 146 px (o texto quebra em TRÊS linhas)
+     · 390 a 639 px → 126 px (duas linhas)
+     · 640 a 1023   →  74 px (texto e botões na mesma linha)
+     · 1024 e acima →  68 px
+
+   Daí 152 px e 84 px: o pior caso de cada lado mais uma folga pequena, porque
+   o texto pode ganhar uma linha com o tipo de letra de recurso ou numa língua
+   futura. A folga vê-se como uma nesga de fotografia entre a legenda do herói
+   e a barra — é respiração, não é buraco. `e2e/consentimento-geometria.spec.ts`
+   mede as duas coisas em 320/360/390/768/1440 e falha se a barra passar a
+   reserva.
+
+   Quem a consome: `.piso-flutuante` (os dois botões fixos), o rodapé (para o
+   aviso não lhe tapar a última linha) e `.recuo-consentimento` (o herói da
+   home, que ancora o título e os dois CTA ao fundo do primeiro ecrã).
+
+   E some sozinha: `:has()` lê a PRESENÇA da barra no DOM, e é o React que a
+   tira de lá quando a pessoa escolhe. Nesse instante o sítio recupera os
+   110 px — a menos de 500 ms de um clique da pessoa, portanto fora do CLS. */
+body:has(.barra-consentimento) {
+  --reserva-consentimento: 152px;
+}
+@media (min-width: 640px) {
+  body:has(.barra-consentimento) {
+    --reserva-consentimento: 84px;
+  }
+}
+
+/* O chão dos dois botões flutuantes (a pílula de WhatsApp e o CTA fixo).
+   Estavam os dois com o `bottom` escrito à mão no componente, e foi assim que
+   ficaram debaixo da barra: eram duas contas separadas que ninguém tinha de
+   manter iguais. Agora é uma só, e some quando a barra some.
+   ⚠ Esta regra vive FORA de `@layer`, portanto ganha a qualquer `bottom-*` do
+   Tailwind no mesmo elemento (ver `CamadasCss.contrato.test.ts`) — quem usar
+   esta classe não deve escrever `bottom-*` ao lado dela. */
+.piso-flutuante {
+  bottom: calc(1.25rem + env(safe-area-inset-bottom) + var(--reserva-consentimento, 0px));
+}
+@media (min-width: 1024px) {
+  .piso-flutuante-lg {
+    bottom: calc(1.75rem + env(safe-area-inset-bottom) + var(--reserva-consentimento, 0px));
+  }
+}
+
+/* Secções ancoradas ao fundo do primeiro ecrã (o herói da home é `min-h-[100svh]
+   flex flex-col justify-end`): o recuo empurra a legenda PARA CIMA dentro da
+   mesma caixa, em vez de encolher a fotografia. */
+.recuo-consentimento {
+  padding-bottom: var(--reserva-consentimento, 0px);
+}
+
+/* O rodapé é o fim da página e leva lá dentro o «Gerir cookies» — a barra não
+   lhe pode tapar a última linha a quem chega ao fundo. */
+body:has(.barra-consentimento) footer {
+  margin-bottom: var(--reserva-consentimento, 0px);
+}
+
+/* ── O itálico do Playfair, que é um desenho à parte e não uma inclinação ──
+   Vive numa família própria, servida SEM pré-carregamento (ver o comentário
+   longo em `[lang]/layout.tsx`): pesa 38 888 B, era pedido em prioridade alta
+   em TODAS as páginas, e no sítio público é desenhado em três sítios, todos na
+   confirmação do pedido de orçamento.
+
+   `font-display italic` já não serve para isto: a família `--font-display`
+   passou a ter só o romano, portanto pedir-lhe itálico dava a oblíqua
+   sintética do browser — que foi exactamente o que se recusou quando isto foi
+   escrito. Esta classe é o único sítio que deve tocar no itálico. */
+.font-display-italico {
+  font-family: var(--font-playfair-italico), Georgia, "Times New Roman", Times, serif;
+  font-style: italic;
+}
+
+/* ── A legenda de sobrevoo não existe onde não há sobrevoo ──
+   Nove elementos por mosaico — gradiente, duas linhas de texto (uma com
+   medição de texto e Playfair), um SVG e um `backdrop-filter` — que só aparecem
+   com `:hover`/`:focus-visible`. Num ecrã táctil não há nem um nem outro, mas o
+   estilo e o layout são pagos na mesma quando o mosaico entra na banda do
+   `content-visibility`, e são 427 mosaicos.
+
+   `hover: none` cobre exactamente os aparelhos onde isto é impossível de ver.
+   Onde há teclado há apontador fino, portanto o `:focus-visible` continua
+   servido — que é o requisito de acessibilidade (WCAG 1.4.13) pelo qual esta
+   camada responde ao foco e não só ao rato. */
+@media (hover: none) {
+  .g-sobrepor {
+    display: none;
+  }
+}
+
+/* ── A moldura de cada fotografia da galeria: é ELA que leva o desfocado ──
+   MEDIDO, e é um defeito de anular-se a si próprio: o desfocado era pintado
+   como `background-image` no PRÓPRIO <img>, e o <img> leva `.g-foto`, que é
+   `opacity: 0`. A opacidade de um elemento apaga-o por inteiro — o fundo dele
+   incluído. Resultado: 16 de 16 mosaicos do primeiro ecrã tinham o desfocado no
+   DOM e 0 de 16 chegavam a mostrá-lo, nos dois tamanhos de ecrã. Os bytes eram
+   enviados, o navegador desenhava-os, e ninguém os via.
+
+   O desfocado passa para o <picture>, que é o elemento por baixo e não tem
+   opacidade nenhuma. O <img> continua a esbater de 0 para 1 por cima — o que
+   antes era um esbatimento a partir do castanho liso do mosaico é agora o que
+   sempre se quis: a fotografia a assentar sobre a sua própria sombra. */
+.g-moldura {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-size: cover;
+  background-position: center;
+}
+
+/* ── Do desfocado para o nítido, nunca um corte seco ──
+   A fotografia entra por cima do seu próprio blur com um esbatimento curto.
+   250 ms é o ponto em que se lê como "assentou" e não como "apareceu": abaixo
+   de ~180 ms o olho regista um estalo, acima de ~350 ms nota-se a esperar.
+
+   `opacity` só — trabalho de compositor, nunca layout, portanto isto pode
+   correr no meio do scroll sem lhe tirar frames. E o estado de repouso é
+   `opacity: 1`, não 0: uma foto que nunca dispare o `load` (JavaScript
+   desligado, um erro) fica VISÍVEL em vez de invisível para sempre. O que a
+   classe faz é começar transparente só quando há blur por baixo de onde
+   esbater. */
+.g-foto {
+  opacity: 0;
+}
+.g-foto-pronta {
+  opacity: 1;
+  transition: opacity 0.25s var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .g-foto {
+    opacity: 1;
+  }
+  .g-foto-pronta {
+    transition: none;
+  }
 }
 
 /* Fundo neutro (moss muito escuro) por baixo de cada foto da galeria, para que
@@ -972,7 +1796,19 @@ body:has([data-orcamento-mode]) .eyebrow {
      `contain-intrinsic-size: auto` lets the browser remember the last real size
      as a belt-and-braces fallback. */
   content-visibility: auto;
-  contain-intrinsic-size: auto;
+  /* `auto 400px` e não `auto`. O `auto` sozinho é gramática INVÁLIDA — a
+     gramática é `auto? [ none | <length{1,2}> ]`, o `auto` é um modificador e
+     não um valor — portanto o parser deitava a declaração inteira fora e a rede
+     que o comentário aqui em cima promete («remember the last real size») nunca
+     existiu. Verificado no browser: `getComputedStyle(tile).containIntrinsicSize`
+     devolvia `none`.
+
+     Hoje não custava nada, e é preciso dizê-lo: a altura dos mosaicos do
+     masonry vem do `aspect-ratio` em linha, por isso o CLS ficou em 0,0002 na
+     mesma. O perigo era outro — os cinco mosaicos do herói também levam
+     `.g-tile` e NÃO têm `aspect-ratio`: dependem da altura fixa da grelha. No
+     dia em que alguém lha tirasse, não havia rede nenhuma por baixo. */
+  contain-intrinsic-size: auto 400px;
 }
 
 /* Confirmação de orçamento — o visto desenha-se: primeiro o anel, depois o
@@ -1000,58 +1836,29 @@ body:has([data-orcamento-mode]) .eyebrow {
   }
 }
 
-/* Chegada celebrativa da confirmação — pétalas botânicas que caem uma vez, nas
-   cores da marca. Só transform/opacity (compositor). Cada pétala recebe posição,
-   cor, duração e atraso por style inline. Reduced-motion: nada cai. */
-@keyframes petal-fall {
-  0% {
-    transform: translate3d(0, -8vh, 0) rotate(0deg);
-    opacity: 0;
-  }
-  8% {
-    opacity: var(--petal-op, 0.85);
-  }
-  90% {
-    opacity: var(--petal-op, 0.85);
-  }
-  100% {
-    transform: translate3d(var(--petal-x, 20px), 96vh, 0) rotate(var(--petal-rot, 320deg));
-    opacity: 0;
-  }
-}
-.petal {
-  position: absolute;
-  top: 0;
-  border-radius: 62% 38% 54% 46% / 58% 44% 56% 42%;
-  /* No explicit will-change: the browser already promotes an element with an
-     active transform/opacity animation, so this only pinned 16 compositor
-     layers AFTER the one-shot fall finished (fill-mode: both leaves them
-     mounted). Dropping it keeps the animation identical, no lingering layers. */
-  /* Longhands (not the `animation` shorthand): a var() in the shorthand's time
-     slots makes Lightning CSS drop the whole rule. Duration/delay come per-petal
-     via inline style; the keyframe still reads --petal-x/rot/op fine. */
-  animation-name: petal-fall;
-  animation-timing-function: cubic-bezier(0.37, 0.2, 0.63, 0.9);
-  animation-fill-mode: both;
-  animation-iteration-count: 1;
-}
-@media (prefers-reduced-motion: reduce) {
-  .petal {
-    display: none;
-  }
-}
-
 /* Entrada escalonada do mosaico-herói. Acima da dobra → animação CSS pura (sem
    IntersectionObserver, como as .anim-*). Termina em transform:none para não
    deixar containing-block que afete o morph <ViewTransition> — mesmo cuidado
    que a .g-reveal do masonry. */
+/* SEM `opacity` — e é a mesma decisão que a `.g-reveal` já tinha tomado dez
+   regras acima («Reveal by a gentle RISE only — never opacity»), da qual o
+   mosaico-herói tinha ficado de fora.
+
+   MEDIDO no HTML construído: os cinco mosaicos do herói levam
+   `--hero-delay: 0/70/140/210/280ms` e o `both` faz a opacidade 0 valer TAMBÉM
+   antes do atraso. Ou seja, a maior peça do primeiro ecrã de secretária depois
+   da fotografia de capa estava transparente de 0 a 280 ms e só ficava opaca aos
+   900–1180 ms — mesmo com os bytes já cá dentro. E um elemento a esbater de 0
+   também não é candidato a LCP enquanto esbate.
+
+   Fica a subida de 18 px, que é o que dá o gesto, e a cascata desce de 70 para
+   40 ms: a onda continua a ler-se e a parede está lá quase quatro vezes mais
+   cedo. */
 @keyframes g-hero-in {
   from {
-    opacity: 0;
     transform: translateY(18px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
@@ -1113,7 +1920,7 @@ body:has([data-orcamento-mode]) .eyebrow {
    telemóvel). Enquanto o dedo arrasta, o JS põe .lb-dragging para seguir o
    toque sem lag; ao largar, a transição trata do resto. */
 .lb-photo-layer {
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.28s var(--ease-out);
 }
 .lb-photo-layer.lb-dragging {
   transition: none;
@@ -1196,14 +2003,17 @@ body:has([data-orcamento-mode]) .eyebrow {
   z-index: 0;
   background: radial-gradient(58% 70% at 50% 50%, rgba(99, 122, 95, 0.11), transparent 72%);
   opacity: 0;
-  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.5s var(--ease-out);
   pointer-events: none;
 }
-.cl-cell:hover {
-  background-color: rgba(99, 122, 95, 0.045);
-}
-.cl-cell:hover::before {
-  opacity: 1;
+/* Gated to hover devices so the logo-wall recolor/lift doesn't stick on tap. */
+@media (hover: hover) {
+  .cl-cell:hover {
+    background-color: rgba(99, 122, 95, 0.045);
+  }
+  .cl-cell:hover::before {
+    opacity: 1;
+  }
 }
 
 /* On hover the logo lifts + swells a touch, and the black silhouette crossfades
@@ -1211,23 +2021,29 @@ body:has([data-orcamento-mode]) .eyebrow {
 .cl-logo {
   position: relative;
   display: inline-flex;
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.cl-cell:hover .cl-logo {
-  transform: translateY(-2px) scale(1.045);
+  transition: transform 0.5s var(--ease-out);
 }
 .cl-black {
-  transition: opacity 0.5s ease;
+  /* O logótipo levanta e cresce na assinatura (`.cl-logo`, acima) enquanto o
+     preto se desvanecia para o musgo em `ease`: um só gesto, duas curvas. */
+  transition: opacity 0.5s var(--ease-out);
 }
-.cl-cell:hover .cl-black {
-  opacity: 0;
+@media (hover: hover) {
+  .cl-cell:hover .cl-logo {
+    transform: translateY(-2px) scale(1.045);
+  }
+  .cl-cell:hover .cl-black {
+    opacity: 0;
+  }
 }
 .cl-moss {
   position: absolute;
   inset: 0;
   background-color: var(--color-moss);
   opacity: 0;
-  transition: opacity 0.5s ease;
+  /* O par do `.cl-black`: as duas metades do mesmo crossfade têm de partilhar a
+     curva, ou uma chega antes da outra e vê-se um piscar a meio. */
+  transition: opacity 0.5s var(--ease-out);
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -1236,8 +2052,10 @@ body:has([data-orcamento-mode]) .eyebrow {
   mask-size: contain;
   pointer-events: none;
 }
-.cl-cell:hover .cl-moss {
-  opacity: 1;
+@media (hover: hover) {
+  .cl-cell:hover .cl-moss {
+    opacity: 1;
+  }
 }
 
 /* Entrance reveal. The hidden "from" state exists only once JS arms it
@@ -1253,9 +2071,9 @@ body:has([data-orcamento-mode]) .eyebrow {
   transform: none;
   filter: blur(0);
   transition:
-    opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-    filter 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 0.75s var(--ease-out),
+    transform 0.75s var(--ease-out),
+    filter 0.75s var(--ease-out);
   transition-delay: var(--cl-delay, 0ms);
 }
 
@@ -1279,6 +2097,55 @@ body:has([data-orcamento-mode]) .eyebrow {
   }
   .cl-cell:hover .cl-logo {
     transform: none;
+  }
+}
+
+/* ── Movimento reduzido: o zoom das fotografias ao passar o rato ────────────
+   Dois sítios pedem `group-hover:scale-[1.06]` numa fotografia — os mosaicos da
+   galeria e o da página de clientes. É um zoom lento (0,7–0,9 s) numa imagem
+   grande: movimento a sério, e sem guarda nenhuma. Quem pede movimento reduzido
+   passa a ver a fotografia quieta; o resto do estado de hover (o gradiente, a
+   legenda) mantém-se, porque isso é informação e não deslocamento.
+
+   Fica AQUI e não nas páginas por duas razões: é a mesma decisão nos dois sítios
+   (e assim não pode divergir), e o utilitário do Tailwind vive na camada
+   `utilities` — uma regra sem camada, como esta, ganha-lhe sempre, sem precisar
+   de `!important` nem de repetir a especificidade do selector gerado. */
+@media (prefers-reduced-motion: reduce) {
+  .group-hover\:scale-\[1\.06\] {
+    scale: none;
+    transition: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CÉLULAS QUE O BROWSER PODE SALTAR
+   ══════════════════════════════════════════════════════════════════════════
+
+   `content-visibility: auto` diz ao browser que pode NÃO desenhar uma célula
+   que está fora do ecrã — nem layout, nem pintura, nem descodificar a imagem
+   que está lá dentro. Assim que ela se aproxima da janela, desenha.
+
+   Porquê aqui e não uma virtualização a sério: as grelhas de fotos são de
+   navegação por TECLADO (setas entre células, Shift para escolher um
+   intervalo, V para ver em grande), e isso depende de as células existirem no
+   DOM — `gridRef.current.querySelector('[data-cell="…"]')`. Uma virtualização
+   que arranque do DOM as células fora do ecrã parte a navegação por teclado e
+   a escolha por intervalo, que é como se escolhem trinta fotos de uma vez.
+   Isto dá o mesmo alívio de renderização sem tocar em nenhuma das duas.
+
+   `contain-intrinsic-size` não é preciso: `content-visibility: auto` implica
+   `contain: size`, e o elemento é quadrado por `aspect-ratio` numa coluna de
+   largura fixa — a altura resolve-se sem olhar para o conteúdo, portanto uma
+   célula saltada ocupa EXACTAMENTE o mesmo espaço que uma desenhada. Sem
+   saltos na barra de deslocamento, sem CLS.
+
+   Em `@layer utilities` de propósito: é um utilitário e tem de se comportar
+   como tal — uma regra sem camada ganharia a toda a gente, que é precisamente
+   o erro que este ficheiro já documenta mais acima. */
+@layer utilities {
+  .celula-saltavel {
+    content-visibility: auto;
   }
 }
 

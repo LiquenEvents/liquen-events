@@ -36,8 +36,8 @@ import { execFileSync } from "child_process";
 const ROOT = process.cwd();
 const IMG_DIR = path.join(ROOT, "public", "imagens");
 const INTAKE_DIR = path.join(IMG_DIR, "_intake");
-const DATA_FILE = path.join(ROOT, "src", "app", "[lang]", "galeria", "photos-data.ts");
-const COLL_FILE = path.join(ROOT, "src", "app", "[lang]", "galeria", "collections.json");
+const DATA_FILE = path.join(ROOT, "src", "app", "[lang]", "(site)", "galeria", "photos-data.ts");
+const COLL_FILE = path.join(ROOT, "src", "app", "[lang]", "(site)", "galeria", "collections.json");
 const EXT = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 const LABELS = ["Casamento", "Corporativo", "Conferência", "Aéreo", "Evento"];
 

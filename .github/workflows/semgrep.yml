@@ -1,0 +1,78 @@
+name: Static analysis (semgrep)
+
+# Complementa o CodeQL em vez de o repetir. O CodeQL é excelente nos padrões
+# genéricos (injecção, travessia, expressões regulares frágeis) e já corre
+# aqui; o que ele NÃO sabe são as invariantes deste projecto — que uma guarda
+# de posse não pode falhar aberta, que um caminho com token nunca vai para
+# telemetria, que cada rota se guarda a si própria.
+#
+# As regras de `.semgrep.yml` vieram todas de defeitos encontrados na auditoria
+# de Julho de 2026, não de um catálogo. É de propósito: uma regra que nunca
+# disparou sobre código real é ruído à espera de acontecer, e o custo do ruído
+# é a equipa aprender a ignorar o alarme.
+
+# Só no `push`, pela mesma razão do Secret scan: com os dois eventos, cada
+# commit num ramo com PR aberto lançava DUAS execuções idênticas desta análise.
+# Aqui não chegavam a morrer no timeout como as do gitleaks, mas o desperdício
+# era o mesmo — duas imagens de contentor a arrancar e duas análises completas
+# para dar exactamente o mesmo resultado sobre o mesmo commit.
+#
+# Não se perde cobertura: os ramos dos PRs vivem neste repositório, portanto o
+# `push` vê tudo o que o `pull_request` via.
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # A imagem traz o semgrep instalado — evita depender de pip no runner.
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Regras deste projecto (bloqueante)
+        # Duas coisas têm de fazer falhar este passo, e são diferentes uma da
+        # outra:
+        #
+        #  1. UM ACHADO — é o que o `--error` faz. Cada regra corresponde a um
+        #     defeito real já corrigido, portanto um achado é uma REGRESSÃO.
+        #
+        #  2. UMA REGRA QUE NÃO COMPILA. Esta é a lição desta auditoria: com
+        #     apenas `--error`, o semgrep escreve `[ERROR] Rule parse error`,
+        #     ignora a regra, e sai com SUCESSO. Aconteceu à primeira — a regra
+        #     da guarda de sessão rebentou, o passo ficou verde, e o portão não
+        #     guardava nada. Um portão verde que não guarda é pior do que
+        #     portão nenhum, porque dá confiança sem a merecer.
+        #
+        # `--strict` NÃO serve para o ponto 2, e experimentei: falha também
+        # quando algum ficheiro do repositório tem uma linha que o parser do
+        # semgrep não digere (0,1% das linhas aqui), o que transforma a saúde
+        # do CI numa função da cobertura do parser deles. Isso é ruído, não
+        # sinal — e ruído num portão treina a equipa a ignorá-lo.
+        #
+        # Por isso a verificação é explícita: procura-se o erro de compilação
+        # na saída e falha-se só por causa dele.
+        run: |
+          estado=0
+          semgrep --config .semgrep.yml --error --metrics=off . > /tmp/semgrep.log 2>&1 || estado=$?
+          cat /tmp/semgrep.log
+          if grep -q "Rule parse error" /tmp/semgrep.log; then
+            echo "::error::Uma regra de .semgrep.yml não compila. O semgrep ignora-a e sai com sucesso — o portão ficaria verde sem guardar nada."
+            exit 1
+          fi
+          exit "$estado"
+
+      - name: Regras da comunidade (informativo)
+        # O conjunto `p/typescript` é grande e ruidoso num repositório com esta
+        # dimensão. Corre para dar visibilidade, mas NÃO bloqueia — transformar
+        # centenas de avisos genéricos em impedimento de publicação treinaria
+        # toda a gente a passar por cima deles, e aí o passo acima também
+        # deixava de ser lido.
+        continue-on-error: true
+        run: semgrep --config p/typescript --metrics=off .

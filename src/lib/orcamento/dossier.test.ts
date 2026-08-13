@@ -297,7 +297,13 @@ describe("computeEventMetrics", () => {
     expect(m.ledgerPaid).toBe(6000);
     expect(m.pctPaid).toBeCloseTo(0.3, 5);
     expect(m.supplierCosts).toBe(4200 + 1500); // actualCost ?? estimatedCost
-    expect(m.margin).toBe(20000 - 5700);
+    // A margem corre em LÍQUIDO dos dois lados: a proposta de 20.000 € brutos
+    // vale 16.260,16 € de base, e os 5.700 € de custo com IVA são 4.634,15 € de
+    // custo real. O IVA entra do cliente e sai para o Estado — não é receita
+    // nem é custo (ver a nota em `EventMetrics.margin`).
+    expect(m.contractedNet).toBe(16260); // o `subtotal` que a proposta gravou
+    expect(m.supplierCostsNet).toBe(4634.1);
+    expect(m.margin).toBe(11625.9);
     expect(m.countdownDays).toBe(7);
     expect(m.rsvpConfirmed).toBe(6);
     expect(m.rsvpTotal).toBe(9);
@@ -325,6 +331,10 @@ describe("computeEventMetrics", () => {
     });
     const m = computeEventMetrics(d, TODAY);
     expect(m.supplierCosts).toBe(0);
+    // 5 000 € é o "Preço final (sem IVA)". O valor CONTRATADO é o que o cliente
+    // paga (6 150 €), porque é com pagamentos e facturas que ele se compara; a
+    // MARGEM é sobre o líquido, e sem custos nenhuns é o preço todo.
+    expect(m.contracted).toBe(6150);
     expect(m.margin).toBe(5000);
     expect(m.rsvpTotal).toBe(2); // 0 + 2
     expect(m.rsvpConfirmed).toBe(2); // party 0 contributes nothing
@@ -341,10 +351,13 @@ describe("computeEventMetrics", () => {
     expect(m.pctPaid).toBe(0);
   });
 
-  it("falls back quotedPrice → priceBreakdown.total when no proposal", () => {
+  it("falls back quotedPrice → priceBreakdown.total when no proposal, sempre com IVA", () => {
+    // O `quotedPrice` é líquido ("Preço final (sem IVA)") e o `priceBreakdown.total`
+    // é bruto: o contratado converte o primeiro à taxa efetiva para os dois ramos
+    // saírem na MESMA unidade (com IVA) — é com ela que se comparam pagamentos.
     expect(
       computeEventMetrics(data({ quote: makeQuote({ quotedPrice: 15000 }) }), TODAY).contracted,
-    ).toBe(15000);
+    ).toBe(18450); // 15 000 × 1,23
     expect(computeEventMetrics(data(), TODAY).contracted).toBe(12300); // priceBreakdown.total
   });
 });
@@ -380,23 +393,54 @@ describe("reconcileFinance", () => {
 
 describe("nextAction", () => {
   it("maps each stage to a sensible kind", () => {
-    expect(nextAction("lead", data(), TODAY).kind).toBe("proposta");
-    expect(nextAction("proposta_enviada", data(), TODAY).kind).toBe("portal");
-    expect(nextAction("aceite", data(), TODAY).kind).toBe("fatura_sinal");
-    expect(nextAction("sinal_pago", data(), TODAY).kind).toBe("producao");
-    expect(nextAction("em_producao", data(), TODAY).kind).toBe("producao");
-    expect(nextAction("concluido", data(), TODAY).kind).toBe("arquivar");
-    expect(nextAction("perdido", data(), TODAY).kind).toBe("none");
+    expect(nextAction("lead", data()).kind).toBe("proposta");
+    expect(nextAction("proposta_enviada", data()).kind).toBe("portal");
+    expect(nextAction("aceite", data()).kind).toBe("fatura_sinal");
+    expect(nextAction("sinal_pago", data()).kind).toBe("producao");
+    expect(nextAction("em_producao", data()).kind).toBe("producao");
+    expect(nextAction("concluido", data()).kind).toBe("arquivar");
+    expect(nextAction("perdido", data()).kind).toBe("none");
   });
 
   it("semana_evento distinguishes unpaid saldo (fatura_saldo) from fully paid (runsheet)", () => {
     const unpaid = data({ proposal: makeProposal({ total: 20000 }), invoices: [] });
-    expect(nextAction("semana_evento", unpaid, TODAY).kind).toBe("fatura_saldo");
+    expect(nextAction("semana_evento", unpaid).kind).toBe("fatura_saldo");
 
     const paid = data({
       proposal: makeProposal({ total: 20000 }),
       invoices: [invoice({ kind: "total", amount: 20000, status: "paga" })],
     });
-    expect(nextAction("semana_evento", paid, TODAY).kind).toBe("runsheet");
+    expect(nextAction("semana_evento", paid).kind).toBe("runsheet");
+  });
+
+  /**
+   * O DINHEIRO REGISTADO À MÃO TAMBÉM É DINHEIRO RECEBIDO.
+   *
+   * `deriveStage` já o diz com todas as letras (é por isso que existe o
+   * `combinedPaidTotal`), e o painel de Pagamentos mostra o "Recebido" a partir
+   * do registo à mão — que é o caminho que o estúdio usa: recebe-se a
+   * transferência, marca-se a linha como paga, e a factura emite-se quando der.
+   *
+   * A próxima acção ficou a olhar só para o livro de faturas. Num casamento de
+   * 12.300 € integralmente pago e registado, na semana do evento, o cabeçalho
+   * mandava «Liquidar o saldo (70%) — falta liquidar o saldo antes do dia»:
+   * 8.610 € pedidos a um casal que já os tinha transferido.
+   */
+  it("semana_evento: o saldo pago à mão já não pede para liquidar o saldo", () => {
+    const pago = data({
+      quote: makeQuote({
+        date: "2026-07-22", // quatro dias depois do TODAY
+        payments: [
+          { id: "p1", kind: "sinal", amount: 3690, date: "2026-03-01", paid: true },
+          { id: "p2", kind: "saldo", amount: 8610, date: "2026-07-10", paid: true },
+        ],
+      }),
+      contract: { status: "aceite", acceptedAt: "2026-03-01T10:00:00Z" },
+      invoices: [],
+    });
+    // O contratado (com IVA) do `priceBreakdown` são 12.300 €, e é isso que
+    // está registado como recebido.
+    expect(deriveStage(pago, TODAY)).toBe("semana_evento");
+    expect(nextAction("semana_evento", pago).kind).toBe("runsheet");
   });
 });

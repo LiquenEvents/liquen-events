@@ -32,6 +32,17 @@ export const mapper: Mapper<Task> = {
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+  /**
+   * Compare-and-set sobre o `updated_at`.
+   *
+   * A tarefa é o objecto mais partilhado do back office: uma pessoa risca-a do
+   * telemóvel enquanto outra lhe muda o responsável ou a data no computador.
+   * São dois patches pequenos e disjuntos — `{done}` e `{assignee, dueDate}` —
+   * e sem comparação o segundo a chegar reescreve a linha inteira a partir da
+   * leitura que fez: a tarefa desmarca-se sozinha. Ninguém interpreta isso como
+   * um conflito; interpreta-o como «alguém voltou a abrir a tarefa».
+   */
+  touch: true,
 };
 
 const repo = createRepository(mapper);

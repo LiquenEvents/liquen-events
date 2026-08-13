@@ -58,6 +58,8 @@ import {
   quoteIdFor,
   createQuote,
   listQuotes,
+  listQuoteSummaries,
+  resumirQuote,
   getQuote,
   updateQuote,
   updateQuoteWith,
@@ -379,5 +381,114 @@ describe("adversarial — the store is an unguarded persistence layer", () => {
     expect(got?.email).toBe("Ana@Example.PT");
     // Mirror columns carry the un-normalised values, so DB search is case/space sensitive.
     expect(mapper.toRow(got as Quote)).toMatchObject({ name: "  Ana  ", email: "Ana@Example.PT" });
+  });
+});
+
+/**
+ * ── O RESUMO DA LISTA ─────────────────────────────────────────────────────
+ *
+ * A página de administração serializava a tabela de pedidos INTEIRA para
+ * dentro do HTML: com 300 pedidos, medidos ~3,8 MB antes de haver um pixel
+ * desenhado — e a lista de convidados sozinha era 47% dos bytes de um
+ * casamento já trabalhado.
+ *
+ * Este bloco prende as DUAS metades da mesma decisão, porque errar qualquer
+ * uma delas é silencioso:
+ *
+ *   1. o que SAI — se um destes campos voltar a viajar na lista, o peso volta
+ *      com ele e ninguém dá por isso até alguém voltar a medir;
+ *
+ *   2. o que FICA — e esta é a metade perigosa. `payments`, `messages`,
+ *      `activityLog`, `eventSuppliers` e `adminNotes` são lidos sobre a lista
+ *      TODA (dinheiro na Visão Geral, tempo de resposta e margem nas
+ *      Estatísticas, o histórico a que o painel de Propostas acrescenta uma
+ *      entrada, as notas internas que gravar escreve de volta). Tirar um
+ *      deles "porque também é grande" não parte nada — muda números no ecrã e
+ *      apaga texto que ninguém pediu para apagar.
+ */
+describe("resumirQuote — o pedido como a lista o precisa", () => {
+  const trabalhado = () =>
+    quote({
+      id: "q-trabalhado",
+      guestList: [{ id: "g1", name: "Família Rodrigues", party: 4, rsvp: "confirmado" }],
+      checklist: [{ id: "c1", label: "Confirmar montagem", done: false }],
+      productionPlan: [{ id: "p1", label: "Atelier — arco", done: true }],
+      timeline: [{ id: "t1", time: "16:30", title: "Cerimónia" }],
+      decorPoints: ["cerimonia", "copo-agua"],
+      payments: [{ id: "pg1", kind: "sinal", amount: 2000, date: "2026-03-01", paid: true }],
+      messages: [{ at: "2026-01-02T10:00:00.000Z", body: "Bom dia" }],
+      activityLog: [
+        { id: "a1", at: "2026-01-02T10:00:00.000Z", kind: "created", summary: "Criado" },
+      ],
+      eventSuppliers: [
+        { id: "s1", name: "Catering", category: "Catering", estimatedCost: 5000, status: "pago" },
+      ],
+      adminNotes: "Cuidado com o prazo da AMARA",
+      tags: ["prioritário"],
+    });
+
+  it("não leva as colecções que só o pedido ABERTO mostra", () => {
+    const resumo = resumirQuote(trabalhado()) as Partial<Quote>;
+    expect(resumo.guestList).toBeUndefined();
+    expect(resumo.checklist).toBeUndefined();
+    expect(resumo.productionPlan).toBeUndefined();
+    expect(resumo.timeline).toBeUndefined();
+    expect(resumo.decorPoints).toBeUndefined();
+    // Não é "vazio", é AUSENTE: uma lista vazia gravada por cima da verdadeira
+    // é precisamente a avaria que o `openQuote` espera pelo pedido inteiro
+    // para não poder acontecer.
+    expect("guestList" in resumo).toBe(false);
+  });
+
+  it("leva tudo o que as vistas de conjunto lêem sobre a lista inteira", () => {
+    const resumo = resumirQuote(trabalhado());
+    expect(resumo.payments).toHaveLength(1);
+    expect(resumo.messages).toHaveLength(1);
+    expect(resumo.activityLog).toHaveLength(1);
+    expect(resumo.eventSuppliers).toHaveLength(1);
+    expect(resumo.adminNotes).toBe("Cuidado com o prazo da AMARA");
+  });
+
+  it("leva o que a tabela, os filtros e a procura desenham", () => {
+    const resumo = resumirQuote(trabalhado());
+    expect(resumo).toMatchObject({
+      id: "q-trabalhado",
+      name: "Ana",
+      email: "ana@example.pt",
+      phone: "910000000",
+      company: "",
+      status: "pendente",
+      category: "particulares",
+      eventType: "casamentos",
+      date: "2026-09-01",
+      location: "Lisboa",
+      guests: 100,
+      submittedAt: "2026-01-01T10:00:00.000Z",
+      tags: ["prioritário"],
+    });
+    expect(resumo.priceBreakdown.total).toBe(1845);
+  });
+
+  it("não toca no pedido que recebeu — a loja continua a ter tudo", async () => {
+    const original = trabalhado();
+    resumirQuote(original);
+    expect(original.guestList).toHaveLength(1);
+    await createQuote(original);
+    expect((await getQuote("q-trabalhado"))?.guestList).toHaveLength(1);
+  });
+
+  it("listQuoteSummaries resume a lista toda; listQuotes continua inteira", async () => {
+    await createQuote(trabalhado());
+    const [resumo] = await listQuoteSummaries();
+    expect((resumo as Partial<Quote>).guestList).toBeUndefined();
+    const [inteiro] = await listQuotes();
+    expect(inteiro.guestList).toHaveLength(1);
+  });
+
+  it("é MESMO mais leve — é a única razão de existir", async () => {
+    await createQuote(trabalhado());
+    const inteiro = JSON.stringify(await listQuotes()).length;
+    const resumo = JSON.stringify(await listQuoteSummaries()).length;
+    expect(resumo).toBeLessThan(inteiro);
   });
 });

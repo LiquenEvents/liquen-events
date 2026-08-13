@@ -481,3 +481,197 @@ describe("FileBackend.assertWritableInProd", () => {
     expect((await dev.get("w9"))?.id).toBe("w9");
   });
 });
+
+// ── Paridade do backend de ficheiro com o do Supabase ──────────────────────
+// O caminho de ficheiro é o que corre quando não há Supabase configurado. Uma
+// guarda que só exista de um dos lados não é uma diferença de desempenho: é uma
+// protecção que desaparece consoante a variável de ambiente que estiver posta.
+// Estes testes prendem as três que faltavam.
+describe("FileBackend: paridade das guardas com o Supabase", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "repo-parity-"));
+  });
+  afterEach(async () => {
+    if (dir) await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  });
+
+  it("recusa um id repetido, como a chave primária do Postgres (23505)", async () => {
+    const backend = new FileBackend<Widget>(widgetMapper, dir);
+    await backend.insert(widget({ id: "w1", name: "Alpha" }));
+
+    // A forma do erro é a que `isUniqueViolation` reconhece — é por ela que
+    // `saveOverviewField` e `createContractIfAbsent` distinguem um conflito de
+    // uma avaria, e essa distinção não pode mudar com o backend.
+    const { isUniqueViolation } = await import("./invoices-store");
+    const err = await backend.insert(widget({ id: "w1", name: "Bravo" })).catch((e) => e);
+    expect(isUniqueViolation(err)).toBe(true);
+
+    // E o duplicado não entrou: continua a haver UMA linha, a primeira.
+    const all = await backend.list();
+    expect(all).toHaveLength(1);
+    expect(all[0].name).toBe("Alpha");
+  });
+
+  it("persist recusa escrever por cima de uma leitura já ultrapassada (ConflictError)", async () => {
+    const backend = new FileBackend<Widget>(widgetMapper, dir);
+    await backend.insert(widget({ id: "w1", qty: 1 }));
+
+    const stale = await backend.get("w1");
+    // Alguém escreve primeiro, a partir de uma leitura fresca…
+    const fresh = await backend.get("w1");
+    await backend.persist("w1", widget({ id: "w1", name: "Winner", qty: 2 }), fresh!);
+
+    // …e a escrita assente na leitura antiga tem de ser recusada, não aceite.
+    await expect(
+      backend.persist("w1", widget({ id: "w1", name: "Clobber", qty: 3 }), stale!),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect((await backend.get("w1"))?.name).toBe("Winner");
+  });
+
+  it("updateWith não perde a escrita concorrente (o mesmo que o Supabase já garantia)", async () => {
+    // Cópia exacta do cenário do teste do backend Supabase acima: uma escrita
+    // entra entre o `get` e o `persist` do `updateWith`. Ali sobrevivem as duas
+    // alterações; aqui tem de acontecer o mesmo.
+    const real = new FileBackend<Widget>(widgetMapper, dir);
+    await real.insert(widget({ id: "w1", name: "Alpha", qty: 1 }));
+
+    let injected = false;
+    const wrapped: Backend<Widget> = {
+      list: () => real.list(),
+      get: (id) => real.get(id),
+      query: (c, v, p) => real.query(c, v, p),
+      insert: (e) => real.insert(e),
+      remove: (id) => real.remove(id),
+      persist: async (id, merged, cas) => {
+        if (!injected) {
+          injected = true;
+          const cur = await real.get(id);
+          await real.persist(id, { ...cur!, name: "Interloped" }, cur!);
+        }
+        return real.persist(id, merged, cas);
+      },
+    };
+
+    const repo = new Repository<Widget>(widgetMapper, () => wrapped);
+    const result = await repo.updateWith("w1", (c) => ({ ...c, qty: c.qty + 1 }));
+
+    expect(result).toMatchObject({ name: "Interloped", qty: 2 });
+    expect(await real.get("w1")).toMatchObject({ name: "Interloped", qty: 2 });
+  });
+});
+
+// ── A fila de escrita tem de ser partilhada por todas as operações ─────────
+// `createRepository` escolhia o backend a cada chamada E construía-o a cada
+// chamada. Como a fila de serialização vive na instância, cada operação ficava
+// com uma fila só sua — ou seja, sem fila nenhuma. Duas criações em simultâneo
+// liam ambas o mesmo array e a segunda escrita apagava a primeira.
+describe("createRepository: um só FileBackend por repositório", () => {
+  let dir: string;
+  let cwdSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "repo-cwd-"));
+    await fs.mkdir(path.join(dir, "data"), { recursive: true });
+    // `createRepository` ancora-se em process.cwd()/data.
+    cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(dir);
+    vi.stubEnv("NODE_ENV", "development");
+    // Sem Supabase configurado é o backend de ficheiro que corre — que é o que
+    // este teste mede. Explícito, para não depender do .env de quem o corre.
+    vi.stubEnv("SUPABASE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+  });
+  afterEach(async () => {
+    cwdSpy.mockRestore();
+    vi.unstubAllEnvs();
+    if (dir) await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  });
+
+  it("serializa criações concorrentes sem perder nenhuma", async () => {
+    const { createRepository } = await import("./repository");
+    const repo = createRepository<Widget>(widgetMapper);
+
+    await Promise.all([
+      repo.create(widget({ id: "a", name: "Alpha" })),
+      repo.create(widget({ id: "b", name: "Bravo" })),
+      repo.create(widget({ id: "c", name: "Charlie" })),
+    ]);
+
+    expect((await repo.list()).map((w) => w.id).sort()).toEqual(["a", "b", "c"]);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A TABELA CUJA CHAVE NÃO SE CHAMA `id`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Onze das doze tabelas têm `id` como chave primária, e o backend do Supabase
+ * tinha esse nome escrito à mão em quatro sítios. A décima segunda —
+ * `biblioteca_fotos` — tem `path text primary key` e nenhuma coluna `id`.
+ *
+ * O defeito era invisível aqui e total em produção: o backend de FICHEIRO usa
+ * o `getId` do mapper e funcionava; o do Supabase perguntava `where id = <o
+ * caminho>` a uma tabela sem `id`, o Postgres respondia «column does not
+ * exist», e o tratamento de erros traduzia isso para «a funcionalidade não
+ * está instalada». Etiquetar uma foto respondia 503, e a LQIP e a cor de cada
+ * fotografia nunca chegavam a ser gravadas — em silêncio.
+ *
+ * Este teste corre contra o cliente falso, que compara colunas como o Postgres
+ * compara: uma linha sem `id` não é encontrada por `where id = …`.
+ */
+interface Ficheiro {
+  path: string;
+  cor: string;
+}
+
+const ficheiroMapper: Mapper<Ficheiro> = {
+  table: "ficheiros",
+  fileName: "ficheiros.json",
+  getId: (f) => f.path,
+  idColumn: "path",
+  // Repare-se: NÃO há coluna `id` nenhuma, tal como na tabela verdadeira.
+  toRow: (f) => ({ path: f.path, cor: f.cor }),
+  fromRow: (r) => ({ path: String(r.path), cor: String(r.cor ?? "") }),
+};
+
+describe("um mapper cuja chave vive noutra coluna", () => {
+  it("lê, escreve e apaga pela coluna que o mapper declara", async () => {
+    const sb = createFakeSupabase();
+    const repo = new Repository<Ficheiro>(
+      ficheiroMapper,
+      () => new SupabaseBackend<Ficheiro>(ficheiroMapper, sb),
+    );
+
+    await repo.create({ path: "tema-a/foto.jpg", cor: "#3d5a40" });
+
+    // Isto é o que estava partido: `get` procurava por `id`.
+    expect((await repo.get("tema-a/foto.jpg"))?.cor).toBe("#3d5a40");
+
+    await repo.update("tema-a/foto.jpg", { cor: "#f0ece4" });
+    expect((await repo.get("tema-a/foto.jpg"))?.cor).toBe("#f0ece4");
+
+    await repo.remove("tema-a/foto.jpg");
+    expect(await repo.get("tema-a/foto.jpg")).toBeNull();
+  });
+
+  /**
+   * A regra, e não o caso: um mapper que não escreve coluna `id` TEM de dizer
+   * qual é a sua. Sem isto, a próxima tabela com chave própria repete o defeito
+   * — e repete-o só em produção.
+   */
+  it("o mapper das fotos da biblioteca declara a coluna da sua chave", async () => {
+    const { mapper } = await import("./biblioteca-fotos-store");
+    const linha = mapper.toRow({
+      path: "tema-a/foto.jpg",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    } as Parameters<typeof mapper.toRow>[0]);
+    expect(
+      "id" in linha || mapper.idColumn,
+      "um mapper sem coluna `id` tem de declarar `idColumn`",
+    ).toBeTruthy();
+    expect(mapper.idColumn).toBe("path");
+  });
+});

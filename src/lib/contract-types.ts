@@ -32,4 +32,22 @@ export interface Contract {
   acceptedName?: string;
   /** Best-effort client IP captured at acceptance (audit trail). */
   acceptedIp?: string;
+  /**
+   * ── O SELO DO DOCUMENTO ACEITE ───────────────────────────────────────────
+   *
+   * A impressão digital (SHA-256) e o tamanho do PDF EXACTO que foi enviado ao
+   * casal, copiados da proposta no instante do aceite.
+   *
+   * O que este contrato já provava: QUEM escreveu o nome, QUANDO, de que IP, e
+   * com que texto de termos (congelado em `termsSnapshot`). O que faltava era o
+   * mais disputado de todos: QUAL documento. Um PDF é reconstruído a partir do
+   * `doc` da proposta, e basta uma mudança no código do desenho para os bytes
+   * deixarem de bater certo — sem selo não há como distinguir "o conteúdo
+   * mudou" de "só o desenho mudou".
+   *
+   * Ausentes nos contratos anteriores a esta mudança, e é assim que deve ser:
+   * um selo inventado a posteriori não seria prova de nada.
+   */
+  propostaPdfSha256?: string;
+  propostaPdfBytes?: number;
 }

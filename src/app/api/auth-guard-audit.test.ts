@@ -111,6 +111,77 @@ vi.mock("@/lib/inventory-store", () =>
     PROP_CATEGORIES: ["Outro"],
   }),
 );
+// Material de logística: catálogo e listas base. Simulados como os outros —
+// sem isto, a auditoria só conseguia afirmar que a rota devolve 401, e não a
+// parte que interessa, que é NENHUMA escrita ter acontecido antes disso.
+vi.mock("@/lib/material-store", () =>
+  H.build("material-store", ["createMaterial", "deleteMaterial", "updateMaterial", "getMaterial"], {
+    listMaterial: H.afn("material-store.listMaterial", async () => []),
+  }),
+);
+vi.mock("@/lib/material-rules-store", () =>
+  H.build("material-rules-store", ["createRule", "updateRule", "deleteRule"], {
+    listRules: H.afn("material-rules-store.listRules", async () => []),
+  }),
+);
+vi.mock("@/lib/material-list-items-store", () =>
+  H.build(
+    "material-list-items-store",
+    ["addListItem", "updateListItem", "removeListItem", "listItemsOf", "removeItemsOf"],
+    { listAllListItems: H.afn("material-list-items-store.listAllListItems", async () => []) },
+  ),
+);
+vi.mock("@/lib/event-material-store", () =>
+  H.build(
+    "event-material-store",
+    [
+      "getForQuote",
+      "createEventMaterial",
+      "updateEventMaterial",
+      "deleteEventMaterial",
+      "getEventMaterial",
+    ],
+    { listEventMaterial: H.afn("event-material-store.listEventMaterial", async () => []) },
+  ),
+);
+vi.mock("@/lib/event-material-log-store", () =>
+  H.build("event-material-log-store", ["registar", "listLogOf"], {
+    listAllLog: H.afn("event-material-log-store.listAllLog", async () => []),
+  }),
+);
+vi.mock("@/lib/event-material-items-store", () =>
+  H.build(
+    "event-material-items-store",
+    [
+      "addEventItem",
+      "updateEventItem",
+      "removeEventItem",
+      "listItemsOfEvent",
+      "removeItemsOfEvent",
+    ],
+    { listAllEventItems: H.afn("event-material-items-store.listAllEventItems", async () => []) },
+  ),
+);
+vi.mock("@/lib/material-lists-store", () =>
+  H.build(
+    "material-lists-store",
+    [
+      "createList",
+      "updateList",
+      "deleteList",
+      "getList",
+      "addListItem",
+      "updateListItem",
+      "removeListItem",
+      "listItemsOf",
+      "duplicateList",
+    ],
+    {
+      listLists: H.afn("material-lists-store.listLists", async () => []),
+      listAllListItems: H.afn("material-lists-store.listAllListItems", async () => []),
+    },
+  ),
+);
 vi.mock("@/lib/invoices-store", () =>
   H.build("invoices-store", [
     "listInvoices",
@@ -150,9 +221,6 @@ vi.mock("@/lib/message-links-store", () =>
   ]),
 );
 vi.mock("@/lib/app-state", () => H.build("app-state", ["getState", "setState"]));
-vi.mock("@/lib/followups", () =>
-  H.build("followups", ["computeFollowUps", "withInvoiceFollowUps"]),
-);
 vi.mock("@/lib/mail", () =>
   H.build("mail", ["sendMail"], { esc: (s: string) => s, MAIL_TO: "team@liquen.test" }),
 );
@@ -165,10 +233,130 @@ vi.mock("@/lib/push", () =>
 vi.mock("@/lib/inbox", () =>
   H.build("inbox", ["listInbox", "getInboxMessage", "setFlags"], { imapConfigured: () => false }),
 );
-vi.mock("@/lib/proposal-storage", () => H.build("proposal-storage", ["uploadProposalImage"]));
+vi.mock("@/lib/proposal-storage", () =>
+  H.build(
+    "proposal-storage",
+    [
+      "uploadProposalImage",
+      "ensureBucket",
+      "createProposalUploadTickets",
+      "confirmProposalUploads",
+    ],
+    {
+      UPLOAD_TICKET_TTL: 300,
+      MAX_UPLOAD_TICKETS: 40,
+      BUCKET_FILE_SIZE_LIMIT: 12 * 1024 * 1024,
+      // Os NOMES dos buckets são constantes, não comportamento — quem os
+      // importa (`lib/derivadas.ts`) só quer a string. Deixá-los de fora fazia
+      // a rota rebentar ao carregar o módulo, e o teste dizia "não devolveu
+      // 401" quando o que se passava era o mock a faltar.
+      PROPOSAL_BUCKET: "proposal-assets",
+      PROPOSAL_THUMB_BUCKET: "proposal-thumbs",
+    },
+  ),
+);
 vi.mock("@/lib/supabase", () =>
   H.build("supabase", [], { getSupabase: () => null, isDatabaseConfigured: () => false }),
 );
+
+// ── Biblioteca de Temas + rascunhos + Visão Geral ────────────────────────────
+// Estes módulos entraram com as rotas que a tabela abaixo passou a cobrir. Tal
+// como os restantes, são espias que registam a chamada: é isso que transforma
+// "a rota tem guarda?" na asserção de que NADA no armazenamento correu.
+vi.mock("@/lib/themes-store", () =>
+  H.build("themes-store", ["getTheme", "createTheme", "updateTheme", "deleteTheme"], {
+    listThemes: H.afn("themes-store.listThemes", async () => []),
+  }),
+);
+vi.mock("@/lib/theme-storage", () =>
+  H.build(
+    "theme-storage",
+    [
+      "uploadThemeImage",
+      "createThemeUploadTickets",
+      "confirmThemeUploads",
+      "listThemeObjects",
+      "countThemeFiles",
+      "readThemeFingerprints",
+      "noteThemeFingerprint",
+      "forgetThemeFingerprints",
+      "findThemeImageByBytes",
+      "signThemeThumbs",
+      "listThemeImagePage",
+      "deleteThemeImage",
+      "deleteThemeFolder",
+      "fetchThemeImageBytes",
+      "copyThemeImageToProposal",
+      "transferThemeImage",
+    ],
+    {
+      // Constantes e auxiliares PUROS ficam síncronos e verdadeiros o suficiente
+      // para o caminho autenticado de sanidade correr até ao fim.
+      THEME_BUCKET: "temas",
+      THEME_THUMB_BUCKET: "temas-mini",
+      SIGNED_TTL: 3600,
+      isAlreadyExists: () => false,
+      themeFolder: (id: string) => `tema-${id}`,
+      isThemePath: () => true,
+      themeIdOfPath: (p: string) => p.split("/")[0],
+      contentTypeForPath: () => "image/jpeg",
+      invalidateThemeCount: () => undefined,
+      planOrderedPage: () => ({ names: [], truncated: false }),
+      listThemeFiles: H.afn("theme-storage.listThemeFiles", async () => ({
+        names: [],
+        ok: true,
+        truncated: false,
+      })),
+      signThemePaths: H.afn("theme-storage.signThemePaths", async () => new Map<string, string>()),
+    },
+  ),
+);
+vi.mock("@/lib/proposal-drafts", () =>
+  H.build("proposal-drafts", ["getProposalDraft", "saveProposalDraft", "clearProposalDraft"], {
+    // A cópia de segurança lê os rascunhos como um conjunto seu. Devolve lista
+    // (e não `undefined`) porque o caminho autenticado de `/api/backup` conta
+    // os registos de cada conjunto — uma espia muda rebentava-o a contar.
+    listProposalDrafts: H.afn("proposal-drafts.listProposalDrafts", async () => []),
+  }),
+);
+// Parcial: o esquema Zod da rota lê OVERVIEW_FIELDS/MAX_* no topo do módulo e o
+// 409 depende da classe StaleWriteError real — só as duas funções de I/O é que
+// passam a espias.
+vi.mock("@/lib/servicos-catalogo-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/servicos-catalogo-store")>()),
+  listarServicos: H.afn("servicos-catalogo-store.listarServicos", async () => []),
+  criarServico: H.afn("servicos-catalogo-store.criarServico", async () => undefined),
+  actualizarServico: H.afn("servicos-catalogo-store.actualizarServico", async () => ({})),
+  apagarServico: H.afn("servicos-catalogo-store.apagarServico", async () => undefined),
+}));
+
+vi.mock("@/lib/proposta-definicoes-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/proposta-definicoes-store")>()),
+  listarDefinicoes: H.afn("proposta-definicoes-store.listarDefinicoes", async () => []),
+  gravarDefinicao: H.afn("proposta-definicoes-store.gravarDefinicao", async () => ({})),
+}));
+
+vi.mock("@/lib/overview-settings-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/overview-settings-store")>()),
+  readOverviewSettings: H.afn("overview-settings-store.readOverviewSettings", async () => ({})),
+  saveOverviewField: H.afn("overview-settings-store.saveOverviewField", async () => ({})),
+}));
+// Passkeys. As funções puras (`mesmaConta`, `contadorRetrocedeu`) ficam reais —
+// não tocam em dados; só as que leem ou escrevem viram espias, para a asserção
+// "não chegou ao store" ter mesmo o que apanhar se um dia a guarda cair.
+vi.mock("@/lib/passkeys-store", async (orig) => ({
+  ...(await orig<typeof import("@/lib/passkeys-store")>()),
+  listPasskeys: H.afn("passkeys-store.listPasskeys", async () => []),
+  listPasskeysFor: H.afn("passkeys-store.listPasskeysFor", async () => []),
+  getPasskey: H.afn("passkeys-store.getPasskey", async () => null),
+  createPasskey: H.afn("passkeys-store.createPasskey"),
+  removePasskeyOwnedBy: H.afn("passkeys-store.removePasskeyOwnedBy", async () => false),
+  renamePasskeyOwnedBy: H.afn("passkeys-store.renamePasskeyOwnedBy", async () => false),
+  marcarUso: H.afn("passkeys-store.marcarUso"),
+}));
+// `sharp` é importado no topo da rota das miniaturas; fica de fora da auditoria
+// pela mesma razão que o pdf-lib.
+vi.mock("sharp", () => ({ default: () => ({ metadata: async () => ({}) }) }));
 // PDF renderers — mocked so pdf-lib / sharp never load in the audit.
 vi.mock("@/lib/contract-pdf", () => H.build("contract-pdf", ["renderContractPdf"]));
 vi.mock("@/lib/invoice-pdf", () => H.build("invoice-pdf", ["renderInvoicePdf"]));
@@ -233,6 +421,32 @@ beforeEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./backup/route", methods: ["GET"] },
+  // A reposição é a rota mais destrutiva da casa: sem sessão tem de sair em
+  // 401 ANTES de tocar em seja o que for (e o módulo que sabe escrever nem
+  // sequer é carregado — ver o import dinâmico em restore/route.ts).
+  { path: "./backup/restore/route", methods: ["POST"] },
+  // As conversões offline expõem o VALOR de cada casamento fechado — é
+  // informação comercial, não uma exportação técnica inofensiva.
+  { path: "./admin/conversoes/route", methods: ["GET"] },
+  // O relato de uma imagem que não desenhou no browser. É telemetria e não
+  // devolve nada de útil — mas ESCREVE nos registos, e uma rota de registo
+  // aberta é um sítio onde qualquer pessoa põe o que quiser no sítio onde nós
+  // procuramos a verdade. Sem sessão, 401.
+  { path: "./admin/imagem-falhou/route", methods: ["POST"] },
+  // Contar as miniaturas em falta lê a biblioteca INTEIRA e as pastas de todas
+  // as propostas; gerar ESCREVE no Storage. Nem uma nem outra podem ficar
+  // abertas — a primeira desenha o mapa do armazenamento a quem perguntar, a
+  // segunda gasta-o.
+  { path: "./admin/derivadas/route", methods: ["GET", "POST"] },
+  // O estado do armazenamento diz se a base de dados responde, se a tabela
+  // existe e se a chave em uso tem permissões — o mapa da instalação, com os
+  // nomes das variáveis a confirmar. E a verificação ESCREVE (é assim que ela é
+  // honesta: tenta gravar e volta a ler). Sem sessão, nem se pergunta.
+  { path: "./admin/armazenamento/route", methods: ["GET"] },
+  // O mesmo, do lado da Meta: o relatório e o envio dos casamentos fechados
+  // trazem o valor de cada negócio. O POST é o que efectivamente ENVIA
+  // conversões para fora — sem sessão não pode sequer ser tentado.
+  { path: "./meta/fechos/route", methods: ["GET", "POST"] },
   { path: "./calendario/route", methods: ["GET", "POST"] },
   { path: "./calendario/[id]/route", methods: ["DELETE"] },
   { path: "./contratos/route", methods: ["GET"] },
@@ -240,7 +454,6 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./email-templates/route", methods: ["GET", "POST", "PUT"] },
   { path: "./faturas/route", methods: ["GET", "POST"] },
   { path: "./faturas/[id]/route", methods: ["GET", "PATCH", "DELETE"] },
-  { path: "./followups/route", methods: ["GET"] },
   { path: "./fornecedores/route", methods: ["GET", "POST"] },
   { path: "./fornecedores/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./inbox/route", methods: ["GET"] },
@@ -250,19 +463,108 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./inbox/reply/route", methods: ["POST"] },
   { path: "./inventario/route", methods: ["GET", "POST"] },
   { path: "./inventario/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./material/route", methods: ["GET", "POST"] },
+  { path: "./material/[id]/route", methods: ["PATCH", "DELETE"] },
+  // Escreve o catálogo todo de uma vez a partir de um CSV. Sem sessão, um
+  // pedido só podia apagar meio inventário.
+  { path: "./material/importar/route", methods: ["POST"] },
+  { path: "./material/listas/route", methods: ["GET", "POST"] },
+  { path: "./material/listas/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./material/regras/route", methods: ["GET", "POST"] },
+  { path: "./material/regras/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./orcamento/[id]/material/route", methods: ["GET", "POST"] },
+  { path: "./orcamento/[id]/material/marcar/route", methods: ["POST"] },
   { path: "./orcamento/route", methods: ["GET"] }, // POST = PUBLIC quote form (below)
   { path: "./orcamento/[id]/route", methods: ["PATCH", "DELETE"] }, // GET partly public (below)
-  { path: "./orcamento/[id]/assets/route", methods: ["POST"] },
+  { path: "./orcamento/[id]/assets/route", methods: ["GET", "POST"] },
+  // Escrita directa e importação da biblioteca: emitem bilhetes de escrita para
+  // o Storage e copiam bytes para a pasta do pedido. Sem sessão, nem os
+  // bilhetes podem ser emitidos.
+  { path: "./orcamento/[id]/assets/url/route", methods: ["POST", "PUT"] },
+  { path: "./orcamento/[id]/assets/importar/route", methods: ["POST"] },
   { path: "./orcamento/[id]/fatura/route", methods: ["POST"] },
   { path: "./orcamento/[id]/mensagem/route", methods: ["POST"] },
+  // Manda um modelo de email ao cliente (e, sem `enviar`, pré-visualiza-o com o
+  // endereço dele lá dentro). Escreve para fora da casa — a barreira é a mesma
+  // do mensageiro.
+  { path: "./orcamento/[id]/modelo/route", methods: ["POST"] },
   { path: "./orcamento/[id]/proposta/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/proposta-doc/route", methods: ["POST"] },
+  // O rascunho é trabalho comercial por publicar (preços, notas internas): ler
+  // conta tanto como escrever.
+  { path: "./orcamento/[id]/proposta-rascunho/route", methods: ["GET", "PUT", "DELETE"] },
+  // Quanto tempo custou montar esta proposta. Não é dado do cliente, mas é
+  // dado sobre COMO a casa trabalha — e o `POST` escreve na medição de que
+  // depende a resposta a "que boards custam mais tempo?".
+  // A biblioteca é o activo principal: ler o ensaio já diz o que lá está, e o
+  // POST escreve etiquetas em ~200 fotos.
+  { path: "./biblioteca/paletas/route", methods: ["GET", "POST"] },
+  { path: "./orcamento/[id]/tempo-activo/route", methods: ["GET", "POST"] },
+  // O histórico devolve o que se cobrou em cada ronda de negociação, e com
+  // `?doc=` devolve um documento inteiro. É a proposta toda, por outra porta.
+  { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
+  // A memória de preços atravessa TODAS as propostas já enviadas: o que se
+  // cobrou a cada cliente, agregado. É o ficheiro comercial da casa numa
+  // resposta JSON.
+  { path: "./orcamento/[id]/memoria/route", methods: ["GET"] },
+  // Diz para que casamentos é que cada foto da biblioteca já foi — nomes de
+  // clientes, datas e locais de OUTROS pedidos, numa resposta só.
+  { path: "./orcamento/[id]/fotos-repetidas/route", methods: ["GET"] },
   { path: "./orcamento/manual/route", methods: ["POST"] },
+  // A biblioteca visual: o vocabulário de etiquetas, a procura por etiquetas e
+  // o etiquetar em lote. Tudo isto lê e escreve o trabalho de arrumação da
+  // equipa, e as fotos que devolve são URLs assinados de um bucket PRIVADO.
+  { path: "./biblioteca/etiquetas/route", methods: ["GET", "POST"] },
+  { path: "./biblioteca/fotos/route", methods: ["GET"] },
+  { path: "./biblioteca/etiquetar/route", methods: ["POST"] },
   { path: "./propostas/route", methods: ["GET"] },
-  { path: "./propostas/[id]/route", methods: ["PATCH"] },
+  { path: "./propostas/[id]/route", methods: ["PATCH", "DELETE"] },
+  // Copiar uma proposta lê o documento de OUTRA e escreve fotos no Storage.
+  { path: "./propostas/copiar/route", methods: ["POST"] },
+  // Os modelos guardam a estrutura e os preços das propostas dela.
+  { path: "./propostas/modelos/route", methods: ["GET", "POST", "DELETE"] },
+  // As preferências do estúdio (validade por omissão).
+  { path: "./propostas/preferencias/route", methods: ["GET", "PUT"] },
+  // A tradução das propostas. Aberta, era a QUOTA da casa a ser gasta por quem
+  // passasse — o plano gratuito do DeepL tem um tecto de caracteres por mês, e
+  // esgotá-lo é a Catarina a ficar sem tradução no dia em que precisa. O `GET`
+  // só diz se o serviço está configurado, e nem isso: quem não tem sessão não
+  // tem nada que saber o que este servidor tem ligado.
+  { path: "./propostas/traduzir/route", methods: ["GET", "POST"] },
   { path: "./push/subscribe/route", methods: ["GET", "POST", "DELETE"] },
   { path: "./tarefas/route", methods: ["GET", "POST"] },
   { path: "./tarefas/[id]/route", methods: ["PATCH", "DELETE"] },
+  // ── Biblioteca de Temas ────────────────────────────────────────────────────
+  // Toda a árvore /temas é back-office: fotos do estúdio, os seus metadados e
+  // as operações em lote que as movem. Estava FORA desta tabela até aqui — as
+  // guardas existiam, mas nada as prendia, e é a tabela que é o contrato.
+  { path: "./temas/route", methods: ["GET", "POST"] },
+  { path: "./temas/[id]/route", methods: ["PATCH", "DELETE"] },
+  { path: "./temas/[id]/imagens/route", methods: ["GET", "POST", "DELETE"] },
+  { path: "./temas/[id]/imagens/url/route", methods: ["POST", "PUT"] },
+  { path: "./temas/[id]/imagens/copiar/route", methods: ["POST"] },
+  { path: "./temas/[id]/miniaturas/route", methods: ["POST"] },
+  { path: "./temas/[id]/repetidas/route", methods: ["POST"] },
+  // Notas da equipa e meta de receita — texto interno, e uma escrita.
+  { path: "./visao-geral/route", methods: ["GET", "PUT"] },
+  // Os números com que o estúdio faz contas (combustível, margem mínima). Ler
+  // não expõe dados de clientes, mas ESCREVER muda o que todas as propostas
+  // seguintes cobram de deslocação — é tão de sessão como o resto.
+  { path: "./proposta-definicoes/route", methods: ["GET", "PUT"] },
+  // A biblioteca de serviços: as palavras que vão nas propostas. Ler já é
+  // interno; escrever muda o que sai em todas as propostas seguintes.
+  { path: "./servicos-catalogo/route", methods: ["GET", "POST"] },
+  { path: "./servicos-catalogo/[id]/route", methods: ["PATCH", "DELETE"] },
+  // Passkeys. A LISTA e a REMOÇÃO são de sessão, como tudo o resto. O REGISTO
+  // também, e é o ponto todo do desenho: transformar um aparelho numa chave só
+  // pode ser feito por quem já provou ser quem diz. Sem esta guarda, um estranho
+  // registava o aparelho dele e passava a ter porta própria.
+  { path: "./admin/passkeys/route", methods: ["GET"] },
+  // O PATCH é o RENOMEAR, e é tão de sessão como o remover: o nome é a única
+  // coisa que distingue os aparelhos na lista, e quem o pudesse mudar sem
+  // sessão baptizava o aparelho de outra pessoa para ela apagar o dela.
+  { path: "./admin/passkeys/[id]/route", methods: ["DELETE", "PATCH"] },
+  { path: "./admin/passkeys/registo/route", methods: ["GET", "POST"] },
 ];
 
 describe("ADMIN-SESSION routes reject the unauthenticated before touching the store", () => {
@@ -299,6 +601,120 @@ describe("ADMIN-SESSION routes reject the unauthenticated before touching the st
     expect(res.status).not.toBe(401);
     expect(calls).toContain("calendar-store.listCalendarEvents");
   });
+
+  // Mesma sanidade para a Biblioteca de Temas, o ramo que esta tabela acabou de
+  // adoptar: prova que os 401 acima são a guarda a decidir e não a rota a
+  // rebentar por outro motivo qualquer.
+  it("GET /api/temas passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./temas/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("themes-store.listThemes");
+  });
+
+  it("GET /api/servicos-catalogo passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./servicos-catalogo/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("servicos-catalogo-store.listarServicos");
+  });
+
+  it("GET /api/proposta-definicoes passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./proposta-definicoes/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("proposta-definicoes-store.listarDefinicoes");
+  });
+
+  it("GET /api/visao-geral passes the guard for an authenticated admin (reaches the store)", async () => {
+    authed.ok = true;
+    const fn = await handler("./visao-geral/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+    expect(calls).toContain("overview-settings-store.readOverviewSettings");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1b. COMPLETUDE — a tabela acima só vale se cobrir mesmo a árvore toda. Este
+// teste lê `src/app/api` do disco e exige que cada ficheiro de rota apareça em
+// ALGUMA das listas deste ficheiro. Foi assim que onze rotas (a Biblioteca de
+// Temas inteira, a Visão Geral, o rascunho da proposta e a escrita directa)
+// se descobriram fora da auditoria: tinham guarda, mas ninguém as prendia. Uma
+// rota nova falha aqui até ser classificada — que é exactamente o ponto.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
+  it("nenhum ficheiro de rota fica fora das tabelas", async () => {
+    const { readdirSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const root = new URL(".", import.meta.url).pathname;
+
+    const found: string[] = [];
+    const walk = (dir: string, rel: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) walk(join(dir, entry.name), `${rel}/${entry.name}`);
+        else if (entry.name === "route.ts") found.push(`.${rel}/route`);
+      }
+    };
+    walk(root, "");
+
+    // As rotas que NÃO são de sessão admin, cada uma coberta na sua secção.
+    const NON_ADMIN = [
+      "./admin/login/route",
+      "./admin/logout/route",
+      "./health/route",
+      "./security/csp-report/route",
+      "./vitals/route",
+      "./orcamento/route", // POST público + GET admin (ambos acima)
+      // A medição da Meta. É PÚBLICA de propósito: recebe os eventos que o
+      // browser acabou de mandar ao pixel, e o browser não tem sessão nenhuma.
+      // O que a protege não é autenticação — é a lista fechada de nomes de
+      // evento, a recusa do `Purchase` (que só o back office pode enviar, por
+      // `./meta/fechos`), e o limite de 20 pedidos por minuto por IP.
+      "./meta/route",
+      // A entrada por passkey. É um CAMINHO DE ENTRADA, como o login por
+      // palavra-passe: exigir sessão para entrar não faria sentido nenhum. O
+      // que a protege é a assinatura do aparelho, verificada contra a chave
+      // pública guardada, a origem e o domínio — mais o tecto de 20 tentativas
+      // por minuto por IP.
+      "./admin/passkeys/entrada/route",
+      // A recuperação de palavra-passe. PÚBLICAS pela mesma razão que a
+      // entrada: quem se esqueceu da palavra-passe não tem sessão nenhuma para
+      // mostrar. O que as fecha é o tecto de pedidos, o token de uso único com
+      // 30 minutos de vida (guardado só em resumo) e o facto de a ligação só
+      // sair para um endereço já configurado no ADMIN_USERS.
+      "./admin/recuperar/route",
+      "./admin/recuperar/definir/route",
+      "./portal/[token]/proposta-pdf/route",
+      "./portal/[token]/contrato-pdf/route",
+      "./proposta/[token]/pdf/route",
+      "./proposta/route",
+      "./cron/reminders/route",
+      "./cron/inbox-check/route",
+      // A cópia de segurança automática. Mesmo guarda das irmãs (Bearer com
+      // CRON_SECRET, comparado em tempo constante, a falhar fechado em
+      // produção) — e sai daqui um ficheiro com TODOS os dados de clientes,
+      // por isso é a rota desta lista onde a guarda mais tem de valer.
+      "./cron/backup/route",
+      "./devproposalpreview/route",
+      /**
+       * O apanha-tudo da API. É PÚBLICO porque não pode ser outra coisa: só
+       * recebe endereços que não existem, e responde 404 em JSON a todos os
+       * métodos, sem tocar em store nenhum e sem dizer que endereços existem.
+       *
+       * Exigir sessão aqui seria pior do que inútil — dizia a um estranho, com
+       * um 401 em vez de um 404, que aquele caminho é «uma coisa que existe e
+       * está fechada». O 404 é a resposta honesta e a que menos conta.
+       */
+      "./[...rota]/route",
+    ];
+    const covered = new Set([...ADMIN.map((r) => r.path), ...NON_ADMIN]);
+    const missing = found.filter((p) => !covered.has(p)).sort();
+    expect(missing, `rotas sem classificação na auditoria: ${missing.join(", ")}`).toEqual([]);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -311,10 +727,39 @@ describe("PUBLIC routes stay reachable without a session", () => {
     expect(res.status).toBe(200);
   });
 
+  it("GET /api/admin/passkeys/entrada dá o desafio sem sessão nenhuma", async () => {
+    // É um caminho de ENTRADA: se exigisse sessão, ninguém entrava por aqui.
+    const fn = await handler("./admin/passkeys/entrada/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).not.toBe(401);
+  });
+
+  it("POST /api/admin/passkeys/entrada recusa uma assinatura inventada — sem 401 por falta de sessão", async () => {
+    // O que a fecha não é a sessão: é a criptografia. Sem desafio selado no
+    // cookie, o pedido morre em 400 — e nunca chega a ler credencial nenhuma.
+    const fn = await handler("./admin/passkeys/entrada/route", "POST");
+    const res = await fn(
+      req("POST", "/api/admin/passkeys/entrada", { response: { id: "credencial-inventada" } }),
+      ctx(),
+    );
+    expect([400, 401, 429]).toContain(res.status);
+    expect(calls, "leu a credencial sem sequer ter um desafio válido").toEqual([]);
+  });
+
   it("POST /api/security/csp-report accepts a report unauthenticated", async () => {
     const fn = await handler("./security/csp-report/route", "POST");
     const res = await fn(req("POST", "/api/security/csp-report", { "csp-report": {} }), ctx());
     // Public report sink: 204 accepted (or 429 if rate-limited) — never an auth wall.
+    expect([204, 429]).toContain(res.status);
+  });
+
+  it("POST /api/vitals accepts a Web Vitals beacon unauthenticated", async () => {
+    const fn = await handler("./vitals/route", "POST");
+    const res = await fn(
+      req("POST", "/api/vitals", { name: "LCP", value: 1234, rating: "good" }),
+      ctx(),
+    );
+    // Public RUM sink (browsers beacon here): 204 accepted (or 429 if rate-limited).
     expect([204, 429]).toContain(res.status);
   });
 
@@ -347,6 +792,24 @@ describe("PUBLIC routes stay reachable without a session", () => {
     const res = await fn(req("POST"), ctx());
     expect(res.status).toBe(200);
   });
+
+  it("POST /api/admin/recuperar é alcançável sem sessão (corpo mal formado → 400)", async () => {
+    // Se exigisse sessão, quem se esqueceu da palavra-passe não tinha por onde
+    // pedir a ligação — que é exactamente o problema que ela veio resolver.
+    const fn = await handler("./admin/recuperar/route", "POST");
+    const res = await fn(req("POST", "/api/admin/recuperar", "{ not json", {}, true), ctx());
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/admin/recuperar/definir recusa uma ligação inventada — sem 401 por falta de sessão", async () => {
+    const fn = await handler("./admin/recuperar/definir/route", "POST");
+    const res = await fn(
+      req("POST", "/api/admin/recuperar/definir", { token: "inventado", password: "x".repeat(14) }),
+      ctx(),
+    );
+    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(400);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -367,6 +830,15 @@ describe("TOKEN-guarded routes deny a bad token", () => {
     expect(calls).toEqual([]);
   });
 
+  it("GET /api/proposta/[token]/pdf → 404 on a bad token", async () => {
+    // Mesmo modelo de confiança do aceite: o token assinado É a autorização, e
+    // um token que não seja o da proposta não abre o documento de ninguém.
+    const fn = await handler("./proposta/[token]/pdf/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).toBe(404);
+    expect(calls).toEqual([]); // nunca chegou à proposta nem ao gerador
+  });
+
   it("POST /api/proposta (accept link) → 401 on a bad/forged token, no mutation", async () => {
     const fn = await handler("./proposta/route", "POST");
     const res = await fn(
@@ -385,7 +857,11 @@ describe("TOKEN-guarded routes deny a bad token", () => {
 describe("SECRET-guarded cron routes fail closed", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  for (const path of ["./cron/reminders/route", "./cron/inbox-check/route"]) {
+  for (const path of [
+    "./cron/reminders/route",
+    "./cron/inbox-check/route",
+    "./cron/backup/route",
+  ]) {
     it(`GET ${path} → 401 in production with no CRON_SECRET, and never scans`, async () => {
       vi.stubEnv("CRON_SECRET", "");
       vi.stubEnv("NODE_ENV", "production");

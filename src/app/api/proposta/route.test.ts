@@ -44,9 +44,15 @@ vi.mock("@/lib/rate-limit", () => ({
 // touch the repository/filesystem. `getContractByProposal` defaults to null so
 // the accept path creates a fresh contract + sinal invoice; the idempotency test
 // overrides it to return an existing one.
-const contractsDb = vi.hoisted(() => ({ existing: null as Record<string, unknown> | null }));
+const contractsDb = vi.hoisted(() => ({
+  existing: null as Record<string, unknown> | null,
+  acceptedByQuote: null as Record<string, unknown> | null,
+}));
 vi.mock("@/lib/contracts-store", () => {
   const getContractByProposal = vi.fn(async () => contractsDb.existing);
+  // The decline guard looks up whether the quote already has an accepted
+  // contract; default null so ordinary declines proceed.
+  const getAcceptedContractByQuote = vi.fn(async () => contractsDb.acceptedByQuote);
   const createContract = vi.fn(async (c: Record<string, unknown>) => c);
   // Espelha o helper real sobre os primitivos mockados: regista via
   // createContract e só reporta created:true quando não pré-existia contrato —
@@ -59,6 +65,7 @@ vi.mock("@/lib/contracts-store", () => {
   });
   return {
     getContractByProposal,
+    getAcceptedContractByQuote,
     createContract,
     createContractIfAbsent,
     newContractId: vi.fn(() => "contract-id"),
@@ -114,6 +121,7 @@ beforeEach(() => {
   proposalsDb.store.clear();
   quotesDb.store.clear();
   contractsDb.existing = null;
+  contractsDb.acceptedByQuote = null;
   vi.clearAllMocks();
 });
 
@@ -320,6 +328,42 @@ describe("POST /api/proposta", () => {
     expect(log.some((e) => e.actor === "Sistema")).toBe(false);
   });
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A FACTURA DE SINAL NASCE COM O DIA DE LISBOA, NÃO COM O DE GREENWICH
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Esta é a factura auto-emitida quando o casal carrega em «Aceitar»: não passa
+   * por ecrã nenhum e ninguém confere a data antes de ela ir para o livro. Era
+   * `new Date().toISOString()`, que é UTC — no Verão em Portugal (UTC+1), das
+   * 00:00 à 01:00 isso dá o dia ANTERIOR.
+   *
+   * Um casal que aceita às 00:30 de 14 de agosto ficava com uma factura datada
+   * de 13 — a data que sai impressa no PDF e que decide o período de IVA.
+   *
+   * A hora é FIXA no teste (e o processo em UTC, como os servidores onde isto
+   * corre): um teste que só falhasse à meia-noite não guardava nada.
+   */
+  it("uma aceitação às 00:30 de agosto emite o sinal com a data de HOJE em Lisboa", async () => {
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    // 14 de agosto de 2026, 00:30 em Lisboa (UTC+1) — 13 de agosto, 23:30 UTC.
+    vi.setSystemTime(new Date("2026-08-13T23:30:00Z"));
+    try {
+      seedProposal("p-meia-noite");
+      const res = await POST(
+        postReq({ token: createProposalToken("p-meia-noite"), action: "aceitar", ...CONSENT }),
+      );
+      expect(res.status).toBe(200);
+      expect(createInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "sinal", issuedAt: "2026-08-14" }),
+      );
+    } finally {
+      vi.useRealTimers();
+      delete process.env.TZ;
+    }
+  });
+
   it("accepts a proposal whose validUntil is the current day (não expira à meia-noite)", async () => {
     // "Válida até 2026-07-19" tem de valer todo o dia 19, não só até 00:00Z.
     // Bug: Date.parse('2026-07-19') = meia-noite UTC, por isso qualquer aceite
@@ -352,6 +396,53 @@ describe("POST /api/proposta", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  /**
+   * ── «EM NEGOCIAÇÃO» É UMA PROPOSTA VIVA, E É QUANDO SE DIZ QUE SIM ────────
+   *
+   * O `em_negociacao` é, nas palavras do próprio tipo, «o estado que descreve a
+   * maior parte do tempo real: a proposta seguiu, houve resposta, e está a
+   * discutir-se». O back office marca-o depois de um telefonema — o
+   * Acompanhamento chama-lhe «Houve resposta, está a discutir-se» — e o portal
+   * do cliente trata-o como equivalente a «enviada».
+   *
+   * Só esta rota discordava: exigia exactamente `"enviada"`. O casal preenchia
+   * o nome, aceitava as condições, carregava em aceitar — e apanhava «Esta
+   * proposta já não está disponível. Contacte-nos para uma atualizada.» sobre
+   * uma proposta que estava perfeitamente de pé. Pior: é o estado em que a
+   * maioria das propostas está no momento exacto em que o cliente decide.
+   *
+   * A guarda continua a existir e continua a valer — o que ela protege é o
+   * rascunho nunca oferecido e a proposta retirada. É `EM_ABERTO` que diz quais
+   * são as vivas, e é essa a lista que manda.
+   */
+  it("aceita uma proposta EM NEGOCIAÇÃO — é o estado normal quando o cliente diz que sim", async () => {
+    seedProposal("p-neg", { status: "em_negociacao" });
+    const res = await POST(
+      postReq({ token: createProposalToken("p-neg"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(200);
+    expect(proposalsDb.store.get("p-neg")?.status).toBe("aceite");
+    expect(createContract).toHaveBeenCalled();
+  });
+
+  it("recusar uma proposta em negociação também é uma resposta legítima", async () => {
+    seedProposal("p-neg2", { status: "em_negociacao" });
+    const res = await POST(postReq({ token: createProposalToken("p-neg2"), action: "recusar" }));
+    expect(res.status).toBe(200);
+    expect(proposalsDb.store.get("p-neg2")?.status).toBe("rejeitada");
+  });
+
+  it("um RASCUNHO nunca oferecido continua a não poder ser aceite (409)", async () => {
+    // A guarda não desapareceu: o que ela protege é isto.
+    seedProposal("p-rasc", { status: "rascunho" });
+    const res = await POST(
+      postReq({ token: createProposalToken("p-rasc"), action: "aceitar", ...CONSENT }),
+    );
+    expect(res.status).toBe(409);
+    expect(proposalsDb.store.get("p-rasc")?.status).toBe("rascunho");
+    expect(createContract).not.toHaveBeenCalled();
   });
 
   it("rejects accepting a SUPERSEDED (not-newest) proposal with 409 and mutates nothing", async () => {
@@ -422,6 +513,20 @@ describe("POST /api/proposta", () => {
     expect(json.status).toBe("rejeitada");
     expect(proposalsDb.store.get("p4")?.status).toBe("rejeitada");
     expect(quotesDb.store.get("q-p4")).toMatchObject({ status: "rejeitado" });
+  });
+
+  it("refuses to decline an old proposal once the booking is confirmed (no quote downgrade)", async () => {
+    // Client accepted the newer proposal (contract + sinal exist), then clicks
+    // "Recusar" on an older still-"enviada" link. The decline must NOT flip the
+    // already-confirmed quote back to "rejeitado" nor touch the old proposal.
+    seedProposal("p-old", { quoteId: "q-conf", createdAt: "2026-02-01T10:00:00.000Z" });
+    quotesDb.store.set("q-conf", { id: "q-conf", status: "aceite" });
+    contractsDb.acceptedByQuote = { id: "c1", quoteId: "q-conf", status: "aceite" };
+
+    const res = await POST(postReq({ token: createProposalToken("p-old"), action: "recusar" }));
+    expect(res.status).toBe(409);
+    expect(proposalsDb.store.get("p-old")?.status).toBe("enviada");
+    expect(quotesDb.store.get("q-conf")).toMatchObject({ status: "aceite" });
   });
 
   it("is idempotent: a second response returns the recorded one without re-updating", async () => {

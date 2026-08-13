@@ -66,6 +66,24 @@ export const mapper: Mapper<Invoice> = {
     // Same day: keep the higher invoice number first (stable, human order).
     return d !== 0 ? d : b.number.localeCompare(a.number);
   },
+  /**
+   * Compare-and-set sobre o `updated_at` — o caminho do dinheiro é o que tem de
+   * ficar mais apertado.
+   *
+   * A DUPLICAÇÃO já estava tratada: o contador `next_invoice_seq` incrementa
+   * dentro de uma só instrução SQL (o lock de linha do Postgres serializa as
+   * emissões) e os índices parciais únicos impedem um segundo sinal/saldo
+   * activo. O que faltava era o outro lado — PERDER uma escrita.
+   *
+   * A situação concreta: o PATCH de `/api/faturas/[id]` marca a fatura como
+   * `paga` e, em consequência, emite o saldo automático; ao mesmo tempo alguém
+   * grava uma nota ou corrige o vencimento a partir de um ecrã aberto há dois
+   * minutos. Sem comparação, a segunda gravação repõe `status: "emitida"` e
+   * `paidAt: undefined` — o livro fiscal passa a dizer que não foi pago, o
+   * saldo automático fica emitido contra um sinal que já não consta como pago,
+   * e nada disto dá erro. Uma fatura tem de perder uma escrita zero vezes.
+   */
+  touch: true,
 };
 
 const repo = createRepository(mapper);
@@ -121,6 +139,19 @@ export function isUniqueViolation(err: unknown): boolean {
  * Not a hard mutex, but in dev two simultaneous POSTs are the realistic worst
  * case and the counter never goes backwards.
  *
+ * CRÍTICO (fiscal), o outro lado da mesma decisão: em PRODUÇÃO sem Supabase
+ * esse contador de recurso vive no `data/app-state.json`, que em serverless é o
+ * disco da função — apagado no deploy seguinte. O percurso é este: emite-se até
+ * FT 2026/0031, sai um deploy, e a factura seguinte é FT 2026/0001. Um número
+ * JÁ USADO, noutro cliente e noutro valor. Numa contabilidade portuguesa isso
+ * não é um incómodo de software: são dois documentos com o mesmo número, e o
+ * assunto passa a ser com a Autoridade Tributária.
+ *
+ * Por isso RECUSA-SE emitir. É a única guarda desta família que pode impedir
+ * alguém de trabalhar, e é deliberado — emitir com um número errado é pior do
+ * que não emitir, porque a factura errada não se apaga, corrige-se com uma nota
+ * de crédito e uma explicação.
+ *
  * CRÍTICO (fiscal): se o Supabase ESTÁ configurado mas a RPC falha (ex.: a
  * migração `db/schema.sql` — invoice_counters + next_invoice_seq — ainda não
  * correu), NÃO caímos para o contador racy de app_state. Em produção, um número
@@ -154,9 +185,33 @@ export async function nextInvoiceNumber(): Promise<string> {
         { year },
       );
       throw new Error(
-        "Numeração de faturas indisponível: o contador atómico (next_invoice_seq) falhou. Aplique db/schema.sql.",
+        "Numeração de faturas indisponível: o contador atómico (next_invoice_seq) falhou. Aplica db/schema.sql.",
       );
     }
+  }
+
+  /**
+   * ── Produção sem Supabase: RECUSAR, e antes de tocar no contador ─────────
+   *
+   * A verificação vem antes do `getState`/`setState` de propósito: recusar
+   * depois de incrementar queimava um número por cada tentativa falhada, o que
+   * é exactamente o tipo de buraco na sequência que esta função existe para não
+   * ter.
+   *
+   * A regra de ambiente é a MESMA de `repository.assertWritableInProd` e de
+   * `app-state.oFicheiroEhEfemero`, escrita aqui à mão pela mesma razão que na
+   * primeira: são a mesma ideia e têm de mudar juntas. (Importar a segunda
+   * amarrava este módulo a todo o `app-state` só para ler uma variável.)
+   */
+  if (process.env.NODE_ENV === "production") {
+    log.error(
+      "nextInvoiceNumber: emissão RECUSADA — Supabase não configurado em produção. O contador de recurso vive no disco da função e o próximo deploy apaga-o: a numeração fiscal recomeçaria em 0001 e repetiria números já emitidos.",
+      undefined,
+      { year },
+    );
+    throw new Error(
+      "Numeração de faturas indisponível: sem base de dados, o contador não sobrevive a um deploy e a numeração fiscal repetir-se-ia. Define SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no alojamento antes de emitir.",
+    );
   }
 
   // ── Fallback: read-increment-write over app-state (SÓ dev — Supabase não

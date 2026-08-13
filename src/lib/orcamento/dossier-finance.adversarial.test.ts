@@ -103,9 +103,14 @@ describe("computeEventMetrics — margin adversarial edges", () => {
       }),
     });
     const m = computeEventMetrics(d, TODAY);
-    expect(m.contracted).toBe(5000);
+    // 5 000 € é o preço SEM IVA; contratado = 6 150 € com IVA, que é a base em
+    // que os pagamentos e as facturas se comparam. A MARGEM, essa, corre em
+    // líquido dos dois lados — o IVA não é receita nem é custo (ver a nota em
+    // `EventMetrics.margin`): 5 000 − 6 504,07 = −1 504,07 €.
+    expect(m.contracted).toBe(6150);
     expect(m.supplierCosts).toBe(8000);
-    expect(m.margin).toBe(-3000); // receita − custo, honestly negative
+    expect(m.supplierCostsNet).toBe(6504.07);
+    expect(m.margin).toBe(-1504.07); // receita − custo, honestamente negativa
     expect(Number.isFinite(m.margin)).toBe(true);
     expect(m.pctPaid).toBe(0); // nothing paid, no divide-by-zero
   });
@@ -151,28 +156,37 @@ describe("computeEventMetrics — margin adversarial edges", () => {
   });
 
   it("overpaid ledger → pctPaid exceeds 1 (coherent, not capped)", () => {
+    // Contratado = 20 000 € sem IVA → 24 600 € com IVA; recebeu-se 25% a mais do
+    // que isso. A percentagem compara com IVA dos dois lados.
     const d = data({
       quote: makeQuote({ quotedPrice: 20000, priceBreakdown: undefined as never }),
-      invoices: [invoice({ kind: "total", amount: 25000, status: "paga" })],
+      invoices: [invoice({ kind: "total", amount: 30750, status: "paga" })],
     });
     const m = computeEventMetrics(d, TODAY);
-    expect(m.ledgerPaid).toBe(25000);
+    expect(m.contracted).toBe(24600);
+    expect(m.ledgerPaid).toBe(30750);
     expect(m.pctPaid).toBeCloseTo(1.25, 10);
   });
 });
 
 describe("computeEventMetrics — ledger sinal/saldo/total coherence", () => {
+  // Contratado 20 000 € sem IVA → 24 600 € com IVA. As faturas fasearam-no a
+  // 30/70 sobre o valor COM IVA (é assim que a rota de faturação as emite):
+  // sinal 7 380 €, saldo 17 220 €.
+  const SINAL = 7380;
+  const SALDO = 17220;
+
   it("anulada invoices are excluded from BOTH ledgerIssued and ledgerPaid", () => {
     const d = data({
       quote: makeQuote({ quotedPrice: 20000, priceBreakdown: undefined as never }),
       invoices: [
-        invoice({ id: "i1", kind: "sinal", amount: 6000, status: "paga" }),
-        invoice({ id: "i2", kind: "saldo", amount: 14000, status: "anulada" }), // voided
+        invoice({ id: "i1", kind: "sinal", amount: SINAL, status: "paga" }),
+        invoice({ id: "i2", kind: "saldo", amount: SALDO, status: "anulada" }), // voided
       ],
     });
     const m = computeEventMetrics(d, TODAY);
-    expect(m.ledgerIssued).toBe(6000); // voided saldo not issued
-    expect(m.ledgerPaid).toBe(6000); // and certainly not paid
+    expect(m.ledgerIssued).toBe(SINAL); // voided saldo not issued
+    expect(m.ledgerPaid).toBe(SINAL); // and certainly not paid
     expect(m.pctPaid).toBeCloseTo(0.3, 10);
   });
 
@@ -180,13 +194,13 @@ describe("computeEventMetrics — ledger sinal/saldo/total coherence", () => {
     const d = data({
       quote: makeQuote({ quotedPrice: 20000, priceBreakdown: undefined as never }),
       invoices: [
-        invoice({ id: "i1", kind: "sinal", amount: 6000, status: "paga" }),
-        invoice({ id: "i2", kind: "saldo", amount: 14000, status: "emitida" }),
+        invoice({ id: "i1", kind: "sinal", amount: SINAL, status: "paga" }),
+        invoice({ id: "i2", kind: "saldo", amount: SALDO, status: "emitida" }),
       ],
     });
     const m = computeEventMetrics(d, TODAY);
-    expect(m.ledgerIssued).toBe(20000);
-    expect(m.ledgerPaid).toBe(6000); // saldo issued but unpaid
+    expect(m.ledgerIssued).toBe(24600);
+    expect(m.ledgerPaid).toBe(SINAL); // saldo issued but unpaid
   });
 });
 
@@ -220,6 +234,8 @@ describe("computeEventMetrics — aggregation invariant (the Estatísticas sum)"
     ];
     let sumContracted = 0,
       sumCosts = 0,
+      sumCostsNet = 0,
+      sumNet = 0,
       sumMargin = 0;
     for (const q of quotes) {
       const m = computeEventMetrics(
@@ -228,12 +244,21 @@ describe("computeEventMetrics — aggregation invariant (the Estatísticas sum)"
       );
       sumContracted += m.contracted;
       sumCosts += m.supplierCosts;
+      sumCostsNet += m.supplierCostsNet;
+      sumNet += m.contractedNet;
       sumMargin += m.margin;
     }
-    expect(sumContracted).toBe(35000);
+    // 20 000 + 5 000 + 10 000 sem IVA = 35 000 € → 43 050 € com IVA, que é a base
+    // em que os pagamentos e as facturas se comparam.
+    expect(sumContracted).toBe(43050);
     expect(sumCosts).toBe(20000);
-    expect(sumMargin).toBe(15000);
-    expect(sumMargin).toBe(sumContracted - sumCosts); // fold stays coherent with a −3000 event mixed in
+    expect(sumNet).toBe(35000);
+    // A margem soma-se em LÍQUIDO dos dois lados: 35 000 − 16 260,17. O total
+    // que se mostra no quadro de rentabilidade tem de continuar a ser a soma das
+    // margens de cada evento, com o evento a perder lá pelo meio.
+    expect(sumCostsNet).toBeCloseTo(16260.17, 2);
+    expect(sumMargin).toBeCloseTo(18739.83, 2);
+    expect(sumMargin).toBeCloseTo(sumNet - sumCostsNet, 10); // o fold mantém-se coerente
   });
 });
 

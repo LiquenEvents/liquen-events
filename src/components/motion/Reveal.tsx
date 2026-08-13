@@ -3,8 +3,9 @@
 import { useRef, type ElementType, type ReactNode } from "react";
 import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 import { useIsomorphicLayoutEffect } from "@/lib/motion/useIsomorphicLayoutEffect";
+import { EASE_OUT, REVEAL_S, STAGGER_S } from "@/lib/motion/tokens";
 
-type Variant = "rise" | "fade" | "mask";
+type Variant = "rise" | "fade" | "mask" | "zoom";
 
 /**
  * Scroll-reveal primitive driven by pure CSS transitions + a shared
@@ -21,8 +22,12 @@ type Variant = "rise" | "fade" | "mask";
  * stops watching it. The effect never runs on the server, so no-JS /
  * reduced-motion users just see the finished content, statically.
  *
- * Easing note: GSAP's `power3.out` is easeOutCubic; `cubic-bezier(0.33, 1, 0.68,
- * 1)` reproduces it to within ~0.003 of normalized progress — visually identical.
+ * Easing note: a revelação desacelera na curva de assinatura do sítio — EASE_OUT
+ * em `@/lib/motion/tokens`, o mesmo valor que `--ease-out` no globals.css. Este
+ * comentário descrevia antes uma curva DIFERENTE (a equivalência ao `power3.out`
+ * do GSAP), que a constante logo abaixo já não usava há muito: é o sintoma
+ * exacto de um valor copiado à mão em vários sítios. Passou a ficha partilhada,
+ * comparada com o CSS por teste, para não voltar a divergir em silêncio.
  *
  * - `rise`  — fade + gentle upward glide (the workhorse).
  * - `fade`  — opacity only.
@@ -31,10 +36,9 @@ type Variant = "rise" | "fade" | "mask";
  * `stagger` animates the element's direct children in sequence instead.
  */
 
-// CSS equivalent of GSAP's `power3.out` (easeOutCubic).
-// The site's signature ease-out (matches --ease-out in globals.css) so scroll
-// reveals decelerate like every other motion on the page.
-const EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
+// A desaceleração de assinatura, partilhada com o CSS e com as outras
+// primitivas (ver @/lib/motion/tokens). Era aqui um literal próprio.
+const EASE = EASE_OUT;
 
 // All instances share observers instead of each spinning up its own. Instances
 // with the same trigger geometry (`start`) share ONE observer; each element
@@ -98,8 +102,9 @@ export default function Reveal({
   delay = 0,
   y = 42,
   // 0.75s (was 1.1s): the old default read as sluggish next to AnimateIn's 0.75s
-  // on the same page, so interior-page reveals felt slow. Now they match.
-  duration = 0.75,
+  // on the same page, so interior-page reveals felt slow. Now they don't just
+  // happen to match — leem a MESMA ficha (REVEAL_S).
+  duration = REVEAL_S,
   stagger,
   start = "top 85%",
 }: {
@@ -121,7 +126,7 @@ export default function Reveal({
 
     const targets: HTMLElement[] = stagger ? (Array.from(el.children) as HTMLElement[]) : [el];
     if (targets.length === 0) return;
-    const step = typeof stagger === "number" ? stagger : 0.09;
+    const step = typeof stagger === "number" ? stagger : STAGGER_S;
 
     // Hide synchronously, before paint — plain inline styles, no transition — so
     // above-the-fold reveals never flash their finished state first.
@@ -130,6 +135,14 @@ export default function Reveal({
         t.style.clipPath = "inset(0 0 100% 0)";
         t.style.transform = `translateY(${y * 0.5}px)`;
         t.style.willChange = "clip-path, transform";
+      } else if (variant === "zoom") {
+        // Cinematic settle: a slightly over-scaled, faded image eases to rest.
+        // Pure transform+opacity → GPU-composited, so it stays 60fps smooth even
+        // on full-bleed photos (unlike a clip-path wipe, which repaints).
+        t.style.opacity = "0";
+        t.style.transform = "scale(1.08)";
+        t.style.transformOrigin = "center";
+        t.style.willChange = "transform, opacity";
       } else if (variant === "fade") {
         t.style.opacity = "0";
       } else {
@@ -147,6 +160,10 @@ export default function Reveal({
         t.style.transition = `clip-path ${duration}s ${EASE} ${d}s, transform ${duration}s ${EASE} ${d}s`;
         t.style.clipPath = "inset(0 0 0% 0)";
         t.style.transform = "translateY(0px)";
+      } else if (variant === "zoom") {
+        t.style.transition = `opacity ${duration}s ${EASE} ${d}s, transform ${duration}s ${EASE} ${d}s`;
+        t.style.opacity = "1";
+        t.style.transform = "scale(1)";
       } else if (variant === "fade") {
         t.style.transition = `opacity ${duration}s ${EASE} ${d}s`;
         t.style.opacity = "1";

@@ -1,18 +1,224 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import type { ZodError } from "zod";
 import type { Quote, QuoteFormData, PriceBreakdown } from "@/lib/orcamento/types";
-import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, LOCATION_LABELS } from "@/lib/orcamento/data";
-import { sendMail, esc } from "@/lib/mail";
+import {
+  CATEGORIES,
+  EVENT_TYPES_BY_CATEGORY,
+  LOCATION_LABELS,
+  BUDGET_RANGES,
+  URGENCY_OPTIONS,
+  eventTagLabel,
+} from "@/lib/orcamento/data";
+import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { rotularPontos } from "@/lib/orcamento/decoracao";
+import { guestRangeLabel, ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcamento/data";
+import { EMAIL_LOGO_CID, emailLogoAttachment } from "@/lib/email-logo";
 import { buildClientConfirmation } from "@/lib/client-confirmation";
 import { LANG_COOKIE, normalizeLocale } from "@/lib/i18n/config";
-import { createQuote, listQuotes, getQuote, generateQuoteId, quoteIdFor } from "@/lib/quotes-store";
+import type { Locale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n";
+import {
+  createQuote,
+  listQuotes,
+  listQuoteSummaries,
+  getQuote,
+  generateQuoteId,
+  quoteIdFor,
+} from "@/lib/quotes-store";
 import { isAuthed } from "@/lib/admin-auth";
+import { jsonWithEtag } from "@/lib/api-cache";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
-import { quotePayloadSchema, firstError } from "@/lib/validation";
+import { quotePayloadSchema } from "@/lib/validation";
 import { log } from "@/lib/logger";
 import { eur0 as eur } from "@/lib/money";
+import { enviarEventos, ipDoPedido } from "@/lib/meta/capi";
+import { EVENTOS as EVENTOS_META } from "@/lib/meta/eventos";
+import { desserializar as desserializarMeta } from "@/lib/meta/click-id";
 
 export const maxDuration = 30;
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O QUE SE LÊ QUANDO O ENVIO É RECUSADO
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O `error` que estas respostas trazem vai DIREITO para o ecrã: os três
+ * formulários públicos (OrcamentoForm, PedidoRapido, PedidoRelampago) mostram-no
+ * tal e qual o receberam, e é a única frase que a pessoa tem para perceber o que
+ * fazer a seguir.
+ *
+ * Duas coisas estavam mal, e as duas custam pedidos:
+ *
+ *  1. o 400 devolvia a frase INTERNA do zod. Quem colasse uma morada comprida no
+ *     «Local / região» — campo sem tecto nenhum no ecrã — carregava em Enviar e
+ *     lia «Too big: expected string to have <=300 characters». Em inglês, sem
+ *     dizer de que campo se fala, e sem nada para corrigir à vista. O pedido não
+ *     seguia, e o passo seguinte dessa pessoa é fechar a página;
+ *
+ *  2. tudo isto só sabia falar português, numa rota que já lê a língua de quem
+ *     escreveu para escolher a língua do email de confirmação. Quem está a ler o
+ *     site em inglês recebia a recusa em português — pior do que o genérico que o
+ *     próprio formulário mostraria se o servidor não dissesse nada.
+ *
+ * As frases passam a ser escritas AQUI, na língua da pessoa, e a nomear o campo
+ * com o mesmo rótulo que ela tem à frente — vindo do dicionário, para não haver
+ * dois nomes para o mesmo campo.
+ */
+
+/** O rótulo do campo, tal como está escrito no formulário. `null` para os
+ *  campos que a pessoa nunca vê (identificadores de anúncios, taxonomias). */
+function rotuloDoCampo(caminho: PropertyKey[], locale: Locale): string | null {
+  const to = getDictionary(locale).orcamento;
+  const campo = String(caminho[caminho.length - 1] ?? "");
+  const rotulos: Record<string, string> = {
+    name: to.labelNome,
+    email: to.labelEmail,
+    phone: to.labelTelefone,
+    location: to.labelLocal,
+    notes: to.labelMensagem,
+    guests: to.labelPessoas,
+    date: to.labelData,
+  };
+  return rotulos[campo] ?? null;
+}
+
+function mensagemDeValidacao(err: ZodError, locale: Locale): string {
+  const to = getDictionary(locale).orcamento;
+  const en = locale === "en";
+  const issue = err.issues[0];
+  const campo = issue ? String(issue.path[issue.path.length - 1] ?? "") : "";
+  const rotulo = issue ? rotuloDoCampo(issue.path, locale) : null;
+
+  // As duas recusas com nome próprio, ditas com a MESMA frase que o formulário
+  // já mostra ao lado do campo — ver o erro duas vezes escrito de duas maneiras
+  // faz duvidar de que seja o mesmo erro.
+  if (campo === "name" && issue?.code === "too_small") return to.errNome;
+  if (campo === "email" && issue?.code === "invalid_format") return to.errEmail;
+
+  // A regra "email OU telefone": a única invariante do esquema que não é sobre
+  // um campo isolado, e por isso a única cuja frase não pode nomear um.
+  //
+  // Vem do dicionário, como as duas de cima, porque o FORMULÁRIO mostra esta
+  // mesma frase ao lado do campo antes de sequer tentar enviar (ver `contactoErr`,
+  // em OrcamentoForm.tsx). Estava aqui escrita à mão nas duas línguas, e duas
+  // cópias da mesma frase é como se acaba com duas frases diferentes para a
+  // mesma recusa.
+  if (issue?.code === "custom") return to.errContacto;
+
+  if (issue?.code === "too_big" && typeof issue.maximum === "number") {
+    const max = issue.maximum;
+    if (rotulo) {
+      return en
+        ? `“${rotulo}” is too long. Please shorten it to ${max} characters or fewer.`
+        : `O campo «${rotulo}» é demasiado longo. Encurte-o para ${max} caracteres ou menos.`;
+    }
+    return en
+      ? `One of the fields is too long (maximum ${max} characters).`
+      : `Um dos campos é demasiado longo (máximo ${max} caracteres).`;
+  }
+
+  if (rotulo) {
+    return en ? `Please check the “${rotulo}” field.` : `Verifique o campo «${rotulo}».`;
+  }
+  return en
+    ? "We couldn't read your request. Please check the fields and try again."
+    : "Não foi possível ler o seu pedido. Verifique os campos e tente novamente.";
+}
+
+/**
+ * O tecto de tentativas conta por ENDEREÇO, e um endereço não é uma pessoa: o
+ * escritório, o espaço de eventos com wi-fi partilhado e a rede móvel do
+ * operador põem muita gente atrás do mesmo. Quem for recusado por causa do
+ * vizinho não fez nada de errado — e a frase dizia-lhe «dentro de momentos»,
+ * que tanto podia ser cinco segundos como um minuto inteiro. O servidor SABE
+ * quanto falta (é o que já vai no `Retry-After`); passa a dizê-lo.
+ */
+function mensagemDeLimite(segundos: number, locale: Locale): string {
+  const en = locale === "en";
+  const minutos = Math.ceil(segundos / 60);
+  const quanto =
+    segundos < 60
+      ? en
+        ? `${segundos} seconds`
+        : `${segundos} segundos`
+      : en
+        ? `${minutos} minute${minutos === 1 ? "" : "s"}`
+        : `${minutos} minuto${minutos === 1 ? "" : "s"}`;
+  return en
+    ? `Too many requests from this connection. Please try again in ${quanto}, or send us a message on WhatsApp.`
+    : `Demasiados pedidos a partir desta ligação. Tente novamente daqui a ${quanto}, ou fale connosco pelo WhatsApp.`;
+}
+
+function mensagemSemRegisto(locale: Locale): string {
+  return locale === "en"
+    ? "We couldn't record your request. Please try again in a moment, or contact us directly."
+    : "Não foi possível registar o seu pedido. Tente novamente dentro de momentos ou contacte-nos diretamente.";
+}
+
+/**
+ * Não há email do cliente, logo não há confirmação a enviar.
+ *
+ * É uma saída antecipada com nome, e não um `if` a envolver sessenta linhas:
+ * o bloco da confirmação já vive dentro de um `try`, e enfiá-lo num `if`
+ * mudava a indentação de tudo o que lá está sem mudar o comportamento de
+ * nada. Quem lê o `catch` vê explicitamente que este caso não é uma falha.
+ */
+class NadaParaConfirmar extends Error {}
+
+/**
+ * Reenvia o `Lead` para a Meta pela Conversions API, com o MESMO `event_id`
+ * que o browser usou no pixel.
+ *
+ * ── AS TRÊS GUARDAS, E PORQUE É QUE CADA UMA EXISTE ────────────────────────
+ *  1. sem `leadEventId` não se envia. É o que garante a deduplicação: um
+ *     identificador gerado aqui nunca encontraria o par do browser, e a
+ *     conversão contaria duas vezes;
+ *  2. sem `metaClick` não se envia. Esse campo só existe quando o pixel
+ *     correu, e o pixel só corre com consentimento — portanto a presença dele
+ *     É a prova de consentimento que o servidor tem. Não se inventa outra;
+ *  3. sem configuração (`META_DATASET_ID` / `META_CAPI_ACCESS_TOKEN`) o
+ *     `enviarEventos` devolve `sem-configuracao` sem abrir socket nenhum.
+ *
+ * NUNCA lança para fora: quem chama embrulha à mesma, mas a regra vale a pena
+ * ser dita duas vezes — o lead vale mil vezes mais do que o evento.
+ */
+async function reenviarLeadParaMeta(
+  request: NextRequest,
+  id: string,
+  form: QuoteFormData,
+): Promise<void> {
+  const eventId = (form.leadEventId ?? "").trim();
+  const meta = (form.metaClick ?? "").trim();
+  if (!eventId || !meta) return;
+
+  const { fbp, fbc } = desserializarMeta(meta);
+  const r = await enviarEventos([
+    {
+      nome: EVENTOS_META.lead,
+      eventId,
+      quando: Math.floor(Date.now() / 1000),
+      fonte: "website",
+      contexto: form.notes?.slice(0, 100) || undefined,
+      pessoa: {
+        email: form.email || undefined,
+        telefone: form.phone || undefined,
+        nome: form.name || undefined,
+        fbp: fbp || undefined,
+        fbc: fbc || undefined,
+        ip: ipDoPedido(request.headers) || undefined,
+        agente: request.headers.get("user-agent") ?? undefined,
+      },
+    },
+  ]);
+  if (!r.enviado && r.motivo !== "sem-configuracao") {
+    log.error("orcamento: Lead não chegou à Meta", undefined, {
+      id,
+      motivo: r.motivo,
+      detalhe: r.detalhe,
+    });
+  }
+}
 
 const MONTHS_PT = [
   "jan",
@@ -67,125 +273,482 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   const estimate = breakdown
     ? `${eur(breakdown.rangeMin)} – ${eur(breakdown.rangeMax)}${breakdown.isEstimate ? " (estimativa)" : ""}`
     : "";
-  const when = prettyDate(form.date);
   const name = form.name?.trim() || "Sem nome";
+  const firstName = name.split(" ")[0] || "o cliente";
   const subtitle = [et, cat].filter(Boolean).join(" · ");
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * «O SEU PEDIDO PARA O CASAMENTOS» — e saiu assim para clientes verdadeiros
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O rótulo da taxonomia é um BALDE NO PLURAL («Casamentos», «Batizados») e
+   * caía dentro de três frases escritas no singular: a mensagem de WhatsApp, e
+   * o assunto e o corpo do `mailto`. Este último é o botão de resposta do email
+   * que a equipa recebe — ela carrega, o correio abre com o assunto já escrito,
+   * e o erro chega à caixa do cliente com o nome dela em cima.
+   *
+   * São duas correcções, e a segunda é a que fecha o buraco:
+   *
+   *   1. A PALAVRA DO PRÓPRIO CLIENTE PRIMEIRO, que é a regra que o corpo da
+   *      confirmação (`confirmarAoCliente`) já seguia — quem escreveu «Casamento
+   *      da Ana e do João» lê isso de volta, e não o nome do balde.
+   *   2. AS FRASES DEIXARAM DE PRECISAR DE ARTIGO. Sem `eventName`, o que resta
+   *      é o balde no plural, e nenhum artigo colado à frente serve para os dois
+   *      números. Adivinhar a concordância (uma tabela de artigos, um
+   *      pluralizador) é uma máquina inteira para um problema que se resolve
+   *      escrevendo a frase de outra maneira: o evento passa a aparecer só onde
+   *      cabe como ETIQUETA (o assunto, depois de um «·»), que é uma construção
+   *      que nunca discorda. As outras duas frases dizem «o seu pedido» — o
+   *      cliente sabe o que pediu, e o email à equipa tem o resumo todo em cima.
+   */
+  // A etiqueta sai do mesmo sítio que a da confirmação — o `eventTagLabel`,
+  // que prefere a palavra do cliente e devolve o tipo no SINGULAR. A equipa lê
+  // sempre em português; o assunto que ela envia com um clique deixa de dizer
+  // «o seu pedido · Casamentos».
+  const evento = eventTagLabel(form, "pt") || cat || "";
 
-  // Subject leads with WHO + WHAT so it's scannable in the inbox; the long
-  // reference stays in the body.
-  const subject =
-    `Novo orçamento — ${[name, et || cat].filter(Boolean).join(" · ")}` +
-    (form.guests ? ` (${form.guests} convidados)` : "");
+  // The date is the hero — availability decides the booking. Lead with the
+  // weekday, flag weekends, and show the full range for a multi-day event. The
+  // weekday is derived from a Y/M/D-constructed date, so it's correct whatever
+  // the server timezone is.
+  const WEEKDAYS_PT = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec((form.date ?? "").trim());
+  const weekday = dm
+    ? WEEKDAYS_PT[new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3])).getDay()]
+    : "";
+  const isWeekend = weekday === "sábado" || weekday === "domingo";
+  const when = prettyDate(form.date);
+  const dateHero =
+    form.isMultiDay && form.endDate
+      ? `${when} – ${prettyDate(form.endDate)}`
+      : weekday
+        ? `${weekday}, ${when}`
+        : when;
 
-  // Detail rows — only the ones actually filled in.
-  // One hairline-separated row. `valueHtml` is already-safe HTML (esc'd text or
-  // a link), so it can hold a mailto:/tel: anchor; empty value → no row.
+  // Fields the form captures but the old email dropped — shown only when set.
+  const budgetLabel = form.budgetRange
+    ? (BUDGET_RANGES.find((b) => b.id === form.budgetRange)?.label ?? "")
+    : "";
+  const urgencyLabel =
+    form.urgency && form.urgency !== "standard"
+      ? (URGENCY_OPTIONS.find((u) => u.id === form.urgency)?.label ?? "")
+      : "";
+  // ── "COMO NOS CONHECEU" NÃO VAI NO EMAIL ─────────────────────────────────
+  // "Retira isto do email", com a fotografia da linha a dizer
+  // `Como nos conheceu  ref:www.google.com`.
+  //
+  // Tinha razão, e o problema não é o campo — é o sítio. O `referralSource`
+  // não é escrito por ninguém: é apanhado pelo LeadSourceCapture no primeiro
+  // ecrã da visita, e o que lá está é `ref:<domínio>` ou uma lista de UTMs,
+  // ou seja, notação de máquina. Num email que a equipa lê com pressa para
+  // decidir se responde, aquela linha ocupa espaço e não ajuda a decidir nada.
+  //
+  // O campo CONTINUA a ser capturado e gravado. O sítio dele é o back office,
+  // onde já alimenta a agregação "de onde vêm os pedidos"
+  // (StatsDashboard.tsx) — que é uma pergunta de fim de mês, não de resposta
+  // a um pedido. Só deixou de ser desenhado no email.
+
+  // ── O ASSUNTO DIZ PRIMEIRO O QUE É ────────────────────────────────────────
+  // A queixa, textual: "não gosto disto assim, quero que fique mais claro que
+  // é um pedido de orçamento, está uma confusão enorme".
+  //
+  // O assunto começava pelo trio de triagem — "Casamentos · 18 set 2027 ·
+  // 250 pax — Catarina..." — porque isso é o que decide se o trabalho cabe na
+  // agenda. Bom raciocínio, conclusão errada: na lista da caixa de correio,
+  // ao lado de tudo o resto, aquilo lia-se como uma marcação já feita, e não
+  // como alguém a pedir orçamento. A triagem só serve depois de se saber o
+  // que a mensagem é.
+  //
+  // "Pedido de orçamento" leva 19 caracteres dos cerca de 45 que um telemóvel
+  // mostra. É caro, e paga-se de bom grado: o resto do assunto repete-se todo
+  // dentro do email, e a linha de pré-visualização — que é a seguir — leva o
+  // nome e a data. O que não se pode recuperar é a mensagem parecer outra
+  // coisa.
+  const subjectLead = [et || cat, when, form.guests ? `${form.guests} pax` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  const subject = subjectLead
+    ? `Pedido de orçamento · ${subjectLead} — ${name}`
+    : `Pedido de orçamento — ${name}`;
+
+  // Hidden inbox-preview line — surfaces what the subject can't.
+  const preheader = [
+    name,
+    dateHero + (isWeekend ? " (fim de semana)" : ""),
+    subtitle,
+    form.guests ? `${form.guests} convidados` : "",
+    local,
+    budgetLabel ? `orçamento ${budgetLabel}` : "",
+    urgencyLabel ? "resposta urgente" : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  // Detail row — hairline-separated; empty value → no row. `valueHtml` is
+  // already-safe HTML (esc'd text or a link). Classes drive dark-mode overrides.
   const row = (label: string, valueHtml: string) =>
     valueHtml
       ? `<tr>
-           <td style="padding:11px 0;border-top:1px solid #f0efe9;color:#9a9e8c;font-size:13px;width:128px;vertical-align:top">${esc(label)}</td>
-           <td style="padding:11px 0;border-top:1px solid #f0efe9;color:#26291d;font-size:14px;font-weight:500">${valueHtml}</td>
+           <td class="em-hair em-muted" style="padding:11px 0;border-top:1px solid #eee8dc;color:#6b6f5a;font-size:13px;width:120px;vertical-align:top">${esc(label)}</td>
+           <td class="em-hair em-strong" style="padding:11px 0;border-top:1px solid #eee8dc;color:#2a2620;font-size:14px;font-weight:500">${valueHtml}</td>
          </tr>`
       : "";
   const link = (href: string, text: string) =>
-    `<a href="${href}" style="color:#5c6437;text-decoration:none">${esc(text)}</a>`;
+    `<a href="${href}" style="color:#4c6150;text-decoration:none">${esc(text)}</a>`;
 
-  const rows =
-    row("Email", link(`mailto:${esc(form.email)}`, form.email)) +
+  // Decision block first (can we do it?), contact block second (how to reply).
+  // Os pontos de decoração que o casal escolheu no pedido. Vão no bloco de
+  // DECISÃO e não nas notas porque é isto que diz, antes da primeira chamada,
+  // se o pedido é a cerimónia toda ou só as mesas do jantar.
+  const decor = rotularPontos(form.decorPoints ?? [], "pt").join(" · ");
+  const noivos = [form.partnerA, form.partnerB]
+    .map((n) => n?.trim())
+    .filter(Boolean)
+    .join(" & ");
+  // Quando não há número exacto, a ordem de grandeza vale mais do que um vazio
+  // — um casamento de 40 e um de 300 não são o mesmo trabalho.
+  const convidados = form.guests
+    ? String(form.guests)
+    : guestRangeLabel(form.guestsRange)
+      ? `~ ${guestRangeLabel(form.guestsRange)}`
+      : "";
+  // A cerimónia e o espaço vão no bloco de DECISÃO pela mesma razão que a
+  // decoração: são as duas linhas que dizem, antes da primeira chamada, quantas
+  // montagens são e se é preciso um plano para o caso de chover.
+  const cerimonia = ceremonyTypeLabel(form.ceremonyType);
+  const espaco = spaceTypeLabel(form.spaceType);
+  const eventRows =
+    row("Convidados", esc(convidados)) +
+    row("Local", esc(local)) +
+    (espaco ? row("Espaço", esc(espaco)) : "") +
+    (cerimonia ? row("Cerimónia", esc(cerimonia)) : "") +
+    // "Casal" e não "Noivos": o formulário deixou de presumir que são um homem
+    // e uma mulher, e o email que ela lê a seguir não pode voltar a presumi-lo.
+    (noivos ? row("Casal", esc(noivos)) : "") +
+    (decor ? row("Decoração", esc(decor)) : "") +
+    (budgetLabel ? row("Orçamento", esc(budgetLabel)) : "") +
+    (urgencyLabel ? row("Antecedência", esc(urgencyLabel)) : "");
+  // O email pode agora vir VAZIO (a regra é "email ou telefone" — ver
+  // quoteFormSchema). `row()` já omite a linha quando o valor é vazio, mas o
+  // `link()` construiria um `mailto:` para lado nenhum, por isso a guarda.
+  const contactRows =
+    (form.email ? row("Email", link(`mailto:${esc(form.email)}`, form.email)) : "") +
     (form.phone ? row("Telefone", link(`tel:${telHref(form.phone)}`, form.phone)) : "") +
     (form.company ? row("Empresa", esc(form.company)) : "") +
-    (form.nif ? row("NIF", esc(form.nif)) : "") +
-    row("Data", esc(when)) +
-    row("Convidados", form.guests ? String(form.guests) : "") +
-    row("Local", esc(local));
+    (form.nif ? row("NIF", esc(form.nif)) : "");
 
-  const html = `
-  <div style="margin:0;padding:0;background:#f6f5f2">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f5f2;padding:28px 12px">
-      <tr><td align="center">
-        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #ecebe4;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-          <!-- Cabeçalho -->
-          <tr><td style="padding:34px 40px 0">
-            <div style="color:#a9a99f;font-size:11px;letter-spacing:3px;text-transform:uppercase">Líquen Events</div>
-            <div style="color:#a9a99f;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-top:26px">Novo pedido de orçamento</div>
-            <div style="font-family:Georgia,'Times New Roman',serif;font-size:25px;color:#1c1f17;margin-top:8px;line-height:1.2">${esc(name)}</div>
-            ${subtitle ? `<div style="color:#7c806f;font-size:14px;margin-top:6px">${esc(subtitle)}</div>` : ""}
-          </td></tr>
+  // Email-specific logo: the site PNG carries ~23% transparent padding, so at a
+  // 38px box the wordmark rendered only ~18px tall (illegible), and width/height
+  // attrs that didn't match its 1.674 ratio made Outlook stretch it. This asset
+  // is pre-trimmed onto an opaque cream plate at an exact 2:1 ratio — the plate
+  // also keeps the mark readable in Gmail's dark theme, which never inverts
+  // image pixels.
+  // cid: — the wordmark travels inside the message. A hosted URL 404s until
+  // production is promoted, and is blocked outright by clients that suppress
+  // remote images by default. See lib/email-logo.
+  const logoUrl = `cid:${EMAIL_LOGO_CID}`;
 
-          <!-- Contactos + detalhes -->
-          <tr><td style="padding:22px 40px 0">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
-          </td></tr>
+  // Actions. WhatsApp is primary when there's a phone (fastest, warmest channel
+  // for PT leads); otherwise the email reply is primary. Both are prefilled.
+  const waMsg = `Olá ${firstName}, fala a equipa da Líquen Events 🌿 Recebemos o seu pedido e teríamos todo o gosto em ajudar. Quando lhe der jeito, é só dizer — combinamos uma conversa sem compromisso.`;
+  const waDigits = form.phone ? form.phone.replace(/\D/g, "") : "";
+  const waNumber = /^9\d{8}$/.test(waDigits) ? `351${waDigits}` : waDigits;
+  const waHref = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsg)}` : "";
+  const mailtoHref = form.email
+    ? // O evento entra como ETIQUETA, depois de um «·» — o separador que a casa
+      // já usa em todo o lado. Assim identifica o assunto sem nunca discordar.
+      `mailto:${esc(form.email)}?subject=${encodeURIComponent(
+        `Líquen Events — o seu pedido${evento ? ` · ${evento}` : ""}`,
+      )}` +
+      `&body=${encodeURIComponent(
+        `Olá ${firstName},\n\nMuito obrigado pelo seu pedido de orçamento — foi um gosto recebê-lo.\n\n\n\nCom os melhores cumprimentos,\nEquipa Líquen Events`,
+      )}`
+    : "";
 
-          <!-- Estimativa -->
-          ${
-            estimate
-              ? `<tr><td style="padding:20px 40px 0">
-                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:2px solid #1c1f17"><tr>
-                     <td style="padding:12px 0 0;color:#9a9e8c;font-size:12px;text-transform:uppercase;letter-spacing:1px;vertical-align:middle">Orçamento estimado</td>
-                     <td style="padding:12px 0 0;text-align:right;color:#1c1f17;font-size:17px;font-weight:600;vertical-align:middle">${esc(estimate)}</td>
+  // Speed-to-lead nudge — urgency-aware when the client flagged it.
+  const nudge = urgencyLabel
+    ? "O cliente pediu resposta com urgência — um olá nas próximas horas faz toda a diferença."
+    : "Pedidos respondidos no próprio dia convertem muito mais.";
+  const btnPrimary =
+    "display:inline-block;background:#4c6150;color:#ffffff;text-decoration:none;font-size:14px;font-weight:500;padding:12px 24px;border-radius:10px";
+  const btnOutline =
+    "display:inline-block;background:#ffffff;border:1px solid #ece7dc;color:#3a3d30;text-decoration:none;font-size:14px;font-weight:500;padding:11px 22px;border-radius:10px";
+  // Três casos, agora que um pedido pode chegar só com telefone OU só com
+  // email: os dois botões, só o WhatsApp, ou só o email. O que NÃO pode
+  // acontecer é desenhar um botão com um `href` vazio — parecia um botão e
+  // não fazia nada, que é a pior das três avarias possíveis num email que a
+  // equipa lê com pressa.
+  const actionsCell =
+    waHref && mailtoHref
+      ? `<td style="padding-right:10px"><a href="${waHref}" style="${btnPrimary}">Enviar WhatsApp</a></td>
+       <td><a href="${mailtoHref}" style="${btnOutline}">Responder por email</a></td>`
+      : waHref
+        ? `<td><a href="${waHref}" style="${btnPrimary}">Enviar WhatsApp</a></td>`
+        : mailtoHref
+          ? `<td><a href="${mailtoHref}" style="${btnPrimary}">Responder ao cliente</a></td>`
+          : // Inalcançável pelo esquema (exige email ou telefone), mas se
+            // alguém afrouxar essa regra é melhor um aviso do que um botão morto.
+            `<td style="color:#8f8a7a;font-size:13px">Sem contacto registado.</td>`;
+
+  const html = `<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>Novo pedido de orçamento</title>
+<style>
+  :root{color-scheme:light dark;supported-color-schemes:light dark}
+  @media (prefers-color-scheme: dark){
+    .em-bg{background:#161911 !important}
+    .em-card{background:#24271c !important;border-color:#3a3d30 !important}
+    .em-strong{color:#f4f3ef !important}
+    .em-muted{color:#c7c9ba !important}
+    .em-hair{border-color:#3a3d30 !important}
+    .em-note{background:#1e2118 !important;border-color:#3a3d30 !important}
+    .em-foot{color:#9a9c8e !important}
+  }
+</style>
+</head>
+<body class="em-bg" style="margin:0;padding:0;background:#f7f4ee">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f7f4ee">${esc(preheader)}&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-bg" style="background:#f7f4ee;padding:32px 12px">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" class="em-card" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #ece7dc;border-radius:16px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+        <!-- Logo colorido -->
+        <tr><td align="center" class="em-hair" style="padding:36px 40px 28px;border-bottom:1px solid #ece7dc">
+          <img src="${logoUrl}" alt="Líquen Events" width="130" height="65" style="width:130px;height:65px;display:block;border:0;margin:0 auto;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#4c6150;text-decoration:none" />
+        </td></tr>
+
+        <!-- Título -->
+        <tr><td style="padding:32px 40px 0">
+          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600">Novo pedido de orçamento</div>
+          <div class="em-strong" style="font-family:Georgia,'Times New Roman',serif;font-size:27px;color:#2a2620;margin-top:14px;line-height:1.15;letter-spacing:-0.01em">${esc(name)}</div>
+          ${subtitle ? `<div class="em-muted" style="color:#8f8a7a;font-size:14px;margin-top:7px">${esc(subtitle)}</div>` : ""}
+        </td></tr>
+
+        <!-- Data em destaque -->
+        <tr><td style="padding:20px 40px 0">
+          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600">Data do evento</div>
+          <div class="em-strong" style="font-family:Georgia,serif;font-size:20px;color:#2a2620;margin-top:6px">${esc(dateHero)}${isWeekend ? ` <span style="font-family:-apple-system,Segoe UI,Arial,sans-serif;font-size:12px;color:#63755a;font-weight:600">· fim de semana</span>` : ""}</div>
+        </td></tr>
+
+        <!-- O evento -->
+        <tr><td style="padding:24px 40px 0">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${eventRows}</table>
+        </td></tr>
+
+        <!-- Estimativa -->
+        ${
+          estimate
+            ? `<tr><td style="padding:16px 40px 0">
+                 <div class="em-note" style="background:#f7f4ee;border:1px solid #ece7dc;border-radius:10px;padding:14px 16px">
+                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+                     <td class="em-muted" style="color:#8f8a7a;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;vertical-align:middle">Orçamento estimado</td>
+                     <td class="em-strong" style="text-align:right;font-family:Georgia,serif;color:#2a2620;font-size:17px;vertical-align:middle">${esc(estimate)}</td>
                    </tr></table>
-                 </td></tr>`
-              : ""
-          }
+                 </div>
+               </td></tr>`
+            : ""
+        }
 
-          <!-- Notas -->
-          ${
-            form.notes
-              ? `<tr><td style="padding:24px 40px 0">
-                   <div style="color:#a9a99f;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Notas do cliente</div>
-                   <div style="color:#45483c;font-size:14px;line-height:1.65;white-space:pre-wrap">${esc(form.notes)}</div>
-                 </td></tr>`
-              : ""
-          }
+        <!-- Contacto -->
+        <tr><td style="padding:24px 40px 0">
+          <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600;margin-bottom:2px">Contacto</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${contactRows}</table>
+        </td></tr>
 
-          <!-- Ação -->
-          <tr><td style="padding:26px 40px 0">
-            <div style="color:#8b8f7e;font-size:13px;line-height:1.55">Responda a este email para falar diretamente com ${esc(name.split(" ")[0] || "o cliente")} — a resposta vai direta para o email do cliente.</div>
-          </td></tr>
+        <!-- Notas -->
+        ${
+          form.notes
+            ? `<tr><td style="padding:24px 40px 0">
+                 <div class="em-muted" style="color:#63755a;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:8px;font-weight:600">Notas do cliente</div>
+                 <div class="em-note em-strong" style="color:#45483c;font-size:14px;line-height:1.65;white-space:pre-wrap;background:#f7f4ee;border:1px solid #ece7dc;border-radius:10px;padding:14px 16px">${esc(form.notes)}</div>
+               </td></tr>`
+            : ""
+        }
 
-          <!-- Rodapé -->
-          <tr><td style="padding:22px 40px 34px">
-            <div style="border-top:1px solid #f0efe9;padding-top:16px;color:#b5b5aa;font-size:11px;letter-spacing:0.3px">Ref. ${esc(id)} · ${new Date().toLocaleString("pt-PT")}</div>
-          </td></tr>
-        </table>
-      </td></tr>
-    </table>
-  </div>`;
+        <!-- Ações -->
+        <tr><td style="padding:32px 40px 0">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>${actionsCell}</tr></table>
+          <div class="em-muted" style="color:#6b6f5a;font-size:12px;line-height:1.5;margin-top:14px">${esc(nudge)}</div>
+          <div class="em-muted" style="color:#8f8a7a;font-size:12px;line-height:1.5;margin-top:6px">Também pode responder a este email — a resposta vai direta para ${esc(firstName)}.</div>
+        </td></tr>
 
+        <!-- Rodapé -->
+        <tr><td style="padding:26px 40px 32px">
+          <div class="em-hair em-foot" style="border-top:1px solid #ece7dc;padding-top:16px;color:#a8a294;font-size:11px;letter-spacing:0.3px">Ref. ${esc(id)} · ${esc(new Date().toLocaleString("pt-PT", { timeZone: "Europe/Lisbon" }))}</div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  // ── A PRIMEIRA LINHA DESTE TEXTO É A PRÉ-VISUALIZAÇÃO DA CAIXA DE CORREIO ──
+  // Ela fotografou a lista de mensagens e por baixo do assunto lia-se "NOVO
+  // PEDIDO DE ORÇAMENTO Referência: LI...". Duas linhas de espaço, e nenhuma
+  // delas a dizer quem escreveu nem quando é o casamento: o cabeçalho repetia
+  // o que o assunto passa a dizer, e a referência é o dado menos útil que este
+  // email tem — serve para procurar mais tarde, não para decidir agora.
+  //
+  // Alguns clientes de correio mostram o HTML e usam a linha invisível de
+  // pré-visualização (a `preheader`, mais acima); outros — foi o caso — mostram
+  // a versão em texto simples. As duas passam a dizer o mesmo, e a referência
+  // desce para o fim.
+  //
+  // As linhas em branco são deliberadas e têm de sobreviver. O filtro de baixo
+  // deixava cair TUDO o que fosse string vazia, e portanto deixava cair também
+  // os espaçamentos: o texto chegava como um bloco corrido de dez linhas
+  // coladas, que é a segunda metade da confusão de que ela se queixou. Os
+  // campos ausentes passam a ser `null`, e é `null` que se filtra.
   const text = [
-    "NOVO PEDIDO DE ORÇAMENTO",
-    `Referência: ${id}`,
+    preheader,
     "",
+    "O EVENTO",
+    subtitle ? `Evento: ${subtitle}` : null,
+    dateHero ? `Data: ${dateHero}${isWeekend ? " (fim de semana)" : ""}` : null,
+    convidados ? `Convidados: ${convidados}` : null,
+    local ? `Local: ${local}` : null,
+    espaco ? `Espaço: ${espaco}` : null,
+    cerimonia ? `Cerimónia: ${cerimonia}` : null,
+    decor ? `Decoração: ${decor}` : null,
+    budgetLabel ? `Orçamento: ${budgetLabel}` : null,
+    urgencyLabel ? `Antecedência: ${urgencyLabel}` : null,
+    estimate ? `Orçamento estimado: ${estimate}` : null,
+    "",
+    "QUEM PEDIU",
     `Nome: ${name}`,
-    `Email: ${form.email}`,
-    form.phone ? `Telefone: ${form.phone}` : "",
-    form.company ? `Empresa: ${form.company}` : "",
-    form.nif ? `NIF: ${form.nif}` : "",
-    "",
-    subtitle ? `Evento: ${subtitle}` : "",
-    when ? `Data: ${when}` : "",
-    form.guests ? `Convidados: ${form.guests}` : "",
-    local ? `Local: ${local}` : "",
-    estimate ? `Orçamento estimado: ${estimate}` : "",
-    form.notes ? `\nNotas:\n${form.notes}` : "",
+    form.email ? `Email: ${form.email}` : null,
+    form.phone ? `Telefone: ${form.phone}` : null,
+    form.company ? `Empresa: ${form.company}` : null,
+    form.nif ? `NIF: ${form.nif}` : null,
+    form.notes ? `\nNOTAS DO CLIENTE\n${form.notes}` : null,
     "",
     "Responda a este email para falar diretamente com o cliente.",
+    `Referência: ${id}`,
   ]
-    .filter((line) => line !== "")
+    .filter((line) => line !== null)
     .join("\n");
 
   return { subject, html, text };
 }
 
+/**
+ * A confirmação ao cliente, na língua em que ele escreveu (best-effort).
+ *
+ * Vive numa função à parte porque corre DEPOIS da resposta (ver o `after` no
+ * POST): lá dentro é a última coisa que a pessoa recebe, mas já não é nada que
+ * o ecrã dela esteja à espera.
+ */
+async function confirmarAoCliente(id: string, form: QuoteFormData, locale: Locale): Promise<void> {
+  // Só existe quando o cliente deu email. Um pedido que chega só com
+  // telemóvel — o caso normal nas variantes sociais — não tem para onde
+  // mandar a confirmação, e é a EQUIPA que responde por WhatsApp. Não é uma
+  // degradação silenciosa: o email à equipa traz o botão de WhatsApp já
+  // pré-preenchido, que é o caminho mais rápido de qualquer forma.
+  try {
+    if (!form.email) throw new NadaParaConfirmar();
+    // Feed the builder what the client actually told us, so the email mirrors
+    // their event back in prose instead of being a generic acknowledgement.
+    // Only the free-text `location` is passed — never the internal pricing
+    // bucket (LOCATION_LABELS), which would read as "your venue is a rural
+    // area". Weddings/christenings are organised by a couple → plural register.
+    const confirmation = buildClientConfirmation({
+      locale,
+      name: form.name,
+      referenceId: id,
+      event: {
+        /**
+         * A etiqueta do evento NA LÍNGUA DESTE EMAIL — é aqui que a tradução
+         * se faz, na leitura, porque o que está guardado é um identificador
+         * («casamentos») e não uma palavra. Antes vinha o `eventName`, que era
+         * o rótulo canónico PORTUGUÊS da lista: um email inglês dizia «Event:
+         * Casamento», e com o `eventName` vazio (é o que os anúncios enviam)
+         * caía-se no balde plural da taxonomia, «Casamentos».
+         *
+         * A palavra do PRÓPRIO cliente continua a ganhar — quem escreveu
+         * «Casamento da Ana e do João» lê isso de volta. O que o
+         * `eventTagLabel` deita fora é um rótulo de lista guardado onde devia
+         * estar um nome.
+         */
+        typeLabel: eventTagLabel(form, locale) || undefined,
+        date: form.date,
+        guests: form.guests || undefined,
+        // Sem número, devolve-se a ordem de grandeza que ELA escolheu — em
+        // vez de calar a linha e deixá-la a pensar que não ficou registada.
+        guestsRange: form.guests ? undefined : guestRangeLabel(form.guestsRange, locale),
+        location: form.location?.trim() || undefined,
+        plural: form.eventType === "casamentos" || form.eventType === "batizados",
+        // Na língua do email, não na da equipa: quem escreveu em inglês
+        // recebe "Ceremony · Dinner tables", não "Cerimónia · Mesas".
+        decor: rotularPontos(form.decorPoints ?? [], locale),
+        // Na língua do email, como tudo o resto deste resumo.
+        ceremony: ceremonyTypeLabel(form.ceremonyType, locale),
+        space: spaceTypeLabel(form.spaceType, locale),
+      },
+    });
+    // Per-recipient daily cap: this email goes to a user-SUPPLIED address, so
+    // without a ceiling the endpoint could be abused to bombard a victim's
+    // inbox from Líquen's sender reputation (a mail-bomb amplifier). 5/day per
+    // address is far above any real client's needs; over it we skip the
+    // confirmation — the lead is already persisted and the team notified.
+    const emailKey = `confirm:${form.email.trim().toLowerCase()}`;
+    if ((await rateLimit(emailKey, 5, 24 * 60 * 60_000)).ok) {
+      const sentRes = await sendMail({
+        to: form.email,
+        // The body invites a reply ("basta responder a este email"), so point
+        // replies explicitly at the monitored inbox. Without this they only
+        // land correctly by coincidence — because MAIL_FROM happens to equal
+        // MAIL_TO today — and a hot lead's reply would vanish the moment a
+        // separate sending identity is configured.
+        replyTo: MAIL_TO,
+        headers: {
+          "Auto-Submitted": "auto-generated", // RFC 3834 — don't auto-reply to us
+          "X-Auto-Response-Suppress": "OOF, AutoReply", // Exchange/Outlook
+        },
+        // Os anexos vêm COM o email: o `buildClientConfirmation` devolve o
+        // logótipo (e o banner, quando existir) que os `cid:` do HTML dele
+        // precisam. Montá-los aqui à mão era voltar a ter duas listas para
+        // manter de acordo — e uma cruz vermelha no dia em que divergissem.
+        ...confirmation,
+      });
+      // sendMail resolves {sent:false} (no throw) when SMTP is unconfigured,
+      // so without this the client silently gets nothing and nobody knows.
+      if (!sentRes.sent) {
+        log.error("orcamento: confirmação ao cliente NÃO enviada — verificar SMTP", undefined, {
+          id,
+        });
+      }
+    } else {
+      log.warn("orcamento: cap diário do email de confirmação atingido — não reenviado", { id });
+    }
+  } catch (mailErr) {
+    // `NadaParaConfirmar` não é uma falha: é o caso previsto de um pedido
+    // que chegou só com telemóvel. Registar isso como erro encheria o
+    // fan-out de alertas com o funcionamento normal das páginas sociais, e
+    // um alerta que toca sempre deixa de ser lido.
+    if (mailErr instanceof NadaParaConfirmar) {
+      log.info("orcamento: pedido sem email — confirmação ao cliente não se aplica", { id });
+    } else {
+      log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
+    }
+  }
+}
+
 export async function POST(request: NextRequest) {
+  // A língua em que esta pessoa está a ler, lida ANTES de tudo o resto: é a
+  // língua de todas as respostas desta rota, incluindo as que recusam o pedido.
+  const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
   try {
     sweep();
     const limited = await rateLimit(`orcamento:${clientIp(request)}`, 5, 60_000);
     if (!limited.ok) {
+      const segundos = Math.max(1, Math.ceil(limited.retryAfter ?? 60));
       return NextResponse.json(
-        { error: "Demasiados pedidos. Tente novamente dentro de momentos." },
-        { status: 429, headers: { "Retry-After": String(limited.retryAfter ?? 60) } },
+        { error: mensagemDeLimite(segundos, locale) },
+        { status: 429, headers: { "Retry-After": String(segundos) } },
       );
     }
 
@@ -207,7 +770,10 @@ export async function POST(request: NextRequest) {
     }
     const parsed = quotePayloadSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
+      return NextResponse.json(
+        { error: mensagemDeValidacao(parsed.error, locale) },
+        { status: 400 },
+      );
     }
     const { form, breakdown } = parsed.data as unknown as {
       form: QuoteFormData;
@@ -240,6 +806,11 @@ export async function POST(request: NextRequest) {
       submittedAt: new Date().toISOString(),
       status: "pendente",
       priceBreakdown: breakdown,
+      // A língua em que esta pessoa escreveu. Já se lia do cookie para escolher
+      // a língua do email de confirmação e deitava-se fora a seguir; guardada,
+      // permite meses depois saber que aquele casal escreveu em inglês — e a
+      // proposta do estúdio sai em português.
+      locale,
     };
 
     // ── Durable delivery FIRST ──────────────────────────────────────────────
@@ -259,82 +830,139 @@ export async function POST(request: NextRequest) {
     // Notify the team by email (a second, independent delivery path). `sendMail`
     // never throws — it returns { sent:false } when SMTP isn't configured — so we
     // read `sent` to know whether the lead actually reached the team's inbox.
-    let emailed = false;
-    try {
-      const email = buildEmail(id, form, breakdown);
-      const res = await sendMail({
-        subject: email.subject,
-        html: email.html,
-        text: email.text,
-        replyTo: form.email,
-      });
-      emailed = res.sent;
-    } catch (mailErr) {
-      log.error("orcamento: email falhou", mailErr, { id });
-    }
-
-    // If the lead reached NEITHER a durable store NOR the team inbox, it is lost.
-    // Return a real error so the visitor can retry or contact us directly, instead
-    // of a false "success" screen over a dropped enquiry.
-    if (!persisted && !emailed) {
-      log.error("orcamento: lead não registada nem enviada — a devolver erro", undefined, { id });
-      return NextResponse.json(
-        {
-          error:
-            "Não foi possível registar o seu pedido. Tente novamente dentro de momentos ou contacte-nos diretamente.",
-        },
-        { status: 503 },
-      );
-    }
-
-    // Partial success: the lead is safely in the store but the team's email
-    // didn't go out (e.g. SMTP unset/misconfigured in prod). The visitor still
-    // sees success — the lead isn't lost — but nobody was actively notified, so
-    // it can sit unseen in the dashboard. Log at ERROR so it reaches the alert
-    // fan-out (Sentry/webhook), turning a silent notification gap into a signal.
-    if (persisted && !emailed) {
-      log.error(
-        "orcamento: lead registada mas email à equipa NÃO enviado — verificar SMTP",
-        undefined,
-        { id },
-      );
-    }
-
-    // Confirmation to the client, in the language they were browsing in (best-effort).
-    try {
-      const locale = normalizeLocale(request.cookies?.get?.(LANG_COOKIE)?.value);
-      const confirmation = buildClientConfirmation({ locale, name: form.name, referenceId: id });
-      // Per-recipient daily cap: this email goes to a user-SUPPLIED address, so
-      // without a ceiling the endpoint could be abused to bombard a victim's
-      // inbox from Líquen's sender reputation (a mail-bomb amplifier). 5/day per
-      // address is far above any real client's needs; over it we skip the
-      // confirmation — the lead is already persisted and the team notified.
-      const emailKey = `confirm:${form.email.trim().toLowerCase()}`;
-      if ((await rateLimit(emailKey, 5, 24 * 60 * 60_000)).ok) {
-        await sendMail({ to: form.email, ...confirmation });
-      } else {
-        log.warn("orcamento: cap diário do email de confirmação atingido — não reenviado", { id });
+    const avisarEquipa = async (): Promise<boolean> => {
+      try {
+        const email = buildEmail(id, form, breakdown);
+        const res = await sendMail({
+          subject: email.subject,
+          html: email.html,
+          text: email.text,
+          // Sem email do cliente não há a quem responder: omite-se o cabeçalho
+          // em vez de o enviar vazio, que faria alguns servidores recusar a
+          // mensagem inteira e perder a notificação do lead.
+          replyTo: form.email || undefined,
+          attachments: [emailLogoAttachment()],
+        });
+        return res.sent;
+      } catch (mailErr) {
+        log.error("orcamento: email falhou", mailErr, { id });
+        return false;
       }
-    } catch (mailErr) {
-      log.error("orcamento: email de confirmação ao cliente falhou", mailErr, { id });
+    };
+
+    /**
+     * ── QUANDO É QUE O EMAIL À EQUIPA TEM DE SAIR ANTES DA RESPOSTA ────────
+     *
+     * Só quando a gravação falhou. Aí o email deixa de ser um aviso e passa a
+     * ser a ÚNICA cópia do pedido, e é ele que decide entre um «recebemos»
+     * verdadeiro e um 503 honesto — não se pode responder sem saber se saiu.
+     *
+     * Com a gravação feita, o pedido já está seguro: esperar pelo SMTP para
+     * responder era pendurar o ecrã de quem enviou num serviço que nada tem que
+     * ver com a pergunta que ele está a fazer («chegou?»). E o nodemailer sabe
+     * esperar 8 s pela ligação, 8 s pela saudação e 20 s pela transferência —
+     * somado ao resto, isso passava dos 25 s em que os três formulários cortam
+     * o pedido. O desfecho: a pessoa lia «não foi possível enviar» sobre um
+     * pedido que estava gravado e já a caminho da caixa de correio da equipa.
+     */
+    let avisada = false;
+    if (!persisted) {
+      avisada = await avisarEquipa();
+      // If the lead reached NEITHER a durable store NOR the team inbox, it is lost.
+      // Return a real error so the visitor can retry or contact us directly, instead
+      // of a false "success" screen over a dropped enquiry.
+      if (!avisada) {
+        log.error("orcamento: lead não registada nem enviada — a devolver erro", undefined, { id });
+        return NextResponse.json({ error: mensagemSemRegisto(locale) }, { status: 503 });
+      }
+      // Partial success ao contrário: a equipa foi avisada, mas o pedido não
+      // ficou em lado nenhum — não aparece no painel, e a referência que o
+      // cliente leva não corresponde a nada. Fica no fan-out de alertas.
+      log.error("orcamento: lead NÃO gravada — só existe no email à equipa", undefined, { id });
     }
 
-    // Push notification to the team's devices (best-effort).
+    /**
+     * ── O QUE FICA PARA DEPOIS DA RESPOSTA ────────────────────────────────
+     *
+     * `after` e não um `void` solto: a plataforma mantém a função viva até isto
+     * acabar (na Vercel, o `waitUntil`). Um `void` fazia o contrário — o
+     * contentor pode congelar assim que a resposta sai, e o email de confirmação,
+     * o `Lead` da Meta e o push desapareciam sem deixar rasto. A diferença entre
+     * os dois só se vê em produção, que é o pior sítio para a descobrir.
+     *
+     * Nada do que está aqui dentro muda a verdade do que já foi respondido: o
+     * pedido está gravado (ou, no caso acima, já na caixa de correio da equipa)
+     * antes de esta linha correr.
+     */
+    const depoisDaResposta = async () => {
+      // Partial success: the lead is safely in the store but the team's email
+      // didn't go out (e.g. SMTP unset/misconfigured in prod). The visitor still
+      // sees success — the lead isn't lost — but nobody was actively notified, so
+      // it can sit unseen in the dashboard. Log at ERROR so it reaches the alert
+      // fan-out (Sentry/webhook), turning a silent notification gap into a signal.
+      if (!avisada && !(await avisarEquipa())) {
+        log.error(
+          "orcamento: lead registada mas email à equipa NÃO enviado — verificar SMTP",
+          undefined,
+          { id },
+        );
+      }
+
+      // Confirmation to the client, in the language they were browsing in (best-effort).
+      await confirmarAoCliente(id, form, locale);
+
+      // ── A Meta, pelo servidor ─────────────────────────────────────────────
+      // O browser já disparou o `Lead` para o pixel com um `event_id`, e enviou-o
+      // aqui dentro do formulário. Reenvia-se o MESMO identificador pela
+      // Conversions API: a Meta reconhece os dois como um acontecimento só, e o
+      // envio do servidor é o que sobrevive ao ITP do Safari e aos bloqueadores.
+      //
+      // Sem `leadEventId` não se envia NADA. Um `event_id` inventado aqui nunca
+      // encontraria o par do browser e a conversão passaria a contar a dobrar —
+      // que é exactamente a avaria que a deduplicação existe para evitar.
+      try {
+        await reenviarLeadParaMeta(request, id, form);
+      } catch (metaErr) {
+        log.error("orcamento: reenvio do Lead para a Meta falhou", metaErr, { id });
+      }
+
+      // Push notification to the team's devices (best-effort).
+      try {
+        await sendPushToAll({
+          title: "Novo pedido de orçamento",
+          body: `${form.name}${form.guests ? ` · ${form.guests} convidados` : ""}`,
+          url: "/orcamento/admin",
+          tag: "novo-orcamento",
+        });
+      } catch (pushErr) {
+        log.error("orcamento: push falhou", pushErr, { id });
+      }
+    };
+
+    /**
+     * O `after` LANÇA quando é chamado fora de um pedido. Se isso acontecer, o
+     * que não pode acontecer é nenhuma das duas coisas que vinham a seguir: nem
+     * este trabalho desaparecer, nem uma resposta JÁ DECIDIDA — o pedido está
+     * gravado — virar um 500 que diz a quem enviou que não conseguiu. Faz-se ali
+     * mesmo, à moda antiga: mais lento, e verdadeiro.
+     */
     try {
-      await sendPushToAll({
-        title: "Novo pedido de orçamento",
-        body: `${form.name}${form.guests ? ` · ${form.guests} convidados` : ""}`,
-        url: "/orcamento/admin",
-        tag: "novo-orcamento",
+      after(depoisDaResposta);
+    } catch (semContexto) {
+      log.warn("orcamento: sem contexto para o `after` — a notificar dentro da resposta", {
+        id,
+        motivo: String(semContexto),
       });
-    } catch (pushErr) {
-      log.error("orcamento: push falhou", pushErr, { id });
+      await depoisDaResposta();
     }
 
     return NextResponse.json({ id, status: "ok" });
   } catch (err) {
     log.error("orcamento POST falhou", err);
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+    // "Erro interno" não diz nada a quem está do outro lado, e dizia-o só em
+    // português. Uma frase que admite a avaria e aponta o caminho alternativo
+    // vale mais do que o nome técnico do que correu mal.
+    return NextResponse.json({ error: mensagemSemRegisto(locale) }, { status: 500 });
   }
 }
 
@@ -344,8 +972,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const quotes = await listQuotes();
-    return NextResponse.json(quotes);
+    /**
+     * `?resumo=1` devolve a lista SEM as colecções que só o pedido aberto
+     * mostra — ver `resumirQuote`. É a mesma forma que a página de
+     * administração recebe no primeiro carregamento, e é preciso aqui pela
+     * mesma razão: esta rota é relida ao voltar ao separador, ao devolver o
+     * foco e de dois em dois minutos. Sem o resumo, a lista inteira voltava a
+     * descarregar-se de dois em dois minutos e a poupança do primeiro
+     * carregamento durava até à primeira mudança de separador.
+     *
+     * Por ADESÃO: sem o parâmetro a resposta é a de sempre, com tudo.
+     */
+    const resumo = new URL(request.url).searchParams.get("resumo") === "1";
+    return jsonWithEtag(request, resumo ? await listQuoteSummaries() : await listQuotes());
   } catch (err) {
     log.error("orcamento GET falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

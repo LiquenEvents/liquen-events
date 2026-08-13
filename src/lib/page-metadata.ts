@@ -43,7 +43,7 @@ export function pageMetadata(input: PageMetaInput): Metadata {
       url: `${SITE.url}${canonical}`,
       title: ogTitle ?? `${title} | ${SITE.name}`,
       description,
-      images: [{ url: ogImage, width: ogWidth, height: ogHeight, alt: `${title} — ${SITE.name}` }],
+      images: [{ url: ogImage, width: ogWidth, height: ogHeight, alt: `${title} | ${SITE.name}` }],
     },
     twitter: {
       card: "summary_large_image",

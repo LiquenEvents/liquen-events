@@ -24,7 +24,7 @@ export const EXAMPLE_VARS: Record<string, string> = {
   link: "https://liquenevents.pt/proposta/exemplo",
   valor: "14.500 €",
   data_evento: "12 de setembro de 2026",
-  local: "Herdade da Malhadinha, Alentejo",
+  local: "Herdade da Malhadinha",
   empresa: "Líquen Events",
 };
 
@@ -41,12 +41,33 @@ export function esc(value: unknown): string {
 }
 
 /**
- * Resolve `{key}` placeholders against `vars`, mirroring `renderTemplate`:
- * every placeholder is replaced, missing keys become empty strings, and values
- * are HTML-escaped. Used to render both the subject and the body in the preview.
+ * Resolve `{key}` placeholders against `vars`, mirroring the BODY half of
+ * `renderTemplate`: every placeholder is replaced, missing keys become empty
+ * strings, and values are HTML-escaped so merge data can't inject markup.
+ *
+ * Para o assunto é o {@link renderPreviewSubject} — ver lá porquê.
  */
 export function renderPreview(source: string, vars: Record<string, string> = EXAMPLE_VARS): string {
   return source.replace(/\{(\w+)\}/g, (_m, key: string) => (key in vars ? esc(vars[key]) : ""));
+}
+
+/**
+ * O mesmo para o ASSUNTO, que não leva escape.
+ *
+ * O assunto é um cabeçalho de email — texto, codificado pelo nodemailer no
+ * envio —, e o caminho real não o escapa (ver `renderTemplate`). Se a
+ * pré-visualização o escapasse, mostrava «Marta &amp; João» num email que sai
+ * com «Marta & João»: quem escreve o modelo ia mexer nele para corrigir uma
+ * coisa que nunca esteve mal. É por isso que as duas funções têm de mudar ao
+ * mesmo tempo — uma pré-visualização que mente ao contrário é igualmente má.
+ */
+export function renderPreviewSubject(
+  source: string,
+  vars: Record<string, string> = EXAMPLE_VARS,
+): string {
+  return source.replace(/\{(\w+)\}/g, (_m, key: string) =>
+    key in vars ? String(vars[key] ?? "") : "",
+  );
 }
 
 // ── Simple ⇄ HTML ─────────────────────────────────────────────────────────
@@ -122,16 +143,38 @@ export function buildSimpleEmailHtml(text: string): string {
         `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px;color:#2a2620">${paragraphHtml(p)}</p>`,
     )
     .join("\n");
+  // SEM RODAPÉ. Ver a razão por extenso em `buildRichEmailHtml`
+  // (`email-rich-format.ts`), que tinha a mesma linha escrita à mão: a
+  // assinatura da casa fecha todo o correio ao cliente, e um segundo fecho
+  // dentro do modelo saía colado a ela na caixa de correio.
   return [
     marker,
     `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#2a2620">`,
     paragraphs,
-    `  <hr style="border:none;border-top:1px solid #eee;margin:20px 0 12px">`,
-    `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Évora, Alentejo</p>`,
     `</div>`,
   ]
     .filter((line) => line.length > 0)
     .join("\n");
+}
+
+/**
+ * Um ponto de código para o texto que ele representa, ou a referência tal e
+ * qual quando não representa nada de escrevível.
+ *
+ * O que fica de fora fica de propósito: os substitutos (D800–DFFF) e o que
+ * passa do último plano fazem o `fromCodePoint` atirar, e um número decimal
+ * comprido colado a um ponto e vírgula («&#99999999;») não é uma entidade — é
+ * texto de alguém. Devolver a referência intacta é sempre melhor do que
+ * deitar a conversão inteira abaixo por causa de um caractere.
+ */
+function codigoParaTexto(codigo: number, original: string): string {
+  if (!Number.isFinite(codigo) || codigo <= 0 || codigo > 0x10ffff) return original;
+  if (codigo >= 0xd800 && codigo <= 0xdfff) return original;
+  try {
+    return String.fromCodePoint(codigo);
+  } catch {
+    return original;
+  }
 }
 
 /**
@@ -153,7 +196,19 @@ export function htmlToPlainText(html: string): string {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    // As REFERÊNCIAS NUMÉRICAS, decimais e hexadecimais, porque é assim que os
+    // editores de texto rico escrevem os acentos («Jo&#227;o»). Isto deixou de
+    // servir só a conversão avançado→simples: é daqui que sai a versão em TEXTO
+    // SIMPLES de todo o email gerado a partir de um modelo (`email-modelos.ts`),
+    // e um `&#227;` que sobrevivesse era o nome de um cliente mal escrito na
+    // metade do email que um leitor de ecrã anuncia.
+    //
+    // Antes do `&amp;`, pela mesma razão que ele vem em último: um `&amp;#227;`
+    // é o texto literal «&#227;» e tem de continuar a sê-lo.
+    .replace(/&#(\d{1,7});/g, (todo, n: string) => codigoParaTexto(Number(n), todo))
+    .replace(/&#[xX]([0-9a-fA-F]{1,6});/g, (todo, h: string) =>
+      codigoParaTexto(parseInt(h, 16), todo),
+    )
     .replace(/&amp;/g, "&");
   // Remove every `<…>` span by scanning, NOT by a "strip the tag" regex.
   // Walking `<` → next `>` can't be defeated by nested/overlapping sequences

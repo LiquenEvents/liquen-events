@@ -89,14 +89,20 @@ export function calculatePrice(form: Partial<QuoteFormData>): PriceBreakdown {
     seasonSurcharge +
     urgencySurcharge +
     addonsCost;
-  const iva = subtotal * 0.23;
-
-  // Round the subtotal and IVA lines independently, then derive the total from
-  // those rounded lines so the breakdown we show the client always adds up
-  // (subtotal + iva === total). Rounding `subtotal * 1.23` on its own drifts a
-  // cent away from the printed lines for awkward fractional subtotals.
+  // Este orçamento público mostra-se em euros inteiros, e o que se mostra tem
+  // de somar: subtotal + IVA === total, sempre.
+  //
+  // ── O IVA CALCULA-SE SOBRE O SUBTOTAL QUE SE MOSTRA ───────────────────────
+  // Era `Math.round(subtotal * 0.23)` sobre o subtotal AINDA POR ARREDONDAR.
+  // Na maior parte dos casos dá o mesmo, e num casamento «personalizado» no
+  // Porto com 80 convidados e urgência não dava: a folha dizia 13.598 € de
+  // subtotal e 3.127 € de IVA, e 23% de 13.598 são 3.128. Um cêntimo de
+  // arredondamento não se vê; um euro numa linha que o cliente sabe fazer de
+  // cabeça faz o orçamento inteiro parecer inventado. O IVA é 23% DAQUELE
+  // número, o que lá está escrito, e não de um número intermédio que ninguém
+  // vê.
   const roundedSubtotal = Math.round(subtotal);
-  const roundedIva = Math.round(iva);
+  const roundedIva = Math.round(roundedSubtotal * 0.23);
   const total = roundedSubtotal + roundedIva;
 
   const isEstimate = !form.date || !form.locationType || !form.guests;

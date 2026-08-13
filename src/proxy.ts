@@ -27,6 +27,26 @@ const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const LANG_COOKIE = "liquen-lang";
 
 /**
+ * O «isto é um ficheiro» do último segmento.
+ *
+ * ERA `/\.[a-zA-Z0-9]+$/` — qualquer ponto seguido de alfanuméricos até ao fim.
+ * O que não estava previsto é que os caminhos com CAPACIDADE também levam um
+ * ponto: um token é `<corpo>.<assinatura>`, e a assinatura é o HMAC-SHA256 em
+ * base64url, 43 caracteres de `[A-Za-z0-9_-]`. Quando calha sair sem `-` nem
+ * `_` — medido: 535 em 2000, 26,8% —, o `/proposta/<token>` passava a ler-se
+ * como um ficheiro estático, não era reescrito para `/pt/proposta/<token>` e
+ * deixava de casar com a rota: o casal abria a ligação da proposta e via a
+ * página de 404. Uma em cada quatro. Como falhava só às vezes, lia-se como
+ * «o link às vezes não abre» e não como um defeito de encaminhamento.
+ *
+ * O tecto de 8 caracteres é o que separa as duas coisas sem ter de nomear
+ * rotas nenhumas: a extensão mais comprida de `public/` é `gitkeep` (7), e uma
+ * assinatura tem sempre 43. Nomear `/proposta` e `/portal` resolvia o caso de
+ * hoje e voltava a partir-se na próxima rota com token.
+ */
+const EXTENSAO_DE_FICHEIRO = /\.[a-zA-Z0-9]{1,8}$/;
+
+/**
  * Paths that must NOT be locale-rewritten: framework internals, the special
  * metadata routes that live at the app root (sitemap/robots/manifest/icons),
  * static asset folders, and anything with a file extension.
@@ -42,7 +62,7 @@ function isNonLocalized(pathname: string): boolean {
     pathname === "/apple-icon.png" ||
     pathname.startsWith("/imagens/") ||
     pathname.startsWith("/logos/") ||
-    /\.[a-zA-Z0-9]+$/.test(pathname)
+    EXTENSAO_DE_FICHEIRO.test(pathname)
   );
 }
 
@@ -66,7 +86,13 @@ export function proxy(req: NextRequest) {
         }
       }
     }
-    const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+    // Don't trust a client-supplied request id verbatim (it's reflected into the
+    // response header and request-scoped logs — a raw value could inject into
+    // logs or spoof correlation). Accept it only if it's a short, safe token;
+    // otherwise mint our own.
+    const incomingId = req.headers.get("x-request-id");
+    const requestId =
+      incomingId && /^[A-Za-z0-9._-]{1,64}$/.test(incomingId) ? incomingId : crypto.randomUUID();
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set("x-request-id", requestId);
     const res = NextResponse.next({ request: { headers: requestHeaders } });
@@ -127,7 +153,14 @@ export const config = {
   // files from the matcher means each such request skips the Node proxy
   // invocation entirely and is served straight from the static layer — the
   // response is byte-for-byte identical to the previous NextResponse.next().
+  // `_img/` estava a faltar nesta lista, e é a pasta com mais tráfego de todas:
+  // são as miniaturas pré-geradas da galeria (5 570 ficheiros) e os heróis. Uma
+  // travessia da galeria invocava esta função ~428 vezes para ela percorrer o
+  // `isNonLocalized` e devolver `next()` — exactamente o desperdício que a
+  // exclusão do `imagens/` aqui ao lado existe para evitar. Não é um descuido
+  // de raciocínio: é de sequência — o `/_img` nasceu com o pré-gerador, depois
+  // de esta linha estar escrita.
   matcher: [
-    "/((?!_next/static|_next/image|imagens/|logos/|favicon\\.ico|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt).*)",
+    "/((?!_next/static|_next/image|_img/|imagens/|logos/|favicon\\.ico|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt).*)",
   ],
 };

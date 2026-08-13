@@ -11,6 +11,8 @@ const db = vi.hoisted(() => ({
   newestByQuote: new Map<string, Record<string, unknown>>(),
   acceptedContractByQuote: new Map<string, Record<string, unknown>>(),
   rendered: [] as unknown[],
+  /** Fotos que o gerador não conseguiu meter no documento. */
+  emFalta: 0,
 }));
 
 vi.mock("@/lib/portal-token", () => ({
@@ -33,16 +35,30 @@ vi.mock("@/lib/proposal-doc-render", () => ({
     db.rendered.push(doc);
     return new Uint8Array([1, 2, 3]);
   }),
+  /**
+   * A cache do PDF passou a pedir o RELATÓRIO e não só os bytes: é assim que
+   * uma proposta com fotos a menos deixa de sair calada para o cliente. O
+   * `emFalta` é regulável por caso para se poder exercitar a recusa.
+   */
+  renderStoredProposalDocPdfWithReport: vi.fn(async (doc: unknown) => {
+    db.rendered.push(doc);
+    return { pdf: new Uint8Array([1, 2, 3]), missingImages: db.emFalta ?? 0, truncations: [] };
+  }),
 }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { GET } from "./route";
+import { esvaziarCachePdf } from "@/lib/proposal-pdf-cache";
 
 function call(token = "good") {
   return GET(new Request("http://x"), { params: Promise.resolve({ token }) });
 }
 
 beforeEach(() => {
+  // A rota serve de uma cache por processo (`proposal-pdf-cache`): sem
+  // esvaziar, o segundo caso deste ficheiro receberia o PDF que o primeiro
+  // desenhou e nunca chegaria a exercitar o que diz exercitar.
+  esvaziarCachePdf();
   db.quotes.clear();
   db.proposalsById.clear();
   db.newestByQuote.clear();
@@ -66,6 +82,25 @@ describe("proposta-pdf — cross-quote isolation probe", () => {
 
     const res = await call();
     // The foreign document must never be rendered/served.
+    expect(db.rendered).toEqual([]);
+    expect(res.status).toBe(404);
+  });
+
+  it("must NOT serve a proposal whose quote_id ficou VAZIO (pedido apagado)", async () => {
+    // O ramo que o guarda antigo deixava passar. `proposals.quote_id` é
+    // `on delete set null` (db/schema.sql): apagar um pedido põe a NULL o
+    // quote_id de todas as suas propostas, e `fromRow` lê NULL como "".
+    // Como "" é falsy, `proposal.quoteId && proposal.quoteId !== quote.id`
+    // saltava a comparação por completo e servia o PDF do outro cliente com
+    // um 200 — reproduzido antes da correcção.
+    db.proposalsById.set("p-orfa", {
+      id: "p-orfa",
+      quoteId: "",
+      doc: { secret: "another-clients-proposal" },
+    });
+    db.acceptedContractByQuote.set("q-1", { proposalId: "p-orfa", status: "aceite" });
+
+    const res = await call();
     expect(db.rendered).toEqual([]);
     expect(res.status).toBe(404);
   });

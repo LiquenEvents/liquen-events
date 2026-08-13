@@ -44,6 +44,28 @@ describe("renderTemplate — send-path merge", () => {
     expect(out.body).toBe("corpo Rui");
   });
 
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * O ASSUNTO NÃO É HTML
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * O corpo é HTML e o escape é o que impede que os dados do cliente injectem
+   * markup. O ASSUNTO é um cabeçalho RFC 5322 — texto, que o nodemailer já
+   * codifica sozinho —, e escapá-lo não protege nada: só se vê. Uma «Marta &
+   * João» recebia um email com «Marta &amp; João» na linha do assunto, na
+   * caixa dela, com o nome dela mal escrito pelo estúdio.
+   */
+  it("não escapa HTML no assunto — é um cabeçalho, não markup", () => {
+    const out = renderTemplate(tpl("Proposta para {nome}", ""), { nome: "Marta & João" });
+    expect(out.subject).toBe("Proposta para Marta & João");
+  });
+
+  it("o corpo continua escapado quando o mesmo valor vai aos dois", () => {
+    const out = renderTemplate(tpl("{nome}", "<p>{nome}</p>"), { nome: `Marta & <b>João</b>` });
+    expect(out.subject).toBe("Marta & <b>João</b>");
+    expect(out.body).toBe("<p>Marta &amp; &lt;b&gt;João&lt;/b&gt;</p>");
+  });
+
   it("leaves a brace-free template untouched", () => {
     const out = renderTemplate(tpl("Assunto fixo", "Corpo sem merges"), {});
     expect(out).toEqual({ subject: "Assunto fixo", body: "Corpo sem merges" });

@@ -5,8 +5,9 @@ import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
  *
  * A companion to admin-smoke: that spec covers the always-visible CORE sidebar
  * items, this one opens the collapsed "Mais" disclosure and walks the SECONDARY
- * destinations tucked behind it (Pipeline, Clientes, Tarefas, Fornecedores,
- * Inventário, Seguimentos, Estatísticas, Modelos de email — labels from nav.tsx).
+ * destinations tucked behind it (Faturas, Propostas Aceites, Temas,
+ * Estatísticas — labels from nav.tsx's
+ * MORE_NAV).
  * For each it asserts:
  *   1. its page heading (H1) renders, so the lazy chunk mounted (not a skeleton),
  *   2. no error boundary ("Ocorreu um erro inesperado") tripped, and
@@ -29,6 +30,10 @@ const IGNORED_CONSOLE = [
   /\[Fast Refresh\]/i,
   /favicon/i,
   /Failed to load resource: the server responded with a status of 404/i,
+  // Recursos de terceiros (analytics) inalcançáveis na rede onde o teste corre
+  // — condição do ambiente, não defeito da aplicação. Um erro lançado pelo
+  // nosso próprio código continua a falhar o passeio.
+  /net::ERR_(TUNNEL_CONNECTION_FAILED|CONNECTION_|NAME_NOT_RESOLVED|PROXY_)/i,
 ];
 
 function isIgnored(text: string): boolean {
@@ -59,9 +64,12 @@ function collectErrors(page: Page) {
 async function login(page: Page): Promise<boolean> {
   await page.goto("/orcamento/admin");
   await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
-  await page.getByLabel(/O teu nome/i).fill("Catarina");
-  await page.getByLabel(/Palavra-passe/i).fill("liquen2026");
-  await page.getByRole("button", { name: /Entrar/i }).click();
+  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
+  // Pelo `name` e não pelo rótulo: «Palavra-passe» passou a ser partilhado com
+  // o botão de mostrar/ocultar, e o botão de entrar diz por que caminho se
+  // entra (a passkey passou a ser o primeiro).
+  await page.locator('input[name="password"]').fill("liquen2026");
+  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
   // The back-office landmark only exists once authenticated.
   try {
     await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
@@ -78,14 +86,10 @@ async function login(page: Page): Promise<boolean> {
 // the H1 the sticky header shows for that view (AdminClient's VIEW_TITLES).
 // admin-smoke already covers every CORE item, so this walk complements it.
 const SECONDARY_VIEWS: { nav: RegExp; heading: RegExp }[] = [
-  { nav: /^Pipeline$/, heading: /^Pipeline$/ },
-  { nav: /^Clientes$/, heading: /^Clientes$/ },
-  { nav: /^Tarefas$/, heading: /^Tarefas$/ },
-  { nav: /^Fornecedores$/, heading: /^Fornecedores$/ },
-  { nav: /^Inventário$/, heading: /^Inventário$/ },
-  { nav: /^Seguimentos$/, heading: /^Seguimentos$/ },
+  { nav: /^Faturas$/, heading: /^Faturas$/ },
+  { nav: /^Propostas Aceites$/, heading: /^Propostas Aceites$/ },
+  { nav: /^Temas$/, heading: /^Temas$/ },
   { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },
-  { nav: /^Modelos de email$/, heading: /^Modelos de email$/ },
 ];
 
 test.describe("Back office — secondary views", () => {
@@ -140,4 +144,13 @@ test.describe("Back office — secondary views", () => {
     // One consolidated assertion: nothing unexpected hit the console the whole walk.
     expect(errors, `Unexpected runtime errors:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  // O passeio «Fazer proposta: escolher o cliente abre o estúdio» vivia aqui e
+  // mudou-se para `fazer-proposta-cliente.spec.ts`. Não por arrumação: ali
+  // saltava SEMPRE («Sem pedidos neste ambiente»), porque este ficheiro corre
+  // contra o build de produção do CI, que recusa escritas sem Supabase, e sem
+  // escrita não há cartão de cliente para escolher. Passou a semear o seu
+  // próprio pedido, o que obriga a um servidor que grave — e este passeio das
+  // vistas secundárias, que é read-only, fica onde está a fazer o que só aqui
+  // se pode fazer: medir os chunks preguiçosos do build de produção.
 });

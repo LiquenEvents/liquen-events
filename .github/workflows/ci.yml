@@ -18,7 +18,24 @@ jobs:
   quality:
     name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Este job faz install + audit + lint + typecheck + ~2900 testes + um build
+    # completo do Next (que inclui a pré-geração de 172 imagens). Em 2026-08-05
+    # levou 15m14s e o GitHub matou-o a meio do build — e um esgotamento de
+    # tempo aparece como "cancelled", que se lê como "alguém cancelou" e não
+    # como "avaria". Custou-me uma diagnose inteira a perceber que não era
+    # código nenhum.
+    #
+    # A corrida anterior tinha levado 11m37s. Ou seja: o tecto estava a três
+    # minutos e meio do trabalho real, e a variação normal de velocidade dos
+    # runners chega para o ultrapassar. 25 minutos volta a dar folga sem
+    # deixar um job encravado a arder durante meia hora.
+    #
+    # 2026-08: sobe para 35. O AVIF ao lado do WebP levou o pré-gerador de ~2
+    # para ~13 minutos numa cache fria, e este job passou a 20m03s — a três
+    # minutos do tecto outra vez. A cache abaixo devolve os 13 minutos na
+    # maioria das corridas; o tecto cobre a primeira corrida depois de entrar
+    # uma fotografia nova, que paga o encode na mesma.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +51,12 @@ jobs:
         run: npm ci || npm install
 
       - name: Audit dependencies (fail on high/critical)
-        run: npm audit --audit-level=high
+        # Audit only what ships to users (production deps). The dev toolchain
+        # (eslint & its plugins) currently pulls a transitive brace-expansion
+        # advisory via minimatch that has no non-breaking fix and never reaches
+        # the deployed site; --omit=dev keeps the gate meaningful for runtime
+        # dependencies without blocking on dev-only tooling advisories.
+        run: npm audit --audit-level=high --omit=dev
 
       - name: Lint
         run: npm run lint
@@ -44,6 +66,27 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+      # ── A CACHE DAS DERIVADAS ──────────────────────────────────────────────
+      # Sem isto, cada corrida re-encoda as 2785 miniaturas do zero. Enquanto
+      # eram só WebP isso custava ~2 minutos e passava despercebido; com o AVIF
+      # ao lado passou a ~13, e foi o que empurrou este job para lá dos 30
+      # minutos e o fez ser cancelado a meio do passo das imagens.
+      #
+      # A Vercel preserva `.next/cache` entre builds sozinha — foi por isso que
+      # os deploys continuaram verdes e só o CI partiu. Aqui é preciso pedir.
+      #
+      # A chave inclui os parâmetros de encode (larguras, qualidades, formatos)
+      # porque mudá-los TEM de invalidar a cache: o pré-gerador já carimba cada
+      # ficheiro com eles, e uma chave que os ignorasse traria de volta
+      # ficheiros da qualidade anterior sem ninguém dar por isso.
+      - name: Cache das miniaturas pré-geradas
+        uses: actions/cache@v4
+        with:
+          path: .next/cache/pregen-gallery
+          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs') }}
+          restore-keys: |
+            pregen-${{ runner.os }}-
 
       - name: Build
         run: npm run build
@@ -55,10 +98,22 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Informational for now: runs the suite but never blocks the PR (the browser
-    # environment can't be validated from the dev sandbox).
-    continue-on-error: true
+    # 45 e não 30. Este job foi CANCELADO aos 30 minutos, a meio do passo das
+    # imagens e com tudo o que já tinha corrido a passar — não por um teste
+    # falhar, mas porque o build à frente ficou ~13 minutos mais lento quando o
+    # AVIF entrou. A cache abaixo trata da causa; este tecto é a folga para a
+    # corrida em que ela não acerta.
+    timeout-minutes: 45
+    # O `continue-on-error` DESCEU DO JOB PARA O PASSO informativo, e é a única
+    # razão por que este ficheiro foi tocado.
+    #
+    # Enquanto estava aqui em cima, NENHUM teste E2E podia pôr um PR vermelho —
+    # a suite corria e o resultado era decorativo. Era essa a peça mecânica que
+    # faltava por trás da queixa "as fotos falham imenso": mesmo que existisse um
+    # teste a apanhar uma imagem partida (e não existia), o CI deixava-a passar à
+    # mesma. A rede de segurança das imagens (e2e/imagens.spec.ts, títulos com
+    # `@imagens`) passa a correr num passo próprio e BLOQUEANTE; o resto da suite
+    # fica exactamente como estava, informativo, no passo anterior.
     steps:
       - uses: actions/checkout@v4
 
@@ -74,19 +129,144 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
+      # ── A CACHE DAS DERIVADAS ──────────────────────────────────────────────
+      # Sem isto, cada corrida re-encoda as 2785 miniaturas do zero. Enquanto
+      # eram só WebP isso custava ~2 minutos e passava despercebido; com o AVIF
+      # ao lado passou a ~13, e foi o que empurrou este job para lá dos 30
+      # minutos e o fez ser cancelado a meio do passo das imagens.
+      #
+      # A Vercel preserva `.next/cache` entre builds sozinha — foi por isso que
+      # os deploys continuaram verdes e só o CI partiu. Aqui é preciso pedir.
+      #
+      # A chave inclui os parâmetros de encode (larguras, qualidades, formatos)
+      # porque mudá-los TEM de invalidar a cache: o pré-gerador já carimba cada
+      # ficheiro com eles, e uma chave que os ignorasse traria de volta
+      # ficheiros da qualidade anterior sem ninguém dar por isso.
+      - name: Cache das miniaturas pré-geradas
+        uses: actions/cache@v4
+        with:
+          path: .next/cache/pregen-gallery
+          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs') }}
+          restore-keys: |
+            pregen-${{ runner.os }}-
+
       - name: Build
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
 
-      - name: Run E2E tests
-        run: npm run test:e2e
+      # Corre primeiro o resto da suite (informativo). Se corresse depois do
+      # passo bloqueante, uma falha nas imagens saltava-o por completo.
+      - name: Run E2E tests (informational)
+        continue-on-error: true
+        # `@propostas` corre no seu próprio passo bloqueante, com config e
+        # servidor próprios — aqui só duplicaria trabalho, e falharia, porque
+        # este servidor é o de produção e recusa escritas sem Supabase.
+        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria"
         env:
           CI: "true"
           # Test-only admin auth so the back-office smoke can log in against the
           # production `next start` server (which otherwise disables login).
           # Hash is the already-committed dev hash for the public "liquen2026"
           # password — no real secret; the session secret is throwaway.
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      # BLOQUEANTE. A ergonomia táctil do back office num iPhone SE (375 px,
+      # toque ligado): alvos de 44x44 px, campos com letra >= 16 px, nada de
+      # conteúdo para lá da margem direita, e nada de focável fora do ecrã. As
+      # quatro regras e os limiares estão
+      # em e2e/ergonomia-tactil.mjs, partilhados com o varrimento que produz o
+      # relatório (scripts/auditar-toque-admin.mjs), para o CI e o relatório
+      # nunca discordarem.
+      #
+      # Bloqueante e não informativo porque isto regride sozinho: basta alguém
+      # escrever `py-1.5` num botão novo. Um passo que avisa e deixa passar é um
+      # passo que se ignora — e a dona trabalha no telemóvel.
+      #
+      # Corre à parte do passo de cima (que é `continue-on-error`) pela mesma
+      # razão que as passkeys: senão a falha ficava enterrada num passo que não
+      # pára nada.
+      # BLOQUEANTE. A galeria é a montra do negócio e recebe tráfego pago: uma
+      # regressão de peso aqui custa dinheiro em duas frentes (converte menos E
+      # o Índice de Qualidade sobe o custo por clique). Estes testes guardam a
+      # CAUSA de cada ganho medido — o tecto de resolução por classe de ecrã, a
+      # ordem AVIF/WebP, o placeholder e a caixa reservada.
+      #
+      # Bloqueante e não informativo porque a regressão é INVISÍVEL: a galeria
+      # continua a parecer bem com fotos três vezes maiores do que precisa. Foi
+      # exactamente assim que ela chegou a 55 MB por travessia sem ninguém dar
+      # por isso — e um passo que avisa e deixa passar é um passo que se ignora.
+      - name: Desempenho da galeria (bloqueante)
+        run: npx playwright test --grep "@galeria"
+        env:
+          CI: "true"
+
+      # Config própria porque estes passeios CRIAM um pedido — precisam de um
+      # cliente na lista para chegar ao estúdio — e o servidor de produção do
+      # CI recusa escritas sem Supabase. Com o servidor de produção, o pedido
+      # não chegava a gravar e a falha aparecia disfarçada de outra coisa
+      # («main li button» não encontrado, trinta linhas à frente). A razão
+      # está escrita em playwright.movel.config.ts.
+      - name: Ergonomia táctil no telemóvel (bloqueante)
+        run: npm run test:e2e:movel
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      # BLOQUEANTE. Os passeios que precisam de GRAVAR — e que por isso têm
+      # servidor próprio (`playwright.dados.config.ts` explica porquê). O
+      # `npm run test:e2e:dados` existia no package.json e não era corrido em
+      # lado nenhum: um passo que não corre é cobertura imaginária, que é o
+      # defeito que aquele config foi escrito para acabar.
+      #
+      # É aqui que vive o `geometria-dos-alvos.spec.ts`: a barra «Guardar
+      # alterações» que nascia fora do ecrã, a tira de totais que não cabia no
+      # telemóvel, e os alvos de 13 px. Nenhum deles se vê sem navegador, e o
+      # de Faturas nem sequer se vê sem uma fatura grande semeada.
+      - name: Geometria e dados — os passeios que gravam (bloqueante)
+        run: npm run test:e2e:dados
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      # BLOQUEANTE. Os dois fluxos de fazer uma proposta: do zero, e a partir
+      # de outra. Config própria porque estes passeios CRIAM dados e o servidor
+      # de produção do CI recusa escritas sem Supabase — a razão está escrita
+      # em playwright.propostas.config.ts.
+      #
+      # Bloqueante porque o que o segundo passeio protege é a única forma de a
+      # duplicação de propostas fazer mal em vez de bem: uma proposta enviada
+      # com o nome ou a data do casamento de outro casal. Um passo que avisa e
+      # deixa passar é um passo que se ignora.
+      - name: Propostas — do zero, e a partir de outra
+        run: npm run test:e2e:propostas
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      # BLOQUEANTE. A entrada por passkey, com um autenticador virtual do
+      # Chrome: assinaturas a sério, verificadas pelo servidor a sério. Corre
+      # com config própria porque precisa de GRAVAR, e o servidor de produção
+      # que os outros passos usam recusa escritas sem Supabase — a razão está
+      # escrita em playwright.passkeys.config.ts. Bloqueante porque isto é
+      # autenticação: um caminho de entrada partido não pode passar em silêncio.
+      - name: Passkeys — registar, entrar sem palavra-passe, e remover
+        run: npm run test:e2e:passkeys
+        env:
+          CI: "true"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      # BLOQUEANTE. Uma imagem que não pinte em qualquer página, em telemóvel ou
+      # em computador, com o menu fechado ou aberto, põe o PR vermelho. Corre em
+      # último para o relatório HTML que fica no artefacto ser o desta rede.
+      - name: Imagens — nenhuma imagem partida em nenhuma página
+        run: npx playwright test --grep "@imagens"
+        env:
+          CI: "true"
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 

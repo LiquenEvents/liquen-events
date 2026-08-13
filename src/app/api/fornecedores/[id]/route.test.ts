@@ -65,4 +65,19 @@ describe("/api/fornecedores/[id]", () => {
     expect(res.status).toBe(400);
     expect(store.update).not.toHaveBeenCalled();
   });
+
+  it("PATCH answers 400 (not 500) to a malformed or non-object body", async () => {
+    authed.ok = true;
+    const cru = (corpo: string) =>
+      new Request("https://liquen.test/api/fornecedores/s1", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: corpo,
+      }) as unknown as NextRequest;
+    for (const corpo of ["{ isto não é JSON", "null", "42", "[]"]) {
+      const res = await PATCH(cru(corpo), ctx("s1"));
+      expect(res.status, corpo).toBe(400);
+    }
+    expect(store.update).not.toHaveBeenCalled();
+  });
 });

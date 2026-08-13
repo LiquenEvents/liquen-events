@@ -36,6 +36,12 @@ export const mapper: Mapper<Contract> = {
     accepted_at: c.acceptedAt || null,
     accepted_name: c.acceptedName || null,
     accepted_ip: c.acceptedIp || null,
+    // Só entram na linha quando existem — mesma razão do `doc` das propostas:
+    // numa base onde o `alter table` ainda não correu, escrever uma coluna
+    // inexistente partia o aceite inteiro, e um aceite por gravar é um negócio
+    // perdido. O selo é importante; não é mais importante do que o contrato.
+    ...(c.propostaPdfSha256 !== undefined ? { proposta_pdf_sha256: c.propostaPdfSha256 } : {}),
+    ...(c.propostaPdfBytes !== undefined ? { proposta_pdf_bytes: c.propostaPdfBytes } : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -50,9 +56,29 @@ export const mapper: Mapper<Contract> = {
     acceptedAt: (r.accepted_at as string) ?? undefined,
     acceptedName: (r.accepted_name as string) ?? undefined,
     acceptedIp: (r.accepted_ip as string) ?? undefined,
+    ...(r.proposta_pdf_sha256 ? { propostaPdfSha256: String(r.proposta_pdf_sha256) } : {}),
+    ...(r.proposta_pdf_bytes != null ? { propostaPdfBytes: Number(r.proposta_pdf_bytes) } : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
+  /**
+   * Compare-and-set sobre o `updated_at`.
+   *
+   * Hoje o contrato quase não se actualiza: nasce no aceite (`createContract`,
+   * com o índice único a garantir que dois aceites concorrentes produzem UM só
+   * contrato e UM só sinal) e fica quieto. O `updateContract` existe e não tem
+   * chamadores em produção — é precisamente por isso que se liga agora.
+   *
+   * Esta linha é prova: o nome escrito, a hora, o IP e o texto congelado dos
+   * termos, que é o que se leva a uma discussão do género «o arco não estava
+   * incluído». No dia em que alguém acrescentar «marcar contrato como
+   * cancelado» ou «corrigir o email do cliente», um ler-fundir-escrever cego
+   * podia repor o `terms_snapshot` de uma leitura anterior — apagar a prova com
+   * uma edição de rotina. Ligar a comparação depois exigiria uma segunda
+   * migração que essa pessoa não vai lembrar-se de fazer; ligá-la agora custa
+   * uma coluna e nenhuma escrita, porque não há nenhuma.
+   */
+  touch: true,
 };
 
 const repo = createRepository(mapper);

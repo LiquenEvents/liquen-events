@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePublicPathname } from "@/lib/use-public-pathname";
 import { useTranslations } from "./LocaleProvider";
-import { localizeHref } from "@/lib/i18n";
+import { localizeHref } from "@/lib/i18n/config";
 import { track } from "@/lib/track";
 
 // Run `cb` when the browser is idle, falling back to a short timeout where
@@ -87,24 +87,50 @@ export default function StickyCTA() {
       // Shown on every breakpoint: on mobile it's the only persistent path to
       // the quote form (the navbar auto-hides on scroll-down). It sits bottom-
       // LEFT, so it never collides with the bottom-right WhatsApp pill.
-      className={`fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-[calc(1.25rem+env(safe-area-inset-left))] lg:bottom-[calc(1.75rem+env(safe-area-inset-bottom))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 ${
+      //
+      // `motion-reduce`: a entrada é um transform (16 px a subir em 500 ms) e
+      // não uma mudança de cor. Este é um dos dois elementos que estão em
+      // TODAS as páginas e que se mexem sozinhos a meio do scroll, portanto
+      // era das lacunas de movimento reduzido que mais vezes se via. Com a
+      // variante o chip passa a aparecer e a recolher de uma vez.
+      // Os dois `bottom-[…]` do Tailwind saíram daqui para `piso-flutuante`
+      // (globals.css). MEDIDO, com a barra de cookies por decidir: no centro
+      // deste chip estava o <button>Recusar do aviso — o CTA permanente para o
+      // formulário de orçamento, visível e morto, nas duas medidas. O `bottom`
+      // era uma conta escrita aqui que não sabia da barra; agora é uma conta
+      // só, que lhe soma a reserva e vale o mesmo de sempre quando não há
+      // aviso. Nada de `bottom-*` ao lado destas classes: a regra à mão vive
+      // fora de `@layer` e ganharia em silêncio (CamadasCss.contrato.test.ts).
+      className={`piso-flutuante piso-flutuante-lg fixed left-[calc(1.25rem+env(safe-area-inset-left))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >
-      {/* Squared ghost chip in the site's SpaceX idiom: dark translucent
-          backing (backdrop blur kept — it floats over photos as well as paper)
-          with a white hairline that fills solid white on hover, text inverting
-          to near-black. */}
+      {/* Squared ghost chip in the site's SpaceX idiom: dark backing with a
+          white hairline that fills solid white on hover, text inverting to
+          near-black. Backdrop-blur dropped on purpose — this chip is fixed and
+          visible while you scroll, and a backdrop-filter re-samples + re-blurs
+          the moving pixels behind it EVERY scroll frame (the textbook scroll
+          jank). At /90 opacity the backing is effectively solid over both photos
+          and paper, so the blur was imperceptible anyway. */}
+      {/* MEDIDO a 375 px com toque emulado: 163×38 px — e só se vê ao rolar,
+          o que é precisamente a razão por que passou despercebido tanto tempo.
+          Uma medição feita no topo da página não o encontra, e este chip é, no
+          telemóvel, o caminho permanente para o formulário de orçamento: a
+          acção mais valiosa do sítio, no alvo mais fácil de falhar por estar
+          encostado ao canto inferior. `alvo-toque` leva-o aos 44 no dedo. */}
       <Link
         href={localizeHref("/orcamento", locale)}
         onClick={() => track("CTAClick", { source: "sticky" })}
-        className="group flex items-center gap-3 px-6 py-3.5 bg-[#0c0e0b]/75 backdrop-blur-md border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
+        className="alvo-toque group flex items-center gap-2 sm:gap-3 px-4 py-2.5 sm:px-6 sm:py-3.5 bg-[#0c0e0b]/90 border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
       >
-        <span className="text-[10px] tracking-[0.28em] uppercase text-white/90 group-hover:text-[#0c0e0b] transition-colors duration-300 ease-expo">
+        <span className="text-[9px] sm:text-[10px] tracking-[0.18em] sm:tracking-[0.28em] uppercase text-white/90 group-hover:text-[#0c0e0b] transition-colors duration-300 ease-expo">
           {t.footer.pedirOrcamento}
         </span>
         <span
-          className="text-white/50 group-hover:text-[#0c0e0b] group-hover:translate-x-0.5 transition-all duration-300 ease-expo text-sm"
+          // `motion-reduce`: a seta desliza meio píxel para a direita ao passar
+          // o rato — é um transform, e é o mesmo remendo que a seta do PhotoWall
+          // já leva. A cor continua a mudar (isso é informação, não movimento).
+          className="text-white/50 group-hover:text-[#0c0e0b] group-hover:translate-x-0.5 transition-all duration-300 ease-expo motion-reduce:transition-none motion-reduce:group-hover:translate-x-0 text-xs sm:text-sm"
           aria-hidden
         >
           →

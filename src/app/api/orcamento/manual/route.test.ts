@@ -127,4 +127,26 @@ describe("POST /api/orcamento/manual", () => {
     const json = await (await POST(req({ name: "X", guests: 50.9 }))).json();
     expect(json.quote.guests).toBe(50);
   });
+
+  /**
+   * Eram os dois ÚNICOS campos do objecto sem `str(...)`: passavam com um
+   * `?? null` e entravam tal e qual no jsonb do pedido — e daí para a cópia de
+   * segurança, que tem tecto.
+   */
+  it("a categoria e o tipo de evento passam pelo mesmo tratamento dos vizinhos", async () => {
+    authed.ok = true;
+    const json = await (
+      await POST(req({ name: "X", category: { nao: "é texto" }, eventType: "e".repeat(500) }))
+    ).json();
+    expect(typeof json.quote.category).toBe("string");
+    expect(json.quote.category.length).toBeLessThanOrEqual(40);
+    expect(json.quote.eventType.length).toBe(60);
+  });
+
+  it("sem categoria nem tipo, continuam a ser null (o «Outro» de sempre)", async () => {
+    authed.ok = true;
+    const json = await (await POST(req({ name: "X" }))).json();
+    expect(json.quote.category).toBeNull();
+    expect(json.quote.eventType).toBeNull();
+  });
 });

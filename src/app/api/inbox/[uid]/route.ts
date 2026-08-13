@@ -11,8 +11,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
   const { uid } = await params;
+  // O UID é um número de sequência do IMAP. Mandar lá `NaN` (de um "abc" no
+  // endereço) fazia o servidor recusar o comando e a rota devolver 502, como
+  // se o correio estivesse em baixo. É o mesmo guarda da rota irmã `flags`.
+  const uidNum = Number(uid);
+  if (!Number.isInteger(uidNum) || uidNum <= 0) {
+    return NextResponse.json({ error: "UID inválido." }, { status: 400 });
+  }
   try {
-    const message = await getInboxMessage(Number(uid));
+    const message = await getInboxMessage(uidNum);
     if (!message) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     return NextResponse.json(message);
   } catch (err) {

@@ -255,7 +255,7 @@ export const Outro: React.FC<{ totalFrames: number }> = ({ totalFrames }) => {
               fontFamily: SANS,
             }}
           >
-            Évora · Portugal · 2026
+            Portugal · 2026
           </span>
         </div>
       </AbsoluteFill>

@@ -16,16 +16,36 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Tectos de cada campo. Não é gosto por números redondos: isto vai para uma
+ * tabela que a cópia de segurança lê inteira, e a cópia tem um tecto de 20 MB —
+ * um corpo de 50 MB colado aqui entrava calado e a partir daí NÃO havia cópia
+ * nenhuma. O texto de um email cabe folgadamente em 20 000 caracteres (o mais
+ * longo dos modelos por omissão não chega a 1 000).
+ */
+const MAX_KEY = 80;
+const MAX_NAME = 120;
+const MAX_SUBJECT = 300;
+const MAX_BODY = 20_000;
+
 /** Upsert a single template. POST and PUT behave identically (create-or-update). */
 async function upsert(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   try {
     const body = await request.json().catch(() => null);
-    const key = String(body?.key ?? "").trim();
+    const key = String(body?.key ?? "")
+      .trim()
+      .slice(0, MAX_KEY);
     if (!key) return NextResponse.json({ error: "Chave obrigatória" }, { status: 400 });
 
-    const name = String(body?.name ?? "").trim();
-    const subject = String(body?.subject ?? "").trim();
+    const name = String(body?.name ?? "")
+      .trim()
+      .slice(0, MAX_NAME);
+    // O assunto acaba num cabeçalho de email: sem CR/LF, como em toda a casa.
+    const subject = String(body?.subject ?? "")
+      .replace(/[\r\n]+/g, " ")
+      .trim()
+      .slice(0, MAX_SUBJECT);
     if (!name) return NextResponse.json({ error: "Nome obrigatório" }, { status: 400 });
     if (!subject) return NextResponse.json({ error: "Assunto obrigatório" }, { status: 400 });
 
@@ -33,7 +53,7 @@ async function upsert(request: NextRequest) {
       key,
       name,
       subject,
-      body: String(body?.body ?? ""),
+      body: String(body?.body ?? "").slice(0, MAX_BODY),
     });
     return NextResponse.json(saved);
   } catch (err) {

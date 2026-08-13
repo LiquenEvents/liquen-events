@@ -15,6 +15,14 @@ export {
 
 const dictionaries: Record<Locale, Dict> = { pt, en };
 
+/**
+ * Fill `{token}` placeholders in a dictionary string.
+ * Unknown tokens collapse to "" rather than leaking `{foo}` into the UI.
+ */
+export function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => values[k] ?? "");
+}
+
 /** Synchronous dictionary lookup — safe in both server and client components. */
 export function getDictionary(locale: Locale): Dict {
   return dictionaries[locale] ?? pt;

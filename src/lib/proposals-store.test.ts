@@ -168,8 +168,17 @@ describe("mapper — toRow / fromRow round-trip", () => {
   });
 });
 
-// ── BUG (needs a schema column to fully fix): the studio `doc` is DROPPED ──────
-describe("mapper — the Proposal Studio `doc` is silently dropped by the Supabase mapping", () => {
+// ── O `doc` do Estúdio de Propostas é GUARDADO (coluna jsonb proposals.doc) ────
+//
+// Durante muito tempo não era: o `toRow` não o escrevia e o `fromRow` não o
+// lia, por isso ao reler uma proposta o documento tinha desaparecido. O estrago
+// era visível de dois lados — o botão "ver a proposta em PDF" do link do
+// cliente NUNCA podia aparecer (a página só o mostra quando há `doc`), e da
+// proposta ENVIADA não ficava cópia nenhuma no servidor: só o rascunho em
+// `app_state`, que o "Limpar rascunho" apaga e que não vai na cópia de
+// segurança. Estes testes são a prova de que o documento sobrevive à ida e
+// volta.
+describe("mapper — o documento do Estúdio (`doc`) sobrevive à gravação", () => {
   const doc: ProposalDoc = {
     ref: "PO Decoração",
     clientNames: "Maria & Zé",
@@ -178,24 +187,128 @@ describe("mapper — the Proposal Studio `doc` is silently dropped by the Supaba
     location: "Évora",
     guests: "150 pax",
     serviceGroups: [],
-    moodBoards: [],
+    // Um mood board com o CAMINHO da foto no Storage (nunca os bytes) — é
+    // exatamente isto que se perdia e que faz falta para reabrir/reimprimir.
+    moodBoards: [{ title: "Cerimónia", images: ["LIQ-1/abc.jpg"] }],
     budgetItems: ["Decor"],
     totalLabel: "Valor Total",
     totalText: "3000,00 € + IVA",
-    coverImages: [],
+    coverImages: ["LIQ-1/capa.jpg", ""],
     // Only the fields the mapper would carry matter here; the rest of the studio
     // boilerplate is irrelevant to persistence, so cast through unknown.
   } as unknown as ProposalDoc;
 
-  it("toRow produces NO `doc` column (there is no proposals.doc column either)", () => {
+  it("toRow escreve a coluna `doc` tal e qual (com os caminhos das fotos)", () => {
     const row = mapper.toRow(mk({ doc }));
+    expect(row.doc).toEqual(doc);
+  });
+
+  it("uma ida-e-volta toRow→fromRow devolve o documento INTEIRO", () => {
+    const row = mapper.toRow(mk({ doc }));
+    row.created_at = "2026-07-01T10:00:00.000Z";
+    const back = mapper.fromRow(row);
+    expect(back.doc).toEqual(doc);
+    // E o caminho da foto continua lá: é o que o gerador do PDF vai buscar.
+    expect(back.doc?.moodBoards[0].images[0]).toBe("LIQ-1/abc.jpg");
+  });
+
+  it("uma proposta SEM documento não escreve a coluna (instalações sem o `alter table`)", () => {
+    // As propostas de linhas (/api/propostas) nunca tiveram `doc`. Escrever
+    // sempre a coluna partia-as numa base onde o db/schema.sql ainda não
+    // correu — inclusive um simples "aceitar proposta".
+    const row = mapper.toRow(mk({ doc: undefined }));
     expect("doc" in row).toBe(false);
   });
 
-  it("a full toRow→fromRow round-trip LOSES `doc` (portal PDF + studio re-open break in prod)", () => {
-    const row = mapper.toRow(mk({ doc }));
+  it("uma linha ANTIGA (doc a null) lê-se como proposta sem documento, sem partir", () => {
+    // O caso das propostas que já existiam quando a coluna foi criada: `null`.
+    // Tem de se ler exatamente como antes — `undefined`, sem a propriedade —
+    // para a página do cliente continuar a abrir (só sem o botão do PDF).
+    const antiga = mapper.fromRow({
+      id: "velha",
+      created_at: "2026-01-01T00:00:00.000Z",
+      doc: null,
+    });
+    expect(antiga.doc).toBeUndefined();
+    expect("doc" in antiga).toBe(false);
+  });
+
+  it("o documento sobrevive a um update que nem lhe toca (aceitar a proposta)", async () => {
+    // O update é read-merge-write: o `doc` lido volta a ser escrito pelo
+    // `toRow`. Se ele se perdesse aqui, o aceite do cliente apagava o
+    // documento — e o botão do PDF desaparecia logo a seguir ao aceite.
+    await createProposal(mk({ id: "a", doc }));
+    const updated = await updateProposal("a", { status: "aceite" });
+    expect(updated?.doc).toEqual(doc);
+    expect(mapper.toRow(updated!).doc).toEqual(doc);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A LÍNGUA DA PROPOSTA É DA PROPOSTA — E AS ANTIGAS NÃO TÊM NENHUMA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A língua deixou de ser um parâmetro do clique e passou a ficar gravada com a
+ * proposta, porque tudo o que vem DEPOIS dela — o email, a página do aceite, o
+ * portal, a segunda descarga do PDF — precisa de saber em que língua o casal
+ * recebeu o documento.
+ *
+ * A coluna é `idioma`, e vale para ela tudo o que já vale para o `doc`:
+ *  · só se escreve quando EXISTE, para uma base onde o `alter table` ainda não
+ *    correu continuar a aceitar todas as outras gravações (aceitar uma
+ *    proposta incluído);
+ *  · uma linha antiga lê-se sem a propriedade — e quem lê decide que isso é
+ *    português, que é o que essas propostas sempre foram.
+ */
+describe("mapper — a língua da proposta (`idioma`)", () => {
+  it("toRow escreve a coluna `idioma` quando a proposta tem língua", () => {
+    expect(mapper.toRow(mk({ idioma: "en" })).idioma).toBe("en");
+    expect(mapper.toRow(mk({ idioma: "pt" })).idioma).toBe("pt");
+  });
+
+  it("uma ida-e-volta toRow→fromRow devolve a mesma língua", () => {
+    const row = mapper.toRow(mk({ idioma: "en" }));
     row.created_at = "2026-07-01T10:00:00.000Z";
-    expect(mapper.fromRow(row).doc).toBeUndefined();
+    expect(mapper.fromRow(row).idioma).toBe("en");
+  });
+
+  it("uma proposta SEM língua não escreve a coluna (bases sem o `alter table`)", () => {
+    const row = mapper.toRow(mk({ idioma: undefined }));
+    expect("idioma" in row).toBe(false);
+  });
+
+  it("uma linha ANTIGA (idioma a null) lê-se SEM a propriedade, sem partir", () => {
+    const antiga = mapper.fromRow({
+      id: "velha",
+      created_at: "2026-01-01T00:00:00.000Z",
+      idioma: null,
+    });
+    expect(antiga.idioma).toBeUndefined();
+    expect("idioma" in antiga).toBe(false);
+  });
+
+  it("uma língua desconhecida na base lê-se como se não houvesse nenhuma", () => {
+    // A coluna tem `check (idioma in ('pt','en'))`, mas a aplicação não pode
+    // depender de a restrição existir numa base antiga: o que não é uma língua
+    // que se saiba desenhar não pode virar um idioma inventado no resto do
+    // produto — vale o mesmo que a ausência, e a ausência é português.
+    const estranha = mapper.fromRow({
+      id: "torta",
+      created_at: "2026-01-01T00:00:00.000Z",
+      idioma: "fr",
+    });
+    expect(estranha.idioma).toBeUndefined();
+  });
+
+  it("a língua sobrevive a um update que nem lhe toca (aceitar a proposta)", async () => {
+    // O update é read-merge-write, como no `doc`: se a língua se perdesse aqui,
+    // o aceite do casal transformava uma proposta inglesa numa portuguesa — e a
+    // segunda descarga passava a dar o documento errado.
+    await createProposal(mk({ id: "en1", idioma: "en" }));
+    const updated = await updateProposal("en1", { status: "aceite" });
+    expect(updated?.idioma).toBe("en");
+    expect(mapper.toRow(updated!).idioma).toBe("en");
   });
 });
 

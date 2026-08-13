@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const VARS = [
   "SESSION_SECRET",
+  "ADMIN_USERS",
   "ADMIN_PASSWORD_HASH",
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
@@ -12,6 +13,7 @@ const VARS = [
   "VAPID_PRIVATE_KEY",
   "SENTRY_DSN",
   "CRON_SECRET",
+  "DEEPL_API_KEY",
 ] as const;
 
 /** validateEnv() is idempotent via a module-level flag, so each test needs a
@@ -76,6 +78,45 @@ describe("validateEnv", () => {
     expect(out).toContain("Missing critical environment variables");
     expect(out).toContain("SUPABASE_URL");
     expect(out).toContain("SUPABASE_SERVICE_ROLE_KEY");
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * SEM PALAVRA-PASSE NENHUMA CONFIGURADA, A PORTA DO BACK OFFICE FICA MURADA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * `sharedHash()` (admin-auth.ts) devolve `null` em produção quando não há
+   * `ADMIN_PASSWORD_HASH` — a hash de desenvolvimento está no repositório e é
+   * pública, portanto NUNCA é usada em produção. A alternativa é o
+   * `ADMIN_USERS`. Sem um NEM outro, o login de admin fica simplesmente
+   * desligado: ninguém entra no back office, e a dona descobre-o quando tenta.
+   *
+   * Isto era um `warn` no meio dos avisos de SMTP e VAPID — e com a frase
+   * errada por cima («else a dev default is used», que é verdade em
+   * desenvolvimento e é exactamente o contrário em produção). Um back office
+   * inacessível é da mesma família do Supabase em falta: um silêncio que só se
+   * ouve tarde.
+   */
+  it("grita quando produção não tem nem ADMIN_PASSWORD_HASH nem ADMIN_USERS", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    for (const k of VARS)
+      if (k !== "ADMIN_PASSWORD_HASH" && k !== "ADMIN_USERS") process.env[k] = "x";
+    process.env.SESSION_SECRET = "um-segredo-de-sessao-com-mais-de-32-caracteres"; // gitleaks:allow — segredo de teste
+    (await freshValidate())();
+    const out = joined(errSpy);
+    expect(out).toContain("Missing critical environment variables");
+    expect(out).toContain("ADMIN_PASSWORD_HASH");
+    // E diz a verdade: em produção não há recurso a palavra-passe nenhuma.
+    expect(out).not.toContain("dev default");
+  });
+
+  it("cala-se quando o ADMIN_USERS sozinho já abre a porta", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    for (const k of VARS) if (k !== "ADMIN_PASSWORD_HASH") process.env[k] = "x";
+    process.env.SESSION_SECRET = "um-segredo-de-sessao-com-mais-de-32-caracteres"; // gitleaks:allow — segredo de teste
+    process.env.ADMIN_USERS = '[{"name":"Catarina","passwordHash":"$2b$10$x"}]';
+    (await freshValidate())();
+    expect(joined(errSpy)).not.toContain("Missing critical");
   });
 
   it("is idempotent — repeated calls validate only once", async () => {

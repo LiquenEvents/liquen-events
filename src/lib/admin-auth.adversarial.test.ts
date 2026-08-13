@@ -1,6 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import type { NextRequest } from "next/server";
-import { createSession, readSession, isAuthed, ADMIN_COOKIE } from "./admin-auth";
+import {
+  createSession,
+  readSession,
+  isAuthed,
+  verifyCredentials,
+  ADMIN_COOKIE,
+} from "./admin-auth";
 import { createPortalToken } from "./portal-token";
 
 // Adversarial coverage for the admin session token verifier. The happy path and
@@ -93,6 +99,106 @@ describe("readSession — cross-domain token confusion", () => {
     const portal = createPortalToken("quote-123");
     expect(readSession(portal)).toBeNull();
   });
+});
+
+/**
+ * Enumeração de contas por tempo de resposta.
+ *
+ * `verifyCredentials` corre um compare de bcrypt mesmo quando o nome não existe,
+ * para que o relógio não denuncie quais as contas válidas. Só que o compare-
+ * -fantasma tem de custar o MESMO que o verdadeiro. Enquanto usou um hash fixo
+ * de custo 10 contra contas reais de custo 12, ele próprio era o oráculo:
+ * medido, 349 ms para uma conta existente contra 86 ms para uma inexistente —
+ * um rácio de 4x, visível do outro lado da Internet.
+ */
+describe("verifyCredentials — nome desconhecido não se distingue pelo tempo", () => {
+  const CUSTO = 12;
+  const GUARDADOS: Record<string, string | undefined> = {};
+  const CHAVES = ["ADMIN_USERS", "ADMIN_PASSWORD_HASH"];
+
+  beforeEach(async () => {
+    for (const k of CHAVES) GUARDADOS[k] = process.env[k];
+    const bcrypt = (await import("bcryptjs")).default;
+    process.env.ADMIN_USERS = JSON.stringify([
+      { name: "Catarina", passwordHash: bcrypt.hashSync("cat-pass", CUSTO) },
+    ]);
+    delete process.env.ADMIN_PASSWORD_HASH;
+  });
+
+  afterEach(() => {
+    for (const k of CHAVES) {
+      if (GUARDADOS[k] === undefined) delete process.env[k];
+      else process.env[k] = GUARDADOS[k];
+    }
+  });
+
+  it("compara contra um hash do mesmo factor de custo das contas reais", async () => {
+    // A prova sem relógio: espia-se o argumento do compare. Com o nome
+    // desconhecido, o hash usado tem de ter o custo das contas configuradas
+    // (12), não o custo do hash de desenvolvimento embutido no ficheiro (10).
+    const bcrypt = (await import("bcryptjs")).default;
+    const usados: string[] = [];
+    const espia = vi.spyOn(bcrypt, "compareSync").mockImplementation((_p, h) => {
+      usados.push(String(h));
+      return false;
+    });
+    try {
+      await verifyCredentials("NaoExisteDeCerteza", "seja-o-que-for");
+    } finally {
+      espia.mockRestore();
+    }
+    expect(usados).toHaveLength(1);
+    expect(usados[0].startsWith(`$2b$${CUSTO}$`)).toBe(true);
+    expect(usados[0].startsWith("$2b$10$")).toBe(false);
+  });
+
+  // A medição a relógio fica FORA da bateria por omissão: numa máquina carregada
+  // o rácio oscila para os dois lados (observado entre 0,47x e 2,38x já COM a
+  // correcção posta), e um teste que falha por causa da carga vale menos do que
+  // teste nenhum. A garantia a sério é a de cima — o factor de custo do hash —
+  // que é exacta e não depende de relógio. Esta fica como reprodutor, a pedido:
+  //
+  //   AUDIT_TIMING=1 npx vitest run src/lib/admin-auth.adversarial.test.ts
+  //
+  // Numa máquina em repouso mediu-se, ANTES da correcção: conta existente 348,9 ms
+  // contra 86,2 ms para uma inexistente — rácio 4,05x (e 4,25x numa repetição).
+  // DEPOIS da correcção o rácio cai para perto de 1.
+  it.runIf(process.env.AUDIT_TIMING)(
+    "mede: existente e inexistente demoram o mesmo",
+    async () => {
+      // Estatística: o MÍNIMO, não a mediana. O ruído do escalonador só acrescenta
+      // tempo, nunca tira, portanto a amostra mais rápida é a estimativa mais
+      // limpa do custo verdadeiro — e é também o que um atacante usaria, repetindo
+      // e ficando com o chão. Com a mediana este teste falhava quando a máquina
+      // estava carregada; com o mínimo não depende da carga.
+      const medir = async (nome: string, n: number) => {
+        let melhor = Infinity;
+        for (let i = 0; i < n; i++) {
+          const t0 = process.hrtime.bigint();
+          await verifyCredentials(nome, "palavra-errada-qualquer");
+          melhor = Math.min(melhor, Number(process.hrtime.bigint() - t0) / 1e6);
+        }
+        return melhor;
+      };
+      // Aquecimento intercalado: o primeiro compare de cada lado paga o arranque
+      // do módulo e o JIT, e não é isso que se quer medir.
+      await medir("Catarina", 2);
+      await medir("NaoExisteDeCerteza", 2);
+      const existe = await medir("Catarina", 8);
+      const naoExiste = await medir("NaoExisteDeCerteza", 8);
+      const racio = existe / naoExiste;
+      // O que interessa é o limite de CIMA: a fuga é a conta existente demorar
+      // MAIS, e antes da correcção o rácio media 4,05x (349 ms contra 86 ms).
+      // Abaixo de 2x já não há sinal aproveitável. O limite de baixo é só uma
+      // rede contra uma medição degenerada — fica largo de propósito, porque uma
+      // máquina carregada consegue puxar qualquer dos dois lados para baixo e a
+      // garantia a sério é o teste do factor de custo, aqui ao lado, que não
+      // depende de relógio nenhum.
+      expect(racio).toBeGreaterThan(0.2);
+      expect(racio).toBeLessThan(2);
+    },
+    120_000,
+  );
 });
 
 describe("isAuthed — cookie plumbing", () => {

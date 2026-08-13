@@ -22,6 +22,16 @@ const authState = vi.hoisted(() => ({ authed: true }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authState.authed }));
 
+/**
+ * Emitir/liquidar uma factura passou a EMPURRAR o estado do pedido (ver
+ * `@/lib/orcamento/estado-do-pedido`). Este ficheiro não testa isso — testa as
+ * guardas do livro — mas sem um duplo do armazenamento dos pedidos as rotas
+ * iam bater no repositório a sério. Devolver `null` (pedido inexistente) é o
+ * caminho inofensivo: a transição é melhor esforço e não altera nenhuma das
+ * respostas que aqui se prendem.
+ */
+vi.mock("@/lib/quotes-store", () => ({ updateQuoteWith: vi.fn(async () => null) }));
+
 vi.mock("@/lib/invoices-store", () => ({
   listInvoices: vi.fn(async () => [...db.store.values()]),
   listInvoicesForQuote: vi.fn(async (quoteId: string) =>
@@ -57,7 +67,12 @@ vi.mock("@/lib/proposals-store", () => ({
   getProposalByQuote: vi.fn(async (quoteId: string) => proposalsDb.store.get(quoteId) ?? null),
 }));
 
-vi.mock("@/lib/money", () => ({ round2: (n: number) => Math.round(n * 100) / 100 }));
+// A matemática do dinheiro é REAL aqui. O duplo antigo trazia só `round2`, e
+// as rotas passaram a usar `splitSinal`/`saldoAPartirDoSinal` — um duplo
+// incompleto dá um 500 que se lê como avaria da rota. E, mais a sério: este
+// ficheiro testa GUARDAS de facturação; falsear as contas por baixo delas
+// tirava-lhes o sentido.
+vi.mock("@/lib/money", async () => await vi.importActual("@/lib/money"));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { POST } from "@/app/api/faturas/route";

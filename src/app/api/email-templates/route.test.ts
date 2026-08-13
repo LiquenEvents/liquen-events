@@ -122,6 +122,36 @@ describe("POST /api/email-templates (upsert)", () => {
     expect(store.upsert).not.toHaveBeenCalled();
   });
 
+  /**
+   * O que fica gravado aqui vai inteiro na cópia de segurança, e a cópia tem
+   * tecto de 20 MB: um corpo colado de 50 MB entrava calado e a partir daí não
+   * havia cópia nenhuma. Todos os campos passam a ter tecto.
+   */
+  it("corta os campos antes de os gravar — nada entra sem tecto", async () => {
+    authed.ok = true;
+    await POST(
+      req("POST", {
+        key: "k".repeat(500),
+        name: "N".repeat(500),
+        subject: "S".repeat(1000),
+        body: "B".repeat(100_000),
+      }),
+    );
+    const guardado = store.upsert.mock.calls[0][0] as Record<string, string>;
+    expect(guardado.key.length).toBe(80);
+    expect(guardado.name.length).toBe(120);
+    expect(guardado.subject.length).toBe(300);
+    expect(guardado.body.length).toBe(20_000);
+  });
+
+  it("o assunto vai para um cabeçalho de email, por isso sai numa linha só", async () => {
+    authed.ok = true;
+    await POST(req("POST", { ...valid, subject: "Recebido\r\nBcc: alguem@x.pt" }));
+    expect(store.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: "Recebido Bcc: alguem@x.pt" }),
+    );
+  });
+
   it("rejects malformed JSON with 400, not 500", async () => {
     authed.ok = true;
     const res = await POST(req("POST", "{ not json", true));

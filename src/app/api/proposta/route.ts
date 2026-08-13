@@ -1,15 +1,19 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
+import { EM_ABERTO } from "@/lib/orcamento/proposta-estado";
 import { getProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
-import { createContractIfAbsent, newContractId } from "@/lib/contracts-store";
-import { TERMS_VERSION, DEFAULT_TERMS, termsToPlainText } from "@/lib/contract-terms";
+import {
+  createContractIfAbsent,
+  newContractId,
+  getAcceptedContractByQuote,
+} from "@/lib/contracts-store";
+import { TERMS_VERSION, termosPara, termsToPlainText } from "@/lib/contract-terms";
 import {
   createInvoice,
   newInvoiceId,
   nextInvoiceNumber,
-  splitThirtySeventy,
   isUniqueViolation,
 } from "@/lib/invoices-store";
 import { buildProductionPlanItems } from "@/lib/production-templates";
@@ -17,10 +21,15 @@ import { checklistTemplate } from "@/lib/checklist-templates";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { sendPushToAll } from "@/lib/push";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
+import { isConflictError } from "@/lib/repository";
 import { log } from "@/lib/logger";
-import { eur } from "@/lib/money";
+import { eur, splitSinal } from "@/lib/money";
+import { depositPercentOf, hojeNoEstudio, type ProposalDoc } from "@/lib/proposal-doc";
 
 export const runtime = "nodejs";
+// O aceite: grava o contrato, desenha o PDF do contrato e manda dois
+// emails. É o momento em que o negócio fecha — não pode morrer a meio.
+export const maxDuration = 60;
 
 /**
  * Public endpoint for a client to accept or decline a proposal via the signed
@@ -62,12 +71,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, status: proposal.status, already: true });
     }
 
-    // Effective revocation: only a live, still-open proposal can be answered.
-    // A signed link lives in the client's inbox for 14 days and is forwardable,
-    // so without this a draft (never really offered) or one the team superseded/
-    // withdrew in the back office (status moved off "enviada") could still be
-    // accepted at a stale price. Reject anything that isn't currently "enviada".
-    if (proposal.status !== "enviada") {
+    /**
+     * Effective revocation: only a live, still-open proposal can be answered.
+     * A signed link lives in the client's inbox for 14 days and is forwardable,
+     * so without this a draft (never really offered) or one the team superseded/
+     * withdrew in the back office could still be accepted at a stale price.
+     *
+     * ── QUAIS SÃO AS VIVAS: `EM_ABERTO`, E NÃO SÓ «ENVIADA» ──────────────────
+     * Isto exigia exactamente `"enviada"`, e por isso recusava o
+     * `em_negociacao` — que é, nas palavras do próprio tipo, «o estado que
+     * descreve a maior parte do tempo real: a proposta seguiu, houve resposta,
+     * e está a discutir-se». O back office marca-o depois de um telefonema (o
+     * Acompanhamento chama-lhe «Houve resposta, está a discutir-se») e o portal
+     * do cliente já o tratava como equivalente a «enviada». Só esta rota
+     * discordava: o casal preenchia o nome, aceitava as condições, carregava em
+     * aceitar — e recebia «Esta proposta já não está disponível» sobre uma
+     * proposta perfeitamente de pé. E é precisamente o estado em que a maioria
+     * está no momento em que o cliente decide.
+     *
+     * A guarda fica, e continua a proteger o que veio proteger: o rascunho
+     * nunca oferecido e o que já foi respondido. Quem decide o que está vivo é
+     * o `EM_ABERTO`, que é a mesma lista que o resto do produto lê.
+     */
+    if (!EM_ABERTO.includes(proposal.status)) {
       return NextResponse.json(
         { error: "Esta proposta já não está disponível. Contacte-nos para uma atualizada." },
         { status: 409 },
@@ -91,45 +117,66 @@ export async function POST(request: NextRequest) {
 
     const accepted = action === "aceitar";
 
-    // Guard against accepting a SUPERSEDED proposal. Creating a revised proposal
-    // does not withdraw the previous one (both stay "enviada"), and the old signed
-    // link lives on in the client's inbox. Accepting it would bind Líquen to the
-    // stale (often cheaper) price and, worse, could mint a 2nd contract for a quote
-    // whose newer proposal was already accepted. So an accept only stands for the
-    // NEWEST offered proposal: if any sibling that was actually sent (status is not
-    // a never-offered "rascunho") is newer, this link is stale. Declining a stale
-    // proposal stays harmless, so the guard only gates acceptance.
-    if (accepted) {
-      try {
-        const siblings = await listProposalsForQuote(proposal.quoteId);
-        const mine = Date.parse(proposal.createdAt);
-        const superseded = siblings.some(
-          (p) =>
-            p.id !== proposal.id &&
-            p.status !== "rascunho" &&
-            !Number.isNaN(Date.parse(p.createdAt)) &&
-            (Number.isNaN(mine) || Date.parse(p.createdAt) > mine),
+    // A DECLINE must never cancel a booking that is already confirmed. Creating a
+    // revised proposal leaves the previous one "enviada" and its signed link lives
+    // on in the client's inbox (forwardable). Without this, a client who accepted
+    // proposal B (minting a contract + 30% sinal invoice) could later click
+    // "Recusar" on an older proposal A and flip the SAME quote back to "rejeitado",
+    // fabricating a "recusada" audit entry over a binding, invoiced deal and making
+    // the team think the deal was lost. If the quote already has an accepted
+    // contract, refuse the decline outright — change nothing.
+    if (!accepted) {
+      const acceptedContract = await getAcceptedContractByQuote(proposal.quoteId);
+      if (acceptedContract) {
+        return NextResponse.json(
+          { error: "Este evento já está confirmado e não pode ser recusado. Contacte-nos." },
+          { status: 409 },
         );
-        if (superseded) {
-          return NextResponse.json(
-            {
-              error:
-                "Existe uma proposta mais recente para este evento. Use o link mais recente ou contacte-nos.",
-            },
-            { status: 409 },
-          );
-        }
-      } catch (e) {
-        // A lookup failure must not block a legitimate accept — log and proceed.
-        log.error("proposta: verificação de proposta mais recente falhou", e, {
-          id: proposal.quoteId,
-        });
       }
+    }
+
+    // Guard against answering a SUPERSEDED proposal. Creating a revised proposal
+    // does not withdraw the previous one (both stay "enviada"), and the old signed
+    // link lives on in the client's inbox. Only the NEWEST offered proposal can be
+    // answered — accepting a stale one would bind Líquen to the old (often cheaper)
+    // price, and declining a stale one would let the client drive the quote's status
+    // off a newer, still-open offer. If any sibling that was actually sent (status
+    // is not a never-offered "rascunho") is newer, this link is stale for BOTH
+    // accept and decline.
+    try {
+      const siblings = await listProposalsForQuote(proposal.quoteId);
+      const mine = Date.parse(proposal.createdAt);
+      const superseded = siblings.some(
+        (p) =>
+          p.id !== proposal.id &&
+          p.status !== "rascunho" &&
+          !Number.isNaN(Date.parse(p.createdAt)) &&
+          (Number.isNaN(mine) || Date.parse(p.createdAt) > mine),
+      );
+      if (superseded) {
+        return NextResponse.json(
+          {
+            error:
+              "Existe uma proposta mais recente para este evento. Use o link mais recente ou contacte-nos.",
+          },
+          { status: 409 },
+        );
+      }
+    } catch (e) {
+      // A lookup failure must not block a legitimate answer — log and proceed.
+      log.error("proposta: verificação de proposta mais recente falhou", e, {
+        id: proposal.quoteId,
+      });
     }
     // Accepting is a binding commitment, so it must carry an explicit agreement
     // to the Termos & Condições plus the name of who is accepting (the signature
     // recorded in the contract). Declining requires neither.
-    const acceptedName = typeof body?.acceptedName === "string" ? body.acceptedName.trim() : "";
+    // Bound the name: this endpoint is unauthenticated (a valid signed link is
+    // the only gate), so cap the length like every zod-validated field to stop
+    // a link-holder from persisting a multi-megabyte string into the contract
+    // and the activity log.
+    const acceptedName =
+      typeof body?.acceptedName === "string" ? body.acceptedName.trim().slice(0, 120) : "";
     if (accepted && (body?.acceptedTerms !== true || !acceptedName)) {
       return NextResponse.json({ error: "É necessário aceitar as condições." }, { status: 400 });
     }
@@ -153,7 +200,43 @@ export async function POST(request: NextRequest) {
 
     const newStatus = accepted ? "aceite" : "rejeitada";
     const respondedAt = new Date().toISOString();
-    await updateProposal(proposal.id, { status: newStatus, respondedAt });
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * A RESPOSTA DO CASAL NÃO PODE APANHAR UM «ERRO INTERNO»
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * Esta escrita passou a ter bloqueio optimista (ver o `touch` em
+     * proposals-store) — que é o que impede a equipa, a mexer na proposta no
+     * back office nesse mesmo minuto, de apagar o aceite que acabou de entrar.
+     * A troco disso, a escrita pode ser RECUSADA se a linha continuar a mudar
+     * durante as três releituras.
+     *
+     * Do outro lado desta rota não está a equipa: está um casal numa página
+     * pública a carregar em «Aceitar». Um 500 aqui diz-lhes que o aceite falhou
+     * quando ninguém sabe se falhou, e a frase da equipa («foi alterado por
+     * outra pessoa») não lhes diz nada. Por isso: nada é criado — nem contrato,
+     * nem sinal, porque isto acontece ANTES dos dois — e o que sai é um 409 com
+     * uma frase que eles percebem e uma acção que resolve, carregar outra vez.
+     *
+     * Vale a pena que seja raro, e é: exige que alguém esteja a gravar a mesma
+     * proposta ao mesmo tempo, três vezes seguidas.
+     */
+    try {
+      await updateProposal(proposal.id, { status: newStatus, respondedAt });
+    } catch (err) {
+      if (!isConflictError(err)) throw err;
+      log.warn("proposta: resposta do cliente em conflito com uma gravação da equipa", {
+        id: proposal.id,
+      });
+      return NextResponse.json(
+        {
+          error:
+            "Estamos a actualizar esta proposta neste preciso momento. " +
+            "A sua resposta ainda NÃO ficou registada — carregue outra vez daqui a instantes.",
+        },
+        { status: 409 },
+      );
+    }
     // Advance the linked quote in the pipeline, recording the client's
     // decision in its activity log (the team's audit trail).
     try {
@@ -198,16 +281,40 @@ export async function POST(request: NextRequest) {
           clientName: proposal.clientName,
           clientEmail: proposal.clientEmail,
           termsVersion: TERMS_VERSION,
-          termsSnapshot: termsToPlainText(DEFAULT_TERMS),
+          // O SNAPSHOT LEVA A PERCENTAGEM DESTA PROPOSTA, não os 30% de sempre.
+          // É este texto que fica congelado como o contrato aceite, e a factura
+          // do sinal, doze linhas abaixo, é emitida sobre a MESMA percentagem.
+          termsSnapshot: termsToPlainText(
+            termosPara(depositPercentOf(proposal.doc as ProposalDoc | undefined)),
+          ),
           status: "aceite",
           createdAt: respondedAt,
           acceptedAt: respondedAt,
           acceptedName,
           acceptedIp: clientIp(request),
+          /**
+           * O SELO DO DOCUMENTO, copiado da proposta que ele acabou de aceitar.
+           *
+           * Não se volta a desenhar o PDF aqui — seriam segundos de espera na
+           * única página onde não se pode fazer o casal esperar, e seria um
+           * documento RECONSTRUÍDO em vez do que eles viram. A impressão digital
+           * foi calculada no envio, sobre os bytes que seguiram mesmo.
+           *
+           * Propostas enviadas antes desta mudança não têm selo, e o contrato
+           * fica sem ele — que é o correcto: um selo inventado a posteriori não
+           * provaria nada.
+           */
+          propostaPdfSha256: proposal.pdfSha256,
+          propostaPdfBytes: proposal.pdfBytes,
         });
         if (created) {
-          // 30% sinal — confirms the reservation of the date.
-          const { sinal } = splitThirtySeventy(proposal.total);
+          // O sinal confirma a reserva da data. A percentagem é a da PROPOSTA
+          // que o cliente acabou de aceitar — se dissesse 40% no PDF e saísse
+          // uma factura de 30%, era pior do que não a poder mudar.
+          const { sinal } = splitSinal(
+            proposal.total,
+            depositPercentOf(proposal.doc as ProposalDoc | undefined),
+          );
           const invoiceNumber = await nextInvoiceNumber();
           try {
             await createInvoice({
@@ -221,7 +328,12 @@ export async function POST(request: NextRequest) {
               // Carrega a taxa de IVA REAL da proposta (podem ser 6%/13%/23%),
               // não um 0,23 fixo. Fallback 0,23 quando a proposta não a traz.
               vatRate: typeof proposal.vatRate === "number" ? proposal.vatRate : 0.23,
-              issuedAt: new Date().toISOString().slice(0, 10),
+              // O dia de LISBOA, não o de Greenwich: esta factura é emitida
+              // sozinha quando o casal carrega em «Aceitar», não passa por ecrã
+              // nenhum e ninguém confere a data antes de ela ir para o livro.
+              // Um aceite às 00:30 de 14 de agosto ficava datado de 13 — a data
+              // impressa no PDF e a que decide o período de IVA.
+              issuedAt: hojeNoEstudio(),
               status: "emitida",
               note: "Sinal 30% — reserva de data (aceitação da proposta)",
             });

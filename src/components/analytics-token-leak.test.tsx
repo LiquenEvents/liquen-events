@@ -1,0 +1,216 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render } from "@testing-library/react";
+
+/**
+ * Rede de segurança: o token do cliente NÃO sai da rota.
+ *
+ * `/proposta/<token>` autoriza ACEITAR a proposta (o que cria contrato e fatura
+ * de sinal) durante 14 dias; `/portal/<token>` abre a reserva inteira durante
+ * 365 dias. Os dois vivem no CAMINHO do URL, por isso qualquer analítico que
+ * reporte o caminho leva o segredo consigo:
+ *
+ *   · o Google tag, que reporta `document.location.href` inteiro — e que o
+ *     banner de consentimento NÃO trava, porque com consentimento negado o
+ *     gtag continua a mandar pings sem cookies;
+ *   · o Plausible, que reporta o caminho da página;
+ *   · os Web Vitals, que gravam o caminho nos registos de produção da Vercel.
+ *
+ * Estes testes falham se qualquer um dos três voltar a deixar passar o token.
+ */
+
+const PORTAL_TOKEN =
+  "eyJ0eXAiOiJwb3J0YWwiLCJxaWQiOiJMSVEtTTFBMkIzLTlGM0M3QTFCMkQ0RTVGNjAiLCJleHAiOjE4MTcwNDU5MDIwNjd9.xYFYVlyLqOb33tAqHDgzJBtmszJm7XHFxgQ3Oy3zGyY";
+const PROPOSAL_TOKEN = "eyJ0eXAiOiJwcm9wb3NhbCIsInBpZCI6InByb3BfMTIzIn0.AbCdEf-_1234567890xyz";
+
+// usePathname é o que decide; controlamo-lo por teste.
+const pathname = vi.hoisted(() => ({ value: "/galeria" }));
+vi.mock("next/navigation", () => ({ usePathname: () => pathname.value }));
+
+// next/script é um componente cliente com agendamento próprio; para este teste
+// só interessa SE é renderizado e com que src.
+vi.mock("next/script", () => ({
+  default: (props: Record<string, unknown>) => <script data-testid="next-script" {...props} />,
+}));
+
+import GoogleTag, { bootstrapGtag, safeLocationHref, GA4_ID, GOOGLE_ADS_ID } from "./GoogleTag";
+import Analytics from "./Analytics";
+
+describe("GoogleTag — não é montado nas rotas com token", () => {
+  beforeEach(() => {
+    pathname.value = "/galeria";
+  });
+
+  it("monta normalmente numa rota pública", () => {
+    const { container } = render(<GoogleTag />);
+    expect(container.innerHTML).toContain("googletagmanager.com/gtag/js");
+    expect(container.innerHTML).toContain("consent");
+  });
+
+  it("não renderiza NADA em /portal/<token>", () => {
+    pathname.value = `/portal/${PORTAL_TOKEN}`;
+    const { container } = render(<GoogleTag />);
+    expect(container.innerHTML).toBe("");
+    expect(container.innerHTML).not.toContain(PORTAL_TOKEN);
+    expect(container.innerHTML).not.toContain("googletagmanager");
+  });
+
+  it("não renderiza NADA em /proposta/<token>, nem com prefixo de idioma", () => {
+    pathname.value = `/en/proposta/${PROPOSAL_TOKEN}`;
+    const { container } = render(<GoogleTag />);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("continua montado após a reescrita do proxy numa rota normal (/pt/galeria)", () => {
+    pathname.value = "/pt/galeria";
+    const { container } = render(<GoogleTag />);
+    expect(container.innerHTML).toContain("googletagmanager.com/gtag/js");
+  });
+
+  it("o bootstrap sanitiza o page_location em vez de mandar o href inteiro", () => {
+    const { container } = render(<GoogleTag />);
+    const html = container.innerHTML;
+    // A defesa em profundidade: mesmo que o tag alguma vez corra numa rota com
+    // token, o que é reportado à Google já vai sem o segredo.
+    expect(html).toContain("page_location");
+    expect(html).toContain("portal|proposta");
+    expect(html).not.toMatch(/gtag\('config', '[^']+'\);/); // já não há config sem page_location
+  });
+});
+
+describe("bootstrapGtag — a reposição sem eval reporta o mesmo, e já sanitizado", () => {
+  type W = { dataLayer?: unknown[]; gtag?: unknown };
+  beforeEach(() => {
+    delete (window as unknown as W).gtag;
+    delete (window as unknown as W).dataLayer;
+    window.localStorage.clear();
+  });
+
+  it("não usa eval — em produção a CSP não traz 'unsafe-eval'", () => {
+    // Se alguém voltar a `new Function(...)`/eval, isto apanha-o: a chamada
+    // rebentaria com uma CSP a sério, mas aqui garantimos que nem sequer é
+    // usada, comparando o comportamento com um eval desactivado.
+    expect(bootstrapGtag.toString()).not.toMatch(/new Function|\beval\(/);
+  });
+
+  it("põe o consentimento em negado por omissão e configura os dois destinos", () => {
+    window.history.replaceState({}, "", "/galeria");
+    bootstrapGtag();
+    const dl = (window as unknown as W).dataLayer!;
+    const calls = dl.map((a) => Array.from(a as ArrayLike<unknown>));
+    expect(calls[0][0]).toBe("consent");
+    expect(calls[0][2]).toMatchObject({ ad_storage: "denied", analytics_storage: "denied" });
+    const configs = calls.filter((c) => c[0] === "config");
+    expect(configs.map((c) => c[1])).toEqual([GOOGLE_ADS_ID, GA4_ID]);
+  });
+
+  it("respeita um consentimento já dado", () => {
+    window.localStorage.setItem("liquen-consent", "granted");
+    bootstrapGtag();
+    const dl = (window as unknown as W).dataLayer!;
+    const first = Array.from(dl[0] as ArrayLike<unknown>);
+    expect(first[2]).toMatchObject({ ad_storage: "granted", ad_user_data: "granted" });
+  });
+
+  it("o page_location vai sem o token", () => {
+    window.history.replaceState({}, "", `/portal/${PORTAL_TOKEN}`);
+    bootstrapGtag();
+    const dl = (window as unknown as W).dataLayer!;
+    const configs = dl
+      .map((a) => Array.from(a as ArrayLike<unknown>))
+      .filter((c) => c[0] === "config");
+    for (const c of configs) {
+      const params = c[2] as { page_location: string };
+      expect(params.page_location).not.toContain(PORTAL_TOKEN);
+      expect(params.page_location).toContain("/portal/[token]");
+    }
+  });
+
+  it("é idempotente — não volta a arrancar por cima do script inline", () => {
+    const existing = vi.fn();
+    (window as unknown as W).gtag = existing;
+    bootstrapGtag();
+    expect((window as unknown as W).gtag).toBe(existing);
+    expect((window as unknown as W).dataLayer).toBeUndefined();
+  });
+
+  it("safeLocationHref deixa as rotas normais intactas", () => {
+    expect(safeLocationHref("https://liquen-events.com/galeria?x=1")).toBe(
+      "https://liquen-events.com/galeria?x=1",
+    );
+  });
+});
+
+describe("Analytics (Plausible) — não é montado nas rotas com token", () => {
+  const OLD = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN = "liquen-events.com";
+    pathname.value = "/galeria";
+  });
+  afterEach(() => {
+    if (OLD === undefined) delete process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
+    else process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN = OLD;
+  });
+
+  it("monta numa rota pública quando está configurado", () => {
+    const { container } = render(<Analytics />);
+    expect(container.innerHTML).toContain("plausible");
+  });
+
+  it("não renderiza NADA em /portal/<token>", () => {
+    pathname.value = `/portal/${PORTAL_TOKEN}`;
+    const { container } = render(<Analytics />);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("não renderiza NADA em /proposta/<token>", () => {
+    pathname.value = `/proposta/${PROPOSAL_TOKEN}`;
+    const { container } = render(<Analytics />);
+    expect(container.innerHTML).toBe("");
+  });
+});
+
+describe("WebVitals — a baliza nunca leva o token", () => {
+  let beacon: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "production");
+    beacon = vi.fn(() => true);
+    Object.defineProperty(navigator, "sendBeacon", { value: beacon, configurable: true });
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  /** Corre o WebVitals num dado caminho e devolve os corpos balizados. */
+  async function beaconedBodies(path: string): Promise<string[]> {
+    window.history.replaceState({}, "", path);
+    // web-vitals é importado dinamicamente; devolvemos callbacks que disparam já.
+    vi.doMock("web-vitals", () => {
+      const fire = (cb: (m: { name: string; value: number; rating: string }) => void) =>
+        cb({ name: "LCP", value: 1234, rating: "good" });
+      return { onLCP: fire, onCLS: fire, onINP: fire, onTTFB: fire, onFCP: fire };
+    });
+    const { default: WebVitals } = await import("./WebVitals");
+    render(<WebVitals />);
+    await new Promise((r) => setTimeout(r, 0));
+    return beacon.mock.calls.map((c) => String(c[1]));
+  }
+
+  it("reporta o caminho já sem o token em /portal/<token>", async () => {
+    const bodies = await beaconedBodies(`/portal/${PORTAL_TOKEN}`);
+    expect(bodies.length).toBeGreaterThan(0);
+    for (const b of bodies) {
+      expect(b).not.toContain(PORTAL_TOKEN);
+      expect(b).toContain("/portal/[token]");
+    }
+  });
+
+  it("reporta o caminho intacto numa rota normal", async () => {
+    const bodies = await beaconedBodies("/galeria");
+    expect(bodies.length).toBeGreaterThan(0);
+    expect(bodies[0]).toContain("/galeria");
+  });
+});

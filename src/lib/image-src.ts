@@ -1,15 +1,29 @@
+import { heroImageLoader } from "./hero-image-loader";
+
 /**
- * Build a URL to an optimised, right-sized copy of an image through Next's
- * image endpoint — used by the WebGL hero layer (HeroCanvas) to pull a GPU
- * texture instead of uploading the full-res original.
+ * O URL de uma cópia já optimizada e do tamanho certo de uma imagem — usado
+ * pela camada WebGL do herói (HeroCanvas) para puxar uma textura para a GPU em
+ * vez de carregar o original em tamanho inteiro.
  *
- * `width` must be one of the project's configured `images.deviceSizes` /
- * `imageSizes`, and quality is fixed at 75 because Next 16 only serves the
- * qualities listed in `images.qualities` (default `[75]`) — any other value
- * returns HTTP 400. Passing a width that matches a next/image request already
- * on the page lets the browser serve the texture straight from cache instead
- * of downloading a second copy.
+ * ISTO CONSTRUÍA UM URL DO `/_next/image` À MÃO, e passou a apontar para o
+ * vazio. Desde que `next.config.ts` declara um `loaderFile`, o optimizador
+ * responde 404 a tudo: `next-server.js` faz `render404` mal veja
+ * `images.loader !== 'default'`, antes de olhar sequer para os parâmetros.
+ * Medido nos dois sentidos, com um build de produção de cada lado — o mesmo
+ * pedido dá 200 com o carregador por omissão e 404 com o nosso. A falha aqui
+ * era silenciosa (a camada WebGL ficava sem textura e a página continuava
+ * apresentável), que é a pior espécie: ninguém dava por ela.
+ *
+ * Agora delega no mesmo carregador que desenha os heróis, portanto a textura
+ * vem do MESMO ficheiro estático que o `<img>` do herói já pediu — e o browser
+ * serve-a da cache em vez de descarregar uma segunda cópia. Era essa a intenção
+ * original do comentário que aqui estava; passou a ser verdade.
+ *
+ * `width` já não tem de coincidir com os `deviceSizes` configurados nem a
+ * qualidade com a lista `images.qualities`: nada disto passa pelo optimizador,
+ * a qualidade está cozida no ficheiro e a largura arredonda para a escada dos
+ * heróis.
  */
 export function sizedImageSrc(src: string, width: number): string {
-  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=75`;
+  return heroImageLoader({ src, width, quality: 75 });
 }

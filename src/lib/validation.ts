@@ -23,12 +23,40 @@ const selectedAddonSchema = z.object({
 export const quoteFormSchema = z
   .object({
     name: trimmed(120).min(2, "Nome demasiado curto"),
-    email: z.email("Email inválido").max(160),
+    // ── PORQUE É QUE O EMAIL DEIXOU DE SER OBRIGATÓRIO ────────────────────
+    // Passou a OPCIONAL, com a regra "email OU telefone" imposta pelo
+    // `.refine()` no fim do esquema. Não é um afrouxamento: continua a ser
+    // impossível gravar um pedido sem forma de responder.
+    //
+    // O que mudou foi o formulário das variantes sociais
+    // (src/components/meta/PedidoRelampago.tsx): tem UM campo de contacto em
+    // vez de dois, e quem chega de um anúncio do Instagram escreve o número
+    // de telemóvel, não o email. Com o email obrigatório, esse formulário
+    // teria de ter os dois campos outra vez — ou de inventar um email, que
+    // seria pior do que tudo.
+    //
+    // Continua a ser VALIDADO como email quando vem preenchido: o que caiu
+    // foi a obrigatoriedade, não a validação. `z.union` com o literal vazio
+    // porque `z.email()` recusa "" e o formulário envia sempre a chave.
+    email: z
+      .union([z.email("Email inválido").max(160), z.literal("")])
+      .optional()
+      .default(""),
     phone: trimmed(40).optional().default(""),
     company: trimmed(160).optional().default(""),
     nif: trimmed(20).optional().default(""),
     guests: z.coerce.number().int().min(0).max(100000).optional().default(0),
     date: trimmed(20).optional().default(""),
+    // ── ESTE 4000 TEM UM PAR DO OUTRO LADO ────────────────────────────────
+    // `notes` é o campo «Como imagina o seu evento?» do formulário público,
+    // com as marcas de «ainda a definir» agarradas à frente. O formulário
+    // trava o campo neste mesmo número (`MAX_NOTAS`, em OrcamentoForm.tsx),
+    // descontando o que as marcas ocupam — porque o zod não tem que vir parar
+    // ao pacote da página que converte só para ela saber onde parar.
+    //
+    // Mexer aqui é mexer lá. Sem isso, quem escreve a página inteira que a
+    // proposta pede carrega em Enviar e recebe um «Too big: expected string
+    // to have <=4000 characters», em inglês, sem saber de que campo se fala.
     notes: trimmed(4000).optional().default(""),
     // Remaining QuoteFormData fields are free-form on the client (category
     // labels, location text, addon picks…) — bound their size/shape so a
@@ -45,9 +73,54 @@ export const quoteFormSchema = z
     isMultiDay: z.boolean().optional(),
     packageTier: trimmed(30).optional(),
     addons: z.array(selectedAddonSchema).max(100).optional().default([]),
+    // Pontos de decoração escolhidos no formulário. TEM de estar declarado
+    // aqui pela mesma razão do `adClick`: o esquema faz `.strip()`, portanto
+    // um campo não declarado é descartado em silêncio — o casal escolhia, a
+    // rota aceitava, e as escolhas nunca chegavam à proposta.
+    //
+    // Guardados como identificadores livres e limitados (e não como um enum
+    // fechado) pela mesma razão que os outros campos de taxonomia: acrescentar
+    // um ponto ao catálogo não pode exigir uma alteração coordenada aqui, ou
+    // mais cedo ou mais tarde o formulário oferece algo que o servidor deita
+    // fora. O que não conhecemos é ignorado na leitura, em `pontosConhecidos`.
+    decorPoints: z.array(trimmed(40)).max(20).optional().default([]),
+    // Nomes dos noivos: opcionais e curtos. Não são validados contra nada — um
+    // nome é o que a pessoa disser que é.
+    partnerA: trimmed(80).optional(),
+    partnerB: trimmed(80).optional(),
+    // A ordem de grandeza dos convidados. Declarado aqui pela mesma razão de
+    // todos os outros: o esquema faz `.strip()`, e um campo não declarado é
+    // descartado em silêncio.
+    guestsRange: trimmed(20).optional().default(""),
+    // O tipo de cerimónia (civil/religiosa/…) e o tipo de espaço
+    // (interior/exterior). Declarados aqui pela mesma razão de todos os outros:
+    // o esquema faz `.strip()`, e um campo não declarado é descartado em
+    // silêncio — o casal escolhia, a rota aceitava o pedido, e a escolha nunca
+    // chegava à base de dados.
+    //
+    // Identificadores livres e curtos, não enums fechados: o que o servidor não
+    // conhecer é ignorado na LEITURA (`ceremonyTypeLabel`/`spaceTypeLabel`
+    // devolvem vazio), que é o sítio certo para essa decisão. Assim acrescentar
+    // uma opção ao catálogo do formulário nunca exige mexer neste ficheiro.
+    ceremonyType: trimmed(30).optional().default(""),
+    spaceType: trimmed(30).optional().default(""),
     budgetRange: trimmed(30).nullish(),
     urgency: trimmed(30).optional(),
     referralSource: trimmed(200).optional().default(""),
+    // Identificador do clique pago (ver src/lib/ads/click-id.ts). TEM de estar
+    // declarado aqui: o esquema faz `.strip()`, portanto um campo não
+    // declarado é descartado em silêncio — o formulário enviaria o gclid, a
+    // rota aceitaria o pedido, e o campo simplesmente não chegava à base de
+    // dados. A medição de receita ficava vazia sem nada rebentar.
+    adClick: trimmed(300).optional().default(""),
+    // Os identificadores da Meta ("fbp=…;fbc=…") e o `event_id` do evento
+    // `Lead` que o browser já disparou. TÊM de estar declarados aqui pela
+    // mesma razão que o `adClick`: o esquema faz `.strip()`, portanto um campo
+    // não declarado é descartado em silêncio — o formulário enviaria, a rota
+    // aceitaria, e o campo simplesmente não chegava à base de dados. A medição
+    // ficava vazia sem nada rebentar.
+    metaClick: trimmed(900).optional().default(""),
+    leadEventId: trimmed(64).optional().default(""),
     acceptTerms: z.boolean().optional(),
     acceptMarketing: z.boolean().optional(),
   })
@@ -56,7 +129,20 @@ export const quoteFormSchema = z
   // .passthrough() let a crafted payload smuggle arbitrary unbounded keys into
   // the stored quote (data-integrity / storage abuse); a genuinely new field
   // should be added here explicitly instead.
-  .strip();
+  .strip()
+  // A invariante que substitui o "email obrigatório": tem de haver PELO MENOS
+  // UMA forma de responder. Um pedido sem email e sem telefone é um pedido que
+  // ninguém consegue atender, e gravá-lo seria pior do que recusá-lo — ficava
+  // na lista a parecer trabalho por fazer, para sempre.
+  //
+  // O telefone é validado por comprimento e não por forma: os números chegam
+  // escritos de todas as maneiras (+351, 00351, com espaços, com pontos) e uma
+  // expressão regular apertada aqui recusaria leads verdadeiros. Nove dígitos
+  // é o mínimo de um número português.
+  .refine((f) => Boolean(f.email) || f.phone.replace(/\D/g, "").length >= 9, {
+    message: "Indique um email ou um telemóvel para lhe podermos responder.",
+    path: ["email"],
+  });
 
 // Price breakdown — computed client-side, so validate the shape before it is
 // persisted and reused in emails, exports and admin revenue maths. Values are
@@ -93,6 +179,51 @@ export const quotePayloadSchema = z.object({
 // nullish is accepted where the UI clears a value.
 const entityId = z.string().min(1).max(64);
 const shortDate = trimmed(30); // "yyyy-mm-dd" (loose — display-only)
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA DATA DE CALENDÁRIO — O SÍTIO ÚNICO ONDE ISSO SE DECIDE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Devolve `yyyy-mm-dd` quando o que chegou É um dia do calendário, e `""` quando
+ * não é. Nunca atira e nunca adivinha.
+ *
+ * ── PORQUE É QUE ISTO EXISTE ───────────────────────────────────────────────
+ * Estas datas acabam todas no mesmo sítio: `new Date(valor + "T12:00:00")`, para
+ * serem escritas por extenso num documento que vai para o cliente. Um valor que
+ * não seja uma data não rebenta nada — imprime **«Invalid Date»** na factura, no
+ * email da proposta e no PDF, com toda a confiança e sem avisar ninguém.
+ * Chegava-se lá por um ano com cinco dígitos (o `<input type="date">` do Chrome
+ * aceita-o), por um rascunho restaurado com «31/12/2026», ou por um campo
+ * validado só ao COMPRIMENTO — que é o que a `validUntil` tinha.
+ *
+ * ── PORQUE É QUE O MOLDE NÃO CHEGA ─────────────────────────────────────────
+ * `2026-02-31` passa o `^\d{4}-\d{2}-\d{2}$` e não dá `Invalid Date` nenhuma:
+ * dá 3 de março. Uma proposta «válida até 03/03» que ela escreveu como fevereiro
+ * é pior do que um erro visível, porque ninguém repara. Por isso a data tem de
+ * sobreviver à ida e à volta pelo calendário.
+ *
+ * Vive aqui, e não copiada em cada rota, porque já esteve escrita em três
+ * (o recibo, o livro de faturas e a validade da proposta) e a quarta cópia era
+ * sempre a que se esquecia de uma destas duas armadilhas.
+ */
+export function dataIso(valor: unknown): string {
+  const s = String(valor ?? "")
+    .trim()
+    .slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+  // Meio-dia UTC: a hora não interessa, só não pode escorregar de dia.
+  const d = new Date(`${s}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s ? "" : s;
+}
+
+/** Uma data de calendário (`yyyy-mm-dd`) ou o vazio de quem não a preencheu.
+ *  A mensagem diz o formato: quem a lê é a Catarina, a meio de um envio. */
+const isoDate = z
+  .string()
+  .trim()
+  .max(30)
+  .refine((v) => v === "" || dataIso(v) !== "", "Data inválida — usa o formato aaaa-mm-dd.");
 
 const checklistItemSchema = z.object({
   id: entityId,
@@ -179,6 +310,24 @@ export const quoteUpdateSchema = z
     date: shortDate,
     guests: z.number().int().min(0).max(100000),
     location: trimmed(300),
+    /**
+     * ── OS DADOS DE CONTACTO, QUE ATÉ AQUI NÃO SE PODIAM CORRIGIR ──────────
+     *
+     * Um pedido nascido de um telefonema entra sem email — é o caso normal, e
+     * a regra «email OU telefone» do formulário público diz que é legítimo. O
+     * que não era legítimo era o que vinha a seguir: a rota do envio recusa-se
+     * a enviar sem destinatário e responde «acrescenta o email e reenvia», e
+     * não havia por onde o acrescentar. O pedido ficava para sempre sem
+     * caminho até ao cliente.
+     *
+     * O email pode ser VAZIO de propósito (o telefone é que é o contacto), por
+     * isso é `email` ou `""` — como nos fornecedores. O nome não: é por ele que
+     * o pedido se reconhece em todas as listas, e um pedido sem nome é um
+     * pedido perdido.
+     */
+    name: trimmed(120).min(1),
+    email: z.union([z.email().max(160), z.literal("")]),
+    phone: trimmed(40),
     contractRef: trimmed(100).nullish(),
     archived: z.boolean(),
   })
@@ -196,7 +345,9 @@ export const proposalLineItemSchema = z.object({
 export const proposalCreateSchema = z.object({
   lineItems: z.array(proposalLineItemSchema).max(200),
   vatRate: z.number().finite().min(0).max(1).optional(),
-  validUntil: shortDate.optional(),
+  // Uma DATA, não «até 30 caracteres»: ver `dataIso`. É o que sai impresso a
+  // dizer «Válida até …» no email e no PDF que o casal recebe.
+  validUntil: isoDate.optional(),
   notes: trimmed(5000).optional(),
 });
 
@@ -226,13 +377,29 @@ export const supplierUpdateSchema = z
   })
   .partial();
 
+// Hosts of the real browser push services. The server later POSTs to the stored
+// endpoint, so restricting it to these known services prevents a blind-SSRF
+// where a crafted subscription points the server at an internal/arbitrary URL.
+const PUSH_ENDPOINT_HOST =
+  /(?:^|\.)(?:fcm\.googleapis\.com|android\.googleapis\.com|web\.push\.apple\.com|push\.services\.mozilla\.com|notify\.windows\.com|push\.services\.microsoft\.com)$/i;
+
+function isKnownPushEndpoint(v: string): boolean {
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" && PUSH_ENDPOINT_HOST.test(u.host);
+  } catch {
+    return false;
+  }
+}
+
 // Web Push subscription — sanitise this network-provided object into a strict,
 // known-good shape before it is ever persisted.
 export const pushSubscriptionSchema = z.object({
   endpoint: z
     .string()
     .regex(/^https:\/\/[^\s]+$/i, "endpoint inválido")
-    .max(1000),
+    .max(1000)
+    .refine(isKnownPushEndpoint, "endpoint de push não reconhecido"),
   keys: z.object({
     p256dh: z.string().min(1).max(300),
     auth: z.string().min(1).max(300),
