@@ -85,7 +85,11 @@ async function login(page: Page): Promise<boolean> {
 // header shows for that view (AdminClient's VIEW_TITLES).
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
-  { nav: /^Pedidos$/, heading: /^Pedidos$/ },
+  // O «Pedidos» leva o contador de quem espera resposta no nome acessível —
+  // «Pedidos, 4 por responder». Ancorado só no princípio, portanto: com o
+  // `$` no fim, este smoke passava num estúdio vazio e falhava assim que
+  // houvesse trabalho, que é o estado normal.
+  { nav: /^Pedidos\b/, heading: /^Pedidos$/ },
   { nav: /^Propostas$/, heading: /^Propostas$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
   { nav: /^Tarefas$/, heading: /^Tarefas$/ },

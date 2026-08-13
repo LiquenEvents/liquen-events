@@ -2181,15 +2181,34 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         </span>
         <span className="truncate">{item.label}</span>
         {item.id === "pedidos" && pendingCount > 0 && (
-          <span
-            className={`ml-auto min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums ${
-              active
-                ? "bg-[var(--bo-accent)] text-white"
-                : "bg-[var(--bo-surface-hover)] text-[var(--bo-text-muted)]"
-            }`}
-          >
-            {pendingCount}
-          </span>
+          <>
+            {/* ── O NÚMERO DIZ DE QUE É ────────────────────────────────────
+                O contador era lido tal e qual: quem ouve o menu ouvia
+                «Pedidos, 4» — e um 4 sozinho tanto pode ser o que falta
+                responder como a posição do item na lista. A casa já resolve
+                isto assim nos cartões da Visão Geral («Pedidos ativos: 4 —
+                ainda em aberto»): a bolha fica decorativa e o nome acessível
+                leva a frase inteira.
+
+                E há um efeito lateral que vale por si: o nome do botão passa
+                a ser estável. Enquanto o número entrava nele, o botão
+                chamava-se «Pedidos» num estúdio sem trabalho e «Pedidos 4»
+                num estúdio com trabalho — que é o estado normal. O `smoke`
+                do back office procurava-o por «Pedidos» exacto e só falhava
+                quando havia dados: um teste que passa no vazio e parte na
+                vida real. */}
+            <span className="sr-only">, {pendingCount} por responder</span>
+            <span
+              aria-hidden="true"
+              className={`ml-auto min-w-[20px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none tabular-nums ${
+                active
+                  ? "bg-[var(--bo-accent)] text-white"
+                  : "bg-[var(--bo-surface-hover)] text-[var(--bo-text-muted)]"
+              }`}
+            >
+              {pendingCount}
+            </span>
+          </>
         )}
       </button>
     );
