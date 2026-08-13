@@ -63,6 +63,24 @@ const st = vi.hoisted(() => ({
   // não muda o resultado da operação.
   thumbCopy: vi.fn(),
   thumbMove: vi.fn(),
+  // A MICRO (96 px) é outra derivada, noutro bucket, e viaja no mesmo gesto:
+  // duplos próprios para se poder ver que ela vai — e para não se confundir a
+  // chamada dela com a da miniatura.
+  microBucket: {
+    exists: true,
+    error: null as unknown,
+    createError: null as { message: string } | null,
+    gets: 0,
+    creates: 0,
+  },
+  microList: vi.fn(),
+  microRemove: vi.fn(),
+  microSigned: vi.fn(),
+  microSignOne: vi.fn(),
+  microUpload: vi.fn(),
+  microUploadUrl: vi.fn(),
+  microCopy: vi.fn(),
+  microMove: vi.fn(),
   // ── Carregamento DIRETO ──────────────────────────────────────────────
   /** Esta instalação sabe emitir URLs de carregamento? Um Supabase antigo
    *  não sabe, e é isso que faz o cliente cair para o multipart. */
@@ -97,21 +115,59 @@ vi.mock("./supabase", () => {
     // originais, que responde a tudo: um teste que encenasse "sem miniatura"
     // recebia uma na mesma.
     const thumbs = bucket.endsWith("-thumbs");
+    // E a MICRO (`theme-micro`, 96 px) é uma terceira família, com duplos
+    // próprios: sem eles, uma chamada à micro caía nos duplos dos ORIGINAIS
+    // (não acaba em `-thumbs`) e um teste sobre ela estaria a medir outra coisa.
+    const familia = bucket === "theme-micro" ? "micro" : thumbs ? "thumb" : "orig";
+    const dupla = {
+      orig: {
+        list: st.list,
+        remove: st.remove,
+        signed: st.signed,
+        signOne: st.signOne,
+        copy: st.copy,
+        move: st.move,
+        upload: st.upload,
+        uploadUrl: st.uploadUrl,
+      },
+      thumb: {
+        list: st.thumbList,
+        remove: st.thumbRemove,
+        signed: st.thumbSigned,
+        signOne: st.thumbSignOne,
+        copy: st.thumbCopy,
+        move: st.thumbMove,
+        upload: st.thumbUpload,
+        uploadUrl: st.thumbUploadUrl,
+      },
+      micro: {
+        list: st.microList,
+        remove: st.microRemove,
+        signed: st.microSigned,
+        signOne: st.microSignOne,
+        copy: st.microCopy,
+        move: st.microMove,
+        upload: st.microUpload,
+        uploadUrl: st.microUploadUrl,
+      },
+    }[familia];
     return {
-      list: thumbs ? st.thumbList : st.list,
-      remove: thumbs ? st.thumbRemove : st.remove,
-      createSignedUrls: thumbs ? st.thumbSigned : st.signed,
-      createSignedUrl: thumbs ? st.thumbSignOne : st.signOne,
-      copy: thumbs ? st.thumbCopy : st.copy,
-      move: thumbs ? st.thumbMove : st.move,
+      list: dupla.list,
+      remove: dupla.remove,
+      createSignedUrls: dupla.signed,
+      createSignedUrl: dupla.signOne,
+      copy: dupla.copy,
+      move: dupla.move,
       download: st.download,
-      upload: thumbs ? st.thumbUpload : st.upload,
-      ...(st.hasUploadUrlApi
-        ? { createSignedUploadUrl: thumbs ? st.thumbUploadUrl : st.uploadUrl }
-        : {}),
+      upload: dupla.upload,
+      ...(st.hasUploadUrlApi ? { createSignedUploadUrl: dupla.uploadUrl } : {}),
     };
   };
-  const stateOf = (name: string) => (name === "theme-thumbs" ? st.thumbBucket : st.bucket);
+  const stateOf = (name: string) => {
+    if (name === "theme-thumbs") return st.thumbBucket;
+    if (name === "theme-micro") return st.microBucket;
+    return st.bucket;
+  };
   return {
     getSupabase: () =>
       st.configured
@@ -155,9 +211,11 @@ beforeEach(() => {
   st.configured = true;
   st.bucket = bucketState();
   st.thumbBucket = bucketState();
+  st.microBucket = bucketState();
   st.buckets = [];
   st.list.mockResolvedValue(page([]));
   st.thumbList.mockResolvedValue(page([]));
+  st.microList.mockResolvedValue(page([]));
   st.thumbRemove.mockImplementation(async (paths: string[]) => ({
     data: paths.map((p) => ({ name: p })),
     error: null,
@@ -189,6 +247,25 @@ beforeEach(() => {
   st.move.mockResolvedValue({ data: { message: "movido" }, error: null });
   st.thumbCopy.mockResolvedValue({ data: { path: "copiado" }, error: null });
   st.thumbMove.mockResolvedValue({ data: { message: "movido" }, error: null });
+  st.microCopy.mockResolvedValue({ data: { path: "copiado" }, error: null });
+  st.microMove.mockResolvedValue({ data: { message: "movido" }, error: null });
+  st.microUpload.mockResolvedValue({ data: { path: "ok" }, error: null });
+  st.microRemove.mockImplementation(async (paths: string[]) => ({
+    data: paths.map((p) => ({ name: p })),
+    error: null,
+  }));
+  st.microSigned.mockImplementation(async (paths: string[]) => ({
+    data: paths.map((path) => ({ path, signedUrl: `https://micro/${path}` })),
+    error: null,
+  }));
+  st.microSignOne.mockImplementation(async (path: string) => ({
+    data: { signedUrl: `https://micro/${path}` },
+    error: null,
+  }));
+  st.microUploadUrl.mockImplementation(async (path: string) => ({
+    data: { signedUrl: `https://upload/theme-micro/${path}?token=muk`, token: "muk", path },
+    error: null,
+  }));
   st.download.mockResolvedValue({
     data: { arrayBuffer: async () => new TextEncoder().encode("foto").buffer },
     error: null,
@@ -1341,6 +1418,58 @@ describe("transferThemeImage", () => {
     const res = await transferThemeImage("t-1/a.jpg", "t-2", "copy");
     expect(res.outcome).toBe("copied");
     expect(res.thumb).toBe(false);
+  });
+
+  /**
+   * ── A MICRO VAI NO MESMO GESTO QUE A MINIATURA ──────────────────────────
+   *
+   * São DUAS derivadas com a mesma chave: a miniatura de 400 px (as grelhas) e
+   * a micro de 96 px (as três tiras de pré-visualização do cartão de tema).
+   * Levava-se a primeira e esquecia-se a segunda — e isso são duas avarias, não
+   * uma: a micro ficava ÓRFÃ na origem (ao mover, apontando para uma foto que
+   * já lá não está) e o cartão do destino passava a puxar os 400 px para
+   * desenhar 43 × 42 px, que são os 91% de bytes a mais que a micro existe
+   * exactamente para poupar.
+   */
+  it("a MICRO acompanha a foto, como a miniatura", async () => {
+    const { transferThemeImage } = await load();
+    await transferThemeImage("t-1/a.jpg", "t-2", "copy");
+    expect(st.thumbCopy).toHaveBeenCalledWith("t-1/a.jpg", "t-2/a.jpg");
+    expect(
+      st.microCopy,
+      "a micro ficou para trás — órfã na origem, em falta no destino",
+    ).toHaveBeenCalledWith("t-1/a.jpg", "t-2/a.jpg");
+  });
+
+  it("ao MOVER, a micro é MOVIDA — não fica órfã na origem", async () => {
+    const { transferThemeImage } = await load();
+    await transferThemeImage("t-1/a.jpg", "t-2", "move");
+    expect(st.microMove).toHaveBeenCalledWith("t-1/a.jpg", "t-2/a.jpg");
+    expect(st.microCopy).not.toHaveBeenCalled();
+  });
+
+  it("a micro falhada não muda o resultado nem o veredicto da miniatura", async () => {
+    // Quem não encontra a micro cai na miniatura — é uma degradação de bytes,
+    // não uma foto perdida. O `thumb` continua a ser sobre os 400 px, que é o
+    // que a conta "N sem miniatura" do painel mostra.
+    st.microCopy.mockResolvedValue({ data: null, error: { statusCode: "500", message: "boom" } });
+    const { transferThemeImage } = await load();
+    const res = await transferThemeImage("t-1/a.jpg", "t-2", "copy");
+    expect(res).toEqual({ outcome: "copied", to: "t-2/a.jpg", thumb: true });
+  });
+
+  it("NUNCA cria o bucket da micro (nem o das miniaturas)", async () => {
+    st.microBucket.exists = false;
+    const { transferThemeImage } = await load();
+    await transferThemeImage("t-1/a.jpg", "t-2", "copy");
+    expect(st.microBucket.creates).toBe(0);
+  });
+
+  it("409 no destino → a micro nem é tentada, como a miniatura", async () => {
+    st.copy.mockResolvedValue({ data: null, error: { statusCode: "409", message: "Duplicate" } });
+    const { transferThemeImage } = await load();
+    expect((await transferThemeImage("t-1/a.jpg", "t-2", "copy")).outcome).toBe("exists");
+    expect(st.microCopy).not.toHaveBeenCalled();
   });
 
   it("uma miniatura que não existe (404) é ignorada — a foto chega na mesma", async () => {

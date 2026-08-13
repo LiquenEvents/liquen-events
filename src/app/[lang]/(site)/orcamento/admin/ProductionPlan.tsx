@@ -106,19 +106,47 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     setNewLabel("");
   }
 
-  // Group the production plan by phase via the label prefix.
-  const grouped = useMemo(
-    () =>
-      DECOR_PRODUCTION.map((phase) => {
-        const prefix = phase.label + SEP;
-        const phaseItems = items.filter((i) => i.label.startsWith(prefix));
-        const done = phaseItems.filter((i) => i.done).length;
-        return { phase, phaseItems, done };
-      }),
-    [items],
-  );
+  /**
+   * Group the production plan by phase via the label prefix — MAIS o que não
+   * cair em fase nenhuma.
+   *
+   * O crachá «X/Y do plano» lê a lista inteira e a vista só desenhava o que
+   * tivesse prefixo: uma tarefa sem ele era contada e invisível, e — sem linha
+   * — também não tinha caixa para riscar nem × para remover. Ficava presa no
+   * plano a puxar o denominador, com ela a contar cinco no ecrã e a ler «2/6».
+   *
+   * E o rótulo não é um campo privado deste painel: repor uma cópia de
+   * segurança traz o `productionPlan` do ficheiro tal e qual (`looseObject`), o
+   * PATCH aceita qualquer texto até 300 caracteres, e mudar o NOME de uma fase
+   * em `DECOR_PRODUCTION` desprende de uma vez tudo o que já está gravado (o
+   * que se guarda é o rótulo, não a chave da fase).
+   *
+   * O grupo das sobras só existe quando há sobras — com o plano normal não há
+   * secção nenhuma a mais.
+   */
+  const grupos = useMemo(() => {
+    const porFase = DECOR_PRODUCTION.map((phase) => {
+      const prefixo = phase.label + SEP;
+      return {
+        key: phase.key,
+        titulo: phase.label,
+        prefixo,
+        itens: items.filter((i) => i.label.startsWith(prefixo)),
+      };
+    });
+    const arrumados = new Set(porFase.flatMap((g) => g.itens.map((i) => i.id)));
+    const sobras = items.filter((i) => !arrumados.has(i.id));
+    const todos =
+      sobras.length > 0
+        ? [...porFase, { key: "sem-fase", titulo: "Sem fase", prefixo: "", itens: sobras }]
+        : porFase;
+    return todos.map((g) => ({ ...g, feitos: g.itens.filter((i) => i.done).length }));
+  }, [items]);
 
-  const seeded = grouped.some((g) => g.phaseItems.length > 0);
+  // O crachá e o desenho passam a ler a MESMA lista: se há itens, há-os para
+  // ver. Era esta a distância que deixava o vazio «por gerar» ao lado de um
+  // crachá que já contava tarefas — e aplicar o plano por cima duplicava-as.
+  const seeded = items.length > 0;
 
   return (
     <div className="border-t border-foreground/10 pt-5">
@@ -166,17 +194,17 @@ export default function ProductionPlan({ quote, onChange }: Props) {
         />
       ) : (
         <div className="flex flex-col gap-4 mb-4">
-          {grouped.map(({ phase, phaseItems, done }) => {
-            if (phaseItems.length === 0) return null;
-            const pct = Math.round((done / phaseItems.length) * 100);
+          {grupos.map(({ key, titulo, prefixo, itens, feitos }) => {
+            if (itens.length === 0) return null;
+            const pct = Math.round((feitos / itens.length) * 100);
             return (
-              <div key={phase.key}>
+              <div key={key}>
                 <div className="flex items-center justify-between mb-1.5">
                   <p className="text-foreground/55 text-[11px] font-medium tracking-[0.08em] uppercase">
-                    {phase.label}
+                    {titulo}
                   </p>
                   <span className="text-foreground/35 text-[10px] tabular-nums bg-foreground/[0.05] rounded-full px-2 py-0.5">
-                    {done}/{phaseItems.length}
+                    {feitos}/{itens.length}
                   </span>
                 </div>
                 <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mb-2">
@@ -186,7 +214,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                   />
                 </div>
                 <div className="flex flex-col gap-0.5">
-                  {phaseItems.map((i) => (
+                  {itens.map((i) => (
                     <div key={i.id} className="group flex items-center gap-2.5 py-1.5">
                       <button
                         onClick={() => toggle(i.id)}
@@ -210,7 +238,8 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                       <span
                         className={`flex-1 text-sm ${i.done ? "text-foreground/35 line-through" : "text-foreground/70"}`}
                       >
-                        {i.label.slice((phase.label + SEP).length)}
+                        {/* Sem fase não há prefixo a cortar: mostra-se inteiro. */}
+                        {i.label.slice(prefixo.length)}
                       </span>
                       <button
                         type="button"

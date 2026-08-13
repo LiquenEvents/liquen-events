@@ -1520,31 +1520,58 @@ export async function transferThemeImage(
     forgetThemeFingerprints(themeIdOfPath(fromPath));
   }
 
-  // A MINIATURA VAI NO MESMO GESTO — e é a diferença entre 1,78 MB e 164 MB.
+  // AS DERIVADAS VÃO NO MESMO GESTO — e é a diferença entre 1,78 MB e 164 MB.
   //
-  // Sem ela, o tema de destino puxa ORIGINAIS: com os números já apurados
-  // neste repositório (2,6 MB por original, 29 KB por miniatura), uma página
-  // de 60 fotos passa de 1,78 MB / 0,3 s para 164 MB / 26 s a 50 Mbit/s —
-  // 92× mais bytes, e o mesmo 26 s que a rota `/miniaturas` já mediu em
+  // Sem a miniatura, o tema de destino puxa ORIGINAIS: com os números já
+  // apurados neste repositório (2,6 MB por original, 29 KB por miniatura), uma
+  // página de 60 fotos passa de 1,78 MB / 0,3 s para 164 MB / 26 s a 50 Mbit/s
+  // — 92× mais bytes, e o mesmo 26 s que a rota `/miniaturas` já mediu em
   // bancada. Repará-la depois custaria 818 MB por 300 fotos; copiá-la custa
   // uma chamada e zero bytes.
   //
-  // Melhor esforço absoluto: NUNCA muda o `outcome` e NUNCA cria o bucket das
-  // miniaturas (numa instalação antiga não há miniatura nenhuma para copiar, e
-  // o 404 é ignorado — a foto chega ao destino exatamente no estado em que
-  // estava na origem, e o banner de reparação cobre-a).
-  let thumb = false;
-  try {
-    const thumbs = sb.storage.from(THEME_THUMB_BUCKET);
-    const { error } =
-      mode === "move" ? await thumbs.move(fromPath, to) : await thumbs.copy(fromPath, to);
-    thumb = !error || isAlreadyExists(error);
-    if (error && !isAlreadyExists(error) && !isNotFound(error)) {
-      log.warn("theme-storage: miniatura não acompanhou a foto", { fromPath, to, mode });
+  // São DUAS e não uma: a miniatura de 400 px e a MICRO de 96 px (as três tiras
+  // de pré-visualização do cartão de tema). Levar só a miniatura fazia duas
+  // avarias de uma vez — ao mover, a micro ficava órfã na origem a apontar para
+  // uma foto que já lá não está; e o cartão do destino voltava a desenhar
+  // 43 × 42 px com o ficheiro de 400 px, que são os 91% de bytes a mais que a
+  // micro existe para poupar.
+  //
+  // Melhor esforço absoluto: NUNCA muda o `outcome` e NUNCA cria os buckets das
+  // derivadas (numa instalação antiga não há derivada nenhuma para copiar, e o
+  // 404 é ignorado — a foto chega ao destino exatamente no estado em que estava
+  // na origem, e o banner de reparação cobre-a).
+  const levarDerivada = async (nomeDoBucket: string) => {
+    try {
+      const derivadas = sb.storage.from(nomeDoBucket);
+      const { error } =
+        mode === "move" ? await derivadas.move(fromPath, to) : await derivadas.copy(fromPath, to);
+      if (error && !isAlreadyExists(error) && !isNotFound(error)) {
+        log.warn("theme-storage: derivada não acompanhou a foto", {
+          bucket: nomeDoBucket,
+          fromPath,
+          to,
+          mode,
+        });
+      }
+      return !error || isAlreadyExists(error);
+    } catch (e) {
+      log.warn("theme-storage: derivada não acompanhou a foto", {
+        bucket: nomeDoBucket,
+        fromPath,
+        erro: String(e),
+      });
+      return false;
     }
-  } catch (e) {
-    log.warn("theme-storage: miniatura não acompanhou a foto", { fromPath, erro: String(e) });
-  }
+  };
+
+  // Só a MINIATURA entra no veredicto que sai daqui: é sobre ela que o painel
+  // conta as "N sem miniatura" a seguir a um lote. Uma micro em falta não é a
+  // mesma coisa — quem não a encontra cai na miniatura, e o pior que acontece
+  // é uma tira de pré-visualização mais pesada.
+  const [thumb] = await Promise.all([
+    levarDerivada(THEME_THUMB_BUCKET),
+    levarDerivada(THEME_MICRO_BUCKET),
+  ]);
 
   return { outcome: "copied", to, thumb };
 }

@@ -52,6 +52,21 @@ const MAX_ECRAS = 6;
  */
 const SUAVIZACAO = 0.25;
 
+/**
+ * De quanto em quanto tempo a velocidade decai com a página PARADA.
+ *
+ * A suavização acima só corria dentro do `scroll`, e sem eventos não há nada
+ * que puxe a velocidade para baixo: quem desse um flick a sério e parasse para
+ * olhar para uma fotografia ficava com a margem colada ao tecto — a página
+ * quieta a descarregar seis ecrãs à frente, que é exactamente o que o tecto
+ * existe para evitar.
+ *
+ * Aplica-se aqui a MESMA suavização, com o mesmo peso: parar é medir zero. O
+ * relógio só anda enquanto houver margem acima do piso — chegado a 2 ecrãs
+ * não há mais nada a descer, e nada fica a bater no vazio.
+ */
+const REPOUSO_MS = 150;
+
 export interface Antecipacao {
   /** Margem a usar num `rootMargin`, em píxeis. Múltiplo da altura do ecrã. */
   margemPx: number;
@@ -70,6 +85,30 @@ export function useAntecipacao(): Antecipacao {
     setAltura(window.innerHeight);
 
     let pendente = false;
+    let repouso: ReturnType<typeof setTimeout> | undefined;
+
+    /** A velocidade que lá está, em degraus de ecrã. Devolve o degrau. */
+    function aplicar() {
+      const h = window.innerHeight || 1;
+      const querido = (velocidadeRef.current * AVISO_S) / h;
+      const degrau = Math.min(MAX_ECRAS, Math.max(MIN_ECRAS, Math.ceil(querido)));
+      setEcras((actual) => (actual === degrau ? actual : degrau));
+      return degrau;
+    }
+
+    function agendarRepouso() {
+      clearTimeout(repouso);
+      repouso = setTimeout(decair, REPOUSO_MS);
+    }
+
+    // Parado é velocidade zero — e uma paragem não gera evento nenhum, por isso
+    // tem de ser o relógio a dizê-lo. Pára de se armar assim que chega ao piso.
+    function decair() {
+      repouso = undefined;
+      velocidadeRef.current *= 1 - SUAVIZACAO;
+      if (aplicar() > MIN_ECRAS) agendarRepouso();
+    }
+
     const medir = () => {
       pendente = false;
       const agora = performance.now();
@@ -84,10 +123,8 @@ export function useAntecipacao(): Antecipacao {
       const instantanea = Math.abs(y - anterior.y) / dt;
       velocidadeRef.current = velocidadeRef.current * (1 - SUAVIZACAO) + instantanea * SUAVIZACAO;
 
-      const h = window.innerHeight || 1;
-      const querido = (velocidadeRef.current * AVISO_S) / h;
-      const degrau = Math.min(MAX_ECRAS, Math.max(MIN_ECRAS, Math.ceil(querido)));
-      setEcras((actual) => (actual === degrau ? actual : degrau));
+      aplicar();
+      agendarRepouso();
     };
 
     const aoScroll = () => {
@@ -102,6 +139,7 @@ export function useAntecipacao(): Antecipacao {
     return () => {
       window.removeEventListener("scroll", aoScroll);
       window.removeEventListener("resize", aoRedimensionar);
+      clearTimeout(repouso);
     };
   }, []);
 

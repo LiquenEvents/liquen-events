@@ -85,6 +85,49 @@ describe("useAntecipacao", () => {
     expect(result.current.margemPx).toBeLessThanOrEqual(6 * ALTURA);
   });
 
+  /**
+   * ── PARAR TAMBÉM É UMA VELOCIDADE ────────────────────────────────────────
+   *
+   * A suavização só era aplicada DENTRO do `scroll`: sem eventos, a velocidade
+   * ficava congelada no último valor medido. Quem desse um flick a sério e
+   * parasse para olhar para uma fotografia ficava com a margem colada aos 6
+   * ecrãs — a página parada a descarregar como se ainda se estivesse a rolar
+   * depressa, que é precisamente o que o tecto existe para evitar.
+   */
+  it("com a página parada, a margem volta ao piso de 2 ecrãs", () => {
+    const { result } = renderHook(() => useAntecipacao());
+    percorrer(50_000);
+    expect(result.current.ecras, "o flick tinha de ter comprado margem").toBeGreaterThan(2);
+
+    // O dedo levantou. Nem mais um evento de scroll — só o tempo a passar.
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(result.current.ecras).toBe(2);
+    expect(result.current.margemPx).toBe(2 * ALTURA);
+  });
+
+  it("o decaimento é gradual — não é um corte a pique", () => {
+    // Cada mudança de degrau cria um IntersectionObserver novo; cair de 6 para
+    // 2 num único passo, no instante em que o dedo levanta, é o mesmo salto que
+    // a suavização existe para não dar.
+    const { result } = renderHook(() => useAntecipacao());
+    // Uma velocidade de leitura rápida, e não um flick absurdo: acima do tecto
+    // o decaimento gasta as primeiras voltas a descer do que já não cabia.
+    percorrer(4000);
+    const doFlick = result.current.ecras;
+    expect(doFlick).toBeGreaterThan(3);
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    const aMeio = result.current.ecras;
+
+    expect(aMeio).toBeLessThan(doFlick);
+    expect(aMeio).toBeGreaterThan(2);
+  });
+
   it("a margem vem em degraus inteiros de ecrã", () => {
     // Não é cosmética: quem a consome usa-a num `rootMargin`, e cada valor
     // novo obriga a criar um IntersectionObserver novo. Um número contínuo

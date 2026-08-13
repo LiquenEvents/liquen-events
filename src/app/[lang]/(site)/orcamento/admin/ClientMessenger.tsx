@@ -4,9 +4,25 @@ import { useState } from "react";
 import type { Quote, QuoteMessage } from "@/lib/orcamento/types";
 import { Button, Field } from "./ui";
 
+/**
+ * O que a rota disse do ENVIO — não da gravação.
+ *
+ * São duas coisas diferentes e o mensageiro sabe-o desde que passou a mostrar o
+ * `emailError` a vermelho: a mensagem fica SEMPRE registada, o e-mail é que pode
+ * não sair (o caso de todos os dias: um pedido que entrou por telefonema e não
+ * tem email). Quem escreve o histórico do pedido a partir do `onSent` precisa da
+ * mesma distinção — senão regista «enviada» sobre uma que ninguém recebeu.
+ */
+export interface EnvioDaMensagem {
+  /** O e-mail saiu mesmo? */
+  emailed: boolean;
+  /** A razão que a rota deu quando não saiu (já pronta para se ler). */
+  emailError?: string;
+}
+
 interface Props {
   quote: Quote;
-  onSent?: (messages: QuoteMessage[]) => void;
+  onSent?: (messages: QuoteMessage[], envio: EnvioDaMensagem) => void;
 }
 
 // Quick-reply templates. {nome} is replaced with the client's first name.
@@ -52,7 +68,8 @@ export default function ClientMessenger({ quote, onSent }: Props) {
       const next = data.quote?.messages ?? [...messages, { at: new Date().toISOString(), body }];
       setMessages(next);
       setText("");
-      onSent?.(next);
+      const emailError = typeof data.emailError === "string" ? data.emailError : undefined;
+      onSent?.(next, { emailed: !!data.emailed, ...(emailError ? { emailError } : {}) });
       /**
        * O e-mail não ter saído é um ERRO, não um rodapé.
        *
@@ -69,7 +86,7 @@ export default function ClientMessenger({ quote, onSent }: Props) {
        */
       if (!data.emailed) {
         setError(
-          data.emailError ||
+          emailError ||
             "A mensagem ficou registada, mas o e-mail NÃO SAIU — o cliente não recebeu nada.",
         );
       }

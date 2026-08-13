@@ -1,6 +1,7 @@
 "use client";
 
 import type { Quote, QuoteMessage, ActivityEntry } from "@/lib/orcamento/types";
+import type { EnvioDaMensagem } from "../../ClientMessenger";
 import { randomId } from "../../util";
 import { ProposalStudio, ClientMessenger } from "../../lazy";
 
@@ -44,7 +45,7 @@ export default function CommsZone({ quote, userName, onQuoteChange, onAddEntry }
       <ClientMessenger
         key={`msg-${quote.id}`}
         quote={quote}
-        onSent={(messages: QuoteMessage[]) => {
+        onSent={(messages: QuoteMessage[], envio: EnvioDaMensagem) => {
           const prevCount = quote.messages?.length ?? 0;
           onQuoteChange({ messages });
           if (messages.length > prevCount) {
@@ -53,7 +54,22 @@ export default function CommsZone({ quote, userName, onQuoteChange, onAddEntry }
               at: new Date().toISOString(),
               kind: "message_sent",
               actor: userName,
-              summary: "Mensagem enviada ao cliente",
+              /**
+               * A mensagem fica SEMPRE registada; o e-mail é que pode não sair
+               * — um pedido que entrou por telefonema não tem email, e a rota
+               * devolve `emailed: false`. O aviso vermelho do mensageiro dura o
+               * tempo do ecrã aberto; esta linha dura para sempre, e era ela
+               * que jurava «enviada ao cliente» sobre uma que ninguém recebeu.
+               *
+               * O histórico é o que se lê meses depois para saber o que se
+               * disse a quem: tem de dizer o que aconteceu de facto. A razão
+               * (`envio.emailError`) fica de fora de propósito — é uma frase de
+               * duas linhas com instruções para AGORA, e o que aqui interessa é
+               * o facto, curto e legível numa lista.
+               */
+              summary: envio.emailed
+                ? "Mensagem enviada ao cliente"
+                : "Mensagem registada — o e-mail não saiu, o cliente não recebeu",
             });
           }
         }}

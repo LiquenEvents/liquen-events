@@ -107,7 +107,6 @@ export default function Miniaturas() {
         // melhor do que repetir a mesma falha duzentas vezes.
         if (!dados.restantes || dados.geradas === 0) break;
       }
-      setFalhadas(problemas);
       toast(
         problemas.length > 0
           ? `${total} miniaturas geradas, ${problemas.length} falharam.`
@@ -116,8 +115,28 @@ export default function Miniaturas() {
       );
       await contar();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Não consegui gerar.", "error");
+      const porque = e instanceof Error ? e.message : "Não consegui gerar.";
+      // Dizer que PAROU A MEIO, e não só o que se avariou: a lista que fica no
+      // ecrã é do que se apurou até aqui, não do trabalho todo. Sem esta parte,
+      // ela lia três falhas e dava a corrida por fechada.
+      toast(
+        problemas.length > 0
+          ? `${porque} — parou a meio: ${total} geradas e ${problemas.length} falhadas até aqui.`
+          : porque,
+        "error",
+      );
     } finally {
+      /**
+       * AQUI, e não no fim do `try`.
+       *
+       * A lista das que falharam era escrita no ecrã só depois de o ciclo
+       * inteiro correr bem. Basta o segundo lote apanhar a rede em baixo para o
+       * `catch` levar consigo tudo o que já se sabia — e o que se sabia era
+       * exactamente o que este painel promete: QUAIS falharam, para se poder
+       * voltar a correr só para essas. Ficava um aviso genérico e nomes
+       * nenhuns, com o trabalho de os apurar a ter de ser repetido do zero.
+       */
+      setFalhadas(problemas);
       setAGerar(false);
     }
   }
