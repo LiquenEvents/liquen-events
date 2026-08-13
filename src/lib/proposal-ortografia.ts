@@ -174,7 +174,7 @@ const POR_CHAVE: ReadonlyMap<string, string> = new Map(
  * escrevem todos «Cocktail», e um documento que misture as duas lê-se como
  * dois documentos colados.
  */
-const GRAFIAS_DA_CASA: ReadonlyArray<readonly [errada: string, certa: string]> = [
+const GRAFIAS_DA_CASA: ReadonlyArray<readonly [errada: string, grafia: string]> = [
   ["seatting", "seating"],
   ["seattings", "seatings"],
   ["plann", "plan"],
@@ -184,7 +184,7 @@ const GRAFIAS_DA_CASA: ReadonlyArray<readonly [errada: string, certa: string]> =
 ];
 
 const POR_ERRO: ReadonlyMap<string, string> = new Map(
-  GRAFIAS_DA_CASA.map(([errada, certa]) => [errada.toLowerCase(), certa]),
+  GRAFIAS_DA_CASA.map(([errada, grafia]) => [errada.toLowerCase(), grafia]),
 );
 
 /**
@@ -201,6 +201,15 @@ const POR_ERRO: ReadonlyMap<string, string> = new Map(
  * Não havia segredo nenhum — é uma palavra de dicionário —, mas «certa» em
  * português e `cert` em inglês são a mesma sequência de letras, e discutir com
  * a heurística sai mais caro do que escolher outro nome. Fica `grafiaDe`.
+ *
+ * ── E NÃO CHEGOU MUDAR O NOME DA FUNÇÃO ───────────────────────────────────
+ * O alerta voltou, igual, com a mesma linha do `localStorage` apontada: a
+ * heurística não olha só ao nome da função, olha a CADA variável por onde o
+ * valor passa. Ficavam cinco `certa` — a etiqueta do tuplo das grafias, o
+ * parâmetro de `comAsMaiusculasDe` e as leituras dentro de `gralhasDoDoc` —, e
+ * cada uma delas marcava outra vez o texto como segredo. Passaram todas a
+ * `grafia`. A regra, para quem escrever aqui: neste ficheiro não há
+ * identificadores começados por «cert», por mais portuguesa que seja a palavra.
  */
 function grafiaDe(palavra: string): string | undefined {
   return POR_CHAVE.get(semAcentos(palavra)) ?? POR_ERRO.get(palavra.toLowerCase());
@@ -213,14 +222,14 @@ function grafiaDe(palavra: string): string | undefined {
  * «cerimónia» — a correcção não pode trazer atrás uma alteração de desenho que
  * ninguém pediu.
  */
-function comAsMaiusculasDe(escrita: string, certa: string): string {
+function comAsMaiusculasDe(escrita: string, grafia: string): string {
   if (escrita === escrita.toUpperCase() && escrita !== escrita.toLowerCase()) {
-    return certa.toUpperCase();
+    return grafia.toUpperCase();
   }
   if (escrita[0] === escrita[0]?.toUpperCase()) {
-    return certa[0].toUpperCase() + certa.slice(1);
+    return grafia[0].toUpperCase() + grafia.slice(1);
   }
-  return certa;
+  return grafia;
 }
 
 /**
@@ -537,17 +546,17 @@ export function gralhasDoDocumento(doc: Partial<ProposalDoc>): Gralha[] {
     if (!texto || !texto.trim()) continue;
     const jaVistas = new Set<string>();
     for (const palavra of palavrasDe(texto)) {
-      const certa = grafiaDe(palavra);
-      if (!certa) continue;
+      const grafia = grafiaDe(palavra);
+      if (!grafia) continue;
       // Já está certa (com ou sem maiúsculas)? Não há nada a dizer.
-      if (palavra.toLowerCase() === certa.toLowerCase()) continue;
+      if (palavra.toLowerCase() === grafia.toLowerCase()) continue;
       if (jaVistas.has(palavra)) continue;
       jaVistas.add(palavra);
       achados.push({
         campo,
         rotulo,
         escrita: palavra,
-        sugerida: comAsMaiusculasDe(palavra, certa),
+        sugerida: comAsMaiusculasDe(palavra, grafia),
         texto,
       });
     }
