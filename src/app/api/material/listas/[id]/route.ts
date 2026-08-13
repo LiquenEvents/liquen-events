@@ -61,7 +61,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         qty: num(l.qty, 1),
         qtyPerPax: l.qtyPerPax ? num(l.qtyPerPax, 0) || undefined : undefined,
         critical: Boolean(l.critical),
-        position: existentes.length,
+        // O fim da lista é o MAIOR `position` + 1, não o número de linhas: a
+        // contagem só coincide com o fim enquanto ninguém apagar nada. Tirada
+        // uma linha do meio, a seguinte nascia empatada com outra que já lá
+        // estava, e a ordem das duas passava a ser a que a base de dados desse
+        // — diferente entre leituras, na lista que alguém segue a carregar.
+        position: existentes.reduce((maior, linha) => Math.max(maior, linha.position + 1), 0),
       });
       return NextResponse.json(criada);
     }

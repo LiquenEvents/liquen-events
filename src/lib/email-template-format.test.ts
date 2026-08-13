@@ -4,6 +4,7 @@ import {
   extractSimpleText,
   isSimpleBody,
   renderPreview,
+  renderPreviewSubject,
   insertToken,
   htmlToPlainText,
   EXAMPLE_VARS,
@@ -15,15 +16,41 @@ describe("renderPreview", () => {
     const src = "Olá {nome}, valor {valor}. {desconhecido}";
     // Same output the send path produces for the same vars.
     const viaServer = renderTemplate(
-      { key: "", name: "", subject: src, body: "", updatedAt: "" },
+      { key: "", name: "", subject: "", body: src, updatedAt: "" },
       EXAMPLE_VARS,
-    ).subject;
+    ).body;
     expect(renderPreview(src)).toBe(viaServer);
     expect(renderPreview(src)).toBe("Olá Maria Silva, valor 14.500 €. ");
   });
 
   it("HTML-escapes merge values so data cannot inject markup", () => {
     expect(renderPreview("{nome}", { nome: '<b>x</b>"&' })).toBe("&lt;b&gt;x&lt;/b&gt;&quot;&amp;");
+  });
+});
+
+/**
+ * A PRÉ-VISUALIZAÇÃO DO ASSUNTO TEM DE MENTIR TÃO POUCO COMO A DO CORPO.
+ *
+ * O assunto é um cabeçalho, não HTML: o caminho de envio não o escapa (ver
+ * `renderTemplate`). Se a pré-visualização o escapasse, quem escreve o modelo
+ * via «Marta &amp; João» no ecrã e mudava o modelo para corrigir uma coisa que
+ * o cliente nunca chegaria a ver — e o contrário é igualmente mau. Os dois
+ * andam sempre juntos.
+ */
+describe("renderPreviewSubject", () => {
+  it("mirrors the send path: no HTML escaping in the subject", () => {
+    const src = "Proposta para {nome}";
+    const vars = { nome: "Marta & João" };
+    const viaServer = renderTemplate(
+      { key: "", name: "", subject: src, body: "", updatedAt: "" },
+      vars,
+    ).subject;
+    expect(renderPreviewSubject(src, vars)).toBe(viaServer);
+    expect(renderPreviewSubject(src, vars)).toBe("Proposta para Marta & João");
+  });
+
+  it("replaces every {key} and blanks unknowns, like the body preview", () => {
+    expect(renderPreviewSubject("Olá {nome}. {desconhecido}")).toBe("Olá Maria Silva. ");
   });
 });
 

@@ -52,7 +52,10 @@ const OUTRA = mensagem({
   text: "Boa tarde.",
 });
 
-function renderThread(message: InboxMessage, onReply = vi.fn(async () => true)) {
+function renderThread(
+  message: InboxMessage,
+  onReply: (text: string, mensagem: InboxMessage) => Promise<boolean> = vi.fn(async () => true),
+) {
   const props = {
     seen: true,
     flagged: false,
@@ -107,6 +110,56 @@ describe("InboxThread — o compositor pertence à mensagem aberta", () => {
     abrir(OUTRA);
     expect(screen.queryByRole("status")).toBeNull();
     expect(caixaDeResposta()).toBeInTheDocument();
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * QUEM ENVIA TEM DE SABER A QUE ESTÁ A RESPONDER
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * O `onReply(text)` só entregava o texto, e o contentor ficava sem os
+   * identificadores da mensagem aberta — sem eles a rota não consegue pôr o
+   * `In-Reply-To`/`References`, e cada resposta abre uma conversa NOVA na caixa
+   * do cliente em vez de continuar a que ele começou. Do lado dele o histórico
+   * fica desfeito: a resposta aparece longe da pergunta.
+   *
+   * O compositor pertence à mensagem aberta (é essa a razão da `key` acima), por
+   * isso é ele que a entrega — e entrega a mensagem que está no ecrã naquele
+   * momento, não a que lá estava quando o painel montou.
+   */
+  it("entrega a mensagem a que se responde, com os identificadores da conversa", async () => {
+    const user = userEvent.setup();
+    const onReply = vi.fn<(text: string, m: InboxMessage) => Promise<boolean>>(async () => true);
+    renderThread(
+      mensagem({ messageId: "<m3@cliente.pt>", references: ["<raiz@cliente.pt>"] }),
+      onReply,
+    );
+
+    await user.type(caixaDeResposta(), "Enviamos hoje.");
+    await user.click(screen.getByRole("button", { name: /enviar resposta/i }));
+
+    await waitFor(() => expect(onReply).toHaveBeenCalledTimes(1));
+    expect(onReply).toHaveBeenCalledWith(
+      "Enviamos hoje.",
+      expect.objectContaining({
+        messageId: "<m3@cliente.pt>",
+        references: ["<raiz@cliente.pt>"],
+        fromAddress: "ana@cliente.pt",
+      }),
+    );
+  });
+
+  it("responde à mensagem que está no ecrã, e não à que lá estava antes", async () => {
+    const user = userEvent.setup();
+    const onReply = vi.fn<(text: string, m: InboxMessage) => Promise<boolean>>(async () => true);
+    const { abrir } = renderThread(mensagem(), onReply);
+
+    abrir(OUTRA);
+    await user.type(caixaDeResposta(), "Boa tarde.");
+    await user.click(screen.getByRole("button", { name: /enviar resposta/i }));
+
+    await waitFor(() => expect(onReply).toHaveBeenCalledTimes(1));
+    expect(onReply.mock.calls[0][1]).toMatchObject({ messageId: "<m2@outro.pt>" });
   });
 
   it("mantém o que está escrito enquanto a mesma mensagem for recarregada", async () => {

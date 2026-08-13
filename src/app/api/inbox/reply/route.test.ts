@@ -80,3 +80,130 @@ describe("POST /api/inbox/reply", () => {
     expect(sendMail).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A RESPOSTA TEM DE CAIR DENTRO DA CONVERSA QUE JÁ EXISTE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Sem `In-Reply-To`/`References` o email sai tecnicamente bem e chega — mas
+ * chega SOLTO. Do lado do cliente (Gmail, Outlook, o telemóvel) cada resposta
+ * do estúdio abre um assunto novo em vez de continuar o que ele escreveu: o
+ * histórico da conversa dele fica desfeito em mensagens avulsas, e a resposta
+ * aparece longe da pergunta. Quem lê pensa que ninguém respondeu ao que
+ * perguntou.
+ *
+ * Os identificadores vêm da mensagem aberta na caixa (`messageId` e
+ * `references` de `InboxItem`) e são, por definição, escritos por quem enviou
+ * — input não confiável, e a caminho de um CABEÇALHO. Daí a validação.
+ */
+function ultimoEnvio() {
+  return vi.mocked(sendMail).mock.calls.at(-1)![0];
+}
+
+describe("POST /api/inbox/reply — encadeamento da conversa", () => {
+  it("liga a resposta à mensagem a que responde (In-Reply-To + References)", async () => {
+    const res = await POST(
+      post({
+        to: "c@x.com",
+        message: "olá",
+        inReplyTo: "<m3@cliente.pt>",
+        references: ["<raiz@cliente.pt>", "<m2@liquen.pt>"],
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(ultimoEnvio().headers).toEqual({
+      "In-Reply-To": "<m3@cliente.pt>",
+      // A cadeia do RFC 5322 §3.6.4: o que a mensagem já trazia, mais ela
+      // própria no fim.
+      References: "<raiz@cliente.pt> <m2@liquen.pt> <m3@cliente.pt>",
+    });
+  });
+
+  it("encadeia na mesma quando a mensagem é a primeira da conversa (sem References)", async () => {
+    await POST(post({ to: "c@x.com", message: "olá", inReplyTo: "<m1@cliente.pt>" }));
+    expect(ultimoEnvio().headers).toEqual({
+      "In-Reply-To": "<m1@cliente.pt>",
+      References: "<m1@cliente.pt>",
+    });
+  });
+
+  it("aceita um Message-ID que venha sem os sinais de menor/maior", async () => {
+    await POST(post({ to: "c@x.com", message: "olá", inReplyTo: "m1@cliente.pt" }));
+    expect(ultimoEnvio().headers).toMatchObject({ "In-Reply-To": "<m1@cliente.pt>" });
+  });
+
+  it("não repete o mesmo identificador na cadeia", async () => {
+    await POST(
+      post({
+        to: "c@x.com",
+        message: "olá",
+        inReplyTo: "<m1@cliente.pt>",
+        references: ["<m1@cliente.pt>"],
+      }),
+    );
+    expect(ultimoEnvio().headers).toMatchObject({ References: "<m1@cliente.pt>" });
+  });
+
+  it("envia sem cabeçalhos de conversa quando não há nada a encadear", async () => {
+    const res = await POST(post({ to: "c@x.com", message: "olá" }));
+    expect(res.status).toBe(200);
+    expect(ultimoEnvio().headers).toBeUndefined();
+  });
+
+  /**
+   * O `messageId` de uma `InboxItem` chega da caixa e pode ser o que o
+   * remetente quiser. Um `<a@x>\r\nBcc: toda-a-gente@…>` era exactamente a
+   * injecção de cabeçalhos contra a qual o `to` e o `subject` já se defendem —
+   * e a resposta continua a ter de sair.
+   */
+  it("deita fora um identificador com quebras de linha, e envia na mesma", async () => {
+    const res = await POST(
+      post({
+        to: "c@x.com",
+        message: "olá",
+        inReplyTo: "<a@x>\r\nBcc: evil@x.com",
+        references: ["<bom@x>"],
+      }),
+    );
+    expect(res.status).toBe(200);
+    const headers = ultimoEnvio().headers ?? {};
+    expect(headers["In-Reply-To"]).toBeUndefined();
+    expect(headers.References).toBe("<bom@x>");
+    expect(JSON.stringify(headers)).not.toContain("Bcc");
+  });
+
+  it("ignora identificadores absurdos e o que não é texto", async () => {
+    await POST(
+      post({
+        to: "c@x.com",
+        message: "olá",
+        references: [`<${"a".repeat(2000)}@x>`, "sem-arroba mas com espaços", "<bom@x>"],
+      }),
+    );
+    expect(ultimoEnvio().headers).toMatchObject({ References: "<bom@x>" });
+  });
+
+  /**
+   * O `References` de uma conversa longa cresce sem tecto e vai INTEIRO para
+   * dentro de um cabeçalho. Corta-se como o `parseReferences` da caixa: a raiz
+   * (que é o que agrupa a conversa) e a linhagem imediata; o meio é o que se
+   * perde sem perder o fio.
+   */
+  it("corta uma cadeia enorme mantendo a raiz e o fim", async () => {
+    const enormes = Array.from({ length: 500 }, (_, i) => `<m${i}@x>`);
+    await POST(
+      post({ to: "c@x.com", message: "olá", inReplyTo: "<atual@x>", references: enormes }),
+    );
+    const ids = (ultimoEnvio().headers!.References as string).split(" ");
+    expect(ids.length).toBeLessThanOrEqual(50);
+    expect(ids[0]).toBe("<m0@x>");
+    expect(ids.at(-1)).toBe("<atual@x>");
+  });
+
+  it("um `references` que não é lista não rebenta o envio", async () => {
+    const res = await POST(post({ to: "c@x.com", message: "olá", references: "<m1@x>" }));
+    expect(res.status).toBe(200);
+    expect(sendMail).toHaveBeenCalledTimes(1);
+  });
+});

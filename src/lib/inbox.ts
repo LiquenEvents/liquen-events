@@ -209,6 +209,12 @@ export async function listInbox(arg: number | ListInboxOptions = 30): Promise<In
   const q = opts.q?.trim();
   const before = opts.before;
 
+  // `before` é "o que está ABAIXO desta UID". Em 1 não está nada — e como o
+  // intervalo `1:0` não existe em IMAP, o pedido acabava por ser `1:1` e o
+  // "carregar mais" do fundo da caixa devolvia outra vez a mensagem mais
+  // antiga, repetida na lista a cada clique. Não há nada para perguntar.
+  if (before != null && before <= 1) return [];
+
   const client = await makeClient();
   await client.connect();
   try {
@@ -224,7 +230,7 @@ export async function listInbox(arg: number | ListInboxOptions = 30): Promise<In
         // fetch the newest `limit` of them.
         const criteria: SearchObject = {};
         if (q) criteria.or = [{ subject: q }, { from: q }, { text: q }];
-        if (before != null) criteria.uid = `1:${Math.max(1, before - 1)}`;
+        if (before != null) criteria.uid = `1:${before - 1}`;
         const found = await client.search(criteria, { uid: true });
         const uids = (found || []).slice(-limit);
         if (!uids.length) return [];

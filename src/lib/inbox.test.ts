@@ -327,6 +327,30 @@ describe("listInbox — surfaces durable metadata", () => {
     expect(items).toEqual([]);
     expect(imap.lastSearch).toMatchObject({ uid: "1:99" });
   });
+
+  /**
+   * O «carregar mais» do fundo da caixa pede o que está ABAIXO da última linha
+   * que já tem. Quando essa última linha é a UID 1, não há nada abaixo — e o
+   * intervalo `1:0` não existe em IMAP, por isso o `Math.max(1, …)` transformava
+   * o pedido em `1:1`: a mensagem mais antiga voltava, e aparecia duas vezes na
+   * lista a cada clique. Não há nada a perguntar ao servidor neste caso.
+   */
+  it("no fundo da caixa não repete a mensagem mais antiga", async () => {
+    imap.fixtures = [fakeMsg({ uid: 1 })];
+    imap.searchResult = [1];
+    const { listInbox } = await loadInbox();
+    expect(await listInbox({ before: 1 })).toEqual([]);
+    // E nem sequer chega a ir ao servidor buscá-la.
+    expect(imap.lastSearch).toBeUndefined();
+  });
+
+  it("ainda pede ao servidor quando há mensagens abaixo (before: 2)", async () => {
+    imap.fixtures = [fakeMsg({ uid: 1 })];
+    imap.searchResult = [1];
+    const { listInbox } = await loadInbox();
+    expect(await listInbox({ before: 2 })).toHaveLength(1);
+    expect(imap.lastSearch).toMatchObject({ uid: "1:1" });
+  });
 });
 
 describe("getInboxMessage", () => {

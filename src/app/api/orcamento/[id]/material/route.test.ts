@@ -1,0 +1,184 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { NextRequest } from "next/server";
+import type { EventMaterialItem } from "@/lib/event-material-types";
+import type { LinhaGerada } from "@/lib/material-rules";
+
+const authed = vi.hoisted(() => ({ ok: true }));
+const dados = vi.hoisted(() => ({
+  /** As linhas que já estavam na checklist antes de se voltar a gerar. */
+  anteriores: [] as unknown[],
+  /** O que o motor de regras devolve nesta geração. */
+  geradas: [] as unknown[],
+  addEventItem: vi.fn(async (input: Record<string, unknown>) => ({ id: "novo", ...input })),
+  removeItemsOfEvent: vi.fn(async () => {}),
+  updateEventMaterial: vi.fn(async () => null),
+}));
+
+vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
+vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
+vi.mock("@/lib/quotes-store", () => ({
+  getQuote: vi.fn(async (id: string) => ({ id, guests: 80, decorPoints: [], notes: "" })),
+}));
+vi.mock("@/lib/proposals-store", () => ({ getProposalByQuote: vi.fn(async () => null) }));
+vi.mock("@/lib/orcamento/decoracao", () => ({ rotularPontos: () => [] as string[] }));
+vi.mock("@/lib/material-store", () => ({ listMaterial: vi.fn(async () => []) }));
+vi.mock("@/lib/material-lists-store", () => ({ listLists: vi.fn(async () => []) }));
+vi.mock("@/lib/material-list-items-store", () => ({ listAllListItems: vi.fn(async () => []) }));
+vi.mock("@/lib/material-rules-store", () => ({ listRules: vi.fn(async () => []) }));
+vi.mock("@/lib/material-rules", () => ({ gerarChecklist: () => dados.geradas }));
+vi.mock("@/lib/event-material-store", () => ({
+  getForQuote: vi.fn(async () => ({ id: "ev1", quoteId: "q1" })),
+  obterOuCriarParaPedido: vi.fn(async () => ({ id: "ev1", quoteId: "q1" })),
+  updateEventMaterial: dados.updateEventMaterial,
+}));
+vi.mock("@/lib/event-material-items-store", () => ({
+  listItemsOfEvent: vi.fn(async () => dados.anteriores),
+  addEventItem: dados.addEventItem,
+  removeItemsOfEvent: dados.removeItemsOfEvent,
+}));
+
+import { POST } from "./route";
+
+function post(id = "q1") {
+  const req = new Request(`https://liquen.test/api/orcamento/${id}/material`, {
+    method: "POST",
+  }) as unknown as NextRequest;
+  return POST(req, { params: Promise.resolve({ id }) });
+}
+
+function gerada(over: Partial<LinhaGerada> = {}): LinhaGerada {
+  return {
+    itemId: "toalha",
+    name: "Toalha de linho",
+    category: "Mesa",
+    unit: "un",
+    kind: "reutilizavel",
+    qty: 10,
+    critical: false,
+    origin: "base",
+    originLabel: "Essenciais",
+    ...over,
+  };
+}
+
+function anterior(over: Partial<EventMaterialItem> = {}): EventMaterialItem {
+  return {
+    id: "linha-1",
+    eventId: "ev1",
+    itemId: "toalha",
+    name: "Toalha de linho",
+    category: "Mesa",
+    unit: "un",
+    kind: "reutilizavel",
+    qty: 10,
+    critical: false,
+    origin: "base",
+    originLabel: "Essenciais",
+    missing: false,
+    ...over,
+  };
+}
+
+/** A linha que a regeneração gravou para um dado item do catálogo. */
+function gravada(itemId: string) {
+  const call = dados.addEventItem.mock.calls.find(
+    (c) => (c[0] as { itemId?: string }).itemId === itemId,
+  );
+  return call?.[0] as unknown as Partial<EventMaterialItem> | undefined;
+}
+
+beforeEach(() => {
+  authed.ok = true;
+  dados.anteriores = [];
+  dados.geradas = [];
+  vi.clearAllMocks();
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * REGENERAR NÃO PODE APAGAR A DEVOLUÇÃO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A regeneração já se preocupava em não perder o que estava CARREGADO — mas
+ * copiava apenas `loadedAt`, `note` e `vehicleId`, e escrevia `missing: false`
+ * por cima de tudo. O fim da vida de uma linha (voltou do evento, quanto se
+ * gastou, o que não voltou) ficava de fora.
+ *
+ * O ecrã do evento tem o botão «Gerar checklist» sempre à mão e não avisa de
+ * nada. Carregá-lo depois do evento — para juntar um serviço que se acrescentou
+ * — punha a checklist inteira por devolver: o material que já estava no
+ * armazém aparecia como estando na carrinha, e as caixas que faltavam
+ * desapareciam da conferência. O registo de quem devolveu e do que se gastou
+ * não existe em mais lado nenhum.
+ */
+describe("POST /api/orcamento/[id]/material — o que a regeneração preserva", () => {
+  it("mantém a devolução, quem a fez, o que se gastou e o que ficou em falta", async () => {
+    dados.anteriores = [
+      anterior({
+        loadedAt: "2026-06-01T08:00:00.000Z",
+        loadedBy: "Rita",
+        vehicleId: "carrinha-1",
+        returnedAt: "2026-06-02T19:00:00.000Z",
+        returnedBy: "Nuno",
+        usedQty: 7,
+        missing: true,
+        note: "faltaram 3",
+      }),
+    ];
+    dados.geradas = [gerada()];
+
+    expect((await post()).status).toBe(200);
+
+    expect(gravada("toalha")).toMatchObject({
+      loadedAt: "2026-06-01T08:00:00.000Z",
+      loadedBy: "Rita",
+      vehicleId: "carrinha-1",
+      returnedAt: "2026-06-02T19:00:00.000Z",
+      returnedBy: "Nuno",
+      usedQty: 7,
+      missing: true,
+      note: "faltaram 3",
+    });
+  });
+
+  /**
+   * Uma linha marcada «em falta» ou com consumo apontado, mas nunca carregada
+   * (o material não chegou a sair do armazém), não passava sequer o filtro do
+   * que se preserva — perdia-se inteira, sem deixar rasto.
+   */
+  it("preserva também a linha que só tem 'em falta' marcado", async () => {
+    dados.anteriores = [anterior({ missing: true })];
+    dados.geradas = [gerada()];
+
+    await post();
+
+    expect(gravada("toalha")).toMatchObject({ missing: true });
+  });
+
+  it("preserva a linha que só tem consumo apontado", async () => {
+    dados.anteriores = [anterior({ usedQty: 0 })];
+    dados.geradas = [gerada()];
+
+    await post();
+
+    expect(gravada("toalha")).toMatchObject({ usedQty: 0 });
+  });
+
+  it("uma linha nova nasce limpa — sem marcas emprestadas de outra", async () => {
+    dados.anteriores = [anterior({ itemId: "toalha", missing: true, returnedAt: "2026-06-02" })];
+    dados.geradas = [gerada(), gerada({ itemId: "vela", name: "Vela" })];
+
+    await post();
+
+    expect(gravada("vela")).toMatchObject({ missing: false });
+    expect(gravada("vela")?.returnedAt).toBeUndefined();
+    expect(gravada("vela")?.usedQty).toBeUndefined();
+  });
+
+  it("401 sem sessão, e nada é regenerado", async () => {
+    authed.ok = false;
+    expect((await post()).status).toBe(401);
+    expect(dados.removeItemsOfEvent).not.toHaveBeenCalled();
+    expect(dados.addEventItem).not.toHaveBeenCalled();
+  });
+});

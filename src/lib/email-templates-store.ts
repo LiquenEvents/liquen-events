@@ -190,14 +190,28 @@ export async function upsertTemplate(
 
 /**
  * Resolve `{key}` placeholders in the subject and body against `vars`. Every
- * placeholder is replaced (missing keys → empty string); values are
- * HTML-escaped so merge data can't inject markup into the email body.
+ * placeholder is replaced (missing keys → empty string).
+ *
+ * O CORPO É ESCAPADO, O ASSUNTO NÃO — e a diferença não é um descuido.
+ *
+ * O corpo é HTML e vai para dentro do email como markup: escapar os valores é
+ * o que impede que os dados de um cliente lá metam etiquetas. O assunto é um
+ * cabeçalho RFC 5322, texto de uma ponta à outra, e quem o codifica é o
+ * nodemailer no envio; passá-lo pelo `esc` não protegia coisa nenhuma e só se
+ * via — uma «Marta & João» recebia um email endereçado a «Marta &amp; João»,
+ * com o nome dela mal escrito na única linha que ela lê antes de abrir.
+ *
+ * A pré-visualização do back office faz esta mesma distinção
+ * (`renderPreview` / `renderPreviewSubject` em `email-template-format.ts`).
+ * As duas andam sempre juntas: mudar uma sem a outra faz o ecrã mentir.
  */
 export function renderTemplate(
   t: EmailTemplate,
   vars: Record<string, string>,
 ): { subject: string; body: string } {
-  const replace = (s: string): string =>
-    s.replace(/\{(\w+)\}/g, (_m, key: string) => (key in vars ? esc(vars[key]) : ""));
-  return { subject: replace(t.subject), body: replace(t.body) };
+  const replace = (s: string, escapar: boolean): string =>
+    s.replace(/\{(\w+)\}/g, (_m, key: string) =>
+      key in vars ? (escapar ? esc(vars[key]) : String(vars[key] ?? "")) : "",
+    );
+  return { subject: replace(t.subject, false), body: replace(t.body, true) };
 }

@@ -35,7 +35,83 @@ const replySchema = z.object({
     .refine((v) => !/[\r\n]/.test(v), "Assunto inválido")
     .optional(),
   message: z.string().trim().min(1, "Mensagem obrigatória").max(10_000),
+  // Os identificadores que ligam esta resposta à conversa do cliente: o
+  // `messageId` e o `references` da mensagem aberta na caixa. Deliberadamente
+  // `unknown` — vêm de um cabeçalho escrito por quem enviou, e é o
+  // `cabecalhosDeConversa` que os valida um a um. Um identificador estragado
+  // faz perder o encadeamento, nunca o envio: a resposta é o que a pessoa
+  // pediu, o resto é acabamento.
+  inReplyTo: z.unknown().optional(),
+  references: z.unknown().optional(),
 });
+
+/**
+ * Quantos identificadores cabem no `References`, e o comprimento de cada um.
+ * Os mesmos tectos da leitura da caixa (ver `parseReferences` em
+ * `src/lib/inbox.ts`) — 998 é o limite de linha do RFC 5322.
+ */
+const MAX_REFERENCIAS = 50;
+const MAX_ID_REFERENCIA = 998;
+/** Quantos identificadores CRUS se chegam a olhar (ver `cabecalhosDeConversa`). */
+const MAX_BRUTAS = 200;
+
+/**
+ * Um Message-ID pronto a entrar num cabeçalho, ou `undefined` se não o for.
+ *
+ * O `\s` do teste apanha o CR/LF da injecção de cabeçalhos ao mesmo tempo que
+ * os identificadores mal formados — a mesma defesa que o `to` e o `subject` já
+ * fazem, aqui aplicada a texto que chegou de fora pelo IMAP. Os `<`, `>`, `,` e
+ * `;` separam identificadores e por isso não podem viver dentro de um.
+ */
+function idDeMensagem(valor: unknown): string | undefined {
+  if (typeof valor !== "string") return undefined;
+  const cru = valor.trim().replace(/^<|>$/g, "");
+  // O `+ 2` é o par de `<>` que se volta a pôr.
+  if (!cru || cru.length + 2 > MAX_ID_REFERENCIA || /[\s<>,;]/.test(cru)) return undefined;
+  return `<${cru}>`;
+}
+
+/**
+ * Os cabeçalhos que fazem a resposta CONTINUAR a conversa em vez de abrir uma
+ * nova na caixa do cliente.
+ *
+ * `In-Reply-To` é a mensagem a que se responde; `References` é a linhagem toda
+ * — o que essa mensagem já trazia, mais ela própria no fim (RFC 5322 §3.6.4).
+ * É por estes dois que o Gmail, o Outlook e o telemóvel juntam as mensagens: a
+ * resposta enviada sem eles chega na mesma, mas chega SOLTA, e do lado de quem
+ * escreveu o histórico fica desfeito em assuntos avulsos.
+ *
+ * Devolve `{}` quando não há nada a encadear (uma mensagem sem `Message-ID`
+ * legível é o caso), para não pôr cabeçalhos vazios no email.
+ */
+function cabecalhosDeConversa(inReplyTo: unknown, references: unknown): Record<string, string> {
+  const emResposta = idDeMensagem(inReplyTo);
+
+  // Tecto ANTES de percorrer, e não só no fim: nada no corpo do pedido limita o
+  // tamanho desta lista, e a verificação de repetidos abaixo é quadrática — um
+  // `references` com um milhão de entradas prendia a função a comparar strings.
+  // Corta-se já pela raiz + linhagem, como em baixo.
+  const brutas = Array.isArray(references) ? references : [];
+  const anteriores =
+    brutas.length <= MAX_BRUTAS ? brutas : [brutas[0], ...brutas.slice(-(MAX_BRUTAS - 1))];
+
+  const cadeia: string[] = [];
+  for (const bruto of [...anteriores, inReplyTo]) {
+    const id = idDeMensagem(bruto);
+    if (id && !cadeia.includes(id)) cadeia.push(id);
+  }
+  // Corta-se pelo meio e não pelo fim, como na leitura: o que agrupa a conversa
+  // é a RAIZ (o primeiro) e a linhagem imediata (os últimos).
+  const limitada =
+    cadeia.length <= MAX_REFERENCIAS
+      ? cadeia
+      : [cadeia[0], ...cadeia.slice(-(MAX_REFERENCIAS - 1))];
+
+  const headers: Record<string, string> = {};
+  if (emResposta) headers["In-Reply-To"] = emResposta;
+  if (limitada.length) headers.References = limitada.join(" ");
+  return headers;
+}
 
 export async function POST(request: NextRequest) {
   if (!isAuthed(request)) {
@@ -80,7 +156,15 @@ export async function POST(request: NextRequest) {
       </div>
     </div>`;
 
-    const mail = await sendMail({ to, replyTo: MAIL_TO, subject, html, text: message });
+    const conversa = cabecalhosDeConversa(parsed.data.inReplyTo, parsed.data.references);
+    const mail = await sendMail({
+      to,
+      replyTo: MAIL_TO,
+      subject,
+      html,
+      text: message,
+      headers: Object.keys(conversa).length ? conversa : undefined,
+    });
     return NextResponse.json({ ok: true, emailed: mail.sent });
   } catch (err) {
     log.error("inbox reply POST falhou", err);

@@ -106,11 +106,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const anteriores = anterior ? await listItemsOfEvent(anterior.id) : [];
     // Guardado por `itemId` porque é a identidade estável entre gerações; as
     // linhas manuais não têm par na geração e vão à parte.
-    const preservar = new Map(
-      anteriores
-        .filter((i) => i.loadedAt || i.note || i.vehicleId)
-        .map((i) => [i.itemId ?? i.id, i]),
-    );
+    //
+    // A DEVOLUÇÃO CONTA TANTO COMO A CARGA. Isto só olhava para o começo da
+    // vida da linha (carregada, com nota, numa carrinha) e deixava de fora o
+    // fim dela: voltou, quem a recebeu, quanto se gastou, o que não apareceu.
+    // Uma linha «em falta» ou com consumo apontado mas nunca carregada nem
+    // sequer passava aqui — e a marcação dela não existe em mais lado nenhum.
+    const marcada = (i: (typeof anteriores)[number]) =>
+      Boolean(i.loadedAt || i.note || i.vehicleId || i.returnedAt || i.missing) ||
+      typeof i.usedQty === "number";
+    const preservar = new Map(anteriores.filter(marcada).map((i) => [i.itemId ?? i.id, i]));
     const manuais = anteriores.filter((i) => i.origin === "manual");
 
     // Uma só por evento, mesmo com dois "gerar" ao mesmo tempo (ver
@@ -136,12 +141,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         origin: g.origin,
         originRef: g.originRef,
         originLabel: g.originLabel,
-        // O que a pessoa fez continua lá.
+        // O que a pessoa fez continua lá — do carregar ao devolver.
         vehicleId: antes?.vehicleId,
         loadedAt: antes?.loadedAt,
         loadedBy: antes?.loadedBy,
+        returnedAt: antes?.returnedAt,
+        returnedBy: antes?.returnedBy,
+        usedQty: antes?.usedQty,
         note: antes?.note,
-        missing: false,
+        // Só uma linha SEM passado nasce sem falhas; `false` fixo apagava o que
+        // ficou por voltar do evento.
+        missing: antes?.missing ?? false,
       });
     }
 

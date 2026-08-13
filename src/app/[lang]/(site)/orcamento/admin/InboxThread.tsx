@@ -62,7 +62,14 @@ interface Props {
   onToggleLabel: (label: string) => void;
   onLinkQuote: (quoteId: string | null) => void;
   onCreateQuote: () => void;
-  onReply: (text: string) => Promise<boolean>;
+  /**
+   * Envia a resposta. Leva a MENSAGEM a que se responde e não só o texto: quem
+   * chama a rota precisa do `messageId` e do `references` dela para o
+   * `In-Reply-To`/`References`, que é o que faz a resposta continuar a conversa
+   * do cliente em vez de lhe abrir uma nova. Sem eles o histórico dele fica
+   * desfeito em assuntos avulsos.
+   */
+  onReply: (text: string, message: InboxMessage) => Promise<boolean>;
 }
 
 export default function InboxThread({
@@ -315,7 +322,7 @@ export default function InboxThread({
           objeto: recarregar a MESMA mensagem — marcar como lida, por exemplo —
           não pode deitar fora o que já lá está escrito. É o que o resto do back
           office faz com `<ClientMessenger key={quote.id}>`. */}
-      <ReplyBox key={message.uid} to={message.fromAddress} onReply={onReply} />
+      <ReplyBox key={message.uid} message={message} onReply={onReply} />
 
       {/* Send-a-proposal-with-attachment — intentionally disabled (not yet wired). */}
       <div className="rounded-2xl border border-dashed border-foreground/15 bg-foreground/[0.015] p-4">
@@ -501,7 +508,14 @@ function AssociatePicker({
 
 // ── Reply composer ──
 
-function ReplyBox({ to, onReply }: { to: string; onReply: (text: string) => Promise<boolean> }) {
+function ReplyBox({
+  message,
+  onReply,
+}: {
+  message: InboxMessage;
+  onReply: (text: string, message: InboxMessage) => Promise<boolean>;
+}) {
+  const to = message.fromAddress;
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -509,7 +523,8 @@ function ReplyBox({ to, onReply }: { to: string; onReply: (text: string) => Prom
   async function submit() {
     if (!text.trim() || sending) return;
     setSending(true);
-    const ok = await onReply(text.trim());
+    // A mensagem vai junto: é dela que saem os identificadores da conversa.
+    const ok = await onReply(text.trim(), message);
     setSending(false);
     if (ok) {
       setSent(true);

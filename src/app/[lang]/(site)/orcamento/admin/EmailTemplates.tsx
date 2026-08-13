@@ -11,6 +11,7 @@ import {
   htmlToPlainText,
   insertToken,
   renderPreview,
+  renderPreviewSubject,
 } from "@/lib/email-template-format";
 import {
   buildRichEmailHtml,
@@ -435,7 +436,9 @@ export default function EmailTemplates() {
   // reflow — doing that per keystroke made composing an email stutter. The
   // contentEditable stays instant; the iframe catches up after a typing pause.
   // (`dirty`/save use the immediate effectiveBody, so save-state stays exact.)
-  const previewSubject = renderPreview(subject);
+  // O assunto vai por `renderPreviewSubject`: é um cabeçalho e não leva escape
+  // de HTML no envio, por isso a pré-visualização também não o pode levar.
+  const previewSubject = renderPreviewSubject(subject);
   const deferredBody = useDeferredValue(effectiveBody);
   const previewSrcDoc = useMemo(() => {
     const rendered = renderPreview(deferredBody);

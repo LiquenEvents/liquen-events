@@ -41,12 +41,33 @@ export function esc(value: unknown): string {
 }
 
 /**
- * Resolve `{key}` placeholders against `vars`, mirroring `renderTemplate`:
- * every placeholder is replaced, missing keys become empty strings, and values
- * are HTML-escaped. Used to render both the subject and the body in the preview.
+ * Resolve `{key}` placeholders against `vars`, mirroring the BODY half of
+ * `renderTemplate`: every placeholder is replaced, missing keys become empty
+ * strings, and values are HTML-escaped so merge data can't inject markup.
+ *
+ * Para o assunto é o {@link renderPreviewSubject} — ver lá porquê.
  */
 export function renderPreview(source: string, vars: Record<string, string> = EXAMPLE_VARS): string {
   return source.replace(/\{(\w+)\}/g, (_m, key: string) => (key in vars ? esc(vars[key]) : ""));
+}
+
+/**
+ * O mesmo para o ASSUNTO, que não leva escape.
+ *
+ * O assunto é um cabeçalho de email — texto, codificado pelo nodemailer no
+ * envio —, e o caminho real não o escapa (ver `renderTemplate`). Se a
+ * pré-visualização o escapasse, mostrava «Marta &amp; João» num email que sai
+ * com «Marta & João»: quem escreve o modelo ia mexer nele para corrigir uma
+ * coisa que nunca esteve mal. É por isso que as duas funções têm de mudar ao
+ * mesmo tempo — uma pré-visualização que mente ao contrário é igualmente má.
+ */
+export function renderPreviewSubject(
+  source: string,
+  vars: Record<string, string> = EXAMPLE_VARS,
+): string {
+  return source.replace(/\{(\w+)\}/g, (_m, key: string) =>
+    key in vars ? String(vars[key] ?? "") : "",
+  );
 }
 
 // ── Simple ⇄ HTML ─────────────────────────────────────────────────────────
