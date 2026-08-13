@@ -826,7 +826,17 @@ export default function Temas() {
           )
         }
         end={
-          <div className="flex items-center gap-2">
+          /* SEM CAIXA À VOLTA, e é isso que corrige a vista no telemóvel.
+             Esta fila estava embrulhada num `div.flex items-center gap-2` —
+             uma cópia do que o `Toolbar` já põe à volta do `end`, mas SEM o
+             `flex-wrap` dele. Uma fila que não quebra não encolhe: pedia
+             591 px num ecrã de 390, esticava o documento para 607, e a barra
+             de navegação de baixo (que é `w-full`) nascia com 607 px de
+             largura e o topo 413 px abaixo do fundo do ecrã — nesta vista
+             ficava-se sem navegação nenhuma. Tirar a caixa devolve a fila ao
+             contentor que sabe quebrá-la; medido, o documento volta aos
+             390 px. Ver `e2e/geometria-dos-alvos.spec.ts` (D4). */
+          <>
             {themes.length > 2 && (
               <label className="flex items-center gap-1.5">
                 <span className="sr-only">Ordenar os temas</span>
@@ -910,7 +920,7 @@ export default function Temas() {
             >
               {adding ? "Cancelar" : "Novo tema"}
             </Button>
-          </div>
+          </>
         }
       />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAdaptativo } from "./adaptativo";
 import { cn } from "./cn";
 
@@ -78,6 +78,37 @@ export function TabelaOuCartoes<T>({
 }: TabelaOuCartoesProps<T>) {
   const { desktop, largo, montado } = useAdaptativo();
   const [ordem, setOrdem] = useState(ordemInicial ?? null);
+  const caixa = useRef<HTMLDivElement>(null);
+  const [rolavel, setRolavel] = useState(false);
+
+  /**
+   * A CAIXA RECEBE FOCO SÓ QUANDO HÁ MESMO PARA ONDE ROLAR.
+   *
+   * Uma zona que rola tem de ser operável sem rato (WCAG 2.1.1) — mas pôr um
+   * `tabindex` permanente em TODAS as tabelas dava uma paragem de Tab antes de
+   * cada uma, mesmo nas que cabem. Por isso mede-se: só quando o conteúdo pede
+   * mais largura do que a caixa tem é que ela entra na ordem de tabulação e se
+   * anuncia como região.
+   *
+   * Observa-se a caixa E a tabela lá dentro: a caixa muda de largura quando a
+   * janela muda, e a tabela muda quando chega uma linha com um nome comprido —
+   * é por isso que as dependências NÃO incluem `itens` nem `colunas`. O
+   * `colunas` das listas é construído em cada desenho (`COLUNAS_DE_PEDIDOS(…)`
+   * em `AdminClient`), portanto pô-lo aqui montava e desmontava um
+   * `ResizeObserver` a cada tecla escrita no painel do pedido. Quem avisa que o
+   * conteúdo mudou é o observador, não a lista de dependências.
+   */
+  useEffect(() => {
+    const el = caixa.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ver = () => setRolavel(el.scrollWidth > el.clientWidth + 1);
+    ver();
+    const observador = new ResizeObserver(ver);
+    observador.observe(el);
+    const tabela = el.firstElementChild;
+    if (tabela) observador.observe(tabela);
+    return () => observador.disconnect();
+  }, [montado, desktop, largo]);
 
   const ordenados = useMemo(() => {
     if (!ordem) return [...itens];
@@ -121,7 +152,40 @@ export function TabelaOuCartoes<T>({
   const visiveis = colunas.filter((c) => !c.soLargo || largo);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-foreground/[0.08] bg-white">
+    /**
+     * ── A CAIXA ROLA; ANTES CORTAVA ───────────────────────────────────────
+     *
+     * Aqui estava `overflow-hidden` (posto para arredondar os cantos) e a
+     * tabela é `w-full`: quando o conteúdo pede mais largura do que a caixa
+     * tem, `w-full` não a impede de crescer — cresce, e o que passa do corte
+     * fica desenhado do lado de lá, sem barra, sem gesto e sem sinal nenhum de
+     * que existe. Num portátil de 1440×900 a tabela de Pedidos pedia 1537 px
+     * numa caixa de 1104: «Pax» e «À espera» simplesmente não existiam para
+     * quem trabalha nesse ecrã, e o `body` tem `overflow-x: clip`, portanto
+     * nem a página rolava até lá.
+     *
+     * ── Porquê rolar, e não esconder colunas ──────────────────────────────
+     * Esconder era esconder INFORMAÇÃO, e a largura de uma tabela é a do seu
+     * conteúdo: um nome de casal por extenso ou uma quinta com morada completa
+     * mudam a conta, portanto não há conjunto de colunas que caiba sempre. E
+     * quem decide o que já não cabe é a CAIXA, não a janela — o `soLargo`
+     * pergunta à janela (≥1440) e a coluna da navegação come 336 px dela, que
+     * é exactamente como duas colunas foram parar ao lado de lá do corte. Uma
+     * caixa que rola resolve os dois casos de uma vez, e resolve-os para todas
+     * as tabelas do back office, que passam todas por aqui.
+     *
+     * `overflow-x-auto` e não `overflow-auto`: só a horizontal é que precisa
+     * de sair do `hidden`; a vertical continua a crescer com a página, que é
+     * como uma lista longa se lê.
+     */
+    <div
+      ref={caixa}
+      // Sem isto, chegar às colunas da direita exigia rato ou dedo (ver acima).
+      tabIndex={rolavel ? 0 : undefined}
+      role={rolavel ? "region" : undefined}
+      aria-label={rolavel ? legenda : undefined}
+      className="overflow-x-auto rounded-xl border border-foreground/[0.08] bg-white"
+    >
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">{legenda}</caption>
         <thead>

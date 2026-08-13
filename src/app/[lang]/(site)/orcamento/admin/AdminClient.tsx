@@ -553,7 +553,16 @@ const QuoteCard = memo(function QuoteCard({
               )}
           </div>
         </div>
-        <div className="flex items-center gap-3 text-foreground/70 text-[10px]">
+        {/* A FILA QUEBRA, e é por isso que o cartão cabe num telemóvel.
+            Categoria · tipo · convidados · região · contagem: são cinco factos
+            que num iPhone SE pedem 316 px numa caixa de 273 (o `pl-12` do risco
+            de estado come 48). Sem `flex-wrap` nada disto encolhe — a fila
+            esticava o cartão, o cartão esticava a página, e o que sobrava para
+            lá da margem («faltam 16 meses», e a própria barra de baixo) ficava
+            CORTADO, porque o `body` tem `overflow-x: clip` e não há como lá
+            chegar. `gap-y-1` e não `gap-3` na vertical: a segunda linha é a
+            continuação da mesma frase, não outro bloco. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-foreground/70 text-[10px]">
           <span>{cat?.label ?? "—"}</span>
           {et && (
             <>
@@ -3544,11 +3553,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <span className="text-foreground/30 text-[9px] tracking-[0.2em] uppercase mr-1">
                   Etiquetas
                 </span>
+                {/* `alvo-toque` como o «Arquivados · N» dez linhas acima: estes
+                    chips são a MESMA fila de filtros, e mediam 68×24 px no
+                    telemóvel — metade do mínimo da casa. O ajudante só cresce
+                    onde há dedo (`pointer: coarse`), portanto no portátil a
+                    fila fica exactamente como está. */}
                 {allTags.map((t) => (
                   <button
                     key={t}
                     onClick={() => setTagFilter((cur) => (cur === t ? null : t))}
-                    className={`px-3 py-1 rounded-full text-[10px] font-medium tracking-wide transition-all duration-150 ${
+                    className={`alvo-toque px-3 py-1 rounded-full text-[10px] font-medium tracking-wide transition-all duration-150 ${
                       tagFilter === t
                         ? "bg-[#4d6350] text-white shadow-sm"
                         : "bg-[#4d6350]/10 text-[#4d6350] hover:bg-[#4d6350]/18"

@@ -416,3 +416,246 @@ test.describe("D3 · alvos de 13 px", () => {
     });
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════ D4 ═════
+/**
+ * A BARRA DE BAIXO EMPURRADA PARA FORA DO ECRÃ PELA BARRA DE FERRAMENTAS.
+ *
+ * Uma fila de controlos em `flex` sem `flex-wrap` não encolhe: pede a largura
+ * que os filhos somam e alarga o DOCUMENTO inteiro atrás de si. Na Biblioteca
+ * de Temas a fila do topo (Ordenar · Rever etiquetas · Compacto/Confortável ·
+ * Novo tema) acabava em x=607 num ecrã de 390, o documento passava a medir 607,
+ * e a navegação de baixo — que é `w-full` — nascia com 607 px de largura e o
+ * topo em y=1257, 413 px abaixo do fundo do ecrã. Nessa vista ficava-se sem
+ * navegação nenhuma.
+ *
+ * Mede-se o SINTOMA (a barra fora do ecrã, o documento mais largo do que o
+ * ecrã) e diz-se qual é a fila culpada, porque é a fila que se corrige — não a
+ * barra, que é vítima.
+ */
+test.describe("D4 · a barra de baixo na Biblioteca de Temas", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  /**
+   * TRÊS TEMAS, SENÃO NÃO HÁ BARRA DE FERRAMENTAS PARA MEDIR.
+   *
+   * Metade dos controlos desta fila só nasce com mais de dois temas (o
+   * «Ordenar» e o Compacto/Confortável) — com a biblioteca vazia a fila cabe, e
+   * o teste ficava verde sobre um ecrã que em uso real está partido. Os
+   * `data/*.json` não são versionados, portanto numa clonagem limpa a
+   * biblioteca ESTÁ vazia: quem precisa dos temas cria-os. Um 409 é o nome já
+   * lá estar, que é o estado que se queria.
+   */
+  async function garantirTresTemas(page: Page) {
+    for (const name of ["Geometria · Terracota", "Geometria · Oliveira", "Geometria · Linho"]) {
+      const r = await page.request.post("/api/temas", { data: { name } });
+      expect(
+        [200, 409],
+        `não foi possível semear o tema «${name}» (${r.status()}: ${await r.text()})`,
+      ).toContain(r.status());
+    }
+  }
+
+  test("a navegação de baixo continua no ecrã, e o documento não alarga", async ({ page }) => {
+    exigirLogin(await entrarNoBackOffice(page));
+    await garantirTresTemas(page);
+    await page.getByRole("button", { name: /Mais destinos/i }).click();
+    await irPara(page, /^Temas/);
+    await expect(page.getByRole("button", { name: /^Novo tema$/ })).toBeVisible();
+    // ⚠ A lista de temas chega por `fetch`, DEPOIS do primeiro desenho, e é ela
+    // que traz metade da fila. Medir mal o «Novo tema» aparece era medir uma
+    // barra de ferramentas a meio — foi o que fez esta rede passar sobre o
+    // defeito à primeira tentativa.
+    await expect(page.getByRole("group", { name: /Tamanho dos cartões/i })).toBeVisible();
+
+    const m = await page.evaluate(() => {
+      const de = document.documentElement;
+      const barra = document.querySelector('nav[aria-label="Destinos principais"]');
+      const r = barra?.getBoundingClientRect() ?? null;
+      // Qual é a fila culpada? A que NÃO QUEBRA e cujo lado direito já passou a
+      // margem do ecrã. As mais fundas primeiro: a casca da página também passa
+      // a margem, mas é vítima da fila que tem lá dentro — e é a fila que se
+      // corrige. Sem este diagnóstico, um vermelho aqui só diz «607 ≠ 390».
+      const fundura = (el: Element) => {
+        let n = 0;
+        for (let p = el.parentElement; p; p = p.parentElement) n += 1;
+        return n;
+      };
+      const culpados = [...document.querySelectorAll("div,ul,nav,header,section,form")]
+        .filter((el) => {
+          const cs = getComputedStyle(el);
+          if (!cs.display.includes("flex") || cs.flexWrap !== "nowrap") return false;
+          if (cs.overflowX === "auto" || cs.overflowX === "scroll") return false;
+          return el.getBoundingClientRect().right > de.clientWidth + 1;
+        })
+        .sort((a, b) => fundura(b) - fundura(a))
+        .map(
+          (el) =>
+            `«${(el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 40)}» acaba em ` +
+            `x=${Math.round(el.getBoundingClientRect().right)} — ${String(el.className).slice(0, 70)}`,
+        );
+      return {
+        documento: de.scrollWidth,
+        ecra: de.clientWidth,
+        altura: window.innerHeight,
+        barra: r
+          ? { largura: Math.round(r.width), topo: Math.round(r.top), existe: true as const }
+          : { existe: false as const },
+        culpados: culpados.slice(0, 5),
+      };
+    });
+
+    const porque = m.culpados.length
+      ? `\nFilas sem \`flex-wrap\` a pedir mais do que têm:\n  ${m.culpados.join("\n  ")}`
+      : "";
+
+    expect(
+      m.documento,
+      `o documento mede ${m.documento} px num ecrã de ${m.ecra} — ` +
+        `${m.documento - m.ecra} px de transbordo horizontal.${porque}`,
+    ).toBeLessThanOrEqual(m.ecra);
+
+    expect(m.barra.existe, "não há barra de navegação de baixo nesta vista").toBe(true);
+    if (m.barra.existe) {
+      expect(
+        m.barra.topo,
+        `a barra de baixo nasce a ${m.barra.topo} px do topo, num ecrã de ${m.altura} px — ` +
+          `está desenhada FORA do ecrã.${porque}`,
+      ).toBeLessThan(m.altura);
+      expect(
+        m.barra.largura,
+        `a barra de baixo mede ${m.barra.largura} px num ecrã de ${m.ecra}.${porque}`,
+      ).toBeLessThanOrEqual(m.ecra);
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════ D5 ═════
+/**
+ * DUAS COLUNAS QUE NÃO EXISTEM PARA QUEM USA PORTÁTIL.
+ *
+ * A tabela de Pedidos mostra as colunas de contexto a partir dos 1440 px —
+ * mas 1440 é a largura do ECRÃ, e a coluna da navegação come 336. Num portátil
+ * de 1440×900 a tabela pedia 1537 px numa caixa de 1104 e o contentor tinha
+ * `overflow: hidden`: «Pax» e «À espera» ficavam desenhadas do lado de lá do
+ * corte, sem barra de rolagem, sem gesto, sem nada. Não é um defeito de
+ * telemóvel — é o mais silencioso dos três, porque no ecrã não há sinal nenhum
+ * de que falta ali qualquer coisa.
+ *
+ * O que se exige NÃO é que caiba: é que exista caminho. Ou a tabela cabe, ou o
+ * contentor rola — e se rola, tem de rolar também para quem não tem rato
+ * (`tabindex`), senão o caminho existe só para metade das pessoas.
+ */
+test.describe("D5 · as colunas escondidas da tabela de Pedidos", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  /**
+   * Um pedido COMPRIDO, senão não há o que medir.
+   *
+   * A largura de uma tabela é a do seu conteúdo: com três pedidos de nome curto
+   * ela cabe, e o teste ficava verde sobre um ecrã que em produção — com nomes
+   * de casal, emails a sério e quintas com morada por extenso — está partido. O
+   * `submissionId` é fixo porque a rota é idempotente por ele: correr isto mil
+   * vezes deixa UM pedido na lista.
+   */
+  async function garantirPedidoComprido(page: Page) {
+    const res = await page.request.post("/api/orcamento", {
+      data: {
+        form: {
+          name: "Maria da Conceição Gonçalves de Almeida e Sousa Vasconcelos",
+          email: "maria.conceicao.vasconcelos.almeida@exemplo-muito-comprido.pt",
+          phone: "912345678",
+          category: "particulares",
+          eventType: "casamentos",
+          eventName: "Casamento",
+          date: "2028-09-15",
+          guests: 200,
+          location: "Quinta do Vale das Amoreiras Velhas, Estrada Nacional 118, km 42, Loures",
+        },
+        website: "",
+        submissionId: "e2e-geometria-tabela-larga",
+      },
+    });
+    // Um 429 (tecto de pedidos por minuto) não é falha do que se está a medir
+    // desde que o pedido já lá esteja de uma corrida anterior — e se não
+    // estiver, a asserção da tabela a seguir diz-lo com números.
+    if (res.ok()) await page.reload();
+  }
+
+  test("nenhuma coluna fica do lado de lá do corte", async ({ page }) => {
+    exigirLogin(await entrarNoBackOffice(page));
+    await garantirPedidoComprido(page);
+    await irPara(page, /^Pedidos/);
+
+    const tabela = page.getByRole("table", { name: /pedidos/i });
+    await expect(tabela).toBeVisible();
+
+    const m = await page.evaluate(() => {
+      const t = document.querySelector("main table");
+      if (!t) return null;
+      let caixa: HTMLElement | null = t.parentElement;
+      while (caixa && !/(auto|scroll)/.test(getComputedStyle(caixa).overflowX)) {
+        // Uma caixa que CORTA (`hidden`/`clip`) não é caminho nenhum — mas é
+        // ela que define o que se vê, por isso guarda-se a primeira que corte.
+        if (/(hidden|clip)/.test(getComputedStyle(caixa).overflowX)) break;
+        caixa = caixa.parentElement;
+      }
+      const cs = caixa ? getComputedStyle(caixa) : null;
+      const colunas = [...t.querySelectorAll("th")].map((th) => ({
+        rotulo: (th.textContent ?? "").replace(/[↕▲▼]/g, "").trim(),
+        direita: Math.round(th.getBoundingClientRect().right),
+      }));
+      const antes = caixa?.scrollLeft ?? 0;
+      if (caixa) caixa.scrollLeft = caixa.scrollWidth;
+      const rolou = (caixa?.scrollLeft ?? 0) > antes;
+      const ultimaDepois = colunas.length
+        ? Math.round([...t.querySelectorAll("th")].at(-1)!.getBoundingClientRect().right)
+        : 0;
+      const caixaDireita = caixa ? Math.round(caixa.getBoundingClientRect().right) : 0;
+      if (caixa) caixa.scrollLeft = antes;
+      return {
+        precisa: t.scrollWidth,
+        cabe: caixa?.clientWidth ?? 0,
+        overflowX: cs?.overflowX ?? "—",
+        tabIndex: caixa?.tabIndex ?? -1,
+        papel: caixa?.getAttribute("role") ?? "",
+        colunas,
+        rolou,
+        ultimaDepois,
+        caixaDireita,
+      };
+    });
+
+    expect(m, "não há tabela de pedidos nesta largura").not.toBeNull();
+    if (!m) return;
+
+    const nomes = m.colunas.map((c) => c.rotulo);
+    expect(nomes, `as colunas desenhadas são ${JSON.stringify(nomes)}`).toContain("Pax");
+    expect(nomes).toContain("À espera");
+
+    // SEMPRE, e não só quando o conteúdo desta corrida transborda: uma tabela
+    // dentro de uma caixa que CORTA está a um nome comprido de perder colunas,
+    // e o que a semente consegue pôr na lista depende do tecto de pedidos por
+    // minuto. Um teste que só verificasse o caso do dia ficava verde no dia
+    // seguinte com o defeito de volta.
+    expect(
+      m.overflowX,
+      `a tabela pede ${m.precisa} px numa caixa de ${m.cabe} e o contentor está ` +
+        `\`overflow-x: ${m.overflowX}\` — o que passar do corte não tem como ser alcançado`,
+    ).toMatch(/auto|scroll/);
+
+    if (m.precisa > m.cabe + 1) {
+      expect(
+        m.tabIndex,
+        "o contentor rola mas não recebe foco — quem navega por teclado não consegue lá chegar " +
+          "(WCAG 2.1.1: uma zona que rola tem de ser operável sem rato)",
+      ).toBeGreaterThanOrEqual(0);
+      expect(m.rolou, "o contentor diz que rola mas não rolou").toBe(true);
+      expect(
+        m.ultimaDepois,
+        `depois de rolar até ao fim, a última coluna acaba em x=${m.ultimaDepois} e a caixa ` +
+          `acaba em ${m.caixaDireita} — continua cortada`,
+      ).toBeLessThanOrEqual(m.caixaDireita + 1);
+    }
+  });
+});
