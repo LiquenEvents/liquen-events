@@ -117,8 +117,14 @@ export function eventTypeName(eventType: unknown, locale = "pt"): string {
   return locale.startsWith("en") ? nome.en : nome.pt;
 }
 
-/** Só para comparar rótulos: sem espaços a mais, sem caixa, sem acentos. */
-function chaveDeRotulo(value: unknown): string {
+/** Só para comparar rótulos: sem espaços a mais, sem caixa, sem acentos.
+ *
+ *  Exportada porque há um segundo leitor com o mesmo problema: o dicionário de
+ *  idiomas da proposta, que precisa de reconhecer um rótulo NOSSO guardado num
+ *  campo do documento («Casamento», «Civil», «100 a 150») para o poder escrever
+ *  na língua do casal. Duas normalizações escritas em dois sítios divergiriam, e
+ *  o sintoma seria um campo que se traduz aqui e não se traduz ali. */
+export function chaveDeRotulo(value: unknown): string {
   return String(value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")

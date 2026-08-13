@@ -154,3 +154,93 @@ describe("fotos em falta", () => {
     expect(estadoCachePdf().entradas).toBe(1);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MESMA PROPOSTA EM DUAS LÍNGUAS SÃO DOIS FICHEIROS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A cache é a porta por onde o casal volta a descarregar o documento — pelo
+ * link da proposta e pelo portal. Enquanto a chave era só o `doc`, as duas
+ * línguas do MESMO documento partilhavam entrada: quem pedisse a inglesa a
+ * seguir a uma portuguesa recebia a portuguesa, servida de memória, sem
+ * desenhar nada e sem erro nenhum.
+ */
+describe("a língua faz parte da chave", () => {
+  it("pedir a mesma proposta noutra língua DESENHA outra vez", async () => {
+    desenhar.mockResolvedValueOnce(pdfDe(10, 1)).mockResolvedValueOnce(pdfDe(10, 2));
+    const pt = await pdfDaPropostaEmCache(doc("LIQ-20"), "pt");
+    const en = await pdfDaPropostaEmCache(doc("LIQ-20"), "en");
+    expect(desenhar).toHaveBeenCalledTimes(2);
+    expect(en).not.toEqual(pt);
+  });
+
+  it("e cada língua fica guardada por si — a segunda vez já não desenha", async () => {
+    desenhar.mockResolvedValue(pdfDe(10, 3));
+    await pdfDaPropostaEmCache(doc("LIQ-21"), "en");
+    await pdfDaPropostaEmCache(doc("LIQ-21"), "en");
+    expect(desenhar).toHaveBeenCalledTimes(1);
+  });
+
+  it("a língua chega ao gerador — não fica pelo caminho a servir de chave", async () => {
+    desenhar.mockResolvedValue(pdfDe(10));
+    await pdfDaPropostaEmCache(doc("LIQ-22"), "en");
+    expect(desenhar).toHaveBeenCalledWith(expect.anything(), "en");
+  });
+
+  it("sem língua é português — o caminho de sempre não muda", async () => {
+    desenhar.mockResolvedValue(pdfDe(10));
+    await pdfDaPropostaEmCache(doc("LIQ-23"));
+    expect(desenhar).toHaveBeenCalledWith(expect.anything(), "pt");
+    // E a entrada é a MESMA que a de um pedido explícito em português: uma
+    // proposta antiga (sem língua gravada) e uma nova em português são o mesmo
+    // ficheiro, e não vale a pena desenhá-lo duas vezes.
+    await pdfDaPropostaEmCache(doc("LIQ-23"), "pt");
+    expect(desenhar).toHaveBeenCalledTimes(1);
+  });
+
+  it("a segunda tentativa (fotos em falta) repete na MESMA língua", async () => {
+    filaDeFaltas = [2, 0];
+    desenhar.mockResolvedValue(pdfDe(100));
+    await pdfDaPropostaEmCache(doc("LIQ-24"), "en");
+    expect(desenhar).toHaveBeenCalledTimes(2);
+    expect(desenhar).toHaveBeenNthCalledWith(2, expect.anything(), "en");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A ORDEM POR QUE SE DESCARREGA NÃO PODE DECIDIR A LÍNGUA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O caso concreto que a chave por conteúdo deixava passar: uma proposta é
+ * descarregada em inglês e fica em memória; alguém pede a portuguesa do MESMO
+ * documento e recebe a inglesa, servida da cache, sem desenhar e sem erro.
+ *
+ * O que o torna perigoso é ser INTERMITENTE: depende de quem descarregou
+ * primeiro e de a função ainda estar quente. Falha de maneiras diferentes em
+ * dias diferentes, e não se reproduz quando se vai procurar.
+ */
+describe("descarregar nas duas línguas, uma a seguir à outra", () => {
+  it("a segunda descarga é MESMO a segunda língua, e não a que estava em cache", async () => {
+    // Bytes distinguíveis: 1 = a inglesa, 2 = a portuguesa.
+    desenhar.mockResolvedValueOnce(pdfDe(10, 1)).mockResolvedValueOnce(pdfDe(10, 2));
+    const en = await pdfDaPropostaEmCache(doc("LIQ-30"), "en");
+    const pt = await pdfDaPropostaEmCache(doc("LIQ-30"), "pt");
+
+    expect(en[0]).toBe(1);
+    expect(pt[0]).toBe(2);
+    expect(desenhar).toHaveBeenCalledTimes(2);
+    expect(desenhar).toHaveBeenNthCalledWith(1, expect.anything(), "en");
+    expect(desenhar).toHaveBeenNthCalledWith(2, expect.anything(), "pt");
+  });
+
+  it("e ao contrário — português primeiro, inglês depois", async () => {
+    desenhar.mockResolvedValueOnce(pdfDe(10, 2)).mockResolvedValueOnce(pdfDe(10, 1));
+    const pt = await pdfDaPropostaEmCache(doc("LIQ-31"), "pt");
+    const en = await pdfDaPropostaEmCache(doc("LIQ-31"), "en");
+    expect(pt[0]).toBe(2);
+    expect(en[0]).toBe(1);
+    expect(desenhar).toHaveBeenCalledTimes(2);
+  });
+});

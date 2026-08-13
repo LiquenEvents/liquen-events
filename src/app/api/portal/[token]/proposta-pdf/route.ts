@@ -4,6 +4,8 @@ import { getQuote } from "@/lib/quotes-store";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
+import { idiomaDaProposta } from "@/lib/proposta-idioma";
+import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
 import { respostaPdf } from "@/lib/pdf-resposta";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
@@ -69,10 +71,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       return new NextResponse(null, { status: 404 });
     }
 
-    const pdf = await pdfDaPropostaEmCache(proposal.doc);
+    /**
+     * ── A LÍNGUA VEM DA PROPOSTA QUE SE SERVE ──────────────────────────────
+     *
+     * Da MESMA proposta cujo `doc` se acabou de resolver — a aceite, quando há
+     * aceite. Redesenhar sempre em português dava, ao casal que aceitou uma
+     * proposta inglesa, um documento diferente do que combinou, meses depois,
+     * na página onde vai reler o que combinou.
+     *
+     * Não se olha para a língua do visitante: o portal pode estar a ser lido em
+     * português por um pai a ajudar, e o documento continua a ser o que o casal
+     * recebeu. Sem língua gravada é português (`idiomaDaProposta`).
+     */
+    const idioma = idiomaDaProposta(proposal);
+    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma);
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
+    // O nome é o mesmo do anexo que seguiu no email, para o ficheiro ser
+    // reconhecível como o documento que o casal já tem.
     const ref = quote.id.replace(/[^A-Za-z0-9_-]/g, "");
-    return respostaPdf(request, pdf, { nome: `Proposta-Liquen-${ref}.pdf` });
+    return respostaPdf(request, pdf, { nome: nomeDoFicheiroDaProposta(ref, idioma) });
   } catch (err) {
     /**
      * A PROPOSTA SAIRIA COM FOTOS A MENOS — e por isso não sai.

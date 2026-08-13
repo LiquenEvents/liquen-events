@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal } from "@/lib/proposals-store";
 import { pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
+import { idiomaDaProposta } from "@/lib/proposta-idioma";
+import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
 import { respostaPdf } from "@/lib/pdf-resposta";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
@@ -56,12 +58,31 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     // caso; isto fecha a mesma porta do lado do servidor.
     if (!proposal?.doc) return new NextResponse(null, { status: 404 });
 
-    const pdf = await pdfDaPropostaEmCache(proposal.doc);
+    /**
+     * ── NA LÍNGUA EM QUE A PROPOSTA FOI FEITA, E NÃO NA DE QUEM PEDE ────────
+     *
+     * Este botão REDESENHA o documento a partir do `doc` guardado. Enquanto a
+     * língua não ficava gravada com a proposta, quem redesenhava não tinha como
+     * a saber e caía em português: o casal inglês recebia a proposta inglesa por
+     * email e, ao carregar no botão da página onde a aceita, abria a
+     * portuguesa — o mesmo documento em duas línguas, sem explicação.
+     *
+     * Não se olha para a língua do VISITANTE (nem para o segmento da rota, nem
+     * para o cookie): o que este link serve é um documento que já existe e que
+     * já foi apresentado numa língua. Quem o reencaminhar para um amigo
+     * português continua a ver o documento que o casal recebeu.
+     *
+     * Uma proposta sem língua gravada é portuguesa — ver `idiomaDaProposta`.
+     */
+    const idioma = idiomaDaProposta(proposal);
+    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma);
     // O nome do ficheiro vai dentro de um cabeçalho: saneia-se a referência
     // (aspas, espaços, acentos) em vez de a confiar tal como está gravada.
     const ref = (proposal.quoteId || proposal.id).replace(/[^A-Za-z0-9_-]/g, "");
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
-    return respostaPdf(request, pdf, { nome: `Proposta-Liquen-${ref}.pdf` });
+    // O NOME é o mesmo com que o ficheiro seguiu no email: o casal tem-no na
+    // caixa de correio e tem de reconhecer o que descarrega como o mesmo.
+    return respostaPdf(request, pdf, { nome: nomeDoFicheiroDaProposta(ref, idioma) });
   } catch (err) {
     /**
      * A PROPOSTA SAIRIA COM FOTOS A MENOS — e por isso não sai.

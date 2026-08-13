@@ -244,6 +244,74 @@ describe("mapper — o documento do Estúdio (`doc`) sobrevive à gravação", (
   });
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A LÍNGUA DA PROPOSTA É DA PROPOSTA — E AS ANTIGAS NÃO TÊM NENHUMA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A língua deixou de ser um parâmetro do clique e passou a ficar gravada com a
+ * proposta, porque tudo o que vem DEPOIS dela — o email, a página do aceite, o
+ * portal, a segunda descarga do PDF — precisa de saber em que língua o casal
+ * recebeu o documento.
+ *
+ * A coluna é `idioma`, e vale para ela tudo o que já vale para o `doc`:
+ *  · só se escreve quando EXISTE, para uma base onde o `alter table` ainda não
+ *    correu continuar a aceitar todas as outras gravações (aceitar uma
+ *    proposta incluído);
+ *  · uma linha antiga lê-se sem a propriedade — e quem lê decide que isso é
+ *    português, que é o que essas propostas sempre foram.
+ */
+describe("mapper — a língua da proposta (`idioma`)", () => {
+  it("toRow escreve a coluna `idioma` quando a proposta tem língua", () => {
+    expect(mapper.toRow(mk({ idioma: "en" })).idioma).toBe("en");
+    expect(mapper.toRow(mk({ idioma: "pt" })).idioma).toBe("pt");
+  });
+
+  it("uma ida-e-volta toRow→fromRow devolve a mesma língua", () => {
+    const row = mapper.toRow(mk({ idioma: "en" }));
+    row.created_at = "2026-07-01T10:00:00.000Z";
+    expect(mapper.fromRow(row).idioma).toBe("en");
+  });
+
+  it("uma proposta SEM língua não escreve a coluna (bases sem o `alter table`)", () => {
+    const row = mapper.toRow(mk({ idioma: undefined }));
+    expect("idioma" in row).toBe(false);
+  });
+
+  it("uma linha ANTIGA (idioma a null) lê-se SEM a propriedade, sem partir", () => {
+    const antiga = mapper.fromRow({
+      id: "velha",
+      created_at: "2026-01-01T00:00:00.000Z",
+      idioma: null,
+    });
+    expect(antiga.idioma).toBeUndefined();
+    expect("idioma" in antiga).toBe(false);
+  });
+
+  it("uma língua desconhecida na base lê-se como se não houvesse nenhuma", () => {
+    // A coluna tem `check (idioma in ('pt','en'))`, mas a aplicação não pode
+    // depender de a restrição existir numa base antiga: o que não é uma língua
+    // que se saiba desenhar não pode virar um idioma inventado no resto do
+    // produto — vale o mesmo que a ausência, e a ausência é português.
+    const estranha = mapper.fromRow({
+      id: "torta",
+      created_at: "2026-01-01T00:00:00.000Z",
+      idioma: "fr",
+    });
+    expect(estranha.idioma).toBeUndefined();
+  });
+
+  it("a língua sobrevive a um update que nem lhe toca (aceitar a proposta)", async () => {
+    // O update é read-merge-write, como no `doc`: se a língua se perdesse aqui,
+    // o aceite do casal transformava uma proposta inglesa numa portuguesa — e a
+    // segunda descarga passava a dar o documento errado.
+    await createProposal(mk({ id: "en1", idioma: "en" }));
+    const updated = await updateProposal("en1", { status: "aceite" });
+    expect(updated?.idioma).toBe("en");
+    expect(mapper.toRow(updated!).idioma).toBe("en");
+  });
+});
+
 // ── create / get / list ───────────────────────────────────────────────────────
 describe("createProposal / getProposal / listAllProposals", () => {
   it("creates then reads a proposal back", async () => {

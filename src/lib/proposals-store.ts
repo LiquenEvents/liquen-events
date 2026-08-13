@@ -1,5 +1,6 @@
 import "server-only";
 import type { Proposal } from "@/lib/orcamento/types";
+import { ehIdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { createRepository, type Mapper } from "./repository";
 
 export const mapper: Mapper<Proposal> = {
@@ -40,6 +41,11 @@ export const mapper: Mapper<Proposal> = {
     // onde o `alter table` ainda não correu continuar a aceitar tudo o resto.
     ...(p.pdfSha256 !== undefined ? { pdf_sha256: p.pdfSha256 } : {}),
     ...(p.pdfBytes !== undefined ? { pdf_bytes: p.pdfBytes } : {}),
+    // A língua em que a proposta foi apresentada ao casal, pelo mesmo cuidado
+    // do `doc`: só entra na linha quando existe. Uma proposta de linhas
+    // (/api/propostas) e todas as que são anteriores a este campo continuam a
+    // gravar-se numa base onde o `alter table` ainda não correu.
+    ...(p.idioma !== undefined ? { idioma: p.idioma } : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -71,6 +77,12 @@ export const mapper: Mapper<Proposal> = {
     ...(r.doc && typeof r.doc === "object" ? { doc: r.doc as Proposal["doc"] } : {}),
     ...(r.pdf_sha256 ? { pdfSha256: String(r.pdf_sha256) } : {}),
     ...(r.pdf_bytes != null ? { pdfBytes: Number(r.pdf_bytes) } : {}),
+    // Simétrico do `toRow`, com uma exigência a mais: só se lê o que é MESMO
+    // uma língua que se sabe desenhar. A coluna tem um `check`, mas a aplicação
+    // não pode depender de ele existir numa base antiga — e um valor estranho a
+    // entrar aqui espalhava-se pelo email, pela página do aceite e pelo PDF.
+    // O que não é língua vale o mesmo que a ausência, e a ausência é português.
+    ...(ehIdiomaDaProposta(r.idioma) ? { idioma: r.idioma } : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),

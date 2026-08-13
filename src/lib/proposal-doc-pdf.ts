@@ -57,6 +57,9 @@ import {
 import { log } from "@/lib/logger";
 import {
   blocosFixosNaLingua,
+  camposDoEventoNaLingua,
+  referenciaNaLingua,
+  rotuloDoTotalNaLingua,
   textosDaProposta,
   IDIOMA_POR_OMISSAO,
   type CampoDoEvento,
@@ -625,6 +628,17 @@ export async function renderProposalDocPdfWithReport(
   const pt = textosDaProposta("pt");
   /** As notas, condições e observações — traduzidas só quando são as da casa. */
   const fixos = blocosFixosNaLingua(doc, idioma);
+  /**
+   * A data, o tipo, a cerimónia e o número de convidados — traduzidos só quando
+   * ainda são o que o estúdio lá pôs (ver `proposal-doc-textos.ts`).
+   *
+   * Não substituem o `doc`: os avisos e os registos continuam a citar a proposta
+   * pelos campos em que ela foi escrita, que são os que ela vê no editor.
+   */
+  const evento = camposDoEventoNaLingua(doc, idioma);
+  /** A referência que corre no topo — na língua do documento se foi o estúdio a
+   *  compô-la, tal e qual se foi ela a escrevê-la. */
+  const refImpressa = referenciaNaLingua(doc, idioma);
   const truncations: DocTruncation[] = [];
   /** As listas que saíram por ordem diferente da escrita — ver o bloco «UMA SÓ
    *  ORDEM PARA O DOCUMENTO INTEIRO». Vazio é o normal. */
@@ -798,7 +812,7 @@ export async function renderProposalDocPdfWithReport(
     const lw = 72;
     const lh = (logoDark.height / logoDark.width) * lw;
     p.drawImage(logoDark, { x: M, y: H - M - lh + 6, width: lw, height: lh });
-    textRight(p, doc.ref, W - M, H - M - 2, { size: 8, color: FAINT });
+    textRight(p, refImpressa, W - M, H - M - 2, { size: 8, color: FAINT });
   };
 
   // Calm footer: a pale hairline, quiet brand + email, plain page number. Called
@@ -979,7 +993,7 @@ export async function renderProposalDocPdfWithReport(
       textCenter(p, names, cx, 262, { font: f.serif, size: nameSize, color: CREAM });
     }
 
-    const sub = [doc.eventType, doc.eventDate].filter(Boolean).join("   ·   ");
+    const sub = [evento.eventType, evento.eventDate].filter(Boolean).join("   ·   ");
     if (sub)
       textCenter(p, sub, cx, 214, { font: f.reg, size: 11, color: CREAM_DIM, tracking: 1.4 });
     if (doc.location)
@@ -1044,15 +1058,15 @@ export async function renderProposalDocPdfWithReport(
     type Campo = [chave: CampoDoEvento, valor: string];
     const campos: Campo[] = [
       [org ? "cliente" : "noivos", doc.clientNames],
-      ...(org ? [] : ([["evento", doc.eventType]] as Campo[])),
-      ["data", doc.eventDate],
+      ...(org ? [] : ([["evento", evento.eventType]] as Campo[])),
+      ["data", evento.eventDate],
       ["local", doc.location],
-      ["convidados", doc.guests],
+      ["convidados", evento.guests],
       ["servico", doc.servico ?? ""],
       ...(org
         ? []
         : ([
-            ["cerimonia", doc.ceremony ?? ""],
+            ["cerimonia", evento.ceremony ?? ""],
             ["hora", doc.time ?? ""],
           ] as Campo[])),
     ];
@@ -1373,9 +1387,10 @@ export async function renderProposalDocPdfWithReport(
     y = sectionHeader(p, t.sobretituloOrcamento, numerada(t.tituloOrcamento), y);
 
     const totalStr = orgT ? (doc.totalEstimatedText ?? "") : doc.totalText;
-    // O rótulo do total de Decoração é ESCRITO POR ELA («Valor Total
-    // Decoração») e sai tal e qual, como o resto do que ela escreve.
-    const totalLbl = orgT ? t.totalEstimado : doc.totalLabel;
+    // O rótulo do total de Decoração é um campo do estúdio, e nasce preenchido
+    // («Valor Total Decoração»): traduz-se enquanto for o que lá nasceu, e sai
+    // tal e qual assim que ela lhe mexer (ver `rotuloDoTotalNaLingua`).
+    const totalLbl = orgT ? t.totalEstimado : rotuloDoTotalNaLingua(doc, idioma);
     const boxW = MEASURE;
     const boxH = 50;
     // Flat, typographic total: a single thin gold hairline (the one accent moment

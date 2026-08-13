@@ -7,7 +7,8 @@ import { getAcceptedContractByQuote, getContractByProposal } from "@/lib/contrac
 import { listInvoicesForQuote } from "@/lib/invoices-store";
 import { splitSinal } from "@/lib/money";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
-import { getDictionary, normalizeLocale } from "@/lib/i18n";
+import { getDictionary, htmlLang, normalizeLocale } from "@/lib/i18n";
+import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import type { Quote } from "@/lib/orcamento/types";
 import { eventTypeName, isQuoteOptionLabel } from "@/lib/orcamento/data";
 import PortalView from "./PortalView";
@@ -33,18 +34,64 @@ import PortalView from "./PortalView";
  */
 export const dynamic = "force-dynamic";
 
-// Private, per-client link — must NEVER be indexed. Localized title so an EN
-// client isn't announced a Portuguese document title on <html lang="en">.
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A LÍNGUA DESTE PORTAL É A DA PROPOSTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O segmento `[lang]` vem do COOKIE de quem visita (ver src/proxy.ts). Um casal
+ * inglês que tenha aberto o site uma vez em português encontrava, meses depois,
+ * o seu portal inteiro em português — a página onde volta para ver se a factura
+ * entrou e para rever o documento que aceitou.
+ *
+ * A proposta é o documento à volta do qual este ecrã existe (é dela que vêm o
+ * total, o plano de pagamentos e o botão do PDF), e é ela que manda. Sem
+ * proposta ainda, não há língua a seguir senão a do visitante.
+ *
+ * Não se redirecciona para o outro segmento, pela mesma razão da página da
+ * proposta: o português canónico é o caminho SEM prefixo e o proxy volta a
+ * reescrevê-lo pelo cookie — seria um ciclo. O `lang` no elemento é o que
+ * arruma a leitura em voz alta.
+ */
+
+// Private, per-client link — must NEVER be indexed. O título segue a língua da
+// proposta, que é a do conteúdo desta página.
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ lang: string }>;
+  params: Promise<{ lang: string; token: string }>;
 }): Promise<Metadata> {
-  const t = getDictionary(normalizeLocale((await params).lang)).portal;
+  const { lang, token } = await params;
+  let locale = normalizeLocale(lang);
+  try {
+    const claim = readPortalToken(token);
+    // A MESMA proposta que a página resolve (a aceite primeiro), senão o
+    // separador podia dizer uma língua e o conteúdo outra.
+    const proposta = claim ? await propostaDoPortal(claim.quoteId) : null;
+    if (proposta) locale = idiomaDaProposta(proposta);
+  } catch {
+    /* uma leitura que falhe não pode deitar abaixo o título: fica o visitante */
+  }
   return {
-    title: t.title,
+    title: getDictionary(locale).portal.title,
     robots: { index: false, follow: false },
   };
+}
+
+/**
+ * A proposta que o portal mostra: a ACEITE, e só na falta dela a mais recente.
+ *
+ * Está numa função porque a página e o título do separador têm de resolver
+ * exactamente a mesma — duas escadas diferentes davam um separador inglês por
+ * cima de um portal português no dia em que houvesse uma revisão por aceitar.
+ */
+async function propostaDoPortal(quoteId: string) {
+  const aceite = await getAcceptedContractByQuote(quoteId);
+  const proposta = aceite
+    ? await getProposal(aceite.proposalId)
+    : await getProposalByQuote(quoteId);
+  // A mesma defesa em profundidade da página: sem pertença provada, nada.
+  return proposta && proposta.quoteId === quoteId ? proposta : null;
 }
 
 /** Friendly, localized event-type label — resolved server-side so the view
@@ -90,8 +137,8 @@ export default async function PortalPage({
   params: Promise<{ lang: string; token: string }>;
 }) {
   const { lang, token } = await params;
-  const locale = normalizeLocale(lang);
-  const t = getDictionary(locale).portal;
+  /** A língua de quem visita: só vale enquanto não houver proposta. */
+  const doVisitante = normalizeLocale(lang);
 
   // Invalid/expired token → 404. A private link must never reveal whether an id
   // exists, so a bad token is indistinguishable from a missing quote.
@@ -123,6 +170,14 @@ export default async function PortalPage({
   // pedido esvazia o quote_id das suas propostas e `fromRow` lê-o como "".
   // Sem pertença provada, não há proposta.
   if (proposal && proposal.quoteId !== quote.id) proposal = null;
+  /**
+   * DAQUI PARA BAIXO manda a proposta: o dicionário, os formatos de data e o
+   * `lang` do bloco. Sem proposta (um pedido que ainda não tem nenhuma), fica a
+   * língua do visitante — que é o que este ecrã sempre fez.
+   */
+  const locale = proposal ? idiomaDaProposta(proposal) : doVisitante;
+  const t = getDictionary(locale).portal;
+
   const [contract, invoices] = await Promise.all([
     acceptedContract
       ? Promise.resolve(acceptedContract)
@@ -155,6 +210,10 @@ export default async function PortalPage({
   return (
     <PortalView
       t={t}
+      /* A língua do CONTEÚDO, que pode não ser a do `<html>` (esse vem do
+         segmento da rota, e o segmento vem do cookie do visitante). É o que
+         faz um leitor de ecrã ler o portal inglês com pronúncia inglesa. */
+      lang={htmlLang(locale)}
       clientName={quote.name}
       eventLabel={etiquetaDoEvento}
       eventName={nomeProprioDoEvento(quote, etiquetaDoEvento)}

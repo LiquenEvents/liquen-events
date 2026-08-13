@@ -36,6 +36,9 @@ vi.mock("@/lib/invoices-store", () => ({
 }));
 vi.mock("@/lib/i18n", () => ({
   normalizeLocale: (l: string) => l,
+  // A página marca a língua do CONTEÚDO no bloco (o `<html lang>` é o do
+  // segmento da rota e pode não ser o mesmo) — ver `PortalView`.
+  htmlLang: (l: string) => (l === "en" ? "en" : "pt-PT"),
   getDictionary: () => ({
     portal: {
       title: "Portal",

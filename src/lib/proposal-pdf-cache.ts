@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
+import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { log } from "@/lib/logger";
 
 /**
@@ -55,8 +56,21 @@ const MAXIMO_POR_ENTRADA = 8 * 1024 * 1024;
 const cache = new Map<string, Buffer<ArrayBuffer>>();
 let bytesGuardados = 0;
 
-function chaveDe(doc: ProposalDoc): string {
-  return createHash("sha256").update(JSON.stringify(doc)).digest("base64url").slice(0, 32);
+/**
+ * A chave é o CONTEÚDO **mais a LÍNGUA**.
+ *
+ * A língua não está dentro do `doc` (o documento guardado é um só, em
+ * português — ver `proposal-doc-textos`), portanto sem ela na chave as duas
+ * versões do mesmo documento partilhavam entrada: quem pedisse a inglesa a
+ * seguir a uma portuguesa recebia a portuguesa, de memória, sem desenhar nada e
+ * sem erro nenhum. É a mesma falha do «documento revisto» que a chave por
+ * conteúdo já evita, só que por um eixo que o JSON do documento não vê.
+ */
+function chaveDe(doc: ProposalDoc, idioma: IdiomaDaProposta): string {
+  return createHash("sha256")
+    .update(`${idioma}:${JSON.stringify(doc)}`)
+    .digest("base64url")
+    .slice(0, 32);
 }
 
 function guardar(chave: string, pdf: Buffer<ArrayBuffer>): void {
@@ -86,8 +100,16 @@ function guardar(chave: string, pdf: Buffer<ArrayBuffer>): void {
  * continua a chamar-se o renderizador directamente: guardar ali só gastava
  * memória.
  */
-export async function pdfDaPropostaEmCache(doc: ProposalDoc): Promise<Buffer<ArrayBuffer>> {
-  const chave = chaveDe(doc);
+export async function pdfDaPropostaEmCache(
+  doc: ProposalDoc,
+  /**
+   * A língua em que a proposta foi feita (`proposals.idioma`, lida com o
+   * `idiomaDaProposta`). Por omissão português, que é o que todas as propostas
+   * anteriores a essa coluna são — e o que esta função sempre desenhou.
+   */
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): Promise<Buffer<ArrayBuffer>> {
+  const chave = chaveDe(doc, idioma);
   const guardado = cache.get(chave);
   if (guardado) {
     // Reinserir para ficar no fim da fila — foi usado agora.
@@ -122,12 +144,14 @@ export async function pdfDaPropostaEmCache(doc: ProposalDoc): Promise<Buffer<Arr
    * frio — o mesmo erro de gravar uma falha como se fosse um facto que já
    * apareceu na cache de fotografias e na célula do estúdio.
    */
-  let ultimo = await renderStoredProposalDocPdfWithReport(doc);
+  let ultimo = await renderStoredProposalDocPdfWithReport(doc, idioma);
   if (ultimo.missingImages > 0) {
     log.warn("proposta-pdf: fotos em falta, a tentar segunda vez", {
       emFalta: ultimo.missingImages,
     });
-    ultimo = await renderStoredProposalDocPdfWithReport(doc);
+    // A repetição é para apanhar uma foto que não resolveu, não para mudar o
+    // que sai: MESMO documento, MESMA língua.
+    ultimo = await renderStoredProposalDocPdfWithReport(doc, idioma);
   }
   if (ultimo.missingImages > 0) {
     log.error("proposta-pdf: RECUSADO — o documento sairia com fotos a menos", null, {

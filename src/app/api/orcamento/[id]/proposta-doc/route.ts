@@ -23,6 +23,7 @@ import {
   IDIOMA_POR_OMISSAO,
   type IdiomaDaProposta,
 } from "@/lib/proposal-doc-textos";
+import { textosDoEmailDaProposta } from "@/lib/email-proposta-textos";
 import { createProposalToken } from "@/lib/proposal-token";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
@@ -118,12 +119,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     /**
      * ══════════════════════════════════════════════════════════════════════
-     * A LÍNGUA É DE QUEM GERA, NÃO DO DOCUMENTO
+     * A LÍNGUA É DO DOCUMENTO QUE SEGUE, NÃO SÓ DESTE CLIQUE
      * ══════════════════════════════════════════════════════════════════════
      *
-     * O documento guardado continua a ser um só, em português. A língua entra
-     * aqui, no pedido, como o tamanho da página entraria: é um parâmetro de
-     * DESENHO. Ver o cabeçalho de `proposal-doc-textos`.
+     * O documento guardado (`doc`) continua a ser um só, em português: a língua
+     * não entra lá dentro, é a moldura com que ele é DESENHADO — ver o
+     * cabeçalho de `proposal-doc-textos`.
+     *
+     * O que mudou é o que acontece a esta variável a seguir. Era um parâmetro
+     * de desenho e mais nada: desenhava o PDF, nomeava o ficheiro e morria no
+     * fim do pedido. Com isso, uma proposta gerada em inglês seguia dentro de
+     * um email português, abria numa página de aceite na língua do VISITANTE, e
+     * voltava a descarregar-se em português — pelo link do casal e pelo portal.
+     * Agora, no ENVIO, fica GRAVADA com a proposta (`proposals.idioma`), e é
+     * dela que vivem o email daqui a vinte linhas, a página do aceite, o portal
+     * e as duas rotas que voltam a desenhar o PDF.
+     *
+     * Na PRÉ-VISUALIZAÇÃO não se grava nada, porque não há proposta nenhuma:
+     * é um PDF para ela ver, e volta a gerar-se daqui a dez segundos.
      *
      * ── PORQUE É QUE UM VALOR ESTRANHO NÃO É UM 400 ───────────────────────
      *
@@ -358,6 +371,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        */
       pdfSha256: createHash("sha256").update(pdfBuffer).digest("hex"),
       pdfBytes: pdfBuffer.byteLength,
+      /**
+       * ── A LÍNGUA EM QUE ESTE PDF FOI DESENHADO ────────────────────────────
+       *
+       * Gravada SEMPRE, mesmo quando é o português: é um facto sobre o
+       * documento que acabou de ser selado na linha de cima — foi desenhado com
+       * esta moldura, e é esta que tem de voltar quando alguém o pedir outra
+       * vez. Deixá-la em branco no caminho português punha uma proposta nova a
+       * ser indistinguível de uma anterior a esta coluna, e obrigava a adivinhar
+       * onde não é preciso.
+       *
+       * É também o que faz o SELO poder ser verificado: quem redesenhar o
+       * documento a partir do `doc` tem agora como saber em que língua o fazer,
+       * e o `sha256` volta a bater. Enquanto isto não se guardava, um PDF inglês
+       * selado no envio nunca mais podia ser reproduzido — quem o redesenhava
+       * desenhava-o em português e obtinha outra impressão digital.
+       */
+      idioma,
     };
 
     // A proposta fica guardada COM o documento (`doc`): é a única cópia
@@ -417,12 +447,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             doc: undefined,
             pdfSha256: undefined,
             pdfBytes: undefined,
+            // A língua é a coluna mais recente das quatro, portanto é a mais
+            // provável de faltar numa base por actualizar. Sai com as outras: o
+            // EMAIL desta proposta segue na língua certa de qualquer maneira (é
+            // decidido aqui, em memória) e o que se perde é a segunda descarga,
+            // que volta a dar o documento em português — o comportamento de
+            // antes desta funcionalidade, dito no `docError`.
+            idioma: undefined,
           });
           docSaved = false;
           docError =
             "A proposta foi guardada e enviada, mas sem o documento nem o selo: falta correr o " +
-            "db/schema.sql na base de dados (colunas `proposals.doc`, `pdf_sha256`, `pdf_bytes`). " +
-            "Sem o documento o cliente não vê o PDF no link, e do que foi enviado só fica o " +
+            "db/schema.sql na base de dados (colunas `proposals.doc`, `pdf_sha256`, `pdf_bytes`, " +
+            "`idioma`). Sem o documento o cliente não vê o PDF no link, sem a língua uma proposta " +
+            "inglesa volta a descarregar-se em português, e do que foi enviado só fica o " +
             "rascunho do estúdio (que se apaga e não vai na cópia de segurança).";
         } catch (e2) {
           log.error("proposta-doc: guardar falhou mesmo sem os campos novos", e2, { id });
@@ -496,42 +534,99 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * Das duas, ganha a mais específica: a mensagem foi escrita há um minuto
      * para este casal; o modelo serve todos. O ecrã dos modelos di-lo.
      */
-    const doModelo = mensagem
-      ? null
-      : await modeloParaEnvioAutomatico(
-          "proposta-enviada",
-          marcadoresDoPedido(quote, {
-            // Quem este email saúda são os NOMES DO CASAL do documento do
-            // estúdio, e não o `quote.name` — que é quem escreveu o pedido e
-            // pode ser a mãe da noiva ou uma wedding planner. É a mesma escolha
-            // que o texto da casa aqui em baixo já fazia.
-            nome: String(doc.clientNames ?? "").trim(),
-            link: acceptUrl,
-            valor: eurDocumento(money.gross),
-            ...(String(doc.eventDate ?? "").trim()
-              ? { data_evento: String(doc.eventDate).trim() }
-              : {}),
-            ...(String(doc.location ?? "").trim() ? { local: String(doc.location).trim() } : {}),
-          }),
-        );
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O MODELO DELA É UM TEXTO PORTUGUÊS — E FICA DE FORA NUMA PROPOSTA INGLESA
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O ecrã «Modelos de email» guarda UM «Proposta enviada», escrito por ela,
+     * em português. Não há versão inglesa, e não se inventa uma: traduzir à
+     * máquina o texto que ela escreveu é exactamente o que esta funcionalidade
+     * se recusa a fazer no documento («o que ela escreveu sai tal e qual»), e
+     * fazê-lo aqui era pior — chegava ao casal sem ninguém o ter lido.
+     *
+     * Restavam duas opções, e nenhuma é indolor:
+     *
+     *   a) MANDAR O MODELO À MESMA. O casal inglês recebe um assunto e um corpo
+     *      em português com um PDF inglês em anexo. É o defeito que se está a
+     *      corrigir, a entrar pela porta do lado — e é o que ele vê PRIMEIRO,
+     *      antes sequer de abrir o documento.
+     *   b) NÃO O USAR, e sair o texto da casa em inglês. Ela perde, naquele
+     *      email, um texto que escreveu; ganha um email inteiro numa língua só.
+     *
+     * Escolhida a (b), por ser a que menos surpreende quem RECEBE — e porque a
+     * rota já tem este recurso montado e explicado para dois casos vizinhos: um
+     * modelo vazio e um modelo com um marcador sem valor caem no texto da casa
+     * exactamente da mesma maneira. Isto é um terceiro «não dá para usar este
+     * modelo aqui», não um mecanismo novo.
+     *
+     * Fica REGISTADO, pela mesma razão que os outros dois: ela guardou um
+     * modelo e o email que saiu não foi o dela; isso tem de se poder ver.
+     *
+     * O que NÃO muda: numa proposta portuguesa — que são todas menos as que ela
+     * marcar como inglesas — o modelo dela continua a ser o que sai, assunto
+     * incluído.
+     *
+     * O caminho por direito é o ecrã dos modelos ganhar uma versão inglesa de
+     * cada modelo. É trabalho de interface e é uma decisão dela; até lá, isto.
+     */
+    if (idioma !== "pt" && !mensagem) {
+      log.warn(
+        "proposta-doc: proposta noutra língua — o modelo «proposta-enviada» não é consultado, sai o texto da casa",
+        { id, idioma },
+      );
+    }
+    const doModelo =
+      mensagem || idioma !== "pt"
+        ? null
+        : await modeloParaEnvioAutomatico(
+            "proposta-enviada",
+            marcadoresDoPedido(quote, {
+              // Quem este email saúda são os NOMES DO CASAL do documento do
+              // estúdio, e não o `quote.name` — que é quem escreveu o pedido e
+              // pode ser a mãe da noiva ou uma wedding planner. É a mesma escolha
+              // que o texto da casa aqui em baixo já fazia.
+              nome: String(doc.clientNames ?? "").trim(),
+              link: acceptUrl,
+              valor: eurDocumento(money.gross),
+              ...(String(doc.eventDate ?? "").trim()
+                ? { data_evento: String(doc.eventDate).trim() }
+                : {}),
+              ...(String(doc.location ?? "").trim() ? { local: String(doc.location).trim() } : {}),
+            }),
+          );
 
+    /**
+     * O TEXTO DA CASA, NA LÍNGUA DA PROPOSTA.
+     *
+     * O desenho do email é UM só — o mesmo título, o mesmo cumprimento, o mesmo
+     * botão verde, no mesmo sítio. O que muda são as PALAVRAS, e elas vivem no
+     * `email-proposta-textos`. Duplicar o markup por língua era garantir que um
+     * dia o botão inglês ficava com outra cor, e ninguém dava por isso porque o
+     * email inglês é o que ela não lê.
+     *
+     * O português é, palavra por palavra, o que sempre saiu daqui.
+     */
+    const t = textosDoEmailDaProposta(idioma);
     const email = doModelo
       ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto })
       : emailAoCliente({
-          html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
-        <p style="font-size:14px;line-height:1.6">Olá ${esc(doc.clientNames)},</p>
-        ${mensagem ? `${paragrafosDaMensagem(mensagem)}\n        ` : ""}<p style="font-size:14px;line-height:1.6">Segue em anexo a proposta personalizada para o seu evento. Pode vê-la e responder online através do botão abaixo.</p>
-        <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">Ver e responder à proposta →</a></p>`,
+          html: `<h2 style="font-size:18px;margin:0 0 12px">${esc(t.titulo)}</h2>
+        <p style="font-size:14px;line-height:1.6">${esc(t.ola)} ${esc(doc.clientNames)},</p>
+        ${mensagem ? `${paragrafosDaMensagem(mensagem)}\n        ` : ""}<p style="font-size:14px;line-height:1.6">${esc(t.intro)}</p>
+        <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">${esc(t.botao)}</a></p>`,
           texto: [
-            "A sua proposta — Líquen Events",
+            t.titulo,
             "",
-            `Olá ${doc.clientNames},`,
+            `${t.ola} ${doc.clientNames},`,
             "",
             // Tal e qual, com as quebras dela: escapar é uma preocupação de HTML, e
             // aqui só se lhe acrescenta a linha em branco que a separa do resto.
+            // A mensagem pessoal não se traduz em língua nenhuma — é dela, como
+            // os títulos e as legendas do documento.
             ...(mensagem ? [mensagem, ""] : []),
-            "Segue em anexo a proposta personalizada para o seu evento.",
-            `Ver e responder online: ${acceptUrl}`,
+            t.introEmTexto,
+            `${t.verOnline} ${acceptUrl}`,
           ].join("\n"),
         });
 
@@ -555,7 +650,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           // `randomUUID()` da nossa base não é referência de ninguém.
           // O assunto vem do MODELO quando é o modelo que sai — o corpo é dela
           // e a linha que o cliente lê antes de abrir também tem de ser.
-          subject: doModelo?.assunto ?? "Proposta para o seu evento — Líquen Events",
+          // …e o assunto da CASA vem na língua da proposta, como o corpo: é a
+          // única linha que o casal lê antes de decidir se abre.
+          subject: doModelo?.assunto ?? t.assunto,
           html: email.html,
           text: email.text,
           // O PDF junta-se aos anexos da assinatura; substituí-los deixava o
@@ -563,7 +660,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           attachments: [
             ...email.attachments,
             {
-              filename: `Proposta-Liquen-${id}.pdf`,
+              // O nome do anexo também é a língua da proposta: ela manda as duas
+              // versões (a portuguesa aos pais, a inglesa ao casal) e com o mesmo
+              // nome a segunda fica «Proposta-Liquen-q1 (1).pdf» na pasta de quem
+              // as receba, sem forma de saber qual é qual sem abrir as duas.
+              filename: t.nomeDoAnexo(id),
               content: pdfBuffer,
               contentType: "application/pdf",
             },

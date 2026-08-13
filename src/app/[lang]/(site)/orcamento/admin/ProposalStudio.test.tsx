@@ -3041,16 +3041,19 @@ describe("gerar a proposta em inglês", () => {
   });
 
   /**
-   * O ENVIO ao cliente fica em português por agora: o corpo do email, o assunto
-   * e o nome do anexo são todos portugueses, e um PDF inglês dentro de um email
-   * português seria pior do que os dois em português. A rota já sabe receber a
-   * língua — o estúdio é que ainda não a manda por este caminho.
+   * ── O ENVIO LEVA A LÍNGUA, E É A MESMA QUE SE PRÉ-VISUALIZOU ──────────────
+   *
+   * O envio não mandava língua nenhuma, e a decisão de então estava escrita: um
+   * PDF inglês dentro de um email português seria pior do que os dois em
+   * português. Agora o email, a página do aceite e a segunda descarga seguem a
+   * língua da proposta, portanto a razão caiu — e escolher «Inglês» para
+   * pré-visualizar e receber uma proposta portuguesa a seguir seria a
+   * surpresa maior das duas.
    */
-  it("o envio ao cliente continua a não mandar língua nenhuma", async () => {
+  it("o envio ao cliente leva a língua escolhida", async () => {
     seedDraft(1);
     renderStudio();
     const user = userEvent.setup();
-    // Escolher inglês na pré-visualização não pode transbordar para o envio.
     await irParaPrever(user);
     await user.click(screen.getByRole("radio", { name: /^Inglês/ }));
 
@@ -3060,9 +3063,75 @@ describe("gerar a proposta em inglês", () => {
 
     await waitFor(() => {
       const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
-      expect(enviados.some((c) => c.mode === "send")).toBe(true);
-      expect(enviados.find((c) => c.mode === "send")).not.toHaveProperty("idioma");
+      expect(enviados.find((c) => c.mode === "send")?.idioma).toBe("en");
     });
+  });
+
+  it("e no caminho de sempre manda «pt», dito e não subentendido", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+
+    await waitFor(() => {
+      const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
+      expect(enviados.find((c) => c.mode === "send")?.idioma).toBe("pt");
+    });
+  });
+
+  /**
+   * A ESCOLHA TEM DE ESTAR ONDE SE ENVIA, E NÃO SÓ ONDE SE PRÉ-VISUALIZA.
+   *
+   * Os passos do estúdio são clicáveis: dá para ir do Conteúdo direito ao
+   * Enviar sem passar pela pré-visualização. Enquanto a língua só desenhava um
+   * PDF para ela ver, isso não tinha consequência nenhuma; agora decide o email
+   * que o casal recebe e a página onde ele responde. Quem envia sem passar pelo
+   * passo 2 tem de poder escolher — e de VER o que está escolhido.
+   */
+  it("o passo 3 deixa escolher a língua, e diz o que ela decide", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+
+    const grupo = await screen.findByRole("radiogroup", { name: "Idioma da proposta" });
+    expect(within(grupo).getByRole("radio", { name: "Português" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    // E diz, antes do clique, o que sai em inglês além do PDF.
+    const nota = screen.getByText(/Em inglês, o email ao cliente/);
+    expect(nota.textContent).toMatch(/página onde ele responde/);
+
+    await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+
+    await waitFor(() => {
+      const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
+      expect(enviados.find((c) => c.mode === "send")?.idioma).toBe("en");
+    });
+  });
+
+  /** A escolha é UMA: mudá-la no passo 3 muda a que a pré-visualização usa, e
+   *  ao contrário. Duas caixas com estados diferentes eram a maneira certa de
+   *  enviar em inglês um documento que ela pré-visualizou em português. */
+  it("a escolha do passo 3 e a do passo 2 são a mesma", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    const grupo = await screen.findByRole("radiogroup", { name: "Idioma da proposta" });
+    await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
+
+    await irParaPrever(user);
+    expect(
+      within(screen.getByRole("radiogroup", { name: "Idioma do PDF" })).getByRole("radio", {
+        name: /^Inglês/,
+      }),
+    ).toHaveAttribute("aria-checked", "true");
   });
 });
 

@@ -10,7 +10,9 @@ import {
 } from "./proposal-doc";
 import {
   blocosFixosNaLingua,
+  referenciaDoDocumento,
   textosDaProposta,
+  type BlocosFixos,
   type IdiomaDaProposta,
   type TextosDoDocumento,
 } from "./proposal-doc-textos";
@@ -378,11 +380,11 @@ describe("o caminho de omissão continua a ser o português", () => {
     });
     const texto = blocosFixosNaLingua(doc, "en").condicoesGerais.join("\n");
     expect(texto).toContain(
-      "This proposal is only valid for the event date subsequently confirmed in writing.",
+      "This proposal is only valid for the event date that is subsequently confirmed in writing.",
     );
     expect(texto).toContain(
       "The quote is valid for the number of guests subsequently confirmed in writing;" +
-        " below or above that number the amount of the proposal will have to be revised.",
+        " if the final number is lower or higher, the amount of the proposal will have to be revised.",
     );
     expect(texto).not.toContain("{DATA}");
     expect(texto).not.toContain("{CONVIDADOS}");
@@ -434,7 +436,7 @@ describe("nada fica por traduzir na versão inglesa", () => {
     const texto = textoInteiro(emIngles.get("decoração cheia")!.escritas);
     // As notas e as condições da casa, na versão inglesa.
     expect(texto).toContain(normalizar("Set-up and dismantling are included in this proposal"));
-    expect(texto).toContain(normalizar("VAT at the legal rate in force is added to the amounts"));
+    expect(texto).toContain(normalizar("VAT at the applicable legal rate is added to the amounts"));
     expect(texto).toContain(normalizar("All materials and props used at the event"));
     expect(texto).toContain(normalizar("30% on acceptance"));
     expect(texto).toContain(normalizar("In the event of cancellation of the service"));
@@ -442,16 +444,92 @@ describe("nada fica por traduzir na versão inglesa", () => {
     for (const linha of [...DEFAULT_NOTAS_IMPORTANTES, ...DEFAULT_CONDICOES_GERAIS]) {
       expect(texto).not.toContain(normalizar(linha.slice(0, 40)));
     }
-    // Os marcadores: a data e o número de convidados são texto DELA e entram
-    // tal e qual na frase inglesa — o que não pode acontecer é sobrar um «{».
-    expect(texto).toContain(normalizar("event to be held on 12 de setembro de 2026"));
-    expect(texto).toContain(normalizar("valid for the stated number of guests (120 pax)"));
+    // Os marcadores: a data ENTRA NA CLÁUSULA na língua do documento — foi o
+    // nosso código que a escreveu (ver «OS CAMPOS QUE O ESTÚDIO ESCREVEU»). O
+    // número de convidados aqui é «120 pax», que se escreve igual nas duas.
+    expect(texto).toContain(normalizar("event to be held on 12 September 2026"));
+    expect(texto).not.toContain(normalizar("12 de setembro de 2026"));
+    expect(texto).toContain(normalizar("valid for the number of guests stated (120 pax)"));
     expect(texto).not.toContain("{DATA}");
     expect(texto).not.toContain("{CONVIDADOS}");
     // E os dias de confirmação continuam a ser a constante, não um número solto.
     expect(texto).toContain(
-      normalizar(`confirmed up to ${DIAS_PARA_CONFIRMAR_CONVIDADOS} days before the event`),
+      normalizar(`confirmed at least ${DIAS_PARA_CONFIRMAR_CONVIDADOS} days before the event`),
     );
+  });
+
+  /** Os sete blocos de texto fixo do documento, pelos nomes por que se
+   *  desenham. */
+  const BLOCOS: (keyof BlocosFixos)[] = [
+    "notasImportantes",
+    "incluido",
+    "naoIncluido",
+    "condicoesGerais",
+    "observacoesGerais",
+    "faseamento",
+    "cancelamento",
+  ];
+
+  /**
+   * ── QUE NÃO SE PERDEU NENHUMA CLÁUSULA ────────────────────────────────────
+   *
+   * A página das Condições Gerais é a mais perigosa do documento: são cláusulas
+   * contratuais, e uma que desapareça na tradução não dá erro nenhum — dá uma
+   * proposta inglesa que promete menos (ou exige menos) do que a portuguesa, e
+   * ninguém dá por isso até haver uma discussão.
+   *
+   * Duas medidas, e são as duas que um humano não consegue repetir de cada vez
+   * que alguém mexe numa frase: o mesmo NÚMERO de entradas em cada bloco, e as
+   * mesmas PERCENTAGENS dentro delas — que são o sinal, o saldo e os 70% do
+   * cancelamento, os três números por que se paga.
+   */
+  it("cada bloco inglês tem exactamente as mesmas entradas que o português", () => {
+    const doc = decoracaoCheia();
+    // Em português a função devolve o DOCUMENTO (as mesmas listas, sem cópia),
+    // por isso os blocos nomeiam-se aqui em vez de se lerem das chaves.
+    const pt = blocosFixosNaLingua(doc, "pt");
+    const en = blocosFixosNaLingua(doc, "en");
+    for (const bloco of BLOCOS) {
+      expect(`${bloco}: ${en[bloco].length}`).toBe(`${bloco}: ${pt[bloco].length}`);
+      // E nenhuma entrada vazia: uma cláusula apagada por engano deixaria uma
+      // linha em branco no meio da lista, que passa por «formatação».
+      for (const linha of en[bloco]) expect(linha.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("as percentagens das cláusulas são as mesmas nas duas línguas", () => {
+    const percentagens = (linhas: readonly string[]) =>
+      linhas.join(" ").match(/\d+(?:[.,]\d+)?%/g) ?? [];
+    for (const pct of [30, 50]) {
+      const doc = withProposalDefaults({ ...decoracaoCheia(), depositPercent: pct });
+      const pt = blocosFixosNaLingua(doc, "pt");
+      const en = blocosFixosNaLingua(doc, "en");
+      for (const bloco of BLOCOS) {
+        expect(`${pct}% ${bloco}: ${percentagens(en[bloco]).join(" ")}`).toBe(
+          `${pct}% ${bloco}: ${percentagens(pt[bloco]).join(" ")}`,
+        );
+      }
+    }
+  });
+
+  /**
+   * Os prazos das cláusulas dizem-se em inglês com «at least» / «no later
+   * than», nunca com «up to»: «até 25 dias antes» é a ÚLTIMA data em que se
+   * pode confirmar, e «up to 25 days before the event» lê-se ao contrário —
+   * como um tecto («no máximo 25 dias»), o que daria a entender que confirmar
+   * com dois meses de antecedência estava fora de prazo.
+   */
+  it("os prazos ingleses são prazos, e não tectos", () => {
+    const doc = decoracaoCheia();
+    const tudo = [
+      ...blocosFixosNaLingua(doc, "en").condicoesGerais,
+      ...blocosFixosNaLingua(doc, "en").faseamento,
+      textosDaProposta("en").quandoSaldo,
+      textosDaProposta("en").quandoSinal,
+    ].join(" ");
+    expect(tudo).toContain(`at least ${DIAS_PARA_CONFIRMAR_CONVIDADOS} days before the event`);
+    expect(textosDaProposta("en").quandoSaldo).toBe("no later than 1 month before the event");
+    expect(tudo).not.toMatch(/up to \d/);
   });
 
   it("o que ela reescreveu à mão sai tal e qual, mesmo em inglês", async () => {
@@ -462,6 +540,143 @@ describe("nada fica por traduzir na versão inglesa", () => {
     // A moldura à volta dela continua inglesa: é a rubrica que é da casa.
     expect(texto).toContain(normalizar("Important notes"));
     expect(texto).not.toContain(normalizar("Set-up and dismantling are included"));
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OS CAMPOS QUE O ESTÚDIO ESCREVEU
+   ═══════════════════════════════════════════════════════════════════════════
+
+   A faixa de apresentação é preenchida de duas mãos: umas linhas vêm do PEDIDO
+   através do nosso código («12 de setembro de 2026», «Casamento», «Civil»,
+   «100 a 150», e a referência que corre no topo de todas as páginas), outras são
+   escritas por ela. As primeiras são nossas e têm de sair na língua do
+   documento; as segundas são dela e saem tal e qual.
+
+   O documento de prova traz a referência COMPOSTA — é o caso normal, porque o
+   estúdio recompõe-na sozinho até alguém lhe mexer. */
+
+/** Uma proposta em que TODOS os campos do evento são os que o nosso código
+ *  escreve, e nenhum deles foi tocado à mão. */
+function comOsCamposDoEstudio(over: Partial<ProposalDoc> = {}): ProposalDoc {
+  const base = withProposalDefaults({
+    ...decoracaoCheia(),
+    clientNames: "Maria & Zé",
+    eventType: "Casamento",
+    eventDate: "12 de setembro de 2026",
+    guests: "100 a 150",
+    ceremony: "Civil",
+    moodBoards: [],
+    // As condições da casa voltam ao molde para serem preenchidas com ESTES
+    // dados: o documento de base traz-nas já preenchidas com outro número de
+    // convidados, e uma condição que não bate certo com o molde é — e bem —
+    // tratada como reescrita à mão.
+    condicoesGerais: undefined,
+    ...over,
+  });
+  // A referência que o estúdio compõe sozinho a partir dos quatro campos.
+  return withProposalDefaults({ ...base, ref: referenciaDoDocumento(base, "pt") });
+}
+
+describe("os campos que o estúdio escreveu saem na língua do documento", () => {
+  it("a data, o tipo, a cerimónia e o número de convidados", { timeout: RELOGIO }, async () => {
+    const doc = comOsCamposDoEstudio();
+    const en = textoInteiro((await desenhar(doc, "en")).escritas);
+
+    expect(en).toContain(normalizar("12 September 2026"));
+    expect(en).toContain(normalizar("Wedding"));
+    expect(en).toContain(normalizar("100 to 150"));
+    // Nenhuma das formas portuguesas sobrevive — nem na capa, nem na faixa, nem
+    // dentro da cláusula que cita a data e o número.
+    expect(en).not.toContain(normalizar("12 de setembro de 2026"));
+    expect(en).not.toContain(normalizar("Casamento"));
+    expect(en).not.toContain(normalizar("100 a 150"));
+  });
+
+  it("a referência que corre no topo das páginas", { timeout: RELOGIO }, async () => {
+    const doc = comOsCamposDoEstudio();
+    expect(doc.ref).toBe("Decoração Casamento Maria & Zé · 12 de setembro de 2026");
+
+    const en = textoInteiro((await desenhar(doc, "en")).escritas);
+    expect(en).toContain(normalizar("Decoration Wedding Maria & Zé · 12 September 2026"));
+    expect(en).not.toContain(normalizar("Decoração"));
+  });
+
+  it("uma referência escrita à mão fica como ela a escreveu", { timeout: RELOGIO }, async () => {
+    const dela = "PO 2026-114 · Maria & Zé";
+    const doc = withProposalDefaults({ ...comOsCamposDoEstudio(), ref: dela });
+    const en = textoInteiro((await desenhar(doc, "en")).escritas);
+    expect(en).toContain(normalizar(dela));
+  });
+
+  it("duas cerimónias numa linha traduzem-se as duas", { timeout: RELOGIO }, async () => {
+    const doc = comOsCamposDoEstudio({ ceremony: "Civil, simbólica" });
+    const en = textoInteiro((await desenhar(doc, "en")).escritas);
+    expect(en).toContain(normalizar("Civil, symbolic"));
+    expect(en).not.toContain(normalizar("simbólica"));
+  });
+
+  it("o que ela escreveu nestes campos sai tal e qual", { timeout: RELOGIO }, async () => {
+    const doc = comOsCamposDoEstudio({
+      eventType: "Renovação de votos",
+      eventDate: "no fim de semana da vindima",
+      ceremony: "Só a bênção, no claustro",
+      guests: "uns 90, mais coro",
+    });
+    const en = textoInteiro((await desenhar(doc, "en")).escritas);
+    for (const dela of [
+      "Renovação de votos",
+      "no fim de semana da vindima",
+      "Só a bênção, no claustro",
+      "uns 90, mais coro",
+    ]) {
+      expect(en).toContain(normalizar(dela));
+    }
+  });
+
+  /**
+   * O rótulo do total só é impresso quando o documento NÃO tem um total que se
+   * consiga somar — é aí que o quadro fecha na linha única da folha antiga, em
+   * vez de fechar na escada TOTAL / IVA / Total a pagar. É também o caso de
+   * qualquer proposta a meio, que é como uma proposta passa a maior parte da
+   * vida.
+   */
+  const semTotalSomavel = (over: Partial<ProposalDoc> = {}) =>
+    comOsCamposDoEstudio({
+      budgetAmounts: undefined,
+      budgetExtras: [],
+      budgetOpcional: undefined,
+      totalAmount: undefined,
+      totalVatMode: undefined,
+      totalText: "[Valor Total]",
+      ...over,
+    });
+
+  it("o rótulo do total que o estúdio semeia", { timeout: RELOGIO }, async () => {
+    const doc = semTotalSomavel({ totalLabel: "Valor Total Decoração" });
+    const en = textoInteiro((await desenhar(doc, "en")).escritas);
+    expect(en).toContain(normalizar("Decoration Total"));
+    expect(en).not.toContain(normalizar("Valor Total Decoração"));
+  });
+
+  it("um rótulo de total escrito por ela fica como está", { timeout: RELOGIO }, async () => {
+    const doc = semTotalSomavel({ totalLabel: "Investimento em flor e decor" });
+    const en = textoInteiro((await desenhar(doc, "en")).escritas);
+    expect(en).toContain(normalizar("Investimento em flor e decor"));
+  });
+
+  it("em português nada disto muda", { timeout: RELOGIO }, async () => {
+    const doc = comOsCamposDoEstudio({ ceremony: "Civil, simbólica" });
+    const pt = textoInteiro((await desenhar(doc, "pt")).escritas);
+    for (const nosso of [
+      "12 de setembro de 2026",
+      "Casamento",
+      "Civil, simbólica",
+      "100 a 150",
+      "Decoração Casamento Maria & Zé · 12 de setembro de 2026",
+    ]) {
+      expect(pt).toContain(normalizar(nosso));
+    }
   });
 });
 

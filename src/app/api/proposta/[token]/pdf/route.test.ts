@@ -173,3 +173,58 @@ describe("GET /api/proposta/[token]/pdf", () => {
     expect(estados.at(-1)).toBe(429);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * VOLTAR A DESCARREGAR DÁ A PROPOSTA NA LÍNGUA EM QUE ELA FOI FEITA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Este botão redesenha o documento a partir do `doc` guardado. Enquanto a
+ * língua não ficava gravada, quem redesenhava não tinha como a saber e caía em
+ * português: o casal inglês recebia a proposta inglesa por email e, ao carregar
+ * no botão da página onde a aceita, abria a portuguesa. O mesmo documento, duas
+ * línguas, sem explicação nenhuma.
+ */
+describe("GET /api/proposta/[token]/pdf — a língua da proposta", () => {
+  it("uma proposta INGLESA volta a sair em inglês", async () => {
+    db.proposals.set("p1", {
+      id: "p1",
+      quoteId: "LIQ-AAA-1",
+      idioma: "en",
+      doc: { ref: "PO" },
+    });
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "en");
+  });
+
+  it("e o ficheiro chama-se como o que seguiu no email", async () => {
+    // O casal já tem um «Proposal-Liquen-….pdf» na caixa de correio: o que
+    // descarrega da página tem de ser reconhecível como o mesmo documento.
+    db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", idioma: "en", doc: { ref: "PO" } });
+    const res = await call();
+    expect(res.headers.get("Content-Disposition")).toContain("Proposal-Liquen-LIQ-AAA-1.pdf");
+  });
+
+  it("uma proposta PORTUGUESA continua exactamente como estava", async () => {
+    db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", idioma: "pt", doc: { ref: "PO" } });
+    const res = await call();
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
+    expect(res.headers.get("Content-Disposition")).toContain("Proposta-Liquen-LIQ-AAA-1.pdf");
+  });
+
+  it("uma proposta ANTIGA, sem língua gravada, é portuguesa", async () => {
+    // O caso que não pode mudar de comportamento: tudo o que foi enviado antes
+    // desta coluna existir foi enviado em português.
+    db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", doc: { ref: "PO" } });
+    const res = await call();
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
+    expect(res.headers.get("Content-Disposition")).toContain("Proposta-Liquen-LIQ-AAA-1.pdf");
+  });
+
+  it("uma língua estranha na base não inventa nada: português", async () => {
+    db.proposals.set("p1", { id: "p1", quoteId: "LIQ-AAA-1", idioma: "fr", doc: { ref: "PO" } });
+    await call();
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ ref: "PO" }, "pt");
+  });
+});

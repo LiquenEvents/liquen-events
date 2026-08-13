@@ -175,3 +175,60 @@ describe("portal proposta-pdf — fotos em falta", () => {
     expect(res.status).toBe(200);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PORTAL DÁ O DOCUMENTO NA LÍNGUA EM QUE A PROPOSTA FOI FEITA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A mesma exigência do link do casal, e pelo mesmo motivo: este botão redesenha
+ * o documento a partir do `doc`, e sem a língua gravada caía sempre em
+ * português. Um casal que aceitou uma proposta inglesa voltava ao portal meses
+ * depois — para reler o que combinou — e descarregava outro documento.
+ *
+ * A língua é a da proposta que o portal SERVE (a aceite, quando há aceite), e
+ * não a do visitante nem a do segmento da rota.
+ */
+describe("portal proposta-pdf — a língua da proposta", () => {
+  it("uma proposta INGLESA volta a sair em inglês, e com o nome do email", async () => {
+    db.newestByQuote.set("q-1", {
+      id: "p-open",
+      quoteId: "q-1",
+      idioma: "en",
+      doc: { which: "open" },
+    });
+    const res = await call();
+    expect(res.status).toBe(200);
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ which: "open" }, "en");
+    expect(res.headers.get("Content-Disposition")).toContain("Proposal-Liquen-q-1.pdf");
+  });
+
+  it("a língua é a da proposta ACEITE, não a da revisão mais recente", async () => {
+    // O portal serve o documento que o casal aceitou; a língua tem de vir do
+    // mesmo sítio, senão o ficheiro sai desenhado com a moldura de uma proposta
+    // que o cliente nunca viu.
+    db.proposalsById.set("p-acc", {
+      id: "p-acc",
+      quoteId: "q-1",
+      idioma: "en",
+      doc: { which: "accepted" },
+    });
+    db.newestByQuote.set("q-1", {
+      id: "p-new",
+      quoteId: "q-1",
+      idioma: "pt",
+      doc: { which: "draft-revision" },
+    });
+    db.acceptedContractByQuote.set("q-1", { proposalId: "p-acc", status: "aceite" });
+
+    await call();
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ which: "accepted" }, "en");
+  });
+
+  it("uma proposta ANTIGA, sem língua gravada, continua portuguesa", async () => {
+    db.newestByQuote.set("q-1", { id: "p-open", quoteId: "q-1", doc: { which: "open" } });
+    const res = await call();
+    expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledWith({ which: "open" }, "pt");
+    expect(res.headers.get("Content-Disposition")).toContain("Proposta-Liquen-q-1.pdf");
+  });
+});

@@ -756,16 +756,14 @@ describe("POST /api/orcamento/[id]/proposta-doc — a língua com que se desenha
   });
 
   /**
-   * A ROTA aceita a língua no envio; o ESTÚDIO é que ainda não a manda.
+   * A LÍNGUA DEIXOU DE MORRER NO FIM DO PEDIDO.
    *
-   * A decisão de produto é que o email ao cliente fica em português por agora —
-   * o corpo do email, o assunto e o nome do anexo são todos portugueses, e um
-   * PDF inglês dentro de um email português seria pior do que os dois em
-   * português. Mas a rota não tem de saber disso: recebe a língua e desenha com
-   * ela, para o dia em que o resto do envio acompanhar não ser preciso mexer
-   * aqui outra vez.
+   * Era este o defeito de fundo: a língua desenhava o PDF, nomeava o ficheiro e
+   * desaparecia. Tudo o que vinha a seguir — o email que a transportava, a
+   * página do aceite, o portal, a segunda descarga — não tinha como saber em
+   * que língua a proposta tinha sido feita, e caía em português.
    */
-  it("o envio já sabe receber a língua — falta o email à volta dela", async () => {
+  it("o envio GRAVA a língua na proposta", async () => {
     const res = await POST(
       req({ mode: "send", idioma: "en", doc: baseDoc({ totalAmount: 3000 }) }),
       {
@@ -774,10 +772,194 @@ describe("POST /api/orcamento/[id]/proposta-doc — a língua com que se desenha
     );
     expect(res.status).toBe(200);
     expect(idiomaDaChamada()).toBe("en");
-    // E o documento guardado continua a ser UM só, sem língua colada: o que fica
-    // na base é o que ela escreveu, em português.
+    expect(created.last!.idioma).toBe("en");
+  });
+
+  it("mas o DOCUMENTO guardado continua a ser um só, sem língua colada", async () => {
+    // O que fica no `doc` é o que ela escreveu, em português. A língua é a
+    // moldura com que foi desenhado, e vive ao lado — duas cópias do mesmo
+    // documento em duas línguas eram duas coisas para manter coerentes.
+    await POST(req({ mode: "send", idioma: "en", doc: baseDoc({ totalAmount: 3000 }) }), {
+      params,
+    });
     expect(created.last!.doc).toBeTruthy();
     expect(created.last!.doc).not.toHaveProperty("idioma");
+  });
+
+  it("sem língua no pedido grava-se «pt» — que é a língua com que se desenhou", async () => {
+    // Não se deixa o campo em branco: a proposta FOI desenhada em português, e
+    // isso é um facto sobre o PDF que o casal recebeu. Quem lê propostas
+    // antigas (sem coluna nenhuma) já sabe que a ausência é português; nas
+    // novas não há razão para deixar a pergunta por responder.
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(created.last!.idioma).toBe("pt");
+  });
+
+  it("a pré-visualização não grava nada — não há proposta nenhuma", async () => {
+    await POST(req({ mode: "preview", idioma: "en", doc: baseDoc() }), { params });
+    expect(created.last).toBeNull();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O EMAIL QUE LEVA A PROPOSTA FALA A LÍNGUA DELA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: as propostas têm de poder ser feitas e traduzidas «de uma
+ * forma espetacularmente bem». Um PDF inglês dentro de um email português não
+ * é isso: o casal inglês recebia «A sua proposta — Líquen Events», «Segue em
+ * anexo…» e um botão «Ver e responder à proposta →» para chegar a um documento
+ * que percebia.
+ *
+ * O que este bloco guarda: o inglês é inglês do assunto ao nome do anexo, e o
+ * PORTUGUÊS NÃO MUDA UMA VÍRGULA.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — o email sai na língua da proposta", () => {
+  const enviado = () =>
+    vi.mocked(sendMail).mock.calls.at(-1)![0] as unknown as {
+      subject: string;
+      html: string;
+      text: string;
+      attachments?: { filename: string }[];
+    };
+
+  beforeEach(() => {
+    vi.mocked(createProposal).mockImplementation(async (p: Proposal) => {
+      created.last = p;
+      store.linhas.set(p.id, { ...p });
+    });
+  });
+
+  it("proposta inglesa: assunto, cumprimento, frase e botão em inglês", async () => {
+    await POST(req({ mode: "send", idioma: "en", doc: baseDoc({ totalAmount: 3000 }) }), {
+      params,
+    });
+    const email = enviado();
+    expect(email.subject).toBe("Proposal for your event — Líquen Events");
+    expect(email.html).toContain("Your proposal — Líquen Events");
+    expect(email.html).toContain("Hello Maria &amp; Zé,");
+    expect(email.html).toContain("Please find attached the proposal");
+    expect(email.html).toContain("View and reply to the proposal");
+    expect(email.text).toContain("View and reply online:");
+    // E não sobra uma palavra portuguesa do corpo antigo.
+    expect(email.html).not.toContain("Olá Maria");
+    expect(email.html).not.toContain("Segue em anexo");
+    expect(email.text).not.toContain("Segue em anexo");
+  });
+
+  it("proposta inglesa: o anexo chama-se Proposal-… e não Proposta-…", async () => {
+    await POST(req({ mode: "send", idioma: "en", doc: baseDoc({ totalAmount: 3000 }) }), {
+      params,
+    });
+    const pdf = enviado().attachments?.find((a) => a.filename.endsWith(".pdf"));
+    expect(pdf?.filename).toBe("Proposal-Liquen-q1.pdf");
+  });
+
+  it("proposta portuguesa: o email de sempre, palavra por palavra", async () => {
+    await POST(req({ mode: "send", idioma: "pt", doc: baseDoc({ totalAmount: 3000 }) }), {
+      params,
+    });
+    const email = enviado();
+    expect(email.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(email.html).toContain("A sua proposta — Líquen Events");
+    expect(email.html).toContain("Olá Maria &amp; Zé,");
+    expect(email.html).toContain("Segue em anexo a proposta personalizada para o seu evento.");
+    expect(email.html).toContain("Ver e responder à proposta");
+    expect(enviado().attachments?.find((a) => a.filename.endsWith(".pdf"))?.filename).toBe(
+      "Proposta-Liquen-q1.pdf",
+    );
+  });
+
+  it("sem língua no pedido (o caminho de sempre) o email continua português", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(enviado().subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+  });
+
+  /**
+   * ── A ASSINATURA DA CASA NÃO SE TRADUZ, E NÃO É ESQUECIMENTO ─────────────
+   *
+   * Lida linha a linha (`email-assinatura.ts`), a assinatura não tem uma única
+   * frase portuguesa: é o NOME dela, o cargo («Manager», que já é inglês), o
+   * telefone, o email, o endereço do site e os nomes das redes. Não há ali
+   * nenhum «Com os melhores cumprimentos» a traduzir — o fecho do email é o
+   * bloco de contactos, e um bloco de contactos é o mesmo em qualquer língua.
+   *
+   * Por isso o email inglês leva a assinatura EXACTAMENTE como o português. É
+   * também a decisão que não mexe nos outros cinco caminhos que a usam.
+   */
+  it("a assinatura da casa vai igual nas duas línguas", async () => {
+    await POST(req({ mode: "send", idioma: "en", doc: baseDoc({ totalAmount: 3000 }) }), {
+      params,
+    });
+    const em = enviado();
+    expect(em.html).toContain("Catarina Gaspar");
+    expect(em.html).toContain("Manager");
+    expect(em.html).toContain("+351 919 259 820");
+    expect(em.text).toContain("Catarina Gaspar");
+  });
+
+  it("a mensagem pessoal dela entra no email inglês tal e qual a escreveu", async () => {
+    // O que ela escreve é dela e não se traduz — é a mesma regra do documento,
+    // onde os títulos e as legendas saem como foram escritos.
+    await POST(
+      req({
+        mode: "send",
+        idioma: "en",
+        doc: baseDoc({ totalAmount: 3000 }),
+        mensagem: "It was a pleasure meeting you at the estate.",
+      }),
+      { params },
+    );
+    const em = enviado();
+    expect(em.html).toContain("It was a pleasure meeting you at the estate.");
+    expect(em.html).toContain("Please find attached the proposal");
+    expect(em.text).toContain("It was a pleasure meeting you at the estate.");
+  });
+
+  /**
+   * ── O MODELO EDITÁVEL DELA E UMA PROPOSTA INGLESA ────────────────────────
+   *
+   * O modelo «Proposta enviada» é UM texto, escrito por ela, em português — o
+   * ecrã «Modelos de email» não tem versão inglesa nenhuma. Debaixo de uma
+   * proposta inglesa, usá-lo era mandar o assunto e o corpo em português com um
+   * PDF inglês em anexo: o defeito que se está a corrigir, pela porta do lado.
+   *
+   * Fica de fora, e sai o texto da casa em inglês — o MESMO recurso que a rota
+   * já usa quando o modelo está vazio ou tem um marcador sem valor. Numa
+   * proposta portuguesa não muda nada: o modelo dela continua a ser o que sai.
+   */
+  it("o modelo português dela não sai por baixo de uma proposta inglesa", async () => {
+    modelo.get.mockResolvedValue({
+      key: "proposta-enviada",
+      name: "Proposta enviada",
+      subject: "A sua proposta | Líquen",
+      body: `<p>Olá {nome}, está pronta.</p>`,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    await POST(req({ mode: "send", idioma: "en", doc: baseDoc({ totalAmount: 3000 }) }), {
+      params,
+    });
+    const em = enviado();
+    expect(em.html).not.toContain("está pronta.");
+    expect(em.subject).toBe("Proposal for your event — Líquen Events");
+    expect(em.html).toContain("Please find attached the proposal");
+  });
+
+  it("e continua a sair numa proposta portuguesa", async () => {
+    modelo.get.mockResolvedValue({
+      key: "proposta-enviada",
+      name: "Proposta enviada",
+      subject: "A sua proposta | Líquen",
+      body: `<p>Olá {nome}, está pronta.</p>`,
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    await POST(req({ mode: "send", idioma: "pt", doc: baseDoc({ totalAmount: 3000 }) }), {
+      params,
+    });
+    expect(enviado().subject).toBe("A sua proposta | Líquen");
+    expect(enviado().html).toContain("Olá Maria &amp; Zé, está pronta.");
   });
 });
 

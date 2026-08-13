@@ -19,7 +19,12 @@ import {
   type MoodBoard,
   type VatMode,
 } from "@/lib/proposal-doc";
-import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
+import {
+  IDIOMA_POR_OMISSAO,
+  dataDoEventoPorExtenso,
+  referenciaDoDocumento,
+  type IdiomaDaProposta,
+} from "@/lib/proposal-doc-textos";
 import { ordemDeSaida, eAOrdemEscrita, aplicarOrdem, ORDEM_EXPLICITA } from "@/lib/proposal-ordem";
 import {
   CONTAGEM_VAZIA,
@@ -30,7 +35,7 @@ import {
 } from "@/lib/tempo-activo";
 import { ehRefDeTema } from "@/lib/theme-ref";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
-import { guestRangeLabel, ceremonyTypeLabel } from "@/lib/orcamento/data";
+import { guestRangeLabel, ceremonyTypeLabel, eventTypeName } from "@/lib/orcamento/data";
 import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
 import PainelInterno from "./PainelInterno";
@@ -160,51 +165,32 @@ const ADD_BTN =
 const REMOVE_BTN =
   "alvo-toque text-foreground/30 hover:text-[#8a2a22] transition-colors text-base leading-none shrink-0";
 
-const PT_MONTHS = [
-  "janeiro",
-  "fevereiro",
-  "março",
-  "abril",
-  "maio",
-  "junho",
-  "julho",
-  "agosto",
-  "setembro",
-  "outubro",
-  "novembro",
-  "dezembro",
-];
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  casamentos: "Casamento",
-  batizados: "Batizado",
-  aniversarios: "Aniversário",
-  jantares_gala: "Jantar de Gala",
-  conferencias: "Conferência",
-  teambuilding: "Teambuilding",
-  lancamentos: "Lançamento de Produto",
-  jantares_empresa: "Jantar de Empresa",
-};
+/* ── Os campos que o estúdio semeia a partir do pedido ─────────────────────
+ *
+ * O tipo, a data e a referência nascem escritos por NÓS, em português — e é
+ * exactamente por isso que o gerador do PDF os sabe reescrever na língua do
+ * casal quando ninguém lhes mexeu (ver «OS CAMPOS QUE O NOSSO CÓDIGO ESCREVEU»,
+ * em `proposal-doc-textos.ts`). Esse reconhecimento é uma COMPARAÇÃO com o que
+ * estas três funções produzem: uma cópia local do nome do tipo, dos meses ou da
+ * forma da referência divergia um dia da de lá, e a partir desse dia a proposta
+ * inglesa voltava a sair com a data em português — sem erro nenhum pelo
+ * caminho. Por isso nenhuma delas escreve texto seu: pedem-no a quem o tem. */
 
 function eventTypeLabel(q: Quote): string {
-  if (q.eventType && EVENT_TYPE_LABELS[q.eventType]) return EVENT_TYPE_LABELS[q.eventType];
-  if (q.category === "empresas") return "Evento Corporativo";
-  return "Casamento";
+  return (
+    eventTypeName(q.eventType) || (q.category === "empresas" ? "Evento Corporativo" : "Casamento")
+  );
 }
 
 /** yyyy-mm-dd → "12 de setembro de 2026"; passes through anything else. */
 function formatEventDate(d?: string): string {
   if (!d) return "";
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
-  if (!m) return d;
-  const month = Number(m[2]);
-  if (month < 1 || month > 12) return d;
-  return `${Number(m[3])} de ${PT_MONTHS[month - 1]} de ${m[1]}`;
+  const iso = /^\d{4}-\d{2}-\d{2}/.exec(d);
+  return iso ? dataDoEventoPorExtenso(iso[0]) : d;
 }
 
 function buildRef(d: StudioDoc): string {
-  const tpl = d.template === "organizacao" ? "Organização" : "Decoração";
-  return `${tpl} ${d.eventType} ${d.clientNames} · ${d.eventDate}`.replace(/\s+/g, " ").trim();
+  return referenciaDoDocumento(d);
 }
 
 /** "Maria & Zé" a partir dos nomes que o casal deu, ou "" se não deu nenhum.
@@ -3870,6 +3856,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         body: JSON.stringify({
           mode: "send",
           doc: { ...stripPendingImages(doc), fotosDeBiblioteca: origensNoDocumento() },
+          /**
+           * ── A LÍNGUA VAI COM O ENVIO, E FICA GRAVADA COM A PROPOSTA ──────
+           *
+           * Aqui não ia nenhuma, e a razão de então está escrita na rota: o
+           * email era português em qualquer caso, e um PDF inglês dentro de um
+           * email português seria pior do que os dois em português. Isso
+           * mudou — o email, a página do aceite, o portal e a segunda descarga
+           * seguem agora a língua da proposta —, e o que ficaria estranho é o
+           * contrário: pré-visualizar em inglês e o casal receber português.
+           *
+           * É a MESMA escolha do passo 2 (um só estado), por isso não há como
+           * enviar numa língua diferente daquela em que ela viu o documento.
+           */
+          idioma: idiomaDoPdf,
           // FORA do documento, e só quando existe: uma caixa em branco não pode
           // fazer sair um email diferente do de sempre — nem sequer um campo
           // vazio a viajar. A mensagem acompanha ESTE envio; o documento que
@@ -6192,6 +6192,53 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   value={money.gross > 0 ? eur(split.sinal) : "—"}
                 />
               </dl>
+              {/* ══════════════════════════════════════════════════════════
+                  A LÍNGUA TAMBÉM SE ESCOLHE AQUI, ONDE SE ENVIA
+                  ══════════════════════════════════════════════════════════
+
+                  A escolha vivia só por cima do «Descarregar PDF», e enquanto
+                  desenhava um PDF para ela ver isso chegava. Deixou de chegar:
+                  a língua fica GRAVADA com a proposta e decide o email que o
+                  casal recebe, o nome do anexo, a página onde ele responde e o
+                  que sai quando ele voltar a descarregar o documento.
+
+                  E os passos deste estúdio são clicáveis — dá para ir do
+                  Conteúdo direito ao Enviar sem passar pela pré-visualização.
+                  Sem este controlo, quem fizesse esse caminho mandava sempre
+                  português sem nunca ver a pergunta.
+
+                  É o MESMO estado do passo 2 (`idiomaDoPdf`), de propósito:
+                  duas caixas independentes eram a maneira certa de enviar em
+                  inglês um documento pré-visualizado em português.
+
+                  A nota diz o que muda ALÉM do PDF, porque é isso que é novo —
+                  a ressalva sobre o que o documento traduz (e o que não
+                  traduz) está no passo 2, ao lado do botão que o gera. */}
+              <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="text-sm text-foreground/60">Idioma</span>
+                <Segmented
+                  size="sm"
+                  ariaLabel="Idioma da proposta"
+                  value={idiomaDoPdf}
+                  onChange={setIdiomaDoPdf}
+                  options={[
+                    { value: "pt", label: "Português" },
+                    {
+                      value: "en",
+                      label: "Inglês",
+                      ariaLabel:
+                        "Inglês — o documento, o email ao cliente e a página onde ele responde saem em inglês",
+                    },
+                  ]}
+                />
+                <p className="w-full text-[11px] leading-snug text-foreground/50">
+                  Em inglês, o email ao cliente (assunto, texto e botão), o nome do ficheiro em
+                  anexo e a página onde ele responde saem em inglês, e é essa a língua que fica
+                  guardada com a proposta. O modelo «Proposta enviada» não é usado nesse caso, por
+                  estar escrito em português: sai o texto da casa. O contrato e a factura são
+                  documentos portugueses e não mudam.
+                </p>
+              </div>
               {/* ── A MENSAGEM QUE SEGUE COM A PROPOSTA ────────────────────
                   Aqui, logo abaixo do resumo do que vai seguir e ANTES das
                   conferências: faz parte do que o cliente vai receber, e é

@@ -35,15 +35,21 @@ vi.mock("@/lib/invoices-store", () => ({
     saldo: Math.round((total - Math.round(total * 0.3 * 100) / 100) * 100) / 100,
   }),
 }));
+/**
+ * O duplo do dicionário DEPENDE da língua (devolvia sempre a mesma folha).
+ * Sem isso, «o portal segue a língua da proposta» passava sem a página fazer
+ * nada — as duas línguas eram o mesmo texto.
+ */
 vi.mock("@/lib/i18n", () => ({
-  normalizeLocale: (l: string) => l,
-  getDictionary: () => ({
+  normalizeLocale: (l: string) => (l === "en" ? "en" : "pt"),
+  htmlLang: (l: string) => (l === "en" ? "en" : "pt-PT"),
+  getDictionary: (locale: string) => ({
     portal: {
-      title: "Portal",
+      title: locale === "en" ? "Client portal" : "Portal",
       eventTypes: {},
-      eventFallbackEmpresa: "Empresa",
-      eventFallbackParticular: "Particular",
-      dateLocale: "pt-PT",
+      eventFallbackEmpresa: locale === "en" ? "Corporate" : "Empresa",
+      eventFallbackParticular: locale === "en" ? "Private" : "Particular",
+      dateLocale: locale === "en" ? "en-GB" : "pt-PT",
     },
   }),
 }));
@@ -256,5 +262,77 @@ describe("Portal page — a linha do evento não se repete", () => {
     const props = await renderProps();
     expect(props.eventLabel).toBe("Casamento");
     expect(props.eventName).toBe("Casamento da Ana e do João");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PORTAL FALA A LÍNGUA DA PROPOSTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O portal é a janela para onde o casal VOLTA — ver se a factura entrou, se o
+ * contrato ficou assinado, rever o documento. A língua vinha do segmento da
+ * rota, que vem do cookie do visitante: um casal inglês que tenha aberto o site
+ * uma vez em português via, meses depois, o seu portal inteiro em português.
+ *
+ * A proposta é o documento à volta do qual tudo isto existe, e é ela que manda.
+ * Quando não há proposta nenhuma (pedido ainda sem proposta), não há língua a
+ * seguir senão a de quem visita — que é o que sempre se fez.
+ */
+describe("Portal page — a língua é a da proposta", () => {
+  const comProposta = (idioma?: string) =>
+    db.newestByQuote.set("q-1", {
+      id: "p-open",
+      quoteId: "q-1",
+      total: 10000,
+      currency: "EUR",
+      status: "enviada",
+      ...(idioma ? { idioma } : {}),
+      doc: { some: "doc" },
+    });
+
+  it("uma proposta INGLESA põe o portal em inglês, mesmo num visitante português", async () => {
+    comProposta("en");
+    const props = await renderProps();
+    expect(props.t.title).toBe("Client portal");
+    expect(props.lang).toBe("en");
+  });
+
+  it("uma proposta PORTUGUESA põe-no em português, mesmo num visitante inglês", async () => {
+    comProposta("pt");
+    const el = await PortalPage({ params: Promise.resolve({ lang: "en", token: "good" }) });
+    expect((el as any).props.t.title).toBe("Portal");
+  });
+
+  it("uma proposta ANTIGA, sem língua gravada, é portuguesa", async () => {
+    comProposta();
+    const el = await PortalPage({ params: Promise.resolve({ lang: "en", token: "good" }) });
+    expect((el as any).props.t.title).toBe("Portal");
+  });
+
+  it("a língua é a da proposta ACEITE, não a da revisão mais recente", async () => {
+    db.proposalsById.set("p-acc", {
+      id: "p-acc",
+      quoteId: "q-1",
+      total: 10000,
+      status: "aceite",
+      idioma: "en",
+      doc: { some: "doc" },
+    });
+    db.newestByQuote.set("q-1", {
+      id: "p-new",
+      quoteId: "q-1",
+      total: 12000,
+      status: "rascunho",
+      idioma: "pt",
+    });
+    db.acceptedContractByQuote.set("q-1", { proposalId: "p-acc", status: "aceite" });
+    const props = await renderProps();
+    expect(props.t.title).toBe("Client portal");
+  });
+
+  it("sem proposta nenhuma, manda o visitante", async () => {
+    const el = await PortalPage({ params: Promise.resolve({ lang: "en", token: "good" }) });
+    expect((el as any).props.t.title).toBe("Client portal");
   });
 });

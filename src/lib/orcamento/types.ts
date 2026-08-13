@@ -478,6 +478,16 @@ export interface Proposal {
    * margem, uma fotografia que entretanto mudou) dá um ficheiro diferente do
    * que o casal viu. Com o selo, comparar é uma linha de comando; sem ele, é a
    * palavra de um contra a do outro.
+   *
+   * ── E O SELO DEPENDE DA LÍNGUA ────────────────────────────────────────────
+   *
+   * O mesmo `doc` tem dois desenhos possíveis (ver `idioma`, aqui em baixo), e
+   * são ficheiros diferentes com resumos diferentes. Isto NÃO se remendou com
+   * dois selos: continua a haver um só, o do PDF que seguiu — o que mudou é que
+   * a proposta passou a dizer em que língua foi desenhado. É o que torna o selo
+   * VERIFICÁVEL: enquanto a língua morria no fim do pedido, um PDF inglês
+   * selado no envio não podia ser reproduzido por ninguém (quem o redesenhasse
+   * obtinha o português, e outro resumo). Ver o comentário do selo na rota.
    */
   pdfSha256?: string;
   pdfBytes?: number;
@@ -485,4 +495,25 @@ export interface Proposal {
    *  can re-open and re-edit a sent proposal. Image fields hold Storage paths,
    *  not bytes. Optional — legacy line-item proposals don't set it. */
   doc?: import("@/lib/proposal-doc").ProposalDoc;
+  /**
+   * ── A LÍNGUA EM QUE ESTA PROPOSTA FOI FEITA ───────────────────────────────
+   *
+   * "pt" ou "en", escolhido no estúdio no momento em que a proposta é gerada e
+   * gravado COM ela. Não pertence ao `doc`: o documento continua a ser um só,
+   * escrito em português, e a língua é a forma como ele foi APRESENTADO ao
+   * casal — o mesmo documento, desenhado noutra moldura.
+   *
+   * É gravado porque tudo o que vem DEPOIS do envio precisa de saber a
+   * resposta: o email que transporta a proposta, a página onde o casal a
+   * aceita, o portal do cliente e a segunda descarga do PDF (pelo link ou pelo
+   * portal). Enquanto isto era só um parâmetro do pedido, uma proposta inglesa
+   * chegava dentro de um email português e voltava a descarregar-se em
+   * português.
+   *
+   * AUSENTE em todas as propostas anteriores a este campo — e ausente é
+   * PORTUGUÊS, que é o que essas propostas sempre foram. Nunca se assume o
+   * contrário, e ninguém escreve "pt" por cima delas: ver `idiomaDaProposta`
+   * em `@/lib/proposta-idioma`, que é o único sítio onde essa leitura se faz.
+   */
+  idioma?: import("@/lib/proposal-doc-textos").IdiomaDaProposta;
 }

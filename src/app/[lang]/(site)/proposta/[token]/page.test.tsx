@@ -27,28 +27,56 @@ vi.mock("next/image", () => ({ default: () => null }));
 // O bloco de resposta é um Client Component com estado próprio e testes seus;
 // aqui interessa a página, por isso entra como um marcador.
 vi.mock("./ProposalResponse", () => ({ default: () => <div data-testid="resposta" /> }));
+/**
+ * O dicionário do duplo DEPENDE da língua, ao contrário do que estava aqui
+ * antes (devolvia sempre o português). Sem isso, um teste sobre «esta página
+ * segue a língua da proposta» passava sem a página fazer nada: as duas línguas
+ * eram a mesma folha de texto.
+ */
 vi.mock("@/lib/i18n", () => ({
-  normalizeLocale: (l: string) => l,
-  getDictionary: () => ({
-    proposta: {
-      linkInvalidTitle: "Link inválido",
-      linkInvalidBody: "…",
-      notFoundTitle: "Não encontrada",
-      notFoundBody: "…",
-      eyebrow: "Proposta",
-      greeting: "Olá",
-      intro: "…",
-      tableDescricao: "Descrição",
-      tableQt: "Qt",
-      tableValor: "Valor",
-      subtotal: "Subtotal",
-      iva: "IVA",
-      total: "Total",
-      validoAte: "Válida até",
-      verPdf: "Ver a proposta completa (PDF)",
-      footerNote: "…",
-      dateLocale: "pt-PT",
-    },
+  normalizeLocale: (l: string) => (l === "en" ? "en" : "pt"),
+  htmlLang: (l: string) => (l === "en" ? "en" : "pt-PT"),
+  getDictionary: (locale: string) => ({
+    proposta:
+      locale === "en"
+        ? {
+            linkInvalidTitle: "Invalid link",
+            linkInvalidBody: "…",
+            notFoundTitle: "Not found",
+            notFoundBody: "…",
+            eyebrow: "Proposal",
+            greeting: "Hello",
+            intro: "…",
+            tableDescricao: "Description",
+            tableQt: "Qty",
+            tableValor: "Amount",
+            subtotal: "Subtotal",
+            iva: "VAT",
+            total: "Total",
+            validoAte: "Valid until",
+            verPdf: "View the full proposal (PDF)",
+            footerNote: "…",
+            dateLocale: "en-GB",
+          }
+        : {
+            linkInvalidTitle: "Link inválido",
+            linkInvalidBody: "…",
+            notFoundTitle: "Não encontrada",
+            notFoundBody: "…",
+            eyebrow: "Proposta",
+            greeting: "Olá",
+            intro: "…",
+            tableDescricao: "Descrição",
+            tableQt: "Qt",
+            tableValor: "Valor",
+            subtotal: "Subtotal",
+            iva: "IVA",
+            total: "Total",
+            validoAte: "Válida até",
+            verPdf: "Ver a proposta completa (PDF)",
+            footerNote: "…",
+            dateLocale: "pt-PT",
+          },
   }),
 }));
 
@@ -71,8 +99,8 @@ const proposta = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-async function abrir(token = "bom") {
-  render(await ProposalPage({ params: Promise.resolve({ lang: "pt", token }) }));
+async function abrir(token = "bom", lang = "pt") {
+  render(await ProposalPage({ params: Promise.resolve({ lang, token }) }));
 }
 
 beforeEach(() => {
@@ -133,5 +161,94 @@ describe("página pública da proposta — o botão do PDF", () => {
 describe("página pública da proposta — nunca servida de um cache", () => {
   it("é renderizada a pedido, a cada visita", () => {
     expect((pagina as { dynamic?: string }).dynamic).toBe("force-dynamic");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PÁGINA SEGUE A LÍNGUA DA PROPOSTA, NÃO A DO VISITANTE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta página é servida no segmento `[lang]`, e a língua desse segmento vem do
+ * COOKIE de quem visita (ver src/proxy.ts): um casal inglês que carregue no
+ * botão do email a partir de um computador onde alguém leu o site em português
+ * caía numa página portuguesa — para responder a uma proposta inglesa.
+ *
+ * O contrário também: quem tenha o site em inglês e receba uma proposta
+ * portuguesa via a moldura inglesa por cima de um documento português.
+ *
+ * A proposta é que manda. Não se redirecciona (o português canónico é o
+ * caminho SEM prefixo, que volta a ser reescrito pelo cookie — seria um ciclo):
+ * escolhe-se o dicionário e marca-se a língua no elemento, para quem lê com um
+ * leitor de ecrã ouvir o texto com a pronúncia certa.
+ */
+describe("página pública da proposta — a língua é a da proposta", () => {
+  it("uma proposta INGLESA abre em inglês, mesmo num visitante português", async () => {
+    db.proposal = proposta({ idioma: "en", doc: { ref: "PO" } });
+    await abrir("bom", "pt");
+    expect(screen.getByText(/Hello/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /View the full proposal/i })).toBeTruthy();
+    expect(screen.queryByText(/Olá/)).toBeNull();
+  });
+
+  it("uma proposta PORTUGUESA abre em português, mesmo num visitante inglês", async () => {
+    db.proposal = proposta({ idioma: "pt", doc: { ref: "PO" } });
+    await abrir("bom", "en");
+    expect(screen.getByText(/Olá/)).toBeTruthy();
+    expect(screen.queryByText(/Hello/)).toBeNull();
+  });
+
+  it("uma proposta ANTIGA (sem língua) é portuguesa", async () => {
+    db.proposal = proposta({ doc: { ref: "PO" } });
+    await abrir("bom", "en");
+    expect(screen.getByText(/Olá/)).toBeTruthy();
+  });
+
+  it("marca a língua no elemento, para quem ouve a página", async () => {
+    db.proposal = proposta({ idioma: "en", doc: { ref: "PO" } });
+    const { container } = render(
+      await ProposalPage({ params: Promise.resolve({ lang: "pt", token: "bom" }) }),
+    );
+    expect(container.querySelector("[lang]")?.getAttribute("lang")).toBe("en");
+  });
+
+  it("sem proposta nenhuma, é o visitante que manda — não há outra língua a seguir", async () => {
+    // Um token forjado ou uma proposta apagada: aqui não há proposta de onde
+    // tirar língua nenhuma, e a página de erro é para quem está a olhar.
+    await abrir("mau", "en");
+    expect(screen.getByText("Invalid link")).toBeTruthy();
+  });
+});
+
+/**
+ * O TÍTULO DO SEPARADOR TAMBÉM É O DA PROPOSTA.
+ *
+ * É o que aparece na lista de separadores e no histórico do navegador. Um
+ * casal inglês com «A sua proposta | Líquen Events» no separador está a ler a
+ * primeira coisa do produto na língua errada.
+ */
+describe("página pública da proposta — o título do separador", () => {
+  it("segue a língua da proposta", async () => {
+    db.proposal = proposta({ idioma: "en" });
+    const meta = await pagina.generateMetadata({
+      params: Promise.resolve({ lang: "pt", token: "bom" }),
+    });
+    expect(meta.title).toBe("Your proposal | Líquen Events");
+  });
+
+  it("e continua a não ser indexado, em língua nenhuma", async () => {
+    db.proposal = proposta({ idioma: "en" });
+    const meta = await pagina.generateMetadata({
+      params: Promise.resolve({ lang: "pt", token: "bom" }),
+    });
+    expect(meta.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("sem proposta, cai na língua do visitante", async () => {
+    db.proposal = null;
+    const meta = await pagina.generateMetadata({
+      params: Promise.resolve({ lang: "en", token: "mau" }),
+    });
+    expect(meta.title).toBe("Your proposal | Líquen Events");
   });
 });

@@ -24,6 +24,13 @@ type InvoiceRow = {
 
 interface PortalViewProps {
   t: Dict["portal"];
+  /**
+   * A língua do conteúdo (`pt-PT` / `en`), resolvida no servidor a partir da
+   * PROPOSTA. Vai para o atributo `lang` do bloco: o `<html lang>` desta página
+   * é o do segmento da rota, que segue o cookie do visitante, e pode não ser o
+   * mesmo. Quem lê com um leitor de ecrã depende disto.
+   */
+  lang: string;
   clientName: string;
   eventLabel: string;
   eventName?: string;
@@ -94,9 +101,16 @@ function estadoParaOCliente(s: ProposalStatus): Exclude<ProposalStatus, "em_nego
  */
 import { eurDocumento as eur } from "@/lib/money";
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, lang }: { children: React.ReactNode; lang: string }) {
   return (
-    <section className="min-h-[80vh] bg-surface flex flex-col items-center px-5 py-16 sm:py-24">
+    <section
+      /* A língua do CONTEÚDO, que é a da PROPOSTA e pode não ser a do `<html>`
+         (esse vem do segmento da rota, e o segmento vem do cookie do
+         visitante). Sem isto, um leitor de ecrã lê o portal inglês com
+         pronúncia portuguesa. */
+      lang={lang}
+      className="min-h-[80vh] bg-surface flex flex-col items-center px-5 py-16 sm:py-24"
+    >
       <Image
         src="/logo-liquen.png"
         alt="Líquen Events"
@@ -123,6 +137,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function PortalView({
   t,
+  lang,
   clientName,
   eventLabel,
   eventName,
@@ -148,7 +163,7 @@ export default function PortalView({
   ) as string[];
 
   return (
-    <Shell>
+    <Shell lang={lang}>
       <div className="w-full max-w-2xl">
         {/* ── Cabeçalho ── */}
         <header className="text-center mb-2">

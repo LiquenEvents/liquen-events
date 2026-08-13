@@ -4,7 +4,8 @@ import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal } from "@/lib/proposals-store";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { SITE } from "@/lib/site";
-import { getDictionary, normalizeLocale } from "@/lib/i18n";
+import { getDictionary, htmlLang, normalizeLocale, type Locale } from "@/lib/i18n";
+import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import ProposalResponse from "./ProposalResponse";
 
 /**
@@ -32,16 +33,56 @@ import ProposalResponse from "./ProposalResponse";
  */
 export const dynamic = "force-dynamic";
 
-// Private, per-client link — never index it. Localized title so an EN client
-// isn't announced a Portuguese document title on <html lang="en">.
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A LÍNGUA DESTA PÁGINA É A DA PROPOSTA, NÃO A DO VISITANTE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O segmento `[lang]` desta rota vem do COOKIE de quem visita (ver o cabeçalho
+ * de src/proxy.ts): um casal inglês que carregue no botão do email a partir de
+ * um computador onde alguém leu o site em português caía numa página portuguesa
+ * para responder a uma proposta inglesa. E ao contrário: quem tem o site em
+ * inglês recebia a moldura inglesa por cima de um documento português.
+ *
+ * O documento é que manda. A proposta já sabe em que língua foi feita
+ * (`proposals.idioma`), e é essa que esta página usa em tudo: o dicionário, o
+ * título do separador e o atributo `lang` do bloco.
+ *
+ * ── PORQUE É QUE NÃO SE REDIRECCIONA PARA O OUTRO SEGMENTO ────────────────
+ *
+ * Seria o mais limpo (arrumava também o `<html lang>` do layout) e NÃO PODE
+ * SER: o português canónico é o caminho SEM prefixo, e o proxy reescreve-o para
+ * `/{lang}/…` segundo o cookie. Um visitante com o cookie em inglês a abrir uma
+ * proposta portuguesa entrava num ciclo — a página mandava-o para o caminho
+ * bare, o proxy devolvia-o a `/en/…`, sem fim. O `lang` no elemento é o que
+ * resolve a parte que interessa a quem lê com um leitor de ecrã.
+ */
+function tituloDoSeparador(locale: Locale): string {
+  return locale === "en" ? "Your proposal | Líquen Events" : "A sua proposta | Líquen Events";
+}
+
+// Private, per-client link — never index it. O título segue a língua da
+// PROPOSTA: é o que aparece no separador e no histórico, e é a primeira coisa
+// que o casal lê do produto.
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ lang: string }>;
+  params: Promise<{ lang: string; token: string }>;
 }): Promise<Metadata> {
-  const locale = normalizeLocale((await params).lang);
+  const { lang, token } = await params;
+  // Sem proposta (token forjado, proposta apagada) não há língua a seguir senão
+  // a de quem está a olhar. Uma leitura que falhe também não pode deitar abaixo
+  // o título da página: cai-se no visitante, como sempre foi.
+  let locale = normalizeLocale(lang);
+  try {
+    const claim = readProposalToken(token);
+    const proposal = claim ? await getProposal(claim.proposalId) : null;
+    if (proposal) locale = idiomaDaProposta(proposal);
+  } catch {
+    /* fica a língua do visitante */
+  }
   return {
-    title: locale === "en" ? "Your proposal | Líquen Events" : "A sua proposta | Líquen Events",
+    title: tituloDoSeparador(locale),
     robots: { index: false, follow: false },
   };
 }
@@ -72,9 +113,16 @@ export async function generateMetadata({
  */
 import { eurDocumento as eur } from "@/lib/money";
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, lang }: { children: React.ReactNode; lang: string }) {
   return (
-    <section className="min-h-[80vh] bg-surface flex flex-col items-center px-5 py-16 sm:py-24">
+    <section
+      /* A língua do CONTEÚDO, que pode não ser a do `<html>` (esse vem do
+         segmento da rota, e o segmento vem do cookie do visitante). Sem isto,
+         um leitor de ecrã lê a proposta inglesa com pronúncia portuguesa —
+         que é, ao pé da letra, incompreensível. */
+      lang={lang}
+      className="min-h-[80vh] bg-surface flex flex-col items-center px-5 py-16 sm:py-24"
+    >
       <Image
         src="/logo-liquen.png"
         alt="Líquen Events"
@@ -87,9 +135,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Message({ title, body }: { title: string; body: string }) {
+function Message({ title, body, lang }: { title: string; body: string; lang: string }) {
   return (
-    <Shell>
+    <Shell lang={lang}>
       <div className="max-w-md text-center">
         <h1
           className="text-foreground/85 font-bold mb-4"
@@ -115,17 +163,39 @@ export default async function ProposalPage({
   params: Promise<{ lang: string; token: string }>;
 }) {
   const { lang, token } = await params;
-  const locale = normalizeLocale(lang);
-  const t = getDictionary(locale).proposta;
+  /**
+   * A língua de QUEM VISITA, e serve para uma coisa só: as duas páginas de
+   * erro. Um token forjado ou uma proposta apagada não têm proposta nenhuma de
+   * onde tirar língua, e o que está no ecrã é uma explicação para quem está a
+   * olhar.
+   */
+  const doVisitante = normalizeLocale(lang);
   const claim = readProposalToken(token);
   if (!claim) {
-    return <Message title={t.linkInvalidTitle} body={t.linkInvalidBody} />;
+    const t = getDictionary(doVisitante).proposta;
+    return (
+      <Message title={t.linkInvalidTitle} body={t.linkInvalidBody} lang={htmlLang(doVisitante)} />
+    );
   }
 
   const proposal = await getProposal(claim.proposalId);
   if (!proposal) {
-    return <Message title={t.notFoundTitle} body={t.notFoundBody} />;
+    const t = getDictionary(doVisitante).proposta;
+    return <Message title={t.notFoundTitle} body={t.notFoundBody} lang={htmlLang(doVisitante)} />;
   }
+
+  /**
+   * DAQUI PARA BAIXO manda a proposta. Tudo o que se lê nesta página descreve
+   * um documento que já foi apresentado ao casal numa língua: o total, a
+   * validade, o botão do PDF e o formulário de resposta. Mostrá-los na língua
+   * do visitante era pôr a moldura numa língua e o documento noutra — e é
+   * exactamente o que acontecia a um casal inglês que abrisse o link a partir
+   * de um computador com o site em português.
+   *
+   * Uma proposta sem língua gravada é portuguesa: ver `idiomaDaProposta`.
+   */
+  const locale = idiomaDaProposta(proposal);
+  const t = getDictionary(locale).proposta;
 
   const cur = proposal.currency || "EUR";
   // Mirror the API's expiry rule (through the WHOLE of the last valid day, i.e.
@@ -146,7 +216,7 @@ export default async function ProposalPage({
     : null;
 
   return (
-    <Shell>
+    <Shell lang={htmlLang(locale)}>
       <div className="w-full max-w-2xl">
         <header className="text-center mb-10">
           <p className="text-foreground/68 text-[10px] tracking-[0.45em] uppercase mb-3">

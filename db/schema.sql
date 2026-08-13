@@ -57,6 +57,11 @@ alter table public.proposals add column if not exists responded_at timestamptz;
 -- simples. O que faltava era provar QUAL documento foi aceite. Numa discussão
 -- do género "o arco não estava incluído", isto é a diferença entre ganhar e
 -- ceder — e custa zero.
+--
+-- O selo é do PDF QUE SEGUIU, e o mesmo documento pode ser desenhado em duas
+-- línguas (ver a coluna `idioma`, mais abaixo): para o reproduzir é preciso
+-- redesenhar na língua gravada. Continua a haver um selo só — é o do ficheiro
+-- que o casal recebeu.
 alter table public.proposals add column if not exists pdf_sha256 text;
 alter table public.proposals add column if not exists pdf_bytes integer;
 
@@ -86,6 +91,29 @@ alter table public.proposals add column if not exists pdf_bytes integer;
 -- aplicação já fazia com todas elas — a página do cliente continua a abrir,
 -- apenas sem o botão do PDF.
 alter table public.proposals add column if not exists doc jsonb;
+
+-- ── A LÍNGUA EM QUE A PROPOSTA FOI APRESENTADA AO CASAL ────────────────────
+-- 'pt' ou 'en', escolhida no estúdio ao gerar. NÃO é uma segunda cópia do
+-- documento: o `doc` continua a ser um só, escrito em português, e isto é a
+-- moldura com que ele foi desenhado no PDF que o casal recebeu.
+--
+-- Guarda-se porque tudo o que vem DEPOIS do envio depende da resposta: o email
+-- que leva a proposta, a página onde o casal a aceita, o portal e a segunda
+-- descarga do PDF (pelo link do cliente e pelo portal). Enquanto era só um
+-- parâmetro do pedido, uma proposta inglesa chegava dentro de um email
+-- português e voltava a descarregar-se em português.
+--
+-- Idempotente e SEM `not null`: as propostas antigas ficam a null, que a
+-- aplicação lê como "não há língua gravada" e trata como PORTUGUÊS — que é o
+-- que essas propostas sempre foram. Não há migração nenhuma a correr sobre
+-- elas.
+--
+-- A restrição é `not valid` como as outras desta tabela: aplica-se ao que se
+-- escrever de agora em diante e não obriga a varrer as linhas que já lá estão.
+alter table public.proposals add column if not exists idioma text;
+alter table public.proposals drop constraint if exists proposals_idioma_chk;
+alter table public.proposals add constraint proposals_idioma_chk
+  check (idioma is null or idioma in ('pt','en')) not valid;
 
 -- ── O acompanhamento depois de a proposta seguir ───────────────────────────
 -- Quando voltar a falar com esta pessoa, e porque é que se perdeu. São dados
