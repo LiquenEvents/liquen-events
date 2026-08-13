@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ParametrosDeslocacao } from "@/lib/orcamento/deslocacao";
 import { custoPorKm, sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
+import { lerNumero, type LimitesDoNumero } from "@/lib/numero-escrito";
+import { porqueRecusou } from "@/lib/erro-do-servidor";
 import { Button, Card } from "./ui";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
@@ -55,20 +57,42 @@ function velho(iso: string | undefined): boolean {
 /** O número como ela o escreve: vírgula decimal. */
 const comVirgula = (n: number) => String(n).replace(".", ",");
 
-/** Um campo numérico com unidade, que aceita vírgula como decimal. */
+/**
+ * Um campo numérico com unidade, que aceita vírgula como decimal — e que DIZ
+ * quando o que lá está não dá um número que sirva.
+ *
+ * ── O QUE ESTE CAMPO CALAVA ───────────────────────────────────────────────
+ * `abc`, `-2,5`, `1,72 €` ou o campo apagado não chegavam ao formulário: o
+ * `onChange` era simplesmente saltado e o parâmetro ficava com o valor
+ * ANTERIOR. O ecrã mostrava o que ela escreveu, o botão gravava o valor velho,
+ * e o aviso verde dizia «Guardado. As propostas seguintes já usam estes
+ * valores.» — sobre uma gravação que não era a dela. O preço do gasóleo velho
+ * seguia dentro da deslocação cobrada ao cliente.
+ *
+ * Continua a não emitir um número que não serve (o formulário nunca fica com
+ * lixo dentro), mas agora conta-o para cima: a frase aparece por baixo do
+ * campo enquanto se escreve, e é ela que trava o botão.
+ */
 function Numero({
   label,
   unidade,
   valor,
+  limites,
+  erro,
   onChange,
+  onErro,
   ajuda,
 }: {
   label: string;
   unidade: string;
   valor: number;
+  limites: LimitesDoNumero;
+  erro?: string;
   onChange: (n: number) => void;
+  onErro: (porque: string | null) => void;
   ajuda?: string;
 }) {
+  const idErro = useId();
   // O estado local é TEXTO: com número, escrever "1," apagava a vírgula ao
   // reformatar e era impossível chegar a "1,72".
   const [texto, setTexto] = useState(() => comVirgula(valor));
@@ -101,32 +125,97 @@ function Numero({
           type="text"
           inputMode="decimal"
           value={texto}
+          aria-invalid={erro ? true : undefined}
+          aria-describedby={erro ? idErro : undefined}
           onChange={(e) => {
             const escrito = e.target.value;
             setTexto(escrito);
-            const n = Number(escrito.replace(",", "."));
-            // Um campo vazio é um campo a meio de ser escrito, e não zero.
-            // `Number("")` é 0, e era esse 0 que ficava nos parâmetros: um
-            // clique em «Guardar» a seguir tirava o combustível da conta da
-            // deslocação de todas as propostas, sem ninguém o ter pedido.
-            if (escrito.trim() === "" || !Number.isFinite(n) || n < 0) return;
-            emitido.current = n;
-            onChange(n);
+            const leitura = lerNumero(escrito, limites);
+            if (!leitura.ok) {
+              // Um campo vazio é um campo a meio de ser escrito, e não zero.
+              // `Number("")` é 0, e era esse 0 que ficava nos parâmetros: um
+              // clique em «Guardar» a seguir tirava o combustível da conta da
+              // deslocação de todas as propostas, sem ninguém o ter pedido.
+              // O formulário continua a não receber isto — mas deixa de ser um
+              // silêncio: a frase fica no campo e o botão sabe dela.
+              onErro(leitura.porque);
+              return;
+            }
+            onErro(null);
+            if (leitura.valor === null) return;
+            emitido.current = leitura.valor;
+            onChange(leitura.valor);
           }}
-          className="bo-input w-24 px-2.5 py-2 text-xs"
+          className={`bo-input w-24 px-2.5 py-2 text-xs${erro ? " border-[#b5654a]" : ""}`}
         />
         <span className="text-[11px] text-foreground/45">{unidade}</span>
       </span>
+      {erro && (
+        <span id={idErro} className="text-[10px] leading-relaxed text-[#b5654a]">
+          {erro}
+        </span>
+      )}
       {ajuda && <span className="text-[10px] leading-relaxed text-foreground/40">{ajuda}</span>}
     </label>
   );
 }
+
+/**
+ * Os limites são os do servidor, campo a campo (ver `deslocacaoSchema` na rota
+ * `/api/proposta-definicoes`). Estão aqui repetidos de propósito: o servidor
+ * continua a ser quem decide — isto é só o ecrã a dizer a mesma coisa a tempo
+ * de ela poder corrigir, em vez de a descobrir num 400 ou, pior, num «Guardado»
+ * que não guardou.
+ *
+ * ── E O CAMPO EM BRANCO? ──────────────────────────────────────────────────
+ * É um ERRO, e não «não mexer». Nenhum destes números tem estado «por definir»:
+ * a conta da deslocação precisa dos seis, e por isso um campo vazio não é uma
+ * instrução — é uma edição a meio. Tratá-lo como «fica o que lá estava» seria
+ * pôr o ecrã a discordar do que está gravado (o campo em branco, o servidor com
+ * 2 €/l) e era exactamente esse desencontro que fazia o preço velho seguir para
+ * as propostas seguintes. Quem quer mesmo apagar não quer apagar: quer
+ * reescrever, e a frase diz-lhe isso.
+ */
+const LIMITES: Record<string, LimitesDoNumero> = {
+  precoLitro: { min: 0, max: 20, nome: "preço do gasóleo", exemplo: "1,72" },
+  consumoLPor100Km: { min: 0, max: 100, nome: "consumo da carrinha", exemplo: "9" },
+  portagensPorKm: { min: 0, max: 5, nome: "custo das portagens", exemplo: "0,09" },
+  desgastePorKm: { min: 0, max: 5, nome: "desgaste por quilómetro", exemplo: "0,10" },
+  franquiaKm: { min: 0, max: 1000, nome: "número de quilómetros", exemplo: "40" },
+  margemMinima: { min: 0, max: 100, nome: "margem mínima", exemplo: "35" },
+};
+
+/** Que campos pertencem a cada botão de gravar. */
+const CAMPOS_DE = {
+  deslocacao: [
+    "precoLitro",
+    "consumoLPor100Km",
+    "portagensPorKm",
+    "desgastePorKm",
+    "franquiaKm",
+  ] as const,
+  margem: ["margemMinima"] as const,
+};
 
 export default function DefinicoesProposta() {
   const { toast } = useToast();
   const [p, setP] = useState<Parametros | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aGravar, setAGravar] = useState(false);
+  /** O que está escrito e não dá um número que sirva, campo a campo. */
+  const [porCorrigir, setPorCorrigir] = useState<Record<string, string>>({});
+
+  const marcar = useCallback((campo: string, porque: string | null) => {
+    setPorCorrigir((antes) => {
+      if (!porque) {
+        if (!(campo in antes)) return antes;
+        const { [campo]: _fora, ...resto } = antes;
+        void _fora;
+        return resto;
+      }
+      return antes[campo] === porque ? antes : { ...antes, [campo]: porque };
+    });
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -145,6 +234,17 @@ export default function DefinicoesProposta() {
 
   const gravar = useCallback(
     async (id: "deslocacao" | "margem", valor: object) => {
+      /**
+       * Um campo por corrigir trava o botão — e o que trava é DITO, com a
+       * frase do campo. Deixar seguir daqui era mandar ao servidor o valor
+       * antigo com cara de novo: 200, aviso verde, e o preço velho dentro da
+       * deslocação de todas as propostas seguintes.
+       */
+      const problema = CAMPOS_DE[id].map((c) => porCorrigir[c]).find(Boolean);
+      if (problema) {
+        toast(`Não foi guardado: ${problema}`, "error");
+        return;
+      }
       setAGravar(true);
       try {
         const res = await fetch("/api/proposta-definicoes", {
@@ -152,9 +252,12 @@ export default function DefinicoesProposta() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id, valor }),
         });
-        const j = await res.json();
-        if (!res.ok) throw new Error(j?.error ?? "falhou");
-        setP(j as Parametros);
+        if (!res.ok) {
+          // A recusa do servidor tal como ele a explica — em português, e não
+          // «não foi possível guardar», que não diz o que fazer a seguir.
+          throw new Error((await porqueRecusou(res)) ?? "Não foi possível guardar.");
+        }
+        setP((await res.json()) as Parametros);
         toast("Guardado. As propostas seguintes já usam estes valores.", "success");
       } catch (e) {
         toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error");
@@ -162,7 +265,7 @@ export default function DefinicoesProposta() {
         setAGravar(false);
       }
     },
-    [toast],
+    [toast, porCorrigir],
   );
 
   if (erro) {
@@ -212,6 +315,9 @@ export default function DefinicoesProposta() {
             label="Preço do gasóleo"
             unidade="€/litro"
             valor={d.precoLitro}
+            limites={LIMITES.precoLitro}
+            erro={porCorrigir.precoLitro}
+            onErro={(porque) => marcar("precoLitro", porque)}
             onChange={(precoLitro) => setP({ ...p, deslocacao: { ...d, precoLitro } })}
             ajuda="O que paga na bomba onde abastece."
           />
@@ -219,18 +325,27 @@ export default function DefinicoesProposta() {
             label="Consumo da carrinha"
             unidade="l/100 km"
             valor={d.consumoLPor100Km}
+            limites={LIMITES.consumoLPor100Km}
+            erro={porCorrigir.consumoLPor100Km}
+            onErro={(porque) => marcar("consumoLPor100Km", porque)}
             onChange={(consumoLPor100Km) => setP({ ...p, deslocacao: { ...d, consumoLPor100Km } })}
           />
           <Numero
             label="Portagens"
             unidade="€/km"
             valor={d.portagensPorKm}
+            limites={LIMITES.portagensPorKm}
+            erro={porCorrigir.portagensPorKm}
+            onErro={(porque) => marcar("portagensPorKm", porque)}
             onChange={(portagensPorKm) => setP({ ...p, deslocacao: { ...d, portagensPorKm } })}
           />
           <Numero
             label="Desgaste"
             unidade="€/km"
             valor={d.desgastePorKm}
+            limites={LIMITES.desgastePorKm}
+            erro={porCorrigir.desgastePorKm}
+            onErro={(porque) => marcar("desgastePorKm", porque)}
             onChange={(desgastePorKm) => setP({ ...p, deslocacao: { ...d, desgastePorKm } })}
             ajuda="Pneus, revisões, o que a carrinha perde por andar."
           />
@@ -238,6 +353,9 @@ export default function DefinicoesProposta() {
             label="Sem cobrar até"
             unidade="km"
             valor={d.franquiaKm}
+            limites={LIMITES.franquiaKm}
+            erro={porCorrigir.franquiaKm}
+            onErro={(porque) => marcar("franquiaKm", porque)}
             onChange={(franquiaKm) => setP({ ...p, deslocacao: { ...d, franquiaKm } })}
             ajuda="A isenção do distrito de Évora, que as condições prometem."
           />
@@ -295,6 +413,9 @@ export default function DefinicoesProposta() {
             label="Avisar abaixo de"
             unidade="%"
             valor={p.margemMinima}
+            limites={LIMITES.margemMinima}
+            erro={porCorrigir.margemMinima}
+            onErro={(porque) => marcar("margemMinima", porque)}
             onChange={(margemMinima) => setP({ ...p, margemMinima })}
           />
           <Button

@@ -21,6 +21,8 @@ import { AvisoDeArmazenamento } from "./AvisoDeArmazenamento";
 import { formatPrice } from "@/lib/orcamento/pricing";
 import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { round2 } from "@/lib/money";
+import { lerNumero } from "@/lib/numero-escrito";
+import { porqueRecusou } from "@/lib/erro-do-servidor";
 import {
   contextoDeLocal,
   diasDeEspera,
@@ -867,6 +869,37 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const motivoVaiComADecisao = !!selected && editStatus !== selected.status;
 
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O NÚMERO DE CONVIDADOS, LIDO ANTES DE SAIR DO ECRÃ
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * `-50` era enviado tal e qual: o servidor respondia 400 com «Too small:
+   * expected number to be >=0», o painel dizia «Não foi possível guardar as
+   * alterações» — sem nomear o campo — e TUDO o que ia na mesma gravação (o
+   * estado, o email acabado de acrescentar) ficava por gravar. O `min={0}` do
+   * input era decoração: o teclado escreve o que quer lá dentro.
+   *
+   * É a mesma regra das definições da proposta, do mesmo módulo: o que não dá
+   * um número que sirva é dito no campo, e não segue.
+   *
+   * ── O CAMPO EM BRANCO AQUI NÃO É O MESMO QUE LÁ ──────────────────────────
+   * Um pedido pode ter entrado sem número de convidados (um telefonema, uma
+   * referência de terceiros), e continuar assim é um estado legítimo — em
+   * branco não há nada para gravar e não se reclama de um campo que ninguém
+   * tocou. Mas APAGAR um número que lá estava é outra coisa: é uma edição a
+   * meio, e o ecrã tem de o dizer em vez de gravar o velho por baixo.
+   */
+  const convidadosEscritos = lerNumero(editGuests, {
+    min: 0,
+    max: 100000,
+    inteiro: true,
+    vazioVale: selected?.guests == null,
+    nome: "número de convidados",
+    exemplo: "80",
+  });
+  const erroDeConvidados = convidadosEscritos.ok ? null : convidadosEscritos.porque;
+
+  /**
    * As alterações que ainda esperam por um clique. São só os campos que NÃO
    * gravam sozinhos — o que se escreve já foi (ou está a ser) gravado, e
    * contá-lo aqui punha o painel a pedir para guardar o que já está guardado.
@@ -1695,8 +1728,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
    * com o nome de cada um. Dois recados ao mesmo tempo sobre a mesma gravação
    * seriam ruído, e o recado que sobra é sempre o menos exacto dos dois.
    */
-  async function saveChanges(opcoes: { silencioso?: boolean } = {}): Promise<boolean> {
-    if (!selected) return true;
+  async function saveChanges(
+    opcoes: { silencioso?: boolean } = {},
+  ): Promise<{ ok: boolean; porque?: string }> {
+    if (!selected) return { ok: true };
     const dizer = (mensagem: string, tipo: "success" | "error") => {
       if (!opcoes.silencioso) toast(mensagem, tipo);
     };
@@ -1747,7 +1782,17 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       }
 
       const newDate = editDate || undefined;
-      const newGuests = editGuests ? parseInt(editGuests, 10) : selected.guests;
+      /**
+       * Um número que não serve NÃO é uma alteração: fica igual ao que está
+       * gravado e, por isso, nem vai no corpo nem se anuncia no registo de
+       * atividade. É assim que o email escrito na mesma gravação deixa de ser
+       * arrastado abaixo por um sinal a menos — o que se consegue guardar
+       * guarda-se, e o que não se consegue fica DITO no campo.
+       */
+      const newGuests =
+        convidadosEscritos.ok && convidadosEscritos.valor !== null
+          ? convidadosEscritos.valor
+          : selected.guests;
       const newLocation = editLocation.trim();
 
       if (newDate !== (selected.date ?? undefined) && newDate) {
@@ -1858,8 +1903,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       // Nada mudou (o botão foi carregado depois de a gravação automática já ter
       // feito o trabalho). Não se inventa um pedido para não fazer nada.
       if (Object.keys(body).length === 0) {
+        // A não ser que o que ela mudou tenha sido justamente o que não serve:
+        // aí «já está tudo guardado» seria mentira.
+        if (erroDeConvidados) {
+          const porque = `Convidados não ficou guardado. ${erroDeConvidados}`;
+          dizer(porque, "error");
+          return { ok: false, porque };
+        }
         dizer("Já está tudo guardado", "success");
-        return true;
+        return { ok: true };
       }
 
       const res = await fetch(`/api/orcamento/${selected.id}`, {
@@ -1867,7 +1919,21 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("save failed");
+      if (!res.ok) {
+        /**
+         * O servidor já diz o que está mal — e era essa a frase que se deitava
+         * fora, para pôr no lugar «Não foi possível guardar as alterações»,
+         * que não nomeia o campo nem diz o que fazer. Passa a ser a dele, em
+         * português (ver `erro-do-servidor`). Sem corpo aproveitável fica a
+         * frase genérica, que pelo menos não inventa uma razão.
+         */
+        const doServidor = await porqueRecusou(res);
+        const porque = doServidor
+          ? `Não foi guardado. ${doServidor}`
+          : "Não foi possível guardar as alterações";
+        dizer(porque, "error");
+        return { ok: false, porque };
+      }
       const updated = await res.json();
       setQuotes((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
       setSelected(updated);
@@ -1879,7 +1945,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditAssigned(updated.assignedTo ?? "");
       setEditLostReason(updated.lostReason ?? "");
       setEditDate(updated.date ?? "");
-      setEditGuests(String(updated.guests ?? ""));
+      // O campo por corrigir fica COMO ELA O ESCREVEU: substituí-lo pelo valor
+      // gravado apagava o que ela acabou de escrever e voltava a esconder o
+      // problema — que é o defeito de origem, ao contrário.
+      if (!erroDeConvidados) setEditGuests(String(updated.guests ?? ""));
       setEditLocation(updated.location ?? "");
       setEditNome(updated.name ?? "");
       setEditEmail(updated.email ?? "");
@@ -1892,11 +1961,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         adminNotes: updated.adminNotes ?? "",
         lostReason: updated.lostReason ?? "",
       };
+      if (erroDeConvidados) {
+        // Guardou-se o que se conseguia guardar, e diz-se o que ficou de fora
+        // e porquê. A barra continua em «Alterações por guardar» — porque
+        // continua mesmo a haver uma alteração por guardar.
+        const porque = `Convidados não ficou guardado. ${erroDeConvidados} O resto das alterações ficou.`;
+        dizer(porque, "error");
+        return { ok: false, porque };
+      }
       dizer("Pedido atualizado", "success");
-      return true;
+      return { ok: true };
     } catch {
-      dizer("Não foi possível guardar as alterações", "error");
-      return false;
+      const porque = "Não foi possível guardar as alterações";
+      dizer(porque, "error");
+      return { ok: false, porque };
     } finally {
       setSaving(false);
     }
@@ -1930,10 +2008,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       }
     }
     if (alteracoesPorConfirmar) {
-      const ok = await saveChanges({ silencioso });
-      if (!ok) {
+      const r = await saveChanges({ silencioso });
+      if (!r.ok) {
         falhou = true;
-        porque = porque ?? "O servidor não aceitou as alterações do pedido.";
+        // A razão é a do próprio campo — «Convidados não ficou guardado. Não
+        // pode ser negativo…». Dizer «o servidor não aceitou as alterações»
+        // por cima disso era voltar ao recado que não diz nada.
+        porque = porque ?? r.porque ?? "O servidor não aceitou as alterações do pedido.";
       }
     }
     return falhou ? { estado: "nao-guardado", porque } : { estado: "guardado" };
@@ -4092,14 +4173,38 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   })()}
                               </div>
                               <div>
-                                <label className="bo-eyebrow block mb-1.5">Convidados</label>
+                                <label
+                                  className="bo-eyebrow block mb-1.5"
+                                  htmlFor="campo-convidados"
+                                >
+                                  Convidados
+                                </label>
                                 <input
+                                  id="campo-convidados"
                                   type="number"
                                   min={0}
                                   value={editGuests}
+                                  aria-invalid={erroDeConvidados ? true : undefined}
+                                  aria-describedby={
+                                    erroDeConvidados ? "erro-dos-convidados" : undefined
+                                  }
                                   onChange={(e) => setEditGuests(e.target.value)}
-                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                  className={`bo-input px-3 py-2 text-sm text-foreground/80 w-full${
+                                    erroDeConvidados ? " border-[#b5654a]" : ""
+                                  }`}
                                 />
+                                {/* O `min={0}` do input não trava nada — o
+                                    teclado escreve o que quer. Esta é a frase
+                                    que chega ANTES do clique, e diz o que
+                                    fazer em vez de citar o esquema. */}
+                                {erroDeConvidados && (
+                                  <p
+                                    id="erro-dos-convidados"
+                                    className="mt-1 text-[10px] leading-relaxed text-[#b5654a]"
+                                  >
+                                    {erroDeConvidados}
+                                  </p>
+                                )}
                               </div>
                               <div>
                                 <label className="bo-eyebrow block mb-1.5">Responsável</label>

@@ -132,6 +132,9 @@ describe("o efeito dos números", () => {
    * Um campo vazio é um campo a meio de ser escrito, não zero. O campo saltava
    * para "0" e punha 0 €/litro nos parâmetros — e um clique em «Guardar
    * deslocação» tirava o combustível da conta de todas as propostas.
+   *
+   * Deixou de ser suficiente não gravar 0: ver a seguir «o que não se consegue
+   * gravar é dito no campo».
    */
   it("limpar o campo não grava 0 €/litro", async () => {
     montar();
@@ -140,8 +143,101 @@ describe("o efeito dos números", () => {
     expect(campo.value).toBe("");
 
     await userEvent.click(screen.getByRole("button", { name: "Guardar deslocação" }));
+    await waitFor(() => expect(screen.getAllByText(/Escreve o preço/).length).toBeGreaterThan(0));
+    expect(enviados).toHaveLength(0);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE NÃO SE CONSEGUE GRAVAR É DITO NO CAMPO, ANTES DO CLIQUE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O defeito medido no servidor: escrever `abc`, `-2,5`, `1,72 €` ou apagar o
+ * campo, carregar em «Guardar deslocação», e o PUT levar o preço ANTIGO — com
+ * o ecrã a responder, a verde, «Guardado. As propostas seguintes já usam estes
+ * valores.» O campo continuava a mostrar o que ela escreveu; só um recarregar
+ * revelava que nada tinha mudado.
+ *
+ * O caso caro é o mais banal de todos: apagar o campo para reescrever o preço
+ * da semana, carregar em Guardar, e ficar com o preço velho em todas as
+ * propostas seguintes — dentro do valor da deslocação cobrada ao cliente.
+ */
+describe("um número que não serve não é gravado às escondidas", () => {
+  /** Escreve no campo do gasóleo e carrega em «Guardar deslocação». */
+  async function escreverEGuardar(texto: string) {
+    montar();
+    const campo = (await screen.findByLabelText(/Preço do gasóleo/)) as HTMLInputElement;
+    await userEvent.clear(campo);
+    if (texto) await userEvent.type(campo, texto);
+    await userEvent.click(screen.getByRole("button", { name: "Guardar deslocação" }));
+    return campo;
+  }
+
+  it.each([
+    ["1,72", 1.72],
+    ["1.72", 1.72],
+    ["2", 2],
+  ])("«%s» é um preço e grava-se como %s", async (escrito, esperado) => {
+    await escreverEGuardar(escrito);
     await waitFor(() => expect(enviados).toHaveLength(1));
-    expect(enviados[0].body.valor).toMatchObject({ precoLitro: 1.65 });
+    expect(enviados[0].body.valor).toMatchObject({ precoLitro: esperado });
+  });
+
+  it.each([
+    ["abc", /só o número/],
+    ["-2,5", /não pode ser negativo/i],
+    ["1,72 €", /só o número/],
+    ["", /Escreve o preço/],
+  ])("«%s» não é um preço: o campo di-lo e nada é enviado", async (escrito, frase) => {
+    const campo = await escreverEGuardar(escrito);
+
+    // 1) A frase está NO campo (e repetida no aviso do clique), e diz o que
+    //    fazer. É o campo que a aponta: `aria-describedby`.
+    await waitFor(() => expect(screen.getAllByText(frase).length).toBeGreaterThan(0));
+    expect(campo.getAttribute("aria-invalid")).toBe("true");
+    const dito = document.getElementById(campo.getAttribute("aria-describedby") ?? "");
+    expect(dito?.textContent ?? "").toMatch(frase);
+    // 2) Nada foi enviado — nem com o valor antigo lá dentro.
+    expect(enviados).toHaveLength(0);
+    // 3) E, sobretudo, ninguém disse que ficou guardado.
+    expect(screen.queryByText(/As propostas seguintes já usam estes valores/)).toBeNull();
+  });
+
+  it("corrigido o campo, a frase desaparece e a gravação segue", async () => {
+    const campo = await escreverEGuardar("abc");
+    await waitFor(() => expect(screen.getAllByText(/só o número/).length).toBeGreaterThan(0));
+
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "1,72");
+    expect(campo.getAttribute("aria-invalid")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar deslocação" }));
+    await waitFor(() => expect(enviados).toHaveLength(1));
+    expect(enviados[0].body.valor).toMatchObject({ precoLitro: 1.72 });
+  });
+
+  it("o mesmo vale para os outros campos da deslocação, não só para o gasóleo", async () => {
+    montar();
+    const campo = (await screen.findByLabelText(/Consumo da carrinha/)) as HTMLInputElement;
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "-3");
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar deslocação" }));
+    await waitFor(() =>
+      expect(screen.getAllByText(/não pode ser negativo/i).length).toBeGreaterThan(0),
+    );
+    expect(enviados).toHaveLength(0);
+  });
+
+  it("um valor fora do que a bomba cobra é recusado antes de sair do ecrã", async () => {
+    // O servidor recusa acima de 20 €/litro. O ecrã tem de o dizer primeiro —
+    // 40 €/l era um erro de dedo que multiplicava a deslocação por vinte.
+    await escreverEGuardar("40");
+    await waitFor(() =>
+      expect(screen.getAllByText(/Não pode ser maior que 20/).length).toBeGreaterThan(0),
+    );
+    expect(enviados).toHaveLength(0);
   });
 });
 
