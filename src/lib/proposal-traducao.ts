@@ -125,6 +125,48 @@ export async function traducaoEstaLigada(buscar: typeof fetch = fetch): Promise<
   }
 }
 
+/**
+ * ── O QUE NUNCA VAI À REDE ────────────────────────────────────────────────
+ *
+ * Um texto sem uma única PALAVRA não tem tradução nenhuma: «2.530,00 €»,
+ * «12/09/2026», «15h30», «23%», «LIQ-2026-014», «a)». Mandá-lo é gastar quota
+ * (são 500 000 caracteres por mês) — mas o motivo mais forte não é esse.
+ *
+ * O motivo mais forte está escrito no cabeçalho do dinheiro de
+ * `proposal-doc-textos.ts`: «a vírgula e o ponto trocam de papel entre as duas
+ * convenções — um leitor que veja "2.460,00 €" numa linha e "2,460.00 €" noutra
+ * não lê duas formatações: lê dois números diferentes». Um tradutor automático
+ * localiza números, e a casa já decidiu que em inglês muda o RÓTULO e não o
+ * número. Um valor que passe pelo serviço volta com o risco de vir na outra
+ * convenção, na mesma página do total que a factura portuguesa vai repetir.
+ *
+ * ── A REGRA É ESTRUTURAL, E DE PROPÓSITO ──────────────────────────────────
+ *
+ * «Tem ao menos duas letras seguidas fora de uma referência.» Não há aqui
+ * vocabulário nenhum: uma lista de palavras a decidir isto seria a mesma tabela
+ * caseira que o cabeçalho deste ficheiro proíbe, e envelhecia à primeira rubrica
+ * nova. Uma data POR EXTENSO («12 de setembro de 2026») tem palavras e VAI —
+ * bem: em inglês é «12 September 2026», e isso é tradução a sério.
+ */
+const PALAVRA = /\p{L}{2,}/u;
+
+/**
+ * Uma referência interna: maiúsculas, um travessão e algarismos —
+ * «LIQ-2026-014», «PO-2026». São chaves de correlação, não são texto.
+ */
+const REFERENCIA = /^\p{Lu}{2,}[-–—][\p{L}\p{N}\-–—/.]*\p{N}[\p{L}\p{N}\-–—/.]*$/u;
+
+/** Vale a pena mandar este texto ao serviço de tradução? */
+export function precisaDeTraducao(texto: string): boolean {
+  const limpo = texto.trim();
+  if (!limpo) return false;
+  for (const pedaco of limpo.split(/\s+/)) {
+    if (REFERENCIA.test(pedaco)) continue;
+    if (PALAVRA.test(pedaco)) return true;
+  }
+  return false;
+}
+
 /** O que aconteceu a uma tentativa de traduzir. */
 export interface ResultadoDaTraducao {
   /** O documento com as traduções escritas — o MESMO objecto quando nada foi
@@ -154,34 +196,55 @@ export async function traduzirParaIngles(
   const campos = camposPorTraduzir(doc);
   if (campos.length === 0) return { doc, escritos: 0 };
 
-  let respostas: string[];
-  try {
-    respostas = await motor(campos.map((c) => c.texto));
-  } catch (e) {
-    return {
-      doc,
-      escritos: 0,
-      porqueFalhou: e instanceof Error ? e.message : "o serviço de tradução não respondeu",
-    };
+  // Os que vão mesmo ao serviço. Os outros — números, valores, datas, horas,
+  // referências — ficam de fora (ver {@link precisaDeTraducao}) e são escritos
+  // aqui abaixo tal e qual. Um documento inteiro de rubricas numéricas não gasta
+  // uma única ida à rede.
+  const aPedir: number[] = [];
+  for (const [i, campo] of campos.entries()) if (precisaDeTraducao(campo.texto)) aPedir.push(i);
+
+  let respostas: string[] = [];
+  if (aPedir.length > 0) {
+    try {
+      respostas = await motor(aPedir.map((i) => campos[i].texto));
+    } catch (e) {
+      return {
+        doc,
+        escritos: 0,
+        porqueFalhou: e instanceof Error ? e.message : "o serviço de tradução não respondeu",
+      };
+    }
   }
 
   // A trava. Um comprimento diferente quer dizer que não se sabe QUAL texto
   // corresponde a QUAL campo — e escrever à mesma era pôr a tradução de um
-  // campo noutro, em silêncio.
-  if (!Array.isArray(respostas) || respostas.length !== campos.length) {
+  // campo noutro, em silêncio. A conta é contra o que foi PEDIDO, que é o que o
+  // motor viu.
+  if (!Array.isArray(respostas) || respostas.length !== aPedir.length) {
     return {
       doc,
       escritos: 0,
       porqueFalhou: `a tradução veio desalinhada (${
         Array.isArray(respostas) ? respostas.length : 0
-      } textos para ${campos.length} campos)`,
+      } textos para ${aPedir.length} campos)`,
     };
   }
 
   let saida = doc;
   let escritos = 0;
+  let proximo = 0;
   for (const [i, campo] of campos.entries()) {
-    const texto = typeof respostas[i] === "string" ? respostas[i].trim() : "";
+    let texto: string;
+    if (aPedir[proximo] === i) {
+      texto = typeof respostas[proximo] === "string" ? respostas[proximo].trim() : "";
+      proximo++;
+    } else {
+      // Não foi pedido porque não há nada a traduzir. Escrever o português na
+      // caixa inglesa é exactamente o que o botão «Ficar em português» faz, e
+      // deixa o campo DECIDIDO em vez de por traduzir para sempre — um aviso
+      // sempre aceso é um aviso que se aprende a ignorar.
+      texto = campo.texto;
+    }
     // Uma posição vazia fica por traduzir. Não é um buraco: no papel esse campo
     // cai para o português, e no ecrã continua a contar como falta — que é
     // exactamente o que é.

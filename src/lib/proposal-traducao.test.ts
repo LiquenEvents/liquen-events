@@ -3,6 +3,7 @@ import { withProposalDefaults, type ProposalDoc } from "./proposal-doc";
 import { camposPorTraduzir, lerEn } from "./proposal-doc-bilingue";
 import {
   motorPelaRota,
+  precisaDeTraducao,
   traducaoEstaLigada,
   traduzirParaIngles,
   type MotorDeTraducao,
@@ -128,6 +129,53 @@ describe("saber se está ligada", () => {
   });
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE É QUE VALE A PENA MANDAR TRADUZIR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A regra é ESTRUTURAL e não tem vocabulário nenhum lá dentro: vale a pena
+ * traduzir um texto que tenha ao menos uma PALAVRA — uma sequência de duas
+ * letras ou mais que não faça parte de uma referência. Um dicionário de
+ * palavras a decidir isto seria a mesma tabela caseira que está proibida a duas
+ * portas daqui, e envelhecia à primeira rubrica nova.
+ */
+describe("precisaDeTraducao", () => {
+  it("prosa precisa", () => {
+    for (const sim of [
+      "Decoração Cerimónia",
+      "Copo d'água",
+      "12 de setembro de 2026", // a data POR EXTENSO é prosa: «12 September 2026»
+      "80 pax",
+      "23% + IVA", // «IVA» é uma palavra, e em inglês é «VAT»
+    ]) {
+      expect(precisaDeTraducao(sim), `«${sim}» é prosa`).toBe(true);
+    }
+  });
+
+  it("números, valores, datas, horas e referências não precisam", () => {
+    for (const nao of [
+      "2.530,00 €",
+      "1 250,00€",
+      "12/09/2026",
+      "12.09.2026",
+      "15h30",
+      "15:30",
+      "23%",
+      "80",
+      "LIQ-2026-014",
+      "—",
+      "a)",
+    ]) {
+      expect(precisaDeTraducao(nao), `«${nao}» não tem nada a traduzir`).toBe(false);
+    }
+  });
+
+  it("vazio e só espaços não precisam", () => {
+    for (const nada of ["", "   ", "\n\t "]) expect(precisaDeTraducao(nada)).toBe(false);
+  });
+});
+
 describe("traduzirParaIngles", () => {
   it("manda ao motor exactamente os campos por traduzir, pela mesma ordem", async () => {
     const doc = proposta();
@@ -228,6 +276,76 @@ describe("traduzirParaIngles", () => {
     expect(resultado.escritos).toBe(0);
     expect(resultado.doc).toBe(doc);
     expect(resultado.porqueFalhou).toBeTruthy();
+  });
+
+  /**
+   * ── O QUE NUNCA VAI À REDE ────────────────────────────────────────────────
+   *
+   * Duas razões, e a segunda é a que dói. A primeira é a quota: são 500 000
+   * caracteres por mês e cada ida desnecessária é quota gasta. A segunda está
+   * escrita em `proposal-doc-textos.ts`, no cabeçalho do dinheiro: «a vírgula e
+   * o ponto trocam de papel entre as duas convenções — um leitor que veja
+   * "2.460,00 €" numa linha e "2,460.00 €" noutra não lê duas formatações: lê
+   * dois números diferentes». Um tradutor automático localiza números, e uma
+   * página de dinheiro com as duas convenções é uma conta de que se desconfia.
+   */
+  it("um campo que é só um número, um valor ou uma data não gasta uma ida à rede", async () => {
+    const doc = proposta({
+      budgetItems: ["Decor Cocktail", "2.530,00 €", "12/09/2026", "15h30", "LIQ-2026-014", "23%"],
+    });
+    const espia = vi.fn(motorFalso());
+    const { doc: traduzido } = await traduzirParaIngles(doc, espia);
+    const mandados = espia.mock.calls[0][0];
+    for (const nada of ["2.530,00 €", "12/09/2026", "15h30", "LIQ-2026-014", "23%"]) {
+      expect(mandados, `«${nada}» não tinha nada que ir ao serviço`).not.toContain(nada);
+    }
+    expect(mandados).toContain("Decor Cocktail");
+    // E ficam DECIDIDOS, não por traduzir: a caixa inglesa recebe o mesmo texto,
+    // que é o que o botão «Ficar em português» já faz. Deixá-los vazios era um
+    // aviso aceso para sempre sobre um campo que não tem tradução nenhuma.
+    expect(lerEn(traduzido, { tipo: "linhaDeOrcamento", i: 1 })).toBe("2.530,00 €");
+    expect(lerEn(traduzido, { tipo: "linhaDeOrcamento", i: 4 })).toBe("LIQ-2026-014");
+    expect(camposPorTraduzir(traduzido)).toHaveLength(0);
+  });
+
+  it("um documento só com números nem chega a chamar o motor — e mesmo assim escreve", async () => {
+    const doc = proposta({
+      serviceGroups: [],
+      budgetItems: ["2.530,00 €", "1.200,00 €"],
+      totalLabel: "",
+    });
+    const espia = vi.fn(motorFalso());
+    const { doc: traduzido, escritos } = await traduzirParaIngles(doc, espia);
+    expect(espia).not.toHaveBeenCalled();
+    // `escritos` tem de contar estes: o estúdio só guarda o documento quando
+    // `escritos > 0` — a zero mostra «Não havia nada por traduzir» e deita a
+    // resposta fora, e estas duas escritas perdiam-se.
+    expect(escritos).toBe(2);
+    expect(lerEn(traduzido, { tipo: "linhaDeOrcamento", i: 0 })).toBe("2.530,00 €");
+  });
+
+  /**
+   * ── O NOME DA QUINTA E O NOME DO CASAL NÃO SÃO TRADUZÍVEIS ────────────────
+   *
+   * «Quinta do Lago» com um tradutor pelo meio é «Lake Farm», e «Monte da
+   * Ravasqueira» é «Ravasqueira Mount»: a proposta manda o casal para um sítio
+   * que não existe. A defesa mais forte é a que já cá está e este teste PRENDE:
+   * o local e os nomes dos noivos não são campos de prosa, não têm caixa
+   * inglesa, e por isso nunca chegam ao serviço. Estão no mesmo saco da
+   * referência e do tipo de evento (ver `temVersaoInglesa`).
+   */
+  it("o local e os nomes dos noivos nunca são mandados traduzir", async () => {
+    const doc = proposta({
+      location: "Herdade dos Grous",
+      clientNames: "Ana e João",
+      ref: "PO Decoração Casamento Ana e João · Monte da Ravasqueira",
+    });
+    const espia = vi.fn(motorFalso());
+    await traduzirParaIngles(doc, espia);
+    const tudo = espia.mock.calls[0][0].join(" | ");
+    expect(tudo).not.toContain("Herdade");
+    expect(tudo).not.toContain("Ana e João");
+    expect(tudo).not.toContain("Ravasqueira");
   });
 
   it("a tradução não muda a FORMA do documento", async () => {
