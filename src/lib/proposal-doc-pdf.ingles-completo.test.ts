@@ -362,7 +362,11 @@ const MARCAS_PT: ReadonlyArray<[nome: string, marca: RegExp]> = [
   ["«Proposta»", /PROPOSTA(?!L)/],
   ["«Serviço(s)»", /SERVICO|SERVIÇO/],
   ["«Preço»", /PRECO|PREÇO/],
-  ["«Nota:»/«Notas»", /^NOTA:|NOTASIMPORTANTES/],
+  // As duas âncoras escritas à vista: `/^NOTA:|NOTASIMPORTANTES/` lê-se como se
+  // o `^` valesse para os dois lados, e não vale — o `|` separa a expressão toda,
+  // portanto o segundo lado casava a meio de qualquer linha. Aqui as duas marcas
+  // são PRINCÍPIOS de linha (um rótulo e um cabeçalho), e é isso que fica escrito.
+  ["«Nota:»/«Notas»", /^(?:NOTA:|NOTASIMPORTANTES)/],
   ["«Hora»", /^HORA:/],
   ["«Local»", /^LOCAL:/],
   ["«Data do Evento»", /DATADOEVENTO/],
