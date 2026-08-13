@@ -2977,6 +2977,12 @@ describe("gerar a proposta em inglês", () => {
    * Só a MOLDURA é traduzida; os títulos, as descrições e as legendas que ela
    * escreveu saem tal e qual. Quem carrega em «Inglês» sem saber disto abre um
    * PDF meio inglês e conclui que está avariado.
+   *
+   * E a ressalva tem de nomear a DATA. É o caso que mais engana: lido no PDF
+   * inglês, o cabeçalho diz «Event Date: 12 de setembro de 2026» — inglês o
+   * rótulo, português a data — porque a data do evento é um campo preenchido e
+   * não moldura. Uma ressalva que se ficasse por «o que escreveste» deixava-a
+   * supor que as datas eram nossas e vinham traduzidas.
    */
   it("diz, antes do clique, que só a moldura muda de língua", async () => {
     seedDraft(1);
@@ -2985,11 +2991,10 @@ describe("gerar a proposta em inglês", () => {
     await irParaPrever(user);
 
     // Está no ecrã ANTES de se escolher fosse o que fosse.
-    expect(
-      screen.getByText(
-        /Em inglês sai a moldura do documento[\s\S]*O que escreveste fica na língua em que o escreveste/,
-      ),
-    ).toBeInTheDocument();
+    const ressalva = screen.getByText(/Em inglês sai a moldura do documento/);
+    expect(ressalva).toBeInTheDocument();
+    // E diz, com todas as letras, que a data não vai traduzida.
+    expect(ressalva.textContent).toMatch(/data/i);
   });
 
   it("e diz o mesmo a quem ouve o controlo em vez de o ver", async () => {
@@ -3001,7 +3006,7 @@ describe("gerar a proposta em inglês", () => {
     const ingles = screen.getByRole("radio", { name: /^Inglês/ });
     // Começa pelo rótulo visível — o nome falado e o escrito não podem divergir.
     expect(ingles.getAttribute("aria-label")).toMatch(
-      /^Inglês — sai a moldura do documento em inglês; o que escreveste fica na língua em que o escreveste$/,
+      /^Inglês — sai a moldura do documento em inglês; os campos que preencheste, incluindo a data do evento, ficam como os escreveste$/,
     );
   });
 

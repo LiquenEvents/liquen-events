@@ -6402,7 +6402,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     // visível, para o nome falado e o nome escrito não
                     // divergirem.
                     ariaLabel:
-                      "Inglês — sai a moldura do documento em inglês; o que escreveste fica na língua em que o escreveste",
+                      "Inglês — sai a moldura do documento em inglês; os campos que preencheste, incluindo a data do evento, ficam como os escreveste",
                   },
                 ]}
               />
@@ -6422,9 +6422,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     : "A gerar…"
                   : "Descarregar PDF"}
               </Button>
+              {/* A ressalva tem de ser verificável no papel, e não uma boa
+                  intenção: quem a lê vai a seguir mandar o PDF a um cliente
+                  inglês. A primeira versão dizia «rótulos, textos da casa,
+                  datas e valores», e «datas» não era verdade — lida no PDF
+                  gerado, a data do evento sai «12 de setembro de 2026» na
+                  proposta inglesa, porque é um campo que ela preenche, não
+                  moldura. Só a data de validade, essa sim calculada por nós,
+                  sai «12 October 2026». Prometer as datas todas era mandá-la
+                  descobrir a diferença à frente do cliente. */}
               <p className="w-full text-right text-[11px] leading-snug text-foreground/50">
-                Em inglês sai a moldura do documento — rótulos, textos da casa, datas e valores. O
-                que escreveste fica na língua em que o escreveste.
+                Em inglês sai a moldura do documento: rótulos, textos da casa e condições. Os campos
+                que preencheste ficam como os escreveste — incluindo a data e o tipo de evento. Os
+                valores continuam à portuguesa (1.234,56 €).
               </p>
             </div>
             <Button
