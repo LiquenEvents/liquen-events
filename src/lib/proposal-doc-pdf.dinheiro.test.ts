@@ -210,7 +210,18 @@ describe("«sem os extras» está na mesma unidade do total grande", () => {
       }),
     );
     expect(texto).not.toMatch(/\d\u00A0\d/);
-    expect(texto).toContain("30.750,00 €");
+    /**
+     * Ponto nos milhares e vírgula nos cêntimos, em todos os números da folha.
+     *
+     * Isto era `toContain("30.750,00 €")`, com um espaço NORMAL antes do
+     * símbolo, e passava porque o número grande saía tal e qual do texto que
+     * ela escreveu no estúdio. Agora é composto por nós — a folha fecha sempre
+     * na escada, e o número grande é o «Total a pagar» —, e o `Intl` põe ali um
+     * espaço INSEPARÁVEL, que é o que se quer: um valor não deve largar o seu
+     * «€» no fim de uma linha. O que este teste guarda é o separador de
+     * milhares, e continua a guardá-lo.
+     */
+    expect(texto).toMatch(/30\.750,00\s€/);
   });
 });
 
@@ -338,14 +349,52 @@ describe("o bloco de totais do orçamento", () => {
     expect(comIva).toContain("Deslocação da Equipa Líquen (75,00 €)");
   });
 
-  it("sem adicionais nenhuns, fica o total de sempre com o rótulo de sempre", async () => {
+  /**
+   * ── SEM ADICIONAIS, A MESMA ESCADA ─────────────────────────────────────────
+   *
+   * Este teste dizia o contrário: `not.toContain("Total a pagar")`. Fixava a
+   * folha antiga — um número grande sozinho, com a unidade escrita ao lado em
+   * texto livre. Mudou por pedido dela, com a proposta da Mariana e do João à
+   * frente: «quero sempre que nas propostas apareça assim na parte do
+   * orçamento». O que o casal tem de conseguir ler sem fazer contas é o que
+   * vai transferir, e isso não pode depender de a proposta ter ou não uma
+   * deslocação.
+   *
+   * O «Subtotal dos serviços» continua de fora, e continua a ser de propósito:
+   * sem adicionais ele É o TOTAL, e o mesmo número duas vezes em linhas
+   * seguidas com rótulos diferentes ensina a desconfiar da conta.
+   */
+  it("sem adicionais nenhuns, a escada é a mesma: TOTAL, IVA e Total a pagar", async () => {
     const texto = await textoDoPdf(proposta({ totalAmount: 7890, totalVatMode: "acrescer" }));
-    // A folha que ela envia há anos: o número grande com o rótulo dela, e nada
-    // mais — não há adicionais para separar do total, e é ela que tem de caber
-    // numa folha só com as notas e as condições de reserva.
-    expect(texto).not.toContain("Total a pagar");
+    // 7.890,00 × 23% = 1.814,70; 7.890,00 + 1.814,70 = 9.704,70.
+    expect(texto).toMatch(/TOTAL \(sem IVA\)\s*7\.?890,00/);
+    expect(texto).toMatch(/IVA \(23%\)\s*1\.?814,70/);
+    expect(texto).toMatch(/Total a pagar\s*9\.?704,70/);
+    // O subtotal não: seria o mesmo 7.890,00 na linha de cima.
     expect(texto).not.toContain("Subtotal dos serviços");
-    expect(texto).toContain("Valor Total Decoração");
+  });
+
+  it("a escada sai na ordem dela também sem adicionais", async () => {
+    const texto = await textoDoPdf(proposta({ totalAmount: 7890, totalVatMode: "acrescer" }));
+    let cursor = -1;
+    for (const rotulo of ["TOTAL (sem IVA)", "IVA (23%)", "Total a pagar"]) {
+      const i = texto.indexOf(rotulo, cursor + 1);
+      expect(i, `«${rotulo}» não está na folha, ou está fora de ordem`).toBeGreaterThan(cursor);
+      cursor = i;
+    }
+  });
+
+  /**
+   * O ramo de baixo continua a existir, e é ele que trata as propostas que
+   * ainda não têm euros: sem número, não se inventa uma escada de zeros.
+   */
+  it("com o total por definir, não se desenha uma escada de zeros", async () => {
+    const texto = await textoDoPdf(
+      proposta({ totalAmount: 0, totalText: "a definir", totalEstimatedText: "" }),
+    );
+    expect(texto).not.toContain("TOTAL (sem IVA)");
+    expect(texto).not.toContain("Total a pagar");
+    expect(texto).toContain("a definir");
   });
 });
 
@@ -360,18 +409,39 @@ describe("o bloco de totais do orçamento", () => {
  * transferir.
  */
 describe("a definição de IVA do estúdio chega ao papel", () => {
-  it("em «acresce», o número grande nunca aparece sozinho", async () => {
-    // Um total escrito à mão, sem o «+ IVA» que o estúdio compõe: o desenho
-    // acrescenta-o, porque é o modo do DOCUMENTO que manda.
+  /**
+   * ── A ANOTAÇÃO DEIXOU DE SER A DEFESA, PASSOU A SÊ-LO A ESCADA ────────────
+   *
+   * Estes dois testes exigiam o «+ IVA» colado ao número grande. Era a defesa
+   * possível enquanto o número grande era TUDO o que a folha dizia. Agora não
+   * é: a folha diz «TOTAL (sem IVA)», diz o imposto em euros e diz o «Total a
+   * pagar». A defesa que aqui se prende é a mesma de sempre — nenhum número
+   * desta folha pode ser lido como preço final quando não é —, e passou a ter
+   * uma forma melhor: em vez de uma etiqueta ao lado, a conta escrita.
+   *
+   * O `comIvaDito` continua vivo e continua preso, no único sítio onde ainda
+   * governa: a proposta SEM euros para somar (o total escrito à mão, «a
+   * definir», uma proposta a meio), que cai no ramo do número em texto livre.
+   */
+  it("em «acresce», o casal vê o imposto em euros e não uma etiqueta ao lado", async () => {
     const texto = await textoDoPdf(
       proposta({ totalAmount: 7890, totalVatMode: "acrescer", totalText: "7.890,00 €" }),
     );
-    expect(texto).toMatch(/7\.?890,00 € \+ IVA/);
+    expect(texto).toMatch(/TOTAL \(sem IVA\)\s*7\.?890,00/);
+    expect(texto).toMatch(/IVA \(23%\)\s*1\.?814,70/);
+    expect(texto).toMatch(/Total a pagar\s*9\.?704,70/);
   });
 
-  it("não duplica o «+ IVA» quando ele já lá está", async () => {
-    const texto = await textoDoPdf(proposta({ totalAmount: 7890, totalVatMode: "acrescer" }));
-    expect(texto).toMatch(/10\.?000,00 € \+ IVA/);
+  it("sem número para somar, a anotação «+ IVA» continua a ser a defesa", async () => {
+    const texto = await textoDoPdf(
+      proposta({
+        totalAmount: 0,
+        totalText: "a combinar",
+        totalEstimatedText: "",
+        totalVatMode: "acrescer",
+      }),
+    );
+    expect(texto).toMatch(/a combinar \+ IVA/);
     expect(texto).not.toContain("+ IVA + IVA");
   });
 

@@ -1637,6 +1637,44 @@ export async function renderProposalDocPdfWithReport(doc: ProposalDoc): Promise<
          que é a regra de quebra desta folha. A folha SEM adicionais — a que ela
          envia há anos e compara com a dela — continua a caber numa página. */
       y -= boxH + 6;
+    } else if (totais.aPagar > 0) {
+      /**
+       * ── SEM VALORES ADICIONAIS, A MESMA FOLHA ────────────────────────────
+       *
+       * Pedido dela, com a proposta da Mariana e do João à frente: «quero
+       * sempre que nas propostas apareça assim na parte do orçamento». Assim é
+       * a escada — TOTAL (sem IVA), IVA, Total a pagar — e não um número
+       * grande sozinho, que era o que saía a qualquer proposta sem deslocação
+       * nem outros adicionais.
+       *
+       * O que estava antes deixava o casal com UM número e a unidade dele
+       * escrita ao lado em texto livre («2.460,00 € + IVA»). Quem lê isso tem
+       * de fazer os 23% de cabeça para saber o que vai transferir — e a folha
+       * do fecho, essa, parte o valor COM IVA em sinal e saldo. Eram duas
+       * páginas do mesmo documento a falar em unidades diferentes, que é o
+       * defeito que este bloco já tinha vindo corrigir do outro lado.
+       *
+       * ── O SUBTOTAL NÃO ENTRA AQUI, E É DE PROPÓSITO ──────────────────────
+       * «Subtotal dos serviços» é o total das linhas listadas por cima dele.
+       * Sem adicionais, esse subtotal É o TOTAL: imprimir os dois era pôr o
+       * mesmo número duas vezes, em duas linhas seguidas, com rótulos
+       * diferentes — que é como se ensina alguém a desconfiar de uma conta.
+       * A escada fica com os três degraus que dizem coisas diferentes.
+       *
+       * ── E QUANDO NÃO HÁ NÚMERO ───────────────────────────────────────────
+       * Uma proposta a meio, ou com o total escrito «a definir», não tem euros
+       * para somar (`aPagar` fica a zero). Aí não se inventa uma escada de
+       * zeros: cai no ramo de baixo, que imprime o que o estúdio escreveu.
+       */
+      // Sem parcelas por cima, a régua de soma não separa nada: seriam doze
+      // pontos de tinta a dizer «o que vem acima somou-se», numa folha onde
+      // nada somou. E cada ponto conta — ver a nota da paginação mais abaixo.
+      budgetBreak(30 + 3 * 18 + boxH);
+      linhaDeTotal("TOTAL (sem IVA)", eurDoc(totais.total), 12.5, true);
+      linhaDeTotal(`IVA (${percentagemDoIva(totais.taxa)})`, eurDoc(totais.iva), 12.5);
+      budgetBreak(boxH + 24);
+      drawTotal(p, y, "Total a pagar", eurDoc(totais.aPagar));
+      y -= boxH + 6;
     } else {
       budgetBreak(boxH + 24 + 18);
       y -= 12;

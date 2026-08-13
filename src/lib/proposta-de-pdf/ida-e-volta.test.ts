@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { renderProposalDocPdf } from "@/lib/proposal-doc-pdf";
 import {
   depositPercentOf,
+  resolveProposalMoney,
   resolveValidUntil,
   withProposalDefaults,
   type ProposalDoc,
@@ -392,19 +393,36 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
       "serviceGroups[0].title",
       "serviceGroups[0].items[0].label",
       "budgetItems[0]",
-      "totalLabel",
-      "totalText",
-      "totalAmount",
-      "totalVatMode",
+      /**
+       * ── O QUE UMA PROPOSTA SEM ADICIONAIS TAMBÉM JÁ NÃO IMPRIME ───────────
+       *
+       * `totalLabel` e `totalText` saíram desta lista, e é a mesma razão que já
+       * os tinha tirado da proposta COM adicionais: a folha passou a fechar
+       * sempre na escada — TOTAL (sem IVA), IVA, «Total a pagar» —, portanto o
+       * número grande é o total COM IVA e o rótulo é «Total a pagar», nosso.
+       * Nem o texto que ela compôs nem o rótulo dela chegam ao papel, e
+       * devolvê-los a partir do que lá está era inventar.
+       *
+       * `totalAmount` e `totalVatMode` também: este documento está em «IVA
+       * incluído», onde o `totalAmount` guardado é o BRUTO. A folha diz a base
+       * em todas as letras, por isso a leitura volta em base + «acrescer» — a
+       * mesma quantia noutra forma. O que tem de bater ao cêntimo é o dinheiro,
+       * e é o que se confere logo a seguir.
+       */
       ...camposFixos(doc),
     ]);
     console.log(tabela("magra", r));
 
     expect(r.acerto).toBe(1);
-    // Sem adicionais, o rótulo do total é o DELA e volta inteiro.
-    expect(lido.totalLabel).toBe("Valor Total");
-    // «3.000,00 €» sem «+ IVA» quer dizer que o IVA já lá está.
-    expect(lido.totalVatMode).toBe("incluido");
+    // ── O DINHEIRO VOLTA AO CÊNTIMO, MUDE A FORMA O QUE MUDAR ──────────────
+    const antes = resolveProposalMoney(doc);
+    const depois = resolveProposalMoney(lido);
+    expect(depois.base).toBe(antes.base);
+    expect(depois.vat).toBe(antes.vat);
+    expect(depois.gross).toBe(antes.gross);
+    // E o que não voltou é DITO, com o motivo — não desaparece em silêncio.
+    expect(rascunho.porLer.map((p) => p.campo)).toContain("totalText");
+    expect(rascunho.porLer.map((p) => p.campo)).toContain("totalLabel");
     // Nenhuma fotografia: as capas estavam vazias e o logótipo não é uma foto.
     expect(rascunho.fotos).toHaveLength(0);
     // Os campos que uma proposta sem estes blocos não pode devolver são DITOS.
@@ -428,7 +446,8 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
       "moodBoards[0].title",
       "budgetItems[0]",
       "budgetItems[1]",
-      "totalText",
+      // `totalText` fora, pela razão escrita na proposta magra: o número grande
+      // é agora o «Total a pagar», e não o texto composto no estúdio.
       ...camposFixos(doc),
     ]);
     console.log(tabela("acentuada", r));
@@ -596,7 +615,11 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
       "budgetRows[0].price",
       "budgetRows[1].item",
       "budgetRows[1].price",
-      "totalEstimatedText",
+      // `totalEstimatedText` fora, pela mesma razão do `totalText` na proposta
+      // magra: também no modelo Organização a folha fecha na escada, e o número
+      // grande é o «Total a pagar» e não o texto estimado composto no estúdio.
+      // O que a estimativa VALE volta pela linha «TOTAL (sem IVA)», conferido
+      // logo abaixo.
       "budgetNote",
       "serviceGroups[0].title",
       "serviceGroups[0].items[0].label",
@@ -605,6 +628,11 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
     ]);
     console.log(tabela("organização", r));
     expect(r.acerto).toBe(1);
+    // A estimativa vale o mesmo depois da ida e volta, mudando embora de forma.
+    const antes = resolveProposalMoney(doc);
+    const depois = resolveProposalMoney(lido);
+    expect(depois.base).toBe(antes.base);
+    expect(depois.gross).toBe(antes.gross);
     // No modelo Organização o cliente vem debaixo de «Cliente», não de «Noivos».
     expect(lido.clientNames).toBe("Ana & Rui");
   }, 200_000);

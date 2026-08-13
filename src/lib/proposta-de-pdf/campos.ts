@@ -29,7 +29,7 @@
  * O que não cai numa destas duas não é devolvido. Fica em `porLer`, com a razão.
  */
 
-import { parseMoneyText, detectVatMode } from "@/lib/proposal-doc";
+import { parseMoneyText, detectVatMode, DEFAULT_VAT_RATE } from "@/lib/proposal-doc";
 import {
   caixaDe,
   chaveDeRotulo,
@@ -1424,15 +1424,40 @@ function lerOrcamento(
   let totalTexto: string | null = null;
   if (grande) {
     totalTexto = grande.c.texto;
-    campos.push(
-      novoCampo(
-        organizacao ? "totalEstimatedText" : "totalText",
-        totalTexto,
-        "alta",
-        "É o número grande do orçamento.",
-        [comoLinha(grande.l.pagina, grande.c)],
-      ),
+    /**
+     * ── O NÚMERO GRANDE NEM SEMPRE É O TEXTO DO TOTAL ────────────────────────
+     *
+     * Quando a folha traz a escada — «TOTAL (sem IVA)», o IVA, e o número
+     * grande por baixo —, o número grande é o TOTAL A PAGAR, com IVA. O texto
+     * que o estúdio compôs para o campo do total («12.450,00 € + IVA») não
+     * chega a ser impresso em lado nenhum, e lê-lo daqui trocava-o pelo bruto:
+     * a proposta voltava da importação a dizer 15.313,50 € onde ela escrevera
+     * 12.450,00 € + IVA.
+     *
+     * É a mesma resposta que já se dava ao `totalLabel` na mesma situação:
+     * declara-se por ler, com o motivo. O `totalAmount` e o `totalVatMode` não
+     * se perdem — saem da linha «TOTAL (sem IVA)», logo abaixo.
+     */
+    const temEscada = esquerda.some(
+      (l) => l.corridas[0] && eRotulo(l.corridas[0].texto, "TOTAL (sem IVA)"),
     );
+    if (temEscada) {
+      porLer.push({
+        campo: organizacao ? "totalEstimatedText" : "totalText",
+        porque:
+          "Nesta folha o número grande é o «Total a pagar» (com IVA). O texto do total escrito no estúdio não chega a ser impresso.",
+      });
+    } else {
+      campos.push(
+        novoCampo(
+          organizacao ? "totalEstimatedText" : "totalText",
+          totalTexto,
+          "alta",
+          "É o número grande do orçamento.",
+          [comoLinha(grande.l.pagina, grande.c)],
+        ),
+      );
+    }
     /**
      * O rótulo do total NÃO está na mesma linha de base do número.
      *
@@ -1491,7 +1516,40 @@ function lerOrcamento(
       .filter((l) => l.corridas[0] && eRotulo(l.corridas[0].texto, "TOTAL (sem IVA)"))
       .map((l) => totalDaLinha(l))
       .find((t): t is NonNullable<typeof t> => t !== null);
-    const valor = daBase ? daBase.montante : parseMoneyText(totalTexto);
+    /**
+     * ── A FOLHA IMPRIME TRÊS NÚMEROS; A LEITURA TEM DE REPRODUZIR OS TRÊS ────
+     *
+     * Ler a base e voltar a calcular o IVA por cima dela só devolve o mesmo
+     * papel quando o documento FOI escrito em «acresce». Num documento em «IVA
+     * incluído», a base é o resultado de uma divisão e o imposto é o RESTO —
+     * 3.000,00 ÷ 1,23 = 2.439,02 e 3.000,00 − 2.439,02 = 560,98 —, ao passo que
+     * 2.439,02 × 23% dá 560,97. Um cêntimo, e com ele a proposta a voltar da
+     * importação a valer 2.999,99 € onde estava impresso 3.000,00 €.
+     *
+     * Não se adivinha qual foi: pergunta-se ao papel. Se a base impressa,
+     * levada pelo IVA, não der o número grande, então a forma que reproduz a
+     * folha é a outra — o bruto com o imposto lá dentro. É o mesmo critério com
+     * que o resto deste leitor decide: ganha o que está escrito.
+     */
+    const bruto = parseMoneyText(totalTexto);
+    // A taxa vem do rótulo impresso — «IVA (23%)» —, e não de uma constante:
+    // é o papel que manda, e uma proposta antiga pode trazer outra taxa.
+    const taxa =
+      esquerda
+        .flatMap((l) => l.corridas)
+        .map((c) => /^\s*IVA\s*\(\s*(\d+(?:[.,]\d+)?)\s*%\s*\)/.exec(c.texto)?.[1])
+        .filter((n): n is string => n !== undefined)
+        .map((n) => Number(n.replace(",", ".")) / 100)
+        .find((t) => t > 0) ?? DEFAULT_VAT_RATE;
+    const baseNaoReproduzOPapel =
+      daBase !== undefined &&
+      bruto > 0 &&
+      Math.round(daBase.montante * (1 + taxa) * 100) !== Math.round(bruto * 100);
+    const valor = baseNaoReproduzOPapel
+      ? bruto
+      : daBase
+        ? daBase.montante
+        : parseMoneyText(totalTexto);
     if (valor > 0) {
       campos.push(
         novoCampo(
@@ -1508,17 +1566,23 @@ function lerOrcamento(
           ],
         ),
       );
-      const modo = daBase ? "acrescer" : detectVatMode(totalTexto);
+      const modo = baseNaoReproduzOPapel
+        ? "incluido"
+        : daBase
+          ? "acrescer"
+          : detectVatMode(totalTexto);
       campos.push(
         novoCampo(
           "totalVatMode",
           modo,
           "media",
-          daBase
-            ? "A folha traz a linha «TOTAL (sem IVA)» e o IVA em separado, portanto o valor é a base."
-            : modo === "acrescer"
-              ? "O número diz «+ IVA», portanto o IVA acresce."
-              : "O número não diz «+ IVA», portanto assume-se que já o inclui.",
+          baseNaoReproduzOPapel
+            ? "A base impressa, levada pelo IVA, não dá o número grande: o documento foi escrito com o imposto já incluído."
+            : daBase
+              ? "A folha traz a linha «TOTAL (sem IVA)» e o IVA em separado, portanto o valor é a base."
+              : modo === "acrescer"
+                ? "O número diz «+ IVA», portanto o IVA acresce."
+                : "O número não diz «+ IVA», portanto assume-se que já o inclui.",
           [
             daBase
               ? comoLinha(grande.l.pagina, daBase.valor)

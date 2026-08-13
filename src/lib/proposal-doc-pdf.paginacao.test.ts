@@ -423,19 +423,51 @@ describe("a folha do orçamento é uma coluna", () => {
    * dela (3 notas, 2 incluídos, 2 não incluídos): se voltar a partir-se, é aqui
    * que se sabe.
    */
-  it("no caso da casa, o quadro e as duas rubricas ficam na mesma folha", async () => {
+  it("no caso da casa, a cauda passa INTEIRA — e o bloco de totais não se parte", async () => {
+    /**
+     * ── O QUE MUDOU, E PORQUÊ ────────────────────────────────────────────────
+     *
+     * Este teste exigia as três coisas na MESMA folha. Deixou de ser possível, e
+     * a razão é uma decisão dela: o bloco do orçamento passou a mostrar sempre a
+     * escada — TOTAL (sem IVA), IVA, Total a pagar — mesmo nas propostas sem
+     * valores adicionais, que antes fechavam num número grande sozinho («quero
+     * sempre que nas propostas apareça assim na parte do orçamento», com a
+     * proposta da Mariana e do João à frente).
+     *
+     * São duas linhas a mais: 24 pontos, contra 1,3 pontos de folga que esta
+     * folha tinha. Não há aqui nada a apertar que não seja apertar a conta — e
+     * um orçamento em que as contas não se vêem é precisamente o defeito que
+     * esta escada veio corrigir. Já se tinha aceitado o mesmo custo nas
+     * propostas COM adicionais; agora as duas comportam-se igual, que é o ponto.
+     *
+     * O que continua a ser garantido — e é o que este teste passa a prender:
+     *  · o bloco de totais NÃO se parte do quadro (o número grande nunca fica
+     *    órfão numa folha sem as linhas que o explicam);
+     *  · a cauda passa INTEIRA: as notas e as condições de reserva vão juntas,
+     *    nunca uma em cada folha;
+     *  · e nada é escrito abaixo do chão da mancha para caber à força.
+     */
     const escritas = corpo(await desenhar(propostaDeOrcamento()));
     const quadro = onde(escritas, "Bouquet da Noiva")!;
+    const totalAPagar = onde(escritas, "Total a pagar")!;
     const notas = onde(escritas, "Notas importantes")!;
     const reserva = onde(escritas, "Condições de reserva")!;
     const gerais = ondeCabecalho(escritas, "Condições Gerais")!;
 
-    expect(notas.pagina, "as «Notas importantes» saíram da folha do quadro").toBe(quadro.pagina);
-    expect(reserva.pagina, "as «Condições de reserva» saíram da folha do quadro").toBe(
-      quadro.pagina,
+    expect(totalAPagar.pagina, "o «Total a pagar» ficou órfão do quadro").toBe(quadro.pagina);
+    expect(notas.pagina, "as notas e as condições de reserva partiram-se em duas folhas").toBe(
+      reserva.pagina,
     );
-    // E o orçamento ocupa UMA folha: a secção seguinte começa logo a seguir.
-    expect(gerais.pagina, "o orçamento gastou mais do que uma folha").toBe(quadro.pagina + 1);
+    // A cauda passa inteira para a folha seguinte, e a secção seguinte começa
+    // logo a seguir a ela: o orçamento não gasta uma terceira folha.
+    expect(notas.pagina, "a cauda não ficou na folha logo a seguir ao quadro").toBe(
+      quadro.pagina + 1,
+    );
+    // E não gasta mais nenhuma: as «Condições Gerais» começam na folha logo a
+    // seguir à cauda, como começavam antes na folha logo a seguir ao quadro.
+    expect(gerais.pagina, "o orçamento gastou uma folha a mais do que a cauda").toBe(
+      notas.pagina + 1,
+    );
 
     // Tudo isto sem descer abaixo do chão da mancha.
     const daFolha = escritas.filter((e) => e.pagina === quadro.pagina && e.y >= M);
