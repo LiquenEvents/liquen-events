@@ -72,7 +72,17 @@ vi.mock("@/lib/proposal-doc-render", () => ({
 vi.mock("@/lib/proposal-token", () => ({ createProposalToken: vi.fn(() => "tok") }));
 vi.mock("@/lib/mail", () => ({
   sendMail: vi.fn(async () => ({ sent: true })),
-  esc: (v: unknown) => String(v ?? ""),
+  // O `esc` do duplo escapa MESMO, como o verdadeiro (`src/lib/mail.ts`). Era
+  // a identidade, e com ela nenhum teste conseguia ver a diferença entre um
+  // texto escapado e um texto cru — que é precisamente o que a mensagem
+  // pessoal (escrita à mão, com `<` e `&` lá dentro) obriga a garantir.
+  esc: (v: unknown) =>
+    String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;"),
   MAIL_TO: "team@example.com",
 }));
 
@@ -749,5 +759,97 @@ describe("POST /api/orcamento/[id]/proposta-doc — assinatura", () => {
     expect(env.attachments?.some((a) => a.filename.endsWith(".pdf"))).toBe(true);
     expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
     expect(env.html).not.toContain("Líquen Events · ");
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * A MENSAGEM QUE ELA ESCREVE E QUE SEGUE COM A PROPOSTA
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «quando eu vou enviar a proposta, quero que também dê para
+ * enviar uma mensagem juntamente com a proposta». O email levava uma frase fixa
+ * e mais nada, e ela não tinha por onde escrever ao casal — a nota pessoal ia
+ * num segundo email, à mão, ou não ia.
+ *
+ * O que estes testes prendem é a ORDEM (o que ela escreveu primeiro, a frase da
+ * casa depois), a segurança do texto dela em HTML, e a promessa de que uma
+ * caixa vazia deixa o email exactamente como ele sempre foi.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — a mensagem pessoal", () => {
+  /** O último email enviado, nas suas duas versões. */
+  const enviado = () =>
+    vi.mocked(sendMail).mock.calls.at(-1)![0] as unknown as { html: string; text: string };
+
+  function envioCom(mensagem: unknown): NextRequest {
+    return req({ mode: "send", doc: baseDoc({ totalAmount: 3000 }), mensagem });
+  }
+
+  it("põe a mensagem dela ANTES da frase da casa e do botão", async () => {
+    await POST(envioCom("Foi um gosto conhecer-vos na quinta."), { params });
+    const { html, text } = enviado();
+    const dela = html.indexOf("Foi um gosto conhecer-vos na quinta.");
+    expect(dela, "a mensagem dela nem sequer entrou no email").toBeGreaterThan(-1);
+    // Depois do olá, antes da moldura: o que é dela é o que se lê primeiro.
+    expect(dela).toBeGreaterThan(html.indexOf("Olá "));
+    expect(dela).toBeLessThan(html.indexOf("Segue em anexo"));
+    expect(dela).toBeLessThan(html.indexOf("Ver e responder"));
+    // A versão em texto conta a mesma história pela mesma ordem — duas
+    // alternativas que divergem são, por si só, um sinal de spam.
+    const noTexto = text.indexOf("Foi um gosto conhecer-vos na quinta.");
+    expect(noTexto).toBeGreaterThan(text.indexOf("Olá "));
+    expect(noTexto).toBeLessThan(text.indexOf("Segue em anexo"));
+  });
+
+  /**
+   * Um `<` ou um `&` na mensagem dela não pode partir o email — e um `<script>`
+   * escrito por engano (ou colado de outro sítio) não pode chegar ao cliente
+   * como marcação.
+   */
+  it("escapa o texto dela no HTML e deixa-o intacto no texto simples", async () => {
+    const escrito = 'Trago o arco & as flores <3 — "prometido" às 14h';
+    await POST(envioCom(escrito), { params });
+    const { html, text } = enviado();
+    expect(html).toContain("&amp;");
+    expect(html).toContain("&lt;3");
+    expect(html).not.toContain("<3");
+    expect(html).not.toContain("Trago o arco & as");
+    // No texto simples vai tal e qual: escapar é uma preocupação de HTML.
+    expect(text).toContain(escrito);
+  });
+
+  it("as linhas em branco viram parágrafos, e as simples uma quebra", async () => {
+    await POST(envioCom("Primeira linha\nSegunda linha\n\nOutro parágrafo"), { params });
+    const { html, text } = enviado();
+    expect(html).toContain("Primeira linha<br>Segunda linha");
+    expect(html).toMatch(/Segunda linha<\/p>[\s\S]*<p[^>]*>Outro parágrafo/);
+    // Sem `<br>` nem `<p>` a colarem-se ao texto simples.
+    expect(text).toContain("Primeira linha\nSegunda linha\n\nOutro parágrafo");
+    expect(text).not.toContain("<br>");
+  });
+
+  /**
+   * OPCIONAL A SÉRIO: sem mensagem (ou com uma caixa só de espaços), o email
+   * tem de sair BYTE A BYTE como saía antes de esta caixa existir — nem um
+   * parágrafo vazio, nem uma linha em branco a mais.
+   */
+  it("sem mensagem, o email sai exactamente como sempre saiu", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const semCampo = enviado();
+    await POST(envioCom("   \n  "), { params });
+    const soEspacos = enviado();
+    expect(soEspacos.html).toBe(semCampo.html);
+    expect(soEspacos.text).toBe(semCampo.text);
+    // O olá encosta à frase da casa, sem nada pelo meio.
+    expect(semCampo.html).toMatch(/Olá [^<]*<\/p>\s*<p[^>]*>Segue em anexo/);
+    expect(semCampo.html).not.toMatch(/<p[^>]*>\s*<\/p>/);
+  });
+
+  /** Um campo que não é texto (um cliente avariado, um número) é o mesmo que
+   *  não haver campo nenhum — nunca um 500 a meio de um envio. */
+  it("ignora um campo que não seja texto, e envia na mesma", async () => {
+    const res = await POST(envioCom({ isto: "não é texto" }), { params });
+    expect(res.status).toBe(200);
+    expect(enviado().html).toMatch(/Olá [^<]*<\/p>\s*<p[^>]*>Segue em anexo/);
   });
 });

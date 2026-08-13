@@ -3065,3 +3065,134 @@ describe("gerar a proposta em inglês", () => {
     });
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MENSAGEM QUE SEGUE COM A PROPOSTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «quando eu vou enviar a proposta, quero que também dê para
+ * enviar uma mensagem juntamente com a proposta, a partir do back office na
+ * parte onde envio a proposta».
+ *
+ * O email levava uma frase fixa («Segue em anexo a proposta personalizada…») e
+ * mais nada. A caixa vive no passo 3, ao lado do resumo do que vai seguir —
+ * onde ela está quando decide enviar.
+ *
+ * O que estes testes prendem: o texto CHEGA ao envio, uma caixa vazia não muda
+ * nada, e o que ela escreveu sobrevive a fechar o separador (o estúdio já grava
+ * rascunho; a mensagem entra no mesmo sítio que o resto do que não é documento).
+ */
+describe("a mensagem pessoal que segue com a proposta", () => {
+  const SIDE_KEY = `${DRAFT_KEY}:meta`;
+  const caixa = () => screen.getByLabelText("Mensagem para o cliente") as HTMLTextAreaElement;
+
+  /** O corpo do último envio (`mode: "send"`). */
+  function envio(): Record<string, unknown> {
+    const corpo = corpos("proposta-doc", "POST").at(-1) ?? "{}";
+    return JSON.parse(corpo);
+  }
+
+  async function enviar(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+  }
+
+  it("o que ela escreve na caixa segue no pedido de envio", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.type(caixa(), "Foi um gosto conhecer-vos na quinta!");
+    await enviar(user);
+
+    await waitFor(() => expect(envio().mensagem).toBe("Foi um gosto conhecer-vos na quinta!"));
+  });
+
+  /** OPCIONAL A SÉRIO: em branco, o pedido é o mesmo de sempre — a rota nem
+   *  chega a ver o campo, e o email sai como saía. */
+  it("em branco, o envio não leva mensagem nenhuma", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await enviar(user);
+
+    await waitFor(() => expect(envio().mode).toBe("send"));
+    expect(envio()).not.toHaveProperty("mensagem");
+  });
+
+  it("espaços em branco contam como caixa vazia", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.type(caixa(), "   ");
+    await enviar(user);
+
+    await waitFor(() => expect(envio().mode).toBe("send"));
+    expect(envio()).not.toHaveProperty("mensagem");
+  });
+
+  it("a mensagem entra no rascunho — fechar o separador não a deita fora", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.type(caixa(), "Ficamos à espera de vos ver!");
+
+    await waitFor(
+      () => expect(localStorage.getItem(SIDE_KEY) ?? "").toContain("Ficamos à espera de vos ver!"),
+      { timeout: 3000 },
+    );
+  });
+
+  it("e volta ao ecrã quando o estúdio reabre", async () => {
+    seedDraft(1);
+    localStorage.setItem(SIDE_KEY, JSON.stringify({ mensagem: "O arco fica incluído." }));
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+
+    await waitFor(() => expect(caixa().value).toBe("O arco fica incluído."));
+  });
+
+  /**
+   * O IRMÃO DO FECHO A DOBRAR. A assinatura da casa entra sozinha no fim de
+   * todo o correio ao cliente; uma caixa que convide a assinar traz de volta o
+   * defeito dos modelos de resposta rápida — dois fechos colados, e o segundo a
+   * desmentir o primeiro.
+   */
+  it("diz-lhe que não precisa de assinar", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    expect(screen.getByText(/assinatura da Líquen/i)).toBeTruthy();
+  });
+
+  /**
+   * O ecrã «Modelos de email» do mesmo back office ensina-lhe que `{nome}` é um
+   * campo de fusão, com botões que o inserem. Esta caixa NÃO os substitui — o
+   * email já abre com «Olá Maria & Zé,» —, por isso diz-o no momento em que ela
+   * o escreve, em vez de o deixar seguir cru para o casal.
+   */
+  it("avisa quando ela escreve um campo de fusão que esta caixa não substitui", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    // O aviso tem um `<code>{nome}</code>` no meio, portanto o texto está
+    // partido por vários nós: procura-se pelo parágrafo inteiro.
+    const aviso = () =>
+      screen.queryAllByText((_, el) => (el?.textContent ?? "").includes("sai tal e qual"), {
+        selector: "p",
+      });
+    expect(aviso()).toHaveLength(0);
+    // `{{` é como se escreve uma chaveta literal no `userEvent` — sem isso, o
+    // `{nome}` era lido como uma tecla especial e nunca chegava à caixa.
+    await user.type(caixa(), "Olá {{nome}, ficamos à espera.");
+    expect(caixa().value).toContain("{nome}");
+    await waitFor(() => expect(aviso()).toHaveLength(1));
+  });
+});

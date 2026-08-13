@@ -35,10 +35,43 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
     }
-    const message = String(body.message ?? "").trim();
-    if (!message) {
+    const escrita = String(body.message ?? "").trim();
+    if (!escrita) {
       return NextResponse.json({ error: "Mensagem vazia." }, { status: 400 });
     }
+
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * O `{nome}` RESOLVE-SE NO ENVIO, E NÃO NO CLIQUE DO MODELO
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * O painel substituía o `{nome}` no instante em que ela carregava num
+     * modelo de resposta rápida — e mais lado nenhum. Só que o MESMO back
+     * office tem um ecrã «Modelos de email» que lhe ensina, com botões que o
+     * inserem, que `{nome}` é um campo de fusão. Quem aprende isso ali
+     * escreve-o também aqui, à mão, e o cliente recebia «Olá {nome},» — a
+     * assinatura de um software mal montado, num email pessoal.
+     *
+     * ── PORQUE AQUI, E NÃO UM AVISO NO ECRÃ ───────────────────────────────
+     *
+     * Avisar punha-a a resolver à mão um problema que a máquina sabe resolver,
+     * e só funcionava enquanto ela lesse o aviso. Aqui é o ÚNICO ponto por onde
+     * a mensagem passa inteira, venha do modelo, da caixa, ou de uma versão
+     * futura do ecrã — e é o mesmo sítio que a GRAVA no histórico, o que faz
+     * com que o que fica registado seja o que o cliente leu. Se a substituição
+     * vivesse só no ecrã, a conversa gravada e a conversa acontecida
+     * divergiam.
+     *
+     * O primeiro nome, como no ecrã: é assim que se trata alguém numa mensagem
+     * («Olá Ana,»), e não pelo nome completo. Sem nome no pedido — os que
+     * entram por telefonema podem não ter — o marcador é RETIRADO na mesma: um
+     * «Olá ,» é um lapso de escrita, um «Olá {nome},» é software estragado à
+     * vista do cliente.
+     */
+    const primeiroNome = String(quote.name ?? "")
+      .trim()
+      .split(/\s+/)[0];
+    const message = escrita.replace(/\{nome\}/g, primeiroNome ?? "");
 
     // O corpo é só o que ESTA mensagem tem de particular: a moldura e a
     // assinatura vêm do `emailAoCliente`, que é a mesma para todo o correio que

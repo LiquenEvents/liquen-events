@@ -112,3 +112,47 @@ describe("Mensageiro do cliente — quando o e-mail não sai", () => {
     expect(screen.queryByText(/não foi enviada/)).toBeNull();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O EMAIL FECHAVA DUAS VEZES — E O SEGUNDO FECHO DESMENTIA O PRIMEIRO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A assinatura da casa (`email-assinatura`) entrou em TODOS os emails ao
+ * cliente. Só que estes três modelos já traziam fecho próprio, e o cliente
+ * passou a receber os dois colados:
+ *
+ *     Com os melhores cumprimentos,
+ *     Equipa Líquen Events        ← fecho do modelo
+ *     --
+ *     Catarina Gaspar             ← assinatura da casa
+ *     Manager
+ *
+ * Dois fechos, e o segundo a desmentir o primeiro sobre quem escreveu. Acontecia
+ * em todos os envios pelos atalhos, que são os mais usados.
+ *
+ * A regra que estes testes prendem: a assinatura é a FONTE ÚNICA do fecho —
+ * quem escreve o corpo não volta a assiná-lo.
+ */
+describe("Mensageiro do cliente — quem fecha o email é a assinatura da casa", () => {
+  for (const modelo of ["Agradecer pedido", "Marcar reunião", "Seguimento proposta"]) {
+    it(`o modelo «${modelo}» já não se despede por cima da assinatura`, async () => {
+      const user = userEvent.setup();
+      render(<ClientMessenger quote={{ ...QUOTE, email: "ana@exemplo.pt" } as Quote} />);
+      await user.click(screen.getByRole("button", { name: modelo }));
+      const caixa = screen.getByLabelText("Mensagem ao cliente") as HTMLTextAreaElement;
+      expect(caixa.value).not.toMatch(/cumprimentos|Até breve|Equipa Líquen Events/i);
+      // E o corpo do modelo continua lá — tirar o fecho não é esvaziar o atalho.
+      expect(caixa.value).toMatch(/^Olá Ana,/);
+      expect(caixa.value.trim().length).toBeGreaterThan(60);
+    });
+  }
+
+  /** Tirar o fecho dos modelos não chega: a caixa está vazia à frente dela e o
+   *  hábito de assinar é dela, não do atalho. Diz-se aqui, uma vez, ao lado do
+   *  sítio onde se escreve. */
+  it("diz ao lado da caixa que a assinatura vai sozinha", () => {
+    render(<ClientMessenger quote={QUOTE} />);
+    expect(screen.getByText(/assinatura da Líquen/i)).toBeTruthy();
+  });
+});

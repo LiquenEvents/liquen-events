@@ -1060,6 +1060,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const [idiomaDoPdf, setIdiomaDoPdf] = useState<IdiomaDaProposta>(IDIOMA_POR_OMISSAO);
   const [confirmSend, setConfirmSend] = useState(false);
+  /**
+   * ── A MENSAGEM QUE SEGUE COM A PROPOSTA ───────────────────────────────────
+   *
+   * Palavras dela: «quando eu vou enviar a proposta, quero que também dê para
+   * enviar uma mensagem juntamente com a proposta». O email levava uma frase
+   * fixa e mais nada; esta caixa é o que ela escreve ao casal, e vai no MESMO
+   * email da proposta (ver `proposta-doc/route.ts`, que explica onde entra).
+   *
+   * NÃO faz parte do `doc`: não é conteúdo da proposta, não vai ao PDF, não
+   * fica guardado com o documento. É a nota que acompanha ESTE envio, e por
+   * isso vive ao lado do rascunho (`SIDE_KEY`), como o `refEdited` e os mapas
+   * de apoio.
+   *
+   * Também não é tocada pelo «Limpar» nem pelo «Repor versão»: esses gestos são
+   * sobre o DOCUMENTO (e são reversíveis por dez segundos, com o documento e o
+   * preço lá dentro). Deitar fora, ao mesmo tempo, um texto que está escrito no
+   * ecrã do passo 3 seria uma perda a mais que a anulação não sabia desfazer.
+   */
+  const [mensagemAoCliente, setMensagemAoCliente] = useState("");
   // Depois de um envio bem-sucedido, o formulário NÃO fica pronto a re-disparar:
   // mostra um estado de confirmação e exige uma escolha consciente para reenviar.
   const [sent, setSent] = useState(false);
@@ -1308,6 +1327,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           setThemeOrigins(meta.themeOrigins);
         }
         if (typeof meta?.refEdited === "boolean") setRefEdited(meta.refEdited);
+        /**
+         * A mensagem que acompanha o envio volta com o rascunho. Escrevê-la é
+         * trabalho como o resto — fechar o separador para ir ver uma data não
+         * pode deitá-la fora.
+         *
+         * Lê-se AQUI, dentro do efeito que corre uma vez só (ver o bloco de
+         * cima, «CORRE UMA VEZ SÓ»): pô-la noutro efeito era abrir a porta ao
+         * mesmo defeito que aquele comentário conta — a segunda passagem do
+         * modo estrito a ler o que a gravação automática acabou de escrever.
+         * Rascunhos guardados antes de esta caixa existir não têm o campo:
+         * abrem na mesma, com a caixa vazia.
+         */
+        if (typeof meta?.mensagem === "string") setMensagemAoCliente(meta.mensagem);
       }
     } catch {
       /* ignore corrupt draft */
@@ -1651,7 +1683,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }
     porGravarRef.current = true;
     setPorGravar(true);
-  }, [doc, assetUrls, themeOrigins, refEdited]);
+    // A mensagem do envio conta como trabalho por gravar: sem ela nesta lista, o
+    // indicador dizia «guardado às 14:32» com o texto dela ainda por escrever no
+    // rascunho — e é essa frase que faz uma pessoa fechar o portátil descansada.
+  }, [doc, assetUrls, themeOrigins, refEdited, mensagemAoCliente]);
 
   useEffect(() => {
     if (!hydrated.current) return;
@@ -1724,6 +1759,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             cores: semProvisorios(assetCores),
             themeOrigins: semProvisorios(themeOrigins),
             refEdited,
+            // A nota que segue com o envio. Fica ao lado do rascunho e não
+            // dentro dele: não é conteúdo da proposta e não pode entrar no
+            // documento que é gravado, enviado e reaberto.
+            mensagem: mensagemAoCliente,
           }),
         );
         setGravadoEm(new Date());
@@ -1765,6 +1804,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     assetCores,
     themeOrigins,
     refEdited,
+    // Sem isto, escrever na caixa da mensagem não voltava a agendar a gravação:
+    // o texto ficava só na memória desta aba e o rascunho guardava a versão
+    // anterior — que é o mesmo que não o guardar.
+    mensagemAoCliente,
     DRAFT_KEY,
     SIDE_KEY,
     quote.id,
@@ -3827,6 +3870,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         body: JSON.stringify({
           mode: "send",
           doc: { ...stripPendingImages(doc), fotosDeBiblioteca: origensNoDocumento() },
+          // FORA do documento, e só quando existe: uma caixa em branco não pode
+          // fazer sair um email diferente do de sempre — nem sequer um campo
+          // vazio a viajar. A mensagem acompanha ESTE envio; o documento que
+          // fica guardado é o mesmo com ela ou sem ela.
+          ...(mensagemAoCliente.trim() ? { mensagem: mensagemAoCliente.trim() } : {}),
         }),
       });
       const data = await res.json().catch(() => null);
@@ -6138,6 +6186,54 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   value={money.gross > 0 ? eur(split.sinal) : "—"}
                 />
               </dl>
+              {/* ── A MENSAGEM QUE SEGUE COM A PROPOSTA ────────────────────
+                  Aqui, logo abaixo do resumo do que vai seguir e ANTES das
+                  conferências: faz parte do que o cliente vai receber, e é
+                  neste ponto do ecrã que ela está quando decide enviar.
+
+                  A caixa é opcional a sério — em branco, o email sai
+                  exactamente como saía antes de ela existir. */}
+              <div className="mt-5">
+                <Field
+                  as="textarea"
+                  label="Mensagem para o cliente"
+                  rows={4}
+                  value={mensagemAoCliente}
+                  onChange={(e) => setMensagemAoCliente(e.target.value)}
+                  placeholder="Opcional. Ex.: Foi um gosto conhecer-vos na quinta — qualquer ajuste é bem-vindo."
+                  className="resize-y"
+                  /* O QUE ELA NÃO TEM DE ESCREVER, dito onde ela escreve.
+                     Os modelos de resposta rápida despediam-se por cima da
+                     assinatura da casa e o cliente recebia dois fechos (ver
+                     `ClientMessenger.tsx`). Uma caixa nova sem esta frase era
+                     o mesmo convite outra vez. */
+                  hint="Vai no mesmo email da proposta, logo a seguir ao «Olá». Em branco, o email segue como sempre. A assinatura da Líquen (Catarina Gaspar, contactos) entra sozinha no fim — não precisas de te despedir."
+                />
+                {/* ── O `{nome}` QUE NÃO SE RESOLVE AQUI ────────────────────
+                    O ecrã «Modelos de email» deste mesmo back office ensina-lhe
+                    que `{nome}` é um campo de fusão, com botões que o inserem —
+                    e o mensageiro do pedido substitui-o mesmo. Esta caixa não:
+                    o email da proposta já abre com «Olá {clientNames},», e um
+                    segundo nome pelo meio (que valor teria — o do casal? o do
+                    primeiro noivo?) não tem leitura única.
+
+                    Avisar é mais honesto do que inventar um significado: ela vê
+                    o problema com o texto à frente e reescreve-o em dois
+                    segundos, em vez de o casal receber «Olá {nome},». */}
+                {/\{[^}\s]{1,24}\}/.test(mensagemAoCliente) && (
+                  <p
+                    aria-live="polite"
+                    className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]"
+                  >
+                    <span aria-hidden="true">⚠</span>
+                    <span>
+                      Esta caixa não preenche campos como <code>{"{nome}"}</code> — o que escreveres
+                      sai tal e qual para o cliente. O email já começa por «Olá{" "}
+                      {doc.clientNames || "…"},».
+                    </span>
+                  </p>
+                )}
+              </div>
               {/* As fotos a caminho têm a sua própria linha, e não a genérica
                   dos campos por preencher: aqui não há nada a fazer senão
                   esperar uns segundos — dizer-lhe para "preencher" seria

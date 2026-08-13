@@ -53,6 +53,35 @@ export const runtime = "nodejs";
  */
 export const maxDuration = 60;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TEXTO QUE ELA ESCREVEU, EM HTML QUE NÃO SE PARTE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A mensagem pessoal é TEXTO escrito à mão numa caixa — não é marcação. Um
+ * «arco & flores» ou um «<3» num email HTML sem escape dá, na melhor das
+ * hipóteses, um símbolo que desaparece; na pior, uma etiqueta aberta que come o
+ * resto da mensagem (o botão da proposta incluído). Por isso passa toda pelo
+ * `esc`, e só DEPOIS de escapada é que se lhe acrescenta marcação nossa.
+ *
+ * As quebras de linha dela têm de sobreviver: num `<p>` sem tratamento, o
+ * navegador de correio junta tudo numa só linha e o que ela escreveu em três
+ * parágrafos chega como um bloco. Linha em branco = parágrafo novo; quebra
+ * simples = `<br>`, que é a leitura que qualquer pessoa faz de uma caixa de
+ * texto.
+ *
+ * `white-space:pre-wrap` teria feito o mesmo com menos código, e não serve
+ * aqui: o Outlook (motor Word) ignora-o, e é onde metade destes emails abre.
+ */
+function paragrafosDaMensagem(texto: string): string {
+  return texto
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p style="font-size:14px;line-height:1.6">${esc(p).replace(/\n/g, "<br>")}</p>`)
+    .join("\n        ");
+}
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -69,9 +98,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       mode?: "preview" | "send";
       doc?: ProposalDoc;
       idioma?: unknown;
+      mensagem?: unknown;
     } | null;
     const raw = body?.doc;
     const mode = body?.mode === "send" ? "send" : "preview";
+
+    /**
+     * A mensagem pessoal do passo «Enviar» do estúdio. OPCIONAL A SÉRIO: vazia,
+     * só com espaços, ou de um tipo que não é texto (um cliente avariado), o
+     * email sai exactamente como saía antes de esta caixa existir. Um envio
+     * nunca pode parar por causa da nota de acompanhamento — ver o cabeçalho
+     * deste ficheiro: uma proposta que não segue é um negócio parado.
+     */
+    const mensagem = typeof body?.mensagem === "string" ? body.mensagem.trim() : "";
 
     /**
      * ══════════════════════════════════════════════════════════════════════
@@ -344,16 +383,44 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
     // Só o corpo: a moldura, a assinatura da casa e os anexos da marca vêm do
     // `email-assinatura` — o mesmo fecho de todo o correio que sai daqui.
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * ONDE ENTRA A MENSAGEM DELA, E PORQUÊ AÍ
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Logo a seguir ao «Olá», ANTES da frase da casa e do botão.
+     *
+     * Quem abre este email é um casal à espera de saber o que a Catarina lhes
+     * tem para dizer. O que é dela — «foi um gosto conhecer-vos na quinta», «o
+     * arco fica incluído, como combinámos» — é a única parte que não se
+     * adivinha; a frase «segue em anexo a proposta» e o botão são a moldura,
+     * que se lê em meio segundo e está igual em todos os emails que já
+     * receberam. Pôr a nota pessoal depois do botão era pô-la depois do sítio
+     * onde muita gente já carregou.
+     *
+     * Fica DEPOIS do «Olá» e não antes porque o cumprimento é o cumprimento: a
+     * mensagem dela é o que se diz ao casal, não o que se diz antes de o
+     * saudar.
+     *
+     * E fica ANTES da assinatura da casa sem que isso se escreva aqui: o
+     * `emailAoCliente` fecha sempre no fim. É por isso que a caixa do estúdio
+     * diz, ao lado, que ela não precisa de se despedir — o fecho é um só, e é
+     * o da casa (ver `email-assinatura.ts` e os modelos do `ClientMessenger`,
+     * que se despediam por cima dele).
+     */
     const email = emailAoCliente({
       html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
         <p style="font-size:14px;line-height:1.6">Olá ${esc(doc.clientNames)},</p>
-        <p style="font-size:14px;line-height:1.6">Segue em anexo a proposta personalizada para o seu evento. Pode vê-la e responder online através do botão abaixo.</p>
+        ${mensagem ? `${paragrafosDaMensagem(mensagem)}\n        ` : ""}<p style="font-size:14px;line-height:1.6">Segue em anexo a proposta personalizada para o seu evento. Pode vê-la e responder online através do botão abaixo.</p>
         <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">Ver e responder à proposta →</a></p>`,
       texto: [
         "A sua proposta — Líquen Events",
         "",
         `Olá ${doc.clientNames},`,
         "",
+        // Tal e qual, com as quebras dela: escapar é uma preocupação de HTML, e
+        // aqui só se lhe acrescenta a linha em branco que a separa do resto.
+        ...(mensagem ? [mensagem, ""] : []),
         "Segue em anexo a proposta personalizada para o seu evento.",
         `Ver e responder online: ${acceptUrl}`,
       ].join("\n"),

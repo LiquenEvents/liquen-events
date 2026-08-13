@@ -4,10 +4,14 @@ import type { NextRequest } from "next/server";
 const authed = vi.hoisted(() => ({ ok: false }));
 const store = vi.hoisted(() => ({
   estado: "pendente" as string,
+  /** O nome do cliente no pedido. Um pedido criado a partir de um telefonema
+   *  pode não ter nenhum — e é aí que o `{nome}` fica sem por onde se resolver. */
+  nome: "Ana Silva" as string,
   get: vi.fn(async (id: string) =>
     id === "LIQ-1"
       ? {
           id: "LIQ-1",
+          name: store.nome,
           email: "ana@x.pt",
           status: store.estado,
           messages: [{ at: "t0", body: "old" }],
@@ -38,6 +42,7 @@ function req(body?: unknown): NextRequest {
 
 beforeEach(() => {
   authed.ok = false;
+  store.nome = "Ana Silva";
   vi.clearAllMocks();
 });
 
@@ -216,5 +221,49 @@ describe("POST /api/orcamento/[id]/mensagem — assinatura", () => {
     await POST(req({ message: "Olá!" }), ctx("LIQ-1"));
     const env = mail.send.mock.calls.at(-1)![0] as { html: string };
     expect(env.html).not.toContain("Líquen Events · ");
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O `{nome}` ESCRITO À MÃO NÃO PODE CHEGAR CRU AO CLIENTE
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O `{nome}` era substituído no CLIQUE do modelo, no ecrã, e mais lado nenhum.
+ * Só que o mesmo back office tem um ecrã «Modelos de email» que lhe ensina —
+ * com botões que o inserem — que `{nome}` é um campo de fusão. Quem aprende
+ * isso ali escreve-o também aqui, à mão, e o cliente recebia «Olá {nome},».
+ *
+ * Passa a resolver-se no ENVIO, que é o único momento em que a mensagem existe
+ * por inteiro: vale para o que veio do modelo, para o que ela escreveu, e para
+ * o que uma versão futura do ecrã mandar. E o histórico guarda o que o cliente
+ * LEU — senão a conversa gravada fica diferente da que aconteceu.
+ */
+describe("POST /api/orcamento/[id]/mensagem — o campo de fusão {nome}", () => {
+  const enviado = () => mail.send.mock.calls.at(-1)![0] as { html: string; text: string };
+
+  it("substitui o {nome} escrito à mão pelo primeiro nome do cliente", async () => {
+    authed.ok = true;
+    await POST(req({ message: "Olá {nome},\n\nFicamos à espera." }), ctx("LIQ-1"));
+    const env = enviado();
+    expect(env.text).toContain("Olá Ana,");
+    expect(env.text, "o marcador seguiu cru para o cliente").not.toContain("{nome}");
+    expect(env.html).not.toContain("{nome}");
+  });
+
+  it("o histórico guarda o que o cliente leu, não o marcador por preencher", async () => {
+    authed.ok = true;
+    await POST(req({ message: "Olá {nome}, obrigada!" }), ctx("LIQ-1"));
+    const patch = store.update.mock.calls.at(-1)?.[1] as { messages?: { body: string }[] };
+    expect(patch.messages?.at(-1)?.body).toBe("Olá Ana, obrigada!");
+  });
+
+  /** Um pedido que entrou por telefonema pode não ter nome. Aí o marcador não
+   *  tem por onde se resolver — o que não pode é seguir à vista do cliente. */
+  it("sem nome no pedido, o marcador desaparece em vez de seguir", async () => {
+    authed.ok = true;
+    store.nome = "";
+    await POST(req({ message: "Olá {nome}, obrigada!" }), ctx("LIQ-1"));
+    expect(enviado().text).not.toContain("{nome}");
   });
 });
