@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido";
 
 /**
  * O SELETOR DA BIBLIOTECA DE TEMAS NÃO PODE VOLTAR A ESPERAR PELA LISTA.
@@ -18,7 +19,12 @@ import { test, expect, type Page } from "@playwright/test";
  * encadeamento. É a única forma de o medir sem depender da velocidade da
  * máquina: o atraso é imposto por nós, e o limiar é relativo a ele.
  *
- * Não precisa de Supabase — as duas rotas são servidas por nós aqui.
+ * Não precisa de Supabase — as duas rotas são servidas por nós aqui. Precisa,
+ * isso sim, de UM PEDIDO na lista, porque o seletor vive dentro do estúdio e o
+ * estúdio abre-se a partir de um cartão de cliente. Esse pedido é criado pelo
+ * próprio passeio (`garantirPedido`), o que obriga a um servidor que grave —
+ * ver `playwright.dados.config.ts`. Enquanto não o criava, este ficheiro estava
+ * VERMELHO e o vermelho ficava escondido no passo `continue-on-error` do CI.
  */
 
 /** Quanto tempo a lista de temas demora a responder, neste teste. */
@@ -30,38 +36,13 @@ const TEMAS = [
 ];
 
 /**
- * Fora do CI, uma máquina sem `ADMIN_PASSWORD_HASH` não entra e o teste
- * salta-se — é o que permite corrê-lo à mão sem montar nada. No CI o segredo
- * ESTÁ definido (ver ci.yml), portanto não entrar é uma avaria e não uma
- * condição do ambiente. Saltar em silêncio ali transformava isto num passo
- * verde que nunca mede nada — foi o que aconteceu numa corrida local, e sem
- * esta distinção teria passado despercebido.
+ * O `exigirLogin` nasceu aqui e mudou-se para `semear-pedido.ts`, para os
+ * outros passeios que passaram a semear os seus dados poderem fazer a mesma
+ * distinção: fora do CI, uma máquina sem `ADMIN_PASSWORD_HASH` não entra e o
+ * teste salta-se; no CI, não entrar é uma avaria e não uma condição do
+ * ambiente. Saltar em silêncio ali transformava isto num passo verde que nunca
+ * mede nada.
  */
-function exigirLogin(entrou: boolean): void {
-  if (process.env.CI) {
-    expect(entrou, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(true);
-  } else {
-    test.skip(!entrou, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
-  }
-}
-
-async function login(page: Page): Promise<boolean> {
-  await page.goto("/orcamento/admin", { waitUntil: "domcontentloaded" });
-  const nome = page.getByLabel(/O teu email/i);
-  if ((await nome.count()) > 0) {
-    await nome.fill("catarina@liquen-events.com");
-    // Pelo `name` e não pelo rótulo: «Palavra-passe» passou a ser partilhado com
-    // o botão de mostrar/ocultar, e o botão de entrar diz por que caminho se
-    // entra (a passkey passou a ser o primeiro).
-    await page.locator('input[name="password"]').fill("liquen2026");
-    await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
-  }
-  return page
-    .getByRole("navigation", { name: /Navegação do back office/i })
-    .waitFor({ state: "visible", timeout: 20000 })
-    .then(() => true)
-    .catch(() => false);
-}
 
 test.describe("Biblioteca de temas — abrir", () => {
   test("as fotos são pedidas SEM esperar pela lista de temas", async ({ page, context }) => {
@@ -82,8 +63,13 @@ test.describe("Biblioteca de temas — abrir", () => {
       }
     });
 
-    const entrou = await login(page);
+    const entrou = await entrarNoBackOffice(page);
     exigirLogin(entrou);
+
+    // O estúdio abre-se a partir de um cartão de cliente — sem pedido nenhum na
+    // lista não há cartão, e este passeio falhava em `li button` com a cara de
+    // um seletor errado. O pedido é criado aqui, pela porta pública.
+    await garantirPedido(page);
 
     const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
     await nav
@@ -91,7 +77,9 @@ test.describe("Biblioteca de temas — abrir", () => {
       .first()
       .click();
     const clientes = page.locator("li button");
-    await expect(clientes.first()).toBeVisible({ timeout: 15000 });
+    // 30 s e não 15: contra o servidor de desenvolvimento, a primeira visita a
+    // «Fazer proposta» paga a compilação da rota.
+    await expect(clientes.first()).toBeVisible({ timeout: 30000 });
     await clientes.first().click();
 
     const abrir = page.getByRole("button", { name: /biblioteca de temas/i }).first();
@@ -145,8 +133,13 @@ test.describe("Biblioteca de temas — abrir", () => {
       }
     });
 
-    const entrou = await login(page);
+    const entrou = await entrarNoBackOffice(page);
     exigirLogin(entrou);
+
+    // O estúdio abre-se a partir de um cartão de cliente — sem pedido nenhum na
+    // lista não há cartão, e este passeio falhava em `li button` com a cara de
+    // um seletor errado. O pedido é criado aqui, pela porta pública.
+    await garantirPedido(page);
 
     const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
     await nav
@@ -154,7 +147,9 @@ test.describe("Biblioteca de temas — abrir", () => {
       .first()
       .click();
     const clientes = page.locator("li button");
-    await expect(clientes.first()).toBeVisible({ timeout: 15000 });
+    // 30 s e não 15: contra o servidor de desenvolvimento, a primeira visita a
+    // «Fazer proposta» paga a compilação da rota.
+    await expect(clientes.first()).toBeVisible({ timeout: 30000 });
     await clientes.first().click();
 
     const abrir = page.getByRole("button", { name: /biblioteca de temas/i }).first();

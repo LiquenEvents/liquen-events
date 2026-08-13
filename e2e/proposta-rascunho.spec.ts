@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido";
 
 /**
  * O rascunho da proposta vive no SERVIDOR, não no navegador.
@@ -10,27 +11,15 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
  *
  * Corre com um SEGUNDO contexto de browser, que é a única forma honesta de o
  * afirmar: contexto novo = cookies e `localStorage` novos, exatamente como o
- * tablet da equipa. `test.skip` quando o login não está disponível (build de
- * produção sem ADMIN_PASSWORD_HASH), como os outros passeios do back office.
+ * tablet da equipa.
+ *
+ * ── O pedido é criado, não procurado ──────────────────────────────────────
+ * Isto saltava com «Sem pedidos nesta instalação» — sempre, porque a lista de
+ * pedidos começa vazia (o armazém em ficheiro não é versionado) e o servidor de
+ * produção do CI recusa escritas sem Supabase. Um passeio que salta sempre é cobertura
+ * imaginária. Agora semeia o seu pedido (`garantirPedido`) e corre com servidor
+ * próprio, que grava — ver `playwright.dados.config.ts`.
  */
-
-async function login(page: Page): Promise<boolean> {
-  await page.goto("/orcamento/admin");
-  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
-  // Pelo `name` e não pelo rótulo: «Palavra-passe» passou a ser partilhado com
-  // o botão de mostrar/ocultar, e o botão de entrar diz por que caminho se
-  // entra (a passkey passou a ser o primeiro).
-  await page.locator('input[name="password"]').fill("liquen2026");
-  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
-  try {
-    await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
-      timeout: 8000,
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function openStudio(page: Page, quoteId: string): Promise<void> {
   await page.goto(`/orcamento/admin/evento/${quoteId}`);
@@ -44,16 +33,9 @@ test.describe("Rascunho da proposta", () => {
   test("segue o trabalho para outro dispositivo", async ({ page, browser }) => {
     test.setTimeout(90_000);
 
-    const loggedIn = await login(page);
-    test.skip(
-      !loggedIn,
-      "Admin login unavailable here (production build without ADMIN_PASSWORD_HASH); CI sets a test hash.",
-    );
+    exigirLogin(await entrarNoBackOffice(page));
 
-    const quotesRes = await page.request.get("/api/orcamento");
-    const quotes: { id: string }[] = quotesRes.ok() ? await quotesRes.json() : [];
-    test.skip(quotes.length === 0, "Sem pedidos nesta instalação — não há estúdio para abrir.");
-    const quoteId = quotes[0].id;
+    const quoteId = await garantirPedido(page);
     const marca = `Maria & Zé ${Date.now().toString(36)}`;
 
     try {
@@ -79,7 +61,7 @@ test.describe("Rascunho da proposta", () => {
       const other: BrowserContext = await browser.newContext();
       try {
         const page2 = await other.newPage();
-        const loggedIn2 = await login(page2);
+        const loggedIn2 = await entrarNoBackOffice(page2);
         expect(loggedIn2, "o segundo dispositivo também entra").toBe(true);
         await openStudio(page2, quoteId);
         await expect(page2.getByLabel(/^Clientes$/i).first()).toHaveValue(marca, {

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { assentar, entrar, escutar, exigirSilencio, irPara, provar } from "./harness";
+import { exigirLogin, garantirPedido } from "../semear-pedido";
 
 /**
  * AGENTE 2 — o editor de serviços sob stress.
@@ -13,24 +14,48 @@ import { assentar, entrar, escutar, exigirSilencio, irPara, provar } from "./har
 const LONGO = "Arranjos de mesa baixos com eucalipto e rosas de jardim ".repeat(6).slice(0, 300);
 const EMOJI = "Arco floral 🌿💐 — cerimónia ☀️";
 
-/** Abre o estúdio do primeiro pedido disponível. */
+/**
+ * Abre o estúdio, criando o pedido de que ele precisa.
+ *
+ * ── O que estava errado ──────────────────────────────────────────────────
+ * Isto procurava um botão «Escolher/Seleccionar/Abrir» que não existe e, não o
+ * encontrando, devolvia `false` — e os seis percursos deste ficheiro saltavam
+ * com «editor não alcançável nesta semente». Todos. Sempre. A causa não era o
+ * botão: era não haver pedido nenhum na lista — ela começa vazia, porque o
+ * armazém em ficheiro não é versionado, e o servidor de produção do CI recusa
+ * criar o pedido que falta.
+ *
+ * Agora o pedido é CRIADO (ver `e2e/semear-pedido.ts`) e o passo 1 do ecrã é
+ * percorrido como uma pessoa o percorre: clicar no cartão do cliente abre o
+ * estúdio ali mesmo. Se o editor não aparecer, isso é um achado — que é o que
+ * este ficheiro anda a caçar — e não uma condição do ambiente para saltar.
+ */
 async function abrirEstudio(page: import("@playwright/test").Page) {
+  await garantirPedido(page);
   await irPara(page, /^Fazer proposta$/);
   await assentar(page, 800);
-  // O passo "Fazer proposta" pode pedir para escolher um pedido primeiro.
-  const escolher = page.getByRole("button", { name: /Escolher|Seleccionar|Abrir/i }).first();
-  if ((await escolher.count()) > 0 && (await escolher.isVisible().catch(() => false))) {
-    await escolher.click().catch(() => {});
-    await assentar(page, 600);
-  }
-  return (await page.getByRole("button", { name: /\+ Adicionar linha/i }).count()) > 0;
+
+  // Passo 1 — o cartão do cliente. `:visible` não é cosmético: a vista
+  // "Pedidos" fica montada por baixo com um cartão para o MESMO pedido, e um
+  // seletor solto apanha esse — que existe no DOM e nunca fica clicável.
+  const clientes = page.locator("main li button:visible");
+  await expect(clientes.first(), "o cartão do cliente do passo 1").toBeVisible({ timeout: 20_000 });
+  await clientes.first().click();
+
+  // Passo 2 — o estúdio, com o editor de serviços montado (o chunk é
+  // preguiçoso, daí a espera generosa).
+  await expect(
+    page.getByLabel(/^Linha 1 do grupo 1$/).first(),
+    "o editor de serviços do estúdio",
+  ).toBeVisible({ timeout: 30_000 });
+  await assentar(page, 800);
 }
 
 test("A2 · 50 linhas: continua utilizável e sem erros de consola", async ({ page }, info) => {
   test.slow();
   const r = escutar(page);
-  test.skip(!(await entrar(page)), "login indisponível");
-  test.skip(!(await abrirEstudio(page)), "editor de serviços não alcançável nesta semente");
+  exigirLogin(await entrar(page));
+  await abrirEstudio(page);
 
   const adicionar = page.getByRole("button", { name: /\+ Adicionar linha/i }).first();
   const primeira = page.getByLabel(/^Linha 1 do grupo 1$/);
@@ -59,8 +84,8 @@ test("A2 · 50 linhas: continua utilizável e sem erros de consola", async ({ pa
 
 test("A2 · nome de 300 caracteres não rebenta o layout", async ({ page }, info) => {
   const r = escutar(page);
-  test.skip(!(await entrar(page)), "login indisponível");
-  test.skip(!(await abrirEstudio(page)), "editor não alcançável");
+  exigirLogin(await entrar(page));
+  await abrirEstudio(page);
 
   const primeira = page.getByLabel(/^Linha 1 do grupo 1$/);
   await primeira.fill(LONGO);
@@ -76,8 +101,8 @@ test("A2 · nome de 300 caracteres não rebenta o layout", async ({ page }, info
 
 test("A2 · emojis e acentos sobrevivem a gravar e reler", async ({ page }) => {
   const r = escutar(page);
-  test.skip(!(await entrar(page)), "login indisponível");
-  test.skip(!(await abrirEstudio(page)), "editor não alcançável");
+  exigirLogin(await entrar(page));
+  await abrirEstudio(page);
 
   const primeira = page.getByLabel(/^Linha 1 do grupo 1$/);
   await primeira.fill(EMOJI);
@@ -87,18 +112,31 @@ test("A2 · emojis e acentos sobrevivem a gravar e reler", async ({ page }) => {
   await page.reload();
   await assentar(page, 1500);
 
-  const valor = await page
-    .getByLabel(/^Linha 1 do grupo 1$/)
-    .inputValue()
-    .catch(() => "");
+  // RECARREGAR VOLTA AO PASSO 1, e isso não é defeito nenhum: o back office
+  // guarda a VISTA («Fazer proposta») e não o cliente escolhido dentro dela.
+  // Este percurso lia o campo logo a seguir ao `reload`, quando o que estava no
+  // ecrã era a lista de clientes — o campo não existia, o `inputValue` ficava a
+  // esperar por ele até ao tecto do teste, e o `.catch` devolvia "" a horas.
+  // Lia-se como «os emojis perderam-se», que é a acusação errada: o que se quer
+  // provar é que o RASCUNHO os guardou, e para isso há que reabrir o estúdio —
+  // que é o que uma pessoa faz.
+  const cliente = page.locator("main li button:visible").first();
+  await expect(cliente, "a lista de clientes depois de recarregar").toBeVisible({
+    timeout: 30_000,
+  });
+  await cliente.click();
+
+  const relido = page.getByLabel(/^Linha 1 do grupo 1$/);
+  await expect(relido, "o editor depois de reabrir o estúdio").toBeVisible({ timeout: 30_000 });
+  const valor = await relido.inputValue();
   expect(valor, "Emojis/acentos perderam-se ao gravar e reler").toContain("Arco floral");
   exigirSilencio(r, "emojis");
 });
 
 test("A2 · apagar uma linha do meio não desloca as outras", async ({ page }) => {
   const r = escutar(page);
-  test.skip(!(await entrar(page)), "login indisponível");
-  test.skip(!(await abrirEstudio(page)), "editor não alcançável");
+  exigirLogin(await entrar(page));
+  await abrirEstudio(page);
 
   const primeira = page.getByLabel(/^Linha 1 do grupo 1$/);
   await primeira.click();
@@ -126,8 +164,8 @@ test("A2 · apagar uma linha do meio não desloca as outras", async ({ page }) =
 
 test("A2 · desfazer várias vezes seguidas não parte nada", async ({ page }) => {
   const r = escutar(page);
-  test.skip(!(await entrar(page)), "login indisponível");
-  test.skip(!(await abrirEstudio(page)), "editor não alcançável");
+  exigirLogin(await entrar(page));
+  await abrirEstudio(page);
 
   const primeira = page.getByLabel(/^Linha 1 do grupo 1$/);
   await primeira.click();
@@ -150,8 +188,8 @@ test("A2 · desfazer várias vezes seguidas não parte nada", async ({ page }) =
 
 test("A2 · grupo sem nome e linha vazia não geram erro", async ({ page }) => {
   const r = escutar(page);
-  test.skip(!(await entrar(page)), "login indisponível");
-  test.skip(!(await abrirEstudio(page)), "editor não alcançável");
+  exigirLogin(await entrar(page));
+  await abrirEstudio(page);
 
   const titulo = page.getByLabel(/Título do grupo 1/i);
   if ((await titulo.count()) > 0) await titulo.fill("");

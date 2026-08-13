@@ -26,7 +26,24 @@ export default defineConfig({
   // um instrumento que escreve um JSON —, portanto um vermelho dela não quer
   // dizer nada, e um vermelho que não quer dizer nada é um vermelho que se
   // aprende a ignorar.
-  testIgnore: ["**/passkeys.spec.ts", "**/upload-medicao.spec.ts"],
+  //
+  // Os seis ficheiros a seguir saíram daqui pela razão que está escrita por
+  // extenso em `playwright.dados.config.ts`: precisam de UM PEDIDO gravado, e
+  // este servidor de produção recusa escritas sem Supabase. Enquanto cá
+  // estiveram, dez dos seus passeios SALTAVAM («Sem pedidos nesta instalação»)
+  // e dois falhavam dentro do passo `continue-on-error` — doze testes que
+  // nunca correram e cuja ausência ninguém via. Correm agora em
+  // `npm run test:e2e:dados`, contra um servidor que grava.
+  testIgnore: [
+    "**/passkeys.spec.ts",
+    "**/upload-medicao.spec.ts",
+    "**/biblioteca-temas.spec.ts",
+    "**/carregamento-movel.spec.ts",
+    "**/fazer-proposta-cliente.spec.ts",
+    "**/proposta-rascunho.spec.ts",
+    "**/temas.spec.ts",
+    "**/caca/a02-editor-stress.spec.ts",
+  ],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

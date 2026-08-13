@@ -144,39 +144,13 @@ test.describe("Back office — secondary views", () => {
     // One consolidated assertion: nothing unexpected hit the console the whole walk.
     expect(errors, `Unexpected runtime errors:\n${errors.join("\n")}`).toEqual([]);
   });
-  test("Fazer proposta: escolher o cliente abre o estúdio nesse mesmo ecrã", async ({ page }) => {
-    // O ecrã existe para um trabalho só, e esse trabalho tem dois passos. O que
-    // aqui se prova é o percurso inteiro: da lista de clientes ao estúdio já
-    // preenchido com os dados daquele pedido, e a volta atrás.
-    const errors = collectErrors(page);
-    const loggedIn = await login(page);
-    test.skip(!loggedIn, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
 
-    const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
-    await sidebar
-      .getByRole("button", { name: /^Fazer proposta$/ })
-      .first()
-      .click();
-    await expect(page.getByRole("heading", { level: 1, name: /^Fazer proposta$/ })).toBeVisible();
-
-    // Passo 1 — a lista de para-quem.
-    await expect(page.getByText(/Passo 1 de 2/)).toBeVisible();
-    const clientes = page.locator("li button");
-    const quantos = await clientes.count();
-    test.skip(quantos === 0, "Sem pedidos neste ambiente — não há cliente para escolher.");
-
-    // Passo 2 — o estúdio, para aquele cliente.
-    await clientes.first().click();
-    await expect(page.getByText(/Proposta para/)).toBeVisible();
-    // O estúdio montou mesmo (o chunk é preguiçoso) e traz o fluxo dos 3 passos.
-    await expect(page.getByRole("button", { name: /Pré-visualizar/ }).first()).toBeVisible({
-      timeout: 15000,
-    });
-
-    // E dá para trocar de cliente sem sair do ecrã.
-    await page.getByRole("button", { name: /Trocar de cliente/ }).click();
-    await expect(page.getByText(/Passo 1 de 2/)).toBeVisible();
-
-    expect(errors, `Erros inesperados:\n${errors.join("\n")}`).toEqual([]);
-  });
+  // O passeio «Fazer proposta: escolher o cliente abre o estúdio» vivia aqui e
+  // mudou-se para `fazer-proposta-cliente.spec.ts`. Não por arrumação: ali
+  // saltava SEMPRE («Sem pedidos neste ambiente»), porque este ficheiro corre
+  // contra o build de produção do CI, que recusa escritas sem Supabase, e sem
+  // escrita não há cartão de cliente para escolher. Passou a semear o seu
+  // próprio pedido, o que obriga a um servidor que grave — e este passeio das
+  // vistas secundárias, que é read-only, fica onde está a fazer o que só aqui
+  // se pode fazer: medir os chunks preguiçosos do build de produção.
 });

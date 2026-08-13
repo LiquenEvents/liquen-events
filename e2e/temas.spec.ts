@@ -1,4 +1,5 @@
 import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
+import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido";
 
 /**
  * Biblioteca de Temas — end-to-end walk of the whole feature, from the empty
@@ -18,8 +19,9 @@ import { test, expect, type ConsoleMessage, type Page } from "@playwright/test";
  * don't exist:
  *
  *   · LOGIN may be unavailable — a production build with no ADMIN_PASSWORD_HASH
- *     refuses the dev password. Then the whole walk `test.skip`s (CI sets a
- *     test hash, so it runs there). Same idiom as admin-smoke/admin-views.
+ *     refuses the dev password. Fora do CI o passeio salta-se por isso; no CI,
+ *     onde o hash de teste ESTÁ definido, não entrar é avaria e falha (ver
+ *     `exigirLogin`, em e2e/semear-pedido.ts).
  *
  *   · SUPABASE STORAGE is normally NOT configured (CI builds without it). The
  *     theme METADATA still works — the repository falls back to a JSON file in
@@ -74,33 +76,6 @@ function collectErrors(page: Page) {
   return errors;
 }
 
-/**
- * Log in through the real login form using the shared password. Returns true
- * once the authenticated back-office landmark appears, or false if login is
- * unavailable in this environment — a production build with no configured
- * ADMIN_PASSWORD_HASH deliberately refuses the dev password, so the caller
- * skips (rather than fails) the walk there. CI supplies a test hash so it runs.
- */
-async function login(page: Page): Promise<boolean> {
-  await page.goto("/orcamento/admin");
-  await expect(page.getByRole("heading", { name: /Painel de Gestão/i })).toBeVisible();
-  await page.getByLabel(/O teu email/i).fill("catarina@liquen-events.com");
-  // Pelo `name` e não pelo rótulo: «Palavra-passe» passou a ser partilhado com
-  // o botão de mostrar/ocultar, e o botão de entrar diz por que caminho se
-  // entra (a passkey passou a ser o primeiro).
-  await page.locator('input[name="password"]').fill("liquen2026");
-  await page.getByRole("button", { name: /^Entrar com palavra-passe$/ }).click();
-  // The back-office landmark only exists once authenticated.
-  try {
-    await expect(page.getByRole("navigation", { name: /Navegação do back office/i })).toBeVisible({
-      timeout: 8000,
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** "Temas" lives behind the collapsed "Mais" disclosure in the sidebar. */
 async function openTemas(page: Page): Promise<void> {
   const sidebar = page.getByRole("navigation", { name: /Navegação do back office/i });
@@ -140,11 +115,7 @@ test.describe("Biblioteca de Temas", () => {
   test("cria um tema, abre-o e escolhe-o a partir de um mood board", async ({ page }) => {
     const errors = collectErrors(page);
 
-    const loggedIn = await login(page);
-    test.skip(
-      !loggedIn,
-      "Admin login unavailable here (production build without ADMIN_PASSWORD_HASH); CI sets a test hash.",
-    );
+    exigirLogin(await entrarNoBackOffice(page));
 
     const errorBoundary = page.getByRole("heading", { name: /Ocorreu um erro inesperado/i });
     const themeName = uniqueThemeName();
@@ -166,17 +137,33 @@ test.describe("Biblioteca de Temas", () => {
       const addPhotos = page.getByRole("button", { name: /Adicionar fotos/i });
       // Duas instalações incompletas, ambas legítimas e ambas explicadas no
       // ecrã: a tabela por criar (falta correr o db/schema.sql) e a base de
-      // dados nem sequer ligada (faltam as chaves do Supabase — é o caso do
-      // CI, onde a aplicação RECUSA escrever em vez de guardar num ficheiro
-      // efémero). Nenhuma é uma regressão: salta-se, não se falha.
+      // dados nem sequer ligada (faltam as chaves do Supabase).
+      //
+      // ── PORQUE É QUE ISTO DEIXOU DE SER UM `skip` NO CI ────────────────
+      // A frase de cima dizia «é o caso do CI». Era — enquanto este passeio
+      // corria contra o build de produção, onde a aplicação RECUSA escrever
+      // em vez de guardar num ficheiro efémero. Agora corre contra um servidor
+      // de desenvolvimento (ver playwright.dados.config.ts), onde os metadados
+      // dos temas TÊM armazém: o ficheiro `data/proposal-themes.json`. Ou seja,
+      // no CI esta condição já não é uma lacuna do ambiente — é uma avaria, e
+      // avarias falham. Fora do CI (onde a instalação pode mesmo estar
+      // incompleta) continua a saltar, com a razão à vista.
       const notInstalled = page.getByText(
         /ainda não está criada na base de dados|base de dados não está ligada/i,
       );
       await expect(addPhotos.or(notInstalled).first()).toBeVisible();
-      test.skip(
-        (await notInstalled.count()) > 0,
-        "Biblioteca de Temas indisponível nesta instalação (falta o db/schema.sql ou as chaves do Supabase).",
-      );
+      const indisponivel = (await notInstalled.count()) > 0;
+      if (process.env.CI) {
+        expect(
+          indisponivel,
+          "a Biblioteca de Temas diz-se indisponível — os metadados deviam gravar em ficheiro neste servidor",
+        ).toBe(false);
+      } else {
+        test.skip(
+          indisponivel,
+          "Biblioteca de Temas indisponível nesta instalação (falta o db/schema.sql ou as chaves do Supabase).",
+        );
+      }
       await expect(addPhotos).toBeVisible();
       await expect(page.getByRole("button", { name: literal(themeName) })).toBeVisible();
       await expect(errorBoundary).toHaveCount(0);
@@ -241,22 +228,33 @@ test.describe("Biblioteca de Temas", () => {
       }
 
       // ── 5. O seletor, a partir de um mood board ───────────────────────
-      // O estúdio vive no Dossier do evento; sem nenhum pedido na base não há
-      // estúdio para abrir — nesse caso esta perna é saltada, não falhada.
-      const quotesRes = await page.request.get("/api/orcamento");
-      const quotes: { id: string }[] = quotesRes.ok() ? await quotesRes.json() : [];
-      test.skip(quotes.length === 0, "Sem pedidos nesta instalação — não há estúdio para abrir.");
+      // O estúdio vive no Dossier do evento, e sem nenhum pedido na base não há
+      // estúdio para abrir. Isto SALTAVA aqui — e saltar aqui é o pior sítio de
+      // todos, porque as quatro pernas anteriores já tinham passado e o
+      // relatório dizia «skipped», como se o passeio inteiro não se aplicasse.
+      // Agora o pedido é criado.
+      const quoteId = await garantirPedido(page);
 
-      await page.goto(`/orcamento/admin/evento/${quotes[0].id}`);
+      await page.goto(`/orcamento/admin/evento/${quoteId}`);
       await expect(page.getByText(/Estúdio de propostas \(PDF\)/i)).toBeVisible();
 
       // Mood boards só existem no modelo "Decoração" (o que abre por omissão) e
       // a proposta começa sem nenhum: criar um é o caminho normal.
-      await page.getByRole("button", { name: /\+ Adicionar mood board/i }).click();
-      await page
-        .getByRole("button", { name: /Escolher da biblioteca de temas/i })
-        .first()
-        .click();
+      //
+      // O clique INSISTE enquanto o mood board não aparecer, e a razão é
+      // concreta: o dossier é servido já pintado, mas os manípulos só existem
+      // depois de o React assumir a página. Um clique nessa janela não faz nada
+      // e não deixa rasto — o passeio seguia e ficava pendurado à espera de um
+      // botão que nunca ia nascer, até esgotar o tempo do teste. O `count()`
+      // antes do clique é o que impede duas insistências criarem dois mood
+      // boards.
+      const adicionar = page.getByRole("button", { name: /\+ Adicionar mood board/i }).first();
+      const escolher = page.getByRole("button", { name: /Escolher da biblioteca de temas/i });
+      await expect(async () => {
+        if ((await escolher.count()) === 0) await adicionar.click();
+        await expect(escolher.first()).toBeVisible({ timeout: 3_000 });
+      }).toPass({ timeout: 60_000 });
+      await escolher.first().click();
 
       const picker = page.getByRole("dialog", { name: /Escolher fotos da biblioteca de temas/i });
       await expect(picker).toBeVisible();
