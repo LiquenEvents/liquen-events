@@ -132,9 +132,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // multipart/alternative passa melhor pelos filtros de spam e é o que se lê
     // num cliente só de texto ou num leitor de ecrã. Valores em bruto (sem
     // `esc`): escapar é uma preocupação de HTML; o texto leva-os tal e qual.
+    /**
+     * A saudação é pelo PRIMEIRO nome. O `quote.name` é o que a pessoa escreveu
+     * no formulário, e há quem lá ponha o nome legal inteiro — saiu mesmo assim
+     * noutro email da casa, «Olá Francisco Maria Carrelhas Das Neves Da Palma
+     * Gaspar,», que ninguém escreveria a falar com um cliente.
+     *
+     * Só aqui: o email do recibo saúda pelo `invoice.clientName`, que é o nome
+     * FISCAL e pode ser uma empresa — cortá-lo pelo primeiro espaço daria «Olá
+     * Torre,» a um hotel. É a mesma forma que o mensageiro já usa.
+     */
+    const primeiroNome = String(quote.name ?? "")
+      .trim()
+      .split(/\s+/)[0];
+
     const email = emailAoCliente({
       html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
-      <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(quote.name)},</p>
+      <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(primeiroNome)},</p>
       <p style="font-size:14px;line-height:1.6;color:#333">
         Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento,
         no valor total de <strong style="color:#7c854b">${eur(total)}</strong> (IVA incluído).
@@ -149,7 +163,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       texto: [
         "A sua proposta — Líquen Events",
         "",
-        `Olá ${quote.name},`,
+        `Olá ${primeiroNome},`,
         "",
         `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eur(total)} (IVA incluído).`,
         proposal.validUntil

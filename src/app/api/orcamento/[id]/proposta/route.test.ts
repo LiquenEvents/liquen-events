@@ -290,6 +290,40 @@ describe("POST /api/orcamento/[id]/proposta — assinatura", () => {
    * conversa na caixa dele são os cabeçalhos `In-Reply-To`/`References`, nunca
    * o assunto.
    */
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * UMA SAUDAÇÃO É PELO PRIMEIRO NOME
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O `quote.name` é o que a pessoa escreveu no formulário público, e há quem
+   * escreva lá o nome legal inteiro. Saiu mesmo, a 27 e 28 de Julho, no email
+   * de confirmação: «Olá Francisco Maria Carrelhas Das Neves Da Palma Gaspar,».
+   * Essa saudação já foi corrigida; esta rota ficou para trás com o nome cru.
+   *
+   * Só o PRIMEIRO nome, e só aqui: o `fatura/route.ts` saúda pelo
+   * `invoice.clientName`, que é o nome FISCAL e pode ser uma empresa — cortá-lo
+   * pelo primeiro espaço daria «Olá Torre,» a um hotel. Casos diferentes,
+   * tratamentos diferentes.
+   */
+  it("saúda pelo primeiro nome, e não pelo nome legal inteiro", async () => {
+    authed.ok = true;
+    quotes.get.mockResolvedValueOnce({
+      id: "LIQ-1",
+      name: "Francisco Maria Carrelhas Das Neves Da Palma Gaspar",
+      email: "f@x.pt",
+      date: "2026-09-01",
+      guests: 50,
+      location: "Lisboa",
+      status: quotes.estado,
+    });
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    const env = mail.send.mock.calls.at(-1)![0] as { html: string; text: string };
+    expect(env.html).toContain("Olá Francisco,");
+    expect(env.text).toContain("Olá Francisco,");
+    expect(env.html).not.toContain("Carrelhas");
+    expect(env.text).not.toContain("Carrelhas");
+  });
+
   it("não põe o identificador interno da proposta no assunto", async () => {
     authed.ok = true;
     const res = await POST(req("POST", validItems), ctx("LIQ-1"));
