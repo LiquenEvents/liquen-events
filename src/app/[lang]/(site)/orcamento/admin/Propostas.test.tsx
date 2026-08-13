@@ -353,3 +353,236 @@ describe("Propostas — a que ficou por enviar", () => {
     expect(screen.getByText("Propostas aceites").previousElementSibling?.textContent).toBe("0%");
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A COLUNA DO MEIO DIZIA SEMPRE 0
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A coluna chamava-se «Itens» e desenhava `p.lineItems.length`. As `lineItems`
+ * são do FORMATO ANTIGO — a tabela de preços do `ProposalBuilder`, que ainda
+ * existe atrás de um link no painel do pedido. A proposta do ESTÚDIO grava
+ * `lineItems: []` à nascença (ver a rota `proposta-doc`) e guarda o que tem
+ * dentro do `doc`: as rubricas em `doc.budgetItems`, os grupos de serviços em
+ * `doc.serviceGroups`. Como hoje toda a gente usa o estúdio, a coluna era zero
+ * em todas as linhas — uma coluna que nunca dizia nada.
+ *
+ * Passa a contar RUBRICAS DE ORÇAMENTO, e o cabeçalho di-lo. Rubricas e grupos
+ * de serviços são coisas diferentes e não se somam: a proposta de referência
+ * tem 40 rubricas e 1 grupo, e a coluna tem de dizer 40 — nunca 1, nunca 41.
+ */
+describe("Propostas — a coluna conta o que está mesmo no documento", () => {
+  /** Ana & Bruno: 1 grupo de serviços, 40 rubricas de orçamento, 15 375 €. */
+  const doEstudio = {
+    id: "p-estudio",
+    quoteId: "q-estudio",
+    clientName: "Ana & Bruno",
+    clientEmail: "ana@example.pt",
+    currency: "EUR",
+    // O estúdio grava-as vazias. É a origem do defeito.
+    lineItems: [],
+    vatRate: 0.23,
+    subtotal: 12500,
+    vat: 2875,
+    total: 15375,
+    status: "enviada",
+    createdAt: "2026-08-01T10:00:00.000Z",
+    doc: {
+      ref: "PO Casamento Ana & Bruno",
+      clientNames: "Ana & Bruno",
+      serviceGroups: [
+        { title: "Decoração Floral de Casamento", items: [{ label: "Arco de cerimónia" }] },
+      ],
+      moodBoards: [],
+      budgetItems: Array.from({ length: 40 }, (_, i) => `Rubrica ${i + 1}`),
+    },
+  };
+
+  /** O formato antigo, que ainda se pode criar: linhas com preço, sem `doc`. */
+  const doFormatoAntigo = {
+    id: "p-antiga",
+    quoteId: "q-antiga",
+    clientName: "Rita & Tomás",
+    clientEmail: "rita@example.pt",
+    currency: "EUR",
+    lineItems: [
+      { description: "Decoração de cerimónia", qty: 1, unitPrice: 2000 },
+      { description: "Centros de mesa", qty: 10, unitPrice: 60 },
+      { description: "Transporte e montagem", qty: 1, unitPrice: 300 },
+    ],
+    vatRate: 0.23,
+    subtotal: 2900,
+    vat: 667,
+    total: 3567,
+    status: "enviada",
+    createdAt: "2026-08-02T10:00:00.000Z",
+  };
+
+  /** Sem documento e sem linhas: não há nada para contar. */
+  const semNada = {
+    id: "p-vazia",
+    quoteId: "q-vazia",
+    clientName: "Zulmira Sem Nada",
+    clientEmail: "z@example.pt",
+    currency: "EUR",
+    lineItems: [],
+    vatRate: 0.23,
+    subtotal: 0,
+    vat: 0,
+    total: 0,
+    status: "enviada",
+    createdAt: "2026-08-03T10:00:00.000Z",
+  };
+
+  beforeEach(() => {
+    __resetListCache();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        String(url).startsWith("/api/propostas")
+          ? response([doEstudio, doFormatoAntigo, semNada])
+          : response([]),
+      ),
+    );
+  });
+
+  /** O texto da célula de `cabecalho` na linha de `nome`. */
+  function celulaDa(nome: string, cabecalho: string): string {
+    const tabela = screen.getByRole("table", { name: "Propostas" });
+    const cabecalhos = [...tabela.querySelectorAll("thead th")].map(
+      (th) => th.textContent?.trim() ?? "",
+    );
+    const i = cabecalhos.indexOf(cabecalho);
+    if (i < 0) throw new Error(`não há coluna «${cabecalho}» — só ${JSON.stringify(cabecalhos)}`);
+    const linha = [...tabela.querySelectorAll("tbody tr")].find((tr) =>
+      tr.textContent?.includes(nome),
+    );
+    if (!linha) throw new Error(`não há linha de «${nome}»`);
+    return linha.querySelectorAll("td")[i]?.textContent?.trim() ?? "";
+  }
+
+  async function desenharTabela() {
+    // A coluna é `soLargo`: só existe a partir dos 1440 px.
+    simularAparelho(1440, false);
+    render(
+      <ToastProvider>
+        <Propostas quotes={[]} onOpenQuote={() => {}} onQuoteUpdated={() => {}} />
+      </ToastProvider>,
+    );
+    await waitFor(() => expect(screen.getByRole("table", { name: "Propostas" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Ana & Bruno")).toBeTruthy());
+  }
+
+  it("o cabeçalho diz o que está a ser contado — rubricas, não «itens»", async () => {
+    await desenharTabela();
+    const cabecalhos = [...screen.getByRole("table").querySelectorAll("thead th")].map((th) =>
+      th.textContent?.trim(),
+    );
+    expect(cabecalhos).toContain("Rubricas");
+    // «Itens» não dizia o quê: linhas de orçamento? serviços? fotografias?
+    expect(cabecalhos).not.toContain("Itens");
+  });
+
+  it("a proposta do estúdio conta as 40 rubricas do documento — e não os grupos", async () => {
+    await desenharTabela();
+    expect(celulaDa("Ana & Bruno", "Rubricas")).toBe("40");
+  });
+
+  it("a proposta do formato antigo continua a contar as suas linhas", async () => {
+    await desenharTabela();
+    expect(celulaDa("Rita & Tomás", "Rubricas")).toBe("3");
+  });
+
+  it("sem documento e sem linhas não inventa um zero — não há nada para contar", async () => {
+    await desenharTabela();
+    expect(celulaDa("Zulmira Sem Nada", "Rubricas")).toBe("—");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MESMA PÁGINA CONTAVA DUAS POPULAÇÕES SEM O DIZER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Rever e reenviar é o caso normal: duas propostas para o mesmo pedido. O ecrã
+ * dizia, ao mesmo tempo e sem uma palavra a explicar, «2 Propostas» (todas as
+ * linhas), «Todas · 2» (idem), «1 proposta enviada aguarda resposta» (por
+ * pedido) e «15 375 €» (por pedido). Nenhum número estava errado; era
+ * impossível conciliá-los a olho.
+ *
+ * As duas contagens ficam — são duas perguntas diferentes («quantas propostas
+ * fiz» e «quantos clientes estão à espera») — mas passam a estar ROTULADAS, e
+ * há uma linha que as concilia para ninguém as tentar somar.
+ */
+describe("Propostas — duas propostas para o mesmo pedido", () => {
+  const base = {
+    quoteId: "q-mesmo",
+    clientName: "Ana & Bruno",
+    clientEmail: "ana@example.pt",
+    currency: "EUR",
+    lineItems: [],
+    vatRate: 0.23,
+    subtotal: 12500,
+    vat: 2875,
+    total: 15375,
+    status: "enviada",
+  };
+  const revisoes = [
+    { ...base, id: "p-1", createdAt: "2026-07-01T10:00:00.000Z" },
+    { ...base, id: "p-2", createdAt: "2026-07-20T10:00:00.000Z" },
+  ];
+
+  beforeEach(() => {
+    __resetListCache();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        String(url).startsWith("/api/propostas") ? response(revisoes) : response([]),
+      ),
+    );
+  });
+
+  const desenhar = () =>
+    render(
+      <ToastProvider>
+        <Propostas quotes={[]} onOpenQuote={() => {}} onQuoteUpdated={() => {}} />
+      </ToastProvider>,
+    );
+
+  it("o primeiro número passa a ser da mesma população que os outros três", async () => {
+    desenhar();
+    await waitFor(() => expect(screen.getAllByText("Ana & Bruno").length).toBeGreaterThan(0));
+    // Era «2 Propostas» ao lado de «15 375 € enviados» e «1 à espera»: três
+    // números do mesmo tamanho, dois deles por pedido e um por linha.
+    const cartao = screen.getByText("Pedidos com proposta");
+    expect(cartao.previousElementSibling?.textContent).toBe("1");
+  });
+
+  it("a linha de cima diz que conta por pedido", async () => {
+    desenhar();
+    await waitFor(() => expect(screen.getAllByText("Ana & Bruno").length).toBeGreaterThan(0));
+    expect(document.body.textContent).toContain("Por pedido");
+  });
+
+  it("concilia os dois números, para ninguém os somar", async () => {
+    desenhar();
+    await waitFor(() => expect(screen.getAllByText("Ana & Bruno").length).toBeGreaterThan(0));
+    expect(screen.getByText(/2 propostas para 1 pedido/)).toBeTruthy();
+  });
+
+  it("a lista continua a mostrar as duas — o filtro conta linhas, e diz «Todas»", async () => {
+    desenhar();
+    await waitFor(() => expect(screen.getAllByText("Ana & Bruno").length).toBeGreaterThan(0));
+    expect(screen.getByText("Todas · 2")).toBeTruthy();
+  });
+
+  it("o valor enviado continua a contar o pedido uma vez", async () => {
+    desenhar();
+    await waitFor(() => expect(screen.getAllByText("Ana & Bruno").length).toBeGreaterThan(0));
+    const valor = screen
+      .getByText("Valor enviado aos clientes")
+      .previousElementSibling?.textContent?.replace(/\s/g, "");
+    // 15 375 €, e nunca 30 750 €.
+    expect(valor).toBe("15375€");
+  });
+});

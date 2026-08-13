@@ -43,6 +43,59 @@ const STATUS_META: Record<ProposalStatus, { label: string; color: string }> = {
   rejeitada: { label: "Recusada", color: "#5a5a55" },
 };
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANTAS RUBRICAS DE ORÇAMENTO TEM ESTA PROPOSTA — E PORQUE É QUE NÃO ERA ISTO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A coluna desenhava `p.lineItems.length` e dizia SEMPRE 0.
+ *
+ * As `lineItems` são do FORMATO ANTIGO: a tabela de descrição/quantidade/preço
+ * do `ProposalBuilder`, que a rota `/api/orcamento/[id]/proposta` grava e que o
+ * portal do cliente ainda desenha. Esse formato não morreu — continua atrás de
+ * um link no painel do pedido — mas deixou de ser o que se usa.
+ *
+ * A proposta que ela faz hoje sai do ESTÚDIO, e essa rota
+ * (`/api/orcamento/[id]/proposta-doc`) grava `lineItems: []` à nascença: o
+ * detalhe não cabe em três colunas, vive no documento — as rubricas em
+ * `doc.budgetItems`, os grupos de serviços em `doc.serviceGroups`, os preços no
+ * array paralelo `doc.budgetAmounts`. O `[]` não é um esquecimento: é a mesma
+ * decisão que faz a página do cliente esconder o cabeçalho da tabela de linhas
+ * quando não há linhas (ver `proposta/[token]/page.tsx`). O que faltava era
+ * alguém dizer isso à coluna.
+ *
+ * ── O QUE SE CONTA, E O QUE NÃO SE CONTA ─────────────────────────────────
+ *
+ * Contam-se RUBRICAS DE ORÇAMENTO — as linhas do quadro «Orçamento Proposto».
+ * É o mesmo objecto nos dois formatos (uma linha de dinheiro), por isso o
+ * número é comparável entre uma proposta de 2025 e uma de hoje.
+ *
+ * NÃO se somam os grupos de serviços. Uma proposta de referência tem 40
+ * rubricas e 1 grupo; 41 não é o tamanho de nada, e «1» responderia a uma
+ * pergunta que ninguém fez nesta coluna. Quem quiser o outro número tem-no no
+ * «Criar a partir de…», que mostra grupos e linhas lado a lado, com nome.
+ *
+ * Devolve `null` quando não há nada para contar — e aí a célula escreve «—» em
+ * vez de «0». Um zero numa coluna de números convida a comparar («esta tem 0,
+ * aquela tem 40»), e o que se passa é outra coisa: aquela proposta não tem
+ * orçamento detalhado nenhum para contar.
+ *
+ * ── DE ONDE VÊM OS DADOS, E O QUE NÃO SE PODE MUDAR SEM MEXER AQUI ────────
+ *
+ * Isto lê o `doc`, e esta lista pede `/api/propostas` INTEIRO. Há uma forma
+ * leve da mesma rota (`?semDoc=1`) que omite o documento de propósito — se um
+ * dia este ecrã passar a usá-la para poupar bytes, todas as propostas do
+ * estúdio voltam a dizer «—» sem nada rebentar. Nesse caso a contagem tem de
+ * viajar no resumo (como já viajam `temDoc`, `temOpcionais` e `pctSinal`), e
+ * não desaparecer.
+ */
+function rubricasDe(p: Proposal): number | null {
+  // O documento manda quando existe: uma proposta do estúdio tem sempre
+  // `lineItems: []`, e cair para elas dava o zero de sempre.
+  const n = p.doc ? (p.doc.budgetItems?.length ?? 0) : (p.lineItems?.length ?? 0);
+  return n > 0 ? n : null;
+}
+
 function expiryInfo(
   validUntil?: string,
 ): { label: string; tone: "ok" | "soon" | "expired" } | null {
@@ -308,9 +361,11 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
     // uma falha do servidor de correio, que não é uma resposta de ninguém.
     const oferecidas = unique.filter((p) => p.status !== "rascunho").length;
     const acceptRate = oferecidas ? Math.round((won / oferecidas) * 100) : 0;
-    return { totalSent, totalWon, acceptRate, pending, porEnviar };
+    // Quantos PEDIDOS distintos têm proposta. É o denominador de tudo o que
+    // está aqui em cima, e passou a estar no ecrã — ver a nota dos KPIs.
+    return { totalSent, totalWon, acceptRate, pending, porEnviar, pedidos: unique.length };
   }, [proposals]);
-  const { totalSent, totalWon, acceptRate, pending, porEnviar } = stats;
+  const { totalSent, totalWon, acceptRate, pending, porEnviar, pedidos } = stats;
 
   const filterOptions: SegmentedOption<ProposalStatus | "all">[] = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -408,28 +463,60 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
         Aqui vês as propostas que enviaste aos clientes e acompanhas quais foram aceites.
       </p>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { v: String(proposals.length), l: "Propostas", accent: true },
-          { v: eur(totalSent), l: "Valor enviado aos clientes", accent: false },
-          { v: eur(totalWon), l: "Valor já ganho", accent: true },
-          { v: `${acceptRate}%`, l: "Propostas aceites", accent: false },
-        ].map((k) => (
-          <Card
-            key={k.l}
-            padding="sm"
-            className={`flex flex-col gap-2 ${k.accent ? "bg-[#4d6350]/[0.05] ring-1 ring-inset ring-[#4d6350]/15" : ""}`}
-          >
-            <p
-              className={`font-display font-semibold leading-none tabular-nums ${k.accent ? "text-[#4d6350]" : "text-foreground/90"}`}
-              style={{ fontSize: "clamp(20px, 2.2vw, 28px)" }}
+      {/*
+        ══════════════════════════════════════════════════════════════════════
+        OS NÚMEROS DE CIMA CONTAM PEDIDOS. A LISTA DE BAIXO CONTA PROPOSTAS.
+        ══════════════════════════════════════════════════════════════════════
+
+        Rever e reenviar é o funcionamento normal: duas propostas para o mesmo
+        casal. E este ecrã dizia, ao mesmo tempo e sem uma palavra a explicar,
+        «2 Propostas», «Todas · 2», «1 proposta enviada aguarda resposta» e
+        «15 375 € enviados». Os dois últimos são deduplicados por pedido
+        (`latestByQuote`); os dois primeiros não eram. Nenhum estava errado —
+        mas estavam lado a lado, do mesmo tamanho, e não havia como conciliá-los
+        a olho. Quem somasse ficava com o dobro do dinheiro que saiu de casa.
+
+        As duas contagens FICAM, porque são duas perguntas diferentes e as duas
+        interessam: «quantos clientes estão à espera de mim» (o pedido) e
+        «quantos documentos fiz» (a proposta). O que muda é que cada uma passa a
+        dizer o que é.
+
+        Aqui em cima manda o PEDIDO, e é a população certa para este bloco: quem
+        olha para os quatro números quer saber quanto dinheiro está lá fora e
+        quantos negócios estão em jogo — e uma proposta revista não é dinheiro a
+        dobrar nem um cliente a mais. Por isso o primeiro cartão deixou de ser
+        «Propostas» (todas as linhas) e passou a ser «Pedidos com proposta», da
+        mesma população dos outros três e dos dois avisos.
+
+        A linha que os concilia está logo a seguir aos avisos, à entrada da
+        lista — que é onde o outro número aparece.
+      */}
+      <div className="flex flex-col gap-2">
+        <p className="bo-eyebrow text-foreground/40">
+          Por pedido · conta-se a proposta mais recente de cada um
+        </p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { v: String(pedidos), l: "Pedidos com proposta", accent: true },
+            { v: eur(totalSent), l: "Valor enviado aos clientes", accent: false },
+            { v: eur(totalWon), l: "Valor já ganho", accent: true },
+            { v: `${acceptRate}%`, l: "Propostas aceites", accent: false },
+          ].map((k) => (
+            <Card
+              key={k.l}
+              padding="sm"
+              className={`flex flex-col gap-2 ${k.accent ? "bg-[#4d6350]/[0.05] ring-1 ring-inset ring-[#4d6350]/15" : ""}`}
             >
-              {k.v}
-            </p>
-            <p className="bo-eyebrow text-foreground/45">{k.l}</p>
-          </Card>
-        ))}
+              <p
+                className={`font-display font-semibold leading-none tabular-nums ${k.accent ? "text-[#4d6350]" : "text-foreground/90"}`}
+                style={{ fontSize: "clamp(20px, 2.2vw, 28px)" }}
+              >
+                {k.v}
+              </p>
+              <p className="bo-eyebrow text-foreground/45">{k.l}</p>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/*
@@ -495,14 +582,35 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       )}
 
       {/* Filter */}
-      <div className="max-w-full overflow-x-auto pb-1 -mb-1">
-        <Segmented
-          ariaLabel="Filtrar propostas por estado"
-          size="sm"
-          value={filter}
-          onChange={setFilter}
-          options={filterOptions}
-        />
+      <div className="flex flex-col gap-2">
+        <div className="max-w-full overflow-x-auto pb-1 -mb-1">
+          <Segmented
+            ariaLabel="Filtrar propostas por estado"
+            size="sm"
+            value={filter}
+            onChange={setFilter}
+            options={filterOptions}
+          />
+        </div>
+        {/*
+          A LINHA QUE CONCILIA AS DUAS CONTAGENS.
+
+          O filtro conta LINHAS («Todas · 2»), os cartões e os avisos contam
+          PEDIDOS. Sem esta frase, o mesmo ecrã tinha um 2 e um 1 sem relação
+          visível, e a leitura natural — somar, ou desconfiar de um deles — era
+          a errada nas duas direcções.
+
+          Só aparece quando os dois números DIFEREM: com uma proposta por
+          pedido, explicar uma diferença que não existe é ruído em todas as
+          visitas para servir a poucas.
+        */}
+        {proposals.length !== pedidos && (
+          <p className="text-xs leading-snug text-foreground/45">
+            {proposals.length} propostas para {pedidos} pedido{pedidos !== 1 ? "s" : ""} — rever e
+            reenviar cria uma linha nova, e a lista mostra-as todas. Os números e os avisos acima
+            contam cada pedido uma vez, pela proposta mais recente.
+          </p>
+        )}
       </div>
 
       {/* List */}
@@ -556,11 +664,25 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
                 {
                   // Contexto útil, mas não é por isto que se procura uma
                   // proposta: só aparece quando há mesmo espaço.
-                  chave: "itens",
-                  cabecalho: "Itens",
+                  //
+                  // O cabeçalho diz O QUE conta (ver `rubricasDe`). Chamava-se
+                  // «Itens» — que podia ser linhas de orçamento, serviços ou
+                  // fotografias — e contava um campo que hoje está sempre
+                  // vazio.
+                  chave: "rubricas",
+                  cabecalho: "Rubricas",
                   soLargo: true,
                   alinharADireita: true,
-                  celula: (p) => <span className="tabular-nums">{p.lineItems.length}</span>,
+                  celula: (p) => {
+                    const n = rubricasDe(p);
+                    return n === null ? (
+                      <span className="text-foreground/30" title="Sem orçamento detalhado">
+                        —
+                      </span>
+                    ) : (
+                      <span className="tabular-nums">{n}</span>
+                    );
+                  },
                 },
                 {
                   chave: "valor",
