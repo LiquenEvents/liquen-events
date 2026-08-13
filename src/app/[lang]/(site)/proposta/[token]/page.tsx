@@ -6,6 +6,31 @@ import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
 import ProposalResponse from "./ProposalResponse";
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * RENDERIZADA A CADA VISITA — NUNCA GUARDADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * `[token]` não tem `generateStaticParams` e nada nesta página usa uma API de
+ * pedido: o idioma vem do SEGMENTO da rota, de propósito, para o sítio
+ * institucional poder ser pré-renderizado (ver o cabeçalho de src/proxy.ts).
+ * Para o Next isto é, portanto, uma rota estática — renderiza à primeira visita
+ * e guarda o HTML no Full Route Cache, sem revalidação, até ao próximo deploy.
+ *
+ * Só que tudo o que esta página mostra é ESTADO que muda por baixo dela. Com o
+ * HTML congelado: o casal aceita, volta ao link (reenviam-no, reabrem-no do
+ * email) e encontra outra vez o formulário de aceitar como se nada tivesse
+ * acontecido; a proposta que o estúdio retirou continua a ser oferecida até um
+ * 409 no clique; e o `expired` fica preso ao dia da primeira visita, portanto o
+ * aviso de validade nunca chega a aparecer.
+ *
+ * `force-dynamic` também é o que põe `Cache-Control: private, no-store` na
+ * resposta. Numa página cujo URL é a própria credencial, isso não é acessório:
+ * é o que impede um cache partilhado (CDN, proxy da empresa) de guardar a
+ * proposta de um cliente e servi-la a quem pedir o mesmo caminho.
+ */
+export const dynamic = "force-dynamic";
+
 // Private, per-client link — never index it. Localized title so an EN client
 // isn't announced a Portuguese document title on <html lang="en">.
 export async function generateMetadata({

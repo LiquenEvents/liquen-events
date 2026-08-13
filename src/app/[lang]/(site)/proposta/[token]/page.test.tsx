@@ -52,7 +52,7 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
-import ProposalPage from "./page";
+import ProposalPage, * as pagina from "./page";
 
 const proposta = (over: Record<string, unknown> = {}) => ({
   id: "p1",
@@ -104,5 +104,34 @@ describe("página pública da proposta — o botão do PDF", () => {
     await abrir("mau");
     expect(screen.queryByRole("link", { name: /PDF/i })).toBeNull();
     expect(screen.getByText("Link inválido")).toBeTruthy();
+  });
+});
+
+/**
+ * ESTA PÁGINA NÃO PODE SER CONGELADA NUM CACHE.
+ *
+ * `[token]` não tem `generateStaticParams`, e nada aqui usa uma API de pedido
+ * (o idioma vem do segmento da rota, de propósito — ver o cabeçalho de
+ * src/proxy.ts). Para o Next isso é uma rota ESTÁTICA: renderiza à primeira
+ * visita e guarda o HTML no Full Route Cache, sem revalidação nenhuma, até ao
+ * próximo deploy.
+ *
+ * O que isso fazia, em concreto, com o estado que esta página lê da base de
+ * dados a cada visita:
+ *
+ *   · o casal aceita, volta ao link (reencaminham-no, reabrem-no do email) e
+ *     encontra outra vez o formulário de aceitar, como se nada tivesse
+ *     acontecido — e o «Já tínhamos registado a sua resposta» nunca aparece;
+ *   · a proposta expira ou o estúdio retira-a, e a página continua a oferecer
+ *     um aceite que a rota vai recusar com um 409/410;
+ *   · a validade (`expired`) é calculada uma única vez, no dia da primeira
+ *     visita, e fica congelada nesse dia.
+ *
+ * `force-dynamic` também é o que põe `Cache-Control: private, no-store` na
+ * resposta — numa página cujo URL é a própria credencial, não é detalhe.
+ */
+describe("página pública da proposta — nunca servida de um cache", () => {
+  it("é renderizada a pedido, a cada visita", () => {
+    expect((pagina as { dynamic?: string }).dynamic).toBe("force-dynamic");
   });
 });

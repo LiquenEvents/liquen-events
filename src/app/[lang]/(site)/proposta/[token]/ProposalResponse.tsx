@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProposalStatus } from "@/lib/orcamento/types";
 import type { Dict } from "@/lib/i18n";
 // Value-imported: DEFAULT_TERMS lives in a client-safe module (no server-only /
@@ -37,8 +37,31 @@ export default function ProposalResponse({
   const [status, setStatus] = useState<"aceite" | "rejeitada" | null>(
     initialStatus === "aceite" ? "aceite" : initialStatus === "rejeitada" ? "rejeitada" : null,
   );
+  // «Isto já cá estava.» Começa verdadeiro quando a decisão veio do servidor no
+  // primeiro render, e passa a verdadeiro quando a rota responde `already` — o
+  // mesmo link aberto noutro telemóvel, ou o segundo clique do mesmo dedo.
+  const [already, setAlready] = useState(decided);
   const [sending, setSending] = useState<"aceitar" | "recusar" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * O FOCO DEPOIS DE DECIDIR.
+   *
+   * Ao responder, o formulário é DESMONTADO e substituído por este painel — o
+   * botão que tinha o foco desaparece com ele e o foco cai no `<body>`. Quem
+   * navega por teclado ou com um leitor de ecrã ficava atirado para o topo do
+   * documento sem nada lhe ser dito; e um `role="status"` que é inserido já com
+   * o conteúdo lá dentro (região e texto ao mesmo tempo) não é anunciado de
+   * forma fiável. Levar o foco ao painel resolve as duas coisas.
+   *
+   * Só quando a decisão foi tomada NESTA visita: numa proposta que já vem
+   * decidida do servidor, o painel está visível de início e roubar-lhe o foco
+   * saltava por cima da proposta inteira sem eles terem feito nada.
+   */
+  const painelRef = useRef<HTMLDivElement>(null);
+  const [justDecided, setJustDecided] = useState(false);
+  useEffect(() => {
+    if (justDecided) painelRef.current?.focus();
+  }, [justDecided]);
   // Terms agreement — required to accept (not to decline). `acceptedName` is the
   // signature recorded in the contract; typed as the Contract field it feeds.
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -78,13 +101,44 @@ export default function ProposalResponse({
         ),
         signal: controller.signal,
       });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || tp.errorFallback);
-      setStatus(data.status === "aceite" ? "aceite" : "rejeitada");
-    } catch (e) {
-      // A timeout/abort has no server message → fall back to the generic retry
-      // copy instead of surfacing a raw "AbortError" string.
-      setError(e instanceof Error && e.name !== "AbortError" ? e.message : tp.errorGeneric);
+      const data: { status?: unknown; already?: unknown; error?: unknown } | null = await res
+        .json()
+        .catch(() => null);
+      if (!res.ok) {
+        // Só a frase que o SERVIDOR escreveu é que se mostra aqui: essa é sobre
+        // a proposta e está na língua da página. Sem corpo legível fica a frase
+        // da casa — nunca o texto cru do erro (ver o `catch`).
+        setError(typeof data?.error === "string" && data.error ? data.error : tp.errorFallback);
+        return;
+      }
+      /**
+       * `res.ok` QUER DIZER QUE FICOU REGISTADO.
+       *
+       * `data.status` era lido sem guarda nenhuma logo a seguir a um
+       * `res.json().catch(() => null)` — bastava o corpo vir ilegível (um proxy
+       * a truncar, uma resposta que não é JSON) para rebentar ali um TypeError,
+       * cair no `catch` e o casal ver «falhou» depois de o servidor ter gravado
+       * o aceite, criado o contrato e emitido o sinal. Se o corpo não se lê,
+       * confirmamos na mesma o que eles acabaram de fazer.
+       */
+      setStatus(
+        data?.status === "aceite" || data?.status === "rejeitada"
+          ? data.status
+          : action === "aceitar"
+            ? "aceite"
+            : "rejeitada",
+      );
+      // A rota é idempotente e diz-nos quando a resposta já lá estava. Sem isto,
+      // quem carregasse em «Recusar» depois de o outro telemóvel já ter aceite
+      // via o ecrã inteiro de festa e ficava a pensar que tinha sido ele.
+      if (data?.already === true) setAlready(true);
+      setJustDecided(true);
+    } catch {
+      // Aqui só chegam falhas do próprio `fetch`: rede que caiu, pedido
+      // abortado pelo tempo-limite. A mensagem desses erros é do browser
+      // («Failed to fetch»), em inglês e sobre XHR — não é uma frase para quem
+      // está a decidir gastar milhares de euros. Fica a da casa.
+      setError(tp.errorGeneric);
     } finally {
       clearTimeout(timeout);
       setSending(null);
@@ -94,7 +148,9 @@ export default function ProposalResponse({
   if (status) {
     return (
       <div
+        ref={painelRef}
         role="status"
+        tabIndex={-1}
         className={`mt-9 rounded-lg border p-6 text-center ${
           status === "aceite"
             ? "border-moss/30 bg-moss/8"
@@ -125,7 +181,7 @@ export default function ProposalResponse({
             <p className="text-foreground/72 text-sm leading-relaxed">{tp.rejeitadaBody}</p>
           </>
         )}
-        {decided && <p className="text-foreground/68 text-[11px] mt-4">{tp.jaRegistado}</p>}
+        {already && <p className="text-foreground/68 text-[11px] mt-4">{tp.jaRegistado}</p>}
       </div>
     );
   }

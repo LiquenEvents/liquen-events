@@ -50,7 +50,7 @@ vi.mock("@/lib/i18n", () => ({
 // Echo props back so we can read them off the returned element (no render).
 vi.mock("./PortalView", () => ({ default: (props: Record<string, unknown>) => props }));
 
-import PortalPage from "./page";
+import PortalPage, * as pagina from "./page";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
 
 async function renderProps(): Promise<any> {
@@ -176,5 +176,27 @@ describe("Portal page — a percentagem do sinal é a da proposta", () => {
 
     expect(props.schedule).toEqual({ sinal: 3000, saldo: 7000 });
     expect(props.depositPercent).toBe(30);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O PORTAL NÃO PODE FICAR CONGELADO NUM CACHE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `[token]` não tem `generateStaticParams` e nada nesta página usa uma API de
+ * pedido (o idioma vem do segmento da rota — ver src/proxy.ts). Para o Next
+ * isso é uma rota ESTÁTICA: renderiza à primeira visita e guarda o HTML no
+ * Full Route Cache, sem revalidação, até ao próximo deploy.
+ *
+ * Este é o ecrã a que o cliente VOLTA — para ver se a factura já entrou, se o
+ * contrato já está assinado, se o sinal já ficou pago. Congelado, ele volta
+ * durante um ano (é o prazo do token do portal) a uma fotografia do dia em que
+ * o abriu pela primeira vez: sinal por pagar, contrato pendente, sem contas
+ * nenhumas — e a escrever ao estúdio a perguntar porquê.
+ */
+describe("Portal page — nunca servida de um cache", () => {
+  it("é renderizada a pedido, a cada visita", () => {
+    expect((pagina as { dynamic?: string }).dynamic).toBe("force-dynamic");
   });
 });

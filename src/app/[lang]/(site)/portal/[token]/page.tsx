@@ -11,6 +11,27 @@ import { getDictionary, normalizeLocale } from "@/lib/i18n";
 import type { EventType, Quote } from "@/lib/orcamento/types";
 import PortalView from "./PortalView";
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * RENDERIZADA A CADA VISITA — NUNCA GUARDADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Mesma razão da página da proposta. `[token]` não tem `generateStaticParams`
+ * e nada aqui usa uma API de pedido (o idioma vem do segmento da rota — ver
+ * src/proxy.ts), por isso o Next trata isto como estático: renderiza à primeira
+ * visita e guarda o HTML até ao próximo deploy.
+ *
+ * Este é o ecrã a que o cliente VOLTA — para ver se a factura já entrou, se o
+ * contrato já ficou assinado, se o sinal já está dado como pago. Congelado, ele
+ * volta durante um ano (é o prazo do token do portal) à fotografia do dia em
+ * que o abriu pela primeira vez, e escreve ao estúdio a perguntar porque é que
+ * o pagamento que fez não aparece.
+ *
+ * E, como na proposta, é isto que põe `Cache-Control: private, no-store` numa
+ * página cujo URL é a própria credencial.
+ */
+export const dynamic = "force-dynamic";
+
 // Private, per-client link — must NEVER be indexed. Localized title so an EN
 // client isn't announced a Portuguese document title on <html lang="en">.
 export async function generateMetadata({
