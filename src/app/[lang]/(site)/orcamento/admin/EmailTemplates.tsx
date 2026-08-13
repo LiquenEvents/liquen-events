@@ -39,12 +39,54 @@ const MERGE_FIELDS: { key: string; label: string; hint: string }[] = [
   { key: "empresa", label: "Empresa", hint: "insere o nome da empresa" },
 ];
 
-/** One-line explanation of when each template is sent. */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE ESTE ECRÃ PROMETIA, E NÃO CUMPRIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Estava escrito aqui, por baixo de cada modelo:
+ *
+ *   «Enviado ao cliente quando a proposta segue.»
+ *   «Enviado quando o sinal é recebido e a reserva fica confirmada.»
+ *   «Enviado na semana anterior ao evento.»
+ *   «Enviado depois do evento, a agradecer ao cliente.»
+ *
+ * Nenhuma das quatro era verdade. O `renderTemplate` — a função que resolve os
+ * `{marcadores}` no envio — não tinha um único chamador de produção: o email
+ * que saía com a proposta era HTML escrito à mão dentro da rota, e os outros
+ * três não saíam de lado nenhum. Ela escreveu estes textos a acreditar que
+ * chegavam a clientes.
+ *
+ * A promessa nova é MENOR e é verdadeira, e cada linha diz duas coisas — se
+ * sai sozinho, e por onde. Um modelo que se envie por um botão sem dizer onde
+ * está o botão só troca uma frase falsa por uma frase inútil.
+ *
+ * ── PORQUE É QUE TRÊS DELES NÃO SÃO AUTOMÁTICOS ───────────────────────────
+ *
+ * Não é trabalho por acabar: é uma decisão. Um «Falta uma semana para o grande
+ * dia» que sai sozinho para um casamento adiado, ou um agradecimento a caminho
+ * de um casal cujo evento foi cancelado na véspera, é a casa a mostrar que não
+ * está a olhar. Ver o cabeçalho de `api/orcamento/[id]/modelo/route.ts`.
+ *
+ * Estas frases andam sempre com o código que as cumpre. Ligar um agendador aos
+ * três, ou mudar de sítio o botão, obriga a reescrevê-las — e há testes
+ * (`EmailTemplates.verdade.test.tsx`) que falham primeiro se assim não for.
+ */
 const DESCRIPTIONS: Record<string, string> = {
-  "proposta-enviada": "Enviado ao cliente quando a proposta segue.",
-  "sinal-recebido": "Enviado quando o sinal é recebido e a reserva fica confirmada.",
-  "semana-evento": "Enviado na semana anterior ao evento.",
-  agradecimento: "Enviado depois do evento, a agradecer ao cliente.",
+  "proposta-enviada":
+    "Sai sozinho no email que leva a proposta ao cliente (botão «Enviar proposta», no Estúdio de " +
+    "propostas). Enquanto não guardares este modelo, sai o texto da casa; e quando escreves uma " +
+    "mensagem tua para acompanhar a proposta, é o texto da casa que sai, para a tua mensagem ficar " +
+    "logo a seguir ao «Olá».",
+  "sinal-recebido":
+    "Não sai sozinho. Envias tu, no Dossier do evento → Comunicação → «Enviar um modelo», quando o " +
+    "sinal já estiver registado como pago.",
+  "semana-evento":
+    "Não sai sozinho. Envias tu, no Dossier do evento → Comunicação → «Enviar um modelo», na semana " +
+    "anterior ao evento.",
+  agradecimento:
+    "Não sai sozinho. Envias tu, no Dossier do evento → Comunicação → «Enviar um modelo», depois do " +
+    "evento.",
 };
 
 type Mode = "visual" | "advanced";
@@ -750,8 +792,19 @@ export default function EmailTemplates() {
           {/* Live preview */}
           <div className="bo-card p-5 xl:sticky xl:top-5">
             <p className="bo-eyebrow mb-1.5">Pré-visualização</p>
+            {/* A MOLDURA E O FECHO NÃO ESTÃO AQUI, E TÊM DE SER DITOS.
+                O que se vê é só o CORPO. Todo o email ao cliente é embrulhado
+                na moldura da casa e fechado pela assinatura (Catarina Gaspar,
+                cargo, contactos, logótipo e banner), que o `emailAoCliente`
+                põe sempre no fim — e essa vive no servidor, com imagens que
+                viajam por `cid:`, portanto não se desenha nesta caixa.
+                Sem esta frase, o modelo despede-se por cima da assinatura e o
+                cliente recebe dois fechos colados: foi exactamente o que
+                aconteceu nos atalhos do mensageiro. */}
             <p className="text-[11px] text-foreground/40 mb-3 leading-relaxed">
-              É assim que o cliente vê o email, com dados de exemplo.
+              É assim que o cliente vê o corpo do email, com dados de exemplo. No fim, a assinatura
+              da Líquen (Catarina Gaspar, contactos e logótipo) entra sozinha — não precisas de te
+              despedir nem de repetir o nome da empresa.
             </p>
             <div className="rounded-lg border border-foreground/[0.08] overflow-hidden">
               <div className="px-3 py-2 bg-foreground/[0.03] border-b border-foreground/[0.06]">

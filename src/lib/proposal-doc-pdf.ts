@@ -32,7 +32,7 @@ import {
 } from "@/lib/proposal-doc";
 import { ordemDeSaida, eAOrdemEscrita } from "@/lib/proposal-ordem";
 import { ordemDasFotos } from "@/lib/proposal-moodboard";
-import { round2 } from "@/lib/money";
+import { eurDocumento, milharesComPonto, round2 } from "@/lib/money";
 import { normalizarValor, somaDosExtrasSemIva, totaisDaProposta } from "@/lib/proposal-budget";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
 import {
@@ -80,44 +80,26 @@ import {
  */
 
 /**
- * O SEPARADOR DE MILHARES DESTA FOLHA É O PONTO.
+ * O SEPARADOR DE MILHARES DESTA FOLHA É O PONTO — e hoje o de todas.
  *
- * O `Intl` pt-PT separa os milhares com um espaço inquebrável — «10 300,00 €».
- * O «Valor Total» é texto escrito por ela, e ela escreve-o como toda a gente
- * escreve em Portugal: «12.300,00 €». O resultado era um orçamento com os dois
- * lado a lado, no mesmo quadro, com pontuação diferente — o género de pormenor
- * que faz um casal olhar duas vezes para uma folha de dinheiro e perguntar se
- * os números vieram de sítios diferentes. (Vieram: um é dela, o outro é uma
- * conta nossa. Não se deve notar.)
+ * O `eurDoc` e o `milharesComPonto` nasceram aqui, privados, porque o problema
+ * era desta folha: o «Valor Total» é texto escrito por ela, e ela escreve-o
+ * como toda a gente escreve em Portugal («12.300,00 €»), enquanto o `Intl` de
+ * pt-PT escrevia «12 300,00 €» — ou «2460,00 €», sem separador nenhum, porque
+ * só agrupa a partir de cinco dígitos. Os dois lado a lado, no mesmo quadro.
  *
- * Normaliza-se AQUI, no desenho, e não no `eur` partilhado: isto é uma decisão
- * tipográfica deste documento, não uma mudança na forma como a aplicação inteira
- * mostra dinheiro. O espaço inquebrável ANTES do «€» fica — esse é o certo.
+ * O mesmo defeito estava, sem ninguém dar por ele, na factura (base com espaço,
+ * IVA sem nada, total com espaço — TUDO na mesma coluna) e no email que leva
+ * esta proposta em anexo («7.890,00 €» no PDF, «7890,00 €» no email). Por isso
+ * o formatador mudou-se para o `money.ts`, ao lado do `eur`, e passou a ser o
+ * de todos os artefactos que o cliente lê. A decisão continua a ser a mesma —
+ * o que mudou foi o âmbito; o raciocínio inteiro está escrito lá.
+ *
+ * O `milharesComPonto` continua a ser usado À PARTE do `eurDocumento` nos
+ * sítios em que o valor é TEXTO DELA (o «Valor Total» escrito à mão, o valor
+ * de um adicional): aí não há número nenhum para formatar, só pontuação para
+ * acertar com a do resto da folha.
  */
-function milharesComPonto(texto: string): string {
-  return texto.replace(/\u00A0(?=\d{3}(?:\D|$))/g, ".");
-}
-
-/**
- * Euros como o resto da folha os escreve.
- *
- * \u2500\u2500 PORQUE \u00C9 QUE N\u00C3O \u00C9 O `eur` PARTILHADO \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
- * O `Intl` de pt-PT s\u00F3 agrupa a partir de CINCO d\u00EDgitos: 30 750 sai \u00AB30 750,00 \u20AC\u00BB
- * e 2 460 sai \u00AB2460,00 \u20AC\u00BB, sem separador nenhum. Numa proposta de decora\u00E7\u00E3o os
- * valores vivem quase todos nos milhares, e o quadro ficava a dizer \u00AB2460,00 \u20AC\u00BB
- * numa linha e \u00AB7.890,00 \u20AC\u00BB na outra \u2014 o n\u00FAmero dela com ponto, o nosso sem
- * nada, na mesma coluna. `always` agrupa sempre, e o `milharesComPonto` troca
- * depois o espa\u00E7o inquebr\u00E1vel pelo ponto que ela escreve.
- */
-const eurDoc = (n: number): string =>
-  milharesComPonto(
-    new Intl.NumberFormat("pt-PT", {
-      style: "currency",
-      currency: "EUR",
-      maximumFractionDigits: 2,
-      useGrouping: "always",
-    }).format(n || 0),
-  );
 
 /**
  * A taxa de IVA como se escreve ao lado do valor: 0,23 → «23%», 0,06 → «6%».
@@ -1612,7 +1594,7 @@ export async function renderProposalDocPdfWithReport(
       budgetBreak(30 + (extras.length + 4) * 18 + boxH);
       linhaDeTotal(
         orgT ? t.subtotalServicosEstimado : t.subtotalServicos,
-        eurDoc(totais.servicos),
+        eurDocumento(totais.servicos),
         11,
         true,
       );
@@ -1640,7 +1622,7 @@ export async function renderProposalDocPdfWithReport(
           // ela pediu: sem ele, uma parcela por baixo de um subtotal tanto pode
           // somar como descontar, e nada na folha o dizia.
           if (i === 0) {
-            textRight(p, cru === null ? "—" : `+ ${eurDoc(base)}`, M + boxW, y, {
+            textRight(p, cru === null ? "—" : `+ ${eurDocumento(base)}`, M + boxW, y, {
               size: 10.5,
               color: INK,
             });
@@ -1652,13 +1634,13 @@ export async function renderProposalDocPdfWithReport(
       y -= 4;
       reguaDeSoma();
       // O TOTAL: a base sobre a qual o IVA, o sinal e o saldo são calculados.
-      linhaDeTotal(t.totalSemIva, eurDoc(totais.total), 12.5, true);
-      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDoc(totais.iva), 12.5);
+      linhaDeTotal(t.totalSemIva, eurDocumento(totais.total), 12.5, true);
+      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDocumento(totais.iva), 12.5);
       budgetBreak(boxH + 24);
       y -= 6;
       // O número grande é o que o casal transfere — e é o mesmo, ao cêntimo,
       // que a folha do fecho parte em sinal e saldo.
-      drawTotal(p, y, t.totalAPagar, eurDoc(totais.aPagar));
+      drawTotal(p, y, t.totalAPagar, eurDocumento(totais.aPagar));
       /* ── O QUE ESTE BLOCO CUSTA, MEDIDO ────────────────────────────────────
          Setenta pontos a mais do que o quadro que aqui estava (o «Valor Total»,
          os adicionais, e nada mais). Numa proposta COM valores adicionais isso
@@ -1704,10 +1686,10 @@ export async function renderProposalDocPdfWithReport(
       // pontos de tinta a dizer «o que vem acima somou-se», numa folha onde
       // nada somou. E cada ponto conta — ver a nota da paginação mais abaixo.
       budgetBreak(30 + 3 * 18 + boxH);
-      linhaDeTotal(t.totalSemIva, eurDoc(totais.total), 12.5, true);
-      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDoc(totais.iva), 12.5);
+      linhaDeTotal(t.totalSemIva, eurDocumento(totais.total), 12.5, true);
+      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDocumento(totais.iva), 12.5);
       budgetBreak(boxH + 24);
-      drawTotal(p, y, t.totalAPagar, eurDoc(totais.aPagar));
+      drawTotal(p, y, t.totalAPagar, eurDocumento(totais.aPagar));
       y -= boxH + 6;
     } else {
       budgetBreak(boxH + 24 + 18);
@@ -1748,7 +1730,7 @@ export async function renderProposalDocPdfWithReport(
       const maisIva = totais.modo === "acrescer" ? ` ${t.maisIva}` : "";
       budgetBreak(40);
       text(p, t.semOsExtras, M, y, { size: 10.5, color: MUTED });
-      textRight(p, `${eurDoc(versoes.comoOTotal.base)}${maisIva}`, M + boxW, y, {
+      textRight(p, `${eurDocumento(versoes.comoOTotal.base)}${maisIva}`, M + boxW, y, {
         font: f.serif,
         size: 13,
         color: INK,
@@ -2079,7 +2061,7 @@ export async function renderProposalDocPdfWithReport(
           [t.sinal(pct), totais.sinal, t.quandoSinal],
           [t.saldo(100 - pct), totais.saldo, t.quandoSaldo],
         ] as const) {
-          text(p, `${rotulo}   ${eurDoc(valor)}`, M + 14, y, {
+          text(p, `${rotulo}   ${eurDocumento(valor)}`, M + 14, y, {
             font: f.serif,
             size: 10.5,
             color: INK,
@@ -2098,7 +2080,7 @@ export async function renderProposalDocPdfWithReport(
          * A frase diz de onde saem, e diz o número: é a mesma palavra («total a
          * pagar») e o mesmo valor, ao cêntimo, que fecha o quadro do orçamento.
          */
-        text(p, t.baseDoCalculo(eurDoc(totais.aPagar)), M + 14, y, { size: 9, color: MUTED });
+        text(p, t.baseDoCalculo(eurDocumento(totais.aPagar)), M + 14, y, { size: 9, color: MUTED });
         y -= 17;
       },
     });

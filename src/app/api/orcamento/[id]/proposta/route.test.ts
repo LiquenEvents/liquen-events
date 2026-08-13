@@ -45,6 +45,13 @@ const mail = vi.hoisted(() => ({ send: vi.fn(async (_opts?: unknown) => ({ sent:
  * por isso: o email saía, o teste ficava verde, e o casal carregava num 404.
  */
 const token = vi.hoisted(() => ({ create: vi.fn((proposalId: string) => `tok:${proposalId}`) }));
+/**
+ * O modelo «proposta-enviada» que ela tem GUARDADO — `null` por omissão, que é
+ * o estado de quem nunca abriu o ecrã «Modelos de email». Aí sai o texto da
+ * casa, exactamente como sempre saiu, e é isso que os testes do dinheiro (mais
+ * abaixo) continuam a medir.
+ */
+const modelo = vi.hoisted(() => ({ get: vi.fn(async (_chave: string) => null as unknown) }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/quotes-store", () => ({ getQuote: quotes.get, updateQuoteWith: quotes.update }));
@@ -58,6 +65,13 @@ vi.mock("@/lib/mail", () => ({
   MAIL_TO: "team@example.com",
 }));
 vi.mock("@/lib/proposal-token", () => ({ createProposalToken: token.create }));
+// Só o `getTemplate` é duplo: o `renderTemplate`, os campos de fusão e as
+// sementes são os verdadeiros, para o que se mede aqui ser mesmo o caminho que
+// leva o texto dela até ao email.
+vi.mock("@/lib/email-templates-store", async (original) => {
+  const real = await original<typeof import("@/lib/email-templates-store")>();
+  return { ...real, getTemplate: modelo.get };
+});
 vi.mock("@/lib/proposal-pdf", () => ({
   renderProposalPdf: vi.fn(async () => new Uint8Array([1, 2, 3])),
 }));
@@ -80,6 +94,7 @@ beforeEach(() => {
   quotes.estado = "pendente";
   quotes.gravado = null;
   vi.clearAllMocks();
+  modelo.get.mockResolvedValue(null);
 });
 
 describe("GET /api/orcamento/[id]/proposta", () => {
@@ -339,5 +354,248 @@ describe("POST /api/orcamento/[id]/proposta — assinatura", () => {
     await POST(req("POST", validItems), ctx("LIQ-1"));
     const env = mail.send.mock.calls.at(-1)![0] as { html: string };
     expect(env.html).not.toContain("Líquen Events · ");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O EMAIL TEM DE DIZER O MESMO NÚMERO QUE O PDF QUE LEVA EM ANEXO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O PDF escreve «7.890,00 €» — é a pontuação portuguesa, e é a que ela própria
+ * escreve à mão no «Valor Total». O email, que sai do mesmo POST e transporta
+ * esse PDF, dizia «7890,00 €»: o `Intl` de pt-PT só agrupa a partir de cinco
+ * dígitos e agrupa com espaço inquebrável, nunca com ponto.
+ *
+ * Dois números diferentes para o mesmo valor, a um clique de distância um do
+ * outro, é o género de pormenor que faz um casal perguntar se os números vieram
+ * de sítios diferentes.
+ */
+describe("POST /api/orcamento/[id]/proposta — o dinheiro no email", () => {
+  /**
+   * O espaço antes do «€» é INQUEBRÁVEL e escreve-se por extenso: à letra, num
+   * ficheiro de texto, é indistinguível de um espaço normal — e uma expectativa
+   * com o espaço errado documenta o contrário do que se quer.
+   */
+  const EURO = "\u00A0€";
+
+  /** O corpo do email, HTML e texto simples, no último envio. */
+  function corpos(): string[] {
+    const env = mail.send.mock.calls.at(-1)![0] as { html: string; text?: string };
+    return [env.html, env.text ?? ""];
+  }
+
+  /** Uma linha com o preço unitário que dá o total pedido, IVA a 23% incluído. */
+  const porTotal = (total: number) => ({
+    lineItems: [{ description: "Decoração", qty: 1, unitPrice: total / 1.23 }],
+  });
+
+  it("escreve os milhares com PONTO, mesmo com quatro dígitos", async () => {
+    authed.ok = true;
+    await POST(req("POST", porTotal(7890)), ctx("LIQ-1"));
+    for (const corpo of corpos()) {
+      expect(corpo).toContain(`7.890,00${EURO}`);
+      expect(corpo).not.toContain(`7890,00${EURO}`);
+    }
+  });
+
+  it("24 600 € sai igual ao PDF — e não com o espaço do Intl", async () => {
+    authed.ok = true;
+    await POST(req("POST", porTotal(24600)), ctx("LIQ-1"));
+    for (const corpo of corpos()) {
+      expect(corpo).toContain(`24.600,00${EURO}`);
+      expect(corpo).not.toContain(`24\u00A0600,00${EURO}`);
+    }
+  });
+
+  it("999 € não leva separador nenhum", async () => {
+    authed.ok = true;
+    await POST(req("POST", porTotal(999)), ctx("LIQ-1"));
+    for (const corpo of corpos()) {
+      expect(corpo).toContain(`999,00${EURO}`);
+      expect(corpo).not.toContain(`.999,00${EURO}`);
+    }
+  });
+
+  it("um milhão leva os dois pontos", async () => {
+    authed.ok = true;
+    await POST(req("POST", porTotal(1234567)), ctx("LIQ-1"));
+    for (const corpo of corpos()) {
+      expect(corpo).toContain(`1.234.567,00${EURO}`);
+    }
+  });
+
+  /**
+   * A FRONTEIRA É QUEM LÊ — e este teste é que a segura.
+   *
+   * A linha do histórico fica com o formato do back office (`eur`), e não
+   * com o dos documentos. Não é esquecimento: o histórico só é lido no
+   * painel (`ActivityLog.tsx`), e há rotas irmãs a escrever linhas da mesma
+   * forma para o mesmo pedido. Mudar só esta punha o painel a mostrar o
+   * mesmo valor de duas maneiras — o defeito outra vez, do lado de dentro.
+   *
+   * O que TEM de ser verdade é que o número do CLIENTE já saiu certo no
+   * mesmo pedido: é isso que se verifica a seguir, lado a lado.
+   */
+  it("o histórico fica com o formato do painel; o email é que muda", async () => {
+    authed.ok = true;
+    await POST(req("POST", porTotal(4600)), ctx("LIQ-1"));
+    const log = JSON.stringify(quotes.gravado?.activityLog ?? []);
+    expect(log).toContain(`4600,00${EURO}`);
+    for (const corpo of corpos()) expect(corpo).toContain(`4.600,00${EURO}`);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O MODELO DELA É O EMAIL QUE SAI COM A PROPOSTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O ecrã «Modelos de email» dizia, por baixo do «Proposta enviada», «Enviado ao
+ * cliente quando a proposta segue» — e era falso: o `renderTemplate` não tinha
+ * um único chamador, e o que saía era o HTML escrito à mão nesta rota. Passa a
+ * ser verdade, com um recurso que nunca deixa sair um email vazio nem com um
+ * buraco onde devia estar um dado.
+ */
+describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", () => {
+  const enviado = () =>
+    mail.send.mock.calls.at(-1)![0] as { subject: string; html: string; text: string };
+
+  const modeloGuardado = (subject: string, body: string) => ({
+    key: "proposta-enviada",
+    name: "Proposta enviada",
+    subject,
+    body,
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  it("sem modelo guardado sai o texto da casa — o de sempre", async () => {
+    authed.ok = true;
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    const email = enviado();
+    expect(email.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(email.html).toContain("Segue em anexo a proposta personalizada");
+  });
+
+  it("com modelo guardado é o texto DELA que vai, assunto incluído", async () => {
+    authed.ok = true;
+    modelo.get.mockResolvedValue(
+      modeloGuardado(
+        "A sua proposta | Líquen Events",
+        `<div style="max-width:560px"><p>Olá {nome}, a proposta está pronta.</p></div>`,
+      ),
+    );
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    const email = enviado();
+    expect(email.subject).toBe("A sua proposta | Líquen Events");
+    expect(email.html).toContain("Olá Ana, a proposta está pronta.");
+    expect(email.html).not.toContain("Segue em anexo a proposta personalizada");
+    // A versão em texto simples é derivada do modelo, não mandada em branco
+    // nem cheia de etiquetas — é ela que passa pelos filtros de spam.
+    expect(email.text).toContain("Olá Ana, a proposta está pronta.");
+    expect(email.text).not.toMatch(/[<>]/);
+  });
+
+  /**
+   * O {link} tem de receber o link de aceitação VERDADEIRO — o token da
+   * proposta que acabou de ser criada, e não o do pedido. Um duplo que
+   * devolvesse sempre a mesma corda deixava passar exactamente esse defeito:
+   * o email saía, o teste ficava verde, e o casal carregava num 404.
+   */
+  it("o {link} recebe o link de aceitação verdadeiro, com o token da proposta", async () => {
+    authed.ok = true;
+    modelo.get.mockResolvedValue(
+      modeloGuardado("A sua proposta", `<p>Veja aqui: <a href="{link}">{link}</a></p>`),
+    );
+    const res = await POST(req("POST", validItems), ctx("LIQ-1"));
+    const { id: proposalId } = await res.json();
+    const esperado = `${SITE.url}/proposta/tok:${proposalId}`;
+    expect(token.create).toHaveBeenCalledWith(proposalId);
+    // O corpo é mesmo o DELA (e não o da casa, que também tem este link).
+    expect(enviado().html).toContain("Veja aqui:");
+    expect(enviado().html).toContain(`href="${esperado}"`);
+    expect(enviado().text).toContain(esperado);
+  });
+
+  it("um modelo guardado VAZIO não manda um email em branco — recorre ao texto da casa", async () => {
+    authed.ok = true;
+    modelo.get.mockResolvedValue(modeloGuardado("A sua proposta", `<div>\n  <p>   </p>\n</div>`));
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+  });
+
+  /**
+   * `renderTemplate` troca por vazio o marcador que não conhece. Um modelo que
+   * cite `{local}` num pedido sem local escreveria «no ». Ninguém está a ver
+   * este envio para poder corrigir — e a proposta TEM de seguir —, por isso
+   * cai-se no texto da casa, que não tem marcadores nenhuns.
+   */
+  it("um marcador sem valor não deixa sair o buraco — recorre ao texto da casa", async () => {
+    authed.ok = true;
+    // Um pedido de um particular: tem local e data, não tem empresa. O modelo
+    // que cite `{empresa}` escreveria «para a » no assunto e «da » no corpo.
+    modelo.get.mockResolvedValue(
+      modeloGuardado("A sua proposta para a {empresa}", `<p>Olá {nome}, da {empresa}.</p>`),
+    );
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    const email = enviado();
+    expect(email.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(email.subject).not.toContain("para a ");
+    expect(email.html).not.toContain("da .");
+  });
+
+  /** O rodapé que os modelos guardados dela trazem lá dentro não pode sair
+   *  colado à assinatura da casa, que o `emailAoCliente` põe sempre no fim. */
+  it("o rodapé que vem DENTRO do modelo guardado não sai a dobrar", async () => {
+    authed.ok = true;
+    modelo.get.mockResolvedValue(
+      modeloGuardado(
+        "A sua proposta",
+        [
+          `<div style="max-width:560px">`,
+          `  <p>Olá {nome},</p>`,
+          `  <hr style="border:none;border-top:1px solid #eee">`,
+          `  <p style="font-size:12px;color:#999">Líquen Events · Portugal</p>`,
+          `</div>`,
+        ].join("\n"),
+      ),
+    );
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    expect(enviado().html).not.toContain("Líquen Events · Portugal");
+  });
+
+  /**
+   * O `{nome}` do modelo é o PRIMEIRO nome, como em todo o resto da casa — há
+   * quem escreva o nome legal inteiro no formulário, e «Olá Francisco Maria
+   * Carrelhas Das Neves Da Palma Gaspar,» já saiu mesmo assim daqui.
+   *
+   * O ESCAPE do valor não se mede neste ficheiro: o `esc` está aqui duplicado
+   * pela identidade (ver o `vi.mock` de `@/lib/mail` lá em cima), portanto um
+   * teste de escape aqui media o duplo e não o código. Vive em
+   * `src/lib/email-modelos.test.ts`, com o `esc` verdadeiro.
+   */
+  it("o {nome} do modelo é o primeiro nome, não o nome legal inteiro", async () => {
+    authed.ok = true;
+    quotes.get.mockResolvedValue({
+      id: "LIQ-1",
+      name: "Francisco Maria Carrelhas Das Neves Da Palma Gaspar",
+      email: "ana@x.pt",
+      date: "2026-09-01",
+      guests: 50,
+      location: "Lisboa",
+      status: "pendente",
+    });
+    modelo.get.mockResolvedValue(modeloGuardado("A sua proposta", `<p>Olá {nome},</p>`));
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    expect(enviado().html).toContain("Olá Francisco,");
+    expect(enviado().html).not.toContain("Carrelhas");
+  });
+
+  it("uma avaria a ler a tabela dos modelos não impede a proposta de seguir", async () => {
+    authed.ok = true;
+    modelo.get.mockRejectedValue(new Error('relation "email_templates" does not exist'));
+    const res = await POST(req("POST", validItems), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
   });
 });

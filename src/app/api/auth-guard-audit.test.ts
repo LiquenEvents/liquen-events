@@ -484,6 +484,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./orcamento/[id]/assets/importar/route", methods: ["POST"] },
   { path: "./orcamento/[id]/fatura/route", methods: ["POST"] },
   { path: "./orcamento/[id]/mensagem/route", methods: ["POST"] },
+  // Manda um modelo de email ao cliente (e, sem `enviar`, pré-visualiza-o com o
+  // endereço dele lá dentro). Escreve para fora da casa — a barreira é a mesma
+  // do mensageiro.
+  { path: "./orcamento/[id]/modelo/route", methods: ["POST"] },
   { path: "./orcamento/[id]/proposta/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/proposta-doc/route", methods: ["POST"] },
   // O rascunho é trabalho comercial por publicar (preços, notas internas): ler

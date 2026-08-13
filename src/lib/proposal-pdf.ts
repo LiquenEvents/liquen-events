@@ -3,6 +3,17 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import type { Proposal } from "@/lib/orcamento/types";
 import { SITE } from "@/lib/site";
 import { winAnsiSafe } from "@/lib/pdf-text";
+/**
+ * O formatador é o PARTILHADO dos documentos, e não uma cópia local do `Intl`.
+ *
+ * Esta era a terceira cópia da mesma função na casa — e a terceira a herdar as
+ * manias do `Intl` de pt-PT: uma linha de 4 600 € saía «4600,00 €» ao lado de
+ * um total de 24 600 € escrito «24 600,00 €», na mesma coluna. O documento novo
+ * da proposta já normalizava isto para si; hoje a regra é uma só, no `money.ts`,
+ * e vale para todos os papéis que o casal lê. A `currency` da proposta continua
+ * a ser respeitada — ver lá.
+ */
+import { eurDocumento } from "@/lib/money";
 
 const MOSS = rgb(0.29, 0.486, 0.349);
 const INK = rgb(0.1, 0.1, 0.1);
@@ -17,14 +28,6 @@ const MARGIN = 56;
  * escrita. Mesmo valor e mesma razão do `FUSO` do contract-pdf.
  */
 const FUSO = "Europe/Lisbon";
-
-function eur(n: number, currency = "EUR"): string {
-  return new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(n || 0);
-}
 
 /**
  * Quebra um texto em linhas que cabem em `maxWidth` (respeita \n internos).
@@ -242,8 +245,8 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
 
     text(lines[0], colDesc, y, { size: 10 });
     textRight(String(item.qty), colQty + 14, y, { size: 10, color: MUTED });
-    textRight(eur(item.unitPrice, p.currency), colUnit + 6, y, { size: 10, color: MUTED });
-    textRight(eur(lineTotal, p.currency), colTotal, y, { size: 10 });
+    textRight(eurDocumento(item.unitPrice, p.currency), colUnit + 6, y, { size: 10, color: MUTED });
+    textRight(eurDocumento(lineTotal, p.currency), colTotal, y, { size: 10 });
     y -= 14;
     for (let i = 1; i < lines.length; i++) {
       text(lines[i], colDesc, y, { size: 10 });
@@ -262,13 +265,13 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
 
   const totalsLabelX = colUnit + 6;
   textRight("Subtotal", totalsLabelX, y, { size: 9, color: MUTED });
-  textRight(eur(p.subtotal, p.currency), colTotal, y, { size: 9 });
+  textRight(eurDocumento(p.subtotal, p.currency), colTotal, y, { size: 9 });
   y -= 16;
   textRight(`IVA (${Math.round(p.vatRate * 100)}%)`, totalsLabelX, y, { size: 9, color: MUTED });
-  textRight(eur(p.vat, p.currency), colTotal, y, { size: 9 });
+  textRight(eurDocumento(p.vat, p.currency), colTotal, y, { size: 9 });
   y -= 20;
   textRight("TOTAL", totalsLabelX, y, { font: bold, size: 12, color: MOSS });
-  textRight(eur(p.total, p.currency), colTotal, y, { font: bold, size: 12, color: MOSS });
+  textRight(eurDocumento(p.total, p.currency), colTotal, y, { font: bold, size: 12, color: MOSS });
   y -= 34;
 
   // ── Validity + notes ──

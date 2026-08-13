@@ -69,6 +69,17 @@ vi.mock("@/lib/proposal-doc-render", () => ({
     };
   }),
 }));
+/**
+ * O modelo «proposta-enviada» que ela tem GUARDADO — `null` por omissão, que é
+ * o estado de quem nunca abriu o ecrã «Modelos de email»: aí sai o texto da
+ * casa, exactamente como sempre saiu. Só o `getTemplate` é duplo; o
+ * `renderTemplate` e as sementes são os verdadeiros.
+ */
+const modelo = vi.hoisted(() => ({ get: vi.fn(async (_chave: string) => null as unknown) }));
+vi.mock("@/lib/email-templates-store", async (original) => {
+  const real = await original<typeof import("@/lib/email-templates-store")>();
+  return { ...real, getTemplate: modelo.get };
+});
 vi.mock("@/lib/proposal-token", () => ({ createProposalToken: vi.fn(() => "tok") }));
 vi.mock("@/lib/mail", () => ({
   sendMail: vi.fn(async () => ({ sent: true })),
@@ -150,6 +161,7 @@ beforeEach(() => {
   store.failFirstWith = null;
   store.attempts = 0;
   vi.clearAllMocks();
+  modelo.get.mockResolvedValue(null);
 });
 
 describe("POST /api/orcamento/[id]/proposta-doc — money model", () => {
@@ -864,5 +876,124 @@ describe("POST /api/orcamento/[id]/proposta-doc — a mensagem pessoal", () => {
     const res = await POST(envioCom({ isto: "não é texto" }), { params });
     expect(res.status).toBe(200);
     expect(enviado().html).toMatch(/Olá [^<]*<\/p>\s*<p[^>]*>Segue em anexo/);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O MODELO «PROPOSTA ENVIADA» TAMBÉM AQUI
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As duas rotas mandam o mesmo email — a proposta que segue para o cliente —,
+ * por caminhos diferentes (a antiga desenha o PDF de linhas, esta desenha o
+ * documento do estúdio). Se só uma respeitasse o modelo dela, o ecrã «Modelos
+ * de email» continuava a mentir, agora com a agravante de depender do botão em
+ * que ela carregou.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — o modelo «proposta-enviada»", () => {
+  const enviado = () =>
+    vi.mocked(sendMail).mock.calls.at(-1)![0] as unknown as {
+      subject: string;
+      html: string;
+      text: string;
+    };
+
+  const modeloGuardado = (subject: string, body: string) => ({
+    key: "proposta-enviada",
+    name: "Proposta enviada",
+    subject,
+    body,
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  it("sem modelo guardado sai o texto da casa — o de sempre", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+  });
+
+  it("com modelo guardado é o texto dela que vai, e o assunto dela também", async () => {
+    modelo.get.mockResolvedValue(
+      modeloGuardado("A sua proposta | Líquen", `<p>Olá {nome}, está pronta.</p>`),
+    );
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const email = enviado();
+    expect(email.subject).toBe("A sua proposta | Líquen");
+    // O `{nome}` aqui são os NOMES DO CASAL do documento do estúdio, como o
+    // texto da casa já fazia — e não o `quote.name`, que pode ser a mãe da
+    // noiva ou uma wedding planner.
+    expect(email.html).toContain("Olá Maria &amp; Zé, está pronta.");
+    expect(email.text).toContain("Olá Maria & Zé, está pronta.");
+  });
+
+  /**
+   * A MENSAGEM DELA GANHA AO MODELO, E NÃO É INDECISÃO.
+   *
+   * O texto da casa foi desenhado à volta da mensagem pessoal: ela entra logo
+   * a seguir ao «Olá» e ANTES do botão, porque depois do botão é depois do
+   * sítio onde muita gente já carregou (a nota longa está na rota). Um corpo
+   * de modelo é markup opaco — não há onde lá dentro enfiar a mensagem sem
+   * adivinhar. Entre despejar a nota dela no fim, depois do botão, e usar o
+   * texto que tem um lugar para ela, ganha o segundo: a mensagem foi escrita
+   * há um minuto para ESTE casal, e é a mais específica das duas.
+   */
+  it("quando ela escreve uma mensagem para acompanhar a proposta, é o texto da casa que sai", async () => {
+    modelo.get.mockResolvedValue(
+      modeloGuardado("A sua proposta | Líquen", `<p>Olá {nome}, está pronta.</p>`),
+    );
+    await POST(
+      req({
+        mode: "send",
+        doc: baseDoc({ totalAmount: 3000 }),
+        mensagem: "Foi um gosto conhecer-vos na quinta.",
+      }),
+      { params },
+    );
+    const email = enviado();
+    expect(email.html).toContain("Foi um gosto conhecer-vos na quinta.");
+    expect(email.html).toContain("Segue em anexo a proposta personalizada");
+    expect(email.html).not.toContain("está pronta.");
+  });
+
+  it("um modelo com um marcador sem valor não deixa sair o buraco", async () => {
+    // O documento do estúdio não tem empresa nenhuma.
+    modelo.get.mockResolvedValue(
+      modeloGuardado("Proposta para a {empresa}", `<p>Olá {nome}, da {empresa}.</p>`),
+    );
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const email = enviado();
+    expect(email.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(email.html).not.toContain("da .");
+  });
+
+  it("o rodapé do modelo guardado não sai colado à assinatura da casa", async () => {
+    modelo.get.mockResolvedValue(
+      modeloGuardado(
+        "A sua proposta",
+        [
+          `<div style="max-width:560px">`,
+          `  <p>Olá {nome},</p>`,
+          `  <hr style="border:none;border-top:1px solid #eee">`,
+          `  <p style="font-size:12px;color:#999">Líquen Events · Portugal</p>`,
+          `</div>`,
+        ].join("\n"),
+      ),
+    );
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(enviado().html).not.toContain("Líquen Events · Portugal");
+    // A assinatura da casa continua lá — é ela o único fecho.
+    expect(enviado().text).toContain("Catarina Gaspar");
+  });
+
+  /** Os nomes do casal vêm de uma caixa de texto do estúdio: um `<` lá dentro
+   *  não pode virar markup no email. */
+  it("o {nome} entra escapado no corpo e legível no texto simples", async () => {
+    modelo.get.mockResolvedValue(modeloGuardado("A sua proposta", `<p>Olá {nome},</p>`));
+    await POST(sendReq(baseDoc({ totalAmount: 3000, clientNames: `<b>Maria</b> & Zé` })), {
+      params,
+    });
+    const email = enviado();
+    expect(email.html).toContain("&lt;b&gt;Maria&lt;/b&gt;");
+    expect(email.html).not.toContain("<b>Maria</b> &");
+    expect(email.text).not.toMatch(/[<>]/);
   });
 });

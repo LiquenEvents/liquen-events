@@ -14,7 +14,21 @@ import { emailAoCliente } from "@/lib/email-assinatura";
 import { isAuthed } from "@/lib/admin-auth";
 import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
-import { eur } from "@/lib/money";
+/**
+ * DOIS FORMATADORES, E É DE PROPÓSITO — a fronteira é quem lê.
+ *
+ * O `eurDocumento` escreve os milhares com PONTO e é o de tudo o que sai para o
+ * CLIENTE: sem ele, um recibo de 4 600 € dizia «4600,00 €» no email e
+ * «4.600,00 €» no PDF anexo, porque o `Intl` de pt-PT só agrupa a partir de
+ * cinco dígitos (ver `money.ts`).
+ *
+ * O `eur` fica na linha do HISTÓRICO, que é do back office e só é lida no
+ * painel (`ActivityLog.tsx`). Mudá-la aqui deixava-a a discordar das linhas
+ * escritas pelas rotas irmãs — o mesmo defeito outra vez, só que por dentro.
+ * Uma mudança de formato no back office é uma decisão de produto e faz-se toda
+ * de uma vez, apontando o `eur` ao `eurDocumento`, não rota a rota.
+ */
+import { eur, eurDocumento } from "@/lib/money";
 import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
 import { dataIso } from "@/lib/validation";
 import { hojeNoEstudio } from "@/lib/proposal-doc";
@@ -281,13 +295,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const mensagem = emailAoCliente({
         html: `<h2 style="font-size:18px;margin:0 0 12px">${docLabel} — Líquen Events</h2>
         <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(invoice.clientName)},</p>
-        <p style="font-size:14px;line-height:1.6;color:#333">Segue em anexo ${docArtigo} no valor de <strong style="color:#7c854b">${eur(invoice.amount)}</strong>.</p>`,
+        <p style="font-size:14px;line-height:1.6;color:#333">Segue em anexo ${docArtigo} no valor de <strong style="color:#7c854b">${eurDocumento(invoice.amount)}</strong>.</p>`,
         texto: [
           `${docLabel} — Líquen Events`,
           "",
           `Olá ${invoice.clientName},`,
           "",
-          `Segue em anexo ${docArtigo} no valor de ${eur(invoice.amount)}.`,
+          `Segue em anexo ${docArtigo} no valor de ${eurDocumento(invoice.amount)}.`,
         ].join("\n"),
       });
       const mail = await sendMail({

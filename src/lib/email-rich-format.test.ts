@@ -177,6 +177,22 @@ describe("back-compat with existing templates", () => {
     expect(extractRichDoc(simple)).toBeNull();
   });
 
+  /**
+   * O construtor do editor visual tinha o MESMO rodapé escrito à mão que o do
+   * modo simples — «Líquen Events · Portugal» por baixo de um risco. Com os
+   * modelos agora mesmo enviados, isso é um segundo fecho colado ao da casa
+   * (Catarina Gaspar, contactos), que o `emailAoCliente` põe sempre no fim.
+   * A razão por extenso está no teste irmão, em `email-template-format.test.ts`.
+   */
+  it("não escreve rodapé nenhum — a assinatura da casa é o único fecho", () => {
+    const html = buildRichEmailHtml(docFromPlainText("Olá {nome},\n\nObrigado."));
+    expect(html).not.toContain("Líquen Events");
+    expect(html).not.toMatch(/<hr\b/i);
+    // O que é dela continua lá, e o modelo continua a reabrir sem perdas.
+    expect(html).toContain("Olá {nome},");
+    expect(extractRichDoc(html)).not.toBeNull();
+  });
+
   it("docFromPlainText opens simple text as paragraphs, preserving tokens", () => {
     const doc = docFromPlainText("Olá {nome},\nlinha 2\n\nsegundo");
     expect(doc.blocks).toEqual([

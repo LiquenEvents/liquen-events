@@ -7,11 +7,27 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
+import { marcadoresDoPedido, modeloParaEnvioAutomatico } from "@/lib/email-modelos";
 import { SITE } from "@/lib/site";
 import { createProposalToken } from "@/lib/proposal-token";
 import { isAuthed } from "@/lib/admin-auth";
 import { proposalCreateSchema, firstError, dataIso } from "@/lib/validation";
 import { log } from "@/lib/logger";
+/**
+ * O MESMO NÚMERO NO EMAIL E NO PDF QUE ELE LEVA EM ANEXO — e dois formatadores.
+ *
+ * Aqui vivia uma QUARTA cópia do `Intl` de pt-PT, escrita à mão nesta rota — e
+ * com ela o email dizia «7890,00 €» enquanto o PDF anexo, gerado no mesmo POST,
+ * dizia «7.890,00 €»: o `Intl` só agrupa milhares a partir de cinco dígitos, e
+ * agrupa-os com espaço inquebrável em vez do ponto português. Dois números para
+ * o mesmo valor, a um clique de distância um do outro.
+ *
+ * O `eurDocumento` é o formatador de tudo o que sai para o CLIENTE; o porquê
+ * inteiro está no `money.ts`. O `eur` fica na linha do HISTÓRICO, que só é lida
+ * no painel — mudá-la aqui deixava-a a discordar das linhas que as rotas irmãs
+ * escrevem para o mesmo pedido.
+ */
+import { eur, eurDocumento } from "@/lib/money";
 
 export const runtime = "nodejs";
 /** O POST desenha o PDF da proposta e ainda fala com o SMTP com o anexo
@@ -22,13 +38,6 @@ export const maxDuration = 60;
 function authorized(request: NextRequest): boolean {
   return isAuthed(request);
 }
-
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2,
-  }).format(n || 0);
 
 // List existing proposals for a quote (admin)
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -146,12 +155,43 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .trim()
       .split(/\s+/)[0];
 
-    const email = emailAoCliente({
-      html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O MODELO DELA, E O TEXTO DA CASA COMO RECURSO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O ecrã «Modelos de email» prometia, por baixo do «Proposta enviada»,
+     * «Enviado ao cliente quando a proposta segue». Era falso: o
+     * `renderTemplate` não tinha um único chamador de produção e o que saía
+     * era o HTML que está aqui em baixo. Passa a ser verdade.
+     *
+     * ── O RECURSO NÃO É ZELO ──────────────────────────────────────────────
+     *
+     * `modeloParaEnvioAutomatico` devolve `null` — e regista porquê — sempre
+     * que o modelo guardado não sirva: não existe, está vazio, ou cita um
+     * marcador que este pedido não sabe preencher. Aí sai o texto de sempre,
+     * que não tem marcadores nenhuns e por isso nunca tem buracos. Um email
+     * em branco, ou com «no » a meio de uma frase, é pior do que não ter
+     * modelo nenhum — e não há aqui ninguém para ler um erro e corrigir.
+     *
+     * Note-se que o `null` é também o estado de quem NUNCA abriu o ecrã: a
+     * semente que ele mostra é um exemplo, não uma decisão dela, e adoptá-la
+     * calava o VALOR TOTAL e a VALIDADE que este texto diz. Nada muda até ela
+     * guardar; a partir daí é o dela que sai.
+     */
+    const doModelo = await modeloParaEnvioAutomatico(
+      "proposta-enviada",
+      marcadoresDoPedido(quote, { link: acceptUrl, valor: eurDocumento(total) }),
+    );
+
+    const email = doModelo
+      ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto })
+      : emailAoCliente({
+          html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
       <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(primeiroNome)},</p>
       <p style="font-size:14px;line-height:1.6;color:#333">
         Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento,
-        no valor total de <strong style="color:#7c854b">${eur(total)}</strong> (IVA incluído).
+        no valor total de <strong style="color:#7c854b">${eurDocumento(total)}</strong> (IVA incluído).
       </p>
       ${proposal.validUntil ? `<p style="font-size:13px;color:#777">Válida até ${esc(new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT"))}.</p>` : ""}
       <p style="margin:24px 0">
@@ -160,23 +200,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       <p style="font-size:14px;line-height:1.6;color:#333">
         Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.
       </p>`,
-      texto: [
-        "A sua proposta — Líquen Events",
-        "",
-        `Olá ${primeiroNome},`,
-        "",
-        `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eur(total)} (IVA incluído).`,
-        proposal.validUntil
-          ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
-          : "",
-        "",
-        `Ver e responder à proposta online: ${acceptUrl}`,
-        "",
-        "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
-      ]
-        .filter((line) => line !== "")
-        .join("\n"),
-    });
+          texto: [
+            "A sua proposta — Líquen Events",
+            "",
+            `Olá ${primeiroNome},`,
+            "",
+            `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eurDocumento(total)} (IVA incluído).`,
+            proposal.validUntil
+              ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
+              : "",
+            "",
+            `Ver e responder à proposta online: ${acceptUrl}`,
+            "",
+            "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
+          ]
+            .filter((line) => line !== "")
+            .join("\n"),
+        });
 
     // Persist the proposal BEFORE emailing. The email carries a signed accept
     // link; sending it before the proposal exists means that link 404s the moment
@@ -223,7 +263,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           // ninguém, e num telemóvel come os caracteres do assunto que ainda se
           // veem. O que junta esta conversa na caixa dele são os cabeçalhos
           // `In-Reply-To`/`References`, nunca o assunto.
-          subject: "Proposta para o seu evento — Líquen Events",
+          //
+          // O assunto vem do MODELO quando é o modelo que sai: o corpo é dela e
+          // a linha que o cliente lê antes de abrir também tem de ser — dois
+          // assuntos para o mesmo email era o ecrã dos modelos a mentir outra
+          // vez, agora só a meio.
+          subject: doModelo?.assunto ?? "Proposta para o seu evento — Líquen Events",
           html: email.html,
           text: email.text,
           // O PDF JUNTA-SE aos anexos da assinatura, não os substitui:

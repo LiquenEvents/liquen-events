@@ -1,0 +1,161 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { Quote } from "@/lib/orcamento/types";
+import EnviarModelo from "./EnviarModelo";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O BOTÃO É O ÚNICO CAMINHO — E NÃO DISPARA POR SI
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A regra que estes testes prendem: **nada aqui envia um email sem dois gestos
+ * dela** — escolher o modelo (que só PRÉ-VISUALIZA) e confirmar. E o segundo
+ * gesto acontece com o destinatário à vista, porque um email a um cliente não
+ * se desfaz.
+ */
+
+const QUOTE = { id: "LIQ-1", name: "Ana Ribeiro", email: "ana@x.pt" } as unknown as Quote;
+
+const fetchMock = vi.fn();
+
+function respostaDe(corpo: unknown, status = 200) {
+  return Promise.resolve({
+    ok: status < 400,
+    status,
+    json: async () => corpo,
+  } as Response);
+}
+
+/** O último corpo enviado ao servidor, já em objecto. */
+function ultimoPedido(): { chave?: string; enviar?: boolean } {
+  const [, init] = fetchMock.mock.calls.at(-1)!;
+  return JSON.parse((init as RequestInit).body as string);
+}
+
+beforeEach(() => {
+  fetchMock.mockReset();
+  vi.stubGlobal("fetch", fetchMock);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+const PREVISTO = {
+  ok: true,
+  destinatario: "ana@x.pt",
+  assunto: "Obrigado por nos ter escolhido",
+  texto: "Olá Ana,\n\nObrigado por nos ter confiado um dia tão especial.",
+};
+
+async function escolherAgradecimento(previsao: unknown = PREVISTO) {
+  fetchMock.mockReturnValueOnce(respostaDe(previsao));
+  await userEvent.click(screen.getByRole("button", { name: /Agradecimento/i }));
+}
+
+describe("EnviarModelo — escolher um modelo apenas pré-visualiza", () => {
+  it("carregar num modelo NÃO envia: pede a pré-visualização", async () => {
+    render(<EnviarModelo quote={QUOTE} />);
+    await escolherAgradecimento();
+    expect(ultimoPedido()).toEqual({ chave: "agradecimento" });
+    expect(ultimoPedido().enviar).toBeUndefined();
+  });
+
+  it("mostra o DESTINATÁRIO, o assunto e o texto antes de confirmar", async () => {
+    render(<EnviarModelo quote={QUOTE} />);
+    await escolherAgradecimento();
+    // O endereço aparece no cabeçalho da zona E na confirmação: o que importa
+    // é que esteja debaixo do «Para», ao lado do botão em que ela vai carregar.
+    expect(await screen.findByText("Para")).toBeInTheDocument();
+    expect(screen.getAllByText("ana@x.pt").length).toBeGreaterThan(1);
+    expect(screen.getByText("Obrigado por nos ter escolhido")).toBeInTheDocument();
+    expect(screen.getByText(/Obrigado por nos ter confiado/)).toBeInTheDocument();
+  });
+
+  it("o modelo da proposta não está aqui — esse sai com a proposta", () => {
+    render(<EnviarModelo quote={QUOTE} />);
+    expect(screen.queryByRole("button", { name: /Proposta enviada/i })).toBeNull();
+  });
+});
+
+describe("EnviarModelo — a recusa por marcador em falta", () => {
+  it("mostra a frase do servidor e NÃO oferece o botão de enviar", async () => {
+    render(<EnviarModelo quote={QUOTE} />);
+    fetchMock.mockReturnValueOnce(
+      respostaDe({
+        ok: false,
+        motivo:
+          "O modelo «Falta uma semana» usa data do evento ({data_evento}), e este pedido não tem esse dado. O email NÃO foi enviado.",
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Falta uma semana/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("{data_evento}");
+    expect(screen.queryByRole("button", { name: /^Enviar ao cliente$/ })).toBeNull();
+  });
+});
+
+describe("EnviarModelo — confirmar", () => {
+  it("só o segundo gesto envia, e só então diz que foi enviado", async () => {
+    const onEnviado = vi.fn();
+    render(<EnviarModelo quote={QUOTE} onEnviado={onEnviado} />);
+    await escolherAgradecimento();
+    expect(onEnviado).not.toHaveBeenCalled();
+
+    fetchMock.mockReturnValueOnce(
+      respostaDe({ ok: true, emailed: true, assunto: PREVISTO.assunto }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^Enviar ao cliente$/ }));
+
+    expect(ultimoPedido()).toEqual({ chave: "agradecimento", enviar: true });
+    expect(onEnviado).toHaveBeenCalledWith(
+      "Agradecimento pós-evento",
+      expect.objectContaining({ emailed: true }),
+    );
+  });
+
+  /**
+   * O e-mail não ter saído é um ERRO, não um rodapé — a mesma decisão do
+   * mensageiro. Um pedido que entrou por telefonema não tem email, e o que não
+   * pode ficar por dizer é que o cliente não recebeu nada.
+   */
+  it("quando o email não sai, di-lo a vermelho com a razão do servidor", async () => {
+    const onEnviado = vi.fn();
+    render(<EnviarModelo quote={QUOTE} onEnviado={onEnviado} />);
+    await escolherAgradecimento();
+    fetchMock.mockReturnValueOnce(
+      respostaDe({
+        ok: true,
+        emailed: false,
+        emailError: "Este pedido não tem email de cliente — não foi enviado nada.",
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^Enviar ao cliente$/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("não tem email de cliente");
+    expect(onEnviado).toHaveBeenCalledWith(
+      "Agradecimento pós-evento",
+      expect.objectContaining({ emailed: false }),
+    );
+  });
+
+  it("cancelar fecha a confirmação sem enviar nada", async () => {
+    render(<EnviarModelo quote={QUOTE} />);
+    await escolherAgradecimento();
+    await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
+    expect(screen.queryByText("Para")).toBeNull();
+    expect(screen.queryByText("Obrigado por nos ter escolhido")).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("um 400 do servidor aparece como erro e não como envio", async () => {
+    const onEnviado = vi.fn();
+    render(<EnviarModelo quote={QUOTE} onEnviado={onEnviado} />);
+    await escolherAgradecimento();
+    fetchMock.mockReturnValueOnce(respostaDe({ error: "O modelo está vazio." }, 400));
+    await userEvent.click(screen.getByRole("button", { name: /^Enviar ao cliente$/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("O modelo está vazio.");
+    expect(onEnviado).not.toHaveBeenCalled();
+  });
+});

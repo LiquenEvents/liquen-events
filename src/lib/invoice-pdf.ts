@@ -1,7 +1,14 @@
 import "server-only";
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { SITE } from "@/lib/site";
-import { eur, round2 } from "@/lib/money";
+/**
+ * `eurDocumento` e não `eur`: um documento fiscal escreve os milhares com PONTO,
+ * como se escrevem em Portugal. Com o `eur`, esta folha dizia «20 000,00 €»,
+ * «4600,00 €» e «24 600,00 €» na MESMA coluna, a três linhas de distância — o
+ * do meio sem separador nenhum, porque o `Intl` de pt-PT só agrupa a partir de
+ * cinco dígitos. O porquê inteiro está no `money.ts`.
+ */
+import { eurDocumento, round2 } from "@/lib/money";
 import { winAnsiSafe } from "@/lib/pdf-text";
 
 const MOSS = rgb(0.29, 0.486, 0.349);
@@ -149,8 +156,9 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
    * ── AS TRÊS PARCELAS TÊM DE FECHAR ────────────────────────────────────────
    *
    * Isto era `base = amount / (1 + vatRate)` e `vat = amount - base`, os dois em
-   * vírgula flutuante e sem arredondar, com o `eur()` a arredondar só na altura
-   * de desenhar. Enquanto o valor vem em cêntimos exactos não se nota; assim que
+   * vírgula flutuante e sem arredondar, com o formatador a arredondar só na
+   * altura de desenhar. Enquanto o valor vem em cêntimos exactos não se nota;
+   * assim que
    * traz uma terceira casa decimal — e traz, porque o `parseMoney` do painel
    * aceita "1000,005" e a rota grava o número tal e qual —, as três linhas da
    * factura deixam de dar:
@@ -199,19 +207,19 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
     y -= 13;
   }
   // O valor fica à altura da PRIMEIRA linha da descrição: é a linha do documento.
-  tr(eur(total), right, yDaLinha, { size: 10 });
+  tr(eurDocumento(total), right, yDaLinha, { size: 10 });
   y -= 9;
   hr(y);
   y -= 18;
 
   tr("Base de incidência", right - 110, y, { size: 9, color: MUTED });
-  tr(eur(base), right, y, { size: 9 });
+  tr(eurDocumento(base), right, y, { size: 9 });
   y -= 16;
   tr(`IVA (${Math.round(d.vatRate * 100)}%)`, right - 110, y, { size: 9, color: MUTED });
-  tr(eur(vat), right, y, { size: 9 });
+  tr(eurDocumento(vat), right, y, { size: 9 });
   y -= 20;
   tr("TOTAL", right - 110, y, { font: bold, size: 12, color: MOSS });
-  tr(eur(total), right, y, { font: bold, size: 12, color: MOSS });
+  tr(eurDocumento(total), right, y, { font: bold, size: 12, color: MOSS });
   y -= 30;
 
   // Status

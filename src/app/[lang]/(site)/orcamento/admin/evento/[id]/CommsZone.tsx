@@ -4,6 +4,7 @@ import type { Quote, QuoteMessage, ActivityEntry } from "@/lib/orcamento/types";
 import { resumoDoEnvio, type EnvioDaMensagem } from "../../envio-da-mensagem";
 import { randomId } from "../../util";
 import { ProposalStudio, ClientMessenger } from "../../lazy";
+import EnviarModelo, { type EnvioDoModelo } from "./EnviarModelo";
 
 /**
  * Zona de Comunicação — Proposal Studio (desenhar/enviar a proposta) e o
@@ -71,6 +72,36 @@ export default function CommsZone({ quote, userName, onQuoteChange, onAddEntry }
             });
           }
         }}
+      />
+
+      {/**
+       * Os modelos de email que ela envia à ordem — sinal recebido, falta uma
+       * semana, agradecimento. Aqui, e não na gaveta do pedido, porque são
+       * momentos de um EVENTO já fechado e é o Dossier que tem o que eles
+       * dizem (o sinal pago, a data, o local, o portal). A razão inteira está
+       * no cabeçalho do `EnviarModelo`.
+       */}
+      <EnviarModelo
+        key={`modelos-${quote.id}`}
+        quote={quote}
+        onEnviado={(nome: string, envio: EnvioDoModelo) =>
+          onAddEntry({
+            id: randomId(),
+            at: new Date().toISOString(),
+            kind: "message_sent",
+            actor: userName,
+            /**
+             * A linha diz o que ACONTECEU e NOMEIA o modelo — meses depois, o
+             * que se quer saber é se o agradecimento chegou a sair, não que
+             * «foi enviado um email». Um envio que não saiu (um pedido sem
+             * endereço) não pode passar por enviado: é a mesma regra que o
+             * `resumoDoEnvio` já segura para o mensageiro.
+             */
+            summary: envio.emailed
+              ? `Modelo «${nome}» enviado ao cliente`
+              : `Modelo «${nome}» — o e-mail não saiu, o cliente não recebeu`,
+          })
+        }
       />
     </section>
   );

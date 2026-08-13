@@ -585,3 +585,70 @@ describe("a data de validade", () => {
     expect(texto).toContain(`Esta proposta é válida até ${esperado}.`);
   });
 });
+
+/**
+ * ── O VALOR QUE VEM EM TEXTO, ESCRITO POR ELA ──────────────────────────────
+ *
+ * Nem tudo o que traz um «€» nesta folha é um número nosso. O valor de cada
+ * ADICIONAL («Deslocação da equipa», «Wedding Coordinator») é texto livre — o
+ * que ela escreveu no estúdio, guardado tal e qual — e sai impresso entre
+ * parênteses ao lado do rótulo, a dois centímetros dos números que nós
+ * formatamos.
+ *
+ * Esse texto não passa por formatador nenhum: passa pelo `milharesComPonto`,
+ * que só sabia trocar o espaço inquebrável do `Intl` pelo ponto. E o `Intl`
+ * NÃO PÕE espaço nenhum abaixo de cinco dígitos — portanto «7890,00 €»,
+ * escrito à mão ou colado de uma proposta antiga, chegava ao papel exactamente
+ * assim, ao lado de um «+ 6.414,63 €» que nós tínhamos escrito bem.
+ *
+ * Corrige-se no DESENHO e não em quem grava: as propostas já guardadas têm o
+ * texto antigo lá dentro, e um casal que reabra a sua proposta de janeiro tem
+ * de a ver bem escrita sem que ninguém volte a gravá-la.
+ *
+ * Os espaços aqui são NORMAIS de propósito — é texto de teclado, não saída do
+ * `Intl`. É essa a forma em que ela o escreve.
+ */
+describe("o valor escrito à mão sai como o resto da folha", () => {
+  /**
+   * O modo «IVA incluído» é o que faz o valor CRU dela aparecer entre
+   * parênteses: o que a folha soma é a BASE (o adicional entra líquido), e o
+   * que ela escreveu vai ao lado, a dizer o que aquele valor era.
+   */
+  const comAdicional = (valueText: string) =>
+    proposta({
+      totalVatMode: "incluido",
+      totalText: "10.000,00 €",
+      budgetExtras: [{ label: "Deslocação da equipa", valueText }],
+    });
+
+  it("um adicional de 7 890 € escrito sem separador imprime-se com ponto", async () => {
+    const texto = await textoDoPdf(comAdicional("7890,00 €"));
+    expect(texto).toContain("Deslocação da equipa (7.890,00 €)");
+    expect(texto).not.toContain("(7890,00");
+  });
+
+  /**
+   * Ela nem sempre escreve os cêntimos — «7890 €» é como um valor de
+   * deslocação aparece escrito à pressa. O separador entra na mesma.
+   */
+  it("um valor sem cêntimos leva o ponto na mesma", async () => {
+    const texto = await textoDoPdf(comAdicional("7890 €"));
+    expect(texto).toContain("Deslocação da equipa (7.890 €)");
+    expect(texto).not.toContain("(7890 €)");
+  });
+
+  it("um valor que ela já escreveu bem não é mexido", async () => {
+    const texto = await textoDoPdf(comAdicional("12.300,00 €"));
+    expect(texto).toContain("Deslocação da equipa (12.300,00 €)");
+  });
+
+  /** Três dígitos não levam separador — e o que não é dinheiro não é tocado. */
+  it("999 € fica como está, e uma frase sem euros também", async () => {
+    const texto = await textoDoPdf(comAdicional("999,00 €"));
+    expect(texto).toContain("Deslocação da equipa (999,00 €)");
+    expect(texto).not.toContain(".999,00");
+
+    const semNumero = await textoDoPdf(comAdicional("a definir"));
+    expect(semNumero).toContain("Deslocação da equipa");
+  });
+});

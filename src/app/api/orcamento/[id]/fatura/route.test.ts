@@ -686,3 +686,83 @@ describe("POST /api/orcamento/[id]/fatura — o «hoje» do recurso", () => {
     }
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O EMAIL DO RECIBO TEM DE DIZER O MESMO NÚMERO QUE O PDF QUE LEVA EM ANEXO
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O `Intl` de pt-PT só agrupa milhares a partir de CINCO dígitos, e agrupa-os com
+ * um espaço inquebrável. Um recibo de 4 600 € saía «4600,00 €» no email — e o
+ * PDF anexo, que já normaliza, dizia «4.600,00 €». O mesmo documento, dois
+ * números, à distância de um clique.
+ *
+ * O `resumo` do histórico («FT 2026/0001 · 4 600,00 €») leva o mesmo valor pela
+ * mesma razão: é o número deste documento, e um documento tem um número só.
+ */
+describe("POST /api/orcamento/[id]/fatura — o dinheiro no email", () => {
+  /**
+   * O espaço antes do «€» é INQUEBRÁVEL e escreve-se \u00A0 por extenso: à
+   * letra, num ficheiro de texto, é indistinguível de um espaço normal — e uma
+   * expectativa com o espaço errado documenta o contrário do que se quer.
+   */
+  const EURO = "\u00A0€";
+
+  /** O corpo do email do recibo, HTML e texto simples, no último envio. */
+  async function corpos(amount: number): Promise<string[]> {
+    const res = await POST(
+      req({ kind: "pagamento", amount, paid: true, email: true }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    const env = vi.mocked(sendMail).mock.calls.at(-1)![0];
+    return [env.html ?? "", env.text ?? ""];
+  }
+
+  it("quatro dígitos levam PONTO, como no PDF anexo", async () => {
+    for (const corpo of await corpos(4600)) {
+      expect(corpo).toContain(`4.600,00${EURO}`);
+      expect(corpo).not.toContain(`4600,00${EURO}`);
+    }
+  });
+
+  it("24 600 € deixa de sair com o espaço do Intl", async () => {
+    for (const corpo of await corpos(24600)) {
+      expect(corpo).toContain(`24.600,00${EURO}`);
+      expect(corpo).not.toContain(`24\u00A0600,00${EURO}`);
+    }
+  });
+
+  it("7 890 € e 1 234 567 € escrevem-se como se escreve em Portugal", async () => {
+    for (const corpo of await corpos(7890)) expect(corpo).toContain(`7.890,00${EURO}`);
+    for (const corpo of await corpos(1234567)) expect(corpo).toContain(`1.234.567,00${EURO}`);
+  });
+
+  it("999 € não leva separador nenhum, e os cêntimos ficam com a vírgula", async () => {
+    for (const corpo of await corpos(999)) {
+      expect(corpo).toContain(`999,00${EURO}`);
+      expect(corpo).not.toContain(`.999,00${EURO}`);
+    }
+    for (const corpo of await corpos(24600.75)) expect(corpo).toContain(`24.600,75${EURO}`);
+  });
+
+  /**
+   * A FRONTEIRA É QUEM LÊ — e este teste é que a segura.
+   *
+   * A linha do histórico fica com o formato do back office (`eur`), e não
+   * com o dos documentos. Não é esquecimento: o histórico só é lido no
+   * painel (`ActivityLog.tsx`), e há rotas irmãs a escrever linhas da mesma
+   * forma para o mesmo pedido. Mudar só esta punha o painel a mostrar o
+   * mesmo valor de duas maneiras — o defeito outra vez, do lado de dentro.
+   *
+   * O que TEM de ser verdade é que o número do CLIENTE já saiu certo no
+   * mesmo pedido: é isso que se verifica a seguir, lado a lado.
+   */
+  it("o histórico fica com o formato do painel; o email é que muda", async () => {
+    const [html, texto] = await corpos(4600);
+    const log = JSON.stringify(pedidos.store.get("LIQ-1")?.activityLog ?? []);
+    expect(log).toContain(`4600,00${EURO}`);
+    expect(html).toContain(`4.600,00${EURO}`);
+    expect(texto).toContain(`4.600,00${EURO}`);
+  });
+});

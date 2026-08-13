@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { splitThirtySeventy, eur, eur0, round2, splitSinal, saldoAPartirDoSinal } from "./money";
+import {
+  splitThirtySeventy,
+  eur,
+  eur0,
+  eurDocumento,
+  milharesComPonto,
+  round2,
+  splitSinal,
+  saldoAPartirDoSinal,
+} from "./money";
+import { winAnsiSafe } from "./pdf-text";
 
 describe("round2", () => {
   it("arredonda aos cêntimos com o meio cêntimo a SUBIR, como manda a factura", () => {
@@ -197,6 +207,142 @@ describe("eur / eur0 formatters", () => {
   });
 });
 
+describe("eurDocumento — o dinheiro como o CLIENTE o lê", () => {
+  /**
+   * Os seis valores que apanham o defeito e a sua fronteira.
+   *
+   * O `eur` partilhado herda a regra do `Intl` de pt-PT, que só agrupa a partir
+   * de CINCO dígitos: 4 600 e 7 890 saíam sem separador nenhum, ao lado de
+   * 24 600 que saía com um espaço inquebrável. Na mesma coluna da factura, e
+   * entre o PDF da proposta e o email que o transporta.
+   *
+   * O 999 está aqui para a regra não passar a ser «mete lá um ponto»: três
+   * dígitos NÃO levam separador em português nenhum.
+   *
+   * ── E O ESPAÇO ANTES DO «€» ESCREVE-SE \u00A0, NÃO À LETRA ─────────────
+   * É um espaço INQUEBRÁVEL, e num ficheiro de texto é indistinguível de um
+   * espaço normal a olho nu. Escrito à letra, uma expectativa com o espaço
+   * errado passava a documentar exactamente o contrário do que se quer.
+   */
+  const EURO = "\u00A0€";
+
+  it("agrupa os milhares com PONTO a partir de quatro dígitos", () => {
+    expect(eurDocumento(4600)).toBe(`4.600,00${EURO}`);
+    expect(eurDocumento(24600)).toBe(`24.600,00${EURO}`);
+    expect(eurDocumento(7890)).toBe(`7.890,00${EURO}`);
+    expect(eurDocumento(1234567)).toBe(`1.234.567,00${EURO}`);
+  });
+
+  it("três dígitos não levam separador", () => {
+    expect(eurDocumento(999)).toBe(`999,00${EURO}`);
+  });
+
+  it("os cêntimos ficam com a vírgula do português", () => {
+    expect(eurDocumento(1234.56)).toBe(`1.234,56${EURO}`);
+    expect(eurDocumento(24600.75)).toBe(`24.600,75${EURO}`);
+  });
+
+  /**
+   * O ESPAÇO ANTES DO «€» É INQUEBRÁVEL, E TEM DE CONTINUAR A SER.
+   *
+   * É o que impede o símbolo de cair sozinho para a linha seguinte num email
+   * estreito. Só o separador de MILHARES vira ponto; o do símbolo fica.
+   */
+  it("mantém o espaço inquebrável antes do símbolo e não põe pontos a mais", () => {
+    expect(eurDocumento(24600)).toContain(EURO);
+    // Um espaço NORMAL antes do «€» seria o mesmo defeito ao contrário.
+    expect(eurDocumento(24600)).not.toContain(" €");
+    expect(eurDocumento(24600).match(/\./g)).toHaveLength(1);
+    expect(eurDocumento(999)).not.toContain(".");
+    // E não pode sobrar espaço inquebrável nenhum onde já está o ponto.
+    expect(eurDocumento(1234567).match(/\u00A0/g)).toHaveLength(1);
+  });
+
+  it("coage o que não é número a zero, como o `eur`", () => {
+    expect(eurDocumento(NaN)).toBe(`0,00${EURO}`);
+    expect(eurDocumento(0)).toBe(`0,00${EURO}`);
+  });
+
+  /**
+   * Só caracteres que as fontes-PADRÃO do pdf-lib sabem codificar.
+   *
+   * A factura e a proposta antiga desenham-se em Helvetica/WinAnsi, e o
+   * `drawText` LANÇA no que essa codificação não tem. O ponto é ASCII, o
+   * espaço inquebrável é 0xA0 (Latin-1) e o «€» é 0x80 no CP1252 — os três
+   * passam. Um separador «bonito» (U+2009, U+202F) rebentava o PDF.
+   */
+  it("escreve-se todo em WinAnsi — o PDF da factura desenha-o sem lançar", () => {
+    for (const n of [4600, 24600, 7890, 999, 1234567, 1234.56]) {
+      expect(winAnsiSafe(eurDocumento(n))).toBe(eurDocumento(n));
+    }
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * O VALOR QUE NÃO É NOSSO — o «Valor Total» que ELA escreve à mão
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * O quadro do orçamento tem duas origens de dinheiro na mesma folha: as linhas
+ * que NÓS calculamos (e formatamos com o `eurDocumento`) e o «Valor Total», que
+ * é TEXTO — escrito à mão por ela, ou gerado pelo estúdio a partir do preço do
+ * pedido, e guardado tal e qual no documento.
+ *
+ * Esse texto não passa por formatador nenhum na altura de desenhar: passa pelo
+ * `milharesComPonto`, que só sabia trocar o espaço inquebrável do `Intl` pelo
+ * ponto. Ora o `Intl` NÃO PÕE espaço nenhum abaixo de cinco dígitos — logo um
+ * total de 7 890 € gravado como «7890,00 €» chegava ao PDF exactamente assim,
+ * por cima de linhas que diziam «7.890,00 €». O mesmo quadro, duas pontuações.
+ *
+ * Corrige-se AQUI, no desenho, e não em quem grava: as propostas já guardadas
+ * têm o texto antigo lá dentro, e um casal que reabra a sua proposta de janeiro
+ * tem de a ver bem escrita sem que ninguém volte a gravá-la.
+ *
+ * O reconhecimento é pelo «€», e é isso que o torna seguro: um ano, um número
+ * de telefone ou uma referência de documento não têm um símbolo de euro colado
+ * a seguir. O que não parece dinheiro não é tocado.
+ */
+describe("milharesComPonto — o dinheiro que vem escrito à mão", () => {
+  const EURO = "\u00A0€";
+
+  it("põe ponto num montante escrito sem separador nenhum", () => {
+    expect(milharesComPonto(`7890,00${EURO}`)).toBe(`7.890,00${EURO}`);
+    expect(milharesComPonto(`4600,00${EURO}`)).toBe(`4.600,00${EURO}`);
+    expect(milharesComPonto(`1234567,00${EURO}`)).toBe(`1.234.567,00${EURO}`);
+  });
+
+  it("continua a trocar o espaço inquebrável do Intl pelo ponto", () => {
+    expect(milharesComPonto(`24\u00A0600,00${EURO}`)).toBe(`24.600,00${EURO}`);
+    expect(milharesComPonto(`1\u00A0234\u00A0567,00${EURO}`)).toBe(`1.234.567,00${EURO}`);
+  });
+
+  it("não mexe no que já está bem escrito", () => {
+    expect(milharesComPonto(`12.300,00${EURO}`)).toBe(`12.300,00${EURO}`);
+    expect(milharesComPonto(`999,00${EURO}`)).toBe(`999,00${EURO}`);
+    expect(milharesComPonto(`0,00${EURO}`)).toBe(`0,00${EURO}`);
+  });
+
+  it("respeita o resto da frase dela — o «+ IVA», o espaço normal, o sem cêntimos", () => {
+    expect(milharesComPonto("8456,25 € + IVA")).toBe("8.456,25 € + IVA");
+    expect(milharesComPonto("2500 €")).toBe("2.500 €");
+    expect(milharesComPonto("a definir")).toBe("a definir");
+    expect(milharesComPonto("Sob consulta")).toBe("Sob consulta");
+  });
+
+  /**
+   * O QUE NÃO TEM «€» AO LADO NÃO É DINHEIRO.
+   *
+   * Sem esta âncora, a regra «quatro dígitos seguidos levam ponto» estragava
+   * anos («2026» → «2.026»), números de documento e contagens de convidados —
+   * e o `milharesComPonto` corre sobre TEXTO DELA, não sobre um número nosso.
+   */
+  it("não toca em números que não são dinheiro", () => {
+    expect(milharesComPonto("Válido até 2026")).toBe("Válido até 2026");
+    expect(milharesComPonto("FT 2026/0007")).toBe("FT 2026/0007");
+    expect(milharesComPonto("1500 convidados")).toBe("1500 convidados");
+    expect(milharesComPonto("+351 919 259 820")).toBe("+351 919 259 820");
+  });
+});
 describe("sinal com percentagem configurável", () => {
   /**
    * A GENERALIZAÇÃO NÃO PODE MUDAR O QUE JÁ ESTÁ FACTURADO.

@@ -12,7 +12,10 @@ import { isAuthed } from "@/lib/admin-auth";
 import { isMissingTable } from "@/lib/repository";
 import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
-import { eur } from "@/lib/money";
+/** `eur` é o formato do PAINEL (a linha do histórico); `eurDocumento` é o de
+ *  tudo o que sai para o cliente — aqui, o `{valor}` que um modelo de email
+ *  pode citar. O porquê da separação está no `money.ts`. */
+import { eur, eurDocumento } from "@/lib/money";
 import { createProposal } from "@/lib/proposals-store";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import {
@@ -23,6 +26,7 @@ import {
 import { createProposalToken } from "@/lib/proposal-token";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
+import { marcadoresDoPedido, modeloParaEnvioAutomatico } from "@/lib/email-modelos";
 import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
 
@@ -408,23 +412,68 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * o da casa (ver `email-assinatura.ts` e os modelos do `ClientMessenger`,
      * que se despediam por cima dele).
      */
-    const email = emailAoCliente({
-      html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O MODELO DELA, E QUANDO É QUE ELE NÃO É USADO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O modelo «proposta-enviada» do ecrã «Modelos de email» passa a ser o
+     * corpo deste email — nas DUAS rotas que mandam uma proposta, senão o que
+     * o cliente recebe passava a depender do botão em que ela carregou. O
+     * recurso é o texto que está aqui em baixo, e a razão inteira está escrita
+     * na rota irmã (`orcamento/[id]/proposta`), que é onde o mesmo `null`
+     * também significa «sai o texto da casa».
+     *
+     * ── A MENSAGEM PESSOAL GANHA AO MODELO ────────────────────────────────
+     *
+     * Quando ela escreve uma mensagem para acompanhar ESTA proposta, o modelo
+     * fica de fora. Não é indecisão: o texto da casa foi desenhado à volta
+     * dessa mensagem — ela entra logo a seguir ao «Olá» e antes do botão, pela
+     * razão que está na nota aqui em cima. O corpo de um modelo é markup
+     * opaco; não há onde lá dentro a enfiar sem adivinhar, e despejá-la no fim
+     * era pô-la depois do sítio onde muita gente já carregou.
+     *
+     * Das duas, ganha a mais específica: a mensagem foi escrita há um minuto
+     * para este casal; o modelo serve todos. O ecrã dos modelos di-lo.
+     */
+    const doModelo = mensagem
+      ? null
+      : await modeloParaEnvioAutomatico(
+          "proposta-enviada",
+          marcadoresDoPedido(quote, {
+            // Quem este email saúda são os NOMES DO CASAL do documento do
+            // estúdio, e não o `quote.name` — que é quem escreveu o pedido e
+            // pode ser a mãe da noiva ou uma wedding planner. É a mesma escolha
+            // que o texto da casa aqui em baixo já fazia.
+            nome: String(doc.clientNames ?? "").trim(),
+            link: acceptUrl,
+            valor: eurDocumento(money.gross),
+            ...(String(doc.eventDate ?? "").trim()
+              ? { data_evento: String(doc.eventDate).trim() }
+              : {}),
+            ...(String(doc.location ?? "").trim() ? { local: String(doc.location).trim() } : {}),
+          }),
+        );
+
+    const email = doModelo
+      ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto })
+      : emailAoCliente({
+          html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
         <p style="font-size:14px;line-height:1.6">Olá ${esc(doc.clientNames)},</p>
         ${mensagem ? `${paragrafosDaMensagem(mensagem)}\n        ` : ""}<p style="font-size:14px;line-height:1.6">Segue em anexo a proposta personalizada para o seu evento. Pode vê-la e responder online através do botão abaixo.</p>
         <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">Ver e responder à proposta →</a></p>`,
-      texto: [
-        "A sua proposta — Líquen Events",
-        "",
-        `Olá ${doc.clientNames},`,
-        "",
-        // Tal e qual, com as quebras dela: escapar é uma preocupação de HTML, e
-        // aqui só se lhe acrescenta a linha em branco que a separa do resto.
-        ...(mensagem ? [mensagem, ""] : []),
-        "Segue em anexo a proposta personalizada para o seu evento.",
-        `Ver e responder online: ${acceptUrl}`,
-      ].join("\n"),
-    });
+          texto: [
+            "A sua proposta — Líquen Events",
+            "",
+            `Olá ${doc.clientNames},`,
+            "",
+            // Tal e qual, com as quebras dela: escapar é uma preocupação de HTML, e
+            // aqui só se lhe acrescenta a linha em branco que a separa do resto.
+            ...(mensagem ? [mensagem, ""] : []),
+            "Segue em anexo a proposta personalizada para o seu evento.",
+            `Ver e responder online: ${acceptUrl}`,
+          ].join("\n"),
+        });
 
     // A proposta JÁ foi guardada acima. O envio do email é um passo separado: se
     // falhar (SMTP em baixo, credenciais erradas, email do cliente inválido) NÃO
@@ -444,7 +493,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           // Sem o identificador interno — a mesma decisão da rota irmã
           // (`orcamento/[id]/proposta`), onde está escrita por extenso: o
           // `randomUUID()` da nossa base não é referência de ninguém.
-          subject: "Proposta para o seu evento — Líquen Events",
+          // O assunto vem do MODELO quando é o modelo que sai — o corpo é dela
+          // e a linha que o cliente lê antes de abrir também tem de ser.
+          subject: doModelo?.assunto ?? "Proposta para o seu evento — Líquen Events",
           html: email.html,
           text: email.text,
           // O PDF junta-se aos anexos da assinatura; substituí-los deixava o

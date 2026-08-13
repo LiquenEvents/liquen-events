@@ -46,12 +46,31 @@ export async function generateMetadata({
   };
 }
 
-const eur = (n: number, currency = "EUR", dateLocale = "pt-PT") =>
-  new Intl.NumberFormat(dateLocale, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(n || 0);
+/**
+ * O DINHEIRO DESTA PÁGINA FICA EM pt-PT NAS DUAS LÍNGUAS — NÃO É UM ESQUECIMENTO.
+ *
+ * Aqui vivia uma cópia do `Intl` que recebia o `dateLocale` do dicionário, e
+ * numa proposta em inglês o mesmo total saía «€24,600.00» enquanto o email que
+ * trouxe o casal a esta página, e o PDF que ela transporta, diziam
+ * «24.600,00 €». O `eurDocumento` é o formatador de tudo o que sai para o
+ * cliente (ver `money.ts`), e é pt-PT por construção.
+ *
+ * Foi decidido de propósito, e não se muda para `en-GB` sem desfazer isto:
+ *
+ *   1. metade dos valores de uma proposta é TEXTO LIVRE escrito por ela, à
+ *      portuguesa. Formatar os nossos à inglesa punha «€24,600.00» ao lado do
+ *      «24.600,00 €» dela, na mesma folha — e nas duas formas a vírgula e o
+ *      ponto TROCAM DE PAPEL: «24.600» lê-se, em inglês, como vinte e quatro
+ *      euros e sessenta;
+ *   2. a FACTURA que se segue é um documento fiscal português e sai em
+ *      português. O casal inglês recebe os dois;
+ *   3. o PDF da proposta já escreve assim em qualquer idioma. Localizar só esta
+ *      página punha-a a discordar do documento que ela própria oferece a abrir.
+ *
+ * As DATAS continuam localizadas — é o `t.dateLocale` que trata delas, e é para
+ * isso que ele existe.
+ */
+import { eurDocumento as eur } from "@/lib/money";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -173,7 +192,7 @@ export default async function ProposalPage({
                 {it.qty}
               </span>
               <span className="w-28 text-right text-foreground/75 text-sm tabular-nums">
-                {eur(it.qty * it.unitPrice, cur, t.dateLocale)}
+                {eur(it.qty * it.unitPrice, cur)}
               </span>
             </div>
           ))}
@@ -182,17 +201,13 @@ export default async function ProposalPage({
           <div className="px-5 py-4 bg-foreground/[0.03] flex flex-col gap-1.5">
             <div className="flex justify-between text-xs">
               <span className="text-foreground/72">{t.subtotal}</span>
-              <span className="text-foreground/72 tabular-nums">
-                {eur(proposal.subtotal, cur, t.dateLocale)}
-              </span>
+              <span className="text-foreground/72 tabular-nums">{eur(proposal.subtotal, cur)}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-foreground/72">
                 {t.iva} ({Math.round(proposal.vatRate * 100)}%)
               </span>
-              <span className="text-foreground/72 tabular-nums">
-                {eur(proposal.vat, cur, t.dateLocale)}
-              </span>
+              <span className="text-foreground/72 tabular-nums">{eur(proposal.vat, cur)}</span>
             </div>
             <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-foreground/10">
               <span className="text-foreground/70 text-sm font-medium">{t.total}</span>
@@ -200,7 +215,7 @@ export default async function ProposalPage({
                 className="text-moss font-bold tabular-nums"
                 style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 3vw, 28px)" }}
               >
-                {eur(proposal.total, cur, t.dateLocale)}
+                {eur(proposal.total, cur)}
               </span>
             </div>
           </div>

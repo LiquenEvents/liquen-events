@@ -68,12 +68,31 @@ function estadoParaOCliente(s: ProposalStatus): Exclude<ProposalStatus, "em_nego
   return s === "em_negociacao" ? "enviada" : s;
 }
 
-const eur = (n: number, currency = "EUR", locale = "pt-PT") =>
-  new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(n || 0);
+/**
+ * O DINHEIRO DESTE PORTAL FICA EM pt-PT NAS DUAS LÍNGUAS — NÃO É UM ESQUECIMENTO.
+ *
+ * Aqui vivia uma cópia do `Intl` que recebia o `locale` do dicionário, e num
+ * portal em inglês o total saía «€24,600.00» — por cima de uma lista de
+ * FACTURAS portuguesas que dizem «24.600,00 €», e ao lado do link para um PDF
+ * que diz o mesmo. O `eurDocumento` é o formatador de tudo o que sai para o
+ * cliente (ver `money.ts`), e é pt-PT por construção.
+ *
+ * Foi decidido de propósito, e não se muda para `en-GB` sem desfazer isto:
+ *
+ *   1. metade dos valores de uma proposta é TEXTO LIVRE escrito por ela, à
+ *      portuguesa. Formatar os nossos à inglesa punha as duas formas na mesma
+ *      folha — e nelas a vírgula e o ponto TROCAM DE PAPEL: «24.600» lê-se, em
+ *      inglês, como vinte e quatro euros e sessenta;
+ *   2. as FACTURAS listadas aqui são documentos fiscais portugueses e saem em
+ *      português. O casal inglês abre-as a partir desta mesma página;
+ *   3. o PDF da proposta já escreve assim em qualquer idioma.
+ *
+ * As DATAS não são afectadas: chegam a este componente JÁ ESCRITAS, em props
+ * resolvidas no servidor (ver `page.tsx`), e continuam a sair no idioma do
+ * casal. O `t.dateLocale` só era lido aqui para formatar DINHEIRO — deixou de
+ * ter leitor neste ficheiro.
+ */
+import { eurDocumento as eur } from "@/lib/money";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -118,7 +137,6 @@ export default function PortalView({
   depositPercent,
   currency,
 }: PortalViewProps) {
-  const locale = t.dateLocale;
   const firstName = clientName?.trim().split(" ")[0] || clientName;
   // Os rótulos do faseamento trazem as duas percentagens — a do sinal e o que
   // sobra — para não poderem discordar do valor impresso ao lado.
@@ -173,7 +191,7 @@ export default function PortalView({
                       fontSize: "clamp(18px, 3vw, 24px)",
                     }}
                   >
-                    {eur(proposal.total, proposal.currency, locale)}
+                    {eur(proposal.total, proposal.currency)}
                   </p>
                 </div>
               </div>
@@ -234,7 +252,7 @@ export default function PortalView({
                   {fill(t.pagamentos.sinal, pcts)}
                 </p>
                 <p className="text-foreground/85 text-sm tabular-nums mt-1">
-                  {eur(schedule.sinal, currency, locale)}
+                  {eur(schedule.sinal, currency)}
                 </p>
               </div>
               <div className="rounded-md border border-foreground/8 px-4 py-3">
@@ -242,7 +260,7 @@ export default function PortalView({
                   {fill(t.pagamentos.saldo, pcts)}
                 </p>
                 <p className="text-foreground/85 text-sm tabular-nums mt-1">
-                  {eur(schedule.saldo, currency, locale)}
+                  {eur(schedule.saldo, currency)}
                 </p>
               </div>
             </div>
@@ -279,7 +297,7 @@ export default function PortalView({
                         )}
                       </div>
                       <span className="text-foreground/85 text-sm tabular-nums">
-                        {eur(inv.amount, currency, locale)}
+                        {eur(inv.amount, currency)}
                       </span>
                       <span
                         className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] tracking-[0.04em] ${

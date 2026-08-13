@@ -123,3 +123,98 @@ export const eur0 = (n: number): string =>
     currency: "EUR",
     maximumFractionDigits: 0,
   }).format(n || 0);
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O DINHEIRO NOS PAPÉIS QUE O CLIENTE LÊ — E PORQUE É QUE NÃO É O `eur`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `Intl` de pt-PT tem duas manias que ninguém em Portugal tem:
+ *
+ *   1. só agrupa milhares a partir de CINCO dígitos — 24 600 sai «24 600,00 €»
+ *      e 4 600 sai «4600,00 €», sem separador nenhum;
+ *   2. agrupa com um espaço INQUEBRÁVEL, nunca com o ponto que toda a gente
+ *      escreve à mão.
+ *
+ * As duas juntas davam isto, TUDO na mesma coluna de uma factura de 24 600 €:
+ *
+ *     Base de incidência   20 000,00 €
+ *     IVA (23%)             4600,00 €     ← um sem separador, entre dois com
+ *     TOTAL                24 600,00 €
+ *
+ * E davam, entre o PDF da proposta e o email que o transporta, «7.890,00 €» num
+ * e «7890,00 €» no outro — dois números para o mesmo valor, à distância de um
+ * clique. É o género de pormenor que faz um casal olhar duas vezes para uma
+ * folha de dinheiro e perguntar se os números vieram de sítios diferentes.
+ * (Vieram: uns são dela, outros são contas nossas. Não se deve notar.)
+ *
+ * `useGrouping: "always"` mata a primeira mania; o {@link milharesComPonto} mata
+ * a segunda.
+ *
+ * ── PORQUE É QUE ISTO NÃO SUBSTITUI O `eur` ────────────────────────────────
+ * Nasceu como `eurDoc`, privado do `proposal-doc-pdf`, com a nota de que era
+ * «uma decisão tipográfica DESTE documento, não uma mudança na forma como a
+ * aplicação inteira mostra dinheiro». O raciocínio mantém-se — o que mudou foi
+ * o âmbito: não é um documento, são TODOS os artefactos que saem para o
+ * cliente (os dois PDFs de proposta, o PDF da factura, os emails que os
+ * levam). Esses escrevem todos igual, e escrevem como ela escreve à mão.
+ *
+ * O back office continua com o {@link eur}: são dezenas de ecrãs internos onde
+ * o formato do `Intl` nunca incomodou ninguém, e mudá-los é uma decisão de
+ * produto, não a correcção de um defeito que o cliente vê. Se um dia se quiser
+ * unificar, unifica-se apontando o `eur` para aqui — não copiando isto para lá.
+ *
+ * ── O ESPAÇO ANTES DO «€» FICA ─────────────────────────────────────────────
+ * Só o separador de MILHARES vira ponto. O espaço antes do símbolo continua
+ * inquebrável, e é isso que impede o «€» de cair sozinho para a linha seguinte
+ * num email estreito ou no fim de uma coluna do PDF.
+ *
+ * ── E É DESENHÁVEL ─────────────────────────────────────────────────────────
+ * A factura e a proposta antiga desenham-se com as fontes-PADRÃO do pdf-lib
+ * (Helvetica/WinAnsi), e o `drawText` LANÇA no que essa codificação não tem.
+ * Os três caracteres em jogo passam: o ponto é ASCII, o espaço inquebrável é
+ * 0xA0 (Latin-1) e o «€» é 0x80 no CP1252. Um separador «tipograficamente
+ * bonito» (U+2009, U+202F) rebentava o PDF — ver `pdf-text.ts`.
+ */
+/**
+ * Um montante escrito SEM separador nenhum — «7890,00 €».
+ *
+ * O `Intl` não põe separador abaixo de cinco dígitos, portanto um total
+ * gerado (ou escrito à mão) nos milhares baixos chega aqui sem nada para
+ * trocar. Reconhece-se pelo «€» que vem a seguir, e é isso que torna a regra
+ * segura: um ano («2026»), um número de documento («FT 2026/0007») ou uma
+ * contagem de convidados não têm um símbolo de euro colado atrás. O que não
+ * parece dinheiro não é tocado.
+ *
+ * Quatro dígitos ou mais, de propósito: 999 não leva separador em português
+ * nenhum, e um valor JÁ pontuado («12.300,00 €») não tem nenhuma corrida de
+ * quatro dígitos seguidos — por isso passar duas vezes por aqui não faz mal.
+ */
+const MONTANTE_SEM_SEPARADOR = /\d{4,}(?=(?:[.,]\d+)?\s*\u20AC)/g;
+
+export function milharesComPonto(texto: string): string {
+  return texto
+    .replace(/\u00A0(?=\d{3}(?:\D|$))/g, ".")
+    .replace(MONTANTE_SEM_SEPARADOR, (inteiros) => inteiros.replace(/\B(?=(\d{3})+$)/g, "."));
+}
+
+/**
+ * Euros como se escrevem no que sai para o cliente: "4.600,00 €".
+ *
+ * Milhares por pontos a partir de quatro dígitos (999 não leva separador),
+ * cêntimos por vírgula, e o espaço inquebrável antes do símbolo.
+ *
+ * A `moeda` existe porque a proposta antiga guarda a sua (`Proposal.currency`)
+ * e desenhava-a: hoje é sempre "EUR", mas uma proposta gravada noutra moeda não
+ * pode passar a dizer euros por causa desta mudança. A pontuação é a mesma seja
+ * qual for o símbolo — quem lê a folha lê-a em português.
+ */
+export const eurDocumento = (n: number, moeda = "EUR"): string =>
+  milharesComPonto(
+    new Intl.NumberFormat("pt-PT", {
+      style: "currency",
+      currency: moeda,
+      maximumFractionDigits: 2,
+      useGrouping: "always",
+    }).format(n || 0),
+  );
