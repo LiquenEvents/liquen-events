@@ -207,3 +207,30 @@ describe("POST /api/inbox/reply — encadeamento da conversa", () => {
     expect(sendMail).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * A resposta escrita à mão na caixa de entrada é o email MAIS pessoal que sai
+ * daqui — e era o que levava o rodapé mais pobre: uma linha com o endereço e o
+ * telefone. Passa a levar a assinatura da casa, igual à das outras rotas.
+ */
+describe("POST /api/inbox/reply — assinatura", () => {
+  it("assina a resposta, no HTML e no texto simples", async () => {
+    await POST(post({ to: "c@x.com", subject: "Re: Oi", message: "Olá, com todo o gosto." }));
+    const env = ultimoEnvio();
+    expect(env.html).toContain("Catarina Gaspar");
+    expect(env.html).toContain("Manager");
+    expect(env.html).toContain("+351 919 259 820");
+    expect(env.text).toContain("Catarina Gaspar");
+    expect(env.text).toContain("+351 919 259 820");
+    // A mensagem que ela escreveu continua lá — a assinatura acrescenta-se, não
+    // substitui nada.
+    expect(env.text).toContain("Olá, com todo o gosto.");
+    expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
+    expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
+  });
+
+  it("deixou de escrever o rodapé à mão", async () => {
+    await POST(post({ to: "c@x.com", message: "olá" }));
+    expect(ultimoEnvio().html).not.toContain("Líquen Events · ");
+  });
+});

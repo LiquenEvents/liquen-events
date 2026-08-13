@@ -117,6 +117,37 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps: false,
 
+  /**
+   * O BANNER DOS EMAILS TEM DE CHEGAR AO SERVIDOR, NÃO À CDN.
+   *
+   * `public/` é servido como ficheiro estático — vai para a CDN e NÃO entra, por
+   * omissão, no rastreio de ficheiros que acompanha as rotas de servidor. A
+   * assinatura dos emails (`src/lib/email-assinatura.ts`) LÊ o banner do disco
+   * para o mandar como anexo `cid:`, porque uma imagem remota num email parte-se
+   * (ver a nota longa no `email-logo.ts`). Sem esta linha, o ficheiro existe no
+   * repositório, existe no site, e não existe onde é preciso: o `readFileSync`
+   * falha em produção, a assinatura sai sem banner e nada o denuncia.
+   *
+   * A chave é um glob de ROTA e o valor um caminho a partir da raiz do projecto.
+   *
+   * E é `/**`, não `/*`. O glob é avaliado com picomatch, onde um `*` NÃO
+   * atravessa barras — medido nesta árvore, `/*` não apanha uma única rota
+   * destas:
+   *
+   *     /*   → /api/orcamento  não · /api/inbox/reply  não
+   *              /api/orcamento/[id]/proposta  não · .../fatura  não
+   *     /**  → todas SIM
+   *
+   * Com `/*` o resultado seria o próprio defeito que este bloco existe para
+   * evitar, e da pior maneira: silencioso. O `public/email/` não entrava no
+   * pacote, o `readFileSync` falhava, e a assinatura saía sem banner sem
+   * ninguém dar por isso — porque o ficheiro está no repositório e o site
+   * mostra-o na mesma.
+   */
+  outputFileTracingIncludes: {
+    "/**": ["public/email/**/*"],
+  },
+
   experimental: {
     // React <ViewTransition> (View Transitions API): página-a-página com
     // deslize direcional e morph thumbnail→lightbox na galeria. Browsers sem

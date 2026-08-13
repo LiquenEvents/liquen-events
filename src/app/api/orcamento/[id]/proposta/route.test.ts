@@ -213,3 +213,35 @@ describe("POST /api/orcamento/[id]/proposta", () => {
     expect(mail.send).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * A proposta é o email de maior valor que sai daqui. Levava um rodapé de uma
+ * linha escrito à mão; passa a levar a assinatura da casa — sem perder o PDF,
+ * que é o ponto todo da mensagem.
+ */
+describe("POST /api/orcamento/[id]/proposta — assinatura", () => {
+  it("assina o email da proposta e mantém o PDF em anexo", async () => {
+    authed.ok = true;
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    const env = mail.send.mock.calls.at(-1)![0] as {
+      html: string;
+      text: string;
+      attachments?: { cid?: string; filename: string }[];
+    };
+    expect(env.html).toContain("Catarina Gaspar");
+    expect(env.html).toContain("Manager");
+    expect(env.html).toContain(SITE.phoneDisplay);
+    expect(env.text).toContain("Catarina Gaspar");
+    expect(env.text).toContain(SITE.phoneDisplay);
+    expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
+    expect(env.attachments?.some((a) => a.filename.endsWith(".pdf"))).toBe(true);
+    expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
+  });
+
+  it("deixou de escrever o rodapé à mão", async () => {
+    authed.ok = true;
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    const env = mail.send.mock.calls.at(-1)![0] as { html: string };
+    expect(env.html).not.toContain("Líquen Events · ");
+  });
+});

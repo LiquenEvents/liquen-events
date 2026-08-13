@@ -566,3 +566,62 @@ describe("GET /api/orcamento", () => {
     expect(store.list).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * «O SEU PEDIDO PARA O CASAMENTOS» — artigo no singular, nome no plural
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Não é hipótese: saiu assim para clientes verdadeiros (13/08 e 10/08), no
+ * assunto do email que ela envia a partir do botão de resposta. O rótulo da
+ * taxonomia é um BALDE NO PLURAL («Casamentos») e ia direito para dentro de
+ * uma frase escrita no singular.
+ *
+ * O corpo da confirmação já tinha isto resolvido — prefere a palavra que o
+ * PRÓPRIO cliente escreveu — e ninguém reparou que as três frases do email à
+ * equipa (WhatsApp, assunto e corpo do `mailto`) tinham o mesmo defeito.
+ */
+describe("concordância do nome do evento", () => {
+  const casamentoSemNome = {
+    ...validForm,
+    phone: "912345678",
+    category: "particulares",
+    eventType: "casamentos",
+  };
+
+  /** As frases pré-preenchidas viajam codificadas dentro dos `href`. */
+  function accoesPreenchidas(html: string): string {
+    return [...html.matchAll(/href="((?:mailto:|https:\/\/wa\.me\/)[^"]+)"/g)]
+      .map((m) => decodeURIComponent(m[1].replace(/&amp;/g, "&")))
+      .join("\n");
+  }
+
+  it("o assunto do mailto não sai com «o casamentos»", async () => {
+    await enviarTudo({ form: casamentoSemNome });
+    const accoes = accoesPreenchidas(sendMailMock.mock.calls[0][0].html);
+    expect(accoes).toContain("mailto:");
+    expect(accoes).not.toContain("o casamentos");
+  });
+
+  it("nem o WhatsApp nem o corpo do mailto dependem do artigo", async () => {
+    await enviarTudo({ form: casamentoSemNome });
+    const accoes = accoesPreenchidas(sendMailMock.mock.calls[0][0].html);
+    expect(accoes).toContain("wa.me");
+    // Nenhuma das três frases pode voltar a colar um artigo singular a um
+    // rótulo que pode vir no plural.
+    expect(accoes).not.toMatch(/pedido para o [a-zà-ú]+s\b/);
+    expect(accoes).not.toMatch(/orçamento para o [a-zà-ú]+s\b/);
+  });
+
+  /**
+   * Quando o cliente escreveu o nome do evento dele, é ESSA a palavra que
+   * aparece — a mesma regra que o corpo da confirmação já seguia.
+   */
+  it("prefere a palavra do próprio cliente ao rótulo da taxonomia", async () => {
+    await enviarTudo({
+      form: { ...casamentoSemNome, eventName: "Casamento da Ana e do João" },
+    });
+    const accoes = accoesPreenchidas(sendMailMock.mock.calls[0][0].html);
+    expect(accoes).toContain("Casamento da Ana e do João");
+  });
+});

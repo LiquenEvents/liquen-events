@@ -10,7 +10,7 @@ import {
 } from "@/lib/invoices-store";
 import { renderInvoicePdf } from "@/lib/invoice-pdf";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
-import { SITE } from "@/lib/site";
+import { emailAoCliente } from "@/lib/email-assinatura";
 import { isAuthed } from "@/lib/admin-auth";
 import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
@@ -209,31 +209,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     let emailed = false;
     if (email) {
-      const html = `
-      <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
-        <h2 style="font-size:18px;margin:0 0 12px">Recibo — Líquen Events</h2>
+      // Só o corpo: a moldura e a assinatura da casa vêm do
+      // `email-assinatura`. A alternativa em TEXTO simples anda sempre com o
+      // HTML — passa melhor pelos filtros de spam e é o que se lê num cliente
+      // só de texto ou num leitor de ecrã.
+      const mensagem = emailAoCliente({
+        html: `<h2 style="font-size:18px;margin:0 0 12px">Recibo — Líquen Events</h2>
         <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(invoice.clientName)},</p>
-        <p style="font-size:14px;line-height:1.6;color:#333">Segue em anexo o recibo no valor de <strong style="color:#7c854b">${eur(invoice.amount)}</strong>.</p>
-        <p style="font-size:13px;color:#777;margin-top:20px">Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}</p>
-      </div>`;
-      // Plain-text alternative (multipart/alternative): better spam-filter
-      // standing and readable by text-only / screen-reader mail clients.
-      const text = [
-        "Recibo — Líquen Events",
-        "",
-        `Olá ${invoice.clientName},`,
-        "",
-        `Segue em anexo o recibo no valor de ${eur(invoice.amount)}.`,
-        "",
-        `Líquen Events · ${MAIL_TO} · ${SITE.phoneDisplay}`,
-      ].join("\n");
+        <p style="font-size:14px;line-height:1.6;color:#333">Segue em anexo o recibo no valor de <strong style="color:#7c854b">${eur(invoice.amount)}</strong>.</p>`,
+        texto: [
+          "Recibo — Líquen Events",
+          "",
+          `Olá ${invoice.clientName},`,
+          "",
+          `Segue em anexo o recibo no valor de ${eur(invoice.amount)}.`,
+        ].join("\n"),
+      });
       const mail = await sendMail({
         to: invoice.clientEmail,
         replyTo: MAIL_TO,
         subject: `Recibo ${number} — Líquen Events`,
-        html,
-        text,
+        html: mensagem.html,
+        text: mensagem.text,
+        // O recibo junta-se aos anexos da assinatura, não os substitui.
         attachments: [
+          ...mensagem.attachments,
           {
             filename: `Recibo-${number.replace(/\//g, "-")}.pdf`,
             content: pdfBuffer,

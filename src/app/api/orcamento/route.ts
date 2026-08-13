@@ -273,7 +273,32 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   const name = form.name?.trim() || "Sem nome";
   const firstName = name.split(" ")[0] || "o cliente";
   const subtitle = [et, cat].filter(Boolean).join(" · ");
-  const eventoLc = (et || cat || "evento").toLowerCase();
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * «O SEU PEDIDO PARA O CASAMENTOS» — e saiu assim para clientes verdadeiros
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O rótulo da taxonomia é um BALDE NO PLURAL («Casamentos», «Batizados») e
+   * caía dentro de três frases escritas no singular: a mensagem de WhatsApp, e
+   * o assunto e o corpo do `mailto`. Este último é o botão de resposta do email
+   * que a equipa recebe — ela carrega, o correio abre com o assunto já escrito,
+   * e o erro chega à caixa do cliente com o nome dela em cima.
+   *
+   * São duas correcções, e a segunda é a que fecha o buraco:
+   *
+   *   1. A PALAVRA DO PRÓPRIO CLIENTE PRIMEIRO, que é a regra que o corpo da
+   *      confirmação (`confirmarAoCliente`) já seguia — quem escreveu «Casamento
+   *      da Ana e do João» lê isso de volta, e não o nome do balde.
+   *   2. AS FRASES DEIXARAM DE PRECISAR DE ARTIGO. Sem `eventName`, o que resta
+   *      é o balde no plural, e nenhum artigo colado à frente serve para os dois
+   *      números. Adivinhar a concordância (uma tabela de artigos, um
+   *      pluralizador) é uma máquina inteira para um problema que se resolve
+   *      escrevendo a frase de outra maneira: o evento passa a aparecer só onde
+   *      cabe como ETIQUETA (o assunto, depois de um «·»), que é uma construção
+   *      que nunca discorda. As outras duas frases dizem «o seu pedido» — o
+   *      cliente sabe o que pediu, e o email à equipa tem o resumo todo em cima.
+   */
+  const evento = form.eventName?.trim() || et || cat || "";
 
   // The date is the hero — availability decides the booking. Lead with the
   // weekday, flag weekends, and show the full range for a multi-day event. The
@@ -418,14 +443,18 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
 
   // Actions. WhatsApp is primary when there's a phone (fastest, warmest channel
   // for PT leads); otherwise the email reply is primary. Both are prefilled.
-  const waMsg = `Olá ${firstName}, fala a equipa da Líquen Events 🌿 Recebemos o seu pedido para o ${eventoLc} e teríamos todo o gosto em ajudar. Quando lhe der jeito, é só dizer — combinamos uma conversa sem compromisso.`;
+  const waMsg = `Olá ${firstName}, fala a equipa da Líquen Events 🌿 Recebemos o seu pedido e teríamos todo o gosto em ajudar. Quando lhe der jeito, é só dizer — combinamos uma conversa sem compromisso.`;
   const waDigits = form.phone ? form.phone.replace(/\D/g, "") : "";
   const waNumber = /^9\d{8}$/.test(waDigits) ? `351${waDigits}` : waDigits;
   const waHref = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsg)}` : "";
   const mailtoHref = form.email
-    ? `mailto:${esc(form.email)}?subject=${encodeURIComponent(`Líquen Events — o seu pedido para o ${eventoLc}`)}` +
+    ? // O evento entra como ETIQUETA, depois de um «·» — o separador que a casa
+      // já usa em todo o lado. Assim identifica o assunto sem nunca discordar.
+      `mailto:${esc(form.email)}?subject=${encodeURIComponent(
+        `Líquen Events — o seu pedido${evento ? ` · ${evento}` : ""}`,
+      )}` +
       `&body=${encodeURIComponent(
-        `Olá ${firstName},\n\nMuito obrigado pelo seu pedido de orçamento para o ${eventoLc} — foi um gosto recebê-lo.\n\n\n\nCom os melhores cumprimentos,\nEquipa Líquen Events`,
+        `Olá ${firstName},\n\nMuito obrigado pelo seu pedido de orçamento — foi um gosto recebê-lo.\n\n\n\nCom os melhores cumprimentos,\nEquipa Líquen Events`,
       )}`
     : "";
 
@@ -668,7 +697,10 @@ async function confirmarAoCliente(id: string, form: QuoteFormData, locale: Local
           "Auto-Submitted": "auto-generated", // RFC 3834 — don't auto-reply to us
           "X-Auto-Response-Suppress": "OOF, AutoReply", // Exchange/Outlook
         },
-        attachments: [emailLogoAttachment()],
+        // Os anexos vêm COM o email: o `buildClientConfirmation` devolve o
+        // logótipo (e o banner, quando existir) que os `cid:` do HTML dele
+        // precisam. Montá-los aqui à mão era voltar a ter duas listas para
+        // manter de acordo — e uma cruz vermelha no dia em que divergissem.
         ...confirmation,
       });
       // sendMail resolves {sent:false} (no throw) when SMTP is unconfigured,

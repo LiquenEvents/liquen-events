@@ -39,6 +39,12 @@ export const SITE = {
   reviews: { rating: 5, count: 56 },
   instagram: "https://www.instagram.com/liquen.events",
   facebook: "https://www.facebook.com/liquen.events",
+  // Ainda não há perfil. Fica VAZIO em vez de não existir: a assinatura dos
+  // emails (`email-assinatura.ts`) percorre as redes e salta as que estão sem
+  // endereço, portanto o dia em que este campo tiver um URL é o dia em que o
+  // LinkedIn aparece nos emails — sem tocar em mais nada. Um ícone social a
+  // apontar para lado nenhum é pior do que não haver ícone.
+  linkedin: "",
   // Google Business Profile (share link) — powers local pack/Maps ranking and
   // lets Google reconcile the site with the profile (sameAs + hasMap).
   googleBusiness: "https://share.google/4Qcuop16TDkYaowsU",

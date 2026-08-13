@@ -60,6 +60,7 @@ vi.mock("@/lib/mail", () => ({
 
 import { POST } from "./route";
 import { createInvoice, nextInvoiceNumber } from "@/lib/invoices-store";
+import { sendMail } from "@/lib/mail";
 import { renderInvoicePdf } from "@/lib/invoice-pdf";
 import { updateQuoteWith } from "@/lib/quotes-store";
 
@@ -408,5 +409,26 @@ describe("POST /api/orcamento/[id]/fatura — o estado do pedido segue o documen
     const json = await res.json();
     expect(json.number).toMatch(/^FT \d{4}\/\d{4}$/);
     expect(json.pdfBase64).toBeTruthy();
+  });
+});
+
+/**
+ * O recibo vai para a caixa de correio de quem já pagou — é o email com que a
+ * casa fica na memória de um cliente. Levava a mesma linha escrita à mão que
+ * todos os outros; passa a levar a assinatura da casa, com o PDF intacto.
+ */
+describe("POST /api/orcamento/[id]/fatura — assinatura", () => {
+  it("assina o email do recibo e mantém o PDF em anexo", async () => {
+    await POST(req({ kind: "pagamento", amount: 500, paid: true, email: true }), ctx("LIQ-1"));
+    const env = vi.mocked(sendMail).mock.calls.at(-1)![0];
+    expect(env.html).toContain("Catarina Gaspar");
+    expect(env.html).toContain("Manager");
+    expect(env.html).toContain("+351 919 259 820");
+    expect(env.text).toContain("Catarina Gaspar");
+    expect(env.text).toContain("+351 919 259 820");
+    expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
+    expect(env.attachments?.some((a) => a.filename.endsWith(".pdf"))).toBe(true);
+    expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
+    expect(env.html).not.toContain("Líquen Events · ");
   });
 });

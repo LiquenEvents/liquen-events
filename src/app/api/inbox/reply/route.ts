@@ -3,7 +3,7 @@ import { z } from "zod";
 import { isAuthed } from "@/lib/admin-auth";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
-import { SITE } from "@/lib/site";
+import { emailAoCliente } from "@/lib/email-assinatura";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -148,21 +148,20 @@ export async function POST(request: NextRequest) {
     const { to, message } = parsed.data;
     const subject = parsed.data.subject?.trim() || "Re: o seu e-mail";
 
-    const html = `
-    <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
-      <p style="font-size:14px;line-height:1.7;color:#222;white-space:pre-wrap">${esc(message)}</p>
-      <div style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;color:#777;font-size:12px">
-        Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}
-      </div>
-    </div>`;
+    // Só o que ela escreveu: a moldura e a assinatura são as mesmas de todo o
+    // correio que sai para um cliente (`email-assinatura`). O rodapé de uma
+    // linha que aqui estava era o mais pobre da casa, no email mais pessoal.
+    const email = emailAoCliente({
+      html: `<p style="font-size:14px;line-height:1.7;color:#2a2620;white-space:pre-wrap">${esc(message)}</p>`,
+      texto: message,
+    });
 
     const conversa = cabecalhosDeConversa(parsed.data.inReplyTo, parsed.data.references);
     const mail = await sendMail({
       to,
       replyTo: MAIL_TO,
       subject,
-      html,
-      text: message,
+      ...email,
       headers: Object.keys(conversa).length ? conversa : undefined,
     });
     return NextResponse.json({ ok: true, emailed: mail.sent });

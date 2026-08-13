@@ -22,6 +22,7 @@ import {
 } from "@/lib/proposal-doc-textos";
 import { createProposalToken } from "@/lib/proposal-token";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { emailAoCliente } from "@/lib/email-assinatura";
 import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
 
@@ -341,24 +342,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
-    const html = `
-      <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#2a2620">
-        <h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
+    // Só o corpo: a moldura, a assinatura da casa e os anexos da marca vêm do
+    // `email-assinatura` — o mesmo fecho de todo o correio que sai daqui.
+    const email = emailAoCliente({
+      html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
         <p style="font-size:14px;line-height:1.6">Olá ${esc(doc.clientNames)},</p>
         <p style="font-size:14px;line-height:1.6">Segue em anexo a proposta personalizada para o seu evento. Pode vê-la e responder online através do botão abaixo.</p>
-        <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">Ver e responder à proposta →</a></p>
-        <p style="font-size:13px;color:#6b665c;margin-top:20px">Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}</p>
-      </div>`;
-    const text = [
-      "A sua proposta — Líquen Events",
-      "",
-      `Olá ${doc.clientNames},`,
-      "",
-      "Segue em anexo a proposta personalizada para o seu evento.",
-      `Ver e responder online: ${acceptUrl}`,
-      "",
-      `Líquen Events · ${MAIL_TO} · ${SITE.phoneDisplay}`,
-    ].join("\n");
+        <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">Ver e responder à proposta →</a></p>`,
+      texto: [
+        "A sua proposta — Líquen Events",
+        "",
+        `Olá ${doc.clientNames},`,
+        "",
+        "Segue em anexo a proposta personalizada para o seu evento.",
+        `Ver e responder online: ${acceptUrl}`,
+      ].join("\n"),
+    });
 
     // A proposta JÁ foi guardada acima. O envio do email é um passo separado: se
     // falhar (SMTP em baixo, credenciais erradas, email do cliente inválido) NÃO
@@ -376,9 +375,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           to: quote.email,
           replyTo: MAIL_TO,
           subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
-          html,
-          text,
+          html: email.html,
+          text: email.text,
+          // O PDF junta-se aos anexos da assinatura; substituí-los deixava o
+          // logótipo de fora e o `cid:` do HTML sem destino.
           attachments: [
+            ...email.attachments,
             {
               filename: `Proposta-Liquen-${id}.pdf`,
               content: pdfBuffer,

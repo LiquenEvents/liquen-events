@@ -6,6 +6,7 @@ import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
+import { emailAoCliente } from "@/lib/email-assinatura";
 import { SITE } from "@/lib/site";
 import { createProposalToken } from "@/lib/proposal-token";
 import { isAuthed } from "@/lib/admin-auth";
@@ -117,10 +118,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Signed link so the client can accept/decline the proposal online.
     const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
 
-    // Email the client with the PDF attached.
-    const clientHtml = `
-    <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
-      <h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
+    // Email the client with the PDF attached. Só o corpo se escreve aqui — a
+    // moldura, a assinatura e os anexos da marca vêm do `email-assinatura`,
+    // que é a mesma assinatura de todo o correio que sai para um cliente.
+    //
+    // A alternativa em TEXTO simples (`texto`) anda sempre com o HTML: um
+    // multipart/alternative passa melhor pelos filtros de spam e é o que se lê
+    // num cliente só de texto ou num leitor de ecrã. Valores em bruto (sem
+    // `esc`): escapar é uma preocupação de HTML; o texto leva-os tal e qual.
+    const email = emailAoCliente({
+      html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
       <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(quote.name)},</p>
       <p style="font-size:14px;line-height:1.6;color:#333">
         Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento,
@@ -132,35 +139,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       </p>
       <p style="font-size:14px;line-height:1.6;color:#333">
         Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.
-      </p>
-      <p style="font-size:13px;color:#777;margin-top:20px">
-        Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}
-      </p>
-    </div>`;
-
-    // Plain-text alternative for the same email. A multipart/alternative message
-    // (html + text) is less likely to be flagged by spam filters and is readable
-    // by text-only / screen-reader mail clients — the two highest-value emails
-    // (this proposal + the receipt) were HTML-only. Raw values here (no esc):
-    // escaping is an HTML concern; plain text takes them verbatim.
-    const clientText = [
-      "A sua proposta — Líquen Events",
-      "",
-      `Olá ${quote.name},`,
-      "",
-      `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eur(total)} (IVA incluído).`,
-      proposal.validUntil
-        ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
-        : "",
-      "",
-      `Ver e responder à proposta online: ${acceptUrl}`,
-      "",
-      "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
-      "",
-      `Líquen Events · ${MAIL_TO} · ${SITE.phoneDisplay}`,
-    ]
-      .filter((line) => line !== "")
-      .join("\n");
+      </p>`,
+      texto: [
+        "A sua proposta — Líquen Events",
+        "",
+        `Olá ${quote.name},`,
+        "",
+        `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eur(total)} (IVA incluído).`,
+        proposal.validUntil
+          ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
+          : "",
+        "",
+        `Ver e responder à proposta online: ${acceptUrl}`,
+        "",
+        "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
+      ]
+        .filter((line) => line !== "")
+        .join("\n"),
+    });
 
     // Persist the proposal BEFORE emailing. The email carries a signed accept
     // link; sending it before the proposal exists means that link 404s the moment
@@ -201,9 +197,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           to: quote.email,
           replyTo: MAIL_TO,
           subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
-          html: clientHtml,
-          text: clientText,
+          html: email.html,
+          text: email.text,
+          // O PDF JUNTA-SE aos anexos da assinatura, não os substitui:
+          // substituí-los deixava o logótipo de fora e punha uma cruz vermelha
+          // no email mais importante que sai daqui.
           attachments: [
+            ...email.attachments,
             {
               filename: `Proposta-Liquen-${id}.pdf`,
               content: pdfBuffer,

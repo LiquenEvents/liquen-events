@@ -184,3 +184,37 @@ describe("POST /api/orcamento/[id]/mensagem — o estado segue a conversa", () =
     expect(patch.messages).toHaveLength(2);
   });
 });
+
+/**
+ * A ASSINATURA DA CASA — a mesma em todo o correio que sai para um cliente.
+ *
+ * Esta rota escrevia o seu próprio rodapé («Líquen Events · email · telefone»),
+ * uma de cinco cópias da mesma linha espalhadas por cinco ficheiros. Passa a
+ * vir do `email-assinatura`, que é o único sítio onde os contactos existem.
+ */
+describe("POST /api/orcamento/[id]/mensagem — assinatura", () => {
+  it("assina a mensagem ao cliente, no HTML e no texto simples", async () => {
+    authed.ok = true;
+    await POST(req({ message: "Olá! Já vos respondo." }), ctx("LIQ-1"));
+    const env = mail.send.mock.calls.at(-1)![0] as {
+      html: string;
+      text: string;
+      attachments?: { cid?: string }[];
+    };
+    expect(env.html).toContain("Catarina Gaspar");
+    expect(env.html).toContain("Manager");
+    expect(env.html).toContain("+351 919 259 820");
+    expect(env.text).toContain("Catarina Gaspar");
+    expect(env.text).toContain("+351 919 259 820");
+    // O logótipo viaja com a mensagem: nada de imagens remotas.
+    expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
+    expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
+  });
+
+  it("deixou de escrever o rodapé à mão", async () => {
+    authed.ok = true;
+    await POST(req({ message: "Olá!" }), ctx("LIQ-1"));
+    const env = mail.send.mock.calls.at(-1)![0] as { html: string };
+    expect(env.html).not.toContain("Líquen Events · ");
+  });
+});

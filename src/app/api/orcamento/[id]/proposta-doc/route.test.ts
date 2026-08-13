@@ -77,6 +77,7 @@ vi.mock("@/lib/mail", () => ({
 }));
 
 import { POST } from "./route";
+import { sendMail } from "@/lib/mail";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import { createProposal } from "@/lib/proposals-store";
 
@@ -728,5 +729,25 @@ describe("POST /api/orcamento/[id]/proposta-doc — a língua com que se desenha
     // na base é o que ela escreveu, em português.
     expect(created.last!.doc).toBeTruthy();
     expect(created.last!.doc).not.toHaveProperty("idioma");
+  });
+});
+
+/**
+ * O envio da proposta do estúdio é o irmão do `/proposta` e tinha o MESMO
+ * rodapé escrito à mão. Passa pela assinatura única, com o PDF intacto.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — assinatura", () => {
+  it("assina o email da proposta e mantém o PDF em anexo", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "acrescer" })), { params });
+    const env = vi.mocked(sendMail).mock.calls.at(-1)![0];
+    expect(env.html).toContain("Catarina Gaspar");
+    expect(env.html).toContain("Manager");
+    expect(env.html).toContain("+351 919 259 820");
+    expect(env.text).toContain("Catarina Gaspar");
+    expect(env.text).toContain("+351 919 259 820");
+    expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
+    expect(env.attachments?.some((a) => a.filename.endsWith(".pdf"))).toBe(true);
+    expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
+    expect(env.html).not.toContain("Líquen Events · ");
   });
 });

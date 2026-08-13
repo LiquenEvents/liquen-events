@@ -3,7 +3,7 @@ import type { QuoteMessage } from "@/lib/orcamento/types";
 import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
-import { SITE } from "@/lib/site";
+import { emailAoCliente } from "@/lib/email-assinatura";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 
@@ -40,14 +40,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Mensagem vazia." }, { status: 400 });
     }
 
-    const html = `
-    <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
-      <p style="font-size:14px;line-height:1.7;color:#222;white-space:pre-wrap">${esc(message)}</p>
-      <div style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;color:#777;font-size:12px">
-        Líquen Events · ${esc(MAIL_TO)} · ${SITE.phoneDisplay}<br>
-        <span style="color:#999">Decoramos eventos, eternizamos memórias.</span>
-      </div>
-    </div>`;
+    // O corpo é só o que ESTA mensagem tem de particular: a moldura e a
+    // assinatura vêm do `emailAoCliente`, que é a mesma para todo o correio que
+    // sai daqui para fora. O rodapé escrito à mão que aqui estava era uma de
+    // cinco cópias da mesma linha.
+    const email = emailAoCliente({
+      html: `<p style="font-size:14px;line-height:1.7;color:#2a2620;white-space:pre-wrap">${esc(message)}</p>`,
+      texto: message,
+    });
 
     /**
      * ════════════════════════════════════════════════════════════════════════
@@ -76,8 +76,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           to: quote.email,
           replyTo: MAIL_TO,
           subject: `Líquen Events — sobre o seu pedido (${id})`,
-          html,
-          text: message,
+          ...email,
         })
       : { sent: false as const };
     const emailError = temDestinatario

@@ -69,7 +69,10 @@ function fromAddress(): string {
   return `${FROM_NAME} <${process.env.SMTP_USER}>`;
 }
 
-interface Attachment {
+// Exportada porque a assinatura (`email-assinatura.ts`) também devolve anexos:
+// com o tipo cá fora, um anexo mal formado parte na compilação e não na caixa
+// de correio de um cliente.
+export interface Attachment {
   filename: string;
   content: Buffer | Uint8Array;
   contentType?: string;

@@ -131,3 +131,37 @@ describe("buildClientConfirmation", () => {
     expect(html).toContain("&lt;img");
   });
 });
+
+/**
+ * A confirmação do formulário público também é um email para um cliente — e
+ * portanto leva a MESMA assinatura que as respostas escritas à mão, o envio da
+ * proposta e o recibo. Era o único que tinha um fecho próprio.
+ */
+describe("buildClientConfirmation — assinatura da casa", () => {
+  it("assina com o nome e o cargo da casa, no HTML e no texto", () => {
+    const { html, text } = buildClientConfirmation({
+      locale: "pt",
+      name: "Ana",
+      referenceId: "LIQ-ABC-1234",
+    });
+    expect(html).toContain("Catarina Gaspar");
+    expect(html).toContain("Manager");
+    expect(text).toContain("Catarina Gaspar");
+    expect(text).toContain("Manager");
+  });
+
+  it("assina também a versão inglesa — a assinatura é a mesma em todo o lado", () => {
+    const { html } = buildClientConfirmation({ locale: "en", name: "John" });
+    expect(html).toContain("Catarina Gaspar");
+  });
+
+  it("não repete os contactos duas vezes no mesmo email", () => {
+    const { html } = buildClientConfirmation({
+      locale: "pt",
+      name: "Ana",
+      referenceId: "LIQ-ABC-1234",
+    });
+    const vezes = html.split("+351 919 259 820").length - 1;
+    expect(vezes).toBe(1);
+  });
+});
