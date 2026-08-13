@@ -1173,6 +1173,14 @@ export async function renderProposalDocPdfWithReport(
      */
     const medirItem = (it: { label: string; desc?: string }) => {
       if (!it.desc) return { lab: "", dx: DESC_X, lines: [it.label] };
+      // SEM RÓTULO NÃO HÁ DOIS PONTOS. Uma linha de serviço só com descrição
+      // desenhava o separador à mesma e saía «: Floral arch.» — uma frase a
+      // começar por dois pontos, que se lê como software estragado. O rótulo é
+      // opcional (ela escreve linhas que são só uma frase), a pontuação que o
+      // acompanha é que não pode sobreviver-lhe.
+      if (!it.label.trim()) {
+        return { lab: "", dx: DESC_X, lines: wrap(f.reg, it.desc, descSize, W - M - DESC_X) };
+      }
       // Sanitiza aqui também: `lab` é medido diretamente com
       // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
       const lab = textoParaFonte(f.bold, `${it.label}: `);
@@ -1442,7 +1450,22 @@ export async function renderProposalDocPdfWithReport(
     let y = H - M - 64;
     y = sectionHeader(p, t.sobretituloOrcamento, numerada(t.tituloOrcamento), y);
 
-    const totalStr = orgT ? (doc.totalEstimatedText ?? "") : doc.totalText;
+    /**
+     * UM MARCADOR POR SUBSTITUIR NÃO É UM VALOR.
+     *
+     * «[Valor Total]» é o que o estúdio semeia no campo enquanto a proposta não
+     * tem preço. A Conferência já o procura antes do envio — mas o aviso é a
+     * montante e é dispensável: quem gerar o PDF sem passar por ela levava o
+     * marcador para o papel, e numa proposta INGLESA chegava em português por
+     * cima. Entre a Conferência e a folha não havia mais nada.
+     *
+     * Cai no mesmo «—» que um total vazio já desenha: é o que diz «ainda não há
+     * preço» sem dizer ao cliente que recebeu um modelo por preencher. Só o
+     * marcador INTEIRO conta — um valor que ela escreva com parênteses rectos
+     * lá dentro continua a sair como o escreveu.
+     */
+    const semMarcador = (v: string) => (/^\[[^\]]*\]$/.test(v.trim()) ? "" : v);
+    const totalStr = semMarcador(orgT ? (doc.totalEstimatedText ?? "") : doc.totalText);
     // O rótulo do total de Decoração é um campo do estúdio, e nasce preenchido
     // («Valor Total Decoração»): traduz-se enquanto for o que lá nasceu, e sai
     // tal e qual assim que ela lhe mexer (ver `rotuloDoTotalNaLingua`).
@@ -1822,7 +1845,11 @@ export async function renderProposalDocPdfWithReport(
     // já vivia a lista com as mesmas percentagens escritas por extenso. Ver lá o
     // porquê da percentagem sair de `depositPercentOf` e não de um «30%» à letra.
 
-    if (doc.budgetNote) {
+    // `.trim()` e não a caixa em bruto: uma nota com um espaço lá dentro é
+    // «verdadeira» para o `if`, e saía «Note:» sozinho no fundo do orçamento —
+    // um rótulo sem nada à frente numa folha que vai para o cliente. Acontece
+    // nas duas línguas; apanhou-o o passeio do PDF inglês.
+    if (doc.budgetNote?.trim()) {
       budgetBreak(30);
       for (const ln of wrap(f.reg, t.nota(doc.budgetNote), 9, boxW)) {
         text(p, ln, M, y, { size: 9, color: MUTED });
