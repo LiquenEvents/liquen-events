@@ -98,6 +98,41 @@ describe("modo de carga", () => {
     await waitFor(() => expect(contador()).toBe("0 de 3 carregados"));
   });
 
+  /**
+   * O «Limpar» apagava TUDO o que alguma vez fora riscado, incluindo o que
+   * pertence a outro filtro — e aparecia/desaparecia consoante a contagem DESTA
+   * lista. A carga faz-se por categorias: risca-se os vasos, sai-se, muda-se o
+   * filtro, entra-se nas toalhas. Um «Limpar» ali dado para refazer as duas
+   * toalhas levava atrás os doze vasos que já estavam na carrinha — sem aviso e
+   * sem forma de desfazer. Ao voltar à categoria anterior lia-se "0 de 14" e
+   * carregava-se outra vez o que já lá estava.
+   *
+   * É a mesma razão do teste acima: este ecrã fala sempre da lista à frente dela.
+   */
+  it("limpar não apaga o que foi riscado noutro filtro", async () => {
+    const { unmount } = desenhar();
+    fireEvent.click(linha("Jarras de vidro"));
+    fireEvent.click(linha("Castiçais"));
+    await waitFor(() => expect(contador()).toBe("2 de 3 carregados"));
+    unmount();
+
+    // Mudou o filtro: só as toalhas estão à frente dela.
+    const so = desenhar([ITENS[2]]);
+    fireEvent.click(linha("Toalhas"));
+    await waitFor(() => expect(contador()).toBe("1 de 1 carregados"));
+    fireEvent.click(screen.getByRole("button", { name: "Limpar" }));
+    await waitFor(() => expect(contador()).toBe("0 de 1 carregados"));
+    so.unmount();
+
+    // De volta à lista inteira: as jarras e os castiçais continuam carregados.
+    desenhar();
+    await waitFor(() =>
+      expect(contador(), "o «Limpar» de uma lista apagou marcações de outra").toBe(
+        "2 de 3 carregados",
+      ),
+    );
+  });
+
   /** A linha inteira é o alvo: um quadrado de 20 px ao sol, com a outra mão
    *  ocupada, é onde se falha o toque. */
   it("a linha inteira é que é o botão, e é alta", () => {

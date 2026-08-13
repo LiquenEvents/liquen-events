@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
 import { printRunSheet } from "./export";
@@ -50,10 +50,24 @@ export default function EventTimeline({ quote, onChange }: Props) {
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null);
   const [draft, setDraft] = useState("");
 
+  /**
+   * Otimista com reversão — mas a reversão é para o último estado que o SERVIDOR
+   * confirmou, e só quando não há gravação mais recente.
+   *
+   * Guardar `items` antes do pedido e repô-lo no erro era guardar um instante
+   * que já passou. Aqui não há confirmação nenhuma a separar dois cliques no ×,
+   * e é assim que o guião se limpa: a correr a lista. O segundo PATCH leva o
+   * guião INTEIRO (já sem o primeiro momento), portanto o servidor fica com os
+   * dois apagados; a primeira remoção, ao falhar, repunha o instante anterior às
+   * DUAS e devolvia ao ecrã um momento que já não existe — num guião que se
+   * imprime e se entrega à equipa na manhã do evento.
+   */
+  const gravacoes = useRef(0);
+  const gravado = useRef<TimelineItem[]>(quote.timeline ?? []);
+
   function persist(next: TimelineItem[]) {
     const sorted = sortByTime(next);
-    // Otimista com reversão: falha do servidor repõe o estado e avisa.
-    const snapshot = items;
+    const minha = ++gravacoes.current;
     setItems(sorted);
     onChange(sorted);
     fetch(`/api/orcamento/${quote.id}`, {
@@ -63,10 +77,15 @@ export default function EventTimeline({ quote, onChange }: Props) {
     })
       .then((res) => {
         if (!res.ok) throw new Error();
+        if (minha === gravacoes.current) gravado.current = sorted;
       })
       .catch(() => {
-        setItems(snapshot);
-        onChange(snapshot);
+        // Já foi substituída por uma gravação mais recente: o que essa levar
+        // contém o que esta levava, portanto não há nada a desfazer nem nada a
+        // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
+        if (minha !== gravacoes.current) return;
+        setItems(gravado.current);
+        onChange(gravado.current);
         toast("Não foi possível guardar o guião. Tenta novamente.", "error");
       });
   }

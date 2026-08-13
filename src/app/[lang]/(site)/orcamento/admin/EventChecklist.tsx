@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
 import type { Quote, ChecklistItem } from "@/lib/orcamento/types";
@@ -22,9 +22,23 @@ export default function EventChecklist({ quote, onChange }: Props) {
   // Confirmação inline (dois cliques) antes de limpar itens concluídos.
   const [confirmClear, setConfirmClear] = useState(false);
 
+  /**
+   * Otimista com reversão — mas a reversão é para o último estado que o SERVIDOR
+   * confirmou, e só quando não há gravação mais recente.
+   *
+   * Guardar `items` antes do pedido e repô-lo no erro era guardar um instante
+   * que já passou. Esta lista usa-se a percorrer e a ir marcando, portanto dois
+   * PATCH no ar são o caso normal e não a corrida rara. O segundo leva a
+   * checklist INTEIRA (já com a primeira marcação dentro), portanto quando o
+   * servidor o aceita fica com as duas; a primeira, ao falhar, repunha o
+   * instante anterior às DUAS e desriscava no ecrã uma tarefa gravada — que a
+   * edição seguinte voltava a gravar como por fazer.
+   */
+  const gravacoes = useRef(0);
+  const gravado = useRef<ChecklistItem[]>(quote.checklist ?? []);
+
   function persist(next: ChecklistItem[]) {
-    // Otimista com reversão: falha do servidor repõe o estado e avisa.
-    const snapshot = items;
+    const minha = ++gravacoes.current;
     setItems(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
@@ -34,10 +48,15 @@ export default function EventChecklist({ quote, onChange }: Props) {
     })
       .then((res) => {
         if (!res.ok) throw new Error();
+        if (minha === gravacoes.current) gravado.current = next;
       })
       .catch(() => {
-        setItems(snapshot);
-        onChange(snapshot);
+        // Já foi substituída por uma gravação mais recente: o que essa levar
+        // contém o que esta levava, portanto não há nada a desfazer nem nada a
+        // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
+        if (minha !== gravacoes.current) return;
+        setItems(gravado.current);
+        onChange(gravado.current);
         toast("Não foi possível guardar a checklist. Tenta novamente.", "error");
       });
   }

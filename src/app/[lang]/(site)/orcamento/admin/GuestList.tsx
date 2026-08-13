@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
+import { metaFor } from "./status-meta";
 import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
 import type { Quote, Guest, RsvpStatus } from "@/lib/orcamento/types";
 import { Button, Field } from "./ui";
@@ -37,16 +38,32 @@ export default function GuestList({ quote, onChange }: Props) {
     let declined = 0;
     for (const g of guests) {
       const n = g.party || 1;
+      // Só "recusado" conta como recusa. Um valor que este ecrã não conheça cai
+      // em "Pendente" — que é o que ele é, uma resposta por apurar — e não em
+      // "Recusados", que seria afirmar uma recusa que ninguém deu.
       if (g.rsvp === "confirmado") confirmed += n;
-      else if (g.rsvp === "pendente") pending += n;
-      else declined += n;
+      else if (g.rsvp === "recusado") declined += n;
+      else pending += n;
     }
     return { confirmed, pending, declined };
   }, [guests]);
 
+  /**
+   * Otimista com reversão — mas a reversão é para o último estado que o SERVIDOR
+   * confirmou, e só quando não há gravação mais recente.
+   *
+   * Guardar `guests` antes do pedido e repô-lo no erro era guardar um instante
+   * que já passou. Marcar duas famílias de seguida põe dois PATCH no ar; o
+   * segundo leva a lista INTEIRA (já com a primeira alteração dentro), portanto
+   * quando o servidor o aceita fica com as duas. A primeira, ao falhar, repunha
+   * o mundo anterior às DUAS e apagava do ecrã — e do `onChange`, e por isso da
+   * gravação seguinte — uma confirmação que estava gravada.
+   */
+  const gravacoes = useRef(0);
+  const gravado = useRef<Guest[]>(quote.guestList ?? []);
+
   function persist(next: Guest[]) {
-    // Otimista com reversão: falha do servidor repõe o estado e avisa.
-    const snapshot = guests;
+    const minha = ++gravacoes.current;
     setGuests(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
@@ -56,10 +73,15 @@ export default function GuestList({ quote, onChange }: Props) {
     })
       .then((res) => {
         if (!res.ok) throw new Error();
+        if (minha === gravacoes.current) gravado.current = next;
       })
       .catch(() => {
-        setGuests(snapshot);
-        onChange(snapshot);
+        // Já foi substituída por uma gravação mais recente: o que essa levar
+        // contém o que esta levava, portanto não há nada a desfazer nem nada a
+        // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
+        if (minha !== gravacoes.current) return;
+        setGuests(gravado.current);
+        onChange(gravado.current);
         toast("Não foi possível guardar a lista de convidados. Tenta novamente.", "error");
       });
   }
@@ -231,12 +253,25 @@ export default function GuestList({ quote, onChange }: Props) {
                 convidados
               </label>
               <select
-                value={g.rsvp}
+                // `?? ""` porque um registo anterior ao campo nem sequer o tem:
+                // um `value` indefinido passava o select a NÃO-controlado a meio
+                // da vida do componente, e a partir daí ele deixava de reflectir
+                // o que está gravado.
+                value={g.rsvp ?? ""}
                 onChange={(e) => setRsvpOf(g.id, e.target.value as RsvpStatus)}
                 aria-label={`Estado do RSVP de ${g.name}`}
                 className="bo-input w-[110px] shrink-0 px-2 py-1 text-[11px] font-medium"
-                style={{ color: RSVP_META[g.rsvp].color }}
+                // `RSVP_META[g.rsvp].color` à bruta era `undefined.color` assim
+                // que aparecesse um valor de fora — uma linha antiga, uma
+                // migração, uma correcção feita à mão na base de dados. Num
+                // componente de cliente isso não perde a linha: perde o back
+                // office inteiro para o ecrã de erro.
+                style={{ color: metaFor(RSVP_META, g.rsvp).color }}
               >
+                {/* Sem esta, um valor desconhecido não casava com opção
+                    nenhuma e o campo mostrava "Pendente" — dizia uma coisa
+                    enquanto o registo dizia outra. Assim vê-se o valor cru. */}
+                {!(g.rsvp in RSVP_META) && <option value={g.rsvp ?? ""}>{g.rsvp || "—"}</option>}
                 <option value="pendente">Pendente</option>
                 <option value="confirmado">Confirmado</option>
                 <option value="recusado">Recusado</option>

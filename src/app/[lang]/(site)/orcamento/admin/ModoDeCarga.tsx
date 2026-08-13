@@ -93,6 +93,26 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
     });
   }, []);
 
+  /**
+   * Limpar é sobre A LISTA À FRENTE DELA, pela mesma razão que a contagem é.
+   *
+   * Apagava tudo o que alguma vez fora riscado. A carga faz-se por categorias —
+   * riscam-se os vasos, sai-se, muda-se o filtro, entram-se as toalhas — e um
+   * «Limpar» dado ali para refazer duas toalhas levava atrás os doze vasos que
+   * já estavam na carrinha. Sem aviso, sem desfazer, e só se dava por isso ao
+   * voltar à categoria anterior e ler "0 de 14". O próprio botão já só aparece
+   * quando esta lista tem alguma coisa riscada; faltava a acção concordar com
+   * isso.
+   */
+  const limpar = useCallback(() => {
+    setRiscados((prev) => {
+      const nova = new Set(prev);
+      for (const i of itens) nova.delete(i.id);
+      guardarRiscados(nova);
+      return nova;
+    });
+  }, [itens]);
+
   // Conta só o que está NA LISTA à frente dela. Se contasse tudo o que alguma
   // vez foi riscado, o "12 de 34" mentia assim que se mudasse de categoria.
   const feitos = useMemo(() => itens.filter((i) => riscados.has(i.id)).length, [itens, riscados]);
@@ -119,10 +139,7 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
           {feitos > 0 && (
             <button
               type="button"
-              onClick={() => {
-                setRiscados(new Set());
-                guardarRiscados(new Set());
-              }}
+              onClick={limpar}
               className="alvo-toque shrink-0 px-3 py-2 text-xs text-foreground/50 underline underline-offset-2"
             >
               Limpar

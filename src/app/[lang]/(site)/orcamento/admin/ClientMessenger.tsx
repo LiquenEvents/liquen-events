@@ -30,7 +30,6 @@ export default function ClientMessenger({ quote, onSent }: Props) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
 
   const firstName = (quote.name || "").trim().split(/\s+/)[0] || "";
   function applyTemplate(tpl: string) {
@@ -42,7 +41,6 @@ export default function ClientMessenger({ quote, onSent }: Props) {
     if (!body || sending) return;
     setSending(true);
     setError(null);
-    setNote(null);
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/mensagem`, {
         method: "POST",
@@ -55,7 +53,26 @@ export default function ClientMessenger({ quote, onSent }: Props) {
       setMessages(next);
       setText("");
       onSent?.(next);
-      if (!data.emailed) setNote("Mensagem registada (e-mail não configurado — não foi enviada).");
+      /**
+       * O e-mail não ter saído é um ERRO, não um rodapé.
+       *
+       * Estava em cinzento claro e com uma frase escrita aqui — «e-mail não
+       * configurado» —, que na esmagadora maioria dos casos é a razão errada: o
+       * que falta é o e-mail DO CLIENTE, num pedido que entrou por telefonema. A
+       * rota já calcula a razão certa e manda-a em `emailError`, com o que fazer
+       * a seguir dentro dela; deitá-la fora mandava-a procurar uma definição de
+       * servidor de correio quando bastava preencher um campo do pedido.
+       *
+       * A mensagem fica registada de qualquer maneira (é a rota que o garante, e
+       * a frase dela di-lo) — o que não pode ficar por dizer é que o cliente não
+       * recebeu nada. Mesma decisão do envio da proposta no ProposalStudio.
+       */
+      if (!data.emailed) {
+        setError(
+          data.emailError ||
+            "A mensagem ficou registada, mas o e-mail NÃO SAIU — o cliente não recebeu nada.",
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao enviar.");
     } finally {
@@ -121,8 +138,11 @@ export default function ClientMessenger({ quote, onSent }: Props) {
         containerClassName="mb-3"
       />
 
-      {error && <p className="text-[#8a2a22] text-xs mb-3">{error}</p>}
-      {note && <p className="text-foreground/50 text-xs mb-3">{note}</p>}
+      {error && (
+        <p className="text-[#8a2a22] text-xs mb-3 leading-relaxed" role="alert">
+          {error}
+        </p>
+      )}
 
       <Button
         variant="primary"

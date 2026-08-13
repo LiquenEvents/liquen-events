@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { randomId, eur2 } from "./util";
 import { useToast } from "./Toast";
+import { metaFor } from "./status-meta";
 import { Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
 import {
@@ -44,9 +45,21 @@ export default function ProductionPlan({ quote, onChange }: Props) {
   const [newPhase, setNewPhase] = useState<string>(DECOR_PRODUCTION[0].key);
   const suppliers = quote.eventSuppliers ?? [];
 
+  /**
+   * Otimista com reversão — mas a reversão é para o último estado que o SERVIDOR
+   * confirmou, e só quando não há gravação mais recente.
+   *
+   * `const snapshot = items` era lido ANTES do `await`, ou seja um instante que
+   * já passou. O atelier risca tarefas em série, portanto dois PATCH no ar são o
+   * caso normal: o segundo leva o plano INTEIRO (já com a primeira marcação
+   * dentro) e o servidor fica com as duas; a primeira, ao falhar, repunha o
+   * instante anterior às DUAS e desriscava uma tarefa que estava gravada.
+   */
+  const gravacoes = useRef(0);
+  const gravado = useRef<ChecklistItem[]>(quote.productionPlan ?? []);
+
   async function persist(next: ChecklistItem[]) {
-    // Otimista com reversão: falha do servidor repõe o estado e avisa.
-    const snapshot = items;
+    const minha = ++gravacoes.current;
     setItems(next);
     onChange?.(next);
     try {
@@ -56,9 +69,14 @@ export default function ProductionPlan({ quote, onChange }: Props) {
         body: JSON.stringify({ productionPlan: next }),
       });
       if (!res.ok) throw new Error(String(res.status));
+      if (minha === gravacoes.current) gravado.current = next;
     } catch {
-      setItems(snapshot);
-      onChange?.(snapshot);
+      // Já foi substituída por uma gravação mais recente: o que essa levar
+      // contém o que esta levava, portanto não há nada a desfazer nem nada a
+      // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
+      if (minha !== gravacoes.current) return;
+      setItems(gravado.current);
+      onChange?.(gravado.current);
       toast("Não foi possível guardar o plano de produção. Tenta novamente.", "error");
     }
   }
@@ -263,29 +281,38 @@ export default function ProductionPlan({ quote, onChange }: Props) {
           </p>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {suppliers.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-xl px-3.5 py-2.5"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-foreground/80 text-xs font-medium truncate">{s.name}</p>
-                  <p className="text-foreground/45 text-[10px]">{s.category}</p>
-                </div>
-                <span
-                  className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
-                  style={{
-                    background: `${STATUS_LABEL[s.status].color}1f`,
-                    color: STATUS_LABEL[s.status].color,
-                  }}
+            {suppliers.map((s) => {
+              // `STATUS_LABEL[s.status].color` à bruta era `undefined.color`
+              // assim que aparecesse um estado de fora — uma linha antiga, uma
+              // migração, uma correcção feita à mão na base de dados. Num
+              // componente de cliente isso não perde a linha do fornecedor:
+              // perde o back office inteiro para o ecrã de erro. O valor cru
+              // fica à vista, em cinzento, para se saber qual é a linha.
+              const estado = metaFor(STATUS_LABEL, s.status);
+              return (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-2.5 bg-foreground/[0.02] border border-foreground/[0.07] rounded-xl px-3.5 py-2.5"
                 >
-                  {STATUS_LABEL[s.status].label}
-                </span>
-                <span className="text-foreground/55 text-[11px] tabular-nums shrink-0">
-                  {eur2(s.estimatedCost)}
-                </span>
-              </div>
-            ))}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-foreground/80 text-xs font-medium truncate">{s.name}</p>
+                    <p className="text-foreground/45 text-[10px]">{s.category}</p>
+                  </div>
+                  <span
+                    className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md shrink-0 font-medium"
+                    style={{
+                      background: `${estado.color}1f`,
+                      color: estado.color,
+                    }}
+                  >
+                    {estado.label}
+                  </span>
+                  <span className="text-foreground/55 text-[11px] tabular-nums shrink-0">
+                    {eur2(s.estimatedCost)}
+                  </span>
+                </div>
+              );
+            })}
             <p className="text-foreground/40 text-[10px] mt-1">Geridos no separador Custos.</p>
           </div>
         )}
