@@ -14,8 +14,11 @@
  */
 export default function AdminLoading() {
   return (
+    // `ecra-de-espera`: ver o `<noscript>` do layout de raiz. O back office não
+    // funciona sem JS de qualquer maneira, mas a alça fica pela mesma razão que
+    // as outras — quem lá chegar sem JS vê o que há, não um esqueleto eterno.
     <div
-      className="min-h-screen bg-surface flex"
+      className="ecra-de-espera min-h-screen bg-surface flex"
       role="status"
       aria-busy="true"
       aria-label="A carregar o back office"

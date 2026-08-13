@@ -14,8 +14,11 @@
  */
 export default function ConfirmacaoLoading() {
   return (
+    // `ecra-de-espera`: ver o `<noscript>` do layout de raiz. Sem JS o React
+    // nunca troca este esqueleto pelo conteúdo, e é por esta classe que ele sai
+    // da frente.
     <div
-      className="relative min-h-screen overflow-hidden bg-surface"
+      className="ecra-de-espera relative min-h-screen overflow-hidden bg-surface"
       role="status"
       aria-busy="true"
       aria-label="A carregar a confirmação"

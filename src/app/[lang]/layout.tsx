@@ -292,11 +292,27 @@ export default async function RootLayout({
 
           Sem JavaScript nada disto corre e a barra aparece de imediato, que é
           o comportamento certo para esse caso.
+
+          ── E A MARCA `com-javascript`, QUE VIAJA DE BOLEIA NESTE MESMO SCRIPT
+          É a única maneira honesta de o CSS saber que há JavaScript: se esta
+          linha correu, há. Serve para o resgate da página sem JS — o React
+          entrega o conteúdo dentro de um `<div hidden>` e só um script o mete
+          no sítio, portanto sem JS o sítio inteiro ficava a mostrar o ecrã de
+          espera. O comentário longo está em `globals.css`, ao pé das regras
+          `html:not(.com-javascript)`.
+
+          Vai de boleia aqui, e não num script próprio, porque tem de ser
+          escrita ANTES da primeira pintura e antes de o `<body>` existir — e
+          este script já é isso. É também a razão de a marca ser POSITIVA
+          («tenho JS») em vez de negativa: uma marca que se ACRESCENTA nunca
+          pisca; uma que se retirasse mostraria o resgate durante um instante a
+          toda a gente.
         */}
         <script
           dangerouslySetInnerHTML={{
             __html:
               "var d=document.documentElement;" +
+              "d.classList.add('com-javascript');" +
               "try{if(localStorage.getItem('liquen-consent'))d.classList.add('consentimento-decidido')}" +
               "catch(e){d.classList.add('consentimento-decidido')}" +
               "d.classList.add('fontes-por-assentar');" +

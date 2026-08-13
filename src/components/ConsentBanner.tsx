@@ -13,16 +13,30 @@ import { ALTURA_BARRA_FIXA_PX, ehRotaSocial } from "@/lib/meta/barra";
 // so doing nothing = no ad cookies.
 type Gtag = (...args: unknown[]) => void;
 
+/**
+ * ── PORQUE É QUE ESTE TEXTO ENCOLHEU ──────────────────────────────────────
+ * Era o dobro disto, e a barra media 191 px num telemóvel de 390×844 — 23% do
+ * ecrã. O que lá estava a mais era DETALHE de segunda camada: a lista de
+ * produtos («Google Analytics», «Google Ads, Instagram e Facebook») e a frase
+ * «pode aceitar ou recusar e a sua escolha fica guardada», que os dois botões
+ * ali ao lado já dizem melhor do que qualquer frase.
+ *
+ * O que a primeira camada de um aviso de cookies tem de dizer — e continua cá
+ * — é PARA QUE SERVEM (estatísticas e medição de publicidade), QUEM os põe
+ * (Google e Meta) e ONDE está o resto (o «Saber mais», que abre a política de
+ * privacidade e é onde a lista de produtos vive por extenso). Encolher o
+ * texto não encolhe o consentimento: encolhe o obstáculo.
+ */
 const COPY = {
   pt: {
-    text: "Usamos cookies do Google e da Meta para estatísticas de visitas (Google Analytics) e para medir a eficácia da nossa publicidade (Google Ads, Instagram e Facebook). Pode aceitar ou recusar e a sua escolha fica guardada.",
+    text: "Usamos cookies do Google e da Meta para estatísticas de visitas e para medir a nossa publicidade.",
     more: "Saber mais",
     accept: "Aceitar",
     decline: "Recusar",
     aria: "Aviso de cookies",
   },
   en: {
-    text: "We use Google and Meta cookies for visit statistics (Google Analytics) and to measure how well our ads perform (Google Ads, Instagram and Facebook). You can accept or decline and your choice is remembered.",
+    text: "We use Google and Meta cookies for visit statistics and to measure our advertising.",
     more: "Learn more",
     accept: "Accept",
     decline: "Decline",
@@ -162,7 +176,25 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
        * legenda de sobrevoo) ficam — esses vêem-se, e o que rendem já está
        * dentro da variância entre corridas.
        */
-      className="barra-consentimento fixed inset-x-0 bottom-0 z-[70] border-t border-white/12 bg-moss-dark/95 px-5 py-4 sm:px-8"
+      /**
+       * ── A GEOMETRIA, QUE ERA O DEFEITO ────────────────────────────────
+       * Esta barra é `fixed` e continua a sê-lo: pô-la no fluxo faria a
+       * página refluir no instante em que ela aparece (ela espera pelas
+       * fontes, ver `fontes-por-assentar`), e esse refluxo é CLS medido.
+       *
+       * O que mudou é que o espaço que ela ocupa passou a ser RESERVADO
+       * pelo resto do sítio, através de `--reserva-consentimento`
+       * (globals.css, ao pé de `html.consentimento-decidido`). A reserva é
+       * uma constante por medida — como o `ALTURA_BARRA_FIXA_PX` da barra
+       * social —, existe desde a primeira pintura e não depende de medir
+       * nada em JavaScript, portanto não custa um pixel de CLS.
+       *
+       * `py-3.5` e `gap-2.5` em vez de `py-4`/`gap-3`: com o texto curto, a
+       * barra do telemóvel passa de 191 px para ~110 px. O ESSENCIAL é que a
+       * reserva declarada no CSS continue a ser maior do que esta caixa —
+       * `e2e/consentimento-geometria.spec.ts` mede as duas e obriga a isso.
+       */
+      className="barra-consentimento fixed inset-x-0 bottom-0 z-[70] border-t border-white/12 bg-moss-dark/95 px-5 py-3.5 sm:px-8 sm:py-4"
       style={{
         // Fora das rotas sociais nada muda: `bottom: 0` (da classe) e o
         // preenchimento a respeitar a zona segura do iPhone.
@@ -177,7 +209,7 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
           : undefined,
       }}
     >
-      <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="mx-auto flex max-w-5xl flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <p className="text-[12.5px] leading-relaxed text-white/80">
           {t.text}{" "}
           <Link

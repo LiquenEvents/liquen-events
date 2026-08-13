@@ -93,7 +93,15 @@ export default function StickyCTA() {
       // TODAS as páginas e que se mexem sozinhos a meio do scroll, portanto
       // era das lacunas de movimento reduzido que mais vezes se via. Com a
       // variante o chip passa a aparecer e a recolher de uma vez.
-      className={`fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-[calc(1.25rem+env(safe-area-inset-left))] lg:bottom-[calc(1.75rem+env(safe-area-inset-bottom))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
+      // Os dois `bottom-[…]` do Tailwind saíram daqui para `piso-flutuante`
+      // (globals.css). MEDIDO, com a barra de cookies por decidir: no centro
+      // deste chip estava o <button>Recusar do aviso — o CTA permanente para o
+      // formulário de orçamento, visível e morto, nas duas medidas. O `bottom`
+      // era uma conta escrita aqui que não sabia da barra; agora é uma conta
+      // só, que lhe soma a reserva e vale o mesmo de sempre quando não há
+      // aviso. Nada de `bottom-*` ao lado destas classes: a regra à mão vive
+      // fora de `@layer` e ganharia em silêncio (CamadasCss.contrato.test.ts).
+      className={`piso-flutuante piso-flutuante-lg fixed left-[calc(1.25rem+env(safe-area-inset-left))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >

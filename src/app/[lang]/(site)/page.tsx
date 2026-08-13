@@ -41,7 +41,15 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
       {/* ── Hero ── */}
       {/* -mt-24 cancels the global <main> pt-24 so the hero runs full-bleed
           behind the transparent fixed navbar. */}
-      <section className="relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
+      {/* `recuo-consentimento`: a legenda deste herói (o <h1> e os dois únicos
+          CTA do primeiro ecrã) está ANCORADA AO FUNDO — `justify-end` + pb-14.
+          É exactamente onde a barra de cookies se senta, e foi por isso que os
+          dois botões ficavam visíveis e mortos até a pessoa decidir sobre os
+          cookies. O recuo levanta a legenda a altura da reserva do aviso e
+          vale 0 px quando não há aviso; a fotografia continua a ocupar o ecrã
+          inteiro, porque o que se mexe é o conteúdo dentro da caixa, não a
+          caixa. Ver `--reserva-consentimento` em globals.css. */}
+      <section className="recuo-consentimento relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} drift className="absolute inset-0">
           <HeroImage
             src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"

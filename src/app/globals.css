@@ -371,6 +371,77 @@ body {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   SEM JAVASCRIPT, A PÁGINA INTEIRA FICAVA NA GAVETA
+   ═══════════════════════════════════════════════════════════════════════════
+
+   O QUE SE VIA, MEDIDO em `/orcamento` com o JS desligado, num Chromium sobre
+   o `next build`: o cabeçalho, um ponto a pulsar a meio do ecrã, e mais nada. O
+   formulário ESTAVA no HTML — `<form>`, dez campos, o botão de enviar — a medir
+   0×0 px.
+
+   PORQUÊ, e não é o que parece. Não é animação de entrada nenhuma (essa é a
+   segunda fechadura da mesma porta, e está tratada no `orc-field-in` mais
+   abaixo): é a renderização em streaming do React. O grupo (site) tem um
+   `loading.tsx`, e um `loading.tsx` é uma fronteira `<Suspense>`. O React manda
+   primeiro a casca com o ecrã de espera lá dentro e o conteúdo a sério vai a
+   seguir, no fim do `<body>`, dentro de
+
+       <div hidden id="S:0">…a página toda…</div>
+
+   com um `<script>` atrás que o tira de lá e o mete no sítio. Esse script é a
+   ÚNICA coisa que faz a troca. Sem JS nunca corre: o conteúdo fica na gaveta e
+   o ecrã de espera fica para sempre. Isto valia para o sítio TODO — só que nas
+   outras páginas ainda se via o rodapé (está fora da fronteira) e a
+   `/orcamento` esconde o rodapé de propósito. Daí ser a única literalmente
+   branca, e é a que dá dinheiro.
+
+   O QUE ESTAS REGRAS FAZEM: devolvem a gaveta ao fluxo, com as medidas do
+   `<main>` que ela substitui (`flex-1 pt-24`) e antes do rodapé (`order`, que
+   no DOM ela vem depois), e escondem o ecrã de espera. O conteúdo passa a estar
+   visível POR OMISSÃO e o script do React passa a ser um acrescento — que é a
+   ordem certa das coisas.
+
+   PORQUE É `html:not(.com-javascript)` E NÃO UM `<noscript>`. Um `<noscript>`
+   com uma folha lá dentro foi a primeira tentativa e NÃO FUNCIONA aqui, por
+   causa das camadas: o `[hidden]` do Tailwind é `display: none !important`
+   dentro de `@layer base`, e — regra do CSS — a ordem das camadas INVERTE-SE
+   para as declarações `!important`, o que faz uma regra `!important` SEM camada
+   perder para uma `!important` que esteja em qualquer camada. Medido: o
+   `<main>` escondia-se (essa regra não disputava nada) e a gaveta continuava a
+   `display: none`. Aqui dentro de `@layer base`, e com mais especificidade,
+   ganha. A marca `com-javascript` é posta no `<html>` pelo mesmo script em
+   linha do `<head>` que decide o aviso de cookies — antes da primeira pintura,
+   e muito antes de a gaveta sequer existir no documento, portanto não há
+   nenhum instante em que isto pisque.
+
+   NÃO É PARA O CASO DO PEDAÇO QUE FALHA A CARREGAR, e vale a pena dizê-lo: esse
+   `<script>` da troca vem EM LINHA no HTML, portanto corre na mesma quando um
+   chunk não chega. O que se perde nesse caso é a hidratação, não o conteúdo.
+
+   O PREÇO: sem JS não há landmark `<main>` (é ele que leva o ecrã de espera e é
+   ele que se esconde). Um conteúdo sem landmark é pior do que um conteúdo com
+   landmark, e é muito melhor do que nenhum conteúdo.
+
+   `div[hidden][id^="S:"]` é o nome que o React 19 dá a estas gavetas. Se um dia
+   mudar, isto deixa de fazer efeito em silêncio — daí `e2e/sem-javascript.spec.ts`,
+   que abre a página sem JS e mede a altura do formulário. */
+@layer base {
+  html:not(.com-javascript) body > main:has(> .ecra-de-espera) {
+    display: none !important;
+  }
+  html:not(.com-javascript) body > div[hidden][id^="S:"] {
+    display: block !important;
+    flex: 1 1 auto;
+    /* o `pt-24` do <main> que esta gaveta passa a substituir */
+    padding-top: 6rem;
+    order: 0;
+  }
+  html:not(.com-javascript) body > footer {
+    order: 1;
+  }
+}
+
 /* ── Mobile base ── */
 html {
   -webkit-text-size-adjust: 100%;
@@ -876,6 +947,23 @@ body:has([data-orcamento-mode]) .scroll-progress {
   }
 }
 
+/* ── A entrada dos campos do orçamento: SUBIDA, nunca opacidade ──
+   Isto era `from { opacity: 0 }` com `animation-fill-mode: both`, e é a mesma
+   decisão que a `.g-reveal` do masonry já tinha tomado por outra razão: **um
+   estado de repouso invisível faz da animação a CONDIÇÃO de o conteúdo
+   existir**, e não um acrescento.
+
+   Aqui não era teórico. Com o JavaScript indisponível, os dez campos deste
+   formulário ficavam a `opacity: 0` com a animação eternamente por começar
+   (`animation-play-state: running`, mas dentro de um antepassado
+   `display: none` — nada avança lá dentro). A causa dessa página vazia era
+   outra, e está escrita no `<noscript>` do layout de raiz; isto era a segunda
+   fechadura da mesma porta — destrancar a primeira sem destrancar esta deixava
+   o formulário revelado e na mesma invisível.
+
+   Um `transform` que não corre deixa o campo 8 px abaixo do sítio, o que
+   ninguém nota. Uma opacidade que não corre deixa-o inexistente. É toda a
+   diferença, e é a razão por que a opacidade saiu daqui. */
 @media (prefers-reduced-motion: no-preference) {
   .orc-reveal > * {
     animation: orc-field-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -912,11 +1000,9 @@ body:has([data-orcamento-mode]) .scroll-progress {
   }
   @keyframes orc-field-in {
     from {
-      opacity: 0;
       transform: translateY(8px);
     }
     to {
-      opacity: 1;
       transform: none;
     }
   }
@@ -1528,6 +1614,95 @@ html.consentimento-decidido .barra-consentimento {
    porque um aviso de cookies que não aparece é pior do que um que salta. */
 html.fontes-por-assentar .barra-consentimento {
   display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A BARRA DE COOKIES RESERVA O ESPAÇO QUE OCUPA — NÃO O ROUBA
+   ═══════════════════════════════════════════════════════════════════════════
+
+   O QUE ESTAVA MAL, MEDIDO com `document.elementFromPoint` no CENTRO de cada
+   alvo, num 390×844 e sem escolha feita: a barra media 191 px (23% do ecrã) e
+   estava por cima de QUATRO acções, todas visíveis e todas mortas —
+
+     · «Pedir orçamento →» do herói  → no ponto do clique estava <a>Saber mais
+     · «Ver galeria →»               → estava o <p> do aviso
+     · «PEDIR ORÇAMENTO →» fixo      → estava o <button>Recusar
+     · botão flutuante de WhatsApp   → estava a caixa dos dois botões
+
+   No computador (1440×900) eram 74 px e dois alvos: o CTA fixo e o WhatsApp.
+
+   PORQUE NÃO SE RESOLVE A METER A BARRA NO FLUXO. Ela é `fixed` e tem de
+   continuar a sê-lo. Duas linhas acima está escrito porquê: a barra aparece
+   depois das fontes assentarem, e uma barra em fluxo a aparecer nesse instante
+   empurra a página inteira — CLS, que já custou 0,0605 uma vez.
+
+   O QUE SE FAZ EM VEZ DISSO. Uma RESERVA: uma constante por medida, declarada
+   aqui, que existe desde a primeira pintura e que o resto do sítio consome
+   para se afastar do fundo do ecrã. Ninguém mede a barra em JavaScript — medir
+   significaria escrever a reserva DEPOIS da primeira pintura, e isso é
+   exactamente o refluxo que se está a evitar. É o mesmo desenho do
+   `ALTURA_BARRA_FIXA_PX` da barra social (src/lib/meta/barra.ts): uma altura
+   declarada, com um teste que a obriga a bater certo com a desenhada.
+
+   A REGRA DE OURO: a reserva tem de ser MAIOR OU IGUAL à altura real da barra.
+   Os valores saíram de uma medição, com toque emulado, em nove larguras e nas
+   duas línguas:
+
+     · 320 e 360 px → 146 px (o texto quebra em TRÊS linhas)
+     · 390 a 639 px → 126 px (duas linhas)
+     · 640 a 1023   →  74 px (texto e botões na mesma linha)
+     · 1024 e acima →  68 px
+
+   Daí 152 px e 84 px: o pior caso de cada lado mais uma folga pequena, porque
+   o texto pode ganhar uma linha com o tipo de letra de recurso ou numa língua
+   futura. A folga vê-se como uma nesga de fotografia entre a legenda do herói
+   e a barra — é respiração, não é buraco. `e2e/consentimento-geometria.spec.ts`
+   mede as duas coisas em 320/360/390/768/1440 e falha se a barra passar a
+   reserva.
+
+   Quem a consome: `.piso-flutuante` (os dois botões fixos), o rodapé (para o
+   aviso não lhe tapar a última linha) e `.recuo-consentimento` (o herói da
+   home, que ancora o título e os dois CTA ao fundo do primeiro ecrã).
+
+   E some sozinha: `:has()` lê a PRESENÇA da barra no DOM, e é o React que a
+   tira de lá quando a pessoa escolhe. Nesse instante o sítio recupera os
+   110 px — a menos de 500 ms de um clique da pessoa, portanto fora do CLS. */
+body:has(.barra-consentimento) {
+  --reserva-consentimento: 152px;
+}
+@media (min-width: 640px) {
+  body:has(.barra-consentimento) {
+    --reserva-consentimento: 84px;
+  }
+}
+
+/* O chão dos dois botões flutuantes (a pílula de WhatsApp e o CTA fixo).
+   Estavam os dois com o `bottom` escrito à mão no componente, e foi assim que
+   ficaram debaixo da barra: eram duas contas separadas que ninguém tinha de
+   manter iguais. Agora é uma só, e some quando a barra some.
+   ⚠ Esta regra vive FORA de `@layer`, portanto ganha a qualquer `bottom-*` do
+   Tailwind no mesmo elemento (ver `CamadasCss.contrato.test.ts`) — quem usar
+   esta classe não deve escrever `bottom-*` ao lado dela. */
+.piso-flutuante {
+  bottom: calc(1.25rem + env(safe-area-inset-bottom) + var(--reserva-consentimento, 0px));
+}
+@media (min-width: 1024px) {
+  .piso-flutuante-lg {
+    bottom: calc(1.75rem + env(safe-area-inset-bottom) + var(--reserva-consentimento, 0px));
+  }
+}
+
+/* Secções ancoradas ao fundo do primeiro ecrã (o herói da home é `min-h-[100svh]
+   flex flex-col justify-end`): o recuo empurra a legenda PARA CIMA dentro da
+   mesma caixa, em vez de encolher a fotografia. */
+.recuo-consentimento {
+  padding-bottom: var(--reserva-consentimento, 0px);
+}
+
+/* O rodapé é o fim da página e leva lá dentro o «Gerir cookies» — a barra não
+   lhe pode tapar a última linha a quem chega ao fundo. */
+body:has(.barra-consentimento) footer {
+  margin-bottom: var(--reserva-consentimento, 0px);
 }
 
 /* ── O itálico do Playfair, que é um desenho à parte e não uma inclinação ──

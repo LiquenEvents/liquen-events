@@ -19,9 +19,13 @@
  */
 export default function Loading() {
   return (
+    // `ecra-de-espera` é a alça de que a folha `<noscript>` do layout de raiz
+    // precisa: sem JS este ecrã fica para sempre (o script que o substitui pelo
+    // conteúdo nunca corre), e é por esta classe que ele se esconde para dar
+    // lugar à página que ficou na gaveta. Ver o comentário longo lá.
     <div
       aria-hidden
-      className="-mt-24 flex min-h-[100svh] w-full items-center justify-center bg-[#0c0e0b]"
+      className="ecra-de-espera -mt-24 flex min-h-[100svh] w-full items-center justify-center bg-[#0c0e0b]"
     >
       <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white/55" />
     </div>
