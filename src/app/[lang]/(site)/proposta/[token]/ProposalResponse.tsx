@@ -6,7 +6,7 @@ import type { Dict } from "@/lib/i18n";
 // Value-imported: DEFAULT_TERMS lives in a client-safe module (no server-only /
 // repository / fs), so shipping it to the browser is safe and doesn't drag the
 // contracts store into the client bundle.
-import { DEFAULT_TERMS } from "@/lib/contract-terms";
+import { termosPara } from "@/lib/contract-terms";
 import type { Contract } from "@/lib/contract-types";
 // O email PARA ONDE SE ESCREVE é o do estúdio — o mesmo do rodapé desta página.
 // Aqui mostrava-se o `clientEmail`, que é o email de quem está a ler: a
@@ -24,6 +24,15 @@ interface Props {
   // Passed in from the server page instead of the site-wide chrome context, so
   // the proposta namespace only ships on this token route.
   proposta: Dict["proposta"];
+  /**
+   * A percentagem do sinal DESTA proposta.
+   *
+   * Os termos diziam «30%» à letra enquanto a factura do sinal é emitida sobre
+   * a percentagem da proposta. Numa proposta a 50%, o casal lia e aceitava um
+   * contrato a dizer 30% e recebia a seguir uma factura de 50%. É este o texto
+   * que ele aceita — tem de ser o mesmo que o servidor congela.
+   */
+  percentagemDoSinal?: number;
 }
 
 export default function ProposalResponse({
@@ -31,6 +40,7 @@ export default function ProposalResponse({
   initialStatus,
   expired = false,
   proposta,
+  percentagemDoSinal,
 }: Props) {
   const tp = proposta.response;
   const decided = initialStatus === "aceite" || initialStatus === "rejeitada";
@@ -222,7 +232,7 @@ export default function ProposalResponse({
           {tt.toggle}
         </summary>
         <div className="max-h-64 overflow-y-auto px-5 pb-5 pt-1 border-t border-foreground/8">
-          {DEFAULT_TERMS.map((s) => (
+          {termosPara(percentagemDoSinal).map((s) => (
             <div key={s.heading} className="mt-4 first:mt-3">
               <h3 className="text-foreground/82 text-[13px] font-semibold mb-1">{s.heading}</h3>
               <p className="text-foreground/68 text-[13px] leading-relaxed">{s.body}</p>

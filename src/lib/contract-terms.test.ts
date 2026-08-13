@@ -3,6 +3,7 @@ import {
   DEFAULT_TERMS,
   TERMS_VERSION,
   termsToPlainText,
+  termosPara,
   type TermsSection,
 } from "./contract-terms";
 
@@ -114,5 +115,57 @@ describe("contract-terms — termsToPlainText", () => {
 
   it("passes empty heading/body straight through (no interpolation, no throw)", () => {
     expect(termsToPlainText([{ heading: "", body: "" }])).toBe("\n");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CONTRATO TEM DE DIZER O SINAL QUE A FACTURA COBRA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O sinal é editável por proposta e o produto inteiro já o respeita — o
+ * faseamento do PDF, o livro de facturas, o painel de pagamentos, o portal e o
+ * estúdio leem todos `depositPercentOf`. Estes termos eram o que faltava:
+ * diziam «30%» à letra, e são a folha que o casal ACEITA. Numa proposta a 50%,
+ * lia-se e aceitava-se um contrato a dizer 30% e recebia-se a seguir uma
+ * factura de 50% — num evento de 12.300 €, 3.690 € escritos contra 6.150 €
+ * cobrados.
+ */
+describe("os termos acompanham o sinal da proposta", () => {
+  const ponto = (secs: TermsSection[], n: string) =>
+    secs.find((s) => s.heading.startsWith(n))!.body;
+
+  it("numa proposta a 50%, o pagamento diz 50% e o restante 50%", () => {
+    const t = termosPara(50);
+    expect(ponto(t, "3.")).toContain("sinal de 50% do total a pagar");
+    expect(ponto(t, "3.")).toContain("O restante 50%");
+    expect(ponto(t, "3.")).not.toContain("30%");
+    expect(ponto(t, "4.")).toContain("O sinal de 50% destina-se");
+  });
+
+  it("sem percentagem, continua a ser a da casa — e igual ao que sempre esteve escrito", () => {
+    expect(termosPara()).toEqual(DEFAULT_TERMS);
+    expect(termosPara(30)).toEqual(DEFAULT_TERMS);
+  });
+
+  it("a indemnização por cancelamento NÃO acompanha o sinal", () => {
+    // Os 70% do ponto 4 são outra coisa: o que o Estúdio tem direito a receber
+    // num cancelamento tardio. É um número negociado, não o saldo.
+    const t = termosPara(50);
+    expect(ponto(t, "4.")).toContain("direito a receber 70% do valor total estipulado");
+  });
+
+  it("os pontos que não falam de dinheiro ficam exactamente iguais", () => {
+    const t = termosPara(40);
+    for (const s of DEFAULT_TERMS) {
+      if (s.heading.startsWith("3.") || s.heading.startsWith("4.")) continue;
+      expect(t.find((x) => x.heading === s.heading)!.body).toBe(s.body);
+    }
+  });
+
+  it("uma percentagem absurda é contida em vez de escrever um disparate", () => {
+    expect(ponto(termosPara(0), "3.")).toContain("sinal de 1%");
+    expect(ponto(termosPara(140), "3.")).toContain("sinal de 99%");
+    expect(ponto(termosPara(33.4), "3.")).toContain("sinal de 33%");
   });
 });

@@ -9,7 +9,7 @@ import {
   newContractId,
   getAcceptedContractByQuote,
 } from "@/lib/contracts-store";
-import { TERMS_VERSION, DEFAULT_TERMS, termsToPlainText } from "@/lib/contract-terms";
+import { TERMS_VERSION, termosPara, termsToPlainText } from "@/lib/contract-terms";
 import {
   createInvoice,
   newInvoiceId,
@@ -281,7 +281,12 @@ export async function POST(request: NextRequest) {
           clientName: proposal.clientName,
           clientEmail: proposal.clientEmail,
           termsVersion: TERMS_VERSION,
-          termsSnapshot: termsToPlainText(DEFAULT_TERMS),
+          // O SNAPSHOT LEVA A PERCENTAGEM DESTA PROPOSTA, não os 30% de sempre.
+          // É este texto que fica congelado como o contrato aceite, e a factura
+          // do sinal, doze linhas abaixo, é emitida sobre a MESMA percentagem.
+          termsSnapshot: termsToPlainText(
+            termosPara(depositPercentOf(proposal.doc as ProposalDoc | undefined)),
+          ),
           status: "aceite",
           createdAt: respondedAt,
           acceptedAt: respondedAt,

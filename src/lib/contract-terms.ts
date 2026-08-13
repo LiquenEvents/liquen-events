@@ -10,6 +10,8 @@
  * e o snapshot que viram, por isso ficam intactas.
  */
 
+import { SINAL_POR_OMISSAO } from "./money";
+
 /**
  * Versão dos termos. Incrementar quando o texto muda de forma relevante.
  *
@@ -29,6 +31,49 @@ export interface TermsSection {
  * (Líquen Events, Portugal). Conciso mas completo — pensado para ser
  * lido, não para intimidar.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS TERMOS PARA UMA DADA PERCENTAGEM DE SINAL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O sinal é editável por proposta (`depositPercent`, no estúdio), e o produto
+ * inteiro já o respeita: o faseamento do PDF, o livro de facturas, o painel de
+ * pagamentos, o portal do cliente e o estúdio leem todos `depositPercentOf`.
+ * Estes termos eram o que faltava — diziam «30%» à letra, em duas frases, e é
+ * ESTE o documento que o casal aceita ao carregar no botão.
+ *
+ * Numa proposta a 50%, o casal lia e aceitava um contrato a dizer 30% e recebia
+ * a seguir uma factura de 50%: num evento de 12.300 €, 3.690 € escritos contra
+ * 6.150 € cobrados. O contrato é a folha que ganha uma discussão, e era a que
+ * estava errada.
+ *
+ * ── O QUE NÃO SE PARAMETRIZA ─────────────────────────────────────────────
+ * O «70%» do ponto 4 NÃO é o saldo: é a indemnização por cancelamento tardio
+ * («o Estúdio tem direito a receber 70% do valor total estipulado»). É um
+ * número de outra natureza, negociado com o advogado dela, e não acompanha o
+ * sinal. Fica exactamente onde estava — que é a razão de este ficheiro compor
+ * as frases à mão em vez de correr um `replace` por «30%».
+ */
+export function termosPara(percentagemDoSinal: number = SINAL_POR_OMISSAO): TermsSection[] {
+  const sinal = Math.round(Math.min(99, Math.max(1, percentagemDoSinal)));
+  const saldo = 100 - sinal;
+  return DEFAULT_TERMS.map((s) => {
+    if (s.heading.startsWith("3.")) {
+      return {
+        ...s,
+        body: `A reserva da data fica confirmada com o pagamento de um sinal de ${sinal}% do total a pagar — o valor final da proposta, com IVA incluído —, devido no momento da aceitação da proposta. O restante ${saldo}%, calculado sobre a mesma base, é liquidado até 1 mês antes da data do evento. A não liquidação do saldo dentro do prazo poderá implicar a suspensão dos preparativos, sem prejuízo dos valores já pagos.`,
+      };
+    }
+    if (s.heading.startsWith("4.")) {
+      return {
+        ...s,
+        body: s.body.replace("O sinal de 30% destina-se", `O sinal de ${sinal}% destina-se`),
+      };
+    }
+    return s;
+  });
+}
+
 export const DEFAULT_TERMS: TermsSection[] = [
   {
     heading: "1. Objeto",

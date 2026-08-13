@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal } from "@/lib/proposals-store";
+import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { SITE } from "@/lib/site";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
 import ProposalResponse from "./ProposalResponse";
@@ -246,6 +247,7 @@ export default async function ProposalPage({
           initialStatus={proposal.status}
           expired={expired}
           proposta={t}
+          percentagemDoSinal={depositPercentOf(proposal.doc as ProposalDoc | undefined)}
         />
 
         <p className="text-foreground/68 text-[11px] text-center mt-10 leading-relaxed">
