@@ -348,9 +348,33 @@ export function useGravacaoAutomatica<T>({
   /** O `porGravar` que a limpeza de um efeito consegue ler: essa corre com as
    *  dependências que tinha, e ficaria para sempre com o do primeiro desenho. */
   const porGravarRef = useRef(false);
+  /**
+   * O temporizador do adiamento que está de pé, para quem grava POR OUTRA PORTA
+   * o poder desarmar. Ver o `desarmarAdiamento` abaixo.
+   */
+  const adiamentoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * ── QUEM GRAVA AGORA DESARMA O QUE IA GRAVAR DAQUI A POUCO ────────────────
+   *
+   * A limpeza do efeito do adiamento só corre quando o efeito volta a correr —
+   * e gravar por fora dele (o botão «Guardar», o ⌘S, o «Guardar tudo», a troca
+   * de pedido) não muda nenhuma das dependências. O temporizador ficava de pé e
+   * disparava passados os 800 ms com o MESMO texto: um segundo pedido para
+   * escrever o que já lá estava, e o indicador a voltar de «guardado» a «a
+   * guardar…» logo depois de lhe termos dito que estava tudo guardado. Nessa
+   * janela o registo volta a contar este ecrã como tendo coisa por gravar, e
+   * fechar o separador é travado por trabalho que já está no servidor.
+   */
+  const desarmarAdiamento = useCallback(() => {
+    if (adiamentoRef.current === null) return;
+    clearTimeout(adiamentoRef.current);
+    adiamentoRef.current = null;
+  }, []);
 
   const gravar = useCallback(async (valorEste: T): Promise<ResultadoDaGravacao> => {
     const chaveDesta = chaveRef.current;
+    desarmarAdiamento();
 
     // A cópia local primeiro: é síncrona, e o que ela guarda sobrevive a tudo o
     // que vier a seguir — inclusive a um servidor que recuse. Rebentar aqui
@@ -424,7 +448,11 @@ export function useGravacaoAutomatica<T>({
     const gravarEste = () => gravar(valor);
     gravarPendente.current = gravarEste;
     const t = setTimeout(() => void gravarEste(), atraso);
-    return () => clearTimeout(t);
+    adiamentoRef.current = t;
+    return () => {
+      clearTimeout(t);
+      if (adiamentoRef.current === t) adiamentoRef.current = null;
+    };
   }, [valor, chave, activo, atraso, gravar, iguaisRef]);
 
   /**

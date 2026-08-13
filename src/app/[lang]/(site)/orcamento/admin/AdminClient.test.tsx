@@ -39,7 +39,20 @@ vi.mock("./lazy", () => {
     Contratos: stub("contratos"),
     Inventario: stub("inventario"),
     ProposalBuilder: stub("proposal-builder"),
-    ProposalStudio: stub("proposal-studio"),
+    // O estúdio devolve o pedido gravado pelo `onQuoteUpdated` — é por aí que o
+    // painel volta a ler o preço. O botão do duplo dá esse caminho a um teste
+    // sem montar as 384 KB do estúdio a sério.
+    ProposalStudio: Object.assign(
+      ({ quote, onQuoteUpdated }: { quote: Quote; onQuoteUpdated: (q: Quote) => void }) => (
+        <div data-testid="view-proposal-studio">
+          proposal-studio stub
+          <button onClick={() => onQuoteUpdated({ ...quote, quotedPrice: 0 })}>
+            estúdio gravou 0 €
+          </button>
+        </div>
+      ),
+      { displayName: "Lazy(proposal-studio)" },
+    ),
     ProductionPlan: stub("production-plan"),
     ClientMessenger: stub("client-messenger"),
     EventChecklist: stub("event-checklist"),
@@ -596,5 +609,181 @@ describe("o painel do pedido e as «alterações por guardar»", () => {
     // E uma alteração a sério continua a contar.
     fireEvent.change(local, { target: { value: "Estremoz" } });
     expect(await screen.findByText(/Alterações por guardar/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * ── OS ATALHOS DE UMA TECLA E AS JANELAS ABERTAS ──────────────────────────
+ *
+ * Os atalhos globais só se calavam com o cursor dentro de um campo. Com uma
+ * janela aberta — os atalhos, o glossário — o foco está num BOTÃO (o «×» de
+ * fechar, para onde a armadilha de foco o leva), e um botão não é um campo:
+ * o «n» chegava ao ouvinte global e abria o «Novo pedido» POR BAIXO da janela
+ * que estava à frente. Ela via um formulário que não pediu, ao lado de um que
+ * já não conseguia fechar de uma vez.
+ *
+ * A regra é a mesma para todas as janelas do turno: enquanto houver uma
+ * aberta, uma tecla solta não muda o que está por trás dela.
+ */
+describe("atalhos de teclado com uma janela aberta", () => {
+  const abrirJanela = async (nome: RegExp) => {
+    renderAdmin([makeQuote({ name: "Sara Lopes" })]);
+    const sidebar = screen.getByRole("complementary");
+    fireEvent.click(within(sidebar).getByRole("button", { name: nome }));
+    return await screen.findByRole("dialog");
+  };
+
+  it("o «n» não abre o «Novo pedido» por baixo dos atalhos", async () => {
+    const janela = await abrirJanela(/^Atalhos$/);
+    // O foco vai para o × de fechar — que é um <button>, não um campo.
+    const fechar = within(janela).getByRole("button", { name: "Fechar" });
+    fechar.focus();
+
+    fireEvent.keyDown(fechar, { key: "n" });
+
+    expect(screen.queryByRole("heading", { name: "Novo pedido" })).not.toBeInTheDocument();
+    // E a janela que estava à frente continua a ser a única.
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  });
+
+  it("o «n» não abre o «Novo pedido» por baixo do glossário", async () => {
+    const janela = await abrirJanela(/^Ajuda e glossário$/);
+    const fechar = within(janela).getByRole("button", { name: "Fechar" });
+    fechar.focus();
+
+    fireEvent.keyDown(fechar, { key: "n" });
+
+    expect(screen.queryByRole("heading", { name: "Novo pedido" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  });
+
+  /**
+   * O mesmo resíduo pela outra porta: o acorde «g» + destino trocava a vista
+   * por trás da janela. Fechá-la devolvia-a a um sítio onde ela não pediu para
+   * estar — e sem nada no ecrã a explicar porquê.
+   */
+  it("o acorde «g» não troca a vista por trás da janela", async () => {
+    const janela = await abrirJanela(/^Atalhos$/);
+    const fechar = within(janela).getByRole("button", { name: "Fechar" });
+    fechar.focus();
+
+    fireEvent.keyDown(fechar, { key: "g" });
+    fireEvent.keyDown(fechar, { key: "t" });
+
+    fireEvent.click(fechar);
+    expect(screen.getByRole("heading", { name: "Visão Geral" })).toBeInTheDocument();
+    expect(screen.queryByTestId("view-tarefas")).not.toBeInTheDocument();
+  });
+
+  /** E o Escape continua a fechar a janela — o atalho que tem de passar. */
+  it("o Escape continua a fechar a janela", async () => {
+    const janela = await abrirJanela(/^Atalhos$/);
+    fireEvent.keyDown(within(janela).getByRole("button", { name: "Fechar" }), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A SELECÇÃO EM LOTE NÃO PODE AGIR SOBRE O QUE ELA NÃO VÊ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A barra de lote contava `selectedIds` cru — a selecção inteira, incluindo os
+ * pedidos que o filtro ou a procura tinham entretanto tirado do ecrã. As duas
+ * acções inofensivas (exportar, email) já se limitavam ao que estava à vista;
+ * as duas que MEXEM não: «Marcar como» e «Apagar (N)» corriam a lista toda.
+ *
+ * O percurso: escolhem-se três pedidos, escreve-se um nome na procura para
+ * conferir um deles, e a barra continua a dizer «3 selecionados». O «Apagar»
+ * pergunta «Apagar 3 pedidos definitivamente?» com um único pedido no ecrã — e
+ * apaga, para sempre, dois que ela não vê. O número que a barra mostra tem de
+ * ser o mesmo número sobre que os botões agem.
+ */
+describe("a selecção em lote e o que está à vista", () => {
+  const seleccionar = (nome: string) =>
+    fireEvent.click(screen.getByRole("checkbox", { name: `Selecionar pedido de ${nome}` }));
+
+  const procurar = (texto: string) =>
+    fireEvent.change(screen.getByLabelText(/Procurar pedidos/), { target: { value: texto } });
+
+  beforeEach(() => {
+    renderAdmin([
+      makeQuote({ id: "LQ-101", name: "Ana Marques" }),
+      makeQuote({ id: "LQ-102", name: "Bruno Dias" }),
+      makeQuote({ id: "LQ-103", name: "Carla Nunes" }),
+    ]);
+    navTo(/Pedidos/);
+    seleccionar("Ana Marques");
+    seleccionar("Bruno Dias");
+    seleccionar("Carla Nunes");
+    expect(screen.getByText(/3 selecionados/)).toBeInTheDocument();
+  });
+
+  it("a contagem passa a ser a dos pedidos que continuam no ecrã", async () => {
+    procurar("Ana");
+    await waitFor(() => expect(screen.queryByText("Bruno Dias")).not.toBeInTheDocument());
+
+    expect(screen.getByText(/1 selecionado$/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apagar (1)" })).toBeInTheDocument();
+  });
+
+  it("apagar só apaga o que ela tem à frente", async () => {
+    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
+    procurar("Ana");
+    await waitFor(() => expect(screen.queryByText("Bruno Dias")).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /^Apagar \(/ }));
+
+    await waitFor(() => expect(confirmar).toHaveBeenCalled());
+    expect(confirmar.mock.calls[0][0]).toMatch(/Apagar 1 pedido/);
+
+    const apagados = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .filter((args) => (args[1] as RequestInit | undefined)?.method === "DELETE")
+      .map((args) => String(args[0]));
+    await waitFor(() => expect(apagados.length).toBeGreaterThan(0));
+    expect(apagados).toEqual(["/api/orcamento/LQ-101"]);
+    confirmar.mockRestore();
+  });
+
+  it("«marcar como» também não alcança o que saiu do ecrã", async () => {
+    procurar("Ana");
+    await waitFor(() => expect(screen.queryByText("Bruno Dias")).not.toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText("Marcar pedidos selecionados como"), {
+      target: { value: "cotado" },
+    });
+
+    const tocados = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .filter((args) => (args[1] as RequestInit | undefined)?.method === "PATCH")
+      .map((args) => String(args[0]));
+    await waitFor(() => expect(tocados.length).toBeGreaterThan(0));
+    expect(tocados).toEqual(["/api/orcamento/LQ-101"]);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM PREÇO DE ZERO É UM PREÇO ESCRITO — TAMBÉM QUANDO VEM DO ESTÚDIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel já sabia disto ao ABRIR o pedido (ver `textoDoPreco`). O caminho de
+ * volta do estúdio de propostas ficou com a conversão antiga, pela verdade do
+ * valor: gravado um total de 0 €, o campo «Preço final» ficava VAZIO enquanto o
+ * pedido tinha 0. Vazio não é 0, e a barra passava a dizer «Alterações por
+ * guardar» sobre uma alteração que ela não fez — a pedir para gravar o que o
+ * estúdio acabou de gravar, e a travar o fecho do separador por causa disso.
+ */
+describe("o preço que volta do estúdio de propostas", () => {
+  it("um total de zero enche o campo com 0, e não deixa o painel sujo", async () => {
+    renderAdmin([makeQuote({ id: "LQ-700", name: "Inês Prado", quotedPrice: 5000 })]);
+    navTo(/Pedidos/);
+    fireEvent.click(screen.getByText("Inês Prado"));
+    await screen.findByRole("button", { name: "Fechar" });
+    expect(screen.queryByText(/Alterações por guardar/)).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: "estúdio gravou 0 €" }));
+
+    expect(screen.getByDisplayValue("0")).toBeInTheDocument();
+    expect(screen.queryByText(/Alterações por guardar/)).not.toBeInTheDocument();
   });
 });

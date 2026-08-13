@@ -108,6 +108,44 @@ describe("useGravacaoAutomatica — a gravação adiada", () => {
     });
     expect(enviar).toHaveBeenCalledWith("já");
   });
+
+  /**
+   * ── GRAVAR JÁ DESARMA O ADIAMENTO ────────────────────────────────────────
+   *
+   * O adiamento ficava de pé depois de a gravação já ter acontecido por outra
+   * porta (o botão «Guardar», o ⌘S, o «Guardar tudo»). Passados os 800 ms
+   * disparava outra vez, com o mesmo texto: um segundo pedido ao servidor para
+   * escrever o que lá estava, e — pior — o indicador a voltar de «guardado» a
+   * «a guardar…» logo a seguir a lhe ter dito que estava tudo guardado. Nessa
+   * janela o registo volta a contar este ecrã como tendo coisa por gravar, e
+   * fechar o separador é travado por trabalho que já está no servidor.
+   */
+  it("gravar já desarma o adiamento — o mesmo texto não vai duas vezes", async () => {
+    const manual = envioManual();
+    const { result, rerender } = renderHook(
+      ({ valor }) => useGravacaoAutomatica({ valor, enviar: manual.enviar }),
+      { initialProps: { valor: "" } },
+    );
+
+    rerender({ valor: "a última linha" });
+
+    let gravou: Promise<unknown> | undefined;
+    act(() => {
+      gravou = result.current.gravarJa();
+    });
+    await act(async () => {
+      manual.responder({ estado: "guardado" });
+      await gravou;
+    });
+    expect(result.current.estado).toBe("guardado");
+
+    // Aqui é onde o temporizador esquecido disparava.
+    await passar(ATRASO_DA_GRAVACAO * 2);
+    expect(manual.chamadas).toEqual(["a última linha"]);
+    expect(result.current.estado).toBe("guardado");
+    expect(result.current.porGravar).toBe(false);
+    expect(result.current.aCaminho).toBe(false);
+  });
 });
 
 describe("useGravacaoAutomatica — descarregar o que ficou pendente", () => {

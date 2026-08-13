@@ -1194,12 +1194,37 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     requestAnimationFrame(() => searchRef.current?.focus());
   }, []);
 
+  /**
+   * ── UMA JANELA À FRENTE CALA OS ATALHOS DE UMA TECLA ──────────────────────
+   *
+   * «Está a escrever num campo» não chegava. Com uma destas janelas aberta o
+   * foco está quase sempre num BOTÃO — a armadilha de foco leva-o para o «×» de
+   * fechar — e um botão não é um campo: o «n» passava, e o «Novo pedido» abria
+   * POR BAIXO da janela que ela tinha à frente. O mesmo com o «/» (saltava para
+   * os Pedidos) e com o acorde «g»+destino (trocava a vista por trás).
+   *
+   * A regra é uma só: enquanto houver uma janela à frente, uma tecla solta não
+   * muda o que está por trás dela. O Escape não passa por aqui — cada janela é
+   * dona do seu, e é assim que continua a fechar-se com uma tecla.
+   */
+  const janelaAberta = newQuoteOpen || shortcutsOpen || ajudaOpen || restoreOpen;
+  const janelaAbertaRef = useRef(false);
+  const paletteAbertaRef = useRef(false);
+  useEffect(() => {
+    janelaAbertaRef.current = janelaAberta;
+    paletteAbertaRef.current = paletteOpen;
+  }, [janelaAberta, paletteOpen]);
+
   // Global keyboard shortcuts. ⌘K works anywhere; the rest are ignored while
   // typing so they never fight with form fields.
   useEffect(() => {
     let lastG = 0; // timestamp of the last "g" press, for the "g then key" chord
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        // A paleta também não se abre por baixo de outra janela; fechá-la com o
+        // mesmo atalho continua a valer, que é o que ⌘K faz quando ela é a que
+        // está à frente.
+        if (janelaAbertaRef.current) return;
         e.preventDefault();
         setPaletteOpen((o) => !o);
         return;
@@ -1213,6 +1238,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           el.tagName === "SELECT" ||
           el.isContentEditable);
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (janelaAbertaRef.current || paletteAbertaRef.current) return;
 
       const k = e.key.toLowerCase();
 
@@ -1238,9 +1264,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       } else if (e.key === "?") {
         e.preventDefault();
         setShortcutsOpen(true);
-      } else if (e.key === "Escape") {
-        setShortcutsOpen(false);
       }
+      // O Escape saiu daqui: com a janela aberta esta linha já não é alcançada
+      // (ver a guarda acima) e sem ela não havia nada para fechar. Quem o trata
+      // é a própria janela, que é onde ele tem de continuar a valer.
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1916,9 +1943,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     void guardarTudoDoPedido();
   }
 
-  // Apply a status to every selected pedido in one go.
-  async function applyBulkStatus(status: QuoteStatus) {
-    const ids = [...selectedIds];
+  /**
+   * Apply a status to every selected pedido in one go.
+   *
+   * Os `ids` vêm de fora, e são sempre os que estão À VISTA (ver
+   * `seleccionadosAVista`). Lidos daqui de dentro eram a selecção crua — que
+   * inclui o que o filtro e a procura tiraram do ecrã.
+   */
+  async function applyBulkStatus(status: QuoteStatus, ids: string[]) {
     if (ids.length === 0 || bulkBusy) return;
     setBulkBusy(true);
     try {
@@ -1946,21 +1978,28 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           : `${ok} atualizado(s), ${failed} falhou(ram)`,
         failed === 0 ? "success" : "error",
       );
-      setSelectedIds(new Set());
+      esquecerDaSeleccao(ids);
     } finally {
       setBulkBusy(false);
     }
   }
 
+  /** Tira do lote os pedidos sobre que se acabou de agir, e só esses: o resto
+   *  da selecção é dela e não se apaga por causa de um gesto sobre outros. */
+  function esquecerDaSeleccao(ids: string[]) {
+    const feitos = new Set(ids);
+    setSelectedIds((prev) => new Set([...prev].filter((id) => !feitos.has(id))));
+  }
+
   // Permanently delete every selected pedido (hard delete, not archive). One
   // confirm covers the whole batch; each id is DELETEd, then the successful
-  // ones are dropped from local state and the selection is cleared.
-  async function deleteSelected() {
-    const ids = [...selectedIds];
+  // ones are dropped from local state and the selection is cleared. Os `ids`
+  // são os que estão À VISTA — ver `applyBulkStatus`.
+  async function deleteSelected(ids: string[]) {
     if (ids.length === 0 || bulkBusy) return;
     if (
       !window.confirm(
-        `Apagar ${ids.length} pedidos definitivamente? Esta ação não pode ser anulada.`,
+        `Apagar ${ids.length} pedido${ids.length !== 1 ? "s" : ""} definitivamente? Esta ação não pode ser anulada.`,
       )
     )
       return;
@@ -1986,7 +2025,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           : `${ok} apagado(s), ${failed} falhou(ram)`,
         failed === 0 ? "success" : "error",
       );
-      setSelectedIds(new Set());
+      esquecerDaSeleccao(ids);
     } finally {
       setBulkBusy(false);
     }
@@ -2115,6 +2154,26 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setVisibleCount(LIST_PAGE_SIZE);
   }, [search, filterStatus, filterCategory, tagFilter, sort, showArchived, mineOnly]);
   const visibleQuotes = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
+  /**
+   * ── A SELECÇÃO SOBRE QUE OS BOTÕES DO LOTE AGEM ───────────────────────────
+   *
+   * `selectedIds` guarda o que ela marcou; isto é a parte que continua NO ECRÃ
+   * depois de o filtro ou a procura terem mudado. A barra do lote contava a
+   * selecção crua e as duas acções que mexem (Marcar como, Apagar) corriam-na
+   * inteira: marcavam-se três pedidos, escrevia-se um nome na procura para
+   * conferir um, e o «Apagar (3)» apagava para sempre dois que já não estavam
+   * no ecrã. O número que a barra mostra e o número sobre que os botões agem
+   * têm de ser o mesmo.
+   *
+   * Sobre `filtered` e não sobre `visibleQuotes`: a paginação é só do desenho —
+   * «Selecionar todos (N)» já conta a lista filtrada inteira, e cortar aqui
+   * pelo que coube na primeira página era um segundo desencontro.
+   */
+  const seleccionadosAVista = useMemo(
+    () => filtered.filter((q) => selectedIds.has(q.id)).map((q) => q.id),
+    [filtered, selectedIds],
+  );
 
   const pendingCount = activeQuotes.filter(
     (q) => q.status === "pendente" || q.status === "em_revisao",
@@ -3358,12 +3417,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             )}
 
             {/* Bulk actions */}
-            {selectedIds.size > 0 && (
+            {seleccionadosAVista.length > 0 && (
               <div className="flex flex-wrap items-center gap-3 mb-5 p-3 rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.06]">
                 <span className="text-[#4d6350] text-xs font-semibold">
-                  {selectedIds.size} selecionado{selectedIds.size !== 1 ? "s" : ""}
+                  {seleccionadosAVista.length} selecionado
+                  {seleccionadosAVista.length !== 1 ? "s" : ""}
                 </span>
-                {selectedIds.size < filtered.length && (
+                {seleccionadosAVista.length < filtered.length && (
                   <button
                     onClick={() => setSelectedIds(new Set(filtered.map((q) => q.id)))}
                     className="text-foreground/40 text-xs hover:text-[#4d6350] transition-colors"
@@ -3380,7 +3440,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     value=""
                     onChange={(e) => {
                       const v = e.target.value as QuoteStatus;
-                      if (v) applyBulkStatus(v);
+                      if (v) applyBulkStatus(v, seleccionadosAVista);
                     }}
                     aria-label="Marcar pedidos selecionados como"
                     className="bo-input px-2 py-1.5 text-xs text-foreground/70 disabled:opacity-50"
@@ -3422,11 +3482,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 {/* Hard delete for the whole selection — restrained terracotta,
                     always behind a single confirm; disabled while a batch runs. */}
                 <button
-                  onClick={deleteSelected}
+                  onClick={() => deleteSelected(seleccionadosAVista)}
                   disabled={bulkBusy}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#b5654a]/25 text-[#b5654a]/80 text-[10px] tracking-[0.12em] uppercase rounded-lg hover:bg-[#b5654a]/10 hover:text-[#b5654a] transition-colors shadow-sm disabled:opacity-50"
                 >
-                  Apagar ({selectedIds.size})
+                  Apagar ({seleccionadosAVista.length})
                 </button>
                 <button
                   onClick={() => setSelectedIds(new Set())}
@@ -4621,7 +4681,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   onQuoteUpdated={(q) => {
                                     setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
                                     setSelected((prev) => (prev?.id === q.id ? q : prev));
-                                    setEditPrice(q.quotedPrice ? String(q.quotedPrice) : "");
+                                    // `textoDoPreco` e não a verdade do valor:
+                                    // um total de ZERO é um preço escrito, e
+                                    // lido como «sem preço» deixava o campo
+                                    // vazio sobre um pedido que tem 0 — a barra
+                                    // a pedir para gravar o que o estúdio
+                                    // acabou de gravar.
+                                    setEditPrice(textoDoPreco(q));
                                   }}
                                   onSent={() => {
                                     setQuotes((prev) =>
