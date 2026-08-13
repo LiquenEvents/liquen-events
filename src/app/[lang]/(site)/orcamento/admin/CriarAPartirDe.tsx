@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { Button } from "./ui";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { ModeloProposta } from "@/lib/proposal-templates";
@@ -98,6 +99,10 @@ export default function CriarAPartirDe({
   const [ativo, setAtivo] = useState(0);
   // O gancho devolve o `ref` e trata do ciclo do foco; o Esc é aqui em baixo,
   // no `onKeyDown`, junto das outras teclas.
+  // Declarado ANTES da armadilha de foco de propósito: os efeitos correm por
+  // ordem de declaração, portanto a página já está trancada quando o foco entra
+  // na caixa. Não custa nada e tira uma ordem de que ninguém quer depender.
+  useTrincoDeScroll(open);
   const caixa = useFocusTrap<HTMLDivElement>(open);
   const campoProcura = useRef<HTMLInputElement>(null);
 

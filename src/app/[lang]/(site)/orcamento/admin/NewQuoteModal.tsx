@@ -5,6 +5,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import type { Quote, EventCategory } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { Button, Field } from "./ui";
 
 interface Props {
@@ -34,6 +35,10 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
   const [saving, setSaving] = useState(false);
   const titleId = useId();
   // Trap Tab within the dialog + restore focus to the trigger on close.
+  // Declarado ANTES da armadilha de foco de propósito: os efeitos correm por
+  // ordem de declaração, portanto a página já está trancada quando o foco entra
+  // na caixa. Não custa nada e tira uma ordem de que ninguém quer depender.
+  useTrincoDeScroll(open);
   const dialogRef = useFocusTrap<HTMLDivElement>(open);
 
   useEffect(() => {

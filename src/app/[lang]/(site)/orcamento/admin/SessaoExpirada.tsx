@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button, Field } from "./ui";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { useToast } from "./Toast";
 import { useAccaoDeGuardarTudo, useInscritos } from "./registo-de-gravacoes";
 import { entrarComDispositivo, mensagemDeErro, suportaPasskeys } from "@/lib/passkeys-cliente";
@@ -114,6 +115,10 @@ export default function SessaoExpirada() {
    * exactamente o aparelho que a omissão a `false` existe para cobrir.
    */
   const [manterSessao, setManterSessao] = useState(false);
+  // Declarado ANTES da armadilha de foco de propósito: os efeitos correm por
+  // ordem de declaração, portanto a página já está trancada quando o foco entra
+  // na caixa. Não custa nada e tira uma ordem de que ninguém quer depender.
+  useTrincoDeScroll(aberto);
   const dialogRef = useFocusTrap<HTMLDivElement>(aberto);
   const { toast } = useToast();
   const accao = useAccaoDeGuardarTudo();

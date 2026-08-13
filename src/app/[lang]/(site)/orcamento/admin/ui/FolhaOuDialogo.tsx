@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useFocusTrap } from "../useFocusTrap";
+import { useTrincoDeScroll } from "../useTrincoDeScroll";
 import { useAdaptativo } from "./adaptativo";
 import { cn } from "./cn";
 
@@ -58,6 +59,12 @@ export function FolhaOuDialogo({
   folhaAlta = false,
 }: FolhaOuDialogoProps) {
   const { telemovel, montado } = useAdaptativo();
+  // Trava o scroll do fundo enquanto está aberto. Sem isto, arrastar dentro da
+  // folha faz a página lá atrás andar — e ao fechar já não se está onde se
+  // estava. O trinco é partilhado com os outros diálogos (e conta-se, para uma
+  // folha aberta por cima de um diálogo não destrancar o de baixo ao fechar);
+  // vem ANTES da armadilha de foco para o foco a entrar não rolar a página.
+  useTrincoDeScroll(aberto);
   const caixaRef = useFocusTrap<HTMLDivElement>(aberto);
   const [arrasto, setArrasto] = useState(0);
   const inicioY = useRef<number | null>(null);
@@ -72,18 +79,6 @@ export function FolhaOuDialogo({
     document.addEventListener("keydown", aoTeclar);
     return () => document.removeEventListener("keydown", aoTeclar);
   }, [aberto, onFechar]);
-
-  // Trava o scroll do fundo enquanto está aberto. Sem isto, arrastar dentro da
-  // folha faz a página lá atrás andar — e ao fechar já não se está onde se
-  // estava.
-  useEffect(() => {
-    if (!aberto) return;
-    const antes = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = antes;
-    };
-  }, [aberto]);
 
   // Cada abertura começa sem arrasto acumulado: sem isto, uma folha fechada a
   // meio de um gesto reabria já puxada para baixo.

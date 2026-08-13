@@ -43,26 +43,63 @@ const TaskRow = memo(function TaskRow({
   onRemove: (id: string) => void;
 }) {
   return (
-    <div className="group flex items-center gap-3 px-5 py-3.5 hover:bg-foreground/[0.02] transition-colors">
+    /* ── LINHA DE TABELA NO COMPUTADOR, CARTÃO DE DUAS LINHAS NO TELEMÓVEL ──
+       MEDIDO a 390×844: o título mostrava 113 px dos 1009 de que precisava —
+       11 %. A causa era esta fila: seis colunas a disputar 342 px, e o título o
+       único com `min-w-0`, portanto o único que cede. Com `truncate` por cima,
+       lia-se «Confirmar com a Herda…» dezasseis vezes seguidas.
+
+       A conversão é a que os cartões de Faturas já fazem — e faz-se com
+       `flex-wrap` SOZINHO, sem ponto de corte por viewport: a fila quebra
+       quando não cabe, que é a pergunta certa (a lição das linhas de grupo do
+       estúdio, em MOBILE-AUDIT.md). O mínimo no título é o que faz o
+       `flex-wrap` disparar — sem ele, o título encolhe até 0 em vez de empurrar
+       os controlos para a linha de baixo.
+
+       Fica assim no telemóvel:
+         linha 1 · [concluir 44px] título inteiro, a quebrar as linhas que
+                   precisar, com o prazo/área/cliente por baixo;
+         linha 2 · prioridade, editar e eliminar, todos com o tamanho da casa.
+       No computador nada muda: tudo cabe numa fila e o título volta a cortar
+       (`sm:truncate`), que é o que mantém a densidade da lista. */
+    <div className="group flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-5 sm:py-3.5 hover:bg-foreground/[0.02] transition-colors">
       <button
         onClick={() => onToggle(t)}
-        className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${t.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
+        // Sem nome acessível, isto era «botão» — dezasseis vezes, e é o que
+        // risca a tarefa. `aria-pressed` diz em que estado está sem depender da
+        // cor do quadrado.
+        aria-label={t.done ? "Marcar como por concluir" : "Marcar como concluída"}
+        aria-pressed={t.done}
+        /* ── 20×20 ENTRE DOIS ALVOS DE 44 ────────────────────────────────
+           MEDIDO: 20×20 px, dezasseis vezes na lista, encostado ao «Editar»
+           e ao «Eliminar» que já são 44. Era o vizinho que ficou de fora.
+
+           O quadrado desenhado continua com 20 px — quem cresce é o alvo à
+           volta, como no rótulo da lista de pedidos. O `p-2` com `-m-2`
+           dá-lhe 36 px para o rato sem ocupar mais espaço na linha, e o
+           `alvo-toque` leva-o aos 44 no dedo (só sob `(pointer: coarse)`,
+           ver globals.css — o portátil mantém a densidade que tem). */
+        className="alvo-toque -m-2 flex shrink-0 items-center justify-center p-2"
       >
-        {t.done && (
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-            <path
-              d="M2 6l2.5 2.5L10 3"
-              stroke="white"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
+        <span
+          className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${t.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 group-hover:border-[#4d6350]/60"}`}
+        >
+          {t.done && (
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6l2.5 2.5L10 3"
+                stroke="white"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </span>
       </button>
       <div className="min-w-0 flex-1">
         <p
-          className={`text-sm truncate ${t.done ? "text-foreground/30 line-through" : "text-foreground/70"}`}
+          className={`text-sm break-words sm:truncate ${t.done ? "text-foreground/30 line-through" : "text-foreground/70"}`}
         >
           {t.title}
         </p>
@@ -84,81 +121,92 @@ const TaskRow = memo(function TaskRow({
           {t.clientName && <span className="text-foreground/25">{t.clientName}</span>}
         </div>
       </div>
-      {t.assignee && (
-        <span
-          className="hidden sm:flex items-center gap-1.5 shrink-0"
-          title={`Responsável: ${t.assignee}`}
-        >
-          <span className="w-5 h-5 rounded-full bg-[#4d6350] text-white flex items-center justify-center text-[9px] font-bold">
-            {t.assignee.slice(0, 1).toUpperCase()}
-          </span>
-          <span className="text-foreground/35 text-[10px]">{t.assignee}</span>
-        </span>
-      )}
-      {!t.done && (
-        <span
-          className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-sm shrink-0"
-          style={{
-            background: `${metaFor(PRIORITY_META, t.priority).color}22`,
-            color: metaFor(PRIORITY_META, t.priority).color,
-          }}
-        >
-          {metaFor(PRIORITY_META, t.priority).label}
-        </span>
-      )}
-      {!t.done && (
-        <button
-          onClick={() => onEdit(t)}
-          /* ── UM ALVO DE 13 PX AO LADO DE «ELIMINAR» ──────────────────────
-             MEDIDO num 390×844 com `(pointer: coarse)`: este botão dava
-             13×13 px e o de eliminar 14×14, a 12 px um do outro. O mínimo da
-             casa é 44 (`.alvo-toque` em globals.css, e é lá que ele existe —
-             só no dedo, para o portátil manter a densidade que tem); o da
-             WCAG 2.2 AA é 24, e com rato nem isso se cumpria.
+      {/* ── A SEGUNDA LINHA DO CARTÃO ────────────────────────────────────────
+          `w-full` num contentor que quebra é o que garante uma linha só para os
+          controlos — não é uma percentagem calculada à sorte que às vezes ainda
+          deixava a etiqueta de prioridade subir para junto do título.
 
-             `alvo-toque` resolve o dedo; o `p-1.5` resolve o rato — leva o
-             desenho de 13 para 25 px SEM crescer a linha (a coluna do título
-             já mede 34) e sem margens negativas, que era o que voltaria a
-             encostar os dois um ao outro. O ícone continua com 13 px. */
-          className="alvo-toque p-1.5 text-foreground/20 hover:text-[#4d6350] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
-          aria-label="Editar tarefa"
+          E `sm:contents` faz esta caixa DESAPARECER a partir de `sm`: os filhos
+          voltam a ser filhos directos da fila, com o mesmo espaçamento de
+          sempre. É por isso que a linha do computador fica byte a byte como
+          estava, em vez de ser um segundo desenho a manter em paralelo. */}
+      <div className="flex w-full items-center gap-2 sm:contents">
+        {t.assignee && (
+          <span
+            className="hidden sm:flex items-center gap-1.5 shrink-0"
+            title={`Responsável: ${t.assignee}`}
+          >
+            <span className="w-5 h-5 rounded-full bg-[#4d6350] text-white flex items-center justify-center text-[9px] font-bold">
+              {t.assignee.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="text-foreground/35 text-[10px]">{t.assignee}</span>
+          </span>
+        )}
+        {!t.done && (
+          <span
+            className="text-[9px] tracking-[0.12em] uppercase px-2 py-0.5 rounded-sm shrink-0"
+            style={{
+              background: `${metaFor(PRIORITY_META, t.priority).color}22`,
+              color: metaFor(PRIORITY_META, t.priority).color,
+            }}
+          >
+            {metaFor(PRIORITY_META, t.priority).label}
+          </span>
+        )}
+        {!t.done && (
+          <button
+            onClick={() => onEdit(t)}
+            /* ── UM ALVO DE 13 PX AO LADO DE «ELIMINAR» ──────────────────────
+               MEDIDO num 390×844 com `(pointer: coarse)`: este botão dava
+               13×13 px e o de eliminar 14×14, a 12 px um do outro. O mínimo da
+               casa é 44 (`.alvo-toque` em globals.css, e é lá que ele existe —
+               só no dedo, para o portátil manter a densidade que tem); o da
+               WCAG 2.2 AA é 24, e com rato nem isso se cumpria.
+
+               `alvo-toque` resolve o dedo; o `p-1.5` resolve o rato — leva o
+               desenho de 13 para 25 px SEM crescer a linha (a coluna do título
+               já mede 34) e sem margens negativas, que era o que voltaria a
+               encostar os dois um ao outro. O ícone continua com 13 px. */
+            className="alvo-toque p-1.5 text-foreground/20 hover:text-[#4d6350] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
+            aria-label="Editar tarefa"
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+            </svg>
+          </button>
+        )}
+        <button
+          onClick={() => onRemove(t.id)}
+          // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
+          // este é o que apaga, portanto é o que mais custa acertar ao lado.
+          className="alvo-toque p-1.5 text-foreground/20 hover:text-[#b5654a] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
+          aria-label="Eliminar"
         >
           <svg
-            width="13"
-            height="13"
+            width="14"
+            height="14"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
           >
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+            <path
+              d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
-      )}
-      <button
-        onClick={() => onRemove(t.id)}
-        // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
-        // este é o que apaga, portanto é o que mais custa acertar ao lado.
-        className="alvo-toque p-1.5 text-foreground/20 hover:text-[#b5654a] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
-        aria-label="Eliminar"
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-        >
-          <path
-            d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
+      </div>
     </div>
   );
 });

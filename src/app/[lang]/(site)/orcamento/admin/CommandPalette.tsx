@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 
 export interface Command {
   id: string;
@@ -44,6 +45,10 @@ export default function CommandPalette({
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   // Trap Tab within the dialog + restore focus to the trigger on close.
+  // Declarado ANTES da armadilha de foco de propósito: os efeitos correm por
+  // ordem de declaração, portanto a página já está trancada quando o foco entra
+  // na caixa. Não custa nada e tira uma ordem de que ninguém quer depender.
+  useTrincoDeScroll(open);
   const dialogRef = useFocusTrap<HTMLDivElement>(open);
   const listaId = useId();
   const idDaOpcao = (i: number) => `${listaId}-op-${i}`;

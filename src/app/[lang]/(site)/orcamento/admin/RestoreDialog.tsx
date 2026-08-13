@@ -9,6 +9,7 @@ import {
   type RestorePlan,
 } from "@/lib/backup-restore-types";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { Button } from "./ui";
 
 /**
@@ -130,6 +131,10 @@ export default function RestoreDialog({ open, onClose, toast }: Props) {
 }
 
 function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
+  // Declarado ANTES da armadilha de foco de propósito: os efeitos correm por
+  // ordem de declaração, portanto a página já está trancada quando o foco entra
+  // na caixa. Não custa nada e tira uma ordem de que ninguém quer depender.
+  useTrincoDeScroll(true);
   const dialogRef = useFocusTrap<HTMLDivElement>(true);
   const fileRef = useRef<HTMLInputElement>(null);
 

@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import { isDateKey, todayKey } from "./util";
 import { Button, Card, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -142,6 +143,9 @@ function AddEventModal({
     note: string;
   }>({ title: "", kind: "evento", time: "", note: "" });
   const [saving, setSaving] = useState(false);
+  // Só existe montado, portanto o trinco vale enquanto existir. Sem ele, o mês
+  // por trás rolava com o diálogo à frente — ver `useTrincoDeScroll`.
+  useTrincoDeScroll(true);
 
   async function submit() {
     const title = form.title.trim();
@@ -459,10 +463,23 @@ export default function Calendario({ quotes, onOpen }: Props) {
             Com 12 px sobram 319, e cada dia fica com 44. É a diferença entre
             acertar no dia certo e abrir o do lado. */}
         <Card padding="lg" className="!p-3 sm:!p-8">
-          {/* ── Header: month title + quiet controls on one row ── */}
-          <div className="flex items-center justify-between gap-3 mb-6">
-            <div className="min-w-0">
-              <h3 className="font-display text-foreground/90 text-xl sm:text-2xl leading-tight truncate">
+          {/* ── Header: month title + quiet controls on one row ──────────────
+              …e em DUAS quando não cabem numa. MEDIDO num telemóvel de 390×844:
+              «Agosto 2026» mostrava 90 px dos 103 de que precisa, e lia-se
+              «Agosto 2…» — o título da vista cortado a meio.
+
+              A fila era `flex` sem quebra, com o grupo de navegação do mês
+              `shrink-0` e o título o único `min-w-0`: quando o espaço faltava,
+              quem cedia era sempre o título, e o `truncate` fazia o resto.
+
+              `flex-wrap` sem ponto de corte por viewport (a lição das linhas de
+              grupo do estúdio, em MOBILE-AUDIT.md: `sm:` mede o ECRÃ, e este
+              cabeçalho vive dentro de um cartão) mais um mínimo legível no
+              título — que é o que faz a quebra disparar, porque com `min-w-0` o
+              título encolhia até 0 em vez de empurrar os botões para baixo. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div className="min-w-[12rem]">
+              <h3 className="font-display text-foreground/90 text-xl sm:text-2xl leading-tight">
                 {MONTHS[month]} {year}
               </h3>
               <p className="text-foreground/40 text-[10px] tracking-[0.2em] uppercase mt-1.5">

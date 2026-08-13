@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -41,6 +42,10 @@ export default function LupaDeFotos({
   onFechar: () => void;
   onMudar: (novoIndice: number) => void;
 }) {
+  // Declarado ANTES da armadilha de foco de propósito: os efeitos correm por
+  // ordem de declaração, portanto a página já está trancada quando o foco entra
+  // na caixa. Não custa nada e tira uma ordem de que ninguém quer depender.
+  useTrincoDeScroll(aberta);
   const caixa = useFocusTrap<HTMLDivElement>(aberta);
   const total = urls.length;
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { Button, Field } from "./ui";
 import { mensagemDeErro, registarDispositivo, suportaPasskeys } from "@/lib/passkeys-cliente";
 
@@ -62,6 +63,10 @@ function nomeSugerido(): string {
 }
 
 export default function PasskeysDialog({ open, onClose, toast }: Props) {
+  // Declarado ANTES da armadilha de foco de propósito: os efeitos correm por
+  // ordem de declaração, portanto a página já está trancada quando o foco entra
+  // na caixa. Não custa nada e tira uma ordem de que ninguém quer depender.
+  useTrincoDeScroll(open);
   const dialogRef = useFocusTrap<HTMLDivElement>(open);
   const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
   const [aCarregar, setACarregar] = useState(false);

@@ -67,6 +67,7 @@ import { onIdle } from "@/lib/onIdle";
 import { marcarSaidaDeProposito } from "./entrada-destino";
 import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, type View } from "./nav";
@@ -1372,15 +1373,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     return () => window.removeEventListener("keydown", onEsc);
   }, [paletteOpen, newQuoteOpen, shortcutsOpen, ajudaOpen, restoreOpen, navOpen, selected]);
 
-  // Lock background scroll while the mobile nav drawer is open.
-  useEffect(() => {
-    if (!navOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [navOpen]);
+  // Lock background scroll while the mobile nav drawer is open. O trinco é o
+  // mesmo dos diálogos (`useTrincoDeScroll`), agora num sítio só: era daqui que
+  // o padrão vinha, e faltava em dez caixas que também tapam a página.
+  useTrincoDeScroll(navOpen);
 
   // A barra lateral é gaveta abaixo de `lg` (1024px) — o mesmo ponto de corte
   // do `lg:sticky` / `lg:translate-x-0` que a desenha. Mesmo guarda do efeito
@@ -1451,14 +1447,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
   // Lock background scroll while the detail drawer is open as a mobile overlay
   // (mirrors the nav-drawer lock above). The inline xl panel never locks.
-  useEffect(() => {
-    if (!selected || !isDetailOverlay) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [selected, isDetailOverlay]);
+  useTrincoDeScroll(!!selected && isDetailOverlay);
 
   // Inline (desktop) detail: move focus into the workspace heading when a pedido
   // opens and restore it to the opener when it closes. Skipped while the panel is
