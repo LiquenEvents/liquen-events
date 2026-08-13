@@ -114,9 +114,18 @@ function bannerDoEmail(): BannerLido | null {
         // Vai na mesma — um banner que não aparece por causa de um limite que
         // ninguém vê é pior do que um email pesado —, mas fica registado para
         // quem for ver porque é que o correio engordou.
+        //
+        // O tamanho MEDIDO não entra aqui, e é de propósito: o `log.warn`
+        // acaba no webhook de alertas (`logger.ts`), que serializa o contexto
+        // para dentro de um `fetch`. Um valor lido do disco a viajar para fora
+        // é um rasto que o CodeQL segue e assinala — «file data in outbound
+        // network request» —, e ainda que aqui seja inofensivo (um comprimento,
+        // de um ficheiro nosso, para o nosso alerta), um aviso de segurança que
+        // se aprende a ignorar deixa de servir para alguma coisa. O nome e o
+        // tecto são constantes nossas e chegam para saber o que fazer; o
+        // tamanho vê-se no ficheiro. NÃO voltes a pôr aqui o `byteLength`.
         log.warn("assinatura: o banner do email é grande demais", {
           ficheiro: nome,
-          bytes: conteudo.byteLength,
           tecto: BANNER_TECTO_BYTES,
         });
       }
