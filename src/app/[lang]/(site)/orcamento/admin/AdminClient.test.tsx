@@ -548,3 +548,53 @@ describe("os contactos do pedido", () => {
     expect(screen.queryByText(/não é enviada a ninguém/i)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PAINEL NÃO PODE NASCER SUJO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «Alterações por guardar» tem um custo: fecha o pedido com uma pergunta,
+ * trava a saída da página, e acende a barra de gravação. Quando aparece sem
+ * ninguém ter escrito nada, ensina-se a fechar a pergunta sem ler — e no dia
+ * em que há mesmo trabalho por gravar, ela fecha-a na mesma.
+ *
+ * Dois caminhos davam isso, os dois por comparações que não batiam certo com
+ * as que a gravação faz.
+ */
+describe("o painel do pedido e as «alterações por guardar»", () => {
+  const abrir = async (over: Partial<Quote>) => {
+    const quote = makeQuote({ id: "LQ-800", name: "Rita Nunes", ...over });
+    renderAdmin([quote]);
+    navTo(/Pedidos/);
+    fireEvent.click(screen.getByText("Rita Nunes"));
+    await screen.findByRole("button", { name: "Fechar" });
+  };
+
+  /**
+   * Um preço de ZERO é um preço escrito — a criação manual chega a gravá-lo,
+   * ao aparar um valor negativo. Lido como «sem preço», o campo abria vazio e
+   * a comparação dava diferente.
+   */
+  it("um pedido com preço zero abre limpo", async () => {
+    await abrir({ quotedPrice: 0 });
+    expect(screen.queryByText(/Alterações por guardar/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * O corpo do PATCH compara os contactos e o local TRIMADOS. Se a conta do
+   * «por guardar» os comparasse crus, um espaço a mais deixava o painel a
+   * pedir para gravar uma alteração que a gravação não encontrava: respondia
+   * «já está tudo guardado» e a barra nunca limpava.
+   */
+  it("um espaço a mais no fim de um campo não conta como alteração", async () => {
+    await abrir({ location: "Évora", name: "Rita Nunes", email: "", phone: "" });
+    const local = screen.getByPlaceholderText("Local do evento…");
+    fireEvent.change(local, { target: { value: "Évora " } });
+    expect(screen.queryByText(/Alterações por guardar/)).not.toBeInTheDocument();
+
+    // E uma alteração a sério continua a contar.
+    fireEvent.change(local, { target: { value: "Estremoz" } });
+    expect(await screen.findByText(/Alterações por guardar/)).toBeInTheDocument();
+  });
+});

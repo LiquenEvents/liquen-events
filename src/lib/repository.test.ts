@@ -602,3 +602,76 @@ describe("createRepository: um só FileBackend por repositório", () => {
     expect((await repo.list()).map((w) => w.id).sort()).toEqual(["a", "b", "c"]);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A TABELA CUJA CHAVE NÃO SE CHAMA `id`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Onze das doze tabelas têm `id` como chave primária, e o backend do Supabase
+ * tinha esse nome escrito à mão em quatro sítios. A décima segunda —
+ * `biblioteca_fotos` — tem `path text primary key` e nenhuma coluna `id`.
+ *
+ * O defeito era invisível aqui e total em produção: o backend de FICHEIRO usa
+ * o `getId` do mapper e funcionava; o do Supabase perguntava `where id = <o
+ * caminho>` a uma tabela sem `id`, o Postgres respondia «column does not
+ * exist», e o tratamento de erros traduzia isso para «a funcionalidade não
+ * está instalada». Etiquetar uma foto respondia 503, e a LQIP e a cor de cada
+ * fotografia nunca chegavam a ser gravadas — em silêncio.
+ *
+ * Este teste corre contra o cliente falso, que compara colunas como o Postgres
+ * compara: uma linha sem `id` não é encontrada por `where id = …`.
+ */
+interface Ficheiro {
+  path: string;
+  cor: string;
+}
+
+const ficheiroMapper: Mapper<Ficheiro> = {
+  table: "ficheiros",
+  fileName: "ficheiros.json",
+  getId: (f) => f.path,
+  idColumn: "path",
+  // Repare-se: NÃO há coluna `id` nenhuma, tal como na tabela verdadeira.
+  toRow: (f) => ({ path: f.path, cor: f.cor }),
+  fromRow: (r) => ({ path: String(r.path), cor: String(r.cor ?? "") }),
+};
+
+describe("um mapper cuja chave vive noutra coluna", () => {
+  it("lê, escreve e apaga pela coluna que o mapper declara", async () => {
+    const sb = createFakeSupabase();
+    const repo = new Repository<Ficheiro>(
+      ficheiroMapper,
+      () => new SupabaseBackend<Ficheiro>(ficheiroMapper, sb),
+    );
+
+    await repo.create({ path: "tema-a/foto.jpg", cor: "#3d5a40" });
+
+    // Isto é o que estava partido: `get` procurava por `id`.
+    expect((await repo.get("tema-a/foto.jpg"))?.cor).toBe("#3d5a40");
+
+    await repo.update("tema-a/foto.jpg", { cor: "#f0ece4" });
+    expect((await repo.get("tema-a/foto.jpg"))?.cor).toBe("#f0ece4");
+
+    await repo.remove("tema-a/foto.jpg");
+    expect(await repo.get("tema-a/foto.jpg")).toBeNull();
+  });
+
+  /**
+   * A regra, e não o caso: um mapper que não escreve coluna `id` TEM de dizer
+   * qual é a sua. Sem isto, a próxima tabela com chave própria repete o defeito
+   * — e repete-o só em produção.
+   */
+  it("o mapper das fotos da biblioteca declara a coluna da sua chave", async () => {
+    const { mapper } = await import("./biblioteca-fotos-store");
+    const linha = mapper.toRow({
+      path: "tema-a/foto.jpg",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    } as Parameters<typeof mapper.toRow>[0]);
+    expect(
+      "id" in linha || mapper.idColumn,
+      "um mapper sem coluna `id` tem de declarar `idColumn`",
+    ).toBeTruthy();
+    expect(mapper.idColumn).toBe("path");
+  });
+});

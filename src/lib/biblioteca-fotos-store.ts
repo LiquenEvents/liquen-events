@@ -26,6 +26,12 @@ export const mapper: Mapper<Foto> = {
   table: "biblioteca_fotos",
   fileName: "biblioteca-fotos.json",
   getId: (f) => f.path,
+  // A chave desta tabela é o CAMINHO, e não um `id` — é a única do sistema
+  // assim. Sem esta linha, o backend do Supabase perguntava `where id = …` a
+  // uma tabela sem coluna `id`: em desenvolvimento (backend de ficheiro) não se
+  // via nada, e em produção a LQIP e a COR de cada foto nunca chegavam a ser
+  // gravadas, e etiquetar respondia «não instalado». Ver `Mapper.idColumn`.
+  idColumn: "path",
   // `pasta` NÃO se escreve: é calculada pela base de dados a partir do `path`
   // (coluna gerada). Escrevê-la seria arriscar duas versões da mesma verdade.
   toRow: (f) => ({

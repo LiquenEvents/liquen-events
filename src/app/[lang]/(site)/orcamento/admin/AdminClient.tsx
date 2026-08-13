@@ -17,7 +17,8 @@ import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orca
 import type { RecentQuote } from "./CommandPalette";
 import { AvisoDeArmazenamento } from "./AvisoDeArmazenamento";
 import { formatPrice } from "@/lib/orcamento/pricing";
-import { contractedAmounts } from "@/lib/orcamento/dossier";
+import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
+import { round2 } from "@/lib/money";
 import {
   contextoDeLocal,
   diasDeEspera,
@@ -698,7 +699,12 @@ function mesmasNotas(a: NotasAutomaticas, b: NotasAutomaticas): boolean {
 /** O preço como o campo o mostra — para saber se o que lá está veio do pedido
  *  ou foi escrito por ela. */
 function textoDoPreco(q: Quote): string {
-  return q.quotedPrice ? String(q.quotedPrice) : "";
+  // `!= null` e não a verdade do valor: um preço de ZERO é um preço escrito (a
+  // criação manual chega a gravá-lo, ao aparar um valor negativo). Lido como
+  // «sem preço», o campo abria vazio, a comparação com `undefined` dava
+  // diferente, e o pedido nascia com «alterações por guardar» sem ninguém lhe
+  // ter tocado — com o aviso de saída da página a travar o fecho do separador.
+  return q.quotedPrice != null ? String(q.quotedPrice) : "";
 }
 
 /**
@@ -873,10 +879,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       (motivoVaiComADecisao && editLostReason !== (selected.lostReason ?? "")) ||
       editDate !== (selected.date ?? "") ||
       editGuests !== String(selected.guests ?? "") ||
-      editLocation !== (selected.location ?? "") ||
-      editNome !== (selected.name ?? "") ||
-      editEmail !== (selected.email ?? "") ||
-      editTelefone !== (selected.phone ?? ""));
+      // TRIMADOS, como o corpo do PATCH os compara (ver `saveChanges`). Com as
+      // duas comparações diferentes, um espaço a mais no fim de um campo punha
+      // o painel a pedir para guardar uma alteração que a gravação depois não
+      // encontrava: respondia «já está tudo guardado» e a barra não limpava —
+      // e a partir daí fechar o pedido perguntava sempre «descartar?».
+      editLocation.trim() !== (selected.location ?? "") ||
+      editNome.trim() !== (selected.name ?? "") ||
+      editEmail.trim() !== (selected.email ?? "") ||
+      editTelefone.trim() !== (selected.phone ?? ""));
 
   /** O que se escreve e ainda não está igual ao que o servidor tem. */
   const escritoPorGravar =
@@ -2980,7 +2991,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 onQuoteUpdated={(q) => {
                   setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
                   setSelected((prev) => (prev?.id === q.id ? q : prev));
-                  setEditPrice(q.quotedPrice ? String(q.quotedPrice) : "");
+                  // A MESMA guarda de id das duas linhas de cima. Sem ela, o
+                  // estúdio a gravar o preço do pedido B escrevia-o no campo do
+                  // pedido A que está aberto no painel — e o «Guardar tudo» do
+                  // cabeçalho mandava-o para A.
+                  if (q.id === selectedRef.current?.id) setEditPrice(textoDoPreco(q));
                 }}
                 onSent={(q) => {
                   setQuotes((prev) =>
@@ -3933,17 +3948,33 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
                                 />
                                 {(() => {
+                                  /**
+                                   * ── A MESMA BASE DOS DOIS LADOS ──────────
+                                   *
+                                   * Isto misturava três coisas na mesma conta:
+                                   * o preço escrito e o `quotedPrice` são
+                                   * LÍQUIDOS, o `priceBreakdown.total` do
+                                   * fallback é BRUTO, e os custos de
+                                   * fornecedor são com IVA (que é dedutível).
+                                   *
+                                   * O resultado era dois números para a mesma
+                                   * pergunta no mesmo ecrã: num pedido de
+                                   * 10.000 € com 5.000 € de custos, aqui dizia
+                                   * «Margem 5.000 €» e o separador Financeiro
+                                   * dizia 5.934,96 €. A regra certa é a que o
+                                   * `EventCosts` já aplica e explica.
+                                   */
+                                  const escrito = parsePriceInput(editPrice);
                                   const revenue =
-                                    parsePriceInput(editPrice) ??
-                                    selected.quotedPrice ??
-                                    selected.priceBreakdown?.total ??
-                                    0;
-                                  const costs = (selected.eventSuppliers ?? []).reduce(
+                                    escrito != null ? escrito : contractedAmounts(selected).net;
+                                  const taxa = effectiveVatRate(selected);
+                                  const custosComIva = (selected.eventSuppliers ?? []).reduce(
                                     (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
                                     0,
                                   );
-                                  if (!costs) return null;
-                                  const margin = revenue - costs;
+                                  if (!custosComIva) return null;
+                                  const costs = round2(custosComIva / (1 + taxa));
+                                  const margin = round2(revenue - costs);
                                   return (
                                     <p className="mt-1 text-[10px] text-foreground/45">
                                       Custos {formatPrice(costs)} · Margem{" "}
@@ -4597,6 +4628,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             ) : (
                               <>
                                 <ProposalBuilder
+                                  // A CHAVE, como todos os outros painéis do
+                                  // detalhe (`pay-`, `costs-`, `studio-`,
+                                  // `guests-`). Sem ela este era o único que
+                                  // NÃO remontava ao trocar de pedido: ficava
+                                  // com as linhas e os preços do cliente
+                                  // anterior e, 800 ms depois, a gravação
+                                  // automática escrevia-os no rascunho do
+                                  // cliente novo — que nunca os teve.
+                                  key={`builder-${selected.id}`}
                                   quote={selected}
                                   onSent={(total) => {
                                     setQuotes((prev) =>

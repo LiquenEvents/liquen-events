@@ -36,6 +36,25 @@ export interface Mapper<T> {
   fileName: string;
   /** Stable identity of an entity. */
   getId(entity: T): string;
+  /**
+   * A COLUNA onde essa identidade vive na base de dados. Omissão: `"id"`.
+   *
+   * ── PORQUE É QUE ISTO TEVE DE EXISTIR ─────────────────────────────────
+   * Estava escrito `"id"` à mão em quatro sítios deste ficheiro. Onze das doze
+   * tabelas chamam-lhe mesmo `id` — o `email-templates-store` até guarda o
+   * slug nessa coluna de propósito, com a razão escrita — e a décima segunda,
+   * `biblioteca_fotos`, tem `path text primary key` e NENHUMA coluna `id`.
+   *
+   * O resultado era invisível em desenvolvimento e total em produção: o
+   * backend de ficheiro usa o `getId` e funciona; o do Supabase perguntava
+   * `where id = '<caminho>'`, o Postgres respondia `42703 — column does not
+   * exist`, e o `isMissingTable` traduzia isso para «a funcionalidade não está
+   * instalada». Etiquetar uma foto respondia 503 a mandar correr um
+   * `db/schema.sql` que já estava certo, e a LQIP e a COR de cada fotografia
+   * nunca chegavam a ser gravadas — em silêncio, porque quem as escreve
+   * envolve-as num `try/catch` de melhor esforço.
+   */
+  idColumn?: string;
   /** Domain object → database row (snake_case columns). */
   toRow(entity: T): Record<string, unknown>;
   /** Database row → domain object. */
@@ -237,6 +256,11 @@ export class SupabaseBackend<T> implements Backend<T> {
     return `${this.cols}, updated_at`;
   }
 
+  /** A coluna da chave — a do mapper, ou `id` como sempre. Ver `idColumn`. */
+  private get idCol() {
+    return this.m.idColumn ?? "id";
+  }
+
   // updated_at as of the read, keyed by the entity object `get` returned.
   // WeakMap: entries vanish with the entities, nothing to clean up.
   private stamps = new WeakMap<object, string | null>();
@@ -267,7 +291,7 @@ export class SupabaseBackend<T> implements Backend<T> {
     const { data, error } = await this.sb
       .from(this.m.table)
       .select(this.colsWithStamp)
-      .eq("id", id)
+      .eq(this.idCol, id)
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
@@ -302,20 +326,20 @@ export class SupabaseBackend<T> implements Backend<T> {
     // we read. Zero rows updated ⇒ someone else wrote in between ⇒ conflict.
     const stamp = cas && typeof cas === "object" ? this.stamps.get(cas as object) : undefined;
     if (stamp !== undefined) {
-      const base = this.sb.from(this.m.table).update(row).eq("id", id);
+      const base = this.sb.from(this.m.table).update(row).eq(this.idCol, id);
       const guarded = stamp === null ? base.is("updated_at", null) : base.eq("updated_at", stamp);
-      const { data, error } = await guarded.select("id");
+      const { data, error } = await guarded.select(this.idCol);
       if (error) throw error;
       if (!data?.length) throw new ConflictError<T>(id, { table: this.m.table, attempted: merged });
       return;
     }
 
-    const { error } = await this.sb.from(this.m.table).update(row).eq("id", id);
+    const { error } = await this.sb.from(this.m.table).update(row).eq(this.idCol, id);
     if (error) throw error;
   }
 
   async remove(id: string): Promise<void> {
-    const { error } = await this.sb.from(this.m.table).delete().eq("id", id);
+    const { error } = await this.sb.from(this.m.table).delete().eq(this.idCol, id);
     if (error) throw error;
   }
 }
