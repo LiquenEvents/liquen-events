@@ -27,7 +27,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
     }
 
-    const body = await request.json();
+    // JSON malformado é pedido errado, não avaria. Sem isto o `request.json()`
+    // atirava, o `catch` lá em baixo devolvia 500 e o painel dizia «erro ao
+    // enviar» — que se lê como o correio ter avariado e leva a reenviar a
+    // mensagem. Mesmo padrão do PATCH de `/api/orcamento/[id]`.
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
+    }
     const message = String(body.message ?? "").trim();
     if (!message) {
       return NextResponse.json({ error: "Mensagem vazia." }, { status: 400 });

@@ -48,6 +48,21 @@ describe("/api/calendario", () => {
     expect(store.create).toHaveBeenCalledTimes(1);
   });
 
+  it("POST answers 400 (not 500) to a malformed or non-object body", async () => {
+    authed.ok = true;
+    const cru = (corpo: string) =>
+      new Request("https://liquen.test/api/calendario", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: corpo,
+      }) as unknown as NextRequest;
+    for (const corpo of ["{ isto não é JSON", "null", '"uma string"', "[]"]) {
+      const res = await POST(cru(corpo));
+      expect(res.status, corpo).toBe(400);
+    }
+    expect(store.create).not.toHaveBeenCalled();
+  });
+
   it("POST rejects a malformed/missing date with 400", async () => {
     authed.ok = true;
     const res = await POST(req("POST", { title: "Sem data válida", date: "15/08/2026" }));

@@ -95,22 +95,38 @@ export async function GET(req: NextRequest) {
   if (!(await isAuthed(req))) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
-  const { resultado, valorTotal } = await reunir();
-  const rodape =
-    "\nPara enviar mesmo:\n" +
-    "    curl -X POST -b <cookie de sessao> .../api/meta/fechos\n" +
-    `\nA Meta recusa eventos com mais de ${DIAS_ACEITES} dias. Corre isto pelo menos\n` +
-    "uma vez por semana, ou os casamentos que fecharem entretanto nao contam.\n";
-  return new NextResponse(relatorio(resultado, valorTotal) + rodape, {
-    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
-  });
+  try {
+    const { resultado, valorTotal } = await reunir();
+    const rodape =
+      "\nPara enviar mesmo:\n" +
+      "    curl -X POST -b <cookie de sessao> .../api/meta/fechos\n" +
+      `\nA Meta recusa eventos com mais de ${DIAS_ACEITES} dias. Corre isto pelo menos\n` +
+      "uma vez por semana, ou os casamentos que fecharem entretanto nao contam.\n";
+    return new NextResponse(relatorio(resultado, valorTotal) + rodape, {
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+    });
+  } catch (err) {
+    // O relatório lê meia dúzia de stores; qualquer uma em baixo saía daqui
+    // como 500 anónimo e sem registo, e quem abre isto não fica a saber se o
+    // que falhou foi a leitura ou se não há mesmo negócios para enviar.
+    log.error("meta/fechos: relatório falhou", err);
+    return NextResponse.json({ error: "Não foi possível reunir os fechos." }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   if (!(await isAuthed(req))) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
-  const { resultado, valorTotal, jaEnviados } = await reunir();
+  // Antes de a Meta ver seja o que for: falhar a reunir é só não enviar nada.
+  const reunido = await reunir().catch((err) => {
+    log.error("meta/fechos: reunião falhou", err);
+    return null;
+  });
+  if (!reunido) {
+    return NextResponse.json({ error: "Não foi possível reunir os fechos." }, { status: 500 });
+  }
+  const { resultado, valorTotal, jaEnviados } = reunido;
   if (resultado.eventos.length === 0) {
     return NextResponse.json({ enviados: 0, valorTotal: 0, examinados: resultado.examinados });
   }
@@ -131,7 +147,23 @@ export async function POST(req: NextRequest) {
   // voltaria a ser candidata, e ninguém daria por isso.
   const refs = resultado.eventos.map((e) => (e.contexto ?? "").replace("casamento-fechado:", ""));
   const lista = [...jaEnviados, ...refs].slice(-MAX_GUARDADAS);
-  await setState(CHAVE_ENVIADOS, lista);
+  /**
+   * ESTA FALHA NÃO PODE SUBIR — a Meta JÁ recebeu os eventos.
+   *
+   * Se o `setState` atirasse daqui para fora, a resposta era 500 e a lista de
+   * enviados ficava por actualizar: as mesmas conversões voltavam a ser
+   * candidatas na corrida seguinte e a Meta recebia-as OUTRA VEZ, a inflar o
+   * valor dos negócios fechados. Um envio duplicado é pior do que um erro
+   * visível, por isso a falha vai no CORPO, com o que é preciso saber para a
+   * remendar à mão, e o envio conta como o que foi: feito.
+   */
+  let guardado = true;
+  try {
+    await setState(CHAVE_ENVIADOS, lista);
+  } catch (err) {
+    guardado = false;
+    log.error("meta/fechos: enviados mas a lista não ficou gravada", err, { refs });
+  }
 
   log.info("meta/fechos: enviados", {
     eventos: resultado.eventos.length,
@@ -143,5 +175,14 @@ export async function POST(req: NextRequest) {
     recebidos: r.recebidos,
     valorTotal,
     examinados: resultado.examinados,
+    ...(guardado
+      ? {}
+      : {
+          registoGuardado: false,
+          aviso:
+            "Os eventos foram aceites pela Meta, mas a lista de enviados não ficou gravada. " +
+            "Não voltes a correr isto sem verificar, ou estas conversões são contadas duas vezes.",
+          referencias: refs,
+        }),
   });
 }

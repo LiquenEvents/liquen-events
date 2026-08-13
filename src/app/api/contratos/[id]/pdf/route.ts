@@ -22,11 +22,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!contract) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
 
     const pdf = await renderContractPdf(contract);
+    // A referência vai para um CABEÇALHO: uma aspa ou um CR/LF vindo do
+    // `quoteId` fazia o `new NextResponse` atirar, e o contrato saía como 500.
+    // Mesmo filtro das rotas irmãs do portal e da proposta.
+    const ref = String(contract.quoteId || contract.id).replace(/[^A-Za-z0-9_-]/g, "");
     // Uint8Array (não Buffer) para satisfazer o BodyInit da Response.
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="Contrato-Liquen-${contract.quoteId || contract.id}.pdf"`,
+        "Content-Disposition": `inline; filename="Contrato-Liquen-${ref}.pdf"`,
       },
     });
   } catch (err) {

@@ -28,8 +28,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
   const { id } = await params;
-  const tempo = await getTempoActivo(id);
-  return NextResponse.json({ ok: true, tempo: tempo ?? { ms: 0, updatedAt: null } });
+  try {
+    const tempo = await getTempoActivo(id);
+    return NextResponse.json({ ok: true, tempo: tempo ?? { ms: 0, updatedAt: null } });
+  } catch (err) {
+    // Uma medição não vale um ecrã partido: o armazenamento em baixo saía daqui
+    // como 500 anónimo e sem registo. Devolve-se o zero e diz-se que não foi
+    // lido — é a mesma política de melhor esforço do POST.
+    log.warn("tempo-activo: leitura falhou", { id, erro: String(err) });
+    return NextResponse.json({ ok: true, tempo: { ms: 0, updatedAt: null }, lido: false });
+  }
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -47,19 +55,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Tempo inválido." }, { status: 400 });
   }
 
-  const { tempo, persistencia } = await acrescentarTempoActivo(id, ms, seccao);
+  try {
+    const { tempo, persistencia } = await acrescentarTempoActivo(id, ms, seccao);
 
-  // Falhar a gravar NÃO é um erro para quem está a trabalhar: perde-se meio
-  // minuto de uma medição, não se perde trabalho nenhum. Fica registado do
-  // lado do servidor, e a resposta diz a verdade sobre onde o número ficou —
-  // sem obrigar o estúdio a interromper nada por causa disto.
-  if (persistencia && !persistencia.gravado) {
-    log.warn("tempo-activo: não gravado", { id, motivo: persistencia.motivo });
+    // Falhar a gravar NÃO é um erro para quem está a trabalhar: perde-se meio
+    // minuto de uma medição, não se perde trabalho nenhum. Fica registado do
+    // lado do servidor, e a resposta diz a verdade sobre onde o número ficou —
+    // sem obrigar o estúdio a interromper nada por causa disto.
+    if (persistencia && !persistencia.gravado) {
+      log.warn("tempo-activo: não gravado", { id, motivo: persistencia.motivo });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      tempo,
+      guardado: persistencia ? persistencia.gravado : true,
+    });
+  } catch (err) {
+    // Mesma política, agora também para o que o armazenamento atira em vez de
+    // devolver: um 500 anónimo aqui punha um aviso no estúdio por causa de
+    // meio minuto de medição.
+    log.warn("tempo-activo: escrita rebentou", { id, erro: String(err) });
+    return NextResponse.json({ ok: true, tempo: { ms: 0, updatedAt: null }, guardado: false });
   }
-
-  return NextResponse.json({
-    ok: true,
-    tempo,
-    guardado: persistencia ? persistencia.gravado : true,
-  });
 }

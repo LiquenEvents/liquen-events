@@ -62,8 +62,14 @@ export async function POST(request: NextRequest) {
     const id = generateQuoteId();
     const quote: Quote = {
       // QuoteFormData defaults
-      category: b.category ?? null,
-      eventType: b.eventType ?? null,
+      //
+      // Com o `?? null` sozinho, estes dois eram os ÚNICOS campos do objecto
+      // sem `str(...)`: um objecto, um número ou uma string de 10 MB entravam
+      // tal e qual no jsonb do pedido e daí para a cópia de segurança. Passam
+      // agora pelo mesmo tratamento que os vizinhos; vazio continua a ser
+      // `null`, que é o que "Outro" grava (ver `QUOTE_EVENT_OPTIONS`).
+      category: (str(b.category, 40) || null) as Quote["category"],
+      eventType: (str(b.eventType, 60) || null) as Quote["eventType"],
       eventName: str(b.eventName, 160),
       date: str(b.date, 40),
       endDate: "",

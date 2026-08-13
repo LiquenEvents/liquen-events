@@ -5,6 +5,8 @@ import { getQuote } from "@/lib/quotes-store";
 import { listarModelos } from "@/lib/proposal-templates";
 import { copiarParaPedido, trocarFotos } from "@/lib/proposal-copy";
 import { duplicarFotosParaPedido } from "@/lib/proposal-storage";
+import { isThemePath } from "@/lib/theme-ref";
+import { MAX_THEME_COPY_BATCH } from "@/lib/theme-types";
 import { log } from "@/lib/logger";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 
@@ -50,7 +52,19 @@ export async function POST(request: NextRequest) {
    * segunda rota a copiar fotos era uma segunda guarda para manter alinhada.
    */
   if (Array.isArray(fotos)) {
-    const caminhos = fotos.filter((p): p is string => typeof p === "string" && p !== "");
+    // Tecto e forma, como nas rotas comparáveis (`/api/temas/[id]/imagens/copiar`
+    // e o etiquetar da biblioteca): sem eles, uma lista feita à mão punha
+    // milhares de cópias de Storage a correr — que nem cabem no `maxDuration`
+    // desta rota — e mandava caminhos por validar directos ao bucket. A forma é
+    // a mesma de sempre, `<pasta>/<ficheiro>.<ext>`, e é ela que impede uma
+    // travessia de diretórios de chegar ao `copy`.
+    if (fotos.length > MAX_THEME_COPY_BATCH) {
+      return NextResponse.json(
+        { error: `Máximo de ${MAX_THEME_COPY_BATCH} fotos por pedido.` },
+        { status: 400 },
+      );
+    }
+    const caminhos = [...new Set(fotos.filter(isThemePath))];
     if (caminhos.length === 0) {
       return NextResponse.json({ error: "Nenhuma foto indicada" }, { status: 400 });
     }

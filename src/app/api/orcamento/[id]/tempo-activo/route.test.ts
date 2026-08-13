@@ -8,15 +8,22 @@ import type { NextRequest } from "next/server";
 const st = vi.hoisted(() => ({
   authed: true,
   acumulado: 0,
+  /** O armazenamento a ATIRAR (não a devolver «não gravei»): sem `try/catch`
+   *  isto saía como 500 anónimo por causa de meio minuto de uma MEDIÇÃO. */
+  rebenta: false,
   acrescentar: vi.fn(),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => st.authed }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock("@/lib/tempo-activo-servidor", () => ({
-  getTempoActivo: vi.fn(async () => ({ ms: st.acumulado, updatedAt: "2026-01-01T00:00:00.000Z" })),
+  getTempoActivo: vi.fn(async () => {
+    if (st.rebenta) throw new Error("app_state em baixo");
+    return { ms: st.acumulado, updatedAt: "2026-01-01T00:00:00.000Z" };
+  }),
   acrescentarTempoActivo: vi.fn(async (id: string, ms: number, seccao?: string) => {
     st.acrescentar(id, ms, seccao);
+    if (st.rebenta) throw new Error("app_state em baixo");
     st.acumulado += ms;
     return {
       tempo: { ms: st.acumulado, updatedAt: "2026-01-01T00:00:00.000Z" },
@@ -36,6 +43,7 @@ const post = (body: unknown) =>
 beforeEach(() => {
   st.authed = true;
   st.acumulado = 0;
+  st.rebenta = false;
   st.acrescentar.mockClear();
 });
 
@@ -80,6 +88,13 @@ describe("POST /api/orcamento/[id]/tempo-activo", () => {
     const res = await POST(mau, { params });
     expect(res.status).toBe(400);
   });
+
+  it("o armazenamento a rebentar não parte o estúdio — diz que não guardou", async () => {
+    st.rebenta = true;
+    const res = await POST(post({ ms: 1000 }), { params });
+    expect(res.status).toBe(200);
+    expect((await res.json()).guardado).toBe(false);
+  });
 });
 
 describe("GET /api/orcamento/[id]/tempo-activo", () => {
@@ -92,5 +107,14 @@ describe("GET /api/orcamento/[id]/tempo-activo", () => {
     st.acumulado = 120_000;
     const res = await GET({} as NextRequest, { params });
     expect((await res.json()).tempo.ms).toBe(120_000);
+  });
+
+  it("uma leitura que rebenta devolve zero e diz que não leu — não um 500", async () => {
+    st.rebenta = true;
+    const res = await GET({} as NextRequest, { params });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.tempo.ms).toBe(0);
+    expect(body.lido).toBe(false);
   });
 });

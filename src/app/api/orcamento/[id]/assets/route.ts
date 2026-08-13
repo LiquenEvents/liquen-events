@@ -88,28 +88,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
   const { id } = await params;
-  const [proprias, daBiblioteca] = await Promise.all([
-    listProposalImages(id),
-    fotosDaBibliotecaDoPedido(id),
-  ]);
-  const imagens = [...proprias, ...daBiblioteca];
-  // AS CORES, num pedido só para todas.
-  //
-  // É com elas que o estúdio avisa que uma foto destoa da paleta do board e
-  // arruma as fotos por cor. Vêm daqui — e não de um `canvas` do lado da
-  // proposta — porque estas fotos chegam por URLs assinados de OUTRO domínio:
-  // ler-lhes os píxeis lançaria (ver `cor-dominante.ts`).
-  //
-  // Melhor esforço: sem base de dados, ou com fotos anteriores a isto existir,
-  // o mapa vem vazio e o estúdio comporta-se exactamente como antes.
-  const cores = await coresDeCaminhos(imagens.map((im) => im.path));
-  return NextResponse.json({
-    ok: true,
-    images: imagens.map((im) => {
-      const cor = cores.get(im.path);
-      return cor ? { ...im, cor } : im;
-    }),
-  });
+  try {
+    const [proprias, daBiblioteca] = await Promise.all([
+      listProposalImages(id),
+      fotosDaBibliotecaDoPedido(id),
+    ]);
+    const imagens = [...proprias, ...daBiblioteca];
+    // AS CORES, num pedido só para todas.
+    //
+    // É com elas que o estúdio avisa que uma foto destoa da paleta do board e
+    // arruma as fotos por cor. Vêm daqui — e não de um `canvas` do lado da
+    // proposta — porque estas fotos chegam por URLs assinados de OUTRO domínio:
+    // ler-lhes os píxeis lançaria (ver `cor-dominante.ts`).
+    //
+    // Melhor esforço: sem base de dados, ou com fotos anteriores a isto existir,
+    // o mapa vem vazio e o estúdio comporta-se exactamente como antes.
+    const cores = await coresDeCaminhos(imagens.map((im) => im.path));
+    return NextResponse.json({
+      ok: true,
+      images: imagens.map((im) => {
+        const cor = cores.get(im.path);
+        return cor ? { ...im, cor } : im;
+      }),
+    });
+  } catch (err) {
+    // Um Storage em baixo saía daqui como 500 anónimo, sem ficar registado —
+    // e o estúdio via a grelha vazia sem nada que dissesse porquê.
+    log.error("assets GET falhou", err, { id });
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
 }
 
 /**

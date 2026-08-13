@@ -203,4 +203,17 @@ describe("GET /api/orcamento/[id]/assets", () => {
     const body = await res.json();
     expect(body.images).toEqual([]);
   });
+
+  /**
+   * O handler não tinha `try/catch`: um Storage a ATIRAR (que não é o mesmo que
+   * devolver uma lista vazia) saía como 500 anónimo e sem nada nos registos.
+   */
+  it("um Storage que rebenta dá um 500 registado, não um 500 anónimo", async () => {
+    const { log } = await import("@/lib/logger");
+    st.list.mockRejectedValueOnce(new Error("Storage em baixo"));
+    const [req, ctx] = getReq();
+    const res = await GET(req, ctx);
+    expect(res.status).toBe(500);
+    expect(log.error).toHaveBeenCalled();
+  });
 });

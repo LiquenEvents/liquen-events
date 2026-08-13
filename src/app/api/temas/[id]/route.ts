@@ -16,6 +16,11 @@ import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** O DELETE copia para as propostas todas as fotos do tema que elas referenciam
+ *  e só depois apaga a pasta — uma cópia de Storage por foto. Um tema cheio não
+ *  cabe nos 10 s por omissão do alojamento, e ser morto a meio deixa fotos
+ *  órfãs. */
+export const maxDuration = 60;
 
 /**
  * A biblioteca só precisa de uma tabela — quando ela falta, dizer o que fazer

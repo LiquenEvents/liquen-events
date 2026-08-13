@@ -42,6 +42,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     ) {
       return NextResponse.json({ error: "Versão inválida" }, { status: 400 });
     }
+    // A resposta do cliente é um `timestamptz` na base (ver db/schema.sql): uma
+    // string qualquer fazia a escrita rebentar lá dentro e sair daqui um 500 a
+    // meio de um gesto trivial. Vazio é limpar, e isso continua a valer.
+    if ("respondedAt" in body && body.respondedAt) {
+      const t = typeof body.respondedAt === "string" ? Date.parse(body.respondedAt) : Number.NaN;
+      if (!Number.isFinite(t)) {
+        return NextResponse.json({ error: "Data de resposta inválida" }, { status: 400 });
+      }
+    }
+    // As duas notas são texto livre — o único campo por onde entra texto sem
+    // forma. Limitadas pela mesma razão que tudo o resto: o que fica gravado
+    // acaba na cópia de segurança, que tem tecto.
+    const MAX_NOTA = 2000;
+    for (const k of ["followUpNote", "lostNote"] as const) {
+      if (k in body && body[k] !== null && typeof body[k] !== "string") {
+        return NextResponse.json({ error: "Nota inválida" }, { status: 400 });
+      }
+    }
     const allowed = [
       "status",
       "respondedAt",
@@ -53,7 +71,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     ] as const;
     const patch: Record<string, unknown> = {};
     for (const k of allowed) {
-      if (k in body) patch[k] = body[k];
+      if (!(k in body)) continue;
+      patch[k] =
+        (k === "followUpNote" || k === "lostNote") && typeof body[k] === "string"
+          ? body[k].slice(0, MAX_NOTA)
+          : body[k];
     }
     const updated = await updateProposal(id, patch);
     if (!updated) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });

@@ -9,6 +9,10 @@ import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Um lote são até `MAX_POR_PEDIDO` fotos, em série e com duas idas à base de
+ *  dados por foto (`garantirFoto` + `etiquetar`); os 10 s por omissão do
+ *  alojamento matavam a revisão a meio, com metade das etiquetas postas. */
+export const maxDuration = 60;
 
 /**
  * ETIQUETAR EM LOTE — pôr ou tirar uma etiqueta a muitas fotos de uma vez.

@@ -135,6 +135,29 @@ describe("POST /api/security/csp-report", () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
+  /**
+   * O endereço é público por necessidade (é o browser que escreve aqui). O
+   * limite de pedidos por minuto já cá estava; o que faltava era o tecto DENTRO
+   * do pedido — um único POST com mil relatórios enchia os registos.
+   */
+  it("regista no máximo 20 relatórios por pedido", async () => {
+    const muitos = Array.from({ length: 200 }, (_, i) => ({
+      type: "csp-violation",
+      body: { documentURL: `https://liquen.pt/${i}`, blockedURL: "https://evil.example/x" },
+    }));
+    const res = await POST(post(JSON.stringify(muitos), "application/reports+json"));
+    expect(res.status).toBe(204);
+    expect(logger.warn).toHaveBeenCalledTimes(20);
+  });
+
+  it("corta cada campo antes de o registar", async () => {
+    const enorme = "https://evil.example/" + "a".repeat(50_000);
+    const res = await POST(post(JSON.stringify({ "csp-report": { "blocked-uri": enorme } })));
+    expect(res.status).toBe(204);
+    const registado = logger.warn.mock.calls[0][1] as { blockedUri?: string };
+    expect(registado.blockedUri!.length).toBe(300);
+  });
+
   it("never echoes report content back in the response body", async () => {
     const res = await POST(
       post(JSON.stringify({ "csp-report": { "document-uri": "https://secret/" } })),

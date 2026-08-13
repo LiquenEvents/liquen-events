@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { listQuotes } from "@/lib/quotes-store";
 import { listAllProposals } from "@/lib/proposals-store";
@@ -318,13 +318,24 @@ export async function GET(request: NextRequest) {
      * levar com o aviso. Um aviso que aparece a quem acabou de fazer o que ele
      * pede é um aviso que se aprende a ignorar.
      *
-     * Sem `await`: o ficheiro é o que interessa, e o carimbo nunca pode ser o
-     * motivo pelo qual o descarregamento demora ou falha.
+     * DEPOIS DA RESPOSTA, e não com um `void` solto (ver a mesma nota em
+     * `/api/admin/recuperar`): o `after` mantém a função viva até a escrita
+     * acabar, enquanto o `void` deixava o contentor congelar assim que o
+     * ficheiro saísse — o carimbo nunca chegava a ser gravado e o painel
+     * continuava a dizer «não chega uma cópia há N dias» a quem tinha acabado
+     * de descarregar uma. O ficheiro continua a ser o que interessa: falhar
+     * aqui não pode fazer falhar o descarregamento.
      */
-    void registarCopiaEnviada({
-      bytes: Buffer.byteLength(corpo, "utf8"),
-      parcial: (payload.incomplete ?? []).length > 0,
-      modo: "manual",
+    after(async () => {
+      try {
+        await registarCopiaEnviada({
+          bytes: Buffer.byteLength(corpo, "utf8"),
+          parcial: (payload.incomplete ?? []).length > 0,
+          modo: "manual",
+        });
+      } catch (err) {
+        log.warn("backup: carimbo da cópia manual não gravado", { erro: String(err) });
+      }
     });
 
     return new NextResponse(corpo, {

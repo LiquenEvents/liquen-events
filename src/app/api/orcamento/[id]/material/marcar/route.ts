@@ -10,6 +10,10 @@ import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Descarrega até `MAX_MARCACOES` marcações, uma a uma e com escrita própria
+ *  cada; os 10 s por omissão do alojamento cortavam a fila a meio e o armazém
+ *  via um erro de rede depois de duas horas offline. */
+export const maxDuration = 60;
 
 const ACCOES: AccaoOffline[] = ["loaded", "unloaded", "returned", "missing", "note", "used"];
 

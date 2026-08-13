@@ -10,11 +10,15 @@ import type { NextRequest } from "next/server";
 const st = vi.hoisted(() => ({
   authed: true,
   dbConfigured: true,
+  quoteExists: true,
   mint: vi.fn(),
   confirm: vi.fn(),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => st.authed }));
+vi.mock("@/lib/quotes-store", () => ({
+  getQuote: vi.fn(async (id: string) => (st.quoteExists ? { id } : null)),
+}));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock("@/lib/supabase", () => ({ isDatabaseConfigured: () => st.dbConfigured }));
 vi.mock("@/lib/proposal-storage", () => ({
@@ -42,6 +46,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   st.authed = true;
   st.dbConfigured = true;
+  st.quoteExists = true;
   st.mint.mockImplementation(async (id: string, types: string[]) =>
     types.map((_, i) => ({
       path: `${id}/uuid-${i}.jpg`,
@@ -88,6 +93,14 @@ describe("POST — emitir bilhetes", () => {
     );
 
     expect(res.status).toBe(400);
+  });
+
+  it("um pedido que não existe não ganha pasta no bucket → 404", async () => {
+    st.quoteExists = false;
+    const res = await POST(...call("POST", "q-inventado", { contentTypes: ["image/jpeg"] }));
+
+    expect(res.status).toBe(404);
+    expect(st.mint).not.toHaveBeenCalled();
   });
 
   it("Storage sem esta capacidade → 503 a apontar para o multipart", async () => {

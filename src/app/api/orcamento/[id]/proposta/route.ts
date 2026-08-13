@@ -13,6 +13,10 @@ import { proposalCreateSchema, firstError } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
+/** O POST desenha o PDF da proposta e ainda fala com o SMTP com o anexo
+ *  colado; os 10 s por omissão do alojamento matavam a função a meio do envio
+ *  e o estúdio ficava sem saber se a proposta chegou ao casal. */
+export const maxDuration = 60;
 
 function authorized(request: NextRequest): boolean {
   return isAuthed(request);

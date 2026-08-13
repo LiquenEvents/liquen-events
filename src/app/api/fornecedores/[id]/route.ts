@@ -24,7 +24,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    const body = await request.json();
+    // JSON malformado (ou um corpo que não é um objecto) é um pedido errado,
+    // não uma avaria nossa: sem isto o `request.json()` atirava e o `catch` lá
+    // em baixo devolvia 500, e um `null` rebentava o `key in body` com um
+    // TypeError. Mesmo padrão do PATCH de `/api/orcamento/[id]`.
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
+    }
     const picked: Record<string, unknown> = {};
     for (const key of ALLOWED) {
       if (key in body) picked[key] = body[key];

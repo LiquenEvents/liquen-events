@@ -82,6 +82,26 @@ beforeEach(() => {
 });
 
 describe("POST /api/orcamento/[id]/fatura", () => {
+  /**
+   * O ecrã diz «erro ao gerar o recibo» a um 500 — que se lê como avaria e leva
+   * a reemitir um documento NUMERADO. Um corpo que não é JSON é um pedido
+   * errado, e nada é criado.
+   */
+  it("responde 400 (não 500) a um corpo malformado, e não numera nada", async () => {
+    const cru = (corpo: string) =>
+      new Request("https://liquen.test/api/orcamento/LIQ-1/fatura", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: corpo,
+      }) as unknown as NextRequest;
+    for (const corpo of ["{ isto não é JSON", "null", '"uma string"', "[]"]) {
+      const res = await POST(cru(corpo), ctx("LIQ-1"));
+      expect(res.status, corpo).toBe(400);
+    }
+    expect(nextInvoiceNumber).not.toHaveBeenCalled();
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
   it("issues a real sequential ledger number (not a random one) and records the invoice", async () => {
     const res = await POST(
       req({ paymentId: "p-abc", kind: "pagamento", amount: 1230, date: "2026-07-18", paid: true }),

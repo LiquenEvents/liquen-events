@@ -48,6 +48,23 @@ const sb = vi.hoisted(() => ({ configured: true, rows: [] as unknown[], fails: f
  *  de quem estiver a correr os testes. */
 const carimbos = vi.hoisted(() => ({ registados: [] as unknown[] }));
 
+/**
+ * O `after` do Next atira fora de um contexto de pedido, por isso é substituído
+ * por um que GUARDA as tarefas em vez de as correr. Não é conveniência: é o que
+ * permite provar que o carimbo ficou mesmo DE FORA da resposta (o ficheiro sai
+ * primeiro) e, ainda assim, que corre — que era exactamente o que o `void`
+ * solto não garantia.
+ */
+const depois = vi.hoisted(() => ({ tarefas: [] as (() => unknown)[] }));
+vi.mock("next/server", async (original) => {
+  const real = await original<typeof import("next/server")>();
+  return { ...real, after: (fn: () => unknown) => depois.tarefas.push(fn) };
+});
+async function correrDepois() {
+  const pendentes = depois.tarefas.splice(0);
+  for (const t of pendentes) await t();
+}
+
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authState.authed }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock("@/lib/copia-de-seguranca-marcador", () => ({
@@ -132,6 +149,7 @@ beforeEach(() => {
     fn.mockResolvedValue([]);
   }
   carimbos.registados = [];
+  depois.tarefas = [];
   vi.clearAllMocks();
 });
 
@@ -322,9 +340,11 @@ describe("GET /api/backup", () => {
 describe("GET /api/backup — o carimbo da cópia", () => {
   it("descarregar carimba, e diz que foi à mão", async () => {
     await GET(get());
-    // O carimbo é disparado sem `await` (o ficheiro é o que interessa), por
-    // isso espera-se pela volta seguinte do event loop.
-    await new Promise((r) => setTimeout(r, 0));
+    // O carimbo fica AGENDADO para depois da resposta (o ficheiro é o que
+    // interessa) — mas agendado no `after`, que a plataforma mantém vivo, e
+    // não num `void` que o contentor podia congelar antes de correr.
+    expect(carimbos.registados).toHaveLength(0);
+    await correrDepois();
     expect(carimbos.registados).toHaveLength(1);
     expect(carimbos.registados[0]).toMatchObject({ modo: "manual", parcial: false });
   });
@@ -332,14 +352,22 @@ describe("GET /api/backup — o carimbo da cópia", () => {
   it("sem sessão não se carimba nada — não saiu cópia nenhuma", async () => {
     authState.authed = false;
     await GET(get());
-    await new Promise((r) => setTimeout(r, 0));
+    await correrDepois();
     expect(carimbos.registados).toHaveLength(0);
   });
 
   it("uma cópia com conjuntos em falta fica carimbada como parcial", async () => {
     stores.quotes.mockRejectedValue(new Error("base de dados em baixo"));
     await GET(get());
-    await new Promise((r) => setTimeout(r, 0));
+    await correrDepois();
     expect(carimbos.registados[0]).toMatchObject({ parcial: true });
+  });
+
+  it("o carimbo a falhar não estraga o ficheiro que já saiu", async () => {
+    const marcador = await import("@/lib/copia-de-seguranca-marcador");
+    vi.mocked(marcador.registarCopiaEnviada).mockRejectedValueOnce(new Error("app_state em baixo"));
+    const res = await GET(get());
+    expect(res.status).toBe(200);
+    await expect(correrDepois()).resolves.toBeUndefined();
   });
 });

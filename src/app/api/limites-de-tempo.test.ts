@@ -58,6 +58,39 @@ const PESADAS: { rota: string; faz: string; minimo: number }[] = [
   { rota: "propostas/copiar", faz: "copia as fotos de uma proposta para outra", minimo: 30 },
   { rota: "orcamento/[id]/assets/importar", faz: "importa fotos para o pedido", minimo: 30 },
   { rota: "admin/derivadas", faz: "refaz derivadas em lote", minimo: 60 },
+  // A segunda vaga, encontrada pela mesma pergunta: quanto trabalho é que esta
+  // rota faz DEPOIS de o pedido entrar? Todas estas passam dos dez segundos com
+  // um lote a sério, e todas morriam a meio sem dar erro que se perceba.
+  {
+    rota: "temas/[id]/imagens/url",
+    faz: "confirma um lote de fotos: cabeçalho do Storage + sharp por cada uma",
+    minimo: 30,
+  },
+  {
+    rota: "orcamento/[id]/assets/url",
+    faz: "o mesmo, para a pasta do pedido",
+    minimo: 30,
+  },
+  {
+    rota: "biblioteca/etiquetar",
+    faz: "etiqueta até 500 fotos, em série, com duas idas à base de dados por foto",
+    minimo: 30,
+  },
+  {
+    rota: "orcamento/[id]/material/marcar",
+    faz: "descarrega até 500 marcações da fila do armazém",
+    minimo: 30,
+  },
+  {
+    rota: "temas/[id]",
+    faz: "o DELETE copia as fotos referenciadas para as propostas e apaga a pasta",
+    minimo: 30,
+  },
+  {
+    rota: "orcamento/[id]/proposta",
+    faz: "desenha o PDF da proposta e envia-o por email, em anexo",
+    minimo: 30,
+  },
   { rota: "cron/backup", faz: "a cópia de segurança diária", minimo: 60 },
   { rota: "cron/reminders", faz: "o resumo diário", minimo: 30 },
   { rota: "cron/inbox-check", faz: "lê a caixa de correio", minimo: 30 },

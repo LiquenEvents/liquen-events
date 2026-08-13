@@ -6,11 +6,16 @@ import {
   UPLOAD_TICKET_TTL,
   MAX_UPLOAD_TICKETS,
 } from "@/lib/proposal-storage";
+import { getQuote } from "@/lib/quotes-store";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Como na rota gémea dos temas: o PUT confirma um lote inteiro e cada foto
+ *  paga uma leitura do cabeçalho no Storage mais um `sharp`. Não cabe nos 10 s
+ *  por omissão do alojamento. */
+export const maxDuration = 60;
 
 /**
  * CARREGAMENTO DIRETO das fotos do estúdio de propostas — a mesma forma da
@@ -57,6 +62,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!isDatabaseConfigured()) return unavailable();
   const { id } = await params;
   try {
+    // O pedido tem de existir: sem isto, um id inventado abria uma pasta nova
+    // no bucket só por se pedir um bilhete para ela — e essa pasta ficava lá
+    // para sempre, sem nada que a fosse arrumar. É o mesmo guarda da rota
+    // gémea dos temas.
+    const quote = await getQuote(id);
+    if (!quote) return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
+
     const payload = await body(request);
     const raw = Array.isArray(payload?.contentTypes) ? payload.contentTypes : null;
     if (!raw || raw.length === 0) {

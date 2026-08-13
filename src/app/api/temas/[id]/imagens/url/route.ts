@@ -10,6 +10,10 @@ import { garantirFoto, updateFoto } from "@/lib/biblioteca-fotos-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** O PUT confirma até `MAX_UPLOAD_TICKETS` fotos de uma vez, e cada uma custa
+ *  uma leitura do cabeçalho no Storage mais um `sharp`; os 10 s por omissão do
+ *  alojamento matavam a função a meio e o estúdio via um erro de rede. */
+export const maxDuration = 60;
 
 /**
  * CARREGAMENTO DIRETO das fotos de um tema, em duas partes.

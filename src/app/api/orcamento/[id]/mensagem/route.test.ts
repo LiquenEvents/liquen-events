@@ -56,6 +56,26 @@ describe("POST /api/orcamento/[id]/mensagem", () => {
     expect(mail.send).not.toHaveBeenCalled();
   });
 
+  /**
+   * O ecrã diz «erro ao enviar» a um 500, e isso lê-se como «o correio
+   * avariou» — leva a carregar outra vez em Enviar. Um corpo que não é JSON é
+   * um pedido errado, e tem de o dizer.
+   */
+  it("answers 400 (not 500) to a malformed or non-object body, and não envia nada", async () => {
+    authed.ok = true;
+    const cru = (corpo: string) =>
+      new Request("https://liquen.test/api/orcamento/LIQ-1/mensagem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: corpo,
+      }) as unknown as NextRequest;
+    for (const corpo of ["{ isto não é JSON", "null", '"uma string"', "[]"]) {
+      const res = await POST(cru(corpo), ctx("LIQ-1"));
+      expect(res.status, corpo).toBe(400);
+    }
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+
   it("rejects an empty (whitespace-only) message with 400", async () => {
     authed.ok = true;
     const res = await POST(req({ message: "   " }), ctx("LIQ-1"));
