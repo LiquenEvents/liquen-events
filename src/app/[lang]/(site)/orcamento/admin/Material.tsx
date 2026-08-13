@@ -238,14 +238,27 @@ function Catalogo() {
   }
 
   async function remove(id: string) {
-    const antes = items;
+    const removido = items.find((i) => i.id === id);
+    if (!removido) return;
     setItems((prev) => prev.filter((i) => i.id !== id));
     try {
       const res = await fetch(`/api/material/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
     } catch {
       // Reversão: o catálogo no ecrã não pode divergir do que está gravado.
-      setItems(antes);
+      //
+      // Repõe-se SÓ esta linha, e sobre o que a lista tiver agora. Guardar a
+      // lista inteira antes do `await` — como se fazia — era guardar um instante
+      // que já passou: não há confirmação nenhuma pelo meio, dois cliques
+      // seguidos põem duas remoções no ar, e a que falhasse repunha o mundo
+      // anterior às DUAS. A que o servidor já tinha apagado voltava ao ecrã, e
+      // com ela à cache do `useCachedList` — o catálogo ficava a afirmar que
+      // existe material que já não existe até alguém recarregar a página.
+      setItems((prev) =>
+        prev.some((i) => i.id === id)
+          ? prev
+          : [...prev, removido].sort((a, b) => a.name.localeCompare(b.name)),
+      );
       toast("Não foi possível remover.", "error");
     }
   }
@@ -274,6 +287,32 @@ function Catalogo() {
     }
   }
 
+  /**
+   * Relê o catálogo. `false` quando a leitura falhou — e aí NÃO escreve nada.
+   *
+   * O corpo de um 401 ou de um 503 é `{ error: "…" }`, um objecto. Isto era um
+   * `fetch(…).then((x) => x.json())` sem `res.ok`, portanto esse objecto entrava
+   * no estado como se fosse o catálogo — e a linha seguinte que faz
+   * `items.filter(...)` atirava. Este ecrã vive dentro do back office, por isso
+   * a excepção subia até ao ecrã de erro da aplicação e levava-o todo.
+   *
+   * Pior: o `setItems` do `useCachedList` escreve através para a cache, que
+   * sobrevive à desmontagem — o objecto de erro ficava lá a rebentar a vista de
+   * cada vez que se voltasse a ela, até alguém recarregar a página.
+   */
+  async function recarregarCatalogo(): Promise<boolean> {
+    try {
+      const res = await fetch("/api/material");
+      if (!res.ok) return false;
+      const lista = await res.json();
+      if (!Array.isArray(lista)) return false;
+      setItems(lista);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function aplicarImportacao() {
     if (!csv) return;
     setImportando(true);
@@ -285,11 +324,6 @@ function Catalogo() {
       });
       if (!res.ok) throw new Error();
       const r = await res.json();
-      // Recarrega em vez de remendar o estado: a importação mexe em muitas
-      // linhas de uma vez e adivinhar o resultado aqui era a maneira de o ecrã
-      // ficar a dizer uma coisa e a base de dados outra.
-      const lista = await fetch("/api/material").then((x) => x.json());
-      setItems(lista);
       setCsv(null);
       setPlano(null);
       toast(
@@ -298,6 +332,17 @@ function Catalogo() {
           ".",
         "success",
       );
+      // Recarrega em vez de remendar o estado: a importação mexe em muitas
+      // linhas de uma vez e adivinhar o resultado aqui era a maneira de o ecrã
+      // ficar a dizer uma coisa e a base de dados outra.
+      //
+      // A releitura é OUTRA operação, e por isso está FORA do desfecho da
+      // gravação: falhar a reler não desmente o que já ficou gravado, e dizer
+      // "a importação falhou" depois de ela ter corrido era mandar repetir uma
+      // importação que já lá está.
+      if (!(await recarregarCatalogo())) {
+        toast("Gravado, mas não foi possível reler o catálogo. Atualiza a página.", "error");
+      }
     } catch {
       toast("A importação falhou.", "error");
     } finally {

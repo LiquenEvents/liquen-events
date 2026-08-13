@@ -28,6 +28,10 @@ interface Listas {
   listas: MaterialList[];
 }
 
+/** Gravou-se, mas o ecrã ficou a mostrar a versão anterior. Dizer as duas
+ *  coisas: o silêncio aqui é o que faz alguém repetir a alteração. */
+const AVISO_RELEITURA = "Gravado, mas não foi possível reler as regras. Atualiza a página.";
+
 export default function MaterialRegras() {
   const { toast } = useToast();
   const {
@@ -50,8 +54,29 @@ export default function MaterialRegras() {
   const [qty, setQty] = useState("1");
   const [ocupado, setOcupado] = useState(false);
 
-  async function recarregar() {
-    setRegras(await fetch("/api/material/regras").then((r) => r.json()));
+  /**
+   * Relê as regras. `false` quando a leitura falhou — e aí não escreve nada.
+   *
+   * Isto era um `.then((r) => r.json())` sem `res.ok`. O corpo de um 401 (a
+   * sessão caduca sozinha, e basta caducar entre gravar e reler) é
+   * `{ error: "…" }` — um objecto, que entrava no estado no lugar do array. A
+   * linha `regras.map(...)` mais abaixo atirava, e como este ecrã é desenhado
+   * dentro do back office a excepção levava o back office todo.
+   *
+   * O `setRegras` escreve através para a cache do `useCachedList`, portanto o
+   * objecto de erro nem sequer desaparecia ao mudar de separador.
+   */
+  async function recarregar(): Promise<boolean> {
+    try {
+      const res = await fetch("/api/material/regras");
+      if (!res.ok) return false;
+      const lista = await res.json();
+      if (!Array.isArray(lista)) return false;
+      setRegras(lista);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async function criar() {
@@ -74,8 +99,8 @@ export default function MaterialRegras() {
       if (!res.ok) throw new Error(r?.error ?? "");
       setNome("");
       setValor("");
-      await recarregar();
       toast("Regra criada.", "success");
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch (e) {
       toast(
         e instanceof Error && e.message ? e.message : "Não foi possível criar a regra.",
@@ -96,7 +121,7 @@ export default function MaterialRegras() {
         body: JSON.stringify({ enabled: !regra.enabled }),
       });
       if (!res.ok) throw new Error();
-      await recarregar();
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch {
       toast("Não foi possível guardar.", "error");
     }
@@ -106,8 +131,8 @@ export default function MaterialRegras() {
     try {
       const res = await fetch(`/api/material/regras/${regra.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      await recarregar();
       toast("Regra apagada.", "success");
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch {
       toast("Não foi possível apagar.", "error");
     }

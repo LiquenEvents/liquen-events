@@ -6,6 +6,7 @@ import type { EventMaterial, EventMaterialItem } from "@/lib/event-material-type
 import { progresso } from "@/lib/event-material-types";
 import { useToast } from "./Toast";
 import { Button, SectionCard } from "./ui";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 /**
  * A CHECKLIST DE MATERIAL DESTE EVENTO.
@@ -27,6 +28,13 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
   const [dados, setDados] = useState<Resposta>({ evento: null, itens: [] });
   const [carregando, setCarregando] = useState(true);
   const [gerando, setGerando] = useState(false);
+  /**
+   * O que a leitura disse quando falhou. `null` é "correu bem"; a string vazia é
+   * "falhou e o servidor não explicou". São três estados e não dois, porque
+   * "não há checklist" e "não consegui perguntar" NÃO são a mesma coisa — ver o
+   * desenho, mais abaixo.
+   */
+  const [falha, setFalha] = useState<string | null>(null);
 
   const buscar = useCallback(async () => {
     try {
@@ -52,14 +60,23 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
        * a excepção. Nunca se escreve no estado o que não tem a forma certa.
        */
       const res = await fetch(`/api/orcamento/${quote.id}/material`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        // E a falha tem de CHEGAR AO ECRÃ. Ficar-se pelo `return` deixava o
+        // painel a afirmar "Ainda sem checklist", com o botão de gerar ao lado,
+        // sobre um evento que pode ter meia carrinha já carregada — ver o
+        // desenho, mais abaixo.
+        const corpo = await res.json().catch(() => null);
+        setFalha(typeof corpo?.error === "string" ? corpo.error : "");
+        return;
+      }
       const r = await res.json();
       setDados({
         evento: r?.evento ?? null,
         itens: Array.isArray(r?.itens) ? r.itens : [],
       });
+      setFalha(null);
     } catch {
-      /* silêncio: o painel mostra o estado vazio e o botão de gerar */
+      setFalha("");
     } finally {
       setCarregando(false);
     }
@@ -75,7 +92,9 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
       const res = await fetch(`/api/orcamento/${quote.id}/material`, { method: "POST" });
       const r = await res.json();
       if (!res.ok) throw new Error();
-      setDados({ evento: r.evento, itens: r.itens });
+      // A mesma regra do `buscar`: só entra no estado o que tem a forma certa.
+      setDados({ evento: r?.evento ?? null, itens: Array.isArray(r?.itens) ? r.itens : [] });
+      setFalha(null);
       toast(
         r.preservadas > 0
           ? `Checklist atualizada. ${r.preservadas} marcações mantidas.`
@@ -101,6 +120,34 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
     }
     return [...mapa.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [itens]);
+
+  /**
+   * ── A LEITURA FALHOU E NÃO TEMOS NADA ────────────────────────────────────
+   * Aqui não se desenha o painel: desenha-se a falha, e sem o botão de gerar.
+   *
+   * "Ainda sem checklist" é uma AFIRMAÇÃO sobre o evento, e uma leitura que não
+   * chegou a acontecer não a sabe fazer. O passo seguinte que ela sugere —
+   * "Gerar checklist" — é o que faz estragos: a geração só preserva o que está
+   * carregado, as notas e o veículo, e as marcações de devolvido e de em falta
+   * ficam para trás. Não se convida a isso a partir de um 401.
+   *
+   * Se já tínhamos lido a checklist e é só a releitura que falha, fica o que
+   * temos: velho, mas verdadeiro.
+   */
+  if (!carregando && falha !== null && !dados.evento) {
+    return (
+      <SectionCard
+        title="Material do evento"
+        description="O que tem de ir na carrinha para esta montagem"
+      >
+        <AvisoDeFalha
+          titulo="Não foi possível ler o material deste evento"
+          mensagem={falha}
+          aoTentarDeNovo={() => void buscar()}
+        />
+      </SectionCard>
+    );
+  }
 
   return (
     <SectionCard

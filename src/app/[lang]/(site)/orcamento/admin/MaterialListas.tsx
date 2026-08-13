@@ -28,6 +28,10 @@ interface Resposta {
 /** Quantos convidados usar na pré-visualização das quantidades que escalam. */
 const PAX_EXEMPLO = 120;
 
+/** Gravou-se, mas o ecrã ficou a mostrar a versão anterior. Calar isto é o que
+ *  faz alguém repetir a alteração — ou dar uma lista por vazia. */
+const AVISO_RELEITURA = "Gravado, mas não foi possível reler as listas. Atualiza a página.";
+
 export default function MaterialListas() {
   const { toast } = useToast();
   const { data, setData, loading, error, errorMessage, refresh } = useCachedList<Resposta>(
@@ -51,9 +55,32 @@ export default function MaterialListas() {
 
   const temEssenciais = listas.some((l) => l.isDefault);
 
-  async function recarregar() {
-    const r = await fetch("/api/material/listas").then((x) => x.json());
-    setData(r);
+  /**
+   * Relê listas e linhas. `false` quando a leitura falhou — e aí não escreve
+   * nada.
+   *
+   * Isto era um `.then((x) => x.json())` sem `res.ok`. O corpo de um 401 ou de
+   * um 503 é `{ error: "…" }`, e esse objecto entrava no estado no lugar da
+   * resposta: como aqui se lê `data?.listas ?? []`, nada rebentava — as listas
+   * ficavam VAZIAS, caladas. Logo a seguir a criar uma lista, o ecrã dizia
+   * "Ainda não há listas" e voltava a oferecer semear os essenciais; e como a
+   * cache do `useCachedList` é a MESMA que o separador das Regras lê, cada
+   * regra passava a apontar para "(lista apagada)".
+   *
+   * Um erro de leitura não pode ser indistinguível de uma tabela vazia, ainda
+   * por cima quando o passo seguinte que ele sugere é recriar o que já existe.
+   */
+  async function recarregar(): Promise<boolean> {
+    try {
+      const res = await fetch("/api/material/listas");
+      if (!res.ok) return false;
+      const r = await res.json();
+      if (!Array.isArray(r?.listas) || !Array.isArray(r?.linhas)) return false;
+      setData(r);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async function semear() {
@@ -66,13 +93,13 @@ export default function MaterialListas() {
       });
       const r = await res.json();
       if (!res.ok) throw new Error(r?.error);
-      await recarregar();
       toast(
         r.criados > 0
           ? `Lista criada, com ${r.criados} itens novos no catálogo.`
           : "Lista criada a partir do catálogo que já tinha.",
         "success",
       );
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch {
       toast("Não foi possível criar os essenciais.", "error");
     } finally {
@@ -92,8 +119,8 @@ export default function MaterialListas() {
       });
       if (!res.ok) throw new Error();
       setNovoNome("");
-      await recarregar();
       toast("Lista criada.", "success");
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch {
       toast("Não foi possível criar a lista.", "error");
     } finally {
@@ -110,8 +137,8 @@ export default function MaterialListas() {
         body: JSON.stringify({ duplicarDe: lista.id, name: `${lista.name} (cópia)` }),
       });
       if (!res.ok) throw new Error();
-      await recarregar();
       toast("Lista duplicada.", "success");
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch {
       toast("Não foi possível duplicar.", "error");
     } finally {
@@ -124,8 +151,8 @@ export default function MaterialListas() {
     try {
       const res = await fetch(`/api/material/listas/${lista.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      await recarregar();
       toast("Lista apagada.", "success");
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch {
       toast("Não foi possível apagar.", "error");
     } finally {
@@ -144,7 +171,7 @@ export default function MaterialListas() {
       });
       if (!res.ok) throw new Error();
       setAAcrescentar("");
-      await recarregar();
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch {
       toast("Não foi possível acrescentar.", "error");
     } finally {
@@ -160,7 +187,7 @@ export default function MaterialListas() {
         body: JSON.stringify({ linhaId, patch }),
       });
       if (!res.ok) throw new Error();
-      await recarregar();
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch {
       toast("Não foi possível guardar.", "error");
     }
@@ -174,7 +201,7 @@ export default function MaterialListas() {
         body: JSON.stringify({ remover: linhaId }),
       });
       if (!res.ok) throw new Error();
-      await recarregar();
+      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
     } catch {
       toast("Não foi possível remover.", "error");
     }
@@ -305,8 +332,32 @@ export default function MaterialListas() {
                                 defaultValue={String(l.qty)}
                                 aria-label={`Quantidade de ${item?.name ?? "item"}`}
                                 onBlur={(e) => {
-                                  const v = Number(e.target.value.replace(",", "."));
-                                  if (Number.isFinite(v) && v !== l.qty) {
+                                  const escrito = e.target.value.trim();
+                                  const v = Number(escrito.replace(",", "."));
+                                  /**
+                                   * Uma caixa APAGADA não é a quantidade zero.
+                                   *
+                                   * `Number("")` é 0, e sem esta guarda
+                                   * seleccionar o número, apagá-lo e carregar
+                                   * noutro sítio gravava zero na lista base. O
+                                   * pior valor possível: a linha continua lá,
+                                   * com o nome e o rótulo de crítico, e toda a
+                                   * checklist gerada a partir dela passa a
+                                   * pedir zero unidades. Quem carrega a
+                                   * carrinha lê "Escadote 0" e passa à frente.
+                                   *
+                                   * Texto que não é número tinha o outro lado
+                                   * do mesmo defeito: não gravava (bem), mas
+                                   * ficava na caixa (mal) — e a caixa é
+                                   * não-controlada (`defaultValue`), por isso
+                                   * ninguém a repunha. O ecrã ficava a dizer
+                                   * uma coisa e a base de dados outra.
+                                   */
+                                  if (!escrito || !Number.isFinite(v) || v < 0) {
+                                    e.target.value = String(l.qty);
+                                    return;
+                                  }
+                                  if (v !== l.qty) {
                                     void alterarLinha(lista.id, l.id, { qty: v });
                                   }
                                 }}
