@@ -525,7 +525,12 @@ export function totaisDaProposta(
 
 type ComOrcamento = Pick<
   ProposalDoc,
-  "budgetItems" | "budgetAmounts" | "budgetCosts" | "budgetScales" | "budgetOpcional"
+  | "budgetItems"
+  | "budgetAmounts"
+  | "budgetCosts"
+  | "budgetScales"
+  | "budgetOpcional"
+  | "budgetItemsEn"
 >;
 
 /**
@@ -544,6 +549,15 @@ const PARALELOS = [
   { campo: "budgetCosts", nascePor: null },
   { campo: "budgetScales", nascePor: null },
   { campo: "budgetOpcional", nascePor: false },
+  // A rubrica escrita em inglês, quando a proposta é bilingue. Entra aqui e não
+  // num tratamento à parte pela razão que este bloco todo conta: uma segunda
+  // lista dos arrays paralelos é uma lista que se esquece do array seguinte. Um
+  // deslize de uma posição aqui não dá erro nenhum — dá a rubrica errada
+  // traduzida no PDF de um cliente que não lê a versão portuguesa.
+  //
+  // Nasce `null` («ainda não foi traduzida»), que é diferente de `""` («foi
+  // decidido que fica igual»). Ver `ProposalDoc.budgetItemsEn`.
+  { campo: "budgetItemsEn", nascePor: null },
 ] as const;
 
 /** Corta ou estica um array paralelo até ao tamanho das linhas. */

@@ -1,6 +1,8 @@
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "./types";
 import { foraDoPadrao, padraoPara } from "./padrao-de-preco";
+import { camposComVersaoInglesa, camposPorTraduzir, lerEn } from "@/lib/proposal-doc-bilingue";
+import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -121,6 +123,19 @@ const POR_SABER = [/\bpor preencher\b/i, /\ba definir\b/i];
  * fica por saber, o nome do que se cobra não.
  */
 function encontrarPlaceholders(doc: ProposalDoc): string[] {
+  /**
+   * ── E AS CAIXAS INGLESAS ──────────────────────────────────────────────────
+   * Um «[TBD]» escrito na caixa inglesa chega ao cliente exactamente da mesma
+   * maneira que um «[Valor Total]» na portuguesa.
+   *
+   * Varridas SÓ com os marcadores de modelo, nunca com o `POR_SABER`: «a
+   * definir» e «por preencher» são frases portuguesas, e o equivalente inglês
+   * («TBD», «to be defined») é legítimo numa proposta inglesa — a mesma
+   * excepção, e o mesmo argumento, do `valueText` dos valores adicionais.
+   */
+  const ingleses = camposComVersaoInglesa(doc)
+    .map((c) => lerEn(doc, c.campo))
+    .filter((t): t is string => typeof t === "string");
   const campos: (string | undefined)[] = [
     doc.headerTitle,
     doc.clientNames,
@@ -144,6 +159,7 @@ function encontrarPlaceholders(doc: ProposalDoc): string[] {
   };
   for (const c of campos) junta(texto(c), [...MARCADORES_DE_MODELO, ...POR_SABER]);
   for (const e of doc.budgetExtras ?? []) junta(texto(e.valueText), MARCADORES_DE_MODELO);
+  for (const t of ingleses) junta(texto(t), MARCADORES_DE_MODELO);
   return [...new Set(achados)];
 }
 
@@ -161,6 +177,14 @@ export interface Contexto {
   historico: Quote[];
   /** O total bruto da proposta, como ela o vê no estúdio. */
   totalBruto: number;
+  /**
+   * A língua em que o PDF vai sair — o `idiomaDoPdf` escolhido no estúdio.
+   *
+   * Opcional, e ausente vale português: é a mesma regra do resto da casa (ver
+   * `proposta-idioma.ts`), e é o que faz esta lista continuar a ser a de sempre
+   * para quem nunca escolheu inglês.
+   */
+  idioma?: IdiomaDaProposta;
 }
 
 /**
@@ -168,7 +192,13 @@ export interface Contexto {
  * passaram — ver uma lista só com problemas não diz se as outras foram
  * sequer feitas, e é essa dúvida que faz voltar a conferir à mão.
  */
-export function conferir({ doc, quote, historico, totalBruto }: Contexto): Verificacao[] {
+export function conferir({
+  doc,
+  quote,
+  historico,
+  totalBruto,
+  idioma = IDIOMA_POR_OMISSAO,
+}: Contexto): Verificacao[] {
   const v: Verificacao[] = [];
 
   // ── O nome ──────────────────────────────────────────────────────────────
@@ -337,22 +367,60 @@ export function conferir({ doc, quote, historico, totalBruto }: Contexto): Verif
 
   // ── O idioma ────────────────────────────────────────────────────────────
   //
-  // O estúdio escreve o documento em português — não há um interruptor de
-  // idioma no PDF, e inventar aqui um seria descrever uma função que não
-  // existe. O que se pode dizer, e é útil, é que o pedido veio em inglês: quem
-  // escreveu em inglês vai receber uma proposta que não lê, e quem decide se
-  // vale a pena reescrevê-la à mão é ela.
+  // ════════════════════════════════════════════════════════════════════════
+  // ESTA VERIFICAÇÃO FOI REESCRITA, E O QUE ELA DIZIA DEIXOU DE SER VERDADE
+  // ════════════════════════════════════════════════════════════════════════
   //
-  // Os pedidos anteriores a este campo não têm idioma nenhum guardado, e nesse
-  // caso não se diz nada — que é diferente de dizer que está tudo bem.
-  const idioma = idiomaDoCliente(quote);
-  if (idioma) {
+  // Dizia «O pedido veio em inglês e a proposta é escrita em português», com um
+  // comentário por cima a explicar que não havia um interruptor de idioma no
+  // PDF e que inventar aqui um seria descrever uma função que não existe.
+  //
+  // Há. Há o selector do passo «Pré-visualizar», há a língua gravada com a
+  // proposta, e há agora a prosa dela escrita nas duas línguas. A verificação
+  // foi REESCRITA e não acrescentada ao lado: duas linhas sobre idioma na mesma
+  // lista, uma delas falsa, ensinam a ignorar as duas.
+  //
+  // ── EM INGLÊS, O QUE INTERESSA É O QUE VAI SAIR EM PORTUGUÊS ────────────
+  // A caixa inglesa vazia cai para o português, sem marca nenhuma no papel — é
+  // a única regra que nunca produz um buraco. A defesa é dizê-lo ANTES, e este
+  // é o último sítio onde se diz.
+  //
+  // ── EM PORTUGUÊS, O QUE INTERESSA É O PEDIDO ───────────────────────────
+  // Quem escreveu em inglês vai receber uma proposta que não lê. Os pedidos
+  // anteriores ao campo `locale` não têm idioma guardado, e nesse caso não se
+  // diz nada — que é diferente de dizer que está tudo bem. E é também o que faz
+  // o estúdio de quem nunca faz propostas inglesas não ganhar uma linha.
+  //
+  // NUNCA `erro`: a Conferência não trava nada, por princípio (ver o cabeçalho
+  // deste ficheiro), e não é aqui que essa regra se rompe. Uma proposta com
+  // metade da prosa por traduzir tem de poder seguir — ela pode ter decidido
+  // que aquelas oito rubricas são nomes próprios.
+  const doCliente = idiomaDoCliente(quote);
+  if (idioma === "en") {
+    const faltam = camposPorTraduzir(doc);
+    const primeiros = faltam.slice(0, 3).map((c) => c.rotulo);
     v.push({
       id: "idioma",
       titulo: "Idioma",
-      severidade: idioma === "en" ? "aviso" : "ok",
+      severidade: faltam.length > 0 ? "aviso" : "ok",
       detalhe:
-        idioma === "en" ? "O pedido veio em inglês e a proposta é escrita em português." : "",
+        faltam.length > 0
+          ? `${
+              faltam.length === 1
+                ? "1 campo não tem versão inglesa e vai sair em português"
+                : `${faltam.length} campos não têm versão inglesa e vão sair em português`
+            }: ${primeiros.join(" · ")}${faltam.length > 3 ? "…" : ""}`
+          : "",
+    });
+  } else if (doCliente) {
+    v.push({
+      id: "idioma",
+      titulo: "Idioma",
+      severidade: doCliente === "en" ? "aviso" : "ok",
+      detalhe:
+        doCliente === "en"
+          ? "O pedido veio em inglês e vais gerar em português. O selector do idioma está no passo anterior."
+          : "",
     });
   }
 

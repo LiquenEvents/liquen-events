@@ -16,6 +16,7 @@ import {
   somaDosExtrasSemIva,
   totaisDaProposta,
 } from "./proposal-budget";
+import { escreverEn } from "./proposal-doc-bilingue";
 import { round2 } from "./money";
 import { resolveProposalMoney, type ProposalDoc } from "./proposal-doc";
 
@@ -608,6 +609,97 @@ describe("linhas e preços andam sempre a par", () => {
     } as unknown as ProposalDoc;
     expect(precosDe(torto)).toEqual([10]);
     expect(somaDosServicos(torto)).toBe(10);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * E A RUBRICA INGLESA ANDA A PAR COM A RUBRICA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * `budgetItemsEn` é mais um array paralelo, e o defeito que ele pode ter é o
+ * mesmo que os custos e as marcas de extra já tiveram: apagar a linha 2 de
+ * cinco sem lhe mexer põe a tradução da linha 3 na linha 2. Não dá erro
+ * nenhum — dá a rubrica errada traduzida no PDF de um cliente que não lê a
+ * versão portuguesa e não tem como desconfiar.
+ *
+ * A defesa é não escrever código novo para isto: o campo entra no `PARALELOS`,
+ * que é onde a disciplina já vive. Estes testes são o cinto por cima dos
+ * suspensórios.
+ */
+describe("as traduções das rubricas viajam com as rubricas", () => {
+  const BILINGUE = {
+    budgetItems: ["Cerimónia", "Cocktail", "Jantar", "Complementos"],
+    budgetAmounts: [900, 1200, 650, 3600],
+    budgetItemsEn: ["Ceremony", "Cocktail", "Dinner", "Extras"],
+  } as unknown as ProposalDoc;
+
+  it("remover uma linha leva a tradução dela, e só a dela", () => {
+    const d = removerLinha(BILINGUE, 1);
+    expect(d.budgetItems).toEqual(["Cerimónia", "Jantar", "Complementos"]);
+    expect(d.budgetItemsEn).toEqual(["Ceremony", "Dinner", "Extras"]);
+  });
+
+  it("acrescentar uma linha acrescenta uma tradução POR ESCREVER, não uma vazia", () => {
+    // `null` e não `""`: «ainda não foi traduzida» tem de continuar a
+    // distinguir-se de «foi decidido que fica igual».
+    const d = adicionarLinha(BILINGUE, "Tecidos");
+    expect(d.budgetItemsEn).toEqual(["Ceremony", "Cocktail", "Dinner", "Extras", null]);
+  });
+
+  it("um documento sem traduções nenhumas não ganha um array de nulls", () => {
+    // O documento tem de continuar a serializar exactamente como serializava —
+    // é o que impede o rascunho de «mudar sozinho».
+    const semIngles = { budgetItems: ["a", "b"], budgetAmounts: [1, 2] } as unknown as ProposalDoc;
+    expect(removerLinha(semIngles, 0).budgetItemsEn).toBeUndefined();
+    expect(adicionarLinha(semIngles).budgetItemsEn).toBeUndefined();
+  });
+
+  it("PROPRIEDADE: inserções e remoções ao calhas nunca separam a rubrica da tradução", () => {
+    // O par (rubrica, tradução) é escrito de propósito com o mesmo número dos
+    // dois lados, para se poder afirmar a correspondência sem depender de um
+    // dicionário.
+    let doc = {
+      budgetItems: [],
+      budgetAmounts: [],
+      budgetItemsEn: [],
+    } as unknown as ProposalDoc;
+    let proximo = 0;
+    // Uma sequência FIXA de gestos: um teste que falha só de vez em quando é um
+    // teste que se aprende a ignorar. Cobre inserir no fim, remover no meio, no
+    // princípio e no fim, e voltar a crescer por cima dos buracos.
+    const gestos: Array<["+" | "-", number]> = [
+      ["+", 0],
+      ["+", 0],
+      ["+", 0],
+      ["-", 1],
+      ["+", 0],
+      ["+", 0],
+      ["-", 0],
+      ["-", 2],
+      ["+", 0],
+      ["+", 0],
+      ["-", 3],
+      ["+", 0],
+    ];
+    for (const [gesto, i] of gestos) {
+      if (gesto === "+") {
+        const n = proximo++;
+        doc = adicionarLinha(doc, `Rubrica ${n}`);
+        doc = escreverEn(
+          doc,
+          { tipo: "linhaDeOrcamento", i: doc.budgetItems.length - 1 },
+          `Item ${n}`,
+        );
+      } else if (i < doc.budgetItems.length) {
+        doc = removerLinha(doc, i);
+      }
+      // O invariante, verificado a CADA gesto: a rubrica `n` tem a tradução `n`.
+      expect(doc.budgetItemsEn).toHaveLength(doc.budgetItems.length);
+      doc.budgetItems.forEach((item, j) => {
+        expect(doc.budgetItemsEn?.[j]).toBe(item.replace("Rubrica", "Item"));
+      });
+    }
   });
 });
 

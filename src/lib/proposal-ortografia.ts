@@ -482,8 +482,14 @@ export function escreverCampo<T extends Partial<ProposalDoc>>(
  * o dos wedding planners. «Oliveirinha» não está em dicionário nenhum, e um
  * aviso sobre o nome da quinta seria exactamente o ruído que faz ignorar os
  * avisos verdadeiros.
+ *
+ * ── E É TAMBÉM O INVENTÁRIO DA SEGUNDA CAIXA ──────────────────────────────
+ * Exportada porque `proposal-doc-bilingue.ts` precisa exactamente desta lista,
+ * com estes rótulos: os campos de prosa que saem impressos são os mesmos que
+ * precisam de par inglês. Duas listas divergiriam, e o sintoma seria um campo
+ * traduzível que nenhuma contagem via.
  */
-function camposDoDocumento(doc: Partial<ProposalDoc>): Array<{
+export function camposDoDocumento(doc: Partial<ProposalDoc>): Array<{
   campo: CampoDeTexto;
   rotulo: string;
 }> {

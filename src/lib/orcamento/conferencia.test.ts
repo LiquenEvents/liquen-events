@@ -377,16 +377,131 @@ describe("o valor", () => {
 });
 
 describe("idioma", () => {
-  it("avisa quando o pedido veio em inglês", () => {
+  it("avisa quando o pedido veio em inglês e a proposta vai sair em português", () => {
     const vs = conferir({ doc: documento(), quote: pedido({ locale: "en" }), ...base });
     expect(achar(vs, "idioma").severidade).toBe("aviso");
+    // E diz-lhe ONDE se muda — o selector vive no passo anterior, e um aviso
+    // que não diz o que fazer é um aviso que se lê e se ignora.
+    expect(achar(vs, "idioma").detalhe).toMatch(/passo anterior/i);
   });
 
-  it("um pedido antigo, sem idioma guardado, não gera verificação nenhuma", () => {
+  it("um pedido antigo, sem idioma guardado, não gera verificação nenhuma em português", () => {
     // Silêncio é diferente de "está tudo bem" — e inventar "pt" para os antigos
     // era afirmar um facto que ninguém registou.
     const vs = conferir({ doc: documento(), quote: pedido(), ...base });
     expect(vs.find((v) => v.id === "idioma")).toBeUndefined();
+  });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A FRASE QUE DEIXOU DE SER VERDADE
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Esta verificação dizia «O pedido veio em inglês e a proposta é escrita em
+   * português», e o comentário por cima dela dizia que não havia um interruptor
+   * de idioma no PDF. Há. Reescrita e não duplicada: duas linhas sobre idioma
+   * na mesma lista, uma delas falsa, é pior do que não haver nenhuma.
+   */
+  it("já não afirma que a proposta é SEMPRE escrita em português", () => {
+    const todas = [
+      ...conferir({ doc: documento(), quote: pedido({ locale: "en" }), ...base }),
+      ...conferir({ doc: documento(), quote: pedido({ locale: "pt" }), ...base }),
+      ...conferir({ doc: documento(), quote: pedido(), idioma: "en", ...base }),
+    ];
+    for (const v of todas) {
+      expect(v.detalhe).not.toContain("a proposta é escrita em português");
+    }
+  });
+
+  it("em inglês e sem faltas, passa", () => {
+    const vs = conferir({
+      doc: documento({
+        serviceGroups: [{ title: "Decoração", titleEn: "Decoration", items: [] }],
+      }),
+      quote: pedido({ locale: "en" }),
+      idioma: "en",
+      ...base,
+    });
+    expect(achar(vs, "idioma").severidade).toBe("ok");
+  });
+
+  it("em inglês, conta os campos que vão sair em português e nomeia os primeiros", () => {
+    const vs = conferir({
+      doc: documento({
+        serviceGroups: [
+          {
+            title: "Decoração Floral",
+            items: [{ label: "Decor Cerimónia" }, { label: "Decor Jantar" }],
+          },
+        ],
+        budgetItems: ["Decor Cocktail"],
+      }),
+      quote: pedido({ locale: "en" }),
+      idioma: "en",
+      ...base,
+    });
+    const v = achar(vs, "idioma");
+    expect(v.severidade).toBe("aviso");
+    // Quatro campos: o título do grupo, as duas linhas e a rubrica.
+    expect(v.detalhe).toMatch(/\b4\b/);
+    expect(v.detalhe).toMatch(/sair em português/i);
+    expect(v.detalhe).toContain("Serviços · grupo 1");
+  });
+
+  it("em inglês, a contagem NÃO conta o que foi decidido ficar em português", () => {
+    // «Lisianthus» traduz-se para «Lisianthus». O botão «Ficar em português»
+    // escreve o mesmo texto na caixa inglesa, e é isso que faz a contagem
+    // baixar — sem ele, um aviso ficava aceso para sempre.
+    const vs = conferir({
+      doc: documento({
+        serviceGroups: [{ title: "Lisianthus", titleEn: "Lisianthus", items: [] }],
+      }),
+      quote: pedido({ locale: "en" }),
+      idioma: "en",
+      ...base,
+    });
+    expect(achar(vs, "idioma").severidade).toBe("ok");
+  });
+
+  it("em português, a contagem das traduções não aparece — nem sequer a verde", () => {
+    // O estúdio de quem nunca faz propostas inglesas não ganha uma linha.
+    const vs = conferir({
+      doc: documento({ serviceGroups: [{ title: "Decoração", items: [] }] }),
+      quote: pedido(),
+      ...base,
+    });
+    expect(vs.find((v) => v.id === "idioma")).toBeUndefined();
+  });
+});
+
+describe("texto de exemplo nas caixas inglesas", () => {
+  it("apanha um [TBD] escrito numa caixa inglesa", () => {
+    // Um marcador de modelo chega ao cliente exactamente da mesma maneira,
+    // esteja escrito em que língua estiver.
+    const vs = conferir({
+      doc: documento({
+        serviceGroups: [{ title: "Decoração", titleEn: "[TBD]", items: [] }],
+      }),
+      quote: pedido(),
+      idioma: "en",
+      ...base,
+    });
+    expect(achar(vs, "placeholders").severidade).toBe("erro");
+  });
+
+  it("NÃO apanha «a definir» numa caixa inglesa", () => {
+    // `POR_SABER` é português, e não faz sentido num campo inglês. O
+    // equivalente inglês («TBD») é legítimo numa proposta inglesa pela mesma
+    // razão que «a definir» é legítimo num valor adicional.
+    const vs = conferir({
+      doc: documento({
+        serviceGroups: [{ title: "Decoração", titleEn: "a definir", items: [] }],
+      }),
+      quote: pedido(),
+      idioma: "en",
+      ...base,
+    });
+    expect(achar(vs, "placeholders").severidade).toBe("ok");
   });
 });
 

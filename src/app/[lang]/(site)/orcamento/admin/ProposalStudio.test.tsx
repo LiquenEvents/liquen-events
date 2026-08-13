@@ -207,6 +207,12 @@ let propostasServidor: unknown[] = [];
 let modelosServidor: unknown[] = [];
 /** O que /api/propostas/copiar devolve — a cópia inteira ou o mapa das fotos. */
 let copiaServidor: unknown = {};
+/** O servidor tem serviço de tradução configurado? Por omissão NÃO — é o
+ *  estado em que a maior parte destes testes corre, e o lado seguro. */
+let traducaoLigadaNoServidor = false;
+/** O que a rota da tradução responde ao POST. */
+let traducaoResponde: (textos: string[]) => Response = (textos) =>
+  reply({ json: { textos: textos.map((t) => `EN: ${t}`) } });
 /** Tudo o que saiu daqui — é onde se lê o que foi GRAVADO e o que foi ENVIADO. */
 let pedidos: { url: string; init?: RequestInit }[] = [];
 const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -233,6 +239,13 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   }
   // Antes do `/propostas` genérico: senão a cópia caía na lista de resumos.
   if (url.includes("/propostas/copiar")) return reply({ json: copiaServidor });
+  // A tradução automática: o GET diz se o SERVIDOR tem serviço configurado (a
+  // chave nunca chega ao browser), o POST devolve os textos traduzidos.
+  if (url.includes("/propostas/traduzir")) {
+    if (metodo === "GET") return reply({ json: { ligada: traducaoLigadaNoServidor } });
+    const enviados = (JSON.parse(String(init?.body ?? "{}")).textos ?? []) as string[];
+    return traducaoResponde(enviados);
+  }
   if (url.includes("/propostas/modelos")) return reply({ json: { modelos: modelosServidor } });
   if (url.includes("/api/propostas?")) return reply({ json: propostasServidor });
   return reply({ json: { images: [] } });
@@ -260,6 +273,8 @@ beforeEach(() => {
   propostasServidor = [];
   modelosServidor = [];
   copiaServidor = {};
+  traducaoLigadaNoServidor = false;
+  traducaoResponde = (textos) => reply({ json: { textos: textos.map((t) => `EN: ${t}`) } });
   fetchMock.mockClear();
   vi.stubGlobal("fetch", fetchMock);
   // O descarregamento do PDF passa por um blob: URL, que o jsdom não tem.
@@ -3263,5 +3278,417 @@ describe("a mensagem pessoal que segue com a proposta", () => {
     await user.type(caixa(), "Olá {{nome}, ficamos à espera.");
     expect(caixa().value).toContain("{nome}");
     await waitFor(() => expect(aviso()).toHaveLength(1));
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PROPOSTA BILINGUE — DUAS CAIXAS POR CAMPO, E SÓ QUANDO SE PEDEM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Decisão dela: cada campo de prosa passa a ter uma caixa portuguesa e uma
+ * inglesa, escritas por ela. O interruptor existe porque o `ServicesEditor` é o
+ * ecrã mais escrito da casa — dobrar-lhe a altura para toda a gente, incluindo
+ * as propostas que nunca vão a inglês, era pagar todos os dias por um caso
+ * ocasional.
+ *
+ * O primeiro teste é o que protege as propostas só-portuguesas: desligado, não
+ * há uma única caixa inglesa no ecrã.
+ */
+describe("proposta bilingue", () => {
+  const interruptor = () => screen.getByRole("button", { name: /Proposta bilingue/i });
+  /** Todas as caixas inglesas desenhadas agora — reconhecem-se pelo `data-campo`
+   *  terminado em `:en`, que é a mesma pega por onde o salto as encontra. */
+  const caixasInglesas = () => document.querySelectorAll("[data-campo$=':en']");
+
+  it("desligado, o ecrã é o de hoje: nenhuma caixa inglesa no DOM", async () => {
+    seedDraft(1);
+    renderStudio();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    expect(caixasInglesas()).toHaveLength(0);
+  });
+
+  it("ligado, cada campo de prosa passa a ter duas caixas", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    await waitFor(() => expect(caixasInglesas().length).toBeGreaterThan(0));
+    // O par do título do mood board: a portuguesa e a inglesa, com a mesma
+    // chave e o sufixo que as distingue.
+    expect(document.querySelector('[data-campo="boardTitulo:0"]')).toBeTruthy();
+    expect(document.querySelector('[data-campo="boardTitulo:0:en"]')).toBeTruthy();
+  });
+
+  it("a caixa inglesa diz-se em voz alta — quem ouve o ecrã ouve a diferença", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    const inglesa = await waitFor(() => {
+      const el = document.querySelector('[data-campo="boardTitulo:0:en"]');
+      if (!el) throw new Error("ainda não");
+      return el as HTMLInputElement;
+    });
+    expect(inglesa.getAttribute("aria-label") ?? "").toMatch(/ingl[êe]s/i);
+  });
+
+  it("escrever na caixa inglesa grava-a no rascunho", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    const inglesa = await waitFor(() => {
+      const el = document.querySelector('[data-campo="boardTitulo:0:en"]');
+      if (!el) throw new Error("ainda não");
+      return el as HTMLInputElement;
+    });
+    await user.type(inglesa, "Ceremony");
+    await waitFor(
+      () => expect(localStorage.getItem(DRAFT_KEY) ?? "").toContain('"titleEn":"Ceremony"'),
+      { timeout: 3000 },
+    );
+    // E o português fica onde estava.
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).moodBoards[0].title).toBe("Cerimónia");
+  });
+
+  /**
+   * O CASO DO OUTRO PORTÁTIL.
+   *
+   * O interruptor vive no `meta` do rascunho, que é estado do EDITOR. Abrir a
+   * proposta noutro computador, restaurá-la do servidor ou copiá-la de outra
+   * deixa o `meta` para trás — e sem esta regra os textos ingleses existiam no
+   * documento e o ecrã não os mostrava: invisíveis e editáveis por acidente.
+   */
+  it("uma proposta que já traz inglês abre com o interruptor LIGADO, sem meta nenhum", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [{ title: "Cerimónia", titleEn: "Ceremony", images: ["board/f.jpg"] }],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+    renderStudio();
+    await waitFor(() => expect(caixasInglesas().length).toBeGreaterThan(0));
+    expect(
+      (document.querySelector('[data-campo="boardTitulo:0:en"]') as HTMLInputElement).value,
+    ).toBe("Ceremony");
+  });
+
+  /**
+   * O RESTAURO DO RASCUNHO É ZONA MINADA — ver o bloco «CORRE UMA VEZ SÓ» no
+   * `ProposalStudio.tsx`. O `meta.bilingue` lê-se DENTRO do efeito que já
+   * existe; um efeito novo a ler o `localStorage` traria de volta o defeito que
+   * abria o estúdio vazio com o trabalho todo guardado.
+   */
+  it("o interruptor volta ligado do meta, e as traduções do rascunho ficam lá", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [{ title: "Cerimónia", images: ["board/f.jpg"] }],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+    localStorage.setItem(`${DRAFT_KEY}:meta`, JSON.stringify({ bilingue: true }));
+    renderStudio();
+    await waitFor(() => expect(caixasInglesas().length).toBeGreaterThan(0));
+    // E o documento restaurado é o dela, não um vazio escrito por cima.
+    expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0);
+  });
+
+  it("o estado do interruptor fica gravado ao lado do rascunho, e não dentro dele", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    await waitFor(
+      () => expect(localStorage.getItem(`${DRAFT_KEY}:meta`) ?? "").toContain('"bilingue":true'),
+      { timeout: 3000 },
+    );
+    // O documento não ganhou um campo que não diz nada sobre a proposta.
+    expect(localStorage.getItem(DRAFT_KEY) ?? "").not.toContain("bilingue");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE VAI SAIR EM PORTUGUÊS, DITO ANTES DE SAIR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A caixa inglesa vazia cai para o português, calada e sem marca no papel. O
+ * preço de o fazer calado são estes três avisos, e é por eles que a decisão
+ * deixa de ser tomada por distracção: o contador em cima do botão que gera, a
+ * verificação da Conferência e o painel «Por traduzir».
+ */
+describe("os avisos da proposta inglesa", () => {
+  /** Um rascunho com prosa por traduzir: um grupo, uma linha e uma rubrica. */
+  function seedPorTraduzir() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ title: "Decoração Floral", items: [{ label: "Decor Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: ["Decor Cocktail"],
+        coverImages: ["", ""],
+        totalLabel: "Valor Total Decoração",
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  /** O selector do idioma é um `Segmented` — os segmentos são `role="radio"`,
+   *  e o nome acessível vem do `ariaLabel` que explica o que a escolha faz. */
+  const escolherIngles = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getAllByRole("radio", { name: /^Inglês/ })[0]);
+  };
+
+  it("em português não há painel nem contador — o ecrã é o de sempre", async () => {
+    seedPorTraduzir();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    expect(screen.queryByText(/Por traduzir/i)).toBeNull();
+  });
+
+  it("com «Inglês» escolhido, o painel lista os campos que vão sair em português", async () => {
+    seedPorTraduzir();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await escolherIngles(user);
+    const painel = await screen.findByRole("region", { name: /Por traduzir/i });
+    expect(within(painel).getByText(/Serviços · grupo 1/)).toBeTruthy();
+    expect(within(painel).getByText(/Orçamento · linha 1/)).toBeTruthy();
+  });
+
+  it("a Conferência passa a contar os campos por traduzir em vez da frase antiga", async () => {
+    seedPorTraduzir();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await escolherIngles(user);
+    const conferencia = await screen.findByRole("region", { name: /Conferência/i });
+    await waitFor(() =>
+      expect(within(conferencia).getByText(/não têm versão inglesa/i)).toBeTruthy(),
+    );
+    expect(conferencia.textContent).not.toContain("a proposta é escrita em português");
+  });
+
+  /**
+   * «Ficar em português» transforma o esquecimento em decisão. Sem ele, um
+   * campo que não precisa de tradução — «Lisianthus» — contava como falta para
+   * sempre, e um aviso sempre aceso é um aviso que se aprende a ignorar.
+   */
+  it("«Ficar em português» copia o texto e faz a contagem baixar", async () => {
+    seedPorTraduzir();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await escolherIngles(user);
+    const painel = await screen.findByRole("region", { name: /Por traduzir/i });
+    // Quatro: o título do grupo, a linha, a rubrica do orçamento e o rótulo do
+    // total — todos com português escrito e a caixa inglesa em branco.
+    expect(within(painel).getAllByRole("button", { name: /^Ficar em português$/ })).toHaveLength(4);
+    // A linha do título do grupo, pelo rótulo — e não a primeira da lista: a
+    // ordem é a dos campos no documento, e o rótulo do total vem antes.
+    const linha = within(painel)
+      .getByText(/Serviços · grupo 1/)
+      .closest("li")!;
+    await user.click(
+      within(linha as HTMLElement).getByRole("button", { name: /^Ficar em português$/ }),
+    );
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("region", { name: /Por traduzir/i })).getAllByRole("button", {
+          name: /^Ficar em português$/,
+        }),
+      ).toHaveLength(3),
+    );
+    // E o que ficou gravado é o português na caixa inglesa — a decisão, escrita.
+    await waitFor(
+      () => expect(localStorage.getItem(DRAFT_KEY) ?? "").toContain('"titleEn":"Decoração Floral"'),
+      { timeout: 3000 },
+    );
+  });
+
+  it("«Traduzir» leva ao conteúdo, acende as caixas inglesas e foca a certa", async () => {
+    seedPorTraduzir();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await escolherIngles(user);
+    const painel = await screen.findByRole("region", { name: /Por traduzir/i });
+    await user.click(within(painel).getAllByRole("button", { name: /^Traduzir$/ })[0]);
+    // O interruptor acende-se sozinho: saltar para uma caixa que não está
+    // desenhada deixava-a a olhar para o campo português sem perceber porquê.
+    const caixa = await waitFor(() => {
+      const el = document.querySelector('[data-campo="grupoTitulo:0:en"]');
+      if (!el) throw new Error("ainda não");
+      return el as HTMLInputElement;
+    });
+    expect(caixa).toBeTruthy();
+  });
+
+  it("o contador em cima do botão que gera diz o que vai acontecer, antes do clique", async () => {
+    seedPorTraduzir();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    // A frase do CONTADOR, que é diferente da da Conferência de propósito: o
+    // passo «Enviar» está desenhado (escondido) ao mesmo tempo que este, e uma
+    // procura por palavras comuns encontrava as duas.
+    const contador = /ainda não têm versão inglesa/i;
+    expect(screen.queryByText(contador)).toBeNull();
+    await escolherIngles(user);
+    await waitFor(() => expect(screen.getByText(contador)).toBeTruthy());
+  });
+
+  it("a ressalva já não promete que a prosa dela fica toda como está", async () => {
+    seedPorTraduzir();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    const ressalva = screen.getByText(/Em inglês sai a moldura do documento/i);
+    expect(ressalva.textContent).toMatch(/caixas «EN»/);
+    expect(ressalva.textContent).not.toMatch(/ficam como os escreveste/);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «TRADUZIR PARA INGLÊS» — O BOTÃO QUE AINDA NÃO TEM MOTOR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Decisão dela: o sistema traduz, ela revê o que quiser. O motor não existe —
+ * não há serviço escolhido nem chave nenhuma no projecto —, e o que existe é a
+ * fronteira onde ele vai entrar (`proposal-traducao.ts`).
+ *
+ * Enquanto não existir, o botão diz-o. Um botão que finge traduzir e não traduz
+ * mandava-a enviar uma proposta a acreditar que estava traduzida — que é o
+ * único desfecho pior do que não haver botão nenhum.
+ */
+describe("traduzir para inglês", () => {
+  const interruptor = () => screen.getByRole("button", { name: /Proposta bilingue/i });
+
+  it("o botão só aparece com a proposta bilingue ligada", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    expect(screen.queryByRole("button", { name: /Traduzir para inglês/i })).toBeNull();
+    await user.click(interruptor());
+    expect(await screen.findByRole("button", { name: /Traduzir para inglês/i })).toBeTruthy();
+  });
+
+  it("sem motor configurado, o botão está desligado e DIZ que ainda não está ligado", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    const botao = await screen.findByRole("button", { name: /Traduzir para inglês/i });
+    expect((botao as HTMLButtonElement).disabled).toBe(true);
+    // A razão está à vista, e não escondida num `title` que ninguém abre.
+    expect(screen.getByText(/tradução automática ainda não está ligada/i)).toBeTruthy();
+  });
+
+  it("com o serviço ligado, o botão preenche as caixas «EN» de uma vez", async () => {
+    traducaoLigadaNoServidor = true;
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    const botao = await waitFor(async () => {
+      const b = (await screen.findByRole("button", {
+        name: /Traduzir para inglês/i,
+      })) as HTMLButtonElement;
+      if (b.disabled) throw new Error("ainda a perguntar ao servidor");
+      return b;
+    });
+    await user.click(botao);
+    const caixa = await waitFor(() => {
+      const el = document.querySelector('[data-campo="boardTitulo:0:en"]') as HTMLInputElement;
+      if (!el || !el.value) throw new Error("ainda não");
+      return el;
+    });
+    expect(caixa.value).toBe("EN: Cerimónia");
+    // O português não se mexe: a tradução vive nos campos `…En`, e é por isso
+    // que ela pode corrigi-la sem perder o que escreveu.
+    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).moodBoards[0].title).toBe("Cerimónia");
+  });
+
+  it("um serviço que recusa não estraga o documento, e diz porquê", async () => {
+    traducaoLigadaNoServidor = true;
+    traducaoResponde = () =>
+      reply({ ok: false, status: 502, json: { error: "a quota de tradução deste mês acabou" } });
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    const botao = await waitFor(async () => {
+      const b = (await screen.findByRole("button", {
+        name: /Traduzir para inglês/i,
+      })) as HTMLButtonElement;
+      if (b.disabled) throw new Error("ainda a perguntar ao servidor");
+      return b;
+    });
+    await user.click(botao);
+    // A frase vem do servidor, escrita em português, e nunca leva a chave.
+    expect(await screen.findByText(/quota de tradução deste mês acabou/i)).toBeTruthy();
+    const caixa = document.querySelector('[data-campo="boardTitulo:0:en"]') as HTMLInputElement;
+    expect(caixa.value).toBe("");
+  });
+
+  it("as caixas continuam a poder ser escritas à mão enquanto não há motor", async () => {
+    // É o que impede a mudança de direcção de deixar a funcionalidade parada à
+    // espera de uma chave: ela pode traduzir uma proposta hoje, à mão.
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    const caixa = await waitFor(() => {
+      const el = document.querySelector('[data-campo="boardTitulo:0:en"]');
+      if (!el) throw new Error("ainda não");
+      return el as HTMLInputElement;
+    });
+    await user.type(caixa, "Ceremony");
+    expect(caixa.value).toBe("Ceremony");
   });
 });

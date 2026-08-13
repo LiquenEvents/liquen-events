@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "@/lib/orcamento/types";
 import { conferir, temReparos, type Severidade } from "@/lib/orcamento/conferencia";
+import type { IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 
 /**
  * A PASSAGEM DE OLHOS ANTES DE ENVIAR.
@@ -35,12 +36,18 @@ interface Props {
   /** Os outros pedidos, para o padrão de preço. Sem eles não há comparação. */
   quotes?: Quote[];
   totalBruto: number;
+  /**
+   * A língua em que o PDF vai sair — o mesmo estado do selector do passo
+   * anterior. É ela que decide se a lista fala do pedido que veio em inglês ou
+   * dos campos que ainda não têm versão inglesa.
+   */
+  idioma?: IdiomaDaProposta;
 }
 
-export default function Conferencia({ doc, quote, quotes = [], totalBruto }: Props) {
+export default function Conferencia({ doc, quote, quotes = [], totalBruto, idioma }: Props) {
   const verificacoes = useMemo(
-    () => conferir({ doc, quote, historico: quotes, totalBruto }),
-    [doc, quote, quotes, totalBruto],
+    () => conferir({ doc, quote, historico: quotes, totalBruto, idioma }),
+    [doc, quote, quotes, totalBruto, idioma],
   );
   const reparos = temReparos(verificacoes);
 

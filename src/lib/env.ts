@@ -49,6 +49,15 @@ const CHECKS: EnvCheck[] = [
   { name: "VAPID_PUBLIC_KEY", enables: "web push notifications" },
   { name: "VAPID_PRIVATE_KEY", enables: "web push notifications" },
   { name: "SENTRY_DSN", enables: "error monitoring (Sentry, via lib/logger)" },
+  // Não é crítica: sem ela o botão «Traduzir para inglês» do estúdio diz, com
+  // todas as letras, que a tradução automática não está ligada, e a proposta
+  // inglesa continua a poder ser escrita à mão. Fica na lista para o aviso de
+  // arranque dizer PORQUE é que o botão está desligado — descobri-lo pelo botão
+  // é descobri-lo com o cliente à espera.
+  {
+    name: "DEEPL_API_KEY",
+    enables: "automatic PT→EN translation of proposal prose (studio «Traduzir para inglês»)",
+  },
   // Without it the /api/cron/* routes fail closed in production (see their
   // authorized() checks) — so this isn't silent data loss, but it does mean
   // the daily digest / inbox-check cron jobs silently stop firing.

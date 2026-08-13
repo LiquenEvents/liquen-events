@@ -380,3 +380,83 @@ describe("trocarFotos", () => {
     expect(trocarFotos(ORIGEM, new Map())).toBe(ORIGEM);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * TRADUZIR UMA VEZ, REUTILIZAR SEMPRE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É aqui que está o valor todo da proposta bilingue. Quase todas as propostas
+ * são uma variação de uma anterior; se as traduções não viajassem na cópia, ela
+ * reescrevia-as a cada casamento inglês.
+ *
+ * A regra deste módulo é «copia-se tudo menos aquilo que é de OUTRA pessoa». Uma
+ * tradução de «Decoração Cerimónia» para «Ceremony Decoration» é do SERVIÇO, não
+ * do casal — exactamente como os custos e as fotos de biblioteca, que já ficam
+ * de propósito.
+ *
+ * Trabalho de código: nenhum — `clonar` é `JSON.parse(JSON.stringify(…))`. O
+ * teste é obrigatório à mesma, senão alguém «limpa» a cópia um dia e ninguém dá
+ * por isso até ao terceiro casamento inglês.
+ */
+describe("as traduções viajam na cópia", () => {
+  const BILINGUE = {
+    ...ORIGEM,
+    serviceGroups: [
+      {
+        letter: "a)",
+        title: "Decoração Floral e Decoração",
+        titleEn: "Wedding Floral Design",
+        items: [
+          { label: "Igreja", labelEn: "Church" },
+          { label: "Cocktail", labelEn: "Cocktail", desc: "Jardim", descEn: "Garden" },
+        ],
+      },
+    ],
+    moodBoards: [
+      {
+        title: "Cerimónia",
+        titleEn: "Ceremony",
+        subtitulo: "Arco",
+        subtituloEn: "Arch",
+        annotation: "Hortênsias",
+        annotationEn: "Hydrangeas",
+        images: ["LIQ-ORIGEM/foto-1.jpg"],
+      },
+    ],
+    budgetItems: ["Decoração Cerimónia", "Decoração Cocktail"],
+    budgetItemsEn: ["Ceremony Decoration", "Cocktail Decoration"],
+    budgetExtras: [{ label: "Deslocação", labelEn: "Travel", valueText: "150,00 €" }],
+    totalLabelEn: "Decoration Total",
+    budgetNote: "Estimativas",
+    budgetNoteEn: "Estimates",
+  } as unknown as ProposalDoc;
+
+  it("leva os textos ingleses todos", () => {
+    const { doc } = copiarParaPedido(BILINGUE, PEDIDO_NOVO);
+    expect(doc.serviceGroups[0].titleEn).toBe("Wedding Floral Design");
+    expect(doc.serviceGroups[0].items[0].labelEn).toBe("Church");
+    expect(doc.serviceGroups[0].items[1].descEn).toBe("Garden");
+    expect(doc.moodBoards[0].titleEn).toBe("Ceremony");
+    expect(doc.moodBoards[0].subtituloEn).toBe("Arch");
+    expect(doc.moodBoards[0].annotationEn).toBe("Hydrangeas");
+    expect(doc.budgetItemsEn).toEqual(["Ceremony Decoration", "Cocktail Decoration"]);
+    expect(doc.budgetExtras?.[0].labelEn).toBe("Travel");
+    expect(doc.totalLabelEn).toBe("Decoration Total");
+    expect(doc.budgetNoteEn).toBe("Estimates");
+  });
+
+  it("a rubrica inglesa continua colada à rubrica que traduz", () => {
+    const { doc } = copiarParaPedido(BILINGUE, PEDIDO_NOVO);
+    expect(doc.budgetItems).toHaveLength(doc.budgetItemsEn?.length ?? -1);
+    expect(doc.budgetItems[0]).toBe("Decoração Cerimónia");
+    expect(doc.budgetItemsEn?.[0]).toBe("Ceremony Decoration");
+  });
+
+  it("uma cópia sem traduções nenhumas continua a não ter campos …En", () => {
+    // O caminho de 100% das propostas de hoje: o documento copiado tem de
+    // serializar exactamente como serializava.
+    const { doc } = copiarParaPedido(ORIGEM, PEDIDO_NOVO);
+    expect(JSON.stringify(doc)).not.toContain('En":');
+  });
+});

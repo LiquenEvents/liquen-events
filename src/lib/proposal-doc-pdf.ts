@@ -65,6 +65,7 @@ import {
   type CampoDoEvento,
   type IdiomaDaProposta,
 } from "@/lib/proposal-doc-textos";
+import { docNaLingua } from "@/lib/proposal-doc-bilingue";
 
 /**
  * A DATA POR EXTENSO mudou-se para `proposal-doc-textos.ts`, com o resto do que
@@ -615,6 +616,38 @@ export async function renderProposalDocPdfWithReport(
   semRedimensionar: number;
   reordenacoes: ReordenacaoDoDocumento[];
 }> {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O DOCUMENTO PORTUGUÊS — GUARDADO ANTES DE MAIS NADA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * É o documento como ela o escreveu, e é ele que manda em duas coisas que a
+   * projecção não pode tocar:
+   *
+   *  1. A ORDEM. Ver o bloco «UMA SÓ ORDEM PARA O DOCUMENTO INTEIRO» — a ordem
+   *     é calculada pelos NOMES dos serviços, e uma rubrica traduzida deixa de
+   *     casar com o serviço português. Calculada sobre o documento inglês, um
+   *     documento meio traduzido saía com o orçamento e os mood boards por
+   *     outra ordem, em silêncio, e só no PDF do casal inglês.
+   *  2. OS AVISOS. O relatório de truncagens e de reordenações é lido no
+   *     estúdio, que é português — pela mesma razão que o `pt` aqui em baixo
+   *     existe.
+   */
+  const docPt = doc;
+  /**
+   * A prosa dela na língua pedida — o que ela traduziu entra no lugar do
+   * português, o que não traduziu fica como está, sem marca nenhuma no papel.
+   *
+   * A projecção é AQUI e não em cada rota: são cinco os caminhos que desenham
+   * (a pré-visualização do estúdio, o envio, o link do casal, o portal e a
+   * pré-visualização de desenvolvimento), e projectar em cada um era garantir
+   * que um dia um deles se esquecia. É o mesmo ponto onde a língua já entra
+   * para os blocos fixos.
+   *
+   * Em português devolve o MESMO objecto, por referência: o caminho de omissão
+   * não faz cópia nenhuma nem desenha nada de diferente.
+   */
+  doc = docNaLingua(doc, idioma);
   /** O que o documento diz por si, na língua pedida. */
   const t = textosDaProposta(idioma);
   /**
@@ -1304,9 +1337,21 @@ export async function renderProposalDocPdfWithReport(
    * listas no ecrã — é isso, e só isso, que garante que o que ela arruma é o
    * que sai impresso. Num documento que ela já arrumou à mão
    * (`ordemExplicita`), devolve a ordem escrita e não toca em nada.
+   *
+   * ── E CALCULA-SE SOBRE O DOCUMENTO PORTUGUÊS ──────────────────────────
+   * `docPt` e não `doc`: a ordem é dada pelos NOMES, e numa proposta bilingue
+   * metade dos nomes pode estar traduzida e a outra metade não. Sobre o
+   * documento inglês, as chaves deixavam de casar, o «sem correspondência não
+   * se mexe» entrava, e o orçamento e os mood boards saíam por outra ordem só
+   * no PDF inglês — que ninguém confere, porque quem confere lê o português.
+   *
+   * Os índices servem os dois documentos porque `docNaLingua` nunca
+   * acrescenta, remove nem reordena: só troca strings no sítio. Esse invariante
+   * está pinado em `proposal-doc-bilingue.test.ts`, e é o que torna estas duas
+   * linhas seguras.
    */
-  const ordemDosBoards = ordemDeSaida(doc, doc.moodBoards, (b) => b.title ?? "");
-  const ordemDasLinhasDoOrcamento = ordemDeSaida(doc, doc.budgetItems, (s) => s);
+  const ordemDosBoards = ordemDeSaida(docPt, docPt.moodBoards, (b) => b.title ?? "");
+  const ordemDasLinhasDoOrcamento = ordemDeSaida(docPt, docPt.budgetItems, (s) => s);
   /** Anota uma lista que saiu por ordem diferente da que está escrita. */
   const notaDeOrdem = (onde: string, rotulos: string[], indices: number[]) => {
     if (eAOrdemEscrita(indices)) return;
@@ -1318,9 +1363,11 @@ export async function renderProposalDocPdfWithReport(
   };
 
   // ── Mood board pages (skip empty boards — never show a client a placeholder) ──
+  // Os rótulos do relatório saem do documento PORTUGUÊS: quem o lê é o estúdio,
+  // e é lá que ela vai procurar o board pelo nome que lhe deu.
   notaDeOrdem(
     "Mood boards",
-    doc.moodBoards.map((b) => b.title ?? ""),
+    docPt.moodBoards.map((b) => b.title ?? ""),
     ordemDosBoards,
   );
   for (const bi of ordemDosBoards) {
@@ -1361,7 +1408,12 @@ export async function renderProposalDocPdfWithReport(
     // Como o mood board se chama num aviso. Sem título, vale a posição — a que
     // ele ocupa NO DOCUMENTO e não a página por que saiu, porque é assim que
     // ela o encontra no estúdio, contado a partir de 1.
-    const boardName = mb.title.trim() ? `«${mb.title.trim()}»` : `${bi + 1}`;
+    //
+    // Pelo título PORTUGUÊS, mesmo num PDF inglês: o aviso é lido no estúdio, e
+    // «Ceremony Decoration cortado» manda-a procurar um board que ali não
+    // existe com esse nome.
+    const tituloPt = (docPt.moodBoards[bi]?.title ?? "").trim();
+    const boardName = tituloPt ? `«${tituloPt}»` : `${bi + 1}`;
     await drawCollage(
       pdf,
       p,
@@ -1482,7 +1534,7 @@ export async function renderProposalDocPdfWithReport(
       // reordenar um sem o outro trocava as marcas de sítio, que é a única
       // maneira de isto poder mentir sobre dinheiro.
       const ordemDasLinhas = ordemDasLinhasDoOrcamento;
-      notaDeOrdem("Orçamento", doc.budgetItems, ordemDasLinhas);
+      notaDeOrdem("Orçamento", docPt.budgetItems, ordemDasLinhas);
       ordemDasLinhas.forEach((i) => {
         const it = doc.budgetItems[i];
         // Os 46 pontos reservados à direita são a largura da marca mais o ar

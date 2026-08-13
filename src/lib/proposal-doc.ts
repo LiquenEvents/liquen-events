@@ -81,9 +81,53 @@ export const MOOD_BOARD_MAX_IMAGES = 10;
  */
 export const MAX_PROPOSAL_DOC_BYTES = 512 * 1024;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS CAMPOS IRMÃOS EM INGLÊS — `…En`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Decisão dela, entre traduzir-lhe a prosa automaticamente e escrever ela as
+ * duas versões: escreve ela as duas. A razão é a que ela deu — a prosa vai num
+ * documento de vinte mil euros, e uma tradução automática chega ao cliente sem
+ * ninguém a ter lido.
+ *
+ * ── PORQUE É QUE É UM CAMPO AO LADO E NÃO UM MAPA À PARTE ─────────────────
+ *
+ * A alternativa óbvia era um `Record<chaveDoCampo, string>` no documento. A
+ * chave desse mapa é POSICIONAL (`itemRotulo:0:3`), e este editor arrasta
+ * grupos, apaga linhas, reordena mood boards e tem um botão «Alinhar pelos
+ * Serviços» que permuta arrays inteiros. Depois de qualquer um desses gestos as
+ * traduções ficavam coladas ao campo errado, em silêncio, num documento a
+ * caminho de um cliente.
+ *
+ * Colado ao campo, o inglês viaja onde o português viaja — e viaja também para
+ * dentro dos MODELOS PARCIAIS, que guardam um `ServiceGroup` ou um `MoodBoard`
+ * isolado, fora do documento (`proposal-templates.ts`). Com um mapa lateral,
+ * guardar um grupo como modelo perdia a tradução e ninguém dava por isso.
+ *
+ * ── AUSENTE É O QUE SEMPRE FOI ────────────────────────────────────────────
+ *
+ * Todos opcionais, e nenhum é semeado por {@link withProposalDefaults}: uma
+ * proposta de 2025 lida da coluna `proposals.doc` continua a satisfazer o tipo,
+ * e um documento sem estes campos desenha exactamente o que sempre desenhou —
+ * ver `proposal-doc-bilingue.ts`, onde a regra vive.
+ *
+ * ── O QUE NÃO TEM SEGUNDA VERSÃO ──────────────────────────────────────────
+ *
+ * O dinheiro (fica à portuguesa nas duas línguas, decisão escrita em
+ * `proposal-doc-textos.ts`), os nomes próprios, e os campos que o NOSSO código
+ * escreve — `eventDate`, `eventType`, `ceremony`, `guests`, `ref` —, que já
+ * saem traduzidos por reconhecimento. Dar-lhes uma segunda caixa era ter dois
+ * mecanismos a escrever o mesmo campo, e no dia em que discordassem ninguém
+ * sabia qual mandava.
+ */
+
 export interface MoodBoard {
   /** Elegant serif title, e.g. "Decoração Cerimónia". */
   title: string;
+  /** O {@link MoodBoard.title} escrito por ela em inglês. Ver o bloco «OS
+   *  CAMPOS IRMÃOS EM INGLÊS». */
+  titleEn?: string;
   /**
    * Subtítulo opcional, por baixo do título.
    *
@@ -93,10 +137,14 @@ export interface MoodBoard {
    * a segunda frase ou se enfia tudo num título com parênteses.
    */
   subtitulo?: string;
+  /** O {@link MoodBoard.subtitulo} em inglês. */
+  subtituloEn?: string;
   /** Uploaded reference photos, laid out as an automatic collage. */
   images: ImageData[];
   /** Optional handwritten-style annotation under the collage. */
   annotation?: string;
+  /** A {@link MoodBoard.annotation} em inglês. */
+  annotationEn?: string;
   /**
    * Como as fotos se dispõem na página.
    *
@@ -185,8 +233,12 @@ export interface ServiceItem {
   id?: string;
   /** Bold label, e.g. "Reunião inicial" or "Decoração Cerimónia". */
   label: string;
+  /** O {@link ServiceItem.label} em inglês. */
+  labelEn?: string;
   /** Optional description shown after the label (Organização template). */
   desc?: string;
+  /** A {@link ServiceItem.desc} em inglês. */
+  descEn?: string;
 }
 
 export interface ServiceGroup {
@@ -196,6 +248,8 @@ export interface ServiceGroup {
   letter?: string;
   /** Group title, e.g. "Decoração Floral de Casamento". */
   title: string;
+  /** O {@link ServiceGroup.title} em inglês. */
+  titleEn?: string;
   /** Sub-items (bullets); each is a label with an optional description. */
   items: ServiceItem[];
 }
@@ -315,6 +369,9 @@ export interface BudgetRow {
 export interface BudgetExtra {
   /** Rótulo à esquerda, e.g. "Deslocação da equipa Líquen". */
   label: string;
+  /** O {@link BudgetExtra.label} em inglês. O `valueText` NÃO tem irmão: o
+   *  dinheiro fica à portuguesa nas duas línguas. */
+  labelEn?: string;
   /** Valor à direita como texto livre, e.g. "896,00 €" ou "895,00 € + IVA". */
   valueText: string;
 }
@@ -328,6 +385,8 @@ export interface ProposalDoc {
   /** Header title on the content pages (Organização template shows
    *  "Proposta de orçamento para Organização de Casamento"). */
   headerTitle?: string;
+  /** O {@link ProposalDoc.headerTitle} em inglês. */
+  headerTitleEn?: string;
 
   // ── 1. Apresentação ──
   /** Couple / client, e.g. "Maria & Zé". */
@@ -352,6 +411,8 @@ export interface ProposalDoc {
    * «Serviço:» seguido de nada é pior do que não haver linha nenhuma).
    */
   servico?: string;
+  /** O {@link ProposalDoc.servico} em inglês. */
+  servicoEn?: string;
   /**
    * @deprecated O campo saiu do estúdio e do PDF (pedido da Catarina).
    *
@@ -393,6 +454,22 @@ export interface ProposalDoc {
   // ── 3./4. Orçamento Proposto ──
   // Decoração template: grouped total.
   budgetItems: string[]; // item NAMES only, e.g. "Decor Cerimónia"
+  /**
+   * Os nomes das rubricas em inglês — array PARALELO a `budgetItems`, com o
+   * índice `i` a traduzir a rubrica `i`.
+   *
+   * `(string | null)[]` e não `string[]` pela mesma razão que os outros quatro
+   * arrays paralelos do orçamento: `null` numa posição quer dizer «esta rubrica
+   * não foi traduzida», que é diferente de `""` («foi decidido que fica
+   * igual»). É essa diferença que faz a lista de campos por traduzir distinguir
+   * o esquecimento da decisão sem um campo a mais.
+   *
+   * Ninguém mexe neste array à mão: entra no `PARALELOS` de
+   * `proposal-budget.ts`, e é isso que o mantém alinhado quando uma linha é
+   * acrescentada, removida ou arrumada. Um deslize de uma posição aqui é a
+   * rubrica errada traduzida no PDF do cliente.
+   */
+  budgetItemsEn?: (string | null)[];
   /**
    * Preços por linha, SÓ INTERNOS — o índice `i` corresponde a
    * `budgetItems[i]`. Servem para somar e para avisar quando a soma e o total
@@ -480,6 +557,16 @@ export interface ProposalDoc {
    */
   notasPorSeccao?: Record<string, string>;
   totalLabel: string; // "Valor Total Decoração"
+  /**
+   * O {@link ProposalDoc.totalLabel} em inglês.
+   *
+   * O rótulo do total também nasce escrito por nós, e por isso já é traduzido
+   * por reconhecimento («Valor Total Decoração» → «Decoration Total», ver
+   * `rotuloDoTotalNaLingua`). Esta caixa MANDA sobre esse reconhecimento: um
+   * rótulo reescrito à mão («Investimento em flor e decor») deixa de ser
+   * reconhecido e só ela o sabe dizer em inglês.
+   */
+  totalLabelEn?: string;
   totalText: string; // "3000,00 € + IVA" — kept as text to match the studio's format
   /** Linhas adicionais mostradas por baixo do total (Deslocação, Wedding
    *  Coordinator, Tecidos, Mobiliário opção A/B, …). Só DISPLAY — ver {@link BudgetExtra}. */
@@ -512,6 +599,8 @@ export interface ProposalDoc {
   budgetRows?: BudgetRow[];
   totalEstimatedText?: string; // "[Valor Total]" / "12.500,00 €"
   budgetNote?: string; // "Os valores são estimativas e podem ser ajustados…"
+  /** A {@link ProposalDoc.budgetNote} em inglês. */
+  budgetNoteEn?: string;
 
   // ── Total ESTRUTURADO (fonte de verdade do dinheiro quando presente) ──
   // O texto livre acima (`totalText`/`totalEstimatedText`) é só para DISPLAY no

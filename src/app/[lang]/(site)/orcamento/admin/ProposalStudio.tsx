@@ -67,6 +67,7 @@ import {
   corrigirGralha,
   corrigirTudo,
   gralhasDoDocumento,
+  lerCampo,
   seccaoDoCampo,
   type CampoDeTexto,
 } from "@/lib/proposal-ortografia";
@@ -140,6 +141,10 @@ import type { ActivityEntry, Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
 import ThemePicker, { type ImportedImage, type ReservedImage } from "./ThemePicker";
 import ServicesEditor, { MoveBtns } from "./ServicesEditor";
+import CaixaInglesa from "./CaixaInglesa";
+import PorTraduzir from "./PorTraduzir";
+import { motorPelaRota, traducaoEstaLigada, traduzirParaIngles } from "@/lib/proposal-traducao";
+import { camposPorTraduzir, docTemIngles, escreverEn, lerEn } from "@/lib/proposal-doc-bilingue";
 import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
 import { Ajuda, Button, Card, Field, Segmented } from "./ui";
 
@@ -1045,6 +1050,40 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * proposta com uma língua colada, que ninguém voltaria a rever.
    */
   const [idiomaDoPdf, setIdiomaDoPdf] = useState<IdiomaDaProposta>(IDIOMA_POR_OMISSAO);
+  /**
+   * ── A PROPOSTA É BILINGUE: CADA CAMPO DE PROSA COM DUAS CAIXAS ────────────
+   *
+   * Estado do ECRÃ, não do documento — como as dobras dos mood boards, o
+   * `refEdited` e os mapas de URLs, e pela mesma razão: não diz nada sobre a
+   * proposta. Posto no `doc`, ia para a coluna `proposals.doc`, para a cópia de
+   * segurança, para a cópia entre pedidos e para a comparação de versões.
+   *
+   * Desligado por omissão, e desligado o ecrã é o de hoje ao pixel: o
+   * `ServicesEditor` é o ecrã mais escrito da casa, e dobrar-lhe a altura para
+   * toda a gente — incluindo as propostas que nunca vão a inglês — era pagar
+   * todos os dias por um caso ocasional.
+   *
+   * ── E ABRE LIGADO QUANDO O DOCUMENTO JÁ TRAZ INGLÊS ──────────────────────
+   * O `meta` fica neste computador. Abrir a proposta noutro portátil,
+   * restaurá-la do servidor ou copiá-la de outra deixa-o para trás — e sem essa
+   * regra os textos ingleses existiam no documento e o ecrã não os mostrava:
+   * invisíveis e editáveis por acidente, que é a pior combinação. A regra
+   * aplica-se no restauro (ver o efeito «CORRE UMA VEZ SÓ») e aqui, para a
+   * proposta que já abre com inglês vindo do pedido.
+   */
+  const [bilingue, setBilingue] = useState(() => docTemIngles(initialDoc(quote)));
+  /** A tradução automática está a correr. Trava o botão para não haver duas a
+   *  escrever no mesmo documento — a segunda escreveria por cima da primeira. */
+  const [aTraduzir, setATraduzir] = useState(false);
+  /**
+   * O servidor tem serviço de tradução configurado?
+   *
+   * Pergunta-se, não se adivinha: a chave vive do lado do servidor e o estúdio
+   * corre no navegador, onde ela nunca pode chegar. Começa em `false` — o lado
+   * seguro: um botão desligado que diz porquê é melhor do que um botão que
+   * promete uma tradução que não vai acontecer.
+   */
+  const [traducaoLigada, setTraducaoLigada] = useState(false);
   const [confirmSend, setConfirmSend] = useState(false);
   /**
    * ── A MENSAGEM QUE SEGUE COM A PROPOSTA ───────────────────────────────────
@@ -1227,6 +1266,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     /** Contador de pedidos. Carregar duas vezes na mesma palavra tem de saltar
      *  as duas — e é ele que evita limpar o alvo DENTRO do efeito. */
     pedido: number;
+    /** A qual das duas caixas. O painel «Por traduzir» manda à INGLESA, que é
+     *  a que está por escrever; as gralhas mandam à portuguesa, onde a palavra
+     *  está. */
+    versao?: "pt" | "en";
   } | null>(null);
   /** A vista com as páginas lado a lado está aberta? */
   const [vistaDeConjunto, setVistaDeConjunto] = useState(false);
@@ -1293,6 +1336,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           // A BASE, não o `totalAmount` cru — ver `baseDoDoc`.
           const base = baseDoDoc(parsed);
           if (base != null) setTotalInput(textoDoTotal(base));
+          // Um rascunho que já traz traduções abre com as caixas inglesas à
+          // vista, haja `meta` ou não: texto que existe no documento e não
+          // aparece no ecrã é texto que se perde sem ninguém dar por isso.
+          if (docTemIngles(parsed)) setBilingue(true);
         }
       }
       const rawMeta = localStorage.getItem(SIDE_KEY);
@@ -1326,6 +1373,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
          * abrem na mesma, com a caixa vazia.
          */
         if (typeof meta?.mensagem === "string") setMensagemAoCliente(meta.mensagem);
+        /**
+         * O interruptor «Proposta bilingue» volta com o rascunho — e lê-se AQUI
+         * pela razão que o bloco de cima conta: um `useEffect` novo a ler o
+         * `localStorage` é a porta por onde o defeito do restauro voltaria a
+         * entrar. Uma linha, no mesmo bloco, com a mesma tolerância a rascunhos
+         * antigos que não o têm.
+         *
+         * `if (…) setBilingue(true)` e não `setBilingue(meta.bilingue)`: um
+         * `meta` gravado com `false` não pode desligar um interruptor que o
+         * documento restaurado acabou de acender (ver logo a seguir).
+         */
+        if (meta?.bilingue === true) setBilingue(true);
       }
     } catch {
       /* ignore corrupt draft */
@@ -1541,6 +1600,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       });
       const base = mandaOPedido ? doPedido : baseDoDoc(doDoServidor);
       if (base != null) setTotalInput(textoDoTotal(base));
+      // O documento do servidor pode trazer traduções que este computador nunca
+      // viu — é o caso de abrir a proposta noutro portátil. As caixas inglesas
+      // acendem-se, pela mesma razão do restauro local.
+      if (docTemIngles(doDoServidor)) setBilingue(true);
     })();
     return () => {
       active = false;
@@ -1614,6 +1677,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     };
   }, [hidratarAssets]);
 
+  /**
+   * ── HÁ SERVIÇO DE TRADUÇÃO NESTE SERVIDOR? ────────────────────────────────
+   *
+   * Uma pergunta, uma vez, ao abrir. A chave vive do lado do servidor — nunca
+   * pode chegar ao navegador —, portanto o estúdio não tem como saber sozinho.
+   *
+   * Falhando (sem rede, sessão caducada), fica `false`, que é o lado seguro: o
+   * botão diz que não está ligada em vez de prometer uma tradução que não vai
+   * acontecer. Nada aqui lê o `localStorage`, e por isso não pisa o efeito de
+   * restauro (ver o bloco «CORRE UMA VEZ SÓ»).
+   */
+  useEffect(() => {
+    let vivo = true;
+    void traducaoEstaLigada().then((ligada) => {
+      if (vivo && ligada) setTraducaoLigada(true);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
   // ── Auto-compose the reference until the user overrides it ──
   useEffect(() => {
     if (refEdited) return;
@@ -1672,7 +1756,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // A mensagem do envio conta como trabalho por gravar: sem ela nesta lista, o
     // indicador dizia «guardado às 14:32» com o texto dela ainda por escrever no
     // rascunho — e é essa frase que faz uma pessoa fechar o portátil descansada.
-  }, [doc, assetUrls, themeOrigins, refEdited, mensagemAoCliente]);
+  }, [doc, assetUrls, themeOrigins, refEdited, mensagemAoCliente, bilingue]);
 
   useEffect(() => {
     if (!hydrated.current) return;
@@ -1749,6 +1833,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             // dentro dele: não é conteúdo da proposta e não pode entrar no
             // documento que é gravado, enviado e reaberto.
             mensagem: mensagemAoCliente,
+            // O interruptor das caixas inglesas. É CONVENIÊNCIA e não
+            // correcção: se este `meta` se perder, o interruptor abre ligado na
+            // mesma quando o documento tem traduções lá dentro. Nenhum trabalho
+            // dela depende de isto sobreviver.
+            bilingue,
           }),
         );
         setGravadoEm(new Date());
@@ -1794,6 +1883,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // o texto ficava só na memória desta aba e o rascunho guardava a versão
     // anterior — que é o mesmo que não o guardar.
     mensagemAoCliente,
+    // O mesmo para o interruptor: sem ele aqui, ligá-lo e fechar o separador
+    // devolvia o ecrã de uma língua só na abertura seguinte.
+    bilingue,
     DRAFT_KEY,
     SIDE_KEY,
     quote.id,
@@ -2220,6 +2312,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       budgetCosts: paralelo(d.budgetCosts),
       budgetScales: paralelo(d.budgetScales),
       budgetOpcional: paralelo(d.budgetOpcional),
+      // A rubrica em inglês vai com a rubrica. Sem esta linha, «Alinhar pelos
+      // Serviços» punha a tradução da Cerimónia na linha do Cocktail — e o PDF
+      // inglês saía com a rubrica errada, sem nada a assinalá-lo. Foi o
+      // `satisfies` daqui de baixo que obrigou a escrevê-la.
+      budgetItemsEn: paralelo(d.budgetItemsEn),
     } satisfies Record<keyof ArrayParaleloDaLinha, unknown>;
     return {
       ...d,
@@ -3411,7 +3508,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   useEffect(() => {
     if (!campoAVisitar) return;
-    const chave = chaveDoCampo(campoAVisitar.campo);
+    // A caixa inglesa leva o mesmo `data-campo` com `:en` colado — o salto
+    // encontra-a com a maquinaria que já existe, sem uma segunda.
+    const chave = chaveDoCampo(campoAVisitar.campo) + (campoAVisitar.versao === "en" ? ":en" : "");
     const alvo =
       document.querySelector<HTMLElement>(`[data-campo="${chave}"]`) ??
       document.getElementById(seccaoDoCampo(campoAVisitar.campo));
@@ -3443,8 +3542,79 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * dobra fechada deixava-a a olhar para um cartão que «não abriu» —, e só
    * então marcar o alvo, para o efeito o encontrar depois de desenhado.
    */
-  function irParaCampo(campo: CampoDeTexto) {
+  /**
+   * A caixa inglesa de um campo — ou nada, com o interruptor desligado.
+   *
+   * Um só sítio a desenhá-las: são catorze famílias de campo espalhadas por
+   * duas secções e dois ficheiros, e catorze cópias desta caixa eram catorze
+   * sítios onde o `data-campo`, o `aria-label` ou a marca de «por traduzir`
+   * podiam divergir. Ver `CaixaInglesa.tsx`.
+   */
+  function caixaDeIngles(
+    campo: CampoDeTexto,
+    rotulo: string,
+    opts: {
+      className?: string;
+      as?: "input" | "textarea";
+      rows?: number;
+      readOnly?: boolean;
+      placeholder?: string;
+    } = {},
+  ) {
+    if (!bilingue) return null;
+    const pt = (lerCampo(doc as ProposalDoc, campo) ?? "").trim();
+    const en = lerEn(doc as ProposalDoc, campo) ?? "";
+    return (
+      <CaixaInglesa
+        campo={campo}
+        rotulo={rotulo}
+        valor={en}
+        onChange={(texto) => setDoc((d) => escreverEn(d, campo, texto))}
+        porTraduzir={pt !== "" && en.trim() === ""}
+        {...opts}
+      />
+    );
+  }
+
+  /**
+   * Manda traduzir tudo o que ainda não tem versão inglesa.
+   *
+   * O documento só muda se a resposta vier ALINHADA — a trava vive na fronteira
+   * (`traduzirParaIngles`), e a razão está lá escrita: uma resposta a que
+   * faltem textos punha a tradução de um campo noutro campo, em silêncio.
+   * Falhando, o que se vê é uma frase a dizê-lo e o documento como estava.
+   */
+  async function traduzirTudo() {
+    if (!traducaoLigada || aTraduzir) return;
+    setATraduzir(true);
+    try {
+      const r = await traduzirParaIngles(doc as ProposalDoc, motorPelaRota());
+      if (r.porqueFalhou) {
+        toast(`Não deu para traduzir: ${r.porqueFalhou}. O documento ficou como estava.`, "error");
+        return;
+      }
+      if (r.escritos === 0) {
+        toast("Não havia nada por traduzir.", "info");
+        return;
+      }
+      setDoc(r.doc);
+      toast(
+        r.escritos === 1
+          ? "1 campo traduzido. Vale a pena passar os olhos."
+          : `${r.escritos} campos traduzidos. Vale a pena passar os olhos.`,
+        "success",
+      );
+    } finally {
+      setATraduzir(false);
+    }
+  }
+
+  function irParaCampo(campo: CampoDeTexto, versao: "pt" | "en" = "pt") {
     setStep("conteudo");
+    // Saltar para uma caixa inglesa que não está desenhada deixava-a a olhar
+    // para o campo português sem perceber porquê. O interruptor acende-se junto
+    // com o salto.
+    if (versao === "en") setBilingue(true);
     if (
       campo.tipo === "boardTitulo" ||
       campo.tipo === "boardSubtitulo" ||
@@ -3453,7 +3623,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const id = doc.moodBoards[campo.bi]?.id;
       if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
     }
-    setCampoAVisitar((antes) => ({ campo, pedido: (antes?.pedido ?? 0) + 1 }));
+    setCampoAVisitar((antes) => ({ campo, pedido: (antes?.pedido ?? 0) + 1, versao }));
   }
 
   /**
@@ -4280,7 +4450,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         <NavEstudio seccoes={seccoes} faltas={faltas} onSeccaoActual={anotarSeccao} />
         <div className="min-w-0 flex-1">
           {/* Template selector */}
-          <div className="mb-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <Segmented
               ariaLabel="Modelo da proposta"
               value={isDeco ? "decoracao" : "organizacao"}
@@ -4290,7 +4460,81 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 { value: "organizacao", label: "Organização" },
               ]}
             />
+            {/* ══════════════════════════════════════════════════════════════
+                PROPOSTA BILINGUE — O INTERRUPTOR
+                ══════════════════════════════════════════════════════════════
+
+                Ligado, cada campo de prosa ganha uma segunda caixa POR BAIXO,
+                marcada «EN». Desligado, o ecrã é o de hoje ao pixel — e é essa
+                a razão de haver um interruptor em vez de as caixas estarem lá
+                sempre: esta secção é o ecrã mais escrito da casa, muitas vezes
+                com o cliente ao telefone, e a maioria das propostas nunca vai a
+                inglês.
+
+                Não é derivado do «Idioma do PDF»: esse vive no passo SEGUINTE
+                ao da escrita, e escolher «Inglês» só para tirar uma prova
+                acendia as caixas todas de repente. */}
+            <button
+              type="button"
+              onClick={() => setBilingue((v) => !v)}
+              aria-pressed={bilingue}
+              className={`alvo-toque inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                bilingue
+                  ? "border-[#4d6350]/40 bg-[#4d6350]/[0.08] text-[#4d6350]"
+                  : "border-foreground/15 text-foreground/60 hover:border-foreground/30 hover:text-foreground/80"
+              }`}
+              title="Acrescenta uma caixa em inglês por baixo de cada campo de texto da proposta."
+            >
+              <span aria-hidden="true">{bilingue ? "✓" : "+"}</span>
+              Proposta bilingue (PT + EN)
+            </button>
           </div>
+
+          {/* ══════════════════════════════════════════════════════════════════
+              TRADUZIR PARA INGLÊS — O BOTÃO, E O MOTOR QUE AINDA NÃO EXISTE
+              ══════════════════════════════════════════════════════════════════
+
+              Decisão dela: «nós fazemos as propostas em português, e depois o
+              próprio sistema faz uma tradução para inglês». As caixas «EN»
+              deixam de ser trabalho obrigatório e passam a ser REVISÃO: ela
+              corrige a que quiser, ou não lê nenhuma.
+
+              O motor não existe — não há serviço de tradução escolhido nem
+              chave nenhuma no projecto. A fronteira onde ele vai entrar está
+              escrita (`proposal-traducao.ts`), e enquanto o motor não existir
+              este botão DIZ-O e não faz nada.
+
+              Um botão que fingisse traduzir — com um dicionário de palavras,
+              por exemplo — mandava-a enviar uma proposta a acreditar que estava
+              traduzida. É o único desfecho pior do que não haver botão nenhum:
+              uma frase portuguesa numa proposta inglesa vê-se; inglês falso não.
+
+              Só aparece com o bilingue ligado: é onde as caixas que ele
+              preenche estão à vista. */}
+          {bilingue && (
+            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <button
+                type="button"
+                disabled={!traducaoLigada || aTraduzir}
+                onClick={() => void traduzirTudo()}
+                className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-foreground/15 px-3 py-1.5 text-xs font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span aria-hidden="true">⇄</span>
+                {aTraduzir ? "A traduzir…" : "Traduzir para inglês"}
+              </button>
+              {traducaoLigada ? (
+                <p className="text-[11px] leading-snug text-foreground/50">
+                  Preenche as caixas «EN» que ainda estão vazias. O que já escreveste fica como está
+                  — e vale a pena passar os olhos pelo que sair.
+                </p>
+              ) : (
+                <p className="text-[11px] leading-snug text-foreground/50">
+                  A tradução automática ainda não está ligada neste servidor. Até lá, as caixas «EN»
+                  escrevem-se à mão, e o que ficar em branco sai em português.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Event fields */}
           <Section title="Evento" id="evento">
@@ -4496,6 +4740,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               // «Guardar agora» — e por isso a mesma função, não uma segunda
               // gravação com outras regras e outras palavras.
               onSave={guardarAgora}
+              // As caixas inglesas dos grupos e das linhas. O editor não sabe
+              // o que é uma proposta bilingue: recebe o interruptor e desenha
+              // uma caixa a mais por campo, com a mesma pega e o mesmo rótulo
+              // do resto da casa.
+              bilingue={bilingue}
             />
           </Section>
 
@@ -4719,6 +4968,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     aria-label="Título do mood board"
                                     readOnly={fechado}
                                   />
+                                  {/* A segunda caixa fica POR BAIXO — o `w-full`
+                                      da `CaixaInglesa` quebra a linha deste
+                                      `flex-wrap`. Só de leitura quando a página
+                                      está fechada, como a portuguesa: um board
+                                      terminado é terminado nas duas línguas. */}
+                                  {caixaDeIngles(
+                                    { tipo: "boardTitulo", bi },
+                                    "Título do mood board",
+                                    {
+                                      className:
+                                        "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75",
+                                      readOnly: fechado,
+                                      placeholder: "Ceremony Decoration",
+                                    },
+                                  )}
                                   {/* O SEGUNDO andar do cabeçalho da página.
                             A proposta feita à mão tem «Complementos dos Noivos»
                             e, por baixo, «Ramo de Noiva (a definir com a
@@ -4735,6 +4999,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     aria-label="Subtítulo do mood board"
                                     readOnly={fechado}
                                   />
+                                  {caixaDeIngles(
+                                    { tipo: "boardSubtitulo", bi },
+                                    "Subtítulo do mood board",
+                                    {
+                                      className:
+                                        "bo-input min-w-[12rem] flex-1 px-2.5 py-2 text-xs text-foreground/75",
+                                      readOnly: fechado,
+                                    },
+                                  )}
                                   {/* A POSIÇÃO NO ECRÃ, não o índice do array: ver
                             `moveBoard`. */}
                                   <MoveBtns
@@ -4848,6 +5121,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       placeholder="Descrição (opcional) — ex.: runner floral com hortênsias verdes, cravo verde, lisianthus branco…"
                                       aria-label="Descrição do mood board"
                                     />
+                                    {caixaDeIngles(
+                                      { tipo: "boardNota", bi },
+                                      "Descrição do mood board",
+                                      {
+                                        className: `${INPUT_SM} mb-2 w-full resize-none leading-relaxed`,
+                                        as: "textarea",
+                                        rows: 2,
+                                      },
+                                    )}
                                     {/* ── A PÁGINA ESTÁ A FICAR CHEIA ─────────
                                         Discreto, e antes do limite: às oito
                                         fotos a página ainda sai inteira, mas
@@ -5370,9 +5652,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           className={`${INPUT_SM} flex-1`}
                           value={l.item}
                           onChange={(e) => updateBudgetItem(i, e.target.value)}
+                          // A pega do salto. Faltava: o «Ver no campo» das
+                          // gralhas caía na secção porque nenhuma rubrica a
+                          // tinha, e o painel «Por traduzir» precisa dela para
+                          // chegar à caixa ao lado.
+                          data-campo={`linhaDeOrcamento:${i}`}
                           placeholder="Decor Cerimónia"
                           aria-label="Item de orçamento"
                         />
+                        {caixaDeIngles({ tipo: "linhaDeOrcamento", i }, "Item de orçamento", {
+                          className: `${INPUT_SM} flex-1`,
+                          placeholder: "Ceremony Decor",
+                        })}
                         {/* COMO É QUE ESTA LINHA ESCALA. Metade das linhas de um
                           orçamento de casamento não é um preço, é uma
                           multiplicação — e quando os convidados mudam, refazer
@@ -5601,13 +5892,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   })()}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field
-                    label="Rótulo do total"
-                    value={doc.totalLabel}
-                    onChange={(e) => patch({ totalLabel: e.target.value })}
-                    data-campo="totalLabel"
-                    placeholder="Valor Total Decoração"
-                  />
+                  <div>
+                    <Field
+                      label="Rótulo do total"
+                      value={doc.totalLabel}
+                      onChange={(e) => patch({ totalLabel: e.target.value })}
+                      data-campo="totalLabel"
+                      placeholder="Valor Total Decoração"
+                    />
+                    {/* «Valor Total Decoração» já sai «Decoration Total» por
+                        reconhecimento; um rótulo reescrito à mão deixa de ser
+                        reconhecido, e é para esse que a caixa existe. */}
+                    {caixaDeIngles({ tipo: "totalLabel" }, "Rótulo do total", {
+                      className: "bo-input px-2.5 py-2 text-xs text-foreground/75",
+                      placeholder: "Decoration Total",
+                    })}
+                  </div>
                 </div>
 
                 {/* Valores adicionais — linhas do orçamento que entram no total
@@ -5638,14 +5938,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           key={i}
                           className="grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
                         >
-                          <input
-                            className="bo-input px-2.5 py-2 text-xs text-foreground/75"
-                            value={ex.label}
-                            onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
-                            data-campo={`extraRotulo:${i}`}
-                            placeholder="Deslocação da equipa Líquen"
-                            aria-label="Descrição da linha adicional"
-                          />
+                          {/* Um invólucro só para as duas caixas ficarem uma por
+                              cima da outra DENTRO da primeira coluna — a linha é
+                              uma grelha, e um filho solto abriria uma coluna
+                              nova em vez de descer. */}
+                          <div className="min-w-0">
+                            <input
+                              className="bo-input px-2.5 py-2 text-xs text-foreground/75"
+                              value={ex.label}
+                              onChange={(e) => updateBudgetExtra(i, { label: e.target.value })}
+                              data-campo={`extraRotulo:${i}`}
+                              placeholder="Deslocação da equipa Líquen"
+                              aria-label="Descrição da linha adicional"
+                            />
+                            {caixaDeIngles(
+                              { tipo: "extraRotulo", i },
+                              "Descrição da linha adicional",
+                              {
+                                className: "bo-input px-2.5 py-2 text-xs text-foreground/75",
+                                placeholder: "Líquen team travel",
+                              },
+                            )}
+                          </div>
                           {/* ── UM CAMPO DE DINHEIRO, NÃO UM CAMPO DE TEXTO ──
                               Chamava-se «Valor (texto)» e aceitava o que lhe
                               escrevessem — que é o que se pede a um campo cujo
@@ -5768,6 +6082,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     data-campo="budgetNote"
                     placeholder="Os valores são estimativas e podem ser ajustados…"
                   />
+                  {caixaDeIngles({ tipo: "budgetNote" }, "Nota do orçamento", {
+                    className: `${INPUT_SM} w-full resize-none leading-relaxed`,
+                    as: "textarea",
+                    rows: 2,
+                  })}
                 </div>
               </>
             )}
@@ -6312,6 +6631,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 quote={quote}
                 quotes={quotes}
                 totalBruto={money.gross}
+                // A língua escolhida aqui ao lado. Sem ela, a lista falava do
+                // pedido que veio em inglês e calava-se sobre a metade da
+                // proposta que ia sair em português.
+                idioma={idiomaDoPdf}
               />
               {/* Os acentos que faltam nos campos que saem impressos. Aqui, ao
                   pé da Conferência, e não a meio de escrever: a palavra ainda
@@ -6329,6 +6652,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   );
                 }}
               />
+              {/* ── O QUE VAI SAIR EM PORTUGUÊS ─────────────────────────────
+                  Logo a seguir às Gralhas, e SÓ com «Inglês» escolhido: numa
+                  proposta portuguesa não há nada por traduzir, e uma secção
+                  vazia a dizê-lo era ruído no ecrã de toda a gente. */}
+              {idiomaDoPdf === "en" && (
+                <PorTraduzir
+                  doc={doc as ProposalDoc}
+                  onFicarEmPortugues={(c) => setDoc((d) => escreverEn(d, c.campo, c.texto))}
+                  onFicarTodosEmPortugues={() => {
+                    const faltam = camposPorTraduzir(doc as ProposalDoc);
+                    setDoc((d) => {
+                      let saida = d;
+                      for (const c of faltam) saida = escreverEn(saida, c.campo, c.texto);
+                      return saida;
+                    });
+                    toast(
+                      faltam.length === 1
+                        ? "1 campo fica em português."
+                        : `${faltam.length} campos ficam em português.`,
+                      "info",
+                    );
+                  }}
+                  onIr={(c) => irParaCampo(c.campo, "en")}
+                />
+              )}
               {/* ── O QUE JÁ SEGUIU ────────────────────────────────────────
                   Depois da conferência (que olha para ESTA proposta) e antes
                   do botão: é aqui que a pergunta "o que é que eles vão ver de
@@ -6571,20 +6919,55 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     : "A gerar…"
                   : "Descarregar PDF"}
               </Button>
-              {/* A ressalva tem de ser verificável no papel, e não uma boa
-                  intenção: quem a lê vai a seguir mandar o PDF a um cliente
-                  inglês. A primeira versão dizia «rótulos, textos da casa,
-                  datas e valores», e «datas» não era verdade — lida no PDF
-                  gerado, a data do evento sai «12 de setembro de 2026» na
-                  proposta inglesa, porque é um campo que ela preenche, não
-                  moldura. Só a data de validade, essa sim calculada por nós,
-                  sai «12 October 2026». Prometer as datas todas era mandá-la
-                  descobrir a diferença à frente do cliente. */}
+              {/* ══════════════════════════════════════════════════════════
+                  A RESSALVA TEM DE SER VERIFICÁVEL NO PAPEL
+                  ══════════════════════════════════════════════════════════
+
+                  Quem a lê vai a seguir mandar o PDF a um cliente inglês.
+
+                  Já esteve errada duas vezes, e das duas por prometer a
+                  descoberta ao cliente: prometeu «datas» quando a data do
+                  evento saía em português, e depois prometeu que os campos
+                  preenchidos ficavam TODOS como estavam — quando a data e o
+                  tipo de evento passaram a traduzir-se sozinhos e a prosa dela
+                  passou a ter uma segunda caixa.
+
+                  Diz agora as três coisas que são verdade, e nenhuma a mais:
+                  o que ela traduziu sai em inglês, o que não traduziu sai em
+                  português, e os valores ficam à portuguesa. */}
               <p className="w-full text-right text-[11px] leading-snug text-foreground/50">
-                Em inglês sai a moldura do documento: rótulos, textos da casa e condições. Os campos
-                que preencheste ficam como os escreveste — incluindo a data e o tipo de evento. Os
-                valores continuam à portuguesa (1.234,56 €).
+                Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a data e
+                o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas «EN»; o que
+                ficar em branco sai em português. Os valores continuam à portuguesa (1.234,56 €).
               </p>
+              {/* ── O QUE FALTA, DITO ANTES DO CLIQUE ──────────────────────
+                  Este é o sítio onde o PDF nasce, e o primeiro PDF inglês sai
+                  quase sempre antes de a Conferência ser vista. Um `toast` não
+                  serviria: o toast conta o que ACONTECEU, e isto conta o que
+                  vai acontecer — tem de estar à vista antes de se carregar.
+                  `aria-live` porque o número muda com o selector ao lado. */}
+              {idiomaDoPdf === "en" &&
+                (() => {
+                  const faltam = camposPorTraduzir(doc as ProposalDoc);
+                  if (faltam.length === 0) return null;
+                  return (
+                    <p
+                      aria-live="polite"
+                      className="w-full text-right text-[11px] leading-snug text-[#8a6420]"
+                    >
+                      {faltam.length === 1
+                        ? "1 campo ainda não tem versão inglesa — vai sair em português."
+                        : `${faltam.length} campos ainda não têm versão inglesa — vão sair em português.`}{" "}
+                      <button
+                        type="button"
+                        onClick={() => irParaCampo(faltam[0].campo, "en")}
+                        className="font-medium underline underline-offset-2"
+                      >
+                        Ver quais
+                      </button>
+                    </p>
+                  );
+                })()}
             </div>
             <Button
               variant="primary"

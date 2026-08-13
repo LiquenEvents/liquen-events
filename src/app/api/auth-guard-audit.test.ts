@@ -525,6 +525,12 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./propostas/modelos/route", methods: ["GET", "POST", "DELETE"] },
   // As preferências do estúdio (validade por omissão).
   { path: "./propostas/preferencias/route", methods: ["GET", "PUT"] },
+  // A tradução das propostas. Aberta, era a QUOTA da casa a ser gasta por quem
+  // passasse — o plano gratuito do DeepL tem um tecto de caracteres por mês, e
+  // esgotá-lo é a Catarina a ficar sem tradução no dia em que precisa. O `GET`
+  // só diz se o serviço está configurado, e nem isso: quem não tem sessão não
+  // tem nada que saber o que este servidor tem ligado.
+  { path: "./propostas/traduzir/route", methods: ["GET", "POST"] },
   { path: "./push/subscribe/route", methods: ["GET", "POST", "DELETE"] },
   { path: "./tarefas/route", methods: ["GET", "POST"] },
   { path: "./tarefas/[id]/route", methods: ["PATCH", "DELETE"] },

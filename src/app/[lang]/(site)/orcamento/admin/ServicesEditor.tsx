@@ -28,6 +28,7 @@ import {
   type ServiceItem,
 } from "@/lib/proposal-doc";
 import BibliotecaServicos, { guardarNaBiblioteca } from "./BibliotecaServicos";
+import CaixaInglesa from "./CaixaInglesa";
 
 /**
  * A secção «Serviços» do estúdio de propostas — grupos (a, b, c…) e as suas
@@ -61,6 +62,14 @@ export interface ServicesEditorProps {
   showDesc?: boolean;
   /** Ctrl/Cmd+Enter — gravar já, sem esperar pelo debounce do estúdio. */
   onSave?: () => void;
+  /**
+   * A proposta é bilingue: cada campo ganha uma caixa inglesa POR BAIXO.
+   *
+   * Desligado por omissão, e desligado este ecrã é exactamente o de sempre —
+   * que é o ponto: é O ECRÃ MAIS ESCRITO DA CASA, e dobrar-lhe a altura para
+   * toda a gente era pagar todos os dias por um caso ocasional.
+   */
+  bilingue?: boolean;
 }
 
 // ── Estilos ──
@@ -156,6 +165,7 @@ export default function ServicesEditor({
   onGroupsChange,
   showDesc = false,
   onSave,
+  bilingue = false,
 }: ServicesEditorProps) {
   // Campos por chave estável, para o foco poder ir para uma linha que ACABOU de
   // nascer (o nó só existe depois do render seguinte).
@@ -646,6 +656,21 @@ export default function ServicesEditor({
                           placeholder="Decoração Floral de Casamento"
                           aria-label={`Título do grupo ${gi + 1}`}
                         />
+                        {/* A caixa inglesa, por baixo: o `w-full` dela quebra a
+                            linha deste `flex-wrap`. Escreve-se em `titleEn`,
+                            que viaja colado ao grupo — incluindo quando o grupo
+                            é guardado como MODELO, isolado do documento. */}
+                        {bilingue && (
+                          <CaixaInglesa
+                            campo={{ tipo: "grupoTitulo", gi }}
+                            rotulo={`Título do grupo ${gi + 1}`}
+                            valor={g.titleEn ?? ""}
+                            onChange={(texto) => updateGroup(gi, { titleEn: texto })}
+                            porTraduzir={!!g.title.trim() && !(g.titleEn ?? "").trim()}
+                            className={`${ROW_INPUT} min-w-[12rem] flex-1 font-medium`}
+                            placeholder="Wedding Floral Design"
+                          />
+                        )}
                         <div className={ROW_ACTIONS}>
                           <MoveBtns
                             onUp={() => moveGroup(gi, -1)}
@@ -684,7 +709,13 @@ export default function ServicesEditor({
                                 <SortableRow
                                   key={iid}
                                   id={iid}
-                                  className="group/row flex items-center gap-1 rounded-md px-0.5 py-0.5 hover:bg-foreground/[0.03] focus-within:bg-foreground/[0.03]"
+                                  // `flex-wrap` só na proposta bilingue: é o que
+                                  // deixa a caixa inglesa descer para baixo da
+                                  // portuguesa. Sem ela, a linha é exactamente
+                                  // a de sempre — uma só, sem quebra possível.
+                                  className={`group/row flex items-center gap-1 rounded-md px-0.5 py-0.5 hover:bg-foreground/[0.03] focus-within:bg-foreground/[0.03] ${
+                                    bilingue ? "flex-wrap" : ""
+                                  }`}
                                 >
                                   {({ handleProps }) => (
                                     <>
@@ -711,6 +742,21 @@ export default function ServicesEditor({
                                         placeholder="Reunião inicial"
                                         aria-label={`Linha ${ii + 1} do grupo ${gi + 1}`}
                                       />
+                                      {bilingue && (
+                                        <CaixaInglesa
+                                          campo={{ tipo: "itemRotulo", gi, ii }}
+                                          rotulo={`Linha ${ii + 1} do grupo ${gi + 1}`}
+                                          valor={it.labelEn ?? ""}
+                                          onChange={(texto) =>
+                                            updateItem(gi, ii, { labelEn: texto })
+                                          }
+                                          porTraduzir={
+                                            !!it.label.trim() && !(it.labelEn ?? "").trim()
+                                          }
+                                          className={`${ROW_INPUT} flex-1`}
+                                          placeholder="Ceremony Decor"
+                                        />
+                                      )}
                                       {showDesc && (
                                         <input
                                           {...fieldProps(itemKey(iid, "desc"))}
@@ -730,6 +776,20 @@ export default function ServicesEditor({
                                           }}
                                           placeholder="Descrição"
                                           aria-label={`Descrição da linha ${ii + 1} do grupo ${gi + 1}`}
+                                        />
+                                      )}
+                                      {showDesc && bilingue && (
+                                        <CaixaInglesa
+                                          campo={{ tipo: "itemDesc", gi, ii }}
+                                          rotulo={`Descrição da linha ${ii + 1} do grupo ${gi + 1}`}
+                                          valor={it.descEn ?? ""}
+                                          onChange={(texto) =>
+                                            updateItem(gi, ii, { descEn: texto })
+                                          }
+                                          porTraduzir={
+                                            !!(it.desc ?? "").trim() && !(it.descEn ?? "").trim()
+                                          }
+                                          className={`${ROW_INPUT} flex-1`}
                                         />
                                       )}
                                       <div className={ROW_ACTIONS}>

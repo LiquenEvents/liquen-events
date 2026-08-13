@@ -549,6 +549,52 @@ describe("percurso completo: exportar → apagar → repor", () => {
   });
 
   /**
+   * ── E A PROPOSTA BILINGUE VOLTA COM AS DUAS LÍNGUAS ─────────────────────
+   *
+   * Os campos `…En` viajam como o resto do documento: o `doc` é JSON opaco em
+   * todo este percurso, e nada aqui precisou de uma linha de código para os
+   * conhecer. É por isso mesmo que o teste é obrigatório — o que ninguém
+   * escreveu é o que ninguém se lembra de verificar, e uma tradução perdida num
+   * restauro é meio dia de trabalho dela que já ninguém consegue distinguir do
+   * que nunca foi escrito.
+   */
+  it("uma proposta BILINGUE volta com as traduções todas", async () => {
+    seedBusiness();
+    const bilingue = {
+      ...DOC_DO_ESTUDIO,
+      serviceGroups: [
+        {
+          letter: "a)",
+          title: "Decoração Floral",
+          titleEn: "Floral Design",
+          items: [{ label: "Cerimónia", labelEn: "Ceremony" }],
+        },
+      ],
+      moodBoards: [
+        {
+          title: "Cerimónia",
+          titleEn: "Ceremony",
+          annotation: "Hortênsias",
+          annotationEn: "Hydrangeas",
+          images: ["LIQ-AAA-1/foto-1.jpg"],
+        },
+      ],
+      budgetItems: ["Decor Cerimónia"],
+      budgetItemsEn: ["Ceremony Decor"],
+      totalLabelEn: "Decoration Total",
+    };
+    rowsOf("proposals")[0].doc = bilingue;
+
+    const antes = await buildBackupPayload();
+    wipeEverything();
+    const file = mustValidate(antes);
+    await applyRestore(file, await planRestore(file));
+
+    const depois = (await buildBackupPayload()).proposals as { doc?: Record<string, unknown> }[];
+    expect(depois[0].doc).toEqual(bilingue);
+  });
+
+  /**
    * ── OS RASCUNHOS DO ESTÚDIO ─────────────────────────────────────────────
    *
    * O maior bloco de trabalho irrecuperável da casa, e o que esta cópia saltava
