@@ -227,6 +227,108 @@ describe("texto de exemplo esquecido", () => {
   });
 });
 
+/**
+ * O NÚMERO DE CONVIDADOS PASSAVA POR CONFERIDO SEM SER COMPARADO COM NADA.
+ *
+ * A verificação só perguntava se o campo estava preenchido: uma proposta a
+ * dizer "80 pax" para um pedido de 120 levava o visto verde, e com ele a frase
+ * "Está tudo de acordo com o pedido original". É o número que manda no
+ * catering e no preço por pessoa — e o aviso do valor também não o apanha,
+ * porque o intervalo habitual é construído com os 120 pax DO PEDIDO.
+ *
+ * Como no mês da data: só se desmente quando o número está mesmo lá escrito. O
+ * campo é texto livre ("120 pax", "100 a 150", "cerca de 120") e sem número
+ * legível não há nada a contradizer.
+ */
+describe("os convidados", () => {
+  it("passa quando o número da proposta é o do pedido", () => {
+    const vs = conferir({
+      doc: documento({ guests: "120 pax" }),
+      quote: pedido({ guests: 120 }),
+      ...base,
+    });
+    expect(achar(vs, "convidados").severidade).toBe("ok");
+  });
+
+  it("avisa quando a proposta é para outro número de pessoas, dizendo os dois", () => {
+    const vs = conferir({
+      doc: documento({ guests: "80 pax" }),
+      quote: pedido({ guests: 120 }),
+      ...base,
+    });
+    const c = achar(vs, "convidados");
+    expect(c.severidade).toBe("aviso");
+    expect(c.detalhe).toContain("80");
+    expect(c.detalhe).toContain("120");
+  });
+
+  it("qualquer número: bate com o do pedido, desmente todos os outros", () => {
+    // Varrimento, e não três exemplos: o que se prende é a propriedade — o
+    // número escrito na proposta é o número que o pedido pediu.
+    const falhas: string[] = [];
+    for (let pax = 10; pax <= 300; pax++) {
+      const igual = conferir({
+        doc: documento({ guests: `${pax} pax` }),
+        quote: pedido({ guests: pax }),
+        ...base,
+      });
+      if (achar(igual, "convidados").severidade !== "ok") falhas.push(`${pax} = ${pax}`);
+
+      const outro = conferir({
+        doc: documento({ guests: `${pax} pax` }),
+        quote: pedido({ guests: pax + 20 }),
+        ...base,
+      });
+      if (achar(outro, "convidados").severidade !== "aviso") {
+        falhas.push(`${pax} ≠ ${pax + 20}`);
+      }
+    }
+    expect(falhas.slice(0, 5)).toEqual([]);
+  });
+
+  it("um intervalo escrito à mão que contenha o número do pedido está certo", () => {
+    // "100 a 150" para 120 pax é uma maneira legítima de o escrever — e um
+    // aviso que não se consegue justificar ensina-se a ignorar.
+    const vs = conferir({
+      doc: documento({ guests: "100 a 150 pessoas" }),
+      quote: pedido({ guests: 120 }),
+      ...base,
+    });
+    expect(achar(vs, "convidados").severidade).toBe("ok");
+  });
+
+  it("sem número legível na proposta, não inventa aviso", () => {
+    const vs = conferir({
+      doc: documento({ guests: "cerca de uma centena" }),
+      quote: pedido({ guests: 120 }),
+      ...base,
+    });
+    expect(achar(vs, "convidados").severidade).toBe("ok");
+  });
+
+  it("sem número no pedido, continua a bastar que a proposta o diga", () => {
+    // O pedido pode ter vindo só com uma ordem de grandeza ("100 a 150"), e aí
+    // não há número para comparar.
+    const vs = conferir({
+      doc: documento({ guests: "120 pax" }),
+      quote: pedido({ guests: undefined }),
+      ...base,
+    });
+    expect(achar(vs, "convidados").severidade).toBe("ok");
+  });
+
+  it("vazio continua a ser aviso", () => {
+    const vs = conferir({
+      doc: documento({ guests: "" }),
+      quote: pedido({ guests: 120 }),
+      ...base,
+    });
+    const c = achar(vs, "convidados");
+    expect(c.severidade).toBe("aviso");
+    expect(c.detalhe).toContain("para quantas pessoas");
+  });
+});
+
 describe("o valor", () => {
   it("sem valor é erro", () => {
     const vs = conferir({ doc: documento(), quote: pedido(), historico: [], totalBruto: 0 });

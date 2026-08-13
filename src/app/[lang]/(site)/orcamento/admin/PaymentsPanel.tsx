@@ -12,6 +12,7 @@ import type { Invoice } from "@/lib/invoices-store";
 import { splitSinal } from "@/lib/money";
 import { usePercentagemDoSinal } from "./percentagem-do-sinal";
 import {
+  combinedPaidTotal,
   computeEventMetrics,
   reconcileFinance,
   type DossierData,
@@ -154,7 +155,9 @@ export default function PaymentsPanel({
   const editRef = useRef<HTMLInputElement>(null);
   // Evita que o `blur` provocado pelo Enter grave a mesma edição duas vezes.
   const committing = useRef(false);
-  const prefilled = useRef(false);
+  // Ela já mexeu no valor (escreveu, limpou, ou escolheu um atalho)? A partir
+  // daí o campo é dela e nada lhe volta a escrever por cima.
+  const valorTocado = useRef(false);
 
   // ── Livro de faturas (FT) do evento — a fonte de verdade financeira ──
   // Cliente não pode importar o store server-only; lê pela API, como Faturas.tsx.
@@ -222,13 +225,27 @@ export default function PaymentsPanel({
   const total = metrics.contractedGross; // proposta > preço cotado > estimativa
   const totalNet = metrics.contractedNet;
   const totalIva = metrics.contractedIva;
-  // "Recebido" = soma dos pagamentos que o utilizador marcou como pagos
-  // (quote.payments). É a leitura que atualiza AO VIVO à medida que se regista o
-  // que já foi pago — antes derivava do livro de faturas (FT) e só mexia ao
-  // emitir uma fatura, o que confundia ("registo um pagamento e nada muda"). O
-  // livro de faturas mantém-se como reconciliação secundária (tabela + banner).
+  // ── "RECEBIDO" CONTA O DINHEIRO TODO, VENHA POR ONDE VIER ────────────────
+  //
+  // Isto já foi as duas coisas erradas. Foi o livro de faturas sozinho, e só
+  // mexia ao emitir uma fatura ("registo um pagamento e nada muda"). Passou a
+  // ser o registo à mão sozinho, que atualiza ao vivo — e aí um casamento
+  // facturado e cobrado pelo separador Faturas, que é onde uma fatura se marca
+  // como paga e onde não fica linha nenhuma em `quote.payments`, aparecia aqui
+  // com «Recebido 0,00 €» e «Em falta 12.300,00 €» a vermelho. Com um atalho
+  // ao lado pronto a cobrar outra vez o que já estava na conta.
+  //
+  // `combinedPaidTotal` é a conta que já resolve isto no resto do cockpit:
+  // confronta as duas fontes espécie a espécie e fica com a maior de cada uma,
+  // por isso o mesmo euro nunca conta duas vezes e nenhuma das duas metades se
+  // perde. Continua a subir ao vivo com o registo à mão, que era a razão de
+  // este número ter deixado de olhar para o livro.
+  //
+  // O registo interno mantém o seu próprio número, rotulado, na lista abaixo —
+  // e a divergência entre as duas fontes é assunto do banner de reconciliação.
+  // A métrica «% Pago» do quadro é outra coisa e continua a ser só do livro.
   const informalPaid = reconciliation.informalPaid;
-  const headlinePaid = informalPaid;
+  const headlinePaid = useMemo(() => combinedPaidTotal(dossier), [dossier]);
   const outstanding = Math.max(0, total - headlinePaid);
   // Estado "tudo recebido" só faz sentido quando há um total contratado.
   const allReceived = total > 0 && outstanding === 0;
@@ -278,9 +295,19 @@ export default function PaymentsPanel({
 
   // Ecrã vazio útil: em vez de uma caixa a dizer que não há nada, a linha de
   // registo já vem com o sinal da proposta preenchido — falta carregar em Registar.
+  //
+  // ── E ACOMPANHA A PERCENTAGEM ATÉ ELA MEXER ─────────────────────────────
+  // A percentagem do sinal vem da lista leve de propostas, por rede: no
+  // primeiro desenho vale ainda a da casa (30%). Enquanto isto se preenchia
+  // UMA só vez, o campo ficava com os 369,00 € dos 30% e o atalho ao lado, já
+  // com a resposta, dizia «Sinal 50% · 615,00 €» — dois números para a mesma
+  // coisa, e o botão Registar grava o do campo.
+  //
+  // Por isso a condição não é "já preenchi", é "ela ainda não mexeu": enquanto
+  // o valor for uma sugestão nossa, é nosso dever mantê-lo certo; a partir do
+  // momento em que é dela, não se lhe toca (ver `valorTocado`).
   useEffect(() => {
-    if (prefilled.current || payments.length > 0 || total <= 0) return;
-    prefilled.current = true;
+    if (valorTocado.current || payments.length > 0 || total <= 0) return;
     setKind("sinal");
     setAmount(fmtAmountInput(split.sinal));
   }, [payments.length, total, split.sinal]);
@@ -393,6 +420,9 @@ export default function PaymentsPanel({
   /** Sugestão de valor: um clique preenche o campo (e o tipo, quando é óbvio). */
   function suggest(value: number, k?: PaymentKind) {
     if (k) setKind(k);
+    // Escolha dela, sobre um número que estava no ecrã: o valor passa a ser
+    // dela e o pré-preenchimento não volta a mexer-lhe.
+    valorTocado.current = true;
     setAmount(fmtAmountInput(value));
     setFormError(null);
     amountRef.current?.focus();
@@ -402,8 +432,13 @@ export default function PaymentsPanel({
   function pickKind(k: PaymentKind) {
     setKind(k);
     if (amount.trim() !== "" || total <= 0) return;
+    // O sinal continua a ser sugestão nossa (fica a acompanhar a percentagem da
+    // proposta); o saldo é um número que só faz sentido agora, e esse fixa-se.
     if (k === "sinal") setAmount(fmtAmountInput(split.sinal));
-    else if (k === "saldo" && outstanding > 0) setAmount(fmtAmountInput(outstanding));
+    else if (k === "saldo" && outstanding > 0) {
+      valorTocado.current = true;
+      setAmount(fmtAmountInput(outstanding));
+    }
   }
 
   /** Recarrega o livro de faturas (após emitir uma fatura/recibo, para a tabela e
@@ -739,6 +774,7 @@ export default function PaymentsPanel({
           aria-invalid={formError ? true : undefined}
           value={amount}
           onChange={(e) => {
+            valorTocado.current = true;
             setAmount(e.target.value);
             if (formError) setFormError(null);
           }}

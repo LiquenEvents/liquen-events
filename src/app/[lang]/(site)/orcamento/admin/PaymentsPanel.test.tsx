@@ -239,6 +239,46 @@ describe("PaymentsPanel — o sinal sugerido é o da proposta", () => {
     );
   });
 
+  /**
+   * ── E O CAMPO TEM DE SEGUIR O ATALHO QUE ESTÁ AO LADO ────────────────────
+   * O painel vazio abre com o sinal já escrito no campo, para bastar carregar
+   * em Registar. Só que a percentagem da proposta chega DEPOIS do primeiro
+   * desenho (vem da lista leve, por rede), e o pré-preenchimento era feito uma
+   * única vez, com a percentagem da casa: o campo ficava com 369,00 € e o
+   * atalho logo ao lado dizia «Sinal 50% · 615,00 €».
+   *
+   * Dois números diferentes para a mesma coisa, no mesmo ecrã, e o que ela
+   * carrega é o botão Registar — que grava o que está NO CAMPO. É a mesma
+   * divergência que já se corrigiu no atalho, a acabar no mesmo sítio: um
+   * sinal de 369 € num evento cuja factura de sinal é de 615 €.
+   */
+  it("o campo pré-preenchido acompanha a percentagem da proposta quando ela chega", async () => {
+    fetchMock = comProposta(50);
+    vi.stubGlobal("fetch", fetchMock);
+    renderPanel(makeQuote());
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Sinal 50%/ })).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText("Valor em euros")).toHaveValue("615,00");
+  });
+
+  it("mas o que ela escreveu no campo manda sempre — nada lho apaga por baixo", async () => {
+    fetchMock = comProposta(50);
+    vi.stubGlobal("fetch", fetchMock);
+    renderPanel(makeQuote());
+
+    const user = userEvent.setup();
+    const valor = screen.getByLabelText("Valor em euros");
+    await user.clear(valor);
+    await user.type(valor, "1.000");
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Sinal 50%/ })).toBeInTheDocument(),
+    );
+    expect(valor).toHaveValue("1.000");
+  });
+
   it("sem proposta que diga outra coisa, continua a ser 30%", async () => {
     renderPanel(makeQuote());
     await waitFor(() =>

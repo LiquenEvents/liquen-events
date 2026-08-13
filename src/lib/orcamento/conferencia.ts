@@ -75,6 +75,18 @@ function mesesEscritos(texto: string): number[] {
 }
 
 /**
+ * Os números de pessoas escritos num texto livre de convidados.
+ *
+ * Devolve uma LISTA pela mesma razão que {@link mesesEscritos}: o campo é
+ * texto livre e ela escreve-o à maneira dela — "120 pax", "100 a 150 pessoas",
+ * "±120". Vazio ("cerca de uma centena") quer dizer "não sei", nunca "está
+ * errado".
+ */
+function paxEscritos(texto: string): number[] {
+  return [...texto.matchAll(/\d+/g)].map((m) => Number(m[0])).filter((n) => n > 0);
+}
+
+/**
  * Marcadores de MODELO — os que nunca são texto verdadeiro, escrevam-se onde
  * se escreverem. Um "[Valor Total]" que chega ao cliente diz-lhe, com todas as
  * letras, que recebeu um modelo por preencher.
@@ -246,13 +258,43 @@ export function conferir({ doc, quote, historico, totalBruto }: Contexto): Verif
   }
 
   // ── Os convidados ───────────────────────────────────────────────────────
-  const temPax = texto(doc.guests) !== "";
-  v.push({
-    id: "convidados",
-    titulo: "Número de convidados",
-    severidade: temPax ? "ok" : "aviso",
-    detalhe: temPax ? "" : "A proposta não diz para quantas pessoas é.",
-  });
+  //
+  // ── E NÃO SÓ SE O CAMPO ESTÁ PREENCHIDO ─────────────────────────────────
+  // Isto perguntava apenas se havia lá alguma coisa escrita: uma proposta a
+  // dizer "80 pax" para um pedido de 120 levava um visto verde, e com ele a
+  // frase "Está tudo de acordo com o pedido original". É o número que manda no
+  // catering e no preço por pessoa, e o aviso do valor não o apanha — o
+  // intervalo habitual é construído com os 120 pax DO PEDIDO, portanto uma
+  // proposta de 80 pax cobrada a 120 fica bem dentro do costume.
+  //
+  // Como no mês da data: só se desmente quando o número está mesmo lá escrito.
+  // Um intervalo que contenha o número do pedido ("100 a 150" para 120) é uma
+  // maneira legítima de o dizer e não se contraria.
+  const paxProposta = texto(doc.guests);
+  const paxPedido = typeof quote.guests === "number" && quote.guests > 0 ? quote.guests : null;
+  const paxBate = (pax: number): boolean => {
+    const numeros = paxEscritos(paxProposta);
+    if (numeros.length === 0) return true;
+    if (numeros.includes(pax)) return true;
+    return numeros.length > 1 && pax >= Math.min(...numeros) && pax <= Math.max(...numeros);
+  };
+  if (!paxProposta) {
+    v.push({
+      id: "convidados",
+      titulo: "Número de convidados",
+      severidade: "aviso",
+      detalhe: "A proposta não diz para quantas pessoas é.",
+    });
+  } else if (paxPedido !== null && !paxBate(paxPedido)) {
+    v.push({
+      id: "convidados",
+      titulo: "Número de convidados",
+      severidade: "aviso",
+      detalhe: `A proposta é para "${paxProposta}" e o pedido pedia ${paxPedido}.`,
+    });
+  } else {
+    v.push({ id: "convidados", titulo: "Número de convidados", severidade: "ok", detalhe: "" });
+  }
 
   // ── O valor ─────────────────────────────────────────────────────────────
   if (totalBruto <= 0) {
