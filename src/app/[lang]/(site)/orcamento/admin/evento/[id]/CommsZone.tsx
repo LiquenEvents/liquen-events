@@ -1,7 +1,7 @@
 "use client";
 
 import type { Quote, QuoteMessage, ActivityEntry } from "@/lib/orcamento/types";
-import type { EnvioDaMensagem } from "../../ClientMessenger";
+import { resumoDoEnvio, type EnvioDaMensagem } from "../../envio-da-mensagem";
 import { randomId } from "../../util";
 import { ProposalStudio, ClientMessenger } from "../../lazy";
 
@@ -67,9 +67,7 @@ export default function CommsZone({ quote, userName, onQuoteChange, onAddEntry }
                * duas linhas com instruções para AGORA, e o que aqui interessa é
                * o facto, curto e legível numa lista.
                */
-              summary: envio.emailed
-                ? "Mensagem enviada ao cliente"
-                : "Mensagem registada — o e-mail não saiu, o cliente não recebeu",
+              summary: resumoDoEnvio(envio),
             });
           }
         }}

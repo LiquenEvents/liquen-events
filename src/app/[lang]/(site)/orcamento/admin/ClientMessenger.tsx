@@ -13,12 +13,8 @@ import { Button, Field } from "./ui";
  * tem email). Quem escreve o histórico do pedido a partir do `onSent` precisa da
  * mesma distinção — senão regista «enviada» sobre uma que ninguém recebeu.
  */
-export interface EnvioDaMensagem {
-  /** O e-mail saiu mesmo? */
-  emailed: boolean;
-  /** A razão que a rota deu quando não saiu (já pronta para se ler). */
-  emailError?: string;
-}
+import type { EnvioDaMensagem } from "./envio-da-mensagem";
+export type { EnvioDaMensagem } from "./envio-da-mensagem";
 
 interface Props {
   quote: Quote;

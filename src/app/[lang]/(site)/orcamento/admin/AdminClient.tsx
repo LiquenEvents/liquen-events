@@ -1,5 +1,7 @@
 "use client";
 
+import { resumoDoEnvio } from "./envio-da-mensagem";
+
 import {
   useState,
   useMemo,
@@ -4759,7 +4761,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             <ClientMessenger
                               key={selected.id}
                               quote={selected}
-                              onSent={(messages) => {
+                              onSent={(messages, envio) => {
                                 const prev_count = selected.messages?.length ?? 0;
                                 setQuotes((prev) =>
                                   prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)),
@@ -4772,7 +4774,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                       at: new Date().toISOString(),
                                       kind: "message_sent",
                                       actor: userName,
-                                      summary: "Mensagem enviada ao cliente",
+                                      /**
+                                       * O QUE ACONTECEU, E NÃO O QUE SE QUIS FAZER.
+                                       *
+                                       * Um pedido que entrou por telefonema não tem
+                                       * email. A rota grava a mensagem à mesma e
+                                       * responde que o email NÃO saiu; o mensageiro
+                                       * diz-o a vermelho, mas o histórico ficava com
+                                       * «Mensagem enviada ao cliente» — e o histórico
+                                       * é o que se lê meses depois para saber o que se
+                                       * disse a quem. Mesma frase que a zona de
+                                       * comunicações do dossiê já usa.
+                                       */
+                                      summary: resumoDoEnvio(envio),
                                     },
                                   ]);
                                 }
