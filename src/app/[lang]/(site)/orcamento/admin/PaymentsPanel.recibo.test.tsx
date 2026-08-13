@@ -22,6 +22,12 @@ import type { Payment, Quote } from "@/lib/orcamento/types";
  * No Firefox um elemento fora da árvore não dispara a transferência — a frase
  * "descarregado" era falsa ali TODAS as vezes. O `ProposalStudio` já fazia o
  * correcto (`document.body.appendChild(a)` … `a.remove()`).
+ *
+ * Nota sobre o `docLabel` nas respostas simuladas: a palavra («Recibo» ou
+ * «Fatura») deixou de ser calculada no painel e passa a vir do servidor, que é
+ * quem a escreve no email e no nome do anexo. É por isso que ela aparece agora
+ * no corpo da resposta — sem ela, o painel não teria como saber que documento
+ * acabou de sair. Ver `PaymentsPanel.envio.test.tsx`.
  */
 
 const PAGAMENTO: Payment = {
@@ -75,7 +81,7 @@ describe("PaymentsPanel — descarregar o recibo", () => {
     const user = userEvent.setup();
     // A rota respondeu bem, mas não veio ficheiro nenhum.
     fetchMock.mockImplementation(async (url: string) =>
-      String(url).includes("/fatura") ? ok({ number: "FT 2026/0001" }) : ok({}),
+      String(url).includes("/fatura") ? ok({ number: "FT 2026/0001", docLabel: "Recibo" }) : ok({}),
     );
     montar();
 
@@ -94,7 +100,7 @@ describe("PaymentsPanel — descarregar o recibo", () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation(async (url: string) =>
       String(url).includes("/fatura")
-        ? ok({ number: "FT 2026/0001", pdfBase64: "JVBERi0xLjQK" })
+        ? ok({ number: "FT 2026/0001", docLabel: "Recibo", pdfBase64: "JVBERi0xLjQK" })
         : ok({}),
     );
 
@@ -125,7 +131,7 @@ describe("PaymentsPanel — descarregar o recibo", () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation(async (url: string) =>
       String(url).includes("/fatura")
-        ? ok({ number: "FT 2026/0001", pdfBase64: "JVBERi0xLjQK" })
+        ? ok({ number: "FT 2026/0001", docLabel: "Recibo", pdfBase64: "JVBERi0xLjQK" })
         : ok({}),
     );
     montar();

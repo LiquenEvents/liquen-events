@@ -95,6 +95,29 @@ const toDossierInvoices = (list: Invoice[]): DossierInvoice[] =>
     paidAt: i.paidAt,
   }));
 
+/**
+ * O endereço para onde os documentos JÁ EMITIDOS deste pedido vão sair, quando é
+ * diferente do email actual do pedido — senão `null`.
+ *
+ * Uma fatura CONGELA o email do cliente no momento da emissão, e isso está
+ * certo: é o endereço que consta do documento fiscal, e pode ser de propósito o
+ * de outro pagador (o espaço, a wedding planner). O que não pode é ser uma
+ * surpresa — se ela corrigiu o email do casal em Maio, o documento de Junho sai
+ * para o antigo, e ela tem de saber ANTES de carregar em enviar, não depois de
+ * o cliente não receber.
+ */
+function enderecoCongeladoDivergente(faturas: Invoice[], emailActual: string): string | null {
+  const actual = String(emailActual ?? "")
+    .trim()
+    .toLowerCase();
+  const congelado = faturas
+    // Uma fatura anulada não se reenvia — o endereço dela não interessa a ninguém.
+    .filter((i) => i?.status !== "anulada")
+    .map((i) => String(i?.clientEmail ?? "").trim())
+    .find((e) => e !== "" && e.toLowerCase() !== actual);
+  return congelado ?? null;
+}
+
 /** Operação que o servidor recusou — a linha fica marcada, com "Repetir". */
 interface FailedOp {
   /** Pagamento afectado (marca a linha; se já não existir, mostra o fantasma). */
@@ -163,20 +186,27 @@ export default function PaymentsPanel({
   // Cliente não pode importar o store server-only; lê pela API, como Faturas.tsx.
   const [invoices, setInvoices] = useState<DossierInvoice[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(showLedger);
+  /** Endereço congelado nas faturas quando difere do email actual (ver acima). */
+  const [enderecoDivergente, setEnderecoDivergente] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!showLedger || !quote.id) return;
+    if (!quote.id) return;
     let alive = true;
-    setLedgerLoading(true);
+    if (showLedger) setLedgerLoading(true);
     (async () => {
       try {
         const res = await fetch(`/api/faturas?quoteId=${encodeURIComponent(quote.id)}`, {
           cache: "no-store",
         });
-        if (res.ok && alive) {
-          const list: Invoice[] = await res.json();
-          setInvoices(toDossierInvoices(list));
-        }
+        if (!res.ok || !alive) return;
+        const body: unknown = await res.json();
+        const list: Invoice[] = Array.isArray(body) ? body : [];
+        // A TABELA do livro (e as métricas que dela derivam) continuam opt-in —
+        // o Dossier rende a sua própria Zona Financeira e não as quer duplicadas.
+        if (showLedger) setInvoices(toDossierInvoices(list));
+        // O AVISO de endereço, esse, tem de existir onde quer que exista o botão
+        // de enviar — e ele existe nos dois sítios.
+        setEnderecoDivergente(enderecoCongeladoDivergente(list, quote.email));
       } catch {
         // Silencioso — o resumo informal continua a funcionar sem o livro.
       } finally {
@@ -186,7 +216,7 @@ export default function PaymentsPanel({
     return () => {
       alive = false;
     };
-  }, [showLedger, quote.id]);
+  }, [showLedger, quote.id, quote.email]);
 
   // Dossier "sintético" só com o que as funções puras precisam (quote + faturas);
   // usa os pagamentos *vivos* (state) para o banner reagir aos toggles.
@@ -444,22 +474,25 @@ export default function PaymentsPanel({
   /** Recarrega o livro de faturas (após emitir uma fatura/recibo, para a tabela e
    *  o banner de reconciliação não ficarem velhos). */
   async function refreshLedger() {
-    if (!showLedger || !quote.id) return;
+    if (!quote.id) return;
     try {
       const res = await fetch(`/api/faturas?quoteId=${encodeURIComponent(quote.id)}`, {
         cache: "no-store",
       });
-      if (res.ok) setInvoices(toDossierInvoices(await res.json()));
+      if (!res.ok) return;
+      const body: unknown = await res.json();
+      const list: Invoice[] = Array.isArray(body) ? body : [];
+      if (showLedger) setInvoices(toDossierInvoices(list));
+      // O documento que acabou de ser emitido congelou um endereço — o aviso
+      // acompanha-o (ex.: emitiu-se agora para o email corrigido, deixa de haver
+      // divergência; ou reaproveitou-se um antigo, e passa a haver).
+      setEnderecoDivergente(enderecoCongeladoDivergente(list, quote.email));
     } catch {
       /* silencioso — o resumo informal continua a funcionar sem o livro */
     }
   }
 
   async function invoice(p: Payment, email: boolean) {
-    // Um documento fiscal só é "Recibo" quando o valor foi recebido; se ainda está
-    // por pagar é uma "Fatura". Rotular em conformidade (o back-end já emite o
-    // estado certo — emitida vs paga).
-    const docLabel = p.paid ? "Recibo" : "Fatura";
     setBusy(p.id);
     try {
       const res = await fetch(`/api/orcamento/${quote.id}/fatura`, {
@@ -478,21 +511,36 @@ export default function PaymentsPanel({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data) {
-        throw new Error(
-          data?.error || `Falha ao gerar ${docLabel === "Recibo" ? "o recibo" : "a fatura"}.`,
-        );
+        // Sem resposta não há palavra do servidor — e inventar uma aqui era
+        // exactamente o hábito que punha o ecrã a dizer o contrário do email.
+        throw new Error(data?.error || "Falha ao emitir o documento.");
       }
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * A PALAVRA E O ENDEREÇO VÊM DE QUEM OS USOU
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Aqui decidia-se `p.paid ? "Recibo" : "Fatura"` e dizia-se «enviado para
+       * {quote.email}». Nenhuma das duas coisas era verdade: a rota escrevia
+       * «Recibo» sempre, e o correio sai para o endereço CONGELADO na fatura,
+       * que pode não ser o email actual do pedido.
+       *
+       * Passam a vir ambos na resposta. O que sobra deste lado é só a
+       * concordância gramatical com a palavra que o servidor mandou.
+       */
+      const doc = typeof data.docLabel === "string" && data.docLabel ? data.docLabel : "Documento";
+      const fem = doc === "Fatura";
       if (email) {
         toast(
           data.emailed
-            ? `${docLabel} enviado para ${quote.email}`
-            : `${docLabel} gerado (email não configurado)`,
+            ? `${doc} ${fem ? "enviada" : "enviado"} para ${data.emailedTo || "o cliente"}`
+            : `${doc} ${fem ? "gerada" : "gerado"} (email não configurado)`,
           data.emailed ? "success" : "info",
         );
       } else if (data.pdfBase64) {
         const a = document.createElement("a");
         a.href = `data:application/pdf;base64,${data.pdfBase64}`;
-        a.download = `${docLabel}-${String(data.number ?? p.id).replace(/\//g, "-")}.pdf`;
+        a.download = `${doc}-${String(data.number ?? p.id).replace(/\//g, "-")}.pdf`;
         // ── O <a> tem de estar na árvore no momento do clique ───────────────
         // Um elemento fora do documento não dispara a transferência no Firefox:
         // o `click()` corria, nada acontecia, e a frase "descarregado" saía na
@@ -500,7 +548,7 @@ export default function PaymentsPanel({
         document.body.appendChild(a);
         a.click();
         a.remove();
-        toast(`${docLabel} descarregado`, "success");
+        toast(`${doc} ${fem ? "descarregada" : "descarregado"}`, "success");
       } else {
         /**
          * ════════════════════════════════════════════════════════════════════
@@ -518,7 +566,7 @@ export default function PaymentsPanel({
          * reacção certa — voltar a pedir o PDF, e não reemitir — não é óbvia.
          */
         toast(
-          `${docLabel} ${data.number ? `${data.number} ` : ""}emitido, mas não foi possível gerar o PDF. Tenta descarregar outra vez.`,
+          `${doc} ${data.number ? `${data.number} ` : ""}${fem ? "emitida" : "emitido"}, mas não foi possível gerar o PDF. Tenta descarregar outra vez.`,
           "error",
         );
       }
@@ -526,12 +574,7 @@ export default function PaymentsPanel({
       // refletirem o novo documento sem reabrir o separador.
       await refreshLedger();
     } catch (e) {
-      toast(
-        e instanceof Error
-          ? e.message
-          : `Não foi possível gerar ${docLabel === "Recibo" ? "o recibo" : "a fatura"}.`,
-        "error",
-      );
+      toast(e instanceof Error ? e.message : "Não foi possível emitir o documento.", "error");
     } finally {
       setBusy(null);
     }
@@ -887,6 +930,22 @@ export default function PaymentsPanel({
           </span>
         )}
       </div>
+
+      {/* ── Para onde é que o «enviar» vai mesmo ──
+          A forma menos intrusiva que serve: uma linha de texto ao lado dos
+          botões, presente ANTES do gesto, `role="status"` (anúncio educado, não
+          interrompe). Nada de diálogo de confirmação e nada de desactivar o
+          botão — enviar para o endereço congelado é muitas vezes o que ela quer,
+          e um documento fiscal endereçado a outro pagador está correcto. O que
+          se corrige é a surpresa, não a decisão dela. */}
+      {enderecoDivergente && (
+        <p role="status" className="text-[#a9781f] text-[11px] leading-snug mb-1.5">
+          As faturas já emitidas neste pedido estão endereçadas a{" "}
+          <strong className="font-medium">{enderecoDivergente}</strong> — é para aí que o envio sai,
+          e não para {quote.email || "o email do pedido"}. Um documento fiscal guarda o endereço com
+          que foi emitido; para o mudar, anula e reemite em Faturas.
+        </p>
+      )}
 
       {/* Lista — uma linha por pagamento, nas mesmas colunas do formulário. */}
       <div className="flex flex-col gap-1">

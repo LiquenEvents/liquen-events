@@ -125,6 +125,50 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           ? activeLedger.find((inv) => (inv.note ?? "").includes(paymentRef))
           : activeLedger.find((inv) => inv.kind === invoiceKind && inv.amount === amount)) ?? null;
 
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * O DESTINATÁRIO DECIDE-SE ANTES DE SE GASTAR UM NÚMERO
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * `types.ts` avisa, em cima do `email` do pedido: «Todo o código que envia
+     * email para o cliente TEM de verificar isto». A mensagem, a proposta e o
+     * proposta-doc verificam. Esta rota não verificava, e a ordem das operações
+     * era a pior possível:
+     *
+     *   • Pedido nascido de um telefonema (`email: ""`): o `to ?? MAIL_TO` não
+     *     apanha a string vazia (o `??` só apanha `null`/`undefined`), portanto
+     *     descia ao nodemailer, que atira «No recipients defined» → 500 «Erro
+     *     ao gerar o recibo». Só que isso acontecia DEPOIS de o número da
+     *     fatura estar gasto, do livro escrito e do estado do pedido mexido.
+     *     Ela lê «erro», carrega outra vez, e gasta outro número.
+     *   • Email `undefined`/`null` (o esquema de reposição aceita `.nullish()`
+     *     e o pedido volta como blob verbatim): o `??` entregava o documento do
+     *     CLIENTE na caixa da CASA e respondia `emailed: true`.
+     *
+     * Por isso a validação vem aqui: depois de LER o livro (preciso de saber
+     * para onde é que este documento está endereçado), antes de lhe ESCREVER
+     * seja o que for. Recusar cedo não gasta nada — nem número, nem livro, nem
+     * histórico do pedido — e a frase diz o que fazer a seguir.
+     *
+     * O endereço é o da FATURA, não o do pedido: um documento fiscal guarda o
+     * endereço com que foi emitido, e pode estar endereçado de propósito a
+     * outro pagador (o espaço, a wedding planner). Só quando a fatura não tem
+     * endereço nenhum (registos antigos) é que se cai para o do pedido.
+     */
+    const destinatario = String(invoice?.clientEmail || quote.email || "").trim();
+    const destinatarioValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destinatario);
+    if (email && !destinatarioValido) {
+      return NextResponse.json(
+        {
+          error:
+            "Este pedido não tem email de cliente válido — não foi emitido nem numerado nada. " +
+            "Acrescenta o email do cliente na ficha do pedido e volta a enviar; " +
+            "entretanto podes descarregar o PDF e enviá-lo à mão.",
+        },
+        { status: 400 },
+      );
+    }
+
     if (invoice) {
       // Documento já emitido: reaproveitamos o MESMO número — nunca criamos um
       // segundo sinal/saldo. Actualizamos apenas o que a realidade deste recibo
@@ -190,6 +234,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       `${invoice.number} · ${eur(invoice.amount)}`,
     );
 
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * «RECIBO» É PROVA DE PAGAMENTO — A PALAVRA SAI DAQUI, E SÓ DAQUI
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * O mesmo botão emite as duas coisas: uma linha já paga (recibo) e uma
+     * linha por liquidar (fatura). Escrevia-se «Recibo» sempre — assunto, nome
+     * do anexo, título e corpo —, e o cliente que ainda não tinha pago recebia
+     * «segue em anexo o recibo» com um PDF que diz FATURA em cima e AGUARDA
+     * PAGAMENTO a meio. Perante o cliente e perante o fisco, é falso.
+     *
+     * O critério é o mais simples que existe e é o MESMO que o PDF imprime: o
+     * estado do documento no livro. Uma linha só, aqui, de onde saem todas as
+     * ocorrências da palavra — incluindo a que o painel mostra, que vem na
+     * resposta em vez de ser recalculada do outro lado. Se as duas pontas
+     * voltarem a decidir em separado, voltam a divergir daqui a três meses.
+     */
+    const pago = invoice.status === "paga";
+    const docLabel = pago ? "Recibo" : "Fatura";
+    const docArtigo = pago ? "o recibo" : "a fatura";
+
     // Render a partir do registo persistido → o número no PDF é, por construção,
     // o número no livro. (O NIF vive no pedido, não na fatura.)
     const number = invoice.number;
@@ -203,7 +268,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       amount: invoice.amount,
       vatRate: invoice.vatRate,
       kindLabel: KIND_LABEL[invoice.kind] ?? "Pagamento",
-      paid: invoice.status === "paga",
+      paid: pago,
     });
     const pdfBuffer = Buffer.from(pdfBytes);
 
@@ -214,28 +279,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // HTML — passa melhor pelos filtros de spam e é o que se lê num cliente
       // só de texto ou num leitor de ecrã.
       const mensagem = emailAoCliente({
-        html: `<h2 style="font-size:18px;margin:0 0 12px">Recibo — Líquen Events</h2>
+        html: `<h2 style="font-size:18px;margin:0 0 12px">${docLabel} — Líquen Events</h2>
         <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(invoice.clientName)},</p>
-        <p style="font-size:14px;line-height:1.6;color:#333">Segue em anexo o recibo no valor de <strong style="color:#7c854b">${eur(invoice.amount)}</strong>.</p>`,
+        <p style="font-size:14px;line-height:1.6;color:#333">Segue em anexo ${docArtigo} no valor de <strong style="color:#7c854b">${eur(invoice.amount)}</strong>.</p>`,
         texto: [
-          "Recibo — Líquen Events",
+          `${docLabel} — Líquen Events`,
           "",
           `Olá ${invoice.clientName},`,
           "",
-          `Segue em anexo o recibo no valor de ${eur(invoice.amount)}.`,
+          `Segue em anexo ${docArtigo} no valor de ${eur(invoice.amount)}.`,
         ].join("\n"),
       });
       const mail = await sendMail({
-        to: invoice.clientEmail,
+        // Endereço já validado acima — nenhum `?? MAIL_TO` decide nada por nós
+        // neste caminho: o documento do cliente nunca pode cair na caixa da casa.
+        to: destinatario,
         replyTo: MAIL_TO,
-        subject: `Recibo ${number} — Líquen Events`,
+        subject: `${docLabel} ${number} — Líquen Events`,
         html: mensagem.html,
         text: mensagem.text,
-        // O recibo junta-se aos anexos da assinatura, não os substitui.
+        // O documento junta-se aos anexos da assinatura, não os substitui.
         attachments: [
           ...mensagem.attachments,
           {
-            filename: `Recibo-${number.replace(/\//g, "-")}.pdf`,
+            filename: `${docLabel}-${number.replace(/\//g, "-")}.pdf`,
             content: pdfBuffer,
             contentType: "application/pdf",
           },
@@ -248,6 +315,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ok: true,
       number,
       emailed,
+      // A palavra que o CLIENTE leu, e o endereço para onde ela foi mesmo. O
+      // painel mostra-as tal e qual em vez de as recalcular: era essa a origem
+      // das duas mentiras no ecrã («Fatura enviada» sobre um email que dizia
+      // «Recibo», e «enviado para {quote.email}» sobre um envio que saiu para o
+      // endereço congelado na fatura).
+      docLabel,
+      ...(email ? { emailedTo: destinatario } : {}),
       pdfBase64: pdfBuffer.toString("base64"),
     });
   } catch (err) {

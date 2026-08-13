@@ -17,6 +17,13 @@ vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
  * armazenamento tem de saber gravar e não só ler.
  */
 const pedidos = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
+/**
+ * A FICHA do pedido, à parte do estado — é daqui que sai o `quote.email`. Passou
+ * a ser um duplo com escrita porque há cenários (pedido nascido de um
+ * telefonema, email corrigido a meio do evento) em que o endereço é o próprio
+ * objecto do teste e não pode estar preso a uma constante.
+ */
+const fichas = vi.hoisted(() => ({ store: new Map<string, Record<string, unknown>>() }));
 
 vi.mock("@/lib/quotes-store", () => ({
   updateQuoteWith: vi.fn(
@@ -28,9 +35,7 @@ vi.mock("@/lib/quotes-store", () => ({
       return proximo;
     },
   ),
-  getQuote: vi.fn(async (id: string) =>
-    id === "LIQ-1" ? { id, name: "Ana Silva", email: "ana@example.com", nif: "500000000" } : null,
-  ),
+  getQuote: vi.fn(async (id: string) => fichas.store.get(id) ?? null),
 }));
 vi.mock("@/lib/invoices-store", () => ({
   listInvoicesForQuote: vi.fn(async (quoteId: string) =>
@@ -79,6 +84,13 @@ beforeEach(() => {
   ledger.numSeq = 0;
   pedidos.store.clear();
   pedidos.store.set("LIQ-1", { id: "LIQ-1", name: "Ana Silva", status: "cotado" });
+  fichas.store.clear();
+  fichas.store.set("LIQ-1", {
+    id: "LIQ-1",
+    name: "Ana Silva",
+    email: "ana@example.com",
+    nif: "500000000",
+  });
   vi.clearAllMocks();
 });
 
@@ -417,6 +429,218 @@ describe("POST /api/orcamento/[id]/fatura — o estado do pedido segue o documen
  * casa fica na memória de um cliente. Levava a mesma linha escrita à mão que
  * todos os outros; passa a levar a assinatura da casa, com o PDF intacto.
  */
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * «RECIBO» É PROVA DE PAGAMENTO — NÃO É OUTRA MANEIRA DE DIZER «FATURA»
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O mesmo botão emite as duas coisas: uma linha JÁ PAGA (recibo) e uma linha
+ * POR PAGAR (fatura). A rota escrevia «Recibo» sempre — no assunto, no nome do
+ * anexo, no título e no corpo. O cliente que ainda não pagou recebia um email a
+ * dizer «segue em anexo o recibo», abria o PDF, e o PDF dizia FATURA em cima e
+ * AGUARDA PAGAMENTO a meio. Perante o cliente e perante o fisco, é falso.
+ *
+ * O critério é UM SÓ e está no livro: `invoice.status === "paga"` — a mesma
+ * verdade que o PDF imprime (PAGO / AGUARDA PAGAMENTO). O painel deixou de o
+ * calcular por sua conta e passa a mostrar a palavra que vem na resposta.
+ */
+describe("POST /api/orcamento/[id]/fatura — a palavra tem de sair de um sítio só", () => {
+  const anexoPdf = () => {
+    const env = vi.mocked(sendMail).mock.calls.at(-1)![0];
+    return env.attachments!.find((a) => a.filename.toLowerCase().endsWith(".pdf"))!;
+  };
+
+  it("uma linha POR PAGAR não pode dizer «Recibo» em lado nenhum", async () => {
+    const res = await POST(
+      req({
+        paymentId: "p-por-pagar",
+        kind: "pagamento",
+        amount: 24600,
+        date: "2026-06-01",
+        paid: false,
+        email: true,
+      }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    const env = vi.mocked(sendMail).mock.calls.at(-1)![0];
+
+    // Nem no assunto, nem no corpo (HTML e texto), nem no nome do anexo.
+    const tudoOQueOClienteLe = [env.subject, env.html, env.text, anexoPdf().filename].join("\n");
+    expect(tudoOQueOClienteLe, "isto ainda não foi pago").not.toMatch(/recibo/i);
+
+    expect(env.subject).toContain("Fatura");
+    expect(anexoPdf().filename).toMatch(/^Fatura-/);
+    // E a palavra volta na resposta, para o painel dizer a MESMA que o cliente leu.
+    expect(json.docLabel).toBe("Fatura");
+  });
+
+  it("uma linha PAGA continua a ser um «Recibo» — em todos os sítios", async () => {
+    const res = await POST(
+      req({
+        paymentId: "p-pago",
+        kind: "pagamento",
+        amount: 24600,
+        date: "2026-06-01",
+        paid: true,
+        email: true,
+      }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    const env = vi.mocked(sendMail).mock.calls.at(-1)![0];
+
+    expect(env.subject).toContain("Recibo");
+    expect(env.html).toMatch(/recibo/i);
+    expect(env.text).toMatch(/recibo/i);
+    expect(anexoPdf().filename).toMatch(/^Recibo-/);
+    expect(json.docLabel).toBe("Recibo");
+  });
+
+  it("a palavra segue o LIVRO, não o que o painel disse: reemitir uma fatura já paga dá «Recibo»", async () => {
+    // A fatura já está `paga` no livro (alguém a liquidou na vista de Faturas);
+    // o painel ainda mostra a linha como pendente e envia `paid: false`.
+    ledger.rows.push({
+      id: "inv-paga",
+      number: "FT 2026/0003",
+      quoteId: "LIQ-1",
+      kind: "sinal",
+      amount: 3750,
+      status: "paga",
+      paidAt: "2026-05-02",
+      clientEmail: "ana@example.com",
+    });
+    const res = await POST(
+      req({ paymentId: "pay-x", kind: "sinal", amount: 3750, paid: false, email: true }),
+      ctx("LIQ-1"),
+    );
+    const json = await res.json();
+    expect(json.docLabel).toBe("Recibo");
+    expect(vi.mocked(sendMail).mock.calls.at(-1)![0].subject).toContain("Recibo");
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O ECRÃ TEM DE DIZER O ENDEREÇO VERDADEIRO
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * A fatura congela o email do cliente na emissão — e isso está certo: o
+ * documento fiscal foi endereçado a alguém (que pode nem ser o casal: o espaço,
+ * a wedding planner). O que estava errado era o painel jurar «enviado para
+ * {quote.email}» — o endereço ACTUAL — enquanto o correio saía para o congelado.
+ * O endereço passa a ser DEVOLVIDO por quem o usou.
+ */
+describe("POST /api/orcamento/[id]/fatura — o endereço volta na resposta", () => {
+  it("devolve o endereço CONGELADO na fatura, e não o email actual do pedido", async () => {
+    ledger.rows.push({
+      id: "inv-antiga",
+      number: "FT 2026/0007",
+      quoteId: "LIQ-1",
+      kind: "sinal",
+      amount: 3750,
+      status: "emitida",
+      clientEmail: "antigo@example.com",
+    });
+    // Ela corrigiu o email do casal em Maio; a fatura é de Abril.
+    fichas.store.set("LIQ-1", { id: "LIQ-1", name: "Ana Silva", email: "novo@example.com" });
+
+    const res = await POST(
+      req({ paymentId: "pay-1", kind: "sinal", amount: 3750, paid: true, email: true }),
+      ctx("LIQ-1"),
+    );
+    const json = await res.json();
+
+    expect(vi.mocked(sendMail).mock.calls.at(-1)![0].to).toBe("antigo@example.com");
+    expect(json.emailedTo, "o ecrã não pode adivinhar o destinatário").toBe("antigo@example.com");
+  });
+
+  it("num documento novo, o endereço devolvido é o do pedido", async () => {
+    const res = await POST(
+      req({ paymentId: "pay-2", kind: "pagamento", amount: 500, paid: true, email: true }),
+      ctx("LIQ-1"),
+    );
+    const json = await res.json();
+    expect(json.emailedTo).toBe("ana@example.com");
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * SEM DESTINATÁRIO NÃO SE GASTA UM NÚMERO DE FATURA
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * `types.ts` avisa em cima do campo: «Todo o código que envia email para o
+ * cliente TEM de verificar isto». A mensagem, a proposta e o proposta-doc
+ * verificam; a fatura não verificava.
+ *
+ * Um pedido nascido de um telefonema tem `email: ""`. O `to ?? MAIL_TO` não
+ * apanha a string vazia: ia para o nodemailer, que atirava «No recipients
+ * defined» → 500 «Erro ao gerar o recibo» DEPOIS de o número estar gasto, o
+ * livro escrito e o estado do pedido mexido. E se o email fosse `null` (o
+ * esquema de reposição aceita `.nullish()`), o `??` entregava o documento do
+ * cliente na caixa da CASA e respondia `emailed: true`.
+ */
+describe("POST /api/orcamento/[id]/fatura — o destinatário valida-se ANTES de numerar", () => {
+  it("um pedido vindo de um telefonema (email vazio) é recusado antes de tocar no livro", async () => {
+    fichas.store.set("LIQ-1", { id: "LIQ-1", name: "Ana Silva", email: "" });
+
+    const res = await POST(
+      req({ paymentId: "p-tel", kind: "pagamento", amount: 500, paid: true, email: true }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    // A frase tem de dizer O QUE FAZER, não só que falhou.
+    expect(json.error).toMatch(/email/i);
+    expect(json.error).toMatch(/acrescenta/i);
+
+    // Nada foi gasto: nem número, nem linha no livro, nem estado do pedido.
+    expect(nextInvoiceNumber).not.toHaveBeenCalled();
+    expect(createInvoice).not.toHaveBeenCalled();
+    expect(updateQuoteWith).not.toHaveBeenCalled();
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(ledger.rows).toHaveLength(0);
+  });
+
+  it("um email ausente (null) não entrega o documento do cliente na caixa da casa", async () => {
+    fichas.store.set("LIQ-1", { id: "LIQ-1", name: "Ana Silva", email: null });
+
+    const res = await POST(
+      req({ paymentId: "p-nulo", kind: "pagamento", amount: 500, paid: true, email: true }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(400);
+    expect(sendMail, "MAIL_TO é a caixa da casa, não a do cliente").not.toHaveBeenCalled();
+    expect(nextInvoiceNumber).not.toHaveBeenCalled();
+  });
+
+  it("um endereço sem forma de email também não passa", async () => {
+    fichas.store.set("LIQ-1", { id: "LIQ-1", name: "Ana Silva", email: "ana(at)example" });
+    const res = await POST(
+      req({ paymentId: "p-torto", kind: "pagamento", amount: 500, paid: true, email: true }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(400);
+    expect(createInvoice).not.toHaveBeenCalled();
+  });
+
+  it("mas DESCARREGAR um pedido sem email continua a funcionar — o documento é dela", async () => {
+    fichas.store.set("LIQ-1", { id: "LIQ-1", name: "Ana Silva", email: "" });
+    const res = await POST(
+      req({ paymentId: "p-desc", kind: "pagamento", amount: 500, paid: true, email: false }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.number).toMatch(/^FT \d{4}\/\d{4}$/);
+    expect(json.pdfBase64).toBeTruthy();
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/orcamento/[id]/fatura — assinatura", () => {
   it("assina o email do recibo e mantém o PDF em anexo", async () => {
     await POST(req({ kind: "pagamento", amount: 500, paid: true, email: true }), ctx("LIQ-1"));
