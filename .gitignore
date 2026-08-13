@@ -100,6 +100,17 @@ instagram-export/
 # outra vez a correr o script.
 /medicoes/
 
+# O armazenamento de ficheiro do Repository (o recurso de DESENVOLVIMENTO, quando
+# não há Supabase configurado). É estado em execução, não fonte. Cinco destes
+# ficheiros estavam versionados vazios (`[]` / `{}`) a servir de semente — mas
+# basta arrancar a app ou correr um passeio e2e para lhes cair dentro um pedido,
+# um rascunho de proposta ou uma lista de material. Resultado: o `git status`
+# ficava sujo para sempre e um `git add -A` distraído commitava dados de teste.
+# Versionar a semente não era preciso: quem lê tolera o ficheiro em falta (o
+# `Repository` devolve `[]`, e o `readDevFile` da cópia de segurança também) e
+# quem escreve faz `mkdir -p`. Ficheiro ausente e ficheiro com `[]` dão o mesmo.
+/data/*.json
+
 # As fotografias de teste do upload (~300 MB, geradas por scripts/gerar-fotos-de-teste.mjs)
 /e2e/fotos-de-teste/
 /e2e/fotos-poucas/
