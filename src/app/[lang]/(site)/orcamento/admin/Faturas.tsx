@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useMemo, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
+import { eventTagLabel } from "@/lib/orcamento/data";
 // `import type` is fully erased at build time, so pulling the shape from the
 // server-only store never drags its runtime `server-only` guard into this
 // client bundle.
@@ -99,7 +100,9 @@ const QuoteOptions = memo(function QuoteOptions({ quotes }: { quotes: Quote[] })
     <>
       {quotes.map((q) => (
         <option key={q.id} value={q.id}>
-          {q.name} · {q.eventName || q.eventType || "evento"}
+          {/* A mesma etiqueta que o cliente lê: o nome que ele deu, ou o tipo
+              no singular. O `q.eventType` cru punha aqui «casamentos». */}
+          {q.name} · {eventTagLabel(q, "pt") || "evento"}
         </option>
       ))}
     </>

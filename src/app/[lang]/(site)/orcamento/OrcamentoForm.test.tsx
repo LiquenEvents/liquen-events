@@ -370,3 +370,60 @@ describe("OrcamentoForm — o limite da mensagem", () => {
     expect(quoteFormSchema.safeParse(enviado.form).success).toBe(true);
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * O `eventName` É UM NOME, NÃO O RÓTULO DA LISTA QUE A PESSOA CARREGOU
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * O formulário gravava em `eventName` o rótulo canónico PORTUGUÊS da opção
+ * escolhida — «Casamento», «Batizado / Comunhão», «Outro» — mesmo quando o
+ * visitante tinha lido a página inteira em inglês. Daí para a frente esse
+ * rótulo era tratado como sendo a palavra do cliente e ia parar dentro de
+ * frases: «para o batizado / comunhão de 3 de maio», «Event: Casamento».
+ *
+ * A escolha já viaja no `eventType`, que é um identificador estável e que se
+ * traduz na leitura. O `eventName` fica para o que ele diz ser: um nome que o
+ * cliente dá ao evento dele — coisa que este formulário nunca chega a
+ * perguntar, e por isso vai vazio.
+ */
+describe("OrcamentoForm — a escolha viaja como tipo, não como nome", () => {
+  async function enviado() {
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    return (
+      JSON.parse((vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string) as {
+        form: { eventType: string | null; category: string | null; eventName: string };
+      }
+    ).form;
+  }
+
+  it("o rótulo da lista não é gravado como nome do evento", async () => {
+    await preencherPedido();
+    enviar();
+    const form = await enviado();
+    expect(form.eventType).toBe("casamentos");
+    expect(form.eventName).toBe("");
+  });
+
+  it("«Outro» também não — não há nome nenhum a inventar", async () => {
+    montar();
+    await userEvent.click(screen.getByRole("radio", { name: to.eventTypeLabels[5] }));
+    fireEvent.change(screen.getByLabelText(new RegExp(to.labelData, "i")), {
+      target: { value: hoje() },
+    });
+    await userEvent.type(screen.getByLabelText(new RegExp(to.labelPessoas, "i")), "40");
+    await userEvent.type(screen.getByLabelText(new RegExp(to.labelLocal, "i")), "Guimarães");
+    await userEvent.type(screen.getByLabelText(new RegExp(`^${to.labelNome}`, "i")), "Ana");
+    await userEvent.type(screen.getByLabelText(new RegExp(to.labelEmail, "i")), "ana@exemplo.pt");
+    await userEvent.type(screen.getByLabelText(new RegExp(to.labelTelefone, "i")), "912345678");
+    await userEvent.type(
+      screen.getByLabelText(new RegExp(to.labelMensagem, "i")),
+      "Uma festa de família.",
+    );
+    enviar();
+    const form = await enviado();
+    expect(form.eventType).toBeNull();
+    expect(form.category).toBeNull();
+    expect(form.eventName).toBe("");
+  });
+});

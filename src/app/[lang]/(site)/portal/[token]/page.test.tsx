@@ -200,3 +200,61 @@ describe("Portal page — nunca servida de um cache", () => {
     expect((pagina as { dynamic?: string }).dynamic).toBe("force-dynamic");
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «CASAMENTO · CASAMENTO · 15 DE MAIO DE 2027»
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A linha do evento juntava DUAS leituras da mesma coisa: o tipo traduzido e o
+ * `eventName` — que, nos pedidos vindos do formulário público, é o rótulo da
+ * lista, em português, exactamente igual ao tipo. Um cliente inglês lia
+ * «Wedding · Casamento · …», que é o mesmo defeito com a tradução por cima.
+ *
+ * O `eventName` continua a aparecer quando é MESMO um nome («Casamento da Ana
+ * e do João», que a equipa escreve no back office): é isso que ele diz ser.
+ */
+describe("Portal page — a linha do evento não se repete", () => {
+  it("um rótulo de lista guardado como nome não entra na linha", async () => {
+    db.quotes.set("q-1", {
+      id: "q-1",
+      name: "Ana",
+      category: "particulares",
+      eventType: "casamentos",
+      eventName: "Casamento",
+      date: "2027-05-15",
+    });
+    const props = await renderProps();
+    expect(props.eventLabel).toBe("Casamento");
+    expect(props.eventName).toBeUndefined();
+  });
+
+  it("num portal inglês o tipo é lido em inglês", async () => {
+    db.quotes.set("q-1", {
+      id: "q-1",
+      name: "Sarah",
+      category: "particulares",
+      eventType: "casamentos",
+      eventName: "Casamento",
+      date: "2027-05-15",
+    });
+    const el = await PortalPage({ params: Promise.resolve({ lang: "en", token: "good" }) });
+    const props = (el as { props: { eventLabel: string; eventName?: string } }).props;
+    expect(props.eventLabel).toBe("Wedding");
+    expect(props.eventName).toBeUndefined();
+  });
+
+  it("mas o nome que a equipa escreveu continua a aparecer", async () => {
+    db.quotes.set("q-1", {
+      id: "q-1",
+      name: "Ana",
+      category: "particulares",
+      eventType: "casamentos",
+      eventName: "Casamento da Ana e do João",
+      date: "2027-05-15",
+    });
+    const props = await renderProps();
+    expect(props.eventLabel).toBe("Casamento");
+    expect(props.eventName).toBe("Casamento da Ana e do João");
+  });
+});

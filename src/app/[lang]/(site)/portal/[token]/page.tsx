@@ -8,7 +8,8 @@ import { listInvoicesForQuote } from "@/lib/invoices-store";
 import { splitSinal } from "@/lib/money";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { getDictionary, normalizeLocale } from "@/lib/i18n";
-import type { EventType, Quote } from "@/lib/orcamento/types";
+import type { Quote } from "@/lib/orcamento/types";
+import { eventTypeName, isQuoteOptionLabel } from "@/lib/orcamento/data";
 import PortalView from "./PortalView";
 
 /**
@@ -46,13 +47,32 @@ export async function generateMetadata({
   };
 }
 
-type EventTypeLabels = Record<EventType, string>;
-
 /** Friendly, localized event-type label — resolved server-side so the view
- *  receives plain text (no enum-to-copy mapping in the presentation layer). */
-function eventLabel(quote: Quote, labels: EventTypeLabels, empresa: string, particular: string) {
-  if (quote.eventType && labels[quote.eventType]) return labels[quote.eventType];
-  return quote.category === "empresas" ? empresa : particular;
+ *  receives plain text (no enum-to-copy mapping in the presentation layer).
+ *
+ *  O nome do tipo vem do `orcamento/data.ts`, que é onde a taxonomia vive: era
+ *  aqui que existia uma SEGUNDA lista das mesmas oito palavras, e duas listas
+ *  da mesma coisa acabam sempre por divergir. */
+function eventLabel(quote: Quote, locale: string, empresa: string, particular: string) {
+  return (
+    eventTypeName(quote.eventType, locale) || (quote.category === "empresas" ? empresa : particular)
+  );
+}
+
+/**
+ * O nome que o CLIENTE (ou a equipa) deu ao evento — e só isso.
+ *
+ * A linha do evento dizia «Casamento · Casamento · 15 de maio de 2027»: o tipo
+ * traduzido e, logo a seguir, o `eventName`, que nos pedidos do formulário
+ * público era o rótulo da lista, em português, palavra por palavra igual ao
+ * tipo. Num portal inglês saía «Wedding · Casamento».
+ */
+function nomeProprioDoEvento(quote: Quote, etiqueta: string): string | undefined {
+  const nome = quote.eventName?.trim();
+  if (!nome || isQuoteOptionLabel(nome)) return undefined;
+  // E se, por acaso, for a mesma palavra que a etiqueta já mostra, também não
+  // vale a pena dizê-la duas vezes.
+  return nome.toLowerCase() === etiqueta.toLowerCase() ? undefined : nome;
 }
 
 /** yyyy-mm-dd (or ISO) → localized "12 de setembro de 2026"; null if absent. */
@@ -125,17 +145,19 @@ export default async function PortalPage({
    */
   const depositPercent = depositPercentOf(proposal?.doc as ProposalDoc | undefined);
 
+  const etiquetaDoEvento = eventLabel(
+    quote,
+    locale,
+    t.eventFallbackEmpresa,
+    t.eventFallbackParticular,
+  );
+
   return (
     <PortalView
       t={t}
       clientName={quote.name}
-      eventLabel={eventLabel(
-        quote,
-        t.eventTypes,
-        t.eventFallbackEmpresa,
-        t.eventFallbackParticular,
-      )}
-      eventName={quote.eventName || undefined}
+      eventLabel={etiquetaDoEvento}
+      eventName={nomeProprioDoEvento(quote, etiquetaDoEvento)}
       eventDate={fmtDate(quote.date, t.dateLocale)}
       location={quote.location || null}
       proposal={

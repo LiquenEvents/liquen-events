@@ -613,7 +613,21 @@ export default function OrcamentoForm({
       phone: telefone.trim(),
       category: opt?.category ?? null,
       eventType: opt?.eventType ?? null,
-      eventName: eventType,
+      /**
+       * VAZIO, e de propósito. Aqui estava o rótulo da opção escolhida — e o
+       * `eventName` é lido em todo o lado como sendo o nome que o CLIENTE deu
+       * ao evento («Casamento da Ana e do João»), portanto era preferido ao
+       * tipo e ia parar dentro de frases: «para o batizado / comunhão de 3 de
+       * maio», «para o outro de 15 de maio». Sempre em português, mesmo para
+       * quem leu a página em inglês, porque estes rótulos são os canónicos.
+       *
+       * A escolha viaja no `eventType`, que é um identificador estável e que
+       * cada leitor traduz para a sua língua (ver `eventTypeName`, em
+       * `orcamento/data.ts`). Este formulário nunca pergunta um nome, logo não
+       * tem nenhum para enviar — e o «Outro» deixa de andar por aí a fingir
+       * que é um.
+       */
+      eventName: "",
       date: dateFlexible ? "" : data,
       guests: guestsFlexible ? 0 : Number(pessoas) || 0,
       location: local.trim(),

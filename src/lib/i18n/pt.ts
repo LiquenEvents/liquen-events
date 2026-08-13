@@ -762,18 +762,11 @@ export const pt = {
     intro:
       "Aqui reúne, num só lugar, tudo o que diz respeito ao seu evento connosco: a proposta, as condições, os pagamentos e os próximos passos.",
     dateLocale: "pt-PT",
-    // Rótulos amigáveis por tipo de evento (o Portal só lê dados; a substituição
-    // é feita no servidor e enviada como texto simples).
-    eventTypes: {
-      casamentos: "Casamento",
-      batizados: "Batizado",
-      aniversarios: "Aniversário",
-      jantares_gala: "Jantar de Gala",
-      conferencias: "Conferência",
-      teambuilding: "Teambuilding",
-      lancamentos: "Lançamento de Produto",
-      jantares_empresa: "Jantar de Empresa",
-    },
+    // O NOME de cada tipo de evento não está aqui: está em
+    // `orcamento/data.ts` (`EVENT_TYPE_NAMES`), ao lado da taxonomia que o
+    // gera, e é lido de lá pelo portal e pelo email de confirmação. Eram estas
+    // oito palavras escritas duas vezes — e duas listas da mesma coisa acabam
+    // sempre por divergir. Só o que sobra quando NÃO há tipo é copy:
     eventFallbackEmpresa: "Evento Corporativo",
     eventFallbackParticular: "Evento",
     semData: "Data a definir",

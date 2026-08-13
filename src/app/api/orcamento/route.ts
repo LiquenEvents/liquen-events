@@ -7,6 +7,7 @@ import {
   LOCATION_LABELS,
   BUDGET_RANGES,
   URGENCY_OPTIONS,
+  eventTagLabel,
 } from "@/lib/orcamento/data";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
@@ -298,7 +299,11 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
    *      que nunca discorda. As outras duas frases dizem «o seu pedido» — o
    *      cliente sabe o que pediu, e o email à equipa tem o resumo todo em cima.
    */
-  const evento = form.eventName?.trim() || et || cat || "";
+  // A etiqueta sai do mesmo sítio que a da confirmação — o `eventTagLabel`,
+  // que prefere a palavra do cliente e devolve o tipo no SINGULAR. A equipa lê
+  // sempre em português; o assunto que ela envia com um clique deixa de dizer
+  // «o seu pedido · Casamentos».
+  const evento = eventTagLabel(form, "pt") || cat || "";
 
   // The date is the hero — availability decides the booking. Lead with the
   // weekday, flag weekends, and show the full range for a multi-day event. The
@@ -653,16 +658,20 @@ async function confirmarAoCliente(id: string, form: QuoteFormData, locale: Local
       name: form.name,
       referenceId: id,
       event: {
-        // The client's OWN word first. The taxonomy label is a plural bucket
-        // ("Casamentos"), which this email drops into a singular sentence —
-        // "o vosso pedido para o casamentos de 25 de janeiro".
-        typeLabel:
-          form.eventName?.trim() ||
-          (form.category && form.eventType
-            ? EVENT_TYPES_BY_CATEGORY[form.category]?.find((e) => e.id === form.eventType)?.label
-            : undefined) ||
-          (form.category ? CATEGORIES.find((c) => c.id === form.category)?.label : undefined) ||
-          undefined,
+        /**
+         * A etiqueta do evento NA LÍNGUA DESTE EMAIL — é aqui que a tradução
+         * se faz, na leitura, porque o que está guardado é um identificador
+         * («casamentos») e não uma palavra. Antes vinha o `eventName`, que era
+         * o rótulo canónico PORTUGUÊS da lista: um email inglês dizia «Event:
+         * Casamento», e com o `eventName` vazio (é o que os anúncios enviam)
+         * caía-se no balde plural da taxonomia, «Casamentos».
+         *
+         * A palavra do PRÓPRIO cliente continua a ganhar — quem escreveu
+         * «Casamento da Ana e do João» lê isso de volta. O que o
+         * `eventTagLabel` deita fora é um rótulo de lista guardado onde devia
+         * estar um nome.
+         */
+        typeLabel: eventTagLabel(form, locale) || undefined,
         date: form.date,
         guests: form.guests || undefined,
         // Sem número, devolve-se a ordem de grandeza que ELA escolheu — em

@@ -11,6 +11,7 @@ import {
   type EventMetrics,
   type NextAction,
 } from "@/lib/orcamento/dossier";
+import { eventTagLabel } from "@/lib/orcamento/data";
 import { downloadEventIcs, printEventDossier, printRunSheet } from "../../export";
 import { Button } from "../../ui";
 
@@ -119,7 +120,9 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
 
   // Facts do título: cliente · evento · data · local.
   const titleBits = [
-    quote.eventName?.trim() || null,
+    // A etiqueta do evento: o nome que o cliente deu, ou o tipo no singular
+    // (o formulário público já não grava o rótulo da lista no `eventName`).
+    eventTagLabel(quote, "pt") || null,
     fmtDate(quote.date),
     quote.location?.trim() || null,
   ].filter(Boolean);

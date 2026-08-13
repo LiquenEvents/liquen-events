@@ -625,3 +625,95 @@ describe("concordância do nome do evento", () => {
     expect(accoes).toContain("Casamento da Ana e do João");
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * A ETIQUETA DO EVENTO NA CONFIRMAÇÃO — NA LÍNGUA DE QUEM A VAI LER
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * O email à equipa já tinha isto resolvido (ver «concordância do nome do
+ * evento», mais acima). A confirmação AO CLIENTE não: o que ela punha à frente
+ * era o `eventName`, e o `eventName` guardava o rótulo canónico PORTUGUÊS da
+ * lista — «Casamento», «Batizado / Comunhão», «Outro» — mesmo quando o
+ * visitante tinha lido o site inteiro em inglês. Saiu «Event: Casamento» a 5 e
+ * a 8 de agosto.
+ *
+ * E quando o `eventName` vinha vazio — que é SEMPRE, no tráfego pago: o
+ * PedidoRapido e o PedidoRelampago enviam `eventName: ""` com
+ * `eventType: "casamentos"` — o que sobrava era o balde no plural da
+ * taxonomia. «para o casamentos», três vezes, a 28 de julho.
+ *
+ * O que se guarda é o `eventType`, que é estável; a língua é escolhida na
+ * LEITURA, aqui, com o `eventTagLabel`.
+ */
+describe("a etiqueta do evento no email de confirmação", () => {
+  /** O segundo email é o do cliente (o primeiro é o da equipa). */
+  async function confirmacaoAoCliente(form: unknown, lang: "pt" | "en" = "pt") {
+    const res = await POST(pedidoNaLingua({ form }, lang));
+    expect(res.status).toBe(200);
+    await correrDepois();
+    return sendMailMock.mock.calls[1][0];
+  }
+
+  const casamentoDeAnuncio = {
+    ...validForm,
+    category: "particulares",
+    eventType: "casamentos",
+    // É isto que o PedidoRapido e o PedidoRelampago enviam.
+    eventName: "",
+    date: "2027-01-25",
+    location: "Évora",
+  };
+
+  it("um pedido vindo de um anúncio não recebe «para o casamentos»", async () => {
+    const cliente = await confirmacaoAoCliente(casamentoDeAnuncio);
+    expect(cliente.text ?? "").not.toContain("para o casamentos");
+    expect(cliente.html).not.toContain("para o casamentos");
+    // O tipo continua a aparecer — como etiqueta, no singular.
+    expect(cliente.text ?? "").toContain("Evento: Casamento");
+  });
+
+  it("quem escreveu em inglês lê o tipo em inglês", async () => {
+    const cliente = await confirmacaoAoCliente(casamentoDeAnuncio, "en");
+    expect(cliente.text ?? "").toContain("Event: Wedding");
+    expect((cliente.text ?? "").toLowerCase()).not.toContain("casamento");
+    expect(cliente.html.toLowerCase()).not.toContain("casamento");
+  });
+
+  it("um rótulo de lista guardado como nome não volta a passar por nome", async () => {
+    // Os pedidos já gravados trazem o rótulo da lista no `eventName` — é o que
+    // o formulário público lá pôs durante meses.
+    const cliente = await confirmacaoAoCliente(
+      {
+        ...validForm,
+        category: "particulares",
+        eventType: "batizados",
+        eventName: "Batizado / Comunhão",
+        date: "2027-05-03",
+      },
+      "en",
+    );
+    expect(cliente.text ?? "").toContain("Event: Christening");
+    expect(cliente.text ?? "").not.toContain("Batizado / Comunhão");
+  });
+
+  it("«Outro» não vira substantivo nem etiqueta em português num email inglês", async () => {
+    const cliente = await confirmacaoAoCliente(
+      { ...validForm, eventName: "Outro", date: "2027-05-15" },
+      "en",
+    );
+    const texto = (cliente.text ?? "").toLowerCase();
+    expect(texto).not.toContain("for your other");
+    expect(texto).not.toContain("event: outro");
+    // A frase confirma o que se sabe mesmo: a data.
+    expect(cliente.text ?? "").toContain("for 15 May 2027");
+  });
+
+  it("o nome que o cliente deu ao evento continua a ganhar ao tipo", async () => {
+    const cliente = await confirmacaoAoCliente({
+      ...casamentoDeAnuncio,
+      eventName: "Casamento da Ana e do João",
+    });
+    expect(cliente.text ?? "").toContain("Evento: Casamento da Ana e do João");
+  });
+});

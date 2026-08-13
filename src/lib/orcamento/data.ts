@@ -55,6 +55,117 @@ export function isPluralRegister(eventType: string | null | undefined): boolean 
   return eventType === "casamentos" || eventType === "batizados";
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM RÓTULO DE LISTA NÃO É UM SUBSTANTIVO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Os rótulos aqui em cima — e os de `EVENT_TYPES_BY_CATEGORY` — existem para
+ * uma LISTA de opções. Vêm no plural («Casamentos»), com barras («Batizado /
+ * Comunhão»), e um deles é a ausência de tipo («Outro»). Servem para quem
+ * escolhe; não servem para «o vosso pedido para o ___».
+ *
+ * Postos dentro de uma frase saíram exactamente como se esperaria, e saíram
+ * para clientes verdadeiros: «É um gosto receber o vosso pedido PARA O
+ * CASAMENTOS de 25 de janeiro», «para o OUTRO de 15 de maio», «para o BATIZADO
+ * / COMUNHÃO de 3 de maio» — a barra de uma lista pendente a meio de uma frase.
+ *
+ * A separação é feita AQUI, na origem, e não em cada sítio que escreve uma
+ * frase, porque eram cinco a remendar e o sexto nascia com o defeito:
+ *
+ *   • `QUOTE_EVENT_OPTIONS[].label` e os `label` da taxonomia — rótulos de
+ *     LISTA. Só para desenhar a lista.
+ *   • {@link eventTypeName} — o NOME do tipo, singular, sem barras, na língua
+ *     de quem lê. É uma ETIQUETA («Evento: Casamento», «Wedding · 12 June»),
+ *     nunca o sujeito de uma frase que precise de artigo.
+ *   • {@link isQuoteOptionLabel} — reconhece um rótulo de lista guardado onde
+ *     devia estar um nome, que é o que a base de dados tem de trás.
+ *
+ * E NENHUMA frase para o cliente depende de um artigo colado ao tipo. Não há
+ * pluralizador nem tabela de géneros (nem os haverá: «Conferência» é feminino,
+ * «Casamento» masculino, e «Outro» não tem salvação nenhuma como substantivo).
+ * As frases foram reescritas para não precisarem — a mesma decisão que o email
+ * à equipa já tinha tomado, em `api/orcamento/route.ts`.
+ */
+
+/**
+ * O NOME de cada tipo de evento, nas duas línguas.
+ *
+ * Guardado fica só o `eventType`: um identificador estável, que não muda com a
+ * língua de quem preencheu nem com a redacção de um rótulo. A tradução é da
+ * LEITURA — como já acontece com a cerimónia e o espaço, mais abaixo. Era o
+ * contrário que punha «Event: Casamento» num email inglês: a língua tinha sido
+ * decidida na ESCRITA, e ficou lá gravada.
+ */
+export const EVENT_TYPE_NAMES: Record<EventType, { pt: string; en: string }> = {
+  casamentos: { pt: "Casamento", en: "Wedding" },
+  batizados: { pt: "Batizado", en: "Christening" },
+  aniversarios: { pt: "Aniversário", en: "Birthday" },
+  jantares_gala: { pt: "Jantar de Gala", en: "Gala Dinner" },
+  conferencias: { pt: "Conferência", en: "Conference" },
+  teambuilding: { pt: "Teambuilding", en: "Team Building" },
+  lancamentos: { pt: "Lançamento de Produto", en: "Product Launch" },
+  jantares_empresa: { pt: "Jantar de Empresa", en: "Company Dinner" },
+};
+
+/** O nome do tipo de evento, na língua de quem lê. Vazio quando não há tipo
+ *  (é o que o «Outro» do formulário grava) ou quando não o conhecemos — e uma
+ *  etiqueta vazia é uma linha que não se escreve, não um espaço em branco. */
+export function eventTypeName(eventType: unknown, locale = "pt"): string {
+  const nome = typeof eventType === "string" ? EVENT_TYPE_NAMES[eventType as EventType] : undefined;
+  if (!nome) return "";
+  return locale.startsWith("en") ? nome.en : nome.pt;
+}
+
+/** Só para comparar rótulos: sem espaços a mais, sem caixa, sem acentos. */
+function chaveDeRotulo(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Isto que está guardado como «nome do evento» é, afinal, um rótulo de lista?
+ *
+ * O `eventName` devia ser o nome que o cliente deu ao evento dele («Casamento
+ * da Ana e do João»), e é por isso que vale a pena preferi-lo ao tipo. Mas o
+ * formulário público gravou lá durante muito tempo o rótulo da LISTA — sempre
+ * em português, mesmo nos pedidos feitos em inglês —, e a base de dados está
+ * cheia deles. Reconhecê-los é o que impede que voltem a passar por nome: no
+ * portal apareciam ao lado do tipo, «Casamento · Casamento · 15 de maio», e
+ * num pedido inglês «Wedding · Casamento».
+ */
+export function isQuoteOptionLabel(value: unknown): boolean {
+  const chave = chaveDeRotulo(value);
+  if (!chave) return false;
+  const rotulos = [
+    ...QUOTE_EVENT_OPTIONS.map((o) => o.label),
+    ...Object.values(EVENT_TYPES_BY_CATEGORY).flatMap((tipos) => tipos.map((t) => t.label)),
+  ];
+  return rotulos.some((r) => chaveDeRotulo(r) === chave);
+}
+
+/**
+ * A ETIQUETA do evento, na língua de quem lê: o nome que o cliente lhe deu, ou
+ * o tipo que escolheu. Vazia quando não há nem um nem outro — e uma etiqueta
+ * vazia não se escreve.
+ *
+ * Etiqueta é tudo o que isto é: entra depois de um «·» ou de um «Evento:»,
+ * onde nunca há concordância para discordar. Não é para se lhe colar um artigo
+ * à frente.
+ */
+export function eventTagLabel(
+  quote: { eventName?: string | null; eventType?: string | null },
+  locale = "pt",
+): string {
+  const proprio = String(quote.eventName ?? "").trim();
+  if (proprio && !isQuoteOptionLabel(proprio)) return proprio;
+  return eventTypeName(quote.eventType, locale);
+}
+
 export const EVENT_TYPES_BY_CATEGORY: Record<
   EventCategory,
   {

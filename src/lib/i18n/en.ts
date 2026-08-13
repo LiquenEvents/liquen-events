@@ -725,18 +725,8 @@ export const en: Dict = {
     intro:
       "Here you'll find everything about your event with us in one place: the proposal, the terms, payments and next steps.",
     dateLocale: "en-GB",
-    // Friendly labels per event type (the portal only reads data; substitution
-    // happens on the server and is sent down as plain text).
-    eventTypes: {
-      casamentos: "Wedding",
-      batizados: "Christening",
-      aniversarios: "Birthday",
-      jantares_gala: "Gala Dinner",
-      conferencias: "Conference",
-      teambuilding: "Team Building",
-      lancamentos: "Product Launch",
-      jantares_empresa: "Company Dinner",
-    },
+    // Ver `pt.ts`: os nomes dos tipos de evento vivem em `orcamento/data.ts`.
+    // Aqui fica só o que se diz quando não há tipo nenhum.
     eventFallbackEmpresa: "Corporate Event",
     eventFallbackParticular: "Event",
     semData: "Date to be confirmed",
