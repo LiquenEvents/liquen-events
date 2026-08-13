@@ -50,10 +50,18 @@ vi.mock("@/lib/passkeys-store", async (orig) => ({
   }),
 }));
 
-const contas = vi.hoisted(() => ({ existe: true }));
+const contas = vi.hoisted(() => ({ existe: true, perguntados: [] as string[] }));
 vi.mock("@/lib/admin-auth", async (orig) => ({
   ...(await orig<typeof import("@/lib/admin-auth")>()),
-  contaExiste: () => contas.existe,
+  // O NOME passa à frente e fica GUARDADO. Um duplo que o deitasse fora
+  // respondia a uma pergunta que ninguém tinha feito: a barreira aqui não é
+  // «alguma conta existe», é «existe A CONTA DESTA CREDENCIAL». Sem isto, uma
+  // guarda que perguntasse pelo id do aparelho — ou por um nome fixo — passava
+  // este teste na mesma, e tirar alguém do ADMIN_USERS deixava de fechar nada.
+  contaExiste: (nome: string) => {
+    contas.perguntados.push(nome);
+    return contas.existe;
+  },
 }));
 
 const { POST, GET } = await import("./route");
@@ -101,6 +109,7 @@ beforeEach(() => {
   store.credencial = credencial();
   store.usos = [];
   contas.existe = true;
+  contas.perguntados = [];
 });
 
 describe("GET — o desafio", () => {
@@ -142,6 +151,12 @@ describe("POST — as barreiras", () => {
     const res = await POST(pedido());
     expect(res.status).toBe(401);
     expect(res.cookies.get(ADMIN_COOKIE)?.value).toBeFalsy();
+    // E perguntou pela conta CERTA: a que está presa à credencial guardada, e
+    // não ao id do aparelho que veio no pedido (que quem bate à porta escolhe).
+    expect(
+      contas.perguntados,
+      "a barreira tem de perguntar pelo `userName` da credencial guardada",
+    ).toEqual(["Catarina"]);
   });
 
   it("assinatura inválida é recusada", async () => {
