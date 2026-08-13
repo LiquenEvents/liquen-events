@@ -230,6 +230,28 @@ export default async function RootLayout({
       lang={htmlLang(locale)}
       data-scroll-behavior="smooth"
       className={`${inter.variable} ${playfair.variable} ${playfairItalico.variable} ${archivo.variable}`}
+      /**
+       * O `className` desta etiqueta é escrito por NÓS no servidor e mexido por
+       * um script ANTES da hidratação — o do `<head>` aqui abaixo, que
+       * acrescenta `com-javascript`, `consentimento-decidido` e
+       * `fontes-por-assentar`. Quando o React hidrata, encontra um `class`
+       * diferente do que serviu e acusa: «some attributes of the server
+       * rendered HTML didn't match the client properties».
+       *
+       * Em produção é só um aviso na consola. Em DESENVOLVIMENTO abre o painel
+       * de erro do Next, que é um `<nextjs-portal>` por cima de tudo — e um
+       * painel por cima de tudo intercepta o toque. Foi assim que apareceu:
+       * o passeio da ergonomia táctil deixou de conseguir carregar na barra de
+       * baixo, com «<nextjs-portal> subtree intercepts pointer events».
+       *
+       * Aqui o `suppressHydrationWarning` é o que a documentação manda usar, e
+       * não um atalho para calar um defeito: a diferença é DELIBERADA (o script
+       * tem de correr antes da primeira pintura, senão o resgate sem JS e a
+       * decisão dos cookies piscavam), e o `class` do `<html>` não é conteúdo
+       * que o React gere. A supressão é rasa — vale para os atributos DESTA
+       * etiqueta e não esconde nada do que está lá dentro.
+       */
+      suppressHydrationWarning
     >
       {/*
         O QUE FICA AQUI E O QUE SAIU DAQUI.
