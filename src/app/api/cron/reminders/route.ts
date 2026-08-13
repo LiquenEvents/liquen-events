@@ -27,6 +27,28 @@ export const maxDuration = 60;
  * production a missing secret fails closed instead of leaving the endpoint
  * wide open (see lib/env.ts, which also warns loudly at startup about this).
  */
+/**
+ * O DIA É O DE LISBOA, e está escrito à mão de propósito.
+ *
+ * As datas com que este resumo compara — `q.date`, `followUpAt`, a data de um
+ * pagamento — são dias do calendário escritos por quem trabalha em Portugal.
+ * O servidor corre em UTC, e no Verão Lisboa está uma hora à frente: entre a
+ * meia-noite e a uma da manhã o calendário daqui já virou e o de UTC não. Um
+ * «hoje» em UTC dava, à 00h30, o dia de ONTEM — o seguimento marcado para hoje
+ * não aparecia, a janela dos 3 dias fechava um dia mais cedo e o casamento que
+ * já tinha acontecido continuava a ser anunciado como próximo.
+ *
+ * Nem local (`setHours`) nem UTC, portanto: o fuso do negócio, pelo nome, como
+ * já se faz no `EntradaComFotografia` e nas conversões do Ads.
+ */
+const FUSO = "Europe/Lisbon";
+const DIA_EM_LISBOA = new Intl.DateTimeFormat("en-CA", {
+  timeZone: FUSO,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 function authorized(req: NextRequest): boolean {
   // A logged-in admin can always trigger it manually (e.g. to test).
   if (isAuthed(req)) return true;
@@ -55,19 +77,15 @@ export async function GET(request: NextRequest) {
     // Archived quotes are soft-deleted — never worth a notification.
     const quotes = allQuotes.filter((q) => !q.archived);
 
-    // Anchor "today" in UTC — the day keys we compare against (q.date,
-    // followUpAt, payment/calendar dates) are all UTC yyyy-mm-dd strings
-    // (`toISOString().slice(0,10)` elsewhere). Using local `setHours`/`setDate`
-    // here mixed a LOCAL midnight into a UTC key, so in any east-of-UTC zone
-    // (e.g. Europe/Lisbon, the app's own locale) the whole window slipped a day.
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const key = (d: Date) => d.toISOString().slice(0, 10);
-    const todayKey = key(today);
+    // O dia de hoje em Lisboa (ver a nota do `DIA_EM_LISBOA`), e a partir dele
+    // a aritmética da janela. Os dias somam-se ao MEIO-DIA em UTC: é o único
+    // sítio da hora onde nem uma mudança de hora nem um fuso conseguem empurrar
+    // a data para o dia ao lado.
+    const todayKey = DIA_EM_LISBOA.format(new Date());
     const plus = (days: number) => {
-      const d = new Date(today);
+      const d = new Date(`${todayKey}T12:00:00Z`);
       d.setUTCDate(d.getUTCDate() + days);
-      return key(d);
+      return d.toISOString().slice(0, 10);
     };
     const in3 = plus(3);
     const in7 = plus(7);
@@ -163,14 +181,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ sent: 0, reason: "nada a notificar" });
     }
 
-    const { sent } = await sendPushToAll({
+    const { sent, failed } = await sendPushToAll({
       title: "Resumo Líquen · hoje",
       body: lines.join(" · "),
       url: "/orcamento/admin",
       tag: "resumo-diario",
     });
 
-    return NextResponse.json({ sent, summary: lines });
+    // `falhados` sai na resposta porque HAVIA o que dizer e não chegou a
+    // aparelho nenhum — sem isto, quem carrega no sino lê o mesmo `sent: 0` que
+    // lê num dia sossegado, e fica descansado por engano.
+    return NextResponse.json({ sent, falhados: failed, summary: lines });
   } catch (err) {
     log.error("cron reminders falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

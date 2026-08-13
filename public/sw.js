@@ -14,7 +14,12 @@
 
 // v3: a vista de carregamento de material passa a poder abrir offline (uma
 // rota, o invólucro só). Bumping the name purges older caches.
-const CACHE = "liquen-cache-v3";
+//
+// v4: as navegações deixaram de guardar respostas que não são a página (ver
+// `vaiParaOInvolucro`). O nome sobe porque a correcção não chega a quem já tem
+// um 500 ou um redireccionamento gravado — é o `activate` que apaga as caches
+// que não conhece, e sem esta subida essa página de erro ficava lá.
+const CACHE = "liquen-cache-v4";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    AS MINIATURAS DA BIBLIOTECA DE TEMAS, GUARDADAS SEM O TOKEN
@@ -207,6 +212,28 @@ function isBypassed(url) {
   );
 }
 
+/**
+ * Esta navegação pode ficar guardada como sendo A PÁGINA?
+ *
+ * Guardava-se o que viesse — e o que vem nem sempre é a página. Durante uma
+ * publicação, ou num minuto mau do alojamento, o que chega é um 500; de uma
+ * ligação velha, um 404. Escritos na cache com a chave da página real, passam a
+ * SER a página quando não houver rede: quem abrir o sítio offline não recebe o
+ * `offline.html`, recebe o erro daquele minuto — e recebe-o até a cache mudar
+ * de nome, que pode ser meses.
+ *
+ * Uma resposta REDIRECCIONADA é recusada pela mesma razão prática: devolvê-la a
+ * uma navegação a partir de um service worker é um erro do browser, e o que se
+ * vê offline não é a página nem o ecrã de offline — é um ecrã de erro.
+ *
+ * A regra é a mesma que o `vaiParaODisco` já aplica às fotografias: só se grava
+ * o que se conseguiu confirmar que é bom. Uma falha não escrita repete-se e
+ * resolve-se sozinha; uma falha escrita fica.
+ */
+function vaiParaOInvolucro(res) {
+  return !!res && res.ok && !res.redirected;
+}
+
 // Content-hashed / immutable assets — safe to serve cache-first.
 function isStaticAsset(url) {
   return (
@@ -247,8 +274,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          if (vaiParaOInvolucro(res)) {
+            const copy = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
           return res;
         })
         .catch(async () => {

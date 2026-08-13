@@ -170,13 +170,45 @@ interface PushPayload {
   tag?: string;
 }
 
-/** Sends a push to every subscriber. Never throws; prunes dead subs. */
-export async function sendPushToAll(payload: PushPayload): Promise<{ sent: number }> {
-  if (!pushConfigured()) return { sent: 0 };
+/**
+ * Sends a push to every subscriber. Never throws; prunes dead subs.
+ *
+ * ── E O QUE NÃO CHEGOU FICA DITO ──────────────────────────────────────────
+ *
+ * Isto apanhava TODOS os erros e não fazia nada com nenhum: só o 404 e o 410
+ * levavam a alguma coisa. Uma chave VAPID rodada, um `VAPID_SUBJECT` que o
+ * serviço recusa, um 403 da Google — tudo devolvia `{ sent: 0 }`, que é
+ * exactamente o que se devolve quando não havia ninguém para avisar.
+ *
+ * O percurso: rodam-se as chaves numa manhã e nunca mais chega uma
+ * notificação. O sino diz «Sem novidades para notificar agora», o registo não
+ * tem uma linha e o Sentry não tem um evento — o sistema está avariado e a
+ * única coisa visível é silêncio, que ninguém distingue de sossego.
+ *
+ * Por isso passam a sair duas coisas: o número de falhas (para quem chama
+ * poder dizer a verdade a quem está a olhar) e uma linha de erro com os
+ * códigos. SEM os endereços: um endpoint de push é uma credencial — quem o tem
+ * manda notificações para aquele aparelho —, e os registos são conservados e
+ * reencaminhados para terceiros.
+ *
+ * Um 410/404 NÃO é falha: é o browser que se desinstalou. Limpa-se e segue.
+ */
+export async function sendPushToAll(
+  payload: PushPayload,
+): Promise<{ sent: number; failed: number }> {
+  if (!pushConfigured()) {
+    log.warn(
+      "push: sem chaves VAPID nenhuma notificação é enviada — defina VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY",
+      { titulo: payload.title },
+    );
+    return { sent: 0, failed: 0 };
+  }
 
   const subs = await listSubscriptions();
   const body = JSON.stringify(payload);
   let sent = 0;
+  let mortas = 0;
+  const codigos: number[] = [];
 
   await Promise.all(
     subs.map(async (sub) => {
@@ -187,10 +219,25 @@ export async function sendPushToAll(payload: PushPayload): Promise<{ sent: numbe
         const code = (err as { statusCode?: number }).statusCode;
         if (code === 404 || code === 410) {
           await removeSubscription(sub.endpoint).catch(() => {});
+          mortas++;
+          return;
         }
+        codigos.push(code ?? 0);
       }
     }),
   );
 
-  return { sent };
+  if (codigos.length > 0) {
+    log.error("push: notificações não entregues", null, {
+      falhadas: codigos.length,
+      enviadas: sent,
+      // 0 = o erro não trouxe código (rede, DNS, timeout).
+      codigos: [...new Set(codigos)].sort((a, b) => a - b),
+    });
+  }
+  if (mortas > 0) {
+    log.info("push: subscrições mortas removidas", { removidas: mortas });
+  }
+
+  return { sent, failed: codigos.length };
 }

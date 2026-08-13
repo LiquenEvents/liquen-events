@@ -29,6 +29,8 @@ const st = vi.hoisted(() => ({
   lido: "[]",
   escrito: null as string | null,
   enviadas: [] as string[],
+  /** Código HTTP com que o serviço de push recusa a entrega, quando recusa. */
+  recusaCom: null as number | null,
 }));
 
 vi.mock("./supabase", () => ({ getSupabase: () => st.cliente }));
@@ -45,6 +47,12 @@ vi.mock("web-push", () => ({
   default: {
     setVapidDetails: vi.fn(),
     sendNotification: vi.fn(async (sub: { endpoint: string }) => {
+      if (st.recusaCom !== null) {
+        // A forma do erro do `web-push`: o código HTTP vem em `statusCode`.
+        throw Object.assign(new Error(`push recusado (${st.recusaCom})`), {
+          statusCode: st.recusaCom,
+        });
+      }
       st.enviadas.push(sub.endpoint);
     }),
   },
@@ -52,6 +60,7 @@ vi.mock("web-push", () => ({
 
 import { saveSubscription, removeSubscription, sendPushToAll } from "./push";
 import { isPersistenceUnavailable } from "./repository";
+import { log } from "./logger";
 
 const SUB = {
   endpoint: "https://fcm.googleapis.com/fcm/send/abc123",
@@ -63,6 +72,8 @@ beforeEach(() => {
   st.lido = "[]";
   st.escrito = null;
   st.enviadas = [];
+  st.recusaCom = null;
+  vi.clearAllMocks();
   vi.stubEnv("VAPID_PUBLIC_KEY", "pub");
   vi.stubEnv("VAPID_PRIVATE_KEY", "priv");
 });
@@ -126,6 +137,64 @@ describe("em desenvolvimento o ficheiro continua a ser um sítio", () => {
     st.lido = JSON.stringify([SUB]);
     const r = await sendPushToAll({ title: "Pedido novo", body: "…" });
     expect(r.sent).toBe(1);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA ENTREGA QUE FALHA TEM DE DEIXAR RASTO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O envio apanhava TODOS os erros e não fazia nada com eles: só o 404 e o 410
+ * levavam a alguma coisa (apagar a subscrição). Uma chave VAPID trocada, um
+ * assunto inválido, o serviço de push da Google a responder 403 — tudo isso
+ * devolvia `{ sent: 0 }`, exactamente igual a «não havia nada para enviar».
+ *
+ * O percurso: as chaves são rodadas numa manhã e ninguém volta a receber uma
+ * notificação. O painel diz «Sem novidades para notificar agora», o registo não
+ * tem uma linha, o Sentry não tem um evento. O sistema inteiro está avariado e
+ * a única coisa que se vê é silêncio — que é indistinguível de sossego.
+ */
+describe("o que falha na entrega é contado e registado", () => {
+  beforeEach(() => {
+    vi.stubEnv("NODE_ENV", "development");
+    st.lido = JSON.stringify([SUB, { ...SUB, endpoint: `${SUB.endpoint}-2` }]);
+  });
+
+  it("uma recusa do serviço de push é contada e sai no registo", async () => {
+    st.recusaCom = 403;
+    const r = await sendPushToAll({ title: "Pedido novo", body: "…" });
+    expect(r).toMatchObject({ sent: 0, failed: 2 });
+    expect(log.error).toHaveBeenCalled();
+  });
+
+  it("o registo não leva o endereço da subscrição, que é uma credencial", async () => {
+    // O endpoint de push é uma capacidade: quem o tem manda notificações para
+    // aquele aparelho. Não vai para registos que são conservados e reencaminhados.
+    st.recusaCom = 403;
+    await sendPushToAll({ title: "Pedido novo", body: "…" });
+    expect(
+      JSON.stringify((log.error as unknown as { mock: { calls: unknown[] } }).mock.calls),
+    ).not.toContain(SUB.endpoint);
+  });
+
+  it("uma subscrição morta é limpa e NÃO conta como avaria", async () => {
+    // 410 é o funcionamento normal: o browser desinstalou-se, apaga-se e segue.
+    // Contá-la como falha punha o painel a gritar por causa de nada.
+    st.recusaCom = 410;
+    const r = await sendPushToAll({ title: "Pedido novo", body: "…" });
+    expect(r).toMatchObject({ sent: 0, failed: 0 });
+    expect(log.error).not.toHaveBeenCalled();
+  });
+
+  it("sem chaves VAPID diz-se qual é a variável que falta", async () => {
+    vi.stubEnv("VAPID_PUBLIC_KEY", "");
+    vi.stubEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "");
+    vi.stubEnv("VAPID_PRIVATE_KEY", "");
+    const r = await sendPushToAll({ title: "Pedido novo", body: "…" });
+    expect(r).toMatchObject({ sent: 0 });
+    const dito = JSON.stringify((log.warn as unknown as { mock: { calls: unknown[] } }).mock.calls);
+    expect(dito).toContain("VAPID");
   });
 });
 
