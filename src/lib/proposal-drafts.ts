@@ -227,6 +227,25 @@ export const mapper: Mapper<RascunhoNaCopia> = {
   table: "app_state",
   fileName: "app-state.json",
   getId: (r) => r.key,
+  /**
+   * A chave do `app_state` chama-se `key`, não `id` (db/schema.sql: `key text
+   * primary key`). Esta é a segunda tabela do sistema assim — a outra é a
+   * `biblioteca_fotos`, cuja chave é `path`, e onde a omissão desta linha custou
+   * a etiquetagem, a LQIP e a cor de todas as fotografias em produção: o
+   * Supabase perguntava `where id = …`, o Postgres respondia `42703 — column
+   * does not exist` e o `isMissingTable` traduzia isso para «a funcionalidade
+   * não está instalada».
+   *
+   * Hoje nenhuma escrita chega a usá-la — os rascunhos têm caminho próprio
+   * (`RestoreTarget.replace` → `replaceProposalDrafts` → `setState`), e é por
+   * isso que a falta nunca deu erro. Mas o `replaceAll` da reposição JÁ lê
+   * `mapper.idColumn ?? "id"` para apagar a tabela, e este mapper é a tradução
+   * oficial destas linhas: no dia em que alguém lhe der um `createRepository`
+   * ou tirar o `replace`, o `where id = 'proposal-draft:<pedido>'` volta — e o
+   * que fica por repor são as propostas por acabar, que não existem em mais
+   * lado nenhum. Declará-la custa uma linha e fecha a porta.
+   */
+  idColumn: "key",
   toRow: (r) => ({
     key: r.key,
     value: {

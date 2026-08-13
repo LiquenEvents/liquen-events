@@ -847,12 +847,29 @@ alter table public.proposal_themes add column if not exists kind text not null d
 --   {"v":1,"eixos":[{"eixo":"tipo","modo":"todas","etiquetas":["tipo:bouquet"]}]}
 alter table public.proposal_themes add column if not exists filter_rule jsonb;
 
--- Lista de caminhos escolhidos à mão, para os temas que não encaixam em
--- etiqueta nenhuma (`kind = 'manual'`).
-alter table public.proposal_themes add column if not exists manual_paths jsonb;
-
 alter table public.proposal_themes add column if not exists favorito boolean not null default false;
 alter table public.proposal_themes add column if not exists arquivado boolean not null default false;
+
+-- ── AS DUAS QUE AINDA NÃO TÊM A OUTRA METADE ────────────────────────────
+-- Estas duas colunas estão criadas e VAZIAS: nenhum `toRow` as escreve, nenhum
+-- `fromRow` as lê, nenhuma rota lhes toca. Estão aqui porque o plano (ver
+-- TEMAS-PLANO.md §4.4) as previu à frente do código, e ficam — criá-las não
+-- custa nada e apagá-las custaria a quem já as tiver preenchido um dia. O que
+-- não pode ficar é a impressão de que funcionam.
+--
+--   manual_paths — a lista de fotos de um tema `kind = 'manual'`. O `kind`
+--     aceita 'manual' (restrição mais abaixo) e o `themes-store` até o lê, mas
+--     NENHUMA rota cria temas manuais: `POST /api/temas` só produz 'pasta' ou
+--     'filtro'. É meia funcionalidade, não uma funcionalidade partida.
+--   ordem — ordem manual dos TEMAS na lista (não confundir com `photo_order`,
+--     que é a ordem das FOTOS dentro de um tema). A lista ordena-se por nome.
+--
+-- QUEM LHES DER USO faz as duas metades na mesma alteração, como o
+-- `photo_order` já está feito: o campo em `ProposalTheme`, o par toRow/fromRow
+-- com a mesma escrita condicional (para uma base sem a coluna continuar a
+-- aceitar um simples renomear), e tira a coluna da lista `NAO_TOCADAS` em
+-- src/lib/mapeamento-e-schema.test.ts — que é o teste que hoje as vigia.
+alter table public.proposal_themes add column if not exists manual_paths jsonb;
 alter table public.proposal_themes add column if not exists ordem int;
 
 do $$ begin
