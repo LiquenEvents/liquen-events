@@ -205,3 +205,88 @@ describe("ProposalResponse — a decisão é anunciada, não só pintada", () =>
     await waitFor(() => expect(document.activeElement).toBe(document.body));
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O BOTÃO QUE FICAVA SÓ COM RETICÊNCIAS
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Enquanto o pedido está a correr, cada botão troca o rótulo pelo seu par
+ * «…Sending». O do aceitar dizia «A registar…»; o do recusar dizia, à letra,
+ * `"…"` — três pontos e mais nada, nas DUAS línguas.
+ *
+ * O que o casal via: carregava em «Recusar», confirmava, e o botão ficava um
+ * quadrado com reticências enquanto a resposta viajava. Sem palavra nenhuma
+ * não há como saber se está a acontecer alguma coisa — e num telemóvel com
+ * rede fraca isso é vários segundos a olhar para «…». Quem lê com um leitor de
+ * ecrã ouve o botão anunciar-se como «reticências».
+ *
+ * Passa a dizer o mesmo que o irmão, que é o que está mesmo a acontecer: a
+ * resposta está a ser registada.
+ */
+describe("ProposalResponse — o que os botões dizem enquanto esperam", () => {
+  it("o botão de recusar diz o que está a fazer, não «…»", () => {
+    for (const lingua of ["pt", "en"] as const) {
+      const d = getDictionary(lingua).proposta.response;
+      expect(d.recusarSending, `[${lingua}] um rótulo sem palavras`).not.toBe("…");
+      expect(d.recusarSending.replace(/[….\s]/g, "").length, `[${lingua}]`).toBeGreaterThan(0);
+      // E diz o MESMO que o do aceitar: as duas respostas são registadas igual.
+      expect(d.recusarSending).toBe(d.aceitarSending);
+    }
+  });
+
+  it("e é esse rótulo que aparece no botão enquanto o pedido corre", async () => {
+    let libertar: (v: unknown) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise((r) => {
+            libertar = r;
+          }),
+      ),
+    );
+    render(<ProposalResponse token="bom" initialStatus="enviada" proposta={tp} />);
+    await userEvent.click(screen.getByRole("button", { name: tp.response.recusar }));
+    expect(await screen.findByRole("button", { name: tp.response.recusarSending })).toBeTruthy();
+    libertar({ ok: true, json: async () => ({ status: "rejeitada" }) });
+    await waitFor(() => expect(screen.getByRole("status")).toBeTruthy());
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * DOIS BOTÕES «RECUSAR» NO MESMO ECRÃ
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Medido num telemóvel (390×844, a página servida em dev), com o Playwright a
+ * recusar-se a carregar por ambiguidade:
+ *
+ *     strict mode violation: getByRole('button', { name: 'Recusar' })
+ *       resolved to 2 elements:
+ *       1) <button …>Recusar</button>            ← recusa a PROPOSTA
+ *       2) <button …>Recusar</button>            ← recusa os COOKIES
+ *
+ * O aviso de cookies (`ConsentBanner`) é fixo ao fundo do ecrã e acompanha o
+ * scroll: enquanto ninguém lhe tocar, os dois «Recusar» estão à vista ao mesmo
+ * tempo, no ecrã onde o casal decide um casamento. O lado do aceitar já estava
+ * desambiguado — «Aceitar proposta →» contra «Aceitar» — e só o do recusar é
+ * que não estava.
+ *
+ * Recusar uma proposta é irreversível do lado do cliente (a rota é idempotente:
+ * a segunda resposta devolve a primeira). Um toque no botão errado não se
+ * desfaz — por isso o rótulo diz O QUE se recusa, como o do lado de cima.
+ */
+describe("ProposalResponse — o botão de recusar nomeia o que recusa", () => {
+  it("não se confunde com o «Recusar» do aviso de cookies", () => {
+    for (const lingua of ["pt", "en"] as const) {
+      const d = getDictionary(lingua).proposta.response;
+      // O rótulo do banner de cookies (ver `ConsentBanner`) é a palavra sozinha.
+      const doBanner = lingua === "pt" ? "Recusar" : "Decline";
+      expect(d.recusar, `[${lingua}]`).not.toBe(doBanner);
+      expect(d.recusar.length, `[${lingua}] tem de nomear o objecto`).toBeGreaterThan(
+        doBanner.length,
+      );
+    }
+  });
+});

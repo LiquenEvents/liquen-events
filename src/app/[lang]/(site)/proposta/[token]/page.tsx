@@ -146,9 +146,16 @@ function Message({ title, body, lang }: { title: string; body: string; lang: str
           {title}
         </h1>
         <p className="text-foreground/72 text-sm leading-relaxed">{body}</p>
+        {/* O ÚNICO caminho que sobra nesta página, e por isso tem de se poder
+            carregar nele com um polegar. Medido num telemóvel: 252×16 px. O
+            texto é minúsculo (`text-xs` em maiúsculas) e está sozinho — não é
+            uma ligação no meio de uma frase, é O botão desta página, e quem
+            aqui chega já teve uma contrariedade.
+            `alvo-toque` é a classe da casa (globals.css): 44 px SÓ em ecrãs de
+            toque, portanto o portátil fica exactamente como estava. */}
         <a
           href={`mailto:${SITE.email}`}
-          className="inline-block mt-8 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
+          className="alvo-toque inline-flex items-center mt-8 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
         >
           {SITE.email}
         </a>
@@ -197,6 +204,29 @@ export default async function ProposalPage({
   const locale = idiomaDaProposta(proposal);
   const t = getDictionary(locale).proposta;
 
+  /**
+   * ── «OLÁ, .» ────────────────────────────────────────────────────────────
+   *
+   * O título era `{t.greeting}, {proposal.clientName.split(" ")[0]}.` e não
+   * tinha guarda nenhuma. Com o nome do cliente vazio — uma linha antiga em
+   * que `client_name` ficou a `null` (o `fromRow` traduz isso para `""`) — o
+   * casal abria o link do email e a primeira coisa que lia, em Playfair a 52
+   * px, era:
+   *
+   *     Olá, .
+   *
+   * E com o campo em falta de todo, o `.split` de `undefined` atirava: o casal
+   * apanhava a página de «Ocorreu um erro inesperado» em vez da proposta.
+   *
+   * Sem nome, cumprimenta-se na mesma — «Olá.» — que é uma frase inteira e não
+   * denuncia nada. Com nome, é exactamente o que sempre saiu.
+   */
+  const primeiroNome =
+    String(proposal.clientName ?? "")
+      .trim()
+      .split(/\s+/)[0] ?? "";
+  const saudacao = primeiroNome ? `${t.greeting}, ${primeiroNome}.` : `${t.greeting}.`;
+
   const cur = proposal.currency || "EUR";
   // Mirror the API's expiry rule (through the WHOLE of the last valid day, i.e.
   // 23:59:59) so the client sees an "expired" notice up front instead of only
@@ -226,7 +256,7 @@ export default async function ProposalPage({
             className="text-foreground/90 font-bold"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 5vw, 52px)" }}
           >
-            {t.greeting}, {proposal.clientName.split(" ")[0]}.
+            {saudacao}
           </h1>
           <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
             {t.intro}

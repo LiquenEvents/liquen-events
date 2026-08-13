@@ -63,15 +63,40 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * divergiam.
      *
      * O primeiro nome, como no ecrã: é assim que se trata alguém numa mensagem
-     * («Olá Ana,»), e não pelo nome completo. Sem nome no pedido — os que
-     * entram por telefonema podem não ter — o marcador é RETIRADO na mesma: um
-     * «Olá ,» é um lapso de escrita, um «Olá {nome},» é software estragado à
-     * vista do cliente.
+     * («Olá Ana,»), e não pelo nome completo.
+     *
+     * ── SEM NOME NO PEDIDO, SAI O MARCADOR *E* O BURACO QUE ELE DEIXA ──────
+     *
+     * Os pedidos que entram por telefonema podem não ter nome. Tirar só o
+     * `{nome}` resolvia metade do problema e deixava a outra à vista: o modelo
+     * de resposta rápida começa por «Olá {nome},» e o cliente lia
+     *
+     *     Olá , obrigada pelo seu contacto!
+     *
+     * — que não é melhor do que o marcador cru, é só um erro diferente, e é o
+     * que estava a acontecer (o teste desta rota media apenas que o `{nome}`
+     * desaparecia). Tira-se o espaço que precede o marcador, e quando ele abre
+     * a linha tira-se também a pontuação que ficaria pendurada:
+     *
+     *     «Olá {nome}, obrigada!»   → «Olá, obrigada!»
+     *     «{nome}, bom dia»         → «bom dia»
+     *     «Falamos com {nome} logo» → «Falamos com logo»  (o espaço não se soma)
+     *
+     * Com nome, nada disto corre: é a substituição simples de sempre.
      */
-    const primeiroNome = String(quote.name ?? "")
-      .trim()
-      .split(/\s+/)[0];
-    const message = escrita.replace(/\{nome\}/g, primeiroNome ?? "");
+    const primeiroNome =
+      String(quote.name ?? "")
+        .trim()
+        .split(/\s+/)[0] ?? "";
+    const message = primeiroNome
+      ? escrita.replace(/\{nome\}/g, primeiroNome)
+      : escrita
+          // O marcador a ABRIR uma linha leva consigo a vírgula (ou os dois
+          // pontos) que ficaria a começar a frase.
+          .replace(/^[ \t]*\{nome\}[ \t]*[,;:]?[ \t]*/gm, "")
+          // No meio de uma frase, sai com o espaço que o precede — senão
+          // «Olá {nome},» deixava «Olá ,».
+          .replace(/[ \t]*\{nome\}/g, "");
 
     // O corpo é só o que ESTA mensagem tem de particular: a moldura e a
     // assinatura vêm do `emailAoCliente`, que é a mesma para todo o correio que
@@ -102,20 +127,55 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * destinatário válido não se tenta enviar, a mensagem é GRAVADA na mesma
      * (é o registo de que ela respondeu), e a resposta diz porque é que o
      * email não saiu. O ecrã já sabe mostrar essa frase.
+     *
+     * ════════════════════════════════════════════════════════════════════════
+     * E O MESMO VALE QUANDO É O CORREIO QUE FALHA
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * A guarda acima só cobria o destinatário VAZIO. Com um endereço bom e o
+     * servidor de correio em baixo — uma ligação que expira (o `mail.ts` corta
+     * aos 8 s), credenciais recusadas, uma caixa cheia do outro lado — o
+     * `sendMail` ATIRA, a excepção subia ao `catch` do fim, a rota respondia
+     * 500 «Erro ao enviar a mensagem», e o `updateQuote` lá em baixo nunca
+     * chegava a correr.
+     *
+     * Ou seja: exactamente o defeito que se tinha corrigido, a entrar pela
+     * porta do lado. Ela escrevia a resposta, carregava em Enviar, via «erro
+     * ao enviar» — e o histórico do pedido continuava vazio. O texto que ela
+     * escreveu só existia naquela caixa, e desaparecia com ela.
+     *
+     * Uma falha de envio deixa portanto de ser uma excepção: é um facto que se
+     * conta na resposta (`emailed: false` + a frase), como já acontece na
+     * geração da proposta. A mensagem é gravada NOS DOIS casos — é o registo
+     * de que ela respondeu, e é ele que lhe permite decidir se telefona.
      */
     const temDestinatario = !!quote.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(quote.email);
-    const mail = temDestinatario
-      ? await sendMail({
+    let mail = { sent: false };
+    let emailError: string | undefined;
+    if (!temDestinatario) {
+      emailError =
+        "Este pedido não tem email — a mensagem ficou registada, mas não foi enviada. " +
+        "Acrescenta o email do cliente para lhe poderes escrever daqui.";
+    } else {
+      try {
+        mail = await sendMail({
           to: quote.email,
           replyTo: MAIL_TO,
           subject: `Líquen Events — sobre o seu pedido (${id})`,
           ...email,
-        })
-      : { sent: false as const };
-    const emailError = temDestinatario
-      ? undefined
-      : "Este pedido não tem email — a mensagem ficou registada, mas não foi enviada. " +
-        "Acrescenta o email do cliente para lhe poderes escrever daqui.";
+        });
+        if (!mail.sent) {
+          emailError =
+            "O envio de email não está configurado neste servidor — a mensagem ficou " +
+            "registada, mas o cliente não a recebeu.";
+        }
+      } catch (e) {
+        log.error("mensagem: a mensagem foi registada mas o email não saiu", e, { id });
+        emailError =
+          "A mensagem ficou registada, mas o servidor de correio não a aceitou — o cliente " +
+          "NÃO a recebeu. Tenta outra vez daqui a pouco, ou fala com ele por telefone.";
+      }
+    }
 
     const newMessage: QuoteMessage = { at: new Date().toISOString(), body: message };
     const messages = [...(quote.messages ?? []), newMessage];

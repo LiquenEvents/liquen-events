@@ -267,3 +267,127 @@ describe("POST /api/orcamento/[id]/mensagem — o campo de fusão {nome}", () =>
     expect(enviado().text).not.toContain("{nome}");
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * UM ENVIO QUE FALHA NÃO PODE LEVAR A MENSAGEM DELA COM ELE
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta rota já sabia que um pedido SEM email não podia engolir a mensagem (ver o
+ * bloco na rota). Faltava-lhe a outra metade, e é a mais provável: um endereço
+ * bom e o servidor de correio a recusar.
+ *
+ * O `sendMail` só promete não atirar quando o SMTP está POR CONFIGURAR
+ * («Resolves with { sent: false } (never throws)», em `mail.ts`). Tudo o resto
+ * ATIRA: a ligação a expirar (o `mail.ts` corta aos 8 s), as credenciais
+ * recusadas, a caixa do cliente cheia, o servidor em baixo. A excepção subia ao
+ * `catch` de topo, a rota respondia 500, e o `updateQuote` — que vem DEPOIS do
+ * envio — nunca corria.
+ *
+ * O que ela via, medido antes da correcção:
+ *
+ *     STATUS: 500  BODY: {"error":"Erro ao enviar a mensagem"}
+ *     updateQuote chamado? 0
+ *
+ * Ou seja: escrevia a resposta, carregava em Enviar, lia «erro ao enviar» — e o
+ * histórico do pedido continuava vazio. O texto que ela tinha escrito só existia
+ * naquela caixa, e desaparecia com ela. É exactamente o defeito que já se tinha
+ * corrigido para os pedidos sem email, a entrar pela porta do lado.
+ */
+describe("POST /api/orcamento/[id]/mensagem — o correio falha, o registo não", () => {
+  it("com o servidor de correio a atirar, a mensagem fica GRAVADA na mesma", async () => {
+    authed.ok = true;
+    store.estado = "pendente";
+    mail.send.mockRejectedValueOnce(new Error("connect ETIMEDOUT 1.2.3.4:465"));
+
+    const res = await POST(req({ message: "Segue o link das fotografias." }), ctx("LIQ-1"));
+
+    expect(res.status, "um envio falhado não é uma avaria da rota").toBe(200);
+    const body = await res.json();
+    expect(body.emailed).toBe(false);
+    // A frase que o painel mostra a vermelho: diz o que aconteceu e o que fazer.
+    expect(String(body.emailError)).toMatch(/correio/i);
+    expect(String(body.emailError), "tem de dizer que o cliente NÃO recebeu").toMatch(/NÃO/);
+
+    const patch = store.update.mock.calls.at(-1)?.[1] as { messages?: { body: string }[] };
+    expect(store.update, "sem isto, o que ela escreveu perde-se").toHaveBeenCalled();
+    expect(patch.messages?.at(-1)?.body).toBe("Segue o link das fotografias.");
+  });
+
+  it("com o SMTP por configurar, o mesmo — gravada, e a dizer que não saiu", async () => {
+    authed.ok = true;
+    mail.send.mockResolvedValueOnce({ sent: false });
+    const res = await POST(req({ message: "Confirmado para as 15h." }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.emailed).toBe(false);
+    expect(String(body.emailError)).toMatch(/não está configurado/i);
+    const patch = store.update.mock.calls.at(-1)?.[1] as { messages?: { body: string }[] };
+    expect(patch.messages?.at(-1)?.body).toBe("Confirmado para as 15h.");
+  });
+
+  it("quando sai mesmo, não inventa erro nenhum", async () => {
+    authed.ok = true;
+    const res = await POST(req({ message: "Olá!" }), ctx("LIQ-1"));
+    const body = await res.json();
+    expect(body.emailed).toBe(true);
+    expect(body).not.toHaveProperty("emailError");
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * «OLÁ ,» — TIRAR O MARCADOR É METADE DO TRABALHO
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Os modelos de resposta rápida do painel começam todos por «Olá {nome},». Num
+ * pedido sem nome — os que entram por telefonema — o marcador era substituído
+ * por vazio e o cliente lia, medido antes da correcção:
+ *
+ *     "Olá , obrigada pelo vosso contacto!"
+ *
+ * Que não é melhor do que o marcador cru: é só um erro diferente, e igualmente
+ * à vista. O buraco sai com o marcador.
+ */
+describe("POST /api/orcamento/[id]/mensagem — sem nome, sem buraco", () => {
+  const texto = () => (mail.send.mock.calls.at(-1)![0] as { text: string }).text;
+
+  it("«Olá {nome}, …» sem nome vira «Olá, …» — não «Olá , …»", async () => {
+    authed.ok = true;
+    store.nome = "";
+    await POST(req({ message: "Olá {nome}, obrigada pelo vosso contacto!" }), ctx("LIQ-1"));
+    expect(texto()).toContain("Olá, obrigada pelo vosso contacto!");
+    expect(texto()).not.toContain("Olá ,");
+    expect(texto()).not.toContain("{nome}");
+  });
+
+  it("o marcador a abrir a linha leva a vírgula que ficaria pendurada", async () => {
+    authed.ok = true;
+    store.nome = "";
+    await POST(req({ message: "{nome}, bom dia." }), ctx("LIQ-1"));
+    expect(texto().split("\n")[0]).toBe("bom dia.");
+  });
+
+  it("no meio de uma frase não deixa dois espaços colados", async () => {
+    authed.ok = true;
+    store.nome = "";
+    await POST(req({ message: "Falamos com {nome} amanhã." }), ctx("LIQ-1"));
+    expect(texto()).toContain("Falamos com amanhã.");
+    expect(texto(), "dois espaços a meio de uma frase").not.toMatch(/\w {2}\w/);
+  });
+
+  it("e o histórico guarda exactamente o que o cliente leu", async () => {
+    authed.ok = true;
+    store.nome = "";
+    await POST(req({ message: "Olá {nome}, obrigada!" }), ctx("LIQ-1"));
+    const patch = store.update.mock.calls.at(-1)?.[1] as { messages?: { body: string }[] };
+    expect(patch.messages?.at(-1)?.body).toBe("Olá, obrigada!");
+  });
+
+  it("com nome, nada disto corre: é a substituição de sempre", async () => {
+    authed.ok = true;
+    store.nome = "Ana Silva";
+    await POST(req({ message: "Olá {nome}, obrigada!" }), ctx("LIQ-1"));
+    expect(texto()).toContain("Olá Ana, obrigada!");
+  });
+});

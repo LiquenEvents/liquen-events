@@ -267,40 +267,63 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * link continua a servir), o estado avança, e a resposta diz que o email
      * não saiu e porquê. Uma proposta por enviar é um negócio parado; três
      * propostas fantasma são um negócio confuso.
+     *
+     * ── E O MESMO QUANDO É O CORREIO QUE FALHA ────────────────────────────
+     *
+     * A guarda acima cobria só o endereço VAZIO. Com um endereço bom e o
+     * servidor de correio em baixo — uma ligação que expira (o `mail.ts` corta
+     * aos 8 s), credenciais recusadas, a caixa do cliente cheia — o `sendMail`
+     * ATIRA e a excepção subia ao `catch` do fim: 500 «Erro ao gerar a
+     * proposta», com a proposta JÁ gravada e o pedido por avançar. Cada nova
+     * tentativa gravava mais uma — exactamente as propostas fantasma que a
+     * nota acima descreve, chegadas pela outra porta.
+     *
+     * A rota irmã (`proposta-doc`, o estúdio) já embrulhava este envio pela
+     * mesma razão, com as mesmas palavras. Aqui faltava.
      */
     const temDestinatario = !!quote.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(quote.email);
-    const mail = temDestinatario
-      ? await sendMail({
-          to: quote.email,
-          replyTo: MAIL_TO,
-          // Sem identificador nenhum. Levava `proposal.id.slice(0, 8)` — oito
-          // caracteres do `randomUUID()` da nossa base, que o casal lia como
-          // «(3f2b1c9a)» na caixa de correio: não é a referência da casa (essa é
-          // a `LIQ-…` que a confirmação lhe mandou guardar), não diz nada a
-          // ninguém, e num telemóvel come os caracteres do assunto que ainda se
-          // veem. O que junta esta conversa na caixa dele são os cabeçalhos
-          // `In-Reply-To`/`References`, nunca o assunto.
-          //
-          // O assunto vem do MODELO quando é o modelo que sai: o corpo é dela e
-          // a linha que o cliente lê antes de abrir também tem de ser — dois
-          // assuntos para o mesmo email era o ecrã dos modelos a mentir outra
-          // vez, agora só a meio.
-          subject: doModelo?.assunto ?? "Proposta para o seu evento — Líquen Events",
-          html: email.html,
-          text: email.text,
-          // O PDF JUNTA-SE aos anexos da assinatura, não os substitui:
-          // substituí-los deixava o logótipo de fora e punha uma cruz vermelha
-          // no email mais importante que sai daqui.
-          attachments: [
-            ...email.attachments,
-            {
-              filename: `Proposta-Liquen-${id}.pdf`,
-              content: pdfBuffer,
-              contentType: "application/pdf",
-            },
-          ],
-        })
-      : { sent: false as const };
+    let envioFalhou = false;
+    const enviar = async () =>
+      await sendMail({
+        to: quote.email,
+        replyTo: MAIL_TO,
+        // Sem identificador nenhum. Levava `proposal.id.slice(0, 8)` — oito
+        // caracteres do `randomUUID()` da nossa base, que o casal lia como
+        // «(3f2b1c9a)» na caixa de correio: não é a referência da casa (essa é
+        // a `LIQ-…` que a confirmação lhe mandou guardar), não diz nada a
+        // ninguém, e num telemóvel come os caracteres do assunto que ainda se
+        // veem. O que junta esta conversa na caixa dele são os cabeçalhos
+        // `In-Reply-To`/`References`, nunca o assunto.
+        //
+        // O assunto vem do MODELO quando é o modelo que sai: o corpo é dela e
+        // a linha que o cliente lê antes de abrir também tem de ser — dois
+        // assuntos para o mesmo email era o ecrã dos modelos a mentir outra
+        // vez, agora só a meio.
+        subject: doModelo?.assunto ?? "Proposta para o seu evento — Líquen Events",
+        html: email.html,
+        text: email.text,
+        // O PDF JUNTA-SE aos anexos da assinatura, não os substitui:
+        // substituí-los deixava o logótipo de fora e punha uma cruz vermelha
+        // no email mais importante que sai daqui.
+        attachments: [
+          ...email.attachments,
+          {
+            filename: `Proposta-Liquen-${id}.pdf`,
+            content: pdfBuffer,
+            contentType: "application/pdf",
+          },
+        ],
+      });
+
+    let mail: { sent: boolean } = { sent: false };
+    if (temDestinatario) {
+      try {
+        mail = await enviar();
+      } catch (e) {
+        envioFalhou = true;
+        log.error("proposta: a proposta ficou gravada mas o email ao cliente falhou", e, { id });
+      }
+    }
 
     /**
      * Seguiu: agora sim, «enviada» — com a hora a que saiu.
@@ -368,13 +391,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       id: proposal.id,
       total,
       emailed: mail.sent,
-      ...(temDestinatario
-        ? {}
-        : {
+      ...(!temDestinatario
+        ? {
             emailError:
               "Este pedido não tem email de cliente — a proposta foi gravada e o link continua a " +
               "servir, mas não foi enviada a ninguém. Acrescenta o email e reenvia.",
-          }),
+          }
+        : envioFalhou
+          ? {
+              emailError:
+                "A proposta foi gravada, mas o servidor de correio não a aceitou — o cliente NÃO " +
+                "a recebeu. Reenvia daqui a pouco: é a mesma proposta, não se cria outra.",
+            }
+          : {}),
       pdfBase64: pdfBuffer.toString("base64"),
     });
   } catch (err) {

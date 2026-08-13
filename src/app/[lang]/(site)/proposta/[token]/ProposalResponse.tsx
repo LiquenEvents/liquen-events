@@ -211,9 +211,13 @@ export default function ProposalResponse({
           {tp.expiradaTitle}
         </p>
         <p className="text-foreground/72 text-sm leading-relaxed">{tp.expiradaBody}</p>
+        {/* Aqui não há botão nenhum — este endereço é a ÚNICA coisa em que se
+            pode carregar depois de ler «esta proposta expirou», e media 16 px
+            de altura no telemóvel. `alvo-toque` é a classe da casa
+            (globals.css): 44 px só em ecrãs de toque, sem mexer no portátil. */}
         <a
           href={`mailto:${SITE.email}`}
-          className="inline-block mt-5 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
+          className="alvo-toque inline-flex items-center mt-5 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
         >
           {SITE.email}
         </a>
@@ -241,7 +245,22 @@ export default function ProposalResponse({
         </div>
       </details>
 
-      <label className="flex items-start gap-3 mb-4 cursor-pointer">
+      {/**
+       * ── O ALVO DE TOQUE DA CAIXA QUE ABRE O «ACEITAR» ────────────────────
+       *
+       * A caixa tem 16 px e a linha inteira media 23 px de altura num
+       * telemóvel — abaixo dos 24×24 do critério mínimo (WCAG 2.5.8) e muito
+       * abaixo dos 44 px que qualquer polegar precisa. E não é uma caixa
+       * qualquer: sem ela marcada o botão «Aceitar proposta» fica inerte, por
+       * isso um toque falhado lê-se como «o botão não funciona» na página onde
+       * se fecham milhares de euros.
+       *
+       * O `py-3` leva a linha aos ~47 px sem mexer no desenho; o `-mt-3` e o
+       * `mb-1` devolvem exactamente o espaçamento que o `mb-4` dava. O
+       * `items-start` fica: em ecrãs estreitos o texto passa a duas linhas e a
+       * caixa tem de continuar alinhada com a primeira.
+       */}
+      <label className="flex items-start gap-3 -mt-3 mb-1 cursor-pointer py-3">
         <input
           type="checkbox"
           checked={acceptedTerms}

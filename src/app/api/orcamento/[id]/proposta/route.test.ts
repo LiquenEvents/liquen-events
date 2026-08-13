@@ -300,6 +300,50 @@ describe("POST /api/orcamento/[id]/proposta", () => {
     expect(quotes.gravado).not.toHaveProperty("activityLog");
   });
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O CORREIO QUE NÃO RESPONDE «NÃO» — ATIRA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O teste acima cobre o correio POR CONFIGURAR, que é o único caso em que o
+   * `sendMail` promete não atirar («Resolves with { sent: false } (never
+   * throws) when SMTP is unconfigured», em `mail.ts`). Todos os outros ATIRAM:
+   * o servidor em baixo, a ligação a cair, as credenciais recusadas, o
+   * destinatário rejeitado, o anexo acima do que o servidor aceita — e um PDF
+   * de proposta com fotografias passa dos 8 MB com facilidade
+   * (`LIMITE_DE_ANEXO`, em `custo-do-pdf.ts`).
+   *
+   * A proposta JÁ está gravada quando isso acontece — tem de estar, pela razão
+   * escrita na rota: o link assinado vai dentro do email. Com a excepção a
+   * subir até ao `catch` de topo, a resposta era 500 «Erro ao gerar a
+   * proposta»: uma frase falsa (o PDF foi gerado, e bem) que manda quem a lê
+   * carregar outra vez no botão — e cada tentativa grava MAIS UMA proposta.
+   * São as «propostas fantasma» que esta mesma rota já descreve por extenso no
+   * caso do pedido sem email, a entrar pela porta do lado.
+   *
+   * É a rota irmã (`proposta-doc`) que faz o que se pede aqui: 200, `emailed:
+   * false`, e uma frase em português que diz o que se passou.
+   */
+  it("com o servidor de correio a atirar, a proposta não vira 500 nem se duplica", async () => {
+    authed.ok = true;
+    quotes.estado = "pendente";
+    mail.send.mockRejectedValueOnce(new Error("connect ECONNREFUSED 1.2.3.4:587"));
+
+    const res = await POST(req("POST", validItems), ctx("LIQ-1"));
+    expect(res.status, "um envio falhado não é um erro a gerar a proposta").toBe(200);
+    const body = await res.json();
+    expect(body.emailed).toBe(false);
+    expect(body.emailError, "tem de dizer o que se passou, em português").toBeTruthy();
+    expect(String(body.emailError)).toMatch(/email|correio/i);
+
+    // Gravada uma vez, e por enviar — para o reenvio não criar uma segunda.
+    expect(proposals.create).toHaveBeenCalledTimes(1);
+    expect(proposals.create.mock.calls[0][0]).toMatchObject({ status: "rascunho" });
+    expect(proposals.update, "nada sobe a «enviada» sem o email ter saído").not.toHaveBeenCalled();
+    // E o pedido não avança para «Proposta enviada»: o preço grava-se, o estado não.
+    expect(quotes.gravado).toMatchObject({ status: "pendente", quotedPrice: 1000 });
+  });
+
   it("returns 503 (does not send an un-acceptable proposal) when persistence fails", async () => {
     authed.ok = true;
     proposals.create.mockRejectedValueOnce(new Error("db down"));
