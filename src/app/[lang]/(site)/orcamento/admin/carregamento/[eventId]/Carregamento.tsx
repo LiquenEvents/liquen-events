@@ -12,6 +12,7 @@ import {
   chaveEvento,
   type MarcacaoPendente,
 } from "@/lib/material-offline";
+import { AvisoDeFalha } from "../../AvisoDeFalha";
 
 /**
  * A VISTA DE CARREGAMENTO — telemóvel, uma mão, sem rede.
@@ -46,6 +47,15 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
   const [aSincronizar, setASincronizar] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
   const [veiculo, setVeiculo] = useState<string>("todos");
+  /**
+   * O que a leitura disse quando falhou. `null` é "correu bem"; a string vazia é
+   * "falhou e o servidor não explicou". São três estados e não dois, pela mesma
+   * razão que estão escritas no painel irmão (`EventMaterial`, que lê ESTA
+   * mesma rota): "não há checklist" e "não consegui perguntar" não são a mesma
+   * coisa, e este ecrã tem uma frase para a primeira que é cara de mais para se
+   * dizer por engano.
+   */
+  const [falha, setFalha] = useState<string | null>(null);
 
   // ── Arranque: o que está guardado localmente aparece JÁ ────────────────────
   useEffect(() => {
@@ -72,7 +82,40 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
 
   const buscar = useCallback(async () => {
     try {
-      const r = await fetch(`/api/orcamento/${quoteId}/material`).then((x) => x.json());
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * UMA LEITURA FALHADA NÃO PODE SAIR DAQUI CALADA
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Não havia `res.ok`: era um `fetch(…).then((x) => x.json())`. Numa
+       * resposta de erro o corpo é `{ error: "…" }`, portanto `r.itens` ficava
+       * `undefined`, o `Array.isArray` apanhava-o e não se escrevia nada — nada
+       * rebentava, e era esse o problema. A falha não deixava rasto NENHUM.
+       *
+       * Os gatilhos são os do costume nesta rota: 401 quando a sessão caduca ou
+       * quando alguém carrega em Sair noutro aparelho, 500 quando as tabelas do
+       * material não respondem. E o telemóvel que abre o endereço da carrinha é
+       * quase sempre um que nunca o abriu — sem cópia local, a lista fica a zero
+       * e o ecrã passava a afirmar, a meio de uma quinta:
+       *
+       *     "Sem checklist. Gera-a primeiro no pedido, no computador."
+       *
+       * Falso — a checklist existe, feita — e caro: o passo que essa frase manda
+       * dar é regenerá-la, e a regeneração só preserva o que está CARREGADO. As
+       * marcações de devolvido e de em falta ficavam para trás.
+       *
+       * O aviso de "Sem rede" do cabeçalho também não cobria isto: com um 401 o
+       * browser está online e o `navigator.onLine` é `true`.
+       */
+      const res = await fetch(`/api/orcamento/${quoteId}/material`);
+      if (!res.ok) {
+        // A frase do SERVIDOR quando ele deu uma: é a diferença entre "não foi
+        // possível ler" e uma instrução que resolve o problema sozinha.
+        const corpo = await res.json().catch(() => null);
+        setFalha(typeof corpo?.error === "string" ? corpo.error : "");
+        return;
+      }
+      const r = await res.json();
       if (Array.isArray(r?.itens)) {
         // A fila por cima: uma marcação feita enquanto este pedido ia a
         // caminho não pode ser apagada pela resposta dele.
@@ -80,8 +123,10 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         setItens(juntos);
         guardarLocal(juntos);
       }
+      setFalha(null);
     } catch {
-      /* offline: fica o que está guardado */
+      /* offline: fica o que está guardado, e o cabeçalho já diz "Sem rede" */
+      setFalha("");
     }
   }, [quoteId, eventId, guardarLocal]);
 
@@ -243,9 +288,29 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
       </header>
 
       {itens.length === 0 ? (
-        <p className="px-4 py-10 text-center text-sm text-foreground/60">
-          Sem checklist. Gera-a primeiro no pedido, no computador.
-        </p>
+        /**
+         * ── LER FALHOU vs NÃO HÁ NADA PARA LER ─────────────────────────────
+         * "Sem checklist" é uma AFIRMAÇÃO sobre o evento, e uma leitura que não
+         * chegou a acontecer não a sabe fazer — muito menos mandar alguém que
+         * está de pé ao lado da carrinha voltar ao computador para gerar de
+         * novo uma lista que já existe (ver o `buscar`).
+         *
+         * Com a cópia local à vista não se desenha nada disto: uma lista velha
+         * e verdadeira vale mais do que um aviso, e é com ela que se carrega.
+         */
+        falha !== null ? (
+          <div className="px-4">
+            <AvisoDeFalha
+              titulo="Não foi possível ler a checklist"
+              mensagem={falha}
+              aoTentarDeNovo={() => void buscar()}
+            />
+          </div>
+        ) : (
+          <p className="px-4 py-10 text-center text-sm text-foreground/60">
+            Sem checklist. Gera-a primeiro no pedido, no computador.
+          </p>
+        )
       ) : (
         // A lista tem nome próprio: um leitor de ecrã anuncia onde entrou, em
         // vez de despejar trinta botões sem contexto.
