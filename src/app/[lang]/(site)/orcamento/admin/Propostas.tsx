@@ -84,9 +84,11 @@ interface Props {
   onOpenQuote?: (q: Quote) => void;
   /** Lets the parent sync its quote state when accepting a proposal also moves the pedido. */
   onQuoteUpdated?: (q: Quote) => void;
+  /** Quem está a trabalhar — vai como `actor` na entrada do histórico do pedido. */
+  userName?: string;
 }
 
-export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props) {
+export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userName }: Props) {
   const { toast } = useToast();
   const {
     data: proposals = [],
@@ -135,14 +137,28 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated }: Props
             id: randomId(),
             at: new Date().toISOString(),
             kind: "status_change" as const,
+            // Quem aceitou. Todas as outras entradas do histórico dizem-no; só
+            // esta — a que fecha o negócio — aparecia sem nome.
+            actor: userName,
             summary: `Proposta aceite — pedido movido para Aceite (${eur(updated.total)})`,
           };
+          /**
+           * ACRESCENTAR ao histórico, e não reescrevê-lo.
+           *
+           * `activityLog: [...lq.activityLog, entry]` grava o retrato que ESTE
+           * ecrã tinha — e os `quotes` chegam do pai, que os carregou quando o
+           * back office abriu. Entre isso e o clique em «Aceitar» cabe uma
+           * manhã inteira de trabalho noutras ferramentas (o Quadro, a gaveta,
+           * o estúdio), e tudo o que elas escreveram desaparecia sem erro
+           * nenhum. O servidor já tem o caminho seguro, que junta ao registo
+           * FRESCO — a mesma decisão, com a mesma razão, está no `Kanban.tsx`.
+           */
           const qRes = await fetch(`/api/orcamento/${lq.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               status: "aceite",
-              activityLog: [...(lq.activityLog ?? []), entry],
+              activityLogAppend: [entry],
             }),
           }).catch(() => null);
           if (qRes?.ok) {

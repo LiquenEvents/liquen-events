@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
@@ -275,5 +275,72 @@ describe("Faturas — a divisão prometida é a da proposta", () => {
     await waitFor(() => expect(frase()).toMatch(/sinal 6\D?150,00/));
     expect(frase()).toMatch(/saldo 6\D?150,00/);
     expect(frase()).not.toMatch(/3\D?690,00/);
+  });
+
+  /**
+   * O RÓTULO DO BOTÃO É A PRIMEIRA COISA QUE SE LÊ — E ERA O ÚNICO 30/70
+   * ESCRITO À MÃO QUE TINHA SOBRADO.
+   *
+   * A frase por baixo e a pré-visualização já usavam a percentagem da
+   * proposta; o botão continuava a prometer "(30/70)". Numa proposta de 50%
+   * ela escolhia um modo cujo nome dizia uma divisão que ninguém ia emitir.
+   */
+  it("o rótulo do modo também diz a percentagem da proposta", async () => {
+    vi.stubGlobal("fetch", comPercentagem(50));
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <Faturas quotes={CASAL} />
+      </ToastProvider>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /nova fatura/i }));
+    await user.selectOptions(screen.getByLabelText(/evento \(opcional\)/i), "q-50");
+
+    await waitFor(() =>
+      expect(screen.getByRole("radio", { name: "Sinal + Saldo (50/50)" })).toBeTruthy(),
+    );
+    expect(screen.queryByRole("radio", { name: /30\/70/ })).toBeNull();
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * A DATA DE EMISSÃO É FISCAL — E NASCIA UM DIA ATRASADA DEPOIS DA MEIA-NOITE
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O campo "Emissão" vem preenchido com hoje, e é isso que o torna perigoso:
+ * ninguém confere um campo que já está certo. Estando com `toISOString()` (que
+ * é UTC), uma fatura emitida à 00:30 de um dia de Verão em Portugal (UTC+1)
+ * saía com a data do dia ANTERIOR — e essa data decide o período de IVA.
+ */
+describe("Faturas — a data de emissão é a do calendário de quem emite", () => {
+  const TZ_ORIGINAL = process.env.TZ;
+
+  beforeAll(() => {
+    process.env.TZ = "Europe/Lisbon";
+  });
+  afterAll(() => {
+    process.env.TZ = TZ_ORIGINAL;
+  });
+
+  beforeEach(() => {
+    // 00:30 de 15 de Julho em Lisboa = 23:30 de 14 de Julho em UTC.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-07-14T23:30:00.000Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("à 00:30 de 15 de Julho em Lisboa, a fatura é de 15 e não de 14", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderFaturas();
+
+    await user.click(await screen.findByRole("button", { name: /nova fatura/i }));
+    await user.click(screen.getByRole("button", { name: /Datas e IVA/ }));
+
+    const emissao = screen.getByLabelText("Emissão") as HTMLInputElement;
+    expect(emissao.value, "a data do documento é a do dia local").toBe("2026-07-15");
   });
 });

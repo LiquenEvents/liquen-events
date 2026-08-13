@@ -65,13 +65,34 @@ export function Segmented<T extends string>({
       ? "h-8 pointer-coarse:h-11 px-3 text-xs"
       : "h-9 pointer-coarse:h-11 px-3.5 text-sm";
 
+  /**
+   * ── O GRUPO TEM DE TER SEMPRE UMA PORTA DE ENTRADA ────────────────────────
+   *
+   * O foco andante dava `tabIndex={0}` só ao segmento activo. Quando o `value`
+   * não consta das opções — um filtro antigo reposto do `localStorage`, um
+   * estado gravado que entretanto deixou de existir — NENHUM segmento ficava
+   * activo, todos ficavam a -1, e o controlo inteiro saía da ordem de
+   * tabulação: com teclado deixava de haver maneira de lá chegar, e portanto de
+   * mudar o filtro que está encravado. Sem rato, o ecrã ficava preso.
+   *
+   * Com um `value` desconhecido, a entrada é o primeiro segmento (e as setas
+   * passam a partir dele). Nada muda no caso normal.
+   */
+  const activeIndex = options.findIndex((o) => o.value === value);
+  const entryIndex = activeIndex === -1 ? 0 : activeIndex;
+
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
     e.preventDefault();
-    const idx = options.findIndex((o) => o.value === value);
-    if (idx === -1) return;
+    if (options.length === 0) return;
+    // Valor fora das opções: a primeira seta escolhe o ponto de entrada em vez
+    // de não fazer nada (era o que prendia o teclado).
+    if (activeIndex === -1) {
+      onChange(options[entryIndex].value);
+      return;
+    }
     const delta = e.key === "ArrowRight" ? 1 : -1;
-    const next = options[(idx + delta + options.length) % options.length];
+    const next = options[(activeIndex + delta + options.length) % options.length];
     onChange(next.value);
   }
 
@@ -91,7 +112,7 @@ export function Segmented<T extends string>({
         className,
       )}
     >
-      {options.map((o) => {
+      {options.map((o, i) => {
         const active = o.value === value;
         return (
           <button
@@ -100,7 +121,7 @@ export function Segmented<T extends string>({
             role="radio"
             aria-checked={active}
             aria-label={o.ariaLabel}
-            tabIndex={active ? 0 : -1}
+            tabIndex={i === entryIndex ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-lg font-medium motion-safe:transition-colors",

@@ -222,6 +222,35 @@ describe("Segmented", () => {
     fireEvent.keyDown(screen.getByRole("radiogroup", { name: "Vista" }), { key: "ArrowDown" });
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  /**
+   * ── UM VALOR DESCONHECIDO NÃO PODE FECHAR O GRUPO AO TECLADO ────────────
+   *
+   * O foco andante dava `tabIndex={0}` só ao segmento activo. Com um `value`
+   * que não consta das opções — um filtro antigo reposto do `localStorage`, um
+   * estado gravado que entretanto deixou de existir — todos ficavam a -1 e o
+   * controlo inteiro saía da ordem de tabulação: sem rato deixava de haver
+   * forma de lá chegar, e portanto de destravar o filtro encravado.
+   */
+  it("keeps a tab stop even when the value is not one of the options", () => {
+    render(
+      <Segmented ariaLabel="Vista" value="antigo" onChange={() => {}} options={[...options]} />,
+    );
+    const alcancaveis = screen
+      .getAllByRole("radio")
+      .filter((b) => b.getAttribute("tabindex") === "0");
+    expect(alcancaveis).toHaveLength(1);
+    expect(alcancaveis[0]).toHaveAccessibleName("Lista");
+  });
+
+  it("an arrow key picks the entry point instead of doing nothing", () => {
+    const onChange = vi.fn();
+    render(
+      <Segmented ariaLabel="Vista" value="antigo" onChange={onChange} options={[...options]} />,
+    );
+    fireEvent.keyDown(screen.getByRole("radiogroup", { name: "Vista" }), { key: "ArrowRight" });
+    expect(onChange).toHaveBeenCalledWith("list");
+  });
 });
 
 /* ------------------------------------------------------------------------- *

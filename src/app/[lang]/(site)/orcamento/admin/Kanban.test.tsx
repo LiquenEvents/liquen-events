@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
@@ -119,6 +119,65 @@ describe("Kanban — o quadro", () => {
     const card = screen.getByRole("button", { name: /^Par 0,/ });
     fireEvent.keyDown(card, { key: "Enter" });
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: "q-0" }));
+  });
+});
+
+/**
+ * ── O SELO DE SEGUIMENTO CONTA OS DIAS DE QUEM ESTÁ A OLHAR ───────────────
+ *
+ * O "hoje" do quadro vinha de `toISOString()`, que é UTC. À 00:30 de um dia de
+ * Verão em Portugal (UTC+1) a data UTC ainda é a de ontem: um seguimento
+ * marcado para hoje deixava de ter selo nenhum, e o cartão passava despercebido
+ * na coluna exactamente no dia em que era preciso pegar no telefone.
+ */
+describe("Kanban — «hoje» é o dia local, não o de UTC", () => {
+  const TZ_ORIGINAL = process.env.TZ;
+
+  beforeAll(() => {
+    process.env.TZ = "Europe/Lisbon";
+  });
+  afterAll(() => {
+    process.env.TZ = TZ_ORIGINAL;
+  });
+
+  beforeEach(() => {
+    // 00:30 de 15 de Julho em Lisboa = 23:30 de 14 de Julho em UTC.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-07-14T23:30:00.000Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const comSeguimento = (followUpAt: string): Quote[] =>
+    [{ ...quotes[0], id: "q-seg", name: "Seguir Hoje", followUpAt }] as unknown as Quote[];
+
+  it("um seguimento marcado para hoje tem selo, e diz «hoje»", () => {
+    render(
+      <ToastProvider>
+        <Kanban
+          quotes={comSeguimento("2026-07-15")}
+          onOpen={vi.fn()}
+          onStatusChange={vi.fn()}
+          userName="Catarina"
+        />
+      </ToastProvider>,
+    );
+    expect(screen.getByTitle("Seguimento hoje")).toBeTruthy();
+  });
+
+  it("o de ontem continua a dizer que está em atraso", () => {
+    render(
+      <ToastProvider>
+        <Kanban
+          quotes={comSeguimento("2026-07-14")}
+          onOpen={vi.fn()}
+          onStatusChange={vi.fn()}
+          userName="Catarina"
+        />
+      </ToastProvider>,
+    );
+    expect(screen.getByTitle("Seguimento em atraso")).toBeTruthy();
   });
 });
 

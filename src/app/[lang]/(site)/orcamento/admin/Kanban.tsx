@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
-import { eventCountdown, randomId } from "./util";
+import { eventCountdown, randomId, todayKey } from "./util";
 import { eur0 as eur } from "@/lib/money";
 import type { ActivityEntry } from "@/lib/orcamento/types";
 import { Card } from "./ui";
@@ -267,7 +267,10 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
     return map;
   }, [quotes]);
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  // O dia LOCAL (`todayKey()` do `util.ts`), nunca o de `toISOString()`, que é
+  // UTC: à meia-noite e meia de Verão em Portugal a data UTC ainda é a de
+  // ontem, e o selo de seguimento passava de «hoje» a «em atraso» nos cartões.
+  const chaveDeHoje = todayKey();
 
   // Shared by drag-and-drop and keyboard moves: optimistic update + PATCH,
   // reverting (and toasting) on failure.
@@ -445,7 +448,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                     colLabel={col.label}
                     colIndex={colIndex}
                     dragging={dragId === q.id}
-                    todayKey={todayKey}
+                    todayKey={chaveDeHoje}
                     onOpen={handleOpen}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}

@@ -253,3 +253,101 @@ describe("qual das duas versões ficaram", () => {
     await waitFor(() => expect(screen.queryByText(/Ficaram com que versão/)).toBeNull());
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DUAS MARCAÇÕES SEGUIDAS NÃO SE PODEM DESFAZER UMA À OUTRA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Numa segunda-feira de manhã marcam-se três ou quatro seguidas, e as gravações
+ * cruzam-se. A lista optimista era reescrita INTEIRA a partir de um retrato
+ * tirado antes do `await` — por isso a resposta da primeira reescrevia por cima
+ * da segunda e desfazia-a no ecrã. Ficava gravada no servidor e o ecrã dizia o
+ * contrário; é o ecrã que ela lê a seguir.
+ *
+ * O mesmo valia para o erro: uma falha numa linha repunha a lista toda e
+ * apagava o trabalho feito nas outras.
+ */
+describe("duas gravações ao mesmo tempo", () => {
+  /** Um `fetch` em que a resposta de cada PATCH só sai quando o teste quiser. */
+  function montarComTravao(propostas: Proposal[], quotes: Quote[] = []) {
+    const travoes = new Map<string, (r: { ok: boolean }) => void>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === "PATCH") {
+          const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+          const id = String(url).split("/").pop()!;
+          enviados.push({ url: String(url), body });
+          const { ok } = await new Promise<{ ok: boolean }>((resolve) => travoes.set(id, resolve));
+          if (!ok) return { ...response({}), ok: false, status: 500 };
+          return response({ ...propostas.find((p) => p.id === id), ...body });
+        }
+        return response(String(url).startsWith("/api/propostas") ? propostas : []);
+      }),
+    );
+    const soltar = async (id: string, ok = true) => {
+      await waitFor(() => expect(travoes.has(id)).toBe(true));
+      travoes.get(id)!({ ok });
+      travoes.delete(id);
+    };
+    return {
+      soltar,
+      ...render(
+        <ToastProvider>
+          <Acompanhamento quotes={quotes} />
+        </ToastProvider>,
+      ),
+    };
+  }
+
+  const duas = () => [
+    proposta({ id: "p-a", clientName: "Casal A" }),
+    proposta({ id: "p-b", clientName: "Casal B" }),
+  ];
+
+  /** O botão de estado da linha de um casal (há um par de botões por linha). */
+  function botao(cliente: string, rotulo: string): HTMLElement {
+    const linha = screen.getByText(cliente).closest("div.rounded-2xl") as HTMLElement;
+    return within(linha).getByRole("button", { name: rotulo });
+  }
+
+  it("a resposta da primeira não desfaz a segunda", async () => {
+    const { soltar } = montarComTravao(duas());
+    await waitFor(() => expect(screen.getByText("Casal A")).toBeTruthy());
+
+    // A primeira fica a meio (o servidor ainda não respondeu)…
+    await userEvent.click(botao("Casal A", "Em negociação"));
+    // …e ela marca já a segunda como ganha, que a tira da lista de abertas.
+    await userEvent.click(botao("Casal B", "Aceite"));
+    await soltar("p-b");
+    await waitFor(() => expect(screen.queryByText("Casal B")).toBeNull());
+
+    // Só agora responde a primeira.
+    await soltar("p-a");
+
+    await waitFor(() =>
+      expect(botao("Casal A", "Em negociação").getAttribute("aria-pressed")).toBe("true"),
+    );
+    expect(screen.queryByText("Casal B"), "o Casal B tinha voltado do retrato velho").toBeNull();
+  });
+
+  it("uma falha reverte SÓ a linha que falhou", async () => {
+    const { soltar } = montarComTravao(duas());
+    await waitFor(() => expect(screen.getByText("Casal A")).toBeTruthy());
+
+    await userEvent.click(botao("Casal A", "Em negociação"));
+    await userEvent.click(botao("Casal B", "Aceite"));
+    await soltar("p-b");
+    await waitFor(() => expect(screen.queryByText("Casal B")).toBeNull());
+
+    // A gravação do Casal A falha.
+    await soltar("p-a", false);
+
+    // Ele volta a "Enviada" — e o Casal B, que ficou gravado, continua fora.
+    await waitFor(() =>
+      expect(botao("Casal A", "Enviada").getAttribute("aria-pressed")).toBe("true"),
+    );
+    expect(screen.queryByText("Casal B")).toBeNull();
+  });
+});

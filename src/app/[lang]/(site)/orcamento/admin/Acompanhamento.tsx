@@ -148,8 +148,24 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
       const paraOEcra = Object.fromEntries(
         Object.entries(patch).map(([k, v]) => [k, v === null ? undefined : v]),
       ) as Partial<Proposal>;
-      const antes = propostas ?? [];
-      setData(antes.map((p) => (p.id === id ? { ...p, ...paraOEcra } : p)));
+      /**
+       * ════════════════════════════════════════════════════════════════════
+       * ACTUALIZAR A LINHA, E NÃO REPOR A LISTA INTEIRA
+       * ════════════════════════════════════════════════════════════════════
+       *
+       * Era `const antes = propostas ?? []` — um retrato tirado ANTES do
+       * `await` — e tanto o sucesso como o erro voltavam a escrever a lista
+       * toda a partir dele. Numa manhã de segunda-feira marcam-se três ou
+       * quatro seguidas, e as chamadas cruzam-se: a segunda gravação repunha
+       * o retrato anterior à primeira e desfazia-a no ecrã. Ficava gravada no
+       * servidor, mas o ecrã dizia o contrário — e é o ecrã que ela lê a
+       * seguir.
+       *
+       * A forma funcional pega sempre na lista ACTUAL, e a reversão mexe só
+       * na linha que falhou. Guardamos essa linha (e só essa) para a repor.
+       */
+      const linhaAntes = (propostas ?? []).find((p) => p.id === id);
+      setData((prev) => (prev ?? []).map((p) => (p.id === id ? { ...p, ...paraOEcra } : p)));
       try {
         const res = await fetch(`/api/propostas/${id}`, {
           method: "PATCH",
@@ -158,10 +174,10 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
         });
         if (!res.ok) throw new Error("falhou");
         const actualizada = (await res.json()) as Proposal;
-        setData(antes.map((p) => (p.id === id ? actualizada : p)));
+        setData((prev) => (prev ?? []).map((p) => (p.id === id ? actualizada : p)));
         toast(comoDizer, "success");
       } catch {
-        setData(antes);
+        setData((prev) => (prev ?? []).map((p) => (p.id === id && linhaAntes ? linhaAntes : p)));
         toast("Não foi possível gravar. Verifica a ligação.", "error");
       } finally {
         setAGravar(null);

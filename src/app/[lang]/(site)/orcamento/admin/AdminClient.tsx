@@ -3012,6 +3012,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             <div className={`${VIEW_WRAP} view-in`}>
               <Propostas
                 quotes={quotes}
+                userName={userName}
                 onOpenQuote={openQuote}
                 onQuoteUpdated={(q) => {
                   setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));

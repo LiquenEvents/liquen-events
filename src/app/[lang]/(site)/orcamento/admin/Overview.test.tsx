@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Quote } from "@/lib/orcamento/types";
@@ -586,5 +586,46 @@ describe("as notas da equipa e o «Guardar tudo»", () => {
     await waitFor(() => expect(gravacoes).toHaveLength(1), { timeout: 3000 });
     expect(gravacoes[0].value).toBe("Confirmar as cadeiras com o fornecedor");
     expect(await screen.findByText(/está tudo guardado no servidor/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * ── «EVENTOS HOJE» CONTA O DIA DE QUEM ESTÁ A OLHAR ───────────────────────
+ *
+ * O painel abre o dia com uma frase — "Tem 1 evento hoje." — e o "hoje" saía
+ * de `toISOString()`, que é UTC. À 00:30 de um dia de Verão em Portugal
+ * (UTC+1) a data UTC ainda é a de ontem: o casamento DESSE dia desaparecia da
+ * contagem e passava a ser só mais um "esta semana". A janela dos próximos 7
+ * dias abria e fechava um dia fora do sítio pela mesma razão.
+ */
+describe("o dia é o local, não o de UTC", () => {
+  const TZ_ORIGINAL = process.env.TZ;
+
+  beforeAll(() => {
+    process.env.TZ = "Europe/Lisbon";
+  });
+  afterAll(() => {
+    process.env.TZ = TZ_ORIGINAL;
+  });
+
+  beforeEach(() => {
+    // 00:30 de 15 de Julho em Lisboa = 23:30 de 14 de Julho em UTC.
+    vi.setSystemTime(new Date("2026-07-14T23:30:00.000Z"));
+  });
+
+  const comEvento = (date: string) => [{ ...quotes[0], id: "q-hoje", date }] as unknown as Quote[];
+
+  it("um casamento marcado para hoje é contado como HOJE", async () => {
+    render(
+      <Overview
+        quotes={comEvento("2026-07-15")}
+        userName="Rita"
+        onOpen={() => {}}
+        onGoStats={() => {}}
+        onGo={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    expect(await screen.findByText(/1 evento hoje/)).toBeInTheDocument();
   });
 });

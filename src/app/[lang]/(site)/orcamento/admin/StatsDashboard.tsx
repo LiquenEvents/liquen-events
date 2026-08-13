@@ -20,6 +20,14 @@ const STATUS_META: Record<QuoteStatus, { label: string; color: string }> = {
   rejeitado: { label: "Perdido", color: "#5a5a55" },
 };
 
+/**
+ * A chave `YYYY-MM-DD` LOCAL de um dia — a mesma regra do `todayKey()` do
+ * `util.ts`, aplicada também a dias que não são hoje. Nunca `toISOString()`,
+ * que é UTC e desliza um dia para quem está a leste/oeste de Greenwich.
+ */
+const chaveLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 const MONTHS_PT = [
   "Jan",
   "Fev",
@@ -318,10 +326,12 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
     }
 
     // ── Finanças reais (a partir dos pagamentos registados) ──
-    const todayKey = now.toISOString().slice(0, 10);
-    const horizon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60)
-      .toISOString()
-      .slice(0, 10);
+    // Dias LOCAIS, não os de `toISOString()` (que é UTC): à meia-noite e meia
+    // de Verão em Portugal a data UTC ainda é a de ontem, e a janela dos
+    // "próximos 60 dias" deixava de fora um pagamento marcado para hoje.
+    // Ver a regra em `util.ts`.
+    const hoje = chaveLocal(now);
+    const horizon = chaveLocal(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60));
     let received = 0,
       outstanding = 0;
     const upcoming: { id: string; name: string; amount: number; date: string; kind: string }[] = [];
@@ -330,7 +340,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         if (p.paid) received += p.amount;
         else {
           outstanding += p.amount;
-          if (p.date && p.date >= todayKey && p.date <= horizon) {
+          if (p.date && p.date >= hoje && p.date <= horizon) {
             upcoming.push({
               id: `${q.id}-${p.id}`,
               name: q.name,

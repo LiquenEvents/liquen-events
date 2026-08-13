@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import type { Quote, Task } from "@/lib/orcamento/types";
 import { eur0 } from "@/lib/money";
+import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { Card } from "./ui";
+import { todayKey } from "./util";
 import { useCachedList } from "./useCachedList";
 
 interface Reminder {
@@ -31,7 +33,11 @@ export default function Reminders({ quotes, onOpen }: Props) {
 
   const reminders = useMemo(() => {
     const now = Date.now();
-    const today = new Date().toISOString().slice(0, 10);
+    // O dia LOCAL, nunca o de `toISOString()` (que é UTC): à meia-noite e meia
+    // de Verão em Portugal a data UTC ainda é a de ONTEM, e daí saía um evento
+    // de hoje dado como passado e um seguimento de hoje anunciado «em atraso».
+    // A regra está escrita em `util.ts`.
+    const today = todayKey();
     const list: Reminder[] = [];
 
     for (const q of quotes) {
@@ -53,7 +59,26 @@ export default function Reminders({ quotes, onOpen }: Props) {
       }
       // Outstanding payments for accepted events
       if (q.status === "aceite" || q.status === "cotado") {
-        const total = q.quotedPrice ?? q.priceBreakdown?.total ?? 0;
+        /**
+         * ══════════════════════════════════════════════════════════════════
+         * O QUE FALTA RECEBER SOMA-SE TUDO COM IVA — OU NÃO SE SOMA
+         * ══════════════════════════════════════════════════════════════════
+         *
+         * Era `q.quotedPrice ?? q.priceBreakdown?.total`. Os dois ramos NÃO
+         * estão na mesma unidade: `quotedPrice` é o «Preço final (SEM IVA)»
+         * do estúdio, `priceBreakdown.total` é BRUTO — e os `payments`, que
+         * se subtraem a seguir, são brutos sempre.
+         *
+         * Num casamento de 10 000 € + IVA (12 300 € a receber) com o sinal de
+         * 3 690 € já pago, o lembrete dizia «Faltam 6 310 €» quando faltavam
+         * 8 610 €. E, pior, calava-se por completo mal os pagamentos
+         * chegassem aos 10 000 €: ficavam 2 300 € por cobrar sem lembrete
+         * nenhum a dizê-lo.
+         *
+         * `contractedAmounts` é a mesma cascata que o dossier e o ecrã das
+         * Faturas usam, e devolve o bruto explicitamente.
+         */
+        const total = contractedAmounts(q).gross;
         const paid = (q.payments ?? []).filter((p) => p.paid).reduce((s, p) => s + p.amount, 0);
         if (total > 0 && paid < total - 1) {
           const eventSoon = q.date && (new Date(q.date + "T12:00:00").getTime() - now) / DAY < 14;

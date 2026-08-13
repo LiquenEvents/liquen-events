@@ -7,7 +7,17 @@ import Reminders from "./Reminders";
 import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
 import { metaFor } from "./status-meta";
+import { todayKey } from "./util";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
+
+/**
+ * A chave `YYYY-MM-DD` LOCAL de um dia qualquer — a regra do `todayKey()` do
+ * `util.ts` aplicada a uma data que não é hoje. `toISOString()` é UTC, e à
+ * meia-noite e meia de Verão em Portugal devolve o dia ANTERIOR: a janela
+ * «próximos 7 dias» abria e fechava um dia fora do sítio.
+ */
+const chaveLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 // Memoised so editing the revenue goal or the team notes (local Overview state)
 // doesn't re-render these two heavier panels every keystroke — their props
@@ -859,10 +869,13 @@ interface Props {
 export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, onNew }: Props) {
   const data = useMemo(() => {
     const now = new Date();
-    const todayKey = now.toISOString().slice(0, 10);
+    // "Hoje" e "daqui a uma semana" no calendário de quem está a olhar — as
+    // datas dos eventos são dias locais, e comparar com o dia UTC dava
+    // "Eventos hoje: 0" numa manhã em que havia um casamento.
+    const hoje = todayKey();
     const weekEnd = new Date(now);
     weekEnd.setDate(weekEnd.getDate() + 7);
-    const weekEndKey = weekEnd.toISOString().slice(0, 10);
+    const weekEndKey = chaveLocal(weekEnd);
     const thisMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
     const lastMonthD = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonthKey = `${lastMonthD.getFullYear()}-${lastMonthD.getMonth()}`;
@@ -888,8 +901,8 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         if (p.paid) received += p.amount;
         else outstanding += p.amount;
       }
-      if (q.date === todayKey) eventsToday++;
-      if (q.date && q.date >= todayKey && q.date <= weekEndKey) eventsThisWeek++;
+      if (q.date === hoje) eventsToday++;
+      if (q.date && q.date >= hoje && q.date <= weekEndKey) eventsThisWeek++;
 
       const sd = new Date(q.submittedAt);
       const sKey = `${sd.getFullYear()}-${sd.getMonth()}`;
@@ -912,9 +925,7 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
     // Next upcoming confirmed event (accepted within next 90 days)
     const nextEvent =
       quotes
-        .filter(
-          (q) => q.date && q.date >= todayKey && (q.status === "aceite" || q.status === "cotado"),
-        )
+        .filter((q) => q.date && q.date >= hoje && (q.status === "aceite" || q.status === "cotado"))
         .sort((a, b) => a.date!.localeCompare(b.date!))[0] ?? null;
     const nextEventDays = nextEvent?.date
       ? Math.round((new Date(nextEvent.date + "T12:00:00").getTime() - Date.now()) / 86400000)

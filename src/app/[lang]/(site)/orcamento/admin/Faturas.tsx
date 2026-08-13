@@ -7,7 +7,7 @@ import type { Quote } from "@/lib/orcamento/types";
 // client bundle.
 import type { Invoice } from "@/lib/invoices-store";
 import { SkeletonList } from "./Skeleton";
-import { eur2 } from "./util";
+import { eur2, todayKey } from "./util";
 import { splitSinal } from "@/lib/money";
 import { usePercentagemDoSinal } from "./percentagem-do-sinal";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
@@ -57,7 +57,16 @@ const KIND_LABEL: Record<Kind, string> = {
   total: "Total",
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+/**
+ * A data de emissão predefinida — o dia LOCAL, e aqui isso é fiscal.
+ *
+ * Era `new Date().toISOString().slice(0, 10)`, que é UTC: uma fatura emitida à
+ * 00:30 de um dia de Verão em Portugal (UTC+1) nascia datada do dia ANTERIOR.
+ * Não é um detalhe de ecrã — é a data que vai no documento, que decide o
+ * período de IVA e que ninguém confere porque o campo já vem preenchido.
+ * A regra e o `todayKey()` estão em `util.ts`.
+ */
+const today = () => todayKey();
 const fmtDate = (d?: string) =>
   d
     ? new Date(d + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short" })
@@ -636,7 +645,11 @@ export default function Faturas({ quotes }: Props) {
               value={mode}
               onChange={setMode}
               options={[
-                { value: "split", label: "Sinal + Saldo (30/70)" },
+                // A percentagem é a da PROPOSTA deste evento, não um 30/70
+                // escrito à mão: numa proposta de 50% o botão prometia uma
+                // divisão que nem a frase por baixo nem a pré-visualização —
+                // ambas já com `pctSinal` — nem o servidor faziam.
+                { value: "split", label: `Sinal + Saldo (${pctSinal}/${100 - pctSinal})` },
                 { value: "single", label: "Fatura única" },
               ]}
             />

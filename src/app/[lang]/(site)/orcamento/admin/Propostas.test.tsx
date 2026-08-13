@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
+import { __resetListCache } from "./useCachedList";
 import Propostas from "./Propostas";
 
 /**
@@ -63,6 +66,9 @@ const response = (body: unknown) => ({
 });
 
 beforeEach(() => {
+  // A cache do `useCachedList` vive no MÓDULO e sobreviveria de um teste para o
+  // outro — cada um tem de começar da mesma folha.
+  __resetListCache();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) =>
@@ -171,5 +177,98 @@ describe("Propostas — a lista muda de forma", () => {
     await waitFor(() => expect(screen.getByText("Cliente Correcto")).toBeTruthy());
     const menu = screen.getByRole("button", { name: "Acções de Cliente Correcto" });
     expect(menu.className).not.toContain("opacity-0");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ACEITAR UMA PROPOSTA NÃO PODE APAGAR O HISTÓRICO DO PEDIDO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Ao aceitar, o pedido associado passa a "Aceite" com uma linha no histórico.
+ * Isso ia como `activityLog: [...tudo o que este ecrã tinha, entrada]` — e o
+ * que este ecrã tem são os `quotes` que o pai carregou quando o back office
+ * abriu. Entre a manhã e o clique cabe tudo o que as outras ferramentas
+ * escreveram (o Quadro, a gaveta, o estúdio), e desaparecia sem erro nenhum.
+ *
+ * O servidor tem o caminho seguro — `activityLogAppend`, que junta ao registo
+ * FRESCO. E a entrada leva o nome de quem aceitou, como todas as outras.
+ */
+describe("Propostas — aceitar acrescenta ao histórico, não o reescreve", () => {
+  const enviada = {
+    id: "p-enviada",
+    quoteId: "q1",
+    clientName: "Ana e Rui",
+    clientEmail: "a@b.pt",
+    currency: "EUR",
+    lineItems: [],
+    vatRate: 0.23,
+    subtotal: 10000,
+    vat: 2300,
+    total: 12300,
+    status: "enviada",
+    createdAt: "2026-05-01T00:00:00.000Z",
+  };
+
+  /** O pedido tal como este ecrã o tem: um retrato VELHO do histórico. */
+  const pedido = {
+    id: "q1",
+    name: "Ana e Rui",
+    status: "cotado",
+    activityLog: [
+      { id: "a1", at: "2026-05-01T09:00:00.000Z", kind: "note", summary: "Retrato da manhã" },
+    ],
+  } as unknown as Quote;
+
+  let enviados: { url: string; body: Record<string, unknown> }[] = [];
+
+  beforeEach(() => {
+    enviados = [];
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const u = String(url);
+        if (init?.method === "PATCH") {
+          const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+          enviados.push({ url: u, body });
+          if (u.startsWith("/api/orcamento/")) return response({ ...pedido, status: "aceite" });
+          return response({ ...enviada, status: "aceite" });
+        }
+        return response(u.startsWith("/api/propostas") ? [enviada] : []);
+      }),
+    );
+  });
+
+  async function aceitar() {
+    render(
+      <ToastProvider>
+        <Propostas quotes={[pedido]} onOpenQuote={() => {}} userName="Catarina" />
+      </ToastProvider>,
+    );
+    await waitFor(() => expect(screen.getAllByText("Ana e Rui").length).toBeGreaterThan(0));
+    await userEvent.click(screen.getAllByRole("button", { name: "Acções de Ana e Rui" })[0]);
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Aceitar" }));
+    await waitFor(() =>
+      expect(enviados.some((e) => e.url.startsWith("/api/orcamento/"))).toBe(true),
+    );
+    return enviados.find((e) => e.url.startsWith("/api/orcamento/"))!;
+  }
+
+  it("manda `activityLogAppend` com uma entrada — e nunca o registo inteiro", async () => {
+    const patch = await aceitar();
+    expect(patch.body.status).toBe("aceite");
+    expect(patch.body).not.toHaveProperty("activityLog");
+    expect(patch.body.activityLogAppend).toHaveLength(1);
+  });
+
+  it("a entrada diz QUEM aceitou", async () => {
+    const patch = await aceitar();
+    const entrada = (patch.body.activityLogAppend as { actor?: string; summary: string }[])[0];
+    expect(entrada.actor).toBe("Catarina");
+    expect(entrada.summary).toMatch(/Proposta aceite/);
   });
 });
