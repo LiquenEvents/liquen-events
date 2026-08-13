@@ -62,6 +62,48 @@ function lerAdClick(): string {
   return c ? serializar(c) : "";
 }
 
+/**
+ * O dia de hoje NO FUSO DE QUEM PREENCHE.
+ *
+ * `new Date().toISOString()` é sempre UTC, e o dia que sai de lá não é o dia
+ * que está no relógio dela. Em Lisboa, no Verão, entre a meia-noite e a 01:00
+ * dava ONTEM, e o `min` do campo passava a deixar escolher um dia já passado.
+ * A oeste de Greenwich era pior ao contrário: ao fim da tarde dava AMANHÃ, e o
+ * dia que ela via no calendário do telemóvel era recusado pelo `okData` — um
+ * beco sem saída, com uma mensagem a mandá-la indicar a data que ela tinha
+ * acabado de indicar.
+ */
+function hojeNoFusoDela(agora: Date = new Date()): string {
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const dia = String(agora.getDate()).padStart(2, "0");
+  return `${agora.getFullYear()}-${mes}-${dia}`;
+}
+
+/**
+ * O e-mail, exactamente como o servidor o lê.
+ *
+ * Isto é a expressão do `z.email()` do zod, que é o que valida o campo em
+ * `quoteFormSchema` (src/lib/validation.ts). Está aqui copiada e não importada
+ * de propósito: importar `@/lib/validation` traria o zod inteiro para o pacote
+ * desta página, que é a página que converte.
+ *
+ * O teste `OrcamentoForm.test.tsx` põe os dois lado a lado sobre a mesma lista
+ * de endereços — é ele o fio que os mantém a dizer a mesma coisa se um deles
+ * um dia mudar. O que estava antes (`/\S+@\S+\.\S+/`) era mais frouxo do que o
+ * servidor: `ana@exemplo.p` ficava com a linha verde de campo válido e só
+ * morria depois do envio, num aviso ao fundo da página que não diz qual o
+ * campo — com o campo do e-mail, ali em cima, ainda a dizer que estava bem.
+ */
+const EMAIL_RE =
+  /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$/;
+
+/**
+ * O tecto do que o servidor grava em `notes` (`quoteFormSchema`, em
+ * src/lib/validation.ts). Repetido aqui, e não importado, pela mesma razão que
+ * a expressão do e-mail: o zod não tem que vir parar ao browser.
+ */
+const MAX_NOTAS = 4000;
+
 // Single source of truth, shared with the confirmation page so both resolve the
 // same option index (and therefore the same localized label).
 const EVENT_TYPES = QUOTE_EVENT_OPTIONS;
@@ -288,10 +330,12 @@ export default function OrcamentoForm({
   // `min` velho de semanas, que deixava escolher datas já passadas. Sem `min`
   // no primeiro desenho, portanto; o `okData` aqui abaixo prende a mesma regra
   // do lado do envio, que é o que conta.
+  //
+  // E é o dia DELA, não o de Greenwich — ver `hojeNoFusoDela` lá em cima.
   const [minDate, setMinDate] = useState("");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMinDate(new Date().toISOString().slice(0, 10));
+    setMinDate(hojeNoFusoDela());
   }, []);
 
   // Restaura o rascunho guardado (uma vez, após montar — evita mismatch de SSR).
@@ -468,7 +512,9 @@ export default function OrcamentoForm({
   // dizer nada, por isso a secção nem chega a existir.
   const ehCasamento = EVENT_TYPES.find((o) => o.label === eventType)?.eventType === "casamentos";
   const okNome = nome.trim().length >= 2;
-  const okEmail = /\S+@\S+\.\S+/.test(email);
+  // A MESMA regra do servidor, e não uma parecida — ver `EMAIL_RE`. Sobre o
+  // valor aparado, porque é aparado que ele viaja no envio.
+  const okEmail = EMAIL_RE.test(email.trim());
   // 9 digits is the Portuguese national number; an international one arrives
   // longer, so accept anything from 9 digits up.
   const okTelefone = telefone.replace(/\D/g, "").length >= 9;
@@ -485,6 +531,29 @@ export default function OrcamentoForm({
   const okPessoas = guestsFlexible || Number(pessoas) > 0;
   const okLocal = local.trim().length >= 2;
   const okMensagem = mensagem.trim().length > 0;
+  /**
+   * Quanto cabe no campo da mensagem.
+   *
+   * O texto dela não viaja sozinho: as marcas de «ainda a definir» seguem
+   * agarradas à frente, dentro do mesmo `notes` que o servidor limita. Sem
+   * limite nenhum no campo, quem escrevia a página inteira que a proposta pede
+   * — a cliente mais empenhada que há — carregava em Enviar e recebia de volta
+   * um «Too big: expected string to have <=4000 characters», em inglês, sem
+   * dizer qual o campo nem quanto sobrava.
+   *
+   * As duas marcas contam SEMPRE, mesmo desmarcadas: marcá-las depois de
+   * escrever não encurta o que já está escrito.
+   */
+  const maxMensagem = useMemo(
+    () =>
+      MAX_NOTAS -
+      [`(${to.dateFlexibleLabel})`, `(${to.labelPessoas}: ${to.guestsFlexibleLabel})`].reduce(
+        // +2 pela linha em branco com que cada marca se separa da seguinte.
+        (sobra, marca) => sobra + marca.length + 2,
+        0,
+      ),
+    [to],
+  );
 
   const show = (t: boolean | undefined) => Boolean(t) || attemptedSubmit;
   const nomeErr = show(touched.nome) && !okNome ? to.errNome : "";
@@ -607,7 +676,24 @@ export default function OrcamentoForm({
         signal: controller.signal,
       });
       const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.id) throw new Error(json?.error || "falha");
+      // ── A RESPOSTA DO SERVIDOR SAI AQUI, E NÃO PELO `catch` ────────────────
+      //
+      // Vinha por um `throw new Error(json?.error)`, e o `catch` mostrava
+      // `e.message` de QUALQUER excepção que passasse por ali. A que passa por
+      // ali quase sempre não é esta: é a do `fetch` a rejeitar quando a rede
+      // cai — «Failed to fetch» no Chrome, «Load failed» no Safari. Era isso
+      // que se lia, em inglês e em bruto, na página que paga a casa, no lugar
+      // da única frase que diz que há um WhatsApp do outro lado.
+      //
+      // Separadas: a explicação do servidor (o 400 que diz «E-mail inválido»,
+      // o 429 que diz para esperar um pouco) sai neste ramo, e o `catch` fica
+      // só com o que ele sabe mesmo explicar — a rede.
+      if (!res.ok || !json?.id) {
+        const doServidor = typeof json?.error === "string" ? json.error.trim() : "";
+        setError(doServidor || to.error);
+        setSending(false);
+        return;
+      }
 
       track("QuoteSubmit", { tipo: opt?.eventType ?? eventType });
 
@@ -637,16 +723,11 @@ export default function OrcamentoForm({
         /* ignora */
       }
       router.push(localizeHref(`/orcamento/confirmacao/${json.id}`, locale));
-    } catch (e) {
-      // Surface the server's specific message (e.g. the "try again / contact us"
-      // text when delivery genuinely failed) instead of the generic fallback.
-      // A timeout/network abort has no server message, so it falls back to the
-      // generic retry copy rather than leaking a raw "AbortError" string.
-      let msg = to.error;
-      if (e instanceof Error && e.name !== "AbortError" && e.message && e.message !== "falha") {
-        msg = e.message;
-      }
-      setError(msg);
+    } catch {
+      // Rede em baixo, DNS, proxy da empresa, ou o `abort` aos 25 s. O que o
+      // browser atira aqui nunca foi escrito para ser lido por ninguém — a
+      // frase do site é que diz o que fazer a seguir, e diz que há WhatsApp.
+      setError(to.error);
       setSending(false);
     } finally {
       clearTimeout(timeout);
@@ -1127,7 +1208,7 @@ export default function OrcamentoForm({
                   aria-invalid={!!emailErr}
                   aria-describedby={emailErr ? "of-email-err" : undefined}
                   className={`${ffInputCls} ${
-                    emailErr ? "border-gold/60" : /\S+@\S+\.\S+/.test(email) ? "border-moss/50" : ""
+                    emailErr ? "border-gold/60" : okEmail ? "border-moss/50" : ""
                   }`}
                   placeholder={to.phEmail}
                 />
@@ -1232,6 +1313,7 @@ export default function OrcamentoForm({
                   onChange={(e) => setMensagem(e.target.value)}
                   onBlur={() => markTouched("mensagem")}
                   rows={6}
+                  maxLength={maxMensagem}
                   aria-invalid={mensagemErr ? true : undefined}
                   aria-describedby={
                     mensagemErr ? "of-mensagem-err of-mensagem-hint" : "of-mensagem-hint"

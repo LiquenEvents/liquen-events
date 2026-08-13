@@ -47,6 +47,16 @@ export const quoteFormSchema = z
     nif: trimmed(20).optional().default(""),
     guests: z.coerce.number().int().min(0).max(100000).optional().default(0),
     date: trimmed(20).optional().default(""),
+    // ── ESTE 4000 TEM UM PAR DO OUTRO LADO ────────────────────────────────
+    // `notes` é o campo «Como imagina o seu evento?» do formulário público,
+    // com as marcas de «ainda a definir» agarradas à frente. O formulário
+    // trava o campo neste mesmo número (`MAX_NOTAS`, em OrcamentoForm.tsx),
+    // descontando o que as marcas ocupam — porque o zod não tem que vir parar
+    // ao pacote da página que converte só para ela saber onde parar.
+    //
+    // Mexer aqui é mexer lá. Sem isso, quem escreve a página inteira que a
+    // proposta pede carrega em Enviar e recebe um «Too big: expected string
+    // to have <=4000 characters», em inglês, sem saber de que campo se fala.
     notes: trimmed(4000).optional().default(""),
     // Remaining QuoteFormData fields are free-form on the client (category
     // labels, location text, addon picks…) — bound their size/shape so a
