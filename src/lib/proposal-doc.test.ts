@@ -318,12 +318,56 @@ describe("proposal-doc — withProposalDefaults", () => {
     expect(joined).not.toContain("{CONVIDADOS}");
   });
 
-  it("uses an em dash when eventDate / guests are empty strings", () => {
+  /**
+   * ── SEM DATA E SEM NÚMERO, A CLÁUSULA CONTINUA A SER UMA FRASE ────────────
+   *
+   * «Data flexível» é o caso NORMAL de quem ainda anda a escolher o dia — o
+   * formulário grava `date: ""` e o estúdio semeia `eventDate: ""`. O que o
+   * casal lia nas Condições Gerais era «Esta proposta só é válida para o evento
+   * a realizar no dia —.»: um marcador de folha de cálculo no meio de uma
+   * CLÁUSULA CONTRATUAL, que é a folha que ganha uma discussão meses depois.
+   *
+   * O padrão certo é o do email de confirmação, que no mesmo caso escreve «Data:
+   * ainda a definir» — palavras, não símbolos.
+   */
+  it("sem data e sem número, as Condições Gerais continuam frases inteiras", () => {
     const doc = withProposalDefaults(base({ eventDate: "", guests: "" }));
     const joined = doc.condicoesGerais.join("\n");
     expect(joined).not.toContain("{DATA}");
     expect(joined).not.toContain("{CONVIDADOS}");
-    expect(joined).toContain("—");
+    // Nem marcador, nem o travessão que lá estava a fazer de data.
+    expect(joined).not.toContain("—");
+    expect(joined).toContain(
+      "Esta proposta só é válida para a data do evento que vier a ser confirmada por escrito.",
+    );
+    expect(joined).toContain(
+      "O orçamento é válido para o número de convidados que vier a ser confirmado por escrito;" +
+        " abaixo ou acima desse número o valor da proposta terá de ser revisto.",
+    );
+  });
+
+  it("com data mas sem número, só a cláusula do número é reescrita", () => {
+    const doc = withProposalDefaults(base({ guests: "" }));
+    const joined = doc.condicoesGerais.join("\n");
+    expect(joined).toContain("a realizar no dia 3 de julho de 2027.");
+    expect(joined).toContain("o número de convidados que vier a ser confirmado por escrito");
+    expect(joined).not.toContain("—");
+  });
+
+  /**
+   * `String.replace` com uma string troca só a PRIMEIRA ocorrência: uma condição
+   * editada à mão com o marcador repetido saía com o segundo literal — «{DATA}»
+   * impresso no PDF do cliente.
+   */
+  it("uma condição editada à mão com o marcador REPETIDO fica toda preenchida", () => {
+    const doc = withProposalDefaults(
+      base({
+        condicoesGerais: ["De {DATA} a {DATA}, para {CONVIDADOS} e não mais de {CONVIDADOS}."],
+      }),
+    );
+    expect(doc.condicoesGerais[0]).toBe(
+      "De 3 de julho de 2027 a 3 de julho de 2027, para 150 pax e não mais de 150 pax.",
+    );
   });
 
   it("still runs token substitution over a CUSTOM condicoesGerais array", () => {

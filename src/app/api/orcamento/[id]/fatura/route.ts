@@ -16,6 +16,8 @@ import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de
 import { log } from "@/lib/logger";
 import { eur } from "@/lib/money";
 import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
+import { dataIso } from "@/lib/validation";
+import { hojeNoEstudio } from "@/lib/proposal-doc";
 
 export const runtime = "nodejs";
 
@@ -63,17 +65,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const invoiceKind = PAYMENT_TO_INVOICE_KIND[paymentKind] ?? "total";
     const vatRate =
       typeof body.vatRate === "number" ? Math.min(Math.max(body.vatRate, 0), 1) : 0.23;
-    // Coerção da data ao formato yyyy-mm-dd, espelhando a rota /faturas: um `date`
-    // malformado do painel persistia tal-e-qual e depois alimentava
-    // `new Date(date+"T12:00:00")` no PDF → "Invalid Date" no recibo (e no `paidAt`
-    // derivado). Um valor ausente ou malformado cai para hoje.
-    const asIsoDate = (v: unknown) => {
-      const s = String(v ?? "")
-        .trim()
-        .slice(0, 10);
-      return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
-    };
-    const issuedAt = asIsoDate(body.date) || new Date().toISOString().slice(0, 10);
+    // Coerção da data ao formato yyyy-mm-dd: um `date` malformado do painel
+    // persistia tal-e-qual e depois alimentava `new Date(date+"T12:00:00")` no
+    // PDF → "Invalid Date" no recibo (e no `paidAt` derivado). A regra estava
+    // escrita aqui e copiada à mão para a rota /faturas; agora é a mesma
+    // `dataIso` para toda a gente — inclusive para a validade da proposta, que
+    // dizia «Válida até Invalid Date» por lhe faltar esta verificação.
+    // Um valor ausente ou malformado cai para hoje.
+    // O recurso é o dia de LISBOA, não o de Greenwich — ver `hojeNoEstudio`.
+    const issuedAt = dataIso(body.date) || hojeNoEstudio();
     const paid = !!body.paid;
     const email = !!body.email;
     const description = String(body.description ?? "").slice(0, 2000);

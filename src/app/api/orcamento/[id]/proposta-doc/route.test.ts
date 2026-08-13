@@ -760,6 +760,19 @@ describe("POST /api/orcamento/[id]/proposta-doc — assinatura", () => {
     expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
     expect(env.html).not.toContain("Líquen Events · ");
   });
+
+  /**
+   * O mesmo assunto da rota irmã, e pela mesma razão: `proposal.id.slice(0, 8)`
+   * punha oito caracteres de um `randomUUID()` na caixa de correio do casal —
+   * uma referência que não é a da casa (`LIQ-…`), que ninguém sabe ler, e que
+   * num telemóvel rouba os caracteres do assunto que ainda se veem.
+   */
+  it("não põe o identificador interno da proposta no assunto", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "acrescer" })), { params });
+    const env = vi.mocked(sendMail).mock.calls.at(-1)![0];
+    expect(env.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(env.subject).not.toMatch(/[0-9a-f]{8}/i);
+  });
 });
 
 /**

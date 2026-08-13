@@ -360,6 +360,35 @@ describe("o caminho de omissão continua a ser o português", () => {
     expect(blocos.cancelamento).toBe(doc.cancelamento);
     expect(blocosFixosNaLingua(doc).notasImportantes).toBe(doc.notasImportantes);
   });
+
+  /**
+   * O casal que ainda não tem data também recebe a proposta em inglês, e a
+   * cláusula é a mesma cláusula contratual: sem o dado tem de continuar a ser
+   * uma frase, na LÍNGUA em que está a ser escrita — nem um travessão, nem o
+   * «a definir» português a meio de uma frase inglesa.
+   */
+  it("sem data e sem número, as condições inglesas também continuam frases", () => {
+    // As condições voltam ao molde: o documento de prova traz-nas já
+    // preenchidas com a data que aqui deixa de existir.
+    const doc = withProposalDefaults({
+      ...decoracaoCheia(),
+      eventDate: "",
+      guests: "",
+      condicoesGerais: undefined,
+    });
+    const texto = blocosFixosNaLingua(doc, "en").condicoesGerais.join("\n");
+    expect(texto).toContain(
+      "This proposal is only valid for the event date subsequently confirmed in writing.",
+    );
+    expect(texto).toContain(
+      "The quote is valid for the number of guests subsequently confirmed in writing;" +
+        " below or above that number the amount of the proposal will have to be revised.",
+    );
+    expect(texto).not.toContain("{DATA}");
+    expect(texto).not.toContain("{CONVIDADOS}");
+    expect(texto).not.toContain("—");
+    expect(texto).not.toContain("a definir");
+  });
 });
 
 describe("nada fica por traduzir na versão inglesa", () => {

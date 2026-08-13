@@ -445,3 +445,59 @@ describe("POST /api/faturas — a numeração fiscal indisponível é uma respos
     expect(res.status).toBe(500);
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * A DATA DE EMISSÃO É O DIA DE LISBOA, NÃO O DE GREENWICH
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * `new Date().toISOString()` é UTC. No Verão em Portugal (UTC+1), entre a
+ * meia-noite e a uma da manhã isso dá o dia ANTERIOR — e esta é a data que sai
+ * impressa no documento fiscal e que decide o período de IVA.
+ *
+ * A hora fica FIXA (e o processo em UTC, como o alojamento onde isto corre):
+ * um teste que só falhasse durante essa hora não guardava nada.
+ */
+describe("POST /api/faturas — a data de emissão por omissão", () => {
+  it("à 00:30 de um dia de agosto emite com a data de HOJE em Lisboa", async () => {
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    // 14 de agosto de 2026, 00:30 em Lisboa (UTC+1) — 13 de agosto, 23:30 UTC.
+    vi.setSystemTime(new Date("2026-08-13T23:30:00Z"));
+    try {
+      const res = await POST(
+        req({ quoteId: "q-1", clientName: "Ana", amount: 3000, kind: "total" }),
+      );
+      expect(res.status).toBe(201);
+      expect(createInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ issuedAt: "2026-08-14" }),
+      );
+    } finally {
+      vi.useRealTimers();
+      delete process.env.TZ;
+    }
+  });
+
+  it("uma data escrita à mão continua a mandar", async () => {
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-13T23:30:00Z"));
+    try {
+      await POST(
+        req({
+          quoteId: "q-1",
+          clientName: "Ana",
+          amount: 3000,
+          kind: "total",
+          issuedAt: "2026-07-01",
+        }),
+      );
+      expect(createInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ issuedAt: "2026-07-01" }),
+      );
+    } finally {
+      vi.useRealTimers();
+      delete process.env.TZ;
+    }
+  });
+});

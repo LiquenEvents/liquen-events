@@ -441,7 +441,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const mail = await sendMail({
           to: quote.email,
           replyTo: MAIL_TO,
-          subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
+          // Sem o identificador interno — a mesma decisão da rota irmã
+          // (`orcamento/[id]/proposta`), onde está escrita por extenso: o
+          // `randomUUID()` da nossa base não é referência de ninguém.
+          subject: "Proposta para o seu evento — Líquen Events",
           html: email.html,
           text: email.text,
           // O PDF junta-se aos anexos da assinatura; substituí-los deixava o

@@ -149,6 +149,41 @@ describe("POST /api/orcamento/[id]/proposta", () => {
 
   /**
    * ══════════════════════════════════════════════════════════════════════════
+   * «VÁLIDA ATÉ INVALID DATE»
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A `validUntil` só era medida ao COMPRIMENTO, e a única coisa que a lia era
+   * `new Date(validUntil + "T12:00:00")`. Um ano com cinco dígitos (o
+   * `<input type="date">` do Chrome aceita-o) ou um rascunho restaurado com
+   * «31/12/2026» punham «Válida até Invalid Date» no HTML, no texto simples e
+   * no PDF anexo — nas três, porque a data é a mesma.
+   *
+   * Recusa-se ANTES de gastar seja o que for: nada gravado, nada enviado, e uma
+   * frase que diz à Catarina o que corrigir.
+   */
+  it("recusa uma validade que não é uma data — sem gravar nem enviar nada", async () => {
+    authed.ok = true;
+    for (const validUntil of ["20266-12-31", "2026-2-3", "31/12/2026", "2026-02-31"]) {
+      const res = await POST(req("POST", { ...validItems, validUntil }), ctx("LIQ-1"));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: expect.stringMatching(/aaaa-mm-dd/) });
+    }
+    expect(proposals.create).not.toHaveBeenCalled();
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+
+  it("uma validade boa continua a sair por extenso nas duas versões do email", async () => {
+    authed.ok = true;
+    await POST(req("POST", { ...validItems, validUntil: "2026-12-31" }), ctx("LIQ-1"));
+    const env = mail.send.mock.calls.at(-1)![0] as { html: string; text: string };
+    expect(env.html).toContain("Válida até 31/12/2026.");
+    expect(env.text).toContain("Válida até 31/12/2026.");
+    expect(env.html).not.toContain("Invalid Date");
+    expect(env.text).not.toContain("Invalid Date");
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
    * O LINK DO EMAIL ABRE A PROPOSTA QUE ACABOU DE SER CRIADA
    * ══════════════════════════════════════════════════════════════════════════
    *
@@ -236,6 +271,33 @@ describe("POST /api/orcamento/[id]/proposta — assinatura", () => {
     expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
     expect(env.attachments?.some((a) => a.filename.endsWith(".pdf"))).toBe(true);
     expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O ASSUNTO É PARA QUEM O LÊ, E QUEM O LÊ É O CASAL
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Levava `proposal.id.slice(0, 8)` — oito caracteres do `randomUUID()` que
+   * numera a proposta na nossa base. Na caixa de correio do casal lia-se
+   * «Proposta para o seu evento — Líquen Events (3f2b1c9a)»: um bloco de
+   * hexadecimal que não diz nada a ninguém — nem ao estúdio, cuja referência é
+   * a `LIQ-…` que a confirmação mandou o cliente guardar — e que num telemóvel
+   * come os caracteres do assunto que ainda se veem.
+   *
+   * Sai, e não é substituído: o email mais lido da casa (a confirmação do
+   * pedido) também não põe referência nenhuma no assunto, e o que junta a
+   * conversa na caixa dele são os cabeçalhos `In-Reply-To`/`References`, nunca
+   * o assunto.
+   */
+  it("não põe o identificador interno da proposta no assunto", async () => {
+    authed.ok = true;
+    const res = await POST(req("POST", validItems), ctx("LIQ-1"));
+    const { id } = await res.json();
+    const env = mail.send.mock.calls.at(-1)![0] as { subject: string };
+    expect(env.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(env.subject).not.toContain(String(id).slice(0, 8));
+    expect(env.subject).not.toMatch(/[0-9a-f]{8}/i);
   });
 
   it("deixou de escrever o rodapé à mão", async () => {

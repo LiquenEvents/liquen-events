@@ -328,6 +328,42 @@ describe("POST /api/proposta", () => {
     expect(log.some((e) => e.actor === "Sistema")).toBe(false);
   });
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A FACTURA DE SINAL NASCE COM O DIA DE LISBOA, NÃO COM O DE GREENWICH
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Esta é a factura auto-emitida quando o casal carrega em «Aceitar»: não passa
+   * por ecrã nenhum e ninguém confere a data antes de ela ir para o livro. Era
+   * `new Date().toISOString()`, que é UTC — no Verão em Portugal (UTC+1), das
+   * 00:00 à 01:00 isso dá o dia ANTERIOR.
+   *
+   * Um casal que aceita às 00:30 de 14 de agosto ficava com uma factura datada
+   * de 13 — a data que sai impressa no PDF e que decide o período de IVA.
+   *
+   * A hora é FIXA no teste (e o processo em UTC, como os servidores onde isto
+   * corre): um teste que só falhasse à meia-noite não guardava nada.
+   */
+  it("uma aceitação às 00:30 de agosto emite o sinal com a data de HOJE em Lisboa", async () => {
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    // 14 de agosto de 2026, 00:30 em Lisboa (UTC+1) — 13 de agosto, 23:30 UTC.
+    vi.setSystemTime(new Date("2026-08-13T23:30:00Z"));
+    try {
+      seedProposal("p-meia-noite");
+      const res = await POST(
+        postReq({ token: createProposalToken("p-meia-noite"), action: "aceitar", ...CONSENT }),
+      );
+      expect(res.status).toBe(200);
+      expect(createInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "sinal", issuedAt: "2026-08-14" }),
+      );
+    } finally {
+      vi.useRealTimers();
+      delete process.env.TZ;
+    }
+  });
+
   it("accepts a proposal whose validUntil is the current day (não expira à meia-noite)", async () => {
     // "Válida até 2026-07-19" tem de valer todo o dia 19, não só até 00:00Z.
     // Bug: Date.parse('2026-07-19') = meia-noite UTC, por isso qualquer aceite

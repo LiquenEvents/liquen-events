@@ -656,3 +656,33 @@ describe("POST /api/orcamento/[id]/fatura — assinatura", () => {
     expect(env.html).not.toContain("Líquen Events · ");
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O «HOJE» DE UM RECIBO É O DIA DE LISBOA
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O recurso da data (sem `date`, ou com um `date` que não é uma data) era
+ * `new Date().toISOString()` — UTC. No Verão em Portugal (UTC+1), entre a
+ * meia-noite e a uma da manhã isso dava o dia ANTERIOR, e é esta a data que sai
+ * impressa no documento e que decide o período de IVA.
+ */
+describe("POST /api/orcamento/[id]/fatura — o «hoje» do recurso", () => {
+  it("à 00:30 de agosto o recibo nasce com o dia de HOJE em Lisboa", async () => {
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    // 14 de agosto de 2026, 00:30 em Lisboa (UTC+1) — 13 de agosto, 23:30 UTC.
+    vi.setSystemTime(new Date("2026-08-13T23:30:00Z"));
+    try {
+      const res = await POST(
+        req({ paymentId: "p-noite", kind: "pagamento", amount: 500, paid: true }),
+        ctx("LIQ-1"),
+      );
+      expect(res.status).toBe(200);
+      expect(ledger.rows[0]).toMatchObject({ issuedAt: "2026-08-14", paidAt: "2026-08-14" });
+    } finally {
+      vi.useRealTimers();
+      delete process.env.TZ;
+    }
+  });
+});

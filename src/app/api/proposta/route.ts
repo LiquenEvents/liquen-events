@@ -24,7 +24,7 @@ import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { isConflictError } from "@/lib/repository";
 import { log } from "@/lib/logger";
 import { eur, splitSinal } from "@/lib/money";
-import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
+import { depositPercentOf, hojeNoEstudio, type ProposalDoc } from "@/lib/proposal-doc";
 
 export const runtime = "nodejs";
 // O aceite: grava o contrato, desenha o PDF do contrato e manda dois
@@ -328,7 +328,12 @@ export async function POST(request: NextRequest) {
               // Carrega a taxa de IVA REAL da proposta (podem ser 6%/13%/23%),
               // não um 0,23 fixo. Fallback 0,23 quando a proposta não a traz.
               vatRate: typeof proposal.vatRate === "number" ? proposal.vatRate : 0.23,
-              issuedAt: new Date().toISOString().slice(0, 10),
+              // O dia de LISBOA, não o de Greenwich: esta factura é emitida
+              // sozinha quando o casal carrega em «Aceitar», não passa por ecrã
+              // nenhum e ninguém confere a data antes de ela ir para o livro.
+              // Um aceite às 00:30 de 14 de agosto ficava datado de 13 — a data
+              // impressa no PDF e a que decide o período de IVA.
+              issuedAt: hojeNoEstudio(),
               status: "emitida",
               note: "Sinal 30% — reserva de data (aceitação da proposta)",
             });

@@ -5,6 +5,8 @@ import {
   quoteUpdateSchema,
   priceBreakdownSchema,
   pushSubscriptionSchema,
+  proposalCreateSchema,
+  dataIso,
   firstError,
 } from "./validation";
 
@@ -202,6 +204,66 @@ describe("pushSubscriptionSchema", () => {
       keys: { p256dh: "key", auth: "auth" },
     });
     expect(r.success).toBe(false);
+  });
+});
+
+/**
+ * ── «VÁLIDA ATÉ INVALID DATE» ──────────────────────────────────────────────
+ *
+ * A `validUntil` era validada por um COMPRIMENTO (30 caracteres), não por um
+ * formato. Um ano com cinco dígitos (o `<input type="date">` do Chrome aceita-o)
+ * ou um rascunho restaurado com «31/12/2026» passavam, e a única coisa que os
+ * lia depois era `new Date(validUntil + "T12:00:00")` — que dá `Invalid Date` e
+ * é assim que sai impresso no email e no PDF do cliente.
+ */
+describe("dataIso — uma data de calendário, não um comprimento", () => {
+  it("aceita uma data real e devolve-a tal e qual", () => {
+    expect(dataIso("2026-12-31")).toBe("2026-12-31");
+    expect(dataIso(" 2028-02-29 ")).toBe("2028-02-29");
+  });
+
+  it("recusa tudo o que dava «Invalid Date» ao cliente", () => {
+    for (const mau of [
+      "20266-12-31",
+      "2026-2-3",
+      "31/12/2026",
+      "",
+      "hoje",
+      null,
+      undefined,
+      20260101,
+    ]) {
+      expect(dataIso(mau)).toBe("");
+    }
+  });
+
+  it("recusa um dia que não existe no calendário, em vez de o deixar rodar", () => {
+    // `new Date("2026-02-31T12:00:00")` não é inválida: é 3 de março. Uma
+    // proposta «válida até 03/03» que ela escreveu como fevereiro é pior do que
+    // um erro visível.
+    expect(dataIso("2026-02-31")).toBe("");
+    expect(dataIso("2026-02-29")).toBe("");
+    expect(dataIso("2026-13-45")).toBe("");
+  });
+});
+
+describe("proposalCreateSchema — a validade", () => {
+  const lineItems = [{ description: "Decoração", qty: 1, unitPrice: 1000 }];
+
+  it("aceita a proposta sem validade nenhuma", () => {
+    expect(proposalCreateSchema.safeParse({ lineItems }).success).toBe(true);
+    expect(proposalCreateSchema.safeParse({ lineItems, validUntil: "" }).success).toBe(true);
+    expect(proposalCreateSchema.safeParse({ lineItems, validUntil: "2026-12-31" }).success).toBe(
+      true,
+    );
+  });
+
+  it("recusa uma validade que não é uma data — antes de ela chegar ao email", () => {
+    for (const mau of ["20266-12-31", "2026-2-3", "31/12/2026", "2026-02-31"]) {
+      const r = proposalCreateSchema.safeParse({ lineItems, validUntil: mau });
+      expect(r.success).toBe(false);
+      if (!r.success) expect(firstError(r.error)).toMatch(/aaaa-mm-dd/);
+    }
   });
 });
 

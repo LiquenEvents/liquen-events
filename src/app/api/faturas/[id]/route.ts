@@ -14,9 +14,10 @@ import {
 import { getProposalByQuote } from "@/lib/proposals-store";
 import { splitSinal, saldoAPartirDoSinal, eur } from "@/lib/money";
 import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
-import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
+import { depositPercentOf, hojeNoEstudio, somarDias, type ProposalDoc } from "@/lib/proposal-doc";
 import { log } from "@/lib/logger";
 import { invoiceUpdateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
+import { dataIso } from "@/lib/validation";
 import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 
 export const runtime = "nodejs";
@@ -84,13 +85,17 @@ async function maybeAutoIssueSaldo(sinal: Invoice): Promise<Invoice | null> {
       /* cross-check é opcional — nunca afeta o valor faturado nem o fluxo */
     }
 
-    const issuedAt = new Date().toISOString().slice(0, 10);
-    // Vencimento por omissão: hoje + 30 dias. A data do evento não é conhecida
-    // aqui (não vive na fatura), por isso usamos um prazo padrão de pagamento —
-    // a equipa pode ajustá-lo no back office se necessário.
-    const dueAt = new Date(Date.now() + SALDO_DUE_DAYS * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
+    // O dia de LISBOA, não o de Greenwich (ver `hojeNoEstudio`): este saldo é
+    // um documento fiscal emitido sozinho, e à 00:30 de um dia de Verão nascia
+    // datado de ontem.
+    const issuedAt = hojeNoEstudio();
+    // Vencimento por omissão: 30 dias depois da EMISSÃO. A data do evento não é
+    // conhecida aqui (não vive na fatura), por isso usamos um prazo padrão de
+    // pagamento — a equipa pode ajustá-lo no back office se necessário. Conta-se
+    // sobre a data e não sobre o instante: somar 30 × 24 h ao relógio trazia de
+    // volta, pela porta do lado, o dia trocado que o `issuedAt` acabou de
+    // corrigir (e uma mudança de hora pelo meio ainda lhe roubava uma hora).
+    const dueAt = somarDias(issuedAt, SALDO_DUE_DAYS);
 
     const saldo: Invoice = {
       id: newInvoiceId(),
@@ -199,16 +204,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       patch.status = body.status;
       // Keep paidAt in lockstep with the status unless the caller set it
       // explicitly: marking paga stamps today, un-paying (or annulling) clears it.
+      // «Hoje» é o dia de Lisboa — ver `hojeNoEstudio`.
       if (body.status === "paga" && !("paidAt" in body)) {
-        patch.paidAt = new Date().toISOString().slice(0, 10);
+        patch.paidAt = hojeNoEstudio();
       } else if (body.status !== "paga") {
         patch.paidAt = undefined;
       }
     }
 
     if ("paidAt" in body) {
-      const s = String(body.paidAt ?? "").slice(0, 10);
-      patch.paidAt = /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : undefined;
+      // A mesma regra de todas as outras datas do livro — ver `dataIso`.
+      patch.paidAt = dataIso(body.paidAt) || undefined;
     }
     if ("note" in body) {
       patch.note = body.note

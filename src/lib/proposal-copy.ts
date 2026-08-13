@@ -124,9 +124,12 @@ function nomesDoCasal(quote: Quote): string {
  * pré-visualização ou envio passa por `withProposalDefaults`, que preenche os
  * marcadores com a data e os convidados DESTE pedido.
  *
- * Quando a origem não tinha data nem convidados, as frases ficaram com um
- * travessão e é assim que ficam — um travessão não é o casamento de ninguém, e
- * procurar travessões pelo texto para os substituir dava muito pior.
+ * Quando a origem não tinha data nem convidados, as frases dela não têm dado
+ * nenhum lá dentro para trocar: são a OUTRA redacção da cláusula, a que fala da
+ * data «que vier a ser confirmada por escrito» (ver `CONDICOES_SEM_DADO` em
+ * `proposal-doc.ts`). Copiadas assim, continuam a ser frases verdadeiras para o
+ * casal novo — e se ele já tiver data, é uma condição a rever à mão, como
+ * qualquer outra que ela tenha reescrito.
  */
 function remarcarCondicoes(condicoes: string[] | undefined, origem: ProposalDoc): string[] {
   if (!condicoes || condicoes.length === 0) return condicoes ?? [];

@@ -10,7 +10,7 @@ import { emailAoCliente } from "@/lib/email-assinatura";
 import { SITE } from "@/lib/site";
 import { createProposalToken } from "@/lib/proposal-token";
 import { isAuthed } from "@/lib/admin-auth";
-import { proposalCreateSchema, firstError } from "@/lib/validation";
+import { proposalCreateSchema, firstError, dataIso } from "@/lib/validation";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -89,7 +89,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       subtotal,
       vat,
       total,
-      validUntil: parsed.data.validUntil || undefined,
+      // Passa pelo `dataIso` mesmo já tendo passado pelo esquema: esta data é
+      // lida em TRÊS sítios (o HTML, o texto simples e o PDF anexo), todos com
+      // `new Date(... + "T12:00:00")`, e o que ali não é uma data imprime
+      // «Válida até Invalid Date» ao cliente. Uma proposta sem validade é uma
+      // proposta sem prazo; uma proposta com uma validade ilegível é um erro
+      // nosso na mão dele.
+      validUntil: dataIso(parsed.data.validUntil) || undefined,
       notes: parsed.data.notes || undefined,
       status: "enviada",
       createdAt: new Date().toISOString(),
@@ -196,7 +202,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ? await sendMail({
           to: quote.email,
           replyTo: MAIL_TO,
-          subject: `Proposta para o seu evento — Líquen Events (${proposal.id.slice(0, 8)})`,
+          // Sem identificador nenhum. Levava `proposal.id.slice(0, 8)` — oito
+          // caracteres do `randomUUID()` da nossa base, que o casal lia como
+          // «(3f2b1c9a)» na caixa de correio: não é a referência da casa (essa é
+          // a `LIQ-…` que a confirmação lhe mandou guardar), não diz nada a
+          // ninguém, e num telemóvel come os caracteres do assunto que ainda se
+          // veem. O que junta esta conversa na caixa dele são os cabeçalhos
+          // `In-Reply-To`/`References`, nunca o assunto.
+          subject: "Proposta para o seu evento — Líquen Events",
           html: email.html,
           text: email.text,
           // O PDF JUNTA-SE aos anexos da assinatura, não os substitui:

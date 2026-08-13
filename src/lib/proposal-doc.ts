@@ -589,6 +589,62 @@ export const DEFAULT_NAO_INCLUIDO: string[] = [
   "Lembranças, papelaria referentes ao evento como menus, seating chart, seating plan.",
 ];
 
+/** Os marcadores que as Condições Gerais trazem para serem preenchidos com os
+ *  dados do evento (ver {@link preencherMarcadores}). */
+const MARCADOR_DATA = "{DATA}";
+const MARCADOR_CONVIDADOS = "{CONVIDADOS}";
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────
+ * AS DUAS CLÁUSULAS QUE CITAM UM DADO QUE PODE AINDA NÃO EXISTIR
+ * ────────────────────────────────────────────────────────────────────────────
+ *
+ * «Data flexível» e «número por decidir» não são o caso raro: são o caso NORMAL
+ * de quem ainda anda a escolher o dia. O formulário grava `date: ""` e o estúdio
+ * abre a proposta com `eventDate: ""`.
+ *
+ * Estas duas frases são CLÁUSULAS CONTRATUAIS — a folha que se vai reler quando
+ * houver uma discussão. Preenchidas com um travessão diziam ao casal «Esta
+ * proposta só é válida para o evento a realizar no dia —.», que não é uma frase
+ * nem é uma condição: é um marcador de folha de cálculo dentro de um contrato.
+ *
+ * Por isso cada uma tem DUAS redacções — a que cita o dado e a que não precisa
+ * dele — e a segunda continua a dizer a mesma coisa em português inteiro. É o
+ * padrão que o email de confirmação já usava no mesmo caso («Data: ainda a
+ * definir»): escreve-se a ausência por palavras, não se enfia um símbolo no
+ * meio da frase. Não se inventa data nem número: diz-se como passam a existir —
+ * por escrito, que é o que a cláusula da pré-reserva já exige.
+ */
+const CONDICAO_DO_DIA = {
+  com: `Esta proposta só é válida para o evento a realizar no dia ${MARCADOR_DATA}.`,
+  sem: "Esta proposta só é válida para a data do evento que vier a ser confirmada por escrito.",
+} as const;
+const CONDICAO_DO_NUMERO = {
+  com: `O orçamento é válido para o número de ${MARCADOR_CONVIDADOS} convidados; abaixo ou acima deste número o valor da proposta terá de ser revisto.`,
+  sem: "O orçamento é válido para o número de convidados que vier a ser confirmado por escrito; abaixo ou acima desse número o valor da proposta terá de ser revisto.",
+} as const;
+
+/**
+ * Frases COM marcador → a mesma frase sem ele, para quando o dado falta.
+ *
+ * A chave é a frase inteira e não o marcador: o que se troca é a CLÁUSULA, não
+ * o buraco no meio dela. Uma condição reescrita à mão pelo estúdio não está
+ * aqui e sai como ela a escreveu — não temos como adivinhar a redacção dela.
+ */
+export type RedaccoesSemDado = Readonly<Record<string, string>>;
+
+/** As redacções alternativas das Condições Gerais da casa, em português. A
+ *  versão inglesa tem as suas (ver `proposal-doc-textos.ts`) e entra pelo
+ *  terceiro argumento do {@link preencherMarcadores}. */
+export const CONDICOES_SEM_DADO: RedaccoesSemDado = {
+  [CONDICAO_DO_DIA.com]: CONDICAO_DO_DIA.sem,
+  [CONDICAO_DO_NUMERO.com]: CONDICAO_DO_NUMERO.sem,
+};
+
+/** O que fica no lugar de um marcador que sobrou numa frase que não conhecemos
+ *  — palavras, nunca um símbolo (ver {@link CONDICOES_SEM_DADO}). */
+const DADO_POR_DEFINIR = "a definir";
+
 /** "Condições Gerais". `{DATA}` / `{CONVIDADOS}` are substituted from the
  *  event data so the wording stays specific without manual editing. */
 export const DEFAULT_CONDICOES_GERAIS: string[] = [
@@ -604,8 +660,8 @@ export const DEFAULT_CONDICOES_GERAIS: string[] = [
   // dizia e a Líquen absorvia.
   "Sempre que a distância ao local ou o horário do evento obriguem a equipa Líquen a pernoitar, será cobrado o valor do alojamento.",
   "Deve estar contemplada a refeição para os elementos da equipa Líquen que ficam durante todo o evento.",
-  "Esta proposta só é válida para o evento a realizar no dia {DATA}.",
-  "O orçamento é válido para o número de {CONVIDADOS} convidados; abaixo ou acima deste número o valor da proposta terá de ser revisto.",
+  CONDICAO_DO_DIA.com,
+  CONDICAO_DO_NUMERO.com,
   `A confirmação do número de pessoas tem de ser feita até ${DIAS_PARA_CONFIRMAR_CONVIDADOS} dias antes da festa. Se o número de participantes que se verificar no dia do evento for inferior ao previsto, será pago o número que foi confirmado. Caso o número de participantes seja superior ao comunicado, terá de ser feito o ajuste dos mesmos, não podendo a Líquen Events ser responsabilizada por falhas ou lacunas que resultem do serviço prestado a um número de participantes superior ao previamente confirmado.`,
   "A Líquen Events reserva-se ao direito de alterar o preço, caso se verifiquem alterações significativas na conjuntura económica nacional e/ou internacional ou nas premissas estabelecidas aquando da realização desta proposta.",
 ];
@@ -627,12 +683,30 @@ export const DEFAULT_OBSERVACOES_GERAIS: string[] = [
  * versão inglesa exactamente da mesma maneira. Duas substituições escritas em
  * dois sítios divergiriam, e o sintoma seria uma proposta em inglês a dizer
  * «{DATA}» ao cliente.
+ *
+ * `semDado` são as redacções alternativas na língua do texto que está a ser
+ * preenchido — as portuguesas por omissão, as inglesas quando é o dicionário a
+ * chamar. Sem o dado, troca-se a CLÁUSULA INTEIRA por essa redacção (ver
+ * {@link CONDICOES_SEM_DADO}); só o que não estiver na tabela é que cai no
+ * `a definir`, e mesmo esse é uma palavra e não um símbolo.
  */
 export function preencherMarcadores(
   texto: string,
   doc: Pick<ProposalDoc, "eventDate" | "guests">,
+  semDado: RedaccoesSemDado = CONDICOES_SEM_DADO,
 ): string {
-  return texto.replace("{DATA}", doc.eventDate || "—").replace("{CONVIDADOS}", doc.guests || "—");
+  const data = (doc.eventDate ?? "").trim();
+  const convidados = (doc.guests ?? "").trim();
+  const faltaODado =
+    (!data && texto.includes(MARCADOR_DATA)) ||
+    (!convidados && texto.includes(MARCADOR_CONVIDADOS));
+  const frase = faltaODado ? (semDado[texto] ?? texto) : texto;
+  // `replaceAll` e não `replace`: com uma string, o `replace` troca só a
+  // PRIMEIRA ocorrência — uma condição editada à mão que repetisse o marcador
+  // saía com o segundo literal, «{DATA}» impresso no PDF do cliente.
+  return frase
+    .replaceAll(MARCADOR_DATA, data || DADO_POR_DEFINIR)
+    .replaceAll(MARCADOR_CONVIDADOS, convidados || DADO_POR_DEFINIR);
 }
 
 /**
@@ -902,6 +976,49 @@ function diaDoEstudio(instante: Date): [ano: number, mes: number, dia: number] {
   return [campo("year"), campo("month"), campo("day")];
 }
 
+const doisDigitos = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * HOJE (`yyyy-mm-dd`) — E «HOJE» É O DIA QUE PORTUGAL ESTÁ A VIVER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * `new Date().toISOString().slice(0, 10)` é o dia de GREENWICH. Os servidores
+ * correm em UTC e, no Verão, Portugal está uma hora à frente: das 00:00 à 01:00
+ * o dia já virou cá e ainda não virou lá.
+ *
+ * Isto não é um detalhe de ecrã. É a data que fica num DOCUMENTO FISCAL: um
+ * casal que aceita a proposta às 00:30 de 14 de agosto ficava com a factura do
+ * sinal — auto-emitida, sem passar por ecrã nenhum — datada de 13 de agosto. É
+ * essa data que sai impressa no PDF e que decide o período de IVA.
+ *
+ * O ecrã das Faturas já tinha esta regra escrita (`todayKey()`, em
+ * `admin/util.ts`, com o relógio do browser, que aí é o de quem está sentado à
+ * frente dele). Do lado do SERVIDOR o relógio da máquina não serve para nada:
+ * o dia tem de ser lido no fuso do estúdio, e é o que o {@link diaDoEstudio} já
+ * fazia para a validade das propostas. Isto é só esse dia escrito por extenso —
+ * uma quarta versão do «hoje» era a que ia ficar por corrigir.
+ *
+ * `instante` é injectável para os testes poderem fixar a hora.
+ */
+export function hojeNoEstudio(instante: Date = new Date()): string {
+  const [ano, mes, dia] = diaDoEstudio(instante);
+  return `${ano}-${doisDigitos(mes)}-${doisDigitos(dia)}`;
+}
+
+/**
+ * O dia de calendário `dias` depois de `dia` (ambos `yyyy-mm-dd`).
+ *
+ * Aritmética sobre a DATA, sem hora nenhuma pelo meio: o `Date.UTC` trata o
+ * excesso de dias (13 + 60) como o calendário trata, virando o mês e o ano
+ * sozinho, e nenhuma mudança para a hora de Verão a meio da contagem lhe rouba
+ * ou lhe dá um dia. Somar `dias × 24 h` a um instante não tem esta propriedade.
+ */
+export function somarDias(dia: string, dias: number): string {
+  const [ano, mes, d] = dia.split("-").map(Number);
+  return new Date(Date.UTC(ano, mes - 1, d + dias)).toISOString().slice(0, 10);
+}
+
 /**
  * Data de validade (yyyy-mm-dd) de uma proposta: honra uma `validUntil`
  * explícita no doc, senão hoje + `validUntilDays` (por omissão
@@ -934,10 +1051,7 @@ export function resolveValidUntil(
   const flooredDays =
     typeof doc.validUntilDays === "number" ? Math.floor(doc.validUntilDays) : Number.NaN;
   const days = flooredDays > 0 ? flooredDays : DEFAULT_VALID_DAYS;
-  const [ano, mes, dia] = diaDoEstudio(from);
-  // `Date.UTC` trata o excesso de dias (13 + 60) como o calendário trata: vira
-  // o mês e o ano sozinho. Aritmética sobre a DATA, sem hora nenhuma pelo meio.
-  return new Date(Date.UTC(ano, mes - 1, dia + days)).toISOString().slice(0, 10);
+  return somarDias(hojeNoEstudio(from), days);
 }
 
 /** Fills the fixed-text defaults into a partial doc, substituting the

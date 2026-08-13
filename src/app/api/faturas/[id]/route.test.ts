@@ -565,3 +565,41 @@ describe("DELETE /api/faturas/[id] — apagar só faturas anuladas", () => {
     expect(invoicesDb.store.has("d3")).toBe(false);
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * AS DATAS DO LIVRO SÃO O DIA DE LISBOA, NÃO O DE GREENWICH
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * `new Date().toISOString()` é UTC. No Verão em Portugal (UTC+1), entre a
+ * meia-noite e a uma da manhã dá o dia ANTERIOR — e aqui isso carimba o dia em
+ * que o dinheiro entrou, a data de emissão do saldo (documento fiscal) e o seu
+ * vencimento.
+ *
+ * A hora fica FIXA, e o processo em UTC como o alojamento onde isto corre.
+ */
+describe("PATCH /api/faturas/[id] — as datas de um pagamento à meia-noite", () => {
+  it("dar por paga às 00:30 de agosto carimba HOJE, e o saldo nasce com o mesmo dia", async () => {
+    process.env.TZ = "UTC";
+    vi.useFakeTimers();
+    // 14 de agosto de 2026, 00:30 em Lisboa (UTC+1) — 13 de agosto, 23:30 UTC.
+    vi.setSystemTime(new Date("2026-08-13T23:30:00Z"));
+    try {
+      seedSinal("s-noite");
+      proposalsDb.store.set("q-s-noite", { total: 12500 });
+      const { req, params } = patchReq("s-noite", { status: "paga" });
+      const res = await PATCH(req, { params });
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.paidAt).toBe("2026-08-14");
+      expect(json.saldoAutoIssued).toMatchObject({
+        issuedAt: "2026-08-14",
+        // O vencimento conta-se a partir do dia da emissão: 30 dias depois.
+        dueAt: "2026-09-13",
+      });
+    } finally {
+      vi.useRealTimers();
+      delete process.env.TZ;
+    }
+  });
+});

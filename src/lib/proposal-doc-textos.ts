@@ -43,6 +43,7 @@ import {
   faseamentoPorOmissao,
   preencherMarcadores,
   type ProposalDoc,
+  type RedaccoesSemDado,
 } from "./proposal-doc";
 
 /** As línguas em que o documento se sabe desenhar. */
@@ -454,6 +455,32 @@ export function textosDaProposta(idioma: IdiomaDaProposta): TextosDoDocumento {
    função (ver `preencherMarcadores`), para o dia e o número de convidados
    entrarem nas duas línguas. */
 
+/**
+ * As duas condições inglesas que citam a data e o número, nas duas redacções —
+ * a que cita o dado e a que se usa quando ele ainda não existe.
+ *
+ * As portuguesas estão em `proposal-doc.ts` (`CONDICOES_SEM_DADO`), com a razão
+ * escrita por extenso: uma cláusula contratual sem o dado tem de continuar a
+ * ser uma frase. Estas vivem aqui porque o inglês é deste ficheiro — escrever
+ * texto inglês no módulo do documento dava duas casas para a mesma língua.
+ */
+const EN_CONDICAO_DO_DIA = {
+  com: "This proposal is only valid for the event to be held on {DATA}.",
+  sem: "This proposal is only valid for the event date subsequently confirmed in writing.",
+} as const;
+const EN_CONDICAO_DO_NUMERO = {
+  com: "The quote is valid for the stated number of guests ({CONVIDADOS}); below or above that number the amount of the proposal will have to be revised.",
+  sem: "The quote is valid for the number of guests subsequently confirmed in writing; below or above that number the amount of the proposal will have to be revised.",
+} as const;
+
+/** A chave é a frase COM marcador, e vem da mesma constante que a lista imprime:
+ *  reescrever a condição inglesa não pode deixar esta tabela a apontar para uma
+ *  frase que já não existe. */
+const EN_CONDICOES_SEM_DADO: RedaccoesSemDado = {
+  [EN_CONDICAO_DO_DIA.com]: EN_CONDICAO_DO_DIA.sem,
+  [EN_CONDICAO_DO_NUMERO.com]: EN_CONDICAO_DO_NUMERO.sem,
+};
+
 /** As condições gerais da casa, em inglês. Os marcadores `{DATA}` e
  *  `{CONVIDADOS}` são os mesmos da versão portuguesa e são preenchidos com os
  *  dados do evento — que são texto dela, e portanto ficam em português. */
@@ -464,8 +491,8 @@ const EN_CONDICOES_GERAIS: string[] = [
   "A travel charge for the Líquen team will be applied according to the distance in kilometres from Évora to the event venue, whenever the event takes place outside the district of Évora.",
   "Whenever the distance to the venue or the schedule of the event requires the Líquen team to stay overnight, the cost of the accommodation will be charged.",
   "A meal must be provided for the members of the Líquen team who stay for the whole event.",
-  "This proposal is only valid for the event to be held on {DATA}.",
-  "The quote is valid for the stated number of guests ({CONVIDADOS}); below or above that number the amount of the proposal will have to be revised.",
+  EN_CONDICAO_DO_DIA.com,
+  EN_CONDICAO_DO_NUMERO.com,
   `The number of people must be confirmed up to ${DIAS_PARA_CONFIRMAR_CONVIDADOS} days before the event. If the number of attendees on the day of the event is lower than expected, the number confirmed will be charged. If the number of attendees is higher than the one communicated, an adjustment must be made, and Líquen Events cannot be held responsible for any failures or shortcomings resulting from a service provided to a number of attendees higher than the one previously confirmed.`,
   "Líquen Events reserves the right to change the price should there be significant changes in the national and/or international economic climate or in the assumptions on which this proposal was drawn up.",
 ];
@@ -543,7 +570,10 @@ export function blocosFixosNaLingua(
   idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
 ): BlocosFixos {
   if (idioma !== "en") return doc;
-  const preencher = (linhas: readonly string[]) => linhas.map((l) => preencherMarcadores(l, doc));
+  // As redacções alternativas vão na LÍNGUA das linhas que se estão a preencher
+  // — sem data, a condição inglesa tem de ser reescrita em inglês.
+  const preencher = (linhas: readonly string[], semDado?: RedaccoesSemDado) =>
+    linhas.map((l) => preencherMarcadores(l, doc, semDado));
   /** O bloco em inglês, se o que está no documento for o da casa. */
   const traduzido = (atual: string[], pt: readonly string[], en: readonly string[]) =>
     saoIguais(atual, pt) ? [...en] : atual;
@@ -559,7 +589,7 @@ export function blocosFixosNaLingua(
     condicoesGerais: traduzido(
       doc.condicoesGerais,
       preencher(DEFAULT_CONDICOES_GERAIS),
-      preencher(EN_CONDICOES_GERAIS),
+      preencher(EN_CONDICOES_GERAIS, EN_CONDICOES_SEM_DADO),
     ),
     observacoesGerais: traduzido(
       doc.observacoesGerais,

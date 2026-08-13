@@ -180,6 +180,51 @@ export const quotePayloadSchema = z.object({
 const entityId = z.string().min(1).max(64);
 const shortDate = trimmed(30); // "yyyy-mm-dd" (loose — display-only)
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA DATA DE CALENDÁRIO — O SÍTIO ÚNICO ONDE ISSO SE DECIDE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Devolve `yyyy-mm-dd` quando o que chegou É um dia do calendário, e `""` quando
+ * não é. Nunca atira e nunca adivinha.
+ *
+ * ── PORQUE É QUE ISTO EXISTE ───────────────────────────────────────────────
+ * Estas datas acabam todas no mesmo sítio: `new Date(valor + "T12:00:00")`, para
+ * serem escritas por extenso num documento que vai para o cliente. Um valor que
+ * não seja uma data não rebenta nada — imprime **«Invalid Date»** na factura, no
+ * email da proposta e no PDF, com toda a confiança e sem avisar ninguém.
+ * Chegava-se lá por um ano com cinco dígitos (o `<input type="date">` do Chrome
+ * aceita-o), por um rascunho restaurado com «31/12/2026», ou por um campo
+ * validado só ao COMPRIMENTO — que é o que a `validUntil` tinha.
+ *
+ * ── PORQUE É QUE O MOLDE NÃO CHEGA ─────────────────────────────────────────
+ * `2026-02-31` passa o `^\d{4}-\d{2}-\d{2}$` e não dá `Invalid Date` nenhuma:
+ * dá 3 de março. Uma proposta «válida até 03/03» que ela escreveu como fevereiro
+ * é pior do que um erro visível, porque ninguém repara. Por isso a data tem de
+ * sobreviver à ida e à volta pelo calendário.
+ *
+ * Vive aqui, e não copiada em cada rota, porque já esteve escrita em três
+ * (o recibo, o livro de faturas e a validade da proposta) e a quarta cópia era
+ * sempre a que se esquecia de uma destas duas armadilhas.
+ */
+export function dataIso(valor: unknown): string {
+  const s = String(valor ?? "")
+    .trim()
+    .slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+  // Meio-dia UTC: a hora não interessa, só não pode escorregar de dia.
+  const d = new Date(`${s}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s ? "" : s;
+}
+
+/** Uma data de calendário (`yyyy-mm-dd`) ou o vazio de quem não a preencheu.
+ *  A mensagem diz o formato: quem a lê é a Catarina, a meio de um envio. */
+const isoDate = z
+  .string()
+  .trim()
+  .max(30)
+  .refine((v) => v === "" || dataIso(v) !== "", "Data inválida — usa o formato aaaa-mm-dd.");
+
 const checklistItemSchema = z.object({
   id: entityId,
   label: trimmed(300),
@@ -300,7 +345,9 @@ export const proposalLineItemSchema = z.object({
 export const proposalCreateSchema = z.object({
   lineItems: z.array(proposalLineItemSchema).max(200),
   vatRate: z.number().finite().min(0).max(1).optional(),
-  validUntil: shortDate.optional(),
+  // Uma DATA, não «até 30 caracteres»: ver `dataIso`. É o que sai impresso a
+  // dizer «Válida até …» no email e no PDF que o casal recebe.
+  validUntil: isoDate.optional(),
   notes: trimmed(5000).optional(),
 });
 

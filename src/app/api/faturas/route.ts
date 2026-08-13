@@ -12,9 +12,10 @@ import {
 import { jsonWithEtag } from "@/lib/api-cache";
 import { splitSinal } from "@/lib/money";
 import { getProposalByQuote } from "@/lib/proposals-store";
-import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
+import { depositPercentOf, hojeNoEstudio, type ProposalDoc } from "@/lib/proposal-doc";
 import { log } from "@/lib/logger";
 import { invoiceCreateSchema, readJsonBody, validateBody } from "@/lib/invoice-validation";
+import { dataIso } from "@/lib/validation";
 import { registarAcontecimento } from "@/lib/estado-do-pedido-servidor";
 
 export const runtime = "nodejs";
@@ -48,10 +49,10 @@ const clean = (v: unknown, max: number) =>
 // carry a fractional-cent amount into the fiscal ledger (e.g. 100.567 → 100.57).
 const num = (v: unknown) =>
   Math.round(Math.min(Math.max(Number(v) || 0, 0), 100_000_000) * 100) / 100;
-const date = (v: unknown) => {
-  const s = clean(v, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
-};
+// A data de um documento fiscal é uma data de calendário, e a regra é uma só
+// para todas as rotas — ver `dataIso` (o molde sozinho deixava passar um
+// "2026-02-31", que não dá erro nenhum: dá 3 de março).
+const date = dataIso;
 
 export async function GET(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -88,7 +89,9 @@ export async function POST(request: NextRequest) {
     const clientEmail = clean(body.clientEmail, 160);
     const vatRate =
       typeof body.vatRate === "number" ? Math.min(Math.max(body.vatRate, 0), 1) : 0.23;
-    const issuedAt = date(body.issuedAt) || new Date().toISOString().slice(0, 10);
+    // Sem data escrita, é o dia de LISBOA e não o de Greenwich — ver
+    // `hojeNoEstudio`. Numa fatura, o dia é fiscal.
+    const issuedAt = date(body.issuedAt) || hojeNoEstudio();
     const dueAt = date(body.dueAt) || undefined;
     const note = body.note ? clean(body.note, 500) : undefined;
 
