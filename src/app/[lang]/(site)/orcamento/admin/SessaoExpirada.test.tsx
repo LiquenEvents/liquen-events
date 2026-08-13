@@ -21,10 +21,18 @@ import SessaoExpirada, { caminhoDoPedido, ehSessaoExpirada } from "./SessaoExpir
  *    continua no DOM, e o trabalho por gravar é gravado a seguir.
  */
 
-const passkeys = vi.hoisted(() => ({ entrar: vi.fn(async () => {}) }));
+const passkeys = vi.hoisted(() => ({
+  entrar: vi.fn(async (_opcoes?: unknown) => {}),
+  // Ligável por teste: o botão do aparelho só existe onde há passkeys, e a
+  // maioria destes testes quer o painel na forma simples, só com a senha.
+  suporta: false,
+}));
 vi.mock("@/lib/passkeys-cliente", () => ({
-  suportaPasskeys: () => false,
-  entrarComDispositivo: () => passkeys.entrar(),
+  suportaPasskeys: () => passkeys.suporta,
+  // As opções passam à frente TAL E QUAL: é nelas que viaja o `manterSessao`,
+  // e um duplo que as deitasse fora deixava passar o defeito que o teste da
+  // validade da sessão apanha mais abaixo.
+  entrarComDispositivo: (opcoes?: unknown) => passkeys.entrar(opcoes),
   mensagemDeErro: () => "falhou",
 }));
 
@@ -169,5 +177,65 @@ describe("o painel de reautenticação", () => {
     await fetch("/api/admin/logout", { method: "POST" });
     await waitFor(() => expect(sessionStorage.getItem(MARCA_DE_SESSAO)).toBeNull());
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * REAUTENTICAR NÃO PODE PROMOVER A SESSÃO.
+ *
+ * O servidor lê a AUSÊNCIA de `manterSessao` como `true`, por
+ * retrocompatibilidade com separadores antigos. Enquanto este painel não
+ * mandava o campo, quem tinha recusado a sessão longa à entrada — que é a
+ * omissão — saía daqui com um cookie de 30 dias, no aparelho que anda para
+ * fora de casa. Estes testes prendem a escolha nas duas portas: a
+ * palavra-passe e o aparelho.
+ */
+describe("a validade da sessão que sai da reautenticação", () => {
+  async function abrirPainel() {
+    montar();
+    respostas = [401];
+    await fetch("/api/tarefas");
+    await screen.findByRole("dialog");
+  }
+
+  /** O corpo do último `POST /api/admin/login` que o painel enviou. */
+  function corpoDaEntrada() {
+    const chamadas = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const entrada = [...chamadas].reverse().find((c) => c[0] === "/api/admin/login");
+    return JSON.parse(String((entrada?.[1] as { body?: string })?.body ?? "{}"));
+  }
+
+  it("por omissão NÃO pede os 30 dias — vai `manterSessao: false`, e não em branco", async () => {
+    const u = userEvent.setup();
+    await abrirPainel();
+    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await u.type(document.querySelector('input[name="password"]')!, "uma-senha-qualquer{Enter}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    // Em branco não serve: é precisamente o que o servidor lê como `true`.
+    expect(corpoDaEntrada()).toHaveProperty("manterSessao", false);
+  });
+
+  it("marcada a caixa, pede-os", async () => {
+    const u = userEvent.setup();
+    await abrirPainel();
+    await u.click(screen.getByRole("checkbox", { name: /Manter a sessão iniciada 30 dias/i }));
+    await u.type(screen.getByLabelText(/O teu email/i), "catarina@liquen-events.com");
+    await u.type(document.querySelector('input[name="password"]')!, "uma-senha-qualquer{Enter}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(corpoDaEntrada()).toHaveProperty("manterSessao", true);
+  });
+
+  it("a mesma escolha vai pela porta do aparelho", async () => {
+    const u = userEvent.setup();
+    passkeys.entrar.mockClear();
+    passkeys.suporta = true;
+    try {
+      await abrirPainel();
+      await u.click(await screen.findByRole("button", { name: /Entrar com este dispositivo/i }));
+    } finally {
+      passkeys.suporta = false;
+    }
+    await waitFor(() => expect(passkeys.entrar).toHaveBeenCalled());
+    expect(passkeys.entrar).toHaveBeenCalledWith({ manterSessao: false });
   });
 });

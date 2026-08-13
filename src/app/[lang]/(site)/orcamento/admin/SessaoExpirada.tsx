@@ -102,6 +102,18 @@ export default function SessaoExpirada() {
   const [erro, setErro] = useState<string | null>(null);
   const [aEntrar, setAEntrar] = useState(false);
   const [aEntrarComDispositivo, setAEntrarComDispositivo] = useState(false);
+  /**
+   * A MESMA ESCOLHA QUE A ENTRADA, E COM A MESMA OMISSÃO.
+   *
+   * Sem este campo, o corpo do `POST /api/admin/login` ia sem `manterSessao` —
+   * e o servidor lê a ausência como `true`, por retrocompatibilidade com
+   * separadores antigos. Resultado: quem tinha DELIBERADAMENTE recusado a
+   * sessão longa (a omissão da entrada é recusar) saía desta reautenticação
+   * com um cookie de 30 dias. E é aqui que isso mais custa: este painel
+   * aparece a meio do trabalho, no portátil que anda para quintas e hotéis —
+   * exactamente o aparelho que a omissão a `false` existe para cobrir.
+   */
+  const [manterSessao, setManterSessao] = useState(false);
   const dialogRef = useFocusTrap<HTMLDivElement>(aberto);
   const { toast } = useToast();
   const accao = useAccaoDeGuardarTudo();
@@ -206,7 +218,7 @@ export default function SessaoExpirada() {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, code }),
+        body: JSON.stringify({ email, password, code, manterSessao }),
       });
       if (res.ok) {
         concluir();
@@ -233,7 +245,7 @@ export default function SessaoExpirada() {
     setAEntrarComDispositivo(true);
     setErro(null);
     try {
-      await entrarComDispositivo();
+      await entrarComDispositivo({ manterSessao });
       concluir();
     } catch (err) {
       const msg = mensagemDeErro(err);
@@ -350,6 +362,18 @@ export default function SessaoExpirada() {
               className="text-center text-lg tracking-[0.4em]"
             />
           )}
+          <label className="alvo-toque flex cursor-pointer items-start gap-2.5 text-left">
+            <input
+              type="checkbox"
+              name="manterSessao"
+              checked={manterSessao}
+              onChange={(e) => setManterSessao(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[#4d6350]"
+            />
+            <span className="text-xs leading-relaxed text-foreground/60">
+              Manter a sessão iniciada 30 dias neste aparelho.
+            </span>
+          </label>
           {erro && (
             <p
               role="alert"
