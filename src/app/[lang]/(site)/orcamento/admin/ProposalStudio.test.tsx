@@ -2782,7 +2782,23 @@ describe("a grelha das fotos conta com a legenda", () => {
     renderStudio();
     const aviso = await screen.findByText(/fotografias são cortadas/);
     expect(aviso.textContent).toMatch(/3 fotografias são cortadas/);
-    expect(aviso.textContent).toMatch(/a 1\.ª perde 63%/);
+    /**
+     * ── PORQUE É QUE OS 63% MUDARAM DE FOTOGRAFIA ─────────────────────────
+     *
+     * Era «a 1.ª perde 63%». Passou a ser a 2.ª, e a 1.ª passou a perder 50%.
+     * Não é este aviso que mudou: é o mosaico, que passou a dar mesmo a maior
+     * célula à primeira posição — o comentário dele dizia-o desde sempre e o
+     * código fazia o contrário, pelo que a foto marcada como principal saía
+     * até 41% MAIS PEQUENA do que as outras.
+     *
+     * Uma caixa maior recorta menos, portanto a fotografia da frente passou a
+     * perder 50% em vez de 63%, e a que lhe cedeu o lugar herdou a perda. As
+     * três continuam a ser as mesmas fotografias, e a soma do que se perde na
+     * página é a mesma: o que mudou foi quem fica com a caixa boa — que é o
+     * ponto todo da correcção.
+     */
+    expect(aviso.textContent).toMatch(/a 1\.ª perde 50%/);
+    expect(aviso.textContent).toMatch(/a 2\.ª perde 63%/);
     expect(aviso.textContent).toMatch(/a 4\.ª perde 50%/);
     // A 3.ª deixa de ser acusada: 4% não é um corte que se note.
     expect(aviso.textContent).not.toMatch(/a 3\.ª/);
