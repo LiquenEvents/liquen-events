@@ -6,6 +6,20 @@
  * arrive — the layout settles in place and the wait feels shorter.
  */
 
+/**
+ * «A CARREGAR», DITO PARA QUEM NÃO VÊ AS BARRAS.
+ *
+ * Estava um `aria-label="A carregar"` numa `div` sem `role`. Uma `div` genérica
+ * não aceita nome — a árvore de acessibilidade deita-o fora —, portanto quem
+ * ouve o ecrã tinha silêncio durante toda a espera e a única conclusão possível
+ * era que a página estava avariada. Uma região viva com texto lá dentro é o que
+ * se anuncia: o texto é o que os leitores lêem, o `role="status"` é o que lhes
+ * diz que apareceu sem ninguém ter carregado em nada.
+ */
+function ADizerQueCarrega() {
+  return <span className="sr-only">A carregar…</span>;
+}
+
 /** A single shimmering bar. `className` controls width/height. */
 export function SkeletonBar({ className = "" }: { className?: string }) {
   return <div className={`bo-skeleton ${className}`} aria-hidden />;
@@ -55,12 +69,8 @@ export function SkeletonRow() {
  */
 export function ViewSkeleton() {
   return (
-    <div
-      className="flex flex-col gap-8"
-      data-view-skeleton=""
-      aria-busy="true"
-      aria-label="A carregar"
-    >
+    <div className="flex flex-col gap-8" data-view-skeleton="" role="status" aria-busy="true">
+      <ADizerQueCarrega />
       {/* Greeting */}
       <div>
         <SkeletonBar className="h-2.5 w-40 mb-3" />
@@ -96,12 +106,17 @@ export function SkeletonList({ rows = 5 }: { rows?: number }) {
   return (
     <div
       className="bo-card overflow-hidden divide-y divide-foreground/[0.06]"
+      role="status"
       aria-busy="true"
-      aria-label="A carregar"
     >
       {Array.from({ length: rows }).map((_, i) => (
         <SkeletonRow key={i} />
       ))}
+      {/* Em ÚLTIMO, e não em primeiro: o `divide-y` desenha a linha divisória em
+          todos os filhos menos o primeiro, e pôr o anúncio à cabeça dava uma
+          linha a mais por cima da primeira fila. Numa região viva a ordem não
+          conta para nada — quem lê, lê o conteúdo todo. */}
+      <ADizerQueCarrega />
     </div>
   );
 }

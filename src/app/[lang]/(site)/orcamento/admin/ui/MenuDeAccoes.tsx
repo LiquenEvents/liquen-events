@@ -52,6 +52,24 @@ export function MenuDeAccoes({
   const podeEsconder = usePodeEsconderNoHover();
   const [aberto, setAberto] = useState(false);
   const caixaRef = useRef<HTMLDivElement>(null);
+  const abridorRef = useRef<HTMLButtonElement>(null);
+
+  /**
+   * ── O FOCO VOLTA A QUEM ABRIU ─────────────────────────────────────────────
+   *
+   * As duas saídas do menu apagam o elemento que tem o foco: o item escolhido
+   * desaparece com o menu, e o Escape fecha-o por baixo dos pés. Sem devolver
+   * o foco ele cai no `<body>` — e o Tab seguinte recomeça no princípio da
+   * página. Numa tabela de trinta linhas isso é voltar a percorrê-las todas
+   * para chegar à linha onde se estava.
+   *
+   * O clique FORA não conta: aí o foco vai para onde se carregou, que é
+   * exactamente onde a pessoa quis ir.
+   */
+  const fecharEDevolverFoco = () => {
+    setAberto(false);
+    abridorRef.current?.focus();
+  };
 
   // Fechar ao clicar fora e ao Escape. `pointerdown` e não `click`: com `click`
   // o menu fechava só depois de a acção de baixo já ter disparado.
@@ -61,7 +79,10 @@ export function MenuDeAccoes({
       if (caixaRef.current && !caixaRef.current.contains(e.target as Node)) setAberto(false);
     };
     const escape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAberto(false);
+      if (e.key === "Escape") {
+        setAberto(false);
+        abridorRef.current?.focus();
+      }
     };
     document.addEventListener("pointerdown", foraDaqui);
     document.addEventListener("keydown", escape);
@@ -100,6 +121,7 @@ export function MenuDeAccoes({
       {noMenu.length > 0 && (
         <>
           <button
+            ref={abridorRef}
             type="button"
             aria-label={`Acções de ${sobre}`}
             aria-haspopup="menu"
@@ -138,7 +160,10 @@ export function MenuDeAccoes({
                     role="menuitem"
                     disabled={a.desativada}
                     onClick={() => {
-                      setAberto(false);
+                      // Devolver o foco ANTES da acção: se ela abrir um
+                      // diálogo, é este botão que a armadilha de foco memoriza
+                      // para devolver no fim (ver `useFocusTrap`).
+                      fecharEDevolverFoco();
                       a.onAccao();
                     }}
                     className={cn(

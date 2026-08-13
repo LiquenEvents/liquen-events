@@ -79,9 +79,13 @@ export default function ShortcutsModal({ open, onClose }: Props) {
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-foreground/[0.07]">
           <p className="bo-eyebrow">Atalhos de teclado</p>
+          {/* `alvo-toque` porque este × media ~14×18 px e é a única saída
+              tocável desta janela: o Escape é uma tecla que num telemóvel não
+              existe, e o fundo escuro não é um controlo. A gémea
+              (`AjudaGlossario`) já o tinha — este ficou para trás. */}
           <button
             onClick={onClose}
-            className="text-foreground/30 hover:text-foreground/60 transition-colors text-lg leading-none"
+            className="alvo-toque text-foreground/30 hover:text-foreground/60 transition-colors text-lg leading-none"
             aria-label="Fechar"
           >
             ×

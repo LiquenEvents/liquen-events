@@ -100,6 +100,13 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
         // mínimo. A altura já vem dos 44 px do `ui/Button.tsx`; falta a
         // largura, e só onde há dedo.
         className="pointer-coarse:min-w-11"
+        // O NOME NÃO PODE VIVER NUM RÓTULO QUE O CSS ESCONDE. O rótulo abaixo é
+        // `hidden sm:inline`: no telemóvel fica `display: none`, e como o "⋯" é
+        // `aria-hidden` o botão ficava LITERALMENTE sem nome — um leitor de ecrã
+        // anunciava «botão» e mais nada, precisamente no ecrã onde ele é a única
+        // porta para duplicar, imprimir e exportar. O `MenuDeAccoes` (o gémeo em
+        // `ui/`) já trazia o seu `aria-label`; este não.
+        aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -133,6 +140,17 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
               onKeyDown={(e) => onItemKeyDown(e, idx)}
               onClick={() => {
                 setOpen(false);
+                // O foco volta ao abridor ANTES de a acção correr. O item
+                // escolhido desaparece com o menu, e sem isto o foco caía no
+                // `<body>`: o Tab seguinte recomeçava no topo da página, longe
+                // da linha em que se estava. O Escape já devolvia o foco — esta
+                // é a saída que se usa a sério, e era a que o perdia.
+                //
+                // Antes da acção e não depois: quando ela abre um diálogo, é
+                // este botão que a armadilha de foco vai memorizar para
+                // devolver no fim (ver `useFocusTrap`), e o efeito do diálogo
+                // corre depois deste clique — leva o foco para dentro na mesma.
+                triggerRef.current?.focus();
                 item.onClick();
               }}
               className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-foreground/75 motion-safe:transition-colors hover:bg-foreground/[0.05] hover:text-foreground/90"

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { CORTES } from "./adaptativo";
 import { FolhaOuDialogo } from "./FolhaOuDialogo";
 import { TabelaOuCartoes } from "./TabelaOuCartoes";
@@ -225,6 +226,43 @@ describe("MenuDeAccoes", () => {
     simularAparelho(TELEMOVEL);
     render(<MenuDeAccoes accoes={ACCOES} sobre="Terracotta" />);
     expect(await screen.findByRole("button", { name: "Acções de Terracotta" })).toBeInTheDocument();
+  });
+
+  /**
+   * ── O FOCO TEM DE VOLTAR AO BOTÃO QUE ABRIU ────────────────────────────────
+   *
+   * As duas saídas do menu — o Escape e escolher uma acção — apagam o elemento
+   * que tinha o foco. Sem o devolver, ele cai no `<body>` e o Tab seguinte
+   * recomeça no princípio da página: numa tabela de trinta linhas isso quer
+   * dizer voltar a percorrê-las todas para chegar à linha onde se estava.
+   */
+  it("o Escape fecha e devolve o foco ao botão que abriu", async () => {
+    simularAparelho(TELEMOVEL);
+    const user = userEvent.setup();
+    render(<MenuDeAccoes accoes={ACCOES} sobre="Terracotta" />);
+
+    const abridor = await screen.findByRole("button", { name: "Acções de Terracotta" });
+    await user.click(abridor);
+    await user.tab();
+    expect(screen.getByRole("menuitem", { name: "Duplicar" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(abridor).toHaveFocus();
+  });
+
+  it("escolher uma acção fecha e devolve o foco ao botão que abriu", async () => {
+    simularAparelho(TELEMOVEL);
+    const user = userEvent.setup();
+    render(<MenuDeAccoes accoes={ACCOES} sobre="Terracotta" />);
+
+    const abridor = await screen.findByRole("button", { name: "Acções de Terracotta" });
+    await user.click(abridor);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicar" }));
+
+    expect(ACCOES[0].onAccao).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(abridor).toHaveFocus();
   });
 });
 

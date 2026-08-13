@@ -22,6 +22,21 @@ export function useToast() {
 
 const TOAST_DURATION = 4000;
 
+/**
+ * ── QUANTOS AVISOS CABEM NO ECRÃ AO MESMO TEMPO ─────────────────────────────
+ *
+ * A pilha cresce para cima a partir do canto de baixo à direita e não tinha
+ * tecto nenhum. Uma gravação em lote que falha em doze linhas dá doze caixas de
+ * ~64 px — 768 px, mais alto do que o ecrã de um telemóvel. Nessa altura o
+ * aviso deixou de avisar: tapou a página inteira, incluindo o trabalho a que se
+ * refere, e as primeiras caixas nem sequer se vêem porque saem por cima.
+ *
+ * Quatro é o que cabe folgadamente em 375 px de altura útil. Quando chega mais
+ * um, sai o MAIS VELHO: o recente é o que ainda diz respeito ao que se acabou
+ * de carregar, e o velho já teve os seus segundos.
+ */
+const MAX_TOASTS = 4;
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -33,7 +48,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   // hover/focus — the provider just enqueues.
   const toast = useCallback((message: string, kind: ToastKind = "info") => {
     const id = idUnico();
-    setToasts((prev) => [...prev, { id, kind, message }]);
+    setToasts((prev) => [...prev, { id, kind, message }].slice(-MAX_TOASTS));
   }, []);
 
   // Errors go to an assertive `role="alert"` region so they interrupt and are

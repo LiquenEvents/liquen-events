@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useFocusTrap } from "./useFocusTrap";
 
@@ -45,6 +45,8 @@ export default function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
   // Trap Tab within the dialog + restore focus to the trigger on close.
   const dialogRef = useFocusTrap<HTMLDivElement>(open);
+  const listaId = useId();
+  const idDaOpcao = (i: number) => `${listaId}-op-${i}`;
 
   useEffect(() => {
     if (open) {
@@ -98,6 +100,17 @@ export default function CommandPalette({
   useEffect(() => {
     if (active >= results.length) setActive(0);
   }, [results.length, active]);
+
+  // ── A ESCOLHA TEM DE ESTAR À VISTA ────────────────────────────────────────
+  // A lista rola dentro de uma caixa de meia altura de ecrã. As setas mexiam o
+  // realce mas não a janela: à quinta ou sexta linha a escolha estava debaixo
+  // do rodapé e o que se via era uma lista parada — carregava-se em Enter e
+  // abria uma coisa que nunca chegou a aparecer. `block: "nearest"` não faz
+  // nada quando já se vê, portanto não há solavanco no caso normal.
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`${listaId}-op-${active}`)?.scrollIntoView({ block: "nearest" });
+  }, [open, active, listaId, results.length]);
 
   if (!open) return null;
 
@@ -161,11 +174,24 @@ export default function CommandPalette({
             <circle cx="11" cy="11" r="7" />
             <path d="m21 21-4.3-4.3" strokeLinecap="round" />
           </svg>
+          {/* O FOCO NUNCA SAI DAQUI — e é por isso que isto tem de ser um
+              combobox a sério. As setas mexem uma escolha que vive noutro
+              elemento; sem `aria-activedescendant` (e sem `role="option"` do
+              outro lado), quem ouve o ecrã carrega em ↓ e não ouve nada, e o
+              Enter a seguir abre uma coisa que nunca foi anunciada. O
+              `placeholder` também não serve de nome: é uma dica, desaparece
+              mal se escreve a primeira letra. */}
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Pesquisar ou navegar…"
+            aria-label="Pesquisar ou navegar"
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls={listaId}
+            aria-autocomplete="list"
+            aria-activedescendant={results.length > 0 ? idDaOpcao(active) : undefined}
             className="flex-1 bg-transparent text-[15px] text-foreground/90 placeholder-foreground/35 focus:outline-none"
           />
           {/* FECHAR: uma tecla em quem tem teclado, um botão em quem não tem.
@@ -193,91 +219,103 @@ export default function CommandPalette({
         </div>
 
         <div className="max-h-[52dvh] overflow-y-auto overscroll-contain p-2">
+          {/* Região viva: esta frase é a resposta à ESCRITA, e escrever não move
+              o foco. Sem `role="status"` quem ouve o ecrã escrevia, não ouvia
+              nada, e ficava sem saber se a paleta estava a pensar, se tinha
+              partido, ou se não havia mesmo nada. */}
           {results.length === 0 && (
-            <p className="py-10 text-center text-sm text-foreground/45">
+            <p role="status" className="py-10 text-center text-sm text-foreground/45">
               Sem resultados para “{query.trim()}”.
             </p>
           )}
-          {groups.map((g) => (
-            <div key={g.name} className="mb-1 last:mb-0">
-              <p className="px-3 pb-1 pt-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
-                {g.name}
-              </p>
-              {g.items.map((c) => {
-                flatIndex++;
-                const idx = flatIndex;
-                const isActive = active === idx;
-                return (
-                  <button
-                    key={c.id}
-                    onMouseEnter={() => setActive(idx)}
-                    onClick={() => {
-                      c.run();
-                      onClose();
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left motion-safe:transition-colors ${
-                      isActive ? "bg-[#4d6350]/[0.12]" : "hover:bg-foreground/[0.04]"
-                    }`}
-                  >
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-                        isActive
-                          ? "bg-[#4d6350]/[0.16] text-[#4d6350]"
-                          : "bg-foreground/[0.05] text-foreground/40"
-                      }`}
-                      aria-hidden="true"
-                    >
-                      {c.hint ? (
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                        >
-                          <circle cx="12" cy="8" r="3.2" />
-                          <path d="M5.5 19a6.5 6.5 0 0 1 13 0" strokeLinecap="round" />
-                        </svg>
-                      ) : (
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                        >
-                          <path
-                            d="M5 12h14M13 6l6 6-6 6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                    </span>
-                    <span
-                      className={`min-w-0 flex-1 truncate text-sm ${
-                        isActive ? "font-medium text-[#4d6350]" : "text-foreground/75"
+          <div id={listaId} role="listbox" aria-label="Resultados">
+            {groups.map((g) => (
+              <div key={g.name} role="group" aria-label={g.name} className="mb-1 last:mb-0">
+                <p
+                  aria-hidden="true"
+                  className="px-3 pb-1 pt-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45"
+                >
+                  {g.name}
+                </p>
+                {g.items.map((c) => {
+                  flatIndex++;
+                  const idx = flatIndex;
+                  const isActive = active === idx;
+                  return (
+                    <button
+                      key={c.id}
+                      id={idDaOpcao(idx)}
+                      role="option"
+                      aria-selected={isActive}
+                      onMouseEnter={() => setActive(idx)}
+                      onClick={() => {
+                        c.run();
+                        onClose();
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left motion-safe:transition-colors ${
+                        isActive ? "bg-[#4d6350]/[0.12]" : "hover:bg-foreground/[0.04]"
                       }`}
                     >
-                      {c.label}
-                    </span>
-                    {c.hint && (
-                      <span className="max-w-[180px] shrink-0 truncate text-xs text-foreground/40">
-                        {c.hint}
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                          isActive
+                            ? "bg-[#4d6350]/[0.16] text-[#4d6350]"
+                            : "bg-foreground/[0.05] text-foreground/40"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {c.hint ? (
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          >
+                            <circle cx="12" cy="8" r="3.2" />
+                            <path d="M5.5 19a6.5 6.5 0 0 1 13 0" strokeLinecap="round" />
+                          </svg>
+                        ) : (
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          >
+                            <path
+                              d="M5 12h14M13 6l6 6-6 6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
                       </span>
-                    )}
-                    {isActive && (
-                      <kbd className="pointer-coarse:hidden shrink-0 rounded-md border border-[#4d6350]/25 px-1.5 py-0.5 text-[10px] text-[#4d6350]">
-                        ↵
-                      </kbd>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+                      <span
+                        className={`min-w-0 flex-1 truncate text-sm ${
+                          isActive ? "font-medium text-[#4d6350]" : "text-foreground/75"
+                        }`}
+                      >
+                        {c.label}
+                      </span>
+                      {c.hint && (
+                        <span className="max-w-[180px] shrink-0 truncate text-xs text-foreground/40">
+                          {c.hint}
+                        </span>
+                      )}
+                      {isActive && (
+                        <kbd className="pointer-coarse:hidden shrink-0 rounded-md border border-[#4d6350]/25 px-1.5 py-0.5 text-[10px] text-[#4d6350]">
+                          ↵
+                        </kbd>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* O rodapé inteiro é instrução de teclado: setas, enter, escape. Num
