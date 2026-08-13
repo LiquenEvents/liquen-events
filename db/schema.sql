@@ -159,8 +159,27 @@ create table if not exists public.suppliers (
   email       text,
   phone       text,
   location    text,
-  notes       text
+  notes       text,
+  -- Avaliação de 1 a 5 estrelas; nulo = por avaliar (que NÃO é zero estrelas).
+  rating      smallint,
+  -- Fornecedor de recurso — o ecrã filtra por "Preferidos" e ordena-os à frente.
+  preferred   boolean not null default false
 );
+
+-- ── AS DUAS METADES DESTE PAR ANDAM JUNTAS ──────────────────────
+-- QUEM ESCREVE são estas colunas; QUEM PROJECTA é o `toRow` do
+-- `src/lib/suppliers-store.ts`. Faltando as colunas, cada gravação de um
+-- fornecedor rebenta com `column "rating" does not exist`; faltando a
+-- projecção, as estrelas e o "preferido" gravam-se com 200 e desaparecem no
+-- recarregamento seguinte — que foi o que aconteceu enquanto o tipo, a rota e o
+-- `supplierUpdateSchema` já aceitavam os dois campos e só a base de dados não
+-- os conhecia. Em desenvolvimento nunca se via: o backend de ficheiro guarda o
+-- objecto de domínio tal e qual. Há um teste que prende o par
+-- (src/lib/suppliers-store.test.ts).
+--
+-- If upgrading an existing database, add the new columns:
+alter table public.suppliers add column if not exists rating    smallint;
+alter table public.suppliers add column if not exists preferred boolean not null default false;
 
 create index if not exists suppliers_category_idx on public.suppliers (category);
 

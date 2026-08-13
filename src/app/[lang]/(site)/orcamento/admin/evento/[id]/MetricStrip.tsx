@@ -4,9 +4,16 @@ import { eur0 } from "@/lib/money";
 import type { EventMetrics } from "@/lib/orcamento/dossier";
 
 /**
- * Faixa de métricas do cockpit — Valor, Margem (c/ IVA), % Pago, contagem
- * decrescente e RSVP. Graciosa quando faltam dados: cada célula cai para "—".
- * Todos os valores são com IVA (rotulados "c/ IVA").
+ * Faixa de métricas do cockpit — Valor, Margem, % Pago, contagem decrescente e
+ * RSVP. Graciosa quando faltam dados: cada célula cai para "—".
+ *
+ * ── CADA CÉLULA DIZ A BASE DE IVA EM QUE ESTÁ ────────────────────────────
+ * O dinheiro que o cliente move (valor contratado, recebido) é COM IVA; a
+ * margem é LÍQUIDA contra LÍQUIDA, porque o IVA não é receita nem é custo (ver
+ * `EventMetrics.margin`). A célula da margem dizia «c/ IVA» sobre um número que
+ * já era líquido e mostrava por baixo os custos brutos — quem tentava fechar a
+ * conta de cabeça não conseguia e ficava sem saber qual dos números acreditar.
+ * O rótulo segue o número, e os custos ao lado seguem a base da margem.
  */
 interface Props {
   metrics: EventMetrics;
@@ -39,6 +46,7 @@ export default function MetricStrip({ metrics }: Props) {
     contracted,
     margin,
     supplierCosts,
+    supplierCostsNet,
     pctPaid,
     ledgerPaid,
     countdownDays,
@@ -69,9 +77,11 @@ export default function MetricStrip({ metrics }: Props) {
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
       <Cell label="Valor c/ IVA" value={contracted > 0 ? eur0(contracted) : "—"} />
       <Cell
-        label="Margem c/ IVA"
+        label="Margem s/ IVA"
         value={supplierCosts > 0 ? eur0(margin) : "—"}
-        sub={supplierCosts > 0 ? `custos ${eur0(supplierCosts)}` : "sem custos registados"}
+        sub={
+          supplierCosts > 0 ? `custos s/ IVA ${eur0(supplierCostsNet)}` : "sem custos registados"
+        }
         tone={supplierCosts > 0 ? (margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]") : undefined}
       />
       <Cell

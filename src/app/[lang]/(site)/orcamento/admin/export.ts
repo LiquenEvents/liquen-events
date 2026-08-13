@@ -5,7 +5,9 @@
  */
 import type { Quote } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
-import { eur0 } from "@/lib/money";
+import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
+import { eur0, round2 } from "@/lib/money";
+import { todayKey } from "./util";
 
 function eventTypeLabel(q: Quote): string {
   if (q.category && q.eventType) {
@@ -142,9 +144,17 @@ export function paymentsToCsvRows(quotes: Quote[]): (string | number)[][] {
   return [header, ...rows];
 }
 
-/** A short ISO date stamp for filenames, e.g. 2026-06-01. */
+/**
+ * O dia civil de quem carrega no botão, `yyyy-mm-dd`, para o nome do ficheiro.
+ *
+ * `toISOString()` é UTC e não serve: em Portugal, no Verão (UTC+1), quem
+ * exporta entre a meia-noite e a 01:00 levava para casa um ficheiro carimbado
+ * com ONTEM — e no dia seguinte tinha dois `clientes-<data>.csv` com a mesma
+ * data e conteúdos diferentes. `todayKey` (do mesmo painel) faz a conta no
+ * calendário local, que é o único que o utilizador reconhece.
+ */
 export function dateStamp(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayKey();
 }
 
 // ── iCalendar (.ics) export ────────────────────────────────────────────────
@@ -411,14 +421,19 @@ export function printRunSheet(q: Quote): void {
   const payments = (q.payments ?? [])
     .slice()
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  const contracted = q.quotedPrice ?? q.priceBreakdown?.total ?? 0;
+  // COM IVA, que é a base dos pagamentos com que ele é confrontado logo abaixo.
+  // A cascata crua `quotedPrice ?? priceBreakdown.total` misturava as duas
+  // bases — o preço manual é líquido, a estimativa é bruta —, pelo que um
+  // evento fechado a 20.000 € + IVA dizia "Contratado 20.000 €" ao lado de
+  // parcelas que somam 24.600 €.
+  const contracted = contractedAmounts(q).gross;
   const paidSum = payments.filter((p) => p.paid).reduce((s, p) => s + p.amount, 0);
   const dueSum = payments.filter((p) => !p.paid).reduce((s, p) => s + p.amount, 0);
   const financeBlock =
     payments.length || contracted
       ? `<h2>Pagamentos</h2>
          <div class="facts">
-           ${contracted ? `<div><span class="k">Contratado</span><span class="v">${eur0(contracted)}</span></div>` : ""}
+           ${contracted ? `<div><span class="k">Contratado (c/ IVA)</span><span class="v">${eur0(contracted)}</span></div>` : ""}
            <div><span class="k">Recebido</span><span class="v">${eur0(paidSum)}</span></div>
            <div><span class="k">Por receber</span><span class="v">${eur0(dueSum)}</span></div>
          </div>
@@ -523,7 +538,11 @@ export function printEventDossier(q: Quote): void {
   };
 
   // ── Financial ──
-  const contracted = q.quotedPrice ?? q.priceBreakdown?.total ?? 0;
+  // As três parcelas saem todas da mesma fonte (`contractedAmounts`), para o
+  // papel nunca voltar a pôr um preço manual (líquido) e uma estimativa (bruta)
+  // debaixo do mesmo rótulo. Cada linha abaixo declara a base que mostra.
+  const amounts = contractedAmounts(q);
+  const contracted = amounts.gross;
   const payments = (q.payments ?? [])
     .slice()
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -533,18 +552,24 @@ export function printEventDossier(q: Quote): void {
     (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
     0,
   );
-  const margin = contracted - supplierCosts;
+  // A margem é líquida contra líquida — a mesma conta de `computeEventMetrics`.
+  // O IVA não é receita nem é custo: entra do cliente e sai para o Estado, e a
+  // diferença entre dois brutos é a margem verdadeira multiplicada por 1,23.
+  // Os custos de fornecedor são registados COM IVA (ver `EventSupplier`), por
+  // isso passam a líquido à taxa a que a receita deste evento foi facturada.
+  const supplierCostsNet = round2(supplierCosts / (1 + effectiveVatRate(q)));
+  const margin = round2(amounts.net - supplierCostsNet);
 
   // ── Sections ──
   const sectionFinancial = `
     <section>
       <h2>Financeiro</h2>
       <div class="facts3">
-        <div><span class="k">Valor contratado</span><span class="v">${contracted ? eur0(contracted) : "—"}</span></div>
+        <div><span class="k">Valor contratado (c/ IVA)</span><span class="v">${contracted ? eur0(contracted) : "—"}</span></div>
         <div><span class="k">Recebido</span><span class="v green">${eur0(paidSum)}</span></div>
         <div><span class="k">Por receber</span><span class="v">${eur0(dueSum)}</span></div>
-        ${supplierCosts > 0 ? `<div><span class="k">Custos fornecedores</span><span class="v">${eur0(supplierCosts)}</span></div>` : ""}
-        ${supplierCosts > 0 ? `<div><span class="k">Margem estimada</span><span class="v ${margin >= 0 ? "green" : "red"}">${eur0(margin)}</span></div>` : ""}
+        ${supplierCosts > 0 ? `<div><span class="k">Custos fornecedores (c/ IVA)</span><span class="v">${eur0(supplierCosts)}</span></div>` : ""}
+        ${supplierCosts > 0 ? `<div><span class="k">Margem estimada (s/ IVA)</span><span class="v ${margin >= 0 ? "green" : "red"}">${eur0(margin)}</span></div>` : ""}
       </div>
       ${
         payments.length

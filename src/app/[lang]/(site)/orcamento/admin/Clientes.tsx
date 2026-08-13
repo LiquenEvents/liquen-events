@@ -53,6 +53,15 @@ function timeAgo(iso: string): string {
 }
 
 interface Client {
+  /**
+   * A identidade por que os pedidos foram juntos — `email || telefone || nome`,
+   * em minúsculas. Guardada, e não reconstruída no sítio onde é precisa: a
+   * lista identificava as linhas por `email || nome`, que é outra identidade.
+   * Duas "Ana Silva" sem e-mail (metade dos pedidos que entram por telefone não
+   * trazem) ficavam bem separadas em dois clientes e mal identificadas com a
+   * mesma chave — o React avisava, e abrir uma sanfona abria as duas.
+   */
+  key: string;
   email: string;
   name: string;
   phone: string;
@@ -101,6 +110,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
       const key = (q.email || q.phone || q.name).toLowerCase();
       if (!map.has(key)) {
         map.set(key, {
+          key,
           email: q.email,
           name: q.name,
           phone: q.phone,
@@ -279,15 +289,15 @@ export default function Clientes({ quotes, onOpen }: Props) {
       {/* List */}
       <div className="flex flex-col gap-2.5">
         {clients.map((c) => {
-          const isOpen = open === (c.email || c.name);
+          const isOpen = open === c.key;
           const decided = c.wonCount + c.rejectedCount;
           const convRate = decided > 0 ? Math.round((c.wonCount / decided) * 100) : -1;
           const waPhone = c.phone?.replace(/[^\d+]/g, "");
 
           return (
-            <Card key={c.email || c.name} padding="none" className="overflow-hidden">
+            <Card key={c.key} padding="none" className="overflow-hidden">
               <button
-                onClick={() => setOpen(isOpen ? null : c.email || c.name)}
+                onClick={() => setOpen(isOpen ? null : c.key)}
                 aria-expanded={isOpen}
                 className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-foreground/[0.025] motion-safe:transition-colors"
               >

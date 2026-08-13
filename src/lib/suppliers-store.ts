@@ -15,6 +15,27 @@ export const mapper: Mapper<Supplier> = {
     phone: s.phone || null,
     location: s.location || null,
     notes: s.notes || null,
+    /**
+     * ── ISTO ESTEVE DE FORA E PARECIA DE PROPÓSITO ────────────────────────
+     * As estrelas e o "preferido" são aceites pelo tipo `Supplier`, pela rota
+     * PATCH e pelo `supplierUpdateSchema`, e o ecrã de Fornecedores filtra e
+     * ordena por eles. Só que as colunas não existiam em `db/schema.sql`, pelo
+     * que projectá-los faria rebentar todas as escritas — e a saída foi
+     * deitá-los fora aqui. Em desenvolvimento nada se notava (o backend de
+     * ficheiro guarda o objecto de domínio tal e qual); com Supabase, avaliar
+     * uma florista com 5 estrelas respondia 200 e no recarregamento seguinte
+     * estava tudo apagado, sem erro nenhum.
+     *
+     * As colunas passaram a existir (`db/schema.sql`, migração idempotente ao
+     * lado da tabela), por isso o par fecha-se aqui. Uma metade sem a outra
+     * parte: sem colunas, `column "rating" does not exist` em cada gravação.
+     *
+     * Nulo e não zero: um fornecedor POR AVALIAR não é um fornecedor de zero
+     * estrelas — é a mesma distinção que a rota faz ao aceitar `rating: null`
+     * para desavaliar e recusar `rating: 0`.
+     */
+    rating: s.rating ?? null,
+    preferred: s.preferred ?? false,
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -24,6 +45,11 @@ export const mapper: Mapper<Supplier> = {
     phone: (r.phone as string) ?? undefined,
     location: (r.location as string) ?? undefined,
     notes: (r.notes as string) ?? undefined,
+    // `undefined` (e não 0/false) quando a linha nada diz, como os contactos
+    // vazios acima — assim uma ficha por avaliar continua a distinguir-se de
+    // uma avaliada com a nota mínima.
+    rating: typeof r.rating === "number" ? r.rating : undefined,
+    preferred: r.preferred === true ? true : undefined,
     createdAt: String(r.created_at ?? new Date().toISOString()),
   }),
   order: { column: "name", ascending: true },
