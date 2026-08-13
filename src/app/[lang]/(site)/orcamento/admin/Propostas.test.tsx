@@ -272,3 +272,84 @@ describe("Propostas — aceitar acrescenta ao histórico, não o reescreve", () 
     expect(entrada.summary).toMatch(/Proposta aceite/);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA PROPOSTA GERADA MAS POR ENVIAR NÃO PODE PARECER ENVIADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Quando o email não sai (SMTP em baixo, contacto errado), a proposta fica
+ * gravada — tem de ficar, senão cada tentativa criava uma proposta duplicada —
+ * mas fica POR ENVIAR. Antes ficava com `status:"enviada"` e este quadro
+ * mostrava-a como «Enviada, à espera de resposta»: ela esperava por uma
+ * resposta que não podia chegar.
+ *
+ * O que este ecrã tem de dizer sobre ela, e é o que se prende aqui:
+ *  · o estado chama-se «Gerada, por enviar» — não «Enviada», não «Rascunho»;
+ *  · há um aviso a dizer que o cliente não recebeu nada e o que fazer;
+ *  · não conta como valor enviado nem como proposta à espera de resposta.
+ */
+describe("Propostas — a que ficou por enviar", () => {
+  const porEnviar = [
+    {
+      id: "p-por-enviar",
+      quoteId: "q9",
+      clientName: "Maria & Zé",
+      clientEmail: "maria@example.pt",
+      currency: "EUR",
+      lineItems: [],
+      vatRate: 0.23,
+      subtotal: 4000,
+      vat: 920,
+      total: 4920,
+      status: "rascunho",
+      createdAt: "2026-08-13T14:06:52.259Z",
+    },
+  ];
+
+  beforeEach(() => {
+    __resetListCache();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        String(url).startsWith("/api/propostas") ? response(porEnviar) : response([]),
+      ),
+    );
+  });
+
+  const desenhar = () =>
+    render(
+      <ToastProvider>
+        <Propostas quotes={[]} onOpenQuote={() => {}} onQuoteUpdated={() => {}} />
+      </ToastProvider>,
+    );
+
+  it("diz «Gerada, por enviar», e nunca «Enviada»", async () => {
+    desenhar();
+    await waitFor(() => expect(screen.getByText("Maria & Zé")).toBeTruthy());
+    expect(screen.getAllByText("Gerada, por enviar").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Enviada")).toBeNull();
+  });
+
+  it("avisa que o cliente não recebeu nada — e que reenviar não cria outra", async () => {
+    desenhar();
+    await waitFor(() => expect(screen.getByText("Maria & Zé")).toBeTruthy());
+    expect(screen.getByText(/1 proposta gerada mas por enviar/)).toBeTruthy();
+    expect(document.body.textContent).toContain("o cliente não recebeu nada");
+    expect(document.body.textContent).toContain("não se cria outra");
+    // E NÃO diz que está à espera de resposta do cliente: ninguém a recebeu.
+    expect(document.body.textContent).not.toContain("aguarda resposta do cliente");
+  });
+
+  it("não entra no valor enviado aos clientes nem na taxa de aceitação", async () => {
+    desenhar();
+    await waitFor(() => expect(screen.getByText("Maria & Zé")).toBeTruthy());
+    const valorEnviado = screen
+      .getByText("Valor enviado aos clientes")
+      .previousElementSibling?.textContent?.replace(/\s/g, "");
+    expect(valorEnviado).toBe("0€");
+    // Zero de zero oferecidas: contá-la baixava a taxa por uma avaria do
+    // servidor de correio, que não é a resposta de ninguém.
+    expect(screen.getByText("Propostas aceites").previousElementSibling?.textContent).toBe("0%");
+  });
+});

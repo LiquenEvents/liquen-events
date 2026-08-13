@@ -3912,6 +3912,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const saiu = Boolean(data?.emailed);
       if (aviso) {
         toast(`No PDF que seguiu, ${aviso}. Verifica a proposta e reenvia.`, "error");
+      } else if (saiu && typeof data?.estadoError === "string") {
+        // Caso raro e feio: o email saiu, mas a proposta ficou marcada como por
+        // enviar (a base recusou a segunda escrita). O link do cliente só aceita
+        // uma proposta em aberto, por isso isto não pode passar em silêncio —
+        // reenviar acerta o estado e reaproveita a MESMA proposta.
+        toast(data.estadoError, "error");
       } else if (saiu) {
         toast("Proposta enviada ao cliente", "success");
       } else {

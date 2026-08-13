@@ -16,7 +16,7 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
  *  tudo o que sai para o cliente — aqui, o `{valor}` que um modelo de email
  *  pode citar. O porquê da separação está no `money.ts`. */
 import { eur, eurDocumento } from "@/lib/money";
-import { createProposal } from "@/lib/proposals-store";
+import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import {
   ehIdiomaDaProposta,
@@ -263,8 +263,43 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Validade: honra uma data explícita no doc, senão hoje + validUntilDays
     // (30 por omissão) — o /proposta recusa aceitar uma proposta expirada.
     const validUntil = resolveValidUntil(doc);
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * REENVIAR NÃO PODE SER GERAR OUTRA
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Quando o email não sai (SMTP em baixo, contacto errado), a proposta fica
+     * gravada — tem de ficar, ver a nota da gravação aqui em baixo — mas fica
+     * POR ENVIAR. Ela corrige o que estava mal e carrega outra vez no mesmo
+     * botão: sem isto, cada tentativa gravava MAIS UMA proposta, e três
+     * tentativas eram três linhas no quadro «Propostas» para o mesmo casal.
+     * É a mesma família das «propostas fantasma» que a rota irmã descreve.
+     *
+     * Reaproveita-se a mais recente que ainda não foi oferecida a ninguém
+     * (`rascunho`) — e só essa. Uma proposta que JÁ seguiu para o casal nunca
+     * é reescrita: uma revisão é uma proposta nova, e é disso que dependem o
+     * histórico, a análise, e a guarda da proposta mais recente no link do
+     * cliente (`/api/proposta`).
+     *
+     * Uma leitura que falhe não pode travar o envio: cai-se na proposta nova,
+     * que é exactamente o que a rota fazia antes.
+     */
+    let porEnviar: Proposal | null = null;
+    if (mode === "send") {
+      try {
+        const irmas = await listProposalsForQuote(id);
+        porEnviar =
+          irmas
+            .filter((p) => p.status === "rascunho")
+            .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0] ?? null;
+      } catch (e) {
+        log.warn("proposta-doc: não deu para procurar uma proposta por enviar", { id, erro: e });
+      }
+    }
+
     const proposal: Proposal = {
-      id: randomUUID(),
+      id: porEnviar?.id ?? randomUUID(),
       quoteId: id,
       clientName: doc.clientNames,
       clientEmail: quote.email,
@@ -275,9 +310,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       vat: money.vat,
       total: money.gross,
       validUntil,
-      status: "enviada",
-      createdAt: new Date().toISOString(),
-      sentAt: new Date().toISOString(),
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * O ESTADO NASCE «POR ENVIAR», E É O CORREIO QUE O FAZ SUBIR
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Isto dizia `status: "enviada"` e `sentAt: agora` — escritos ANTES de se
+       * tentar enviar seja o que for. Com o SMTP em baixo, o estúdio mostrava um
+       * aviso passageiro e o registo ficava com
+       * `{"status":"enviada","sentAt":"…"}` para sempre: o quadro «Propostas»
+       * mostrava uma proposta «Enviada, à espera de resposta» que nunca saiu de
+       * casa, e o Acompanhamento punha-a a contar dias por uma resposta que não
+       * podia chegar. Um aviso passa; um estado errado fica.
+       *
+       * «Enviada» é um FACTO sobre o mundo — o servidor de correio aceitou a
+       * mensagem — e só se escreve depois de ele acontecer (mais abaixo, a
+       * seguir ao `sendMail`). Até lá a proposta é o que é: um documento gerado,
+       * guardado, por enviar. O `rascunho` é o estado que o resto do produto já
+       * lê como «nunca foi oferecida a ninguém» — o link do cliente recusa-a
+       * (`EM_ABERTO`), a análise não a conta, o Acompanhamento não a persegue.
+       *
+       * O que NÃO muda: a proposta é gravada na mesma, antes do envio. Ver a
+       * nota da gravação, aqui em baixo — é o que impede as propostas fantasma.
+       */
+      status: "rascunho",
+      createdAt: porEnviar?.createdAt ?? new Date().toISOString(),
       doc, // stored with Storage paths so it can be re-opened + edited
       /**
        * ── O SELO DO DOCUMENTO ────────────────────────────────────────────────
@@ -310,8 +367,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // isso aconteceu mesmo.
     let docSaved = true;
     let docError: string | undefined;
+    /** Gravar ESTA proposta: uma linha nova, ou a que ficou por enviar (acima). */
+    const guardar = (p: Proposal): Promise<unknown> =>
+      porEnviar ? updateProposal(p.id, p) : createProposal(p);
     try {
-      await createProposal(proposal);
+      await guardar(proposal);
     } catch (e) {
       // Coluna `proposals.doc` em falta = instalação onde o db/schema.sql desta
       // versão ainda não foi corrido. NÃO se deita fora o envio por causa
@@ -352,7 +412,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           { id },
         );
         try {
-          await createProposal({
+          await guardar({
             ...proposal,
             doc: undefined,
             pdfSha256: undefined,
@@ -517,6 +577,46 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * AGORA SIM: SEGUIU, LOGO ESTÁ «ENVIADA»
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Segunda escrita, e de propósito. A primeira teve de ser antes do email
+     * (o link assinado que vai no correio tem de encontrar a proposta se o
+     * casal carregar nele no segundo seguinte); esta é a única que pode dizer
+     * «enviada», porque só aqui é que isso já aconteceu.
+     *
+     * Se ESTA falhar, a proposta seguiu na mesma e fica marcada como por
+     * enviar. É o erro para o lado seguro — mostra menos do que a verdade em
+     * vez de mais — mas não é inofensivo: o link do cliente recusa uma
+     * proposta que não está em aberto. Por isso grita no registo e volta na
+     * resposta, para ela poder reenviá-la (o reenvio reaproveita esta linha, e
+     * o casal recebe o mesmo documento).
+     */
+    let estadoError: string | undefined;
+    /** O estado com que a proposta FICOU — é este que a resposta conta. (Uma
+     *  variável e não `proposal.status`: o objecto já foi entregue à camada de
+     *  gravação, e mudá-lo por baixo dela seria mentir a quem o guardou.) */
+    let estado = proposal.status;
+    if (emailed) {
+      const sentAt = new Date().toISOString();
+      try {
+        const gravado = await updateProposal(proposal.id, { status: "enviada", sentAt });
+        if (!gravado) throw new Error("proposta não encontrada ao marcar como enviada");
+        estado = "enviada";
+      } catch (e) {
+        log.error("proposta-doc: o email saiu mas a proposta ficou por marcar como enviada", e, {
+          id,
+          proposta: proposal.id,
+        });
+        estadoError =
+          "O email seguiu para o cliente, mas a proposta ficou marcada como «por enviar» — " +
+          "a base de dados recusou a actualização. Reenvia-a para acertar o estado (é a mesma " +
+          "proposta, não se cria outra).";
+      }
+    }
+
     try {
       /**
        * ══════════════════════════════════════════════════════════════════════
@@ -554,13 +654,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        * PDF de uma dúzia de páginas e mandou-se um email. A regra tem de ser
        * avaliada contra o que está gravado AGORA, e a linha nova do histórico
        * não pode apagar a que outra ferramenta escreveu entretanto.
+       *
+       * ── E A TRANSIÇÃO SÓ ACONTECE SE O EMAIL SAIU ────────────────────────
+       *
+       * «Proposta enviada» no Quadro é a mesma afirmação que o estado da
+       * proposta faz, vista do outro lado do back office — e era escrita com a
+       * mesma cegueira. Um pedido em «Proposta enviada» sobre um email que
+       * nunca saiu tira-o da coluna onde ela ia dar por ele, e escreve no
+       * histórico uma linha que não é verdade. O PREÇO grava-se na mesma: foi
+       * decidido, é dele que vivem a margem e a proposta seguinte, e nada nele
+       * depende de o correio ter funcionado.
        */
       await updateQuoteWith(id, (actual) => {
-        const transicao = transicaoDoPedido({
-          acontecimento: "proposta_enviada",
-          estadoActual: actual.status,
-          detalhe: eur(money.gross),
-        });
+        const transicao = emailed
+          ? transicaoDoPedido({
+              acontecimento: "proposta_enviada",
+              estadoActual: actual.status,
+              detalhe: eur(money.gross),
+            })
+          : null;
         return {
           ...actual,
           quotedPrice: money.base,
@@ -594,6 +706,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       id: proposal.id,
       emailed,
       emailError,
+      /**
+       * O estado em que a proposta FICOU. Vai na resposta porque é a resposta a
+       * «e agora, o que é que ela vê no quadro?»: com o email fora, é
+       * `rascunho` — «Gerada, por enviar» — e não «Enviada, à espera de
+       * resposta». Quem chamar esta rota à mão fica a saber o mesmo.
+       */
+      estado,
+      ...(estadoError ? { estadoError } : {}),
       missingImages,
       truncations,
       // Quanto pesou este documento. O estúdio guarda-o com o tempo que a

@@ -36,6 +36,11 @@ const quotes = vi.hoisted(() => ({
 const proposals = vi.hoisted(() => ({
   create: vi.fn(async (_p?: unknown) => {}),
   listForQuote: vi.fn(async () => [{ id: "p-existing", quoteId: "LIQ-1" }]),
+  /**
+   * A segunda escrita: a que marca a proposta como enviada DEPOIS de o email
+   * sair. O estado deixou de ser decidido na criação — ver a nota na rota.
+   */
+  update: vi.fn(async (id: string, patch: Record<string, unknown>) => ({ id, ...patch })),
 }));
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_opts?: unknown) => ({ sent: true })) }));
 /**
@@ -57,6 +62,7 @@ vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/quotes-store", () => ({ getQuote: quotes.get, updateQuoteWith: quotes.update }));
 vi.mock("@/lib/proposals-store", () => ({
   createProposal: proposals.create,
+  updateProposal: proposals.update,
   listProposalsForQuote: proposals.listForQuote,
 }));
 vi.mock("@/lib/mail", () => ({
@@ -148,14 +154,20 @@ describe("POST /api/orcamento/[id]/proposta", () => {
     // subtotal 2000, vat 0.23 → total 2460.
     expect(json.total).toBeCloseTo(2460, 5);
     expect(json.emailed).toBe(true);
-    // Persisted as "enviada" before the email goes out.
+    // Gravada ANTES do email (o link assinado tem de encontrar a proposta),
+    // mas ainda POR ENVIAR — «enviada» é um facto que só acontece a seguir.
     expect(proposals.create).toHaveBeenCalledTimes(1);
     expect(proposals.create.mock.calls[0][0]).toMatchObject({
       quoteId: "LIQ-1",
-      status: "enviada",
+      status: "rascunho",
       clientEmail: "ana@x.pt",
     });
+    expect(proposals.create.mock.calls[0][0]).not.toHaveProperty("sentAt");
     expect(mail.send).toHaveBeenCalledTimes(1);
+    // E depois de o correio a aceitar, aí sim.
+    expect(proposals.update).toHaveBeenCalledTimes(1);
+    expect(proposals.update.mock.calls[0][1]).toMatchObject({ status: "enviada" });
+    expect(String(proposals.update.mock.calls[0][1].sentAt)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     // Quote status advances (best-effort) to cotado with the quoted total.
     // 2460 era o total COM IVA; o campo é o "Preço final (sem IVA)", portanto
     // grava-se o subtotal (2000). Ver a nota na rota.
@@ -253,6 +265,39 @@ describe("POST /api/orcamento/[id]/proposta", () => {
     expect(log).toHaveLength(1);
     expect(log[0].actor).toBe("Sistema");
     expect(log[0].summary).toContain("Proposta enviada");
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O MESMO DEFEITO DA ROTA DO ESTÚDIO, NESTA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Com o SMTP em baixo (`sent:false`), esta rota gravava na mesma
+   * `status:"enviada"` + `sentAt` e fazia o pedido avançar para «Proposta
+   * enviada». O aviso do ecrã passa; o registo fica a dizer que a proposta está
+   * à espera de uma resposta que ninguém pode dar.
+   *
+   * A proposta continua a ser GRAVADA — é o que impede as propostas fantasma,
+   * e o link continua a servir assim que o estado acertar.
+   */
+  it("com o correio em baixo, a proposta fica guardada mas NÃO «enviada»", async () => {
+    authed.ok = true;
+    quotes.estado = "pendente";
+    mail.send.mockResolvedValueOnce({ sent: false });
+
+    const res = await POST(req("POST", validItems), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).emailed).toBe(false);
+
+    // Guardada — a protecção contra duplicados não regride.
+    expect(proposals.create).toHaveBeenCalledTimes(1);
+    // Mas por enviar, e sem hora de envio.
+    expect(proposals.create.mock.calls[0][0]).toMatchObject({ status: "rascunho" });
+    expect(proposals.create.mock.calls[0][0]).not.toHaveProperty("sentAt");
+    expect(proposals.update, "nada sobe a «enviada» sem o email ter saído").not.toHaveBeenCalled();
+    // E o pedido não avança para «Proposta enviada» — nem escreve a linha.
+    expect(quotes.gravado).toMatchObject({ status: "pendente", quotedPrice: 1000 });
+    expect(quotes.gravado).not.toHaveProperty("activityLog");
   });
 
   it("returns 503 (does not send an un-acceptable proposal) when persistence fails", async () => {

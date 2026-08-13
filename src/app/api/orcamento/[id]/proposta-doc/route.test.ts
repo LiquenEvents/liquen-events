@@ -45,13 +45,39 @@ vi.mock("@/lib/quotes-store", () => ({
 }));
 /** Avaria a injetar na PRIMEIRA gravação (a segunda é sempre aceite). Serve
  *  para retratar uma base onde a coluna `proposals.doc` ainda não existe. */
-const store = vi.hoisted(() => ({ failFirstWith: null as unknown, attempts: 0 }));
+const store = vi.hoisted(() => ({
+  failFirstWith: null as unknown,
+  attempts: 0,
+  /**
+   * O que ficou mesmo GRAVADO, por identificador.
+   *
+   * O `created.last` só sabe o que foi passado à criação — e o estado de uma
+   * proposta deixou de ser decidido aí: nasce «rascunho» e só sobe a «enviada»
+   * quando o servidor de correio aceita o email. Sem esta tabela não havia como
+   * afirmar em que estado a proposta FICOU, que é a mentira que se está a
+   * corrigir.
+   */
+  linhas: new Map<string, Proposal>(),
+}));
 vi.mock("@/lib/proposals-store", () => ({
   createProposal: vi.fn(async (p: Proposal) => {
     store.attempts++;
     if (store.attempts === 1 && store.failFirstWith) throw store.failFirstWith;
     created.last = p;
+    store.linhas.set(p.id, { ...p });
   }),
+  updateProposal: vi.fn(async (id: string, patch: Partial<Proposal>) => {
+    const actual = store.linhas.get(id);
+    if (!actual) return null;
+    const novo = { ...actual, ...patch };
+    store.linhas.set(id, novo);
+    return novo;
+  }),
+  listProposalsForQuote: vi.fn(async (quoteId: string) =>
+    [...store.linhas.values()]
+      .filter((p) => p.quoteId === quoteId)
+      .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
+  ),
 }));
 // The real renderer is server-only + rasterises a PDF; stub it to a byte or two.
 vi.mock("@/lib/proposal-doc-render", () => ({
@@ -160,6 +186,7 @@ beforeEach(() => {
   updated.estado = "pendente";
   store.failFirstWith = null;
   store.attempts = 0;
+  store.linhas.clear();
   vi.clearAllMocks();
   modelo.get.mockResolvedValue(null);
 });
@@ -995,5 +1022,140 @@ describe("POST /api/orcamento/[id]/proposta-doc — o modelo «proposta-enviada�
     expect(email.html).toContain("&lt;b&gt;Maria&lt;/b&gt;");
     expect(email.html).not.toContain("<b>Maria</b> &");
     expect(email.text).not.toMatch(/[<>]/);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «ENVIADA» É UM FACTO, NÃO UMA INTENÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Com o SMTP em baixo, o estúdio dava 200, um aviso passageiro («Envio de email
+ * não configurado.») — e no servidor ficava gravado
+ * `{"status":"enviada","sentAt":"2026-08-13T14:06:52.259Z"}`. O aviso passa; o
+ * registo fica. Passados dez minutos, o quadro «Propostas» mostrava uma
+ * proposta «Enviada, à espera de resposta» que nunca saiu de casa — e ela ia
+ * esperar por uma resposta que não podia chegar.
+ *
+ * A causa era a ordem: o estado e a hora do envio eram escritos INCONDICIONAL-
+ * MENTE, antes de sequer se tentar enviar, e o `catch` do envio também não os
+ * desfazia.
+ *
+ * ── O QUE NÃO SE PODE PARTIR AO CORRIGIR ────────────────────────────────────
+ *
+ * A proposta é gravada ANTES do envio de propósito, e está documentado porquê:
+ * se o envio deitasse a gravação abaixo com um 500, ela tentava outra vez e
+ * criava propostas fantasma — «enviada» na lista, no Acompanhamento e nas
+ * contagens, sem ninguém as ter recebido. Por isso estes testes exigem as duas
+ * coisas ao mesmo tempo: a proposta FICA GUARDADA nos dois casos, e o ESTADO
+ * só diz «enviada» quando o email saiu mesmo.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — «enviada» só quando o email saiu", () => {
+  beforeEach(() => {
+    renderMock.missing = 0;
+    renderMock.truncations = [];
+    renderMock.sequencia = [];
+    renderMock.chamadas = 0;
+    store.linhas.clear();
+    store.attempts = 0;
+    store.failFirstWith = null;
+    updated.estado = "pendente";
+    // Os blocos acima deixam `createProposal` com uma implementação própria (e
+    // `mockImplementation` sobrevive ao `clearAllMocks`): aqui a gravação tem
+    // de voltar a alimentar a tabela do duplo, que é o que se afirma.
+    vi.mocked(createProposal).mockImplementation(async (p: Proposal) => {
+      created.last = p;
+      store.linhas.set(p.id, { ...p });
+    });
+    vi.mocked(sendMail).mockResolvedValue({ sent: true });
+  });
+
+  /** A única proposta gravada (os testes que criam mais do que uma contam-nas). */
+  const gravada = (): Proposal => [...store.linhas.values()][0];
+
+  it("SMTP em baixo: a proposta fica guardada, mas o estado NÃO diz «enviada»", async () => {
+    vi.mocked(sendMail).mockResolvedValue({ sent: false });
+
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.emailed).toBe(false);
+    expect(body.emailError).toBeTruthy();
+
+    // 1) FICA GUARDADA — a protecção contra propostas fantasma não regride.
+    expect(store.linhas.size, "a proposta tem de ficar gravada na mesma").toBe(1);
+    expect(gravada().doc, "e com o documento, que é a única cópia durável").toBeTruthy();
+
+    // 2) E O ESTADO NÃO MENTE.
+    expect(gravada().status).not.toBe("enviada");
+    expect(gravada().sentAt, "não há hora de envio quando não houve envio").toBeUndefined();
+  });
+
+  it("o envio a atirar (credenciais erradas) deixa exactamente o mesmo", async () => {
+    vi.mocked(sendMail).mockRejectedValue(new Error("EAUTH: invalid login"));
+
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    expect((await res.json()).emailed).toBe(false);
+    expect(store.linhas.size).toBe(1);
+    expect(gravada().status).not.toBe("enviada");
+    expect(gravada().sentAt).toBeUndefined();
+  });
+
+  it("com o email a sair, aí sim: «enviada», com a hora a que saiu", async () => {
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    expect((await res.json()).emailed).toBe(true);
+    expect(store.linhas.size).toBe(1);
+    expect(gravada().status).toBe("enviada");
+    expect(Date.parse(gravada().sentAt ?? "")).toBeGreaterThan(0);
+  });
+
+  /**
+   * O pedido no Quadro é a mesma mentira vista do outro lado: um pedido em
+   * «Proposta enviada» sobre uma proposta que ninguém recebeu. O PREÇO grava-se
+   * na mesma — foi decidido, e nada nele depende de o email ter saído.
+   */
+  it("sem email, o pedido não avança para «Proposta enviada» — mas o preço grava-se", async () => {
+    vi.mocked(sendMail).mockResolvedValue({ sent: false });
+    updated.estado = "pendente";
+
+    await POST(sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "acrescer" })), { params });
+
+    expect(updated.last?.status).toBe("pendente");
+    expect(updated.last).not.toHaveProperty("activityLog");
+    expect(updated.last?.quotedPrice).toBe(3000);
+  });
+
+  /**
+   * E o reenvio: depois de o email falhar, ela corrige o SMTP e carrega outra
+   * vez. Isso NÃO pode encher a lista de propostas fantasma — a proposta que
+   * ficou por enviar é a MESMA que agora segue.
+   */
+  it("reenviar uma proposta por enviar não cria uma segunda", async () => {
+    vi.mocked(sendMail).mockResolvedValue({ sent: false });
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(store.linhas.size).toBe(1);
+    const primeira = gravada().id;
+
+    vi.mocked(sendMail).mockResolvedValue({ sent: true });
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+
+    expect(store.linhas.size, "reenviar reaproveita a que ficou por enviar").toBe(1);
+    expect(gravada().id).toBe(primeira);
+    expect(gravada().status).toBe("enviada");
+  });
+
+  /**
+   * O contrário também tem de valer: uma proposta que JÁ seguiu para o casal
+   * não se reescreve por cima. Uma revisão é uma proposta nova — é disso que
+   * dependem o histórico, a análise e a guarda da proposta mais recente no
+   * link do cliente (`/api/proposta`).
+   */
+  it("mas uma proposta já enviada nunca é reescrita: a revisão é uma proposta nova", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    await POST(sendReq(baseDoc({ totalAmount: 4000 })), { params });
+    expect(store.linhas.size).toBe(2);
+    expect([...store.linhas.values()].every((p) => p.status === "enviada")).toBe(true);
   });
 });

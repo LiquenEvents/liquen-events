@@ -8,6 +8,7 @@ import Agenda from "./Agenda";
 import { eur0 as eur } from "@/lib/money";
 import { metaFor } from "./status-meta";
 import { todayKey } from "./util";
+import { useRelogio } from "./relogio";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 
 /**
@@ -55,13 +56,35 @@ function eventTypeLabel(q: Quote): string {
   return CATEGORIES.find((c) => c.id === q.category)?.label ?? "Outro";
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+/**
+ * «há 3min», «há 2h», «ontem».
+ *
+ * O `agora` VEM DE FORA (do {@link useRelogio}) e não de um `Date.now()` aqui
+ * dentro. Era daqui que saía o defeito: esta função era chamada durante o
+ * desenho, no servidor e no browser, e os dois caíam em minutos diferentes —
+ * «Hydration failed because the server rendered text didn't match the client»,
+ * com `+ há 3min` / `- há 2min` no registo. Ver o cabeçalho do `relogio.ts`.
+ */
+function timeAgo(iso: string, agora: number): string {
+  const diff = agora - new Date(iso).getTime();
   const h = diff / 36e5;
   if (h < 1) return `há ${Math.max(1, Math.round(diff / 6e4))}min`;
   if (h < 24) return `há ${Math.round(h)}h`;
   const d = Math.round(h / 24);
   return d === 1 ? "ontem" : `há ${d}d`;
+}
+
+/**
+ * A idade de um pedido, desenhada só no browser.
+ *
+ * Antes de hidratar não há hora nenhuma (é o que impede o desencontro), e no
+ * lugar do texto fica um espaço inquebrável: a linha guarda a altura que vai
+ * ocupar, portanto nada salta quando o valor chega — o que acontece no mesmo
+ * instante em que a página ganha vida.
+ */
+function TempoDesde({ iso, className }: { iso: string; className?: string }) {
+  const agora = useRelogio();
+  return <span className={className}>{agora === null ? " " : timeAgo(iso, agora)}</span>;
 }
 
 /** A small ▲/▼ delta pill comparing this month to last. */
@@ -867,6 +890,25 @@ interface Props {
 }
 
 export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, onNew }: Props) {
+  /**
+   * ── O QUE AQUI DENTRO AINDA LÊ O RELÓGIO, E PORQUE É QUE FICA ─────────────
+   *
+   * Este cálculo também usa a hora (o «hoje» dos eventos, os «14d parado», os
+   * dias até ao próximo evento) e, ao contrário do `timeAgo` e da saudação, NÃO
+   * passou para o {@link useRelogio}. A razão é a diferença de grão: aqui as
+   * contas mudam de valor à MEIA-NOITE, não ao minuto, e o desencontro exige
+   * que a fronteira do dia caia no segundo entre o desenho do servidor e a
+   * hidratação — contra uma fronteira por minuto, que era o que dava «há 3min»
+   * contra «há 2min» em 3 de 25 aberturas.
+   *
+   * E o preço de o adiar seria o ecrã: sem hora, este bloco não sabe contar
+   * nada, e a Visão Geral chegaria em branco — que é precisamente o que o
+   * desenho no servidor existe para evitar. O mesmo vale para o Reminders e
+   * para a Agenda, que contam dias pela mesma régua.
+   *
+   * Fica anotado por ser uma decisão e não um descuido: se um dia estes números
+   * passarem a mudar ao minuto, o caminho está aberto — é o mesmo `useRelogio`.
+   */
   const data = useMemo(() => {
     const now = new Date();
     // "Hoje" e "daqui a uma semana" no calendário de quem está a olhar — as
@@ -994,8 +1036,25 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
     };
   }, [quotes]);
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Bom dia" : hour < 20 ? "Boa tarde" : "Boa noite";
+  /**
+   * ── A SAUDAÇÃO E A DATA TAMBÉM SÃO RELÓGIO ────────────────────────────────
+   *
+   * O mesmo padrão do `timeAgo`, e neste ficheiro havia mais dois: a hora, para
+   * escolher entre «Bom dia» e «Boa tarde», e a data por extenso. Aqui o
+   * desencontro não é sequer uma corrida de segundos — é SISTEMÁTICO: o servidor
+   * corre em UTC e ela está em Portugal, que no Verão está uma hora à frente.
+   * Entre as 12:00 e as 13:00 de Lisboa o servidor escrevia «Bom dia» e o
+   * browser dizia «Boa tarde», TODOS OS DIAS; a data por extenso discordava da
+   * meia-noite à uma da manhã.
+   *
+   * Enquanto não há relógio, saúda-se sem hora nenhuma — «Olá» é verdade a
+   * qualquer hora — e a linha da data fica em branco. Uma e outra acertam-se no
+   * instante em que a página hidrata.
+   */
+  const agora = useRelogio();
+  const hour = agora === null ? null : new Date(agora).getHours();
+  const greeting =
+    hour === null ? "Olá" : hour < 12 ? "Bom dia" : hour < 20 ? "Boa tarde" : "Boa noite";
 
   // Smart headline: surface the most pressing things for today.
   const headline = (() => {
@@ -1055,11 +1114,17 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
     },
   ];
 
-  const dateLabel = new Date().toLocaleDateString("pt-PT", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const dateLabel =
+    agora === null
+      ? // Espaço INQUEBRÁVEL e não um espaço normal: um espaço normal colapsa e
+        // a linha ficaria com altura zero até hidratar — a página assentava com
+        // um salto. Este guarda o lugar exacto que a data vai ocupar.
+        " "
+      : new Date(agora).toLocaleDateString("pt-PT", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        });
 
   // Warm onboarding state — a fresh back office with no pedidos yet. Instead of a
   // grid of empty cards, greet the user and point them at their first action.
@@ -1488,7 +1553,10 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                       {metaFor(STATUS_META, q.status).label}
                     </span>
                   )}
-                  <p className="text-foreground/22 text-[10px] mt-1">{timeAgo(q.submittedAt)}</p>
+                  <TempoDesde
+                    iso={q.submittedAt}
+                    className="text-foreground/22 text-[10px] mt-1 block"
+                  />
                 </div>
               </button>
             ))}
@@ -1507,9 +1575,10 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
                 className={`alvo-toque !justify-between w-full text-left px-5 py-3 hover:bg-foreground/[0.025] transition-colors motion-reduce:transition-none flex items-center justify-between gap-3 ${FOCUS_RING} focus-visible:ring-inset`}
               >
                 <span className="text-foreground/58 text-xs truncate font-medium">{q.name}</span>
-                <span className="text-foreground/30 text-[10px] shrink-0">
-                  {timeAgo(q.submittedAt)}
-                </span>
+                <TempoDesde
+                  iso={q.submittedAt}
+                  className="text-foreground/30 text-[10px] shrink-0"
+                />
               </button>
             ))}
             {data.recent.length === 0 && (

@@ -19,7 +19,24 @@ const eur = (n: number) =>
   }).format(n || 0);
 
 const STATUS_META: Record<ProposalStatus, { label: string; color: string }> = {
-  rascunho: { label: "Rascunho", color: "#8a8a82" },
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * «GERADA, POR ENVIAR» — E PORQUE É QUE ISTO DEIXOU DE SER «RASCUNHO»
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Este estado passou a existir MESMO na base de dados. A proposta que o
+   * estúdio gera fica guardada antes de o email sair (é o que impede as
+   * propostas duplicadas), e quando o correio não a aceita — SMTP em baixo,
+   * contacto errado — fica assim: um documento feito, gravado, que ninguém
+   * recebeu. Antes ficava «Enviada» e ela esperava por uma resposta que não
+   * podia chegar.
+   *
+   * A palavra é «Gerada, por enviar» e não «Rascunho»: rascunho é uma coisa por
+   * acabar, e esta está acabada — só não saiu. E é ÂMBAR, a mesma cor com que
+   * este ecrã já avisa: é a única linha da lista que pede alguma coisa dela
+   * hoje.
+   */
+  rascunho: { label: "Gerada, por enviar", color: "#a9781f" },
   enviada: { label: "Enviada", color: "#9aa36a" },
   em_negociacao: { label: "Em negociação", color: "#7d8a55" },
   aceite: { label: "Aceite", color: "#525a2f" },
@@ -245,6 +262,11 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
           // Enviadas com expiração iminente first
           const aExp = a.validUntil ? new Date(a.validUntil + "T12:00:00").getTime() : Infinity;
           const bExp = b.validUntil ? new Date(b.validUntil + "T12:00:00").getTime() : Infinity;
+          // Acima de tudo, as que ficaram por enviar: são as únicas em que o
+          // atraso é nosso. Uma proposta à espera de resposta espera pelo
+          // cliente; esta espera por ela.
+          if (a.status === "rascunho" && b.status !== "rascunho") return -1;
+          if (a.status !== "rascunho" && b.status === "rascunho") return 1;
           if (a.status === "enviada" && b.status !== "enviada") return -1;
           if (a.status !== "enviada" && b.status === "enviada") return 1;
           if (a.status === "enviada" && b.status === "enviada") return aExp - bExp;
@@ -270,6 +292,8 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
     let totalWon = 0;
     let won = 0;
     let pending = 0;
+    // Geradas mas por enviar: o email não saiu, o cliente não recebeu nada.
+    let porEnviar = 0;
     for (const p of unique) {
       if (p.status === "enviada" || p.status === "aceite") totalSent += p.total;
       if (p.status === "aceite") {
@@ -277,25 +301,30 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
         won += 1;
       }
       if (p.status === "enviada") pending += 1;
+      if (p.status === "rascunho") porEnviar += 1;
     }
-    const acceptRate = unique.length ? Math.round((won / unique.length) * 100) : 0;
-    return { totalSent, totalWon, acceptRate, pending };
+    // O denominador são as propostas OFERECIDAS. Uma que nunca saiu de casa não
+    // pode ser aceite nem recusada — contá-la baixava a taxa de aceitação por
+    // uma falha do servidor de correio, que não é uma resposta de ninguém.
+    const oferecidas = unique.filter((p) => p.status !== "rascunho").length;
+    const acceptRate = oferecidas ? Math.round((won / oferecidas) * 100) : 0;
+    return { totalSent, totalWon, acceptRate, pending, porEnviar };
   }, [proposals]);
-  const { totalSent, totalWon, acceptRate, pending } = stats;
+  const { totalSent, totalWon, acceptRate, pending, porEnviar } = stats;
 
   const filterOptions: SegmentedOption<ProposalStatus | "all">[] = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const p of proposals) counts[p.status] = (counts[p.status] ?? 0) + 1;
     return [
       { value: "all", label: `Todas · ${proposals.length}` },
-      // "rascunho" não é persistido no servidor (os rascunhos vivem só no
-      // browser), por isso o chip aparecia sempre a 0 e confundia — fica de fora.
-      ...(Object.keys(STATUS_META) as ProposalStatus[])
-        .filter((s) => s !== "rascunho")
-        .map((s) => ({
-          value: s,
-          label: `${STATUS_META[s].label} · ${counts[s] ?? 0}`,
-        })),
+      // O chip de «Gerada, por enviar» ficava de fora porque o estado não era
+      // persistido no servidor (os rascunhos viviam só no browser) e aparecia
+      // sempre a 0. Passou a ser: é assim que fica uma proposta cujo email não
+      // saiu, e é o primeiro sítio onde ela vai querer filtrar.
+      ...(Object.keys(STATUS_META) as ProposalStatus[]).map((s) => ({
+        value: s,
+        label: `${STATUS_META[s].label} · ${counts[s] ?? 0}`,
+      })),
     ];
   }, [proposals]);
 
@@ -402,6 +431,42 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
           </Card>
         ))}
       </div>
+
+      {/*
+        O AVISO QUE VEM PRIMEIRO: as que nem sequer saíram.
+
+        Uma proposta à espera de resposta é o funcionamento normal do negócio.
+        Uma proposta gerada que ficou em casa é trabalho feito e parado — e era
+        invisível, porque o ecrã dizia «Enviada» sobre ela. Fica acima do outro
+        aviso, e é vermelho e não âmbar: aqui não se espera por ninguém, falta
+        fazer uma coisa.
+      */}
+      {porEnviar > 0 && (
+        <div className="flex items-start gap-3 rounded-2xl border border-[#8a2a22]/25 bg-[#8a2a22]/[0.06] px-4 py-3">
+          <svg
+            className="mt-0.5 shrink-0 text-[#8a2a22]"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M3 5h18v14H3z" />
+            <path d="m3 6 9 7 9-7" />
+          </svg>
+          <p className="text-[#8a2a22] text-sm leading-snug">
+            <strong className="font-semibold">
+              {porEnviar} proposta{porEnviar !== 1 ? "s" : ""} gerada
+              {porEnviar !== 1 ? "s" : ""} mas por enviar
+            </strong>{" "}
+            — o email não saiu e o cliente não recebeu nada. Abre o pedido e envia outra vez: é a
+            mesma proposta, não se cria outra.
+          </p>
+        </div>
+      )}
 
       {/* Pending alert */}
       {pending > 0 && (

@@ -4,7 +4,7 @@ import type { Proposal } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
-import { createProposal, listProposalsForQuote } from "@/lib/proposals-store";
+import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
 import { marcadoresDoPedido, modeloParaEnvioAutomatico } from "@/lib/email-modelos";
@@ -106,9 +106,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // nosso na mão dele.
       validUntil: dataIso(parsed.data.validUntil) || undefined,
       notes: parsed.data.notes || undefined,
-      status: "enviada",
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * «ENVIADA» É UM FACTO, E AINDA NÃO ACONTECEU AQUI
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Dizia `status: "enviada"` com `sentAt` a acompanhar — as duas coisas
+       * escritas ANTES de se falar com o servidor de correio, e nenhuma delas
+       * desfeita quando ele não aceitava a mensagem. Com o SMTP em baixo, ou um
+       * pedido sem email (o caso que está contado mais abaixo), ficava gravada
+       * uma proposta «Enviada, à espera de resposta» que nunca saiu de casa: o
+       * quadro «Propostas» mostrava-a à espera, o Acompanhamento contava-lhe os
+       * dias, e a resposta não podia chegar.
+       *
+       * Nasce por enviar; sobe a «enviada» a seguir ao envio, e só se ele
+       * correr bem. É a mesma correcção, com a mesma razão, da rota do estúdio
+       * (`proposta-doc`) — que é onde vive o botão que ela usa todos os dias, e
+       * onde está também o reaproveitamento da proposta por enviar no reenvio.
+       */
+      status: "rascunho",
       createdAt: new Date().toISOString(),
-      sentAt: new Date().toISOString(),
     };
 
     // Event metadata for the PDF header
@@ -285,6 +302,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         })
       : { sent: false as const };
 
+    /**
+     * Seguiu: agora sim, «enviada» — com a hora a que saiu.
+     *
+     * Segunda escrita de propósito, pela razão da primeira: o link assinado vai
+     * dentro do email e tem de encontrar a proposta se o casal carregar nele no
+     * segundo seguinte. Se esta falhar, a proposta seguiu e fica marcada como
+     * por enviar — erro para o lado seguro, mas registado, porque o link do
+     * cliente só aceita uma proposta em aberto.
+     */
+    if (mail.sent) {
+      const sentAt = new Date().toISOString();
+      try {
+        await updateProposal(proposal.id, { status: "enviada", sentAt });
+      } catch (e) {
+        log.error("proposta: o email saiu mas a proposta ficou por marcar como enviada", e, {
+          id,
+          proposta: proposal.id,
+        });
+      }
+    }
+
     // Advance the quote status (best-effort — the proposal is already saved & sent).
     try {
       // `subtotal` (SEM IVA) e não `total`. Ver a nota extensa na rota irmã
@@ -298,12 +336,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // fazia recuar um pedido já ganho a quem se reenviasse uma proposta
       // revista. O preço grava-se nos dois casos — ver a nota longa na rota
       // irmã, que tem exactamente o mesmo problema e a mesma solução.
+      //
+      // E, pela mesma razão do estado da proposta, a transição só acontece
+      // quando o email SAIU: «Proposta enviada» no Quadro é a mesma afirmação,
+      // vista do outro lado. O preço não depende disso.
       await updateQuoteWith(id, (actual) => {
-        const transicao = transicaoDoPedido({
-          acontecimento: "proposta_enviada",
-          estadoActual: actual.status,
-          detalhe: eur(total),
-        });
+        const transicao = mail.sent
+          ? transicaoDoPedido({
+              acontecimento: "proposta_enviada",
+              estadoActual: actual.status,
+              detalhe: eur(total),
+            })
+          : null;
         return {
           ...actual,
           quotedPrice: subtotal,
