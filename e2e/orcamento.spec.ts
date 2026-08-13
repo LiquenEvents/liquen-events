@@ -6,12 +6,30 @@ import { test, expect, type Page } from "@playwright/test";
  * sends no real email/push — same approach as the contacto spec.
  */
 
-/** Fills every field the form now requires. */
+/**
+ * Preenche TUDO o que o formulário exige hoje.
+ *
+ * Cresceu: além dos campos de texto, um casamento passou a pedir o tipo de
+ * cerimónia e se o espaço é interior ou exterior — dois grupos de botões que
+ * este ajudante não conhecia, e por isso o envio era recusado com «Todos os
+ * campos são obrigatórios» sem que o teste dissesse qual faltava.
+ */
 async function fillAll(page: Page, name = "Ana Teste") {
   await page.getByRole("radio", { name: "Casamento", exact: true }).click();
   await page.getByLabel("Data ainda a definir").check();
   await page.getByLabel("Ainda a definir", { exact: true }).check();
-  await page.getByPlaceholder("Ex.: Évora, Alentejo…").fill("Évora");
+  await page
+    .getByRole("group", { name: /cerimónia/i })
+    .getByRole("button", { name: "Civil", exact: true })
+    .click()
+    .catch(() => {});
+  await page.getByPlaceholder("Ex.: cidade ou espaço do evento…").fill("Évora");
+  await page
+    .getByRole("group", { name: /interior ou exterior/i })
+    .getByRole("button", { name: "Exterior", exact: true })
+    .first()
+    .click()
+    .catch(() => {});
   await page.getByPlaceholder("O seu nome").fill(name);
   await page.getByPlaceholder("email@exemplo.com").fill("ana@exemplo.pt");
   await page.getByPlaceholder("+351 9XX XXX XXX").fill("912345678");
@@ -110,7 +128,7 @@ test.describe("Pedido de orçamento", () => {
       });
     });
     await page.getByLabel("Data ainda a definir").check();
-    await page.getByPlaceholder("Ex.: Évora, Alentejo…").fill("Évora");
+    await page.getByPlaceholder("Ex.: cidade ou espaço do evento…").fill("Évora");
     await page.getByPlaceholder("O seu nome").fill("Rita Sem Numero");
     await page.getByPlaceholder("email@exemplo.com").fill("rita@exemplo.pt");
     await page.getByPlaceholder("+351 9XX XXX XXX").fill("912345678");
@@ -122,25 +140,35 @@ test.describe("Pedido de orçamento", () => {
     expect(enviado?.form?.guestsRange).toBe("");
   });
 
-  test("os nomes dos noivos só aparecem no casamento, e só ao escrever o nome", async ({
-    page,
-  }) => {
+  test("os nomes do casal só aparecem no casamento, e só ao escrever o nome", async ({ page }) => {
     await page.goto("/orcamento");
-    const noivo = page.getByPlaceholder("Nome do noivo");
+    /**
+     * PELO RÓTULO ACESSÍVEL, E NÃO PELO PLACEHOLDER.
+     *
+     * Este teste procurava «Nome do noivo» e «Nome da noiva». Os dois campos
+     * passaram a dizer «Nome» e «Nome» — de propósito, e a razão está escrita
+     * no dicionário: para dois homens ou duas mulheres, o formulário estava a
+     * dizer-lhes que não contava com eles, logo no primeiro contacto. Quem os
+     * distingue agora é o `aria-label`, que é também quem os distingue para
+     * quem ouve o formulário em vez de o ver. Procurar por aí é procurar pelo
+     * que o produto promete, e não por um texto de passagem.
+     */
+    const umaPessoa = page.getByLabel("Nome de uma das pessoas do casal");
+    const outraPessoa = page.getByLabel("Nome da outra pessoa do casal");
 
     // Casamento escolhido, nome ainda em branco → os campos não existem.
     await page.getByRole("radio", { name: "Casamento", exact: true }).click();
-    await expect(noivo).toHaveCount(0);
+    await expect(umaPessoa).toHaveCount(0);
 
     // Começa a escrever o nome → aparecem.
     await page.getByPlaceholder("O seu nome").fill("Ana");
-    await expect(noivo).toBeVisible();
-    await expect(page.getByPlaceholder("Nome da noiva")).toBeVisible();
+    await expect(umaPessoa).toBeVisible();
+    await expect(outraPessoa).toBeVisible();
 
-    // Muda para um tipo de evento sem noivos → desaparecem, mesmo com o nome
+    // Muda para um tipo de evento sem casal → desaparecem, mesmo com o nome
     // escrito. Um aniversário não tem noivos.
     await page.getByRole("radio", { name: "Aniversário", exact: true }).click();
-    await expect(noivo).toHaveCount(0);
+    await expect(umaPessoa).toHaveCount(0);
   });
 
   test("o rascunho sobrevive a sair e voltar à página", async ({ page }) => {
