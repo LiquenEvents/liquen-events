@@ -32,7 +32,7 @@ import {
 } from "@/lib/proposal-doc";
 import { ordemDeSaida, eAOrdemEscrita } from "@/lib/proposal-ordem";
 import { ordemDasFotos } from "@/lib/proposal-moodboard";
-import { eurDocumento, milharesComPonto, round2 } from "@/lib/money";
+import { eurDocumento, milharesComPonto, montanteNaLingua, round2 } from "@/lib/money";
 import { normalizarValor, somaDosExtrasSemIva, totaisDaProposta } from "@/lib/proposal-budget";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
 import {
@@ -669,6 +669,17 @@ export async function renderProposalDocPdfWithReport(
    * pelos campos em que ela foi escrita, que são os que ela vê no editor.
    */
   const evento = camposDoEventoNaLingua(doc, idioma);
+  /**
+   * O DINHEIRO NA LÍNGUA DO DOCUMENTO.
+   *
+   * Numa folha inglesa «4.600,00 €» escreve-se «€4,600.00». Passa por aqui TUDO
+   * o que é montante — as nossas contas e os campos que ela escreve à mão —,
+   * porque converter só metade punha as duas pontuações na mesma coluna do
+   * mesmo quadro. Em português é a identidade: a folha portuguesa não muda um
+   * carácter. Ver `montantesEmIngles`.
+   */
+  const dinheiro = (texto: string) => montanteNaLingua(milharesComPonto(texto), idioma);
+  const eurDoc = (n: number, moeda?: string) => dinheiro(eurDocumento(n, moeda));
   /** A referência que corre no topo — na língua do documento se foi o estúdio a
    *  compô-la, tal e qual se foi ela a escrevê-la. */
   const refImpressa = referenciaNaLingua(doc, idioma);
@@ -1485,7 +1496,7 @@ export async function renderProposalDocPdfWithReport(
       // O total também passa pelo normalizador: quando o texto foi GERADO pelo
       // estúdio (que usa o mesmo `eur` que nós) vem com espaço inquebrável, e
       // ficaria a discordar dos números que desenhamos por baixo dele.
-      const amount = milharesComPonto(valor ?? (totalStr || "—"));
+      const amount = dinheiro(valor ?? (totalStr || "—"));
       const amountSafe = textoParaFonte(f.serifB, amount);
       pg.drawText(amountSafe, {
         x: M + boxW - f.serifB.widthOfTextAtSize(amountSafe, 22),
@@ -1688,7 +1699,7 @@ export async function renderProposalDocPdfWithReport(
       budgetBreak(30 + (extras.length + 4) * 18 + boxH);
       linhaDeTotal(
         orgT ? t.subtotalServicosEstimado : t.subtotalServicos,
-        eurDocumento(totais.servicos),
+        eurDoc(totais.servicos),
         11,
         true,
       );
@@ -1706,7 +1717,7 @@ export async function renderProposalDocPdfWithReport(
         const base = somaDosExtrasSemIva([ex], { mode: totais.modo, vatRate: totais.taxa });
         const dito =
           cru !== null && round2(cru) !== base
-            ? `${ex.label} (${milharesComPonto(ex.valueText.trim())})`
+            ? `${ex.label} (${dinheiro(ex.valueText.trim())})`
             : ex.label;
         const lines = wrap(f.reg, dito, 10.5, boxW - PRICE_COL);
         budgetBreak(Math.max(18, lines.length * 14));
@@ -1716,7 +1727,7 @@ export async function renderProposalDocPdfWithReport(
           // ela pediu: sem ele, uma parcela por baixo de um subtotal tanto pode
           // somar como descontar, e nada na folha o dizia.
           if (i === 0) {
-            textRight(p, cru === null ? "—" : `+ ${eurDocumento(base)}`, M + boxW, y, {
+            textRight(p, cru === null ? "—" : `+ ${eurDoc(base)}`, M + boxW, y, {
               size: 10.5,
               color: INK,
             });
@@ -1728,13 +1739,13 @@ export async function renderProposalDocPdfWithReport(
       y -= 4;
       reguaDeSoma();
       // O TOTAL: a base sobre a qual o IVA, o sinal e o saldo são calculados.
-      linhaDeTotal(t.totalSemIva, eurDocumento(totais.total), 12.5, true);
-      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDocumento(totais.iva), 12.5);
+      linhaDeTotal(t.totalSemIva, eurDoc(totais.total), 12.5, true);
+      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDoc(totais.iva), 12.5);
       budgetBreak(boxH + 24);
       y -= 6;
       // O número grande é o que o casal transfere — e é o mesmo, ao cêntimo,
       // que a folha do fecho parte em sinal e saldo.
-      drawTotal(p, y, t.totalAPagar, eurDocumento(totais.aPagar));
+      drawTotal(p, y, t.totalAPagar, eurDoc(totais.aPagar));
       /* ── O QUE ESTE BLOCO CUSTA, MEDIDO ────────────────────────────────────
          Setenta pontos a mais do que o quadro que aqui estava (o «Valor Total»,
          os adicionais, e nada mais). Numa proposta COM valores adicionais isso
@@ -1780,10 +1791,10 @@ export async function renderProposalDocPdfWithReport(
       // pontos de tinta a dizer «o que vem acima somou-se», numa folha onde
       // nada somou. E cada ponto conta — ver a nota da paginação mais abaixo.
       budgetBreak(30 + 3 * 18 + boxH);
-      linhaDeTotal(t.totalSemIva, eurDocumento(totais.total), 12.5, true);
-      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDocumento(totais.iva), 12.5);
+      linhaDeTotal(t.totalSemIva, eurDoc(totais.total), 12.5, true);
+      linhaDeTotal(t.iva(percentagemDoIva(totais.taxa)), eurDoc(totais.iva), 12.5);
       budgetBreak(boxH + 24);
-      drawTotal(p, y, t.totalAPagar, eurDocumento(totais.aPagar));
+      drawTotal(p, y, t.totalAPagar, eurDoc(totais.aPagar));
       y -= boxH + 6;
     } else {
       budgetBreak(boxH + 24 + 18);
@@ -1824,7 +1835,7 @@ export async function renderProposalDocPdfWithReport(
       const maisIva = totais.modo === "acrescer" ? ` ${t.maisIva}` : "";
       budgetBreak(40);
       text(p, t.semOsExtras, M, y, { size: 10.5, color: MUTED });
-      textRight(p, `${eurDocumento(versoes.comoOTotal.base)}${maisIva}`, M + boxW, y, {
+      textRight(p, `${eurDoc(versoes.comoOTotal.base)}${maisIva}`, M + boxW, y, {
         font: f.serif,
         size: 13,
         color: INK,
@@ -2159,7 +2170,7 @@ export async function renderProposalDocPdfWithReport(
           [t.sinal(pct), totais.sinal, t.quandoSinal],
           [t.saldo(100 - pct), totais.saldo, t.quandoSaldo],
         ] as const) {
-          text(p, `${rotulo}   ${eurDocumento(valor)}`, M + 14, y, {
+          text(p, `${rotulo}   ${eurDoc(valor)}`, M + 14, y, {
             font: f.serif,
             size: 10.5,
             color: INK,
@@ -2178,7 +2189,7 @@ export async function renderProposalDocPdfWithReport(
          * A frase diz de onde saem, e diz o número: é a mesma palavra («total a
          * pagar») e o mesmo valor, ao cêntimo, que fecha o quadro do orçamento.
          */
-        text(p, t.baseDoCalculo(eurDocumento(totais.aPagar)), M + 14, y, { size: 9, color: MUTED });
+        text(p, t.baseDoCalculo(eurDoc(totais.aPagar)), M + 14, y, { size: 9, color: MUTED });
         y -= 17;
       },
     });

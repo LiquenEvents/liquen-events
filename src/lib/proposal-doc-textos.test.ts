@@ -860,18 +860,38 @@ describe("as datas e o dinheiro", () => {
     );
   });
 
-  it("os euros saem com a pontuação portuguesa NAS DUAS línguas", () => {
-    // A decisão está escrita no cabeçalho do dicionário: metade do dinheiro
-    // desta folha é texto dela, e duas convenções na mesma coluna leem-se como
-    // dois números diferentes.
+  it("os euros saem à inglesa na folha inglesa e à portuguesa na portuguesa", () => {
+    /**
+     * ESTA REGRA MUDOU, E A ANTERIOR ESTAVA AQUI ESCRITA.
+     *
+     * Até aqui a folha inglesa levava a pontuação portuguesa nas duas línguas,
+     * pela razão que continua a ser verdadeira: metade do dinheiro desta folha é
+     * TEXTO DELA (o «Valor Total», os adicionais, o preço estimado), e duas
+     * convenções na mesma coluna leem-se como dois números diferentes.
+     *
+     * A dona da casa decidiu o contrário — na proposta inglesa o valor escreve-se
+     * à inglesa, com o símbolo à frente —, e o que tornou a decisão segura foi
+     * resolver o problema em vez de o contornar: a conversão trabalha sobre o
+     * TEXTO já escrito e apanha os campos dela também, portanto a coluna
+     * continua a falar uma língua só. Ver `montantesEmIngles`.
+     */
     const en = textoInteiro(emIngles.get("decoração cheia")!.escritas);
     const pt = textoInteiro(emPortugues.get("decoração cheia")!.escritas);
-    for (const valor of ["6.875,00", "1.581,25", "8.456,25", "2.536,88"]) {
-      expect(en).toContain(valor);
-      expect(pt).toContain(valor);
+
+    for (const [portugues, ingles] of [
+      ["6.875,00", "€6,875.00"],
+      ["1.581,25", "€1,581.25"],
+      ["8.456,25", "€8,456.25"],
+      ["2.536,88", "€2,536.88"],
+    ]) {
+      expect(en, `a folha inglesa tinha de trazer ${ingles}`).toContain(normalizar(ingles));
+      expect(pt, `a folha portuguesa tinha de trazer ${portugues}`).toContain(portugues);
     }
-    // E nunca a pontuação inglesa.
-    expect(en).not.toMatch(/\d,\d{3}\.\d{2}/);
+
+    // E nenhuma das duas fica com a pontuação da outra: é isso que garante que
+    // não há uma coluna com as duas convenções lado a lado.
+    expect(en, "sobrou pontuação portuguesa na folha inglesa").not.toMatch(/\d\.\d{3},\d{2}/);
+    expect(pt, "entrou pontuação inglesa na folha portuguesa").not.toMatch(/\d,\d{3}\.\d{2}/);
   });
 });
 
