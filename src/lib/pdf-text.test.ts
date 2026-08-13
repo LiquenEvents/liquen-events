@@ -136,4 +136,36 @@ describe("as quebras de linha escritas no editor", () => {
   it("duas quebras seguidas continuam a ser duas — um parágrafo em branco é intenção", () => {
     expect(textoParaFonte(LATINA2, "Um\r\n\r\nDois")).toBe("Um\n\nDois");
   });
+
+  /**
+   * AS OUTRAS TRÊS QUEBRAS DE LINHA — as que não se escrevem, colam-se.
+   *
+   * O `\r` é a quebra que o Enter de uma caixa de texto produz. Mas o Unicode
+   * tem mais três, e nenhuma delas vem de um teclado: vêm de COLAR.
+   *
+   *   U+2028 LINE SEPARATOR      — o shift+Enter do Word e do Google Docs, e o
+   *                                que sai de copiar texto de um PDF;
+   *   U+2029 PARAGRAPH SEPARATOR — o fim de parágrafo do mesmo sítio;
+   *   U+0085 NEL                 — o «next line» que chega de ficheiros e de
+   *                                exportações do mundo dos mainframes.
+   *
+   * Todas são quebras de linha por definição da norma, e nenhuma é imprimível.
+   * Caíam no mesmo buraco que o `\r` caía: o WinAnsi não as codifica, viravam
+   * «?» — e, pior que o `\r`, não vinham acompanhadas de um `\n` a mudar de
+   * linha, portanto o parágrafo ficava TODO numa linha só com um «?» a meio,
+   * onde devia estar a mudança de linha. Uma legenda de mood board colada do
+   * Word chegava assim ao casal.
+   *
+   * A cura é a mesma e no mesmo sítio: são quebras, tornam-se `\n` antes de
+   * qualquer decisão sobre o que a fonte sabe desenhar.
+   */
+  it("as quebras coladas do Word (U+2028, U+2029) e o NEL são quebras, não «?»", () => {
+    for (const q of ["\u2028", "\u2029", "\u0085"]) {
+      const colado = `Arranjos na piscina.${q}Arranjo floral no bar.`;
+      const esperado = "Arranjos na piscina.\nArranjo floral no bar.";
+      const nome = `U+${q.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}`;
+      expect(winAnsiSafe(colado), nome).toBe(esperado);
+      expect(textoParaFonte(LATINA2, colado), nome).toBe(esperado);
+    }
+  });
 });

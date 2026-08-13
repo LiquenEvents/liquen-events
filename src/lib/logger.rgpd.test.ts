@@ -39,6 +39,31 @@ describe("redacção — dados pessoais", () => {
     expect(redactString("contacto +351 912 345 678")).not.toContain("912");
   });
 
+  /**
+   * O telefone no fim de uma frase.
+   *
+   * A guarda do lado direito do padrão português era `(?![\w.-])`, e o `.`
+   * estava lá para não apanhar pedaços de números maiores (IPs, versões). Só
+   * que um telefone escrito por uma pessoa acaba, quase sempre, num PONTO — é
+   * o fim da frase. E do lado esquerdo a mesma guarda recusava o «tel.» que
+   * toda a gente escreve antes do número. Nesses dois casos o telefone saía
+   * INTEIRO para os registos da Vercel, para o Sentry e para o webhook do
+   * Slack. O padrão internacional (`+351 …`) nunca teve o problema: a guarda
+   * dele já era só `(?![\w])`.
+   */
+  it("redige o telefone mesmo colado à pontuação da frase", () => {
+    expect(redactString("Contacto da noiva: 912345678.")).not.toContain("912345678");
+    expect(redactString("tel.912345678")).not.toContain("912345678");
+    expect(redactString("ligar para 912345678, depois das 18h")).not.toContain("912345678");
+    expect(redactString("(912345678)")).not.toContain("912345678");
+  });
+
+  it("continua a não apanhar pedaços de números maiores", () => {
+    // O que a guarda do `.` protegia: um endereço IP não é um telefone.
+    expect(redactString("origem 255.255.255.0")).toBe("origem 255.255.255.0");
+    expect(redactString("versão 2.10.345.678.9")).toBe("versão 2.10.345.678.9");
+  });
+
   it("não estraga marcas temporais, identificadores internos nem números normais", () => {
     const ts = "2026-07-31T13:21:00.000Z";
     expect(redactString(ts)).toBe(ts);

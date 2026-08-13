@@ -17,9 +17,15 @@ interface EnvCheck {
 
 const CHECKS: EnvCheck[] = [
   { name: "SESSION_SECRET", critical: true, enables: "tamper-proof admin sessions" },
+  // Fora de produção, faltar isto é inofensivo: `sharedHash()` cai na hash de
+  // desenvolvimento. Em produção NÃO cai — a hash de desenvolvimento está no
+  // repositório e é pública, por isso `sharedHash()` devolve `null` e o login
+  // de admin fica DESLIGADO. Como o `ADMIN_USERS` é a outra porta para a mesma
+  // fechadura, a criticidade não é desta variável sozinha: é das duas em falta
+  // ao mesmo tempo, e por isso está tratada à parte (ver `validateEnv`).
   {
     name: "ADMIN_PASSWORD_HASH",
-    enables: "the shared admin password (else a dev default is used)",
+    enables: "the shared admin password (no fallback in production — login is refused without it)",
   },
   // Without Supabase in production the app silently falls back to local JSON
   // files, which are EPHEMERAL on serverless — submissions would be lost on the
@@ -64,11 +70,28 @@ export function validateEnv(): void {
   const missing: string[] = [];
   const missingCritical: string[] = [];
 
+  const definida = (name: string): boolean => {
+    const value = process.env[name];
+    return Boolean(value && value.length > 0);
+  };
+
   for (const check of CHECKS) {
-    const value = process.env[check.name];
-    if (value && value.length > 0) continue;
+    if (definida(check.name)) continue;
     if (check.critical && isProd) missingCritical.push(`${check.name} — ${check.enables}`);
     else missing.push(`${check.name} — ${check.enables}`);
+  }
+
+  // A PORTA DO BACK OFFICE. Nenhuma das duas variáveis é crítica sozinha — são
+  // duas maneiras de configurar a MESMA fechadura, e quem usa contas
+  // individuais não tem (nem quer) uma palavra-passe partilhada. Faltarem as
+  // duas em produção é que é crítico: `sharedHash()` recusa a hash de
+  // desenvolvimento (é pública, está no repositório), `configuredUsers()`
+  // devolve null, e o login de admin fica desligado — ninguém entra, e
+  // descobre-se ao tentar. Sem esta linha, o aviso ficava no meio dos do SMTP.
+  if (isProd && !definida("ADMIN_PASSWORD_HASH") && !definida("ADMIN_USERS")) {
+    missingCritical.push(
+      "ADMIN_PASSWORD_HASH (ou ADMIN_USERS) — sem um dos dois o login do back office fica DESLIGADO em produção",
+    );
   }
 
   // SESSION_SECRET must be a real key, not merely present: the token/session

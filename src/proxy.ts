@@ -27,6 +27,26 @@ const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const LANG_COOKIE = "liquen-lang";
 
 /**
+ * O «isto é um ficheiro» do último segmento.
+ *
+ * ERA `/\.[a-zA-Z0-9]+$/` — qualquer ponto seguido de alfanuméricos até ao fim.
+ * O que não estava previsto é que os caminhos com CAPACIDADE também levam um
+ * ponto: um token é `<corpo>.<assinatura>`, e a assinatura é o HMAC-SHA256 em
+ * base64url, 43 caracteres de `[A-Za-z0-9_-]`. Quando calha sair sem `-` nem
+ * `_` — medido: 535 em 2000, 26,8% —, o `/proposta/<token>` passava a ler-se
+ * como um ficheiro estático, não era reescrito para `/pt/proposta/<token>` e
+ * deixava de casar com a rota: o casal abria a ligação da proposta e via a
+ * página de 404. Uma em cada quatro. Como falhava só às vezes, lia-se como
+ * «o link às vezes não abre» e não como um defeito de encaminhamento.
+ *
+ * O tecto de 8 caracteres é o que separa as duas coisas sem ter de nomear
+ * rotas nenhumas: a extensão mais comprida de `public/` é `gitkeep` (7), e uma
+ * assinatura tem sempre 43. Nomear `/proposta` e `/portal` resolvia o caso de
+ * hoje e voltava a partir-se na próxima rota com token.
+ */
+const EXTENSAO_DE_FICHEIRO = /\.[a-zA-Z0-9]{1,8}$/;
+
+/**
  * Paths that must NOT be locale-rewritten: framework internals, the special
  * metadata routes that live at the app root (sitemap/robots/manifest/icons),
  * static asset folders, and anything with a file extension.
@@ -42,7 +62,7 @@ function isNonLocalized(pathname: string): boolean {
     pathname === "/apple-icon.png" ||
     pathname.startsWith("/imagens/") ||
     pathname.startsWith("/logos/") ||
-    /\.[a-zA-Z0-9]+$/.test(pathname)
+    EXTENSAO_DE_FICHEIRO.test(pathname)
   );
 }
 

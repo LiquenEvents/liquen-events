@@ -99,8 +99,27 @@ const TRACOS: ReadonlyArray<[RegExp, string]> = [
  * Normalizar as três formas (`\r\n`, `\r` sozinho do mundo antigo do Mac, e
  * `\n`) numa só ANTES de tudo o resto é o que faz o resto do ficheiro poder
  * tratar de quebras de linha sem pensar nisto outra vez.
+ *
+ * ── E AS TRÊS QUE NÃO SE ESCREVEM, COLAM-SE ────────────────────────────────
+ *
+ * O `\r` chega do Enter. Mas há mais três quebras de linha na norma, e nenhuma
+ * delas vem de um teclado — vêm do COLAR que esta parte do ficheiro existe para
+ * tratar:
+ *
+ *   · U+2028 LINE SEPARATOR      — o shift+Enter do Word e do Google Docs, e o
+ *                                  que sai de copiar texto de dentro de um PDF;
+ *   · U+2029 PARAGRAPH SEPARATOR — o fim de parágrafo vindo do mesmo sítio;
+ *   · U+0085 NEL                 — o «next line» de exportações e ficheiros
+ *                                  herdados.
+ *
+ * Caíam no mesmo buraco do `\r` e caíam pior: o `\r` vinha acompanhado de um
+ * `\n` que ainda mudava de linha, deixando só um «?» a mais; estas vêm
+ * sozinhas, portanto o parágrafo colado ficava TODO numa linha só, com um «?»
+ * exactamente onde devia estar a mudança de linha. Nenhuma é imprimível e
+ * todas são, por definição da norma, uma quebra — não há aqui adivinhação
+ * nenhuma, é a mesma tradução exacta que o resto da tabela faz.
  */
-const RETORNOS = /\r\n?/g;
+const RETORNOS = /\r\n?|[\u2028\u2029\u0085]/g;
 
 function arrumar(input: string): string {
   let s = input

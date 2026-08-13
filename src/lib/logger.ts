@@ -7,8 +7,10 @@
  * Error monitoring: set SENTRY_DSN and every error-level log is also captured
  * in Sentry (grouping, alert rules, history) via the plain envelope HTTP API —
  * no SDK dependency. ERROR_WEBHOOK_URL additionally posts errors to a
- * Slack/Discord webhook for real-time pings. Both are fire-and-forget:
- * observability must never become a failure mode.
+ * Slack/Discord webhook for real-time pings. Neither ever blocks the response
+ * and neither can throw — observability must never become a failure mode — mas
+ * também não se largam ao vento: ver `prenderAoPedido`, que os mantém vivos até
+ * saírem quando há um pedido a que os prender.
  */
 type Level = "debug" | "info" | "warn" | "error";
 type Context = Record<string, unknown>;
@@ -39,9 +41,18 @@ const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
 /** Telefones. Deliberadamente conservador para não estragar datas ISO, marcas
  *  temporais nem contagens: só apanha o formato internacional (+351 …) e o
- *  nacional português de 9 dígitos iniciado por 2 ou 9. */
+ *  nacional português de 9 dígitos iniciado por 2 ou 9.
+ *
+ *  AS GUARDAS DO NACIONAL SÃO DUAS, E NÃO UMA. A guarda única era `[\w.-]` dos
+ *  dois lados, para o padrão não morder um pedaço de um número maior (um IP,
+ *  uma versão). Só que apanhava a pontuação da FRASE ao mesmo tempo: um
+ *  «Contacto: 912345678.» ou um «tel.912345678» — que é como as pessoas
+ *  escrevem — saíam INTEIROS para os registos, para o Sentry e para o webhook.
+ *  O `.` e o `-` só continuam um número quando têm um DÍGITO do outro lado, e é
+ *  isso que a segunda guarda diz; a pontuação passa a poder tocar no número.
+ *  (O internacional nunca teve o problema — ver a guarda dele, só `[\w]`.) */
 const PHONE_INTL_RE = /(?<![\w+])\+\d{1,3}[\s.-]?\d(?:[\s.-]?\d){6,13}(?![\w])/g;
-const PHONE_PT_RE = /(?<![\w+.-])[29]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}(?![\w.-])/g;
+const PHONE_PT_RE = /(?<![\w+])(?<![.-]\d)[29]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}(?![\w])(?![.-]\d)/g;
 
 /** Segmentos-token nos caminhos públicos com capacidade: /proposta/<token>
  *  aceita uma proposta (14 dias) e /portal/<token> abre a reserva inteira do
@@ -106,6 +117,54 @@ export function redactContext(context?: Context): Context | undefined {
   return redactValue(context) as Context;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// O ALERTA TEM DE SOBREVIVER AO FIM DO PEDIDO
+//
+// Em serverless o contentor é CONGELADO assim que a resposta sai. Um
+// `void fetch(...)` que ainda não tenha ligado morre aí: a linha aparece na
+// consola e o Sentry / o webhook nunca recebem nada. É o mesmo defeito que se
+// corrigiu no `/api/backup` e no `/api/orcamento`, e aqui é pior — o que se
+// perde é o aviso de que alguma coisa correu mal, ou seja, a falha apaga o seu
+// próprio alarme.
+//
+// Ali a cura foi o `after()` do `next/server`. AQUI NÃO PODE SER: este ficheiro
+// é importado por componentes de CLIENTE (o sino das notificações, o
+// `error.tsx`, o `global-error.tsx`), e um `import` estático de `next/server`
+// arrastava código de servidor para o pacote do browser.
+//
+// Por isso vai-se ao mecanismo que está POR BAIXO do `after`, e que a
+// documentação do Next descreve como o contrato de quem implementa plataformas
+// (docs/01-app/03-api-reference/04-functions/after.md, «supporting `after` for
+// serverless platforms»): `globalThis[Symbol.for("@next/request-context")]`.
+// Um símbolo global não é um `import` — no browser, nos testes e nos scripts
+// simplesmente não existe, e o registo degrada exactamente para o que fazia
+// antes. Sem uma terceira entrada no logger, sem `next/server` no bundle.
+// ─────────────────────────────────────────────────────────────────────────────
+const CONTEXTO_DO_PEDIDO = Symbol.for("@next/request-context");
+
+type ContextoDoPedido = {
+  get?: () => { waitUntil?: (promessa: Promise<unknown>) => void } | undefined;
+};
+
+/**
+ * Prende ao pedido em curso um trabalho que já está a andar.
+ *
+ * A promessa entregue NUNCA rejeita (o `.catch` é de quem chama, e há um teste
+ * a prendê-lo): um webhook em baixo não pode derrubar a invocação por onde o
+ * alerta ia sair. E se não houver contexto de pedido, fica o que sempre houve —
+ * disparar e seguir.
+ */
+function prenderAoPedido(trabalho: Promise<unknown>): void {
+  try {
+    const ctx = (globalThis as Record<symbol, unknown>)[CONTEXTO_DO_PEDIDO] as
+      | ContextoDoPedido
+      | undefined;
+    ctx?.get?.()?.waitUntil?.(trabalho);
+  } catch {
+    /* observabilidade nunca pode ser modo de falha */
+  }
+}
+
 // Optional real-time error alerting. When ERROR_WEBHOOK_URL is set, error-level
 // logs are POSTed (fire-and-forget) to a Slack/Discord/any incoming webhook so
 // the team is notified in production. It never blocks or throws — observability
@@ -129,12 +188,17 @@ function alertWebhook(message: string, context: Context | undefined, err: unknow
   const text = `🔴 Líquen — ${message}${detail ? `\n${detail}` : ""}${ctx}`.slice(0, 1500);
 
   // Slack reads `text`, Discord reads `content` — send both so either works.
-  void fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, content: text }),
-    signal: AbortSignal.timeout(5000),
-  }).catch(() => {});
+  prenderAoPedido(
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, content: text }),
+      signal: AbortSignal.timeout(5000),
+    }).then(
+      () => {},
+      () => {},
+    ),
+  );
 }
 
 // Sentry via the envelope HTTP API. DSN format: https://KEY@HOST/PROJECT_ID.
@@ -180,15 +244,20 @@ function sentryCapture(message: string, context: Context | undefined, err: unkno
   // Envelope = 3 newline-separated JSON lines: headers, item header, payload.
   const envelope = `${JSON.stringify({ event_id: eventId, sent_at: sentAt })}\n${JSON.stringify({ type: "event" })}\n${JSON.stringify(event)}`;
 
-  void fetch(`https://${host}/api/${projectId}/envelope/`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-sentry-envelope",
-      "X-Sentry-Auth": `Sentry sentry_version=7, sentry_key=${key}, sentry_client=liquen-logger/1.0`,
-    },
-    body: envelope,
-    signal: AbortSignal.timeout(5000),
-  }).catch(() => {});
+  prenderAoPedido(
+    fetch(`https://${host}/api/${projectId}/envelope/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-sentry-envelope",
+        "X-Sentry-Auth": `Sentry sentry_version=7, sentry_key=${key}, sentry_client=liquen-logger/1.0`,
+      },
+      body: envelope,
+      signal: AbortSignal.timeout(5000),
+    }).then(
+      () => {},
+      () => {},
+    ),
+  );
 }
 
 function emit(level: Level, rawMessage: string, rawContext?: Context, rawErr?: unknown) {
