@@ -257,10 +257,18 @@ describe("PaymentsPanel — o sinal sugerido é o da proposta", () => {
     vi.stubGlobal("fetch", fetchMock);
     renderPanel(makeQuote());
 
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Sinal 50%/ })).toBeInTheDocument(),
-    );
-    expect(screen.getByLabelText("Valor em euros")).toHaveValue("615,00");
+    // A espera é pelo CAMPO, e não pelo botão ao lado: o botão desenha-se com a
+    // percentagem nova no mesmo instante em que ela chega, mas quem escreve no
+    // campo é um `useEffect` — corre DEPOIS desse desenho. Há por isso um
+    // desenho intermédio, verdadeiro e curto, em que o botão já diz «Sinal 50% ·
+    // 615,00 €» e o campo ainda tem os 369,00 € da percentagem da casa. Esperar
+    // pelo botão e só então olhar para o campo era apanhar essa fresta: passava
+    // na máquina de quem escreveu o teste e falhava na integração, com a
+    // máquina cheia. Falhou mesmo, no CI, com «expected 615,00, received
+    // 369,00». O que este teste quer dizer é «o campo acaba por acompanhar» —
+    // então é pelo campo que se espera.
+    await waitFor(() => expect(screen.getByLabelText("Valor em euros")).toHaveValue("615,00"));
+    expect(screen.getByRole("button", { name: /Sinal 50%/ })).toBeInTheDocument();
   });
 
   it("mas o que ela escreveu no campo manda sempre — nada lho apaga por baixo", async () => {
