@@ -9,7 +9,9 @@ import {
   type ProposalDoc,
 } from "./proposal-doc";
 import {
+  MESES_ANTES_DO_SALDO,
   blocosFixosNaLingua,
+  camposDoEventoNaLingua,
   referenciaDoDocumento,
   textosDaProposta,
   type BlocosFixos,
@@ -528,7 +530,11 @@ describe("nada fica por traduzir na versão inglesa", () => {
       textosDaProposta("en").quandoSinal,
     ].join(" ");
     expect(tudo).toContain(`at least ${DIAS_PARA_CONFIRMAR_CONVIDADOS} days before the event`);
-    expect(textosDaProposta("en").quandoSaldo).toBe("no later than 1 month before the event");
+    // O prazo vem da constante (ver `MESES_ANTES_DO_SALDO`); o que este teste
+    // fixa é a REDACÇÃO à volta dele — «no later than», nunca «up to».
+    expect(textosDaProposta("en").quandoSaldo).toBe(
+      `no later than ${MESES_ANTES_DO_SALDO} month before the event`,
+    );
     expect(tudo).not.toMatch(/up to \d/);
   });
 
@@ -540,6 +546,170 @@ describe("nada fica por traduzir na versão inglesa", () => {
     // A moldura à volta dela continua inglesa: é a rubrica que é da casa.
     expect(texto).toContain(normalizar("Important notes"));
     expect(texto).not.toContain(normalizar("Set-up and dismantling are included"));
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   O INGLÊS DA CASA — QUE NÃO SOA A TRADUÇÃO
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Uma frase pode estar traduzida, estar gramatical, e mesmo assim dizer ao
+   casal que o documento foi escrito noutra língua. Não dá erro nenhum, não
+   aparece no varrimento das sobras portuguesas — e é a primeira coisa que se
+   nota num documento de vinte mil euros.
+
+   O que se mede aqui é a MOLDURA contra o inglês que a casa já escreve no
+   sítio, no portal e nos emails (`src/lib/i18n/en.ts`): uma palavra que a
+   proposta escreve de uma maneira e o portal de outra é a mesma marca a falar
+   com duas vozes ao mesmo cliente. */
+
+describe("o inglês da moldura é o inglês da casa", () => {
+  /**
+   * «Contactos» → «Contact», e não «Contacts».
+   *
+   * O plural é português. Em inglês «contacts» é a lista de pessoas que se
+   * conhece (a agenda), não o bloco onde se diz como falar connosco — e a casa
+   * já resolveu isto: a navegação e o rodapé do sítio dizem «Contact».
+   */
+  it("o bloco de contactos chama-se como o sítio lhe chama", () => {
+    expect(textosDaProposta("en").contactos).toBe("Contact");
+    expect(textosDaProposta("pt").contactos).toBe("Contactos");
+  });
+
+  /**
+   * «email», sem hífen, em toda a moldura inglesa.
+   *
+   * O rótulo do bloco de contactos já é «Email»; as cláusulas escreviam
+   * «e-mail» na mesma folha. Duas grafias da mesma palavra no mesmo papel leem-
+   * se como descuido, e a que a casa usa em prosa — no portal e nos emails que
+   * levam a proposta — é a sem hífen.
+   */
+  it("«email» escreve-se sem hífen, como o rótulo e como o resto da casa", () => {
+    const doc = decoracaoCheia();
+    const en = blocosFixosNaLingua(doc, "en");
+    const tudo = [
+      ...Object.values(textosDaProposta("en")).filter((v) => typeof v === "string"),
+      ...en.condicoesGerais,
+      ...en.cancelamento,
+      ...en.observacoesGerais,
+      textosDaProposta("en").passoAceitar,
+    ].join(" ");
+    expect(tudo).not.toMatch(/e-mail/i);
+    expect(tudo).toMatch(/\bemail\b/);
+  });
+
+  /**
+   * ── A CLÁUSULA QUE PERDEU O NOME DE QUEM VALIDA ───────────────────────────
+   *
+   * A portuguesa diz «terão de ser validados PELA MESMA» — pela Líquen Events,
+   * nomeada na frase anterior. A inglesa dizia «subject to OUR confirmation».
+   *
+   * É uma cláusula contratual escrita na terceira pessoa do princípio ao fim
+   * («Líquen Events reserves the right…», «Líquen Events is entitled…»), e um
+   * «our» a meio troca de voz dentro da mesma frase: quem lê tem de adivinhar
+   * de quem é o «our», que numa folha assinada é exactamente a pergunta que não
+   * se pode deixar em aberto.
+   */
+  it("as condições gerais inglesas falam da Líquen Events na terceira pessoa", () => {
+    const clausulas = blocosFixosNaLingua(decoracaoCheia(), "en").condicoesGerais;
+    const comPrimeiraPessoa = clausulas.filter((c) => /\b(our|we|us)\b/i.test(c));
+    expect(comPrimeiraPessoa).toEqual([]);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OS NÚMEROS DAS CLÁUSULAS — UM SÓ, PARA AS DUAS LÍNGUAS
+   ═══════════════════════════════════════════════════════════════════════════
+
+   O teste das percentagens, mais acima, apanha o sinal, o saldo e os 70% do
+   cancelamento. Não apanha o resto dos números por que se paga e se conta o
+   tempo: o 30.º dia, a hora do oitavo dia útil, os dias de confirmação, o mês
+   do saldo. Todos esses estão escritos DUAS vezes — uma em cada língua — e uma
+   proposta inglesa a dizer um prazo diferente da portuguesa é a pior coisa que
+   esta folha pode fazer, porque vai assinada nas duas.
+
+   A comparação é feita sobre os ALGARISMOS de cada bloco, pela ordem em que
+   aparecem. As palavras («oitavo» / «eighth») ficam de fora nas duas línguas, e
+   por isso não desequilibram nada. */
+
+/**
+ * Os números de um bloco, prontos a comparar entre línguas.
+ *
+ * O relógio é a única conversão: «14h» em português e «2 p.m.» em inglês são a
+ * MESMA hora escrita como cada língua a escreve, e têm de contar como o mesmo
+ * número — senão a comparação dava alarme precisamente por a tradução estar
+ * certa.
+ */
+function numerosDoBloco(linhas: readonly string[]): string[] {
+  const texto = linhas
+    .join(" ")
+    .replace(/(\d{1,2})h(?:\d{2})?\b/g, (_, h: string) => `${Number(h)}:00`)
+    .replace(/(\d{1,2})\s*p\.?m\.?/gi, (_, h: string) => `${(Number(h) % 12) + 12}:00`)
+    .replace(/(\d{1,2})\s*a\.?m\.?/gi, (_, h: string) => `${Number(h) % 12}:00`);
+  return texto.match(/\d+(?:[.,:]\d+)?/g) ?? [];
+}
+
+describe("os números das cláusulas são os mesmos nas duas línguas", () => {
+  /** Os sete blocos, outra vez pelos nomes por que se desenham. */
+  const BLOCOS: (keyof BlocosFixos)[] = [
+    "notasImportantes",
+    "incluido",
+    "naoIncluido",
+    "condicoesGerais",
+    "observacoesGerais",
+    "faseamento",
+    "cancelamento",
+  ];
+
+  it("cada bloco inglês diz os mesmos algarismos, pela mesma ordem", () => {
+    // Dois documentos, para o número de convidados entrar nas duas formas em
+    // que ele existe: o intervalo do formulário («100 a 150» / «100 to 150»),
+    // que se traduz, e o que ela escreve à mão («120 pax»), que não.
+    const documentos = [
+      decoracaoCheia(),
+      withProposalDefaults({
+        ...decoracaoCheia(),
+        guests: "100 a 150",
+        depositPercent: 50,
+        condicoesGerais: undefined,
+      }),
+    ];
+    for (const doc of documentos) {
+      const pt = blocosFixosNaLingua(doc, "pt");
+      const en = blocosFixosNaLingua(doc, "en");
+      for (const bloco of BLOCOS) {
+        expect(`${bloco}: ${numerosDoBloco(en[bloco]).join(" ")}`).toBe(
+          `${bloco}: ${numerosDoBloco(pt[bloco]).join(" ")}`,
+        );
+      }
+    }
+  });
+
+  /**
+   * O prazo do saldo é dito QUATRO vezes: na linha do faseamento e na coluna do
+   * quadro dos pagamentos, vezes duas línguas. Já divergiu uma vez — a inglesa
+   * dizia um prazo que a portuguesa não dizia —, e quatro literais soltos é a
+   * garantia de que volta a divergir.
+   */
+  it("o prazo do saldo é o mesmo número nas quatro frases que o dizem", () => {
+    const doc = decoracaoCheia();
+    // A linha do saldo é a segunda do faseamento; a percentagem que a abre não
+    // é o prazo, e sai antes de se procurar o número.
+    const semAPercentagem = (linha: string) => linha.replace(/^\s*\d+%/, "");
+    const numero = (s: string) => (s.match(/\d+/) ?? ["nenhum"])[0];
+    const prazos = {
+      "faseamento pt": numero(semAPercentagem(blocosFixosNaLingua(doc, "pt").faseamento[1])),
+      "faseamento en": numero(semAPercentagem(blocosFixosNaLingua(doc, "en").faseamento[1])),
+      "quadro pt": numero(textosDaProposta("pt").quandoSaldo),
+      "quadro en": numero(textosDaProposta("en").quandoSaldo),
+    };
+    const esperado = prazos["faseamento pt"];
+    expect(prazos).toEqual({
+      "faseamento pt": esperado,
+      "faseamento en": esperado,
+      "quadro pt": esperado,
+      "quadro en": esperado,
+    });
   });
 });
 
@@ -773,5 +943,60 @@ describe("as palavras inglesas cabem na folha", () => {
     for (const [nome, ingles] of emIngles) {
       expect(`${nome}: ${ingles.paginas}`).toBe(`${nome}: ${emPortugues.get(nome)!.paginas}`);
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * A HORA DO EVENTO, NA LÍNGUA DE QUEM LÊ
+ *
+ * A hora era o último pedaço de português que ficava numa proposta inglesa: o
+ * campo saía «Time: 16h00». O «h» a separar as horas dos minutos é notação
+ * portuguesa — um casal britânico lê horas em ciclo de doze e diz «4 p.m.», que
+ * é aliás como esta mesma folha já escreve a hora do cancelamento («2 p.m. on
+ * the eighth working day»). Duas notações na mesma folha é uma delas estar
+ * errada.
+ *
+ * Traduz-se por RECONHECIMENTO, como o tipo de evento e os convidados: só o que
+ * é inequivocamente um relógio. Uma hora escrita à maneira dela («ao final da
+ * tarde», «17h–23h») fica exactamente como ela a escreveu — inventar uma
+ * conversão sobre texto que não se percebeu é pior do que deixar o português.
+ */
+describe("a hora do evento em inglês", () => {
+  const horaEm = (time: string, idioma: IdiomaDaProposta = "en") =>
+    camposDoEventoNaLingua({ eventType: "", eventDate: "", guests: "", time }, idioma).time;
+
+  it("«16h00» é «4 p.m.», como a folha já escreve as horas", () => {
+    expect(horaEm("16h00")).toBe("4 p.m.");
+  });
+
+  it("os minutos vão junto quando existem", () => {
+    expect(horaEm("16h30")).toBe("4:30 p.m.");
+    expect(horaEm("11h15")).toBe("11:15 a.m.");
+  });
+
+  it("a hora sem minutos e a hora com dois pontos são a mesma hora", () => {
+    // Ela escreve das duas maneiras, e as duas são relógios.
+    expect(horaEm("16h")).toBe("4 p.m.");
+    expect(horaEm("16:00")).toBe("4 p.m.");
+  });
+
+  it("nem «0 a.m.» nem «12 p.m.»: meio-dia e meia-noite dizem-se por extenso", () => {
+    // «12 p.m.» é ambíguo em inglês — metade das pessoas lê-o como meia-noite.
+    expect(horaEm("12h00")).toBe("12 noon");
+    expect(horaEm("00h00")).toBe("12 midnight");
+    expect(horaEm("12h30")).toBe("12:30 p.m.");
+  });
+
+  it("o que não é um relógio fica como ela o escreveu", () => {
+    // Melhor uma frase portuguesa dela do que uma hora inventada por nós.
+    expect(horaEm("ao final da tarde")).toBe("ao final da tarde");
+    expect(horaEm("17h às 23h")).toBe("17h às 23h");
+    expect(horaEm("25h00")).toBe("25h00");
+    expect(horaEm("")).toBe("");
+  });
+
+  it("em português não se toca na hora", () => {
+    expect(horaEm("16h00", "pt")).toBe("16h00");
   });
 });

@@ -1100,7 +1100,11 @@ export async function renderProposalDocPdfWithReport(
         ? []
         : ([
             ["cerimonia", evento.ceremony ?? ""],
-            ["hora", doc.time ?? ""],
+            // `evento.time` e não `doc.time`: a hora também se traduz («16h00»
+            // → «4 p.m.»), e era o último pedaço de português que ficava numa
+            // proposta inglesa. O que não for um relógio vem de lá como ela o
+            // escreveu — ver `horaEmIngles`.
+            ["hora", evento.time ?? ""],
           ] as Campo[])),
     ];
     // Um «Hora:» seguido de nada não é um campo por preencher: é um erro

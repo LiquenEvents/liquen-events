@@ -56,6 +56,26 @@ import {
 /** As línguas em que o documento se sabe desenhar. */
 export type IdiomaDaProposta = "pt" | "en";
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   O PRAZO DO SALDO — UM NÚMERO SÓ PARA AS DUAS LÍNGUAS
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Quantos meses antes do evento se paga o saldo. Está dito em QUATRO frases —
+   a linha do faseamento e a coluna «quando» do quadro dos pagamentos, vezes
+   duas línguas — e já divergiu uma vez: a inglesa dizia um prazo que a
+   portuguesa não dizia. Quatro literais soltos é a garantia de que volta a
+   acontecer, e o sintoma é a proposta a marcar duas datas de pagamento
+   diferentes conforme a língua em que sai — assinadas as duas.
+
+   Daqui saem as três frases que este ficheiro escreve. A quarta (a linha
+   portuguesa do faseamento) vive em `proposal-doc.ts`, ao lado da percentagem
+   do sinal que a abre, e é o teste dos números que a mantém a par. */
+export const MESES_ANTES_DO_SALDO = 1;
+
+/** «1 mês» / «2 meses» — o prazo escrito como a frase o recebe. */
+const mesesPt = (n: number) => `${n} ${n === 1 ? "mês" : "meses"}`;
+const mesesEn = (n: number) => `${n} ${n === 1 ? "month" : "months"}`;
+
 /** `true` para o que é mesmo uma das línguas — para validar o que chega de fora. */
 export function ehIdiomaDaProposta(v: unknown): v is IdiomaDaProposta {
   return v === "pt" || v === "en";
@@ -353,7 +373,7 @@ const PT: TextosDoDocumento = {
   sinal: (pct) => `Sinal ${pct}%`,
   saldo: (pct) => `Saldo ${pct}%`,
   quandoSinal: "na adjudicação, para reservar a data",
-  quandoSaldo: "até 1 mês antes do evento",
+  quandoSaldo: `até ${mesesPt(MESES_ANTES_DO_SALDO)} antes do evento`,
   baseDoCalculo: (total) => `Calculados sobre o total a pagar — ${total}, com IVA incluído.`,
   cancelamento: "Cancelamento",
   contactos: "Contactos",
@@ -437,11 +457,15 @@ const EN: TextosDoDocumento = {
   tituloCondicoes: "General Conditions",
 
   proximosPassos: "Next Steps",
-  // «através da ligação enviada no e-mail» → «using the link in our e-mail». O
+  // «através da ligação enviada no e-mail» → «using the link in our email». O
   // literal («through the link sent by e-mail») é gramatical e não é o que se
   // escreve.
+  //
+  // «email» sem hífen, aqui e em toda a moldura inglesa: o rótulo do bloco de
+  // contactos já é «Email», e duas grafias da mesma palavra na mesma folha leem-
+  // se como descuido. É também a grafia que a casa usa em prosa no portal.
   passoAceitar:
-    "To confirm this proposal, simply accept it online using the link in our e-mail, or reply to us directly.",
+    "To confirm this proposal, simply accept it online using the link in our email, or reply to us directly.",
   passoSinal: "The date is only secured once the deposit has been paid.",
   passoValidade: (data) => `This proposal is valid until ${data}.`,
   observacoesGerais: "General Remarks",
@@ -453,10 +477,14 @@ const EN: TextosDoDocumento = {
   // month before» lê-se em inglês como «até um mês, no máximo», que é quase o
   // contrário: dá a entender que pagar dois meses antes estaria fora de prazo.
   // «no later than» é o que um prazo diz em inglês.
-  quandoSaldo: "no later than 1 month before the event",
+  quandoSaldo: `no later than ${mesesEn(MESES_ANTES_DO_SALDO)} before the event`,
   baseDoCalculo: (total) => `Calculated on the total payable — ${total}, VAT included.`,
   cancelamento: "Cancellation",
-  contactos: "Contacts",
+  // «Contact», no singular. «Contacts» é o plural português: em inglês são as
+  // pessoas que se conhece — a agenda —, não o bloco onde se diz como falar
+  // connosco. E é a palavra que a casa já usa no sítio e no portal, que é onde
+  // o mesmo casal a vai ler a seguir.
+  contactos: "Contact",
   email: "Email",
   telefone: "Phone",
 
@@ -595,10 +623,52 @@ function cerimoniaEmIngles(valor: string): string {
   return emIngles.every(Boolean) ? emIngles.join(", ") : "";
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A HORA — O ÚLTIMO PEDAÇO DE PORTUGUÊS DE UMA PROPOSTA INGLESA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O campo saía «Time: 16h00». O «h» a separar as horas dos minutos é notação
+ * portuguesa; um casal britânico lê o relógio em ciclo de doze e diz «4 p.m.» —
+ * que é, aliás, como esta mesma folha já escreve a hora do cancelamento («2 p.m.
+ * on the eighth working day»). Duas notações na mesma folha querem dizer que uma
+ * delas está errada.
+ *
+ * ── PORQUE É QUE MEIO-DIA E MEIA-NOITE SÃO CASOS À PARTE ───────────────────
+ *
+ * «12 p.m.» é ambíguo em inglês — há quem o leia como meia-noite — e «0 a.m.»
+ * não é hora nenhuma. Numa folha em que a hora é a que o casal vai usar para
+ * chegar ao sítio, a ambiguidade é cara: escrevem-se por extenso.
+ *
+ * ── E PORQUE É QUE O QUE NÃO SE PERCEBE FICA COMO ESTAVA ───────────────────
+ *
+ * Reconhece-se um RELÓGIO e mais nada. Ela também escreve «ao final da tarde» ou
+ * «17h às 23h», e sobre isso não há conversão que se possa fazer sem inventar:
+ * uma hora inventada por nós numa proposta é pior do que uma frase portuguesa
+ * escrita por ela. É a mesma regra do tipo de evento e dos convidados — traduz-se
+ * o que nasceu do nosso código, e o resto é dela.
+ */
+function horaEmIngles(valor: string): string {
+  const m = /^(\d{1,2})\s*(?:h|:|\.)\s*(\d{2})?$/i.exec(valor.trim());
+  if (!m) return "";
+  const horas = Number(m[1]);
+  const minutos = m[2] ? Number(m[2]) : 0;
+  if (horas > 23 || minutos > 59) return "";
+
+  if (minutos === 0 && horas === 12) return "12 noon";
+  if (minutos === 0 && horas === 0) return "12 midnight";
+
+  const periodo = horas < 12 ? "a.m." : "p.m.";
+  // 0 → 12, 13 → 1, 12 → 12: o ciclo de doze não tem hora zero.
+  const doze = horas % 12 === 0 ? 12 : horas % 12;
+  const relogio = minutos === 0 ? `${doze}` : `${doze}:${String(minutos).padStart(2, "0")}`;
+  return `${relogio} ${periodo}`;
+}
+
 /** Os campos do evento que o nosso código escreve, na língua pedida. */
 export type CamposDoEventoEscritos = Pick<
   ProposalDoc,
-  "eventType" | "eventDate" | "ceremony" | "guests"
+  "eventType" | "eventDate" | "ceremony" | "guests" | "time"
 >;
 
 /**
@@ -619,6 +689,7 @@ export function camposDoEventoNaLingua(
     eventDate: iso ? EN.data(iso) : doc.eventDate,
     ceremony: cerimoniaEmIngles(doc.ceremony ?? "") || doc.ceremony,
     guests: traduzido(doc.guests ?? "", CONVIDADOS_EN) || doc.guests,
+    time: horaEmIngles(doc.time ?? "") || doc.time,
   };
 }
 
@@ -749,8 +820,13 @@ const EN_CONDICOES_SEM_DADO: RedaccoesSemDado = {
  *  dados do evento — que são texto dela, e portanto ficam em português. */
 const EN_CONDICOES_GERAIS: string[] = [
   "VAT at the applicable legal rate is added to the amounts, as described.",
-  "Quotes sent by Líquen Events remain subject to our confirmation when the client accepts them; the deciding factor is our availability to carry out the event.",
-  "The event must be provisionally booked in writing, by e-mail. The booking is only confirmed once the deposit has been paid.",
+  // A portuguesa diz «terão de ser validados PELA MESMA» — pela Líquen Events,
+  // nomeada na mesma frase. A inglesa dizia «subject to OUR confirmation… OUR
+  // availability», e trocava de voz a meio de uma cláusula que o resto da lista
+  // escreve na terceira pessoa («Líquen Events reserves the right…»). Numa folha
+  // assinada, quem lê não pode ficar a adivinhar de quem é o «our».
+  "Quotes sent by Líquen Events are subject to confirmation by Líquen Events when the client accepts them; the deciding factor is its availability to carry out the event.",
+  "The event must be provisionally booked in writing, by email. The booking is only confirmed once the deposit has been paid.",
   "A travel charge for the Líquen team applies whenever the event takes place outside the district of Évora, based on the distance in kilometres from Évora to the venue.",
   "Whenever the distance to the venue or the event timings require the Líquen team to stay overnight, accommodation costs will be charged.",
   "A meal must be provided for the members of the Líquen team who stay for the whole event.",
@@ -792,7 +868,7 @@ const EN_OBSERVACOES_GERAIS: string[] = [
 
 const EN_CANCELAMENTO: string[] = [
   "In the event of cancellation of the service, Líquen Events reserves the right not to refund the deposit. If the cancellation is made between the 30th day before the event and 2 p.m. on the eighth working day before the date of the event, Líquen Events is entitled to receive 70% of the total amount agreed for the event, plus the applicable VAT.",
-  "If the event is cancelled after 2 p.m. on the eighth working day before the date of the event, Líquen Events is entitled to receive the full amount agreed for the event, plus VAT. In either case, the cancellation is only valid if made in writing, by e-mail; the date and time of receipt are what count.",
+  "If the event is cancelled after 2 p.m. on the eighth working day before the date of the event, Líquen Events is entitled to receive the full amount agreed for the event, plus VAT. In either case, the cancellation is only valid if made in writing, by email; the date and time of receipt are what count.",
   "Any dispute will be referred to the Lisbon consumer arbitration centre (Centro de Arbitragem de Conflitos de Consumo de Lisboa).",
 ];
 
@@ -802,7 +878,7 @@ function faseamentoEn(pctSinal: number): string[] {
   const sinal = depositPercentOf({ depositPercent: pctSinal });
   return [
     `${sinal}% on acceptance;`,
-    `${100 - sinal}% 1 month before;`,
+    `${100 - sinal}% ${mesesEn(MESES_ANTES_DO_SALDO)} before;`,
     // «a primeira percentagem definida» → «the first instalment above»: em
     // inglês a percentagem já está escrita duas linhas acima, e é a ela que a
     // frase aponta. E «booked», e não «considered booked», para dizer o mesmo
