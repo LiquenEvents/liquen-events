@@ -8,6 +8,11 @@ import type { Dict } from "@/lib/i18n";
 // contracts store into the client bundle.
 import { DEFAULT_TERMS } from "@/lib/contract-terms";
 import type { Contract } from "@/lib/contract-types";
+// O email PARA ONDE SE ESCREVE é o do estúdio — o mesmo do rodapé desta página.
+// Aqui mostrava-se o `clientEmail`, que é o email de quem está a ler: a
+// proposta expirada e a falha ao responder mandavam o casal escrever a si
+// próprio, e o único caminho de recurso da página não ia dar a lado nenhum.
+import { SITE } from "@/lib/site";
 
 interface Props {
   token: string;
@@ -16,7 +21,6 @@ interface Props {
   // client hasn't already responded), we replace the accept/decline form with an
   // "expired" notice so they never click Accept only to hit the API's 410.
   expired?: boolean;
-  clientEmail: string;
   // Passed in from the server page instead of the site-wide chrome context, so
   // the proposta namespace only ships on this token route.
   proposta: Dict["proposta"];
@@ -26,7 +30,6 @@ export default function ProposalResponse({
   token,
   initialStatus,
   expired = false,
-  clientEmail,
   proposta,
 }: Props) {
   const tp = proposta.response;
@@ -143,10 +146,10 @@ export default function ProposalResponse({
         </p>
         <p className="text-foreground/72 text-sm leading-relaxed">{tp.expiradaBody}</p>
         <a
-          href={`mailto:${clientEmail}`}
+          href={`mailto:${SITE.email}`}
           className="inline-block mt-5 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
         >
-          {clientEmail}
+          {SITE.email}
         </a>
       </div>
     );
@@ -224,7 +227,7 @@ export default function ProposalResponse({
       {error && (
         <p role="alert" className="text-[#a04a2f] text-xs mt-3 text-center">
           {error} {tp.errorSuffix}{" "}
-          <a href={`mailto:${clientEmail}`} className="underline">
+          <a href={`mailto:${SITE.email}`} className="underline">
             {tp.errorLink}
           </a>
           .

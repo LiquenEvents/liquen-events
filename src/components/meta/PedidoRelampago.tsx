@@ -8,6 +8,7 @@ import { lerClique, serializar } from "@/lib/ads/click-id";
 import { lerIdentificadores, serializar as serializarMeta } from "@/lib/meta/click-id";
 import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
 import { localizeHref, type Locale } from "@/lib/i18n/config";
+import { clearSubmissionId, ensureSubmissionId } from "@/lib/orcamento/submission-id";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -142,7 +143,11 @@ export default function PedidoRelampago({
   const router = useRouter();
   const id = useId();
   const [aEnviar, setAEnviar] = useState(false);
-  const [erro, setErro] = useState<"" | "envio" | "contacto">("");
+  // A MENSAGEM a mostrar, e já não um código de erro. O 400 da rota diz o que
+  // está mal («Email inválido», «Nome demasiado curto») e isso deitava-se fora:
+  // quem escrevia um email sem TLD lia «Não foi possível enviar» e voltava a
+  // carregar no botão para sempre, sem saber que campo corrigir.
+  const [erro, setErro] = useState("");
   const comecouRef = useRef(false);
 
   function aoTocar() {
@@ -161,7 +166,7 @@ export default function PedidoRelampago({
 
     const contacto = repartirContacto(s("contacto"));
     if (!contacto) {
-      setErro("contacto");
+      setErro(textos.erroContacto);
       return;
     }
     setErro("");
@@ -237,11 +242,30 @@ export default function PedidoRelampago({
       const res = await fetch("/api/orcamento", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ form, website: s("website") }),
+        // O `submissionId` torna o envio idempotente: no browser interno do
+        // Instagram, onde a rede falha mais, o segundo toque no botão depois de
+        // uma resposta perdida deixava aqui dois pedidos e dois emails.
+        body: JSON.stringify({
+          form,
+          website: s("website"),
+          submissionId: ensureSubmissionId(),
+        }),
         signal: controlador.signal,
       });
-      const json = (await res.json().catch(() => null)) as { id?: string } | null;
-      if (!res.ok || !json?.id) throw new Error("falha");
+      const json = (await res.json().catch(() => null)) as {
+        id?: string;
+        error?: string;
+      } | null;
+      if (!res.ok || !json?.id) {
+        // A mensagem do SERVIDOR, e nada mais: o 400 diz o motivo («Nome
+        // demasiado curto», «Email inválido») e é isso que se lê. Sai daqui em
+        // vez de subir como excepção de propósito — assim uma falha de rede
+        // (`TypeError: Failed to fetch`) nunca se confunde com uma resposta e
+        // acaba no ecrã em bruto.
+        setErro(json?.error || textos.erro);
+        setAEnviar(false);
+        return;
+      }
 
       track("QuoteSubmit", { tipo: "casamentos", origem: contexto });
       try {
@@ -257,9 +281,14 @@ export default function PedidoRelampago({
       } catch {
         /* a confirmação usa o recurso genérico */
       }
+      // Pedido entregue: o identificador deste envio sai de cena para que um
+      // pedido genuinamente novo mais tarde não seja deduplicado contra este.
+      clearSubmissionId();
       router.push(localizeHref(`/orcamento/confirmacao/${json.id}`, locale));
     } catch {
-      setErro("envio");
+      // Rede em baixo ou ligação pendurada: não há motivo nenhum para dar, e o
+      // texto genérico é o certo (um "AbortError" em bruto não é uma mensagem).
+      setErro(textos.erro);
       setAEnviar(false);
     } finally {
       clearTimeout(limite);
@@ -271,8 +300,13 @@ export default function PedidoRelampago({
       id="pedido"
       onSubmit={submeter}
       onFocusCapture={aoTocar}
+      // SEM `noValidate`: não há validação por campo neste formulário, por isso
+      // desligar a do browser deixava o nome vazio ou a data em branco irem até
+      // ao servidor para voltarem como um erro genérico no fundo do ecrã. A
+      // nativa marca o campo errado e leva lá o cursor, que é o que falta aqui.
+      // O «contacto» continua a ser `type="text"` — quem o valida é o
+      // `repartirContacto`, porque o campo aceita telemóvel OU email.
       className="bg-surface px-5 py-8 sm:px-8 sm:py-10"
-      noValidate
     >
       <h2 className="text-[22px] font-bold uppercase leading-tight tracking-display">
         {textos.titulo}
@@ -339,15 +373,28 @@ export default function PedidoRelampago({
         </div>
       </div>
 
-      {/* Campo-armadilha. Fora do ecrã e fora da ordem de tabulação. */}
+      {/* Campo-armadilha. Fora do ecrã e fora da ordem de tabulação.
+          O `autoComplete="off"` sozinho não chega: o 1Password e o LastPass
+          ignoram-no e enchem o campo à mesma — e como é o SERVIDOR que descarta
+          quem o preenche, isso descartava pedidos verdadeiros em silêncio.
+          As dicas `data-*` são o que estes gestores respeitam. */}
       <div aria-hidden="true" className="absolute left-[-9999px] h-px w-px overflow-hidden">
         <label htmlFor={`${id}-website`}>Website</label>
-        <input id={`${id}-website`} name="website" type="text" tabIndex={-1} autoComplete="off" />
+        <input
+          id={`${id}-website`}
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          data-1p-ignore="true"
+          data-lpignore="true"
+          data-form-type="other"
+        />
       </div>
 
       {erro && (
         <p role="alert" className="mt-5 text-[13px] text-red-700">
-          {erro === "contacto" ? textos.erroContacto : textos.erro}
+          {erro}
         </p>
       )}
 

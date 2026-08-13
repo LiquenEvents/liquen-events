@@ -20,6 +20,10 @@ import {
   SPACE_TYPES,
 } from "@/lib/orcamento/data";
 import { PONTOS_DECORACAO } from "@/lib/orcamento/decoracao";
+// O identificador de idempotência vive num módulo partilhado: os formulários
+// curtos dos anúncios usam exactamente o mesmo, e duas cópias da mesma regra é
+// como se acaba com duas regras diferentes.
+import { clearSubmissionId, ensureSubmissionId } from "@/lib/orcamento/submission-id";
 
 /**
  * Pedido de orçamento — formulário simples e direto.
@@ -56,25 +60,6 @@ function readLeadSource(): string {
 function lerAdClick(): string {
   const c = lerClique();
   return c ? serializar(c) : "";
-}
-
-const SUBMISSION_KEY = "liquen-orcamento-sid";
-function ensureSubmissionId(): string {
-  try {
-    let sid = localStorage.getItem(SUBMISSION_KEY);
-    if (!sid) {
-      sid =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-      localStorage.setItem(SUBMISSION_KEY, sid);
-    }
-    return sid;
-  } catch {
-    // No localStorage (private mode / blocked): fall back to a per-call id — no
-    // cross-reload dedup, but the request still carries a valid submissionId.
-    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-  }
 }
 
 // Single source of truth, shared with the confirmation page so both resolve the
@@ -295,7 +280,19 @@ export default function OrcamentoForm({
   const telefoneRef = useRef<HTMLInputElement>(null);
   const mensagemRef = useRef<HTMLTextAreaElement>(null);
   // Data mínima = hoje (não faz sentido pedir orçamento para uma data passada).
-  const [minDate] = useState(() => new Date().toISOString().slice(0, 10));
+  //
+  // Calculada num EFEITO, e não no primeiro desenho: esta página é pré-gerada
+  // no build, por isso o HTML servido levava a data em que o site foi
+  // compilado. Na hidratação o cliente dizia outra, o React avisava da
+  // divergência e — como faz com os atributos — ficava com a do servidor: um
+  // `min` velho de semanas, que deixava escolher datas já passadas. Sem `min`
+  // no primeiro desenho, portanto; o `okData` aqui abaixo prende a mesma regra
+  // do lado do envio, que é o que conta.
+  const [minDate, setMinDate] = useState("");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMinDate(new Date().toISOString().slice(0, 10));
+  }, []);
 
   // Restaura o rascunho guardado (uma vez, após montar — evita mismatch de SSR).
   const firstSave = useRef(true);
@@ -327,6 +324,11 @@ export default function OrcamentoForm({
       if (d.pessoasAprox) setPessoasAprox(d.pessoasAprox);
       if (d.cerimonia) setCerimonia(d.cerimonia);
       if (d.espaco) setEspaco(d.espaco);
+      // Os nomes do casal são gravados como todos os outros: quem sai daqui
+      // para ler a política de privacidade e volta não pode voltar a um
+      // formulário que se lembra de tudo menos de quem se vai casar.
+      if (d.noivo) setNoivo(d.noivo);
+      if (d.noiva) setNoiva(d.noiva);
     } catch {
       /* localStorage indisponível — segue sem rascunho */
     }
@@ -379,6 +381,8 @@ export default function OrcamentoForm({
       pessoasAprox,
       cerimonia,
       espaco,
+      noivo,
+      noiva,
     };
   }, [
     eventType,
@@ -395,6 +399,8 @@ export default function OrcamentoForm({
     pessoasAprox,
     cerimonia,
     espaco,
+    noivo,
+    noiva,
   ]);
   // Once the quote is submitted the draft is intentionally cleared; block any
   // later lifecycle flush (the router.push unmount below) from resurrecting it.
@@ -432,6 +438,8 @@ export default function OrcamentoForm({
     pessoasAprox,
     cerimonia,
     espaco,
+    noivo,
+    noiva,
     flushDraft,
   ]);
 
@@ -465,7 +473,12 @@ export default function OrcamentoForm({
   // longer, so accept anything from 9 digits up.
   const okTelefone = telefone.replace(/\D/g, "").length >= 9;
   // "Ainda a definir" IS an answer — the field is satisfied either way.
-  const okData = dateFlexible || data !== "";
+  // A data passada é recusada AQUI e não só pelo `min` do campo: o `min` é uma
+  // sugestão que se contorna a escrever no teclado, e um pedido para o mês
+  // passado não é um pedido. Enquanto `minDate` ainda não foi calculada (o
+  // primeiro desenho, antes do efeito) não se rejeita nada — mais vale não
+  // acusar do que acusar por engano.
+  const okData = dateFlexible || (data !== "" && (!minDate || data >= minDate));
   // "Ainda a definir" IS an answer here too: a ordem de grandeza que ela pode
   // escolher a seguir fica OPCIONAL de propósito — quem não faz mesmo ideia
   // segue em frente, que é melhor do que inventar um número ou desistir.
@@ -619,7 +632,7 @@ export default function OrcamentoForm({
         sessionStorage.removeItem(DRAFT_KEY);
         // Retire this enquiry's idempotency id so a genuinely NEW enquiry later
         // gets a fresh one (and doesn't dedup against the just-sent lead).
-        localStorage.removeItem(SUBMISSION_KEY);
+        clearSubmissionId();
       } catch {
         /* ignora */
       }
@@ -666,8 +679,11 @@ export default function OrcamentoForm({
   // that feeds it changes.
   const waLink = useMemo(
     () => waHref(waMessage()),
+    // `pessoasAprox` entra na lista porque a mensagem o LÊ: sem ele, quem
+    // marcava "ainda a definir" e escolhia a seguir a ordem de grandeza levava
+    // para o WhatsApp um "Ainda a definir" que já não era verdade.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [eventType, dateFlexible, data, pessoas, guestsFlexible, local, nome, to, t],
+    [eventType, dateFlexible, data, pessoas, guestsFlexible, pessoasAprox, local, nome, to, t],
   );
 
   // Arrow-key navigation for the event-type radiogroup (WAI-ARIA radio pattern).
@@ -924,7 +940,7 @@ export default function OrcamentoForm({
                     id="of-data"
                     ref={dataRef}
                     type="date"
-                    min={minDate}
+                    min={minDate || undefined}
                     value={data}
                     disabled={dateFlexible}
                     onBlur={() => markTouched("data")}

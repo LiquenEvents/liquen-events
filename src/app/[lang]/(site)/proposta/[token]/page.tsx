@@ -220,7 +220,6 @@ export default async function ProposalPage({
           token={token}
           initialStatus={proposal.status}
           expired={expired}
-          clientEmail={proposal.clientEmail}
           proposta={t}
         />
 

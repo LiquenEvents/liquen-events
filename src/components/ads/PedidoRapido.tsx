@@ -7,6 +7,7 @@ import { lerClique, serializar } from "@/lib/ads/click-id";
 import { LEAD_SOURCE_KEY } from "@/components/LeadSourceCapture";
 import { localizeHref, type Locale } from "@/lib/i18n/config";
 import { PRIMARY_BUTTON_CLASS } from "@/lib/ui-classes";
+import { clearSubmissionId, ensureSubmissionId } from "@/lib/orcamento/submission-id";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -135,7 +136,11 @@ export default function PedidoRapido({
   const router = useRouter();
   const id = useId();
   const [aEnviar, setAEnviar] = useState(false);
-  const [erro, setErro] = useState(false);
+  // A MENSAGEM do erro, e já não um sim/não. O 400 da rota diz o que está mal
+  // («Email inválido», «Nome demasiado curto») e era isso que se deitava fora:
+  // quem escrevia o email sem TLD via «Não foi possível enviar» e voltava a
+  // carregar no botão para sempre, sem nunca saber que campo corrigir.
+  const [erro, setErro] = useState("");
   const comecouRef = useRef(false);
 
   // "Começou a preencher" é o sinal intermédio que falta na maioria das contas:
@@ -150,7 +155,7 @@ export default function PedidoRapido({
   async function submeter(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (aEnviar) return;
-    setErro(false);
+    setErro("");
     setAEnviar(true);
 
     const dados = new FormData(e.currentTarget);
@@ -192,11 +197,26 @@ export default function PedidoRapido({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // `website` é o campo-armadilha que a rota também inspecciona.
-        body: JSON.stringify({ form, website: s("website") }),
+        // O `submissionId` torna o envio idempotente: numa rede fraca, o dedo
+        // que carrega outra vez porque a resposta não chegou deixava aqui dois
+        // pedidos e dois emails.
+        body: JSON.stringify({ form, website: s("website"), submissionId: ensureSubmissionId() }),
         signal: controller.signal,
       });
-      const json = (await res.json().catch(() => null)) as { id?: string } | null;
-      if (!res.ok || !json?.id) throw new Error("falha");
+      const json = (await res.json().catch(() => null)) as {
+        id?: string;
+        error?: string;
+      } | null;
+      if (!res.ok || !json?.id) {
+        // A mensagem do SERVIDOR, e nada mais: o 400 diz o motivo («Nome
+        // demasiado curto», «Email inválido») e é isso que se lê. Sai daqui em
+        // vez de subir como excepção de propósito — assim uma falha de rede
+        // (`TypeError: Failed to fetch`) nunca se confunde com uma resposta e
+        // acaba no ecrã em bruto.
+        setErro(json?.error || textos.erro);
+        setAEnviar(false);
+        return;
+      }
 
       track("QuoteSubmit", { tipo: "casamentos", origem: contexto });
       try {
@@ -212,9 +232,14 @@ export default function PedidoRapido({
       } catch {
         /* a confirmação usa o recurso genérico */
       }
+      // Pedido entregue: o identificador deste envio sai de cena para que um
+      // pedido genuinamente novo mais tarde não seja deduplicado contra este.
+      clearSubmissionId();
       router.push(localizeHref(`/orcamento/confirmacao/${json.id}`, locale));
     } catch {
-      setErro(true);
+      // Rede em baixo ou ligação pendurada: não há motivo nenhum para dar, e o
+      // texto genérico é o certo (um "AbortError" em bruto não é uma mensagem).
+      setErro(textos.erro);
       setAEnviar(false);
     } finally {
       clearTimeout(timeout);
@@ -225,8 +250,11 @@ export default function PedidoRapido({
     <form
       onSubmit={submeter}
       onFocusCapture={aoTocar}
+      // SEM `noValidate`: não há validação por campo neste formulário, por isso
+      // desligar a do browser deixava o email sem TLD ou o nome vazio irem até
+      // ao servidor para voltarem como um erro genérico no fundo do ecrã. A
+      // nativa marca o campo errado e leva lá o cursor, que é o que falta aqui.
       className={`bg-surface/95 backdrop-blur-sm p-6 sm:p-8 shadow-xl shadow-black/10 ${className}`}
-      noValidate
     >
       <h2 className="text-[22px] sm:text-[26px] font-bold tracking-display uppercase leading-tight">
         {textos.titulo}
@@ -315,15 +343,28 @@ export default function PedidoRapido({
       </div>
 
       {/* Campo-armadilha. Fora do ecrã e fora da ordem de tabulação, com
-          autocomplete desligado para o gestor de senhas não o preencher. */}
+          autocomplete desligado para o gestor de senhas não o preencher.
+          O `autoComplete="off"` sozinho não chega: o 1Password e o LastPass
+          ignoram-no e enchem o campo à mesma — e como é o SERVIDOR que descarta
+          quem o preenche, isso descartava pedidos verdadeiros em silêncio.
+          As dicas `data-*` são o que estes gestores respeitam. */}
       <div aria-hidden="true" className="absolute left-[-9999px] w-px h-px overflow-hidden">
         <label htmlFor={`${id}-website`}>Website</label>
-        <input id={`${id}-website`} name="website" type="text" tabIndex={-1} autoComplete="off" />
+        <input
+          id={`${id}-website`}
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          data-1p-ignore="true"
+          data-lpignore="true"
+          data-form-type="other"
+        />
       </div>
 
       {erro && (
         <p role="alert" className="mt-4 text-[13px] text-red-700">
-          {textos.erro}
+          {erro}
         </p>
       )}
 
