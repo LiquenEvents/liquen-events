@@ -261,16 +261,28 @@ export function alturaDaLegenda(linhas: number): number {
  *
  * Vem com o mesmo tecto do desenho: mais do que {@link TEXTO_DO_MOODBOARD}
  * `.legenda.maxLinhas` não é impresso.
+ *
+ * ── A LINHA EM BRANCO TAMBÉM É UMA LINHA ──────────────────────────────────
+ * Isto começava por `texto.trim()`, e o desenho não faz nada disso: o gerador
+ * decide pelo texto CRU (`mb.annotation ? wrap(…) : []`) e o `wrap` dá uma
+ * linha a cada parágrafo, incluindo os vazios. Uma descrição escrita numa
+ * caixa de texto acaba muitas vezes com um Enter a mais — «Tons azuis\n\n» são
+ * TRÊS linhas na folha (57 pt reservados) e eram UMA na estimativa (27 pt). A
+ * miniatura do estúdio compunha a página com 30 pontos de mancha que a folha
+ * não tem: medido, as fotos saíam até 22% maiores do que são impressas e o
+ * aviso «esta foto perde X%» diferia do recorte verdadeiro em quase dez pontos
+ * percentuais. É o mesmo defeito que a altura da legenda existe para não haver.
  */
 export function linhasDaLegendaAprox(texto: string | undefined): number {
   const L = TEXTO_DO_MOODBOARD.legenda;
-  const limpo = (texto ?? "").trim();
-  if (!limpo) return 0;
+  // Sem texto nenhum não há legenda — é a única porta que o gerador fecha, e é
+  // a mesma que se fecha aqui.
+  if (!texto) return 0;
   // 0,5 em por caractere: a média de um texto em caixa mista na Carlito, que é
   // uma fonte de largura Calibri. Não se finge mais precisão do que esta.
   const porLinha = Math.max(1, Math.floor((PAGINA_W - 2 * PAGINA_M) / (L.tamanho * 0.5)));
   let linhas = 0;
-  for (const paragrafo of limpo.split("\n")) {
+  for (const paragrafo of texto.split("\n")) {
     let atual = 0;
     linhas += 1;
     for (const palavra of paragrafo.split(/\s+/).filter(Boolean)) {
@@ -421,7 +433,7 @@ function mosaico(n: number, alturaAnotacao: number): CaixaPdf[] {
   const passoX = (a.w + RESPIRO) / CELULAS_X;
   const passoY = (a.h + RESPIRO) / CELULAS_Y;
   const topo = a.y + a.h;
-  return pedacos.slice(0, n).map((p) => ({
+  const caixas = pedacos.slice(0, n).map((p) => ({
     x: a.x + p.cx * passoX,
     // `cy` conta de cima para baixo (é como se lê uma página); o PDF conta de
     // baixo. A conversão é aqui, uma vez, e não em cada layout.
@@ -429,6 +441,38 @@ function mosaico(n: number, alturaAnotacao: number): CaixaPdf[] {
     w: p.cw * passoX - RESPIRO,
     h: p.ch * passoY - RESPIRO,
   }));
+  return comAMaiorPrimeiro(caixas);
+}
+
+/**
+ * A CAIXA GRANDE É A DA PRIMEIRA FOTO — e no mosaico não era.
+ *
+ * O mosaico é uma das duas disposições onde marcar a «foto principal» quer
+ * dizer alguma coisa (ver `temLugarDeDestaque`, em `proposal-moodboard.ts`), e
+ * o que a marca faz é pôr essa foto na primeira posição. A promessa escrita ao
+ * lado era que «a primeira célula é a maior do arranjo». Não era: os cortes
+ * partem sempre o MAIOR pedaço que ainda existe, e o primeiro pedaço é o que
+ * mais vezes é partido. Medido com três fotos, na mancha de uma página com
+ * legenda de uma linha: a primeira célula ficava com 57.838 pt² e a terceira
+ * com 98.206 — a foto que ela marcou como principal saía 41% mais pequena do
+ * que a que não marcou.
+ *
+ * A correcção é uma TROCA e não uma ordenação: a maior célula passa para a
+ * frente e a que lá estava fica no lugar dela. Ordenar por área desfazia a
+ * leitura do mosaico (as células deixavam de aparecer pela ordem por que se
+ * lêem na página); trocar duas mexe no mínimo indispensável para a marca
+ * deixar de mentir.
+ */
+function comAMaiorPrimeiro(caixas: CaixaPdf[]): CaixaPdf[] {
+  if (caixas.length < 2) return caixas;
+  const area = (c: CaixaPdf) => c.w * c.h;
+  let iMaior = 0;
+  for (let k = 1; k < caixas.length; k++) if (area(caixas[k]) > area(caixas[iMaior])) iMaior = k;
+  if (iMaior === 0) return caixas;
+  const trocadas = [...caixas];
+  trocadas[0] = caixas[iMaior];
+  trocadas[iMaior] = caixas[0];
+  return trocadas;
 }
 
 // ── Composições sem recorte ────────────────────────────────────────────────
@@ -743,13 +787,49 @@ function mosaicoSemRecorte(aspectos: number[], a: Area): CaixaPdf[] {
     return dispor(montar(raiz, mascara), a);
   }
 
-  let melhor: { caixas: CaixaPdf[]; menor: number } | null = null;
+  let melhor: {
+    caixas: CaixaPdf[];
+    menor: number;
+    semSelos: boolean;
+    primeiraMaior: boolean;
+  } | null = null;
   for (let mascara = 0; mascara < 1 << indice.size; mascara++) {
     const caixas = dispor(montar(raiz, mascara), a);
     if (caixas.length !== n) continue;
     let menor = Infinity;
-    for (const c of caixas) menor = Math.min(menor, c.w * c.h);
-    if (!melhor || menor > melhor.menor) melhor = { caixas, menor };
+    let menorLado = Infinity;
+    for (const c of caixas) {
+      menor = Math.min(menor, c.w * c.h);
+      menorLado = Math.min(menorLado, c.w, c.h);
+    }
+    /**
+     * ── E A PRIMEIRA FOTO É A GRANDE ──────────────────────────────────────
+     *
+     * O mesmo critério do «destaque» (ver `destaqueSemRecorte`), e pela mesma
+     * razão: o mosaico é uma das duas disposições onde a marca de «principal»
+     * promete uma caixa maior, e aqui as caixas não se podem trocar entre si —
+     * cada uma tem a forma da fotografia que lá está. Ou a árvore dá a maior
+     * área à primeira foto, ou a promessa não se cumpre.
+     *
+     * Medido com três panorâmicas 12:5: a árvore escolhida só pelo tamanho da
+     * menor dava 28.680 pt² à primeira e 118.244 à terceira — a foto marcada
+     * saía QUATRO vezes mais pequena do que a que lhe ficava ao lado.
+     *
+     * Vem antes do tamanho da menor, e cede quando nenhuma árvore consegue
+     * (duas fotos lado a lado com a mesma altura: a mais larga é sempre a
+     * maior, e não há arranjo que o desfaça).
+     *
+     * O que NÃO cede é a trava dos selos ({@link LADO_MINIMO_DA_FOTO}): um
+     * destaque comprado com uma fotografia de 1,1 cm é o defeito de origem
+     * outra vez, e ela nem chegou a pedir o destaque nessa foto.
+     */
+    const semSelos = menorLado > LADO_MINIMO_DA_FOTO;
+    const primeiraMaior = caixas.every((c) => c.w * c.h <= caixas[0].w * caixas[0].h + 0.01);
+    const candidato = { caixas, menor, semSelos, primeiraMaior };
+    if (!melhor) melhor = candidato;
+    else if (semSelos !== melhor.semSelos) melhor = semSelos ? candidato : melhor;
+    else if (primeiraMaior !== melhor.primeiraMaior) melhor = primeiraMaior ? candidato : melhor;
+    else if (menor > melhor.menor) melhor = candidato;
   }
   return melhor ? melhor.caixas : [];
 }
@@ -1055,9 +1135,27 @@ function arranjoDoMoodboard(
  * fazer é DIZER: uma foto deitada perde ali 69% e uma panorâmica 81%, contra
  * 30% de uma ao alto. Com o número à frente, escolher uma vertical para a capa
  * deixa de ser sorte.
+ *
+ * ── AQUI A FORMA DA FOTO É A VERDADEIRA, NÃO A APERTADA ────────────────────
+ *
+ * Isto media com `aspetoSeguro`, que aperta o aspecto ao intervalo [0,35; 4]
+ * antes de o usar. Para COMPOR está certo — uma panorâmica de 10:1 esmagava a
+ * fila inteira numa tira, e é para isso que o aperto existe. Para MEDIR O QUE
+ * SE PERDE está exactamente ao contrário: a caixa que a composição lhe deu tem
+ * aspecto 4, a fotografia tem 10, e o desenho recorta-a (`drawCoverImage`,
+ * em `proposal-doc-pdf.ts`) — 60% da panorâmica fica de fora da folha. Medido
+ * nos dois lados do aperto, o aviso do estúdio dizia **0%** nesse caso, que é
+ * o único número que não podia dizer: a perda maior de todas era a única que
+ * ficava calada.
+ *
+ * O que não se consegue ler (nem número, nem positivo) continua a valer
+ * {@link ASPETO_POR_OMISSAO} — sem forma não há perda que se possa afirmar.
  */
 export function perdaNoRecorte(aspetoDaFoto: number, aspetoDaCaixa: number): number {
-  const f = aspetoSeguro(aspetoDaFoto);
+  const f =
+    typeof aspetoDaFoto === "number" && Number.isFinite(aspetoDaFoto) && aspetoDaFoto > 0
+      ? aspetoDaFoto
+      : ASPETO_POR_OMISSAO;
   const c = aspetoDaCaixa > 0 && Number.isFinite(aspetoDaCaixa) ? aspetoDaCaixa : f;
   return 1 - Math.min(f, c) / Math.max(f, c);
 }

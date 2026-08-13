@@ -145,6 +145,37 @@ describe("a área que o recorte deita fora", () => {
     expect(perdaNoRecorte(2, 1)).toBeCloseTo(0.5, 6);
     expect(perdaNoRecorte(1, 2)).toBeCloseTo(0.5, 6);
   });
+
+  /**
+   * ── A FOTOGRAFIA DE FORMA ABSURDA É A QUE MAIS PERDE, E ERA A ÚNICA CALADA ─
+   *
+   * A composição aperta o aspecto de cada foto ao intervalo [0,35; 4]
+   * (`aspetoSeguro`), e faz bem: sem isso uma panorâmica de 10:1 esmagava a
+   * fila inteira numa tira de dois centímetros. Mas a MEDIÇÃO da perda usava o
+   * mesmo aspecto apertado dos dois lados da conta — comparava uma foto de 4:1
+   * que não existe com a caixa de 4:1 que a composição lhe deu — e respondia
+   * ZERO. O desenho não aperta nada: `drawCoverImage` recorta a fotografia
+   * verdadeira para encher a caixa, e 60% da panorâmica fica de fora da folha.
+   *
+   * O aviso existe para ela poder trocar a foto antes de a proposta seguir. A
+   * perda maior de todas era a única sobre a qual ele se calava.
+   */
+  it("mede a forma verdadeira da foto, mesmo a que a composição teve de apertar", () => {
+    // 10:1 numa caixa de 4:1 (o máximo que a composição dá): fica 40% da foto.
+    expect(perdaNoRecorte(10, 4)).toBeCloseTo(0.6, 6);
+    // E um alto de 1:10 numa caixa de 0,35: sobra pouco mais de um terço.
+    expect(perdaNoRecorte(0.1, 0.35)).toBeCloseTo(0.714, 3);
+    // Na página, com a forma da foto ligada — o arranjo não corta NENHUMA das
+    // outras, e diz o que corta nesta.
+    expect(perdasDoMoodboard("filas", [10, 1.5, 1.5], 8, true)).toEqual([0.6, 0, 0]);
+    // Na tira da capa, uma panorâmica destas perde quase tudo: 95%, não 88%.
+    expect(perdaNaCapa(10)).toBeCloseTo(0.953, 3);
+    expect(perdaNaCapa(0.1)).toBeCloseTo(0.786, 3);
+    // O que não é forma nenhuma continua a valer o 3:2 por omissão — sem saber
+    // a forma não se pode afirmar perda nenhuma.
+    expect(perdaNoRecorte(Number.NaN, 1.5)).toBe(0);
+    expect(perdaNoRecorte(0, 1.5)).toBe(0);
+  });
 });
 
 /**

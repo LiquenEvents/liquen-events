@@ -58,7 +58,31 @@ describe("alturaDaLegenda", () => {
 describe("linhasDaLegendaAprox", () => {
   it("sem texto não há linhas", () => {
     expect(linhasDaLegendaAprox(undefined)).toBe(0);
-    expect(linhasDaLegendaAprox("   ")).toBe(0);
+    expect(linhasDaLegendaAprox("")).toBe(0);
+  });
+
+  /**
+   * ── A LINHA EM BRANCO OCUPA ESPAÇO NA FOLHA, LOGO CONTA ───────────────────
+   *
+   * Esta estimativa só existe para dar o MESMO número que o desenho, e o
+   * desenho não limpa nada: pergunta se há texto (`mb.annotation ? … : []`) e
+   * a partir daí o `wrap` devolve uma linha por parágrafo, vazio ou não.
+   *
+   * Isto começava por `trim()`, e por isso discordava do desenho em dois casos
+   * banais: uma descrição escrita numa caixa de texto que ficou com um Enter a
+   * mais no fim, e uma que ficou só com espaços. «Tons azuis\n\n» reserva 57
+   * pontos na folha e a estimativa dizia 27 — trinta pontos de mancha que a
+   * página não tem. Medido no que isso muda: as fotos da pré-visualização
+   * saíam até 22% maiores em área do que são impressas, e o aviso «esta foto
+   * perde X%» diferia do recorte verdadeiro em quase dez pontos percentuais.
+   */
+  it("uma linha em branco conta como linha, porque a folha reserva-a", () => {
+    expect(linhasDaLegendaAprox("Tons azuis")).toBe(1);
+    // O Enter a mais no fim da caixa de texto: três linhas na folha.
+    expect(linhasDaLegendaAprox("Tons azuis\n\n")).toBe(3);
+    // Só espaços: o desenho reserva na mesma a linha (e imprime-a vazia).
+    expect(linhasDaLegendaAprox("   ")).toBe(1);
+    expect(linhasDaLegendaAprox("\n")).toBe(2);
   });
 
   it("uma frase curta é uma linha", () => {

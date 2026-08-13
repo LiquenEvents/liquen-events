@@ -150,6 +150,82 @@ describe("a promessa que a geometria tem de cumprir", () => {
       expect(areas[0], `${layout}: a primeira caixa tem de ser a maior`).toBeCloseTo(maior, 6);
     }
   });
+
+  /**
+   * ── E EM TODAS AS PÁGINAS, NÃO SÓ NAQUELA ─────────────────────────────────
+   *
+   * O caso acima é um caso. A promessa é geral, e era geralmente falsa: no
+   * mosaico os cortes partem sempre o MAIOR pedaço que ainda existe, e o
+   * primeiro pedaço é justamente o que mais vezes é partido. Medido antes
+   * disto, com três fotos e uma legenda de uma linha, a primeira célula ficava
+   * com 57.838 pt² e a terceira com 98.206 — a foto marcada como principal
+   * saía 41% MAIS PEQUENA do que a que ninguém marcou. Com sete fotos era o
+   * mesmo, com dez também.
+   *
+   * Por isso o teste é um varrimento: todas as contagens, as formas que
+   * aparecem mesmo, e todas as alturas de legenda (que mudam a mancha e, com
+   * ela, qual é a maior célula). Um exemplo escolhido a dedo já cá estava, e
+   * foi exactamente por ser um só que isto passou despercebido.
+   */
+  it("varrendo contagens, formas e legendas, a primeira caixa é sempre a maior", async () => {
+    const { caixasDoMoodboard, alturaDaLegenda } = await import("./proposal-geometria");
+    /** As formas que saem de uma máquina e de um telemóvel, e uma mistura —
+     *  que é o que uma página de inspiração verdadeira tem. */
+    const FORMAS: Record<string, number> = {
+      "ao alto 2:3": 2 / 3,
+      quadrada: 1,
+      "deitada 3:2": 1.5,
+      "panorâmica 12:5": 2.4,
+    };
+    const VARIADAS = [1.5, 0.75, 1.33, 0.8, 1.78, 1.0, 0.67, 1.5, 1.2, 0.9];
+    for (const layout of ["destaque", "mosaico"] as const) {
+      for (let n = 2; n <= 10; n++) {
+        const casos: [string, number[]][] = [
+          ...Object.entries(FORMAS).map(([nome, asp]): [string, number[]] => [
+            nome,
+            Array.from({ length: n }, () => asp),
+          ]),
+          ["variadas", VARIADAS.slice(0, n)],
+          // A marcada é uma vertical no meio de deitadas: é o caso em que a
+          // caixa grande e a foto que lá vai têm formas mais diferentes.
+          ["a principal ao alto", [0.7, ...VARIADAS.slice(1, n)]],
+        ];
+        for (const [nome, aspectos] of casos) {
+          for (let linhas = 0; linhas <= 5; linhas++) {
+            const caixas = caixasDoMoodboard(layout, aspectos, alturaDaLegenda(linhas));
+            const areas = caixas.map((c) => c.w * c.h);
+            const maior = Math.max(...areas);
+            expect(
+              areas[0],
+              `${layout}/${n} ${nome}, legenda de ${linhas} linhas: a primeira caixa tem ${areas[0].toFixed(0)} pt² e a maior ${maior.toFixed(0)}`,
+            ).toBeGreaterThanOrEqual(maior - 0.01);
+          }
+        }
+      }
+    }
+  });
+
+  /**
+   * Com as caixas a tomarem a forma das fotografias não há troca possível —
+   * cada caixa tem o aspecto da foto que lá está —, e a página tem de nascer
+   * já com a primeira em primeiro. É o que o «destaque» sem recorte já fazia
+   * (escolhe entre arranjos) e o mosaico não fazia de todo: três panorâmicas
+   * 12:5 davam 28.680 pt² à primeira e 118.244 à terceira, QUATRO vezes mais.
+   */
+  it("sem recorte, o mosaico também escolhe a árvore que dá a maior à primeira", async () => {
+    const { caixasDoMoodboard } = await import("./proposal-geometria");
+    for (const aspectos of [
+      [2.4, 2.4, 2.4],
+      [1.5, 1.5, 1.5, 1.5, 1.5],
+      [1.5, 0.75, 1.33, 0.8, 1.78, 1.0],
+    ]) {
+      const areas = caixasDoMoodboard("mosaico", aspectos, 8, true).map((c) => c.w * c.h);
+      expect(areas[0], `[${aspectos}]: ${areas.map((a) => a.toFixed(0)).join(", ")}`).toBeCloseTo(
+        Math.max(...areas),
+        6,
+      );
+    }
+  });
 });
 
 describe("porque é que o automático escolheu aquilo", () => {
