@@ -96,13 +96,72 @@ export function collectAttachments(node?: MessageStructureObject): InboxAttachme
 }
 
 /**
+ * Quantos Message-IDs do `References:` se guardam, e o comprimento máximo de
+ * cada um.
+ *
+ * O cabeçalho é escrito por quem envia e não tem tecto nenhum — e este é pedido
+ * para TODAS as mensagens da listagem (ver `LIST_QUERY`), o que faz dele o
+ * único campo aqui em que um remetente sozinho multiplica o tamanho da resposta
+ * da caixa inteira: umas centenas de KB de `<...>` numa mensagem viravam
+ * milhares de identificadores por linha, em JSON, num campo que o ecrã nem
+ * sequer mostra. Cinquenta chegam de sobra para encadear uma conversa (o
+ * RFC 5322 §3.6.4 conta com que as implementações cortem), e 998 é o limite de
+ * linha do próprio RFC — um identificador maior do que isso não é um
+ * identificador.
+ */
+const MAX_REFERENCIAS = 50;
+const MAX_ID_REFERENCIA = 998;
+
+/**
  * Parse a References header buffer into an ordered list of Message-IDs. We only
  * ever fetch the References header into this buffer, so pulling every `<...>`
  * token out is safe (and folded/continued lines just work).
+ *
+ * Cortar pelo meio e não pelo fim: o que serve para encadear é a RAIZ da
+ * conversa (o primeiro) e a linhagem imediata (os últimos). O meio é o que se
+ * pode perder sem perder o fio.
  */
 export function parseReferences(headers?: Buffer): string[] {
   if (!headers) return [];
-  return headers.toString("utf8").match(/<[^>]+>/g) ?? [];
+  const todos = (headers.toString("utf8").match(/<[^>]+>/g) ?? []).filter(
+    (id) => id.length <= MAX_ID_REFERENCIA,
+  );
+  if (todos.length <= MAX_REFERENCIAS) return todos;
+  return [todos[0], ...todos.slice(-(MAX_REFERENCIAS - 1))];
+}
+
+/**
+ * A data do envelope → ISO, ou "" quando não há data utilizável.
+ *
+ * O cabeçalho `Date:` é escrito por quem envia e não há nada que o obrigue a
+ * ser uma data. Quando não a consegue ler, o imapflow devolve a STRING CRUA do
+ * cabeçalho em `envelope.date` — apesar de o tipo prometer um `Date` (ver
+ * `imapflow/lib/tools.js`, «if (date.toString() === 'Invalid Date')»). O
+ * `(env.date ?? new Date()).toISOString()` que aqui estava rebentava com um
+ * TypeError, e o erro não ficava na linha: subia pelo `listInbox` e a caixa
+ * INTEIRA respondia 500 por causa de uma mensagem só — que qualquer remetente
+ * consegue lá pôr de propósito.
+ *
+ * Devolve "" e não a hora da leitura porque carimbar `new Date()` punha uma
+ * mensagem sem data no topo da lista a cada recarregamento: uma mentira mais
+ * difícil de apanhar do que um espaço vazio. O `fmtDate` do ecrã já não mostra
+ * nada para uma data que não se lê, e a ordenação abaixo manda-as para o fim.
+ */
+function toIsoDate(value: unknown): string {
+  if (value instanceof Date) return Number.isNaN(+value) ? "" : value.toISOString();
+  if (typeof value === "string" && value.trim()) {
+    const parsed = new Date(value);
+    // O texto do cabeçalho ainda pode ser uma data perfeitamente legível que só
+    // o imapflow recusou — aproveita-se em vez de a deitar fora.
+    return Number.isNaN(+parsed) ? "" : parsed.toISOString();
+  }
+  return "";
+}
+
+/** Ordenação: sem data legível vai para o fim, e nunca devolve NaN ao `sort`. */
+function tempoDaMensagem(item: InboxItem): number {
+  const t = +new Date(item.date);
+  return Number.isNaN(t) ? 0 : t;
 }
 
 const LIST_QUERY: FetchQueryObject = {
@@ -120,7 +179,7 @@ function toInboxItem(msg: FetchMessageObject): InboxItem {
     from: f?.name || f?.address || "—",
     fromAddress: f?.address || "",
     subject: env?.subject || "(sem assunto)",
-    date: (env?.date ?? new Date()).toISOString(),
+    date: toIsoDate(env?.date),
     seen: msg.flags?.has("\\Seen") ?? false,
     messageId: env?.messageId || "",
     inReplyTo: env?.inReplyTo || undefined,
@@ -178,7 +237,7 @@ export async function listInbox(arg: number | ListInboxOptions = 30): Promise<In
           items.push(toInboxItem(msg));
         }
       }
-      items.sort((a, b) => +new Date(b.date) - +new Date(a.date));
+      items.sort((a, b) => tempoDaMensagem(b) - tempoDaMensagem(a));
       return items;
     } finally {
       lock.release();

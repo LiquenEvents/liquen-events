@@ -10,7 +10,16 @@
 
 import type { InboxItemEnriched } from "@/lib/inbox-types";
 import { SkeletonBar } from "./Skeleton";
-import { fmtDate, IconPaperclip, IconPin, IconStar, LabelPill, LinkedChip } from "./InboxShared";
+import {
+  fmtDate,
+  IconInbox,
+  IconPaperclip,
+  IconPin,
+  IconStar,
+  LabelPill,
+  LinkedChip,
+} from "./InboxShared";
+import { EmptyState } from "./ui";
 
 interface Props {
   items: InboxItemEnriched[];
@@ -19,6 +28,13 @@ interface Props {
   flaggedUids: Set<number>;
   /** Resolve a linked pedido id to a display name for the "ligado a:" chip. */
   quoteName: (quoteId: string) => string | undefined;
+  /**
+   * A linha a mostrar quando não há nada para listar. Quem sabe o PORQUÊ é o
+   * contentor — caixa nova, filtro «arquivo», pesquisa sem resultados, IMAP em
+   * baixo —, e as três últimas chegam cá exactamente com a mesma forma da
+   * primeira: uma lista vazia. Sem indicação, diz-se só o caso geral.
+   */
+  emptyHint?: string;
   onOpen: (uid: number) => void;
   onToggleStar: (item: InboxItemEnriched) => void;
 }
@@ -29,6 +45,7 @@ export default function InboxList({
   loading,
   flaggedUids,
   quoteName,
+  emptyHint,
   onOpen,
   onToggleStar,
 }: Props) {
@@ -45,6 +62,23 @@ export default function InboxList({
           </div>
         ))}
       </div>
+    );
+  }
+
+  /**
+   * Sem linhas, isto devolvia um `<ul>` vazio — a coluna ficava literalmente em
+   * branco, e um rectângulo branco não distingue «não há emails» de «isto
+   * avariou». Quem espera tranquilo e quem devia ir ver o servidor viam o mesmo
+   * ecrã.
+   */
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon={<IconInbox className="h-6 w-6" />}
+        title="Sem mensagens para mostrar"
+        description={emptyHint ?? "Os emails que chegarem à caixa do estúdio aparecem aqui."}
+        className="py-12"
+      />
     );
   }
 

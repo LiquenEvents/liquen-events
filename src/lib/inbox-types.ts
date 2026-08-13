@@ -33,6 +33,11 @@ export interface InboxItem {
   from: string;
   fromAddress: string;
   subject: string;
+  /**
+   * Data ISO, ou "" quando o `Date:` da mensagem não é legível — cabeçalho que
+   * quem envia escreve à vontade e que já deitou abaixo a listagem inteira (ver
+   * `toIsoDate` em `inbox.ts`). O `fmtDate` do ecrã trata "" como "sem data".
+   */
   date: string;
   seen: boolean;
   /** RFC822 Message-ID — the durable identity. Empty string only if the server omitted it. */

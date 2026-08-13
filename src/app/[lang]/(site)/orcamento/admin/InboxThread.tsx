@@ -306,7 +306,16 @@ export default function InboxThread({
       )}
 
       {/* Reply */}
-      <ReplyBox to={message.fromAddress} onReply={onReply} />
+      {/* A `key` não é detalhe: este painel NÃO desmonta ao abrir outro email —
+          só recebe outra `message` —, e sem ela o compositor ficava com o
+          estado do email anterior. O rascunho escrito para uma pessoa ficava no
+          ecrã com o endereço de outra por baixo, e o aviso «✓ Resposta enviada
+          para …» reaparecia num email a que ninguém tinha respondido. Pelo
+          `uid` (a identidade da mensagem aberta, a mesma da lista) e não pelo
+          objeto: recarregar a MESMA mensagem — marcar como lida, por exemplo —
+          não pode deitar fora o que já lá está escrito. É o que o resto do back
+          office faz com `<ClientMessenger key={quote.id}>`. */}
+      <ReplyBox key={message.uid} to={message.fromAddress} onReply={onReply} />
 
       {/* Send-a-proposal-with-attachment — intentionally disabled (not yet wired). */}
       <div className="rounded-2xl border border-dashed border-foreground/15 bg-foreground/[0.015] p-4">
