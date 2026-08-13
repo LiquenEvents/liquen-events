@@ -72,6 +72,27 @@ export function generateStaticParams() {
   return todosOsCaminhos().map((c) => ({ slug: c.slug }));
 }
 
+/**
+ * NENHUM canónico e NENHUM hreflang nesta rota — e tem de ser dito em voz alta.
+ *
+ * Não basta não chamar o `pageMetadata`: o layout de raiz declara
+ * `alternates: { canonical, languages }`, e o Next só substitui essa chave se o
+ * descendente a declarar também. Sem esta linha, as 20 páginas do ramo
+ * herdavam-na e saíam TODAS com `<link rel="canonical" href="…/">` — a dizer
+ * que são cópias da página inicial. O comentário que aqui estava prometia o
+ * contrário do que o HTML fazia.
+ *
+ * A intenção mantém-se, agora cumprida: estas páginas são `noindex` (ver o
+ * layout do ramo), e um canónico numa página noindex é um sinal contraditório
+ * — ou aponta a si própria, e contradiz o noindex, ou aponta para outra, e
+ * pede que se indexe uma página em vez desta. Não emitir nenhum é a única das
+ * três hipóteses que diz a verdade.
+ *
+ * `null` e não `{}`: é `null` que o resolvedor do Next lê como "não há
+ * alternates"; um objecto vazio deixava a chave lá sem dizer nada.
+ */
+const SEM_CANONICO = null;
+
 export async function generateMetadata({
   params,
 }: {
@@ -80,19 +101,53 @@ export async function generateMetadata({
   const { lang, slug } = await params;
   const locale = normalizeLocale(lang);
   const r = resolverVariante(slug);
-  if (!r) return { title: locale === "en" ? "Page not found" : "Página não encontrada" };
+  /**
+   * As DUAS condições que a página usa para fazer `notFound()`, e não só a
+   * primeira — os metadados e a página têm de concordar sobre o que existe.
+   *
+   * MEDIDO: `generateMetadata` para `/pt/s/portugal` devolvia
+   * `<title>Casamentos em Portugal | Líquen Events</title>` e um `og:image`
+   * com a capa, para um endereço que a página 404. Como a variante
+   * internacional é `soEm: "en"`, o resultado era um endereço que se cola no
+   * WhatsApp, mostra um cartão bonito com a fotografia, e leva quem carrega a
+   * uma página de erro. São dois dos vinte endereços do ramo (`portugal` e
+   * `portugal-b` em português).
+   */
+  if (!r || (r.variante.soEm && r.variante.soEm !== locale)) {
+    return {
+      title: locale === "en" ? "Page not found" : "Página não encontrada",
+      alternates: SEM_CANONICO,
+    };
+  }
   const c = conteudoVariante(r.variante, locale);
-  // Sem `pageMetadata`: essa função emite canónico e hreflang, que só fazem
-  // sentido numa página para ser indexada. Esta é `noindex` (declarado no
-  // layout do ramo) e um canónico numa página noindex é um sinal contraditório.
   return {
-    title: c.metaTitle,
+    /**
+     * `absolute` — o título já está pronto, não lhe apliquem o modelo.
+     *
+     * MEDIDO no HTML construído antes disto:
+     *   <title>Casamentos na Comporta | Líquen Events | Líquen Events</title>
+     * O `metaTitle` do catálogo já traz a marca lá dentro, de propósito, e o
+     * layout de raiz declara `template: "%s | Líquen Events"` e aplica-o a
+     * qualquer título entregue como texto simples — incluindo a um que já a
+     * tinha. Aqui o separador do browser não decide cliques (isto é `noindex`),
+     * mas o título viaja: é o que a pré-visualização do WhatsApp e o browser
+     * interno do Instagram mostram por cima da página.
+     *
+     * É o mesmo defeito, e a mesma cura, de /casamentos/[polo]. Prende-o o
+     * teste `s/metadados.test.ts`.
+     */
+    title: { absolute: c.metaTitle },
     description: c.metaDescription,
+    // Explícito porque o og:title NÃO leva o modelo do layout de raiz (a raiz
+    // declara `openGraph.title` como texto, não como modelo). Fica escrito à
+    // mesma: sem esta linha, um dia em que a raiz ganhe um modelo de og o
+    // cartão social passava a repetir a marca sem ninguém dar por isso.
     openGraph: {
       title: c.metaTitle,
       description: c.metaDescription,
       images: [{ url: r.variante.capa }],
     },
+    alternates: SEM_CANONICO,
   };
 }
 
@@ -159,9 +214,17 @@ export default async function PaginaSocial({
             priority
             className="h-[38px] w-auto"
           />
+          {/* `alvo-toque`: esta âncora não trazia espaçamento nenhum, e texto
+              de 11 px sem `padding` dá um alvo de ~16 px de altura — cerca de
+              um terço do mínimo de 44 que o TOUCH-AUDIT.md fixou. É o telefone,
+              um dos três actos de conversão da página, num ramo que só é visto
+              ao telemóvel; os outros dois vivem na barra fixa e já têm 48 px.
+              A classe (globals.css) leva o alvo a 44×44 SÓ em ponteiro grosso e
+              não mexe no que se vê: o texto fica no mesmo sítio e no portátil
+              nada muda. É a mesma cura do resto do repositório. */}
           <a
             href={`tel:${SITE.phone}`}
-            className="text-[11px] tracking-[0.14em] text-white/80 underline underline-offset-4"
+            className="alvo-toque text-[11px] tracking-[0.14em] text-white/80 underline underline-offset-4"
           >
             {SITE.phoneDisplay}
           </a>
@@ -296,7 +359,10 @@ export default async function PaginaSocial({
           quem somos e onde está a política de privacidade. */}
       <footer className="px-5 pb-28 text-center text-[11px] text-foreground/40">
         {SITE.name} ·{" "}
-        <a href={localizeHref("/privacidade", locale)} className="underline">
+        {/* `alvo-toque` pela mesma razão do telefone lá em cima. Aqui não muda
+            nada do que se lê: a caixa cresce à volta do texto, que fica no
+            mesmo sítio da linha. */}
+        <a href={localizeHref("/privacidade", locale)} className="alvo-toque underline">
           {en ? "Privacy" : "Privacidade"}
         </a>
       </footer>
