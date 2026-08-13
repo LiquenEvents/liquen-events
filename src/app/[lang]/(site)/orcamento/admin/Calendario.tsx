@@ -387,10 +387,34 @@ export default function Calendario({ quotes, onOpen }: Props) {
       .slice(0, 6);
   }, [quotes]);
 
-  const monthPrefix = `${year}-${pad2(month + 1)}`;
-  const monthQuoteCount = quotes.filter((q) => q.date && q.date.startsWith(monthPrefix)).length;
-  const monthEventCount = events.filter((e) => e.date.startsWith(monthPrefix)).length;
-  const monthTotal = monthQuoteCount + monthEventCount;
+  /**
+   * Quantos eventos tem este mês — contados a partir do que a GRELHA desenha.
+   *
+   * Contava-se pela data de INÍCIO (`q.date.startsWith(mês)`), e um evento de
+   * vários dias ocupa todos os dias do intervalo (ver `byDay`): uma passagem de
+   * ano de 30/12 a 02/01 pintava-se em Janeiro e, ao mesmo tempo, Janeiro dizia
+   * "Sem eventos este mês" e abria o estado vazio POR BAIXO da grelha que tinha
+   * lá o evento. Quem lê aquele número está a decidir se aceita mais trabalho
+   * para o mês.
+   *
+   * Contamos por identidade — um evento de três dias é UM evento — e por
+   * tabela, para não somar um pedido e uma marcação com o mesmo id. E, vindo de
+   * `byDay`/`eventsByDay`, uma data por marcar ("a definir") fica de fora sem
+   * regra à parte: se a grelha não a desenha, também não a conta.
+   */
+  const monthTotal = useMemo(() => {
+    const prefixo = `${year}-${pad2(month + 1)}`;
+    const vistos = new Set<string>();
+    for (const [dia, doDia] of byDay) {
+      if (!dia.startsWith(prefixo)) continue;
+      for (const q of doDia) vistos.add(`q:${q.id}`);
+    }
+    for (const [dia, doDia] of eventsByDay) {
+      if (!dia.startsWith(prefixo)) continue;
+      for (const e of doDia) vistos.add(`e:${e.id}`);
+    }
+    return vistos.size;
+  }, [byDay, eventsByDay, year, month]);
 
   const dayLabelLong = (key: string) =>
     new Date(key + "T12:00:00").toLocaleDateString("pt-PT", {

@@ -25,9 +25,27 @@ function eventTypeLabel(q: Quote): string {
   return CATEGORIES.find((c) => c.id === q.category)?.label ?? "Outro";
 }
 
+/** Meio-dia LOCAL do dia civil desta data — a âncora que faz a subtração dar
+ *  dias de calendário inteiros mesmo com uma mudança de hora pelo meio. */
+function localNoon(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12).getTime();
+}
+
+/**
+ * Há quanto tempo, em DIAS DO CALENDÁRIO — não em blocos de 24 horas.
+ *
+ * Dividir o intervalo em milissegundos por 86 400 000 responde a outra
+ * pergunta: um pedido de ontem às 21h, visto hoje às 00h30, tem três horas e
+ * meia e dizia "hoje"; um de terça à noite visto na sexta de manhã tem 2,4
+ * intervalos e dizia "há 2d" quando já iam três noites sem contacto. Esta
+ * coluna é o que decide a quem se liga a seguir, por isso conta-se como uma
+ * pessoa conta: pelos dias que viraram (ver `eventCountdown` em util.ts).
+ */
 function timeAgo(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (days === 0) return "hoje";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const days = Math.round((localNoon(new Date()) - localNoon(d)) / 86400000);
+  if (days <= 0) return "hoje";
   if (days === 1) return "ontem";
   if (days < 30) return `há ${days}d`;
   const months = Math.round(days / 30);

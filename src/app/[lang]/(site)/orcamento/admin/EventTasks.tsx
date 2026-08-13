@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Quote, Task, TaskPriority } from "@/lib/orcamento/types";
 import { todayKey } from "./util";
 import { useToast } from "./Toast";
 import { Button, Field, EmptyState } from "./ui";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
   baixa: "#8a8a82",
@@ -35,17 +36,48 @@ export default function EventTasks({ quote, userName }: Props) {
   const [newPriority, setNewPriority] = useState<TaskPriority>("normal");
   const [newDue, setNewDue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [erro, setErro] = useState(false);
+  const [mensagemDeErro, setMensagemDeErro] = useState("");
+
+  /**
+   * A leitura não olhava para a resposta: um 500, as tabelas por instalar ou a
+   * rede em baixo caíam todos no mesmo `[]` de uma lista mesmo vazia, e o painel
+   * dizia "Sem tarefas ligadas a este evento". É a frase mais tranquilizadora
+   * deste ecrã e é o contrário do que se sabe — ela abre o evento na véspera da
+   * montagem, lê isso, e fecha o separador com o que falta fazer intacto do
+   * outro lado. Mesmo tratamento que a lista global de Tarefas e os
+   * Fornecedores: guardar a explicação do servidor e mostrar o `AvisoDeFalha`.
+   */
+  const carregar = useCallback(async () => {
+    try {
+      const res = await fetch("/api/tarefas");
+      if (!res.ok) {
+        const corpo = await res.json().catch(() => null);
+        const dito = typeof corpo?.error === "string" ? corpo.error : "";
+        throw new Error(dito || String(res.status));
+      }
+      const data: unknown = await res.json();
+      if (!Array.isArray(data)) throw new Error();
+      setTasks((data as Task[]).filter((t) => t.quoteId === quote.id));
+      setErro(false);
+      setMensagemDeErro("");
+    } catch (e) {
+      setErro(true);
+      setMensagemDeErro(e instanceof Error ? e.message : "");
+    } finally {
+      setLoading(false);
+    }
+  }, [quote.id]);
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/tarefas")
-      .then((r) => r.json())
-      .then((data: Task[]) => {
-        setTasks(Array.isArray(data) ? data.filter((t) => t.quoteId === quote.id) : []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [quote.id]);
+    void carregar();
+  }, [carregar]);
+
+  const tentarDeNovo = useCallback(() => {
+    setLoading(true);
+    void carregar();
+  }, [carregar]);
 
   async function toggleDone(task: Task) {
     const next = { ...task, done: !task.done };
@@ -219,6 +251,12 @@ export default function EventTasks({ quote, userName }: Props) {
             <div key={i} className="bo-skeleton h-12 w-full rounded-xl" />
           ))}
         </div>
+      ) : erro && tasks.length === 0 ? (
+        <AvisoDeFalha
+          titulo="Não foi possível ler as tarefas deste evento"
+          mensagem={mensagemDeErro}
+          aoTentarDeNovo={tentarDeNovo}
+        />
       ) : tasks.length === 0 && !adding ? (
         <EmptyState
           className="px-4 py-10"

@@ -205,8 +205,8 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
   }, []);
 
   async function saveEditTask(id: string) {
-    // Keep the pre-edit list so we can undo if the save doesn't stick.
-    const snapshot = tasksRef.current;
+    // Repõe-se ESTA tarefa, não a lista. Ver a nota sobre a reposição em `toggle`.
+    const anterior = tasksRef.current.find((t) => t.id === id);
     setTasks((prev) =>
       prev.map((t) =>
         t.id === id
@@ -226,7 +226,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       });
       if (!res.ok) throw new Error();
     } catch {
-      setTasks(snapshot);
+      if (anterior) setTasks((prev) => prev.map((t) => (t.id === id ? anterior : t)));
       toast("Não foi possível guardar as alterações. Tenta novamente.", "error");
     }
   }
@@ -269,7 +269,13 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     async (task: Task) => {
       // Optimistic tick, but undo it if the server rejects — otherwise the box
       // stays flipped while the task is unchanged, and desyncs on next reload.
-      const snapshot = tasksRef.current;
+      //
+      // A reposição é DESTA tarefa e mais nenhuma. Repor a lista inteira (que era
+      // o que se fazia) desfazia tudo o que tivesse gravado bem enquanto este
+      // pedido estava a caminho: ela risca uma tarefa, o pedido lento de outra
+      // volta com erro, e a primeira desmarca-se sozinha no ecrã apesar de estar
+      // concluída no servidor — o desfecho que o `touch` do `tasks-store` existe
+      // para impedir, só que aqui sem servidor nenhum pelo meio.
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
       try {
         const res = await fetch(`/api/tarefas/${task.id}`, {
@@ -279,7 +285,7 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
         });
         if (!res.ok) throw new Error();
       } catch {
-        setTasks(snapshot);
+        setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: task.done } : t)));
         toast("Não foi possível atualizar a tarefa. Tenta novamente.", "error");
       }
     },
@@ -291,13 +297,21 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       const t = tasksRef.current.find((x) => x.id === id);
       // Only confirm when there's real content to lose (skip trivial empties).
       if (t && !confirm(`Eliminar a tarefa "${t.title}"?`)) return;
-      const snapshot = tasksRef.current;
+      // Guardamos a tarefa e o sítio dela, não a lista: se a eliminação for
+      // recusada devolve-se ESTA linha ao lugar sem mexer no que outras
+      // gravações tenham feito entretanto (ver a nota em `toggle`).
+      const posicao = tasksRef.current.findIndex((x) => x.id === id);
       setTasks((prev) => prev.filter((x) => x.id !== id));
       try {
         const res = await fetch(`/api/tarefas/${id}`, { method: "DELETE" });
         if (!res.ok) throw new Error();
       } catch {
-        setTasks(snapshot);
+        if (t)
+          setTasks((prev) => {
+            if (prev.some((x) => x.id === id)) return prev;
+            const onde = Math.min(posicao < 0 ? prev.length : posicao, prev.length);
+            return [...prev.slice(0, onde), t, ...prev.slice(onde)];
+          });
         toast("Não foi possível eliminar a tarefa. Tenta novamente.", "error");
       }
     },

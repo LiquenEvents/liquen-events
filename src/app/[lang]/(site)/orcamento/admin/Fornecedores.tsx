@@ -31,6 +31,13 @@ const EMPTY_FORM = {
   notes: "",
 };
 
+/**
+ * O que o PATCH de `/api/fornecedores/[id]` aceita: os campos do fornecedor,
+ * com `null` a valer "apagar". É assim que o `supplierUpdateSchema` os declara
+ * (`.nullish()`), e é a diferença entre poder e não poder tirar uma avaliação.
+ */
+type PatchFornecedor = { [K in keyof Supplier]?: Supplier[K] | null };
+
 const PlusIcon = (
   <svg
     width="16"
@@ -127,9 +134,15 @@ export default function Fornecedores() {
     }
   }
 
-  async function patchSupplier(id: string, patch: Partial<Supplier>): Promise<boolean> {
+  async function patchSupplier(id: string, patch: PatchFornecedor): Promise<boolean> {
     const snapshot = suppliers;
-    setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+    // `null` é o "apagar este campo" que a rota entende; em memória o campo
+    // passa a não existir — que é exactamente como ele volta a ser lido depois
+    // (o `fromRow` do store traduz a coluna nula para `undefined`).
+    const emMemoria = Object.fromEntries(
+      Object.entries(patch).map(([k, v]) => [k, v ?? undefined]),
+    ) as Partial<Supplier>;
+    setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...emMemoria } : s)));
     try {
       const res = await fetch(`/api/fornecedores/${id}`, {
         method: "PATCH",
@@ -548,8 +561,13 @@ export default function Fornecedores() {
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
                         key={star}
+                        // Apagar a avaliação manda `null`, não `0`: o
+                        // `supplierUpdateSchema` da rota aceita 1–5 ou nulo, e o
+                        // zero levava 400 — a estrela voltava a acender-se e
+                        // ficava um "não foi possível guardar" sem explicação. É
+                        // o único caminho para desfazer um clique enganado.
                         onClick={() =>
-                          patchSupplier(s.id, { rating: s.rating === star ? 0 : star })
+                          patchSupplier(s.id, { rating: s.rating === star ? null : star })
                         }
                         className="transition-colors focus:outline-none"
                         aria-label={`${star} estrela${star !== 1 ? "s" : ""}`}
