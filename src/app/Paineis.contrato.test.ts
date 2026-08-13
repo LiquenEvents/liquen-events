@@ -92,6 +92,21 @@ describe("painéis com content-visibility: o espaço reservado tem de bater com 
     expect(min).toMatch(/var\(--cv-h/);
   });
 
+  it("`.cv-panel` pinta um fundo próprio — senão a caixa saltada mostra o branco do corpo", () => {
+    // A QUEIXA QUE ISTO PRENDE: «quando faço scroll e depois volto para cima, as
+    // imagens começam a piscar brancas». O `content-visibility: auto` salta o
+    // CONTEÚDO, não o elemento: enquanto a fotografia não volta a desenhar, o
+    // que se vê é o fundo do painel — e sem fundo nenhum vê-se o corpo do
+    // sítio, que é #ffffff. A subida é onde isso aparece, porque a secção entra
+    // no ecrã já quase inteira. Medido com `e2e/piscar-subida.mjs`.
+    const bloco = /\.cv-panel\s*\{([^}]*)\}/.exec(css)?.[1];
+    const fundo = /background-color:\s*([^;]+);/.exec(bloco!)?.[1]?.trim();
+    expect(fundo, "sem `background-color`, o painel saltado volta a piscar branco").toBeTruthy();
+    // Sobreponível por painel, como o `--cv-h`: um painel de fundo claro tem de
+    // poder dizê-lo sem deixar de ter fundo.
+    expect(fundo).toMatch(/var\(--cv-bg/);
+  });
+
   it("nenhuma página escreve content-visibility à mão — passa toda pelo .cv-panel", () => {
     const infractores = paginas
       .filter(({ src }) => /contentVisibility|content-visibility:\s*auto/.test(src))

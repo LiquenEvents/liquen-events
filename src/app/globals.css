@@ -1447,6 +1447,27 @@ body:has([data-orcamento-mode]) .eyebrow {
   min-height: var(--cv-h, clamp(480px, 60vh, 680px));
   content-visibility: auto;
   contain-intrinsic-size: auto var(--cv-h, clamp(480px, 60vh, 680px));
+  /* ── «A SUBIR, AS FOTOS PISCAM BRANCAS» ─────────────────────────────────
+     O `content-visibility: auto` salta o CONTEÚDO, não o elemento: o painel
+     continua a existir e a pintar o FUNDO DELE PRÓPRIO. Sem fundo nenhum, o
+     que se via enquanto a fotografia não voltava a desenhar era o corpo do
+     sítio — que é #ffffff. Daí o branco.
+
+     A descida disfarça-o (a secção entra pela borda de baixo e há tempo até
+     chegar ao meio do ecrã); a subida não, porque a secção entra já quase
+     inteira. Medido com `e2e/piscar-subida.mjs` num Chromium com o CPU
+     abrandado 4×: na subida, 19 blocos de 20×20 com mais de 90% de píxeis
+     quase-brancos e 5 frames a mudar com a página PARADA. Nas capturas de
+     ecrã do telemóvel vê-se o painel inteiro em branco por cima da
+     fotografia seguinte.
+
+     É a mesma defesa que a `.g-tile` da galeria já usava, e pela mesma razão
+     escrita lá («a regressão do buraco escuro»): um fundo que a caixa saltada
+     também pinta. O tom por omissão é o verde-quase-preto das fotografias
+     destes painéis, portanto o pior caso passa a ser a fotografia a aparecer
+     sobre a sua própria sombra em vez de sobre um flash branco. Um painel de
+     fundo claro sobrepõe com `[--cv-bg:…]`, como já faz com `--cv-h`. */
+  background-color: var(--cv-bg, #12160f);
 }
 
 /* ── O aviso de cookies de quem já respondeu ──
