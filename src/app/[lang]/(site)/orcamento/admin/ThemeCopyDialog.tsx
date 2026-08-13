@@ -52,6 +52,11 @@ export interface ThemeCopyOutcome {
   existing: string[];
   /** As que não foi possível levar — continuam aqui, intactas. */
   failed: string[];
+  /** As que o "Parar" apanhou antes de saírem: nem foram tentadas, e continuam
+   *  aqui. Sem elas no relatório, quem chama não tem como distinguir "não a
+   *  levei" de "esqueci-me dela" — e a seleção de que ela precisa para retomar
+   *  desaparecia. */
+  untouched: string[];
   /** Chegaram ao destino sem miniatura: o tema de destino passa a puxar
    *  originais (medido: 164 MB por página de 60, contra 1,78 MB). */
   thumbsMissing: number;
@@ -159,6 +164,7 @@ export default function ThemeCopyDialog({
     const copied: string[] = [];
     const existing: string[] = [];
     const failed: string[] = [];
+    const untouched: string[] = [];
     let thumbsMissing = 0;
     let stopped = false;
     let firstError: string | null = null;
@@ -166,6 +172,10 @@ export default function ThemeCopyDialog({
     for (let i = 0; i < paths.length; i += THEME_COPY_CHUNK) {
       if (stopRequested.current || !alive.current) {
         stopped = true;
+        // O que ficou por tentar tem de sair daqui com nome. É este o
+        // conjunto que continua selecionado do outro lado, e sem ele retomar
+        // um lote de 300 parado aos 20 era voltar a escolher 280 à mão.
+        untouched.push(...paths.slice(i));
         break;
       }
       const chunk = paths.slice(i, i + THEME_COPY_CHUNK);
@@ -209,6 +219,7 @@ export default function ThemeCopyDialog({
       copied,
       existing,
       failed,
+      untouched,
       thumbsMissing,
       stopped,
     });

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import { ToastProvider } from "./Toast";
 
@@ -224,6 +224,65 @@ describe("rever etiquetas", () => {
     await waitFor(() => expect(fotos()).toHaveLength(3));
     fireEvent.click(screen.getByRole("button", { name: "sem tipo" }));
     expect(screen.queryByLabelText("Nome do tema a criar com este filtro")).not.toBeInTheDocument();
+  });
+
+  /**
+   * A PROCURA LENTA QUE CHEGA DEPOIS DA RÁPIDA.
+   *
+   * A primeira consulta é a biblioteca inteira e é a mais demorada; a do filtro
+   * é curta. Sem cancelamento, a lenta aterrava por cima da que ela pediu a
+   * seguir e a grelha ficava a mostrar a biblioteca toda com o chip «sem tipo»
+   * aceso — e etiquetar em bloco a partir dali punha o tipo em fotos que já o
+   * tinham.
+   */
+  it("uma resposta atrasada não pinta a grelha por cima do filtro pedido a seguir", async () => {
+    const pendentes: ((r: Response) => void)[] = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/biblioteca/etiquetas")) {
+        return new Response(JSON.stringify(ETIQUETAS), { status: 200 });
+      }
+      if (url.startsWith("/api/biblioteca/fotos")) {
+        return new Promise<Response>((resolve) => pendentes.push(resolve));
+      }
+      return new Response("{}", { status: 404 });
+    });
+
+    abrir();
+    await waitFor(() => expect(pendentes).toHaveLength(1));
+    fireEvent.click(screen.getByRole("button", { name: "sem tipo" }));
+    await waitFor(() => expect(pendentes).toHaveLength(2));
+
+    const resposta = (fotos: unknown[]) =>
+      new Response(JSON.stringify({ ok: true, total: fotos.length, fotos }), { status: 200 });
+
+    // A do filtro responde primeiro…
+    await act(async () => {
+      pendentes[1](resposta([foto(9)]));
+    });
+    // …e a da biblioteca inteira só depois. Já não vale nada.
+    await act(async () => {
+      pendentes[0](resposta([foto(1), foto(2), foto(3)]));
+    });
+
+    expect(fotos()).toHaveLength(1);
+  });
+
+  /**
+   * A MINIATURA QUE NÃO EXISTE.
+   *
+   * Assinar um caminho no Storage não verifica que o ficheiro lá está: as fotos
+   * anteriores às miniaturas vêm com `thumbUrl` bem formado para um objecto que
+   * não existe, e o 404 só aparece no navegador. Sem plano B ficava um quadrado
+   * vazio — e etiquetar às cegas é exactamente o que este ecrã veio evitar.
+   */
+  it("uma miniatura que não existe cai para o original, não para um quadrado vazio", async () => {
+    abrir();
+    await waitFor(() => expect(fotos()).toHaveLength(3));
+    const img = () => fotos()[0].querySelector("img")!;
+    expect(img().getAttribute("src")).toBe("https://cdn.test/t1.jpg");
+    fireEvent.error(img());
+    await waitFor(() => expect(img().getAttribute("src")).toBe("https://cdn.test/f1.jpg"));
   });
 
   it("sem nada por arrumar, diz isso em vez de um vazio mudo", async () => {

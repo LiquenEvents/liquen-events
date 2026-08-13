@@ -1571,6 +1571,68 @@ describe("Biblioteca de Temas — copiar e mover fotos entre temas", () => {
     expect(Math.max(...bodies)).toBeLessThanOrEqual(MAX_THEME_COPY_BATCH);
   });
 
+  /**
+   * PARAR A MEIO NÃO PODE CUSTAR A SELEÇÃO.
+   *
+   * Mover 60 fotos são três pedidos. Ela carrega em "Parar" depois do primeiro:
+   * 20 foram, 40 ficaram sem ser sequer tentadas. Essas 40 não estão nem em
+   * `copied`, nem em `existing`, nem em `failed` — e a grelha limpava-lhes a
+   * seleção, deixando o cartão a dizer "as que faltavam continuam neste tema"
+   * sem o botão de retomar e sem forma de as reencontrar a não ser clicando
+   * quarenta vezes.
+   */
+  it("parar a meio deixa selecionadas as que ainda não foram tentadas", async () => {
+    const grande = { ok: true, images: many(1, THEME_PAGE_SIZE), total: THEME_PAGE_SIZE };
+    route("GET /api/temas", () => ok([THEME, OUTRO]));
+    route("GET /api/temas/t1/imagens", () => ok(grande));
+    route("POST /api/temas/t1/imagens/copiar", () => {
+      const feitos = requests.filter(
+        (r) => routeKey(r.url, r.init) === "POST /api/temas/t1/imagens/copiar",
+      );
+      const paths: string[] = JSON.parse(
+        String(feitos[feitos.length - 1].init?.body ?? "{}"),
+      ).paths;
+      return ok({
+        ok: true,
+        copied: paths.map((p) => ({ from: p, to: p.replace("t1/", "t2/") })),
+        existing: [],
+        failed: [],
+        requested: paths.length,
+        thumbsMissing: 0,
+      });
+    });
+    hold("POST /api/temas/t1/imagens/copiar");
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 1 de 60" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 60 de 60" }), {
+      shiftKey: true,
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copiar para…" }));
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Mover" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Mover 60 fotos$/ }));
+    });
+
+    // "Parar" enquanto o primeiro pedido ainda vai a caminho: o que já foi
+    // pedido termina, o resto nem chega a ser tentado.
+    fireEvent.click(screen.getByRole("button", { name: "Parar" }));
+    await release("POST /api/temas/t1/imagens/copiar");
+    await settlePhotos();
+
+    // Um pedido só — os outros dois nem saíram.
+    expect(callsTo("POST /api/temas/t1/imagens/copiar")).toBe(1);
+    expect(photos()).toHaveLength(THEME_PAGE_SIZE - THEME_COPY_CHUNK);
+    // E as que faltavam continuam escolhidas, prontas para retomar.
+    expect(
+      screen.getByText(`${THEME_PAGE_SIZE - THEME_COPY_CHUNK} fotos selecionadas`),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeInTheDocument();
+  });
+
   it("uma cópia que falha inteira deixa as fotos onde estavam", async () => {
     route("GET /api/temas", () => ok([THEME, OUTRO]));
     route("GET /api/temas/t1/imagens", () => ok(cinco));

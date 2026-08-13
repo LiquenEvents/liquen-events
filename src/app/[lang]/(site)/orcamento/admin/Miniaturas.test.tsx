@@ -91,6 +91,59 @@ describe("Miniaturas", () => {
     expect(chamadas.filter((c) => c.metodo === "POST")).toHaveLength(3);
   });
 
+  /**
+   * A SEGUNDA PASSAGEM COMEÇA DO ZERO.
+   *
+   * A primeira faz 52 e deixa 8 por fazer. Ao carregar em "Gerar as 8", a
+   * contagem anterior ficava lá: enquanto o primeiro lote não respondia — que
+   * num lote grande são segundos — o botão dizia «A gerar… 52/8» e a barra
+   * estava cheia sem nada ter sido feito. Uma barra que mente uma vez deixa de
+   * se poder ler.
+   */
+  it("uma segunda passagem não começa com a contagem da primeira", async () => {
+    let posts = 0;
+    let emFalta = 60;
+    const soltar: (() => void)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const metodo = init?.method ?? "GET";
+        chamadas.push({ metodo });
+        if (metodo === "POST") {
+          posts += 1;
+          if (posts === 1) {
+            emFalta = 8;
+            return respostaDe({
+              ok: true,
+              geradas: 52,
+              falhas: Array.from({ length: 8 }, (_, i) => `theme-thumbs/x/${i}.jpg`),
+              restantes: 0,
+            });
+          }
+          // A segunda fica pendurada: é este o instante que interessa ver.
+          return new Promise<Response>((resolve) => {
+            soltar.push(() =>
+              resolve(respostaDe({ ok: true, geradas: 0, falhas: [], restantes: 0 })),
+            );
+          });
+        }
+        return respostaDe({ ok: true, linhas: [], fotos: 100, emFalta, avisos: [] });
+      }),
+    );
+
+    render(<Miniaturas />);
+    await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
+    await waitFor(() => screen.getByRole("button", { name: /gerar as 60/i }));
+    await userEvent.click(screen.getByRole("button", { name: /gerar as 60/i }));
+
+    await waitFor(() => screen.getByRole("button", { name: /gerar as 8/i }));
+    await userEvent.click(screen.getByRole("button", { name: /gerar as 8/i }));
+
+    expect(screen.getByRole("button", { name: /a gerar/i }).textContent).toBe("A gerar… 0/8");
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("0");
+    soltar[0]?.();
+  });
+
   it("um lote que não gera nada pára o ciclo em vez de repetir para sempre", async () => {
     vi.stubGlobal(
       "fetch",

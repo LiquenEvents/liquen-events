@@ -5,6 +5,7 @@ import { EIXOS, type Eixo, type EixoDaRegra, type Etiqueta } from "@/lib/bibliot
 import { MAX_THEME_NAME } from "@/lib/theme-types";
 import { Button, Card } from "./ui";
 import { useToast } from "./Toast";
+import ImagemComPlanoB from "./ImagemComPlanoB";
 
 /**
  * REVER ETIQUETAS — o ecrã onde se arruma a biblioteca em lote.
@@ -83,11 +84,24 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
     return p.toString();
   }, [exigidas, semEixo, porConfirmar]);
 
+  /**
+   * A consulta em curso. Só a ÚLTIMA manda no que aparece.
+   *
+   * A primeira procura é a biblioteca inteira e é a demorada; a de um filtro é
+   * curta. Sem isto, a lenta aterrava por cima da que ela pediu a seguir e a
+   * grelha ficava a mostrar a biblioteca toda com o chip «sem tipo» aceso — e
+   * daí a etiquetar em bloco fotos que já tinham tipo é um clique.
+   */
+  const consulta = useRef(0);
+
   const recarregar = useCallback(async () => {
+    const minha = ++consulta.current;
     setCarregando(true);
     try {
       const res = await fetch(`/api/biblioteca/fotos?${procura}`, { cache: "no-store" });
       const data = await res.json().catch(() => null);
+      // Chegou tarde: já há uma procura mais nova a caminho (ou entregue).
+      if (minha !== consulta.current) return;
       if (res.ok && data?.ok) {
         setFotos(data.fotos ?? []);
         setTotal(data.total ?? 0);
@@ -100,9 +114,12 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
         toast(data?.error || "Não foi possível procurar na biblioteca.", "error");
       }
     } catch {
-      toast("Não foi possível procurar. Verifica a ligação.", "error");
+      if (minha === consulta.current)
+        toast("Não foi possível procurar. Verifica a ligação.", "error");
     } finally {
-      setCarregando(false);
+      // O indicador só se apaga com a resposta que interessa: apagá-lo com uma
+      // resposta velha dizia "pronto" com a grelha ainda a mudar.
+      if (minha === consulta.current) setCarregando(false);
     }
   }, [procura, toast]);
 
@@ -384,12 +401,15 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
                   escolhida ? "border-[#4d6350]" : "border-transparent hover:border-foreground/20"
                 }`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                {/* A miniatura, com o ORIGINAL como plano B. Assinar um caminho
+                    no Storage não confirma que o ficheiro lá está: as fotos
+                    anteriores às miniaturas trazem um `thumbUrl` bem formado
+                    para um objecto que não existe, e o 404 só aparece no
+                    navegador. Sem isto ficava um quadrado vazio — e escolher
+                    trinta fotos a partir de quadrados vazios não é escolher. */}
+                <ImagemComPlanoB
                   src={f.thumbUrl || f.url}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
+                  planoB={f.url}
                   className="h-full w-full object-cover"
                 />
                 {escolhida && (

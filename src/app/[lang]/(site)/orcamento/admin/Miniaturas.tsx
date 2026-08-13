@@ -84,6 +84,11 @@ export default function Miniaturas() {
   async function gerar() {
     setAGerar(true);
     setFalhadas([]);
+    // A contagem recomeça AQUI, e não à chegada do primeiro lote: uma segunda
+    // passagem sobre as que ficaram deixava o número da primeira no ecrã — «A
+    // gerar… 52/8», com a barra cheia e nada feito — durante todo o tempo do
+    // primeiro pedido.
+    setFeitas(0);
     let total = 0;
     const problemas: string[] = [];
     try {

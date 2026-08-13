@@ -21,6 +21,7 @@ import { prepareImageWithThumb } from "./image-prep";
 import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
+import ImagemComPlanoB from "./ImagemComPlanoB";
 import { SugestaoDeNome } from "./SugestaoDeNome";
 
 /**
@@ -519,57 +520,6 @@ async function expandDropEntries(entries: FileSystemEntry[]): Promise<{
     }
   }
   return { files, capped: files.length >= MAX_DROP_FILES || queue.length > 0 };
-}
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * UMA IMAGEM QUE SABE CAIR PARA O TAMANHO DE CIMA
- * ════════════════════════════════════════════════════════════════════════════
- *
- * O cartão de um tema pede a derivada mais pequena que serve — 96 px para uma
- * tira, 400 px para a capa. Essas derivadas podem não existir: nascem no
- * carregamento, e as fotos mais antigas (ou migradas em massa) não as têm.
- *
- * O servidor não consegue saber: assinar um caminho no Supabase Storage NÃO
- * verifica que o ficheiro lá está, e devolve um URL bem formado para um objecto
- * inexistente. Quem descobre é o navegador, com um 404, e até aqui o que
- * acontecia a seguir era nada — ficava a célula vazia. Era isto que deixava os
- * cartões cinzentos.
- *
- * `planoB` é o ORIGINAL, o único que veio da listagem da pasta e portanto o
- * único que existe de certeza. Troca-se UMA vez: se o original também falhar,
- * fica o fundo, porque insistir era um ciclo.
- */
-function ImagemComPlanoB({
-  src,
-  planoB,
-  className,
-}: {
-  src: string;
-  planoB?: string;
-  className?: string;
-}) {
-  const [actual, setActual] = useState(src);
-  // Um `src` novo (outra capa escolhida, outra listagem) recomeça do princípio:
-  // sem isto, uma imagem que caiu para o original ficava lá presa.
-  const [visto, setVisto] = useState(src);
-  if (visto !== src) {
-    setVisto(src);
-    setActual(src);
-  }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={actual}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      onError={() => {
-        if (planoB && actual !== planoB) setActual(planoB);
-      }}
-      className={className}
-    />
-  );
 }
 
 export default function Temas() {
@@ -2415,7 +2365,10 @@ function ThemeFolder({
       setCoverPath((c) => (c && gone.has(c) ? undefined : c));
       anchor.current = null;
     }
-    const stuck = new Set([...r.failed, ...r.existing]);
+    // O que continua aqui: o que falhou, o que já lá estava, e — quando ela
+    // carregou em "Parar" — o que nem chegou a ser tentado. As três coisas têm
+    // o mesmo remédio (voltar a mandar), por isso ficam todas selecionadas.
+    const stuck = new Set([...r.failed, ...r.existing, ...r.untouched]);
     setSelected((prev) => new Set([...prev].filter((p) => stuck.has(p))));
 
     // O cartão vermelho fica no ecrã enquanto houver fotos por levar; um
@@ -2936,7 +2889,7 @@ function ThemeFolder({
           <p className="bo-text-muted mt-1 text-xs">
             {copyReport.failed.length > 0
               ? "Continuam neste tema e ficaram selecionadas — podes tentar outra vez sem as escolher de novo."
-              : "As que faltavam continuam neste tema."}
+              : "As que faltavam continuam neste tema e ficaram selecionadas — podes retomar sem as escolher de novo."}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {selectedCount > 0 && (
