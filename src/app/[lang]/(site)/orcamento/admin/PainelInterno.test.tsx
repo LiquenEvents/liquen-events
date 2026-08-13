@@ -281,3 +281,68 @@ describe("a memória de preços", () => {
     await waitFor(() => expect(screen.queryByText(/propostas parecidas/)).toBeNull());
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CAMPO DO CUSTO É DA LINHA, NÃO DA POSIÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As linhas desenham-se com `key={i}` — a POSIÇÃO — e o campo do custo é
+ * não-controlado (`defaultValue` + `onBlur`). Apagada uma linha do meio lá em
+ * cima, o React reaproveita o nó que sobrevive na posição e o `defaultValue`
+ * não se volta a aplicar: o campo ficava com o custo da linha ANTERIOR ao lado
+ * do nome da linha nova, e o `blur` seguinte gravava-o por cima do verdadeiro.
+ * A margem que daí sai deixa de ser a desta linha, e nada o assinala.
+ */
+describe("apagar uma linha do meio", () => {
+  const tresLinhas = (over: Partial<ProposalDoc> = {}) =>
+    doc({
+      budgetItems: ["Alfa", "Beta", "Gama"],
+      budgetAmounts: [1000, 2000, 3000],
+      budgetCosts: [100, 200, 300],
+      ...over,
+    }) as ProposalDoc;
+
+  it("o custo que fica no campo é o da linha que sobrou — e é esse que se grava", async () => {
+    const onCusto = vi.fn();
+    const { rerender } = render(
+      <PainelInterno
+        doc={tresLinhas()}
+        quote={pedido()}
+        quotes={[]}
+        totalBruto={7380}
+        onCusto={onCusto}
+        onDeslocacao={vi.fn()}
+      />,
+    );
+    await abrir();
+    expect(screen.getByLabelText("Custo da linha 3")).toHaveValue("300");
+
+    // A «Beta» é apagada lá em cima, no orçamento: o painel recebe o documento
+    // já sem ela.
+    rerender(
+      <PainelInterno
+        doc={tresLinhas({
+          budgetItems: ["Alfa", "Gama"],
+          budgetAmounts: [1000, 3000],
+          budgetCosts: [100, 300],
+        })}
+        quote={pedido()}
+        quotes={[]}
+        totalBruto={7380}
+        onCusto={onCusto}
+        onDeslocacao={vi.fn()}
+      />,
+    );
+
+    // A metade visível: o campo mostrava «200» ao lado da «Gama».
+    const campo = screen.getByLabelText("Custo da linha 2");
+    expect(campo).toHaveValue("300");
+
+    // E a metade cara: tocar no campo e sair dele gravava o que lá estava.
+    await userEvent.click(campo);
+    await userEvent.tab();
+    expect(onCusto).toHaveBeenCalledWith(1, 300);
+    expect(onCusto).not.toHaveBeenCalledWith(1, 200);
+  });
+});

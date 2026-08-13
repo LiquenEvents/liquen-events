@@ -13,6 +13,16 @@ import ProposalStudio, {
   textoDoTotal,
 } from "./ProposalStudio";
 import { totaisDaProposta } from "@/lib/proposal-budget";
+// A MESMA geometria que o gerador usa. As caixas esperadas não se escrevem à
+// mão: sai daqui o que a página desenha, e é com isso que a grelha do estúdio
+// tem de concordar.
+import {
+  ASPETO_POR_OMISSAO,
+  alturaDaLegenda,
+  aspetoDaCaixa,
+  caixasDoMoodboard,
+  linhasDaLegendaAprox,
+} from "@/lib/proposal-geometria";
 import { parseMoneyText } from "@/lib/proposal-doc";
 import { eur } from "@/lib/money";
 import type { Quote } from "@/lib/orcamento/types";
@@ -2532,5 +2542,300 @@ describe("a margem no bloco dos totais", () => {
     renderStudio();
     await screen.findByText("Só para si");
     expect(await screen.findByText(/Abaixo dos \d+% que definiu/)).toBeTruthy();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CAMPO DE PREÇO É DA LINHA, NÃO DA POSIÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O defeito mais caro que esta página teve, porque grava o número errado com
+ * bom aspecto. As linhas desenham-se com `key={i}` — a POSIÇÃO — e o campo do
+ * preço era não-controlado (`defaultValue` + `onBlur`): apagada a linha do
+ * meio, o React reaproveita o nó que sobrevive na posição e o `defaultValue`
+ * não se volta a aplicar. O campo ficava com o preço da linha ANTERIOR ao lado
+ * do nome da linha nova, e o `blur` seguinte gravava-o por cima do verdadeiro.
+ *
+ * Daí ia para o PDF, para o sinal e para a factura, sem nada a assinalar.
+ */
+describe("apagar uma linha do meio do orçamento", () => {
+  function seedTresLinhas(extra: Record<string, unknown> = {}) {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: ["Alfa", "Beta", "Gama"],
+        budgetAmounts: [100, 200, 300],
+        coverImages: ["", ""],
+        totalAmount: 600,
+        totalVatMode: "acrescer",
+        ...extra,
+      }),
+    );
+  }
+
+  /** Carrega no × da linha com este nome. */
+  async function apagar(user: ReturnType<typeof userEvent.setup>, nome: string) {
+    const campo = await screen.findByDisplayValue(nome);
+    await user.click(within(campo.parentElement!).getByLabelText("Remover item"));
+  }
+
+  const gravado = () => JSON.parse(localStorage.getItem(DRAFT_KEY)!);
+
+  it("o preço que fica no campo é o da linha que sobrou — e é esse que se grava", async () => {
+    seedTresLinhas();
+    renderStudio();
+    const user = userEvent.setup();
+    await apagar(user, "Beta");
+
+    // A metade visível do defeito: o campo mostrava «200» ao lado da «Gama».
+    const preco = await screen.findByLabelText("Preço de Gama");
+    expect(preco).toHaveValue("300");
+
+    // E a metade cara: tocar no campo e sair dele gravava o que lá estava.
+    await user.click(preco);
+    await user.tab();
+    await waitFor(() => expect(gravado().budgetAmounts).toEqual([100, 300]));
+  });
+
+  /** O preço unitário da escala tem o mesmo mal e a mesma cura — e uma fórmula
+   *  ao lado a explicar, com toda a confiança, a conta de outra linha. */
+  it("o preço unitário que fica no campo é o da linha que sobrou", async () => {
+    seedTresLinhas({
+      budgetScales: [
+        { tipo: "por-convidado", unitario: 10 },
+        { tipo: "por-convidado", unitario: 20 },
+        { tipo: "por-convidado", unitario: 30 },
+      ],
+    });
+    renderStudio();
+    const user = userEvent.setup();
+    await apagar(user, "Beta");
+
+    const unitario = await screen.findByLabelText("Preço por convidado de Gama");
+    expect(unitario).toHaveValue("30");
+
+    await user.click(unitario);
+    await user.tab();
+    await waitFor(() =>
+      expect((gravado().budgetScales as { unitario: number }[]).map((e) => e.unitario)).toEqual([
+        10, 30,
+      ]),
+    );
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «ARRUMAR EU» LEVA A MARCA DE EXTRA COM A LINHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `budgetOpcional` é um array paralelo às linhas como os preços e os custos.
+ * Ficava de fora da permutação: arrumar a ordem deixava a marca «extra» na
+ * rubrica errada — o PDF imprimia-a ao lado da linha que não era, e a versão
+ * sem extras ficava cem euros ao lado da verdade.
+ */
+describe("arrumar a ordem do orçamento", () => {
+  function seedForaDeOrdem() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        // A ordem manda-a a lista de Serviços: primeiro a Cerimónia, depois o
+        // Jantar. O orçamento está escrito ao contrário.
+        serviceGroups: [
+          { letter: "a)", title: "Cerimónia", items: [{ label: "Igreja" }] },
+          { letter: "b)", title: "Jantar", items: [{ label: "Mesas" }] },
+        ],
+        moodBoards: [],
+        budgetItems: ["Decor Jantar", "Decor Cerimónia"],
+        budgetAmounts: [200, 100],
+        // O extra está na CERIMÓNIA, que é a linha que vai mudar de sítio.
+        budgetOpcional: [false, true],
+        coverImages: ["", ""],
+        totalAmount: 300,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  it("a marca «extra» viaja com a linha, como o preço", async () => {
+    seedForaDeOrdem();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click((await screen.findAllByRole("button", { name: "Arrumar eu" }))[0]);
+
+    await waitFor(() => {
+      const doc = JSON.parse(localStorage.getItem(DRAFT_KEY)!);
+      expect(doc.budgetItems).toEqual(["Decor Cerimónia", "Decor Jantar"]);
+      // Os preços já viajavam; a marca de extra é que ficava para trás.
+      expect(doc.budgetAmounts).toEqual([100, 200]);
+      expect(doc.budgetOpcional).toEqual([true, false]);
+    });
+
+    // E o que ela vê bate certo com o que ficou gravado.
+    expect(screen.getByLabelText("Decor Cerimónia é um extra opcional")).toBeChecked();
+    expect(screen.getByLabelText("Decor Jantar é um extra opcional")).not.toBeChecked();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A LEGENDA ROUBA ALTURA ÀS FOTOS — TAMBÉM NA GRELHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A página reserva altura para a descrição, e reserva mais quanto mais linhas
+ * ela tiver. A grelha das fotos e o aviso «esta foto perde X%» pediam as caixas
+ * SEM essa altura (ficavam com a omissão de 8 pt, a de quem não tem legenda
+ * nenhuma), enquanto a miniatura desenhada no mesmo cartão já a contava: as
+ * duas metades do cartão discordavam, e o aviso disparava — ou calava-se —
+ * pelas razões erradas.
+ */
+describe("a grelha das fotos conta com a legenda", () => {
+  /** Duas linhas de descrição, medidas por `linhasDaLegendaAprox`. */
+  const LEGENDA =
+    "Flores brancas e verdes, com muito verde e pouca cor, para a cerimónia toda ao ar livre, ao fim da tarde, com velas nos bancos e no altar.";
+
+  function seedBoardComLegenda() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [
+          {
+            title: "Cerimónia",
+            annotation: LEGENDA,
+            layout: "mosaico",
+            images: Array.from({ length: 4 }, (_, i) => `board/foto-${i}.jpg`),
+          },
+        ],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  // O jsdom não descarrega imagens, portanto nenhuma foto é medida e todas
+  // entram com a forma por omissão — a mesma que o gerador assume.
+  const aspectos = Array.from({ length: 4 }, () => ASPETO_POR_OMISSAO);
+  const comLegenda = caixasDoMoodboard(
+    "mosaico",
+    aspectos,
+    alturaDaLegenda(linhasDaLegendaAprox(LEGENDA)),
+    false,
+  );
+  const semLegenda = caixasDoMoodboard("mosaico", aspectos, undefined, false);
+
+  it("cada célula tem a forma da caixa que a página lhe dá", async () => {
+    // Se um dia as duas geometrias coincidirem, este teste deixa de medir o
+    // que diz medir — e é melhor falhar aqui do que passar por engano.
+    expect(aspetoDaCaixa(comLegenda[0])).not.toBe(aspetoDaCaixa(semLegenda[0]));
+
+    seedBoardComLegenda();
+    renderStudio();
+    const cartao = await waitFor(() => {
+      const el = document.getElementById("mood-board-0");
+      expect(el).toBeTruthy();
+      return el!;
+    });
+    const celulas = [...cartao.querySelectorAll<HTMLElement>("[data-foto]")];
+    expect(celulas).toHaveLength(4);
+    // `parseFloat` porque o jsdom normaliza o `aspect-ratio` para «0.558 / 1»
+    // — o número é o mesmo, a escrita é que é dele.
+    expect(celulas.map((c) => parseFloat(c.style.aspectRatio))).toEqual(
+      comLegenda.map((caixa) => aspetoDaCaixa(caixa)),
+    );
+  });
+
+  /**
+   * A conta do aviso é a mesma da grelha. Com a omissão de 8 pt, a 3.ª foto
+   * aparecia na lista das cortadas (perdia 14%); com a altura verdadeira perde
+   * 4% e não é caso para aviso nenhum. O aviso existe para ela ir trocar UMA
+   * fotografia — apontar-lhe a errada é pior do que estar calado.
+   */
+  it("as percentagens de perda são as da página, não as de uma folha sem legenda", async () => {
+    seedBoardComLegenda();
+    renderStudio();
+    const aviso = await screen.findByText(/fotografias são cortadas/);
+    expect(aviso.textContent).toMatch(/3 fotografias são cortadas/);
+    expect(aviso.textContent).toMatch(/a 1\.ª perde 63%/);
+    expect(aviso.textContent).toMatch(/a 4\.ª perde 50%/);
+    // A 3.ª deixa de ser acusada: 4% não é um corte que se note.
+    expect(aviso.textContent).not.toMatch(/a 3\.ª/);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A VISTA DE CONJUNTO OCUPA A LARGURA TODA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Estava dentro da grelha de duas colunas do índice, como TERCEIRO filho: por
+ * colocação automática ficava com a coluna do índice e empurrava a lista dos
+ * mood boards para os 11 rem — 176 px de largura para as fotografias todas, a
+ * partir dos 1024 px.
+ */
+describe("ver as páginas lado a lado", () => {
+  function seedDoisBoards() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [
+          { title: "Cerimónia", annotation: "", images: ["board/a.jpg"] },
+          { title: "Jantar", annotation: "", images: ["board/b.jpg"] },
+        ],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  it("não entra na grelha do índice — a grelha continua com duas colunas e dois filhos", async () => {
+    seedDoisBoards();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Ver as páginas lado a lado" }));
+
+    const vista = await screen.findByText("Vista de conjunto");
+    const grelha = document.querySelector('[class*="lg:grid-cols-[11rem"]');
+    expect(grelha).toBeTruthy();
+    // O índice e a lista dos boards, e mais nada: um terceiro filho é o que
+    // mandava a lista para a coluna de 176 px.
+    expect(grelha!.children).toHaveLength(2);
+    expect(grelha!.contains(vista)).toBe(false);
   });
 });

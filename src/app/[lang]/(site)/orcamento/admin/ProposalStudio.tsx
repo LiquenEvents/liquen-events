@@ -100,10 +100,12 @@ import { depositPercentOf } from "@/lib/proposal-doc";
 // um segundo desenho, aproximado, mentia no dia em que divergisse.
 import {
   ASPETO_POR_OMISSAO,
+  alturaDaLegenda,
   aspetoDaCaixa,
   aspetoDaCapa,
   caixasDoMoodboard,
   layoutSugerido,
+  linhasDaLegendaAprox,
   PAGINA_H,
   PAGINA_W,
   perdaNaCapa,
@@ -2146,23 +2148,45 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * torna o arrasto possível: enquanto a sugestão mandasse, arrastar um board
    * era pô-lo num sítio e vê-lo voltar na página seguinte.
    *
-   * Os preços, os custos e as escalas são arrays PARALELOS às linhas — viajam
-   * com a mesma permutação ou o orçamento trocava os preços de sítio, que é
-   * um erro que só se vê quando o cliente pergunta.
+   * Os preços, os custos, as escalas e as marcas de extra são arrays PARALELOS
+   * às linhas — viajam todos com a mesma permutação ou o orçamento trocava os
+   * preços de sítio, que é um erro que só se vê quando o cliente pergunta.
+   *
+   * ── PORQUE É QUE A LISTA NÃO SE ESCREVE AQUI À MÃO ────────────────────────
+   * Escrevia-se, e faltava-lhe um: o `budgetOpcional`. A marca de «extra»
+   * ficava para trás na permutação, portanto «Arrumar eu» deixava-a na rubrica
+   * errada — o PDF imprimia «extra» ao lado da linha que não era, e a versão
+   * sem extras ficava cem euros ao lado da verdade. Uma segunda lista dos
+   * arrays paralelos é uma lista que se esquece do array seguinte.
+   *
+   * A lista verdadeira é a de `proposal-budget` (o `PARALELOS` que o
+   * `adicionarLinha`/`removerLinha` usam). Não é exportada, mas o TIPO dela é
+   * alcançável pela assinatura do `adicionarLinha` — e com o `satisfies` lá em
+   * baixo a exigir que estejam cá todas, esquecer uma passa a ser erro de
+   * compilação em vez de um extra na linha errada.
    */
+  type ArrayParaleloDaLinha = Omit<Parameters<typeof adicionarLinha>[0], "budgetItems">;
+
   function arrumadoEExplicito(d: StudioDoc): StudioDoc {
     const linhas = linhasDe(d);
     const ordemL = ordemDeSaida(d as ProposalDoc, linhas, (l) => l.item ?? "");
     const ordemB = ordemDeSaida(d as ProposalDoc, d.moodBoards, (b) => b.title ?? "");
     const paralelo = <T,>(arr: T[] | undefined) =>
       arr === undefined ? undefined : aplicarOrdem(arr, ordemL);
+    // `satisfies` e não uma anotação de tipo: exige que estejam cá TODAS as
+    // chaves paralelas, sem trocar o tipo exacto de cada array por um tipo
+    // comum — que era o que faria o spread lá em baixo deixar de casar.
+    const paralelos = {
+      budgetAmounts: paralelo(d.budgetAmounts),
+      budgetCosts: paralelo(d.budgetCosts),
+      budgetScales: paralelo(d.budgetScales),
+      budgetOpcional: paralelo(d.budgetOpcional),
+    } satisfies Record<keyof ArrayParaleloDaLinha, unknown>;
     return {
       ...d,
       ordemExplicita: ORDEM_EXPLICITA,
       budgetItems: aplicarOrdem(d.budgetItems ?? [], ordemL),
-      budgetAmounts: paralelo(d.budgetAmounts),
-      budgetCosts: paralelo(d.budgetCosts),
-      budgetScales: paralelo(d.budgetScales),
+      ...paralelos,
       moodBoards: aplicarOrdem(d.moodBoards, ordemB),
     };
   }
@@ -4417,33 +4441,41 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 onMover={moverSeleccaoParaBoard}
                 onLimpar={() => setSeleccionadas(new Set())}
               />
+              {/* ── AS PÁGINAS LADO A LADO ────────────────────────────────
+                  A pergunta que o editor não deixa fazer — «isto parece tudo
+                  do mesmo casamento?» — só se responde com as folhas todas à
+                  mesma distância dos olhos.
+
+                  FORA DA GRELHA, e acima dela. Lá dentro era o TERCEIRO filho
+                  de uma grelha de duas colunas: por colocação automática, a
+                  vista ficava com a coluna do índice e a lista dos mood boards
+                  descia para a coluna de 11 rem — 176 px de largura para as
+                  fotografias todas, a partir dos 1024 px. Aqui em cima ocupa a
+                  largura toda, que é a única em que umas folhas lado a lado se
+                  comparam. */}
+              {vistaDeConjunto && (
+                <VistaDeConjunto
+                  boards={doc.moodBoards}
+                  ordem={ordemDosBoards}
+                  urls={assetUrls}
+                  originais={assetOriginais}
+                  aspetos={aspetosDasFotos}
+                  onMover={(de, para) => moverBoardParaPosicao(de, para)}
+                  onSaltar={(bi) => {
+                    const id = doc.moodBoards[bi]?.id;
+                    if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
+                    document
+                      .getElementById(`mood-board-${bi}`)
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  onFechar={() => setVistaDeConjunto(false)}
+                />
+              )}
               {/* ── O ÍNDICE ─────────────────────────────────────────────
                   Em ecrã largo é uma coluna fixa ao lado; em telemóvel, uma
                   tira que se percorre por cima da lista — a 390 px, uma coluna
                   lateral roubava metade da grelha das fotos. */}
               <div className="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-5">
-                {/* ── AS PÁGINAS LADO A LADO ────────────────────────────────
-                  A pergunta que o editor não deixa fazer — «isto parece tudo
-                  do mesmo casamento?» — só se responde com as folhas todas à
-                  mesma distância dos olhos. */}
-                {vistaDeConjunto && (
-                  <VistaDeConjunto
-                    boards={doc.moodBoards}
-                    ordem={ordemDosBoards}
-                    urls={assetUrls}
-                    originais={assetOriginais}
-                    aspetos={aspetosDasFotos}
-                    onMover={(de, para) => moverBoardParaPosicao(de, para)}
-                    onSaltar={(bi) => {
-                      const id = doc.moodBoards[bi]?.id;
-                      if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
-                      document
-                        .getElementById(`mood-board-${bi}`)
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }}
-                    onFechar={() => setVistaDeConjunto(false)}
-                  />
-                )}
                 <MoodBoardIndice
                   boards={doc.moodBoards}
                   ordem={ordemDosBoards}
@@ -4509,10 +4541,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                          */
                         const semRecorte = b.enquadramento === "forma-da-foto";
                         const layoutDoBoard = b.layout ?? layoutSugerido(aspectos.length);
+                        /**
+                         * A ALTURA QUE A LEGENDA ROUBA ÀS FOTOS.
+                         *
+                         * A página reserva altura para a descrição, e reserva
+                         * MAIS quanto mais linhas ela tiver: com cinco linhas
+                         * são 87 pontos, 15% da folha. Aqui deixava-se a omissão
+                         * de 8 pt — a de quem não tem legenda nenhuma —, e as
+                         * caixas saíam mais altas do que a página as desenha.
+                         * A grelha mostrava um recorte que a folha não faz e o
+                         * aviso «esta foto perde X%» disparava (ou calava-se)
+                         * pelas razões erradas, com dez pontos percentuais de
+                         * diferença. A `PreviaDaPagina`, desenhada no MESMO
+                         * cartão, já contava a legenda: as duas metades do
+                         * cartão discordavam uma da outra.
+                         */
+                        const alturaLegenda = alturaDaLegenda(linhasDaLegendaAprox(b.annotation));
                         const caixas = caixasDoMoodboard(
                           layoutDoBoard,
                           aspectos,
-                          undefined,
+                          alturaLegenda,
                           semRecorte,
                         );
                         const comDestaque = temLugarDeDestaque(layoutDoBoard);
@@ -4531,7 +4579,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                          */
                         const cortadas = semRecorte
                           ? []
-                          : perdasDoMoodboard(layoutDoBoard, aspectos)
+                          : // Com a MESMA altura de legenda das caixas aqui em
+                            // cima: uma perda medida noutra geometria é uma
+                            // percentagem sobre uma página que não existe.
+                            perdasDoMoodboard(layoutDoBoard, aspectos, alturaLegenda)
                               .map((perda, i) => ({ perda, i }))
                               .filter(({ perda }) => perda > PERDA_QUE_SE_AVISA);
                         return (
@@ -5280,6 +5331,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               tracejada, lavada, e diz «sem preço» — três
                               palavras que ninguém confunde com euros. */}
                           <input
+                            /**
+                             * ── A CHAVE TRAZ O PREÇO GRAVADO DE VOLTA AO CAMPO ──
+                             * A linha é desenhada com `key={i}`, e o `i` é a
+                             * POSIÇÃO: ao apagar a do meio, o React reaproveita
+                             * o nó que sobrevive na posição e um `defaultValue`
+                             * não se volta a aplicar a um nó que já existia. O
+                             * campo ficava a mostrar o preço da linha ANTERIOR
+                             * ao lado do nome da linha nova — e o `blur`
+                             * seguinte GRAVAVA esse número por cima do
+                             * verdadeiro. Com [Alfa, Beta, Gama] a 100/200/300,
+                             * apagar a Beta e tocar no campo da Gama punha a
+                             * Gama a valer 200 €, e daí ia para o PDF, para o
+                             * sinal e para a factura. O mesmo acontecia no
+                             * arrumar, no Cmd+Z, no anular a limpeza e no repor
+                             * uma versão: o que estava no campo deixava de ser
+                             * o que estava no documento.
+                             *
+                             * Pôr o valor gravado na chave resolve-o pela raiz —
+                             * é o mesmo remédio que os valores adicionais já
+                             * usam aqui em baixo. A chave só muda quando o
+                             * DOCUMENTO muda, nunca a cada tecla: continua a
+                             * poder escrever-se «1.500,50» sem o campo se
+                             * reformatar a meio da escrita.
+                             */
+                            key={`preco:${i}:${l.preco}`}
                             className={`bo-input px-2.5 py-2 text-right text-xs ${
                               semPreco
                                 ? "border-dashed bg-foreground/[0.02] text-foreground/40 placeholder:text-foreground/30 placeholder:italic"
@@ -5343,6 +5419,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           <div className="flex w-full flex-wrap items-center gap-2 pl-1">
                             <span className="w-24 shrink-0">
                               <input
+                                // A mesma chave do preço, e pela mesma razão: o
+                                // unitário é um `defaultValue` num nó que a
+                                // remoção de uma linha reaproveita, e sem isto
+                                // ficava a mostrar o unitário da linha anterior
+                                // — com a fórmula ao lado a explicar uma conta
+                                // que já não era a desta linha.
+                                key={`unitario:${i}:${escala.unitario}`}
                                 className="bo-input px-2.5 py-2 text-right text-xs text-foreground/75"
                                 defaultValue={String(escala.unitario)}
                                 onBlur={(e) => definirUnitario(i, e.target.value)}

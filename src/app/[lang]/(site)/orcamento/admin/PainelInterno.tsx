@@ -200,6 +200,22 @@ export default function PainelInterno({
                           {l?.preco === null ? "—" : eur(l!.preco!)}
                         </span>
                         <input
+                          /**
+                           * ── A CHAVE TRAZ O CUSTO GRAVADO DE VOLTA AO CAMPO ──
+                           * A linha é desenhada com `key={i}`, que é a POSIÇÃO e
+                           * não a linha: ao apagar uma linha do meio lá em cima,
+                           * o React reaproveita o nó que sobrevive na posição e
+                           * o `defaultValue` não se volta a aplicar. O campo
+                           * ficava com o custo da linha ANTERIOR ao lado do nome
+                           * da linha nova, e o `blur` seguinte gravava-o por
+                           * cima do verdadeiro — a margem que daí sai deixava de
+                           * ser a desta linha, sem nada a assinalar. Pôr o valor
+                           * gravado na chave obriga o campo a nascer de novo
+                           * sempre que o documento diz outra coisa; a chave não
+                           * muda a cada tecla, por isso continua a poder
+                           * escrever-se «1.500» sem reformatar a meio.
+                           */
+                          key={`custo:${i}:${custos[i]}`}
                           type="text"
                           inputMode="decimal"
                           defaultValue={custos[i] === null ? "" : String(custos[i])}
