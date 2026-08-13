@@ -68,6 +68,7 @@ async function correrDepois() {
 }
 
 import { POST, GET } from "./route";
+import { getDictionary } from "@/lib/i18n";
 import { sendMail } from "@/lib/mail";
 import { sendPushToAll } from "@/lib/push";
 import { enviarEventos } from "@/lib/meta/capi";
@@ -715,5 +716,93 @@ describe("a etiqueta do evento no email de confirmação", () => {
       eventName: "Casamento da Ana e do João",
     });
     expect(cliente.text ?? "").toContain("Evento: Casamento da Ana e do João");
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * UM PEDIDO QUE CHEGA SÓ COM TELEMÓVEL
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * A regra do esquema é "email OU telefone", e o formulário do site passou a
+ * aceitar o mesmo (ver `OrcamentoForm.test.tsx`). Isso põe nesta rota um
+ * caminho que antes quase não se percorria: `form.email` vazio.
+ *
+ * Duas coisas não podem acontecer aí, e ambas são silenciosas quando
+ * acontecem:
+ *  1. a confirmação ao cliente não pode ser enviada para um destinatário
+ *     vazio, nem rebentar o trabalho que corre depois da resposta (o `after`
+ *     leva também a Meta e o push);
+ *  2. o email à equipa não pode sair com um `Reply-To:` vazio — há servidores
+ *     que recusam a mensagem inteira por causa disso, e a única cópia do lead
+ *     ia com ela.
+ *
+ * A rota já sabe disto (`NadaParaConfirmar`); estes testes prendem-no, porque
+ * é o tipo de guarda que desaparece na primeira reescrita.
+ */
+describe("pedido sem email, só com telemóvel", () => {
+  const soTelemovel = { name: "Ana Silva", email: "", phone: "912345678", guests: 50 };
+
+  it("é aceite e gravado, como o esquema manda", async () => {
+    const res = await enviarTudo({ form: soTelemovel });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: expect.any(String) });
+    expect(store.create).toHaveBeenCalled();
+  });
+
+  it("não manda email nenhum para o vazio", async () => {
+    await enviarTudo({ form: soTelemovel });
+    // Só o da equipa. A confirmação ao cliente nem chega a ser tentada.
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    for (const [args] of sendMailMock.mock.calls) {
+      // Ausente é o que se quer (o `to` cai no MAIL_TO da casa, o `Reply-To:`
+      // não chega a ser escrito). O que não pode existir é a string vazia.
+      expect(args.to).not.toBe("");
+      expect(args.replyTo).not.toBe("");
+    }
+  });
+
+  it("e o resto do trabalho que corre depois da resposta acontece na mesma", async () => {
+    // Se a confirmação atirasse em vez de sair pela porta prevista, levava com
+    // ela o push e a Meta, que correm no mesmo `after`.
+    await enviarTudo({ form: soTelemovel });
+    expect(pushMock).toHaveBeenCalled();
+  });
+
+  it("com email, aí sim, saem os dois: o da equipa e a confirmação ao cliente", async () => {
+    // O contraste que dá sentido ao teste de cima.
+    await enviarTudo({ form: { ...soTelemovel, email: "ana@example.com" } });
+    expect(sendMailMock).toHaveBeenCalledTimes(2);
+    expect(sendMailMock.mock.calls.map(([a]) => a.to)).toContain("ana@example.com");
+  });
+});
+
+/**
+ * A RECUSA DE UM PEDIDO SEM CONTACTO NENHUM, DITA COM A FRASE DO FORMULÁRIO.
+ *
+ * O formulário mostra esta frase ao lado do campo antes de tentar enviar
+ * (`errContacto`); a rota devolve-a a quem chega aqui à mesma (um script, um
+ * browser antigo, um pedido forjado). É a MESMA chave do dicionário, e é este
+ * teste o fio que as mantém a dizer a mesma coisa.
+ */
+describe("pedido sem email e sem telemóvel", () => {
+  it("é recusado com a frase que o formulário mostra", async () => {
+    const res = await POST(req("POST", { form: { name: "Ana Silva", email: "", phone: "" } }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(getDictionary("pt").orcamento.errContacto);
+  });
+
+  it("e em inglês, na frase inglesa", async () => {
+    const res = await POST(
+      pedidoNaLingua({ form: { name: "Ana Silva", email: "", phone: "" } }, "en"),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(getDictionary("en").orcamento.errContacto);
+  });
+
+  it("um telemóvel curto de mais não conta como contacto", async () => {
+    const res = await POST(req("POST", { form: { name: "Ana Silva", email: "", phone: "91234" } }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(getDictionary("pt").orcamento.errContacto);
   });
 });

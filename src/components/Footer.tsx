@@ -16,11 +16,28 @@ const FOOTER_BG = "/imagens/JOAO_E_PEDRO_1Y1A4472.jpg";
 
 // Service detail slugs, paired with t.footer.serviceLinks (same order) — gives
 // the money pages keyword-anchored internal links from every page's footer.
+//
+// ── ESTA LISTA TEM DE COBRIR O CATÁLOGO INTEIRO ────────────────────────────
+// É escrita à mão (e não derivada de `SERVICES`) porque o rótulo de cada link
+// é traduzido e vive no dicionário, emparelhado por ÍNDICE: derivar os slugs
+// daqui faria nascer um link sem rótulo, invisível ao olho e mudo ao leitor de
+// ecrã, no dia em que alguém acrescentasse um serviço.
+//
+// O preço de ser à mão foi este: «batizados-e-comunhoes» tem página, sitemap e
+// lugar em /servicos desde sempre, e nunca chegou ao rodapé. O rodapé aparece
+// em TODAS as páginas e nas duas línguas, portanto o serviço andou a perder a
+// ligação interna que os outros quatro têm em todo o lado.
+//
+// Quem guarda isto agora é `rodape-servicos.test.tsx`: percorre `SERVICES` e
+// exige um link por serviço, nas duas línguas. Acrescentar um serviço ao
+// catálogo passa a partir esse teste até esta lista e os dois dicionários
+// crescerem com ele.
 const serviceSlugs = [
   "casamentos",
   "aluguer-de-viaturas-classicas",
   "eventos-corporativos",
   "festas-e-aniversarios",
+  "batizados-e-comunhoes",
 ];
 
 export default function Footer({ locale = "pt" }: { locale?: Locale }) {

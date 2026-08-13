@@ -475,12 +475,16 @@ export const en: Dict = {
     phLocal: "e.g. city or venue…",
     phNome: "Your name",
     phEmail: "email@example.com",
+    hintEmail: "Email is our preferred channel: that is where the confirmation goes.",
     phTelefone: "+351 9XX XXX XXX",
     phMensagem: "Style, colours, atmosphere, inspiration you've saved…",
     hintMensagem:
       "The more you tell us about the style you have in mind, the colours, the mood, references you've saved, the more tailored the proposal. This is where we start designing it.",
     errNome: "Please enter your name",
     errEmail: "Invalid email",
+    // Ver `pt.ts`: a frase da regra "email ou telemóvel", partilhada pela rota
+    // e pelo formulário.
+    errContacto: "Please leave us an email or a phone number so we can get back to you.",
     errTipo: "Please select the event type.",
     errData: "Add the date, or tick \u201cDate still to be decided\u201d.",
     errPessoas: "Add how many people, or tick \u201cStill to be decided\u201d.",
@@ -491,7 +495,10 @@ export const en: Dict = {
     enviando: "Sending…",
     ouWhatsApp: "or via WhatsApp",
     error: "We couldn't send your request. Please try again or reach us on WhatsApp.",
-    requiredNote: "All fields are required.",
+    // Ver `pt.ts` para o porquê destas duas.
+    requiredNote: "All fields are required, except the contact: either one will do.",
+    avisoSemEmail:
+      "Without an email you won't get a written confirmation. We'll reply on the phone number you leave us.",
     submitReassure: "A tailored proposal, crafted in detail.",
     privacyPre: "By submitting, you accept our ",
     privacyLinkLabel: "Privacy Policy",
@@ -620,6 +627,14 @@ export const en: Dict = {
     noDataNotePlural:
       "Save the reference above. We've sent the details to our team and will be in touch shortly.",
     footerNote: "A formal proposal is sent after our team reviews your request.",
+    // Ver `pt.ts`: sem email não há confirmação escrita, e quem enviou tem de o
+    // saber aqui em vez de ficar à espera dela.
+    semEmailNota:
+      "You didn't leave us an email, so you won't get this confirmation in writing. Save the reference above: we'll reply on the phone number you left us.",
+    semEmailNotaPlural:
+      "You didn't leave us an email, so you won't get this confirmation in writing. Save the reference above: we'll reply on the phone number you left us.",
+    stepPropostaSemEmail:
+      "We'll agree the best way to get it to you, by WhatsApp or by email if there is one by then.",
     proximosPassos: "Next steps",
     steps: [
       { label: "Request review", desc: "Our team reviews every detail." },
@@ -809,11 +824,13 @@ export const en: Dict = {
     disponivel: "Available for new events",
     paginas: "Pages",
     servicosTitulo: "Services",
+    // Ver `pt.ts`: emparelhados por índice com `serviceSlugs`, em Footer.tsx.
     serviceLinks: [
       "Wedding Decoration",
       "Classic Car Rental",
       "Corporate Events",
       "Parties & Celebrations",
+      "Christenings & Communions",
     ],
     contacto: "Contact",
     pedirOrcamento: "Request a quote",

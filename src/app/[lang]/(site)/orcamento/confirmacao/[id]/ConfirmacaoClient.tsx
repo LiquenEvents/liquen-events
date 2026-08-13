@@ -295,6 +295,29 @@ export default function ConfirmacaoClient({
     ? `${firstName}, ${tc.lead.charAt(0).toLowerCase()}${tc.lead.slice(1)}`
     : tc.lead;
 
+  /**
+   * ── ESTE PEDIDO NÃO TEM PARA ONDE MANDAR A CONFIRMAÇÃO ──────────────────
+   *
+   * A regra do servidor é "email OU telemóvel" (`quoteFormSchema`), e o
+   * formulário passou a aceitar o mesmo: há pedidos que chegam só com
+   * telemóvel. A confirmação automática vai por email, portanto a estes não vai
+   * nada, e a rota sabe-o (`NadaParaConfirmar`, em api/orcamento/route.ts).
+   *
+   * O que esta página não podia continuar a fazer era prometer o contrário. Ela
+   * dizia «Recebemos o seu pedido» e a lista de passos prometia uma proposta
+   * «por email»; quem não deixou email ficava a vigiar uma caixa de correio
+   * onde nunca chega nada, e ao terceiro dia conclui que o pedido se perdeu.
+   *
+   * Só quando SABEMOS que não há email: enquanto o pedido não chegou (o `quote`
+   * é nulo, ou veio de uma leitura que não trouxe o contacto) não se avisa de
+   * nada, porque um aviso destes a quem DEU email é pior do que não o dar.
+   */
+  const semEmail = !!quote && !quote.email;
+  /** Os próximos passos, sem a promessa que este pedido não pode cumprir. */
+  const steps = semEmail
+    ? tc.steps.map((s, i) => (i === 1 ? { ...s, desc: tc.stepPropostaSemEmail } : s))
+    : tc.steps;
+
   // Only the fields we actually collect — packages/add-ons aren't part of the
   // flow, so they never appear here. "Categoria" is deliberately absent: it's
   // internal taxonomy ("Eventos Particulares"), it says nothing the type row
@@ -432,6 +455,17 @@ export default function ConfirmacaoClient({
               {lead}
             </p>
           </AnimateIn>
+
+          {/* Logo a seguir à frase que diz o que vai acontecer, porque é aqui
+              que a expectativa se forma. Filete dourado e não moss: não é uma
+              falha nem uma confirmação, é uma condição do pedido que ela fez. */}
+          {semEmail && (
+            <AnimateIn from="bottom" delay={200}>
+              <p className="mt-6 max-w-[34rem] border-l-2 border-gold/70 pl-5 text-foreground/78 text-[14px] leading-[1.75]">
+                {pick(tc.semEmailNota, tc.semEmailNotaPlural)}
+              </p>
+            </AnimateIn>
+          )}
 
           {/* Perspective: two working days is nothing against 300 days of
               planning. Shown only when there IS a date to count towards. */}
@@ -588,7 +622,7 @@ export default function ConfirmacaoClient({
                   {tc.proximosPassos}
                 </p>
                 <ol>
-                  {tc.steps.map((item, i) => (
+                  {steps.map((item, i) => (
                     <li
                       key={i}
                       className="flex gap-5 py-5 border-b border-foreground/10 last:border-b-0"

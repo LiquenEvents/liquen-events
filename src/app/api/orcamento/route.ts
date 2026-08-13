@@ -98,11 +98,13 @@ function mensagemDeValidacao(err: ZodError, locale: Locale): string {
 
   // A regra "email OU telefone": a única invariante do esquema que não é sobre
   // um campo isolado, e por isso a única cuja frase não pode nomear um.
-  if (issue?.code === "custom") {
-    return en
-      ? "Please leave us an email or a phone number so we can get back to you."
-      : "Indique um email ou um telemóvel para lhe podermos responder.";
-  }
+  //
+  // Vem do dicionário, como as duas de cima, porque o FORMULÁRIO mostra esta
+  // mesma frase ao lado do campo antes de sequer tentar enviar (ver `contactoErr`,
+  // em OrcamentoForm.tsx). Estava aqui escrita à mão nas duas línguas, e duas
+  // cópias da mesma frase é como se acaba com duas frases diferentes para a
+  // mesma recusa.
+  if (issue?.code === "custom") return to.errContacto;
 
   if (issue?.code === "too_big" && typeof issue.maximum === "number") {
     const max = issue.maximum;

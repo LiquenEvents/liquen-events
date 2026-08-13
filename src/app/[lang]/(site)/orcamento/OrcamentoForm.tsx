@@ -512,12 +512,42 @@ export default function OrcamentoForm({
   // dizer nada, por isso a secção nem chega a existir.
   const ehCasamento = EVENT_TYPES.find((o) => o.label === eventType)?.eventType === "casamentos";
   const okNome = nome.trim().length >= 2;
+  /**
+   * ── O CONTACTO: EMAIL **OU** TELEMÓVEL, QUE É O QUE O SERVIDOR ACEITA ────
+   *
+   * A regra do negócio está escrita uma única vez, em `quoteFormSchema`
+   * (src/lib/validation.ts): tem de haver PELO MENOS UMA forma de responder.
+   * Este formulário exigia as duas, e por isso recusava pedidos que a casa
+   * aceita: quem só queria deixar o telemóvel levava com «E-mail inválido» e
+   * não conseguia enviar. O lead perdia-se inteiro, em silêncio, na página que
+   * paga a casa.
+   *
+   * O que muda é só a AUSÊNCIA. Um campo preenchido continua a ser julgado
+   * exactamente como antes:
+   *  - um email mal escrito é recusado no próprio campo (a mesma `EMAIL_RE` do
+   *    servidor). O que se aceita é não o ter, não é tê-lo pela metade;
+   *  - o telemóvel segue a mesma lógica, pelo mesmo motivo. É ligeiramente mais
+   *    apertado do que o servidor (que só lhe mede o comprimento quando não há
+   *    email), e de propósito: um número truncado é um engano de dedo, e
+   *    apanhá-lo aqui custa uma correcção, enquanto deixá-lo passar custa a
+   *    resposta a este pedido.
+   *
+   * O email NÃO deixou de ser pedido: é o canal preferido, é por lá que segue a
+   * confirmação automática, e a dica ao lado do campo diz isso. Deixou só de ser
+   * exigido a quem já nos deu o telemóvel.
+   */
+  const temEmail = email.trim() !== "";
+  const temTelefone = telefone.trim() !== "";
   // A MESMA regra do servidor, e não uma parecida — ver `EMAIL_RE`. Sobre o
   // valor aparado, porque é aparado que ele viaja no envio.
-  const okEmail = EMAIL_RE.test(email.trim());
+  const okEmail = !temEmail || EMAIL_RE.test(email.trim());
   // 9 digits is the Portuguese national number; an international one arrives
   // longer, so accept anything from 9 digits up.
-  const okTelefone = telefone.replace(/\D/g, "").length >= 9;
+  const okTelefone = !temTelefone || telefone.replace(/\D/g, "").length >= 9;
+  /** Há por onde responder a esta pessoa? É a invariante do servidor, dita aqui. */
+  const okContacto = (temEmail && okEmail) || (temTelefone && okTelefone);
+  /** Nem um nem outro: é o único caso em que a frase a mostrar não é de um campo. */
+  const nenhumContacto = !temEmail && !temTelefone;
   // "Ainda a definir" IS an answer — the field is satisfied either way.
   // A data passada é recusada AQUI e não só pelo `min` do campo: o `min` é uma
   // sugestão que se contorna a escrever no teclado, e um pedido para o mês
@@ -557,7 +587,19 @@ export default function OrcamentoForm({
 
   const show = (t: boolean | undefined) => Boolean(t) || attemptedSubmit;
   const nomeErr = show(touched.nome) && !okNome ? to.errNome : "";
-  const emailErr = show(touched.email) && !okEmail ? to.errEmail : "";
+  /**
+   * A frase de «falta um contacto» só aparece quando OS DOIS campos já foram
+   * deixados para trás (ou no envio, que é o que o `show` acrescenta). Acusá-la
+   * ao sair do email seria acusar quem ia escrever o telemóvel a seguir, que é
+   * o campo logo abaixo.
+   *
+   * Vive no campo do email porque é lá que o servidor a põe (`path: ["email"]`),
+   * e porque o email é o canal preferido: se só se pode pedir uma coisa a quem
+   * ainda não deu nenhuma, pede-se essa.
+   */
+  const contactoErr =
+    nenhumContacto && show(touched.email) && show(touched.telefone) ? to.errContacto : "";
+  const emailErr = temEmail ? (show(touched.email) && !okEmail ? to.errEmail : "") : contactoErr;
   const telefoneErr = show(touched.telefone) && !okTelefone ? to.errTelefone : "";
   const dataErr = show(touched.data) && !okData ? to.errData : "";
   const pessoasErr = show(touched.pessoas) && !okPessoas ? to.errPessoas : "";
@@ -565,7 +607,22 @@ export default function OrcamentoForm({
   const mensagemErr = show(touched.mensagem) && !okMensagem ? to.errMensagem : "";
   const tipoErr = attemptedSubmit && !okTipo ? to.errTipo : "";
   const ready =
-    okTipo && okNome && okEmail && okTelefone && okData && okPessoas && okLocal && okMensagem;
+    okTipo &&
+    okNome &&
+    okEmail &&
+    okTelefone &&
+    okContacto &&
+    okData &&
+    okPessoas &&
+    okLocal &&
+    okMensagem;
+  /**
+   * Vai enviar-se um pedido a que não se pode responder por escrito.
+   *
+   * Só quando o pedido está pronto a sair: dizer isto a meio do preenchimento
+   * seria dizê-lo a toda a gente, porque toda a gente começa sem email.
+   */
+  const semEmailParaConfirmar = ready && !temEmail;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -596,7 +653,10 @@ export default function OrcamentoForm({
         [okPessoas, pessoasRef.current],
         [okLocal, localRef.current],
         [okNome, nomeRef.current],
-        [okEmail, emailRef.current],
+        // O campo do email leva o foco por duas razões: quando o email está mal
+        // escrito, e quando não há contacto nenhum — que é onde a frase de
+        // «falta um contacto» está escrita, e onde o servidor a põe também.
+        [okEmail && !nenhumContacto, emailRef.current],
         [okTelefone, telefoneRef.current],
         [okMensagem, mensagemRef.current],
       ];
@@ -1204,29 +1264,42 @@ export default function OrcamentoForm({
                   placeholder={to.phNome}
                 />
               </FloatingField>
-              <FloatingField
-                htmlFor="of-email"
-                label={to.labelEmail}
-                error={emailErr}
-                errorId="of-email-err"
-              >
-                <input
-                  id="of-email"
-                  ref={emailRef}
-                  type="email"
-                  autoComplete="email"
-                  aria-required="true"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => markTouched("email")}
-                  aria-invalid={!!emailErr}
-                  aria-describedby={emailErr ? "of-email-err" : undefined}
-                  className={`${ffInputCls} ${
-                    emailErr ? "border-gold/60" : okEmail ? "border-moss/50" : ""
-                  }`}
-                  placeholder={to.phEmail}
-                />
-              </FloatingField>
+              {/* O email é PEDIDO, não exigido: quem deixar o telemóvel pode
+                  seguir sem ele (é a regra do servidor, ver `okContacto`). Por
+                  isso não leva `aria-required` fixo — anunciá-lo como
+                  obrigatório a quem ouve o formulário seria dizer-lhe que não
+                  pode enviar sem ele, que é precisamente o engano que se está a
+                  desfazer. A dica por baixo diz porque é que vale a pena dá-lo. */}
+              <div>
+                <FloatingField
+                  htmlFor="of-email"
+                  label={to.labelEmail}
+                  error={emailErr}
+                  errorId="of-email-err"
+                >
+                  <input
+                    id="of-email"
+                    ref={emailRef}
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => markTouched("email")}
+                    aria-invalid={!!emailErr}
+                    aria-describedby={emailErr ? "of-email-err of-email-hint" : "of-email-hint"}
+                    className={`${ffInputCls} ${
+                      emailErr ? "border-gold/60" : temEmail && okEmail ? "border-moss/50" : ""
+                    }`}
+                    placeholder={to.phEmail}
+                  />
+                </FloatingField>
+                <p
+                  id="of-email-hint"
+                  className="mt-2 text-[11px] leading-relaxed text-foreground/68"
+                >
+                  {to.hintEmail}
+                </p>
+              </div>
             </div>
 
             {/* Nomes dos noivos — só no casamento, e só depois de ela começar a
@@ -1380,6 +1453,22 @@ export default function OrcamentoForm({
                 <span className="sr-only"> ({t.common.newWindow})</span>
               </a>
             </div>
+
+            {/* O que acontece A SEGUIR a quem envia sem email, dito ANTES de
+                enviar e ao lado do botão que o vai fazer.
+                A confirmação automática vai por email; sem email não vai a
+                lado nenhum, e deixar a pessoa a vigiar uma caixa de correio
+                onde nunca chega nada é o pior fim possível para um pedido que
+                correu bem. `role="status"` e não `alert`: isto não é uma
+                recusa, é o preço de uma escolha legítima. */}
+            {semEmailParaConfirmar && (
+              <p
+                role="status"
+                className="-mt-2 flex items-start gap-3 border-l-2 border-gold/70 pl-4 text-[12px] leading-relaxed text-foreground/78 max-w-md"
+              >
+                {to.avisoSemEmail}
+              </p>
+            )}
 
             {/* Reassurance + privacy at the point of decision — the moment
                 hesitation peaks. Reuses facts already shown up top. */}

@@ -509,12 +509,31 @@ export const pt = {
     phLocal: "Ex.: cidade ou espaço do evento…",
     phNome: "O seu nome",
     phEmail: "email@exemplo.com",
+    /**
+     * O email continua a ser PEDIDO, deixou é de ser exigido a quem dá o
+     * telemóvel. A dica diz as duas coisas por ordem: qual preferimos, e o que
+     * se perde ao não o deixar. Fica debaixo do campo, e não numa nota
+     * genérica lá em cima, porque é ali que a decisão se toma.
+     */
+    hintEmail: "Preferimos o email: é por lá que segue a confirmação do pedido.",
     phTelefone: "+351 9XX XXX XXX",
     phMensagem: "Estilo, cores, ambiente, inspirações que guardou…",
     hintMensagem:
       "Quanto mais nos contar sobre o estilo que tem em mente, as cores, o ambiente, referências que guardou, mais à medida sai a proposta. É por aqui que a começamos a desenhar.",
     errNome: "Indique o seu nome",
     errEmail: "E-mail inválido",
+    /**
+     * ── A FRASE DA REGRA «EMAIL OU TELEMÓVEL», NUM SÓ SÍTIO ────────────────
+     *
+     * A invariante é do SERVIDOR (`quoteFormSchema`, em src/lib/validation.ts):
+     * tem de haver pelo menos uma forma de responder. A rota devolve esta frase
+     * quando a recusa vem de lá (`mensagemDeValidacao`, em
+     * src/app/api/orcamento/route.ts, que a lê daqui) e o formulário mostra-a
+     * ao lado do campo antes de chegar a enviar. É de propósito que é a MESMA:
+     * ler o mesmo erro escrito de duas maneiras faz duvidar de que seja o mesmo
+     * erro.
+     */
+    errContacto: "Indique um email ou um telemóvel para lhe podermos responder.",
     errTipo: "Selecione o tipo de evento.",
     errData: "Indique a data, ou marque \u201cData ainda a definir\u201d.",
     errPessoas: "Indique quantas pessoas, ou marque \u201cAinda a definir\u201d.",
@@ -525,7 +544,21 @@ export const pt = {
     enviando: "A enviar…",
     ouWhatsApp: "ou pelo WhatsApp",
     error: "Não foi possível enviar. Tente novamente ou fale connosco pelo WhatsApp.",
-    requiredNote: "Todos os campos são obrigatórios.",
+    /**
+     * Dizia «Todos os campos são obrigatórios.» e passou a ser falso no dia em
+     * que o contacto deixou de exigir os dois. Uma chave de campos obrigatórios
+     * que mente é pior do que não existir: manda preencher o que não é preciso,
+     * e quem só tem telemóvel para dar lê ali que não pode enviar.
+     */
+    requiredNote: "Todos os campos são obrigatórios, exceto o contacto: basta um dos dois.",
+    /**
+     * O que acontece A SEGUIR a quem envia sem email, dito ANTES de enviar.
+     * A confirmação automática vai por email; sem email não vai a lado nenhum,
+     * e deixar a pessoa à espera de uma coisa que nunca chega é o mesmo que
+     * lhe mentir devagar.
+     */
+    avisoSemEmail:
+      "Sem email não recebe a confirmação por escrito. Respondemos-lhe pelo telemóvel que nos deixar.",
     submitReassure: "Uma proposta à medida, pensada ao detalhe.",
     privacyPre: "Ao enviar, aceita a nossa ",
     privacyLinkLabel: "Política de Privacidade",
@@ -654,6 +687,23 @@ export const pt = {
     noDataNotePlural:
       "Guardem a referência acima. Enviámos os detalhes para a nossa equipa e entraremos em contacto convosco brevemente.",
     footerNote: "Proposta formal enviada após análise do pedido pela nossa equipa.",
+    /**
+     * ── QUEM ENVIOU SEM EMAIL TEM DE SABER O QUE NÃO VAI RECEBER ──────────
+     *
+     * O pedido pode chegar só com telemóvel (a regra do servidor é "email OU
+     * telemóvel"). A confirmação automática vai por email, e sem email não vai
+     * a lado nenhum. Sem esta nota, esta página diz "Recebemos o seu pedido" e
+     * a lista de passos promete uma proposta "por email", e a pessoa fica a
+     * vigiar uma caixa de correio onde nunca chega nada.
+     */
+    semEmailNota:
+      "Não nos deixou um email, por isso não recebe esta confirmação por escrito. Guarde a referência acima: respondemos-lhe pelo telemóvel que nos deixou.",
+    semEmailNotaPlural:
+      "Não nos deixaram um email, por isso não recebem esta confirmação por escrito. Guardem a referência acima: respondemos-vos pelo telemóvel que nos deixaram.",
+    /** O passo 2 sem a promessa que não se pode cumprir. Escrito sem tratamento
+     *  para servir os dois registos, como os restantes passos. */
+    stepPropostaSemEmail:
+      "Combinamos a melhor forma de a fazer chegar, por WhatsApp ou por email, se entretanto houver um.",
     proximosPassos: "Próximos passos",
     steps: [
       { label: "Análise do pedido", desc: "A nossa equipa analisa todos os detalhes." },
@@ -855,11 +905,15 @@ export const pt = {
     disponivel: "Disponível para novos eventos",
     paginas: "Páginas",
     servicosTitulo: "Serviços",
+    // Emparelhados por ÍNDICE com `serviceSlugs`, em Footer.tsx. A ordem é a do
+    // catálogo (`SERVICES`), para que acrescentar um serviço seja acrescentar
+    // uma linha no fim de cada uma das três listas.
     serviceLinks: [
       "Decoração de Casamentos",
       "Aluguer de Viaturas Clássicas",
       "Eventos Corporativos",
       "Festas e Aniversários",
+      "Batizados e Comunhões",
     ],
     contacto: "Contacto",
     pedirOrcamento: "Pedir orçamento",
