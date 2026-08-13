@@ -39,6 +39,21 @@ interface Entry<T = unknown> {
 const cache = new Map<string, Entry>();
 
 /**
+ * Quantas escritas LOCAIS já houve nesta chave.
+ *
+ * É o que distingue "o servidor tem novidades" de "eu tenho novidades que o
+ * servidor ainda não viu". Um pedido guarda o número com que partiu; se ele
+ * mudou até a resposta chegar, o corpo que chegou descreve o mundo de ANTES
+ * dessa escrita e não pode passar por cima dela — a linha apagada voltava ao
+ * ecrã, e com o ETag novo agarrado a ela: a revalidação seguinte levava um 304
+ * e a ressurreição ficava. Como a cache é partilhada, aparecia em todos os
+ * painéis com esta chave.
+ *
+ * O ramo do 304 já tinha esta regra escrita; o do 200 é que não a tinha.
+ */
+const escritas = new Map<string, number>();
+
+/**
  * Uma viagem por chave, mesmo quando três sítios pedem ao mesmo tempo.
  *
  * No arranque isto acontece de verdade: o `prefetchList` ocioso do AdminClient
@@ -54,6 +69,7 @@ function loadOnce(key: string, url: string): Promise<Entry | null> {
 
   const run = (async (): Promise<Entry | null> => {
     const before = cache.get(key);
+    const escritasAoPartir = escritas.get(key) ?? 0;
     const res = await fetch(url, {
       cache: "no-store",
       headers: before?.etag ? { "If-None-Match": before.etag } : undefined,
@@ -76,10 +92,15 @@ function loadOnce(key: string, url: string): Promise<Entry | null> {
       throw new Error(dito || String(res.status));
     }
 
-    const entry: Entry = {
-      data: await res.json(),
-      etag: res.headers.get("etag") ?? undefined,
-    };
+    const corpo = await res.json();
+
+    // Houve uma escrita optimista enquanto isto voava: o corpo que chegou é
+    // mais VELHO do que o que ela já vê, e o ETag descreve esse corpo velho.
+    // Fica o que está em cache, sem carimbo — a viagem seguinte volta a pedir
+    // tudo e é essa que reconcilia.
+    if ((escritas.get(key) ?? 0) !== escritasAoPartir) return cache.get(key) ?? null;
+
+    const entry: Entry = { data: corpo, etag: res.headers.get("etag") ?? undefined };
     cache.set(key, entry);
     return entry;
   })();
@@ -153,6 +174,10 @@ export function useCachedList<T>(key: string, url: string): CachedList<T> {
 
   const setData = useCallback(
     (updater: T | ((prev: T) => T)) => {
+      // Marcada AQUI, e não dentro do actualizador: este corre no render
+      // seguinte, e o que interessa é o instante em que ela mexeu na lista —
+      // qualquer resposta que ainda esteja no ar já é anterior a isto.
+      escritas.set(key, (escritas.get(key) ?? 0) + 1);
       setDataState((prev) => {
         const next = typeof updater === "function" ? (updater as (p: T) => T)(prev as T) : updater;
         // Sem ETag: o que temos em mão já não é a versão que o servidor
@@ -180,4 +205,5 @@ export function useCachedList<T>(key: string, url: string): CachedList<T> {
 export function __resetListCache(): void {
   cache.clear();
   inFlight.clear();
+  escritas.clear();
 }

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ThemeImage } from "@/lib/theme-types";
 import { Button } from "./ui";
+import { AvisoDeFalha } from "./AvisoDeFalha";
+import { useFotoComPlanoB } from "./useFotoComPlanoB";
 
 /**
  * VER UMA FOTO EM GRANDE, dentro da biblioteca de temas.
@@ -15,6 +17,16 @@ import { Button } from "./ui";
  * biblioteca onde os pixéis todos valem os bytes. Enquanto ele chega, fica a
  * miniatura esticada por baixo, para haver sempre alguma coisa no ecrã em vez
  * de um retângulo vazio.
+ *
+ * ── QUANDO O ORIGINAL NÃO CHEGA ────────────────────────────────────────────
+ * A grelha ao lado já sabia disto e este ecrã não: sem `onError`, um URL
+ * assinado que expirou ou uma foto apagada noutro separador deixavam o
+ * «carregou» a `false` para sempre — a miniatura desfocada eternamente ou,
+ * nas fotos que não têm nenhuma (precisamente as que o painel «Miniaturas»
+ * existe para reparar), um retângulo preto sem uma palavra. Aqui usa-se a
+ * mesma cascata do resto da casa (`useFotoComPlanoB`): tenta-se o original,
+ * cai-se para a miniatura, e só depois se diz que não foi — com o botão para
+ * voltar a tentar, porque desistir nunca quer dizer para sempre.
  */
 
 export interface PhotoLightboxProps {
@@ -40,8 +52,18 @@ export default function PhotoLightbox({
   const dialogRef = useRef<HTMLDivElement>(null);
   // O original ainda não chegou: mostra-se a miniatura esticada.
   const [loaded, setLoaded] = useState(false);
+  const { alvo, desistiu, aoFalhar, tentarDeNovo } = useFotoComPlanoB(image?.url, image?.thumbUrl);
 
-  useEffect(() => setLoaded(false), [index]);
+  // Recomeçar do princípio a cada alvo novo — outra foto, ou a queda do
+  // original para a miniatura. Ajustado DURANTE o desenho, e não num efeito,
+  // que é o padrão da casa (ver `ImagemComPlanoB`): assim não há um fotograma
+  // com a opacidade da foto anterior por cima de uma imagem que ainda não
+  // pediu nada.
+  const [alvoVisto, setAlvoVisto] = useState(alvo);
+  if (alvoVisto !== alvo) {
+    setAlvoVisto(alvo);
+    setLoaded(false);
+  }
 
   const go = useCallback(
     (delta: number) => {
@@ -162,8 +184,10 @@ export default function PhotoLightbox({
           </button>
         )}
         {/* A miniatura por baixo enquanto o original não chega: há sempre
-            imagem, em vez de um retângulo preto durante um segundo. */}
-        {!loaded && image.thumbUrl && (
+            imagem, em vez de um retângulo preto durante um segundo. Deixa de
+            fazer sentido quando é ELA o alvo (seria a mesma foto desfocada por
+            baixo de si própria) ou quando já não há nada por onde tentar. */}
+        {!loaded && !desistiu && image.thumbUrl && alvo !== image.thumbUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={image.thumbUrl}
@@ -172,16 +196,25 @@ export default function PhotoLightbox({
             className="absolute max-h-full max-w-full object-contain blur-sm"
           />
         )}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          key={image.path}
-          src={image.url}
-          alt={`Foto ${index + 1} de ${images.length}`}
-          onLoad={() => setLoaded(true)}
-          className={`max-h-full max-w-full object-contain motion-safe:transition-opacity ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-        />
+        {desistiu || !alvo ? (
+          <AvisoDeFalha
+            titulo="Não foi possível mostrar esta fotografia"
+            mensagem="A ligação pode ter caído, ou a foto pode ter sido removida noutro separador. O ficheiro continua no tema."
+            aoTentarDeNovo={tentarDeNovo}
+          />
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            key={alvo}
+            src={alvo}
+            alt={`Foto ${index + 1} de ${images.length}`}
+            onLoad={() => setLoaded(true)}
+            onError={aoFalhar}
+            className={`max-h-full max-w-full object-contain motion-safe:transition-opacity ${
+              loaded ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        )}
         {index < images.length - 1 && (
           <button
             type="button"

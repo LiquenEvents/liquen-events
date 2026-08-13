@@ -57,10 +57,35 @@ interface SplitView<P> {
   warm: () => Promise<void>;
 }
 
-function splitView<P extends object>(load: () => Promise<ViewModule<P>>): SplitView<P> {
-  const Deferred = dynamic(load, { loading: ViewLoading });
+export function splitView<P extends object>(load: () => Promise<ViewModule<P>>): SplitView<P> {
   let Resolved: ComponentType<P> | null = null;
   let inFlight: Promise<void> | null = null;
+
+  /* ── UMA FALHA DE REDE NÃO PODE FICAR COLADA À VISTA ─────────────────────
+   *
+   * O `dynamic()` desenha através de um `React.lazy`, e um `React.lazy` guarda
+   * a promessa do `import()` PARA SEMPRE — a que resolveu e também a que
+   * rejeitou. O Wi-Fi da quinta a cair a meio do descarregamento de um chunk
+   * ficava, por isso, gravado no componente: ela voltava à vista e o React
+   * voltava a atirar o MESMO erro, sem sequer tocar na rede, até alguém
+   * recarregar a página inteira. Um chunk que não chegou é um acidente; o que
+   * não pode é ser definitivo.
+   *
+   * Quando o `import()` falha deitamos fora o componente falhado e fazemos
+   * outro. A montagem seguinte lê esta variável de novo (`View` escolhe ao
+   * montar), portanto volta à vista = tentativa nova. */
+  let Deferred = adiar();
+
+  function adiar(): ComponentType<P> {
+    return dynamic(
+      () =>
+        load().catch((erro: unknown) => {
+          Deferred = adiar();
+          throw erro;
+        }),
+      { loading: ViewLoading },
+    ) as ComponentType<P>;
+  }
 
   const warm = (): Promise<void> => {
     if (Resolved) return Promise.resolve();

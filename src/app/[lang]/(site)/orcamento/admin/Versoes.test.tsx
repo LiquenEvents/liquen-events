@@ -126,4 +126,56 @@ describe("repor", () => {
     montar([V2, V1], doc({}));
     await waitFor(() => expect(screen.getByText(/não envia nada ao cliente/)).toBeTruthy());
   });
+
+  it("dois cliques seguidos repõem a ÚLTIMA pedida, mesmo que a outra chegue depois", async () => {
+    // O pior desfecho deste painel: carregar em «Repor» numa versão, achar que
+    // não fez nada porque a rede está lenta, carregar noutra — e ficar com a
+    // primeira no estúdio, sem nada no ecrã a dizê-lo. A partir daí o que se
+    // grava é a proposta errada.
+    const DOC_V1 = doc({ totalAmount: 8000 });
+    const DOC_V2 = doc({ totalAmount: 9500 });
+    const onRestaurar = vi.fn();
+
+    /** Cada leitura de documento fica pendurada até o teste a soltar — é assim
+     *  que se põe a rede a devolver as respostas fora de ordem. */
+    const pendentes: { id: string; solta: (d: ProposalDoc) => void }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const u = String(url);
+        if (!u.includes("?doc=")) {
+          return { ok: true, status: 200, json: async () => ({ versoes: [V2, V1] }) };
+        }
+        const id = u.split("?doc=")[1];
+        const espera = new Promise<ProposalDoc>((r) => pendentes.push({ id, solta: r }));
+        return { ok: true, status: 200, json: async () => ({ doc: await espera }) };
+      }),
+    );
+
+    render(<Versoes quoteId="LIQ-1" doc={doc({})} onRestaurar={onRestaurar} />);
+    await waitFor(() => expect(screen.getByText(/Versão 1/)).toBeTruthy());
+    // A primeira leitura é a da comparação de cima; fica pendurada, e o painel
+    // de cima simplesmente não aparece.
+    await waitFor(() => expect(pendentes).toHaveLength(1));
+
+    const botoes = screen.getAllByRole("button", { name: "Repor esta versão" });
+    await userEvent.click(botoes[0]); // Versão 2, a de cima
+    await waitFor(() => expect(pendentes).toHaveLength(2));
+    await userEvent.click(botoes[1]); // e logo a seguir a Versão 1
+    await waitFor(() => expect(pendentes).toHaveLength(3));
+    expect(pendentes[1].id).toBe("v2");
+    expect(pendentes[2].id).toBe("v1");
+
+    // A v1 — a ÚLTIMA pedida — chega primeiro; a v2 vem atrasada.
+    pendentes[2].solta(DOC_V1);
+    await waitFor(() => expect(onRestaurar).toHaveBeenCalledWith(DOC_V1));
+    pendentes[1].solta(DOC_V2);
+    await waitFor(() =>
+      expect(screen.queryAllByRole("button", { name: "A repor…" })).toHaveLength(0),
+    );
+
+    // A resposta atrasada não pode voltar a escrever no estúdio.
+    expect(onRestaurar).toHaveBeenCalledTimes(1);
+    expect(onRestaurar).toHaveBeenLastCalledWith(DOC_V1);
+  });
 });

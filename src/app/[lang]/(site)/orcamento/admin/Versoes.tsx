@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import { diferencas, type Mudanca } from "@/lib/orcamento/diferencas";
 import { Button } from "./ui/Button";
@@ -25,6 +25,14 @@ import { Button } from "./ui/Button";
  * preciso passar pelo Enviar, com a conferência pelo meio. Um botão que
  * reenviasse uma proposta de há três semanas por um clique era uma forma nova
  * de mandar o preço errado.
+ *
+ * ── E REPÕE A QUE ELA PEDIU POR ÚLTIMO ─────────────────────────────────────
+ * Só o botão da versão a repor ficava desactivado; os outros continuavam a
+ * aceitar cliques. Numa rede lenta o gesto natural — carregar, achar que não
+ * fez nada, carregar noutra — pedia dois documentos, e quem escrevia no
+ * estúdio era o que chegasse EM ÚLTIMO. Ficava lá a proposta errada, sem nada
+ * no ecrã a dizê-lo, e o que se gravava a seguir era essa. Agora só a última
+ * pedida conta; as respostas atrasadas são deitadas fora.
  */
 
 /** Uma versão como a rota a devolve — sem o documento. */
@@ -122,8 +130,12 @@ export default function Versoes({ quoteId, doc, onRestaurar }: Props) {
 
   const porEnviar = useMemo(() => (ultimoDoc ? diferencas(ultimoDoc, doc) : []), [ultimoDoc, doc]);
 
+  /** Qual foi o último pedido de reposição. Só esse pode escrever no estúdio. */
+  const pedido = useRef(0);
+
   const restaurar = useCallback(
     async (id: string) => {
+      const meu = ++pedido.current;
       setARepor(id);
       try {
         const res = await fetch(`/api/orcamento/${quoteId}/versoes?doc=${id}`, {
@@ -131,11 +143,19 @@ export default function Versoes({ quoteId, doc, onRestaurar }: Props) {
         });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as { doc?: ProposalDoc };
+        // Chegou depois de ela ter pedido outra: esta já não é a versão que ela
+        // está à espera de ver, e escrevê-la seria repor a errada.
+        if (meu !== pedido.current) return;
         if (data.doc) onRestaurar(data.doc);
+        // Uma resposta sem documento é uma falha como as outras — em silêncio,
+        // o botão voltava ao normal e o estúdio ficava como estava.
+        else setErro(true);
       } catch {
-        setErro(true);
+        if (meu === pedido.current) setErro(true);
       } finally {
-        setARepor(null);
+        // Só o pedido em curso larga o "A repor…": senão a resposta atrasada
+        // apagava o sinal de que ainda há uma reposição a caminho.
+        if (meu === pedido.current) setARepor(null);
       }
     },
     [quoteId, onRestaurar],

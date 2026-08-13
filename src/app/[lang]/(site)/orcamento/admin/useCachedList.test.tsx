@@ -202,6 +202,58 @@ describe("useCachedList — escritas optimistas", () => {
     await waitFor(() => expect(second.result.current.data).toHaveLength(2));
     expect(second.result.current.data).toEqual([{ id: "a" }, { id: "editado" }]);
   });
+
+  it("um 200 que chegue atrasado também não desfaz a escrita optimista", async () => {
+    // O gémeo do caso de cima, e o que a cache tinha por tratar: o pedido parte,
+    // ela apaga uma linha enquanto ele voa, e o corpo que chega descreve o
+    // mundo de ANTES dessa alteração. Escrevê-lo na cache repõe a linha
+    // apagada à frente dela — e, pior, com o ETag novo: a revalidação seguinte
+    // leva um 304 e a linha ressuscitada fica. Como a cache é partilhada, a
+    // entrada envenenada aparece em todos os painéis com esta chave.
+    let release: (r: Response) => void = () => {};
+    const pending = new Promise<Response>((r) => (release = r));
+    replies = [{ status: 200, body: [{ id: "a" }, { id: "b" }], etag: 'W/"v1"' }];
+
+    const primeira = renderHook(() => useCachedList<{ id: string }[]>("k", "/api/k"));
+    await waitFor(() => expect(primeira.result.current.data).toHaveLength(2));
+    primeira.unmount();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => pending),
+    );
+    const segunda = renderHook(() => useCachedList<{ id: string }[]>("k", "/api/k"));
+    // Ela apaga a linha "b" enquanto a revalidação está no ar.
+    act(() => segunda.result.current.setData([{ id: "a" }]));
+
+    await act(async () => {
+      release({
+        ok: true,
+        status: 200,
+        headers: new Headers({ etag: 'W/"v2"' }),
+        json: async () => [{ id: "a" }, { id: "b" }],
+      } as unknown as Response);
+      // Deixar a resposta atravessar a cadeia toda antes de perguntar seja o
+      // que for: é precisamente quando ela assenta que o defeito aparecia.
+      await pending;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // A linha apagada não volta ao ecrã…
+    expect(segunda.result.current.data).toEqual([{ id: "a" }]);
+    segunda.unmount();
+
+    // …nem à cache: o painel seguinte a montar com esta chave vê o que ela fez.
+    vi.stubGlobal("fetch", vi.fn(fetchMock));
+    replies = [{ status: 200, body: [{ id: "a" }], etag: 'W/"v3"' }];
+    const terceira = renderHook(() => useCachedList<{ id: string }[]>("k", "/api/k"));
+    expect(terceira.result.current.data).toEqual([{ id: "a" }]);
+    // E sem ETag: o que temos em mão continua a não ser o que o servidor
+    // carimbou, portanto a viagem seguinte tem de trazer o corpo todo.
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1].ifNoneMatch).toBeNull();
+  });
 });
 
 describe("useCachedList — refresh", () => {
