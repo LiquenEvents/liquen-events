@@ -769,8 +769,23 @@ export function detectVatMode(text: string | undefined): VatMode {
   return "incluido";
 }
 
-/** Resultado desdobrado do total de uma proposta, sempre coerente:
- *  `gross = base + vat` e `vat = round2(base * vatRate)`. */
+/**
+ * Resultado desdobrado do total de uma proposta. O que está garantido, e o que
+ * está pinado em `money-invariantes.test.ts`, é UM invariante só:
+ *
+ *     gross === round2(base + vat)
+ *
+ * Dizia-se aqui, a mais, que `vat = round2(base * vatRate)`. Não é verdade no
+ * modo "incluído", e não é por descuido: aí o IVA é obtido por SUBTRACÇÃO
+ * (`gross − base`), que é o que faz as duas parcelas fecharem o bruto ao
+ * cêntimo. Num bruto de 10.000,03 € a 23%, a base é 8.130,11 € e o IVA 1.869,92
+ * €, enquanto `base × 0,23` arredonda a 1.869,93 € — um cêntimo a mais, que
+ * somado à base já não dá o total que o cliente viu. Em 10.000,00 € facturados
+ * isso é o género de cêntimo que separa a factura da proposta.
+ *
+ * Quem precisar do IVA deste documento LÊ o `vat`; recalculá-lo a partir da
+ * base é a maneira de o perder.
+ */
 export interface ProposalMoney {
   /** Base tributável (sem IVA). */
   base: number;
@@ -852,9 +867,44 @@ export function totalAmountParaBase(
   return mode === "acrescer" ? b : round2(b * (1 + taxa));
 }
 
-/** Data de validade (yyyy-mm-dd) de uma proposta: honra uma `validUntil`
- *  explícita no doc, senão hoje + `validUntilDays` (por omissão
- *  {@link DEFAULT_VALID_DAYS}). `from` é injetável para testes. */
+/** O fuso do estúdio. A validade de uma proposta é um DIA DO CALENDÁRIO, e o
+ *  calendário que conta é o de quem a envia — ver {@link resolveValidUntil}. */
+export const FUSO_DO_ESTUDIO = "Europe/Lisbon";
+
+const CAMPOS_DO_DIA = new Intl.DateTimeFormat("en-US", {
+  timeZone: FUSO_DO_ESTUDIO,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** O ano/mês/dia que o relógio de Portugal marca neste instante. */
+function diaDoEstudio(instante: Date): [ano: number, mes: number, dia: number] {
+  const partes = CAMPOS_DO_DIA.formatToParts(instante);
+  const campo = (tipo: string) => Number(partes.find((p) => p.type === tipo)?.value);
+  return [campo("year"), campo("month"), campo("day")];
+}
+
+/**
+ * Data de validade (yyyy-mm-dd) de uma proposta: honra uma `validUntil`
+ * explícita no doc, senão hoje + `validUntilDays` (por omissão
+ * {@link DEFAULT_VALID_DAYS}). `from` é injetável para testes.
+ *
+ * ── PORQUE É QUE O «HOJE» NÃO É O DE GREENWICH ─────────────────────────────
+ * Isto era `d.setDate(d.getDate() + days)` seguido de `toISOString()`, o que dá
+ * sempre o dia UTC do instante mais os dias. Entre a meia-noite e a 01:00 do
+ * Verão, Lisboa já virou o dia e Greenwich ainda não: uma proposta enviada às
+ * 00:30 de 13 de Agosto contava a partir de 12 e saía «válida até 11 de
+ * Outubro» em vez de 12 — um dia a menos do que os 60 que o documento promete,
+ * e o dia que falta é o ÚLTIMO, que é justamente aquele em que os casais que
+ * ainda não decidiram decidem. Depois disso, o link de aceitação recusa a
+ * proposta com a data do próprio PDF ainda a dizer que ela é válida.
+ *
+ * O dia civil é lido no fuso do estúdio e os dias somam-se sobre esse dia, não
+ * sobre o instante: o resultado é o mesmo com o processo em UTC (é onde correm
+ * os servidores) ou em Lisboa, e nenhuma mudança para a hora de Verão a meio da
+ * contagem lhe rouba ou lhe dá um dia.
+ */
 export function resolveValidUntil(
   doc: Pick<ProposalDoc, "validUntil" | "validUntilDays">,
   from: Date = new Date(),
@@ -867,9 +917,10 @@ export function resolveValidUntil(
   const flooredDays =
     typeof doc.validUntilDays === "number" ? Math.floor(doc.validUntilDays) : Number.NaN;
   const days = flooredDays > 0 ? flooredDays : DEFAULT_VALID_DAYS;
-  const d = new Date(from);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const [ano, mes, dia] = diaDoEstudio(from);
+  // `Date.UTC` trata o excesso de dias (13 + 60) como o calendário trata: vira
+  // o mês e o ano sozinho. Aritmética sobre a DATA, sem hora nenhuma pelo meio.
+  return new Date(Date.UTC(ano, mes - 1, dia + days)).toISOString().slice(0, 10);
 }
 
 /** Fills the fixed-text defaults into a partial doc, substituting the

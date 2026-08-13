@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { createProposalToken, readProposalToken } from "./proposal-token";
+import { DEFAULT_VALID_DAYS } from "./proposal-doc";
 import { createSession } from "./admin-auth";
 
 // proposal-token reads the signing secret lazily from the environment, so keep
@@ -72,8 +73,39 @@ describe("proposal-token — signed accept links", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
     const token = createProposalToken("prop-123");
-    vi.setSystemTime(new Date("2026-04-01T00:00:00Z")); // > 45 days later
+    vi.setSystemTime(new Date("2027-01-01T00:00:00Z")); // um ano depois
     expect(readProposalToken(token)).toBeNull();
+  });
+
+  /**
+   * ── O LINK TEM DE DURAR MAIS DO QUE A PROPOSTA ───────────────────────────
+   *
+   * O prazo do token era 14 dias, escrito à mão, com o argumento de estar
+   * «comfortably past a normal decision window». A janela de decisão deixou de
+   * ser 14 dias no dia em que a validade da proposta passou a 60
+   * ({@link DEFAULT_VALID_DAYS}) — e ninguém voltou aqui. O casal que abrisse o
+   * email ao fim de três semanas, com o PDF a dizer «válida até 12 de Outubro»,
+   * carregava no link e recebia «Link inválido ou expirado»: um beco sem saída,
+   * na página que existe para eles dizerem que sim.
+   *
+   * O que este teste prende não é o número — é a RELAÇÃO entre os dois. Se
+   * alguém voltar a mexer na validade por omissão, é aqui que ouve.
+   */
+  it("continua válido no último dia de validade da proposta (e um pouco depois)", () => {
+    vi.useFakeTimers();
+    const envio = new Date("2026-01-01T00:00:00Z");
+    vi.setSystemTime(envio);
+    const token = createProposalToken("prop-123");
+
+    // O último dia da validade por omissão: o link tem de abrir.
+    vi.setSystemTime(envio.getTime() + DEFAULT_VALID_DAYS * 864e5);
+    expect(readProposalToken(token)).toEqual({ proposalId: "prop-123" });
+
+    // E ainda depois disso, para o casal encontrar a frase honesta («esta
+    // proposta expirou») em vez de um link partido — e para o estúdio poder
+    // esticar a validade sem ter de reenviar o email.
+    vi.setSystemTime(envio.getTime() + (DEFAULT_VALID_DAYS + 7) * 864e5);
+    expect(readProposalToken(token)).toEqual({ proposalId: "prop-123" });
   });
 
   it("rejects a validly-signed token that carries no proposal id", () => {
@@ -118,7 +150,7 @@ describe("proposal-token — signed accept links", () => {
   });
 
   // Backward compatibility: accept links minted before the typ claim existed
-  // (payload had only { pid, exp }) must keep validating for their 14-day life.
+  // (payload had only { pid, exp }) must keep validating until they expire.
   it("still accepts a legacy token that carries no type claim", () => {
     expect(readProposalToken(forge({ pid: "prop-legacy", exp: Date.now() + 1e9 }))).toEqual({
       proposalId: "prop-legacy",

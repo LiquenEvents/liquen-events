@@ -197,6 +197,34 @@ describe("proposal-doc — resolveValidUntil", () => {
       "2026-02-09",
     );
   });
+
+  /**
+   * ── OS DIAS CONTAM-SE A PARTIR DO DIA DE QUEM ENVIA ──────────────────────
+   *
+   * A validade é um DIA DO CALENDÁRIO, e o calendário do estúdio é o de
+   * Portugal. Entre a meia-noite e a 01:00 do Verão, Lisboa já virou o dia e
+   * Greenwich ainda não — e a conta partia do dia de Greenwich, portanto de
+   * ONTEM. A proposta enviada às 00:30 de 13 de Agosto saía «válida até 11 de
+   * Outubro» em vez de 12: um dia a menos do que os 60 prometidos, e o dia que
+   * falta é o último, que é justamente aquele em que os casais decidem.
+   *
+   * As datas destes testes são instantes ABSOLUTOS de propósito: o resultado
+   * tem de ser o mesmo com o processo em UTC (é onde correm os servidores e o
+   * runner) ou em Lisboa.
+   */
+  it("conta os dias a partir do dia civil PORTUGUÊS e não do de Greenwich", () => {
+    // 13/08/2026 00:30 em Lisboa (WEST, UTC+1) — ainda 12/08 em UTC.
+    const madrugadaDeVerao = new Date("2026-08-12T23:30:00Z");
+    expect(resolveValidUntil({ validUntilDays: 60 }, madrugadaDeVerao)).toBe("2026-10-12");
+    expect(resolveValidUntil({}, madrugadaDeVerao)).toBe("2026-10-12");
+  });
+
+  it("no Inverno (Lisboa == UTC) a mesma hora dá o mesmo dia de sempre", () => {
+    // 12/01/2026 23:30 em Lisboa (WET, UTC+0): aqui os dois calendários batem
+    // certo, e o resultado não pode mudar com a correcção acima.
+    const madrugadaDeInverno = new Date("2026-01-12T23:30:00Z");
+    expect(resolveValidUntil({ validUntilDays: 60 }, madrugadaDeInverno)).toBe("2026-03-13");
+  });
 });
 
 describe("proposal-doc — withProposalDefaults", () => {

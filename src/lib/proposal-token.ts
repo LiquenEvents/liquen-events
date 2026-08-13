@@ -1,6 +1,7 @@
 import "server-only";
 import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 import { log } from "./logger";
+import { DEFAULT_VALID_DAYS } from "./proposal-doc";
 
 /**
  * Signed, expiring tokens for the public "accept your proposal online" links.
@@ -13,15 +14,45 @@ import { log } from "./logger";
  * Domain separation: the payload carries `typ: "proposal"`, and the admin
  * session signs with a *derived* key while these tokens sign with the raw base
  * secret. Together this ensures a proposal link — which lives in a client's URL
- * for 14 days — can NEVER be replayed as an admin session cookie (and vice
- * versa), even though both are derived from the same SESSION_SECRET.
+ * for months (ver {@link TTL_MS}) — can NEVER be replayed as an admin session
+ * cookie (and vice versa), even though both are derived from the same
+ * SESSION_SECRET.
  */
-// 14 days — comfortably past a normal decision window while keeping the
-// exposure window of a forwarded link short. The state-changing action is
-// already effectively one-time (the route is idempotent once the proposal is
-// accepted/declined); per-proposal revocation would need a data-model change
-// for little marginal gain over an unforgeable + rate-limited + short-lived token.
-const TTL_MS = 1000 * 60 * 60 * 24 * 14;
+/**
+ * Quanto tempo o link sobrevive à validade da proposta.
+ *
+ * O casal que chega um dia atrasado tem de encontrar a frase honesta — «esta
+ * proposta expirou a 12 de Outubro, fale connosco» — e não um link partido. E
+ * o estúdio esticar a validade por mais uns dias (mudar o `validUntil`) não
+ * pode obrigar a reenviar o email.
+ */
+const DIAS_DE_GRACA = 30;
+
+/**
+ * Prazo do link de aceitação.
+ *
+ * ── PORQUE É QUE ISTO NÃO É UM NÚMERO ESCRITO À MÃO ────────────────────────
+ * Eram 14 dias, com o argumento de estarem «comfortably past a normal decision
+ * window». Estavam, quando a proposta valia 30 dias; deixaram de estar quando a
+ * validade por omissão passou a 60 ({@link DEFAULT_VALID_DAYS}, o que a folha
+ * feita à mão sempre disse) — e este ficheiro não soube. O casal que abrisse o
+ * email ao fim de três semanas, com o PDF na mão a dizer «válida até 12 de
+ * Outubro», carregava no link e lia «Link inválido ou expirado». Um beco sem
+ * saída na única página em que eles dizem que sim, e nada no back office a
+ * mostrar que aquilo tinha acontecido.
+ *
+ * O prazo passa a SAIR da validade, para os dois números não poderem voltar a
+ * separar-se. O custo é uma janela de exposição maior para um link reencaminhado
+ * — e é um custo pequeno: o token é infalsificável, a rota tem limite de taxa, e
+ * a acção que ele permite é efectivamente única (uma proposta já aceite ou
+ * recusada não volta a mudar de estado). O link do Portal do Cliente, que mostra
+ * bastante mais, já vive um ano com o mesmo raciocínio.
+ *
+ * Uma proposta com uma validade MAIOR do que a por omissão (`validUntilDays`)
+ * continua a poder sobreviver ao seu próprio link; para essa fechar, o prazo
+ * teria de ser decidido no momento de a enviar, onde a validade é conhecida.
+ */
+const TTL_MS = 1000 * 60 * 60 * 24 * (DEFAULT_VALID_DAYS + DIAS_DE_GRACA);
 
 let randomFallbackSecret: string | null = null;
 
@@ -83,7 +114,7 @@ export function readProposalToken(token: string | undefined | null): { proposalI
     // A token that declares a different kind (e.g. an admin session,
     // typ:"session") is never a proposal link — refuse it. Tokens minted before
     // this claim existed carry no `typ`; still accept those so already-sent
-    // 14-day accept links keep working.
+    // accept links keep working until they expire on their own.
     if (payload.typ !== undefined && payload.typ !== "proposal") return null;
     if (typeof payload.exp !== "number" || Date.now() > payload.exp) return null;
     if (typeof payload.pid !== "string" || !payload.pid) return null;
