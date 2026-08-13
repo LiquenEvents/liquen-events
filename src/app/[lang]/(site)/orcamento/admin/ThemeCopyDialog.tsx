@@ -9,6 +9,7 @@ import {
   type ThemeSummary,
 } from "@/lib/theme-types";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { Button } from "./ui";
 
 /**
@@ -92,6 +93,9 @@ export default function ThemeCopyDialog({
   onDone: (outcome: ThemeCopyOutcome) => void;
 }) {
   const trapRef = useFocusTrap<HTMLDivElement>(true);
+  // Como no `ThemePicker` e pela mesma razão: montado é aberto, e o fundo não
+  // pode rolar por trás de um diálogo.
+  useTrincoDeScroll(true);
   const others = useMemo(
     () => themes.filter((t) => t.id !== sourceTheme.id),
     [themes, sourceTheme],

@@ -12,6 +12,7 @@ import {
 } from "@/lib/theme-types";
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { Button } from "./ui";
 import {
   type PaginaTema,
@@ -930,6 +931,10 @@ export default function ThemePicker({
 }: Props) {
   const { toast } = useToast();
   const trapRef = useFocusTrap<HTMLDivElement>(true);
+  // O fundo não anda enquanto isto está à frente. `true` como o `useFocusTrap`
+  // ao lado: este diálogo só existe montado, portanto estar montado É estar
+  // aberto. Era um dos dois que faltavam quando o trinco passou a ser da casa.
+  useTrincoDeScroll(true);
   const tick = useImportRuntime();
 
   // O que já está em cache entra no estado LOGO no primeiro desenho: reabrir o
