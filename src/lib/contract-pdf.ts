@@ -70,12 +70,34 @@ export function wrap(font: PDFFont, rawText: string, size: number, maxWidth: num
   return out;
 }
 
-/** ISO → "18 de julho de 2026, 14:32" (data + hora; o aceite é pontual). */
+/**
+ * O fuso em que este documento é lido, e por isso o único em que pode ser
+ * escrito. Mesmo valor e mesma razão do `FUSO` da rota dos lembretes e do módulo
+ * das conversões offline.
+ */
+const FUSO = "Europe/Lisbon";
+
+/**
+ * ISO → "18 de julho de 2026 às 14:32" (data + hora; o aceite é pontual).
+ *
+ * ── PORQUE É QUE O FUSO ESTÁ ESCRITO À MÃO ──────────────────────────────────
+ *
+ * Sem ele, o `toLocaleString` usa o fuso da MÁQUINA que gerou o PDF — que no
+ * alojamento é UTC. Portugal é UTC+1 no Verão, por isso um aceite registado às
+ * 23:32 de 2 de julho saía impresso como «02 de julho de 2026 às 23:32» quando
+ * o cliente carregou no botão já a 3 de julho, 00:32. Num contrato, o momento
+ * do aceite é a data em que ele passa a vincular: errar o DIA não é um pormenor
+ * de apresentação, é o documento a dizer outra coisa do que aconteceu.
+ *
+ * E há o outro lado, mais insidioso: sem fuso fixo, o mesmo contrato descarregado
+ * do portal e regerado noutra máquina traz datas diferentes.
+ */
 function fmtDateTime(iso?: string): string {
   if (!iso) return "—";
   const dt = new Date(iso);
   if (Number.isNaN(dt.getTime())) return iso;
   return dt.toLocaleString("pt-PT", {
+    timeZone: FUSO,
     day: "2-digit",
     month: "long",
     year: "numeric",

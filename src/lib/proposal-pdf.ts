@@ -12,12 +12,51 @@ const LINE = rgb(0.85, 0.85, 0.85);
 const A4 = { w: 595.28, h: 841.89 };
 const MARGIN = 56;
 
+/**
+ * O fuso em que esta proposta é lida, e por isso o único em que pode ser
+ * escrita. Mesmo valor e mesma razão do `FUSO` do contract-pdf.
+ */
+const FUSO = "Europe/Lisbon";
+
 function eur(n: number, currency = "EUR"): string {
   return new Intl.NumberFormat("pt-PT", {
     style: "currency",
     currency,
     maximumFractionDigits: 2,
   }).format(n || 0);
+}
+
+/**
+ * Quebra um texto em linhas que cabem em `maxWidth` (respeita \n internos).
+ *
+ * Gémeo do `wrap` do contract-pdf. Estava aqui escrito duas vezes à mão — uma
+ * para a descrição das linhas, outra para as notas —, com a segunda a desenhar
+ * enquanto media. Uma só, que devolve linhas e não desenha nada, é o que permite
+ * ao chamador contar de quantas precisa ANTES de decidir se cabem na página.
+ *
+ * Sanitiza cada parágrafo DEPOIS de partir nos \n do texto cru: o `winAnsiSafe`
+ * preserva a quebra de linha, mas medir e partir é trabalho de quem conhece a
+ * largura. Antes de medir tem mesmo de passar — `widthOfTextAtSize` lança nos
+ * glifos que o WinAnsi/Helvetica não codifica, tal como o `drawText`.
+ */
+function quebrar(font: PDFFont, texto: string, size: number, maxWidth: number): string[] {
+  const linhas: string[] = [];
+  for (const bruto of texto.split("\n")) {
+    const palavras = winAnsiSafe(bruto).split(/\s+/).filter(Boolean);
+    if (palavras.length === 0) continue;
+    let linha = "";
+    for (const p of palavras) {
+      const tentativa = linha ? `${linha} ${p}` : p;
+      if (font.widthOfTextAtSize(tentativa, size) > maxWidth && linha) {
+        linhas.push(linha);
+        linha = p;
+      } else {
+        linha = tentativa;
+      }
+    }
+    linhas.push(linha);
+  }
+  return linhas;
 }
 
 interface Meta {
@@ -27,14 +66,14 @@ interface Meta {
   location?: string;
 }
 
-/** Renders a clean, single-page A4 proposal PDF and returns the bytes. */
+/** Renders a clean A4 proposal PDF and returns the bytes. */
 export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
-  const page = doc.addPage([A4.w, A4.h]);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
 
   const right = A4.w - MARGIN;
+  let page: PDFPage = doc.addPage([A4.w, A4.h]);
   let y = A4.h - MARGIN;
 
   // Sanitiza no ponto de desenho: campos como clientName/eventType/notes vêm do
@@ -73,6 +112,80 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
       color: LINE,
     });
 
+  // ── Colunas da tabela ──
+  const colDesc = MARGIN;
+  const colQty = right - 200;
+  const colUnit = right - 120;
+  const colTotal = right;
+  const maxDesc = colQty - colDesc - 20;
+
+  const cabecalhoDaTabela = () => {
+    text("DESCRIÇÃO", colDesc, y, { font: bold, size: 8, color: MUTED });
+    textRight("QT", colQty + 14, y, { font: bold, size: 8, color: MUTED });
+    textRight("UNIT.", colUnit + 6, y, { font: bold, size: 8, color: MUTED });
+    textRight("TOTAL", colTotal, y, { font: bold, size: 8, color: MUTED });
+    y -= 10;
+    hr(y);
+    y -= 18;
+  };
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════════
+   * A PROPOSTA QUE NÃO CABIA NA FOLHA — E LEVAVA O TOTAL COM ELA
+   * ════════════════════════════════════════════════════════════════════════════
+   *
+   * Este documento desenhava-se numa página fixa e nunca perguntava se ainda
+   * havia folha. O `y` continuava a descer para lá do rodapé e depois para lá do
+   * zero, e o pdf-lib desenha na mesma — em coordenadas que nenhum leitor mostra.
+   *
+   * Com 26 linhas de orçamento o «TOTAL» já saía em cima do rodapé; com 40 (o
+   * esquema aceita até 200) saía a y = −162, ou seja: o casal recebia uma
+   * proposta com dez itens em falta, sem subtotal, sem IVA, sem total, sem a
+   * validade e sem as notas. Nada assinalava a perda — nem um aviso na rota, nem
+   * uma página a mais. Uma proposta de decoração de casamento com vinte e tal
+   * rubricas (arranjos, mesas, transporte, montagem) é o caso normal, não o
+   * extremo.
+   *
+   * Passa a haver páginas de continuação, no molde do contract-pdf: o rodapé
+   * fecha a página que sai, a nova abre com a identificação e a referência, e a
+   * tabela repete os seus cabeçalhos para as colunas continuarem a ter nome.
+   */
+  const rodape = (pg: PDFPage) => {
+    const yy = MARGIN - 12;
+    pg.drawLine({
+      start: { x: MARGIN, y: yy + 16 },
+      end: { x: A4.w - MARGIN, y: yy + 16 },
+      thickness: 0.7,
+      color: LINE,
+    });
+    pg.drawText(`${SITE.email}   ·   ${SITE.phoneDisplay}   ·   Portugal`, {
+      x: MARGIN,
+      y: yy,
+      font,
+      size: 8,
+      color: MUTED,
+    });
+  };
+
+  const novaPagina = () => {
+    rodape(page);
+    page = doc.addPage([A4.w, A4.h]);
+    y = A4.h - MARGIN;
+    text("LÍQUEN EVENTS", MARGIN, y, { font: bold, size: 12, color: MOSS });
+    textRight(`Ref. ${p.id}`, right, y, { size: 9, color: MUTED });
+    y -= 12;
+    hr(y);
+    y -= 24;
+  };
+
+  /** Garante `need` pontos de folha; senão salta de página. Diz se saltou — quem
+   *  está a meio da tabela precisa de saber, para repetir os cabeçalhos. */
+  const garantir = (need: number): boolean => {
+    if (y - need >= MARGIN + 20) return false;
+    novaPagina();
+    return true;
+  };
+
   // ── Header ──
   text("LÍQUEN EVENTS", MARGIN, y, { font: bold, size: 20, color: MOSS });
   textRight("PROPOSTA", right, y, { font: bold, size: 12, color: MUTED });
@@ -80,7 +193,16 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
   text("Decoramos eventos, eternizamos memórias.", MARGIN, y, { size: 9, color: MUTED });
   textRight(`Ref. ${p.id}`, right, y, { size: 9, color: MUTED });
   y -= 14;
-  textRight(new Date(p.createdAt).toLocaleDateString("pt-PT"), right, y, { size: 9, color: MUTED });
+  /**
+   * A data de emissão no fuso de Portugal, e não no da máquina que gerou o PDF
+   * (UTC, no alojamento). Uma proposta criada às 23:30 de 2 de julho saía datada
+   * de 02/07 quando em Lisboa já era dia 3 — e é dessa data que se contam os
+   * dias de validade que o documento promete três linhas abaixo.
+   */
+  textRight(new Date(p.createdAt).toLocaleDateString("pt-PT", { timeZone: FUSO }), right, y, {
+    size: 9,
+    color: MUTED,
+  });
   y -= 18;
   hr(y);
   y -= 28;
@@ -105,39 +227,18 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
   y -= 30;
 
   // ── Line items table ──
-  const colDesc = MARGIN;
-  const colQty = right - 200;
-  const colUnit = right - 120;
-  const colTotal = right;
-
-  text("DESCRIÇÃO", colDesc, y, { font: bold, size: 8, color: MUTED });
-  textRight("QT", colQty + 14, y, { font: bold, size: 8, color: MUTED });
-  textRight("UNIT.", colUnit + 6, y, { font: bold, size: 8, color: MUTED });
-  textRight("TOTAL", colTotal, y, { font: bold, size: 8, color: MUTED });
-  y -= 10;
-  hr(y);
-  y -= 18;
+  cabecalhoDaTabela();
 
   for (const item of p.lineItems) {
     const lineTotal = item.qty * item.unitPrice;
-    // wrap description to ~ colQty width. Sanitiza ANTES de medir/quebrar: a
-    // descrição é texto do cliente e `widthOfTextAtSize` também lança em glifos
-    // que o WinAnsi não codifica.
-    const maxWidth = colQty - colDesc - 20;
-    const words = winAnsiSafe(item.description || "").split(/\s+/);
-    let line = "";
-    const lines: string[] = [];
-    for (const w of words) {
-      const test = line ? `${line} ${w}` : w;
-      if (font.widthOfTextAtSize(test, 10) > maxWidth && line) {
-        lines.push(line);
-        line = w;
-      } else {
-        line = test;
-      }
-    }
-    if (line) lines.push(line);
+    const lines = quebrar(font, item.description || "", 10, maxDesc);
     if (lines.length === 0) lines.push("—");
+
+    // A linha inteira salta junta: a descrição em cima e o valor na página
+    // seguinte seria pior do que a folha a acabar. E a página nova volta a dizer
+    // o nome das colunas — sem eles, «1  100,00 €  100,00 €» é uma fila de
+    // números sem cabeçalho.
+    if (garantir(lines.length * 14 + 4)) cabecalhoDaTabela();
 
     text(lines[0], colDesc, y, { size: 10 });
     textRight(String(item.qty), colQty + 14, y, { size: 10, color: MUTED });
@@ -151,11 +252,14 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
     y -= 4;
   }
 
+  // ── Totals ──
+  // O bloco inteiro (traço + três linhas) ou nenhum: um subtotal sozinho no fim
+  // de uma página, com o total na seguinte, é a conta partida ao meio.
+  garantir(6 + 22 + 16 + 20 + 12);
   y -= 6;
   hr(y);
   y -= 22;
 
-  // ── Totals ──
   const totalsLabelX = colUnit + 6;
   textRight("Subtotal", totalsLabelX, y, { size: 9, color: MUTED });
   textRight(eur(p.subtotal, p.currency), colTotal, y, { size: 9 });
@@ -169,6 +273,7 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
 
   // ── Validity + notes ──
   if (p.validUntil) {
+    garantir(18);
     text(
       `Proposta válida até ${new Date(p.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`,
       MARGIN,
@@ -178,44 +283,18 @@ export async function renderProposalPdf(p: Proposal, meta: Meta = {}): Promise<U
     y -= 18;
   }
   if (p.notes) {
+    garantir(27);
     text("NOTAS", MARGIN, y, { font: bold, size: 8, color: MUTED });
     y -= 14;
-    // Sanitiza as notas do cliente antes de medir/quebrar (ver descrição acima).
-    for (const raw of winAnsiSafe(p.notes).split("\n")) {
-      const words = raw.split(/\s+/);
-      let line = "";
-      const maxWidth = right - MARGIN;
-      for (const w of words) {
-        const test = line ? `${line} ${w}` : w;
-        if (font.widthOfTextAtSize(test, 9) > maxWidth && line) {
-          text(line, MARGIN, y, { size: 9, color: INK });
-          y -= 13;
-          line = w;
-        } else {
-          line = test;
-        }
-      }
-      if (line) {
-        text(line, MARGIN, y, { size: 9, color: INK });
-        y -= 13;
-      }
+    for (const linha of quebrar(font, p.notes, 9, right - MARGIN)) {
+      garantir(13);
+      text(linha, MARGIN, y, { size: 9, color: INK });
+      y -= 13;
     }
   }
 
   // ── Footer ──
-  drawFooter(page, font);
+  rodape(page);
 
   return doc.save();
-}
-
-function drawFooter(page: PDFPage, font: PDFFont) {
-  const y = MARGIN - 12;
-  page.drawLine({
-    start: { x: MARGIN, y: y + 16 },
-    end: { x: A4.w - MARGIN, y: y + 16 },
-    thickness: 0.7,
-    color: LINE,
-  });
-  const parts = `${SITE.email}   ·   ${SITE.phoneDisplay}   ·   Portugal`;
-  page.drawText(parts, { x: MARGIN, y, font, size: 8, color: MUTED });
 }
