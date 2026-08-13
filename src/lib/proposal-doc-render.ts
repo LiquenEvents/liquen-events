@@ -1,6 +1,11 @@
 import "server-only";
 import sharp from "sharp";
-import { MOOD_BOARD_MAX_IMAGES, type ProposalDoc, withProposalDefaults } from "@/lib/proposal-doc";
+import {
+  MOOD_BOARD_MAX_IMAGES,
+  type MoodBoard,
+  type ProposalDoc,
+  withProposalDefaults,
+} from "@/lib/proposal-doc";
 import {
   caixasDaCapa,
   caixasDoCollage,
@@ -9,12 +14,24 @@ import {
   type DocTruncation,
 } from "@/lib/proposal-doc-pdf";
 import {
+  alturaDaLegenda,
+  caixasDoMoodboard,
+  linhasDaLegendaAprox,
+  ASPETO_POR_OMISSAO,
+} from "@/lib/proposal-geometria";
+import { layoutDoBoard, marcaDepoisDeMexer, ordemDasFotos } from "@/lib/proposal-moodboard";
+import {
   fetchProposalCoverBytes,
   fetchProposalImageBytes,
   fetchProposalThumbBytes,
   uploadProposalCover,
 } from "@/lib/proposal-storage";
-import { derivadaDaCapa, pixelsForBox, type TargetPixels } from "@/lib/proposal-image";
+import {
+  aspetoDaImagem,
+  derivadaDaCapa,
+  pixelsForBox,
+  type TargetPixels,
+} from "@/lib/proposal-image";
 import { log } from "@/lib/logger";
 
 /**
@@ -72,6 +89,61 @@ async function cobre(bytes: Buffer, alvo: TargetPixels): Promise<boolean> {
 const MAX_IMAGES_PER_DOC = 80;
 const FETCH_CONCURRENCY = 4;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A CAIXA DE CADA FOTO DE UM MOOD BOARD, PELA ORDEM DO ARRAY
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma caixa por posição de `mb.images`: aquela onde ESSA fotografia vai ser
+ * desenhada. `aspectos` é a forma de cada uma, também pela ordem do array, e
+ * `null` onde ainda não foi medida.
+ *
+ * A geometria é a do gerador ({@link caixasDoMoodboard}) e não a grelha fixa do
+ * arranjo em destaque: são cinco disposições, e medir todas pela do destaque
+ * ficava ABAIXO da caixa real logo em «filas» com quatro fotos (previa 266×299
+ * px, a caixa pede 452×301).
+ *
+ * ── E o desenho não desenha pela ordem do array ────────────────────────────
+ * Duas coisas que uma medição posição a posição não via:
+ *
+ * · **a permuta**. A foto marcada como principal é desenhada na PRIMEIRA caixa
+ *   ({@link ordemDasFotos}, a mesma função do gerador e do estúdio). Medir cada
+ *   foto pelo lugar que ocupa no array pedia à sexta uma miniatura de célula
+ *   pequena e desenhava-a na caixa de 56% da mancha.
+ * · **o corte**. Só as primeiras {@link MOOD_BOARD_MAX_IMAGES} são desenhadas —
+ *   e o corte é feito DEPOIS da permuta, portanto uma foto marcada em décimo
+ *   primeiro lugar entra na página na mesma.
+ *
+ * A que não é desenhada leva a MENOR caixa da página. Não é por elegância: é
+ * para não ficar SEM caixa nenhuma. Uma caixa a `null` é, em {@link buscar}, o
+ * sinal de «isto é a CAPA» — e uma foto de mood board que fosse por aí pagava o
+ * recorte da tira alta e uma escrita no armazenamento para uma fotografia que
+ * nem sequer é impressa.
+ */
+function caixasDoDesenho(mb: MoodBoard, aspectos: readonly (number | null)[]): CaixaPdf[] {
+  const legenda = alturaDaLegenda(linhasDaLegendaAprox(mb.annotation));
+  const desenhadas = ordemDasFotos(mb).slice(0, MOOD_BOARD_MAX_IMAGES);
+  const caixas = caixasDoMoodboard(
+    layoutDoBoard(mb),
+    desenhadas.map((i) => aspectos[i] ?? ASPETO_POR_OMISSAO),
+    legenda,
+    mb.enquadramento === "forma-da-foto",
+  );
+  const menor = caixas.reduce<CaixaPdf | undefined>(
+    (m, c) => (!m || c.w * c.h < m.w * m.h ? c : m),
+    undefined,
+  );
+  // Sem caixa nenhuma (uma composição que não fechou) fica a mancha inteira —
+  // `caixasDoCollage(1)` é exactamente isso. É o majorante trivial: erra para o
+  // lado de descarregar grande de mais, que é o lado invisível.
+  const recurso = menor ?? caixasDoCollage(1, legenda)[0];
+  const porFoto = mb.images.map(() => recurso);
+  desenhadas.forEach((i, d) => {
+    if (caixas[d]) porFoto[i] = caixas[d];
+  });
+  return porFoto;
+}
+
 /** Resolve `fn` over `items` with at most `limit` in flight at once. */
 async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
   const out = new Array<R>(items.length);
@@ -103,24 +175,26 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
  * o caminho de recurso (o PDF de 3,31 MB do PDF-BEFORE.md).
  *
  * Agora pergunta-se primeiro ONDE a foto vai ser desenhada — `caixasDaCapa` e
- * `caixasDoCollage`, as mesmas funções que o desenho usa — e pede-se o
+ * `caixasDoMoodboard`, as mesmas funções que o desenho usa — e pede-se o
  * tamanho que essa caixa justifica.
  *
  * ── Porquê duas passagens ─────────────────────────────────────────────────
- * A disposição de um mood board depende de QUANTAS fotos ele tem, e só se sabe
- * quais entraram depois de as tentar buscar: uma foto que falhe faz as
- * restantes crescer. Adivinhar a disposição antes disso daria, nesse caso, uma
- * miniatura ampliada — uma foto desfocada numa proposta que vai para um casal.
+ * A caixa de uma foto de mood board depende da FORMA de todas as fotos da
+ * página (é isso que faz uma vertical sair vertical em vez de recortada), e a
+ * forma só se conhece depois de descarregar. Depende também de QUANTAS
+ * entraram: uma foto que falhe faz as restantes crescer.
  *
  * Por isso:
- *   1.ª  busca-se o que se acha que chega (a miniatura onde é plausível, o
- *        original onde de certeza não chega). Isto diz quais existem.
- *   2.ª  com as sobreviventes, calcula-se a disposição VERDADEIRA e verifica-se
- *        cada uma contra a sua caixa. A que ficar curta é rebuscada em
- *        original.
+ *   1.ª  busca-se o que se acha que chega — a caixa medida com a disposição e a
+ *        ordem verdadeiras (estão no documento) e a forma por omissão, que é a
+ *        única coisa que ainda não se sabe. Isto diz quais existem.
+ *   2.ª  com as sobreviventes e as formas MEDIDAS, corre-se a mesma geometria
+ *        que o gerador vai correr e verifica-se cada foto contra a caixa onde
+ *        ela vai mesmo ser desenhada. A que ficar curta é rebuscada em original.
  *
- * A 2.ª passagem quase nunca busca nada: no caso normal ninguém falha e as
- * caixas são as previstas.
+ * A garantia mora na 2.ª: é lá que a caixa é a verdadeira, e é lá que uma
+ * miniatura que ia ser ampliada é apanhada. A 1.ª é só uma aposta a poupar
+ * bytes — errá-la custa uma ida ao armazenamento de 20 KB, nunca uma foto mole.
  */
 async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; missing: number }> {
   let remaining = MAX_IMAGES_PER_DOC;
@@ -241,26 +315,31 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
     // A poupança seria de um caso que o estúdio não deixa acontecer; a perda
     // de aviso seria real. Só o TAMANHO de cada ficheiro muda aqui.
     /**
-     * ── PORQUE É QUE ISTO CONTINUA A MEDIR PELO «DESTAQUE» ─────────────────
+     * ── 1.ª PASSAGEM: A MELHOR MEDIDA QUE HÁ SEM AS FOTOS EM MÃO ───────────
      *
-     * O desenho passou a ter cinco layouts, e o que sai depende da FORMA de
-     * cada fotografia ({@link caixasDoMoodboard}) — que só se conhece depois de
-     * a descarregar. Aqui ainda não se descarregou nada: é este o ovo e a
-     * galinha.
+     * A disposição, a ordem de desenho e a legenda são conhecidas aqui — estão
+     * no documento. O que falta são as FORMAS, que só se sabem depois de
+     * descarregar; usa-se a forma por omissão, a mesma que o estúdio usa
+     * enquanto não mediu ({@link ASPETO_POR_OMISSAO}).
      *
-     * Mede-se pelo arranjo em destaque, que tem a maior caixa de todos (56% da
-     * largura da mancha). Nenhuma célula de nenhum outro layout é maior do que
-     * essa, portanto o ficheiro pedido nunca fica curto — erra-se para o lado
-     * de descarregar grande de mais, que é invisível, e nunca para o lado de
-     * uma foto ampliada, que se vê no documento do casal.
+     * ── E porque é que isto não é um majorante ───────────────────────────
+     * Porque, sem as formas, um majorante a sério é a MANCHA INTEIRA: medido,
+     * uma panorâmica no meio de nove verticais leva 661 dos 706 pontos de
+     * largura da mancha em «fila única», e em «filas» chega aos 706 — e QUALQUER
+     * uma das dez pode ser essa. Pedir a mancha para todas as fotos era voltar a
+     * descarregar o original de todas: os megabytes e a memória que este módulo
+     * existe para não gastar (ver o cabeçalho).
      *
-     * O preço é vir um original onde uma miniatura chegava, em páginas de
-     * muitas fotos. Fecha-se quando as formas forem conhecidas antes da
-     * primeira ida ao armazenamento.
+     * Por isso esta passagem só decide se a miniatura PODE servir. Quem garante
+     * que serve MESMO é a 2.ª, com as formas medidas: errar aqui custa uma ida
+     * ao armazenamento de 20 KB deitada fora, e nunca uma foto ampliada.
      */
-    const previstas = caixasDoCollage(Math.min(mb.images.length, MOOD_BOARD_MAX_IMAGES));
+    const previstas = caixasDoDesenho(
+      mb,
+      mb.images.map(() => null),
+    );
     const obtidas = await mapLimit(
-      mb.images.map((ref, i) => ({ ref, caixa: previstas[i] ?? null })),
+      mb.images.map((ref, i) => ({ ref, caixa: previstas[i] })),
       FETCH_CONCURRENCY,
       // Uma referência VAZIA não é uma foto que faltou: é um lugar que nunca
       // teve foto nenhuma. Ir buscá-la falhava sempre e somava ao contador —
@@ -270,19 +349,43 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
       ({ ref, caixa }) => (ref ? buscarComTecto(ref, caixa) : Promise.resolve(null)),
     );
 
-    // ── 2.ª passagem: com as sobreviventes, a disposição VERDADEIRA ──
-    // Uma foto que falhou faz as restantes CRESCER, e uma miniatura escolhida
-    // para a caixa pequena passaria a ser ampliada. Aqui isso é apanhado e
-    // corrigido — é a diferença entre uma foto nítida e uma mole no documento
-    // que vai para o casal.
-    const vivas = obtidas.filter((r): r is Resolvida => !!r);
-    const reais = caixasDoCollage(Math.min(vivas.length, MOOD_BOARD_MAX_IMAGES));
+    /**
+     * ── 2.ª PASSAGEM: O DESENHO VERDADEIRO ────────────────────────────────
+     *
+     * Os bytes estão em mão, portanto as FORMAS são conhecidas — o `sharp` lê-as
+     * do cabeçalho em microssegundos. A partir daqui a geometria é a mesma que o
+     * gerador vai correr: mesma disposição, mesmas formas, mesma altura de
+     * legenda, mesma permutação. É isto que fecha o buraco — uma miniatura que a
+     * 1.ª passagem aceitou para uma caixa que afinal é maior (porque uma foto
+     * falhou e as outras cresceram, ou porque a página tem verticais e as filas
+     * ficam mais altas) é apanhada aqui e sobe ao original.
+     */
+    const vivas: Resolvida[] = [];
+    /** Para onde foi cada foto depois de as que faltaram saírem da lista. */
+    const paraOndeFoi: (number | null)[] = obtidas.map((r) => {
+      if (!r) return null;
+      vivas.push(r);
+      return vivas.length - 1;
+    });
+    /**
+     * ── A MARCA VEM ATRÁS DA COMPACTAÇÃO ──────────────────────────────────
+     *
+     * `images` é reescrito sem as que faltaram, e um índice que apontava para a
+     * quinta posição de uma lista que encolheu passa a apontar para OUTRA
+     * fotografia: a página sai com a foto errada em grande e ninguém lhe tocou.
+     * É o mesmo cuidado — e a mesma função — que o estúdio usa em todo o lado
+     * onde as fotos mexem.
+     */
+    const principal = marcaDepoisDeMexer(mb, (antigo) => paraOndeFoi[antigo] ?? null);
+    const mbFinal: MoodBoard = { ...mb, images: vivas.map((r) => r.ref), principal };
+    const formas = await Promise.all(vivas.map((r) => aspetoDaImagem(r.bytes)));
+    const reais = caixasDoDesenho(mbFinal, formas);
     const finais = await mapLimit(
-      vivas.map((r, i) => ({ r, caixa: reais[i] ?? null })),
+      vivas.map((r, i) => ({ r, caixa: reais[i] })),
       FETCH_CONCURRENCY,
       async ({ r, caixa }) => {
-        // Já é o original, ou a caixa não mudou de tamanho: nada a fazer.
-        if (r.original || !caixa) return r.bytes;
+        // Já é o original: não há mais nada maior para onde subir.
+        if (r.original) return r.bytes;
         const alvo = pixelsForBox(caixa.w, caixa.h, "collage");
         if (await cobre(r.bytes, alvo)) return r.bytes;
         // Ficou curta. Sobe-se ao original; se ELE falhar agora, fica-se com a
@@ -292,7 +395,8 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
       },
     );
 
-    moodBoards.push({ ...mb, images: finais.map((b) => b.toString("base64")) });
+    // A marca reindexada segue com o board: o gerador vai permutar por ela.
+    moodBoards.push({ ...mb, images: finais.map((b) => b.toString("base64")), principal });
   }
 
   return { doc: { ...doc, coverImages: cover, moodBoards }, missing };

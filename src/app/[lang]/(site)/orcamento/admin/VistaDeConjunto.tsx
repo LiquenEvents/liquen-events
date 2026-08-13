@@ -30,6 +30,19 @@ import PreviaDaPagina from "./PreviaDaPagina";
  * portanto é aqui que se tem de poder mexer. As setas movem POSIÇÕES no ecrã, e
  * a acção é a mesma do editor (`moveBoard`) — não uma segunda maneira de
  * reordenar, que um dia discordaria da primeira.
+ *
+ * ── E MOVEM CONTRA O VIZINHO QUE SE VÊ ────────────────────────────────────
+ * Esta vista só desenha as páginas COM fotografias — as vazias não são
+ * impressas e não têm nada para comparar. As setas moviam contra a ordem
+ * completa: com uma página vazia pelo meio, a seta trocava a página com ESSA, o
+ * ecrã ficava exactamente igual, e o que se lê é uma seta avariada. Carregar
+ * outra vez fazia o mesmo, agora com a página já duas posições longe de onde
+ * ela julgava.
+ *
+ * Por isso o vizinho é o vizinho VISÍVEL, e a posição para onde a página vai é
+ * a dele — o que salta por cima das vazias e deixa a lista do ecrã trocada, que
+ * é a única coisa que a seta prometeu. Nas pontas da lista visível a seta fica
+ * desligada, em vez de ficar a mexer no que não se vê.
  */
 export default function VistaDeConjunto({
   boards,
@@ -80,10 +93,14 @@ export default function VistaDeConjunto({
         </p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-          {comFotos.map((bi) => {
+          {comFotos.map((bi, vi) => {
             const b = boards[bi];
             const desenho = ordemDasFotos(b).slice(0, MOOD_BOARD_MAX_IMAGES);
             const pos = ordem.indexOf(bi);
+            // Para onde a página vai: o lugar do vizinho VISÍVEL, saltando por
+            // cima das vazias. `-1` = não há vizinho desse lado.
+            const paraTras = vi > 0 ? ordem.indexOf(comFotos[vi - 1]) : -1;
+            const paraAFrente = vi < comFotos.length - 1 ? ordem.indexOf(comFotos[vi + 1]) : -1;
             return (
               <li key={bi} className="min-w-0">
                 <button
@@ -112,8 +129,8 @@ export default function VistaDeConjunto({
                   <span className="flex shrink-0 gap-0.5">
                     <button
                       type="button"
-                      onClick={() => onMover(pos, pos - 1)}
-                      disabled={pos === 0}
+                      onClick={() => onMover(pos, paraTras)}
+                      disabled={paraTras < 0}
                       aria-label={`Mover a página ${pos + 1} para trás`}
                       className="alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-foreground/[0.07] disabled:opacity-30"
                     >
@@ -121,8 +138,8 @@ export default function VistaDeConjunto({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onMover(pos, pos + 1)}
-                      disabled={pos === ordem.length - 1}
+                      onClick={() => onMover(pos, paraAFrente)}
+                      disabled={paraAFrente < 0}
                       aria-label={`Mover a página ${pos + 1} para a frente`}
                       className="alvo-toque flex h-6 w-6 items-center justify-center rounded-md text-foreground/45 transition-colors hover:bg-foreground/[0.07] disabled:opacity-30"
                     >
