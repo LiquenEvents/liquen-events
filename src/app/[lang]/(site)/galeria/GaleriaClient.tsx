@@ -1586,6 +1586,25 @@ export default function GaleriaClient({
 }
 
 /**
+ * O que se sabe sobre UMA fotografia do lightbox. Carimbado com o índice dela
+ * de propósito — ver a nota grande dentro do `Lightbox`.
+ */
+type EstadoDaFoto = {
+  idx: number;
+  /** Portão da pré-carga: os vizinhos só são pedidos depois de ESTA chegar. */
+  carregada: boolean;
+  formato: "avif" | "webp";
+  /** Desistiu-se da derivada: pede-se o ficheiro original tal e qual. */
+  cru: boolean;
+};
+const estadoDaFotoDoZero = (idx: number): EstadoDaFoto => ({
+  idx,
+  carregada: false,
+  formato: "avif",
+  cru: false,
+});
+
+/**
  * O lightbox propriamente dito. É montado SÓ quando aberto (ver `GaleriaClient`),
  * por isso todos os seus refs, efeitos e listeners (teclado, trap de foco, foco
  * de entrada/saída, slideshow, bloqueio de scroll, gestos táteis, pré-carga de
@@ -1633,10 +1652,40 @@ function Lightbox({
   const backdropRef = useRef<HTMLDivElement>(null);
   const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
 
-  // Gate the next-photo preload on the CURRENT photo having loaded, so opening
-  // (and each ←/→ step) decodes only the visible photo first — no hero-vs-
-  // neighbour decode contention in the open/step frame. Resets per photo.
-  const [heroLoaded, setHeroLoaded] = useState(false);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O QUE SE SABE SOBRE A FOTOGRAFIA ABERTA VEM CARIMBADO COM O ÍNDICE DELA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * São três coisas — se já carregou (portão da pré-carga dos vizinhos), em que
+   * formato está a ser pedida, e se já se desistiu da derivada — e as três são
+   * DA FOTOGRAFIA, não do lightbox. Eram três `useState` repostos num efeito
+   * PASSIVO com `[index]`, e um efeito passivo corre DEPOIS do commit: no
+   * commit em que o índice muda, os três valores ainda são os da fotografia
+   * anterior. Isso via-se, e não era teórico:
+   *
+   *  • `heroLoaded` ficava `true` por um commit, portanto os dois `<img>` dos
+   *    vizinhos NOVOS eram montados — e um `<img>` montado é um pedido — ao
+   *    mesmo tempo que a fotografia que a pessoa acabou de abrir. É exactamente
+   *    a disputa que o portão existe para evitar. A seguir o efeito arrancava-os
+   *    do DOM, abortando os pedidos, para os voltar a fazer do zero quando o
+   *    herói chegasse. Medido com `GaleriaClient.precarga.test.tsx`: dois
+   *    `<img>` de vizinho criados e removidos dentro do mesmo `→`;
+   *  • `lbRaw`/`lbFormato` arrastavam a desistência da fotografia ANTERIOR para
+   *    a seguinte: depois de uma foto cair no ficheiro original, a seguinte era
+   *    pedida em original (a fotografia inteira, sem derivada) durante esse
+   *    commit, antes de o efeito a repor em AVIF.
+   *
+   * Com o carimbo, a reposição é DERIVADA no próprio render: um índice novo lê
+   * um estado novo no mesmo instante em que o índice muda, sem commit nenhum
+   * pelo meio e sem efeito nenhum.
+   */
+  const [guardado, setGuardado] = useState<EstadoDaFoto>(() => estadoDaFotoDoZero(index));
+  const foto = guardado.idx === index ? guardado : estadoDaFotoDoZero(index);
+  /** Anota o que se sabe da fotografia ABERTA — nunca da anterior. */
+  const anotar = (mudanca: (a: EstadoDaFoto) => EstadoDaFoto) =>
+    setGuardado((p) => mudanca(p.idx === index ? p : estadoDaFotoDoZero(index)));
+  const heroLoaded = foto.carregada;
 
   /**
    * A foto do lightbox é a ÚNICA imagem da galeria que continua a passar pelo
@@ -1645,9 +1694,9 @@ function Lightbox({
    * re-tentativa nem legenda de falha, ganha aqui a mesma rede de segurança
    * que a grelha já tinha: se o optimizador falhar, serve-se o ficheiro
    * original de `/imagens/x.jpg`. Uma foto pesada é melhor do que um ecrã
-   * preto. Repõe-se a cada foto.
+   * preto. Repõe-se a cada foto (ver o carimbo acima).
    */
-  const [lbRaw, setLbRaw] = useState(false);
+  const lbRaw = foto.cru;
   /**
    * ── O FORMATO DA FOTOGRAFIA GRANDE ────────────────────────────────────────
    *
@@ -1668,12 +1717,7 @@ function Lightbox({
    * não teria fotografia nenhuma. O degrau seguinte continua a ser o ficheiro
    * original, que existe sempre.
    */
-  const [lbFormato, setLbFormato] = useState<"avif" | "webp">("avif");
-  useEffect(() => {
-    setHeroLoaded(false);
-    setLbRaw(false);
-    setLbFormato("avif");
-  }, [index]);
+  const lbFormato = foto.formato;
 
   // Defer the (secondary) thumbnail strip to the frame AFTER the lightbox
   // opens, so the open commit only has to mount the hero photo — not also a row
@@ -1769,12 +1813,35 @@ function Lightbox({
       ? SLIDE_MS_REDUCED
       : SLIDE_MS,
   );
+  /**
+   * O separador está escondido? Tem de ser ESTADO, e não uma leitura solta de
+   * `document.hidden` dentro do efeito do avanço.
+   *
+   * Era uma leitura solta, e falhava dos dois lados. Esconder o separador não
+   * parava nada — o temporizador já armado disparava na mesma e a fotografia
+   * avançava com o visitante a olhar para outra coisa. E ao voltar não havia
+   * mudança de estado nenhuma que fizesse o efeito correr outra vez: a única
+   * coisa que o re-arma é a foto mudar, e ela tinha deixado de mudar. O
+   * slideshow ficava morto para o resto da visita, com o botão a dizer
+   * "Pausar" e `aria-pressed="true"` — ou seja, a afirmar que está a andar.
+   *
+   * É o caso normal de quem o põe a andar no telemóvel: muda de app, atende,
+   * volta. Voltava para um slideshow parado que se dizia a andar.
+   */
+  const [separadorEscondido, setSeparadorEscondido] = useState(
+    () => typeof document !== "undefined" && document.hidden,
+  );
   useEffect(() => {
-    if (!playing) return;
-    if (typeof document !== "undefined" && document.hidden) return;
+    const aoMudar = () => setSeparadorEscondido(document.hidden);
+    aoMudar();
+    document.addEventListener("visibilitychange", aoMudar);
+    return () => document.removeEventListener("visibilitychange", aoMudar);
+  }, []);
+  useEffect(() => {
+    if (!playing || separadorEscondido) return;
     const id = window.setTimeout(next, slideMs);
     return () => window.clearTimeout(id);
-  }, [playing, next, slideMs]);
+  }, [playing, separadorEscondido, next, slideMs]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -2095,8 +2162,9 @@ function Lightbox({
                 // avif → webp → original. Nunca salta um degrau: o WebP é o que
                 // salva quem não sabe ler AVIF, e o original é o que salva quem
                 // não tem a derivada.
-                if (!lbRaw && lbFormato === "avif") setLbFormato("webp");
-                else setLbRaw(true);
+                anotar((a) =>
+                  !a.cru && a.formato === "avif" ? { ...a, formato: "webp" } : { ...a, cru: true },
+                );
               }}
               // priority: the full-res lightbox photo is a DIFFERENT srcset
               // candidate than the tile thumbnail, so opening starts a cold fetch.
@@ -2106,7 +2174,7 @@ function Lightbox({
               // foto que ja esta no DOM a propria doc recomenda antes
               // fetchPriority="high", que e exactamente o efeito que se quer.
               fetchPriority="high"
-              onLoad={() => setHeroLoaded(true)}
+              onLoad={() => anotar((a) => ({ ...a, carregada: true }))}
               className={`object-contain ${
                 playing ? "lb-kenburns" : justOpened ? "lb-open-in" : "lb-photo-in"
               }`}

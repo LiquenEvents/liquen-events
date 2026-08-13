@@ -87,7 +87,13 @@ export default function StickyCTA() {
       // Shown on every breakpoint: on mobile it's the only persistent path to
       // the quote form (the navbar auto-hides on scroll-down). It sits bottom-
       // LEFT, so it never collides with the bottom-right WhatsApp pill.
-      className={`fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-[calc(1.25rem+env(safe-area-inset-left))] lg:bottom-[calc(1.75rem+env(safe-area-inset-bottom))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 ${
+      //
+      // `motion-reduce`: a entrada é um transform (16 px a subir em 500 ms) e
+      // não uma mudança de cor. Este é um dos dois elementos que estão em
+      // TODAS as páginas e que se mexem sozinhos a meio do scroll, portanto
+      // era das lacunas de movimento reduzido que mais vezes se via. Com a
+      // variante o chip passa a aparecer e a recolher de uma vez.
+      className={`fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-[calc(1.25rem+env(safe-area-inset-left))] lg:bottom-[calc(1.75rem+env(safe-area-inset-bottom))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >
@@ -107,7 +113,10 @@ export default function StickyCTA() {
           {t.footer.pedirOrcamento}
         </span>
         <span
-          className="text-white/50 group-hover:text-[#0c0e0b] group-hover:translate-x-0.5 transition-all duration-300 ease-expo text-xs sm:text-sm"
+          // `motion-reduce`: a seta desliza meio píxel para a direita ao passar
+          // o rato — é um transform, e é o mesmo remendo que a seta do PhotoWall
+          // já leva. A cor continua a mudar (isso é informação, não movimento).
+          className="text-white/50 group-hover:text-[#0c0e0b] group-hover:translate-x-0.5 transition-all duration-300 ease-expo motion-reduce:transition-none motion-reduce:group-hover:translate-x-0 text-xs sm:text-sm"
           aria-hidden
         >
           →

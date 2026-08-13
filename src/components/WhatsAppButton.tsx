@@ -76,7 +76,13 @@ export default function WhatsAppButton() {
       // visual coerente. O brilho do hover acompanha em musgo.
       // Icon-only (a compact circle) below sm so it never collides with the
       // bottom-left "Pedir orçamento" pill on small phones; full label from sm up.
-      className={`whatsapp-fixed fixed z-50 flex items-center justify-center gap-2.5 p-3.5 sm:pl-4 sm:pr-5 sm:py-[13px] bg-moss hover:bg-moss-dark text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-moss/25 hover:scale-105 transition-all duration-500 ${
+      //
+      // `motion-reduce`: eram dois movimentos, não um. A entrada é um transform
+      // (16 px a subir em 500 ms) que corre sozinho a meio de cada scroll, e o
+      // `hover:scale-105` faz a pílula CRESCER debaixo do rato. A cor do fundo
+      // e a sombra continuam a responder ao rato — isso diz que o botão está
+      // sob o cursor, e um estado que muda não é movimento.
+      className={`whatsapp-fixed fixed z-50 flex items-center justify-center gap-2.5 p-3.5 sm:pl-4 sm:pr-5 sm:py-[13px] bg-moss hover:bg-moss-dark text-white rounded-full shadow-lg shadow-black/30 hover:shadow-xl hover:shadow-moss/25 hover:scale-105 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 motion-reduce:hover:scale-100 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
       style={{
