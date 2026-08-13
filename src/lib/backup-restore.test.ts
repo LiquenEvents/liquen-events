@@ -43,6 +43,9 @@ const db = vi.hoisted(() => ({
    * fora. É com isto que se põe à prova a sonda de pré-voo das propostas.
    */
   missingColumns: new Map<string, Set<string>>(),
+  /** A coluna por que cada tabela foi apagada. É o que prova que a reposição
+   *  usa a chave que o `mapper` declara e não `id` à letra. */
+  deleteColumns: new Map<string, string>(),
   configured: true,
 }));
 
@@ -200,15 +203,21 @@ function fakeSupabase() {
           return { error: null };
         },
         delete() {
-          const run = async () => {
+          // A coluna do filtro conta: filtrar por uma que a tabela não tem é o
+          // 42703 do Postgres, e nesse caso NÃO se apaga nada — que é
+          // exactamente o que acontecia à `biblioteca_fotos`, sem coluna `id`.
+          const run = async (column?: string) => {
             if (shouldFail(table, "write")) return { error: new Error(`${table} recusa escritas`) };
+            const absent = column ? missingColumnIn(table, [column]) : null;
+            if (absent) return { error: undefinedColumn(table, absent) };
+            if (column) db.deleteColumns.set(table, column);
             db.writes.push(`delete:${table}`);
             db.tables.set(table, []);
             return { error: null };
           };
           return {
-            not: () => run(),
-            eq: () => run(),
+            not: (column: string) => run(column),
+            eq: (column: string) => run(column),
             then: (resolve: (v: unknown) => unknown) => run().then(resolve),
           };
         },
@@ -465,6 +474,7 @@ beforeEach(() => {
   db.writes.length = 0;
   db.fail.clear();
   db.missingColumns.clear();
+  db.deleteColumns.clear();
   db.configured = true;
   vi.clearAllMocks();
 });
@@ -702,6 +712,88 @@ describe("percurso completo: exportar → apagar → repor", () => {
     expect(result.applied.map((a) => a.key).sort()).toEqual(
       RESTORE_TARGETS.map((t) => t.key).sort(),
     );
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 1b. A CHAVE PRIMÁRIA NÃO SE CHAMA `id` EM TODA A GENTE
+// ════════════════════════════════════════════════════════════════════════════
+//
+// O `replaceAll` apagava sempre com `not("id","is",null)` e um comentário a
+// dizer «a coluna é chave primária». É verdade em onze das doze tabelas — e é
+// falso na `biblioteca_fotos`, que tem `path text primary key` e NENHUMA coluna
+// `id` (ver `Mapper.idColumn`). O Postgres respondia 42703 e o conjunto das
+// fotos falhava.
+//
+// E não falhava sozinho: as ETIQUETAS DAS FOTOS são apagadas antes, por
+// cascata da chave estrangeira. Ou seja, uma reposição apagava o trabalho de
+// etiquetar — a única coisa da biblioteca que não se reconstrói do bucket — e
+// depois não conseguia repor as fotos a que as etiquetas se agarravam.
+
+/** As três tabelas da biblioteca visual, e a base a dizer a verdade sobre a
+ *  `biblioteca_fotos`: não tem coluna `id` nenhuma. */
+function seedBiblioteca(): void {
+  db.tables.clear();
+  rowsOf("biblioteca_etiquetas").push({
+    id: "estilo:terracotta",
+    eixo: "estilo",
+    nome: "Terracotta",
+    ordem: 1,
+    created_at: ONTEM,
+  });
+  rowsOf("biblioteca_fotos").push({
+    path: "terracotta/foto-1.jpg",
+    pasta: "terracotta",
+    fingerprint: "f1",
+    md5: "m1",
+    largura: 2000,
+    altura: 1300,
+    lqip: "data:image/webp;base64,AAA",
+    created_at: ONTEM,
+    updated_at: ONTEM,
+  });
+  rowsOf("biblioteca_foto_etiquetas").push({
+    id: "terracotta/foto-1.jpg#estilo:terracotta",
+    path: "terracotta/foto-1.jpg",
+    etiqueta_id: "estilo:terracotta",
+    origem: "manual",
+    created_at: ONTEM,
+  });
+  db.missingColumns.set("biblioteca_fotos", new Set(["id"]));
+}
+
+describe("repor a Biblioteca visual (a tabela cuja chave é o `path`)", () => {
+  it("as fotos são apagadas pela coluna que o mapper declara, e voltam", async () => {
+    seedBiblioteca();
+    const copia = await buildBackupPayload();
+    expect(copia.bibliotecaFotos).toHaveLength(1);
+
+    wipeEverything();
+    const file = mustValidate(copia);
+    const result = await applyRestore(file, await planRestore(file));
+
+    expect(result.failed, "nenhum conjunto podia falhar").toEqual([]);
+    expect(db.deleteColumns.get("biblioteca_fotos")).toBe("path");
+    expect(rowsOf("biblioteca_fotos")).toHaveLength(1);
+    // O que se perdia de verdade: as etiquetas, apagadas antes por cascata.
+    expect(rowsOf("biblioteca_foto_etiquetas")).toHaveLength(1);
+    expect((await buildBackupPayload()).bibliotecaFotoEtiquetas).toEqual(
+      copia.bibliotecaFotoEtiquetas,
+    );
+  });
+
+  it("cada conjunto apaga pela chave do SEU mapper — nenhum por um `id` presumido", async () => {
+    seedBiblioteca();
+    const file = mustValidate(await buildBackupPayload());
+    await applyRestore(file, await planRestore(file));
+
+    for (const t of RESTORE_TARGETS) {
+      // Os conjuntos com escrita à medida (os rascunhos) não apagam a tabela.
+      if (!db.deleteColumns.has(t.table)) continue;
+      expect(db.deleteColumns.get(t.table), `${t.key} apagou pela coluna errada`).toBe(
+        t.mapper.idColumn ?? "id",
+      );
+    }
   });
 });
 

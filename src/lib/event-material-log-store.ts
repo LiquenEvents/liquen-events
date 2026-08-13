@@ -59,10 +59,20 @@ const repo = createRepository(mapper);
 
 export const listAllLog = (): Promise<EventMaterialLog[]> => repo.list();
 
+/**
+ * O registo de UM evento — filtrado pela base de dados, nunca em memória.
+ *
+ * Isto era um `list()` da tabela inteira seguido de um `filter`. Esta tabela é
+ * append-only e cresce a CADA marcação de material de CADA evento: ao fim de
+ * uma época, ver o registo de um casamento passava por trazer o registo de
+ * todos os outros para a função e deitar fora 99% deles. O `where()` empurra o
+ * filtro para onde ele custa um índice em vez de uma tabela inteira, e
+ * atravessa os dois backends (o de ficheiro recebe o predicado equivalente).
+ */
 export async function listLogOf(eventId: string): Promise<EventMaterialLog[]> {
-  return (await repo.list())
-    .filter((l) => l.eventId === eventId)
-    .sort((a, b) => b.markedAt.localeCompare(a.markedAt));
+  return (await repo.where("event_id", eventId, (l) => l.eventId === eventId)).sort((a, b) =>
+    b.markedAt.localeCompare(a.markedAt),
+  );
 }
 
 export async function registar(

@@ -255,13 +255,33 @@ async function fetchHeader(bucket: string, path: string): Promise<Buffer | null>
   try {
     const { data } = await sb.storage.from(bucket).createSignedUrl(path, 60);
     if (!data?.signedUrl) return null;
+    return lerCabecalho(data.signedUrl, bucket, path);
+  } catch (e) {
+    // Nunca lança: quem chama trata `null` como "não se conseguiu ler", e um
+    // Storage a rebentar aqui não pode derrubar a confirmação inteira.
+    log.warn("storage: cabeçalho não lido", { bucket, path, erro: String(e) });
+    return null;
+  }
+}
+
+/**
+ * O mesmo, a partir de um URL JÁ assinado — para quem assinou um LOTE inteiro
+ * de uma vez (ver `confirmProposalUploads`) e não tem de voltar ao servidor
+ * para assinar foto a foto.
+ */
+async function lerCabecalho(
+  signedUrl: string,
+  bucket: string,
+  path: string,
+): Promise<Buffer | null> {
+  try {
     const res = await fetchSeguindoRedireccoes(
-      data.signedUrl,
+      signedUrl,
       {
         headers: { Range: `bytes=0-${HEADER_BYTES - 1}` },
         signal: AbortSignal.timeout(8000),
       },
-      new URL(data.signedUrl).host,
+      new URL(signedUrl).host,
     );
     if (!res || !res.ok || !res.body) return null;
     const chunks: Uint8Array[] = [];
@@ -291,7 +311,12 @@ export async function inspectStoredImage(
   bucket: string,
   path: string,
 ): Promise<{ ok: boolean; reason: string }> {
-  const head = await fetchHeader(bucket, path);
+  return avaliarCabecalho(await fetchHeader(bucket, path));
+}
+
+/** A decisão em si, separada de COMO os bytes foram buscados — para o caminho
+ *  em lote poder reutilizá-la sem duplicar a regra dos pixéis. */
+async function avaliarCabecalho(head: Buffer | null): Promise<{ ok: boolean; reason: string }> {
   if (!head || head.byteLength === 0) return { ok: false, reason: "ilegivel" };
   try {
     const meta = await sharp(head).metadata();
@@ -344,9 +369,37 @@ export async function confirmProposalUploads(
   const mine = paths.filter((p) => isProposalPath(p, quoteId));
   for (const p of paths) if (!mine.includes(p)) rejected.push(p);
 
-  const checked = await Promise.all(
-    mine.map(async (path) => ({ path, verdict: await inspectStoredImage(PROPOSAL_BUCKET, path) })),
-  );
+  /**
+   * ── PORQUE É QUE ISTO É EM LOTE E COM TECTO ──────────────────────────────
+   *
+   * Estava um `Promise.all` sobre as fotos todas, e cada uma assinava o SEU URL
+   * e fazia o SEU pedido de cabeçalho: sessenta fotos eram cento e vinte
+   * pedidos ao Storage disparados no mesmo instante, dentro de uma rota que
+   * alguém está a ver a rodar. Uma ida ao servidor POR FOTO é precisamente o
+   * que o `assinarLote` existe para não haver (ver `signProposalThumbs`).
+   *
+   * Assina-se tudo num pedido só, e os cabeçalhos vão em grupos de oito — o
+   * mesmo tecto de `duplicarFotosParaPedido`, e pela mesma razão.
+   */
+  const assinados = await assinarLote(PROPOSAL_BUCKET, [...mine], false, 60);
+  const EM_PARALELO = 8;
+  const checked: { path: string; verdict: { ok: boolean; reason: string } }[] = [];
+  for (let i = 0; i < mine.length; i += EM_PARALELO) {
+    const lote = mine.slice(i, i + EM_PARALELO);
+    checked.push(
+      ...(await Promise.all(
+        lote.map(async (path) => {
+          const url = assinados.get(path);
+          // Sem URL no lote, volta-se a assinar esta sozinha: uma assinatura em
+          // falta não pode passar por "a foto não presta" e mandá-la apagar.
+          const head = url
+            ? await lerCabecalho(url, PROPOSAL_BUCKET, path)
+            : await fetchHeader(PROPOSAL_BUCKET, path);
+          return { path, verdict: await avaliarCabecalho(head) };
+        }),
+      )),
+    );
+  }
   const good: string[] = [];
   for (const { path, verdict } of checked) {
     if (verdict.ok) {
@@ -409,6 +462,23 @@ export async function uploadProposalImage(
 }
 
 /**
+ * Uma PÁGINA da listagem do Storage, e o tecto de páginas.
+ *
+ * O `list` do Storage nunca devolve a pasta inteira: traz uma página, e é quem
+ * chama que tem de pedir a seguinte. Estava um `limit: 200` seco e sem
+ * paginação nenhuma — passadas 200 fotos num pedido, as mais antigas
+ * desapareciam do estúdio EM SILÊNCIO, que é exactamente a truncagem calada que
+ * a regra da casa proíbe (ver o comentário no topo de `repository.ts`).
+ *
+ * O tecto de páginas existe por prudência, não por desenho: um Storage que
+ * ignore o `offset` devolveria a mesma página para sempre e o ciclo não
+ * acabava. Ao bater no tecto fica um AVISO — a truncagem continua a nunca ser
+ * calada.
+ */
+const PAGINA_DA_LISTAGEM = 200;
+const MAX_PAGINAS = 25;
+
+/**
  * List every image already uploaded for a quote, newest first, each with a fresh
  * signed URL. The bucket folder (`${quoteId}/…`) is the device-independent index
  * of what the studio has stored for this pedido, so the studio can re-offer those
@@ -420,20 +490,52 @@ export async function listProposalImages(quoteId: string): Promise<UploadedImage
   if (!sb || !(await ensureBucket())) return [];
   const safeId = quoteId.replace(/[^a-zA-Z0-9_-]/g, "");
   try {
-    const { data, error } = await sb.storage.from(PROPOSAL_BUCKET).list(safeId, {
-      limit: 200,
-      sortBy: { column: "created_at", order: "desc" },
-    });
-    if (error || !data) return [];
+    const objectos: { id?: string | null; name: string }[] = [];
+    let pagina = 0;
+    for (; pagina < MAX_PAGINAS; pagina++) {
+      const { data, error } = await sb.storage.from(PROPOSAL_BUCKET).list(safeId, {
+        limit: PAGINA_DA_LISTAGEM,
+        offset: pagina * PAGINA_DA_LISTAGEM,
+        sortBy: { column: "created_at", order: "desc" },
+      });
+      // Um erro na PRIMEIRA página não dá lista nenhuma, como sempre deu. Numa
+      // página seguinte já há fotos na mão: devolvê-las é melhor do que devolver
+      // vazio, mas não pode passar por completo — daí o aviso.
+      if (error || !data) {
+        if (objectos.length === 0) return [];
+        log.warn("proposal-storage: listagem interrompida a meio — faltam fotos", {
+          quoteId,
+          pagina,
+          ate_agora: objectos.length,
+        });
+        break;
+      }
+      objectos.push(...data);
+      // Página incompleta = fim da pasta. É a única forma de saber que acabou.
+      if (data.length < PAGINA_DA_LISTAGEM) break;
+    }
+    if (pagina === MAX_PAGINAS) {
+      log.warn("proposal-storage: listagem truncada no tecto de páginas", {
+        quoteId,
+        fotos: objectos.length,
+      });
+    }
     // Only real files (Storage can report folder placeholders with no id).
-    const paths = data
+    const paths = objectos
       .filter((o) => o.id && !o.name.startsWith("."))
       .map((o) => `${safeId}/${o.name}`);
     if (paths.length === 0) return [];
-    const { data: signed } = await sb.storage
-      .from(PROPOSAL_BUCKET)
-      .createSignedUrls(paths, SIGNED_TTL);
-    const imagens = (signed ?? [])
+    // Assinar em lotes do tamanho da página: com paginação a pasta pode agora
+    // trazer milhares de caminhos, e um só pedido com todos seria um corpo
+    // enorme. Continua a ser uma ida ao servidor por LOTE, nunca por foto.
+    const signed: { path?: string | null; signedUrl?: string | null }[] = [];
+    for (let i = 0; i < paths.length; i += PAGINA_DA_LISTAGEM) {
+      const { data: lote } = await sb.storage
+        .from(PROPOSAL_BUCKET)
+        .createSignedUrls(paths.slice(i, i + PAGINA_DA_LISTAGEM), SIGNED_TTL);
+      signed.push(...(lote ?? []));
+    }
+    const imagens = signed
       .map((s) => ({ path: s.path ?? "", url: s.signedUrl ?? "" }))
       .filter((im) => im.path && im.url);
     // As miniaturas EM LOTE, num só pedido: assinar uma de cada vez seria uma

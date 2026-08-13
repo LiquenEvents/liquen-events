@@ -90,10 +90,19 @@ const repo = createRepository(mapper);
 
 export const listAllEventItems = (): Promise<EventMaterialItem[]> => repo.list();
 
+/**
+ * As linhas de UM evento — filtradas pela base de dados, não em memória.
+ *
+ * Era um `list()` da tabela toda seguido de um `filter`: a checklist de um
+ * evento trazia as linhas de TODOS os eventos já feitos para dentro da função,
+ * e isto é lido do telemóvel a meio de uma carga. O `where()` faz o filtro onde
+ * ele é barato, e serve os dois backends (o de ficheiro leva o predicado
+ * equivalente).
+ */
 export async function listItemsOfEvent(eventId: string): Promise<EventMaterialItem[]> {
-  return (await repo.list())
-    .filter((i) => i.eventId === eventId)
-    .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+  return (await repo.where("event_id", eventId, (i) => i.eventId === eventId)).sort(
+    (a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name),
+  );
 }
 
 export async function addEventItem(
@@ -111,7 +120,22 @@ export const updateEventItem = (
 
 export const removeEventItem = (id: string): Promise<void> => repo.remove(id);
 
+/**
+ * Quantos apagamentos podem estar no ar ao mesmo tempo.
+ *
+ * Não há apagamento em bloco no `Repository` (só `remove(id)`), e apagar uma
+ * linha de cada vez EM SÉRIE faz uma checklist de duzentas linhas custar
+ * duzentas idas ao servidor uma atrás da outra — regenerar a checklist ficava
+ * parada segundos. Em grupos, é uma espera em vez de duzentas; com tecto,
+ * porque disparar as duzentas de uma vez é o outro extremo (o mesmo oito de
+ * `proposal-storage.duplicarFotosParaPedido`).
+ */
+const APAGAR_EM_PARALELO = 8;
+
 /** Todas as linhas de um evento — para quem regenera ou apaga a checklist. */
 export async function removeItemsOfEvent(eventId: string): Promise<void> {
-  for (const l of await listItemsOfEvent(eventId)) await repo.remove(l.id);
+  const linhas = await listItemsOfEvent(eventId);
+  for (let i = 0; i < linhas.length; i += APAGAR_EM_PARALELO) {
+    await Promise.all(linhas.slice(i, i + APAGAR_EM_PARALELO).map((l) => repo.remove(l.id)));
+  }
 }

@@ -64,10 +64,17 @@ const repo = createRepository(mapper);
 
 export const listAllListItems = (): Promise<MaterialListItem[]> => repo.list();
 
+/**
+ * As linhas de UMA lista — filtradas pela base de dados, não em memória.
+ *
+ * Era um `list()` da tabela inteira seguido de um `filter`: abrir uma lista
+ * base trazia as linhas de todas as outras. O `where()` faz o filtro do lado de
+ * lá e serve os dois backends (o de ficheiro leva o predicado equivalente).
+ */
 export async function listItemsOf(listId: string): Promise<MaterialListItem[]> {
-  return (await repo.list())
-    .filter((i) => i.listId === listId)
-    .sort((a, b) => a.position - b.position);
+  return (await repo.where("list_id", listId, (i) => i.listId === listId)).sort(
+    (a, b) => a.position - b.position,
+  );
 }
 
 export async function addListItem(
@@ -85,7 +92,18 @@ export const updateListItem = (
 
 export const removeListItem = (id: string): Promise<void> => repo.remove(id);
 
+/**
+ * Quantos apagamentos podem estar no ar ao mesmo tempo. O `Repository` não tem
+ * apagamento em bloco (só `remove(id)`), e em série uma lista de cem linhas são
+ * cem idas ao servidor uma atrás da outra. Em grupos, com tecto — o mesmo oito
+ * que o resto do código usa para não abrir ligações a mais.
+ */
+const APAGAR_EM_PARALELO = 8;
+
 /** Todas as linhas de uma lista, para quem a apaga ou a duplica. */
 export async function removeItemsOf(listId: string): Promise<void> {
-  for (const l of await listItemsOf(listId)) await repo.remove(l.id);
+  const linhas = await listItemsOf(listId);
+  for (let i = 0; i < linhas.length; i += APAGAR_EM_PARALELO) {
+    await Promise.all(linhas.slice(i, i + APAGAR_EM_PARALELO).map((l) => repo.remove(l.id)));
+  }
 }

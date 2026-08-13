@@ -1486,9 +1486,20 @@ async function replaceAll(
   if (target.replace) return target.replace(rows);
 
   if (sb) {
-    // PostgREST exige um filtro num delete: `id is not null` é verdade para
-    // toda a linha (a coluna é chave primária) e apaga a tabela inteira.
-    const del = await sb.from(target.table).delete().not("id", "is", null);
+    // PostgREST exige um filtro num delete: `<chave> is not null` é verdade
+    // para toda a linha (é chave primária, não pode ser nula) e apaga a tabela
+    // inteira.
+    //
+    // A coluna é a que o `mapper` DECLARA, nunca `id` à letra. Onze das doze
+    // tabelas chamam-lhe mesmo `id`, mas a `biblioteca_fotos` tem `path text
+    // primary key` e nenhuma coluna `id` (ver `Mapper.idColumn`) — e o Postgres
+    // respondia `42703 — column does not exist` a um delete escrito à mão.
+    // O estrago não ficava por não repor as fotos: as ETIQUETAS das fotos são
+    // apagadas ANTES, por cascata da chave estrangeira, portanto a reposição
+    // apagava o trabalho de etiquetar e depois não conseguia repor as fotos que
+    // as etiquetas apontavam.
+    const colunaDaChave = target.mapper.idColumn ?? "id";
+    const del = await sb.from(target.table).delete().not(colunaDaChave, "is", null);
     if (del.error) throw del.error;
     const CHUNK = 500;
     for (let i = 0; i < rows.length; i += CHUNK) {

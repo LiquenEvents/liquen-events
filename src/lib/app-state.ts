@@ -183,6 +183,46 @@ async function readFileState(): Promise<Record<string, unknown>> {
   }
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O FICHEIRO É UM MAPA INTEIRO: DUAS ESCRITAS AO MESMO TEMPO SÃO UMA SÓ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Aqui não se grava uma linha, grava-se o mapa TODO: ler o ficheiro, pôr a
+ * chave, escrever o ficheiro. Há um `await` no meio, e é isso que estraga tudo
+ * — duas chamadas em paralelo lêem ambas o mapa ANTES de qualquer uma escrever,
+ * e a segunda grava por cima o mapa dela, sem a chave da primeira. A primeira
+ * escrita aconteceu mesmo; foi a seguinte que a apagou.
+ *
+ * Onde isto doeu: a REPOSIÇÃO de uma cópia de segurança repõe os rascunhos do
+ * estúdio em lotes de 25 chamadas paralelas (ver `proposal-drafts.ts`). Medido,
+ * de 25 escritas sobrevivia UMA — e a reposição reportava sucesso total, porque
+ * cada `setState` devolvia honestamente `{ gravado: true }` sobre uma escrita
+ * que de facto tinha acontecido.
+ *
+ * A solução é a MESMA que o `FileBackend` do `repository.ts` já usa pela mesma
+ * razão, e deliberadamente igual para não haver duas ideias diferentes de como
+ * se serializa uma escrita a um ficheiro: encadear as operações numa fila, de
+ * modo a que o ler-mutar-escrever seja atómico dentro do processo. A fila é do
+ * MÓDULO porque o ficheiro também é (há um só `FILE`).
+ *
+ * O que isto NÃO resolve — e não pode: dois processos a escrever no mesmo
+ * ficheiro. Continua a ser um recurso de desenvolvimento; em produção quem
+ * guarda é o Supabase, e é o caminho de cima que trata disso.
+ */
+let filaDoFicheiro: Promise<unknown> = Promise.resolve();
+
+function emFila<R>(trabalho: () => Promise<R>): Promise<R> {
+  // `then(fn, fn)`: uma escrita que falhou não pode deixar a fila entupida para
+  // as seguintes.
+  const corrida = filaDoFicheiro.then(trabalho, trabalho);
+  filaDoFicheiro = corrida.then(
+    () => {},
+    () => {},
+  );
+  return corrida;
+}
+
 export async function getState<T>(key: string): Promise<T | null> {
   const sb = getSupabase();
   if (sb) {
@@ -291,10 +331,15 @@ export async function setState<T>(key: string, value: T): Promise<ResultadoDeEsc
     return { gravado: false, duradouro: false, onde: "nenhures", motivo };
   }
   try {
-    const all = await readFileState();
-    all[key] = value;
-    await fs.mkdir(path.dirname(FILE), { recursive: true });
-    await fs.writeFile(FILE, JSON.stringify(all, null, 2));
+    // Ler-mutar-escrever em fila: ver `emFila`. Sem isto, o que se grava aqui é
+    // o mapa como ele estava para ESTA chamada, e quem entrar a seguir apaga a
+    // chave que esta acabou de pôr.
+    await emFila(async () => {
+      const all = await readFileState();
+      all[key] = value;
+      await fs.mkdir(path.dirname(FILE), { recursive: true });
+      await fs.writeFile(FILE, JSON.stringify(all, null, 2));
+    });
     // A escrita aconteceu nos dois casos. O que muda — e é tudo o que muda — é
     // o que se DIZ sobre o sítio onde ela ficou.
     if (oFicheiroEhEfemero()) {

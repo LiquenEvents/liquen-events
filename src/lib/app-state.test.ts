@@ -23,17 +23,32 @@ const st = vi.hoisted(() => ({
   respostas: [] as (unknown | null)[],
   chamadas: 0,
   ficheiroRebenta: false,
+  /** Faz rebentar SÓ a escrita que traga esta chave — para se poder encenar uma
+   *  falha a meio de uma fila sem derrubar as escritas seguintes. */
+  rebentaSeContiver: null as string | null,
   escritoNoFicheiro: null as string | null,
+  /** O ficheiro DE VERDADE: o que lá está agora. Sem isto, um duplo que devolve
+   *  sempre "{}" à leitura esconde precisamente o defeito da escrita perdida. */
+  conteudo: "{}",
 }));
 
 vi.mock("./supabase", () => ({ getSupabase: () => st.cliente }));
 vi.mock("./logger", () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 vi.mock("fs", () => ({
   promises: {
-    readFile: vi.fn(async () => "{}"),
+    readFile: vi.fn(async () => {
+      // Ler do disco leva tempo, e é nessa fresta que o defeito vive: sem fila,
+      // as escritas em paralelo lêem TODAS o mapa antes de alguma o escrever.
+      await new Promise((r) => setTimeout(r, 1));
+      return st.conteudo;
+    }),
     mkdir: vi.fn(async () => undefined),
     writeFile: vi.fn(async (_p: string, conteudo: string) => {
-      if (st.ficheiroRebenta) throw new Error("EROFS: read-only file system");
+      await new Promise((r) => setTimeout(r, 1));
+      if (st.ficheiroRebenta || (st.rebentaSeContiver && conteudo.includes(st.rebentaSeContiver))) {
+        throw new Error("EROFS: read-only file system");
+      }
+      st.conteudo = conteudo;
       st.escritoNoFicheiro = conteudo;
     }),
   },
@@ -59,7 +74,9 @@ beforeEach(() => {
   st.respostas = [];
   st.chamadas = 0;
   st.ficheiroRebenta = false;
+  st.rebentaSeContiver = null;
   st.escritoNoFicheiro = null;
+  st.conteudo = "{}";
 });
 
 describe("setState diz onde é que a coisa ficou", () => {
@@ -142,6 +159,56 @@ describe("setState sem base de dados (o recurso de desenvolvimento)", () => {
     expect(r.gravado).toBe(false);
     expect(r.onde).toBe("nenhures");
     expect(r.duradouro).toBe(false);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * VINTE E CINCO ESCRITAS AO MESMO TEMPO NÃO PODEM DAR UMA SÓ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O caminho do ficheiro grava o mapa INTEIRO: lê, põe a chave, escreve. Com um
+ * `await` no meio, duas chamadas em paralelo lêem ambas o mapa antes de
+ * qualquer uma escrever, e a segunda grava por cima sem a chave da primeira.
+ *
+ * Isto não é hipotético nem raro: a REPOSIÇÃO de uma cópia de segurança repõe
+ * os rascunhos do estúdio em lotes de 25 chamadas paralelas
+ * (`proposal-drafts.ts`). Sobrevivia UM de cada 25 — e a reposição reportava
+ * sucesso total, porque cada escrita aconteceu mesmo; foi a seguinte que a
+ * apagou. É o mesmo defeito que o `FileBackend` do `repository.ts` já tinha
+ * resolvido com uma fila, e é a mesma fila que aqui se usa.
+ */
+describe("o ficheiro não pode perder escritas em paralelo", () => {
+  it("25 rascunhos gravados ao mesmo tempo estão TODOS lá no fim", async () => {
+    st.cliente = null;
+    const chaves = Array.from({ length: 25 }, (_, i) => `proposal-draft:LQ-${i}`);
+
+    const resultados = await Promise.all(chaves.map((k, i) => setState(k, { n: i })));
+
+    // Cada uma diz que gravou — e isso continua a ser verdade.
+    expect(resultados.every((r) => r.gravado)).toBe(true);
+    // O que mudou: agora também é verdade DEPOIS de todas terem gravado.
+    const final = JSON.parse(st.conteudo) as Record<string, { n: number }>;
+    expect(Object.keys(final).sort()).toEqual([...chaves].sort());
+    expect(final["proposal-draft:LQ-0"]).toEqual({ n: 0 });
+    expect(final["proposal-draft:LQ-24"]).toEqual({ n: 24 });
+  });
+
+  it("uma escrita que rebenta não entope a fila das seguintes", async () => {
+    st.cliente = null;
+    st.rebentaSeContiver = "k-ma";
+    const [rMá, rBoa] = await Promise.all([setState("k-ma", 1), setState("k-boa", 2)]);
+
+    expect(rMá.gravado).toBe(false);
+    expect(rBoa.gravado).toBe(true);
+    expect(JSON.parse(st.conteudo)).toEqual({ "k-boa": 2 });
+  });
+
+  it("escritas seguidas à mesma chave ficam na última, não numa qualquer", async () => {
+    st.cliente = null;
+    await Promise.all([setState("k", 1), setState("k", 2), setState("k", 3)]);
+    // A fila preserva a ORDEM de chegada: a última a entrar é a que fica.
+    expect(JSON.parse(st.conteudo)).toEqual({ k: 3 });
   });
 });
 

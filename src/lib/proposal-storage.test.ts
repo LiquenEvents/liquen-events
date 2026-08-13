@@ -20,11 +20,23 @@ const st = vi.hoisted(() => ({
   metaThrows: false,
   removed: [] as string[],
   signed: vi.fn(),
+  /** Assinatura UMA A UMA. Está aqui para se poder CONTAR: uma ida ao servidor
+   *  por foto é precisamente o que o caminho em lote existe para não fazer. */
+  signedOne: vi.fn(),
   uploadUrl: vi.fn(),
   hasUploadUrlApi: true,
+  /** O conteúdo da pasta do pedido, para a listagem paginada. */
+  objectos: [] as { id: string; name: string }[],
+  /** Um Storage que ignora o `offset` — devolve sempre a mesma página. */
+  ignoraOffset: false,
+  /** Cada `list`, com o que lhe foi pedido. */
+  listagens: [] as { prefixo: string; limit?: number; offset?: number }[],
+  log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
-vi.mock("./logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
+// O registo vive no `st` (e não num objecto novo a cada reposição de módulos)
+// para os AVISOS poderem ser lidos nos testes: uma truncagem calada é o defeito.
+vi.mock("./logger", () => ({ log: st.log }));
 vi.mock("./supabase", () => ({
   isDatabaseConfigured: () => true,
   getSupabase: () => ({
@@ -34,10 +46,13 @@ vi.mock("./supabase", () => ({
       updateBucket: async () => ({ data: null, error: null }),
       from: () => ({
         createSignedUrls: st.signed,
-        createSignedUrl: async (path: string) => ({
-          data: { signedUrl: `https://storage.test/${path}` },
-          error: null,
-        }),
+        createSignedUrl: st.signedOne,
+        list: async (prefixo: string, opts?: { limit?: number; offset?: number }) => {
+          st.listagens.push({ prefixo, limit: opts?.limit, offset: opts?.offset });
+          const limite = opts?.limit ?? 100;
+          const salto = st.ignoraOffset ? 0 : (opts?.offset ?? 0);
+          return { data: st.objectos.slice(salto, salto + limite), error: null };
+        },
         remove: async (paths: string[]) => {
           st.removed.push(...paths);
           return { data: paths.map((name) => ({ name })), error: null };
@@ -70,6 +85,9 @@ beforeEach(() => {
   st.meta = { width: 3000, height: 2000 };
   st.metaThrows = false;
   st.removed = [];
+  st.objectos = [];
+  st.ignoraOffset = false;
+  st.listagens = [];
   // O Storage devolve o cabeçalho pedido; `fetchHeader` é código real.
   vi.stubGlobal(
     "fetch",
@@ -82,6 +100,10 @@ beforeEach(() => {
   }));
   st.uploadUrl.mockImplementation(async (path: string) => ({
     data: { signedUrl: `https://up/${path}?token=tok`, token: "tok", path },
+    error: null,
+  }));
+  st.signedOne.mockImplementation(async (path: string) => ({
+    data: { signedUrl: `https://storage.test/${path}` },
     error: null,
   }));
 });
@@ -198,5 +220,122 @@ describe("confirmProposalUploads", () => {
 
     expect(res.rejected).toEqual(["q-1/vazia.jpg"]);
     expect(st.removed).toContain("q-1/vazia.jpg");
+  });
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * SESSENTA FOTOS NÃO PODEM SER CENTO E VINTE PEDIDOS AO MESMO TEMPO
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * A confirmação fazia um `Promise.all` sobre as fotos todas, e cada uma
+   * assinava o SEU URL e fazia o SEU pedido de cabeçalho. Assinar em lote já
+   * existia no módulo (`assinarLote`), com comentários noutros sítios a dizer
+   * que uma ida ao servidor POR FOTO é o que se evita — só este caminho é que
+   * não o fazia.
+   */
+  it("assina TUDO num pedido só e não uma vez por foto", async () => {
+    const paths = Array.from({ length: 30 }, (_, i) => `q-1/f${i}.jpg`);
+    const { confirmProposalUploads } = await load();
+    const res = await confirmProposalUploads("q-1", paths);
+
+    expect(res.images).toHaveLength(30);
+    expect(st.signedOne).not.toHaveBeenCalled();
+    // Um lote para verificar as 30, outro para as assinar para o estúdio.
+    expect(st.signed).toHaveBeenCalledTimes(2);
+    expect(st.signed.mock.calls[0][0]).toEqual(paths);
+  });
+
+  it("os pedidos de cabeçalho vão com tecto de concorrência", async () => {
+    let emCurso = 0;
+    let maximo = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        emCurso++;
+        maximo = Math.max(maximo, emCurso);
+        await new Promise((r) => setTimeout(r, 2));
+        emCurso--;
+        return new Response(new Uint8Array(1024));
+      }),
+    );
+    const paths = Array.from({ length: 30 }, (_, i) => `q-1/f${i}.jpg`);
+    const { confirmProposalUploads } = await load();
+    await confirmProposalUploads("q-1", paths);
+
+    expect(maximo).toBeLessThanOrEqual(8);
+    // E foram lidas todas — o tecto atrasa, não deita fotos fora.
+    expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(30);
+  });
+
+  it("uma foto que o lote não assinou é assinada à parte, não dada por má", async () => {
+    // Uma assinatura em falta não é prova de que a foto não presta — e apagá-la
+    // por isso seria perder a foto de alguém por causa de um soluço do Storage.
+    st.signed.mockImplementation(async (paths: string[]) => ({
+      data: paths
+        .filter((p) => !p.endsWith("teimosa.jpg"))
+        .map((path) => ({
+          path,
+          signedUrl: `https://signed/${path}`,
+        })),
+      error: null,
+    }));
+    const { confirmProposalUploads } = await load();
+    const res = await confirmProposalUploads("q-1", ["q-1/boa.jpg", "q-1/teimosa.jpg"]);
+
+    expect(st.signedOne).toHaveBeenCalledWith("q-1/teimosa.jpg", 60);
+    expect(res.rejected).toEqual([]);
+    expect(st.removed).toEqual([]);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UMA LISTAGEM QUE CORTA EM SILÊNCIO PERDE FOTOS DO ESTÚDIO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Estava um `limit: 200` sem paginação e sem aviso: passadas 200 fotos num
+ * pedido, as mais antigas desapareciam da grelha — e a pasta é a única lista
+ * independente do dispositivo (um rascunho no `localStorage` é daquele
+ * navegador). A regra da casa está escrita no topo do `repository.ts`: a
+ * truncagem nunca é calada.
+ */
+describe("listProposalImages pagina a pasta", () => {
+  const pasta = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `id-${i}`, name: `f${i}.jpg` }));
+
+  it("uma pasta com mais de 200 fotos vem INTEIRA", async () => {
+    st.objectos = pasta(250);
+    const { listProposalImages } = await load();
+    const imagens = await listProposalImages("q-1");
+
+    expect(imagens).toHaveLength(250);
+    // Duas páginas: a segunda veio incompleta e por isso é a última.
+    expect(st.listagens.map((l) => l.offset)).toEqual([0, 200]);
+    expect(imagens[0].path).toBe("q-1/f0.jpg");
+    expect(imagens[249].path).toBe("q-1/f249.jpg");
+  });
+
+  it("uma pasta que cabe numa página não pede a seguinte", async () => {
+    st.objectos = pasta(3);
+    const { listProposalImages } = await load();
+
+    expect(await listProposalImages("q-1")).toHaveLength(3);
+    expect(st.listagens).toHaveLength(1);
+  });
+
+  it("um Storage que ignore o `offset` pára no tecto — e AVISA", async () => {
+    // Sem tecto isto era um ciclo infinito; com tecto e sem aviso era a mesma
+    // truncagem calada de antes, só que mais tarde.
+    st.ignoraOffset = true;
+    st.objectos = pasta(200);
+    const { listProposalImages } = await load();
+    const imagens = await listProposalImages("q-1");
+
+    expect(imagens.length).toBeGreaterThan(0);
+    expect(st.listagens.length).toBe(25);
+    expect(st.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining("truncada"),
+      expect.objectContaining({ quoteId: "q-1" }),
+    );
   });
 });
