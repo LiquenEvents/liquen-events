@@ -68,19 +68,26 @@ export default function ModelosParciais({
   const [modelos, setModelos] = useState<ModeloProposta[]>([]);
   const [aGuardar, setAGuardar] = useState(false);
   const [nome, setNome] = useState("");
+  /** A leitura falhou — o menu tem de dizer isso e não «não tens nenhum». */
+  const [naoDeuParaLer, setNaoDeuParaLer] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
     try {
       const r = await fetch("/api/propostas/modelos");
       const j = await r.json().catch(() => null);
-      setModelos(
-        Array.isArray(j?.modelos)
-          ? (j.modelos as ModeloProposta[]).filter((m) => m.tipo === tipo)
-          : [],
-      );
-    } catch {
-      toast?.("Não deu para ler os modelos.", "error");
+      // Sem olhar ao `r.ok`, o corpo de um 401 (sessão caída) ou de um 500 é
+      // `{error: …}`, não traz `modelos`, e entrava aqui como lista vazia — o
+      // menu passava a dizer-lhe que nunca tinha guardado nada. Os modelos
+      // estavam lá; o que ela lia era o convite a montar tudo outra vez.
+      if (!r.ok || !Array.isArray(j?.modelos)) {
+        throw new Error(typeof j?.error === "string" ? j.error : "Não deu para ler os modelos.");
+      }
+      setNaoDeuParaLer(false);
+      setModelos((j.modelos as ModeloProposta[]).filter((m) => m.tipo === tipo));
+    } catch (e) {
+      setNaoDeuParaLer(true);
+      toast?.(e instanceof Error ? e.message : "Não deu para ler os modelos.", "error");
     }
   }, [tipo, toast]);
 
@@ -174,7 +181,11 @@ export default function ModelosParciais({
 
       {aberto && (
         <div className="absolute top-full left-0 z-30 mt-1 w-72 rounded-xl border border-foreground/10 bg-background p-1 shadow-lg">
-          {modelos.length === 0 ? (
+          {naoDeuParaLer ? (
+            <p className="px-3 py-2 text-xs text-[#a03123]">
+              Não deu para ler os modelos guardados. Volta a tentar — os que tinhas continuam lá.
+            </p>
+          ) : modelos.length === 0 ? (
             <p className="px-3 py-2 text-xs text-foreground/50">
               Ainda não guardaste nenhum {ROTULO[tipo].um}. Monta um e carrega em «Guardar como
               modelo».

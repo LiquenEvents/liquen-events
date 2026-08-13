@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
 import { Card, Field, Button, EmptyState } from "@/app/[lang]/(site)/orcamento/admin/ui";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
+import { useTravaoDeSaida } from "./useGravacaoAutomatica";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -454,16 +455,16 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
    *  Havendo registo, quem trava é ele: um travão só para o back office
    *  inteiro, capaz de dizer O QUE é que se perde. Este continua a valer onde
    *  não há registo — um travão que desaparecesse em silêncio seria a pior
-   *  troca possível. */
-  useEffect(() => {
-    if (oRegistoFalaPorMim) return;
-    if (!estado && !porGravarRef.current) return;
-    const aviso = (e: BeforeUnloadEvent) => {
-      if (porGravarRef.current || estado === "so-neste-computador") e.preventDefault();
-    };
-    window.addEventListener("beforeunload", aviso);
-    return () => window.removeEventListener("beforeunload", aviso);
-  }, [oRegistoFalaPorMim, estado]);
+   *  troca possível.
+   *
+   *  ── PORQUE É QUE ISTO LÊ O ESTADO E NÃO O `ref` ─────────────────────────
+   *  Estava escrito à mão, e o que o armava eram `oRegistoFalaPorMim` e
+   *  `estado`. Mas `estado` só ganha valor QUANDO A PRIMEIRA GRAVAÇÃO COMEÇA,
+   *  e `porGravarRef` é um `ref`: mudar não volta a correr efeito nenhum. Ou
+   *  seja, durante os primeiros 800 ms de escrita — a única janela que este
+   *  travão existe para cobrir — não havia travão nenhum. É para isto que o
+   *  `porGravar` anda em estado a par do `ref` (ver a declaração). */
+  useTravaoDeSaida(!oRegistoFalaPorMim && (porGravar || estado === "so-neste-computador"));
 
   const subtotal = items.reduce(
     (s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0),

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Quote, ActivityEntry, ActivityKind } from "@/lib/orcamento/types";
 import { randomId } from "./util";
+import { UNKNOWN_STATUS_COLOR } from "./status-meta";
 import { Button, Field } from "./ui";
 
 const KIND_META: Record<ActivityKind, { label: string; color: string; d: string }> = {
@@ -72,6 +73,27 @@ const KIND_META: Record<ActivityKind, { label: string; color: string; d: string 
     d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
   },
 };
+
+/**
+ * Um tipo de entrada que este mapa não conhece mostra-se cru e em cinzento, com
+ * um ponto no lugar do ícone.
+ *
+ * Ler `KIND_META[entry.kind]` à bruta dá `undefined` assim que aparece um valor
+ * de fora — uma linha antiga, uma migração, um tipo novo escrito pelo servidor
+ * antes de este ecrã o conhecer — e, num componente de cliente, isso não perde
+ * a linha: perde o back office inteiro para o ecrã de erro. É a mesma escolha
+ * (e o mesmo cinzento) do `metaFor` dos estados; aqui há um terceiro campo, o
+ * desenho do ícone, que o `metaFor` não sabe dar.
+ */
+function metaDaEntrada(kind: string): { label: string; color: string; d: string } {
+  return (
+    KIND_META[kind as ActivityKind] ?? {
+      label: kind || "—",
+      color: UNKNOWN_STATUS_COLOR,
+      d: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+    }
+  );
+}
 
 function timeLabel(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -245,7 +267,7 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
         )}
         <div className="flex flex-col">
           {entries.map((entry, i) => {
-            const m = KIND_META[entry.kind];
+            const m = metaDaEntrada(entry.kind);
             return (
               <div key={entry.id} className={`flex gap-3 ${i < entries.length - 1 ? "pb-4" : ""}`}>
                 <div

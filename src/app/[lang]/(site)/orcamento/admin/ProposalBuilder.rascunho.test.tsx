@@ -196,6 +196,30 @@ describe("o orçamento escrito à mão sobrevive a sair do ecrã", () => {
 
   /** Linhas acrescentadas à mão são o caso da colaboradora: doze linhas
    *  escritas uma a uma. Não podem voltar reduzidas a uma. */
+  /**
+   * ── O TRAVÃO DE SAÍDA TEM DE ESTAR ARMADO NO PRIMEIRO CARÁCTER ───────────
+   *
+   * A janela que perde trabalho são os 800 ms entre a última tecla e a
+   * gravação — e é essa, e só essa, que o `beforeunload` existe para travar. O
+   * efeito que o punha dependia de `estado`, que só passa a ter valor QUANDO A
+   * PRIMEIRA GRAVAÇÃO COMEÇA: escrever e fechar o separador a seguir, num
+   * orçamento ainda por gravar, não perguntava nada. Fechava, e as linhas
+   * escritas não estavam em lado nenhum.
+   */
+  it("pergunta antes de fechar o separador, logo à primeira linha escrita", async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    const descricao = await screen.findByLabelText("Descrição da linha 1");
+    await user.clear(descricao);
+    await user.type(descricao, "Arranjos de mesa");
+
+    // Ainda dentro dos 800 ms: nada foi gravado, e é aqui que ela fecha.
+    expect(gravados()).toEqual([]);
+    const fecho = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(fecho);
+    expect(fecho.defaultPrevented).toBe(true);
+  });
+
   it("as linhas acrescentadas à mão voltam todas", async () => {
     const user = userEvent.setup();
     const { unmount } = renderBuilder();

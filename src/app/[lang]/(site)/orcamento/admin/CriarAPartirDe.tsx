@@ -91,6 +91,8 @@ export default function CriarAPartirDe({
   const [modelos, setModelos] = useState<ModeloProposta[]>([]);
   const [propostas, setPropostas] = useState<ResumoProposta[]>([]);
   const [aCarregar, setACarregar] = useState(false);
+  /** A leitura falhou — o ecrã tem de dizer isso, e não «não há nada». */
+  const [naoDeuParaLer, setNaoDeuParaLer] = useState(false);
   const [aCopiar, setACopiar] = useState<string | null>(null);
   const [procura, setProcura] = useState("");
   const [ativo, setAtivo] = useState(0);
@@ -104,10 +106,18 @@ export default function CriarAPartirDe({
     if (!open) return;
     let vivo = true;
     setACarregar(true);
-    Promise.all([
-      fetch("/api/propostas/modelos").then((r) => (r.ok ? r.json() : { modelos: [] })),
-      fetch("/api/propostas?resumo=1").then((r) => (r.ok ? r.json() : [])),
-    ])
+    setNaoDeuParaLer(false);
+    // Uma resposta que não seja 2xx traz `{error: …}` no corpo, não a lista.
+    // Transformá-la em lista vazia — que era o que estas duas linhas faziam —
+    // dizia-lhe, com a sessão caída, que não havia propostas anteriores nem
+    // modelos guardados. É a mentira mais cara deste ecrã: a resposta a ela é
+    // montar do zero as 23 linhas que já existiam noutro sítio.
+    const ler = async (rota: string) => {
+      const r = await fetch(rota);
+      if (!r.ok) throw new Error(String(r.status));
+      return r.json();
+    };
+    Promise.all([ler("/api/propostas/modelos"), ler("/api/propostas?resumo=1")])
       .then(([m, p]) => {
         if (!vivo) return;
         setModelos(Array.isArray(m?.modelos) ? m.modelos : []);
@@ -117,7 +127,9 @@ export default function CriarAPartirDe({
         setPropostas((Array.isArray(p) ? p : []).filter((x: ResumoProposta) => x.temDoc));
       })
       .catch(() => {
-        if (vivo) toast?.("Não deu para ler as propostas anteriores.", "error");
+        if (!vivo) return;
+        setNaoDeuParaLer(true);
+        toast?.("Não deu para ler as propostas anteriores.", "error");
       })
       .finally(() => vivo && setACarregar(false));
     return () => {
@@ -248,7 +260,13 @@ export default function CriarAPartirDe({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {aCarregar && <p className="p-4 text-sm text-foreground/50">A carregar…</p>}
-          {!aCarregar && linhas.length === 0 && (
+          {!aCarregar && naoDeuParaLer && linhas.length === 0 && (
+            <p className="p-4 text-sm text-[#a03123]">
+              Não deu para ler as propostas anteriores. Fecha e volta a abrir — o que já fizeste
+              continua guardado.
+            </p>
+          )}
+          {!aCarregar && !naoDeuParaLer && linhas.length === 0 && (
             <p className="p-4 text-sm text-foreground/50">
               {procura
                 ? "Nada encontrado. Experimenta outro nome ou local."

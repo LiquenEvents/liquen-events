@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import { useToast } from "./Toast";
 
@@ -21,10 +21,27 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
   const [tags, setTags] = useState<string[]>(quote.tags ?? []);
   const [input, setInput] = useState("");
   const id = useId();
+  /** Número de ordem da última gravação lançada (ver `persist`). */
+  const ordem = useRef(0);
+  /** A última lista que o servidor aceitou — o único sítio seguro para onde
+   *  voltar quando uma gravação falha. */
+  const confirmado = useRef<string[]>(quote.tags ?? []);
 
   function persist(next: string[]) {
     // Otimista com reversão: falha do servidor repõe o estado e avisa.
-    const snapshot = tags;
+    //
+    // ── PORQUE É QUE A REVERSÃO NÃO PODE SER «O QUE ESTAVA ANTES DE MIM» ────
+    // Escrever duas etiquetas a seguir uma à outra lança duas gravações que se
+    // atropelam, e cada uma manda a lista INTEIRA. A segunda já levou as duas e
+    // foi aceite; a primeira, ao falhar, repunha o ecrã como estava antes das
+    // duas — apagava da vista (e da cópia do pedido no painel) uma etiqueta que
+    // o servidor tinha guardado, e a etiqueta seguinte gravava por cima da
+    // lista já sem ela.
+    //
+    // Daí as duas marcas: só a ÚLTIMA gravação pode mexer no ecrã, e o que ela
+    // repõe é o último estado CONFIRMADO pelo servidor — nunca uma lista
+    // intermédia que nunca lá chegou.
+    const minha = ++ordem.current;
     setTags(next);
     onChange(next);
     fetch(`/api/orcamento/${quote.id}`, {
@@ -34,10 +51,12 @@ export default function TagsField({ quote, suggestions, onChange }: Props) {
     })
       .then((res) => {
         if (!res.ok) throw new Error();
+        if (minha === ordem.current) confirmado.current = next;
       })
       .catch(() => {
-        setTags(snapshot);
-        onChange(snapshot);
+        if (minha !== ordem.current) return;
+        setTags(confirmado.current);
+        onChange(confirmado.current);
         toast("Não foi possível guardar as etiquetas. Tenta novamente.", "error");
       });
   }
