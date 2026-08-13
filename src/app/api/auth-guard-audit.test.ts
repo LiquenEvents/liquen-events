@@ -690,6 +690,16 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       // por isso é a rota desta lista onde a guarda mais tem de valer.
       "./cron/backup/route",
       "./devproposalpreview/route",
+      /**
+       * O apanha-tudo da API. É PÚBLICO porque não pode ser outra coisa: só
+       * recebe endereços que não existem, e responde 404 em JSON a todos os
+       * métodos, sem tocar em store nenhum e sem dizer que endereços existem.
+       *
+       * Exigir sessão aqui seria pior do que inútil — dizia a um estranho, com
+       * um 401 em vez de um 404, que aquele caminho é «uma coisa que existe e
+       * está fechada». O 404 é a resposta honesta e a que menos conta.
+       */
+      "./[...rota]/route",
     ];
     const covered = new Set([...ADMIN.map((r) => r.path), ...NON_ADMIN]);
     const missing = found.filter((p) => !covered.has(p)).sort();
