@@ -18,6 +18,7 @@ import {
   lerDesafio,
   novoDesafio,
   opcoesCookieDesafio,
+  opcoesParaEsquecerDesafio,
   selarDesafio,
 } from "@/lib/passkey-challenge";
 import { RP_NAME, origemEsperada, rpID } from "@/lib/passkey-rp";
@@ -156,19 +157,32 @@ export async function POST(req: NextRequest) {
   }
 
   const selado = lerDesafio(req.cookies.get(CHALLENGE_COOKIE)?.value, "registo");
+
+  /**
+   * O DESAFIO SERVE UMA VEZ, ACERTE OU NÃO. A razão está por extenso na rota
+   * irmã (`entrada/route.ts`) e no cabeçalho do `passkey-challenge.ts`: um
+   * desafio que sobrevive à recusa deixa de ser um desafio e passa a ser um
+   * número reutilizável durante o que lhe resta de prazo.
+   */
+  const gastandoODesafio = (res: NextResponse): NextResponse => {
+    res.cookies.set(CHALLENGE_COOKIE, "", opcoesParaEsquecerDesafio());
+    return res;
+  };
+
   if (!selado) {
-    return NextResponse.json(
-      { error: "O pedido de registo expirou. Volta a tentar." },
-      { status: 400 },
+    return gastandoODesafio(
+      NextResponse.json({ error: "O pedido de registo expirou. Volta a tentar." }, { status: 400 }),
     );
   }
   // O desafio foi emitido para a conta que o pediu. Se a sessão entretanto
   // mudou de pessoa (mesmo browser, outra entrada), o registo não pode seguir
   // — acabaria a prender o aparelho de alguém à conta de outra pessoa.
   if (!mesmaConta(selado.userName, conta)) {
-    return NextResponse.json(
-      { error: "A sessão mudou durante o registo. Volta a tentar." },
-      { status: 400 },
+    return gastandoODesafio(
+      NextResponse.json(
+        { error: "A sessão mudou durante o registo. Volta a tentar." },
+        { status: 400 },
+      ),
     );
   }
 
@@ -183,16 +197,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     log.warn("passkeys: registo recusado", { conta, err: String(err) });
-    return NextResponse.json(
-      { error: "Não foi possível confirmar este dispositivo." },
-      { status: 400 },
+    return gastandoODesafio(
+      NextResponse.json({ error: "Não foi possível confirmar este dispositivo." }, { status: 400 }),
     );
   }
 
   if (!verificacao.verified || !verificacao.registrationInfo) {
-    return NextResponse.json(
-      { error: "Não foi possível confirmar este dispositivo." },
-      { status: 400 },
+    return gastandoODesafio(
+      NextResponse.json({ error: "Não foi possível confirmar este dispositivo." }, { status: 400 }),
     );
   }
 
@@ -212,12 +224,9 @@ export async function POST(req: NextRequest) {
       lastUsedAt: null,
     });
   } catch (err) {
-    return respostaDeAvaria(err, "gravação do dispositivo");
+    return gastandoODesafio(respostaDeAvaria(err, "gravação do dispositivo"));
   }
 
   log.info("passkeys: dispositivo registado", { conta });
-  const res = NextResponse.json({ ok: true });
-  // O desafio cumpriu o que tinha a fazer; fica no browser mais nem um segundo.
-  res.cookies.delete(CHALLENGE_COOKIE);
-  return res;
+  return gastandoODesafio(NextResponse.json({ ok: true }));
 }

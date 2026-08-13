@@ -18,6 +18,7 @@ import {
   lerDesafio,
   novoDesafio,
   opcoesCookieDesafio,
+  opcoesParaEsquecerDesafio,
   selarDesafio,
 } from "@/lib/passkey-challenge";
 import { origemEsperada, rpID } from "@/lib/passkey-rp";
@@ -105,8 +106,25 @@ export async function POST(req: NextRequest) {
   }
 
   const selado = lerDesafio(req.cookies.get(CHALLENGE_COOKIE)?.value, "entrada");
+
+  /**
+   * O DESAFIO SERVE UMA VEZ, ACERTE OU NÃO.
+   *
+   * Daqui para baixo o desafio já foi apresentado, portanto está gasto — e sai
+   * do browser em qualquer desfecho, não só no feliz. Deixá-lo vivo depois de
+   * uma recusa dava ao mesmo número mais tentativas dentro dos dois minutos de
+   * prazo, que é precisamente o que um desafio existe para não ter. Não custa
+   * nada a quem entra: o cliente pede um desafio novo antes de cada envio.
+   */
+  const gastandoODesafio = (res: NextResponse): NextResponse => {
+    res.cookies.set(CHALLENGE_COOKIE, "", opcoesParaEsquecerDesafio());
+    return res;
+  };
+
   if (!selado) {
-    return NextResponse.json({ error: "O pedido expirou. Volte a tentar." }, { status: 400 });
+    return gastandoODesafio(
+      NextResponse.json({ error: "O pedido expirou. Volte a tentar." }, { status: 400 }),
+    );
   }
 
   const dominio = rpID(req);
@@ -116,7 +134,7 @@ export async function POST(req: NextRequest) {
     credencial = await getPasskey(parsed.data.response.id);
   } catch (err) {
     log.error("passkeys: leitura da credencial falhou", { err });
-    return NextResponse.json({ error: RECUSA }, { status: 401 });
+    return gastandoODesafio(NextResponse.json({ error: RECUSA }, { status: 401 }));
   }
 
   // Credencial desconhecida, ou registada noutro domínio. A segunda hipótese é
@@ -124,14 +142,14 @@ export async function POST(req: NextRequest) {
   // domínio para o qual a credencial guardada não bate certo.
   if (!credencial || credencial.rpId !== dominio) {
     log.warn("passkeys: credencial desconhecida ou de outro domínio", { ip, dominio });
-    return NextResponse.json({ error: RECUSA }, { status: 401 });
+    return gastandoODesafio(NextResponse.json({ error: RECUSA }, { status: 401 }));
   }
 
   // A conta pode ter sido removida do ADMIN_USERS desde que o aparelho foi
   // registado. Tirar alguém da lista tem de fechar TAMBÉM esta porta.
   if (!contaExiste(credencial.userName)) {
     log.warn("passkeys: conta já não existe", { ip, conta: credencial.userName });
-    return NextResponse.json({ error: RECUSA }, { status: 401 });
+    return gastandoODesafio(NextResponse.json({ error: RECUSA }, { status: 401 }));
   }
 
   let verificacao;
@@ -151,11 +169,11 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     log.warn("passkeys: assinatura recusada", { ip, err: String(err) });
-    return NextResponse.json({ error: RECUSA }, { status: 401 });
+    return gastandoODesafio(NextResponse.json({ error: RECUSA }, { status: 401 }));
   }
 
   if (!verificacao.verified) {
-    return NextResponse.json({ error: RECUSA }, { status: 401 });
+    return gastandoODesafio(NextResponse.json({ error: RECUSA }, { status: 401 }));
   }
 
   const novoContador = verificacao.authenticationInfo.newCounter;
@@ -168,7 +186,7 @@ export async function POST(req: NextRequest) {
       guardado: credencial.counter,
       recebido: novoContador,
     });
-    return NextResponse.json({ error: RECUSA }, { status: 401 });
+    return gastandoODesafio(NextResponse.json({ error: RECUSA }, { status: 401 }));
   }
 
   try {
@@ -195,6 +213,5 @@ export async function POST(req: NextRequest) {
     ...cookieBase,
   });
   res.cookies.set(ADMIN_NAME_COOKIE, credencial.userName, { httpOnly: false, ...cookieBase });
-  res.cookies.delete(CHALLENGE_COOKIE);
-  return res;
+  return gastandoODesafio(res);
 }

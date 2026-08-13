@@ -52,8 +52,43 @@ function memoryRateLimit(key: string, limit: number, windowMs: number): RateResu
 }
 
 // ── Distributed limiter via Upstash Redis REST ──
-// One pipelined round-trip: INCR (atomic) + PEXPIRE (sliding window). Throws on
-// any failure so the caller can degrade to the in-memory limiter.
+// Throws on any failure so the caller can degrade to the in-memory limiter.
+async function pipeline(
+  url: string,
+  token: string,
+  comandos: string[][],
+): Promise<Array<{ result?: number }>> {
+  const res = await fetch(`${url.replace(/\/$/, "")}/pipeline`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(comandos),
+    signal: AbortSignal.timeout(2000),
+  });
+  if (!res.ok) throw new Error(`upstash ${res.status}`);
+  return (await res.json()) as Array<{ result?: number }>;
+}
+
+/**
+ * ── A JANELA É FIXA, E ISSO NÃO É UM PORMENOR DE IMPLEMENTAÇÃO ─────────────
+ *
+ * O prazo da chave punha-se a CADA toque (`INCR` + `PEXPIRE` juntos). Parece
+ * inofensivo e é outra política com o mesmo nome: enquanto houver pedidos, a
+ * chave nunca chega ao fim e o contador só sobe. Um tecto que diz «3 pedidos por
+ * hora» passava a ser «3 e nunca mais» — e quem o gastava era quem estava a
+ * bater à porta, não quem tinha a chave. Em concreto, um estranho que soubesse
+ * o endereço da Catarina e mandasse um pedido de recuperação de vez em quando
+ * mantinha a recuperação DELA fechada indefinidamente; e o limitador de memória,
+ * que marca o fim da janela quando ela abre, contava o contrário do outro —
+ * portanto o comportamento mudava consoante houvesse Upstash configurado.
+ *
+ * Agora o prazo só é posto quando a chave AINDA NÃO O TEM (o `PTTL` diz -1 numa
+ * chave sem prazo e -2 numa que não existe), e o `Retry-After` passa a ser o que
+ * FALTA e não a janela inteira.
+ *
+ * Fica uma frincha assumida: entre o `INCR` e o `PEXPIRE` a chave existe sem
+ * prazo. Se o processo morrer aí, o pedido seguinte vê `-1` e põe o prazo a
+ * partir DESSE instante — a janela desloca-se, não desaparece.
+ */
 async function redisRateLimit(
   url: string,
   token: string,
@@ -61,19 +96,19 @@ async function redisRateLimit(
   limit: number,
   windowMs: number,
 ): Promise<RateResult> {
-  const res = await fetch(`${url.replace(/\/$/, "")}/pipeline`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify([
-      ["INCR", key],
-      ["PEXPIRE", key, String(windowMs)],
-    ]),
-    signal: AbortSignal.timeout(2000),
-  });
-  if (!res.ok) throw new Error(`upstash ${res.status}`);
-  const data = (await res.json()) as Array<{ result?: number }>;
+  const data = await pipeline(url, token, [
+    ["INCR", key],
+    ["PTTL", key],
+  ]);
   const count = Number(data?.[0]?.result ?? 0);
-  return count > limit ? { ok: false, retryAfter: Math.ceil(windowMs / 1000) } : { ok: true };
+  const faltaMs = Number(data?.[1]?.result ?? -1);
+
+  if (!(faltaMs > 0)) {
+    await pipeline(url, token, [["PEXPIRE", key, String(windowMs)]]);
+  }
+
+  if (count <= limit) return { ok: true };
+  return { ok: false, retryAfter: Math.ceil((faltaMs > 0 ? faltaMs : windowMs) / 1000) };
 }
 
 /**

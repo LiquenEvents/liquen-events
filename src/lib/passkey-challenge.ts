@@ -18,17 +18,19 @@ import { subKey } from "./admin-auth";
  * vida curta, e o fluxo — registo ou entrada — vai no `typ`, para que um desafio
  * emitido para uma coisa não sirva para a outra.
  *
- * ── O que este desenho NÃO faz ────────────────────────────────────────────
- * Não impede a REUTILIZAÇÃO do mesmo desafio dentro dos dois minutos de vida:
- * sem estado partilhado não há onde marcar "este já foi gasto". Quem apanhasse
- * um desafio e a assinatura correspondente podia repeti-los nessa janela.
+ * ── COMO É QUE ISTO SERVE UMA VEZ SÓ ──────────────────────────────────────
+ * Sem estado partilhado não há onde marcar "este já foi gasto" numa tabela — o
+ * lugar onde se marca é o próprio browser: quem consome o desafio APAGA o
+ * cookie no mesmo movimento, e a rota faz isso em QUALQUER desfecho, não só no
+ * feliz (ver `opcoesParaEsquecerDesafio`). O cliente pede sempre um desafio
+ * novo antes de cada envio, portanto uma segunda tentativa é uma cerimónia nova
+ * e não a repetição da anterior.
  *
- * Para o fazer valer alguma coisa, o atacante teria de conseguir ler o corpo de
- * um pedido HTTPS já feito — e nesse mundo tem o cookie de sessão, que dura 30
- * dias e não precisa de repetição nenhuma. Ou seja: a repetição de desafio não
- * abre nada que já não estivesse aberto. Fica escrito porque a alternativa —
- * uma tabela de desafios com marca de gasto — é o passo seguinte se um dia isto
- * proteger algo mais do que o back office.
+ * Isto fecha a repetição na porta por onde ela chegaria — a mesma máquina, o
+ * mesmo cookie — que é o que sobra depois de o prazo curto e a assinatura presa
+ * à origem terem feito a sua parte. Uma tabela de desafios com marca de gasto
+ * continua a ser o passo seguinte se um dia isto proteger algo mais do que o
+ * back office: aí o desafio deixa de depender de o browser colaborar.
  */
 
 /** Vida do desafio. Curta: é o tempo de tocar no leitor, não o de ir almoçar. */
@@ -129,4 +131,20 @@ export function opcoesCookieDesafio() {
     path: "/",
     maxAge: Math.floor(CHALLENGE_TTL_MS / 1000),
   };
+}
+
+/**
+ * Opções para GASTAR o desafio — o mesmo cookie, com o prazo já passado.
+ *
+ * Existe como função e não como duas linhas em cada rota porque um cookie só se
+ * apaga com os MESMOS atributos com que foi posto: o caminho é que decide qual
+ * dos cookies com este nome é que morre, e o dia em que um deles fosse escrito
+ * à mão com outro caminho era o dia em que «apagar» passava a não apagar nada
+ * sem ninguém ver (é a armadilha que o `logout` tem escrita ao lado).
+ *
+ * `maxAge: 0` e `expires` na época: o primeiro chega a qualquer browser destes
+ * anos, o segundo é o cinto para os que não o leiam.
+ */
+export function opcoesParaEsquecerDesafio() {
+  return { ...opcoesCookieDesafio(), maxAge: 0, expires: new Date(0) };
 }
