@@ -215,6 +215,23 @@ jobs:
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
+      # BLOQUEANTE. Os passeios que precisam de GRAVAR — e que por isso têm
+      # servidor próprio (`playwright.dados.config.ts` explica porquê). O
+      # `npm run test:e2e:dados` existia no package.json e não era corrido em
+      # lado nenhum: um passo que não corre é cobertura imaginária, que é o
+      # defeito que aquele config foi escrito para acabar.
+      #
+      # É aqui que vive o `geometria-dos-alvos.spec.ts`: a barra «Guardar
+      # alterações» que nascia fora do ecrã, a tira de totais que não cabia no
+      # telemóvel, e os alvos de 13 px. Nenhum deles se vê sem navegador, e o
+      # de Faturas nem sequer se vê sem uma fatura grande semeada.
+      - name: Geometria e dados — os passeios que gravam (bloqueante)
+        run: npm run test:e2e:dados
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
       # BLOQUEANTE. Os dois fluxos de fazer uma proposta: do zero, e a partir
       # de outra. Config própria porque estes passeios CRIAM dados e o servidor
       # de produção do CI recusa escritas sem Supabase — a razão está escrita

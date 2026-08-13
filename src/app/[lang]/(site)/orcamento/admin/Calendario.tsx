@@ -644,7 +644,17 @@ export default function Calendario({ quotes, onOpen }: Props) {
                         e.stopPropagation();
                         openAdd(key);
                       }}
-                      className="hidden sm:block pointer-coarse:!hidden text-[#4d6350]/0 group-hover:text-[#4d6350]/60 hover:!text-[#4d6350] text-sm leading-none px-0.5 motion-safe:transition-colors"
+                      /* ── 13×14 PX, TRINTA E CINCO A COMPETIR NA GRELHA ────
+                         MEDIDO a 1440×900: `13.1×14` px cada. Este «+» nunca é
+                         desenhado no dedo (`pointer-coarse:!hidden`), portanto
+                         a régua é a do rato — e a da WCAG 2.2 AA (2.5.8) são
+                         24×24. Numa grelha de 35 dias, um alvo de 13 px falha
+                         para o dia do lado, que é outra data.
+
+                         `size-6` é só a CAIXA que recebe o clique: o «+» fica
+                         com o mesmo `text-sm`, centrado, e como a célula tem
+                         `min-h-[80px]` a linha do topo não empurra nada. */
+                      className="hidden sm:flex pointer-coarse:!hidden size-6 items-center justify-center text-[#4d6350]/0 group-hover:text-[#4d6350]/60 hover:!text-[#4d6350] text-sm leading-none motion-safe:transition-colors"
                     >
                       +
                     </button>

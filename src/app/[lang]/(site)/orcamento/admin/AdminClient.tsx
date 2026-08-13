@@ -835,6 +835,33 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // trap, aria-modal, scroll lock) — the inline panel must not trap focus.
   const [isDetailOverlay, setIsDetailOverlay] = useState(false);
   /**
+   * ── A ALTURA DA COLUNA DE DETALHE, MEDIDA E NÃO PRESUMIDA ─────────────────
+   *
+   * `xl:max-h-[calc(100vh-7rem)]` presumia que esta coluna começa colada ao
+   * cabeçalho: 6rem do `xl:top-24` mais 1rem de folga no fundo. Não começa.
+   * MEDIDO num 1440×900: a linha da grelha arranca a 341 px do topo — abaixo
+   * do título e da barra de filtros —, a coluna ficava com 788 px de altura, e
+   * 341 + 788 dá 1129 num ecrã de 900. A barra «Guardar alterações», que vive
+   * colada ao fundo DESTA coluna, nascia 229 px abaixo da dobra:
+   * `elementFromPoint` no centro do botão devolvia `null`.
+   *
+   * E rolar a gaveta até ao fim não a trazia — ela está colada ao fundo do
+   * contentor que rola, não ao fundo do ecrã —, portanto quem rola até bater no
+   * fim conclui, com toda a razão, que não há mais nada por baixo. Só rolar a
+   * PÁGINA inteira (269 px, todo o curso que ela tem) a revelava.
+   *
+   * O `xl:sticky xl:top-24` também nunca chegou a colar nada: um `sticky` só
+   * tem caminho para andar se a caixa que o contém for mais alta do que ele, e
+   * aqui a altura da grelha É a desta coluna — zero caminho. Por isso isto não
+   * se resolve só com CSS: a altura que sobra depende de ONDE a coluna começa,
+   * e onde ela começa mede-se.
+   *
+   * `null` até à primeira medição — e nessa altura vale a classe do Tailwind,
+   * que é o comportamento de antes. Nunca se aplica no telemóvel: lá a gaveta é
+   * `fixed inset-y-0` e já está certa (medida: 775→844 num ecrã de 844).
+   */
+  const [alturaDoDetalhe, setAlturaDoDetalhe] = useState<number | null>(null);
+  /**
    * A barra lateral está fora do ecrã (gaveta), e não encostada como coluna?
    *
    * Abaixo de `lg` a barra é uma gaveta que vive em `-translate-x-full` quando
@@ -1370,6 +1397,48 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
+
+  /**
+   * Mede quanto ECRÃ sobra a partir de onde a coluna de detalhe começa, e é
+   * essa a altura dela. Ver a nota do `alturaDoDetalhe`, lá em cima.
+   *
+   * Mede-se o topo da LINHA da grelha e não o do painel: o painel é `sticky`, e
+   * um painel colado ao cabeçalho mentiria sobre onde começa. A linha é
+   * estática, portanto `rect.top + scrollY` é sempre o sítio dela no documento
+   * — o pior caso, com a página por rolar, que é como ela abre um pedido.
+   *
+   * Volta a medir quando a janela muda de tamanho e quando alguma caixa acima
+   * cresce (a barra de filtros a passar para duas linhas, por exemplo). O
+   * `ResizeObserver` também dispara com a mudança que nós próprios fazemos —
+   * mas aí o topo é o mesmo, o valor é o mesmo, e o React não volta a desenhar.
+   */
+  useEffect(() => {
+    if (!selected || isDetailOverlay) return;
+    if (typeof window === "undefined") return;
+    const linha = drawerRef.current?.parentElement;
+    if (!linha) return;
+
+    const medir = () => {
+      const topo = linha.getBoundingClientRect().top + window.scrollY;
+      // A mesma folga de 1rem que o `calc(100vh-7rem)` já reservava no fundo.
+      const sobra = Math.round(window.innerHeight - topo - 16);
+      // Um chão para janelas muito baixas: mais vale uma coluna curta que rola
+      // do que uma coluna de 100 px onde não cabe nada.
+      setAlturaDoDetalhe(Math.max(sobra, 320));
+    };
+
+    medir();
+    window.addEventListener("resize", medir);
+    const observador = typeof ResizeObserver !== "undefined" ? new ResizeObserver(medir) : null;
+    observador?.observe(linha);
+    // E a caixa da vista inteira, que é quem muda de altura quando cresce algo
+    // ACIMA da grelha — a grelha sozinha não dá por isso.
+    if (linha.parentElement) observador?.observe(linha.parentElement);
+    return () => {
+      window.removeEventListener("resize", medir);
+      observador?.disconnect();
+    };
+  }, [selected, isDetailOverlay, drawerRef]);
 
   // Lock background scroll while the detail drawer is open as a mobile overlay
   // (mirrors the nav-drawer lock above). The inline xl panel never locks.
@@ -3674,309 +3743,274 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     role={isDetailOverlay ? "dialog" : undefined}
                     aria-modal={isDetailOverlay ? true : undefined}
                     aria-labelledby={isDetailOverlay ? "detail-drawer-title" : undefined}
-                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-full max-w-md sm:max-w-xl lg:max-w-3xl xl:max-w-none xl:w-auto bg-white border-l xl:border border-foreground/[0.08] xl:rounded-2xl xl:sticky xl:top-24 max-h-[100dvh] xl:max-h-[calc(100vh-7rem)] overflow-x-hidden overflow-y-auto overscroll-contain shadow-lg xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)]"
+                    /* ── O PAINEL É UMA MOLDURA: CABEÇA, MEIO QUE ROLA, PÉ ───
+                       O que rola passou a ser a caixa de DENTRO. Antes rolava
+                       o painel inteiro e a barra de gravação ia lá dentro,
+                       `sticky bottom-0` — colada ao fundo do que rola. Duas
+                       coisas más saíam daí:
+
+                       · o estúdio de propostas tem a SUA barra `sticky
+                         bottom-0` (z-20) e as duas disputavam a mesma aresta:
+                         medido a 1280×800, a meio da rolagem quem estava no
+                         centro do «Guardar alterações» era a barra do estúdio;
+                       · e uma barra colada ao fundo de uma caixa que rola
+                         depende de onde a caixa está — não é uma promessa.
+
+                       Com o pé FORA da caixa que rola, a aresta de baixo do
+                       que rola fica por cima dele: o `sticky` do estúdio cola
+                       ali e nunca mais o tapa, sem guerra de `z-index` e sem o
+                       estúdio ter de saber que existe um pé por baixo. */
+                    className="fixed xl:static inset-y-0 right-0 z-50 xl:z-auto flex w-full max-w-md flex-col overflow-hidden border-l bg-white shadow-lg sm:max-w-xl lg:max-w-3xl xl:sticky xl:top-24 xl:w-auto xl:max-w-none xl:rounded-2xl xl:border xl:shadow-[0_1px_2px_rgba(42,38,32,0.04)] border-foreground/[0.08] max-h-[100dvh] xl:max-h-[calc(100vh-7rem)]"
+                    // A altura medida ganha à classe — e só existe na coluna do
+                    // computador. Ver `alturaDoDetalhe`.
+                    style={
+                      isDetailOverlay || alturaDoDetalhe === null
+                        ? undefined
+                        : { maxHeight: alturaDoDetalhe }
+                    }
                   >
-                    <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white px-5 pt-5 sm:px-7">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <h2
-                            id="detail-drawer-title"
-                            ref={detailTitleRef}
-                            tabIndex={-1}
-                            title={selected.name}
-                            /* line-clamp (not truncate): a global `h1,h2,h3 {
+                    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+                      <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white px-5 pt-5 sm:px-7">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <h2
+                              id="detail-drawer-title"
+                              ref={detailTitleRef}
+                              tabIndex={-1}
+                              title={selected.name}
+                              /* line-clamp (not truncate): a global `h1,h2,h3 {
                                text-wrap: balance }` is unlayered and overrides
                                Tailwind's layered `truncate`, so a long name would
                                wrap to many lines and shove the content down.
                                Clamp to 2 lines with an ellipsis instead. */
-                            className="line-clamp-2 break-words font-display text-xl leading-tight text-foreground/90 focus:outline-none sm:text-2xl"
-                          >
-                            {selected.name}
-                          </h2>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
-                            {statusBadge(selected.status)}
-                            <span
-                              className="font-mono text-[10px] tracking-tight text-foreground/40"
-                              title={selected.id}
+                              className="line-clamp-2 break-words font-display text-xl leading-tight text-foreground/90 focus:outline-none sm:text-2xl"
                             >
-                              Ref. {shortRef(selected.id)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-                          {/* Full-screen cockpit for this event — the one place that
-                              unifies proposta/contrato/faturas/produção. Primary. */}
-                          <Link
-                            href={`/${lang}/orcamento/admin/evento/${selected.id}`}
-                            className="alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16] inline-flex items-center"
-                            title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
-                          >
-                            <svg
-                              width="15"
-                              height="15"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                              aria-hidden="true"
-                            >
-                              <rect x="3" y="3" width="7" height="9" rx="1" />
-                              <rect x="14" y="3" width="7" height="5" rx="1" />
-                              <rect x="14" y="12" width="7" height="9" rx="1" />
-                              <rect x="3" y="16" width="7" height="5" rx="1" />
-                            </svg>
-                            <span className="hidden sm:inline">Dossier</span>
-                          </Link>
-                          {/* Every secondary / destructive / print action tucked into
-                              one calm overflow menu so the header stays uncluttered. */}
-                          <MoreMenu
-                            items={[
-                              {
-                                label: "Duplicar pedido",
-                                hint: "Clonar para um cliente recorrente",
-                                onClick: () => duplicateQuote(selected),
-                                icon: (
-                                  <svg
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.7"
-                                    aria-hidden="true"
-                                  >
-                                    <rect x="9" y="9" width="11" height="11" rx="2" />
-                                    <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
-                                  </svg>
-                                ),
-                              },
-                              {
-                                label: selected.archived ? "Restaurar pedido" : "Arquivar pedido",
-                                hint: selected.archived
-                                  ? "Voltar a mostrar na lista principal"
-                                  : "Ocultar da lista principal (reversível)",
-                                onClick: async () => {
-                                  const next = !selected.archived;
-                                  const confirm_ =
-                                    !next ||
-                                    window.confirm(
-                                      `Arquivar "${selected.name}"? Ficará oculto da lista principal.`,
-                                    );
-                                  if (!confirm_) return;
-                                  const res = await fetch(`/api/orcamento/${selected.id}`, {
-                                    method: "PATCH",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ archived: next }),
-                                  });
-                                  if (res.ok) {
-                                    const updated = await res.json();
-                                    setQuotes((prev) =>
-                                      prev.map((q) => (q.id === updated.id ? updated : q)),
-                                    );
-                                    setSelected(updated);
-                                    toast(
-                                      next ? "Pedido arquivado" : "Pedido restaurado",
-                                      "success",
-                                    );
-                                  }
-                                },
-                                icon: (
-                                  <svg
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.7"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                  >
-                                    <path d="M21 8v13H3V8M23 3H1v5h22V3zM10 12h4" />
-                                  </svg>
-                                ),
-                              },
-                              {
-                                label: "Guião do dia",
-                                hint: "Imprimir a folha de operações",
-                                onClick: () => printRunSheet(selected),
-                                icon: (
-                                  <svg
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.7"
-                                    aria-hidden="true"
-                                  >
-                                    <path
-                                      d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                    <rect x="6" y="14" width="12" height="7" rx="1" />
-                                  </svg>
-                                ),
-                              },
-                              {
-                                label: "Dossier PDF",
-                                hint: "Imprimir o dossier completo do evento",
-                                onClick: () => printEventDossier(selected),
-                                icon: (
-                                  <svg
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.7"
-                                    aria-hidden="true"
-                                  >
-                                    <path
-                                      d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                    <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" strokeLinecap="round" />
-                                  </svg>
-                                ),
-                              },
-                              ...(selected.date
-                                ? [
-                                    {
-                                      label: "Adicionar ao calendário",
-                                      hint: "Descarregar .ics (Google/Apple/Outlook)",
-                                      onClick: () => downloadEventIcs(selected),
-                                      icon: (
-                                        <svg
-                                          width="16"
-                                          height="16"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="1.7"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          aria-hidden="true"
-                                        >
-                                          <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-                                          <path d="M12 13v5M9.5 15.5 12 18l2.5-2.5" />
-                                        </svg>
-                                      ),
-                                    },
-                                  ]
-                                : []),
-                              {
-                                label: "Apagar pedido",
-                                hint: "Ação definitiva — não pode ser anulada",
-                                onClick: async () => {
-                                  if (
-                                    !window.confirm(
-                                      "Apagar definitivamente este pedido? Esta ação não pode ser anulada.",
-                                    )
-                                  )
-                                    return;
-                                  try {
-                                    const res = await fetch(`/api/orcamento/${selected.id}`, {
-                                      method: "DELETE",
-                                    });
-                                    if (!res.ok) throw new Error("delete failed");
-                                    setQuotes((prev) => prev.filter((q) => q.id !== selected.id));
-                                    setSelected(null);
-                                    toast("Pedido apagado", "success");
-                                  } catch {
-                                    toast("Não foi possível apagar o pedido", "error");
-                                  }
-                                },
-                                icon: (
-                                  <svg
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.7"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                  >
-                                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
-                                  </svg>
-                                ),
-                              },
-                            ]}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={closeDetail}
-                            aria-label="Fechar"
-                            className="px-2 pointer-coarse:min-w-11"
-                          >
-                            <svg
-                              width="18"
-                              height="18"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M18 6 6 18M6 6l12 12" />
-                            </svg>
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Tudo à vista: ciclo de vida, próxima ação, o formulário de
-                        gestão sempre presente e as ferramentas em separadores logo
-                        abaixo — nada fica escondido atrás de revelações. */}
-                    <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-5 py-6 sm:px-7 sm:py-8">
-                      {/* Ciclo de vida — em que fase está o pedido, num relance. */}
-                      <LifecycleStepper quote={selected} />
-
-                      {/* Próxima ação — o único passo seguinte, em destaque. Abre a
-                          ferramenta certa dentro da área avançada. */}
-                      {(() => {
-                        const na = detailNextAction(selected);
-                        const reopen = deriveRequestLifecycle(selected).perdido;
-                        return (
-                          <div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (reopen) setEditStatus("em_revisao");
-                                if (na.tab === "gestao") {
-                                  // O próximo passo é uma edição no formulário —
-                                  // levar o utilizador até lá.
-                                  gestaoRef.current?.scrollIntoView({
-                                    behavior: "smooth",
-                                    block: "start",
-                                  });
-                                } else {
-                                  setDetailTab(na.tab);
-                                  toolsRef.current?.scrollIntoView({
-                                    behavior: "smooth",
-                                    block: "start",
-                                  });
-                                }
-                              }}
-                              className="flex w-full items-center gap-3 rounded-2xl bg-[#4d6350] px-5 py-4 text-left text-white shadow-sm motion-safe:transition-colors hover:bg-[#415440]"
-                            >
-                              <span className="min-w-0 flex-1">
-                                <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">
-                                  Próxima ação
-                                </span>
-                                <span className="mt-0.5 block text-sm font-semibold">
-                                  {na.label}
-                                </span>
-                                <span className="mt-0.5 block text-xs text-white/70">
-                                  {na.hint}
-                                </span>
+                              {selected.name}
+                            </h2>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+                              {statusBadge(selected.status)}
+                              <span
+                                className="font-mono text-[10px] tracking-tight text-foreground/40"
+                                title={selected.id}
+                              >
+                                Ref. {shortRef(selected.id)}
                               </span>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                            {/* Full-screen cockpit for this event — the one place that
+                              unifies proposta/contrato/faturas/produção. Primary. */}
+                            <Link
+                              href={`/${lang}/orcamento/admin/evento/${selected.id}`}
+                              className="alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16] inline-flex items-center"
+                              title="Abrir o Dossier do evento (vista completa: ciclo de vida, financeiro, produção)"
+                            >
+                              <svg
+                                width="15"
+                                height="15"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.7"
+                                aria-hidden="true"
+                              >
+                                <rect x="3" y="3" width="7" height="9" rx="1" />
+                                <rect x="14" y="3" width="7" height="5" rx="1" />
+                                <rect x="14" y="12" width="7" height="9" rx="1" />
+                                <rect x="3" y="16" width="7" height="5" rx="1" />
+                              </svg>
+                              <span className="hidden sm:inline">Dossier</span>
+                            </Link>
+                            {/* Every secondary / destructive / print action tucked into
+                              one calm overflow menu so the header stays uncluttered. */}
+                            <MoreMenu
+                              items={[
+                                {
+                                  label: "Duplicar pedido",
+                                  hint: "Clonar para um cliente recorrente",
+                                  onClick: () => duplicateQuote(selected),
+                                  icon: (
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="1.7"
+                                      aria-hidden="true"
+                                    >
+                                      <rect x="9" y="9" width="11" height="11" rx="2" />
+                                      <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
+                                    </svg>
+                                  ),
+                                },
+                                {
+                                  label: selected.archived ? "Restaurar pedido" : "Arquivar pedido",
+                                  hint: selected.archived
+                                    ? "Voltar a mostrar na lista principal"
+                                    : "Ocultar da lista principal (reversível)",
+                                  onClick: async () => {
+                                    const next = !selected.archived;
+                                    const confirm_ =
+                                      !next ||
+                                      window.confirm(
+                                        `Arquivar "${selected.name}"? Ficará oculto da lista principal.`,
+                                      );
+                                    if (!confirm_) return;
+                                    const res = await fetch(`/api/orcamento/${selected.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ archived: next }),
+                                    });
+                                    if (res.ok) {
+                                      const updated = await res.json();
+                                      setQuotes((prev) =>
+                                        prev.map((q) => (q.id === updated.id ? updated : q)),
+                                      );
+                                      setSelected(updated);
+                                      toast(
+                                        next ? "Pedido arquivado" : "Pedido restaurado",
+                                        "success",
+                                      );
+                                    }
+                                  },
+                                  icon: (
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="1.7"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M21 8v13H3V8M23 3H1v5h22V3zM10 12h4" />
+                                    </svg>
+                                  ),
+                                },
+                                {
+                                  label: "Guião do dia",
+                                  hint: "Imprimir a folha de operações",
+                                  onClick: () => printRunSheet(selected),
+                                  icon: (
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="1.7"
+                                      aria-hidden="true"
+                                    >
+                                      <path
+                                        d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                      <rect x="6" y="14" width="12" height="7" rx="1" />
+                                    </svg>
+                                  ),
+                                },
+                                {
+                                  label: "Dossier PDF",
+                                  hint: "Imprimir o dossier completo do evento",
+                                  onClick: () => printEventDossier(selected),
+                                  icon: (
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="1.7"
+                                      aria-hidden="true"
+                                    >
+                                      <path
+                                        d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                      <path
+                                        d="M14 2v6h6M9 13h6M9 17h6M9 9h1"
+                                        strokeLinecap="round"
+                                      />
+                                    </svg>
+                                  ),
+                                },
+                                ...(selected.date
+                                  ? [
+                                      {
+                                        label: "Adicionar ao calendário",
+                                        hint: "Descarregar .ics (Google/Apple/Outlook)",
+                                        onClick: () => downloadEventIcs(selected),
+                                        icon: (
+                                          <svg
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.7"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            aria-hidden="true"
+                                          >
+                                            <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+                                            <path d="M12 13v5M9.5 15.5 12 18l2.5-2.5" />
+                                          </svg>
+                                        ),
+                                      },
+                                    ]
+                                  : []),
+                                {
+                                  label: "Apagar pedido",
+                                  hint: "Ação definitiva — não pode ser anulada",
+                                  onClick: async () => {
+                                    if (
+                                      !window.confirm(
+                                        "Apagar definitivamente este pedido? Esta ação não pode ser anulada.",
+                                      )
+                                    )
+                                      return;
+                                    try {
+                                      const res = await fetch(`/api/orcamento/${selected.id}`, {
+                                        method: "DELETE",
+                                      });
+                                      if (!res.ok) throw new Error("delete failed");
+                                      setQuotes((prev) => prev.filter((q) => q.id !== selected.id));
+                                      setSelected(null);
+                                      toast("Pedido apagado", "success");
+                                    } catch {
+                                      toast("Não foi possível apagar o pedido", "error");
+                                    }
+                                  },
+                                  icon: (
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="1.7"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
+                                    </svg>
+                                  ),
+                                },
+                              ]}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={closeDetail}
+                              aria-label="Fechar"
+                              className="px-2 pointer-coarse:min-w-11"
+                            >
                               <svg
                                 width="18"
                                 height="18"
@@ -3985,249 +4019,312 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 stroke="currentColor"
                                 strokeWidth="1.8"
                                 strokeLinecap="round"
-                                strokeLinejoin="round"
                                 aria-hidden="true"
-                                className="shrink-0 text-white/80"
                               >
-                                <path d="M5 12h14M13 6l6 6-6 6" />
+                                <path d="M18 6 6 18M6 6l12 12" />
                               </svg>
-                            </button>
+                            </Button>
                           </div>
-                        );
-                      })()}
+                        </div>
+                      </div>
 
-                      {/* ── Gestão do pedido — o formulário de trabalho, SEMPRE
-                          visível (nada escondido atrás de "Mostrar mais"). ── */}
-                      <div ref={gestaoRef} className="scroll-mt-24">
-                        <SectionCard eyebrow="Gestão do pedido" padding="md">
-                          <div className="flex flex-col gap-5">
-                            {/* Factos do evento — contexto compacto, só leitura. */}
-                            <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-foreground/55">
-                              {[
-                                {
-                                  l: "Tipo",
-                                  v: CATEGORIES.find((c) => c.id === selected.category)?.label,
-                                },
-                                {
-                                  l: "Sub-tipo",
-                                  v:
-                                    selected.category && selected.eventType
-                                      ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
-                                          (e) => e.id === selected.eventType,
-                                        )?.label
-                                      : null,
-                                },
-                                {
-                                  l: "Pacote",
-                                  v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
-                                },
-                                {
-                                  l: "Duração",
-                                  v: selected.duration ? `${selected.duration}h` : null,
-                                },
-                                {
-                                  l: "Extras",
-                                  v: selected.addons?.length
-                                    ? `${selected.addons.length} serviços`
-                                    : null,
-                                },
-                                {
-                                  // Sem número exacto, a ordem de grandeza. Um
-                                  // pedido a dizer só "por definir" não deixa
-                                  // decidir nada; "~ 100 a 150" deixa.
-                                  l: "Convidados",
-                                  v: selected.guests
-                                    ? null
-                                    : guestRangeLabel(selected.guestsRange)
-                                      ? `~ ${guestRangeLabel(selected.guestsRange)}`
-                                      : null,
-                                },
-                                {
-                                  // Interior ou exterior. Fica ao lado do
-                                  // local porque é a continuação da mesma
-                                  // pergunta — e porque é o que diz se há uma
-                                  // montagem alternativa a preparar.
-                                  l: "Espaço",
-                                  v: spaceTypeLabel(selected.spaceType) || null,
-                                },
-                                {
-                                  // Civil, religiosa ou as duas: é o que diz se
-                                  // são dois sítios para montar num só dia.
-                                  l: "Cerimónia",
-                                  v: ceremonyTypeLabel(selected.ceremonyType) || null,
-                                },
-                                {
-                                  // O que o casal marcou no pedido. Aparece
-                                  // aqui em cima, com a data e o local, porque
-                                  // é o que decide o desenho da proposta e não
-                                  // se pode ficar a saber só ao abri-la.
-                                  l: "Decoração",
-                                  v:
-                                    rotularPontos(selected.decorPoints ?? [], "pt").join(" · ") ||
-                                    null,
-                                },
-                              ]
-                                .filter((f) => f.v)
-                                .map(({ l, v }) => (
-                                  <span key={l}>
-                                    <span className="uppercase tracking-wide text-foreground/40 text-[9px] mr-1">
-                                      {l}
-                                    </span>
-                                    {v}
-                                  </span>
-                                ))}
-                            </div>
+                      {/* Tudo à vista: ciclo de vida, próxima ação, o formulário de
+                        gestão sempre presente e as ferramentas em separadores logo
+                        abaixo — nada fica escondido atrás de revelações. */}
+                      <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-5 py-6 sm:px-7 sm:py-8">
+                        {/* Ciclo de vida — em que fase está o pedido, num relance. */}
+                        <LifecycleStepper quote={selected} />
 
-                            {/* Campos editáveis — tudo em grelha, à mão. */}
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                              <div>
-                                <label className="bo-eyebrow block mb-1.5">Estado</label>
-                                <select
-                                  // O rótulo ao lado não está ligado ao campo
-                                  // (é um `label` sem `for`), e sem isto quem
-                                  // usa leitor de ecrã ouve só «combobox».
-                                  aria-label="Estado do pedido"
-                                  value={editStatus}
-                                  onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
-                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
-                                >
-                                  {STATUS_OPTIONS.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                      {s.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="bo-eyebrow block mb-1.5">
-                                  Preço final (sem IVA) €
-                                </label>
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={editPrice}
-                                  onChange={(e) => setEditPrice(e.target.value)}
-                                  placeholder="Ex.: 12500"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
-                                />
-                                {(() => {
-                                  /**
-                                   * ── A MESMA BASE DOS DOIS LADOS ──────────
-                                   *
-                                   * Isto misturava três coisas na mesma conta:
-                                   * o preço escrito e o `quotedPrice` são
-                                   * LÍQUIDOS, o `priceBreakdown.total` do
-                                   * fallback é BRUTO, e os custos de
-                                   * fornecedor são com IVA (que é dedutível).
-                                   *
-                                   * O resultado era dois números para a mesma
-                                   * pergunta no mesmo ecrã: num pedido de
-                                   * 10.000 € com 5.000 € de custos, aqui dizia
-                                   * «Margem 5.000 €» e o separador Financeiro
-                                   * dizia 5.934,96 €. A regra certa é a que o
-                                   * `EventCosts` já aplica e explica.
-                                   */
-                                  const escrito = parsePriceInput(editPrice);
-                                  const revenue =
-                                    escrito != null ? escrito : contractedAmounts(selected).net;
-                                  const taxa = effectiveVatRate(selected);
-                                  const custosComIva = (selected.eventSuppliers ?? []).reduce(
-                                    (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
-                                    0,
-                                  );
-                                  if (!custosComIva) return null;
-                                  const costs = round2(custosComIva / (1 + taxa));
-                                  const margin = round2(revenue - costs);
-                                  return (
-                                    <p className="mt-1 text-[10px] text-foreground/45">
-                                      Custos {formatPrice(costs)} · Margem{" "}
-                                      <span
-                                        className={
-                                          margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]"
-                                        }
-                                      >
-                                        {formatPrice(margin)}
-                                      </span>
-                                    </p>
-                                  );
-                                })()}
-                              </div>
-                              <div>
-                                <label className="bo-eyebrow block mb-1.5">Data do evento</label>
-                                <input
-                                  type="date"
-                                  value={editDate}
-                                  onChange={(e) => setEditDate(e.target.value)}
-                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
-                                />
-                                {editDate &&
-                                  (() => {
-                                    const cd = eventCountdown(editDate);
-                                    return cd ? (
-                                      <p
-                                        className={`mt-1 text-[10px] ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/40"}`}
-                                      >
-                                        {cd.label}
-                                      </p>
-                                    ) : null;
-                                  })()}
-                              </div>
-                              <div>
-                                <label
-                                  className="bo-eyebrow block mb-1.5"
-                                  htmlFor="campo-convidados"
-                                >
-                                  Convidados
-                                </label>
-                                <input
-                                  id="campo-convidados"
-                                  type="number"
-                                  min={0}
-                                  value={editGuests}
-                                  aria-invalid={erroDeConvidados ? true : undefined}
-                                  aria-describedby={
-                                    erroDeConvidados ? "erro-dos-convidados" : undefined
+                        {/* Próxima ação — o único passo seguinte, em destaque. Abre a
+                          ferramenta certa dentro da área avançada. */}
+                        {(() => {
+                          const na = detailNextAction(selected);
+                          const reopen = deriveRequestLifecycle(selected).perdido;
+                          return (
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (reopen) setEditStatus("em_revisao");
+                                  if (na.tab === "gestao") {
+                                    // O próximo passo é uma edição no formulário —
+                                    // levar o utilizador até lá.
+                                    gestaoRef.current?.scrollIntoView({
+                                      behavior: "smooth",
+                                      block: "start",
+                                    });
+                                  } else {
+                                    setDetailTab(na.tab);
+                                    toolsRef.current?.scrollIntoView({
+                                      behavior: "smooth",
+                                      block: "start",
+                                    });
                                   }
-                                  onChange={(e) => setEditGuests(e.target.value)}
-                                  className={`bo-input px-3 py-2 text-sm text-foreground/80 w-full${
-                                    erroDeConvidados ? " border-[#b5654a]" : ""
-                                  }`}
-                                />
-                                {/* O `min={0}` do input não trava nada — o
+                                }}
+                                className="flex w-full items-center gap-3 rounded-2xl bg-[#4d6350] px-5 py-4 text-left text-white shadow-sm motion-safe:transition-colors hover:bg-[#415440]"
+                              >
+                                <span className="min-w-0 flex-1">
+                                  <span className="block text-[9px] uppercase tracking-[0.2em] text-white/60">
+                                    Próxima ação
+                                  </span>
+                                  <span className="mt-0.5 block text-sm font-semibold">
+                                    {na.label}
+                                  </span>
+                                  <span className="mt-0.5 block text-xs text-white/70">
+                                    {na.hint}
+                                  </span>
+                                </span>
+                                <svg
+                                  width="18"
+                                  height="18"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                  className="shrink-0 text-white/80"
+                                >
+                                  <path d="M5 12h14M13 6l6 6-6 6" />
+                                </svg>
+                              </button>
+                            </div>
+                          );
+                        })()}
+
+                        {/* ── Gestão do pedido — o formulário de trabalho, SEMPRE
+                          visível (nada escondido atrás de "Mostrar mais"). ── */}
+                        <div ref={gestaoRef} className="scroll-mt-24">
+                          <SectionCard eyebrow="Gestão do pedido" padding="md">
+                            <div className="flex flex-col gap-5">
+                              {/* Factos do evento — contexto compacto, só leitura. */}
+                              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-foreground/55">
+                                {[
+                                  {
+                                    l: "Tipo",
+                                    v: CATEGORIES.find((c) => c.id === selected.category)?.label,
+                                  },
+                                  {
+                                    l: "Sub-tipo",
+                                    v:
+                                      selected.category && selected.eventType
+                                        ? EVENT_TYPES_BY_CATEGORY[selected.category]?.find(
+                                            (e) => e.id === selected.eventType,
+                                          )?.label
+                                        : null,
+                                  },
+                                  {
+                                    l: "Pacote",
+                                    v: PACKAGES.find((p) => p.id === selected.packageTier)?.label,
+                                  },
+                                  {
+                                    l: "Duração",
+                                    v: selected.duration ? `${selected.duration}h` : null,
+                                  },
+                                  {
+                                    l: "Extras",
+                                    v: selected.addons?.length
+                                      ? `${selected.addons.length} serviços`
+                                      : null,
+                                  },
+                                  {
+                                    // Sem número exacto, a ordem de grandeza. Um
+                                    // pedido a dizer só "por definir" não deixa
+                                    // decidir nada; "~ 100 a 150" deixa.
+                                    l: "Convidados",
+                                    v: selected.guests
+                                      ? null
+                                      : guestRangeLabel(selected.guestsRange)
+                                        ? `~ ${guestRangeLabel(selected.guestsRange)}`
+                                        : null,
+                                  },
+                                  {
+                                    // Interior ou exterior. Fica ao lado do
+                                    // local porque é a continuação da mesma
+                                    // pergunta — e porque é o que diz se há uma
+                                    // montagem alternativa a preparar.
+                                    l: "Espaço",
+                                    v: spaceTypeLabel(selected.spaceType) || null,
+                                  },
+                                  {
+                                    // Civil, religiosa ou as duas: é o que diz se
+                                    // são dois sítios para montar num só dia.
+                                    l: "Cerimónia",
+                                    v: ceremonyTypeLabel(selected.ceremonyType) || null,
+                                  },
+                                  {
+                                    // O que o casal marcou no pedido. Aparece
+                                    // aqui em cima, com a data e o local, porque
+                                    // é o que decide o desenho da proposta e não
+                                    // se pode ficar a saber só ao abri-la.
+                                    l: "Decoração",
+                                    v:
+                                      rotularPontos(selected.decorPoints ?? [], "pt").join(" · ") ||
+                                      null,
+                                  },
+                                ]
+                                  .filter((f) => f.v)
+                                  .map(({ l, v }) => (
+                                    <span key={l}>
+                                      <span className="uppercase tracking-wide text-foreground/40 text-[9px] mr-1">
+                                        {l}
+                                      </span>
+                                      {v}
+                                    </span>
+                                  ))}
+                              </div>
+
+                              {/* Campos editáveis — tudo em grelha, à mão. */}
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div>
+                                  <label className="bo-eyebrow block mb-1.5">Estado</label>
+                                  <select
+                                    // O rótulo ao lado não está ligado ao campo
+                                    // (é um `label` sem `for`), e sem isto quem
+                                    // usa leitor de ecrã ouve só «combobox».
+                                    aria-label="Estado do pedido"
+                                    value={editStatus}
+                                    onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                  >
+                                    {STATUS_OPTIONS.map((s) => (
+                                      <option key={s.id} value={s.id}>
+                                        {s.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="bo-eyebrow block mb-1.5">
+                                    Preço final (sem IVA) €
+                                  </label>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={editPrice}
+                                    onChange={(e) => setEditPrice(e.target.value)}
+                                    placeholder="Ex.: 12500"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                  />
+                                  {(() => {
+                                    /**
+                                     * ── A MESMA BASE DOS DOIS LADOS ──────────
+                                     *
+                                     * Isto misturava três coisas na mesma conta:
+                                     * o preço escrito e o `quotedPrice` são
+                                     * LÍQUIDOS, o `priceBreakdown.total` do
+                                     * fallback é BRUTO, e os custos de
+                                     * fornecedor são com IVA (que é dedutível).
+                                     *
+                                     * O resultado era dois números para a mesma
+                                     * pergunta no mesmo ecrã: num pedido de
+                                     * 10.000 € com 5.000 € de custos, aqui dizia
+                                     * «Margem 5.000 €» e o separador Financeiro
+                                     * dizia 5.934,96 €. A regra certa é a que o
+                                     * `EventCosts` já aplica e explica.
+                                     */
+                                    const escrito = parsePriceInput(editPrice);
+                                    const revenue =
+                                      escrito != null ? escrito : contractedAmounts(selected).net;
+                                    const taxa = effectiveVatRate(selected);
+                                    const custosComIva = (selected.eventSuppliers ?? []).reduce(
+                                      (s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0),
+                                      0,
+                                    );
+                                    if (!custosComIva) return null;
+                                    const costs = round2(custosComIva / (1 + taxa));
+                                    const margin = round2(revenue - costs);
+                                    return (
+                                      <p className="mt-1 text-[10px] text-foreground/45">
+                                        Custos {formatPrice(costs)} · Margem{" "}
+                                        <span
+                                          className={
+                                            margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]"
+                                          }
+                                        >
+                                          {formatPrice(margin)}
+                                        </span>
+                                      </p>
+                                    );
+                                  })()}
+                                </div>
+                                <div>
+                                  <label className="bo-eyebrow block mb-1.5">Data do evento</label>
+                                  <input
+                                    type="date"
+                                    value={editDate}
+                                    onChange={(e) => setEditDate(e.target.value)}
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                  />
+                                  {editDate &&
+                                    (() => {
+                                      const cd = eventCountdown(editDate);
+                                      return cd ? (
+                                        <p
+                                          className={`mt-1 text-[10px] ${cd.tone === "soon" || cd.tone === "today" ? "text-[#b5654a]" : "text-foreground/40"}`}
+                                        >
+                                          {cd.label}
+                                        </p>
+                                      ) : null;
+                                    })()}
+                                </div>
+                                <div>
+                                  <label
+                                    className="bo-eyebrow block mb-1.5"
+                                    htmlFor="campo-convidados"
+                                  >
+                                    Convidados
+                                  </label>
+                                  <input
+                                    id="campo-convidados"
+                                    type="number"
+                                    min={0}
+                                    value={editGuests}
+                                    aria-invalid={erroDeConvidados ? true : undefined}
+                                    aria-describedby={
+                                      erroDeConvidados ? "erro-dos-convidados" : undefined
+                                    }
+                                    onChange={(e) => setEditGuests(e.target.value)}
+                                    className={`bo-input px-3 py-2 text-sm text-foreground/80 w-full${
+                                      erroDeConvidados ? " border-[#b5654a]" : ""
+                                    }`}
+                                  />
+                                  {/* O `min={0}` do input não trava nada — o
                                     teclado escreve o que quer. Esta é a frase
                                     que chega ANTES do clique, e diz o que
                                     fazer em vez de citar o esquema. */}
-                                {erroDeConvidados && (
-                                  <p
-                                    id="erro-dos-convidados"
-                                    className="mt-1 text-[10px] leading-relaxed text-[#b5654a]"
-                                  >
-                                    {erroDeConvidados}
-                                  </p>
-                                )}
+                                  {erroDeConvidados && (
+                                    <p
+                                      id="erro-dos-convidados"
+                                      className="mt-1 text-[10px] leading-relaxed text-[#b5654a]"
+                                    >
+                                      {erroDeConvidados}
+                                    </p>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="bo-eyebrow block mb-1.5">Responsável</label>
+                                  <input
+                                    type="text"
+                                    value={editAssigned}
+                                    onChange={(e) => setEditAssigned(e.target.value)}
+                                    placeholder="Nome do membro da equipa…"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="bo-eyebrow block mb-1.5">Local</label>
+                                  <input
+                                    value={editLocation}
+                                    onChange={(e) => setEditLocation(e.target.value)}
+                                    placeholder="Local do evento…"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                  />
+                                </div>
                               </div>
-                              <div>
-                                <label className="bo-eyebrow block mb-1.5">Responsável</label>
-                                <input
-                                  type="text"
-                                  value={editAssigned}
-                                  onChange={(e) => setEditAssigned(e.target.value)}
-                                  placeholder="Nome do membro da equipa…"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
-                                />
-                              </div>
-                              <div>
-                                <label className="bo-eyebrow block mb-1.5">Local</label>
-                                <input
-                                  value={editLocation}
-                                  onChange={(e) => setEditLocation(e.target.value)}
-                                  placeholder="Local do evento…"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
-                                />
-                              </div>
-                            </div>
 
-                            {/* ── OS CONTACTOS, QUE ATÉ AQUI ERAM DEFINITIVOS ──
+                              {/* ── OS CONTACTOS, QUE ATÉ AQUI ERAM DEFINITIVOS ──
                                 Palavras dela: «se criarmos um pedido novo e não
                                 colocarmos um email, depois quando quisermos
                                 colocar o email para enviarmos a proposta, não
@@ -4243,772 +4340,798 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                                 Ficam num bloco próprio e por baixo: são os
                                 dados de QUEM, e o que está em cima é o QUÊ. */}
-                            <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-3">
-                              <div>
-                                <label className="bo-eyebrow block mb-1.5">Nome do cliente</label>
-                                <input
-                                  value={editNome}
-                                  onChange={(e) => setEditNome(e.target.value)}
-                                  placeholder="Quem pediu…"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
-                                />
-                              </div>
-                              <div>
-                                <label className="bo-eyebrow block mb-1.5">Email</label>
-                                <input
-                                  type="email"
-                                  inputMode="email"
-                                  autoComplete="off"
-                                  value={editEmail}
-                                  onChange={(e) => setEditEmail(e.target.value)}
-                                  placeholder="para onde a proposta segue…"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
-                                />
-                                {/* O aviso aparece só quando falta MESMO, e diz
+                              <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-3">
+                                <div>
+                                  <label className="bo-eyebrow block mb-1.5">Nome do cliente</label>
+                                  <input
+                                    value={editNome}
+                                    onChange={(e) => setEditNome(e.target.value)}
+                                    placeholder="Quem pediu…"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="bo-eyebrow block mb-1.5">Email</label>
+                                  <input
+                                    type="email"
+                                    inputMode="email"
+                                    autoComplete="off"
+                                    value={editEmail}
+                                    onChange={(e) => setEditEmail(e.target.value)}
+                                    placeholder="para onde a proposta segue…"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                  />
+                                  {/* O aviso aparece só quando falta MESMO, e diz
                                     a consequência em vez de dizer «campo
                                     obrigatório» — porque não é: há pedidos que
                                     só têm telefone, e isso é legítimo. */}
-                                {!editEmail.trim() && (
-                                  <p className="mt-1 text-[10px] leading-relaxed text-[#b5654a]">
-                                    Sem email, a proposta é gravada e o link continua a servir, mas
-                                    não é enviada a ninguém.
-                                  </p>
-                                )}
+                                  {!editEmail.trim() && (
+                                    <p className="mt-1 text-[10px] leading-relaxed text-[#b5654a]">
+                                      Sem email, a proposta é gravada e o link continua a servir,
+                                      mas não é enviada a ninguém.
+                                    </p>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="bo-eyebrow block mb-1.5">Telefone</label>
+                                  <input
+                                    type="tel"
+                                    inputMode="tel"
+                                    autoComplete="off"
+                                    value={editTelefone}
+                                    onChange={(e) => setEditTelefone(e.target.value)}
+                                    placeholder="+351…"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+                                  />
+                                </div>
                               </div>
-                              <div>
-                                <label className="bo-eyebrow block mb-1.5">Telefone</label>
-                                <input
-                                  type="tel"
-                                  inputMode="tel"
-                                  autoComplete="off"
-                                  value={editTelefone}
-                                  onChange={(e) => setEditTelefone(e.target.value)}
-                                  placeholder="+351…"
-                                  className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
+
+                              {/* Etiquetas + seguimento — gravam sozinhos. */}
+                              <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-2">
+                                <TagsField
+                                  key={`tags-${selected.id}`}
+                                  quote={selected}
+                                  suggestions={allTags}
+                                  onChange={(tags) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) => (q.id === selected.id ? { ...q, tags } : q)),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, tags } : prev));
+                                  }}
+                                />
+                                <FollowUpField
+                                  key={`fu-${selected.id}`}
+                                  quote={selected}
+                                  onChange={(followUpAt) => {
+                                    setQuotes((prev) =>
+                                      prev.map((q) =>
+                                        q.id === selected.id ? { ...q, followUpAt } : q,
+                                      ),
+                                    );
+                                    setSelected((prev) => (prev ? { ...prev, followUpAt } : prev));
+                                  }}
                                 />
                               </div>
-                            </div>
 
-                            {/* Etiquetas + seguimento — gravam sozinhos. */}
-                            <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-2">
-                              <TagsField
-                                key={`tags-${selected.id}`}
-                                quote={selected}
-                                suggestions={allTags}
-                                onChange={(tags) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) => (q.id === selected.id ? { ...q, tags } : q)),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, tags } : prev));
-                                }}
-                              />
-                              <FollowUpField
-                                key={`fu-${selected.id}`}
-                                quote={selected}
-                                onChange={(followUpAt) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, followUpAt } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, followUpAt } : prev));
-                                }}
-                              />
-                            </div>
+                              {editStatus === "rejeitado" && (
+                                <div>
+                                  <label className="bo-eyebrow block mb-1.5">Motivo de perda</label>
+                                  <textarea
+                                    rows={2}
+                                    value={editLostReason}
+                                    onChange={(e) => setEditLostReason(e.target.value)}
+                                    placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
+                                    className="bo-input px-3 py-2 text-sm text-foreground/80 resize-none w-full"
+                                  />
+                                </div>
+                              )}
+                              {selected.status === "rejeitado" &&
+                                selected.lostReason &&
+                                editStatus !== "rejeitado" && (
+                                  <div className="rounded-lg border border-foreground/[0.07] bg-foreground/[0.04] px-3 py-2">
+                                    <p className="mb-1 text-[9px] uppercase tracking-[0.2em] text-foreground/60">
+                                      Motivo de perda anterior
+                                    </p>
+                                    <p className="text-xs text-foreground/72">
+                                      {selected.lostReason}
+                                    </p>
+                                  </div>
+                                )}
 
-                            {editStatus === "rejeitado" && (
                               <div>
-                                <label className="bo-eyebrow block mb-1.5">Motivo de perda</label>
+                                <label className="bo-eyebrow block mb-1.5">Notas internas</label>
                                 <textarea
-                                  rows={2}
-                                  value={editLostReason}
-                                  onChange={(e) => setEditLostReason(e.target.value)}
-                                  placeholder="Ex.: Orçamento acima do esperado, escolheram outro fornecedor…"
+                                  rows={3}
+                                  aria-label="Notas internas"
+                                  // O que se escreve aqui grava-se sozinho — ver a
+                                  // gravação automática lá em cima. A barra de
+                                  // baixo diz em que pé está.
+                                  aria-describedby="estado-da-gravacao-do-pedido"
+                                  value={editNotes}
+                                  onChange={(e) => setEditNotes(e.target.value)}
+                                  placeholder="Notas internas sobre este pedido…"
                                   className="bo-input px-3 py-2 text-sm text-foreground/80 resize-none w-full"
                                 />
                               </div>
-                            )}
-                            {selected.status === "rejeitado" &&
-                              selected.lostReason &&
-                              editStatus !== "rejeitado" && (
-                                <div className="rounded-lg border border-foreground/[0.07] bg-foreground/[0.04] px-3 py-2">
-                                  <p className="mb-1 text-[9px] uppercase tracking-[0.2em] text-foreground/60">
-                                    Motivo de perda anterior
-                                  </p>
-                                  <p className="text-xs text-foreground/72">
-                                    {selected.lostReason}
-                                  </p>
-                                </div>
-                              )}
 
-                            <div>
-                              <label className="bo-eyebrow block mb-1.5">Notas internas</label>
-                              <textarea
-                                rows={3}
-                                aria-label="Notas internas"
-                                // O que se escreve aqui grava-se sozinho — ver a
-                                // gravação automática lá em cima. A barra de
-                                // baixo diz em que pé está.
-                                aria-describedby="estado-da-gravacao-do-pedido"
-                                value={editNotes}
-                                onChange={(e) => setEditNotes(e.target.value)}
-                                placeholder="Notas internas sobre este pedido…"
-                                className="bo-input px-3 py-2 text-sm text-foreground/80 resize-none w-full"
-                              />
-                            </div>
-
-                            {/* Estimativa calculada — contexto para definir o preço. */}
-                            {selected.priceBreakdown && (
-                              <div className="rounded-lg bg-foreground/[0.04] p-3 flex flex-col gap-1.5">
-                                <p className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
-                                  Estimativa calculada
-                                </p>
-                                {selected.priceBreakdown.addonsCost > 0 && (
+                              {/* Estimativa calculada — contexto para definir o preço. */}
+                              {selected.priceBreakdown && (
+                                <div className="rounded-lg bg-foreground/[0.04] p-3 flex flex-col gap-1.5">
+                                  <p className="text-[9px] uppercase tracking-[0.2em] text-foreground/50">
+                                    Estimativa calculada
+                                  </p>
+                                  {selected.priceBreakdown.addonsCost > 0 && (
+                                    <div className="flex justify-between text-[10px]">
+                                      <span className="text-foreground/60">Extras</span>
+                                      <span className="text-foreground/72">
+                                        {formatPrice(selected.priceBreakdown.addonsCost)}
+                                      </span>
+                                    </div>
+                                  )}
                                   <div className="flex justify-between text-[10px]">
-                                    <span className="text-foreground/60">Extras</span>
+                                    <span className="text-foreground/60">Subtotal</span>
                                     <span className="text-foreground/72">
-                                      {formatPrice(selected.priceBreakdown.addonsCost)}
+                                      {formatPrice(selected.priceBreakdown.subtotal)}
                                     </span>
                                   </div>
-                                )}
-                                <div className="flex justify-between text-[10px]">
-                                  <span className="text-foreground/60">Subtotal</span>
-                                  <span className="text-foreground/72">
-                                    {formatPrice(selected.priceBreakdown.subtotal)}
-                                  </span>
+                                  <div className="flex justify-between text-[10px]">
+                                    <span className="text-foreground/60">IVA 23%</span>
+                                    <span className="text-foreground/72">
+                                      {formatPrice(selected.priceBreakdown.iva)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between border-t border-foreground/8 pt-1 text-xs font-medium">
+                                    <span className="text-foreground/60">Total</span>
+                                    <span className="font-semibold text-[#4d6350]">
+                                      {formatPrice(selected.priceBreakdown.total)}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div className="flex justify-between text-[10px]">
-                                  <span className="text-foreground/60">IVA 23%</span>
-                                  <span className="text-foreground/72">
-                                    {formatPrice(selected.priceBreakdown.iva)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between border-t border-foreground/8 pt-1 text-xs font-medium">
-                                  <span className="text-foreground/60">Total</span>
-                                  <span className="font-semibold text-[#4d6350]">
-                                    {formatPrice(selected.priceBreakdown.total)}
-                                  </span>
-                                </div>
-                              </div>
+                              )}
+                            </div>
+                          </SectionCard>
+                        </div>
+
+                        {/* Contacto — como falar com o cliente. */}
+                        <SectionCard eyebrow="Contacto" padding="sm">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={`mailto:${selected.email}`}
+                                className="alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline"
+                              >
+                                {selected.email}
+                              </a>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard?.writeText(selected.email);
+                                  toast("Email copiado", "success");
+                                }}
+                                className="alvo-toque shrink-0 text-foreground/25 transition-colors hover:text-foreground/55"
+                                title="Copiar email"
+                                aria-label="Copiar email"
+                              >
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                >
+                                  <rect x="9" y="9" width="11" height="11" rx="2" />
+                                  <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
+                                </svg>
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={`tel:${selected.phone}`}
+                                className="alvo-toque text-xs text-foreground/70 hover:text-foreground/90"
+                              >
+                                {selected.phone}
+                              </a>
+                              {selected.phone && (
+                                <a
+                                  href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] transition-opacity hover:opacity-80 inline-flex items-center"
+                                  title="Abrir conversa no WhatsApp"
+                                >
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
+                                  </svg>
+                                  WhatsApp
+                                </a>
+                              )}
+                            </div>
+                            {selected.company && (
+                              <p className="text-xs text-foreground/70">{selected.company}</p>
+                            )}
+                            {selected.nif && (
+                              <p className="text-xs text-foreground/70">NIF: {selected.nif}</p>
                             )}
                           </div>
                         </SectionCard>
-                      </div>
 
-                      {/* Contacto — como falar com o cliente. */}
-                      <SectionCard eyebrow="Contacto" padding="sm">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={`mailto:${selected.email}`}
-                              className="alvo-toque !justify-start truncate text-xs text-[#4d6350] hover:underline"
-                            >
-                              {selected.email}
-                            </a>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard?.writeText(selected.email);
-                                toast("Email copiado", "success");
-                              }}
-                              className="alvo-toque shrink-0 text-foreground/25 transition-colors hover:text-foreground/55"
-                              title="Copiar email"
-                              aria-label="Copiar email"
-                            >
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                              >
-                                <rect x="9" y="9" width="11" height="11" rx="2" />
-                                <path d="M5 15V5a2 2 0 0 1 2-2h10" strokeLinecap="round" />
-                              </svg>
-                            </button>
+                        {/* Notas do cliente — contexto imediato, se existirem. */}
+                        {selected.notes && (
+                          <div>
+                            <p className="bo-eyebrow mb-2">Notas do Cliente</p>
+                            <p className="rounded-lg bg-foreground/[0.04] p-3 text-xs leading-relaxed text-foreground/72">
+                              {selected.notes}
+                            </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={`tel:${selected.phone}`}
-                              className="alvo-toque text-xs text-foreground/70 hover:text-foreground/90"
-                            >
-                              {selected.phone}
-                            </a>
-                            {selected.phone && (
-                              <a
-                                href={`https://wa.me/${selected.phone.replace(/[^\d]/g, "")}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="alvo-toque shrink-0 gap-1 text-[10px] uppercase tracking-[0.08em] text-[#4d6350] transition-opacity hover:opacity-80 inline-flex items-center"
-                                title="Abrir conversa no WhatsApp"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />
-                                </svg>
-                                WhatsApp
-                              </a>
-                            )}
-                          </div>
-                          {selected.company && (
-                            <p className="text-xs text-foreground/70">{selected.company}</p>
-                          )}
-                          {selected.nif && (
-                            <p className="text-xs text-foreground/70">NIF: {selected.nif}</p>
-                          )}
-                        </div>
-                      </SectionCard>
+                        )}
 
-                      {/* Notas do cliente — contexto imediato, se existirem. */}
-                      {selected.notes && (
-                        <div>
-                          <p className="bo-eyebrow mb-2">Notas do Cliente</p>
-                          <p className="rounded-lg bg-foreground/[0.04] p-3 text-xs leading-relaxed text-foreground/72">
-                            {selected.notes}
-                          </p>
-                        </div>
-                      )}
+                        <p className="text-[10px] text-foreground/50">
+                          Submetido em{" "}
+                          {new Date(selected.submittedAt).toLocaleString("pt-PT", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
 
-                      <p className="text-[10px] text-foreground/50">
-                        Submetido em{" "}
-                        {new Date(selected.submittedAt).toLocaleString("pt-PT", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-
-                      {/* ── Ferramentas — sempre visíveis, organizadas em três
+                        {/* ── Ferramentas — sempre visíveis, organizadas em três
                           separadores (a gestão já está acima, sempre presente). */}
-                      <div
-                        id="detail-tools"
-                        ref={toolsRef}
-                        className="flex scroll-mt-24 flex-col gap-7 border-t border-foreground/[0.08] pt-8"
-                      >
-                        {/* Section header — the command centre of the pedido. */}
-                        <div className="flex flex-col gap-1.5">
-                          <p className="bo-eyebrow">Ferramentas do pedido</p>
-                          <p className="text-xs leading-relaxed text-foreground/55">
-                            Tudo o que precisa para preparar, cobrar e propor — num só lugar.
-                          </p>
-                        </div>
+                        <div
+                          id="detail-tools"
+                          ref={toolsRef}
+                          className="flex scroll-mt-24 flex-col gap-7 border-t border-foreground/[0.08] pt-8"
+                        >
+                          {/* Section header — the command centre of the pedido. */}
+                          <div className="flex flex-col gap-1.5">
+                            <p className="bo-eyebrow">Ferramentas do pedido</p>
+                            <p className="text-xs leading-relaxed text-foreground/55">
+                              Tudo o que precisa para preparar, cobrar e propor — num só lugar.
+                            </p>
+                          </div>
 
-                        {/* Section tabs as cards — Arrow keys move between tabs
+                          {/* Section tabs as cards — Arrow keys move between tabs
                             (WAI-ARIA tablist pattern). Each card carries the tab's
                             plain-language hint plus its live counter as a pill. */}
-                        <div
-                          role="tablist"
-                          aria-label="Secções do pedido"
-                          className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-                        >
-                          {DETAIL_TABS.map((tab, i, arr) => {
-                            const active = detailTab === tab.id;
-                            // Contador por cartão: "N por fazer" (checklist) na
-                            // Produção e "falta €X" no Financeiro — visão imediata
-                            // sem abrir cada separador.
-                            let badge: string | null = null;
-                            if (tab.id === "producao") {
-                              const todo = (selected.checklist ?? []).filter((c) => !c.done).length;
-                              badge = todo > 0 ? `${todo} por fazer` : null;
-                            } else if (tab.id === "financeiro") {
-                              const gross = contractedAmounts(selected).gross;
-                              const paid = (selected.payments ?? []).reduce(
-                                (s, p) => s + (p.paid ? p.amount : 0),
-                                0,
-                              );
-                              const out = Math.max(0, gross - paid);
-                              badge = out > 0 ? `falta ${eur(out)}` : null;
-                            }
-                            return (
-                              <button
-                                key={tab.id}
-                                id={`detail-tab-${tab.id}`}
-                                role="tab"
-                                aria-selected={active}
-                                aria-controls={`detail-panel-${tab.id}`}
-                                tabIndex={active ? 0 : -1}
-                                onClick={() => setDetailTab(tab.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-                                  e.preventDefault();
-                                  const dir = e.key === "ArrowRight" ? 1 : -1;
-                                  const nextIdx = (i + dir + arr.length) % arr.length;
-                                  setDetailTab(arr[nextIdx].id);
-                                  const tabs =
-                                    e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-                                      '[role="tab"]',
-                                    );
-                                  tabs?.[nextIdx]?.focus();
-                                }}
-                                className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
-                                  active
-                                    ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-[0_2px_12px_rgba(77,99,80,0.10)]"
-                                    : "border-foreground/[0.08] bg-foreground/[0.02] hover:-translate-y-0.5 hover:border-foreground/[0.14] hover:bg-foreground/[0.03] hover:shadow-sm"
-                                }`}
-                              >
-                                <span
-                                  aria-hidden
-                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl motion-safe:transition-colors ${
+                          <div
+                            role="tablist"
+                            aria-label="Secções do pedido"
+                            className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                          >
+                            {DETAIL_TABS.map((tab, i, arr) => {
+                              const active = detailTab === tab.id;
+                              // Contador por cartão: "N por fazer" (checklist) na
+                              // Produção e "falta €X" no Financeiro — visão imediata
+                              // sem abrir cada separador.
+                              let badge: string | null = null;
+                              if (tab.id === "producao") {
+                                const todo = (selected.checklist ?? []).filter(
+                                  (c) => !c.done,
+                                ).length;
+                                badge = todo > 0 ? `${todo} por fazer` : null;
+                              } else if (tab.id === "financeiro") {
+                                const gross = contractedAmounts(selected).gross;
+                                const paid = (selected.payments ?? []).reduce(
+                                  (s, p) => s + (p.paid ? p.amount : 0),
+                                  0,
+                                );
+                                const out = Math.max(0, gross - paid);
+                                badge = out > 0 ? `falta ${eur(out)}` : null;
+                              }
+                              return (
+                                <button
+                                  key={tab.id}
+                                  id={`detail-tab-${tab.id}`}
+                                  role="tab"
+                                  aria-selected={active}
+                                  aria-controls={`detail-panel-${tab.id}`}
+                                  tabIndex={active ? 0 : -1}
+                                  onClick={() => setDetailTab(tab.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+                                    e.preventDefault();
+                                    const dir = e.key === "ArrowRight" ? 1 : -1;
+                                    const nextIdx = (i + dir + arr.length) % arr.length;
+                                    setDetailTab(arr[nextIdx].id);
+                                    const tabs =
+                                      e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                                        '[role="tab"]',
+                                      );
+                                    tabs?.[nextIdx]?.focus();
+                                  }}
+                                  className={`flex min-w-0 flex-col items-start gap-3 rounded-2xl border p-4 text-left motion-safe:transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
                                     active
-                                      ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
-                                      : "bg-foreground/[0.05] text-foreground/55"
+                                      ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-[0_2px_12px_rgba(77,99,80,0.10)]"
+                                      : "border-foreground/[0.08] bg-foreground/[0.02] hover:-translate-y-0.5 hover:border-foreground/[0.14] hover:bg-foreground/[0.03] hover:shadow-sm"
                                   }`}
                                 >
-                                  {tab.icon}
-                                </span>
-                                <span className="flex min-w-0 flex-col gap-1">
                                   <span
-                                    className={`text-xs font-semibold uppercase tracking-[0.08em] ${
-                                      active ? "text-foreground/85" : "text-foreground/70"
-                                    }`}
-                                  >
-                                    {tab.label}
-                                  </span>
-                                  <span className="text-[11px] leading-relaxed text-foreground/50">
-                                    {tab.hint}
-                                  </span>
-                                </span>
-                                {badge && (
-                                  <span
-                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold leading-none tracking-[0.04em] tabular-nums ${
+                                    aria-hidden
+                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl motion-safe:transition-colors ${
                                       active
-                                        ? "bg-[#4d6350]/15 text-[#4d6350]"
-                                        : "bg-foreground/[0.07] text-foreground/55"
+                                        ? "bg-[#4d6350]/[0.12] text-[#4d6350]"
+                                        : "bg-foreground/[0.05] text-foreground/55"
                                     }`}
                                   >
-                                    {badge}
+                                    {tab.icon}
                                   </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
+                                  <span className="flex min-w-0 flex-col gap-1">
+                                    <span
+                                      className={`text-xs font-semibold uppercase tracking-[0.08em] ${
+                                        active ? "text-foreground/85" : "text-foreground/70"
+                                      }`}
+                                    >
+                                      {tab.label}
+                                    </span>
+                                    <span className="text-[11px] leading-relaxed text-foreground/50">
+                                      {tab.hint}
+                                    </span>
+                                  </span>
+                                  {badge && (
+                                    <span
+                                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold leading-none tracking-[0.04em] tabular-nums ${
+                                        active
+                                          ? "bg-[#4d6350]/15 text-[#4d6350]"
+                                          : "bg-foreground/[0.07] text-foreground/55"
+                                      }`}
+                                    >
+                                      {badge}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
 
-                        {/* Coluna única — as ferramentas do separador ativo */}
-                        <div className="flex min-w-0 flex-col gap-6">
-                          {/* Keep-alive: os três painéis ficam sempre montados e só
+                          {/* Coluna única — as ferramentas do separador ativo */}
+                          <div className="flex min-w-0 flex-col gap-6">
+                            {/* Keep-alive: os três painéis ficam sempre montados e só
                               escondidos (`hidden`), para nunca se perder trabalho a
                               meio (mensagem por enviar, proposta em edição) ao trocar
                               de separador. */}
-                          <div
-                            role="tabpanel"
-                            id="detail-panel-producao"
-                            aria-labelledby="detail-tab-producao"
-                            tabIndex={0}
-                            hidden={detailTab !== "producao"}
-                            className="flex flex-col gap-6 focus:outline-none"
-                          >
-                            {/* Preparação — the daily driver (tarefas + checklist),
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-producao"
+                              aria-labelledby="detail-tab-producao"
+                              tabIndex={0}
+                              hidden={detailTab !== "producao"}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              {/* Preparação — the daily driver (tarefas + checklist),
                                   always open and first. */}
-                            <p className="bo-eyebrow text-foreground/45">Preparação</p>
+                              <p className="bo-eyebrow text-foreground/45">Preparação</p>
 
-                            {/* Tasks linked to this event */}
-                            <EventTasks
-                              key={`tasks-${selected.id}`}
-                              quote={selected}
-                              userName={userName}
-                            />
+                              {/* Tasks linked to this event */}
+                              <EventTasks
+                                key={`tasks-${selected.id}`}
+                                quote={selected}
+                                userName={userName}
+                              />
 
-                            {/* Production checklist */}
-                            <EventChecklist
-                              key={`cl-${selected.id}`}
-                              quote={selected}
-                              onChange={(checklist) => {
-                                setQuotes((prev) =>
-                                  prev.map((q) => (q.id === selected.id ? { ...q, checklist } : q)),
-                                );
-                                setSelected((prev) => (prev ? { ...prev, checklist } : prev));
-                              }}
-                            />
+                              {/* Production checklist */}
+                              <EventChecklist
+                                key={`cl-${selected.id}`}
+                                quote={selected}
+                                onChange={(checklist) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, checklist } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                                }}
+                              />
 
-                            {/* Material que vai na carrinha */}
-                            <EventMaterial key={`mat-${selected.id}`} quote={selected} />
+                              {/* Material que vai na carrinha */}
+                              <EventMaterial key={`mat-${selected.id}`} quote={selected} />
 
-                            {/* Plano &amp; dia do evento — occasional tools, collapsed so
+                              {/* Plano &amp; dia do evento — occasional tools, collapsed so
                                   the tab opens short. Native <details> keeps every child
                                   mounted (hidden via CSS), so fetch/PATCH lifecycles are
                                   untouched. */}
-                            <details className="group border-t border-foreground/10 pt-4">
-                              <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
-                                <svg
-                                  className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="1.8"
-                                >
-                                  <path
-                                    d="m9 6 6 6-6 6"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                              <details className="group border-t border-foreground/10 pt-4">
+                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                  <svg
+                                    className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                  >
+                                    <path
+                                      d="m9 6 6 6-6 6"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                  Plano de decoração, cronograma e convidados
+                                </summary>
+                                <div className="flex flex-col gap-6 pt-6">
+                                  {/* Decor production plan (sourcing → strike) */}
+                                  <ProductionPlan
+                                    key={`prod-${selected.id}`}
+                                    quote={selected}
+                                    onChange={(productionPlan) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, productionPlan } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) =>
+                                        prev ? { ...prev, productionPlan } : prev,
+                                      );
+                                    }}
                                   />
-                                </svg>
-                                Plano de decoração, cronograma e convidados
-                              </summary>
-                              <div className="flex flex-col gap-6 pt-6">
-                                {/* Decor production plan (sourcing → strike) */}
-                                <ProductionPlan
-                                  key={`prod-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(productionPlan) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, productionPlan } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) =>
-                                      prev ? { ...prev, productionPlan } : prev,
-                                    );
-                                  }}
-                                />
 
-                                {/* Day-of run sheet */}
-                                <EventTimeline
-                                  key={`tl-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(timeline) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, timeline } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                                  }}
-                                />
+                                  {/* Day-of run sheet */}
+                                  <EventTimeline
+                                    key={`tl-${selected.id}`}
+                                    quote={selected}
+                                    onChange={(timeline) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, timeline } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) => (prev ? { ...prev, timeline } : prev));
+                                    }}
+                                  />
 
-                                {/* Guest list / RSVP */}
-                                <GuestList
-                                  key={`guests-${selected.id}`}
-                                  quote={selected}
-                                  onChange={(guestList) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, guestList } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) => (prev ? { ...prev, guestList } : prev));
-                                  }}
-                                />
-                              </div>
-                            </details>
-                          </div>
+                                  {/* Guest list / RSVP */}
+                                  <GuestList
+                                    key={`guests-${selected.id}`}
+                                    quote={selected}
+                                    onChange={(guestList) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, guestList } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) => (prev ? { ...prev, guestList } : prev));
+                                    }}
+                                  />
+                                </div>
+                              </details>
+                            </div>
 
-                          <div
-                            role="tabpanel"
-                            id="detail-panel-financeiro"
-                            aria-labelledby="detail-tab-financeiro"
-                            tabIndex={0}
-                            hidden={detailTab !== "financeiro"}
-                            className="flex flex-col gap-6 focus:outline-none"
-                          >
-                            {/* Cobrança — payments first (the key action), costs
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-financeiro"
+                              aria-labelledby="detail-tab-financeiro"
+                              tabIndex={0}
+                              hidden={detailTab !== "financeiro"}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              {/* Cobrança — payments first (the key action), costs
                                   below. Eyebrow mirrors the other two panels. */}
-                            <p className="bo-eyebrow text-foreground/45">Pagamentos e faturação</p>
+                              <p className="bo-eyebrow text-foreground/45">
+                                Pagamentos e faturação
+                              </p>
 
-                            {/* Payments & invoicing */}
-                            <PaymentsPanel
-                              key={`pay-${selected.id}`}
-                              quote={selected}
-                              showLedger
-                              onChange={(payments) => {
-                                setQuotes((prev) =>
-                                  prev.map((q) => (q.id === selected.id ? { ...q, payments } : q)),
-                                );
-                                setSelected((prev) => (prev ? { ...prev, payments } : prev));
-                              }}
-                              onContractRef={(ref) => {
-                                const contractRef = ref || undefined;
-                                setQuotes((prev) =>
-                                  prev.map((q) =>
-                                    q.id === selected.id ? { ...q, contractRef } : q,
-                                  ),
-                                );
-                                setSelected((prev) => (prev ? { ...prev, contractRef } : prev));
-                              }}
-                            />
+                              {/* Payments & invoicing */}
+                              <PaymentsPanel
+                                key={`pay-${selected.id}`}
+                                quote={selected}
+                                showLedger
+                                onChange={(payments) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, payments } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, payments } : prev));
+                                }}
+                                onContractRef={(ref) => {
+                                  const contractRef = ref || undefined;
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, contractRef } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, contractRef } : prev));
+                                }}
+                              />
 
-                            {/* Suppliers booked for this event + budget vs actual cost */}
-                            <EventCosts
-                              key={`costs-${selected.id}`}
-                              quote={selected}
-                              onChange={(eventSuppliers) => {
-                                setQuotes((prev) =>
-                                  prev.map((q) =>
-                                    q.id === selected.id ? { ...q, eventSuppliers } : q,
-                                  ),
-                                );
-                                setSelected((prev) => (prev ? { ...prev, eventSuppliers } : prev));
-                              }}
-                            />
-                          </div>
+                              {/* Suppliers booked for this event + budget vs actual cost */}
+                              <EventCosts
+                                key={`costs-${selected.id}`}
+                                quote={selected}
+                                onChange={(eventSuppliers) => {
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, eventSuppliers } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) =>
+                                    prev ? { ...prev, eventSuppliers } : prev,
+                                  );
+                                }}
+                              />
+                            </div>
 
-                          <div
-                            role="tabpanel"
-                            id="detail-panel-comunicacao"
-                            aria-labelledby="detail-tab-comunicacao"
-                            tabIndex={0}
-                            hidden={detailTab !== "comunicacao"}
-                            className="flex flex-col gap-6 focus:outline-none"
-                          >
-                            {/* Step 1 — the proposal. One tool at a time: the detailed
+                            <div
+                              role="tabpanel"
+                              id="detail-panel-comunicacao"
+                              aria-labelledby="detail-tab-comunicacao"
+                              tabIndex={0}
+                              hidden={detailTab !== "comunicacao"}
+                              className="flex flex-col gap-6 focus:outline-none"
+                            >
+                              {/* Step 1 — the proposal. One tool at a time: the detailed
                                   Studio by default, or the quick price-table Builder —
                                   never both stacked on screen. The mode is an explicit,
                                   calm segmented choice so a newcomer sees both exist. */}
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
-                              <Segmented
-                                ariaLabel="Tipo de proposta"
-                                size="sm"
-                                value={showBuilder ? "rapida" : "detalhada"}
-                                onChange={(v) => setShowBuilder(v === "rapida")}
-                                options={[
-                                  { value: "detalhada", label: "Detalhada" },
-                                  { value: "rapida", label: "Rápida" },
-                                ]}
-                              />
-                            </div>
-                            <p className="-mt-3 text-xs leading-relaxed text-foreground/45">
-                              {showBuilder
-                                ? "Rápida — uma tabela de preços simples, sem imagens nem PDF."
-                                : "Detalhada — proposta completa em PDF, com capa, serviços e imagens."}
-                            </p>
-                            {!showBuilder ? (
-                              <>
-                                <ProposalStudio
-                                  key={`studio-${selected.id}`}
-                                  quote={selected}
-                                  quotes={activeQuotes}
-                                  // O valor é um só: o estúdio grava-o no
-                                  // pedido, e o "Preço final" aqui ao lado tem
-                                  // de mostrar o mesmo número sem ser preciso
-                                  // recarregar nada.
-                                  onQuoteUpdated={(q) => {
-                                    setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
-                                    setSelected((prev) => (prev?.id === q.id ? q : prev));
-                                    // `textoDoPreco` e não a verdade do valor:
-                                    // um total de ZERO é um preço escrito, e
-                                    // lido como «sem preço» deixava o campo
-                                    // vazio sobre um pedido que tem 0 — a barra
-                                    // a pedir para gravar o que o estúdio
-                                    // acabou de gravar.
-                                    setEditPrice(textoDoPreco(q));
-                                  }}
-                                  onSent={() => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id ? { ...q, status: "cotado" } : q,
-                                      ),
-                                    );
-                                    setSelected((prev) =>
-                                      prev ? { ...prev, status: "cotado" } : prev,
-                                    );
-                                    setEditStatus("cotado");
-                                    appendActivity(selected.id, [
-                                      {
-                                        id: randomId(),
-                                        at: new Date().toISOString(),
-                                        kind: "proposal_sent",
-                                        actor: userName,
-                                        summary: "Proposta enviada ao cliente (Studio)",
-                                      },
-                                    ]);
-                                  }}
-                                />
-                              </>
-                            ) : (
-                              <>
-                                <ProposalBuilder
-                                  // A CHAVE, como todos os outros painéis do
-                                  // detalhe (`pay-`, `costs-`, `studio-`,
-                                  // `guests-`). Sem ela este era o único que
-                                  // NÃO remontava ao trocar de pedido: ficava
-                                  // com as linhas e os preços do cliente
-                                  // anterior e, 800 ms depois, a gravação
-                                  // automática escrevia-os no rascunho do
-                                  // cliente novo — que nunca os teve.
-                                  key={`builder-${selected.id}`}
-                                  quote={selected}
-                                  onSent={(total) => {
-                                    setQuotes((prev) =>
-                                      prev.map((q) =>
-                                        q.id === selected.id
-                                          ? { ...q, status: "cotado", quotedPrice: total }
-                                          : q,
-                                      ),
-                                    );
-                                    setSelected((prev) =>
-                                      prev
-                                        ? { ...prev, status: "cotado", quotedPrice: total }
-                                        : prev,
-                                    );
-                                    setEditStatus("cotado");
-                                    appendActivity(selected.id, [
-                                      {
-                                        id: randomId(),
-                                        at: new Date().toISOString(),
-                                        kind: "proposal_sent",
-                                        actor: userName,
-                                        summary: `Proposta enviada — ${eur(total)}`,
-                                      },
-                                    ]);
-                                  }}
-                                />
-                              </>
-                            )}
-
-                            {/* Step 2 — talk to the client. */}
-                            <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
-                              2 · Falar com o cliente
-                            </p>
-                            <ClientMessenger
-                              key={selected.id}
-                              quote={selected}
-                              onSent={(messages, envio) => {
-                                const prev_count = selected.messages?.length ?? 0;
-                                setQuotes((prev) =>
-                                  prev.map((q) => (q.id === selected.id ? { ...q, messages } : q)),
-                                );
-                                setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                                if (messages.length > prev_count) {
-                                  appendActivity(selected.id, [
-                                    {
-                                      id: randomId(),
-                                      at: new Date().toISOString(),
-                                      kind: "message_sent",
-                                      actor: userName,
-                                      /**
-                                       * O QUE ACONTECEU, E NÃO O QUE SE QUIS FAZER.
-                                       *
-                                       * Um pedido que entrou por telefonema não tem
-                                       * email. A rota grava a mensagem à mesma e
-                                       * responde que o email NÃO saiu; o mensageiro
-                                       * diz-o a vermelho, mas o histórico ficava com
-                                       * «Mensagem enviada ao cliente» — e o histórico
-                                       * é o que se lê meses depois para saber o que se
-                                       * disse a quem. Mesma frase que a zona de
-                                       * comunicações do dossiê já usa.
-                                       */
-                                      summary: resumoDoEnvio(envio),
-                                    },
-                                  ]);
-                                }
-                              }}
-                            />
-
-                            {/* Activity history — de-emphasised, collapsed by default. */}
-                            <details className="group border-t border-foreground/10 pt-4">
-                              <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
-                                <svg
-                                  className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="1.8"
-                                >
-                                  <path
-                                    d="m9 6 6 6-6 6"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                                Histórico de atividade
-                              </summary>
-                              <div className="pt-6">
-                                <ActivityLog
-                                  quote={selected}
-                                  actor={userName}
-                                  onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
+                                <Segmented
+                                  ariaLabel="Tipo de proposta"
+                                  size="sm"
+                                  value={showBuilder ? "rapida" : "detalhada"}
+                                  onChange={(v) => setShowBuilder(v === "rapida")}
+                                  options={[
+                                    { value: "detalhada", label: "Detalhada" },
+                                    { value: "rapida", label: "Rápida" },
+                                  ]}
                                 />
                               </div>
-                            </details>
+                              <p className="-mt-3 text-xs leading-relaxed text-foreground/45">
+                                {showBuilder
+                                  ? "Rápida — uma tabela de preços simples, sem imagens nem PDF."
+                                  : "Detalhada — proposta completa em PDF, com capa, serviços e imagens."}
+                              </p>
+                              {!showBuilder ? (
+                                <>
+                                  <ProposalStudio
+                                    key={`studio-${selected.id}`}
+                                    quote={selected}
+                                    quotes={activeQuotes}
+                                    // O valor é um só: o estúdio grava-o no
+                                    // pedido, e o "Preço final" aqui ao lado tem
+                                    // de mostrar o mesmo número sem ser preciso
+                                    // recarregar nada.
+                                    onQuoteUpdated={(q) => {
+                                      setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
+                                      setSelected((prev) => (prev?.id === q.id ? q : prev));
+                                      // `textoDoPreco` e não a verdade do valor:
+                                      // um total de ZERO é um preço escrito, e
+                                      // lido como «sem preço» deixava o campo
+                                      // vazio sobre um pedido que tem 0 — a barra
+                                      // a pedir para gravar o que o estúdio
+                                      // acabou de gravar.
+                                      setEditPrice(textoDoPreco(q));
+                                    }}
+                                    onSent={() => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) =>
+                                        prev ? { ...prev, status: "cotado" } : prev,
+                                      );
+                                      setEditStatus("cotado");
+                                      appendActivity(selected.id, [
+                                        {
+                                          id: randomId(),
+                                          at: new Date().toISOString(),
+                                          kind: "proposal_sent",
+                                          actor: userName,
+                                          summary: "Proposta enviada ao cliente (Studio)",
+                                        },
+                                      ]);
+                                    }}
+                                  />
+                                </>
+                              ) : (
+                                <>
+                                  <ProposalBuilder
+                                    // A CHAVE, como todos os outros painéis do
+                                    // detalhe (`pay-`, `costs-`, `studio-`,
+                                    // `guests-`). Sem ela este era o único que
+                                    // NÃO remontava ao trocar de pedido: ficava
+                                    // com as linhas e os preços do cliente
+                                    // anterior e, 800 ms depois, a gravação
+                                    // automática escrevia-os no rascunho do
+                                    // cliente novo — que nunca os teve.
+                                    key={`builder-${selected.id}`}
+                                    quote={selected}
+                                    onSent={(total) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id
+                                            ? { ...q, status: "cotado", quotedPrice: total }
+                                            : q,
+                                        ),
+                                      );
+                                      setSelected((prev) =>
+                                        prev
+                                          ? { ...prev, status: "cotado", quotedPrice: total }
+                                          : prev,
+                                      );
+                                      setEditStatus("cotado");
+                                      appendActivity(selected.id, [
+                                        {
+                                          id: randomId(),
+                                          at: new Date().toISOString(),
+                                          kind: "proposal_sent",
+                                          actor: userName,
+                                          summary: `Proposta enviada — ${eur(total)}`,
+                                        },
+                                      ]);
+                                    }}
+                                  />
+                                </>
+                              )}
+
+                              {/* Step 2 — talk to the client. */}
+                              <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
+                                2 · Falar com o cliente
+                              </p>
+                              <ClientMessenger
+                                key={selected.id}
+                                quote={selected}
+                                onSent={(messages, envio) => {
+                                  const prev_count = selected.messages?.length ?? 0;
+                                  setQuotes((prev) =>
+                                    prev.map((q) =>
+                                      q.id === selected.id ? { ...q, messages } : q,
+                                    ),
+                                  );
+                                  setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                                  if (messages.length > prev_count) {
+                                    appendActivity(selected.id, [
+                                      {
+                                        id: randomId(),
+                                        at: new Date().toISOString(),
+                                        kind: "message_sent",
+                                        actor: userName,
+                                        /**
+                                         * O QUE ACONTECEU, E NÃO O QUE SE QUIS FAZER.
+                                         *
+                                         * Um pedido que entrou por telefonema não tem
+                                         * email. A rota grava a mensagem à mesma e
+                                         * responde que o email NÃO saiu; o mensageiro
+                                         * diz-o a vermelho, mas o histórico ficava com
+                                         * «Mensagem enviada ao cliente» — e o histórico
+                                         * é o que se lê meses depois para saber o que se
+                                         * disse a quem. Mesma frase que a zona de
+                                         * comunicações do dossiê já usa.
+                                         */
+                                        summary: resumoDoEnvio(envio),
+                                      },
+                                    ]);
+                                  }
+                                }}
+                              />
+
+                              {/* Activity history — de-emphasised, collapsed by default. */}
+                              <details className="group border-t border-foreground/10 pt-4">
+                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                  <svg
+                                    className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                  >
+                                    <path
+                                      d="m9 6 6 6-6 6"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                  Histórico de atividade
+                                </summary>
+                                <div className="pt-6">
+                                  <ActivityLog
+                                    quote={selected}
+                                    actor={userName}
+                                    onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                                  />
+                                </div>
+                              </details>
+                            </div>
                           </div>
                         </div>
                       </div>
-
-                      {/* ── Barra de gravação fixa ──────────────────────────
-                          Aparece seja qual for a secção onde ela está — nunca
-                          mais um "guardar" escondido — e agora também DEPOIS de
-                          gravar, porque «guardado às 14:32» é a informação que
-                          dispensa a pergunta «isto ficou guardado?».
-
-                          O botão não desaparece: ela pediu «um botão para
-                          guardar ou então que guarde automaticamente», e ter os
-                          dois é melhor do que ter um — o automático protege, o
-                          botão dá sossego. Mas tem de dizer a verdade: se já
-                          está guardado, é isso que ele diz. */}
-                      {(isDirty || gravacao.estado) &&
-                        (() => {
-                          const alarme = !!gravacao.naoChegouAoServidor;
-                          const porque = gravacao.naoChegouAoServidor?.porque;
-                          const rotuloDoBotao = saving
-                            ? "A guardar…"
-                            : alarme
-                              ? "Tentar de novo"
-                              : alteracoesPorConfirmar
-                                ? "Guardar alterações"
-                                : "Guardado";
-                          const haQueFazer = alteracoesPorConfirmar || alarme || gravacao.porGravar;
-                          return (
-                            <div className="sticky bottom-0 z-10 -mx-5 -mb-6 border-t border-foreground/[0.08] bg-white px-5 py-3 sm:-mx-7 sm:-mb-8 sm:px-7">
-                              <div className="flex items-center justify-between gap-3">
-                                <p
-                                  id="estado-da-gravacao-do-pedido"
-                                  role="status"
-                                  // Um aviso que não chegou ao servidor tem de
-                                  // ser anunciado, não descoberto.
-                                  aria-live={alarme ? "assertive" : "polite"}
-                                  className={
-                                    alarme
-                                      ? "flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-[#a03123]"
-                                      : "flex items-center gap-1.5 text-[11px] tracking-wide text-gold-text"
-                                  }
-                                >
-                                  {alarme ? (
-                                    <>
-                                      <span aria-hidden>⚠</span>
-                                      {gravacao.texto?.longo}
-                                      {porque ? ` ${porque}` : ""}
-                                    </>
-                                  ) : (
-                                    <>
-                                      {alteracoesPorConfirmar && (
-                                        <>
-                                          <span className="h-1.5 w-1.5 rounded-full bg-gold/80" />
-                                          Alterações por guardar
-                                        </>
-                                      )}
-                                      {gravacao.texto && (
-                                        <span
-                                          className={
-                                            alteracoesPorConfirmar ? "text-foreground/45" : ""
-                                          }
-                                        >
-                                          {alteracoesPorConfirmar ? "· " : ""}
-                                          {gravacao.texto.longo}
-                                        </span>
-                                      )}
-                                    </>
-                                  )}
-                                </p>
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  onClick={guardarAgora}
-                                  loading={saving}
-                                  disabled={!haQueFazer}
-                                >
-                                  {rotuloDoBotao}
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })()}
                     </div>
+
+                    {/* ── O PÉ DO PAINEL: A BARRA DE GRAVAÇÃO ─────────────
+                        Aparece seja qual for a secção onde ela está — nunca
+                        mais um "guardar" escondido — e agora também DEPOIS de
+                        gravar, porque «guardado às 14:32» é a informação que
+                        dispensa a pergunta «isto ficou guardado?».
+
+                        O botão não desaparece: ela pediu «um botão para
+                        guardar ou então que guarde automaticamente», e ter os
+                        dois é melhor do que ter um — o automático protege, o
+                        botão dá sossego. Mas tem de dizer a verdade: se já
+                        está guardado, é isso que ele diz.
+
+                        E deixou de ser `sticky` porque deixou de precisar: é o
+                        PÉ da moldura, fora da caixa que rola, portanto está no
+                        fundo do painel sempre — em vez de estar no fundo do que
+                        rola, que é onde ela não estava a ver. */}
+                    {(isDirty || gravacao.estado) &&
+                      (() => {
+                        const alarme = !!gravacao.naoChegouAoServidor;
+                        const porque = gravacao.naoChegouAoServidor?.porque;
+                        const rotuloDoBotao = saving
+                          ? "A guardar…"
+                          : alarme
+                            ? "Tentar de novo"
+                            : alteracoesPorConfirmar
+                              ? "Guardar alterações"
+                              : "Guardado";
+                        const haQueFazer = alteracoesPorConfirmar || alarme || gravacao.porGravar;
+                        return (
+                          <div className="shrink-0 border-t border-foreground/[0.08] bg-white">
+                            {/* A mesma medida e o mesmo respiro do corpo
+                                  (`max-w-3xl px-5 sm:px-7`), para o botão ficar
+                                  alinhado com o que está por cima dele. */}
+                            <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-5 py-3 sm:px-7">
+                              <p
+                                id="estado-da-gravacao-do-pedido"
+                                role="status"
+                                // Um aviso que não chegou ao servidor tem de
+                                // ser anunciado, não descoberto.
+                                aria-live={alarme ? "assertive" : "polite"}
+                                className={
+                                  alarme
+                                    ? "flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-[#a03123]"
+                                    : "flex items-center gap-1.5 text-[11px] tracking-wide text-gold-text"
+                                }
+                              >
+                                {alarme ? (
+                                  <>
+                                    <span aria-hidden>⚠</span>
+                                    {gravacao.texto?.longo}
+                                    {porque ? ` ${porque}` : ""}
+                                  </>
+                                ) : (
+                                  <>
+                                    {alteracoesPorConfirmar && (
+                                      <>
+                                        <span className="h-1.5 w-1.5 rounded-full bg-gold/80" />
+                                        Alterações por guardar
+                                      </>
+                                    )}
+                                    {gravacao.texto && (
+                                      <span
+                                        className={
+                                          alteracoesPorConfirmar ? "text-foreground/45" : ""
+                                        }
+                                      >
+                                        {alteracoesPorConfirmar ? "· " : ""}
+                                        {gravacao.texto.longo}
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </p>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={guardarAgora}
+                                loading={saving}
+                                disabled={!haQueFazer}
+                              >
+                                {rotuloDoBotao}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                   </div>
                 </>
               ) : null}

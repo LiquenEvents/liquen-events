@@ -109,7 +109,18 @@ const TaskRow = memo(function TaskRow({
       {!t.done && (
         <button
           onClick={() => onEdit(t)}
-          className="text-foreground/20 hover:text-[#4d6350] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
+          /* ── UM ALVO DE 13 PX AO LADO DE «ELIMINAR» ──────────────────────
+             MEDIDO num 390×844 com `(pointer: coarse)`: este botão dava
+             13×13 px e o de eliminar 14×14, a 12 px um do outro. O mínimo da
+             casa é 44 (`.alvo-toque` em globals.css, e é lá que ele existe —
+             só no dedo, para o portátil manter a densidade que tem); o da
+             WCAG 2.2 AA é 24, e com rato nem isso se cumpria.
+
+             `alvo-toque` resolve o dedo; o `p-1.5` resolve o rato — leva o
+             desenho de 13 para 25 px SEM crescer a linha (a coluna do título
+             já mede 34) e sem margens negativas, que era o que voltaria a
+             encostar os dois um ao outro. O ícone continua com 13 px. */
+          className="alvo-toque p-1.5 text-foreground/20 hover:text-[#4d6350] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
           aria-label="Editar tarefa"
         >
           <svg
@@ -128,7 +139,9 @@ const TaskRow = memo(function TaskRow({
       )}
       <button
         onClick={() => onRemove(t.id)}
-        className="text-foreground/20 hover:text-[#b5654a] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
+        // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
+        // este é o que apaga, portanto é o que mais custa acertar ao lado.
+        className="alvo-toque p-1.5 text-foreground/20 hover:text-[#b5654a] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
         aria-label="Eliminar"
       >
         <svg

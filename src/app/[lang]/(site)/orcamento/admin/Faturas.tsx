@@ -612,7 +612,24 @@ export default function Faturas({ quotes }: Props) {
     <div>
       {/* Totals + primary action */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="grid flex-1 grid-cols-3 gap-3 min-w-[280px]">
+        {/* ── A TIRA TEM DE CABER NO TELEMÓVEL ────────────────────────────
+            Três colunas num ecrã de 390 px dão 77 px de caixa a cada valor. Um
+            total acima de 100 000 € pede 118: MEDIDO, `scrollWidth 118` para
+            `clientWidth 77`, 41 px cortados — em «Emitido» lia-se «272 375,00»
+            com o «€» decepado, e em «Em dívida» era a margem que o comia.
+
+            E o valor não encolhe nem parte: o formato de dinheiro da casa
+            (`src/lib/money.ts`, decisão de produto) usa espaços FINOS E DUROS
+            entre os milhares e antes do símbolo, e um espaço duro não é sítio
+            para partir a linha. Portanto o número transbordava a caixa, e com
+            ele a página: `document.scrollWidth` ia a 397 num ecrã de 390 e a
+            barra de navegação de baixo passava a desenhar-se com 397.
+
+            A saída é dar-lhe largura, não tirar-lhe algarismos: duas colunas no
+            telemóvel (139 px de caixa) e o «Em dívida» — o número que a faz ir
+            atrás de dinheiro — na sua própria linha, com a tira inteira. As
+            três colunas voltam a partir de `sm`, onde sempre couberam. */}
+        <div className="grid flex-1 grid-cols-2 gap-3 min-w-[280px] sm:grid-cols-3">
           {[
             { l: "Emitido", v: eur2(totals.emitido), c: "text-foreground/80" },
             { l: "Pago", v: eur2(totals.pago), c: "text-[#4d6350]" },
@@ -620,9 +637,14 @@ export default function Faturas({ quotes }: Props) {
               l: "Em dívida",
               v: eur2(totals.divida),
               c: totals.divida > 0 ? "text-[#8a2a22]" : "text-foreground/40",
+              largo: true,
             },
           ].map((k) => (
-            <Card key={k.l} padding="sm">
+            <Card
+              key={k.l}
+              padding="sm"
+              className={k.largo ? "col-span-2 sm:col-span-1" : undefined}
+            >
               <p className={`text-lg font-semibold tabular-nums ${k.c}`}>{k.v}</p>
               <p className="bo-eyebrow mt-1.5">{k.l}</p>
             </Card>
