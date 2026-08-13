@@ -44,15 +44,20 @@ export async function generateMetadata({
   const estilo = getEstilo(slug);
   if (!estilo) return { title: locale === "en" ? "Page not found" : "Página não encontrada" };
   const c = estilo[locale];
-  return pageMetadata({
+  const meta = pageMetadata({
     locale,
     title: c.metaTitle,
+    ogTitle: c.metaTitle,
     description: c.metaDescription,
     path: `/casamentos/estilo/${estilo.slug}`,
     image: estilo.hero,
     keywords: [c.h1, `${c.nome} wedding Portugal`],
     ogLocale: getDictionary(locale).meta.ogLocale,
   });
+  // Título absoluto e `ogTitle` explícito: o `metaTitle` do catálogo já traz a
+  // marca, e sem isto ela saía duas vezes — no separador e no cartão social.
+  // A medição e o porquê estão em ../../[polo]/page.tsx.
+  return { ...meta, title: { absolute: c.metaTitle } };
 }
 
 export default async function EstiloPage({

@@ -62,9 +62,14 @@ export async function generateMetadata({
   const polo = getPolo(slug);
   if (!polo) return { title: locale === "en" ? "Page not found" : "Página não encontrada" };
   const c = conteudoPolo(polo, locale);
-  return pageMetadata({
+  const meta = pageMetadata({
     locale,
     title: c.metaTitle,
+    // O `metaTitle` do catálogo JÁ TRAZ A MARCA — é ele que se quer ver, tal e
+    // qual, no resultado da pesquisa. Sem este `ogTitle`, o `pageMetadata`
+    // acrescentava-lhe " | Líquen Events" por sua conta e o cartão social saía
+    // com a marca escrita duas vezes.
+    ogTitle: c.metaTitle,
     description: c.metaDescription,
     path: caminhoPolo(polo.slug),
     image: polo.hero,
@@ -74,6 +79,21 @@ export async function generateMetadata({
     ],
     ogLocale: getDictionary(locale).meta.ogLocale,
   });
+  /**
+   * `absolute` — o título já está pronto, não lhe apliquem o modelo.
+   *
+   * MEDIDO no HTML construído antes disto:
+   *   <title>Casamentos em Herdades do Alentejo | Líquen Events | Líquen Events</title>
+   * O layout de raiz declara `template: "%s | Líquen Events"` e aplica-o a
+   * qualquer título entregue como texto simples — incluindo a um que já tinha
+   * a marca lá dentro. São 17 páginas deste ramo, vezes dois idiomas, e são
+   * precisamente as que recebem tráfego PAGO: a Google corta o título aos
+   * ~580 px e a repetição gastava 17 caracteres do que decide o clique.
+   *
+   * O mesmo em /casamentos/estilo/[estilo] e /casamentos/destination; prende-o
+   * o teste `casamentos/titulos.test.ts`.
+   */
+  return { ...meta, title: { absolute: c.metaTitle } };
 }
 
 export default async function PoloPage({

@@ -75,7 +75,7 @@ import { heroImageLoader, heroAvifSrcSet } from "@/lib/hero-image-loader";
  * ela vive no `<img>` e o `<img>` nem chegaria a ser escolhido.
  */
 export default function HeroImage(props: Omit<SafeImageProps, "initialLoader">) {
-  const { priority, sizes, src, ...resto } = props;
+  const { priority, sizes, src, fill, ...resto } = props;
   const avif = typeof src === "string" ? heroAvifSrcSet(src) : null;
 
   // Declarado durante o render, que é como esta API se usa. O `href` é o maior
@@ -99,6 +99,7 @@ export default function HeroImage(props: Omit<SafeImageProps, "initialLoader">) 
       initialLoader={heroImageLoader}
       src={src}
       sizes={sizes}
+      fill={fill}
       /**
        * SÓ O HERÓI DE PRIORIDADE TROCA DE MECANISMO.
        *
@@ -129,8 +130,28 @@ export default function HeroImage(props: Omit<SafeImageProps, "initialLoader">) 
 
   if (!avif) return imagem;
 
+  /**
+   * ── O `<picture>` TEM DE ESTAR POSICIONADO QUANDO A IMAGEM É `fill` ──────
+   *
+   * Uma imagem `fill` é `position: absolute; inset: 0`, logo cola-se ao
+   * antepassado POSICIONADO mais próximo. Este `<picture>` — que só existe por
+   * causa do AVIF — entrava no meio em `position: static` e passava esse papel
+   * para cima, para lá de si. O next/image dá pelo desvio e escreve-o na
+   * consola em todas as páginas com capa: «has "fill" and parent element with
+   * invalid "position". Provided "static"».
+   *
+   * Hoje as dez capas do sítio vivem todas dentro de uma caixa `absolute
+   * inset-0`, portanto a caixa a que a fotografia se agarrava media o mesmo
+   * que a certa e ninguém via nada — mas por acidente, não por desenho. Com
+   * `absolute inset-0` aqui, o `<picture>` volta a ser a caixa da imagem
+   * (mesmos pixels: cobre o pai de bordo a bordo) e sai do fluxo, onde, sendo
+   * um elemento em linha, ainda gerava uma linha de texto vazia.
+   *
+   * Só com `fill`: sem ele a imagem tem largura e altura próprias e ocupa
+   * lugar no fluxo — arrancá-la de lá encolheria a caixa que a segura.
+   */
   return (
-    <picture>
+    <picture className={fill ? "absolute inset-0" : undefined}>
       <source type="image/avif" srcSet={avif} sizes={sizes} />
       {imagem}
     </picture>

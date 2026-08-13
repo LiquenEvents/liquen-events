@@ -133,9 +133,10 @@ export async function generateMetadata({
   const { lang } = await params;
   const locale = normalizeLocale(lang);
   const c = CONTEUDO[locale];
-  return pageMetadata({
+  const meta = pageMetadata({
     locale,
     title: c.metaTitle,
+    ogTitle: c.metaTitle,
     description: c.metaDescription,
     path: CAMINHO,
     image: HERO,
@@ -148,6 +149,10 @@ export async function generateMetadata({
     ],
     ogLocale: getDictionary(locale).meta.ogLocale,
   });
+  // Título absoluto e `ogTitle` explícito: o `metaTitle` daqui já traz a marca,
+  // e sem isto ela saía duas vezes. A medição e o porquê estão em
+  // ../[polo]/page.tsx.
+  return { ...meta, title: { absolute: c.metaTitle } };
 }
 
 export default async function DestinationPage({ params }: { params: Promise<{ lang: string }> }) {
