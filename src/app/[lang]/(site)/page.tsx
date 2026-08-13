@@ -94,19 +94,35 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
               <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2">
                 {/* Primary hero actions. Small 9px label on phones (the py-2
                     still keeps a ≥40px tap target and the underline keeps the
-                    minimal look); 10px from sm up. */}
+                    minimal look); 10px from sm up.
+                    ── O comentário acima estava optimista, e foi MEDIDO ──
+                    A 375 px com toque emulado davam 140×31 e 101×31 px: 31, não
+                    40. São as duas primeiras acções do sítio, no primeiro ecrã.
+
+                    `alvo-toque` no link e o filete num `<span>` por dentro. Os
+                    dois no mesmo elemento não podiam ficar: o `border-b` desenha
+                    no fundo da CAIXA, portanto crescer a caixa para 44 px
+                    afastava o traço do texto uns 7 px e deixava-o a pairar por
+                    baixo, como uma risca solta em vez de um sublinhado. Com o
+                    embrulho, a caixa cresce e o filete continua colado à
+                    palavra. O `group-hover` substitui o `hover` porque quem
+                    recebe o rato agora é o link, não o span. */}
                 <TrackedLink
                   href={localizeHref("/orcamento", locale)}
                   trackProps={{ source: "hero" }}
-                  className="inline-flex items-center gap-1.5 text-white/85 text-[9px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
+                  className="alvo-toque group inline-flex items-center text-white/85 text-[9px] sm:text-[10px] tracking-[0.28em] uppercase py-2 sm:pb-1 sm:py-0 transition-colors hover:text-white"
                 >
-                  {t.common.pedirOrcamento} <span aria-hidden>→</span>
+                  <span className="inline-flex items-center gap-1.5 border-b border-white/30 transition-colors group-hover:border-white">
+                    {t.common.pedirOrcamento} <span aria-hidden>→</span>
+                  </span>
                 </TrackedLink>
                 <Link
                   href={localizeHref("/galeria", locale)}
-                  className="inline-flex items-center gap-1.5 text-white/85 text-[9px] sm:text-[10px] tracking-[0.28em] uppercase border-b border-white/30 py-2 sm:pb-1 sm:py-0 transition-colors hover:border-white hover:text-white"
+                  className="alvo-toque group inline-flex items-center text-white/85 text-[9px] sm:text-[10px] tracking-[0.28em] uppercase py-2 sm:pb-1 sm:py-0 transition-colors hover:text-white"
                 >
-                  {t.common.verGaleria} <span aria-hidden>→</span>
+                  <span className="inline-flex items-center gap-1.5 border-b border-white/30 transition-colors group-hover:border-white">
+                    {t.common.verGaleria} <span aria-hidden>→</span>
+                  </span>
                 </Link>
               </div>
             </div>
@@ -191,9 +207,13 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
                 >
                   {s.title}
                 </h2>
+                {/* MEDIDO a 375 px com toque emulado: 154×37 px. Aqui o
+                    `alvo-toque` cresce a moldura desenhada, e é o que se quer —
+                    um botão de contorno deve ter a altura do alvo, senão o
+                    traço promete um alvo maior do que o que existe. */}
                 <Link
                   href={localizeHref(s.href, locale)}
-                  className="mt-6 sm:mt-8 inline-flex items-center gap-2 sm:gap-3 border border-white/70 text-white text-[10px] sm:text-[11px] tracking-[0.18em] sm:tracking-[0.3em] uppercase px-5 py-2.5 sm:px-8 sm:py-3.5 hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+                  className="alvo-toque mt-6 sm:mt-8 inline-flex items-center gap-2 sm:gap-3 border border-white/70 text-white text-[10px] sm:text-[11px] tracking-[0.18em] sm:tracking-[0.3em] uppercase px-5 py-2.5 sm:px-8 sm:py-3.5 hover:bg-white hover:text-[#0c0e0b] hover:border-white transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 >
                   {t.common.verServicos}
                   <span aria-hidden>→</span>

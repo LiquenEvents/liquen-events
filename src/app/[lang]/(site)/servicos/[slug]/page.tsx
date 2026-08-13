@@ -159,11 +159,16 @@ export default async function ServiceDetailPage({
             aria-label={t.nav.breadcrumb}
             className="text-[11px] tracking-[0.2em] uppercase text-cream/60 mb-8"
           >
+            {/* `alvo-toque` nos dois degraus clicáveis: mediam 47×14 e 72×14 px
+                a 375 px com toque emulado — 14 px de altura, menos de um terço
+                do mínimo, e são a única forma de subir um nível nesta página
+                sem o botão "voltar" do browser. O último degrau não leva nada:
+                é a página actual, não é um link. */}
             <ol className="flex flex-wrap items-center gap-2">
               <li>
                 <Link
                   href={localizeHref("/", locale)}
-                  className="hover:text-cream transition-colors"
+                  className="alvo-toque hover:text-cream transition-colors"
                 >
                   {t.nav.inicio}
                 </Link>
@@ -174,7 +179,7 @@ export default async function ServiceDetailPage({
               <li>
                 <Link
                   href={localizeHref("/servicos", locale)}
-                  className="hover:text-cream transition-colors"
+                  className="alvo-toque hover:text-cream transition-colors"
                 >
                   {t.nav.servicos}
                 </Link>

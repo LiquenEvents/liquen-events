@@ -196,7 +196,12 @@ const MobileMenu = memo(function MobileMenu({
                 prefetch
                 transitionTypes={navTypes(link.href)}
                 aria-current={active ? "page" : undefined}
-                className={`group flex items-center justify-between py-2.5 sm:py-3 transition-colors duration-300 ${
+                // MEDIDO com o menu ABERTO a 375 px e toque emulado: 311×43 px.
+                // Falha por um pixel — e é o menu inteiro, cinco itens, a única
+                // navegação que existe no telemóvel. Um varrimento que não abre
+                // o menu diz zero achados sobre ele com toda a confiança do
+                // mundo; este só apareceu ao abri-lo de propósito.
+                className={`alvo-toque group flex items-center justify-between py-2.5 sm:py-3 transition-colors duration-300 ${
                   active ? "text-white" : "text-white/55 hover:text-white"
                 }`}
                 style={reveal(80 + i * 60)}
@@ -294,7 +299,8 @@ const MobileMenu = memo(function MobileMenu({
         <Link
           href={localizeHref("/orcamento", locale)}
           onClick={() => track("CTAClick", { source: "nav-mobile" })}
-          className="group flex items-center justify-between w-full border border-white/25 px-5 py-2.5 text-white text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-white hover:text-[#0c0e0b] hover:border-white"
+          // 311×37 px medidos com o menu aberto — a acção principal do menu.
+          className="alvo-toque group flex items-center justify-between w-full border border-white/25 px-5 py-2.5 text-white text-[10px] tracking-[0.28em] uppercase transition-colors duration-300 hover:bg-white hover:text-[#0c0e0b] hover:border-white"
         >
           <span>{t.nav.pedirOrcamento}</span>
           <span
@@ -526,7 +532,18 @@ export default function Navbar() {
                 prefetch
                 transitionTypes={navTypes(link.href)}
                 aria-current={isActive(link.href) ? "page" : undefined}
-                className={`link-line py-1.5 -my-1.5 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
+                // ── A BARRA DE `lg` PARA CIMA TAMBÉM SE TOCA ────────────────
+                // Estes quatro links, o "Contacto" e a CTA ao lado só existem a
+                // partir de 1024 px — largura a que ninguém pensa em "telemóvel"
+                // e onde, no entanto, há aparelhos de toque: um iPad Pro
+                // deitado, um portátil com ecrã táctil. MEDIDO a 1440×900 com
+                // toque emulado: 47×29, 72×29, 61×29, 70×29 px, "Contacto" a
+                // 121×35 e a CTA a 197×32. Nenhum aparece numa medição a 375 px,
+                // porque a essa largura estão em `display: none`.
+                //
+                // `alvo-toque` não lhes toca com rato — a densidade calma da
+                // barra no portátil fica exactamente como está.
+                className={`alvo-toque link-line py-1.5 -my-1.5 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300 ${
                   light
                     ? isActive(link.href)
                       ? "text-white nav-active-light"
@@ -550,7 +567,7 @@ export default function Navbar() {
             <Link
               href={localizeHref("/contacto", locale)}
               transitionTypes={navTypes("/contacto")}
-              className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 transition-all duration-300 ${
+              className={`alvo-toque text-[11px] tracking-[0.2em] uppercase border px-5 py-2 transition-all duration-300 ${
                 light
                   ? "border-white/50 text-white/90 hover:border-white/80 hover:bg-white/10"
                   : "border-moss/60 text-moss hover:border-moss/80 hover:bg-moss/10"
@@ -568,7 +585,7 @@ export default function Navbar() {
               <Link
                 href={localizeHref("/orcamento", locale)}
                 onClick={() => track("CTAClick", { source: "nav" })}
-                className={`text-[11px] tracking-[0.2em] uppercase border px-5 py-2 transition-colors duration-300 ease-expo ${
+                className={`alvo-toque text-[11px] tracking-[0.2em] uppercase border px-5 py-2 transition-colors duration-300 ease-expo ${
                   light
                     ? "border-white/70 text-white hover:bg-white hover:text-[#0c0e0b] hover:border-white"
                     : "border-moss text-moss hover:bg-moss hover:text-white hover:border-moss"
@@ -582,22 +599,34 @@ export default function Navbar() {
           {/* Mobile: hamburger on the RIGHT (balances the left PT/EN toggle
               around the centred logo). */}
           <div className="lg:hidden flex items-center">
+            {/* `alvo-toque` porque este botão media 46×43 px com toque emulado
+                — falha o mínimo por UM pixel de altura, e é a única forma de
+                abrir a navegação num telemóvel em todas as páginas do sítio.
+                Um pixel não se vê e falha na mesma: a régua não é um gosto.
+
+                Os três filetes vão dentro de UM `<span>` de propósito. O
+                `.alvo-toque` faz do botão um `inline-flex` no dedo, e sem este
+                embrulho os filetes passavam a ser TRÊS itens de flex lado a
+                lado — o hambúrguer virava três traços em linha. Com o embrulho
+                há um único item, centrado, e o ícone fica como está. */}
             <button
               ref={toggleBtnRef}
-              className="p-3.5 -mr-2"
+              className="alvo-toque p-3.5 -mr-2"
               onClick={() => setIsOpen(!isOpen)}
               aria-label={isOpen ? t.nav.closeMenu : t.nav.menuLabel}
               aria-expanded={isOpen}
             >
-              <span
-                className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "rotate-45 translate-y-2" : ""}`}
-              />
-              <span
-                className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "opacity-0" : ""}`}
-              />
-              <span
-                className={`block w-[18px] h-px transition-all duration-300 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
-              />
+              <span className="block">
+                <span
+                  className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "rotate-45 translate-y-2" : ""}`}
+                />
+                <span
+                  className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "opacity-0" : ""}`}
+                />
+                <span
+                  className={`block w-[18px] h-px transition-all duration-300 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
+                />
+              </span>
             </button>
           </div>
         </div>

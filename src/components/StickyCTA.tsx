@@ -104,10 +104,16 @@ export default function StickyCTA() {
           the moving pixels behind it EVERY scroll frame (the textbook scroll
           jank). At /90 opacity the backing is effectively solid over both photos
           and paper, so the blur was imperceptible anyway. */}
+      {/* MEDIDO a 375 px com toque emulado: 163×38 px — e só se vê ao rolar,
+          o que é precisamente a razão por que passou despercebido tanto tempo.
+          Uma medição feita no topo da página não o encontra, e este chip é, no
+          telemóvel, o caminho permanente para o formulário de orçamento: a
+          acção mais valiosa do sítio, no alvo mais fácil de falhar por estar
+          encostado ao canto inferior. `alvo-toque` leva-o aos 44 no dedo. */}
       <Link
         href={localizeHref("/orcamento", locale)}
         onClick={() => track("CTAClick", { source: "sticky" })}
-        className="group flex items-center gap-2 sm:gap-3 px-4 py-2.5 sm:px-6 sm:py-3.5 bg-[#0c0e0b]/90 border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
+        className="alvo-toque group flex items-center gap-2 sm:gap-3 px-4 py-2.5 sm:px-6 sm:py-3.5 bg-[#0c0e0b]/90 border border-white/70 hover:bg-white hover:border-white transition-colors duration-300 ease-expo"
       >
         <span className="text-[9px] sm:text-[10px] tracking-[0.18em] sm:tracking-[0.28em] uppercase text-white/90 group-hover:text-[#0c0e0b] transition-colors duration-300 ease-expo">
           {t.footer.pedirOrcamento}

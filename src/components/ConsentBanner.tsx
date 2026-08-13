@@ -190,19 +190,23 @@ export default function ConsentBanner({ locale }: { locale: Locale }) {
         {/* Accept and Decline are given equal visual weight (same border, size
             and contrast). CNPD cookie guidance requires refusing to be as easy
             and as prominent as accepting — a low-contrast "decline" would be a
-            dark pattern that undermines freely-given consent. */}
+            dark pattern that undermines freely-given consent.
+            Por isso `alvo-toque` nos DOIS: mediam 108×35 e 102×35 px a 375 px
+            com toque emulado, e a igualdade que a CNPD pede também é de alvo —
+            se recusar fosse mais fácil de falhar do que aceitar, o
+            consentimento deixava de ser livre por via do dedo. */}
         <div className="flex flex-shrink-0 items-center gap-2.5">
           <button
             type="button"
             onClick={() => choose(false)}
-            className="border border-white/70 px-5 py-2 text-[11px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
+            className="alvo-toque border border-white/70 px-5 py-2 text-[11px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
           >
             {t.decline}
           </button>
           <button
             type="button"
             onClick={() => choose(true)}
-            className="border border-white/70 px-5 py-2 text-[11px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
+            className="alvo-toque border border-white/70 px-5 py-2 text-[11px] uppercase tracking-[0.18em] text-white transition-colors hover:bg-white hover:text-[#0c0e0b]"
           >
             {t.accept}
           </button>

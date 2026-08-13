@@ -32,8 +32,15 @@ export default function LanguageToggle({ light = false }: { light?: boolean }) {
 
   // px/py enlarge the hit area to the 24×24 minimum (WCAG 2.5.8); the negative
   // vertical margin keeps the navbar's height unchanged.
+  //
+  // `alvo-toque` leva os dois de 31×29 para 44×44 NO DEDO, e só no dedo (ver
+  // globals.css). MEDIDO a 375 px com toque emulado, antes: 31×29 px cada — dois
+  // terços da altura mínima, encostados um ao outro, e presentes em TODAS as
+  // páginas do sítio. É também o alvo mais fácil de falhar por engano de todos:
+  // errar o PT e acertar no EN recarrega a página inteira noutro idioma.
+  // Com rato o toggle fica exactamente como estava.
   const base =
-    "px-1.5 py-1.5 -my-1.5 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300";
+    "alvo-toque px-1.5 py-1.5 -my-1.5 text-[11px] tracking-[0.2em] uppercase transition-colors duration-300";
   const activeCls = light ? "text-white" : "text-moss";
   const idleCls = light
     ? "text-white/60 hover:text-white/90"

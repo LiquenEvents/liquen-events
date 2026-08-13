@@ -144,13 +144,28 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                     <p className="text-foreground/70 text-[10px] tracking-[0.4em] uppercase mb-2.5">
                       {item.label}
                     </p>
+                    {/* `alvo-toque` + `flex items-center` no lugar do `block`.
+                        MEDIDO a 375 px com toque emulado: 327×20 px cada — os
+                        342×20 que a primeira espreitadela viu, à largura certa.
+                        São largos e baixos, que é o pior formato possível: o
+                        dedo acerta na linha e falha na altura. E são, os três,
+                        o que esta página existe para dar — o email, o telefone
+                        e a morada.
+
+                        `flex` e não `block` porque o `display` do `.alvo-toque`
+                        vive numa camada e QUALQUER utilitário de `display` do
+                        Tailwind lhe ganha (verificado). Com `block` a caixa
+                        crescia para 44 px e o texto ficava colado ao topo, com
+                        a legenda de baixo a 26 px de distância. Em ponteiro
+                        fino `flex items-center` desenha exactamente o mesmo que
+                        `block`. */}
                     {item.href ? (
                       <a
                         href={item.href}
                         {...(item.href.startsWith("http")
                           ? { target: "_blank", rel: "noopener noreferrer" }
                           : {})}
-                        className="text-foreground text-sm font-medium hover:text-moss transition-colors block mb-1.5"
+                        className="alvo-toque !justify-start flex items-center text-foreground text-sm font-medium hover:text-moss transition-colors mb-1.5"
                       >
                         {item.value}
                       </a>
@@ -230,15 +245,24 @@ export default async function ContactoPage({ params }: { params: Promise<{ lang:
                   { label: "Instagram", href: SITE.instagram },
                   { label: "Facebook", href: SITE.facebook },
                 ].map((s) => (
+                  /* `min-h-[24px]` era o mínimo da WCAG 2.5.8 e ficava-se por
+                     lá: medidos a 375 px com toque emulado, 89×30 e 81×30 px.
+                     `alvo-toque` leva-os aos 44 das Human Interface Guidelines,
+                     que é o que este repositório fixou. O filete vai para um
+                     `<span>` por dentro pela mesma razão do herói da página
+                     inicial: um `border-b` desenha no fundo da caixa, e uma
+                     caixa de 44 px deixava-o a pairar 7 px abaixo da palavra. */
                   <a
                     key={s.label}
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center min-h-[24px] py-1.5 text-[11px] tracking-[0.25em] uppercase text-foreground/60 hover:text-foreground transition-colors border-b border-foreground/15 hover:border-foreground/40"
+                    className="alvo-toque group inline-flex items-center py-1.5 text-[11px] tracking-[0.25em] uppercase text-foreground/60 hover:text-foreground transition-colors"
                   >
-                    {s.label}
-                    <span className="sr-only"> ({t.common.newWindow})</span>
+                    <span className="border-b border-foreground/15 transition-colors group-hover:border-foreground/40">
+                      {s.label}
+                      <span className="sr-only"> ({t.common.newWindow})</span>
+                    </span>
                   </a>
                 ))}
               </div>

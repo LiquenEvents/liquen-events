@@ -11,7 +11,10 @@ export default function ManageCookiesLink({ locale }: { locale: Locale }) {
     <button
       type="button"
       onClick={() => window.dispatchEvent(new Event("liquen:open-consent"))}
-      className="link-line hover:text-white transition-colors"
+      // `alvo-toque`: media 73×17 px no telemóvel, ao lado dos dois links de
+      // legais que agora também o levam. É por aqui que se RETIRA o
+      // consentimento, e o RGPD exige que retirar seja tão fácil como dar.
+      className="alvo-toque link-line hover:text-white transition-colors"
     >
       {label}
     </button>

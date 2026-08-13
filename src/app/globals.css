@@ -513,6 +513,39 @@ body::before {
   position: relative;
   display: inline-block;
 }
+/* MEDIDO, e é a mesma armadilha da cascata que este ficheiro já documenta duas
+   vezes (a largura do `.bo-input`, o `display` do `.alvo-toque`).
+   ─────────────────────────────────────────────────────────────────────────
+   `.link-line` está FORA de camadas; o `display: inline-flex` do `.alvo-toque`
+   está dentro de `@layer components` — e uma regra sem camada ganha sempre a
+   uma com camada, aconteça o que acontecer à especificidade. Resultado, num
+   link do rodapé marcado `link-line alvo-toque` e medido a 375 px com toque
+   emulado: `min-height: 44px` aplicava-se (essa parte é sem camada) mas o
+   `display` continuava `inline-block`. A caixa crescia para 44 px e o texto
+   ficava COLADO AO TOPO dela, com 29 px de vazio por baixo — quatro links do
+   rodapé com um buraco cada, que é pior de ver do que o defeito que se veio
+   corrigir.
+
+   Não chega pôr `pointer-coarse:inline-flex` no elemento: os utilitários do
+   Tailwind também vivem numa camada, e perdem pela mesma razão (verificado).
+   Também não serve mudar `.alvo-toque` de camada — está lá de propósito, para
+   que um `pointer-coarse:hidden` lhe possa ganhar.
+
+   Fica esta regra, com os dois nomes, no mesmo sítio onde vive `.link-line`:
+   quando um link é as duas coisas, é o alvo de toque que manda no `display`.
+
+   SEM `justify-content`, ao contrário do `.alvo-toque` original — e é de
+   propósito. A centragem HORIZONTAL não é precisa aqui (uma caixa que encolhe
+   para o conteúdo não tem para onde centrar) e, num link que seja item de flex
+   e por isso esticado, passava a mandar ela em vez do `text-align` herdado —
+   que é quem alinha estes links hoje, ao centro no telemóvel e à direita a
+   partir de `sm`. Ficaria tudo ao meio numa coluna alinhada à direita. */
+@media (pointer: coarse) {
+  .link-line.alvo-toque {
+    display: inline-flex;
+    align-items: center;
+  }
+}
 .link-line::after {
   content: "";
   position: absolute;

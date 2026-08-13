@@ -83,14 +83,18 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
               {t.footer.pedirOrcamento} <span aria-hidden>→</span>
             </TrackedLink>
 
-            {/* Social icons */}
+            {/* Social icons.
+                `alvo-toque` nos três: o `p-2 -m-2` dava-lhes 35×35 px medidos
+                com toque emulado — a margem negativa recupera para o desenho o
+                espaço que o preenchimento tinha dado ao dedo, e o alvo ficava a
+                9 px do mínimo. No dedo passam a 44×44 sem mexer no ícone. */}
             <div className="mt-9 flex items-center gap-6">
               <a
                 href={SITE.instagram}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Instagram (${t.common.newWindow})`}
-                className="inline-flex items-center justify-center p-2 -m-2 text-white/60 hover:text-white transition-colors duration-300"
+                className="alvo-toque inline-flex items-center justify-center p-2 -m-2 text-white/60 hover:text-white transition-colors duration-300"
               >
                 <svg
                   width="19"
@@ -112,7 +116,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Facebook (${t.common.newWindow})`}
-                className="inline-flex items-center justify-center p-2 -m-2 text-white/60 hover:text-white transition-colors duration-300"
+                className="alvo-toque inline-flex items-center justify-center p-2 -m-2 text-white/60 hover:text-white transition-colors duration-300"
               >
                 <svg
                   width="19"
@@ -132,7 +136,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`WhatsApp (${t.common.newWindow})`}
-                className="inline-flex items-center justify-center p-2 -m-2 text-white/60 hover:text-white transition-colors duration-300"
+                className="alvo-toque inline-flex items-center justify-center p-2 -m-2 text-white/60 hover:text-white transition-colors duration-300"
               >
                 <WhatsAppIcon className="w-[19px] h-[19px]" />
               </a>
@@ -145,12 +149,17 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
               <p className="text-white/55 text-[10px] tracking-[0.42em] uppercase mb-4">
                 {t.footer.servicosTitulo}
               </p>
+              {/* `alvo-toque` em todos os links deste rodapé: medidos a 375 px
+                  com toque emulado, os quatro serviços davam ~20 px de altura,
+                  o email e o telefone 20 px, e os três da barra de direitos de
+                  autor 17 px. Nenhum chegava a metade do mínimo — e são os
+                  links que aparecem em TODAS as páginas do sítio. */}
               <ul className="flex flex-col gap-2.5">
                 {serviceSlugs.map((slug, i) => (
                   <li key={slug}>
                     <Link
                       href={localizeHref(`/servicos/${slug}`, locale)}
-                      className="link-line text-[13px] text-white/75 hover:text-white transition-colors duration-300"
+                      className="alvo-toque link-line text-[13px] text-white/75 hover:text-white transition-colors duration-300"
                     >
                       {t.footer.serviceLinks[i]}
                     </Link>
@@ -163,9 +172,16 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                 {t.footer.contacto}
               </p>
               <div className="flex flex-col gap-2.5 text-[13px] text-white/75">
+                {/* `justify-center sm:justify-end` porque estes dois são itens
+                    de flex e por isso ESTICAM à largura da coluna: quando o
+                    `alvo-toque` os torna `inline-flex`, quem os alinha deixa de
+                    ser o `text-align` herdado (centro no telemóvel, direita a
+                    partir de `sm`) e passa a ser o `justify-content`. Sem estas
+                    duas classes ficavam à esquerda numa coluna alinhada à
+                    direita. Em ponteiro fino não fazem nada. */}
                 <a
                   href={`mailto:${SITE.email}`}
-                  className="link-line hover:text-white transition-colors duration-300"
+                  className="alvo-toque link-line justify-center sm:justify-end hover:text-white transition-colors duration-300"
                 >
                   {SITE.email}
                 </a>
@@ -176,7 +192,7 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
                   event="PhoneClick"
                   trackProps={{ origem: "footer" }}
                   href={`tel:${SITE.phone}`}
-                  className="link-line hover:text-white transition-colors duration-300"
+                  className="alvo-toque link-line justify-center sm:justify-end hover:text-white transition-colors duration-300"
                 >
                   {SITE.phoneDisplay}
                 </TrackedAnchor>
@@ -194,13 +210,13 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
             <div className="flex items-center gap-5 text-[11px] text-white/55 tracking-wide">
               <Link
                 href={localizeHref("/privacidade", locale)}
-                className="link-line hover:text-white transition-colors"
+                className="alvo-toque link-line hover:text-white transition-colors"
               >
                 {t.footer.privacidade}
               </Link>
               <Link
                 href={localizeHref("/termos", locale)}
-                className="link-line hover:text-white transition-colors"
+                className="alvo-toque link-line hover:text-white transition-colors"
               >
                 {t.footer.termos}
               </Link>

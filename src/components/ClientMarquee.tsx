@@ -155,15 +155,34 @@ export default function ClientMarquee() {
       </div>
       {/* Pause/resume control. Hidden from the reduced-motion path — there the
           band doesn't animate (globals.css), so there's nothing to pause. */}
+      {/* MEDIDO a 375 px com toque emulado: 28×28 px. É o único comando desta
+          banda e o que a WCAG 2.2.2 exige que exista para poder parar um
+          movimento automático — um comando de pausa que não se acerta com o
+          dedo é um comando que não existe.
+
+          O `alvo-toque` fica no BOTÃO e o círculo desenhado passa para um
+          `<span>` por dentro. Posto no próprio botão, o `min-width/height` de
+          44 px inchava a bolinha para 44 px numa banda de 60 px de altura — o
+          comando passava a ser a coisa maior de uma faixa que é para se ver de
+          relance. Assim o alvo tem 44 e o desenho continua a ter 28. */}
       <button
         type="button"
         onClick={() => setUserPaused((p) => !p)}
         aria-pressed={userPaused}
         aria-label={userPaused ? t.common.retomarLogos : t.common.pausarLogos}
-        className="motion-reduce:hidden absolute bottom-1 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-foreground/15 bg-surface/80 text-foreground/60 backdrop-blur-sm transition-colors hover:text-foreground/90 hover:border-foreground/30"
+        // `pointer-coarse:bottom-0` porque a caixa de 44 px cresce à volta do
+        // círculo: mantida em `bottom-1`, empurrava-o 8 px para dentro da
+        // banda. A zero, o círculo fica a 8 px do fundo em vez de 4 — e o
+        // botão inteiro fica DENTRO da banda (60 px de altura), que é o que
+        // importa: esta banda é `overflow-hidden`, e o que saísse dela era
+        // cortado, alvo incluído.
+        className="alvo-toque group motion-reduce:hidden absolute bottom-1 right-2 z-20 flex items-center justify-center pointer-coarse:right-0 pointer-coarse:bottom-0"
       >
-        <span aria-hidden className="text-[11px] leading-none">
-          {userPaused ? "▶" : "❚❚"}
+        <span
+          className="flex h-7 w-7 items-center justify-center rounded-full border border-foreground/15 bg-surface/80 text-foreground/60 backdrop-blur-sm transition-colors group-hover:border-foreground/30 group-hover:text-foreground/90"
+          aria-hidden
+        >
+          <span className="text-[11px] leading-none">{userPaused ? "▶" : "❚❚"}</span>
         </span>
       </button>
     </div>

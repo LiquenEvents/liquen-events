@@ -245,12 +245,17 @@ export default async function DestinationPage({ params }: { params: Promise<{ la
               </div>
             ))}
           </div>
+          {/* `alvo-toque` nos treze: medidos a 375 px com toque emulado, davam
+              15 px de altura cada — a lista inteira de destinos desta página, e
+              a única porta para as treze páginas de pólo. O sublinhado é
+              `text-decoration` e não `border-b`, portanto acompanha o texto e
+              não o fundo da caixa: crescer o alvo não o descola da palavra. */}
           <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-[12px] tracking-[0.2em] uppercase">
             {POLOS.map((polo) => (
               <li key={polo.slug}>
                 <Link
                   href={localizeHref(caminhoPolo(polo.slug), locale)}
-                  className="underline hover:text-moss"
+                  className="alvo-toque underline hover:text-moss"
                 >
                   {conteudoPolo(polo, locale).eyebrow}
                 </Link>
@@ -267,7 +272,10 @@ export default async function DestinationPage({ params }: { params: Promise<{ la
             event="EmailClick"
             trackProps={{ origem: "internacional" }}
             href={`mailto:${SITE.email}`}
-            className="text-[12px] tracking-[0.25em] uppercase underline hover:text-moss"
+            // `!justify-start` porque este link é item de uma coluna de flex e
+            // por isso estica à largura toda; sem ele, o `justify-content:
+            // center` do `.alvo-toque` punha o email ao meio no telemóvel.
+            className="alvo-toque !justify-start text-[12px] tracking-[0.25em] uppercase underline hover:text-moss"
           >
             {SITE.email}
           </TrackedAnchor>
