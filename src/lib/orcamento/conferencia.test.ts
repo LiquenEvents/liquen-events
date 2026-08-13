@@ -75,6 +75,48 @@ describe("data e local", () => {
     expect(achar(vs, "data").severidade).toBe("aviso");
   });
 
+  /**
+   * O MÊS TROCADO PASSAVA POR CONFERIDO.
+   *
+   * A comparação lia o ano e o dia e ignorava o mês — que é justamente o pedaço
+   * que se troca ao escrever a data por extenso, porque é o único que se escreve
+   * por palavras. Um pedido para 18 de Setembro com a proposta a dizer 18 de
+   * Outubro levava um visto verde e "Está tudo de acordo com o pedido original".
+   *
+   * O que sai daqui vai para o cliente e é a data que ele mete na cabeça. Não
+   * dizer nada é pior do que não conferir: quem lê o visto deixa de conferir.
+   */
+  it("avisa quando o mês não é o do pedido, ainda que o dia e o ano batam", () => {
+    const vs = conferir({
+      doc: documento({ eventDate: "18 de Outubro de 2027" }),
+      quote: pedido({ date: "2027-09-18" }),
+      ...base,
+    });
+    const data = achar(vs, "data");
+    expect(data.severidade).toBe("aviso");
+    expect(data.detalhe).toContain("Outubro");
+  });
+
+  it("não inventa aviso quando a proposta não escreve mês nenhum reconhecível", () => {
+    // O campo é texto livre. Se não há mês legível, não há mês para desmentir —
+    // e um aviso que não se consegue justificar ensina-se a ignorar.
+    const vs = conferir({
+      doc: documento({ eventDate: "18.09.2027" }),
+      quote: pedido({ date: "2027-09-18" }),
+      ...base,
+    });
+    expect(achar(vs, "data").severidade).toBe("ok");
+  });
+
+  it("aceita o mês escrito sem acentos", () => {
+    const vs = conferir({
+      doc: documento({ eventDate: "Sábado, 1 de marco de 2027" }),
+      quote: pedido({ date: "2027-03-01" }),
+      ...base,
+    });
+    expect(achar(vs, "data").severidade).toBe("ok");
+  });
+
   it("avisa quando o local difere", () => {
     const vs = conferir({
       doc: documento({ location: "Quinta em Palmela" }),
@@ -199,6 +241,31 @@ describe("o valor", () => {
     const valor = achar(vs, "valor");
     expect(valor.severidade).toBe("aviso");
     expect(valor.detalhe).toContain("120 pax");
+  });
+
+  /**
+   * O TOTAL DA PROPOSTA É BRUTO; O `quotedPrice` DO HISTÓRICO É LÍQUIDO.
+   *
+   * O estúdio passa aqui o total COM IVA (`money.gross`), e o padrão era
+   * construído com os `quotedPrice` dos pedidos antigos, que é o campo "Preço
+   * final (SEM IVA)". Dez casamentos de 120 pax cobrados a 10.000 € davam um
+   * intervalo de 10.000 a 10.000, e a proposta seguinte — cotada exactamente ao
+   * mesmo preço, 10.000 € + IVA = 12.300 € — aparecia "acima do habitual".
+   *
+   * Todas as vezes. E o aviso que existe para apanhar um zero a mais aprende-se
+   * a ignorar em duas semanas.
+   */
+  it("uma proposta cotada ao preço do costume não é «acima do habitual»", () => {
+    const historico = Array.from({ length: 10 }, (_, i) =>
+      pedido({ id: `H-${i}`, status: "aceite", guests: 120, quotedPrice: 10_000 }),
+    );
+    const vs = conferir({
+      doc: documento(),
+      quote: pedido(),
+      historico,
+      totalBruto: 12_300, // os mesmos 10.000 €, com IVA
+    });
+    expect(achar(vs, "valor").severidade).toBe("ok");
   });
 
   it("sem histórico que chegue, não diz nada sobre o preço", () => {

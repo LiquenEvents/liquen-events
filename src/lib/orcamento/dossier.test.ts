@@ -393,23 +393,54 @@ describe("reconcileFinance", () => {
 
 describe("nextAction", () => {
   it("maps each stage to a sensible kind", () => {
-    expect(nextAction("lead", data(), TODAY).kind).toBe("proposta");
-    expect(nextAction("proposta_enviada", data(), TODAY).kind).toBe("portal");
-    expect(nextAction("aceite", data(), TODAY).kind).toBe("fatura_sinal");
-    expect(nextAction("sinal_pago", data(), TODAY).kind).toBe("producao");
-    expect(nextAction("em_producao", data(), TODAY).kind).toBe("producao");
-    expect(nextAction("concluido", data(), TODAY).kind).toBe("arquivar");
-    expect(nextAction("perdido", data(), TODAY).kind).toBe("none");
+    expect(nextAction("lead", data()).kind).toBe("proposta");
+    expect(nextAction("proposta_enviada", data()).kind).toBe("portal");
+    expect(nextAction("aceite", data()).kind).toBe("fatura_sinal");
+    expect(nextAction("sinal_pago", data()).kind).toBe("producao");
+    expect(nextAction("em_producao", data()).kind).toBe("producao");
+    expect(nextAction("concluido", data()).kind).toBe("arquivar");
+    expect(nextAction("perdido", data()).kind).toBe("none");
   });
 
   it("semana_evento distinguishes unpaid saldo (fatura_saldo) from fully paid (runsheet)", () => {
     const unpaid = data({ proposal: makeProposal({ total: 20000 }), invoices: [] });
-    expect(nextAction("semana_evento", unpaid, TODAY).kind).toBe("fatura_saldo");
+    expect(nextAction("semana_evento", unpaid).kind).toBe("fatura_saldo");
 
     const paid = data({
       proposal: makeProposal({ total: 20000 }),
       invoices: [invoice({ kind: "total", amount: 20000, status: "paga" })],
     });
-    expect(nextAction("semana_evento", paid, TODAY).kind).toBe("runsheet");
+    expect(nextAction("semana_evento", paid).kind).toBe("runsheet");
+  });
+
+  /**
+   * O DINHEIRO REGISTADO À MÃO TAMBÉM É DINHEIRO RECEBIDO.
+   *
+   * `deriveStage` já o diz com todas as letras (é por isso que existe o
+   * `combinedPaidTotal`), e o painel de Pagamentos mostra o "Recebido" a partir
+   * do registo à mão — que é o caminho que o estúdio usa: recebe-se a
+   * transferência, marca-se a linha como paga, e a factura emite-se quando der.
+   *
+   * A próxima acção ficou a olhar só para o livro de faturas. Num casamento de
+   * 12.300 € integralmente pago e registado, na semana do evento, o cabeçalho
+   * mandava «Liquidar o saldo (70%) — falta liquidar o saldo antes do dia»:
+   * 8.610 € pedidos a um casal que já os tinha transferido.
+   */
+  it("semana_evento: o saldo pago à mão já não pede para liquidar o saldo", () => {
+    const pago = data({
+      quote: makeQuote({
+        date: "2026-07-22", // quatro dias depois do TODAY
+        payments: [
+          { id: "p1", kind: "sinal", amount: 3690, date: "2026-03-01", paid: true },
+          { id: "p2", kind: "saldo", amount: 8610, date: "2026-07-10", paid: true },
+        ],
+      }),
+      contract: { status: "aceite", acceptedAt: "2026-03-01T10:00:00Z" },
+      invoices: [],
+    });
+    // O contratado (com IVA) do `priceBreakdown` são 12.300 €, e é isso que
+    // está registado como recebido.
+    expect(deriveStage(pago, TODAY)).toBe("semana_evento");
+    expect(nextAction("semana_evento", pago).kind).toBe("runsheet");
   });
 });

@@ -37,11 +37,41 @@ export interface Verificacao {
 
 const texto = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
+const semAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 /** Compara nomes ignorando acentos, maiúsculas e espaços a mais. */
 function mesmoNome(a: string, b: string): boolean {
-  const n = (s: string) =>
-    s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const n = (s: string) => semAcentos(s).replace(/\s+/g, " ").trim();
   return n(a) === n(b);
+}
+
+/** Os meses como aparecem escritos numa proposta, já sem acentos. */
+const MESES = [
+  "janeiro",
+  "fevereiro",
+  "marco",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
+/**
+ * Os meses (1–12) escritos por extenso num texto livre de data.
+ *
+ * Devolve uma LISTA porque a data de um evento de vários dias pode nomear dois
+ * ("de 30 de Setembro a 2 de Outubro"), e vazio quando não há mês legível — que
+ * é o caso de "18.09.2027", de "Set." e de tudo o que ela escreva à maneira
+ * dela. Vazio quer dizer "não sei", nunca "está errado".
+ */
+function mesesEscritos(texto: string): number[] {
+  const t = semAcentos(texto);
+  return MESES.map((m, i) => (t.includes(m) ? i + 1 : 0)).filter((m) => m > 0);
 }
 
 /**
@@ -165,9 +195,25 @@ export function conferir({ doc, quote, historico, totalBruto }: Contexto): Verif
   } else if (dataPedido && /^\d{4}-\d{2}-\d{2}$/.test(dataPedido)) {
     // A data da proposta escreve-se por extenso ("12 de Setembro de 2027"), por
     // isso compara-se pelos números que lá estão: o ano e o dia.
+    //
+    // ── E PELO MÊS, QUE É O QUE SE TROCA ────────────────────────────────────
+    // O mês é a única parte da data que se escreve por palavras, e por isso é a
+    // que se troca — um pedido para 18 de Setembro com a proposta a dizer 18 de
+    // Outubro batia no ano, batia no dia, e levava um visto verde a caminho do
+    // cliente. Um visto verde numa data errada é pior do que não conferir nada:
+    // quem lê o visto deixa de conferir.
+    //
+    // Só desmente quando o mês está mesmo lá escrito. O campo é texto livre e
+    // ela escreve-o à maneira dela ("18.09.2027", "Set."); sem mês legível não
+    // há nada a contradizer, e o dia e o ano continuam a mandar como sempre.
     const ano = dataPedido.slice(0, 4);
     const dia = String(Number(dataPedido.slice(8, 10)));
-    const bate = dataProposta.includes(ano) && new RegExp(`\\b${dia}\\b`).test(dataProposta);
+    const mes = Number(dataPedido.slice(5, 7));
+    const mesesDaProposta = mesesEscritos(dataProposta);
+    const bate =
+      dataProposta.includes(ano) &&
+      new RegExp(`\\b${dia}\\b`).test(dataProposta) &&
+      (mesesDaProposta.length === 0 || mesesDaProposta.includes(mes));
     v.push({
       id: "data",
       titulo: "Data do evento",

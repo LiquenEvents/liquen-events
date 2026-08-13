@@ -172,7 +172,10 @@ describe("valor fora do habitual", () => {
   });
 
   it("cala-se quando o valor é normal", async () => {
-    montar({ quotes: historico, totalBruto: 10_000 });
+    // 12.300 € são os 10.000 € do histórico com IVA: o `totalBruto` que este
+    // painel passa é BRUTO e o `quotedPrice` guardado é líquido. É o mesmo
+    // preço, escrito nas duas moedas (ver `padrao-de-preco.valorDe`).
+    montar({ quotes: historico, totalBruto: 12_300 });
     await abrir();
     expect(screen.queryByText(/costuma ficar entre/)).toBeNull();
   });

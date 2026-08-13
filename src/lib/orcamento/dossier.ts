@@ -466,12 +466,13 @@ export interface NextAction {
  * A próxima ação sugerida para o cabeçalho — deriva da fase e, quando útil, do
  * estado financeiro (ex.: na semana do evento distingue "falta liquidar o saldo"
  * de "tudo pago, prepare o run sheet").
+ *
+ * Não recebe o "hoje": a fase já vem decidida (é `deriveStage` que olha para o
+ * calendário) e o resto é dinheiro, que não muda com o dia. A regra do topo do
+ * módulo vale nos dois sentidos — quem precisa do relógio pede-o, quem não
+ * precisa não finge precisar.
  */
-export function nextAction(
-  stage: EventStage,
-  d: DossierData,
-  today: Date = new Date(),
-): NextAction {
+export function nextAction(stage: EventStage, d: DossierData): NextAction {
   // A percentagem do sinal é a da PROPOSTA aceite, não os 30% da casa escritos
   // à mão. Uma proposta a 50% deixava o cabeçalho a mandar «Emitir fatura de
   // sinal (30%)» e a rota a emitir 50% — o ecrã a discordar da factura que ele
@@ -510,8 +511,26 @@ export function nextAction(
         kind: "producao",
       };
     case "semana_evento": {
-      const { pctPaid } = computeEventMetrics(d, today);
-      if (pctPaid < 1) {
+      /**
+       * ── O QUE FALTA RECEBER LÊ-SE DAS DUAS FONTES ─────────────────────────
+       * E não do `pctPaid`, que é livro-de-faturas puro (e assim fica: para a
+       * métrica «% Pago» o livro é a verdade, está dito em `computeEventMetrics`).
+       *
+       * Uma FRASE que manda ir buscar dinheiro é outra coisa. O fluxo normal do
+       * estúdio é receber a transferência, marcar a linha como paga no painel de
+       * Pagamentos — que é o que faz subir o "Recebido" — e emitir a factura
+       * quando calhar. Enquanto isto olhou só para o livro, um casamento de
+       * 12.300 € integralmente pago e registado dizia, na semana do evento,
+       * «Liquidar o saldo (70%) — falta liquidar o saldo antes do dia»: 8.610 €
+       * pedidos a um casal que já os tinha transferido.
+       *
+       * `combinedPaidTotal` é o mesmo critério com que `deriveStage` decide o
+       * `saldoPago` logo acima — o ecrã não pode chegar à semana do evento por
+       * uma conta e mandar cobrar por outra.
+       */
+      const contratado = contractedTotal(d);
+      const liquidado = contratado > 0 && combinedPaidTotal(d) >= round2(contratado);
+      if (!liquidado) {
         return {
           label: `Liquidar o saldo (${100 - pctSinal}%)`,
           hint: "Evento esta semana — falta liquidar o saldo antes do dia.",

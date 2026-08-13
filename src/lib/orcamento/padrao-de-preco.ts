@@ -1,4 +1,5 @@
 import type { Quote } from "./types";
+import { contractedAmounts } from "./dossier";
 import { localizar } from "@/lib/geo/portugal";
 
 /**
@@ -39,9 +40,29 @@ export interface Padrao {
   regiao: string | null;
 }
 
-/** O valor fechado de um pedido: o preço cotado, senão a estimativa. */
+/**
+ * O valor fechado de um pedido: o preço cotado, senão a estimativa — SEMPRE COM
+ * IVA.
+ *
+ * ── PORQUE É QUE ISTO NÃO LÊ O `quotedPrice` DIRECTAMENTE ──────────────────
+ * Porque os dois sítios onde o valor pode estar guardado NÃO estão na mesma
+ * unidade: o `quotedPrice` é o campo "Preço final (SEM IVA)" do estúdio e o
+ * `priceBreakdown.total` já vem com IVA. Lidos em bruto, o mesmo casamento
+ * valia 10.000 € ou 12.300 € consoante o ramo, e um intervalo construído com os
+ * dois misturava as duas moedas.
+ *
+ * E o número com que este intervalo é confrontado é BRUTO: tanto a Conferência
+ * como o Painel Interno passam o total com IVA da proposta, que é o que está no
+ * ecrã. Enquanto o padrão foi líquido, dez casamentos cobrados a 10.000 € davam
+ * um habitual de 10.000 a 10.000 e a proposta seguinte, cotada exactamente ao
+ * mesmo preço, aparecia "acima" — todas as vezes.
+ *
+ * `contractedAmounts` é o ajudante canónico que sabe converter cada ramo; a
+ * estimativa fica como rede para os pedidos cujo `quotedPrice` está a zero.
+ */
 function valorDe(q: Quote): number | null {
-  if (typeof q.quotedPrice === "number" && q.quotedPrice > 0) return q.quotedPrice;
+  const { gross } = contractedAmounts(q);
+  if (gross > 0) return gross;
   const t = q.priceBreakdown?.total;
   return typeof t === "number" && t > 0 ? t : null;
 }
