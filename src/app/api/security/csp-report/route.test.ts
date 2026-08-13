@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 
-const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter?: number } }));
+const rl = vi.hoisted(() => ({
+  result: { ok: true } as { ok: boolean; retryAfter?: number },
+  /** Grava POR QUE CHAVE (e com que tecto) a rota limita — um duplo que deitasse
+   *  fora os argumentos deixava passar um balde partilhado por toda a gente. */
+  limit: vi.fn(async (_chave: string, _max: number, _janelaMs: number) => rl.result),
+}));
 const logger = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
 vi.mock("@/lib/logger", () => ({ log: logger }));
 vi.mock("@/lib/rate-limit", () => ({
-  rateLimit: vi.fn(async () => rl.result),
+  rateLimit: rl.limit,
   clientIp: () => "test-ip",
   sweep: () => {},
 }));
@@ -126,6 +131,17 @@ describe("POST /api/security/csp-report", () => {
   it("a non-object JSON body (e.g. a bare string) must not 500 → 204", async () => {
     const res = await POST(post(JSON.stringify("just a string")));
     expect(res.status).toBe(204);
+  });
+
+  /**
+   * O balde é POR ORIGEM. Um balde único para o endereço inteiro seria pior do
+   * que não ter limite nenhum: bastava um browser em ciclo para calar os
+   * relatórios de toda a gente — que é exactamente a altura em que eles
+   * interessam.
+   */
+  it("limita por origem, com o tecto de 30 por minuto", async () => {
+    await POST(post(JSON.stringify({ "csp-report": {} })));
+    expect(rl.limit).toHaveBeenCalledWith("csp:test-ip", 30, 60_000);
   });
 
   it("rate-limited callers get 429 and are not logged", async () => {

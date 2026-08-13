@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PDFDocument } from "pdf-lib";
+import sharp from "sharp";
 import { withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
 
 /**
@@ -11,15 +12,23 @@ import { withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
  * falta são simplesmente descartadas e o PDF sai na mesma.
  */
 const fetchProposalImageBytes = vi.fn<(ref: string) => Promise<Buffer | null>>();
+// Sem miniaturas nesta instalação: o resolvedor cai para o original, que é
+// exactamente o caminho que estes testes exercitam.
+const fetchProposalThumbBytes = vi.fn<(ref: string) => Promise<Buffer | null>>(async () => null);
+// Nem derivadas de capa: a primeira geração recorta e tenta guardar, e é
+// isso que estes testes vêem — sem armazenamento por baixo.
+const fetchProposalCoverBytes = vi.fn<(ref: string) => Promise<Buffer | null>>(async () => null);
+/** Guarda o CAMINHO e os BYTES que lhe mandam: era por não os guardar que
+ *  ninguém podia dizer sob que nome — nem com que fotografia — a derivada da
+ *  capa ficava escrita. */
+const uploadProposalCover = vi.fn<(ref: string, bytes: Buffer) => Promise<boolean>>(
+  async () => false,
+);
 vi.mock("@/lib/proposal-storage", () => ({
   fetchProposalImageBytes: (ref: string) => fetchProposalImageBytes(ref),
-  // Sem miniaturas nesta instalação: o resolvedor cai para o original, que é
-  // exactamente o caminho que estes testes exercitam.
-  fetchProposalThumbBytes: async () => null,
-  // Nem derivadas de capa: a primeira geração recorta e tenta guardar, e é
-  // isso que estes testes vêem — sem armazenamento por baixo.
-  fetchProposalCoverBytes: async () => null,
-  uploadProposalCover: async () => false,
+  fetchProposalThumbBytes: (ref: string) => fetchProposalThumbBytes(ref),
+  fetchProposalCoverBytes: (ref: string) => fetchProposalCoverBytes(ref),
+  uploadProposalCover: (ref: string, bytes: Buffer) => uploadProposalCover(ref, bytes),
 }));
 
 // Import DEPOIS do mock (a factory acima é elevada pelo Vitest).
@@ -44,7 +53,65 @@ function storedDoc(): ProposalDoc {
 }
 
 describe("renderStoredProposalDocPdf", () => {
-  beforeEach(() => fetchProposalImageBytes.mockReset());
+  beforeEach(() => {
+    fetchProposalImageBytes.mockReset();
+    fetchProposalThumbBytes.mockClear();
+    fetchProposalCoverBytes.mockClear();
+    uploadProposalCover.mockClear();
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * CADA FOTO PELO SEU CAMINHO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A capa e o mood board têm derivadas DIFERENTES no armazenamento — uma tira
+   * alta (~617×1323) e uma miniatura de 400 px — e os caminhos não se trocam.
+   * Uma foto de mood board mandada pelo caminho da capa paga o recorte da tira
+   * e uma ESCRITA no armazenamento por uma fotografia que nem sequer é impressa
+   * àquele tamanho; e a capa pelo caminho da miniatura sai ampliada na primeira
+   * página. Cada função tem de ser chamada com a SUA fotografia.
+   */
+  it("pergunta pela miniatura das fotos do mood board e pela tira de capa das da capa", async () => {
+    fetchProposalImageBytes.mockResolvedValue(null);
+    // Dez numa página: só a esta lotação as células descem abaixo do lado da
+    // miniatura e a pergunta chega a ser feita.
+    const fotos = Array.from({ length: 10 }, (_, i) => `storage/mb-${i}.jpg`);
+    await renderStoredProposalDocPdf({
+      ...storedDoc(),
+      moodBoards: [{ title: "Cerimónia", images: fotos }],
+    });
+    expect(fetchProposalThumbBytes.mock.calls.flat()).toEqual(fotos);
+    expect(fetchProposalCoverBytes.mock.calls.flat()).toEqual([
+      "storage/cover-1.jpg",
+      "storage/cover-2.jpg",
+    ]);
+  });
+
+  /**
+   * A derivada da capa é feita à primeira vez que faltar e GUARDADA, para
+   * ninguém voltar a pagar o recorte. Guardada onde? Debaixo da fotografia de
+   * onde saiu — e com os bytes RECORTADOS, não com o original. Escrever ali o
+   * original é a avaria silenciosa perfeita: a derivada passa a existir, o
+   * atalho passa a aceitá-la, e a poupança que este caminho todo existe para
+   * conseguir desaparece para sempre sem nada falhar.
+   */
+  it("guarda a derivada da capa debaixo da foto de onde saiu, e recortada", async () => {
+    const original = await sharp({
+      create: { width: 1400, height: 3000, channels: 3, background: { r: 124, g: 133, b: 75 } },
+    })
+      .jpeg()
+      .toBuffer();
+    fetchProposalImageBytes.mockResolvedValue(original);
+    await renderStoredProposalDocPdf({
+      ...storedDoc(),
+      moodBoards: [],
+      coverImages: ["storage/cover-1.jpg", ""],
+    });
+    const [destino, guardados] = uploadProposalCover.mock.calls[0];
+    expect(destino).toBe("storage/cover-1.jpg");
+    expect(guardados.equals(original)).toBe(false);
+  });
 
   it("resolves every image reference and returns a PDF Buffer even when they're missing", async () => {
     fetchProposalImageBytes.mockResolvedValue(null); // todas em falta → descartadas

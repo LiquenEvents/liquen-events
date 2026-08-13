@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import sharp from "sharp";
 
 /**
  * UMA PROPOSTA NÃO PODE SEGUIR PARA O CLIENTE COM FOTOS A MENOS EM SILÊNCIO.
@@ -13,6 +14,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  */
 
 const fetchMock = vi.hoisted(() => vi.fn());
+/**
+ * O armazenamento de DERIVADAS, que também conta para esta contagem: uma foto
+ * que a tira de capa já resolvida serve não está em falta nenhuma. Os duplos
+ * guardam o caminho que lhes pedem — enquanto o deitavam fora, uma derivada
+ * procurada debaixo do nome errado não resolvia nada e ninguém dava por isso.
+ */
+const armazem = vi.hoisted(() => ({
+  thumb: vi.fn(async (_ref: string) => null as Buffer | null),
+  capa: vi.fn(async (_ref: string) => null as Buffer | null),
+  guardarCapa: vi.fn(async (_ref: string, _bytes: Buffer) => false),
+}));
 /** O gerador, aqui de mentira: guarda o documento que RECEBEU (para se ver o
  *  que sobrou depois da resolução das fotos) e devolve o relatório de conteúdo
  *  cortado que cada teste quiser. */
@@ -25,9 +37,9 @@ const pdfMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/proposal-storage", () => ({
   fetchProposalImageBytes: fetchMock,
-  fetchProposalThumbBytes: async () => null,
-  fetchProposalCoverBytes: async () => null,
-  uploadProposalCover: async () => false,
+  fetchProposalThumbBytes: armazem.thumb,
+  fetchProposalCoverBytes: armazem.capa,
+  uploadProposalCover: armazem.guardarCapa,
 }));
 vi.mock("@/lib/proposal-doc-pdf", async (importOriginal) => ({
   // A GEOMETRIA é real. É ela que o resolvedor usa para decidir o tamanho de
@@ -56,6 +68,10 @@ const docWith = (cover: string[], board: string[]) =>
 
 beforeEach(() => {
   fetchMock.mockReset();
+  armazem.thumb.mockClear();
+  armazem.capa.mockClear();
+  armazem.capa.mockResolvedValue(null);
+  armazem.guardarCapa.mockClear();
   pdfMock.docs = [];
   pdfMock.truncations = [];
   pdfMock.undrawnImages = 0;
@@ -66,6 +82,27 @@ describe("contagem de fotos em falta", () => {
     fetchMock.mockResolvedValue(Buffer.from("foto"));
     const { missingImages } = await renderStoredProposalDocPdfWithReport(
       docWith(["a.jpg", "b.jpg"], ["c.jpg"]),
+    );
+    expect(missingImages).toBe(0);
+  });
+
+  /**
+   * A capa tem duas fontes: a tira já recortada e guardada, e o original. A
+   * tira é procurada DEBAIXO da fotografia a que pertence — procurá-la por
+   * outro nome qualquer devolvia sempre nada, e a foto ia parar à contagem (ou,
+   * pior, ao original, que é o que este caminho existe para não descarregar).
+   * Aqui o original não existe de propósito: quem resolve é a tira, ou ninguém.
+   */
+  it("a tira de capa já guardada resolve a foto — que não conta como em falta", async () => {
+    const tira = await sharp({
+      create: { width: 1400, height: 3000, channels: 3, background: { r: 124, g: 133, b: 75 } },
+    })
+      .jpeg()
+      .toBuffer();
+    armazem.capa.mockImplementation(async (ref: string) => (ref === "a.jpg" ? tira : null));
+    fetchMock.mockResolvedValue(null);
+    const { missingImages } = await renderStoredProposalDocPdfWithReport(
+      docWith(["a.jpg", ""], []),
     );
     expect(missingImages).toBe(0);
   });

@@ -12,20 +12,33 @@ const dados = vi.hoisted(() => ({
   addEventItem: vi.fn(async (input: Record<string, unknown>) => ({ id: "novo", ...input })),
   removeItemsOfEvent: vi.fn(async () => {}),
   updateEventMaterial: vi.fn(async () => null),
+  /**
+   * Os dois duplos que ficam entre o PEDIDO e as REGRAS. Gravam o que lhes
+   * chega: um duplo que deitasse fora os argumentos deixava a rota alimentar o
+   * motor com o pedido errado — ou com o campo do lado — sem nenhum teste poder
+   * dar por isso.
+   */
+  rotular: vi.fn((_pontos: readonly string[], _locale: string) => [] as string[]),
+  gerar: vi.fn((_ctx: unknown, _fontes: unknown) => dados.geradas),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock("@/lib/quotes-store", () => ({
-  getQuote: vi.fn(async (id: string) => ({ id, guests: 80, decorPoints: [], notes: "" })),
+  getQuote: vi.fn(async (id: string) => ({
+    id,
+    guests: 80,
+    decorPoints: ["arco-floral"],
+    notes: "querem velas nas mesas",
+  })),
 }));
 vi.mock("@/lib/proposals-store", () => ({ getProposalByQuote: vi.fn(async () => null) }));
-vi.mock("@/lib/orcamento/decoracao", () => ({ rotularPontos: () => [] as string[] }));
+vi.mock("@/lib/orcamento/decoracao", () => ({ rotularPontos: dados.rotular }));
 vi.mock("@/lib/material-store", () => ({ listMaterial: vi.fn(async () => []) }));
 vi.mock("@/lib/material-lists-store", () => ({ listLists: vi.fn(async () => []) }));
 vi.mock("@/lib/material-list-items-store", () => ({ listAllListItems: vi.fn(async () => []) }));
 vi.mock("@/lib/material-rules-store", () => ({ listRules: vi.fn(async () => []) }));
-vi.mock("@/lib/material-rules", () => ({ gerarChecklist: () => dados.geradas }));
+vi.mock("@/lib/material-rules", () => ({ gerarChecklist: dados.gerar }));
 vi.mock("@/lib/event-material-store", () => ({
   getForQuote: vi.fn(async () => ({ id: "ev1", quoteId: "q1" })),
   obterOuCriarParaPedido: vi.fn(async () => ({ id: "ev1", quoteId: "q1" })),
@@ -173,6 +186,29 @@ describe("POST /api/orcamento/[id]/material — o que a regeneração preserva",
     expect(gravada("vela")).toMatchObject({ missing: false });
     expect(gravada("vela")?.returnedAt).toBeUndefined();
     expect(gravada("vela")?.usedQty).toBeUndefined();
+  });
+
+  /**
+   * As regras só são tão boas como o contexto que lhes chega. O que o casal
+   * marcou no formulário são PONTOS DE DECORAÇÃO (ids), e é `rotularPontos` que
+   * os transforma nos rótulos que uma regra sabe reconhecer — em português, que
+   * é a língua em que as regras estão escritas.
+   */
+  it("dá ao rotulador os pontos que o casal marcou, em português", async () => {
+    await post();
+    expect(dados.rotular).toHaveBeenCalledWith(["arco-floral"], "pt");
+  });
+
+  /**
+   * E o motor recebe o contexto DESTE pedido: o número de convidados (é ele que
+   * escala as quantidades) e o texto onde as regras de `texto` procuram.
+   */
+  it("alimenta o motor de regras com o contexto do pedido", async () => {
+    await post();
+    expect(dados.gerar.mock.calls[0][0]).toMatchObject({
+      pax: 80,
+      texto: expect.stringContaining("querem velas nas mesas"),
+    });
   });
 
   it("401 sem sessão, e nada é regenerado", async () => {

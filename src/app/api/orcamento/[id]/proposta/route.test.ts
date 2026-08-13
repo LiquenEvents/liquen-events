@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
+import { SITE } from "@/lib/site";
 
 const authed = vi.hoisted(() => ({ ok: false }));
 const quotes = vi.hoisted(() => ({
@@ -37,6 +38,13 @@ const proposals = vi.hoisted(() => ({
   listForQuote: vi.fn(async () => [{ id: "p-existing", quoteId: "LIQ-1" }]),
 }));
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_opts?: unknown) => ({ sent: true })) }));
+/**
+ * O token do link de aceitação, aqui de mentira — mas COM o identificador que
+ * lhe passaram lá dentro. Um duplo que devolvesse sempre a mesma corda deixava
+ * a rota mintar o link para o pedido em vez de para a proposta sem ninguém dar
+ * por isso: o email saía, o teste ficava verde, e o casal carregava num 404.
+ */
+const token = vi.hoisted(() => ({ create: vi.fn((proposalId: string) => `tok:${proposalId}`) }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/quotes-store", () => ({ getQuote: quotes.get, updateQuoteWith: quotes.update }));
@@ -49,7 +57,7 @@ vi.mock("@/lib/mail", () => ({
   esc: (v: unknown) => String(v ?? ""),
   MAIL_TO: "team@example.com",
 }));
-vi.mock("@/lib/proposal-token", () => ({ createProposalToken: () => "signed-token" }));
+vi.mock("@/lib/proposal-token", () => ({ createProposalToken: token.create }));
 vi.mock("@/lib/proposal-pdf", () => ({
   renderProposalPdf: vi.fn(async () => new Uint8Array([1, 2, 3])),
 }));
@@ -137,6 +145,26 @@ describe("POST /api/orcamento/[id]/proposta", () => {
     // 2460 era o total COM IVA; o campo é o "Preço final (sem IVA)", portanto
     // grava-se o subtotal (2000). Ver a nota na rota.
     expect(quotes.gravado).toMatchObject({ status: "cotado", quotedPrice: 2000 });
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O LINK DO EMAIL ABRE A PROPOSTA QUE ACABOU DE SER CRIADA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * É a única coisa que o email leva além do PDF, e já falhou duas vezes: uma a
+   * abrir 404, outra a ser recusado com «esta proposta já não está disponível».
+   * O token assina UM identificador — o da proposta —, e o pedido tem outro ao
+   * lado (`LIQ-1`) que se parece com ele em tudo menos no que interessa.
+   */
+  it("manda no email um link assinado com o id da proposta acabada de criar", async () => {
+    authed.ok = true;
+    const res = await POST(req("POST", validItems), ctx("LIQ-1"));
+    const { id: idDaProposta } = await res.json();
+    const enviado = mail.send.mock.calls[0][0] as { html: string; text: string };
+    const link = `${SITE.url}/proposta/tok:${idDaProposta}`;
+    expect(enviado.html).toContain(link);
+    expect(enviado.text).toContain(link);
   });
 
   /**
