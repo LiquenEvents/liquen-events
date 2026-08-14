@@ -6112,6 +6112,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 budgetCosts: custosDe(d as ProposalDoc).map((v, j) => (j === i ? custo : v)),
               }))
             }
+            /**
+             * Os quilómetros até ao local ficam no DOCUMENTO, não num estado
+             * do ecrã: é isso que os torna o número desta proposta e que
+             * impede que mudar a sede ou o preço do gasóleo lhes toque depois.
+             *
+             * `null` apaga o campo — «não decidi», e a tabela volta a sugerir.
+             * Escrever 0 aqui seria dizer «é em casa», que é outra coisa.
+             */
+            onKm={(km) =>
+              setDoc((d) => {
+                if (km === null) {
+                  const { kmDeslocacao: _fora, ...resto } = d;
+                  void _fora;
+                  return resto;
+                }
+                return { ...d, kmDeslocacao: km };
+              })
+            }
             onDeslocacao={(label, valueText) => {
               // Se já lá está uma linha de deslocação, actualiza-se essa em
               // vez de acrescentar uma segunda — duas linhas de deslocação
