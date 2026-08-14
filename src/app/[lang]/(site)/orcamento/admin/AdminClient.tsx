@@ -33,6 +33,8 @@ import {
   regioesDe,
   tomDeEspera,
 } from "@/lib/orcamento/espera";
+import { faltaODesfecho } from "@/lib/orcamento/desfecho";
+import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel, ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcamento/data";
@@ -328,6 +330,10 @@ function COLUNAS_DE_PEDIDOS(ctx: {
   toggleSelect: (id: string) => void;
   todayStr: string;
   atual?: string;
+  /** Quem está a marcar — vai para o histórico do pedido. */
+  userName: string;
+  /** O pedido gravado quando alguém marca o desfecho na própria linha. */
+  onDesfecho: (q: Quote) => void;
 }): Coluna<Quote>[] {
   const diasAEsperar = (q: Quote) =>
     Math.floor((Date.now() - new Date(q.submittedAt).getTime()) / 86400000);
@@ -368,7 +374,39 @@ function COLUNAS_DE_PEDIDOS(ctx: {
         </span>
       ),
     },
-    { chave: "estado", cabecalho: "Estado", celula: (q) => statusBadge(q.status) },
+    {
+      /**
+       * ── «JÁ RESPONDERAM?» TAMBÉM NO COMPUTADOR ─────────────────────────
+       *
+       * No telemóvel a lista é uma pilha de cartões e o gesto vive no cartão;
+       * no computador é ESTA tabela. Sem isto, o gesto existia no telemóvel e
+       * desaparecia no portátil onde ela trabalha o dia inteiro.
+       *
+       * Vai por baixo do próprio estado, e NÃO numa coluna nova ao fundo: a
+       * tabela já pede mais largura do que a caixa tem num portátil de 1440 (é
+       * por isso que a caixa rola), e uma coluna nova no fim nascia fora do
+       * ecrã — que é o oposto de «à frente dela no momento em que se lembra».
+       * A pergunta é sobre o estado; fica colada a ele.
+       */
+      chave: "estado",
+      cabecalho: "Estado",
+      celula: (q) => (
+        // Um `div` e não um `span`: o componente traz a sua própria caixa de
+        // bloco, e um `div` dentro de um `span` é HTML inválido — o browser
+        // desfaz o aninhamento e a célula parte-se ao meio.
+        <div className="min-w-[9rem]">
+          {statusBadge(q.status)}
+          {faltaODesfecho(q) && (
+            <PerguntaDeDesfecho
+              key={`desfecho-${q.id}`}
+              quote={q}
+              quem={ctx.userName}
+              onGravado={ctx.onDesfecho}
+            />
+          )}
+        </div>
+      ),
+    },
     {
       chave: "data",
       cabecalho: "Data do evento",
@@ -439,15 +477,21 @@ const QuoteCard = memo(function QuoteCard({
   isCurrent,
   isSelected,
   todayStr,
+  userName,
   onOpen,
   onToggle,
+  onDesfecho,
 }: {
   q: Quote;
   isCurrent: boolean;
   isSelected: boolean;
   todayStr: string;
+  /** Quem está a marcar — vai para o histórico do pedido. */
+  userName: string;
   onOpen: (q: Quote) => void;
   onToggle: (id: string) => void;
+  /** O pedido gravado quando alguém marca aqui o desfecho. */
+  onDesfecho: (q: Quote) => void;
 }) {
   const cat = CATEGORIES.find((c) => c.id === q.category);
   const et =
@@ -463,8 +507,24 @@ const QuoteCard = memo(function QuoteCard({
   const espera = diasDeEspera(q);
   const tom = espera === null ? null : tomDeEspera(espera);
   const ctx = contextoDeLocal(q);
+  /** Este cartão foi marcado agora, aqui. Ver o comentário lá em baixo. */
+  const [marcadoAqui, setMarcadoAqui] = useState(false);
   return (
-    <div className="relative">
+    /* ── A MOLDURA DO CARTÃO É ESTA CAIXA, E NÃO O BOTÃO LÁ DENTRO ──────────
+       Estava no `<button>`: o risco, o fundo branco e a sombra eram dele. Com a
+       pergunta «já responderam?» a ter de ficar FORA desse botão (um botão
+       dentro de outro é HTML inválido), o gesto ficava a flutuar por baixo do
+       cartão, em cima do fundo da página, como se pertencesse ao pedido
+       seguinte. A moldura sobe um nível e passa a abraçar os dois. */
+    <div
+      className={`relative rounded-xl border transition-all duration-200 motion-reduce:transition-none ${
+        isCurrent
+          ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
+          : isSelected
+            ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
+            : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
+      }`}
+    >
       {/* O `<input>` mede 16 px, mas quem se toca é o RÓTULO — o HTML manda o
           toque no rótulo activar o controlo. 24 px chegavam para o rato e não
           para o dedo; `alvo-toque` leva-o a 44 px no telemóvel sem mexer no
@@ -484,13 +544,7 @@ const QuoteCard = memo(function QuoteCard({
       <button
         type="button"
         onClick={() => onOpen(q)}
-        className={`w-full text-left p-5 pl-12 rounded-xl border transition-all duration-200 ${
-          isCurrent
-            ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
-            : isSelected
-              ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
-              : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
-        }`}
+        className="w-full text-left p-5 pl-12 rounded-xl"
       >
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="min-w-0">
@@ -656,6 +710,33 @@ const QuoteCard = memo(function QuoteCard({
           </div>
         </div>
       </button>
+      {/* ── «JÁ RESPONDERAM?» ───────────────────────────────────────────────
+          FORA do botão do cartão, e é obrigatório que assim seja: um <button>
+          dentro de outro <button> é HTML inválido, o browser desfaz o aninhamento
+          e o que sai é um cartão partido em pedaços com o gesto a abrir o pedido
+          em vez de o marcar.
+
+          A moldura só existe quando há pergunta a fazer: um `div` com margem
+          desenhado à mesma em todos os cartões punha 16 px de vazio por baixo
+          de cada pedido novo da lista.
+
+          O `|| marcadoAqui` é o que impede a moldura de desaparecer NO INSTANTE
+          da marcação: assim que o servidor responde, o pedido deixa de ter
+          proposta enviada e a condição de cima passa a falsa. Sem a segunda
+          metade, o recibo («Marcado como perdido») e o campo do motivo — que é
+          opcional e vem DEPOIS — nasciam e morriam no mesmo render. */}
+      {(faltaODesfecho(q) || marcadoAqui) && (
+        <div className="px-5 pb-4 -mt-2">
+          <PerguntaDeDesfecho
+            quote={q}
+            quem={userName}
+            onGravado={(actualizado) => {
+              setMarcadoAqui(true);
+              onDesfecho(actualizado);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 });
@@ -776,6 +857,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     "espera" | "recent" | "old" | "value" | "followup" | "eventdate"
   >("espera");
   const [saving, setSaving] = useState(false);
+  /**
+   * O id do pedido cujo desfecho acabou de ser marcado NO PAINEL.
+   *
+   * É um id e não um booleano: trocar de pedido tem de voltar a mostrar a
+   * pergunta, e um `true` esquecido deixava o recibo do casamento anterior em
+   * cima do pedido seguinte.
+   */
+  const [marcadoNoPainel, setMarcadoNoPainel] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState<QuoteStatus>("pendente");
@@ -1051,6 +1140,59 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditEmail((v) => (v === (antes.email ?? "") ? (updated.email ?? "") : v));
     setEditTelefone((v) => (v === (antes.phone ?? "") ? (updated.phone ?? "") : v));
   }, []);
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O PEDIDO QUE VOLTOU DE UMA MARCAÇÃO DE DESFECHO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Parece o {@link absorverDoServidor} e não é — e a diferença tem duas
+   * razões, uma de conteúdo e outra de forma.
+   *
+   * ── Conteúdo: aqui a marcação GANHA ────────────────────────────────────
+   * O `absorverDoServidor` é conservador de propósito: só acerta os campos que
+   * ela NÃO tocou, para uma gravação alheia não lhe apagar trabalho. Uma
+   * marcação de desfecho não é alheia — é ela, agora, a confirmar um estado e
+   * um valor que acabou de ler no ecrã. Esses dois campos passam a ser o que
+   * o servidor gravou, ponto.
+   *
+   * ── Forma: nada de `ref` ───────────────────────────────────────────────
+   * O `absorverDoServidor` lê o `selectedRef` para saber como o pedido estava
+   * antes. Passá-lo à fábrica das colunas — que é CHAMADA durante o desenho —
+   * fazia a regra `react-hooks` acusar leitura de `ref` no desenho. A regra
+   * tem razão na forma (ninguém garante que a fábrica não chama o que recebe),
+   * e a saída certa não é calá-la: é este caminho, que lê o `selected` do
+   * estado e não de um `ref`.
+   *
+   * Só mexe no formulário quando o pedido marcado é o que está ABERTO. Sem
+   * essa guarda, marcar o casamento da Ana na tabela escrevia o estado dela
+   * por cima do formulário do casamento do Rui, aberto ao lado.
+   */
+  const marcarDesfecho = useCallback(
+    (actualizado: Quote) => {
+      setQuotes((prev) => prev.map((q) => (q.id === actualizado.id ? actualizado : q)));
+      if (selected?.id !== actualizado.id) return;
+      setSelected(actualizado);
+      setEditStatus(actualizado.status);
+      setEditPrice(textoDoPreco(actualizado));
+      setEditLostReason(actualizado.lostReason ?? "");
+      /**
+       * ── O QUE AQUI NÃO SE FAZ, E PORQUÊ ──────────────────────────────────
+       * Não se mexe na linha de base da gravação automática
+       * (`escritoNoServidor`). Seria uma escrita num `ref` dentro do que a
+       * fábrica das colunas recebe, e é exactamente isso que faz a regra
+       * `react-hooks` acusar leitura de `ref` no desenho — o preço de a
+       * calar seria pior do que o defeito.
+       *
+       * O que se perde: quando o gesto grava um motivo de perda com o pedido
+       * ABERTO, a base fica um passo atrás e a gravação automática reenvia o
+       * MESMO motivo uma vez. É um PATCH repetido e idempotente, não uma
+       * perda: o `isDirty` não se acende (o campo e o pedido dizem o mesmo) e
+       * nada é apagado. Trocar isso pela regra desligada não valia a pena.
+       */
+    },
+    [selected?.id],
+  );
 
   /**
    * Manda ao servidor SÓ o que foi tocado. Uma tentativa — a repetição é do
@@ -3171,6 +3313,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 onGoStats={() => setView("estatisticas")}
                 onGo={(v) => setView(v)}
                 onNew={() => setNewQuoteOpen(true)}
+                // Marcar «Ganho» na lista «à espera de resposta» da Visão Geral
+                // grava no servidor; sem isto, a lista continuava a mostrar o
+                // pedido pendurado e o ecrã ficava a dizer o contrário.
+                onQuoteAtualizado={marcarDesfecho}
               />
             </div>
           )}
@@ -3701,8 +3847,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         isCurrent={selected?.id === q.id}
                         isSelected={selectedIds.has(q.id)}
                         todayStr={todayStr}
+                        userName={userName}
                         onOpen={openQuoteStable}
                         onToggle={toggleSelect}
+                        onDesfecho={marcarDesfecho}
                       />
                     )}
                     aoAbrir={openQuoteStable}
@@ -3711,6 +3859,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       toggleSelect,
                       todayStr,
                       atual: selected?.id,
+                      userName,
+                      onDesfecho: marcarDesfecho,
                     })}
                   />
                 )}
@@ -4026,6 +4176,32 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-5 py-6 sm:px-7 sm:py-8">
                         {/* Ciclo de vida — em que fase está o pedido, num relance. */}
                         <LifecycleStepper quote={selected} />
+
+                        {/* ── «JÁ RESPONDERAM?», TAMBÉM AQUI ─────────────────
+                          O mesmo gesto do cartão da lista, no sítio onde ela
+                          está quando abre um pedido para lhe telefonar. Está em
+                          cima, antes de tudo o resto, porque é a única coisa que
+                          falta para os números serem verdade — e não em baixo,
+                          escondido no selector de estado do formulário de gestão
+                          (que continua a existir, e é por onde se CORRIGE um
+                          desfecho já marcado).
+
+                          `marcadoNoPainel` faz aqui o que o `marcadoAqui` faz no
+                          cartão: segura a moldura no instante em que o pedido
+                          deixa de ter proposta enviada, para o recibo e o campo
+                          opcional do motivo não desaparecerem ao nascer. */}
+                        {(faltaODesfecho(selected) || marcadoNoPainel === selected.id) && (
+                          <PerguntaDeDesfecho
+                            key={`desfecho-${selected.id}`}
+                            quote={selected}
+                            quem={userName}
+                            variante="painel"
+                            onGravado={(actualizado) => {
+                              setMarcadoNoPainel(actualizado.id);
+                              marcarDesfecho(actualizado);
+                            }}
+                          />
+                        )}
 
                         {/* Próxima ação — o único passo seguinte, em destaque. Abre a
                           ferramenta certa dentro da área avançada. */}

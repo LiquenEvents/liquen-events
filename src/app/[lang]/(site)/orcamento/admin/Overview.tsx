@@ -10,6 +10,9 @@ import { metaFor } from "./status-meta";
 import { todayKey } from "./util";
 import { useRelogio } from "./relogio";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
+import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
+import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
+import { esperaEmPalavras } from "@/lib/orcamento/espera";
 
 /**
  * A chave `YYYY-MM-DD` LOCAL de um dia qualquer — a regra do `todayKey()` do
@@ -880,6 +883,102 @@ const PainelEquipa = memo(function PainelEquipa({ wonThisMonth }: { wonThisMonth
   );
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * À ESPERA DE RESPOSTA — o dinheiro que está pendurado
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * As propostas que seguiram há {@link DIAS_ATE_PERGUNTAR} dias ou mais e em que
+ * ninguém marcou nada. Não é um alarme: é a lista de quem se telefona hoje, com
+ * o valor ao lado para se ver de relance quanto está em jogo.
+ *
+ * Cada linha traz o gesto inteiro — «Ganho» e «Perdido» ali mesmo. Se para
+ * marcar fosse preciso abrir o pedido, o gesto voltava a ser um plano em vez de
+ * um toque, e o plano é justamente o que não estava a acontecer.
+ *
+ * Desaparece sozinha quando não há nenhuma. Uma secção que diz «nada aqui»
+ * todos os dias é uma secção que se deixa de ler.
+ */
+function AEsperaDeResposta({
+  linhas,
+  pendurado,
+  userName,
+  onOpen,
+  onQuoteAtualizado,
+}: {
+  linhas: { quote: Quote; dias: number; valor: number }[];
+  pendurado: number;
+  userName: string;
+  onOpen: (q: Quote) => void;
+  onQuoteAtualizado?: (q: Quote) => void;
+}) {
+  if (linhas.length === 0) return null;
+  return (
+    <section aria-labelledby="a-espera-de-resposta-titulo" className="bo-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 border-b border-foreground/[0.07]">
+        <div>
+          <h3 id="a-espera-de-resposta-titulo" className="bo-eyebrow">
+            À espera de resposta
+          </h3>
+          <p className="text-foreground/40 text-[11px] mt-1 leading-snug">
+            Propostas enviadas há {DIAS_ATE_PERGUNTAR} dias ou mais sem resposta marcada.
+          </p>
+        </div>
+        <div className="text-right">
+          <p
+            className="text-[#7c854b] font-bold leading-none"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(16px, 2vw, 22px)" }}
+          >
+            {eur(pendurado)}
+          </p>
+          <p className="text-foreground/35 text-[9px] tracking-[0.2em] uppercase mt-1">
+            pendurado em {linhas.length} proposta{linhas.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
+      <ul className="divide-y divide-foreground/[0.06]">
+        {linhas.slice(0, 8).map(({ quote, dias, valor }) => (
+          <li key={quote.id} className="px-5 py-3">
+            {/* A linha inteira é UM botão, com o mesmo desenho da «Atividade
+                recente» aqui em baixo: `w-full` mais `!justify-between`, para o
+                `alvo-toque` esticar em vez de centrar. O nome à esquerda, o
+                dinheiro à direita, e o rótulo dito por extenso para quem ouve o
+                ecrã (senão o nome acessível seria a linha toda seguida). */}
+            <button
+              type="button"
+              onClick={() => onOpen(quote)}
+              aria-label={`Abrir o pedido de ${quote.name}`}
+              className={`alvo-toque !justify-between w-full flex items-center justify-between gap-3 text-left rounded ${FOCUS_RING}`}
+            >
+              <span className="min-w-0">
+                <span className="block text-foreground/72 text-sm font-medium truncate">
+                  {quote.name}
+                </span>
+                <span className="block text-foreground/35 text-xs mt-0.5 truncate">
+                  {eventTypeLabel(quote)} · {esperaEmPalavras(dias)}
+                </span>
+              </span>
+              <span className="shrink-0 text-[#4d6350] text-sm font-semibold tabular-nums">
+                {eur(valor)}
+              </span>
+            </button>
+            <PerguntaDeDesfecho
+              quote={quote}
+              quem={userName}
+              onGravado={(q) => onQuoteAtualizado?.(q)}
+            />
+          </li>
+        ))}
+      </ul>
+      {linhas.length > 8 && (
+        <p className="px-5 py-3 text-foreground/35 text-[11px] border-t border-foreground/[0.06]">
+          e mais {linhas.length - 8} — vê-as todas na lista de pedidos.
+        </p>
+      )}
+    </section>
+  );
+}
+
 interface Props {
   quotes: Quote[];
   userName: string;
@@ -887,9 +986,23 @@ interface Props {
   onGoStats: () => void;
   onGo: (view: "pedidos" | "kanban" | "calendario" | "tarefas" | "propostas" | "clientes") => void;
   onNew: () => void;
+  /**
+   * O pedido tal como o servidor o devolveu depois de alguém marcar aqui o
+   * desfecho. Quem recebe actualiza a lista — sem isto, marcar «Ganho» na Visão
+   * Geral mudava o servidor e deixava o ecrã a dizer o contrário.
+   */
+  onQuoteAtualizado?: (q: Quote) => void;
 }
 
-export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, onNew }: Props) {
+export default function Overview({
+  quotes,
+  userName,
+  onOpen,
+  onGoStats,
+  onGo,
+  onNew,
+  onQuoteAtualizado,
+}: Props) {
   /**
    * ── O QUE AQUI DENTRO AINDA LÊ O RELÓGIO, E PORQUE É QUE FICA ─────────────
    *
@@ -1013,10 +1126,19 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
       (byStatus["pendente"] ?? 0) + (byStatus["em_revisao"] ?? 0) + (byStatus["cotado"] ?? 0);
     const pendingReview = (byStatus["pendente"] ?? 0) + (byStatus["em_revisao"] ?? 0);
 
+    /**
+     * As propostas que seguiram e em que ninguém marcou nada há uma semana ou
+     * mais. É a lista do dinheiro pendurado — ver `DIAS_ATE_PERGUNTAR` para o
+     * porquê dos sete dias.
+     */
+    const semResposta = aEsperaDeResposta(quotes, now);
+
     return {
       thisMonth,
       lastMonth,
       pipeline,
+      semResposta,
+      pendurado: totalPendurado(semResposta),
       won,
       wonThisMonth,
       wonLastMonth,
@@ -1307,42 +1429,55 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
         </button>
       )}
 
-      {/* KPI hero strip — the four-or-five numbers that matter most at a glance.
-          Each card is a shortcut into the view that acts on it. Labels are written
-          for a newcomer, with a one-line helper spelling out what each means. */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      {/**
+       * ══════════════════════════════════════════════════════════════════════
+       * OS TRÊS NÚMEROS, E O QUE CADA UM CONTA
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Palavras dela: «Não dá para perceber qual é o dinheiro que ganhamos.»
+       * Os três já existiam — estavam perdidos numa fila de cinco cartões, com
+       * rótulos («Valor em propostas», «Receita ganha») que descrevem uma
+       * coluna de base de dados e não uma pergunta. E a linha de apoio que este
+       * ficheiro já calculava, o `hint`, NUNCA CHEGAVA AO ECRÃ: só ia parar ao
+       * `aria-label`. Quem lê com os olhos nunca a viu.
+       *
+       * Agora são três, grandes, com a frase por baixo em letra pequena. Um
+       * número em que ela não confia vale zero, e ela disse-me que não percebia
+       * estes.
+       *
+       * ── OS RÓTULOS MUDARAM, OS NÚMEROS NÃO ───────────────────────────────
+       * «Receita ganha» → «Ganho» e «Valor em propostas» → «À espera» são a
+       * MESMA conta, com o nome que ela usa a falar. A regra da casa (ver o que
+       * se fez ontem ao tirar as facturas) é não mudar o significado de um
+       * número sem mudar o rótulo; mudar só o rótulo, mantendo a conta, é o que
+       * aqui se faz — e a frase por baixo diz exactamente qual é a conta.
+       */}
+      <div
+        role="group"
+        aria-label="Dinheiro — ganho, à espera e recebido"
+        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+      >
         {[
           {
-            v: String(data.active),
-            l: "Pedidos ativos",
-            hint: "ainda em aberto",
-            dark: true,
-            go: () => onGo("pedidos"),
-          },
-          {
-            v: String(data.pendingReview),
-            l: "Por responder",
-            hint: "aguardam proposta",
-            go: () => onGo("pedidos"),
+            v: eur(data.won),
+            l: "Ganho",
+            hint: "propostas que marcaste como ganhas, ao valor confirmado",
+            delta: { now: data.wonThisMonth, prev: data.wonLastMonth },
+            cor: "#3a5c39",
+            go: onGoStats,
           },
           {
             v: eur(data.pipeline),
-            l: "Valor em propostas",
-            hint: "enviadas, à espera de resposta",
+            l: "À espera",
+            hint: "propostas enviadas, ainda sem resposta marcada",
+            cor: "#7c854b",
             go: () => onGo("kanban"),
           },
           {
-            v: String(data.eventsThisWeek),
-            l: "Próximos 7 dias",
-            hint: "eventos agendados",
-            go: () => onGo("calendario"),
-          },
-          {
-            v: eur(data.won),
-            l: "Receita ganha",
-            hint: "propostas fechadas",
-            dark: true,
-            delta: { now: data.wonThisMonth, prev: data.wonLastMonth },
+            v: eur(data.received),
+            l: "Recebido",
+            hint: "pagamentos que já estão dados como recebidos",
+            cor: "#4d6350",
             go: onGoStats,
           },
         ].map((k) => (
@@ -1350,23 +1485,81 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
             key={k.l}
             onClick={k.go}
             aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
-            className={`group relative overflow-hidden rounded-xl p-5 border text-left transition-colors duration-200 motion-reduce:transition-none bg-[var(--bo-surface)] border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
+            className={`rounded-2xl p-5 border text-left transition-colors duration-200 motion-reduce:transition-none bg-[var(--bo-surface)] border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
-            <div className="flex items-start justify-between gap-2 relative">
+            <div className="flex items-start justify-between gap-2">
               <p
-                className="font-bold leading-none mb-2 text-[var(--bo-text)]"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 2.4vw, 30px)" }}
+                className="font-bold leading-none"
+                style={{
+                  fontFamily: "var(--font-playfair)",
+                  fontSize: "clamp(24px, 3vw, 34px)",
+                  color: k.cor,
+                }}
               >
                 {k.v}
               </p>
               {k.delta && <Delta now={k.delta.now} prev={k.delta.prev} />}
             </div>
-            <p className="text-[9px] tracking-[0.25em] uppercase relative font-medium text-[var(--bo-text-faint)]">
+            <p className="mt-2 text-[10px] tracking-[0.25em] uppercase font-semibold text-[var(--bo-text)]">
               {k.l}
             </p>
+            {/* A LETRA PEQUENA QUE FALTAVA. Não é decoração: é a diferença
+                entre um número e um número em que se confia. */}
+            <p className="mt-1 text-[11px] leading-snug text-foreground/45">{k.hint}</p>
           </button>
         ))}
       </div>
+
+      {/* Os contadores de trabalho — quantos, e não quanto. Ficam por baixo dos
+          três de dinheiro, e trazem agora a mesma linha de apoio à vista. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          {
+            v: String(data.active),
+            l: "Pedidos ativos",
+            hint: "ainda em aberto, seja em que fase for",
+            go: () => onGo("pedidos"),
+          },
+          {
+            v: String(data.pendingReview),
+            l: "Por responder",
+            hint: "esperam uma proposta nossa",
+            go: () => onGo("pedidos"),
+          },
+          {
+            v: String(data.eventsThisWeek),
+            l: "Próximos 7 dias",
+            hint: "eventos já agendados",
+            go: () => onGo("calendario"),
+          },
+        ].map((k) => (
+          <button
+            key={k.l}
+            onClick={k.go}
+            aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
+            className={`rounded-xl p-4 border text-left transition-colors duration-200 motion-reduce:transition-none bg-[var(--bo-surface)] border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
+          >
+            <p
+              className="font-bold leading-none text-[var(--bo-text)]"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2.2vw, 26px)" }}
+            >
+              {k.v}
+            </p>
+            <p className="mt-2 text-[9px] tracking-[0.25em] uppercase font-medium text-[var(--bo-text-faint)]">
+              {k.l}
+            </p>
+            <p className="mt-1 text-[11px] leading-snug text-foreground/40">{k.hint}</p>
+          </button>
+        ))}
+      </div>
+
+      <AEsperaDeResposta
+        linhas={data.semResposta}
+        pendurado={data.pendurado}
+        userName={userName}
+        onOpen={onOpen}
+        onQuoteAtualizado={onQuoteAtualizado}
+      />
 
       <PainelEquipa wonThisMonth={data.wonThisMonth} />
 

@@ -55,6 +55,17 @@ vi.mock("@/lib/quotes-store", () => ({
   updateQuote: store.update,
   deleteQuote: store.remove,
 }));
+/**
+ * A sementeira do plano de produção, espiada.
+ *
+ * Estava por espiar porque nunca era chamada a sério: o esboço da loja não
+ * expõe o `updateQuoteWith`, a chamada rebentava e o `try` de melhor esforço da
+ * rota engolia o erro em silêncio. Um caminho que só passava por sorte não é um
+ * caminho guardado — e este é o que herdou o trabalho do botão «Aceitar
+ * proposta» que saiu.
+ */
+const semeador = vi.hoisted(() => ({ semear: vi.fn(async () => {}) }));
+vi.mock("@/lib/semear-producao", () => ({ semearProducaoAoGanhar: semeador.semear }));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: vi.fn(async () => rl.result),
@@ -63,8 +74,11 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 
 import { GET, PATCH, DELETE } from "./route";
+import { corpoDaMarcacao } from "@/lib/orcamento/desfecho";
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
+/** O último patch que a rota mandou gravar. */
+const gravadoNaLoja = () => store.update.mock.calls.at(-1)?.[1] as Record<string, unknown>;
 function req(method: "GET" | "PATCH" | "DELETE", body?: unknown): NextRequest {
   return new Request("https://liquen.test/api/orcamento/LIQ-1", {
     method,
@@ -435,5 +449,69 @@ describe("PATCH /api/orcamento/[id] — o estado segue o que se registou", () =>
     await PATCH(req("PATCH", { adminNotes: "combinado por telefone" }), ctx("LIQ-1"));
     expect(store.get).not.toHaveBeenCalled();
     expect(gravado()).toEqual({ adminNotes: "combinado por telefone" });
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O GESTO NOVO PASSA PELA MESMA PORTA — E A PRODUÇÃO ARRANCA PREENCHIDA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A pergunta «Já responderam?» do back office grava por AQUI, com o corpo que o
+ * `corpoDaMarcacao` constrói. Se um dia esse corpo deixar de trazer o `status`
+ * — ou se alguém lhe der uma rota «mais directa» — a marcação continuava a
+ * parecer que resultava e a equipa perdia o plano de produção pré-preenchido,
+ * sem ninguém ligar a perda ao gesto novo. É exactamente o que aconteceu quando
+ * o botão «Aceitar proposta» do cliente saiu.
+ */
+describe("marcar o desfecho pela pergunta do back office", () => {
+  const corpo = (desfecho: "ganho" | "perdido", valor?: number) =>
+    corpoDaMarcacao({
+      desfecho,
+      valor,
+      quem: "Catarina",
+      quando: "2026-08-14T09:00:00.000Z",
+      id: () => "entrada-1",
+    });
+
+  it("marcar «Ganho» semeia a produção, como o botão que saiu fazia", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    const res = await PATCH(req("PATCH", corpo("ganho", 4600)), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(gravadoNaLoja()).toMatchObject({ status: "aceite", quotedPrice: 4600 });
+    expect(semeador.semear).toHaveBeenCalledWith("LIQ-1", expect.any(String));
+  });
+
+  it("marcar «Perdido» não semeia nada", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    const res = await PATCH(req("PATCH", corpo("perdido")), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(gravadoNaLoja()).toMatchObject({ status: "rejeitado" });
+    expect(semeador.semear).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Um pedido perdido que se corrige para ganho é um pedido ganho: a produção
+   * arranca na mesma, e a sementeira é idempotente (só preenche o que está
+   * vazio), por isso corrigir para trás e para a frente não duplica tarefas.
+   */
+  it("corrigir um pedido perdido para ganho semeia à mesma", async () => {
+    authed.ok = true;
+    store.override = { status: "rejeitado" };
+    await PATCH(req("PATCH", corpo("ganho", 5000)), ctx("LIQ-1"));
+    expect(gravadoNaLoja()).toMatchObject({ status: "aceite", quotedPrice: 5000 });
+    expect(semeador.semear).toHaveBeenCalledTimes(1);
+  });
+
+  /** O valor confirmado vai para o `quotedPrice` — e não para um campo novo. */
+  it("o valor confirmado escreve no mesmo sítio que a Visão Geral soma", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    await PATCH(req("PATCH", corpo("ganho", 0)), ctx("LIQ-1"));
+    const escrito = gravadoNaLoja();
+    expect(escrito.quotedPrice).toBe(0);
+    expect(Object.keys(escrito)).not.toContain("valorGanho");
   });
 });
