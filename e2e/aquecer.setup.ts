@@ -68,11 +68,33 @@ setup("aquecer as rotas pesadas do back office", async ({ page }) => {
     await expect(page.getByLabel(/^Linha 1 do grupo 1$/).first()).toBeVisible({ timeout: 8_000 });
   }).toPass({ timeout: 120_000 });
 
-  // O dossier do evento, que é outra rota e outro pacote.
-  await page.goto(`/orcamento/admin/evento/${quoteId}`);
-  await expect(page.getByText(/Estúdio de propostas \(PDF\)/i).first()).toBeVisible({
-    timeout: 90_000,
-  });
+  /**
+   * O dossier do evento, que é outra rota e outro pacote.
+   *
+   * ── PORQUE É QUE ISTO INSISTE, COMO OS PASSOS DE CIMA ─────────────────────
+   *
+   * Era uma espera única de 90 s e caiu no CI. O que caiu NÃO foi o estúdio: o
+   * passo anterior já o tinha aberto e visto («Linha 1 do grupo 1»). Caiu esta
+   * ROTA, que compila um segundo pacote pesado — o dossier puxa o mesmo estúdio
+   * por carregamento preguiçoso, e a página do back office tinha acabado de
+   * crescer ~2000 linhas com o gesto de «Ganho / Perdido».
+   *
+   * A assimetria é que era o defeito: os dois passos de cima já insistiam com
+   * 120 s (`toPass`) precisamente por isto, e este ficara com uma espera seca
+   * mais curta do que a deles. Passa a insistir pelo mesmo caminho, e com um
+   * `reload` entre tentativas — uma navegação que apanhe o pacote a meio da
+   * compilação não se resolve esperando na mesma página.
+   *
+   * Este ficheiro é o AQUECIMENTO: a função dele é absorver a primeira
+   * compilação para que os passeios a seguir não lhe paguem. Ser generoso aqui
+   * é o objectivo, não um remendo.
+   */
+  await expect(async () => {
+    await page.goto(`/orcamento/admin/evento/${quoteId}`);
+    await expect(page.getByText(/Estúdio de propostas \(PDF\)/i).first()).toBeVisible({
+      timeout: 30_000,
+    });
+  }).toPass({ timeout: 180_000 });
 
   // A vista de carregamento de material partilha o invólucro do back office mas
   // tem rota própria; um id inexistente serve para a compilar (o que interessa
