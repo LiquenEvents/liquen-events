@@ -26,7 +26,6 @@ vi.mock("@/lib/proposals-store", () => ({
 vi.mock("next/image", () => ({ default: () => null }));
 // O bloco de resposta é um Client Component com estado próprio e testes seus;
 // aqui interessa a página, por isso entra como um marcador.
-vi.mock("./ProposalResponse", () => ({ default: () => <div data-testid="resposta" /> }));
 /**
  * O dicionário do duplo DEPENDE da língua, ao contrário do que estava aqui
  * antes (devolvia sempre o português). Sem isso, um teste sobre «esta página
@@ -56,6 +55,8 @@ vi.mock("@/lib/i18n", () => ({
             validoAte: "Valid until",
             verPdf: "View the full proposal (PDF)",
             footerNote: "…",
+            respostaComo: "Let us know by email or by phone whether you would like to go ahead.",
+            respostaExpirada: "This proposal is past its validity date.",
             dateLocale: "en-GB",
           }
         : {
@@ -75,6 +76,8 @@ vi.mock("@/lib/i18n", () => ({
             validoAte: "Válida até",
             verPdf: "Ver a proposta completa (PDF)",
             footerNote: "…",
+            respostaComo: "Diga-nos por e-mail ou por telefone se quer avançar com esta proposta.",
+            respostaExpirada: "O prazo de validade desta proposta já passou.",
             dateLocale: "pt-PT",
           },
   }),
@@ -124,8 +127,9 @@ describe("página pública da proposta — o botão do PDF", () => {
     db.proposal = proposta();
     await abrir();
     expect(screen.queryByRole("link", { name: /PDF/i })).toBeNull();
-    // E a página continua a servir para o que serve: rever o valor e responder.
-    expect(screen.getByTestId("resposta")).toBeTruthy();
+    // E a página continua a servir para o que serve: rever o valor e saber como
+    // responder — por email ou por telefone, que é a única forma que há.
+    expect(screen.getByText(/por e-mail ou por telefone/i)).toBeTruthy();
   });
 
   it("um token inválido não chega sequer a mostrar uma proposta", async () => {
@@ -303,7 +307,7 @@ describe("página pública da proposta — o cumprimento", () => {
     await abrir();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá.");
     // E continua a ser a página da proposta, não uma página de erro.
-    expect(screen.getByTestId("resposta")).toBeTruthy();
+    expect(screen.getByText(/por e-mail ou por telefone/i)).toBeTruthy();
   });
 
   it("em inglês, a mesma regra", async () => {

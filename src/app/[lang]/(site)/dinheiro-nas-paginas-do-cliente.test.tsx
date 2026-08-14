@@ -47,7 +47,6 @@ vi.mock("@/lib/proposals-store", () => ({
   getProposalByQuote: vi.fn(async () => null),
 }));
 vi.mock("next/image", () => ({ default: () => null }));
-vi.mock("./proposta/[token]/ProposalResponse", () => ({ default: () => <div /> }));
 
 import ProposalPage from "./proposta/[token]/page";
 import PortalView from "./portal/[token]/PortalView";

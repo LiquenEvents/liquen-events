@@ -839,15 +839,21 @@ describe("TOKEN-guarded routes deny a bad token", () => {
     expect(calls).toEqual([]); // nunca chegou à proposta nem ao gerador
   });
 
-  it("POST /api/proposta (accept link) → 401 on a bad/forged token, no mutation", async () => {
-    const fn = await handler("./proposta/route", "POST");
-    const res = await fn(
-      req("POST", "/api/proposta", { token: "bad-token", action: "aceitar" }),
-      ctx(),
-    );
-    expect(res.status).toBe(401);
-    expect(calls).not.toContain("proposals-store.updateProposal");
-    expect(calls).not.toContain("contracts-store.createContractIfAbsent");
+  /**
+   * A ROTA DO ACEITE JÁ NÃO EXISTE, E É ISSO QUE SE AUDITA AGORA.
+   *
+   * Havia aqui um teste a provar que ela recusava um token forjado. Recusava —
+   * mas a dona da casa mandou tirar o botão de aceitar do lado do cliente («não
+   * quero que eles cliquem num botão para aceitarem a proposta»), e uma rota
+   * que grava decisões do casal não pode ficar de pé só porque estava bem
+   * guardada: uma ligação antiga numa caixa de correio continuava a poder
+   * escrever um «aceito» que ninguém quis.
+   *
+   * O guarda passa a ser a AUSÊNCIA. A prova de que nada foi esquecido está em
+   * `proposta/[token]/nada-de-aceitar-por-botao.test.ts`.
+   */
+  it("POST /api/proposta (o aceite do cliente) já não existe", async () => {
+    await expect(handler("./proposta/route", "POST")).rejects.toThrow();
   });
 });
 

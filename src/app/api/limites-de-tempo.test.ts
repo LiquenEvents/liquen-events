@@ -48,7 +48,8 @@ const PESADAS: { rota: string; faz: string; minimo: number }[] = [
   { rota: "temas/[id]/miniaturas", faz: "fabrica miniaturas em lote", minimo: 30 },
   { rota: "temas/[id]/imagens/copiar", faz: "copia fotos entre pastas", minimo: 30 },
   { rota: "contratos/[id]/pdf", faz: "desenha o PDF do contrato", minimo: 20 },
-  { rota: "proposta", faz: "o aceite: contrato, PDF e dois emails", minimo: 30 },
+  // A rota do aceite do cliente saiu (ver `nada-de-aceitar-por-botao.test.ts`):
+  // a proposta passa a ser aceite pela conversa, e marcada no back office.
   { rota: "proposta/[token]/pdf", faz: "serve o PDF da proposta ao cliente", minimo: 20 },
   { rota: "portal/[token]/proposta-pdf", faz: "o mesmo, pelo portal", minimo: 20 },
   { rota: "portal/[token]/contrato-pdf", faz: "o contrato, pelo portal", minimo: 20 },

@@ -809,7 +809,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — a língua com que se desenha
  * Palavras dela: as propostas têm de poder ser feitas e traduzidas «de uma
  * forma espetacularmente bem». Um PDF inglês dentro de um email português não
  * é isso: o casal inglês recebia «A sua proposta — Líquen Events», «Segue em
- * anexo…» e um botão «Ver e responder à proposta →» para chegar a um documento
+ * anexo…» e um botão «Ver a proposta →» para chegar a um documento
  * que percebia.
  *
  * O que este bloco guarda: o inglês é inglês do assunto ao nome do anexo, e o
@@ -840,8 +840,8 @@ describe("POST /api/orcamento/[id]/proposta-doc — o email sai na língua da pr
     expect(email.html).toContain("Your proposal — Líquen Events");
     expect(email.html).toContain("Hello Maria &amp; Zé,");
     expect(email.html).toContain("Please find attached the proposal");
-    expect(email.html).toContain("View and reply to the proposal");
-    expect(email.text).toContain("View and reply online:");
+    expect(email.html).toContain("View the proposal");
+    expect(email.text).toContain("View online:");
     // E não sobra uma palavra portuguesa do corpo antigo.
     expect(email.html).not.toContain("Olá Maria");
     expect(email.html).not.toContain("Segue em anexo");
@@ -865,7 +865,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — o email sai na língua da pr
     expect(email.html).toContain("A sua proposta — Líquen Events");
     expect(email.html).toContain("Olá Maria &amp; Zé,");
     expect(email.html).toContain("Segue em anexo a proposta personalizada para o seu evento.");
-    expect(email.html).toContain("Ver e responder à proposta");
+    expect(email.html).toContain("Ver a proposta");
     expect(enviado().attachments?.find((a) => a.filename.endsWith(".pdf"))?.filename).toBe(
       "Proposta-Liquen-q1.pdf",
     );
@@ -1027,7 +1027,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — a mensagem pessoal", () => {
     // Depois do olá, antes da moldura: o que é dela é o que se lê primeiro.
     expect(dela).toBeGreaterThan(html.indexOf("Olá "));
     expect(dela).toBeLessThan(html.indexOf("Segue em anexo"));
-    expect(dela).toBeLessThan(html.indexOf("Ver e responder"));
+    expect(dela).toBeLessThan(html.indexOf("Ver a proposta"));
     // A versão em texto conta a mesma história pela mesma ordem — duas
     // alternativas que divergem são, por si só, um sinal de spam.
     const noTexto = text.indexOf("Foi um gosto conhecer-vos na quinta.");

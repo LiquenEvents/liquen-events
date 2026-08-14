@@ -773,36 +773,11 @@ export const pt = {
     validoAte: "Válida até",
     verPdf: "Ver a proposta completa (PDF)",
     footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos:",
+    respostaComo:
+      "Diga-nos por e-mail ou por telefone se quer avançar com esta proposta. Respondemos a todas as mensagens.",
+    respostaExpirada:
+      "O prazo de validade desta proposta já passou. Fale connosco e preparamos-lhe uma proposta atualizada com todo o gosto.",
     dateLocale: "pt-PT",
-    response: {
-      confirmRecusar: "Tem a certeza que pretende recusar a proposta?",
-      confirmAceitar: "Confirma que pretende aceitar esta proposta?",
-      aceiteTitle: "Proposta aceite. Obrigado!",
-      aceiteBody:
-        "Que alegria avançar consigo. A nossa equipa entra em contacto em breve com os próximos passos.",
-      rejeitadaTitle: "Resposta registada.",
-      rejeitadaBody:
-        "Obrigado por nos dizer. Se mudar de ideias ou quiser ajustar algo, estamos sempre ao dispor.",
-      jaRegistado: "Já tínhamos registado a sua resposta a esta proposta.",
-      expiradaTitle: "Esta proposta expirou.",
-      expiradaBody:
-        "O prazo de validade desta proposta já passou, por isso não é possível aceitá-la aqui. Fale connosco e preparamos-lhe uma proposta atualizada com todo o gosto.",
-      aceitar: "Aceitar proposta →",
-      aceitarSending: "A registar…",
-      recusar: "Recusar proposta",
-      recusarSending: "A registar…",
-      errorFallback: "Não foi possível registar a sua resposta.",
-      errorGeneric: "Erro. Tente novamente.",
-      errorSuffix: "Em alternativa,",
-      errorLink: "escreva-nos",
-    },
-    terms: {
-      toggle: "Ler os Termos e Condições",
-      checkboxLabel: "Li e aceito os Termos e Condições",
-      nameLabel: "Nome de quem aceita",
-      namePlaceholder: "O seu nome completo",
-      missing: "Para aceitar, confirme os termos e indique o seu nome.",
-    },
   },
 
   portal: {
@@ -840,7 +815,7 @@ export const pt = {
       download: "Descarregar contrato (PDF)",
       pendingTitle: "Aceitação pendente",
       pendingBody:
-        "Depois de rever a proposta, poderá aceitar as condições através do link que lhe enviámos por e-mail. Ficamos a aguardar.",
+        "Depois de rever a proposta, diga-nos por e-mail ou por telefone se quer avançar. Ficamos a aguardar.",
     },
     pagamentos: {
       title: "Pagamentos",

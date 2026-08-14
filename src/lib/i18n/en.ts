@@ -701,36 +701,11 @@ export const en: Dict = {
     validoAte: "Valid until",
     verPdf: "View the full proposal (PDF)",
     footerNote: "Any questions or changes? Reply to this email or contact us:",
+    respostaComo:
+      "Let us know by email or by phone whether you would like to go ahead with this proposal. We reply to every message.",
+    respostaExpirada:
+      "This proposal is past its validity date. Talk to us and we will gladly prepare an updated one.",
     dateLocale: "en-GB",
-    response: {
-      confirmRecusar: "Are you sure you want to decline the proposal?",
-      confirmAceitar: "Do you confirm you want to accept this proposal?",
-      aceiteTitle: "Proposal accepted. Thank you!",
-      aceiteBody:
-        "We're delighted to move forward with you. Our team will be in touch shortly with next steps.",
-      rejeitadaTitle: "Response recorded.",
-      rejeitadaBody:
-        "Thank you for letting us know. If you change your mind or want to adjust anything, we're always here.",
-      jaRegistado: "We had already recorded your response to this proposal.",
-      expiradaTitle: "This proposal has expired.",
-      expiradaBody:
-        "This proposal's validity date has passed, so it can no longer be accepted here. Get in touch and we'll gladly prepare an updated proposal for you.",
-      aceitar: "Accept proposal →",
-      aceitarSending: "Recording…",
-      recusar: "Decline proposal",
-      recusarSending: "Recording…",
-      errorFallback: "We couldn't record your response.",
-      errorGeneric: "Error. Please try again.",
-      errorSuffix: "Alternatively,",
-      errorLink: "email us",
-    },
-    terms: {
-      toggle: "Read the Terms & Conditions",
-      checkboxLabel: "I have read and accept the Terms & Conditions",
-      nameLabel: "Name of who is accepting",
-      namePlaceholder: "Your full name",
-      missing: "To accept, please confirm the terms and enter your name.",
-    },
   },
 
   portal: {

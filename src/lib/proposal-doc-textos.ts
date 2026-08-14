@@ -364,8 +364,7 @@ const PT: TextosDoDocumento = {
   tituloCondicoes: "Condições Gerais",
 
   proximosPassos: "Próximos Passos",
-  passoAceitar:
-    "Para confirmar esta proposta, basta aceitá-la online através da ligação enviada no e-mail, ou responder-nos diretamente.",
+  passoAceitar: "Para confirmar esta proposta, basta responder-nos por e-mail ou por telefone.",
   passoSinal: "A reserva da data só fica garantida após o pagamento do sinal.",
   passoValidade: (data) => `Esta proposta é válida até ${data}.`,
   observacoesGerais: "Observações Gerais",
@@ -464,8 +463,7 @@ const EN: TextosDoDocumento = {
   // «email» sem hífen, aqui e em toda a moldura inglesa: o rótulo do bloco de
   // contactos já é «Email», e duas grafias da mesma palavra na mesma folha leem-
   // se como descuido. É também a grafia que a casa usa em prosa no portal.
-  passoAceitar:
-    "To confirm this proposal, simply accept it online using the link in our email, or reply to us directly.",
+  passoAceitar: "To confirm this proposal, simply reply to us by email or by phone.",
   passoSinal: "The date is only secured once the deposit has been paid.",
   passoValidade: (data) => `This proposal is valid until ${data}.`,
   observacoesGerais: "General Remarks",
