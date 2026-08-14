@@ -740,7 +740,7 @@ export const en: Dict = {
       download: "Download contract (PDF)",
       pendingTitle: "Acceptance pending",
       pendingBody:
-        "Once you've reviewed the proposal, you can accept the terms through the link we sent you by email. We look forward to it.",
+        "Once you've reviewed the proposal, let us know by email or by phone whether you'd like to go ahead. We look forward to hearing from you.",
     },
     pagamentos: {
       title: "Payments",

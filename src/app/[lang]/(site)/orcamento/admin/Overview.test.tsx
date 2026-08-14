@@ -139,7 +139,7 @@ function cartaoNotas(): HTMLElement {
 /**
  * ── O RELÓGIO FICA PARADO, E ISTO NÃO É ZELO A MAIS ───────────────────────
  *
- * Dois testes deste ficheiro afirmam percentagens ("33%", "25%") que o
+ * Dois testes deste ficheiro afirmam percentagens ("41%", "31%") que o
  * `Overview` calcula sobre a receita GANHA ESTE MÊS. O pedido de mentira aqui
  * em cima tem `lastUpdated: 2026-07-20`, portanto conta como "este mês"
  * enquanto o relógio da máquina estiver em Julho de 2026 — e deixa de contar à
@@ -208,8 +208,9 @@ describe("as notas vêm do servidor", () => {
   it("mostra a meta de receita guardada no servidor", async () => {
     servidor.meta = campo("meta", "15000", 1);
     desenhar();
-    // 5000 ganhos este mês contra uma meta de 15000 → 33%.
-    expect(await screen.findByText("33%")).toBeInTheDocument();
+    // O «Preço final» de 5000 € é SEM IVA; o ganho do mês conta-se com IVA,
+    // como o resto do dinheiro deste ecrã: 5000 x 1,23 = 6150 de 15000 → 41%.
+    expect(await screen.findByText("41%")).toBeInTheDocument();
   });
 
   it("enquanto lê não diz 'Sem notas.' (isso seria afirmar que não há nenhuma)", async () => {
@@ -279,8 +280,8 @@ describe("gravar", () => {
 
     await waitFor(() => expect(gravacoes).toHaveLength(1));
     expect(gravacoes[0]).toEqual({ id: "meta", value: "20000", baseRevision: 0 });
-    // 5000 de 20000 → 25%, e o editor fechou.
-    expect(await screen.findByText("25%")).toBeInTheDocument();
+    // 5000 sem IVA = 6150 com IVA, de 20000 → 31%, e o editor fechou.
+    expect(await screen.findByText("31%")).toBeInTheDocument();
   });
 
   it("gravar as notas não deixa o texto no localStorage (deixou de ser onde ele vive)", async () => {

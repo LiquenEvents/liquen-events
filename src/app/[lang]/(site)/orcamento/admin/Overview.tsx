@@ -12,6 +12,7 @@ import { useRelogio } from "./relogio";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
+import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { esperaEmPalavras } from "@/lib/orcamento/espera";
 
 /**
@@ -532,7 +533,10 @@ const MetaReceita = memo(function MetaReceita({
   return (
     <div className="bo-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="bo-eyebrow">Meta de receita — este mês</h3>
+        {/* A meta mede-se contra o mesmo «Ganho» da fila de cima, que passou a
+            ser com IVA. Dizê-lo aqui é o que impede a barra de parecer mais
+            fácil de encher sem nada ter mudado do lado do negócio. */}
+        <h3 className="bo-eyebrow">Meta de receita (com IVA) — este mês</h3>
         {!editingGoal && carga !== "erro" && (
           <button
             onClick={() => {
@@ -1050,8 +1054,29 @@ export default function Overview({
 
     for (const q of quotes) {
       byStatus[q.status] = (byStatus[q.status] ?? 0) + 1;
-      if (q.status === "cotado" && q.quotedPrice) pipeline += q.quotedPrice;
-      if (q.status === "aceite" && q.quotedPrice) won += q.quotedPrice;
+      /**
+       * ── OS TRÊS NÚMEROS TÊM DE ESTAR NA MESMA UNIDADE ────────────────────
+       *
+       * «Ganho» e «Recebido» estão lado a lado na mesma fila, e estavam em
+       * unidades diferentes: o Ganho somava `quotedPrice`, que é o campo
+       * «Preço final (SEM IVA)» do ecrã, e o Recebido soma linhas de pagamento,
+       * que são COM IVA. Um casamento integralmente pago mostrava Recebido 23%
+       * acima do Ganho — o que se lê como um erro de contas, e ensina a não
+       * confiar na fila inteira.
+       *
+       * A casa já tinha corrigido este mesmo erro duas vezes, e deixou as duas
+       * escritas: em `Reminders.tsx` («os dois ramos NÃO estão na mesma
+       * unidade») e em `PaymentsPanel.tsx» («deixava o "Em falta" errado em
+       * ~23%»). Este era o ecrã que faltava — e é o primeiro que ela abre.
+       *
+       * `contractedAmounts` é a mesma cascata que o dossier, os lembretes e o
+       * painel de pagamentos já usam: proposta > preço cotado > estimativa,
+       * sempre devolvida com IVA. Sem proposta à mão aqui, o ramo do
+       * `quotedPrice` deriva o bruto pela taxa efectiva do pedido.
+       */
+      const contratado = q.quotedPrice != null ? contractedAmounts(q).gross : 0;
+      if (q.status === "cotado" && q.quotedPrice) pipeline += contratado;
+      if (q.status === "aceite" && q.quotedPrice) won += contratado;
       for (const p of q.payments ?? []) {
         if (p.paid) received += p.amount;
         else outstanding += p.amount;
@@ -1071,8 +1096,8 @@ export default function Overview({
       if (q.status === "aceite" && q.quotedPrice) {
         const wd = new Date(q.lastUpdated ?? q.submittedAt);
         const wKey = `${wd.getFullYear()}-${wd.getMonth()}`;
-        if (wKey === thisMonthKey) wonThisMonth += q.quotedPrice;
-        if (wKey === lastMonthKey) wonLastMonth += q.quotedPrice;
+        if (wKey === thisMonthKey) wonThisMonth += contratado;
+        if (wKey === lastMonthKey) wonLastMonth += contratado;
       }
     }
 
@@ -1112,7 +1137,19 @@ export default function Overview({
     const accepted = byStatus["aceite"] ?? 0;
     const decided = accepted + (byStatus["rejeitado"] ?? 0);
     const conversion = decided > 0 ? Math.round((accepted / decided) * 100) : 0;
-    const avgTicket = accepted > 0 ? won / accepted : 0;
+    /**
+     * O denominador do valor médio é quem TEM preço, não quem foi ganho.
+     *
+     * `won` só soma os aceites com `quotedPrice` preenchido; dividir pelo total
+     * de aceites metia no denominador casamentos que não entraram no
+     * numerador, e o «valor médio por evento ganho» saía sistematicamente
+     * abaixo da verdade — mais abaixo quanto mais pedidos ganhos estivessem
+     * por preencher, que é precisamente quando o número é mais consultado.
+     */
+    const acceptedComPreco = quotes.filter(
+      (q) => q.status === "aceite" && q.quotedPrice != null,
+    ).length;
+    const avgTicket = acceptedComPreco > 0 ? won / acceptedComPreco : 0;
     // `billed` é o total REGISTADO (recebido + a receber) das linhas de
     // pagamento — nunca leu o livro de facturas, nem quando ele existia. O nome
     // ficou da altura em que a casa facturava aqui; não é mostrado em lado
@@ -1491,7 +1528,7 @@ export default function Overview({
           {
             v: eur(data.won),
             l: "Ganho",
-            hint: "propostas que marcaste como ganhas, ao valor confirmado",
+            hint: "propostas que marcaste como ganhas, ao valor confirmado com IVA",
             delta: { now: data.wonThisMonth, prev: data.wonLastMonth },
             cor: "#3a5c39",
             go: onGoStats,
@@ -1499,7 +1536,7 @@ export default function Overview({
           {
             v: eur(data.pipeline),
             l: "À espera",
-            hint: "propostas enviadas, ainda sem resposta marcada",
+            hint: "propostas enviadas, ainda sem resposta marcada, com IVA",
             cor: "#7c854b",
             go: () => onGo("kanban"),
           },
