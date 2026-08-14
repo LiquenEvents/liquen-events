@@ -1,5 +1,5 @@
 import type { Quote, QuoteStatus } from "./types";
-import { kmDeEvora, localizar } from "@/lib/geo/portugal";
+import { BASE_OMISSAO, kmEntre, localizar } from "@/lib/geo/portugal";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -79,19 +79,26 @@ export function provavelDestination(q: Quote): boolean {
 export interface Contexto {
   /** A terra ou região reconhecida no local escrito, se houver. */
   regiao: string | null;
-  /** Distância a Évora, quando dá para a saber. */
+  /** Distância à sede, quando dá para a saber. */
   km: number | null;
   /** A distância foi medida sobre uma região inteira, não sobre uma terra. */
   aproximado: boolean;
   destination: boolean;
 }
 
-/** Tudo o que a lista precisa de saber sobre ONDE é este pedido. */
-export function contextoDeLocal(q: Quote): Contexto {
+/**
+ * Tudo o que a lista precisa de saber sobre ONDE é este pedido.
+ *
+ * `base` é a sede — o sítio de onde a distância se conta. Tem valor de partida
+ * porque esta função é chamada de dentro de uma linha da lista, que não lê as
+ * definições da casa: sem base dada, mede-se de Évora, exactamente como se
+ * media quando Évora estava escrita à letra aqui dentro.
+ */
+export function contextoDeLocal(q: Quote, base: string = BASE_OMISSAO): Contexto {
   const l = localizar(q.location);
   return {
     regiao: l?.lugar.nome ?? null,
-    km: kmDeEvora(q.location),
+    km: kmEntre(base, q.location),
     aproximado: Boolean(l?.aproximado),
     destination: provavelDestination(q),
   };

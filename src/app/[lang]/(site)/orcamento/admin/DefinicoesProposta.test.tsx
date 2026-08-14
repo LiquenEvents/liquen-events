@@ -17,6 +17,7 @@ const NUNCA = "1970-01-01T00:00:00.000Z";
 
 const parametros = (over: Record<string, unknown> = {}) => ({
   deslocacao: {
+    base: "Évora",
     consumoLPor100Km: 9,
     precoLitro: 1.65,
     portagensPorKm: 0.09,
@@ -238,6 +239,83 @@ describe("um número que não serve não é gravado às escondidas", () => {
       expect(screen.getAllByText(/Não pode ser maior que 20/).length).toBeGreaterThan(0),
     );
     expect(enviados).toHaveLength(0);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «EU QUERO QUE SE ADAPTE A QUALQUER SÍTIO»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A sede estava escrita à letra no código — Évora, em cinco sítios diferentes.
+ * Passa a ser um campo, com Évora por omissão, e tudo o que a pressupunha lê
+ * daqui: os exemplos deste ecrã, a franquia, e a conta de cada proposta.
+ */
+describe("o local da sede", () => {
+  it("aparece com Évora por omissão, e diz para que serve", async () => {
+    montar();
+    const campo = (await screen.findByLabelText(/Local da sede/)) as HTMLInputElement;
+    expect(campo.value).toBe("Évora");
+  });
+
+  it("mudar a sede muda os exemplos, antes de gravar", async () => {
+    montar();
+    // Com a casa em Évora, ir ao Porto é a viagem longa e Évora é isenta.
+    await waitFor(() => expect(screen.getByText(/Porto:/)).toBeTruthy());
+    expect(screen.getByText(/Porto: ?/)?.parentElement?.textContent).toMatch(/ida e volta/);
+
+    const campo = (await screen.findByLabelText(/Local da sede/)) as HTMLInputElement;
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "Porto");
+
+    // Com a casa no Porto, é o Porto que passa a estar dentro da isenção.
+    await waitFor(() =>
+      expect(screen.getByText(/Porto:/)?.parentElement?.textContent).toMatch(
+        /sem deslocação a cobrar/,
+      ),
+    );
+    expect(enviados).toHaveLength(0);
+  });
+
+  it("grava-se com os outros números da deslocação", async () => {
+    montar();
+    const campo = (await screen.findByLabelText(/Local da sede/)) as HTMLInputElement;
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "Setúbal");
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar deslocação" }));
+    await waitFor(() => expect(enviados).toHaveLength(1));
+    expect(enviados[0].body.valor).toMatchObject({ base: "Setúbal", precoLitro: 1.65 });
+  });
+
+  it("uma sede em branco não se grava às escondidas", async () => {
+    // O mesmo defeito dos números: o campo apagado deixava seguir o valor
+    // ANTIGO com um «Guardado» a verde por cima.
+    montar();
+    const campo = (await screen.findByLabelText(/Local da sede/)) as HTMLInputElement;
+    await userEvent.clear(campo);
+
+    await userEvent.click(screen.getByRole("button", { name: "Guardar deslocação" }));
+    await waitFor(() =>
+      expect(screen.getAllByText(/Escreve a terra de onde parte/).length).toBeGreaterThan(0),
+    );
+    expect(enviados).toHaveLength(0);
+    expect(screen.queryByText(/As propostas seguintes já usam estes valores/)).toBeNull();
+  });
+
+  it("uma sede que a tabela não conhece é dita, e não deixa o ecrã mudo", async () => {
+    // É legítimo: a sede pode ser numa terra pequena. O que não pode é o ecrã
+    // ficar sem exemplos nenhuns sem explicar porquê.
+    montar();
+    const campo = (await screen.findByLabelText(/Local da sede/)) as HTMLInputElement;
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "Peço à Ínsua");
+
+    await waitFor(() => expect(screen.getByText(/não conheço essa terra/i)).toBeTruthy());
+    // E continua a poder ser gravada — não é um erro, é uma consequência.
+    await userEvent.click(screen.getByRole("button", { name: "Guardar deslocação" }));
+    await waitFor(() => expect(enviados).toHaveLength(1));
+    expect(enviados[0].body.valor).toMatchObject({ base: "Peço à Ínsua" });
   });
 });
 

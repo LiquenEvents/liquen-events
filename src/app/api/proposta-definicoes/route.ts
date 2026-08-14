@@ -9,6 +9,7 @@ import {
   parametrosDe,
 } from "@/lib/proposta-definicoes-store";
 import { firstError } from "@/lib/validation";
+import { BASE_OMISSAO } from "@/lib/geo/portugal";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -38,6 +39,19 @@ const SEM_BASE_DE_DADOS =
  * proposta seguinte. Recusar aqui é mais barato do que explicar ao cliente.
  */
 const deslocacaoSchema = z.object({
+  /**
+   * O local da sede.
+   *
+   * OPCIONAL com valor de partida, e não obrigatório, por duas razões: um
+   * separador do estúdio aberto antes deste deploy envia os seis números sem
+   * base e não pode ficar sem conseguir gravar; e uma linha `deslocacao` já
+   * gravada em 2026 não tem esta chave — lê-se com Évora, que é o que ela
+   * sempre significou.
+   *
+   * O `trim` antes do `min(1)` é o que impede uma sede de espaços em branco de
+   * passar: com ela, nenhuma proposta voltaria a ter sugestão de quilómetros.
+   */
+  base: z.string().trim().min(1).max(120).default(BASE_OMISSAO),
   consumoLPor100Km: z.number().finite().min(0).max(100),
   precoLitro: z.number().finite().min(0).max(20),
   portagensPorKm: z.number().finite().min(0).max(5),

@@ -394,6 +394,31 @@ export interface ProposalDoc {
   eventType: string; // "Casamento"
   eventDate: string; // "3 de julho de 2027"
   location: string; // "Monte da Oliveirinha"
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * OS QUILÓMETROS ATÉ AO LOCAL, ESCRITOS POR QUEM FAZ A ESTRADA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A deslocação era calculada a partir de uma tabela de cem localidades: um
+   * casamento numa herdade que lá não estivesse não tinha conta nenhuma, e o
+   * painel dizia «não reconheço o local». Este campo é a saída — a distância
+   * num sentido, em quilómetros, tal como ela a mede.
+   *
+   * ── PORQUE É QUE VIVE NO DOCUMENTO E NÃO NAS DEFINIÇÕES ─────────────────
+   * Porque é um facto DESTA proposta, como o local e o número de convidados, e
+   * não uma regra da casa. E porque é isso que congela o número: uma vez
+   * escrito aqui, mudar a sede, a tabela ou o preço do gasóleo deixa de lhe
+   * tocar — a decisão passa a valer só para as propostas seguintes.
+   *
+   * AUSENTE de propósito nas propostas antigas, e nunca semeado por
+   * {@link withProposalDefaults}: sem ele, a conta é a que sempre foi (a
+   * sugestão da tabela a partir da sede). Semear a sugestão aqui era escrever
+   * no documento um número que ninguém confirmou.
+   *
+   * Zero é um valor legítimo — o evento na própria casa — e por isso quem lê
+   * este campo tem de distinguir `0` de `undefined`, nunca com um `||`.
+   */
+  kmDeslocacao?: number;
   guests: string; // "150 pax"
   ceremony?: string; // "Civil, simbólica"
   time?: string; // "A definir"

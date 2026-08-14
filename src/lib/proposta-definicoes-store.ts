@@ -109,6 +109,18 @@ function num(v: unknown, omissao: number): number {
 }
 
 /**
+ * Só aceita texto com alguma coisa dentro — o resto fica com o de partida.
+ *
+ * Uma base em branco não é uma escolha, é um campo por preencher: com ela, a
+ * conta da deslocação deixava de saber de onde parte e passava a não sugerir
+ * quilómetros nenhuns em TODAS as propostas. Voltar ao valor de partida é a
+ * única saída que não estraga nada em silêncio.
+ */
+function texto(v: unknown, omissao: string): string {
+  return typeof v === "string" && v.trim() ? v.trim() : omissao;
+}
+
+/**
  * Os parâmetros a usar agora: o que estiver gravado, com os valores de partida
  * a tapar os buracos.
  *
@@ -122,6 +134,10 @@ export function parametrosDe(linhas: Definicao[]): Parametros {
 
   return {
     deslocacao: {
+      // A sede. Gravada como texto e lida como texto: quem a mudar de terra
+      // muda-a aqui, e a conta da deslocação passa a partir do sítio novo sem
+      // que ninguém toque em código.
+      base: texto(d.base, PARAMETROS_OMISSAO.base),
       consumoLPor100Km: num(d.consumoLPor100Km, PARAMETROS_OMISSAO.consumoLPor100Km),
       precoLitro: num(d.precoLitro, PARAMETROS_OMISSAO.precoLitro),
       portagensPorKm: num(d.portagensPorKm, PARAMETROS_OMISSAO.portagensPorKm),

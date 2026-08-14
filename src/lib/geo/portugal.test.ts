@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  BASE_OMISSAO,
   EVORA,
   distanciaKm,
   kmDeEvora,
+  kmEntre,
   kmPorEstrada,
   localizar,
   lugaresConhecidos,
@@ -104,6 +106,72 @@ describe("distâncias", () => {
     const a = localizar("Braga")!.lugar;
     const b = localizar("Faro")!.lugar;
     expect(kmPorEstrada(a, b)).toBe(kmPorEstrada(b, a));
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A CASA NÃO É PARA SEMPRE EM ÉVORA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Évora era o ponto de partida ESCRITO À LETRA no módulo. Passa a ser só o
+ * valor por omissão de uma definição, e o que o código sabe fazer é medir de
+ * um sítio qualquer para outro sítio qualquer.
+ */
+describe("medir a partir de uma base escolhida", () => {
+  it("por omissão a base é Évora, e o número não muda por causa disso", () => {
+    expect(BASE_OMISSAO).toBe("Évora");
+    // A garantia que interessa a quem já tem propostas feitas: com a base por
+    // omissão, a conta dá exactamente o que dava antes.
+    for (const sitio of ["Lisboa", "Porto", "Faro", "Palmela"]) {
+      expect(kmEntre(BASE_OMISSAO, sitio)).toBe(kmDeEvora(sitio));
+    }
+  });
+
+  it("mudar a base muda a distância — é esse o ponto", () => {
+    // Lisboa fica a um salto de Évora e a meio país do Porto.
+    expect(kmEntre("Porto", "Lisboa")!).toBeGreaterThan(kmEntre("Évora", "Lisboa")!);
+    // E de Faro, o Algarve deixa de ser longe.
+    expect(kmEntre("Faro", "Albufeira")!).toBeLessThan(kmEntre("Évora", "Albufeira")!);
+  });
+
+  it("da base a si própria é zero, seja qual for a base", () => {
+    expect(kmEntre("Faro", "Faro")).toBe(0);
+    expect(kmEntre("Braga", "Braga")).toBe(0);
+  });
+
+  it("o mesmo sítio escrito de duas maneiras é o mesmo sítio", () => {
+    // "Évora" e "evora" são a mesma terra — a base escrita à pressa, sem
+    // acento e em minúsculas, não pode dar uma conta diferente.
+    expect(kmEntre("evora", "lisboa")).toBe(kmEntre("Évora", "Lisboa"));
+    expect(kmEntre("evora", "Évora")).toBe(0);
+    expect(kmEntre("  ÉVORA  ", "Évora")).toBe(0);
+  });
+
+  it("uma base que não se conhece não dá um palpite", () => {
+    // Se a sede mudar para uma terra que a tabela não tem, o honesto é dizer
+    // que não sabemos — quem chama pede então os quilómetros à mão.
+    expect(kmEntre("Peço à Ínsua", "Lisboa")).toBeNull();
+    expect(kmEntre("", "Lisboa")).toBeNull();
+    expect(kmEntre(null, "Lisboa")).toBeNull();
+  });
+
+  it("um destino que não se conhece também não", () => {
+    expect(kmEntre("Évora", "Quinta sem nome conhecido")).toBeNull();
+    expect(kmEntre("Évora", "")).toBeNull();
+    expect(kmEntre("Évora", undefined)).toBeNull();
+  });
+
+  it("continua a não haver estrada para as ilhas, venha de onde vier", () => {
+    expect(kmEntre("Porto", "Funchal")).toBeNull();
+    expect(kmEntre("Funchal", "Ponta Delgada")).toBeNull();
+    // Mas dentro da mesma ilha há.
+    expect(kmEntre("Funchal", "Funchal")).toBe(0);
+  });
+
+  it("a distância é simétrica, e arredondada aos 5 km como sempre foi", () => {
+    expect(kmEntre("Braga", "Faro")).toBe(kmEntre("Faro", "Braga"));
+    expect(kmEntre("Porto", "Lisboa")! % 5).toBe(0);
   });
 });
 

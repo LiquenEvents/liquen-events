@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "@/lib/orcamento/types";
 import PainelInterno from "./PainelInterno";
+import { esquecerDefinicoes } from "./definicoes-da-proposta";
 
 /**
  * O painel existe para responder a três perguntas que só interessam a quem
@@ -28,6 +29,7 @@ const pedido = (over: Partial<Quote> = {}): Quote =>
 function montar(props: Partial<Parameters<typeof PainelInterno>[0]> = {}) {
   const onCusto = vi.fn();
   const onDeslocacao = vi.fn();
+  const onKm = vi.fn();
   render(
     <PainelInterno
       doc={doc()}
@@ -36,22 +38,32 @@ function montar(props: Partial<Parameters<typeof PainelInterno>[0]> = {}) {
       totalBruto={7380}
       onCusto={onCusto}
       onDeslocacao={onDeslocacao}
+      onKm={onKm}
       {...props}
     />,
   );
-  return { onCusto, onDeslocacao };
+  return { onCusto, onDeslocacao, onKm };
 }
 
 /** Abre a gaveta — está fechada por omissão, e é isso que a torna discreta. */
 const abrir = () => userEvent.click(screen.getByRole("button", { name: /Só para ti/ }));
 
+/** A sede que as definições devolvem neste teste. Évora, salvo dito ao contrário. */
+let base = "Évora";
+
 beforeEach(() => {
+  base = "Évora";
+  // As definições são lidas UMA vez por página e guardadas no módulo. Sem este
+  // esquecimento, a primeira resposta valia para o ficheiro de testes inteiro e
+  // um teste que muda a sede não mudava coisa nenhuma.
+  esquecerDefinicoes();
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => ({
       ok: true,
       json: async () => ({
         deslocacao: {
+          base,
           consumoLPor100Km: 9,
           precoLitro: 1.65,
           portagensPorKm: 0.09,
@@ -146,7 +158,162 @@ describe("deslocação", () => {
   it("sem local reconhecível diz o que fazer, em vez de calar-se", async () => {
     montar({ doc: doc({ location: "Portugal" }), quote: pedido({ location: "Portugal" }) });
     await abrir();
-    await waitFor(() => expect(screen.getByText(/Não reconheço o local/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Não sei a distância/)).toBeTruthy());
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUALQUER SÍTIO DO PAÍS, E NÃO SÓ OS QUE A TABELA CONHECE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel só calculava a deslocação para as terras da tabela. Para tudo o
+ * resto — que é a maior parte das herdades — dizia «não reconheço o local» e
+ * era um beco: ou se escrevia a terra grande mais próxima (e a conta ficava
+ * errada), ou se punha o valor à mão nos valores adicionais (e a conta deixava
+ * de existir). Passa a haver um campo para os quilómetros.
+ */
+describe("os quilómetros da viagem", () => {
+  it("vêm preenchidos com a sugestão da tabela quando ela sabe", async () => {
+    montar();
+    await abrir();
+    const campo = (await screen.findByLabelText(/Quilómetros até ao local/)) as HTMLInputElement;
+    // Évora–Palmela, pela tabela: 105 km.
+    expect(campo.value).toBe("105");
+    expect(screen.getByText(/sugestão a partir de Évora/)).toBeTruthy();
+  });
+
+  it("dão conta a uma herdade que a tabela nunca ouviu nomear", async () => {
+    const sitio = "Herdade do Zambujeiro do Mar";
+    montar({ doc: doc({ location: sitio }), quote: pedido({ location: sitio }) });
+    await abrir();
+    // Sem quilómetros ainda não há conta — mas há por onde a fazer.
+    await waitFor(() => expect(screen.getByText(/Não sei a distância/)).toBeTruthy());
+
+    const campo = (await screen.findByLabelText(/Quilómetros até ao local/)) as HTMLInputElement;
+    expect(campo.value).toBe("");
+  });
+
+  it("o que ela escreve fica no documento — é o que impede o número de fugir", async () => {
+    const sitio = "Herdade do Zambujeiro do Mar";
+    const { onKm } = montar({ doc: doc({ location: sitio }), quote: pedido({ location: sitio }) });
+    await abrir();
+    const campo = await screen.findByLabelText(/Quilómetros até ao local/);
+    await userEvent.type(campo, "180");
+    await waitFor(() => expect(onKm).toHaveBeenCalledWith(180));
+  });
+
+  it("com os quilómetros escritos, a conta faz-se e a linha pode entrar", async () => {
+    const sitio = "Herdade do Zambujeiro do Mar";
+    const { onDeslocacao } = montar({
+      doc: doc({ location: sitio, kmDeslocacao: 180 }),
+      quote: pedido({ location: sitio }),
+    });
+    await abrir();
+    // 180 km × 2 × 0,34 €/km = 122,40 € → 122 €.
+    await waitFor(() => expect(screen.getByText(/180 km/)).toBeTruthy());
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Pôr nos valores adicionais/ }),
+    );
+    expect(onDeslocacao).toHaveBeenCalledWith(
+      "Deslocação da equipa Líquen",
+      expect.stringMatching(/122,00\s?€.*\+ IVA/),
+    );
+  });
+
+  it("os quilómetros escritos ganham à tabela", async () => {
+    // Palmela está na tabela a 105 km. Se ela mediu 130, valem 130.
+    montar({ doc: doc({ location: "Palmela", kmDeslocacao: 130 }) });
+    await abrir();
+    await waitFor(() => expect(screen.getByText(/130 km/)).toBeTruthy());
+    expect(screen.queryByText(/105 km/)).toBeNull();
+    expect(screen.getByText(/escritos por ti/)).toBeTruthy();
+  });
+
+  it("zero quilómetros é o evento em casa — isento, e não «não sei»", async () => {
+    montar({ doc: doc({ location: "Quinta aqui ao lado", kmDeslocacao: 0 }) });
+    await abrir();
+    await waitFor(() => expect(screen.getByText(/sem deslocação a cobrar/)).toBeTruthy());
+    expect(screen.queryByText(/Não sei a distância/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Pôr nos valores adicionais/ })).toBeNull();
+  });
+
+  it("apagar o campo devolve a palavra à tabela, em vez de gravar zero", async () => {
+    // Zero e vazio não são a mesma coisa: um diz «é aqui», o outro diz «não
+    // decidi». Gravar 0 ao apagar tirava a deslocação da proposta sem ninguém
+    // o ter pedido.
+    const { onKm } = montar({ doc: doc({ location: "Palmela", kmDeslocacao: 130 }) });
+    await abrir();
+    const campo = await screen.findByLabelText(/Quilómetros até ao local/);
+    await userEvent.clear(campo);
+    await waitFor(() => expect(onKm).toHaveBeenCalledWith(null));
+  });
+
+  it("um número que não serve é dito no campo, e não vai para o documento", async () => {
+    const { onKm } = montar();
+    await abrir();
+    const campo = await screen.findByLabelText(/Quilómetros até ao local/);
+    await userEvent.clear(campo);
+    await userEvent.type(campo, "abc");
+    await waitFor(() => expect(screen.getByText(/só o número/)).toBeTruthy());
+    expect(onKm).not.toHaveBeenCalledWith(expect.any(Number));
+  });
+});
+
+describe("a sede é a que está nas definições", () => {
+  it("um servidor antigo, que ainda não sabe da sede, não põe «undefined» no ecrã", async () => {
+    // Durante um deploy há minutos em que o servidor velho responde sem base.
+    // O ecrã tem de cair em Évora — que é o que essa resposta sempre quis
+    // dizer — e não escrever a palavra `undefined` ao lado dos quilómetros.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          deslocacao: {
+            consumoLPor100Km: 9,
+            precoLitro: 1.65,
+            portagensPorKm: 0.09,
+            desgastePorKm: 0.1,
+            franquiaKm: 40,
+            idaEVolta: true,
+          },
+          margemMinima: 35,
+        }),
+      })),
+    );
+    montar();
+    await abrir();
+    await waitFor(() => expect(screen.getByText(/sugestão a partir de Évora/)).toBeTruthy());
+    expect(screen.queryByText(/undefined/)).toBeNull();
+  });
+
+  it("mudar a base muda a conta — do Algarve, o Algarve fica perto", async () => {
+    base = "Faro";
+    montar({ doc: doc({ location: "Albufeira" }), quote: pedido({ location: "Albufeira" }) });
+    await abrir();
+    // Faro–Albufeira cabe dentro dos 40 km da isenção; Évora–Albufeira não.
+    await waitFor(() => expect(screen.getByText(/sem deslocação a cobrar/)).toBeTruthy());
+    expect(screen.getByText(/sugestão a partir de Faro/)).toBeTruthy();
+  });
+});
+
+describe("o que já foi calculado não muda sozinho", () => {
+  it("uma proposta com a linha da deslocação já posta não a vê ser reescrita", async () => {
+    // A linha dos valores adicionais é TEXTO gravado no documento. Mudar a
+    // sede, a tabela ou o preço do gasóleo muda a SUGESTÃO — nunca o que já
+    // foi enviado a um casal.
+    base = "Porto";
+    const { onDeslocacao, onKm } = montar({
+      doc: doc({
+        location: "Palmela",
+        budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "71,00 € + IVA" }],
+      }),
+    });
+    await abrir();
+    await waitFor(() => expect(screen.getByLabelText(/Quilómetros até ao local/)).toBeTruthy());
+    expect(onDeslocacao).not.toHaveBeenCalled();
+    expect(onKm).not.toHaveBeenCalled();
   });
 });
 
@@ -316,6 +483,7 @@ describe("apagar uma linha do meio", () => {
         totalBruto={7380}
         onCusto={onCusto}
         onDeslocacao={vi.fn()}
+        onKm={vi.fn()}
       />,
     );
     await abrir();
@@ -335,6 +503,7 @@ describe("apagar uma linha do meio", () => {
         totalBruto={7380}
         onCusto={onCusto}
         onDeslocacao={vi.fn()}
+        onKm={vi.fn()}
       />,
     );
 
