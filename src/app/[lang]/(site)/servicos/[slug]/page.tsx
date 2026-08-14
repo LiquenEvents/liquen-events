@@ -70,7 +70,17 @@ export async function generateMetadata({
   const { lang, slug } = await params;
   const locale = normalizeLocale(lang);
   const svc = getService(slug, locale);
-  if (!svc) return { title: locale === "en" ? "Service not found" : "Serviço não encontrado" };
+  // `robots` a acompanhar o título: sem ele, o `index, follow` que o layout de
+  // raiz declara para o sítio inteiro ficava a valer para uma página que não
+  // existe. MEDIDO em `/servicos/servico-que-nao-existe`: saíam DUAS etiquetas,
+  // `index, follow` à frente e o `noindex` que o Next injecta atrás — duas
+  // ordens contrárias na mesma resposta, e a primeira era a errada. Ver
+  // `e2e/endereco-que-nao-existe.spec.ts`.
+  if (!svc)
+    return {
+      title: locale === "en" ? "Service not found" : "Serviço não encontrado",
+      robots: { index: false, follow: false },
+    };
   return pageMetadata({
     locale,
     title: svc.metaTitle,
