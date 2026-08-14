@@ -11,26 +11,9 @@
  * funções que precisam do "hoje" aceitam-no por parâmetro (injectável nos
  * testes); o valor por omissão só é lido dentro da função, no momento da chamada.
  */
-import type { Quote, Proposal, Payment } from "./types";
+import type { Quote, Proposal } from "./types";
 import { round2 } from "@/lib/money";
 import { depositPercentOf } from "@/lib/proposal-doc";
-
-/**
- * Fatura tal como o Dossier a consome — subconjunto serializável do tipo
- * `Invoice` do `invoices-store` (server-only). Redefinido aqui para que este
- * módulo, e por arrasto os componentes de cliente, nunca tenham de importar o
- * store. A página servidor mapeia as faturas reais para esta forma.
- */
-export interface DossierInvoice {
-  id: string;
-  number: string;
-  kind: "sinal" | "saldo" | "total";
-  amount: number; // com IVA, em €
-  status: "emitida" | "paga" | "anulada";
-  issuedAt: string; // yyyy-mm-dd
-  dueAt?: string;
-  paidAt?: string;
-}
 
 /**
  * Contrato (aceitação de T&C) reduzido aos campos que o Dossier mostra. Espelha
@@ -51,7 +34,6 @@ export interface DossierData {
   quote: Quote;
   proposal: Proposal | null;
   contract: DossierContract | null;
-  invoices: DossierInvoice[];
 }
 
 /**
@@ -198,67 +180,27 @@ function contractedTotal(d: DossierData): number {
   return contractedAmounts(d.quote, d.proposal).gross;
 }
 
-/** Soma das faturas pagas (com IVA). */
-function ledgerPaidTotal(invoices: DossierInvoice[]): number {
-  return invoices.reduce((s, i) => s + (i.status === "paga" ? i.amount : 0), 0);
-}
-
-/** Soma dos pagamentos informais (quote.payments) marcados como pagos. */
-function informalPaidTotal(quote: Quote): number {
-  return (quote.payments ?? []).reduce((s, p) => s + (p.paid ? p.amount : 0), 0);
-}
-
 /**
- * Espécie do livro correspondente a cada espécie de pagamento informal. É o
- * MESMO mapa que a rota de faturação aplica ao emitir o documento a partir de
- * uma linha de pagamento (`api/orcamento/[id]/fatura`): sinal→sinal,
- * saldo→saldo, pagamento avulso→total. Por construção, o recibo de um pagamento
- * cai sempre no balde da linha que o originou — é isso que torna a comparação
- * balde-a-balde abaixo fiável.
+ * Dinheiro RECEBIDO neste evento: a soma das linhas de `quote.payments` dadas
+ * por recebidas.
+ *
+ * Isto já foi uma conta com duas fontes. Enquanto a casa emitia facturas, o
+ * mesmo euro podia estar escrito em dois sítios — a linha de pagamento e a
+ * factura marcada como paga — e a conta confrontava-os espécie a espécie
+ * (sinal/saldo/avulso), ficando com o maior de cada lado para não somar o mesmo
+ * dinheiro duas vezes nem perder a metade que só existia de um lado.
+ *
+ * A facturação saiu daqui (passou a ser feita noutro sítio) e com ela saiu o
+ * livro. Sobra UMA fonte, que é a que ela alimenta à mão e sempre alimentou: o
+ * registo de pagamentos. A conta é agora a soma directa — e é de propósito que
+ * não guarda vestígios da anterior: uma comparação com um lado que já não
+ * existe daria sempre o mesmo resultado e só enganava quem a lesse.
+ *
+ * Arredonda aos cêntimos no fim para um desvio de vírgula flutuante nunca
+ * deixar um evento integralmente pago aquém do total contratado.
  */
-const PAYMENT_TO_INVOICE_KIND: Record<Payment["kind"], DossierInvoice["kind"]> = {
-  sinal: "sinal",
-  saldo: "saldo",
-  pagamento: "total",
-};
-
-const INVOICE_KINDS: DossierInvoice["kind"][] = ["sinal", "saldo", "total"];
-
-/**
- * Dinheiro recebido contando as DUAS fontes — o livro de faturas e o registo à
- * mão (`quote.payments`) — sem somar o mesmo euro duas vezes.
- *
- * As duas fontes não são duas carteiras: são duas VISTAS do mesmo dinheiro (é
- * exatamente isso que `reconcileFinance` confronta, avisando quando divergem).
- * O fluxo normal regista o pagamento à mão e depois emite o recibo a partir
- * dessa linha, pelo que o mesmo valor aparece dos dois lados — somá-los daria o
- * dobro. Mas há eventos pagos só por um dos caminhos, e até eventos com o sinal
- * faturado e o saldo só registado à mão; ficar apenas com o maior TOTAL perderia
- * essa metade.
- *
- * Por isso confrontamos espécie a espécie (sinal / saldo / avulso) e ficamos com
- * o MAIOR de cada lado:
- *   • o mesmo dinheiro nos dois sítios → conta uma vez;
- *   • cada espécie pela sua fonte → somam-se as espécies, não as fontes;
- *   • registo parcial de um dos lados → prevalece o lado mais completo.
- *
- * Arredonda aos cêntimos no fim, como `reconcileFinance`, para um desvio de
- * vírgula flutuante nunca deixar um evento integralmente pago aquém do total.
- */
-export function combinedPaidTotal(d: DossierData): number {
-  const payments = d.quote.payments ?? [];
-  const total = INVOICE_KINDS.reduce((sum, kind) => {
-    const ledger = d.invoices.reduce(
-      (s, i) => s + (i.kind === kind && i.status === "paga" ? i.amount : 0),
-      0,
-    );
-    const informal = payments.reduce(
-      (s, p) => s + (p.paid && PAYMENT_TO_INVOICE_KIND[p.kind] === kind ? p.amount : 0),
-      0,
-    );
-    return sum + Math.max(ledger, informal);
-  }, 0);
-  return round2(total);
+export function paidTotal(quote: Quote): number {
+  return round2((quote.payments ?? []).reduce((s, p) => s + (p.paid ? p.amount : 0), 0));
 }
 
 /**
@@ -267,7 +209,7 @@ export function combinedPaidTotal(d: DossierData): number {
  * A implementação segue à letra a tabela do plano.
  */
 export function deriveStage(d: DossierData, today: Date = new Date()): EventStage {
-  const { quote, proposal, contract, invoices } = d;
+  const { quote, proposal, contract } = d;
 
   const perdido = quote.status === "rejeitado" || proposal?.status === "rejeitada";
 
@@ -284,28 +226,23 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
   const eventPassed = !Number.isNaN(eventDayEnd) && eventDayEnd < today.getTime();
 
   const contracted = contractedTotal(d);
-  const combinedPaid = combinedPaidTotal(d);
+  const pago = paidTotal(quote);
 
-  // Sinal e saldo lêem as MESMAS duas fontes, com o mesmo critério: uma fatura
-  // da espécie certa dada por paga, ou uma linha de pagamento da espécie certa
-  // marcada como recebida. Enquanto o saldo só olhava para o livro, um evento já
-  // realizado e integralmente pago pelo caminho rápido (registo à mão, que é o
-  // que o painel de Pagamentos sugere e o que faz subir o "Recebido") nunca
-  // chegava a `concluido`: ficava `em_producao` para sempre e acumulava no
-  // quadro, ano após ano. Um valor registado e dado por pago vale o mesmo dos
-  // dois lados — a divergência entre livro e registo é assunto do banner de
-  // reconciliação, não da fase do evento.
+  // Sinal e saldo lêem o registo de pagamentos, que é o único sítio onde o
+  // dinheiro recebido está escrito desde que a facturação saiu daqui. O
+  // critério não mudou: uma linha da espécie certa dada por recebida.
+  //
+  // A rede de segurança do saldo continua a ser a que mais importa — há quem
+  // nunca rotule a última parcela como «saldo». Um evento já realizado e
+  // integralmente pago mas com as parcelas todas rotuladas «pagamento» ficaria
+  // preso em `em_producao` para sempre e acumulava no quadro, ano após ano.
   const saldoPago =
-    invoices.some((i) => (i.kind === "saldo" || i.kind === "total") && i.status === "paga") ||
     (quote.payments ?? []).some((p) => p.kind === "saldo" && p.paid && p.amount > 0) ||
-    // Rede de segurança para quem nunca rotula a última parcela como "saldo":
-    // o contratado está coberto, venha o dinheiro de onde vier (sem contar o
-    // mesmo euro duas vezes — ver `combinedPaidTotal`).
-    (contracted > 0 && combinedPaid >= round2(contracted));
+    (contracted > 0 && pago >= round2(contracted));
 
-  const sinalPago =
-    invoices.some((i) => i.kind === "sinal" && i.status === "paga") ||
-    (quote.payments ?? []).some((p) => p.kind === "sinal" && p.paid && p.amount > 0);
+  const sinalPago = (quote.payments ?? []).some(
+    (p) => p.kind === "sinal" && p.paid && p.amount > 0,
+  );
 
   // `quote.status === "aceite"` conta como aceite mesmo sem proposta/contrato:
   // a rota manual permite marcar um negócio como ganho diretamente (reserva
@@ -344,13 +281,30 @@ export function deriveStage(d: DossierData, today: Date = new Date()): EventStag
 export interface EventMetrics {
   contracted: number;
   /** Valor contratado com IVA (o que o cliente paga) — corrige o `quotedPrice`
-   *  sem IVA para a mesma base dos pagamentos/faturas. Usar isto no "em falta". */
+   *  sem IVA para a mesma base dos pagamentos. Usar isto no "em falta". */
   contractedGross: number;
   contractedNet: number; // sem IVA
   contractedIva: number; // valor do IVA
-  ledgerIssued: number;
-  ledgerPaid: number;
-  informalPaid: number;
+  /**
+   * Dinheiro recebido, do registo de pagamentos (ver `paidTotal`).
+   *
+   * Substitui os antigos `ledgerPaid` (soma das facturas pagas), `ledgerIssued`
+   * (soma das facturas emitidas) e `informalPaid` (soma dos pagamentos). Os dois
+   * primeiros morreram com o livro de facturas; o terceiro só se chamava
+   * «informal» por oposição ao livro, e sem livro é simplesmente o recebido.
+   */
+  paid: number;
+  /**
+   * Fracção do contratado que já entrou — `paid / contractedGross`.
+   *
+   * ATENÇÃO ao que este número passou a querer dizer: era a percentagem
+   * FACTURADA E COBRADA (lia só facturas com estado «paga») e é agora a
+   * percentagem REGISTADA COMO RECEBIDA. Para um evento cujo dinheiro sempre
+   * foi registado no painel de Pagamentos dá o mesmo; para um que só tivesse
+   * facturas marcadas como pagas e nenhuma linha de pagamento, passa a 0% até
+   * o recebimento ser registado. Por isso o ecrã que o mostra (MetricStrip)
+   * diz agora «% Recebido» e não «% Pago».
+   */
   pctPaid: number;
   /** Custos de fornecedor COM IVA — é assim que eles são registados. */
   supplierCosts: number;
@@ -382,17 +336,16 @@ export interface EventMetrics {
 
 /**
  * Métricas do cockpit — todas com IVA (rotular "c/ IVA" onde forem mostradas).
- * O livro de faturas (não `quote.payments`) é a verdade para Recebido / % Pago.
+ * `quote.payments` é a verdade para Recebido / % Recebido: é o único registo de
+ * dinheiro que esta aplicação guarda desde que a facturação saiu daqui.
  */
 export function computeEventMetrics(d: DossierData, today: Date = new Date()): EventMetrics {
-  const { quote, invoices } = d;
+  const { quote } = d;
 
   const contracted = contractedTotal(d);
   const amounts = contractedAmounts(quote, d.proposal);
-  const ledgerIssued = invoices.reduce((s, i) => s + (i.status !== "anulada" ? i.amount : 0), 0);
-  const ledgerPaid = ledgerPaidTotal(invoices);
-  const informalPaid = informalPaidTotal(quote);
-  const pctPaid = contracted > 0 ? ledgerPaid / contracted : 0;
+  const paid = paidTotal(quote);
+  const pctPaid = contracted > 0 ? paid / contracted : 0;
 
   const supplierCosts = round2(
     (quote.eventSuppliers ?? []).reduce((s, e) => s + (e.actualCost ?? e.estimatedCost ?? 0), 0),
@@ -416,9 +369,7 @@ export function computeEventMetrics(d: DossierData, today: Date = new Date()): E
     contractedGross: amounts.gross,
     contractedNet: amounts.net,
     contractedIva: amounts.iva,
-    ledgerIssued,
-    ledgerPaid,
-    informalPaid,
+    paid,
     pctPaid,
     supplierCosts,
     supplierCostsNet,
@@ -429,28 +380,36 @@ export function computeEventMetrics(d: DossierData, today: Date = new Date()): E
   };
 }
 
-export interface FinanceReconciliation {
-  diverges: boolean;
-  informalPaid: number;
-  ledgerPaid: number;
-}
-
 /**
- * Confronta os pagamentos registados à mão (quote.payments) com o que o livro
- * de faturas diz estar pago. Arredonda aos cêntimos antes de comparar, para um
- * desvio de arredondamento nunca disparar um falso alarme.
+ * ════════════════════════════════════════════════════════════════════════════
+ * A RECONCILIAÇÃO FINANCEIRA SAIU DAQUI — E PORQUÊ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Havia aqui um `reconcileFinance` e, nos dois ecrãs do dinheiro (a Zona
+ * Financeira do dossiê e o painel de Pagamentos), um aviso âmbar que dizia
+ * «Pagamentos registados (X) não batem com faturas pagas (Y)».
+ *
+ * Reconciliar é confrontar DUAS contagens do mesmo dinheiro. Eram elas o
+ * registo de pagamentos e o livro de facturas. O livro saiu — a casa passou a
+ * facturar noutro sítio — e sobrou uma contagem só.
+ *
+ * Manter a função era mantê-la a comparar os pagamentos com zero: o aviso
+ * passaria a acender-se em TODOS os eventos com dinheiro recebido, a dizer que
+ * as facturas pagas somam 0,00 €. Um alarme que está sempre aceso não é um
+ * alarme — é ruído por cima do número certo, e ensina a ignorar o sítio onde um
+ * dia pode aparecer um aviso a sério.
+ *
+ * Por isso não ficou uma versão amputada: ficou nada, e o recebido passou a ser
+ * um número só (`paidTotal`). Se um dia voltar a haver uma segunda contagem —
+ * um ficheiro do programa de facturação, um extracto bancário — a reconciliação
+ * volta a fazer sentido e escreve-se contra ESSA fonte, não contra o fantasma
+ * desta.
  */
-export function reconcileFinance(d: DossierData): FinanceReconciliation {
-  const informalPaid = round2(informalPaidTotal(d.quote));
-  const ledgerPaid = round2(ledgerPaidTotal(d.invoices));
-  return { diverges: informalPaid !== ledgerPaid, informalPaid, ledgerPaid };
-}
-
 export type NextActionKind =
   | "proposta"
   | "portal"
-  | "fatura_sinal"
-  | "fatura_saldo"
+  | "sinal"
+  | "saldo"
   | "producao"
   | "runsheet"
   | "arquivar"
@@ -474,10 +433,9 @@ export interface NextAction {
  */
 export function nextAction(stage: EventStage, d: DossierData): NextAction {
   // A percentagem do sinal é a da PROPOSTA aceite, não os 30% da casa escritos
-  // à mão. Uma proposta a 50% deixava o cabeçalho a mandar «Emitir fatura de
-  // sinal (30%)» e a rota a emitir 50% — o ecrã a discordar da factura que ele
-  // próprio manda emitir. Sem proposta vale a percentagem por omissão, que é
-  // exactamente o que estas frases sempre disseram.
+  // à mão: é a percentagem que o cliente aceitou e a que o painel de Pagamentos
+  // sugere. Sem proposta vale a percentagem por omissão, que é exactamente o
+  // que estas frases sempre disseram.
   const pctSinal = depositPercentOf(d.proposal?.doc);
   switch (stage) {
     case "lead":
@@ -493,10 +451,13 @@ export function nextAction(stage: EventStage, d: DossierData): NextAction {
         kind: "portal",
       };
     case "aceite":
+      // Já não manda «Emitir fatura de sinal»: a factura é emitida noutro
+      // sítio e este ecrã não sabe nada dela. O que ele sabe — e o que faz a
+      // fase avançar — é se o sinal foi RECEBIDO e registado.
       return {
-        label: `Emitir fatura de sinal (${pctSinal}%)`,
+        label: `Registar o sinal (${pctSinal}%)`,
         hint: "Contrato aceite — falta receber o sinal para arrancar.",
-        kind: "fatura_sinal",
+        kind: "sinal",
       };
     case "sinal_pago":
       return {
@@ -512,29 +473,22 @@ export function nextAction(stage: EventStage, d: DossierData): NextAction {
       };
     case "semana_evento": {
       /**
-       * ── O QUE FALTA RECEBER LÊ-SE DAS DUAS FONTES ─────────────────────────
-       * E não do `pctPaid`, que é livro-de-faturas puro (e assim fica: para a
-       * métrica «% Pago» o livro é a verdade, está dito em `computeEventMetrics`).
-       *
-       * Uma FRASE que manda ir buscar dinheiro é outra coisa. O fluxo normal do
-       * estúdio é receber a transferência, marcar a linha como paga no painel de
-       * Pagamentos — que é o que faz subir o "Recebido" — e emitir a factura
-       * quando calhar. Enquanto isto olhou só para o livro, um casamento de
-       * 12.300 € integralmente pago e registado dizia, na semana do evento,
-       * «Liquidar o saldo (70%) — falta liquidar o saldo antes do dia»: 8.610 €
-       * pedidos a um casal que já os tinha transferido.
-       *
-       * `combinedPaidTotal` é o mesmo critério com que `deriveStage` decide o
+       * O que falta receber lê-se do MESMO sítio de onde `deriveStage` tira o
        * `saldoPago` logo acima — o ecrã não pode chegar à semana do evento por
        * uma conta e mandar cobrar por outra.
+       *
+       * O erro que isto evita continua a valer: um casamento de 12.300 €
+       * integralmente recebido e registado não pode dizer, na semana do evento,
+       * «Liquidar o saldo (70%)» e pedir 8.610 € a um casal que já os
+       * transferiu.
        */
       const contratado = contractedTotal(d);
-      const liquidado = contratado > 0 && combinedPaidTotal(d) >= round2(contratado);
+      const liquidado = contratado > 0 && paidTotal(d.quote) >= round2(contratado);
       if (!liquidado) {
         return {
           label: `Liquidar o saldo (${100 - pctSinal}%)`,
           hint: "Evento esta semana — falta liquidar o saldo antes do dia.",
-          kind: "fatura_saldo",
+          kind: "saldo",
         };
       }
       return {

@@ -6,19 +6,9 @@ import { parseMoney, randomId, eur2, todayKey, isDateKey } from "./util";
 import { Button } from "./ui";
 import { useToast } from "./Toast";
 import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
-// `import type` é apagado no build, por isso puxar a forma da fatura do store
-// server-only não arrasta o guarda `server-only` para este bundle de cliente.
-import type { Invoice } from "@/lib/invoices-store";
 import { splitSinal } from "@/lib/money";
 import { usePercentagemDoSinal } from "./percentagem-do-sinal";
-import {
-  combinedPaidTotal,
-  computeEventMetrics,
-  reconcileFinance,
-  type DossierData,
-  type DossierInvoice,
-} from "@/lib/orcamento/dossier";
-import { metaFor } from "./status-meta";
+import { computeEventMetrics, paidTotal, type DossierData } from "@/lib/orcamento/dossier";
 
 const KIND_LABEL: Record<PaymentKind, string> = {
   sinal: "Sinal",
@@ -45,26 +35,6 @@ const GRID =
   "@min-[36rem]:gap-y-0 " +
   "@min-[36rem]:grid-cols-[6.25rem_5.5rem_7.25rem_minmax(3.5rem,1fr)_5rem_5.5rem]";
 
-// Rótulos do livro de faturas (FT) — espelham a Zona Financeira do Dossier.
-// A percentagem é a DESTE evento (as faturas listadas são todas dele), por isso
-// não pode ser um 30/70 escrito à mão: numa proposta de 50% o livro rotulava
-// «Sinal (30%)» uma fatura que tinha sido emitida a 50%.
-const invKindLabel = (pctSinal: number): Record<DossierInvoice["kind"], string> => ({
-  sinal: `Sinal (${pctSinal}%)`,
-  saldo: `Saldo (${100 - pctSinal}%)`,
-  total: "Total",
-});
-const INV_STATUS_META: Record<DossierInvoice["status"], { label: string; color: string }> = {
-  emitida: { label: "Emitida", color: "#9aa36a" },
-  paga: { label: "Paga", color: "#4d6350" },
-  anulada: { label: "Anulada", color: "#b5654a" },
-};
-
-const fmtInvDate = (d?: string) =>
-  d
-    ? new Date(d + "T12:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short" })
-    : "—";
-
 /** Data curta para a tabela de pagamentos ("12 mai"). */
 const fmtRowDate = (d: string) =>
   isDateKey(d)
@@ -82,42 +52,6 @@ function yesterdayKey(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Invoice (superconjunto server-only) → DossierInvoice (os campos puros). */
-const toDossierInvoices = (list: Invoice[]): DossierInvoice[] =>
-  list.map((i) => ({
-    id: i.id,
-    number: i.number,
-    kind: i.kind,
-    amount: i.amount,
-    status: i.status,
-    issuedAt: i.issuedAt,
-    dueAt: i.dueAt,
-    paidAt: i.paidAt,
-  }));
-
-/**
- * O endereço para onde os documentos JÁ EMITIDOS deste pedido vão sair, quando é
- * diferente do email actual do pedido — senão `null`.
- *
- * Uma fatura CONGELA o email do cliente no momento da emissão, e isso está
- * certo: é o endereço que consta do documento fiscal, e pode ser de propósito o
- * de outro pagador (o espaço, a wedding planner). O que não pode é ser uma
- * surpresa — se ela corrigiu o email do casal em Maio, o documento de Junho sai
- * para o antigo, e ela tem de saber ANTES de carregar em enviar, não depois de
- * o cliente não receber.
- */
-function enderecoCongeladoDivergente(faturas: Invoice[], emailActual: string): string | null {
-  const actual = String(emailActual ?? "")
-    .trim()
-    .toLowerCase();
-  const congelado = faturas
-    // Uma fatura anulada não se reenvia — o endereço dela não interessa a ninguém.
-    .filter((i) => i?.status !== "anulada")
-    .map((i) => String(i?.clientEmail ?? "").trim())
-    .find((e) => e !== "" && e.toLowerCase() !== actual);
-  return congelado ?? null;
-}
-
 /** Operação que o servidor recusou — a linha fica marcada, com "Repetir". */
 interface FailedOp {
   /** Pagamento afectado (marca a linha; se já não existir, mostra o fantasma). */
@@ -133,25 +67,13 @@ interface Props {
   quote: Quote;
   onChange: (payments: Payment[]) => void;
   /**
-   * Mostra o livro de faturas (FT) + banner de reconciliação e faz o headline
-   * Recebido/Em falta derivar do livro (a verdade). Opt-in: o Dossier já rende a
-   * sua própria Zona Financeira, por isso deixa isto por omissão (`false`) para
-   * não duplicar. O painel Financeiro do back office liga-o.
-   */
-  showLedger?: boolean;
-  /**
    * Notifica o pai quando o Nº de contrato é gravado, para o estado partilhado
    * (selected/quotes) não ficar velho — o ciclo de vida e o CSV dependem dele.
    */
   onContractRef?: (ref: string) => void;
 }
 
-export default function PaymentsPanel({
-  quote,
-  onChange,
-  showLedger = false,
-  onContractRef,
-}: Props) {
+export default function PaymentsPanel({ quote, onChange, onContractRef }: Props) {
   const { toast } = useToast();
   const [payments, setPayments] = useState<Payment[]>(quote.payments ?? []);
   const [kind, setKind] = useState<PaymentKind>("sinal");
@@ -163,7 +85,6 @@ export default function PaymentsPanel({
   // um pagamento previsto/por receber.
   const [paidOnAdd, setPaidOnAdd] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
   const [contractRef, setContractRef] = useState(quote.contractRef ?? "");
   const [savingRef, setSavingRef] = useState(false);
   // Edição inline do valor de uma linha (sem modal): clico, altero, Enter.
@@ -182,50 +103,14 @@ export default function PaymentsPanel({
   // daí o campo é dela e nada lhe volta a escrever por cima.
   const valorTocado = useRef(false);
 
-  // ── Livro de faturas (FT) do evento — a fonte de verdade financeira ──
-  // Cliente não pode importar o store server-only; lê pela API, como Faturas.tsx.
-  const [invoices, setInvoices] = useState<DossierInvoice[]>([]);
-  const [ledgerLoading, setLedgerLoading] = useState(showLedger);
-  /** Endereço congelado nas faturas quando difere do email actual (ver acima). */
-  const [enderecoDivergente, setEnderecoDivergente] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!quote.id) return;
-    let alive = true;
-    if (showLedger) setLedgerLoading(true);
-    (async () => {
-      try {
-        const res = await fetch(`/api/faturas?quoteId=${encodeURIComponent(quote.id)}`, {
-          cache: "no-store",
-        });
-        if (!res.ok || !alive) return;
-        const body: unknown = await res.json();
-        const list: Invoice[] = Array.isArray(body) ? body : [];
-        // A TABELA do livro (e as métricas que dela derivam) continuam opt-in —
-        // o Dossier rende a sua própria Zona Financeira e não as quer duplicadas.
-        if (showLedger) setInvoices(toDossierInvoices(list));
-        // O AVISO de endereço, esse, tem de existir onde quer que exista o botão
-        // de enviar — e ele existe nos dois sítios.
-        setEnderecoDivergente(enderecoCongeladoDivergente(list, quote.email));
-      } catch {
-        // Silencioso — o resumo informal continua a funcionar sem o livro.
-      } finally {
-        if (alive) setLedgerLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [showLedger, quote.id, quote.email]);
-
-  // Dossier "sintético" só com o que as funções puras precisam (quote + faturas);
-  // usa os pagamentos *vivos* (state) para o banner reagir aos toggles.
+  // Dossier "sintético" só com o que as funções puras precisam; usa os
+  // pagamentos *vivos* (state) para o topo reagir aos toggles sem esperar
+  // pela gravação.
   const dossier: DossierData = useMemo(
-    () => ({ quote: { ...quote, payments }, proposal: null, contract: null, invoices }),
-    [quote, payments, invoices],
+    () => ({ quote: { ...quote, payments }, proposal: null, contract: null }),
+    [quote, payments],
   );
   const metrics = useMemo(() => computeEventMetrics(dossier), [dossier]);
-  const reconciliation = useMemo(() => reconcileFinance(dossier), [dossier]);
 
   async function saveContractRef() {
     const next = contractRef.trim();
@@ -249,33 +134,24 @@ export default function PaymentsPanel({
     }
   }
 
-  // Total COM IVA (o que o cliente paga): a mesma base dos pagamentos/faturas, que
-  // são com IVA. Antes usava-se `contracted`, que para um preço manual (quotedPrice,
+  // Total COM IVA (o que o cliente paga): a mesma base dos pagamentos, que são
+  // com IVA. Antes usava-se `contracted`, que para um preço manual (quotedPrice,
   // sem IVA) deixava o "Em falta" errado em ~23%.
   const total = metrics.contractedGross; // proposta > preço cotado > estimativa
   const totalNet = metrics.contractedNet;
   const totalIva = metrics.contractedIva;
-  // ── "RECEBIDO" CONTA O DINHEIRO TODO, VENHA POR ONDE VIER ────────────────
+  // ── "RECEBIDO" É O QUE ESTÁ REGISTADO COMO RECEBIDO ──────────────────────
   //
-  // Isto já foi as duas coisas erradas. Foi o livro de faturas sozinho, e só
-  // mexia ao emitir uma fatura ("registo um pagamento e nada muda"). Passou a
-  // ser o registo à mão sozinho, que atualiza ao vivo — e aí um casamento
-  // facturado e cobrado pelo separador Faturas, que é onde uma fatura se marca
-  // como paga e onde não fica linha nenhuma em `quote.payments`, aparecia aqui
-  // com «Recebido 0,00 €» e «Em falta 12.300,00 €» a vermelho. Com um atalho
-  // ao lado pronto a cobrar outra vez o que já estava na conta.
+  // Este número já foi de tudo. Foi o livro de faturas sozinho, e só mexia ao
+  // emitir uma factura («registo um pagamento e nada muda»). Depois passou a
+  // somar as duas fontes espécie a espécie, para não perder o dinheiro que
+  // entrava por um lado e não pelo outro.
   //
-  // `combinedPaidTotal` é a conta que já resolve isto no resto do cockpit:
-  // confronta as duas fontes espécie a espécie e fica com a maior de cada uma,
-  // por isso o mesmo euro nunca conta duas vezes e nenhuma das duas metades se
-  // perde. Continua a subir ao vivo com o registo à mão, que era a razão de
-  // este número ter deixado de olhar para o livro.
-  //
-  // O registo interno mantém o seu próprio número, rotulado, na lista abaixo —
-  // e a divergência entre as duas fontes é assunto do banner de reconciliação.
-  // A métrica «% Pago» do quadro é outra coisa e continua a ser só do livro.
-  const informalPaid = reconciliation.informalPaid;
-  const headlinePaid = useMemo(() => combinedPaidTotal(dossier), [dossier]);
+  // Agora há uma fonte só — a facturação saiu desta casa — e é a que ela
+  // alimenta: as linhas de pagamento deste painel, mesmo aqui em baixo. Sobe ao
+  // vivo à medida que se marcam como recebidas, que é o comportamento que ela
+  // conhece e o que este ecrã sempre prometeu.
+  const headlinePaid = useMemo(() => paidTotal(dossier.quote), [dossier]);
   const outstanding = Math.max(0, total - headlinePaid);
   // Estado "tudo recebido" só faz sentido quando há um total contratado.
   const allReceived = total > 0 && outstanding === 0;
@@ -471,115 +347,6 @@ export default function PaymentsPanel({
     }
   }
 
-  /** Recarrega o livro de faturas (após emitir uma fatura/recibo, para a tabela e
-   *  o banner de reconciliação não ficarem velhos). */
-  async function refreshLedger() {
-    if (!quote.id) return;
-    try {
-      const res = await fetch(`/api/faturas?quoteId=${encodeURIComponent(quote.id)}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) return;
-      const body: unknown = await res.json();
-      const list: Invoice[] = Array.isArray(body) ? body : [];
-      if (showLedger) setInvoices(toDossierInvoices(list));
-      // O documento que acabou de ser emitido congelou um endereço — o aviso
-      // acompanha-o (ex.: emitiu-se agora para o email corrigido, deixa de haver
-      // divergência; ou reaproveitou-se um antigo, e passa a haver).
-      setEnderecoDivergente(enderecoCongeladoDivergente(list, quote.email));
-    } catch {
-      /* silencioso — o resumo informal continua a funcionar sem o livro */
-    }
-  }
-
-  async function invoice(p: Payment, email: boolean) {
-    setBusy(p.id);
-    try {
-      const res = await fetch(`/api/orcamento/${quote.id}/fatura`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // `paymentId` é a chave de idempotência do livro de faturas: descarregar
-        // e depois enviar o mesmo pagamento reaproveita o mesmo número (FT AAAA/NNNN).
-        body: JSON.stringify({
-          paymentId: p.id,
-          kind: p.kind,
-          amount: p.amount,
-          date: p.date,
-          paid: p.paid,
-          email,
-        }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data) {
-        // Sem resposta não há palavra do servidor — e inventar uma aqui era
-        // exactamente o hábito que punha o ecrã a dizer o contrário do email.
-        throw new Error(data?.error || "Falha ao emitir o documento.");
-      }
-      /**
-       * ══════════════════════════════════════════════════════════════════════
-       * A PALAVRA E O ENDEREÇO VÊM DE QUEM OS USOU
-       * ══════════════════════════════════════════════════════════════════════
-       *
-       * Aqui decidia-se `p.paid ? "Recibo" : "Fatura"` e dizia-se «enviado para
-       * {quote.email}». Nenhuma das duas coisas era verdade: a rota escrevia
-       * «Recibo» sempre, e o correio sai para o endereço CONGELADO na fatura,
-       * que pode não ser o email actual do pedido.
-       *
-       * Passam a vir ambos na resposta. O que sobra deste lado é só a
-       * concordância gramatical com a palavra que o servidor mandou.
-       */
-      const doc = typeof data.docLabel === "string" && data.docLabel ? data.docLabel : "Documento";
-      const fem = doc === "Fatura";
-      if (email) {
-        toast(
-          data.emailed
-            ? `${doc} ${fem ? "enviada" : "enviado"} para ${data.emailedTo || "o cliente"}`
-            : `${doc} ${fem ? "gerada" : "gerado"} (email não configurado)`,
-          data.emailed ? "success" : "info",
-        );
-      } else if (data.pdfBase64) {
-        const a = document.createElement("a");
-        a.href = `data:application/pdf;base64,${data.pdfBase64}`;
-        a.download = `${doc}-${String(data.number ?? p.id).replace(/\//g, "-")}.pdf`;
-        // ── O <a> tem de estar na árvore no momento do clique ───────────────
-        // Um elemento fora do documento não dispara a transferência no Firefox:
-        // o `click()` corria, nada acontecia, e a frase "descarregado" saía na
-        // mesma. O `ProposalStudio` já fazia isto assim — é o mesmo gesto.
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        toast(`${doc} ${fem ? "descarregada" : "descarregado"}`, "success");
-      } else {
-        /**
-         * ════════════════════════════════════════════════════════════════════
-         * "DESCARREGADO" SÓ SE TIVER SAÍDO UM FICHEIRO
-         * ════════════════════════════════════════════════════════════════════
-         *
-         * Este `toast` estava FORA do `if (data.pdfBase64)`. Uma resposta 200 sem
-         * PDF — o que a rota devolve quando o gerador não produziu nada — dizia
-         * na mesma "Recibo descarregado". Ela vai à pasta das transferências,
-         * não encontra nada, e não tem como saber se falhou o programa, o
-         * browser, ou ela. Ao telefone com o cliente, promete o recibo na mesma.
-         *
-         * O documento FOI emitido (o número está gasto e o livro mudou), o que
-         * faltou foi o ficheiro. A frase tem de separar as duas coisas, senão a
-         * reacção certa — voltar a pedir o PDF, e não reemitir — não é óbvia.
-         */
-        toast(
-          `${doc} ${data.number ? `${data.number} ` : ""}${fem ? "emitida" : "emitido"}, mas não foi possível gerar o PDF. Tenta descarregar outra vez.`,
-          "error",
-        );
-      }
-      // O livro de faturas mudou — recarregar para a tabela e a reconciliação
-      // refletirem o novo documento sem reabrir o separador.
-      await refreshLedger();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Não foi possível emitir o documento.", "error");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   /**
    * Os atalhos que preenchem o formulário: «Sinal 30% · 450 €», «50% · …»,
    * «Hoje», «Ontem».
@@ -604,7 +371,7 @@ export default function PaymentsPanel({
     // (que muda entre o estúdio, o separador Financeiro e o tablet), não à janela.
     <div className="@container border-t border-foreground/10 pt-5">
       <div className="flex items-center justify-between gap-3 mb-4">
-        <p className="bo-eyebrow">Pagamentos &amp; Faturação</p>
+        <p className="bo-eyebrow">Pagamentos</p>
         {/* Contract reference */}
         <div className="flex items-center gap-2">
           <label
@@ -623,7 +390,7 @@ export default function PaymentsPanel({
             }}
             placeholder="2026-001"
             className={`bo-input w-24 px-2.5 py-1.5 text-xs text-foreground/80 ${savingRef ? "opacity-50" : ""}`}
-            title="Número de referência do contrato/fatura"
+            title="Número de referência do contrato"
           />
         </div>
       </div>
@@ -748,40 +515,6 @@ export default function PaymentsPanel({
             </p>
             <p className="text-foreground/45 text-[11px] mt-0.5">
               Verifica os valores registados ou o total do contrato.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Banner de reconciliação — pagamentos informais ≠ faturas pagas. */}
-      {showLedger && reconciliation.diverges && (
-        <div
-          role="alert"
-          className="flex items-start gap-2.5 rounded-lg border border-[#c99a3a]/40 bg-[#c99a3a]/[0.08] px-3.5 py-2.5 mb-4"
-        >
-          <svg
-            className="text-[#a9781f] shrink-0 mt-0.5"
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          >
-            <path
-              d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <div className="min-w-0">
-            <p className="text-[#a9781f] text-xs font-medium leading-snug">
-              Registo informal ({eur2(reconciliation.informalPaid)}) não bate com faturas pagas (
-              {eur2(reconciliation.ledgerPaid)}).
-            </p>
-            <p className="text-foreground/45 text-[11px] mt-0.5">
-              O livro de faturas é a fonte de verdade — confirma no separador Faturas ou no livro
-              abaixo.
             </p>
           </div>
         </div>
@@ -950,26 +683,10 @@ export default function PaymentsPanel({
         </p>
         {payments.length > 0 && (
           <span className="text-foreground/40 text-[10px] tabular-nums">
-            {eur2(informalPaid)} recebido{showLedger ? " (registo interno)" : ""}
+            {eur2(headlinePaid)} recebido
           </span>
         )}
       </div>
-
-      {/* ── Para onde é que o «enviar» vai mesmo ──
-          A forma menos intrusiva que serve: uma linha de texto ao lado dos
-          botões, presente ANTES do gesto, `role="status"` (anúncio educado, não
-          interrompe). Nada de diálogo de confirmação e nada de desactivar o
-          botão — enviar para o endereço congelado é muitas vezes o que ela quer,
-          e um documento fiscal endereçado a outro pagador está correcto. O que
-          se corrige é a surpresa, não a decisão dela. */}
-      {enderecoDivergente && (
-        <p role="status" className="text-[#a9781f] text-[11px] leading-snug mb-1.5">
-          As faturas já emitidas neste pedido estão endereçadas a{" "}
-          <strong className="font-medium">{enderecoDivergente}</strong> — é para aí que o envio sai,
-          e não para {quote.email || "o email do pedido"}. Um documento fiscal guarda o endereço com
-          que foi emitido; para o mudar, anula e reemite em Faturas.
-        </p>
-      )}
 
       {/* Lista — uma linha por pagamento, nas mesmas colunas do formulário. */}
       <div className="flex flex-col gap-1">
@@ -1067,49 +784,6 @@ export default function PaymentsPanel({
                   <>
                     <button
                       type="button"
-                      onClick={() => invoice(p, false)}
-                      disabled={busy === p.id}
-                      aria-label={`Descarregar ${p.paid ? "recibo" : "fatura"} PDF`}
-                      title={`Descarregar ${p.paid ? "recibo" : "fatura"} PDF`}
-                      className="text-foreground/45 hover:text-[#4d6350] transition-colors p-1"
-                    >
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                      >
-                        <path
-                          d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => invoice(p, true)}
-                      disabled={busy === p.id}
-                      aria-label={`Enviar ${p.paid ? "recibo" : "fatura"} por e-mail`}
-                      title={`Enviar ${p.paid ? "recibo" : "fatura"} por e-mail`}
-                      className="text-foreground/45 hover:text-[#4d6350] transition-colors p-1"
-                    >
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                      >
-                        <path d="M3 7l9 6 9-6" />
-                        <rect x="3" y="5" width="18" height="14" rx="2" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => remove(p)}
                       className="text-foreground/45 hover:text-[#b5654a] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-all p-1"
                       aria-label={`Remover ${KIND_LABEL[p.kind]} ${eur2(p.amount)}`}
@@ -1160,97 +834,6 @@ export default function PaymentsPanel({
           </div>
         )}
       </div>
-
-      {/* ── Livro de faturas (FT) — leitura, a verdade fiscal do evento. Colapsado
-          por omissão para não pesar no dia-a-dia; abre sozinho quando o registo
-          informal diverge (o banner acima mantém-se sempre visível). ── */}
-      {showLedger && (
-        <details
-          className="group/ledger mt-5 rounded-xl border border-foreground/[0.06] bg-foreground/[0.02]"
-          open={reconciliation.diverges || undefined}
-        >
-          <summary className="flex cursor-pointer select-none list-none items-center justify-between gap-2 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
-            <span className="text-foreground/45 text-[10px] tracking-[0.2em] uppercase">
-              Faturas emitidas (livro)
-              {!ledgerLoading && <span className="text-foreground/35"> · {invoices.length}</span>}
-            </span>
-            <svg
-              className="text-foreground/40 shrink-0 motion-safe:transition-transform group-open/ledger:rotate-180"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-            >
-              <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </summary>
-          <div className="px-3.5 pb-3">
-            {ledgerLoading ? (
-              // Caixas vazias encolhidas: uma linha discreta, não um bloco.
-              <p className="text-foreground/30 text-[11px] py-1">A carregar faturas…</p>
-            ) : invoices.length === 0 ? (
-              <p className="text-foreground/35 text-[11px] py-1">Sem faturas emitidas.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-foreground/30 text-[9px] tracking-[0.12em] uppercase text-left">
-                      <th className="font-medium py-1.5 pr-3">Nº</th>
-                      <th className="font-medium py-1.5 pr-3">Tipo</th>
-                      <th className="font-medium py-1.5 pr-3 text-right">Valor c/ IVA</th>
-                      <th className="font-medium py-1.5 pr-3">Emissão</th>
-                      <th className="font-medium py-1.5 pr-3">Venc.</th>
-                      <th className="font-medium py-1.5 pr-3">Pago</th>
-                      <th className="font-medium py-1.5">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.map((i) => (
-                      <tr
-                        key={i.id}
-                        className={`border-t border-foreground/[0.06] ${i.status === "anulada" ? "opacity-55" : ""}`}
-                      >
-                        <td className="py-2 pr-3 text-foreground/55 tabular-nums whitespace-nowrap">
-                          {i.number}
-                        </td>
-                        <td className="py-2 pr-3 text-foreground/50">
-                          {invKindLabel(pctSinal)[i.kind]}
-                        </td>
-                        <td className="py-2 pr-3 text-foreground/70 tabular-nums text-right whitespace-nowrap">
-                          {eur2(i.amount)}
-                        </td>
-                        <td className="py-2 pr-3 text-foreground/45 tabular-nums whitespace-nowrap">
-                          {fmtInvDate(i.issuedAt)}
-                        </td>
-                        <td className="py-2 pr-3 text-foreground/45 tabular-nums whitespace-nowrap">
-                          {fmtInvDate(i.dueAt)}
-                        </td>
-                        <td className="py-2 pr-3 text-foreground/45 tabular-nums whitespace-nowrap">
-                          {fmtInvDate(i.paidAt)}
-                        </td>
-                        <td className="py-2 whitespace-nowrap">
-                          <span
-                            className="text-[9px] tracking-[0.1em] uppercase px-2 py-0.5 rounded-md"
-                            style={{
-                              background: `${metaFor(INV_STATUS_META, i.status).color}18`,
-                              color: metaFor(INV_STATUS_META, i.status).color,
-                            }}
-                          >
-                            {metaFor(INV_STATUS_META, i.status).label}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </details>
-      )}
     </div>
   );
 }

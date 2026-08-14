@@ -49,7 +49,7 @@ const TaskRow = memo(function TaskRow({
        único com `min-w-0`, portanto o único que cede. Com `truncate` por cima,
        lia-se «Confirmar com a Herda…» dezasseis vezes seguidas.
 
-       A conversão é a que os cartões de Faturas já fazem — e faz-se com
+       A conversão é a que os outros cartões do back office já fazem — e faz-se com
        `flex-wrap` SOZINHO, sem ponto de corte por viewport: a fila quebra
        quando não cabe, que é a pergunta certa (a lição das linhas de grupo do
        estúdio, em MOBILE-AUDIT.md). O mínimo no título é o que faz o

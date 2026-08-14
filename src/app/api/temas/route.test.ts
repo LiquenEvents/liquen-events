@@ -367,7 +367,7 @@ describe("a base de dados não está ligada", () => {
  *
  * A biblioteca de temas é lida em quase todo o lado e muda muito pouco — o
  * caso de manual para uma resposta condicional, como já faziam /api/propostas,
- * /api/faturas e as outras listas do back office. Aqui não fazia: cada
+ * /api/propostas e as outras listas do back office. Aqui não fazia: cada
  * revalidação descarregava a lista inteira outra vez.
  *
  * A ARMADILHA que estes testes prendem: as capas e as tiras vêm em URLs

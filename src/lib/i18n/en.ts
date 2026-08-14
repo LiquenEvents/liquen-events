@@ -751,27 +751,7 @@ export const en: Dict = {
       // Percentages are filled in from the PROPOSAL — see the pt dictionary.
       sinal: "Deposit ({sinal}%)",
       saldo: "Balance ({saldo}%)",
-      faturasTitle: "Invoices",
-      thNumero: "No.",
-      thTipo: "Type",
-      thMontante: "Amount",
-      thEstado: "Status",
-      kind: {
-        sinal: "Deposit",
-        saldo: "Balance",
-        total: "Total",
-      },
-      estado: {
-        emitida: "Pending",
-        paga: "Paid",
-        anulada: "Void",
-      },
-      emitidaEm: "Issued on {date}",
-      pagaEm: "Paid on {date}",
-      venceEm: "Due on {date}",
       semTotal: "The payment schedule becomes available once the proposal is ready.",
-      noInvoices:
-        "We haven't issued any invoices yet. The expected schedule is shown above; we'll send each invoice as it's issued.",
     },
     proximos: {
       title: "Next steps",

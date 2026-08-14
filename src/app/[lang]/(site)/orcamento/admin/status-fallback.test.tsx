@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { ToastProvider } from "./Toast";
 import { metaFor, UNKNOWN_STATUS_COLOR } from "./status-meta";
-import Faturas from "./Faturas";
 import Tarefas from "./Tarefas";
 import Contratos from "./Contratos";
 
@@ -74,46 +73,6 @@ describe("metaFor", () => {
 
   it("nunca lê propriedades de undefined (era isto que derrubava o ecrã)", () => {
     expect(() => metaFor({}, "seja-o-que-for").color).not.toThrow();
-  });
-});
-
-describe("Faturas — estado fora do mapa", () => {
-  it("desenha o livro todo e mostra o valor cru", async () => {
-    serve({
-      "/api/faturas": [
-        {
-          id: "i1",
-          number: "FT 2026/0001",
-          clientName: "Cliente Normal",
-          kind: "total",
-          amount: 1000,
-          vatRate: 0.23,
-          issuedAt: "2026-01-01",
-          status: "paga",
-        },
-        {
-          id: "i2",
-          number: "FT 2026/0002",
-          clientName: "Cliente Estranho",
-          kind: "total",
-          amount: 2000,
-          vatRate: 0.23,
-          issuedAt: "2026-01-02",
-          // Fora do mapa (emitida/paga/anulada).
-          status: "cancelada",
-        },
-      ],
-    });
-
-    render(
-      <ToastProvider>
-        <Faturas quotes={[]} />
-      </ToastProvider>,
-    );
-
-    await waitFor(() => expect(screen.getAllByText(/Cliente Normal/).length).toBeGreaterThan(0));
-    expect(screen.getAllByText(/Cliente Estranho/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("cancelada").length).toBeGreaterThan(0);
   });
 });
 

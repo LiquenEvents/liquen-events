@@ -110,7 +110,7 @@ describe("aquecimento das vistas do back office", () => {
     };
     mod.warmViewChunks({
       schedule,
-      order: ["faturas", "contratos"],
+      order: ["temas", "contratos"],
       prefetch: async (v) => {
         done.push(v);
       },
@@ -120,7 +120,7 @@ describe("aquecimento das vistas do back office", () => {
       await Promise.resolve();
       await Promise.resolve();
     }
-    expect(done).toEqual(["faturas", "contratos"]);
+    expect(done).toEqual(["temas", "contratos"]);
     // Fila esgotada → nada mais fica agendado.
     expect(queue).toHaveLength(0);
   });
@@ -134,10 +134,10 @@ describe("aquecimento das vistas do back office", () => {
     };
     mod.warmViewChunks({
       schedule,
-      order: ["faturas", "contratos"],
+      order: ["temas", "contratos"],
       prefetch: async (v) => {
         done.push(v);
-        if (v === "faturas") throw new Error("rede em baixo");
+        if (v === "temas") throw new Error("rede em baixo");
       },
     });
     for (let i = 0; i < 4; i++) {
@@ -145,7 +145,7 @@ describe("aquecimento das vistas do back office", () => {
       await Promise.resolve();
       await Promise.resolve();
     }
-    expect(done).toEqual(["faturas", "contratos"]);
+    expect(done).toEqual(["temas", "contratos"]);
   });
 
   it("não gasta dados de uma ligação medida (Save-Data) nem de 2g", async () => {
@@ -212,7 +212,7 @@ describe("aquecimento das vistas do back office", () => {
     // `overview` chega sempre no primeiro pedido — nenhum deles se aquece.
     expect(mod.WARM_ORDER).not.toContain("pedidos");
     expect(mod.WARM_ORDER).not.toContain("overview");
-    expect(mod.WARM_ORDER).toContain("faturas");
+    expect(mod.WARM_ORDER).toContain("contratos");
     expect(mod.WARM_ORDER).toContain("temas");
     expect(new Set(mod.WARM_ORDER).size).toBe(mod.WARM_ORDER.length);
   });
@@ -233,14 +233,14 @@ describe("vista já aquecida desenha sem esqueleto", () => {
 
     // Antes de aquecer: cai no `dynamic()`, que desenha o `loading` — o
     // esqueleto de vista, marcado com `data-view-skeleton`.
-    const { unmount } = render(<mod2.Faturas />);
+    const { unmount } = render(<mod2.Contratos />);
     expect(document.querySelector("[data-view-skeleton]")).not.toBeNull();
     unmount();
 
     // Depois de aquecer, a mesma vista monta directamente com o conteúdo real:
     // sem <Suspense>, logo sem os 300 ms que o React segura um fallback.
-    await mod2.prefetchView("faturas");
-    const { container } = render(<mod2.Faturas />);
+    await mod2.prefetchView("contratos");
+    const { container } = render(<mod2.Contratos />);
     expect(document.querySelector("[data-view-skeleton]")).toBeNull();
     // Conteúdo a sério (não se afirma QUAL — a cópia é da vista, não deste
     // teste); só que a vista montou em vez do lugar reservado. O esqueleto de

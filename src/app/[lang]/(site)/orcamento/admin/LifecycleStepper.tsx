@@ -1,28 +1,34 @@
 /**
  * LifecycleStepper — mostra, de forma compacta e horizontal, em que ponto do
  * ciclo de vida está o pedido selecionado: Pedido → Proposta → Contrato →
- * Fatura → Evento.
+ * Pagamento → Evento.
+ *
+ * O quarto passo chamou-se «Fatura» enquanto a casa facturava aqui dentro. O
+ * que ele sempre mediu, porém, foi o SINAL ter entrado (`sinal_pago`) — e é
+ * isso que continua a medir, agora que a factura é emitida noutro sítio e esta
+ * aplicação não sabe se saiu. Chamar-lhe «Fatura» passaria a prometer um
+ * documento que este ecrã não tem como conhecer.
  *
  * É uma vista SIMPLIFICADA (5 passos) do modelo de 7 fases do Dossier
  * (`EventStage` em `@/lib/orcamento/dossier`). Mantém o vocabulário coerente:
  * cada passo grosso agrupa uma ou mais fases finas do Dossier —
  *   proposta_enviada → Proposta, aceite → Contrato,
- *   sinal_pago/em_producao → Fatura, semana_evento/concluido → Evento.
+ *   sinal_pago/em_producao → Pagamento, semana_evento/concluido → Evento.
  *
  * Client-safe: só depende de tipos e de funções puras do Dossier. Nunca importa
  * nenhum `*-store.ts` nem `server-only`.
  */
 import type { Quote } from "@/lib/orcamento/types";
-import { deriveStage, type DossierInvoice, type EventStage } from "@/lib/orcamento/dossier";
+import { deriveStage, type EventStage } from "@/lib/orcamento/dossier";
 
-type StageId = "pedido" | "proposta" | "contrato" | "fatura" | "evento";
+type StageId = "pedido" | "proposta" | "contrato" | "pagamento" | "evento";
 type StageState = "feito" | "atual" | "por_fazer";
 
 const STEPS: { id: StageId; label: string }[] = [
   { id: "pedido", label: "Pedido" },
   { id: "proposta", label: "Proposta" },
   { id: "contrato", label: "Contrato" },
-  { id: "fatura", label: "Fatura" },
+  { id: "pagamento", label: "Pagamento" },
   { id: "evento", label: "Evento" },
 ];
 
@@ -50,23 +56,20 @@ const STAGE_STEP: Record<Exclude<EventStage, "perdido">, number> = {
  * a sua própria, e as duas discordavam no sítio que mais custa dinheiro: aqui,
  * `if (eventPassed) return { allDone: true }` pintava os cinco passos de verde
  * assim que a data do casamento ficava para trás — sem olhar para um cêntimo.
- * O Dossier só chega a `concluido` com o evento passado E o saldo liquidado (do
- * livro de faturas ou do registo à mão, ver `combinedPaidTotal`); é ele que está
- * certo. O estúdio corria a lista, via tudo verde e um "Rever produção do
- * evento" em casamentos com o saldo por receber.
+ * O Dossier só chega a `concluido` com o evento passado E o saldo liquidado
+ * (ver `paidTotal`); é ele que está certo. O estúdio corria a lista, via tudo
+ * verde e um "Rever produção do evento" em casamentos com o saldo por receber.
  *
- * `invoices` é opcional porque a lista do back office só tem o Quote à mão. Sem
- * o livro de faturas, um casamento pago APENAS por faturas (sem nenhuma linha em
- * `quote.payments`) aparece aquém da sua fase — erra a favor de "ainda há
- * trabalho", nunca a favor de "está tratado". O Dossier do evento, esse, recebe
- * as faturas e fecha a conta.
+ * Só precisa do Quote: o dinheiro recebido vive todo em `quote.payments`, que a
+ * lista do back office já tem à mão. (Enquanto houve livro de facturas, esta
+ * função aceitava-o à parte, porque um casamento podia estar pago só do lado do
+ * livro e a lista não o sabia.)
  */
 export function deriveRequestLifecycle(
   quote: Quote,
   today: Date = new Date(),
-  invoices: DossierInvoice[] = [],
 ): { perdido: boolean; currentIndex: number; allDone: boolean } {
-  const stage = deriveStage({ quote, proposal: null, contract: null, invoices }, today);
+  const stage = deriveStage({ quote, proposal: null, contract: null }, today);
   if (stage === "perdido") return { perdido: true, currentIndex: 0, allDone: false };
   return { perdido: false, currentIndex: STAGE_STEP[stage], allDone: stage === "concluido" };
 }
@@ -87,14 +90,8 @@ function CheckIcon() {
   );
 }
 
-export default function LifecycleStepper({
-  quote,
-  invoices,
-}: {
-  quote: Quote;
-  invoices?: DossierInvoice[];
-}) {
-  const { perdido, currentIndex, allDone } = deriveRequestLifecycle(quote, new Date(), invoices);
+export default function LifecycleStepper({ quote }: { quote: Quote }) {
+  const { perdido, currentIndex, allDone } = deriveRequestLifecycle(quote, new Date());
 
   if (perdido) {
     return (

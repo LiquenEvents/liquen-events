@@ -12,7 +12,7 @@ interface Props {
 
 /**
  * Ajuda de entrada para quem começa: explica o percurso de um trabalho
- * (Pedido → Proposta → Contrato → Fatura → Evento) e traduz o vocabulário do
+ * (Pedido → Proposta → Contrato → Pagamento → Evento) e traduz o vocabulário do
  * back-office em linguagem simples. Abre a partir do botão "?" na barra de topo.
  *
  * Espelha o ShortcutsModal: role="dialog"/aria-modal, foco levado para dentro e

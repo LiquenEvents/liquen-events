@@ -25,7 +25,7 @@ export const GA4_ID = "G-29CZZ76H6F";
 // reporta `document.location.href` inteiro, e em /portal/<token> ou
 // /proposta/<token> isso é o segredo do cliente (o token do portal vale 365
 // dias; o da proposta autoriza ACEITAR a proposta, o que cria contrato e
-// fatura de sinal). Quem tenha acesso à propriedade GA4 ou Ads — uma agência,
+// o sinal a receber). Quem tenha acesso à propriedade GA4 ou Ads — uma agência,
 // um prestador, alguém que já saiu — leria tokens vivos na dimensão do caminho
 // de página. Nas rotas normais o valor é rigorosamente o mesmo href de sempre,
 // por isso a medição não muda em nada.

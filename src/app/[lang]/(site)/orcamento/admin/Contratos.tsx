@@ -14,7 +14,7 @@ import { AvisoDeFalha } from "./AvisoDeFalha";
 
 // Estado do contrato → rótulo + paleta. Aceite usa o musgo (positivo); pendente
 // fica esbatido, à espera da assinatura do cliente. Mesma linguagem cromática
-// das chips de Faturas/Inventário.
+// das chips do Inventário.
 const STATUS_META: Record<ContractStatus, { label: string; bg: string; text: string }> = {
   aceite: { label: "Aceite", bg: "#e7efe4", text: "#3a5c39" },
   pendente: { label: "Pendente", bg: "#00000008", text: "#8a8378" },

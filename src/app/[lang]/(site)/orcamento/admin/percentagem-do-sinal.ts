@@ -9,13 +9,12 @@ import { useCachedList } from "./useCachedList";
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * O sinal deixou de ser 30% no dia em que o estúdio ganhou a caixa
- * «Sinal (%)». As rotas que EMITEM as facturas passaram a lê-la
- * (`depositPercentOf`), mas os dois ecrãs onde ela vê o número ANTES de emitir
- * — o formulário de Faturas e o painel de Pagamentos — continuavam a dividir
- * 30/70 à letra. Numa proposta de 50%: o formulário prometia «sinal
- * 3.690,00 €», ela carregava em Emitir, e no livro apareciam duas faturas de
- * 6.150,00 €. Não é um erro de contas — é o ecrã a dizer uma coisa e o botão a
- * fazer outra, que é a espécie de coisa que faz perder a confiança no resto.
+ * «Sinal (%)». A proposta passou a guardá-la (`depositPercentOf`), mas os ecrãs
+ * onde ela vê o número — o painel de Pagamentos, o dossiê — continuavam a
+ * dividir 30/70 à letra. Numa proposta de 50%, o atalho oferecia «sinal
+ * 3.690,00 €» quando o combinado com o cliente eram 6.150,00 €: ela registava o
+ * que o botão dizia e o «Em falta» ficava errado a partir daí. Não é um erro de
+ * contas — é o ecrã a dizer uma coisa e o combinado a ser outra.
  *
  * Vive num sítio só, e não copiado nos dois componentes, precisamente porque
  * duas cópias é a forma de um deles voltar a ficar para trás.

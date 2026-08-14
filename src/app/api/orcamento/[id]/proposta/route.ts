@@ -164,9 +164,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * noutro email da casa, «Olá Francisco Maria Carrelhas Das Neves Da Palma
      * Gaspar,», que ninguém escreveria a falar com um cliente.
      *
-     * Só aqui: o email do recibo saúda pelo `invoice.clientName`, que é o nome
-     * FISCAL e pode ser uma empresa — cortá-lo pelo primeiro espaço daria «Olá
-     * Torre,» a um hotel. É a mesma forma que o mensageiro já usa.
+     * É a mesma forma que o mensageiro já usa.
      */
     const primeiroNome = String(quote.name ?? "")
       .trim()

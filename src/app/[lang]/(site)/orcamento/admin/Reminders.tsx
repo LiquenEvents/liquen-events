@@ -75,8 +75,8 @@ export default function Reminders({ quotes, onOpen }: Props) {
          * chegassem aos 10 000 €: ficavam 2 300 € por cobrar sem lembrete
          * nenhum a dizê-lo.
          *
-         * `contractedAmounts` é a mesma cascata que o dossier e o ecrã das
-         * Faturas usam, e devolve o bruto explicitamente.
+         * `contractedAmounts` é a mesma cascata que o dossier e o painel de
+         * Pagamentos usam, e devolve o bruto explicitamente.
          */
         const total = contractedAmounts(q).gross;
         const paid = (q.payments ?? []).filter((p) => p.paid).reduce((s, p) => s + p.amount, 0);

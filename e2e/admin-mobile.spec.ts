@@ -334,7 +334,6 @@ const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
   { nav: /^Fazer proposta$/, heading: /^Fazer proposta$/ },
   { nav: /^Propostas$/, heading: /^Propostas$/ },
-  { nav: /^Faturas$/, heading: /^Faturas$/ },
   { nav: /^Propostas Aceites$/, heading: /^Propostas Aceites$/ },
   { nav: /^Material$/, heading: /^Material$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
@@ -488,10 +487,9 @@ test.describe("Back office — mobile", () => {
    * página), e um passeio de navegação que muda de estado a meio deixa de
    * poder continuar a percorrer a navegação.
    *
-   * O separador Financeiro NÃO é auditado por inteiro de propósito: o livro de
-   * faturas que lá vive está a ser removido do produto, e uma rede que falha
-   * por causa de código condenado é uma rede que se desliga. Em vez disso
-   * medem-se, pelo nome, os controlos do registo de pagamentos — que ficam.
+   * O separador Financeiro é auditado pelos controlos do REGISTO DE PAGAMENTOS,
+   * medidos pelo nome. (O livro de faturas que lá viveu saiu do produto — a
+   * facturação passou a ser feita noutro programa.)
    */
   test("@movel phone: o painel de um pedido também se toca com o dedo", async ({ page }) => {
     const errors = collectErrors(page);

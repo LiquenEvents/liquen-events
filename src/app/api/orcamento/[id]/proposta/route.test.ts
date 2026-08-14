@@ -404,10 +404,7 @@ describe("POST /api/orcamento/[id]/proposta — assinatura", () => {
    * de confirmação: «Olá Francisco Maria Carrelhas Das Neves Da Palma Gaspar,».
    * Essa saudação já foi corrigida; esta rota ficou para trás com o nome cru.
    *
-   * Só o PRIMEIRO nome, e só aqui: o `fatura/route.ts` saúda pelo
-   * `invoice.clientName`, que é o nome FISCAL e pode ser uma empresa — cortá-lo
-   * pelo primeiro espaço daria «Olá Torre,» a um hotel. Casos diferentes,
-   * tratamentos diferentes.
+   * Só o PRIMEIRO nome: é a mesma forma que o mensageiro já usa.
    */
   it("saúda pelo primeiro nome, e não pelo nome legal inteiro", async () => {
     authed.ok = true;

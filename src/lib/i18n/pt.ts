@@ -829,30 +829,10 @@ export const pt = {
         "O pagamento é faseado: {sinal}% de sinal para reservar a data e {saldo}% de saldo antes do evento, calculados sobre o total a pagar (com IVA incluído).",
       scheduleTitle: "Plano previsto",
       // As percentagens vêm preenchidas (`fill`) com as da PROPOSTA — é
-      // editável por proposta e é a mesma que as facturas usam.
+      // editável por proposta e é o que o cliente vai transferir.
       sinal: "Sinal ({sinal}%)",
       saldo: "Saldo ({saldo}%)",
-      faturasTitle: "Faturas",
-      thNumero: "Nº",
-      thTipo: "Tipo",
-      thMontante: "Montante",
-      thEstado: "Estado",
-      kind: {
-        sinal: "Sinal",
-        saldo: "Saldo",
-        total: "Total",
-      },
-      estado: {
-        emitida: "Pendente",
-        paga: "Paga",
-        anulada: "Anulada",
-      },
-      emitidaEm: "Emitida a {date}",
-      pagaEm: "Paga a {date}",
-      venceEm: "Vence a {date}",
       semTotal: "O plano de pagamentos fica disponível assim que a proposta estiver pronta.",
-      noInvoices:
-        "Ainda não emitimos faturas. Em cima fica o plano previsto; enviamos cada fatura assim que for emitida.",
     },
     proximos: {
       title: "Próximos passos",

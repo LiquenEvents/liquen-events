@@ -307,9 +307,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 // Hard delete — for junk/test leads. This is deliberately distinct from
 // archiving (PATCH { archived: true }), a reversible soft-delete that keeps the
-// record. Deleting only removes the quote itself: related invoices and
-// contracts are fiscal records and are intentionally left untouched. (Draft
-// proposals are left too — proposals-store exposes no clean delete helper.)
+// record. Deleting only removes the quote itself: the contracts and the already
+// issued invoices are fiscal records and are intentionally left untouched — the
+// invoices table outlives the invoicing code, which moved out of this app.
+// (Draft proposals are left too — proposals-store exposes no clean delete
+// helper.)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

@@ -59,7 +59,6 @@ import type { ActivityEntry, QuoteStatus } from "./types";
 export type AcontecimentoDoPedido =
   | "mensagem_enviada"
   | "proposta_enviada"
-  | "fatura_emitida"
   | "pagamento_recebido"
   | "contrato_registado";
 
@@ -96,16 +95,16 @@ export const ROTULO_DO_ESTADO: Record<QuoteStatus, string> = {
  * «Dá direito» e não «põe»: é o TECTO que aquele acontecimento justifica. Se o
  * pedido já estiver acima, fica onde está (regra 1).
  *
- * Porque é que emitir uma factura vale `aceite` (= «Ganho»): não se manda uma
- * factura a quem ainda está a pensar. Um documento fiscal em nome do cliente é
- * a afirmação mais forte que este negócio produz de que o trabalho é nosso —
- * mais forte, até, do que o carimbo do aceite, que pode ter sido dado ao
- * telefone e nunca ter passado pelo link.
+ * Houve aqui um `fatura_emitida`, que valia `aceite` («Ganho») pela mesma razão
+ * por que `pagamento_recebido` o vale: não se manda uma factura a quem ainda
+ * está a pensar. Saiu com a facturação — nada nesta aplicação emite facturas, e
+ * um acontecimento que ninguém produz não pertence a esta lista (ver a regra no
+ * topo do tipo). As linhas de histórico já escritas por ele não se perdem: são
+ * texto livre gravado com `kind: "status_change"`, como todas as outras.
  */
 export const ESTADO_APOS: Record<AcontecimentoDoPedido, QuoteStatus> = {
   mensagem_enviada: "em_revisao",
   proposta_enviada: "cotado",
-  fatura_emitida: "aceite",
   pagamento_recebido: "aceite",
   contrato_registado: "aceite",
 };
@@ -117,7 +116,6 @@ export const ESTADO_APOS: Record<AcontecimentoDoPedido, QuoteStatus> = {
 const MOTIVO: Record<AcontecimentoDoPedido, string> = {
   mensagem_enviada: "respondemos ao cliente",
   proposta_enviada: "proposta enviada ao cliente",
-  fatura_emitida: "fatura emitida",
   pagamento_recebido: "pagamento recebido",
   contrato_registado: "contrato registado",
 };

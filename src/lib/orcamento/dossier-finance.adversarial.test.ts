@@ -1,21 +1,16 @@
 import { describe, it, expect } from "vitest";
-import {
-  computeEventMetrics,
-  reconcileFinance,
-  type DossierData,
-  type DossierInvoice,
-} from "./dossier";
+import { computeEventMetrics, paidTotal, type DossierData } from "./dossier";
 import type { Quote, Payment } from "./types";
 
 /**
  * Adversarial QA — the FINANCEIRO / MARGIN math shared by the Estatísticas
  * dashboard (margem por tipo de evento) and the Dossier. StatsDashboard, Overview
  * and EventCosts all aggregate the SAME per-event building blocks that
- * `computeEventMetrics`/`reconcileFinance` expose, so pinning these pure helpers
- * pins the reporting math too. Every test injects a fixed `today` — never the
- * real clock. Focus: division-by-zero receita, negative margin (custo > receita),
- * anulada exclusion, float drift in cent sums, empty state (no NaN/Infinity) and
- * sinal/saldo/total ledger coherence.
+ * `computeEventMetrics`/`paidTotal` expose, so pinning these pure helpers pins
+ * the reporting math too. Every test injects a fixed `today` — never the real
+ * clock. Focus: division-by-zero receita, negative margin (custo > receita),
+ * float drift in cent sums, empty state (no NaN/Infinity) and the sinal/saldo
+ * coherence of the payments record.
  */
 
 const TODAY = new Date("2026-07-18T09:00:00Z");
@@ -69,20 +64,13 @@ function makeQuote(over: Partial<Quote> = {}): Quote {
   };
 }
 
-function invoice(over: Partial<DossierInvoice> = {}): DossierInvoice {
-  return {
-    id: "i1",
-    number: "FT 2026/0001",
-    kind: "sinal",
-    amount: 6000,
-    status: "emitida",
-    issuedAt: "2026-02-05",
-    ...over,
-  };
+/** Linha de pagamento RECEBIDA; os testes sobrepõem só o que exercitam. */
+function pago(over: Partial<Payment> = {}): Payment {
+  return { id: "p1", kind: "sinal", amount: 6000, date: "2026-02-05", paid: true, ...over };
 }
 
 function data(over: Partial<DossierData> = {}): DossierData {
-  return { quote: makeQuote(), proposal: null, contract: null, invoices: [], ...over };
+  return { quote: makeQuote(), proposal: null, contract: null, ...over };
 }
 
 describe("computeEventMetrics — margin adversarial edges", () => {
@@ -104,7 +92,7 @@ describe("computeEventMetrics — margin adversarial edges", () => {
     });
     const m = computeEventMetrics(d, TODAY);
     // 5 000 € é o preço SEM IVA; contratado = 6 150 € com IVA, que é a base em
-    // que os pagamentos e as facturas se comparam. A MARGEM, essa, corre em
+    // que os pagamentos se comparam. A MARGEM, essa, corre em
     // líquido dos dois lados — o IVA não é receita nem é custo (ver a nota em
     // `EventMetrics.margin`): 5 000 − 6 504,07 = −1 504,07 €.
     expect(m.contracted).toBe(6150);
@@ -117,8 +105,11 @@ describe("computeEventMetrics — margin adversarial edges", () => {
 
   it("ZERO receita (no proposal/quote/breakdown) → no NaN/Infinity anywhere", () => {
     const d = data({
-      quote: makeQuote({ quotedPrice: undefined, priceBreakdown: undefined as never }),
-      invoices: [invoice({ status: "paga", amount: 500 })],
+      quote: makeQuote({
+        quotedPrice: undefined,
+        priceBreakdown: undefined as never,
+        payments: [pago({ amount: 500 })],
+      }),
     });
     const m = computeEventMetrics(d, TODAY);
     expect(m.contracted).toBe(0);
@@ -141,9 +132,7 @@ describe("computeEventMetrics — margin adversarial edges", () => {
     const m = computeEventMetrics(d, TODAY);
     for (const v of [
       m.contracted,
-      m.ledgerIssued,
-      m.ledgerPaid,
-      m.informalPaid,
+      m.paid,
       m.pctPaid,
       m.supplierCosts,
       m.margin,
@@ -155,52 +144,59 @@ describe("computeEventMetrics — margin adversarial edges", () => {
     expect(m.margin).toBe(0);
   });
 
-  it("overpaid ledger → pctPaid exceeds 1 (coherent, not capped)", () => {
+  it("recebido acima do contratado → pctPaid passa de 1 (coerente, não travado)", () => {
     // Contratado = 20 000 € sem IVA → 24 600 € com IVA; recebeu-se 25% a mais do
     // que isso. A percentagem compara com IVA dos dois lados.
     const d = data({
-      quote: makeQuote({ quotedPrice: 20000, priceBreakdown: undefined as never }),
-      invoices: [invoice({ kind: "total", amount: 30750, status: "paga" })],
+      quote: makeQuote({
+        quotedPrice: 20000,
+        priceBreakdown: undefined as never,
+        payments: [pago({ kind: "pagamento", amount: 30750 })],
+      }),
     });
     const m = computeEventMetrics(d, TODAY);
     expect(m.contracted).toBe(24600);
-    expect(m.ledgerPaid).toBe(30750);
+    expect(m.paid).toBe(30750);
     expect(m.pctPaid).toBeCloseTo(1.25, 10);
   });
 });
 
-describe("computeEventMetrics — ledger sinal/saldo/total coherence", () => {
-  // Contratado 20 000 € sem IVA → 24 600 € com IVA. As faturas fasearam-no a
-  // 30/70 sobre o valor COM IVA (é assim que a rota de faturação as emite):
-  // sinal 7 380 €, saldo 17 220 €.
+describe("computeEventMetrics — coerência sinal/saldo do registo de pagamentos", () => {
+  // Contratado 20 000 € sem IVA → 24 600 € com IVA, faseado a 30/70 sobre o
+  // valor COM IVA: sinal 7 380 €, saldo 17 220 €.
   const SINAL = 7380;
   const SALDO = 17220;
 
-  it("anulada invoices are excluded from BOTH ledgerIssued and ledgerPaid", () => {
+  it("uma linha POR receber não conta para o recebido nem para a percentagem", () => {
     const d = data({
-      quote: makeQuote({ quotedPrice: 20000, priceBreakdown: undefined as never }),
-      invoices: [
-        invoice({ id: "i1", kind: "sinal", amount: SINAL, status: "paga" }),
-        invoice({ id: "i2", kind: "saldo", amount: SALDO, status: "anulada" }), // voided
-      ],
+      quote: makeQuote({
+        quotedPrice: 20000,
+        priceBreakdown: undefined as never,
+        payments: [
+          pago({ id: "p1", kind: "sinal", amount: SINAL }),
+          pago({ id: "p2", kind: "saldo", amount: SALDO, paid: false }),
+        ],
+      }),
     });
     const m = computeEventMetrics(d, TODAY);
-    expect(m.ledgerIssued).toBe(SINAL); // voided saldo not issued
-    expect(m.ledgerPaid).toBe(SINAL); // and certainly not paid
+    expect(m.paid).toBe(SINAL);
     expect(m.pctPaid).toBeCloseTo(0.3, 10);
   });
 
-  it("an EMITIDA (issued-but-unpaid) invoice counts as issued but NOT as paid", () => {
+  it("sinal + saldo ambos recebidos fecham o contratado ao cêntimo", () => {
     const d = data({
-      quote: makeQuote({ quotedPrice: 20000, priceBreakdown: undefined as never }),
-      invoices: [
-        invoice({ id: "i1", kind: "sinal", amount: SINAL, status: "paga" }),
-        invoice({ id: "i2", kind: "saldo", amount: SALDO, status: "emitida" }),
-      ],
+      quote: makeQuote({
+        quotedPrice: 20000,
+        priceBreakdown: undefined as never,
+        payments: [
+          pago({ id: "p1", kind: "sinal", amount: SINAL }),
+          pago({ id: "p2", kind: "saldo", amount: SALDO }),
+        ],
+      }),
     });
     const m = computeEventMetrics(d, TODAY);
-    expect(m.ledgerIssued).toBe(24600);
-    expect(m.ledgerPaid).toBe(SINAL); // saldo issued but unpaid
+    expect(m.paid).toBe(24600);
+    expect(m.pctPaid).toBe(1);
   });
 });
 
@@ -238,10 +234,7 @@ describe("computeEventMetrics — aggregation invariant (the Estatísticas sum)"
       sumNet = 0,
       sumMargin = 0;
     for (const q of quotes) {
-      const m = computeEventMetrics(
-        { quote: q, proposal: null, contract: null, invoices: [] },
-        TODAY,
-      );
+      const m = computeEventMetrics({ quote: q, proposal: null, contract: null }, TODAY);
       sumContracted += m.contracted;
       sumCosts += m.supplierCosts;
       sumCostsNet += m.supplierCostsNet;
@@ -262,50 +255,45 @@ describe("computeEventMetrics — aggregation invariant (the Estatísticas sum)"
   });
 });
 
-describe("reconcileFinance — cent-level truth, no false alarms", () => {
-  it("float-drift cent sums do NOT trigger a spurious divergence (round2 both sides)", () => {
-    // 0.10 + 0.20 = 0.30000000000000004 in IEEE-754. A naive === against a single
-    // 0.30 invoice would flag a bogus reconciliation warning; round2 must absorb it.
+describe("paidTotal — verdade ao cêntimo, sem falsos alarmes", () => {
+  /**
+   * Estes testes eram do `reconcileFinance`, que confrontava o registo de
+   * pagamentos com o livro de facturas. O livro saiu com a facturação (ver a
+   * nota em `dossier.ts`); o rigor ao cêntimo que eles protegiam continua a
+   * valer — é o mesmo `round2` que impede um desvio de vírgula flutuante de
+   * deixar um evento integralmente pago aquém do total contratado.
+   */
+  it("a deriva de vírgula flutuante é absorvida (round2)", () => {
+    // 0.10 + 0.20 = 0.30000000000000004 em IEEE-754. Sem round2, um evento
+    // contratado a 0,30 € nunca chegaria a «liquidado».
     const payments: Payment[] = [
       { id: "p1", kind: "sinal", amount: 0.1, date: "2026-02-01", paid: true },
       { id: "p2", kind: "pagamento", amount: 0.2, date: "2026-02-02", paid: true },
     ];
-    const d = data({
-      quote: makeQuote({ payments }),
-      invoices: [invoice({ kind: "sinal", amount: 0.3, status: "paga" })],
-    });
-    const r = reconcileFinance(d);
-    expect(r.informalPaid).toBe(0.3);
-    expect(r.ledgerPaid).toBe(0.3);
-    expect(r.diverges).toBe(false);
+    expect(paidTotal(makeQuote({ payments }))).toBe(0.3);
   });
 
-  it("only PAID informal payments and PAGA invoices count toward each side", () => {
+  it("só as linhas marcadas como recebidas contam", () => {
     const payments: Payment[] = [
       { id: "p1", kind: "sinal", amount: 6000, date: "2026-02-01", paid: true },
-      { id: "p2", kind: "saldo", amount: 14000, date: "2026-05-01", paid: false }, // pending
+      { id: "p2", kind: "saldo", amount: 14000, date: "2026-05-01", paid: false }, // pendente
     ];
-    const d = data({
-      quote: makeQuote({ payments }),
-      invoices: [
-        invoice({ id: "i1", kind: "sinal", amount: 6000, status: "paga" }),
-        invoice({ id: "i2", kind: "saldo", amount: 14000, status: "emitida" }), // not paid
-      ],
-    });
-    const r = reconcileFinance(d);
-    expect(r.informalPaid).toBe(6000);
-    expect(r.ledgerPaid).toBe(6000);
-    expect(r.diverges).toBe(false);
+    expect(paidTotal(makeQuote({ payments }))).toBe(6000);
   });
 
-  it("genuine mismatch still surfaces (informal ahead of the ledger)", () => {
+  it("um evento sem pagamento nenhum vale 0, e não NaN", () => {
+    expect(paidTotal(makeQuote())).toBe(0);
+    expect(paidTotal(makeQuote({ payments: [] }))).toBe(0);
+    expect(Number.isFinite(paidTotal(makeQuote()))).toBe(true);
+  });
+
+  it("valores negativos (estorno registado à mão) subtraem, e não são ignorados", () => {
+    // Um estorno é dinheiro que SAIU. Ignorá-lo deixava o «Recebido» a afirmar
+    // um valor que já não está na conta.
     const payments: Payment[] = [
-      { id: "p1", kind: "sinal", amount: 6000, date: "2026-02-01", paid: true },
+      { id: "p1", kind: "pagamento", amount: 1000, date: "2026-02-01", paid: true },
+      { id: "p2", kind: "pagamento", amount: -250, date: "2026-03-01", paid: true },
     ];
-    const d = data({ quote: makeQuote({ payments }), invoices: [] });
-    const r = reconcileFinance(d);
-    expect(r.informalPaid).toBe(6000);
-    expect(r.ledgerPaid).toBe(0);
-    expect(r.diverges).toBe(true);
+    expect(paidTotal(makeQuote({ payments }))).toBe(750);
   });
 });

@@ -41,7 +41,6 @@ vi.mock("./lazy", () => {
     Fornecedores: stub("fornecedores"),
     StatsDashboard: stub("estatisticas"),
     EmailTemplates: stub("modelos-email"),
-    Faturas: stub("faturas"),
     Contratos: stub("contratos"),
     Inventario: stub("inventario"),
     ProposalBuilder: stub("proposal-builder"),

@@ -91,7 +91,6 @@ import {
   FazerProposta,
   ProductionPlan,
   EmailTemplates,
-  Faturas,
   Contratos,
   Inventario,
   Material,
@@ -174,7 +173,7 @@ const DETAIL_TABS: { id: DetailTab; label: string; hint: string; icon: ReactNode
   {
     id: "financeiro",
     label: "Financeiro",
-    hint: "Preço, custos, margem, pagamentos e faturação.",
+    hint: "Preço, custos, margem e pagamentos.",
     icon: (
       <svg
         width="15"
@@ -239,7 +238,7 @@ function detailNextAction(quote: Quote): { label: string; hint: string; tab: Det
     case 2:
       return {
         label: "Registar pagamento",
-        hint: "Sinal, faturação e custos do evento",
+        hint: "Sinal, saldo e custos do evento",
         tab: "financeiro",
       };
     case 3:
@@ -1180,7 +1179,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   }, []);
 
   // Warm the caches of the high-traffic API views during idle after first
-  // paint, so the first click on Propostas / Faturas / Tarefas / Calendário is
+  // paint, so the first click on Propostas / Tarefas / Calendário is
   // instant instead of a cold round-trip. Uses the same shared cache the views
   // read from (useCachedList), so a warmed view renders immediately with no
   // skeleton. Cheap + non-blocking; skipped if already cached/in-flight.
@@ -1197,7 +1196,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       // números errados durante uma pintura. Quando passarem a `?semDoc=1`,
       // passam também a esta chave e voltam a aproveitar o aquecimento.
       prefetchList("propostas-leves", "/api/propostas?semDoc=1");
-      prefetchList("faturas", "/api/faturas");
       prefetchList("tarefas", "/api/tarefas");
       prefetchList("calendario", "/api/calendario");
     });
@@ -2467,7 +2465,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     material: "Material",
     temas: "Temas",
     estatisticas: "Estatísticas",
-    faturas: "Faturas",
     contratos: "Propostas Aceites",
     "modelos-email": "Modelos de email",
   };
@@ -2512,7 +2509,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     material: "O que vai nas carrinhas: ferramentas, consumíveis, escadotes",
     temas: "Fotos de inspiração por tema, prontas para as propostas",
     estatisticas: "Métricas e desempenho",
-    faturas: "Livro de faturação e pagamentos",
     contratos: "Aceitações de condições e estado de cada contrato",
     "modelos-email": "Emails reutilizáveis da equipa",
   };
@@ -3313,13 +3309,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             </div>
           )}
 
-          {/* ── Faturas ── */}
-          {view === "faturas" && (
-            <div className={`${VIEW_WRAP} view-in`}>
-              <Faturas quotes={quotes} />
-            </div>
-          )}
-
           {/* ── Contratos ── */}
           {view === "contratos" && (
             <div className={`${VIEW_WRAP} view-in`}>
@@ -3802,7 +3791,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </div>
                           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                             {/* Full-screen cockpit for this event — the one place that
-                              unifies proposta/contrato/faturas/produção. Primary. */}
+                              unifies proposta/contrato/pagamentos/produção. Primary. */}
                             <Link
                               href={`/${lang}/orcamento/admin/evento/${selected.id}`}
                               className="alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16] inline-flex items-center"
@@ -4825,15 +4814,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             >
                               {/* Cobrança — payments first (the key action), costs
                                   below. Eyebrow mirrors the other two panels. */}
-                              <p className="bo-eyebrow text-foreground/45">
-                                Pagamentos e faturação
-                              </p>
+                              <p className="bo-eyebrow text-foreground/45">Pagamentos</p>
 
-                              {/* Payments & invoicing */}
                               <PaymentsPanel
                                 key={`pay-${selected.id}`}
                                 quote={selected}
-                                showLedger
                                 onChange={(payments) => {
                                   setQuotes((prev) =>
                                     prev.map((q) =>

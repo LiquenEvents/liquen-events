@@ -1000,6 +1000,11 @@ export default function Overview({ quotes, userName, onOpen, onGoStats, onGo, on
     const decided = accepted + (byStatus["rejeitado"] ?? 0);
     const conversion = decided > 0 ? Math.round((accepted / decided) * 100) : 0;
     const avgTicket = accepted > 0 ? won / accepted : 0;
+    // `billed` é o total REGISTADO (recebido + a receber) das linhas de
+    // pagamento — nunca leu o livro de facturas, nem quando ele existia. O nome
+    // ficou da altura em que a casa facturava aqui; não é mostrado em lado
+    // nenhum (serve só de denominador da barra), por isso mantém-se para não
+    // mexer no que não mudou.
     const billed = received + outstanding;
 
     // Active pipeline = everything not yet won/lost. Pending review = the leads

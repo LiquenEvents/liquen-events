@@ -6,7 +6,6 @@ import { normalizeLocale } from "@/lib/i18n";
 import { getQuote } from "@/lib/quotes-store";
 import { getProposalByQuote } from "@/lib/proposals-store";
 import { getContractByProposal, getAcceptedContractByQuote } from "@/lib/contracts-store";
-import { listInvoicesForQuote } from "@/lib/invoices-store";
 import { createPortalToken } from "@/lib/portal-token";
 import type { DossierData } from "@/lib/orcamento/dossier";
 import DossierClient from "./DossierClient";
@@ -14,8 +13,8 @@ import { entradaCom } from "../../entrada-destino";
 
 /**
  * Dossier do Evento — cockpit de página inteira para UM evento. Este é o único
- * componente SERVIDOR da rota: agrega tudo (pedido, proposta, contrato, faturas)
- * a partir dos stores server-only e entrega ao cliente APENAS dados
+ * componente SERVIDOR da rota: agrega tudo (pedido, proposta, contrato) a
+ * partir dos stores server-only e entrega ao cliente APENAS dados
  * serializáveis, exactamente como `portal/[token]/page.tsx`. Nenhum store
  * atravessa a fronteira — o `DossierClient` e os seus filhos só veem props.
  *
@@ -58,12 +57,10 @@ export default async function EventoDossierPage({
   // essa proposta não tem contrato e um lookup por ela perderia o cartão de
   // contrato e faria a fase regredir de `em_producao` para `sinal_pago`. Mantemos
   // o lookup por proposta como recurso (contratos antigos indexados só por ela).
-  // As faturas são independentes, por isso vão em paralelo.
   const proposal = await getProposalByQuote(quote.id);
-  const [contractByQuote, contractByProposal, invoices] = await Promise.all([
+  const [contractByQuote, contractByProposal] = await Promise.all([
     getAcceptedContractByQuote(quote.id),
     proposal ? getContractByProposal(proposal.id) : Promise.resolve(null),
-    listInvoicesForQuote(quote.id),
   ]);
   const contract = contractByQuote ?? contractByProposal;
 
@@ -71,8 +68,8 @@ export default async function EventoDossierPage({
   // string; o cliente nunca importa `portal-token` (server-only).
   const portalUrl = `/${locale}/portal/${createPortalToken(quote.id)}`;
 
-  // Fronteira serializável: reduzimos contrato e faturas aos campos que o
-  // Dossier mostra (sem instâncias, sem funções).
+  // Fronteira serializável: reduzimos o contrato aos campos que o Dossier
+  // mostra (sem instâncias, sem funções).
   const data: DossierData = {
     quote,
     proposal: proposal ?? null,
@@ -84,16 +81,6 @@ export default async function EventoDossierPage({
           termsVersion: contract.termsVersion,
         }
       : null,
-    invoices: invoices.map((i) => ({
-      id: i.id,
-      number: i.number,
-      kind: i.kind,
-      amount: i.amount,
-      status: i.status,
-      issuedAt: i.issuedAt,
-      dueAt: i.dueAt,
-      paidAt: i.paidAt,
-    })),
   };
 
   return (

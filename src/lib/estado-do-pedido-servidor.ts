@@ -15,16 +15,16 @@ import { log } from "@/lib/logger";
  *
  * ── PORQUE É QUE ISTO NUNCA ATIRA ─────────────────────────────────────────
  *
- * Quem chama já fez a coisa a sério: a factura está no livro com um número
- * fiscal gasto, o email seguiu, o PDF está na caixa de correio do casal. Deixar
- * um erro subir daqui transformava uma factura EMITIDA numa resposta «Erro ao
- * criar a fatura» — e ela tenta outra vez, e a segunda tentativa bate na guarda
- * de duplicação. Ficava com o ecrã a dizer ao mesmo tempo que falhou e que já
- * existe, quando o que falhou foi só a cor de uma coluna.
+ * Quem chama já fez a coisa a sério: a proposta seguiu por email, o pagamento
+ * ficou registado, o contrato está guardado. Deixar um erro subir daqui
+ * transformava um trabalho FEITO numa mensagem de falha — e quem a lê tenta
+ * outra vez, e a segunda tentativa bate nas guardas de duplicação. Ficava com o
+ * ecrã a dizer ao mesmo tempo que falhou e que já existe, quando o que falhou
+ * foi só a cor de uma coluna.
  *
  * Por isso: melhor esforço, tudo apanhado, e um registo de erro para não se
- * perder em silêncio. O estado errado corrige-se com um arrasto no quadro; uma
- * factura emitida que a aplicação diz não ter emitido, não.
+ * perder em silêncio. O estado errado corrige-se com um arrasto no quadro; um
+ * email enviado que a aplicação diz não ter enviado, não.
  *
  * ── PORQUE É QUE É `updateQuoteWith` E NÃO `updateQuote` ──────────────────
  *
@@ -53,8 +53,8 @@ export async function registarAcontecimento(
   acontecimento: AcontecimentoDoPedido,
   detalhe?: string,
 ): Promise<QuoteStatus | null> {
-  // Uma factura pode ser emitida sem pedido associado (avulsa, na vista de
-  // Faturas). Não há coluna nenhuma para mexer — e não é um erro.
+  // Há acontecimentos sem pedido associado. Não há coluna nenhuma para mexer —
+  // e não é um erro.
   if (!quoteId) return null;
 
   const resultado: { estado: QuoteStatus | null } = { estado: null };

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { PDFDocument, PDFArray, PDFRawStream, decodePDFRawStream, type PDFObject } from "pdf-lib";
-import { renderInvoicePdf, type InvoiceData } from "./invoice-pdf";
 import { renderProposalPdf } from "./proposal-pdf";
 import type { Proposal } from "@/lib/orcamento/types";
 
@@ -88,21 +87,6 @@ const valores = (linhas: string[]) => linhas.filter((s) => s.includes("€"));
  */
 const COMO_SE_ESCREVE = /^-?\d{1,3}(\.\d{3})*,\d{2}\u00A0€$/;
 
-function fatura(over: Partial<InvoiceData> = {}): InvoiceData {
-  return {
-    number: "FT 2026/0007",
-    date: "2026-07-18",
-    clientName: "Maria & Zé",
-    clientEmail: "maria@example.com",
-    description: "",
-    amount: 24600,
-    vatRate: 0.23,
-    kindLabel: "Sinal",
-    paid: false,
-    ...over,
-  };
-}
-
 function proposta(over: Partial<Proposal> = {}): Proposal {
   return {
     id: "p-1",
@@ -121,41 +105,8 @@ function proposta(over: Partial<Proposal> = {}): Proposal {
   };
 }
 
-describe("PDF da factura", () => {
-  /**
-   * O CASO QUE ELA VIU: base 20 000, IVA 4 600, total 24 600.
-   *
-   * O IVA é o único dos três com quatro dígitos, e era o único que saía sem
-   * separador — no meio dos outros dois, na mesma coluna.
-   */
-  it("as três parcelas da mesma coluna escrevem-se com a mesma pontuação", async () => {
-    const impresso = await textoImpresso(await renderInvoicePdf(fatura({ amount: 24600 })));
-    expect(impresso).toContain(`20.000,00${EURO}`);
-    expect(impresso).toContain(`4.600,00${EURO}`);
-    expect(impresso).toContain(`24.600,00${EURO}`);
-    expect(impresso).not.toContain(`4600,00${EURO}`);
-  });
-
-  it("todos os valores da folha seguem a mesma regra, seja qual for a grandeza", async () => {
-    for (const amount of [999, 4600, 7890, 24600, 1234567, 1234.56]) {
-      const impresso = valores(await textoImpresso(await renderInvoicePdf(fatura({ amount }))));
-      expect(impresso.length, `${amount} € não imprimiu valor nenhum`).toBeGreaterThan(0);
-      for (const v of impresso) {
-        expect(v, `«${v}» não é como se escreve dinheiro em Portugal`).toMatch(COMO_SE_ESCREVE);
-      }
-    }
-  });
-
-  /** Três dígitos NÃO levam separador — a regra não é «mete lá um ponto». */
-  it("999 € fica sem separador nenhum", async () => {
-    const impresso = await textoImpresso(await renderInvoicePdf(fatura({ amount: 999 })));
-    expect(impresso).toContain(`999,00${EURO}`);
-    expect(impresso.join(" ")).not.toContain(".999");
-  });
-});
-
 describe("PDF da proposta (o antigo, de uma folha)", () => {
-  it("escreve o dinheiro como a factura e como o documento novo", async () => {
+  it("escreve o dinheiro como o documento novo", async () => {
     const impresso = valores(
       await textoImpresso(
         await renderProposalPdf(

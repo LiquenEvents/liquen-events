@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 /**
  * Stale-while-revalidate cache for the back-office list views.
  *
- * The admin dashboard mounts each API-backed view (Propostas, Faturas, Tarefas,
+ * The admin dashboard mounts each API-backed view (Propostas, Tarefas,
  * …) only while it's active, so without a cache every tab switch re-fetches from
  * scratch and re-flashes a skeleton — the biggest "feels slow" drag in daily
  * use. This module-level cache survives unmounts, so:

@@ -135,7 +135,6 @@ const tarefas = splitView(() => import("./Tarefas"));
 const fornecedores = splitView(() => import("./Fornecedores"));
 const estatisticas = splitView(() => import("./StatsDashboard"));
 const modelosEmail = splitView(() => import("./EmailTemplates"));
-const faturas = splitView(() => import("./Faturas"));
 const contratos = splitView(() => import("./Contratos"));
 const inventario = splitView(() => import("./Inventario"));
 const material = splitView(() => import("./Material"));
@@ -153,7 +152,6 @@ export const Tarefas = tarefas.View;
 export const Fornecedores = fornecedores.View;
 export const StatsDashboard = estatisticas.View;
 export const EmailTemplates = modelosEmail.View;
-export const Faturas = faturas.View;
 export const Contratos = contratos.View;
 export const Inventario = inventario.View;
 export const Material = material.View;
@@ -224,7 +222,6 @@ const VIEW_WARMERS: Partial<Record<View, () => Promise<void>>> = {
   material: material.warm,
   temas: temas.warm,
   estatisticas: estatisticas.warm,
-  faturas: faturas.warm,
   contratos: contratos.warm,
   "modelos-email": modelosEmail.warm,
 };

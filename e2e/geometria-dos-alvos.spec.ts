@@ -23,9 +23,8 @@ import { entrarNoBackOffice, exigirLogin, garantirPedido } from "./semear-pedido
  *   D1 · a barra «Guardar alterações» do painel do pedido nascia FORA do ecrã
  *        num portátil de 900 px de altura — e rolar a gaveta até ao fim não a
  *        trazia, porque ela está colada ao fundo da GAVETA e não do ecrã.
- *   D2 · a tira de totais das Faturas não cabia num telemóvel: um valor acima
- *        de 100 000 € pedia 118 px numa caixa de 77, o «€» ficava cortado, e a
- *        tira empurrava a página 7 px para o lado.
+ *   D2 · (era a tira de totais das Faturas, que não cabia num telemóvel. Saiu
+ *        com a facturação — o ecrã que a mostrava já não existe.)
  *   D3 · alvos de 13 px: «Editar tarefa»/«Eliminar» no telemóvel (o mínimo da
  *        casa é 44) e o «+» de cada dia do calendário no computador (o mínimo
  *        da WCAG 2.2 AA é 24).
@@ -258,82 +257,6 @@ test.describe("D1 · e no telemóvel continua bem", () => {
 
     const onde = await quemEstaNoCentro(page, "#estado-da-gravacao-do-pedido ~ button");
     expect(onde.meu, `no telemóvel, no centro do botão está ${onde.quem}`).toBe(true);
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════ D2 ═════
-test.describe("D2 · a tira de totais das Faturas", () => {
-  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-
-  /**
-   * Sem uma fatura grande não há defeito para ver: com 15 375 € o corte era de
-   * 29 px, com 272 375 € é de 41. O livro é idempotente por soma — só se emite
-   * o que falta para lá chegar, para correr isto mil vezes não encher o livro.
-   */
-  async function garantirLivroGrande(page: Page) {
-    const lidas = await page.request.get("/api/faturas");
-    expect(lidas.ok(), "não foi possível ler o livro de faturas").toBe(true);
-    const livro = (await lidas.json()) as { amount: number; status: string }[];
-    const emitido = livro
-      .filter((i) => i.status !== "anulada")
-      .reduce((soma, i) => soma + i.amount, 0);
-    const emFalta = 272_375 - emitido;
-    if (emFalta < 1) return;
-    const res = await page.request.post("/api/faturas", {
-      data: {
-        clientName: "Gala Anual — semente de geometria",
-        clientEmail: "gala.geometria@example.pt",
-        kind: "total",
-        amount: emFalta,
-        vatRate: 0.23,
-        issuedAt: "2026-08-13",
-      },
-    });
-    expect(res.ok(), `não foi possível semear a fatura grande (${res.status()})`).toBe(true);
-  }
-
-  test("cabe no telemóvel, com o «€» inteiro e sem empurrar a página", async ({ page }) => {
-    exigirLogin(await entrarNoBackOffice(page));
-    await garantirLivroGrande(page);
-    await page.reload();
-
-    // «Faturas» vive na gaveta, não na barra de baixo.
-    await page.getByRole("button", { name: /Mais destinos/i }).click();
-    await irPara(page, "Faturas");
-    await expect(page.getByText("Emitido", { exact: true })).toBeVisible();
-
-    const medida = await page.evaluate(() => {
-      const rotulos = [...document.querySelectorAll("p")].filter((p) =>
-        /^(Emitido|Pago|Em dívida)$/.test((p.textContent ?? "").trim()),
-      );
-      return {
-        cartoes: rotulos.map((r) => {
-          const valor = r.parentElement?.querySelector("p");
-          return {
-            rotulo: (r.textContent ?? "").trim(),
-            texto: (valor?.textContent ?? "").trim(),
-            precisa: valor?.scrollWidth ?? 0,
-            temDisponivel: valor?.clientWidth ?? 0,
-          };
-        }),
-        larguraDoDocumento: document.documentElement.scrollWidth,
-        larguraDoEcra: document.documentElement.clientWidth,
-      };
-    });
-
-    for (const c of medida.cartoes) {
-      expect(
-        c.precisa,
-        `o valor de «${c.rotulo}» («${c.texto}») pede ${c.precisa} px numa caixa de ${c.temDisponivel} px — ` +
-          `são ${c.precisa - c.temDisponivel} px cortados`,
-      ).toBeLessThanOrEqual(c.temDisponivel);
-    }
-
-    expect(
-      medida.larguraDoDocumento,
-      `a página mede ${medida.larguraDoDocumento} px num ecrã de ${medida.larguraDoEcra} px — ` +
-        `${medida.larguraDoDocumento - medida.larguraDoEcra} px de transbordo horizontal`,
-    ).toBeLessThanOrEqual(medida.larguraDoEcra);
   });
 });
 
