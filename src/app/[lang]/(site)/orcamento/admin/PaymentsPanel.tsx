@@ -580,9 +580,22 @@ export default function PaymentsPanel({
     }
   }
 
+  /**
+   * Os atalhos que preenchem o formulário: «Sinal 30% · 450 €», «50% · …»,
+   * «Hoje», «Ontem».
+   *
+   * MEDIDO a 375 px: 45×28 e 56×28 — abaixo dos 44 de altura das guidelines, e
+   * encostados uns aos outros numa fila. Errar o toque aqui não é inócuo: entre
+   * «Hoje» e «Ontem» está a diferença entre datar um recebimento no dia certo e
+   * no dia errado, e entre «Sinal» e «50%» está o dobro do valor.
+   *
+   * `alvo-toque` só cresce sob `(pointer: coarse)`; com rato a fila mantém a
+   * densidade que tem. O `inline-flex` que a classe traz é o que estes já são
+   * na prática, portanto o desenho não muda — cresce a caixa em que se toca.
+   */
   const chip =
-    "rounded-full border border-foreground/[0.12] bg-foreground/[0.02] px-2.5 py-1 text-[11px] " +
-    "tabular-nums text-foreground/65 hover:border-[#4d6350]/50 hover:text-[#4d6350] " +
+    "alvo-toque rounded-full border border-foreground/[0.12] bg-foreground/[0.02] px-2.5 py-1 " +
+    "text-[11px] tabular-nums text-foreground/65 hover:border-[#4d6350]/50 hover:text-[#4d6350] " +
     "motion-safe:transition-colors";
   const ghostFailed = Boolean(failed?.ghost && !payments.some((p) => p.id === failed.id));
 
@@ -840,7 +853,18 @@ export default function PaymentsPanel({
           placeholder="MB Way…"
           className="bo-input px-2 py-2 text-xs text-foreground/70"
         />
-        <label className="inline-flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-foreground/65">
+        {/* ── 163×18 NUM TELEMÓVEL ────────────────────────────────────────
+            MEDIDO a 375 px: o alvo deste interruptor era 163×18 — menos de
+            metade dos 44 de altura. E é o que decide se a linha que se está a
+            registar já entrou ou é só um plano: falhá-lo dá um pagamento
+            marcado por receber quando o dinheiro já cá está (ou o contrário),
+            e é essa marca que faz o pedido passar a «Ganho» (ver o PATCH em
+            `api/orcamento/[id]/route.ts`).
+
+            Cresce o RÓTULO, não o quadrado: o HTML manda o toque no rótulo
+            activar o controlo, e o desenho fica igual. `alvo-toque` só age sob
+            `(pointer: coarse)`. */}
+        <label className="alvo-toque !justify-start inline-flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-foreground/65">
           <input
             type="checkbox"
             checked={paidOnAdd}

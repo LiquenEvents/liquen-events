@@ -123,8 +123,23 @@ test.describe("Back office — secondary views", () => {
       if ((await navButton.count()) === 0) continue;
 
       await navButton.first().click();
-      // Page heading (H1) confirms the lazy chunk mounted, not the skeleton.
+      // O <h1> diz que se CHEGOU ao destino — e mais nada. Estava aqui escrito
+      // que ele confirma que o chunk montou; não confirma. O título vem do
+      // cabeçalho do AdminClient (`VIEW_TITLES`) e aparece no instante do
+      // clique, com o esqueleto ainda no lugar da vista. Quem confirma a
+      // montagem é o esqueleto ter saído e o <main> ter conteúdo próprio.
+      // (Medido no passeio do telemóvel: <h1> visível, sete elementos
+      // interactivos na página, todos da navegação.)
       await expect(page.getByRole("heading", { level: 1, name: view.heading })).toBeVisible();
+      await expect(
+        page.locator("[data-view-skeleton]"),
+        `"${view.heading.source}": o esqueleto ficou no ecrã — o chunk da vista não montou.`,
+      ).toHaveCount(0);
+      await expect
+        .poll(() => page.locator("main :is(a[href],button,input,select,textarea)").count(), {
+          message: `"${view.heading.source}": o <main> não tem nada de interactivo — a vista não montou.`,
+        })
+        .toBeGreaterThan(0);
       // No error boundary anywhere on the page for this view.
       await expect(errorBoundary).toHaveCount(0);
     }

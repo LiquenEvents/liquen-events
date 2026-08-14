@@ -4737,9 +4737,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               {/* Plano &amp; dia do evento — occasional tools, collapsed so
                                   the tab opens short. Native <details> keeps every child
                                   mounted (hidden via CSS), so fetch/PATCH lifecycles are
-                                  untouched. */}
+                                  untouched.
+
+                                  O `alvo-toque` do interruptor não é cosmético:
+                                  MEDIDO a 375 px, este `<summary>` tinha 334×16
+                                  e é a única porta para o plano de decoração, o
+                                  cronograma e a lista de convidados. Um
+                                  `<summary>` não é `<button>` nem tem `role`,
+                                  por isso nenhuma auditoria de alvos o via —
+                                  agora vê (ver `e2e/ergonomia-tactil.mjs`). Só
+                                  cresce sob `(pointer: coarse)`; no portátil
+                                  fica como estava. */}
                               <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
                                   <svg
                                     className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
                                     width="14"
@@ -5017,7 +5027,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                               {/* Activity history — de-emphasised, collapsed by default. */}
                               <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
                                   <svg
                                     className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
                                     width="14"

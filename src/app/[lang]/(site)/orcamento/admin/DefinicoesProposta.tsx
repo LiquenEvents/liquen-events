@@ -361,7 +361,17 @@ export default function DefinicoesProposta() {
           />
         </div>
 
-        <label className="mt-3 inline-flex items-center gap-2.5 py-1.5 cursor-pointer text-foreground/68">
+        {/* ── 227×30 NUM TELEMÓVEL ──────────────────────────────────────────
+            MEDIDO a 375 px com o auditor de `e2e/ergonomia-tactil.mjs`: o alvo
+            deste interruptor era 227×30 — abaixo dos 44 de altura. O quadrado
+            desenhado continua com 16 px; quem cresce é o RÓTULO à volta, que é
+            o que o HTML manda tocar (é o padrão que a lista de pedidos já
+            usava). `alvo-toque` só age sob `(pointer: coarse)`, portanto no
+            portátil esta linha fica exactamente como estava.
+
+            Não foi apanhado antes porque o passeio do telemóvel nunca visitava
+            as Definições — passou a visitar (ver `e2e/admin-mobile.spec.ts`). */}
+        <label className="alvo-toque !justify-start mt-3 inline-flex items-center gap-2.5 py-1.5 cursor-pointer text-foreground/68">
           <input
             type="checkbox"
             checked={d.idaEVolta}
