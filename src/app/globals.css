@@ -150,6 +150,26 @@ body.admin-mode {
   --bo-fs-body: 0.9375rem;
   --bo-fs-lead: 1.0625rem;
   --bo-fs-title: 1.25rem;
+  /* ── A altura da barra de destinos do telemóvel, num sítio só ──
+     A barra é `fixed`, portanto não empurra nada: tudo o que não lhe pode
+     ficar por baixo — a última linha da lista, o aviso de erro, a barra do
+     total do estúdio — tem de saber a altura dela.
+
+     Estava escrita à mão em QUATRO sítios: o `<main>` do `AdminClient`, a barra
+     em si, o `Toast` e o `ProposalStudio`. Quatro cópias do mesmo «56px», que
+     se afastaram todas ao mesmo tempo assim que os rótulos subiram de 8 px
+     para o chão de 12: «Fazer proposta» passou a duas linhas, a barra cresceu
+     para 71 px, e o conteúdo continuou a guardar 56. Quinze píxeis de lista
+     debaixo da barra, e o aviso de erro a pousar-lhe em cima — justamente no
+     momento em que ela quer sair dali.
+
+     Encontrar as quatro não foi mérito de leitura: duas apareceram porque o
+     `admin-mobile.spec.ts` falhou, e a quarta porque o teste passou a procurar
+     em TODOS os ficheiros em vez de nos que eu já conhecia.
+
+     72 px é a altura com os rótulos legíveis. Quem precisar dela lê ESTE
+     token — `barra-inferior.test.tsx` falha se alguém voltar a copiá-lo. */
+  --bo-barra-inferior: 72px;
   --bo-lh-tight: 1.3;
   --bo-lh-body: 1.6;
   --bo-tracking-tight: -0.011em; /* modern sans tightening for UI text */
@@ -238,6 +258,77 @@ body.admin-mode .bo-text-muted {
 }
 body.admin-mode .bo-text-faint {
   color: var(--bo-text-faint);
+}
+
+/* ── CHÃO DA LETRA NO TELEMÓVEL ────────────────────────────────────────────
+   Palavras dela sobre o back office ao telemóvel: «está tudo muito feio», e a
+   primeira das quatro queixas é «letra e leitura».
+
+   Medido a 390×844, antes desta regra: 65 nós de texto abaixo de 12 px na
+   Visão Geral e 79 na lista de Pedidos. Os cinco rótulos da barra de baixo —
+   os destinos que ela carrega o dia inteiro — a 8 px. O calendário e as
+   etiquetas de estado a 9. Dezenas a 10.
+
+   ── Isto NÃO é uma escala nova ──────────────────────────────────────────
+   A escala da casa está vinte linhas acima e já tem chão:
+
+       caption 12 · label 13 · body 15 · lead 17 · title 20
+
+   `--bo-fs-caption` é o degrau mais baixo. O defeito nunca foi haver letra
+   pequena — foi ~470 chamadas pedirem `text-[8px]`…`text-[11px]` à mão, POR
+   BAIXO do último degrau, num sítio onde a escala nunca desceu. Aqui o
+   telemóvel volta a assentar no chão que já existia.
+
+   ── Porquê central, e não em cada chamada ───────────────────────────────
+   Pela mesma razão do bloco do `uppercase` acima: são centenas de sítios em
+   ~40 ficheiros, e uma regra que se lê de uma vez mantém-se honesta melhor do
+   que 470 decisões soltas. `escala-movel.test.ts` é a rede — varre os `.tsx`
+   do back office e falha se aparecer um tamanho sub-12 sem chão, ou se este
+   bloco desaparecer.
+
+   ── Porquê o espacejamento desce quando a letra sobe ────────────────────
+   Não é gosto: é geometria. «Pedidos ativos» com `tracking-[0.25em]` cresce
+   ~3 px POR LETRA ao passar de 9 para 12 px — mais de 40 px numa coluna de
+   113. Subir o tamanho sem desapertar o espacejamento trocava letra pequena
+   por texto transbordado.
+
+   ── Porquê 1024, e não o corte `telemovel` de 640 ───────────────────────
+   Comecei em 639.98 (o corte `telemovel`) por ser o mais seguro. Medido a 768
+   — um iPad em retrato — o defeito estava todo lá na mesma: 58 nós abaixo de
+   12 px na Visão Geral e 66 nos Pedidos, INCLUINDO os mesmos rótulos de 8 px
+   da barra de baixo.
+
+   E tinha de estar, porque a fronteira não é a largura do telemóvel: é a
+   largura em que a interface MUDA DE FORMA. O `TabelaOuCartoes` só passa a
+   tabela a partir de 1024; abaixo disso — telemóvel E tablet — servem-se
+   cartões, a barra inferior e a gaveta, que são exactamente as peças onde
+   vivem estes rótulos minúsculos. Cortar a 640 deixava metade dos aparelhos
+   que usam a interface de dedo com o problema por resolver.
+
+   É a mesma lição que o `font-size: 16px` dos campos, vinte linhas abaixo, já
+   tinha aprendido à custa de uma medição: estava em `max-width: 640px`, deixava
+   o iPad de fora, e o comentário que lá ficou diz «a largura nunca foi a
+   pergunta certa». Aqui a pergunta certa é «que forma tem este ecrã», e a
+   resposta é o mesmo 1024 que o `useAdaptativo` já usa para `desktop`.
+
+   O computador continua garantido: a partir de 1024 nada nesta regra se
+   aplica, é lá que vive a tabela densa, e a medição a 1440 confirma-o. Fora de
+   `@layer`, de propósito — os utilitários do Tailwind vivem numa camada, e
+   sem isto o `text-[9px]` da chamada ganhava outra vez. */
+@media (max-width: 1023.98px) {
+  body.admin-mode :is(.text-\[8px\], .text-\[9px\], .text-\[10px\], .text-\[11px\], .text-\[7px\]) {
+    font-size: var(--bo-fs-caption);
+    letter-spacing: 0.01em;
+  }
+  /* `.bo-eyebrow` é o mesmo defeito por outra porta: não é um utilitário do
+     Tailwind, é uma classe própria fixada em 11 px com 0.14em de espacejamento,
+     e é ela que titula QUASE TODAS as secções do painel («Agenda · próximos»,
+     «Precisam de atenção», «Fases dos pedidos»). Ficavam nove títulos por
+     baixo do chão num ecrã onde os títulos são o mapa. */
+  body.admin-mode .bo-eyebrow {
+    font-size: var(--bo-fs-caption);
+    letter-spacing: 0.04em;
+  }
 }
 
 /* ── Selection ── */

@@ -6739,7 +6739,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            de um toque que não pegou.
            A partir de `lg` a navegação passa a barra lateral e a folga deixa de
            fazer sentido. */
-        className="sticky bottom-[calc(56px+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3 lg:bottom-0"
+        /* Esta barra pousa EM CIMA da barra de destinos do telemóvel, portanto
+           a sua distância ao fundo é a altura dessa barra — que passou a viver
+           no token `--bo-barra-inferior`. Era a quarta cópia do «56px», e com a
+           barra a crescer para 72 px ficava a tapá-la. `lg:bottom-0` porque
+           acima de 1024 não há barra nenhuma por baixo. */
+        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3 lg:bottom-0"
       >
         {step === "conteudo" && (
           <>

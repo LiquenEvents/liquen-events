@@ -69,10 +69,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           alguma coisa falhou, que é quando ela quer sair dali.
 
           A conta é a mesma que o `<main>` já faz para não esconder a última
-          linha da lista (`pb-[calc(56px+env(safe-area-inset-bottom))]`): 56 px
-          de barra, mais o entalhe, mais um respiro. Acima de `lg` não há barra
-          nenhuma e volta aos 24 px de sempre. */}
-      <div className="fixed bottom-[calc(56px+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none lg:bottom-6">
+          linha da lista: a altura da barra, mais o entalhe, mais um respiro.
+          Acima de `lg` não há barra nenhuma e volta aos 24 px de sempre.
+
+          ── E A ALTURA VEM DO TOKEN, não de um «56px» escrito aqui ──────────
+          Estava escrito. Era a TERCEIRA cópia do mesmo número (o `<main>` tinha
+          as outras duas), e foi a que sobrou quando a barra cresceu para 72 px
+          ao levantar os rótulos de 8 px para o chão de 12: o aviso passou a
+          acabar aos 603 px com a barra a começar aos 594, ou seja a pousar-lhe
+          em cima — exactamente o defeito que este comentário diz ter corrigido.
+          Quem o apanhou foi o passeio `admin-mobile.spec.ts`, não os olhos.
+          Com `var(--bo-barra-inferior)` deixa de haver número para discordar. */}
+      <div className="fixed bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none lg:bottom-6">
         <div role="alert" aria-live="assertive" className="flex flex-col gap-2">
           {errorToasts.map((t) => (
             <ToastItem key={t.id} toast={t} onClose={() => remove(t.id)} />

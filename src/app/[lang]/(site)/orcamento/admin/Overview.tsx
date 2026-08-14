@@ -1332,12 +1332,20 @@ export default function Overview({
           </h2>
           {headline && <p className="text-foreground/40 text-sm mt-2">{headline}</p>}
         </div>
-        <div className="flex flex-wrap gap-2">
+        {/* GRELHA DE DUAS COLUNAS, e não `flex-wrap`.
+            A 390 px os quatro atalhos quebravam 2+2 mas com a largura de cada
+            rótulo: «Novo pedido» ficava curto ao lado de «Fases dos pedidos», e
+            a coluna da direita saía irregular — o desalinho que se vê primeiro
+            num telemóvel, antes sequer de se ler o que lá está. Numa grelha as
+            duas colunas têm a mesma largura, e deixa de depender do
+            comprimento das palavras. No computador (`lg:`) volta a ser a fila
+            que era, encostada à direita do cumprimento. */}
+        <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap">
           {quickActions.map((a, i) => (
             <button
               key={a.label}
               onClick={a.onClick}
-              className={`alvo-toque flex items-center gap-2 px-3.5 py-2 rounded-xl text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
+              className={`alvo-toque flex items-center justify-center lg:justify-start gap-2 px-3.5 py-2 rounded-xl text-[13px] lg:text-[10px] tracking-[0.12em] uppercase font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} ${
                 i === 0
                   ? "bg-[#1b2119] text-white/90 hover:bg-[#2a3227] shadow-sm"
                   : "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 shadow-sm"
@@ -1452,10 +1460,32 @@ export default function Overview({
        * número sem mudar o rótulo; mudar só o rótulo, mantendo a conta, é o que
        * aqui se faz — e a frase por baixo diz exactamente qual é a conta.
        */}
+      {/**
+       * ── E A FORMA DISTO NUM TELEMÓVEL ────────────────────────────────────
+       *
+       * Medido a 390×844: cada um destes era um cartão de 358×109 px, os três
+       * empilhados de 319 a 670. Trezentos e cinquenta e um píxeis — 42% do
+       * ecrã — para três números. Palavras dela: «para mobile nada está
+       * adequado». Um número de dinheiro não precisa de um cartão inteiro.
+       *
+       * Abaixo de 640 os três passam a viver DENTRO DA MESMA CAIXA, uma linha
+       * cada, separados por um risco: o rótulo e a frase à esquerda, o número
+       * à direita, onde o olho já o vai buscar numa fila de valores. A moldura
+       * sobe para o grupo (`border`+`divide-y`) e sai de cada botão — três
+       * caixas com ar entre elas gastam três vezes a mesma margem.
+       *
+       * A partir de 640 nada disto se aplica: volta a grelha de três cartões,
+       * exactamente como estava. É diferença só de ESTILO, portanto é CSS e
+       * não um hook — a regra do `ADAPTIVE-PRIMITIVES.md`.
+       *
+       * O que NÃO muda é a frase por baixo de cada número. É a razão de ela
+       * poder confiar nos valores; encolher o bloco à custa dela seria trocar
+       * este problema pelo pior.
+       */}
       <div
         role="group"
         aria-label="Dinheiro — ganho, à espera e recebido"
-        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+        className="flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-3 sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent"
       >
         {[
           {
@@ -1485,9 +1515,14 @@ export default function Overview({
             key={k.l}
             onClick={k.go}
             aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
-            className={`rounded-2xl p-5 border text-left transition-colors duration-200 motion-reduce:transition-none bg-[var(--bo-surface)] border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
+            /* `flex-wrap` + `order`: no telemóvel a linha lê-se «rótulo …
+               número» e a frase passa por baixo, a toda a largura (`w-full`).
+               A partir de 640 tudo volta a `block`, e a ordem do DOM — número,
+               rótulo, frase — é a que se vê. A ordem do DOM não muda em lado
+               nenhum, portanto quem ouve a página ouve sempre o mesmo. */
+            className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-2xl sm:p-5 sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
-            <div className="flex items-start justify-between gap-2">
+            <div className="order-2 ml-auto flex items-start gap-2 sm:order-none sm:ml-0 sm:w-full sm:justify-between">
               <p
                 className="font-bold leading-none"
                 style={{
@@ -1500,19 +1535,40 @@ export default function Overview({
               </p>
               {k.delta && <Delta now={k.delta.now} prev={k.delta.prev} />}
             </div>
-            <p className="mt-2 text-[10px] tracking-[0.25em] uppercase font-semibold text-[var(--bo-text)]">
+            {/* O rótulo era `text-[10px]` com 0.25em de espacejamento: o chão
+                do telemóvel levanta-o a 12, mas num rótulo que agora ENCABEÇA
+                a linha isso ainda é pouco. 15 px (o degrau `body` da casa) é o
+                que o faz ler-se como nome do número e não como legenda. */}
+            {/* O tamanho troca em `lg:`, NÃO em `sm:`, e isso é deliberado.
+                O layout muda aos 640 (a linha vira cartão), mas o rótulo
+                miudinho em maiúsculas só faz sentido onde a interface é densa
+                de rato — 1024, a mesma linha em que o chão da letra acaba e a
+                tabela começa. Com o corte em `sm:` havia uma FRESTA entre 640 e
+                1023 onde o `sm:text-[10px]` voltava a pintar por baixo do chão:
+                medido num iPad a 768, eram estes três rótulos outra vez a 10 px. */}
+            <p className="order-1 text-[15px] font-semibold text-[var(--bo-text)] sm:mt-2 lg:text-[10px] lg:tracking-[0.25em] lg:uppercase">
               {k.l}
             </p>
             {/* A LETRA PEQUENA QUE FALTAVA. Não é decoração: é a diferença
-                entre um número e um número em que se confia. */}
-            <p className="mt-1 text-[11px] leading-snug text-foreground/45">{k.hint}</p>
+                entre um número e um número em que se confia.
+                O cinzento passou de `text-foreground/45` (~3.8:1 sobre branco,
+                abaixo de AA) para o degrau auditado `--bo-text-muted`
+                (~5.6:1) — é este o «cinzento-azeitona pequeno» que ela disse
+                não conseguir ler. */}
+            <p className="order-3 mt-1 w-full text-[12px] leading-snug bo-text-muted sm:w-auto">
+              {k.hint}
+            </p>
           </button>
         ))}
       </div>
 
       {/* Os contadores de trabalho — quantos, e não quanto. Ficam por baixo dos
-          três de dinheiro, e trazem agora a mesma linha de apoio à vista. */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          três de dinheiro, e trazem agora a mesma linha de apoio à vista.
+          Mesma forma dos três de cima no telemóvel, e de propósito: são duas
+          leituras — «o dinheiro» e «o trabalho» — e duas caixas dizem isso
+          melhor do que seis cartões todos iguais empilhados. Os números são
+          contagens curtas, portanto as linhas ficam ainda mais baixas. */}
+      <div className="flex flex-col divide-y divide-[var(--bo-hairline)] rounded-2xl border border-[var(--bo-hairline)] bg-[var(--bo-surface)] sm:grid sm:grid-cols-3 sm:gap-3 sm:divide-y-0 sm:rounded-none sm:border-0 sm:bg-transparent">
         {[
           {
             v: String(data.active),
@@ -1537,18 +1593,26 @@ export default function Overview({
             key={k.l}
             onClick={k.go}
             aria-label={`${k.l}: ${k.v} — ${k.hint}. Abrir.`}
-            className={`rounded-xl p-4 border text-left transition-colors duration-200 motion-reduce:transition-none bg-[var(--bo-surface)] border-[var(--bo-hairline)] hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
+            className={`flex flex-wrap items-baseline gap-x-3 p-4 text-left transition-colors duration-200 motion-reduce:transition-none sm:block sm:rounded-xl sm:border sm:bg-[var(--bo-surface)] sm:border-[var(--bo-hairline)] sm:hover:border-[var(--bo-hairline-strong)] ${FOCUS_RING}`}
           >
             <p
-              className="font-bold leading-none text-[var(--bo-text)]"
+              className="order-2 ml-auto font-bold leading-none text-[var(--bo-text)] sm:order-none sm:ml-0"
               style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(18px, 2.2vw, 26px)" }}
             >
               {k.v}
             </p>
-            <p className="mt-2 text-[9px] tracking-[0.25em] uppercase font-medium text-[var(--bo-text-faint)]">
+            {/* Era `text-[9px]` no tom `faint` — o degrau que o próprio
+                `globals.css` marca como «decorativo, nunca o único portador de
+                informação». Só que ERA o único: sem ele o número é um algarismo
+                solto. Passa a 15 px no tom de texto a sério. */}
+            {/* `lg:` e não `sm:`, pela mesma razão do bloco de cima: entre 640
+                e 1023 o `sm:text-[9px]` reabria a fresta por baixo do chão. */}
+            <p className="order-1 text-[15px] font-semibold text-[var(--bo-text)] sm:mt-2 lg:text-[9px] lg:font-medium lg:tracking-[0.25em] lg:uppercase lg:text-[var(--bo-text-faint)]">
               {k.l}
             </p>
-            <p className="mt-1 text-[11px] leading-snug text-foreground/40">{k.hint}</p>
+            <p className="order-3 mt-1 w-full text-[12px] leading-snug bo-text-muted sm:w-auto">
+              {k.hint}
+            </p>
           </button>
         ))}
       </div>
