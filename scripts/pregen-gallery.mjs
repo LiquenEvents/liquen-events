@@ -41,6 +41,7 @@
  */
 import sharp from "sharp";
 import { promises as fs } from "fs";
+import { createHash } from "crypto";
 import path from "path";
 import os from "os";
 
@@ -194,13 +195,40 @@ try {
   index = {};
 }
 
-/** Carimbo de uma fonte: muda se o ficheiro mudar (mtime + tamanho) ou se as
-    larguras/qualidade mudarem — nesse caso toda a galeria é regenerada. */
-function stamp(st) {
+/**
+ * Carimbo de uma fonte: muda se o CONTEÚDO do ficheiro mudar, ou se as
+ * larguras/qualidade mudarem — nesse caso toda a galeria é regenerada.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * PORQUÊ O CONTEÚDO E NÃO A DATA DE MODIFICAÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O carimbo era `mtime:tamanho`, e nessa forma esta cache NUNCA acertava na
+ * Vercel — só em desenvolvimento, onde os ficheiros ficam quietos no disco.
+ *
+ * O git não guarda datas de modificação. Cada build começa por um clone
+ * limpo, e o clone escreve os 557 ficheiros com a data desse instante: duas
+ * fotos commitadas com meses de diferença saem do clone com o mesmo carimbo
+ * ao nanossegundo, e o carimbo é outro em cada build. A cache respondia
+ * sempre "esta foto mudou", e as 557 fotos × 5 larguras × 2 formatos eram
+ * recodificadas do princípio — meia hora de build, sempre, mesmo num commit
+ * que não tocou numa única imagem.
+ *
+ * O resumo do conteúdo não tem esse problema: uma foto que não mudou dá o
+ * mesmo resumo em qualquer máquina e em qualquer dia. É o mesmo carimbo que
+ * scripts/pregen-heroes.mjs já usa, e pela mesma razão.
+ *
+ * O QUE CUSTA. Ler e resumir os 557 originais (283 MB) leva cerca de 20
+ * segundos — e o ficheiro é lido UMA vez, com o mesmo `buffer` a servir para
+ * o resumo e para a codificação quando ela é precisa. Vinte segundos contra
+ * meia hora.
+ */
+function stamp(conteudo) {
   // Os parâmetros do AVIF entram no carimbo: mudar a qualidade tem de
   // invalidar a cache, senão o build seguinte serve ficheiros da qualidade
   // anterior e ninguém dá por isso.
-  return `${Math.round(st.mtimeMs)}:${st.size}:${WIDTHS.join(",")}:${QUALITY}:a${AVIF_QUALITY}e${AVIF_EFFORT}`;
+  const resumo = createHash("sha1").update(conteudo).digest("hex");
+  return `${resumo}:${conteudo.length}:${WIDTHS.join(",")}:${QUALITY}:a${AVIF_QUALITY}e${AVIF_EFFORT}`;
 }
 
 const nextIndex = {};
@@ -277,8 +305,20 @@ async function worker() {
     let want;
     let color;
     try {
-      const st = await fh.stat();
-      want = stamp(st);
+      /**
+       * UM read do original, que serve para as duas coisas: o carimbo que
+       * decide a cache e, se ela não acertar, a codificação lá em baixo. Ler
+       * duas vezes o mesmo ficheiro para carimbar e depois para codificar
+       * pagava 283 MB de leitura a dobrar sem nada em troca.
+       */
+      let input;
+      try {
+        input = await fh.readFile();
+      } catch (err) {
+        failures.push(`${src}: ${err.message}`);
+        continue;
+      }
+      want = stamp(input);
 
       // Reaproveitar da cache de build quando a fonte não mudou E todos os
       // ficheiros estão lá (uma cache truncada regenera em vez de mentir).
@@ -300,12 +340,10 @@ async function worker() {
       }
 
       if (!cached) {
-        // Um único read do original reutilizado para todas as larguras: o custo
-        // dominante é o decode, não o encode. Lido pelo MESMO descritor.
-        let input;
+        // O read já está feito acima e o mesmo buffer serve todas as larguras:
+        // o custo dominante é o decode, não o encode.
         let meta;
         try {
-          input = await fh.readFile();
           meta = await sharp(input).metadata();
         } catch (err) {
           failures.push(`${src}: ${err.message}`);

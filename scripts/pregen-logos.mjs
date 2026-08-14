@@ -35,6 +35,7 @@
  */
 import sharp from "sharp";
 import { promises as fs } from "fs";
+import { createHash } from "crypto";
 import path from "path";
 import os from "os";
 
@@ -155,10 +156,14 @@ try {
   index = {};
 }
 
-/** Carimbo de uma fonte: muda se o ficheiro mudar (mtime + tamanho) ou se as
-    larguras/qualidade mudarem — nesse caso regenera-se tudo. */
-function stamp(st) {
-  return `${Math.round(st.mtimeMs)}:${st.size}:${WIDTHS.join(",")}:${QUALITY}`;
+/** Carimbo de uma fonte: muda se o CONTEÚDO do ficheiro mudar, ou se as
+    larguras/qualidade mudarem — nesse caso regenera-se tudo. A data de
+    modificação não serve: o git não a guarda, e o clone de cada build da
+    Vercel escreve todos os ficheiros com a data desse instante, o que fazia a
+    cache falhar sempre. A razão completa está em scripts/pregen-gallery.mjs. */
+function stamp(conteudo) {
+  const resumo = createHash("sha1").update(conteudo).digest("hex");
+  return `${resumo}:${conteudo.length}:${WIDTHS.join(",")}:${QUALITY}`;
 }
 
 const nextIndex = {};
@@ -214,8 +219,15 @@ async function worker() {
 
     let want;
     try {
-      const st = await fh.stat();
-      want = stamp(st);
+      // Um read só, para o carimbo e para a codificação.
+      let input;
+      try {
+        input = await fh.readFile();
+      } catch (err) {
+        failures.push(`${src}: ${err.message}`);
+        continue;
+      }
+      want = stamp(input);
 
       // Reaproveitar da cache quando a fonte não mudou E todos os ficheiros
       // estão lá (uma cache truncada regenera em vez de mentir).
@@ -232,10 +244,8 @@ async function worker() {
       }
 
       if (!cached) {
-        let input;
         let meta;
         try {
-          input = await fh.readFile();
           meta = await sharp(input).metadata();
         } catch (err) {
           failures.push(`${src}: ${err.message}`);
