@@ -131,6 +131,20 @@ describe("contexto do local", () => {
     expect(c.km).toBeNull();
     expect(c.destination).toBe(true);
   });
+
+  /**
+   * Évora deixou de estar escrita à letra: os quilómetros contam-se a partir da
+   * sede, que é uma definição. Quem não a passar continua a ver o de sempre —
+   * é o que impede esta mudança de mexer numa lista que já estava certa.
+   */
+  it("mede a partir da sede que lhe derem, e de Évora quando não lhe dão nenhuma", () => {
+    const pedidoAlgarvio = pedido({ location: "Albufeira" });
+    const deEvora = contextoDeLocal(pedidoAlgarvio);
+    const deFaro = contextoDeLocal(pedidoAlgarvio, "Faro");
+    expect(deFaro.km!).toBeLessThan(deEvora.km!);
+    // A região é a do evento e não muda com a sede — só a distância muda.
+    expect(deFaro.regiao).toBe(deEvora.regiao);
+  });
 });
 
 describe("as listas dos filtros", () => {

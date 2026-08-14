@@ -382,7 +382,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
     > = {};
     for (const q of filteredQuotes) {
       if (q.status !== "aceite") continue;
-      const m = computeEventMetrics({ quote: q, proposal: null, contract: null, invoices: [] });
+      const m = computeEventMetrics({ quote: q, proposal: null, contract: null });
       if (m.contracted <= 0) continue;
       profContracted += m.contracted;
       profContractedNet += m.contractedNet;
@@ -607,7 +607,13 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                 <Kpi value={eur(stats.received)} label="Recebido" accent />
                 <Kpi value={eur(stats.outstanding)} label="A receber" />
                 <Kpi value={eur(stats.avgTicket)} label="Ticket médio" />
-                <Kpi value={eur(stats.received + stats.outstanding)} label="Faturado total" />
+                {/* «Registado total», e já não «Faturado total». O número não
+                    mudou — sempre foi recebido + a receber, somado das linhas
+                    de pagamento (ver o cálculo acima), e nunca leu uma factura.
+                    O rótulo é que prometia uma coisa que esta aplicação já não
+                    faz: quem o lesse hoje procuraria o total facturado, que
+                    vive no programa de facturação e não aqui. */}
+                <Kpi value={eur(stats.received + stats.outstanding)} label="Registado total" />
               </div>
               {/* received vs outstanding bar */}
               {stats.received + stats.outstanding > 0 && (

@@ -1,153 +1,34 @@
 "use client";
 
 import type { Quote } from "@/lib/orcamento/types";
-import { eur } from "@/lib/money";
-import type { DossierInvoice, FinanceReconciliation } from "@/lib/orcamento/dossier";
 import { PaymentsPanel, EventCosts } from "../../lazy";
-import { usePercentagemDoSinal } from "../../percentagem-do-sinal";
-
-/** yyyy-mm-dd → "12/09/26"; "—" se ausente. */
-function shortDate(v?: string): string {
-  if (!v) return "—";
-  const dt = new Date(v.length <= 10 ? `${v}T12:00:00` : v);
-  if (Number.isNaN(dt.getTime())) return "—";
-  return dt.toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit", year: "2-digit" });
-}
-
-// A percentagem é a da PROPOSTA deste evento, não 30/70 escritos à mão: é ela
-// que as rotas de facturação usam para emitir o sinal e o saldo. Rotular «Sinal
-// (30%)» uma fatura emitida a 50% é dizer com toda a confiança um número que
-// ninguém usou — e este quadro está a três centímetros do valor real dela.
-const kindLabel = (pctSinal: number): Record<DossierInvoice["kind"], string> => ({
-  sinal: `Sinal (${pctSinal}%)`,
-  saldo: `Saldo (${100 - pctSinal}%)`,
-  total: "Total",
-});
-const STATUS_LABEL: Record<DossierInvoice["status"], string> = {
-  emitida: "Emitida",
-  paga: "Paga",
-  anulada: "Anulada",
-};
-const STATUS_TONE: Record<DossierInvoice["status"], string> = {
-  emitida: "bg-gold/15 text-gold-text",
-  paga: "bg-[#4d6350]/15 text-[#4d6350]",
-  anulada: "bg-foreground/8 text-foreground/35 line-through",
-};
 
 /**
- * Zona Financeira — pagamentos e custos (ferramentas reutilizadas) mais o livro
- * de faturas (FT) como pequena tabela. O livro — e não `quote.payments` — é a
- * verdade para % Pago / Recebido: quando os dois divergem, mostramos um aviso
- * âmbar de reconciliação (regra da verdade financeira).
+ * Zona Financeira — pagamentos e custos do evento (ferramentas reutilizadas).
+ *
+ * Teve aqui, durante muito tempo, o livro de faturas (FT) como pequena tabela e
+ * um aviso âmbar de reconciliação por cima dela: o livro era a verdade para
+ * «% Pago / Recebido» e o aviso acendia-se quando os pagamentos registados não
+ * batiam com as faturas dadas por pagas.
+ *
+ * A casa deixou de facturar aqui — factura noutro sítio — e as duas coisas
+ * saíram juntas, porque uma não vive sem a outra: sem livro não há segunda
+ * contagem para confrontar, e um aviso que compara o dinheiro recebido com um
+ * zero fixo estaria aceso em todos os eventos pagos (ver a nota extensa em
+ * `@/lib/orcamento/dossier`).
+ *
+ * O que fica é o que ela alimenta e sempre alimentou: quem pagou o quê e
+ * quando, e o que isso custou.
  */
 interface Props {
   quote: Quote;
-  invoices: DossierInvoice[];
-  reconciliation: FinanceReconciliation;
   onQuoteChange: (patch: Partial<Quote>) => void;
 }
 
-export default function FinanceZone({ quote, invoices, reconciliation, onQuoteChange }: Props) {
-  const pctSinal = usePercentagemDoSinal(quote.id);
-  const KIND_LABEL = kindLabel(pctSinal);
-
+export default function FinanceZone({ quote, onQuoteChange }: Props) {
   return (
     <section id="zone-financeiro" className="bo-card p-5 sm:p-6 scroll-mt-40 flex flex-col gap-6">
       <p className="bo-eyebrow">Financeiro</p>
-
-      {/* Aviso de reconciliação — pagamentos registados ≠ faturas emitidas. */}
-      {reconciliation.diverges && (
-        <div
-          role="alert"
-          className="flex items-start gap-3 rounded-lg border border-gold/40 bg-gold/[0.08] px-4 py-3"
-        >
-          <svg
-            className="text-gold-text shrink-0 mt-0.5"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          >
-            <path
-              d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <div className="min-w-0">
-            {/* PAGAS, e não «emitidas»: o número do lado do livro é o das
-                faturas com estado «paga» (ver `ledgerPaidTotal`). O caso banal
-                é a fatura do sinal emitida, o cliente a pagar, o pagamento
-                registado à mão e a fatura por marcar — e a legenda «emitidas»
-                punha um 0,00 € por cima de uma fatura emitida que está na
-                tabela aqui em baixo. Quem lê fica a discutir com o ecrã em vez
-                de ir fazer a única coisa que falta. */}
-            <p className="text-gold-text text-xs font-medium leading-snug">
-              Pagamentos registados ({eur(reconciliation.informalPaid)}) não batem com faturas pagas
-              ({eur(reconciliation.ledgerPaid)}).
-            </p>
-            <p className="text-foreground/45 text-[11px] mt-0.5">
-              O livro de faturas é a fonte de verdade — confirma na secção Faturas o que está mesmo
-              pago.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Livro de faturas (FT) */}
-      <div>
-        <p className="text-foreground/35 text-[10px] tracking-[0.2em] uppercase mb-2">
-          Livro de faturas
-        </p>
-        {invoices.length === 0 ? (
-          <p className="text-foreground/35 text-xs bg-foreground/[0.03] rounded-lg px-3 py-4 text-center">
-            Sem faturas emitidas para este evento.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-foreground/30 text-[9px] tracking-[0.12em] uppercase text-left">
-                  <th className="font-medium py-1.5 pr-3">Nº</th>
-                  <th className="font-medium py-1.5 pr-3">Tipo</th>
-                  <th className="font-medium py-1.5 pr-3 text-right">Valor c/ IVA</th>
-                  <th className="font-medium py-1.5 pr-3">Emissão</th>
-                  <th className="font-medium py-1.5 pr-3">Pago</th>
-                  <th className="font-medium py-1.5">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((i) => (
-                  <tr key={i.id} className="border-t border-foreground/[0.06]">
-                    <td className="py-2 pr-3 text-foreground/55 tabular-nums whitespace-nowrap">
-                      {i.number}
-                    </td>
-                    <td className="py-2 pr-3 text-foreground/50">{KIND_LABEL[i.kind]}</td>
-                    <td className="py-2 pr-3 text-foreground/70 tabular-nums text-right whitespace-nowrap">
-                      {eur(i.amount)}
-                    </td>
-                    <td className="py-2 pr-3 text-foreground/45 tabular-nums whitespace-nowrap">
-                      {shortDate(i.issuedAt)}
-                    </td>
-                    <td className="py-2 pr-3 text-foreground/45 tabular-nums whitespace-nowrap">
-                      {shortDate(i.paidAt)}
-                    </td>
-                    <td className="py-2">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-sm text-[9px] tracking-[0.1em] uppercase ${STATUS_TONE[i.status]}`}
-                      >
-                        {STATUS_LABEL[i.status]}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
 
       {/* Pagamentos (faseamento sinal/saldo da proposta) */}
       <PaymentsPanel

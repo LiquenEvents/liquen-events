@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "@/lib/orcamento/types";
 import { custosDe, margemTotal, margensPorLinha } from "@/lib/orcamento/margem";
 import { normalizarValor } from "@/lib/proposal-budget";
-import { sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
+import { kmSugerido, sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
+import { lerNumero } from "@/lib/numero-escrito";
 import { useDefinicoesDaProposta } from "./definicoes-da-proposta";
 import { foraDoPadrao, padraoPara } from "@/lib/orcamento/padrao-de-preco";
 import { chaveDoServico, type Historico, type Omissao } from "@/lib/orcamento/memoria-de-precos";
@@ -42,6 +43,120 @@ import { Button } from "./ui";
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(n || 0);
 
+/**
+ * Os limites do campo dos quilómetros.
+ *
+ * INTEIRO porque a distância a um casamento não se discute às centenas de
+ * metros — e porque um "180,5" ia escrito com ponto para dentro da fórmula que
+ * ela lê no ecrã. TECTO em 3000 porque é um erro de dedo que se apanha aqui ou
+ * se explica ao cliente depois: à volta de 3000 km ainda cabe uma viagem a
+ * Espanha ou França; 18000 é um zero a mais que multiplicava a deslocação por
+ * dez. VAZIO VALE, e é a peça central: um campo em branco não é zero — é «não
+ * decidi», e devolve a palavra à tabela.
+ */
+const LIMITES_KM = {
+  min: 0,
+  max: 3000,
+  inteiro: true,
+  vazioVale: true,
+  nome: "número de quilómetros",
+  exemplo: "180",
+} as const;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O CAMPO QUE FAZ A CONTA VALER PARA QUALQUER SÍTIO DO PAÍS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A deslocação só se calculava para as terras de uma tabela de cem nomes.
+ * Fora delas o painel dizia «não reconheço o local» e não havia mais nada a
+ * fazer ali: ou se escrevia a cidade grande mais próxima (e a conta ficava
+ * errada, para menos), ou se punha o valor à mão nos valores adicionais (e
+ * deixava de haver conta nenhuma para mostrar ao cliente).
+ *
+ * Aqui escrevem-se os quilómetros. A tabela continua a servir — enche o campo
+ * com o que sabe, para os casos habituais não darem trabalho nenhum —, mas o
+ * que fica gravado é o que ela deixar escrito.
+ *
+ * ── O TEXTO É LOCAL, E RE-SINCRONIZA-SE QUANDO O NÚMERO VEM DE FORA ────────
+ * Mesmo problema, mesma solução do campo do gasóleo nas Definições: guardar o
+ * último número que este campo EMITIU distingue o eco da própria escrita (não
+ * se toca no texto, senão apagar um algarismo era impossível) de um número que
+ * veio de fora — a sede a chegar das definições, ou o local a mudar —, que é a
+ * única altura em que o campo tem de ser reescrito. Assim o que está no campo é
+ * sempre o número que a conta está a usar.
+ */
+function CampoKm({
+  km,
+  sugerido,
+  base,
+  onKm,
+}: {
+  /** O que está gravado no documento. `undefined` = ainda nada. */
+  km: number | undefined;
+  /** O que a tabela sugere a partir da sede. `null` = não sabe. */
+  sugerido: number | null;
+  base: string;
+  onKm: (km: number | null) => void;
+}) {
+  const idErro = useId();
+  const externo = km ?? sugerido;
+  const [texto, setTexto] = useState(() => (externo === null ? "" : String(externo)));
+  const [erro, setErro] = useState<string | null>(null);
+  const emitido = useRef<number | null>(externo);
+  useEffect(() => {
+    if (externo === emitido.current) return;
+    emitido.current = externo;
+    setTexto(externo === null ? "" : String(externo));
+    setErro(null);
+  }, [externo]);
+
+  return (
+    <div className="mt-1.5 flex flex-col gap-1">
+      <label className="flex items-center gap-2">
+        <span className="text-[11px] text-foreground/55">Quilómetros até ao local</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={texto}
+          aria-invalid={erro ? true : undefined}
+          aria-describedby={erro ? idErro : undefined}
+          onChange={(e) => {
+            const escrito = e.target.value;
+            setTexto(escrito);
+            const leitura = lerNumero(escrito, LIMITES_KM);
+            if (!leitura.ok) {
+              // Não sai daqui um número que não serve. O documento fica com o
+              // que tinha, e a frase diz o que fazer — em vez de o painel
+              // calcular em silêncio sobre um `NaN`.
+              setErro(leitura.porque);
+              return;
+            }
+            setErro(null);
+            emitido.current = leitura.valor;
+            onKm(leitura.valor);
+          }}
+          className={`bo-input w-20 px-2 py-1.5 text-xs${erro ? " border-[#b5654a]" : ""}`}
+        />
+        <span className="text-[11px] text-foreground/45">km, num sentido</span>
+      </label>
+      {erro ? (
+        <span id={idErro} className="text-[10px] leading-relaxed text-[#b5654a]">
+          {erro}
+        </span>
+      ) : (
+        <span className="text-[10px] leading-relaxed text-foreground/40">
+          {km !== undefined
+            ? "Quilómetros escritos por ti — é este número que fica na proposta."
+            : sugerido !== null
+              ? `≈ sugestão a partir de ${base}, medida em linha recta com folga. Corrige se souberes melhor.`
+              : `Não conheço este sítio nem ${base} na tabela de distâncias. Escreve os quilómetros e a conta faz-se na mesma.`}
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface Props {
   doc: ProposalDoc;
   /** O pedido a que a proposta responde — dá o local e o nº de convidados. */
@@ -53,6 +168,13 @@ interface Props {
   onCusto: (i: number, custo: number | null) => void;
   /** Acrescenta a deslocação aos valores adicionais da proposta. */
   onDeslocacao: (label: string, valueText: string) => void;
+  /**
+   * Escreve (ou apaga) os quilómetros até ao local NO DOCUMENTO.
+   *
+   * `null` quer dizer «não decidi» e devolve a palavra à tabela — não é zero,
+   * que quer dizer «é aqui». Ver `ProposalDoc.kmDeslocacao`.
+   */
+  onKm: (km: number | null) => void;
 }
 
 export default function PainelInterno({
@@ -62,6 +184,7 @@ export default function PainelInterno({
   totalBruto,
   onCusto,
   onDeslocacao,
+  onKm,
 }: Props) {
   const [aberto, setAberto] = useState(false);
   // As definições da casa — o gasóleo e a margem mínima — lidas uma vez por
@@ -95,9 +218,25 @@ export default function PainelInterno({
   const total = useMemo(() => margemTotal(doc), [doc]);
   const custos = useMemo(() => custosDe(doc), [doc]);
 
+  /**
+   * ── OS QUILÓMETROS: O QUE ELA ESCREVEU, OU O QUE A TABELA SUGERE ─────────
+   *
+   * `doc.kmDeslocacao` é o número gravado NESTA proposta e manda sempre. Só
+   * quando ele não existe é que a tabela de geografia dá um palpite a partir
+   * da sede — e o campo mostra-o já preenchido, para ela o poder confirmar ou
+   * corrigir de uma vez.
+   *
+   * A comparação com `undefined` é deliberada: zero é uma resposta legítima (o
+   * evento na própria casa) e um `??` sobre um `||` trocá-la-ia em silêncio
+   * pela sugestão.
+   */
+  const local = doc.location || quote.location;
+  const sugerido = useMemo(() => kmSugerido(local, parametros.base), [local, parametros.base]);
+  const kmEscritos = doc.kmDeslocacao;
+
   const deslocacao = useMemo(
-    () => sugerirDeslocacao(doc.location || quote.location, parametros),
-    [doc.location, quote.location, parametros],
+    () => sugerirDeslocacao(local, parametros, { km: kmEscritos }),
+    [local, parametros, kmEscritos],
   );
 
   const fora = useMemo(
@@ -305,11 +444,16 @@ export default function PainelInterno({
           {/* ── Deslocação ───────────────────────────────────────────── */}
           <div className="mt-5 border-t border-foreground/[0.08] pt-4">
             <span className="bo-eyebrow">Deslocação</span>
+
+            {/* Os quilómetros primeiro, porque são o que decide tudo o resto —
+                e porque é aqui que um sítio fora da tabela deixa de ser um
+                beco sem saída. */}
+            <CampoKm km={kmEscritos} sugerido={sugerido} base={parametros.base} onKm={onKm} />
+
             {deslocacao === null ? (
               <p className="mt-1.5 text-xs leading-relaxed text-foreground/50">
-                Não reconheço o local, por isso não calculo os quilómetros. Escreve a terra no campo
-                do local (ex.: &quot;Quinta X, Palmela&quot;) ou põe o valor à mão nos valores
-                adicionais.
+                Não sei a distância a este local — não o encontro na tabela e ainda não há
+                quilómetros escritos. Escreve-os aqui em cima e faço a conta.
               </p>
             ) : (
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-2">

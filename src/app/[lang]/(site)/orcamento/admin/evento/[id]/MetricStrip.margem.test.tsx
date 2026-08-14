@@ -63,7 +63,7 @@ function metricas() {
       },
     ],
   } as unknown as Quote;
-  const d: DossierData = { quote, proposal: null, contract: null, invoices: [] };
+  const d: DossierData = { quote, proposal: null, contract: null };
   return computeEventMetrics(d, new Date("2026-08-13T12:00:00.000Z"));
 }
 

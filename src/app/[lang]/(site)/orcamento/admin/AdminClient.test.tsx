@@ -35,8 +35,8 @@ vi.mock("./lazy", () => {
     Fornecedores: stub("fornecedores"),
     StatsDashboard: stub("estatisticas"),
     EmailTemplates: stub("modelos-email"),
-    Faturas: stub("faturas"),
     Contratos: stub("contratos"),
+    Temas: stub("temas"),
     Inventario: stub("inventario"),
     ProposalBuilder: stub("proposal-builder"),
     // O estúdio devolve o pedido gravado pelo `onQuoteUpdated` — é por aí que o
@@ -229,13 +229,14 @@ describe("AdminClient shell", () => {
 
   it("persists the chosen view to localStorage", () => {
     renderAdmin([makeQuote()]);
-    // As Faturas e não a Organização de propostas: esta prova é sobre GRAVAR a
-    // vista escolhida, e serve com qualquer destino do menu. O kanban saiu do
-    // menu a pedido dela (continua a abrir por link directo, ver `nav.tsx`).
-    navTo(/Faturas/);
-    expect(localStorage.getItem("liquen-admin-view")).toBe("faturas");
+    // Os Temas e não a Organização de propostas: esta prova é sobre GRAVAR a
+    // vista escolhida, e serve com qualquer destino do menu. (Era a das
+    // Faturas, que saiu com a facturação; o kanban saiu do menu a pedido dela e
+    // continua a abrir por link directo, ver `nav.tsx`.)
+    navTo(/Temas/);
+    expect(localStorage.getItem("liquen-admin-view")).toBe("temas");
     // And the chosen surface is now mounted.
-    expect(screen.getByTestId("view-faturas")).toBeInTheDocument();
+    expect(screen.getByTestId("view-temas")).toBeInTheDocument();
   });
 
   it("opens a quote's detail panel and closes it", async () => {

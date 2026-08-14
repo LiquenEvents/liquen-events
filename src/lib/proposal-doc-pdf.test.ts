@@ -359,6 +359,35 @@ describe("renderProposalDocPdf", () => {
     expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
     expect(bytes.length).toBeGreaterThan(1000);
   });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * UM CAMPO QUE FALTA NÃO PODE SER UM ERRO NO BOTÃO «GERAR»
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O `withProposalDefaults` já converte os ARRAYS em falta para `[]`, com a
+   * nota escrita ao lado: «a corrupt/old localStorage draft could omit them […]
+   * would throw "undefined is not iterable" → generic 500 "erro ao gerar"». Os
+   * CAMPOS de dentro desses arrays não tinham a mesma rede.
+   *
+   * O `label` de um serviço é obrigatório no tipo, e o tipo não manda em nada
+   * do que chega aqui: o `doc` vem do corpo de um pedido (a rota valida a `ref`
+   * e os nomes, e mais nada), de um rascunho antigo, de uma cópia de segurança
+   * restaurada, ou de um documento relido a partir de um PDF. Sem ele, o
+   * desenho atirava `TypeError: Cannot read properties of undefined (reading
+   * 'trim')` — e o que ela via era isso, dentro de um 500, em inglês.
+   */
+  it("um serviço sem `label` desenha a proposta em vez de rebentar", async () => {
+    const doc = decoracaoDoc();
+    // Exactamente o que um rascunho antigo traz: a descrição sem o rótulo.
+    doc.serviceGroups[0].items = [
+      { desc: "Arco floral e passadeira." } as (typeof doc.serviceGroups)[0]["items"][0],
+      {} as (typeof doc.serviceGroups)[0]["items"][0],
+    ];
+    const bytes = await renderProposalDocPdf(doc);
+    expect(Buffer.from(bytes.subarray(0, 5)).toString("latin1")).toBe("%PDF-");
+    expect(bytes.length).toBeGreaterThan(1000);
+  });
 });
 
 /**

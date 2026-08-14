@@ -60,7 +60,14 @@ export async function generateMetadata({
   const { lang, polo: slug } = await params;
   const locale = normalizeLocale(lang);
   const polo = getPolo(slug);
-  if (!polo) return { title: locale === "en" ? "Page not found" : "Página não encontrada" };
+  // `robots` a acompanhar o título — mesma razão, e mesma medição, que em
+  // `servicos/[slug]`: um pólo que não existe saía com `index, follow` à frente
+  // do `noindex`. Ver `e2e/endereco-que-nao-existe.spec.ts`.
+  if (!polo)
+    return {
+      title: locale === "en" ? "Page not found" : "Página não encontrada",
+      robots: { index: false, follow: false },
+    };
   const c = conteudoPolo(polo, locale);
   const meta = pageMetadata({
     locale,

@@ -68,8 +68,26 @@ export const AUDITOR = `(() => {
   const ESPACO_MIN = ${ESPACO_MIN};
   const LETRA_CAMPO_MIN = ${LETRA_CAMPO_MIN};
 
+  /**
+   * O \`summary\` está nesta lista, e demorou a lá chegar.
+   *
+   * Um \`<details><summary>\` é um interruptor a sério: recebe foco, responde ao
+   * toque e ao Enter, e é a ÚNICA porta para o que está lá dentro. Só que não é
+   * \`<button>\`, não tem \`role\`, e não tem \`tabindex\` escrito — portanto passava
+   * por esta rede sem tocar em nenhum fio.
+   *
+   * O que isso escondeu, medido a 375 px: «Detalhes (opcional)» das Tarefas com
+   * 122×15, «Histórico de atividade» do painel do pedido com 334×16 e «Plano de
+   * decoração, cronograma e convidados» com 334×16. Três interruptores de 15 px
+   * de altura — um terço do mínimo — e o do meio é o que abre as ferramentas de
+   * produção inteiras. Nenhum deles aparecia em relatório nenhum.
+   *
+   * Um \`summary\` sem \`details\` à volta não é interruptor nenhum (é texto), mas
+   * também não existe neste código; medi-lo a mais custava um achado falso, e
+   * medi-lo a menos custava três verdadeiros.
+   */
   const SELECTOR_INTERACTIVO = [
-    "a[href]", "button", "input", "select", "textarea",
+    "a[href]", "button", "input", "select", "textarea", "summary",
     "[role=button]", "[role=link]", "[role=tab]", "[role=checkbox]",
     "[role=switch]", "[role=menuitem]", "[role=option]", "[tabindex]:not([tabindex='-1'])",
   ].join(",");

@@ -42,7 +42,14 @@ export async function generateMetadata({
   const { lang, estilo: slug } = await params;
   const locale = normalizeLocale(lang);
   const estilo = getEstilo(slug);
-  if (!estilo) return { title: locale === "en" ? "Page not found" : "Página não encontrada" };
+  // `robots` a acompanhar o título — mesma razão, e mesma medição, que em
+  // `servicos/[slug]`: um estilo que não existe saía com `index, follow` à
+  // frente do `noindex`. Ver `e2e/endereco-que-nao-existe.spec.ts`.
+  if (!estilo)
+    return {
+      title: locale === "en" ? "Page not found" : "Página não encontrada",
+      robots: { index: false, follow: false },
+    };
   const c = estilo[locale];
   const meta = pageMetadata({
     locale,

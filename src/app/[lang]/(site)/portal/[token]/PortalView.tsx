@@ -11,17 +11,6 @@ import { SITE } from "@/lib/site";
  * static page that matches the proposta link's aesthetic.
  */
 
-type InvoiceRow = {
-  id: string;
-  number: string;
-  kind: "sinal" | "saldo" | "total";
-  amount: number;
-  status: "emitida" | "paga" | "anulada";
-  issuedAt: string | null;
-  dueAt: string | null;
-  paidAt: string | null;
-};
-
 interface PortalViewProps {
   t: Dict["portal"];
   /**
@@ -50,13 +39,12 @@ interface PortalViewProps {
     termsVersion?: string;
   } | null;
   contratoPdfHref: string | null;
-  invoices: InvoiceRow[];
   schedule: { sinal: number; saldo: number } | null;
   /**
    * A percentagem do sinal desta proposta (1–99), resolvida no servidor.
    *
    * Vem como prop e não escrita nos rótulos porque é editável por proposta, e é
-   * ela que as facturas usam. Ver o comentário em `page.tsx`.
+   * o valor que o cliente vai transferir. Ver o comentário em `page.tsx`.
    */
   depositPercent: number;
   currency: string;
@@ -147,7 +135,6 @@ export default function PortalView({
   pdfHref,
   contract,
   contratoPdfHref,
-  invoices,
   schedule,
   depositPercent,
   currency,
@@ -281,59 +268,6 @@ export default function PortalView({
             </div>
           ) : (
             <p className="text-foreground/68 text-sm mt-3">{t.pagamentos.semTotal}</p>
-          )}
-
-          {invoices.length > 0 ? (
-            <div className="mt-6">
-              <h3 className="text-foreground/62 text-[11px] tracking-[0.15em] uppercase mb-2">
-                {t.pagamentos.faturasTitle}
-              </h3>
-              <ul className="flex flex-col divide-y divide-foreground/8 border-t border-foreground/8">
-                {invoices.map((inv) => {
-                  const paid = inv.status === "paga";
-                  const void_ = inv.status === "anulada";
-                  const dateLine = paid
-                    ? inv.paidAt && fill(t.pagamentos.pagaEm, { date: inv.paidAt })
-                    : inv.dueAt
-                      ? fill(t.pagamentos.venceEm, { date: inv.dueAt })
-                      : inv.issuedAt && fill(t.pagamentos.emitidaEm, { date: inv.issuedAt });
-                  return (
-                    <li key={inv.id} className="flex items-center gap-3 py-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-foreground/85 text-sm">
-                          {inv.number}
-                          <span className="text-foreground/55">
-                            {" "}
-                            · {t.pagamentos.kind[inv.kind]}
-                          </span>
-                        </p>
-                        {dateLine && (
-                          <p className="text-foreground/58 text-xs mt-0.5">{dateLine}</p>
-                        )}
-                      </div>
-                      <span className="text-foreground/85 text-sm tabular-nums">
-                        {eur(inv.amount, currency)}
-                      </span>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] tracking-[0.04em] ${
-                          paid
-                            ? "bg-moss/15 text-moss"
-                            : void_
-                              ? "bg-foreground/8 text-foreground/55 line-through"
-                              : "bg-gold/15 text-gold-text"
-                        }`}
-                      >
-                        {t.pagamentos.estado[inv.status]}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : (
-            <p className="text-foreground/62 text-xs mt-4 leading-relaxed">
-              {t.pagamentos.noInvoices}
-            </p>
           )}
         </Section>
 

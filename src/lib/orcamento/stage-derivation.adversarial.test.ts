@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { combinedPaidTotal, deriveStage, type DossierData, type EventStage } from "./dossier";
+import { paidTotal, deriveStage, type DossierData, type EventStage } from "./dossier";
 import type { Quote, Proposal, Payment } from "./types";
 
 /**
@@ -12,12 +12,13 @@ import type { Quote, Proposal, Payment } from "./types";
  * (sem proposta nem contrato) a aparecer como `lead`, contradizendo o
  * `deriveRequestLifecycle` do stepper para o MESMO pedido.
  *
- * Foco 2: simetria das DUAS fontes de dinheiro no mesmo cálculo. O `sinalPago`
- * sempre aceitou um pagamento registado à mão (`quote.payments`) além do livro
- * de faturas; o `saldoPago` só olhava para o livro. Um evento já realizado e
- * todo pago pelo caminho rápido (registo à mão, o que o painel de Pagamentos
- * sugere e o que faz subir o "Recebido") nunca chegava a `concluido` — ficava
- * `em_producao` para sempre. O ecrã mentia sobre o estado do evento.
+ * Foco 2: o dinheiro que fecha um evento. Houve aqui duas fontes — o registo de
+ * pagamentos e o livro de facturas — e o `saldoPago` só olhava para o livro: um
+ * evento já realizado e todo pago pelo caminho rápido (registo à mão, o que o
+ * painel de Pagamentos sugere e o que faz subir o "Recebido") nunca chegava a
+ * `concluido` e ficava `em_producao` para sempre. Hoje há uma fonte só — a
+ * facturação saiu desta aplicação — e estes testes fixam-na: é o registo de
+ * pagamentos que decide a fase, com todos os seus casos de fronteira.
  *
  * Todos os testes injectam um `today` fixo — nunca dependem do relógio real.
  */
@@ -96,7 +97,6 @@ function data(over: Partial<DossierData> = {}): DossierData {
     quote: makeQuote(),
     proposal: null,
     contract: null,
-    invoices: [],
     ...over,
   };
 }
@@ -129,17 +129,12 @@ describe("deriveStage — quote.status as a first-class won signal", () => {
 
   it("won quote, event passed, saldo paid → 'concluido'", () => {
     const d = data({
-      quote: makeQuote({ status: "aceite", date: "2026-07-01", quotedPrice: 20000 }),
-      invoices: [
-        {
-          id: "i1",
-          number: "FT 2026/0002",
-          kind: "saldo",
-          amount: 20000,
-          status: "paga",
-          issuedAt: "2026-06-10",
-        },
-      ],
+      quote: makeQuote({
+        status: "aceite",
+        date: "2026-07-01",
+        quotedPrice: 20000,
+        payments: [{ id: "p1", kind: "saldo", amount: 20000, date: "2026-06-10", paid: true }],
+      }),
     });
     expect(deriveStage(d, TODAY)).toBe("concluido");
   });
@@ -162,13 +157,13 @@ describe("deriveStage — quote.status as a first-class won signal", () => {
 /**
  * Cenário-base das duas fontes: casamento ganho à mão (sem proposta), preço da
  * estimativa — `priceBreakdown.total` = 12 300 € COM IVA, a mesma base dos
- * pagamentos e das faturas. Faseamento 30/70 → sinal 3 690 €, saldo 8 610 €.
+ * pagamentos. Faseamento 30/70 → sinal 3 690 €, saldo 8 610 €.
  */
 const CONTRACTED = 12300;
 const SINAL = 3690;
 const SALDO = 8610;
 
-/** Pagamento informal (linha do painel de Pagamentos) já marcado como recebido. */
+/** Linha do painel de Pagamentos já marcada como recebida. */
 function paid(kind: Payment["kind"], amount: number, id = `pay-${kind}`): Payment {
   return { id, kind, amount, date: "2026-06-20", paid: true };
 }
@@ -178,38 +173,21 @@ function pastEvent(over: Partial<Quote> = {}): Quote {
   return makeQuote({ status: "aceite", date: "2026-07-01", ...over });
 }
 
-describe("deriveStage — saldo pago: livro de faturas E registo à mão", () => {
-  it("pago só pelo LIVRO: fatura de saldo paga → concluido", () => {
+describe("deriveStage — o saldo que fecha o evento", () => {
+  it("sinal + saldo registados e marcados recebidos → concluido", () => {
+    // O DEFEITO histórico. Registar o dinheiro é o caminho rápido (e o que o
+    // painel de Pagamentos sugere: "Já pago" vem ligado). Enquanto isto olhou
+    // só para o livro de facturas, o casamento já realizado e integralmente
+    // pago ficava eternamente `em_producao` e acumulava no quadro, ano após ano.
     const d = data({
-      quote: pastEvent(),
-      invoices: [
-        {
-          id: "i1",
-          number: "FT 2026/0002",
-          kind: "saldo",
-          amount: SALDO,
-          status: "paga",
-          issuedAt: "2026-06-10",
-        },
-      ],
+      quote: pastEvent({ payments: [paid("sinal", SINAL), paid("saldo", SALDO)] }),
     });
     expect(deriveStage(d, TODAY)).toBe<EventStage>("concluido");
   });
 
-  it("pago só À MÃO: sinal + saldo registados e marcados pagos → concluido", () => {
-    // O DEFEITO. Registar o dinheiro à mão é o caminho rápido (e o que o painel
-    // de Pagamentos sugere: "Já pago" vem ligado). Sem faturas no livro, o
-    // casamento já realizado e integralmente pago ficava eternamente
-    // `em_producao` e acumulava no quadro, ano após ano.
-    const d = data({
-      quote: pastEvent({ payments: [paid("sinal", SINAL), paid("saldo", SALDO)] }),
-    });
-    expect(deriveStage(d, TODAY)).toBe("concluido");
-  });
-
-  it("pago só À MÃO sem linha rotulada 'saldo': entradas avulsas cobrem o total → concluido", () => {
+  it("sem linha rotulada 'saldo': entradas avulsas que cobrem o total → concluido", () => {
     // Nem toda a gente usa o rótulo "Saldo final": duas transferências avulsas
-    // que cobrem o contratado valem tanto como uma fatura de saldo paga.
+    // que cobrem o contratado valem tanto como uma linha de saldo recebida.
     const d = data({
       quote: pastEvent({
         payments: [
@@ -221,47 +199,7 @@ describe("deriveStage — saldo pago: livro de faturas E registo à mão", () =>
     expect(deriveStage(d, TODAY)).toBe("concluido");
   });
 
-  it("pago pelos DOIS caminhos (sinal no livro, saldo à mão) → concluido", () => {
-    const d = data({
-      quote: pastEvent({ payments: [paid("saldo", SALDO)] }),
-      invoices: [
-        {
-          id: "i1",
-          number: "FT 2026/0001",
-          kind: "sinal",
-          amount: SINAL,
-          status: "paga",
-          issuedAt: "2026-03-01",
-        },
-      ],
-    });
-    expect(deriveStage(d, TODAY)).toBe("concluido");
-  });
-
-  it("o MESMO dinheiro nos dois sítios NÃO conta a dobrar", () => {
-    // Metade do contrato (6 150 € de 12 300 €) registada à mão E faturada no
-    // livro — é o fluxo normal: regista-se o pagamento e emite-se o recibo a
-    // partir dele. Somar as duas fontes daria 12 300 € e declararia concluído um
-    // casamento com metade por receber. O mesmo sinal, visto de dois sítios, só
-    // pode valer 6 150 €.
-    const d = data({
-      quote: pastEvent({ payments: [paid("sinal", 6150)] }),
-      invoices: [
-        {
-          id: "i1",
-          number: "FT 2026/0001",
-          kind: "sinal",
-          amount: 6150,
-          status: "paga",
-          issuedAt: "2026-03-01",
-        },
-      ],
-    });
-    expect(combinedPaidTotal(d)).toBe(6150); // não 12 300
-    expect(deriveStage(d, TODAY)).toBe("em_producao"); // metade por receber
-  });
-
-  it("pago a MEIO (só o sinal, à mão) → fica em_producao, não concluido", () => {
+  it("pago a MEIO (só o sinal) → fica em_producao, não concluido", () => {
     const d = data({ quote: pastEvent({ payments: [paid("sinal", SINAL)] }) });
     expect(deriveStage(d, TODAY)).toBe("em_producao");
   });
@@ -283,7 +221,7 @@ describe("deriveStage — saldo pago: livro de faturas E registo à mão", () =>
     expect(deriveStage(d, TODAY)).toBe("aceite");
   });
 
-  it("EVENTO FUTURO todo pago à mão NUNCA aparece como concluido", () => {
+  it("EVENTO FUTURO todo pago NUNCA aparece como concluido", () => {
     // A guarda que importa: dinheiro recebido adiantado não faz o casamento
     // acontecer. Data distante → em_producao; dentro da semana → semana_evento.
     const payments = [paid("sinal", SINAL), paid("saldo", SALDO)];
@@ -304,7 +242,7 @@ describe("deriveStage — saldo pago: livro de faturas E registo à mão", () =>
     expect(deriveStage(hoje, new Date("2026-07-18T15:00:00Z"))).toBe("semana_evento");
   });
 
-  it("perdido continua a ganhar a tudo, mesmo com o saldo pago à mão", () => {
+  it("perdido continua a ganhar a tudo, mesmo com o saldo recebido", () => {
     const d = data({
       quote: pastEvent({ status: "rejeitado", payments: [paid("saldo", SALDO)] }),
     });
@@ -312,120 +250,30 @@ describe("deriveStage — saldo pago: livro de faturas E registo à mão", () =>
   });
 });
 
-describe("combinedPaidTotal — duas vistas do mesmo dinheiro, nunca duas carteiras", () => {
-  it("espelho perfeito (livro = registo à mão) conta uma só vez", () => {
+describe("paidTotal — o que conta como dinheiro recebido", () => {
+  it("soma as espécies todas: sinal + saldo fecham o contratado", () => {
     const d = data({
       quote: makeQuote({ payments: [paid("sinal", SINAL), paid("saldo", SALDO)] }),
-      invoices: [
-        {
-          id: "i1",
-          number: "FT 2026/0001",
-          kind: "sinal",
-          amount: SINAL,
-          status: "paga",
-          issuedAt: "2026-03-01",
-        },
-        {
-          id: "i2",
-          number: "FT 2026/0002",
-          kind: "saldo",
-          amount: SALDO,
-          status: "paga",
-          issuedAt: "2026-06-10",
-        },
-      ],
     });
-    expect(combinedPaidTotal(d)).toBe(CONTRACTED);
+    expect(paidTotal(d.quote)).toBe(CONTRACTED);
   });
 
-  it("cada espécie pela sua fonte (sinal no livro, saldo à mão) soma as duas", () => {
-    const d = data({
-      quote: makeQuote({ payments: [paid("saldo", SALDO)] }),
-      invoices: [
-        {
-          id: "i1",
-          number: "FT 2026/0001",
-          kind: "sinal",
-          amount: SINAL,
-          status: "paga",
-          issuedAt: "2026-03-01",
-        },
-      ],
-    });
-    expect(combinedPaidTotal(d)).toBe(CONTRACTED);
-  });
-
-  it("registo parcial de um dos lados → prevalece o lado mais completo", () => {
-    // Registaram-se 1 000 € à mão do sinal de 3 690 € que a fatura já dá por
-    // liquidado. Vale o livro (3 690), não a soma (4 690) nem o registo (1 000).
-    const d = data({
-      quote: makeQuote({ payments: [paid("sinal", 1000)] }),
-      invoices: [
-        {
-          id: "i1",
-          number: "FT 2026/0001",
-          kind: "sinal",
-          amount: SINAL,
-          status: "paga",
-          issuedAt: "2026-03-01",
-        },
-      ],
-    });
-    expect(combinedPaidTotal(d)).toBe(SINAL);
-  });
-
-  it("só conta o que está pago: emitida/anulada e linhas por pagar valem 0", () => {
+  it("só conta o que está marcado como recebido — as linhas por pagar valem 0", () => {
     const d = data({
       quote: makeQuote({
-        payments: [{ id: "p1", kind: "saldo", amount: SALDO, date: "2026-07-05", paid: false }],
+        payments: [
+          { id: "p1", kind: "saldo", amount: SALDO, date: "2026-07-05", paid: false },
+          { id: "p2", kind: "sinal", amount: SINAL, date: "2026-03-01", paid: false },
+        ],
       }),
-      invoices: [
-        {
-          id: "i1",
-          number: "FT 2026/0001",
-          kind: "sinal",
-          amount: SINAL,
-          status: "emitida",
-          issuedAt: "2026-03-01",
-        },
-        {
-          id: "i2",
-          number: "FT 2026/0002",
-          kind: "saldo",
-          amount: SALDO,
-          status: "anulada",
-          issuedAt: "2026-06-10",
-        },
-      ],
     });
-    expect(combinedPaidTotal(d)).toBe(0);
+    expect(paidTotal(d.quote)).toBe(0);
   });
 
-  it("soma aos cêntimos, sem lixo de vírgula flutuante", () => {
-    // 0.10 + 0.20 = 0.30000000000000004 em IEEE-754. `reconcileFinance` já
-    // arredonda aos cêntimos antes de comparar; esta soma tem de fazer o mesmo.
+  it("um pagamento avulso conta tanto como um rotulado", () => {
     const d = data({
-      quote: makeQuote({ payments: [paid("pagamento", 0.1, "p1"), paid("saldo", 0.2, "p2")] }),
+      quote: makeQuote({ payments: [paid("pagamento", CONTRACTED, "pay-avulso")] }),
     });
-    expect(combinedPaidTotal(d)).toBe(0.3);
-  });
-
-  it("um desvio de cêntimo não deixa um evento INTEGRALMENTE pago preso em produção", () => {
-    // Contrato pequeno de propósito: só nesta ordem de grandeza é que o desvio
-    // do IEEE-754 é maior que o passo entre dois valores representáveis
-    // (6.10 + 1.95 + 1.95 = 9.999999999999998, abaixo de 10). O arredondamento
-    // aos cêntimos absorve-o; sem ele o evento ficava eternamente `em_producao`
-    // por dois zeptocêntimos.
-    const centavos = pastEvent({
-      priceBreakdown: { ...makeQuote().priceBreakdown!, subtotal: 8.13, iva: 1.87, total: 10 },
-      payments: [
-        paid("pagamento", 6.1, "p1"),
-        paid("pagamento", 1.95, "p2"),
-        { id: "p3", kind: "pagamento", amount: 1.95, date: "2026-06-22", paid: true },
-      ],
-    });
-    expect(6.1 + 1.95 + 1.95).toBeLessThan(10); // o desvio existe mesmo
-    expect(combinedPaidTotal(data({ quote: centavos }))).toBe(10);
-    expect(deriveStage(data({ quote: centavos }), TODAY)).toBe("concluido");
+    expect(paidTotal(d.quote)).toBe(CONTRACTED);
   });
 });

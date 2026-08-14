@@ -169,3 +169,85 @@ describe("as quebras de linha escritas no editor", () => {
     }
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O APELIDO QUE PERDIA LETRAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Nenhuma das duas fontes desta casa cobre o latino ESTENDIDO: a Carlito que o
+ * documento da proposta embute vem em SUBCONJUNTO (329 glifos — medido no
+ * ficheiro: `hasGlyphForCodePoint(0x142)` diz que não) e as fontes-padrão do
+ * pdf-lib são WinAnsi por definição. Ficam de fora o polaco (ł ś ń ż ę ć),
+ * o checo (ř ů), o húngaro (ő ű), o turco (ğ ş ı) e o romeno (ș ț).
+ *
+ * O sintoma era diferente conforme o caminho, e nenhum dos dois é aceitável
+ * numa folha que vai para o casal:
+ *
+ *   · no documento da proposta a letra DESAPARECIA — «Michał Wiśniewski» saía
+ *     «Micha Winiewski», em corpo 52, no meio da capa;
+ *   · nos papéis das fontes-padrão virava «?» — «Wi?niewski».
+ *
+ * Um nome próprio não é um emoji: tirar-lhe o acento é o que qualquer pessoa
+ * faz quando o teclado não o tem, e é uma transformação exacta (em Unicode,
+ * «ś» É «s» mais um acento). O emoji e o que não é letra latina continuam a
+ * seguir a regra de sempre.
+ */
+describe("uma letra que a fonte não tem perde o acento, não a letra", () => {
+  /** Uma fonte com o CP1252 e mais nada — a Carlito embutida, medida. */
+  const SUBCONJUNTO = fonteQueSabe(
+    (cp) =>
+      cp <= 0x7e ||
+      (cp >= 0xa0 && cp <= 0xff) ||
+      [0x20ac, 0x2013, 0x2014, 0x2018, 0x2019, 0x201c, 0x201d].includes(cp),
+  );
+
+  it("o polaco de um apelido chega inteiro à capa, sem acentos", () => {
+    expect(textoParaFonte(SUBCONJUNTO, "Zofia & Michał Wiśniewski")).toBe(
+      "Zofia & Michal Wisniewski",
+    );
+    expect(winAnsiSafe("Zofia & Michał Wiśniewski")).toBe("Zofia & Michal Wisniewski");
+  });
+
+  /**
+   * Só se perde o que a codificação NÃO TEM. O «á» do checo, o «ö» do turco e o
+   * «î» do romeno vivem no Latin-1 e ficam intactos — o que cai é o «ř», o «ő»,
+   * o «ş», o «ț», o «đ». É por isso que estas linhas não são translitera­ções
+   * inteiras: são a folha a ficar com o máximo de acento que sabe desenhar.
+   */
+  it("o mesmo para o checo, o húngaro, o turco e o romeno", () => {
+    for (const [escrito, esperado] of [
+      ["Jiří Dvořák", "Jirí Dvorák"],
+      ["Győző Erdős", "Gyozo Erdos"],
+      ["Ayşe Gökçe", "Ayse Gökçe"],
+      ["Ștefan Țîrlea", "Stefan Tîrlea"],
+      ["Đorđe Ilić", "Dorde Ilic"],
+    ] as const) {
+      expect(textoParaFonte(SUBCONJUNTO, escrito), escrito).toBe(esperado);
+      expect(winAnsiSafe(escrito), escrito).toBe(esperado);
+    }
+  });
+
+  it("o que a fonte TEM continua exactamente como ela o escreveu", () => {
+    // A regra é uma rede, não um normalizador: o português não perde um acento.
+    const pt = "Decoração — Cerimónia, Copo d'água, Jantar (80 pax) 4.600,00 €";
+    expect(textoParaFonte(SUBCONJUNTO, pt)).toBe(pt);
+    expect(winAnsiSafe(pt)).toBe(pt);
+  });
+
+  it("o que não é letra latina segue a regra de sempre", () => {
+    // Sem base latina por baixo não há nada a tirar: o emoji desaparece do
+    // documento da proposta e vira «?» nas fontes-padrão, como sempre.
+    expect(textoParaFonte(SUBCONJUNTO, "Tons Ω 🌿 李明")).toBe("Tons   ");
+    expect(winAnsiSafe("Tons Ω")).toBe("Tons ?");
+  });
+
+  it("não lança quando lhe mentem sobre o tipo", () => {
+    // O `doc` que chega ao desenho não é validado campo a campo: um campo em
+    // falta dava `undefined.normalize is not a function` — um 500 no «Gerar».
+    for (const nada of [undefined, null]) {
+      expect(winAnsiSafe(nada as unknown as string)).toBe("");
+      expect(textoParaFonte(SUBCONJUNTO, nada as unknown as string)).toBe("");
+    }
+  });
+});

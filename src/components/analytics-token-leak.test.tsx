@@ -5,8 +5,8 @@ import { render } from "@testing-library/react";
 /**
  * Rede de segurança: o token do cliente NÃO sai da rota.
  *
- * `/proposta/<token>` autoriza ACEITAR a proposta (o que cria contrato e fatura
- * de sinal) durante 14 dias; `/portal/<token>` abre a reserva inteira durante
+ * `/proposta/<token>` autoriza ACEITAR a proposta (o que cria o contrato)
+ * durante 14 dias; `/portal/<token>` abre a reserva inteira durante
  * 365 dias. Os dois vivem no CAMINHO do URL, por isso qualquer analítico que
  * reporte o caminho leva o segredo consigo:
  *

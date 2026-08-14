@@ -213,6 +213,8 @@ let traducaoLigadaNoServidor = false;
 /** O que a rota da tradução responde ao POST. */
 let traducaoResponde: (textos: string[]) => Response = (textos) =>
   reply({ json: { textos: textos.map((t) => `EN: ${t}`) } });
+/** As fotos que o servidor conhece para este pedido (`GET /assets`). */
+let assetsServidor: { path: string; url: string; thumbUrl?: string; cor?: string }[] = [];
 /** Tudo o que saiu daqui — é onde se lê o que foi GRAVADO e o que foi ENVIADO. */
 let pedidos: { url: string; init?: RequestInit }[] = [];
 const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -248,6 +250,10 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   }
   if (url.includes("/propostas/modelos")) return reply({ json: { modelos: modelosServidor } });
   if (url.includes("/api/propostas?")) return reply({ json: propostasServidor });
+  // As fotos que o SERVIDOR conhece para este pedido, com as assinaturas
+  // frescas. É por aqui que a grelha volta a ter miniaturas num navegador que
+  // nunca viu esta proposta — ver «o mesmo pedido, no outro endereço».
+  if (url.includes("/assets")) return reply({ json: { images: assetsServidor } });
   return reply({ json: { images: [] } });
 });
 
@@ -273,6 +279,7 @@ beforeEach(() => {
   propostasServidor = [];
   modelosServidor = [];
   copiaServidor = {};
+  assetsServidor = [];
   traducaoLigadaNoServidor = false;
   traducaoResponde = (textos) => reply({ json: { textos: textos.map((t) => `EN: ${t}`) } });
   fetchMock.mockClear();
@@ -3148,6 +3155,83 @@ describe("gerar a proposta em inglês", () => {
       }),
     ).toHaveAttribute("aria-checked", "true");
   });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A LÍNGUA ESCOLHIDA TEM DE SOBREVIVER A FECHAR O SEPARADOR
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O relato: «não estava a dar; depois mudei para inglês e deu». É o sintoma
+   * exacto de uma escolha que se apaga sozinha — ela escolhe «Inglês», traduz,
+   * pré-visualiza, fecha o portátil, volta no dia seguinte e o selector está em
+   * «Português» outra vez, sem nada a dizê-lo. Carrega em «Inglês», e «dá».
+   *
+   * E o custo não é ela ter de carregar duas vezes. A língua vai GRAVADA com o
+   * envio: decide o email que o casal recebe, o nome do anexo, a página onde
+   * ele responde e a segunda descarga. Uma proposta escrita e revista em
+   * inglês, enviada com o selector reposto, chega ao casal britânico em
+   * português — e no ecrã dela nada indicou que se tinha perdido a escolha.
+   *
+   * Fica no `meta` do rascunho, ao lado do interruptor bilingue e da mensagem
+   * ao cliente, e pela mesma razão: não é conteúdo da proposta, é a maneira
+   * como ela está a trabalhar nesta.
+   */
+  it("a língua escolhida volta com o rascunho", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+    await user.click(screen.getByRole("radio", { name: /^Inglês/ }));
+
+    // Fica gravada ao lado do rascunho — é o que sobrevive a fechar o separador.
+    await waitFor(() =>
+      expect(localStorage.getItem(`${DRAFT_KEY}:meta`) ?? "").toContain('"idioma":"en"'),
+    );
+
+    // O separador fecha e volta a abrir.
+    cleanup();
+    renderStudio();
+    const outra = userEvent.setup();
+    await irParaPrever(outra);
+    expect(
+      within(screen.getByRole("radiogroup", { name: "Idioma do PDF" })).getByRole("radio", {
+        name: /^Inglês/,
+      }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+
+  /** E o envio que se segue a essa reabertura leva «en» — que é o que o casal
+   *  recebe. Sem isto, o teste de cima provava um pixel e não o desfecho. */
+  it("e o envio depois de reabrir leva a língua que ela tinha escolhido", async () => {
+    seedDraft(1);
+    localStorage.setItem(`${DRAFT_KEY}:meta`, JSON.stringify({ idioma: "en" }));
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+
+    await waitFor(() => {
+      const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c));
+      expect(enviados.find((c) => c.mode === "send")?.idioma).toBe("en");
+    });
+  });
+
+  /** Voltar atrás também tem de pegar: um `meta` com «en» não pode ressuscitar
+   *  uma escolha que ela desfez. É a diferença entre guardar a escolha e
+   *  guardar só metade dela. */
+  it("e voltar a «Português» também fica guardado", async () => {
+    seedDraft(1);
+    localStorage.setItem(`${DRAFT_KEY}:meta`, JSON.stringify({ idioma: "en" }));
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+    await user.click(screen.getByRole("radio", { name: "Português" }));
+
+    await waitFor(() =>
+      expect(localStorage.getItem(`${DRAFT_KEY}:meta`) ?? "").toContain('"idioma":"pt"'),
+    );
+  });
 });
 
 /**
@@ -3603,6 +3687,12 @@ describe("os avisos da proposta inglesa", () => {
  */
 describe("traduzir para inglês", () => {
   const interruptor = () => screen.getByRole("button", { name: /Proposta bilingue/i });
+  /** O duplo do `fetch` deste ficheiro, para o repor: um teste daqui troca-o
+   *  por um servidor que recusa, e `mockClear` não desfaz isso. */
+  const fetchDeSempre = fetchMock.getMockImplementation()!;
+  afterEach(() => {
+    fetchMock.mockImplementation(fetchDeSempre);
+  });
 
   it("o botão só aparece com a proposta bilingue ligada", async () => {
     seedDraft(1);
@@ -3624,6 +3714,47 @@ describe("traduzir para inglês", () => {
     expect((botao as HTMLButtonElement).disabled).toBe(true);
     // A razão está à vista, e não escondida num `title` que ninguém abre.
     expect(screen.getByText(/tradução automática ainda não está ligada/i)).toBeTruthy();
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * «AINDA NÃO ESTÁ LIGADA» É UMA AFIRMAÇÃO SOBRE A CONFIGURAÇÃO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O estúdio pergunta ao servidor, uma vez, ao abrir. Se a pergunta não chegar
+   * a ter resposta — sessão caducada, rede em baixo, um 500 — o botão tem de
+   * ficar desligado na mesma: prometer uma tradução que não vai acontecer é
+   * pior. O que NÃO pode acontecer é dizer-lhe que falta configurar uma chave.
+   *
+   * Essa frase manda-a à Vercel procurar uma variável de ambiente, ou fá-la
+   * desistir e escrever as caixas inglesas à mão, quando o que estava avariado
+   * se curava recarregando a página. É a diferença entre «isto não existe» e
+   * «não consegui perguntar», e é a diferença entre uma tarde perdida e um F5.
+   */
+  it("uma pergunta que não teve resposta NÃO se lê como «falta a chave»", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      // A rota da tradução responde 401 — a sessão do back office caducou. Tudo
+      // o resto continua a responder como sempre.
+      if (String(input).includes("/propostas/traduzir")) {
+        pedidos.push({ url: String(input), init });
+        return reply({ ok: false, status: 401, json: { error: "Não autorizado" } });
+      }
+      return fetchDeSempre(input, init);
+    });
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+
+    // O botão fica desligado — isso é que está certo e não muda.
+    const botao = await screen.findByRole("button", { name: /Traduzir para inglês/i });
+    expect((botao as HTMLButtonElement).disabled).toBe(true);
+    // Mas a frase não pode culpar a configuração de um problema que não é dela.
+    expect(screen.queryByText(/tradução automática ainda não está ligada/i)).toBeNull();
+    // Diz o que se sabe — que não se soube — e o que fazer a seguir.
+    expect(screen.getByText(/não deu para saber/i)).toBeTruthy();
+    expect(screen.getByText(/recarrega/i)).toBeTruthy();
   });
 
   it("com o serviço ligado, o botão preenche as caixas «EN» de uma vez", async () => {
@@ -3675,6 +3806,64 @@ describe("traduzir para inglês", () => {
     expect(caixa.value).toBe("");
   });
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * METADE TRADUZIDA NÃO PODE APARECER A VERDE E MAIS NADA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O motor manda os textos em lotes de 50, e um lote que falhe volta VAZIO nas
+   * suas posições — de propósito, para não deitar fora os que já vieram. Só
+   * atira quando NENHUM passa.
+   *
+   * Numa proposta grande, portanto, um 429 ou uma quota que acaba no segundo
+   * lote devolve os primeiros campos traduzidos e o resto em português, sem
+   * erro nenhum. O ecrã dizia «N campos traduzidos», a verde, e mais nada.
+   *
+   * Do lado dela isto lê-se como «não está a dar»: dá numa proposta pequena e
+   * não dá numa grande. E o número que aparece está certo — o que faltava era a
+   * outra metade da frase, e a indicação de que carregar outra vez adianta (o
+   * que já veio está escrito e não se volta a pedir).
+   */
+  it("o que foi pedido e não voltou é DITO, e não escondido atrás do contador", async () => {
+    traducaoLigadaNoServidor = true;
+    // O primeiro texto volta traduzido; os outros voltam vazios — a forma de um
+    // lote que falhou no meio de uma proposta grande.
+    traducaoResponde = (textos) =>
+      reply({ json: { textos: textos.map((t, i) => (i === 0 ? `EN: ${t}` : "")) } });
+    // Um documento com prosa que chegue para haver «o primeiro» e «os outros».
+    seedDraft(1);
+    const rascunho = JSON.parse(localStorage.getItem(DRAFT_KEY)!);
+    rascunho.serviceGroups = [
+      {
+        title: "Decoração Floral",
+        items: [
+          { label: "Decor Cerimónia", desc: "Arco e coxia" },
+          { label: "Decor Jantar", desc: "Centros de mesa" },
+        ],
+      },
+    ];
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(rascunho));
+
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    const botao = await waitFor(async () => {
+      const b = (await screen.findByRole("button", {
+        name: /Traduzir para inglês/i,
+      })) as HTMLButtonElement;
+      if (b.disabled) throw new Error("ainda a perguntar ao servidor");
+      return b;
+    });
+    await user.click(botao);
+
+    // Os que vieram entram — isso não muda.
+    expect(await screen.findByText(/campo traduzido|campos traduzidos/i)).toBeTruthy();
+    // E os que não vieram são ditos, com o número e o que fazer a seguir.
+    const aviso = await screen.findByText(/não voltaram do serviço/i);
+    expect(aviso.textContent).toMatch(/outra vez/i);
+  });
+
   it("as caixas continuam a poder ser escritas à mão enquanto não há motor", async () => {
     // É o que impede a mudança de direcção de deixar a funcionalidade parada à
     // espera de uma chave: ela pode traduzir uma proposta hoje, à mão.
@@ -3690,5 +3879,331 @@ describe("traduzir para inglês", () => {
     });
     await user.type(caixa, "Ceremony");
     expect(caixa.value).toBe("Ceremony");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * TRADUZIR COM AS FOTOS A MEIO — «JÁ ESTAVA A ALTERAR FOTOS»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O relato, à letra: «quando alterou para inglês, deu, mas já estava a alterar
+ * fotos». A tradução DEU — as caixas «EN» encheram-se, o toast disse que sim —
+ * e as fotos que ela estava a mexer nesse intervalo desapareceram.
+ *
+ * A tradução é uma ida à rede: entre a carregada no botão e a resposta passam
+ * segundos, e nesses segundos o estúdio continua vivo. Ela carrega uma foto,
+ * tira outra, arruma a grelha. Se a resposta voltar e REPUSER o documento que
+ * existia no instante do clique, tudo o que ela fez entretanto vai fora — e
+ * vai fora em silêncio, porque a gravação automática grava logo a seguir a
+ * versão amputada, no `localStorage` e no servidor.
+ *
+ * É a mesma disciplina que a cópia de fotos da biblioteca já segue, escrita lá
+ * ao lado: «se ela já tiver mexido no bloco entretanto (arrastado, removido uma
+ * foto), a troca acompanha na mesma em vez de escrever por cima do que ela
+ * fez». A tradução tem de a seguir também.
+ */
+describe("traduzir com as fotos a meio", () => {
+  const interruptor = () => screen.getByRole("button", { name: /Proposta bilingue/i });
+  const celulas = () => Array.from(document.querySelectorAll<HTMLElement>("[data-foto]"));
+  const fotosDoRascunho = (): string[] => {
+    const cru = localStorage.getItem(DRAFT_KEY);
+    if (!cru) return [];
+    return (JSON.parse(cru)?.moodBoards?.[0]?.images ?? []) as string[];
+  };
+
+  /**
+   * A rota da tradução fica PRESA até se soltar a corda que isto devolve.
+   *
+   * É a janela real: o pedido saiu, a resposta ainda não chegou, e o estúdio
+   * continua a responder às mãos dela.
+   */
+  function traducaoPresa(): () => void {
+    let soltar!: () => void;
+    const espera = new Promise<void>((r) => {
+      soltar = r;
+    });
+    traducaoResponde = (textos) =>
+      ({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => {
+          await espera;
+          return { textos: textos.map((t) => `EN: ${t}`) };
+        },
+      }) as unknown as Response;
+    return () => soltar();
+  }
+
+  /** Liga o bilingue e devolve o botão de traduzir já activo. */
+  async function botaoDeTraduzir(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(interruptor());
+    return waitFor(async () => {
+      const b = (await screen.findByRole("button", {
+        name: /Traduzir para inglês/i,
+      })) as HTMLButtonElement;
+      if (b.disabled) throw new Error("ainda a perguntar ao servidor");
+      return b;
+    });
+  }
+
+  /** Espera pela caixa inglesa preenchida — a prova de que a tradução chegou. */
+  async function traducaoChegou() {
+    await waitFor(() => {
+      const el = document.querySelector('[data-campo="boardTitulo:0:en"]') as HTMLInputElement;
+      if (!el || !el.value) throw new Error("ainda não");
+    });
+  }
+
+  it("uma foto acrescentada enquanto a tradução vai a caminho NÃO desaparece", async () => {
+    traducaoLigadaNoServidor = true;
+    const soltar = traducaoPresa();
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+
+    const botao = await botaoDeTraduzir(user);
+    await user.click(botao);
+
+    // Ela não fica a olhar para o botão: continua a montar o mood board.
+    await user.click(
+      await screen.findByRole("button", { name: /Escolher da biblioteca de temas/ }),
+    );
+    await user.click(await screen.findByRole("button", { name: "escolher-foto-de-teste" }));
+    expect(celulas()).toHaveLength(2);
+
+    // E só agora é que a tradução responde.
+    await act(async () => {
+      soltar();
+      await Promise.resolve();
+    });
+    await traducaoChegou();
+
+    // A tradução entrou — e a foto que ela pôs continua lá, no ecrã e no
+    // rascunho gravado.
+    expect(celulas()).toHaveLength(2);
+    await waitFor(() => expect(fotosDoRascunho()).toContain("board/nova.jpg"));
+  });
+
+  it("uma foto removida enquanto a tradução vai a caminho NÃO volta", async () => {
+    traducaoLigadaNoServidor = true;
+    const soltar = traducaoPresa();
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+
+    const botao = await botaoDeTraduzir(user);
+    await user.click(botao);
+
+    const remover = document.querySelectorAll<HTMLElement>('[aria-label="Remover fotografia"]');
+    await user.click(remover[0]);
+    expect(celulas()).toHaveLength(1);
+
+    await act(async () => {
+      soltar();
+      await Promise.resolve();
+    });
+    await traducaoChegou();
+
+    expect(celulas()).toHaveLength(1);
+    await waitFor(() => expect(fotosDoRascunho()).toEqual(["board/foto-1.jpg"]));
+  });
+
+  it("as fotos reordenadas enquanto a tradução vai a caminho ficam pela ordem nova", async () => {
+    traducaoLigadaNoServidor = true;
+    const soltar = traducaoPresa();
+    seedDraft(3);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+
+    const botao = await botaoDeTraduzir(user);
+    await user.click(botao);
+
+    // «Para trás» na segunda foto: a ordem passa a 1, 0, 2.
+    const paraTras = document.querySelectorAll<HTMLElement>('[aria-label="Mover para trás"]');
+    await user.click(paraTras[1]);
+    await waitFor(() =>
+      expect(fotosDoRascunho()).toEqual([
+        "board/foto-1.jpg",
+        "board/foto-0.jpg",
+        "board/foto-2.jpg",
+      ]),
+    );
+
+    // A partir daqui só interessa o que for gravado DEPOIS da tradução chegar:
+    // o `localStorage` ainda tem a versão de há um instante, e lê-lo cedo
+    // demais dava um teste verde sobre um documento que ainda vai ser
+    // reescrito.
+    pedidos = [];
+    await act(async () => {
+      soltar();
+      await Promise.resolve();
+    });
+    await traducaoChegou();
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+
+    const gravado = corpos("proposta-rascunho").at(-1)!;
+    expect(JSON.parse(gravado).doc.moodBoards[0].images).toEqual([
+      "board/foto-1.jpg",
+      "board/foto-0.jpg",
+      "board/foto-2.jpg",
+    ]);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «AS FOTOS DESAPARECERAM DEPOIS DO DEPLOYMENT»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma foto posta numa proposta são TRÊS coisas em três sítios diferentes, e
+ * confundi-las é confundir o que se perdeu:
+ *
+ *   · os BYTES         → o bucket do Supabase (`proposal-storage.ts`). Não há
+ *                        um único caminho que os escreva em disco local: sem
+ *                        base de dados a rota das fotos responde 503 e o
+ *                        carregamento não acontece. Um deploy não lhes toca.
+ *   · as ASSINATURAS   → pedidas ao servidor a cada abertura (`/assets`).
+ *                        Expiram, e voltam a nascer. Também não se perdem.
+ *   · a LISTA          → quais, por que ordem, em que mood board. Isto é a
+ *                        MONTAGEM, é trabalho de horas, e vive no documento do
+ *                        estúdio. É a única das três que se pode perder.
+ *
+ * A lista tem três cópias, e só uma delas dura: o `localStorage` (por ORIGEM,
+ * neste navegador), o rascunho no servidor (`app_state`) e a proposta gravada
+ * ao enviar. Os dois testes que se seguem cobrem os dois desfechos.
+ */
+describe("a lista das fotos e o que sobrevive a um deployment", () => {
+  const celulas = () => Array.from(document.querySelectorAll<HTMLElement>("[data-foto]"));
+
+  /**
+   * ── A HIPÓTESE DO ENDEREÇO ──────────────────────────────────────────────
+   *
+   * O `localStorage` é POR ORIGEM. O endereço de pré-visualização
+   * (`…-git-….vercel.app`) e o domínio de produção são origens diferentes para
+   * o navegador: um rascunho montado num não existe no outro. Do lado de quem
+   * trabalha isso lê-se exactamente como «as fotos desapareceram depois do
+   * deployment» — sem que nada se tenha perdido.
+   *
+   * Este teste é a boa notícia, e é o que autoriza dizê-la: com o rascunho no
+   * SERVIDOR, abrir o mesmo pedido num navegador que nunca viu esta proposta
+   * (é o que um `localStorage` vazio é) devolve a montagem inteira, com as
+   * fotos e as assinaturas frescas.
+   */
+  it("o MESMO pedido, no outro endereço: a montagem volta inteira do servidor", async () => {
+    // Um navegador que nunca viu esta proposta — nem rascunho, nem `meta`, nem
+    // uma única assinatura guardada. É o que a outra origem é.
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+    rascunhoServidor = {
+      updatedAt: new Date().toISOString(),
+      doc: {
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [
+          { title: "Cerimónia", images: ["q1/a.jpg", "q1/b.jpg", "q1/c.jpg"] },
+          { title: "Copo de água", images: ["q1/d.jpg"] },
+        ],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      },
+    };
+    // O servidor conhece as fotos e assina-as de novo: as assinaturas não são
+    // trabalho dela, nascem a cada abertura.
+    assetsServidor = [
+      { path: "q1/a.jpg", url: "https://sb/q1/a.jpg?assinado=1" },
+      { path: "q1/b.jpg", url: "https://sb/q1/b.jpg?assinado=1" },
+      { path: "q1/c.jpg", url: "https://sb/q1/c.jpg?assinado=1" },
+      { path: "q1/d.jpg", url: "https://sb/q1/d.jpg?assinado=1" },
+    ];
+    renderStudio();
+
+    // A montagem: os dois mood boards, com as fotos e pela ordem em que ela as
+    // pôs. É isto que não pode depender do endereço.
+    await screen.findByDisplayValue("Cerimónia");
+    await screen.findByDisplayValue("Copo de água");
+    await waitFor(() => expect(celulas()).toHaveLength(4));
+
+    // E as células têm mesmo por onde desenhar — a assinatura fresca do
+    // servidor. Sem isto o ecrã tinha quatro buracos, que se lê na mesma como
+    // «as fotos desapareceram».
+    await waitFor(() => {
+      const fontes = Array.from(document.querySelectorAll("img")).map((i) => i.getAttribute("src"));
+      expect(fontes.filter((f) => f?.includes("assinado=1")).length).toBeGreaterThanOrEqual(4);
+    });
+  });
+
+  /**
+   * ── O CASO EM QUE SE PERDE MESMO ────────────────────────────────────────
+   *
+   * Produção sem Supabase: o `app_state` cai no `data/app-state.json`, que em
+   * Vercel é o disco da função — o `setState` devolve `duradouro: false` e a
+   * rota di-lo por escrito, com `guardado: true`, `duradouro: false` e a frase
+   * a explicar que o próximo deploy o apaga.
+   *
+   * O estúdio lê o `updatedAt`, o `overwrote` e o `previousBy` dessa resposta —
+   * e deita fora o `duradouro`. Resultado: o indicador escreve «guardado às
+   * 14:32» sobre um rascunho que o deploy seguinte leva. É a MESMA frase, sobre
+   * a MESMA perda, que este ficheiro inteiro existe para não voltar a deixar
+   * dizer: «"Guardado" é a palavra que faz uma pessoa fechar o portátil
+   * descansada».
+   */
+  it("um rascunho guardado onde o deploy apaga NÃO pode ser anunciado como guardado", async () => {
+    gravacaoDoRascunho = () =>
+      reply({
+        json: {
+          ok: true,
+          guardado: true,
+          // O servidor diz a verdade: ficou, e não dura.
+          duradouro: false,
+          onde: "ficheiro-efemero",
+          aviso:
+            "Guardado apenas no disco do servidor, que é apagado no próximo deploy. " +
+            "Liga a base de dados (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY) para o trabalho ficar mesmo guardado.",
+          updatedAt: new Date().toISOString(),
+          overwrote: false,
+        },
+      });
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+
+    // Ela mexe na proposta — é o que dispara a gravação.
+    await user.type(screen.getByLabelText("Clientes"), "!");
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+
+    // O indicador assenta — e não pode assentar na frase de sempre, que é a
+    // que faz uma pessoa fechar o portátil descansada.
+    // O indicador assenta — e não pode assentar na frase de sempre, que é a
+    // que faz uma pessoa fechar o portátil descansada.
+    await waitFor(
+      () => {
+        expect(screen.queryByText(/^guardado às \d{2}:\d{2}$/)).toBeNull();
+        expect(screen.getAllByText(/próximo deploy apaga/i)).not.toEqual([]);
+      },
+      { timeout: 3000 },
+    );
+    // E ela tem de ficar a saber o que se passa, com o nome das variáveis que
+    // resolvem — é quem está no ecrã que pode ir falar com quem gere a
+    // instalação.
+    expect(
+      await screen.findAllByText(/apagado no próximo deploy/i, undefined, { timeout: 3000 }),
+    ).not.toEqual([]);
   });
 });

@@ -9,7 +9,6 @@
  *   · Estados do pedido — STATUS_OPTIONS em AdminClient.tsx:
  *       Novo · Aguardar resposta · Proposta enviada · Ganho · Perdido
  *   · Fases do Dossier — STAGE_LABELS em src/lib/orcamento/dossier.ts
- *   · Estados da fatura — invoice-validation.ts: emitida · paga · anulada
  *   · "Guião do dia" (folha de operações), "Mood boards",
  *     "Portal do cliente", filtro "VIP" — todos presentes na UI de admin.
  */
@@ -45,8 +44,8 @@ export const LIFECYCLE: LifecycleStep[] = [
     desc: "Quando o cliente aceita as condições por escrito, fica feito o contrato e a data do evento é reservada para ele.",
   },
   {
-    step: "Fatura (sinal + saldo)",
-    desc: "Cobramos em duas faturas: primeiro o sinal, que garante a reserva, e mais perto do evento o saldo, que é o resto do valor.",
+    step: "Pagamento (sinal + saldo)",
+    desc: "Cobramos em duas partes: primeiro o sinal, que garante a reserva, e mais perto do evento o saldo, que é o resto do valor. Aqui regista-se o que foi recebido e quando; as faturas são emitidas noutro programa.",
   },
   {
     step: "Evento",
@@ -118,16 +117,8 @@ export const GLOSSARY: GlossaryEntry[] = [
     def: "O imposto que acresce ao valor dos serviços e é entregue ao Estado (em Portugal, normalmente 23%). Um preço «sem IVA» ainda não o inclui e vai subir quando o IVA for somado; um preço «com IVA» já é o valor final que o cliente paga.",
   },
   {
-    term: "Fatura",
-    def: "O documento oficial que pede um pagamento ao cliente. Pode ser do sinal, do saldo, ou uma fatura única com o valor todo. Cada fatura fica emitida, paga ou anulada.",
-  },
-  {
-    term: "Recibo",
-    def: "O comprovativo de que um pagamento já foi feito. A fatura pede; o recibo confirma que recebemos.",
-  },
-  {
-    term: "Anulada",
-    def: "Uma fatura que foi cancelada e deixou de contar — por exemplo, se foi emitida com um erro. Não desaparece do registo, mas não conta para os totais a receber.",
+    term: "Pagamento registado",
+    def: "Uma linha do registo de pagamentos de um evento: quanto entrou, de que tipo (sinal, saldo ou avulso), em que dia e por que meio. É daqui que saem o «Recebido» e o «A receber» de todos os quadros. As faturas em si são emitidas noutro programa e não vivem aqui.",
   },
   {
     term: "Convidados",
@@ -135,7 +126,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     term: "Dossier",
-    def: "A vista completa de um evento (o “Dossier do evento”), com tudo num só sítio: contacto, proposta, contrato, faturas e produção. É o “processo” do evento e onde as contas ficam certas.",
+    def: "A vista completa de um evento (o “Dossier do evento”), com tudo num só sítio: contacto, proposta, contrato, pagamentos e produção. É o “processo” do evento e onde as contas ficam certas.",
   },
   {
     term: "Guião do dia",
@@ -151,7 +142,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     term: "Apagar",
-    def: "Eliminar um pedido (ou uma fatura) em definitivo. Ao contrário de arquivar, esta ação não pode ser anulada, por isso pedimos sempre confirmação antes.",
+    def: "Eliminar um pedido em definitivo. Ao contrário de arquivar, esta ação não pode ser anulada, por isso pedimos sempre confirmação antes.",
   },
   {
     term: "Portal do cliente",

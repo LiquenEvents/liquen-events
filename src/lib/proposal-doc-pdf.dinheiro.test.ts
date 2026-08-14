@@ -560,9 +560,29 @@ describe("a data de validade", () => {
   it("são os 60 dias configurados, contados da emissão", async () => {
     // Sem `validUntil` explícita, a data sai de hoje + `validUntilDays`. 60 é a
     // omissão da casa (DEFAULT_VALID_DAYS), e é o que a folha promete.
-    const emitida = new Date();
-    const limite = new Date(emitida);
-    limite.setDate(limite.getDate() + 60);
+    /**
+     * ── «HOJE» É O DIA QUE PORTUGAL ESTÁ A VIVER, TAMBÉM AQUI ──────────────
+     *
+     * Isto contava a partir de `new Date().toISOString()`, que é o dia de
+     * GREENWICH — e o código que está a ser medido conta de propósito pelo
+     * relógio de Lisboa (ver `hojeNoEstudio`, com a nota da factura do sinal
+     * datada do dia anterior). No Verão, das 23:00 às 00:00 UTC, os dois
+     * discordam num dia: a suite ficava vermelha durante uma hora por noite,
+     * sobre código certo. Um vermelho que aparece e desaparece sozinho é um
+     * vermelho que se aprende a ignorar — e é o mesmo defeito, do outro lado.
+     *
+     * O dia de Lisboa calcula-se aqui à parte, sem chamar a função que se está
+     * a medir: `en-CA` dá `yyyy-mm-dd`, e a soma faz-se em UTC sobre esses três
+     * campos, onde o dia tem sempre 24 horas.
+     */
+    const emLisboa = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Lisbon",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const [ano, mes, dia] = emLisboa.split("-").map(Number);
+    const limite = new Date(Date.UTC(ano, mes - 1, dia + 60));
     const iso = limite.toISOString().slice(0, 10);
     expect(iso).toBe(resolveValidUntil(proposta()));
 

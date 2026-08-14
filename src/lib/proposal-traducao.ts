@@ -37,6 +37,7 @@
 
 import type { ProposalDoc } from "./proposal-doc";
 import { camposPorTraduzir, escreverEn } from "./proposal-doc-bilingue";
+import { lerCampo, type CampoDeTexto } from "./proposal-ortografia";
 
 /**
  * ── A FRONTEIRA ───────────────────────────────────────────────────────────
@@ -74,20 +75,68 @@ export const MAX_TEXTOS_POR_TRADUCAO = 300;
 export const MAX_CARACTERES_POR_TRADUCAO = 60_000;
 
 /**
+ * Os lotes de um pedido, PELA ORDEM.
+ *
+ * Vive aqui e não em cada motor porque há dois tectos a respeitar no mesmo
+ * caminho — o desta rota e o do serviço lá ao fundo (ver
+ * `MAX_TEXTOS_POR_PEDIDO` em `proposal-traducao-deepl.ts`) — e dois
+ * partidores acabariam por discordar num deles. A regra é a mesma nos dois
+ * sítios e escreve-se uma vez.
+ *
+ * Um texto sozinho maior do que o tecto vai à mesma, sozinho: cortá-lo era
+ * devolver meia frase e deixá-lo de fora era devolver menos textos do que os
+ * pedidos — o desalinhamento, que é o defeito que toda a gente aqui evita.
+ */
+export function emLotes(textos: string[], maxTextos: number, maxCaracteres: number): string[][] {
+  const lotes: string[][] = [];
+  let lote: string[] = [];
+  let caracteres = 0;
+  for (const texto of textos) {
+    const cabe = lote.length < maxTextos && caracteres + texto.length <= maxCaracteres;
+    if (lote.length > 0 && !cabe) {
+      lotes.push(lote);
+      lote = [];
+      caracteres = 0;
+    }
+    lote.push(texto);
+    caracteres += texto.length;
+  }
+  if (lote.length > 0) lotes.push(lote);
+  return lotes;
+}
+
+/**
  * O motor do lado do ESTÚDIO: manda os textos à rota e devolve o que ela
  * responder.
  *
  * As mensagens de erro vêm do servidor já escritas em português — é o que o
  * `toast` mostra. Um `501` é o caso em que não há serviço configurado, e
  * distingue-se dos outros: não correu nada mal, falta ligar.
+ *
+ * ── E VAI EM LOTES, PORQUE A ROTA TEM TECTOS ──────────────────────────────
+ *
+ * A rota recusa (413) um pedido com mais de {@link MAX_TEXTOS_POR_TRADUCAO}
+ * textos. O comentário lá diz que «a contagem é a mesma que o estúdio já
+ * respeita» — e não respeitava: mandava os campos todos num pedido só.
+ *
+ * A margem não era teórica. Medida numa proposta pesada mas plausível — 8
+ * grupos de 8 rubricas com descrição, 12 mood boards, 40 linhas de orçamento —
+ * dá 218 campos para um tecto de 300. O sintoma seria o pior de todos para
+ * diagnosticar: dá em todas as propostas dela menos nas maiores, e nessas dá
+ * «Não deu para traduzir» sem nada que ligue a causa ao tamanho.
+ *
+ * Um lote que falhe volta VAZIO nas suas posições, exactamente como no motor
+ * do DeepL e pela mesma razão: o que já veio foi PAGO, e deitá-lo fora porque
+ * o pedido seguinte apanhou um 429 era pagá-lo outra vez. A fronteira sabe ler
+ * uma posição vazia (fica por traduzir) e a contagem `naoVieram` di-lo no ecrã.
+ * Se NENHUM lote passar, atira-se — o painel precisa da frase.
  */
 export function motorPelaRota(buscar: typeof fetch = fetch): MotorDeTraducao {
-  return async (textos: string[]): Promise<string[]> => {
-    if (textos.length === 0) return [];
+  async function pedirUmLote(lote: string[]): Promise<string[]> {
     const r = await buscar(ROTA_DE_TRADUCAO, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ textos }),
+      body: JSON.stringify({ textos: lote }),
     });
     const corpo = (await r.json().catch(() => null)) as {
       textos?: unknown;
@@ -102,26 +151,87 @@ export function motorPelaRota(buscar: typeof fetch = fetch): MotorDeTraducao {
     if (!Array.isArray(saida) || saida.some((t) => typeof t !== "string")) {
       throw new Error("a resposta da tradução não veio na forma esperada");
     }
+    // A trava de sempre, agora por lote: um lote a que faltem textos desalinha
+    // tudo o que vem a seguir. Recusá-lo não contamina os outros.
+    if (saida.length !== lote.length) {
+      throw new Error(
+        `a tradução veio desalinhada (${saida.length} textos para ${lote.length} campos)`,
+      );
+    }
     return saida as string[];
+  }
+
+  return async (textos: string[]): Promise<string[]> => {
+    if (textos.length === 0) return [];
+    const lotes = emLotes(textos, MAX_TEXTOS_POR_TRADUCAO, MAX_CARACTERES_POR_TRADUCAO);
+    // O caminho de quase todas as propostas: um lote só, um pedido só, e o erro
+    // sobe tal e qual como subia antes de haver lotes nenhuns.
+    if (lotes.length === 1) return pedirUmLote(lotes[0]);
+
+    const saida = new Array<string>(textos.length).fill("");
+    let posicao = 0;
+    let algumPassou = false;
+    let primeiroErro: unknown = null;
+    for (const lote of lotes) {
+      const inicio = posicao;
+      posicao += lote.length;
+      try {
+        const traduzidos = await pedirUmLote(lote);
+        for (const [i, t] of traduzidos.entries()) saida[inicio + i] = t;
+        algumPassou = true;
+      } catch (e) {
+        primeiroErro ??= e;
+      }
+    }
+    if (!algumPassou && primeiroErro) throw primeiroErro;
+    return saida;
   };
 }
+
+/**
+ * O que se sabe sobre a tradução automática deste servidor.
+ *
+ *  · `"ligada"`      — há serviço configurado; o botão trabalha.
+ *  · `"desligada"`   — o servidor RESPONDEU e disse que não tem chave.
+ *  · `"indisponivel"` — não se conseguiu perguntar: rede em baixo, sessão
+ *                       caducada, um 500, uma resposta com outra forma.
+ */
+export type EstadoDaTraducao = "ligada" | "desligada" | "indisponivel";
 
 /**
  * A tradução automática está ligada NESTE servidor?
  *
  * Pergunta-se, não se adivinha: a chave vive do lado do servidor e o estúdio
- * não tem como a ver — nem deve. Uma falha de rede vale «não está ligada», que
- * é o lado seguro: o botão fica desligado a dizer porquê, em vez de prometer
- * uma tradução que não vai acontecer.
+ * não tem como a ver — nem deve.
+ *
+ * ── PORQUE É QUE ISTO NÃO DEVOLVE UM `boolean` ────────────────────────────
+ *
+ * Devolvia. Uma falha de rede, uma sessão caducada e um 500 valiam todos
+ * `false`, que desligava o botão — o lado seguro, e isso continua igual: os
+ * três desligam-no na mesma. O que estava errado era a FRASE que ficava por
+ * baixo, e que só tem uma versão quando o estado só tem dois valores: «a
+ * tradução automática ainda não está ligada neste servidor».
+ *
+ * Essa frase é uma afirmação sobre a CONFIGURAÇÃO. Quem a lê vai pôr a chave
+ * na Vercel, ou desiste e escreve as caixas inglesas à mão. Dita sobre uma
+ * sessão que caducou, manda-a resolver um problema que não existe — e o
+ * verdadeiro cura-se recarregando a página.
+ *
+ * Só a resposta EXPLÍCITA do servidor («não tenho chave») vale `"desligada"`.
+ * Tudo o resto é `"indisponivel"`: não é um «não», é um «não sei».
  */
-export async function traducaoEstaLigada(buscar: typeof fetch = fetch): Promise<boolean> {
+export async function estadoDaTraducao(buscar: typeof fetch = fetch): Promise<EstadoDaTraducao> {
   try {
     const r = await buscar(ROTA_DE_TRADUCAO);
-    if (!r.ok) return false;
+    if (!r.ok) return "indisponivel";
     const corpo = (await r.json().catch(() => null)) as { ligada?: unknown } | null;
-    return corpo?.ligada === true;
+    if (corpo?.ligada === true) return "ligada";
+    if (corpo?.ligada === false) return "desligada";
+    // Nem `true` nem `false`: um apanha-tudo de API, um portal cativo, um
+    // corpo que não é o nosso. Não se lê como um «não».
+    return "indisponivel";
   } catch {
-    return false;
+    return "indisponivel";
   }
 }
 
@@ -167,15 +277,126 @@ export function precisaDeTraducao(texto: string): boolean {
   return false;
 }
 
+/**
+ * ── UMA TRADUÇÃO À ESPERA DE SER ESCRITA ──────────────────────────────────
+ *
+ * Uma caixa inglesa a preencher: QUAL campo, o que se lá escreve, e — o que
+ * interessa — o PORTUGUÊS a partir do qual ela foi traduzida.
+ *
+ * O português viaja junto porque o campo é POSICIONAL (`boardTitulo:0`,
+ * `itemRotulo:1:2`) e a tradução é uma ida à rede que demora segundos. Nesses
+ * segundos ela continua a trabalhar: arrasta um mood board, apaga um grupo,
+ * acrescenta uma linha. Quando a resposta volta, `boardTitulo:0` pode já ser
+ * OUTRO board — e escrever ali a tradução do primeiro era pôr a frase inglesa
+ * na página errada, em silêncio, num documento a caminho de um cliente.
+ *
+ * É o mesmo perigo que o cabeçalho dos campos `…En` de `proposal-doc.ts`
+ * descreve para um mapa lateral com chaves posicionais. A diferença é que aqui
+ * a chave só existe durante a ida à rede — e o português é a prova de que ela
+ * ainda aponta ao mesmo sítio quando se volta.
+ */
+export interface TraducaoEscrita {
+  /** Qual o campo. Posicional, e por isso acompanhado do {@link pt}. */
+  campo: CampoDeTexto;
+  /** O texto português que foi mandado traduzir, sem espaços à volta. */
+  pt: string;
+  /** O inglês a escrever na caixa «EN» deste campo. */
+  en: string;
+}
+
 /** O que aconteceu a uma tentativa de traduzir. */
 export interface ResultadoDaTraducao {
-  /** O documento com as traduções escritas — o MESMO objecto quando nada foi
-   *  escrito, para não sujar as comparações por referência do estúdio. */
+  /**
+   * O documento com as traduções escritas — o MESMO objecto quando nada foi
+   * escrito, para não sujar as comparações por referência do estúdio.
+   *
+   * ATENÇÃO a quem o consome depois de um `await`: este documento nasceu do que
+   * existia no instante em que a tradução foi PEDIDA. Pô-lo de volta no estado
+   * deita fora tudo o que tiver acontecido entretanto — que é exactamente o que
+   * fazia desaparecer as fotos de quem continuava a montar o mood board
+   * enquanto traduzia. Quem tem um documento vivo à mão usa {@link escritas} e
+   * {@link aplicarTraducao}, não isto.
+   */
   doc: ProposalDoc;
   /** Quantas caixas inglesas ficaram preenchidas. */
   escritos: number;
+  /**
+   * As traduções, uma a uma, para poderem ser aplicadas ao documento COMO ELE
+   * ESTIVER na altura de as escrever. Ver {@link aplicarTraducao}.
+   */
+  escritas: TraducaoEscrita[];
+  /**
+   * ── OS QUE FORAM PEDIDOS AO SERVIÇO E NÃO VOLTARAM ──────────────────────
+   *
+   * Não é `porqueFalhou` (esse é «não deu NADA»), nem são os campos que ela
+   * decidiu deixar em português (esses foram escritos). É uma terceira coisa, e
+   * a mais fácil de calar: o motor manda os textos em LOTES, e um lote que
+   * falhe volta VAZIO nas suas posições em vez de deitar fora os que já vieram.
+   * Só atira quando NENHUM lote passa.
+   *
+   * Consequência, sem este número: numa proposta grande, um 429 ou uma quota
+   * que acaba no segundo lote devolvia os primeiros 50 campos traduzidos e os
+   * outros 70 vazios, com o ecrã a dizer «50 campos traduzidos», a verde. Do
+   * lado dela lê-se como «não está a dar» — dá numa proposta pequena e não dá
+   * numa grande, e o número que aparece está certo: o que falta é a outra
+   * metade da frase.
+   */
+  naoVieram: number;
   /** Porque é que não deu, quando não deu. Vazio quando correu bem. */
   porqueFalhou?: string;
+}
+
+/** O que aconteceu ao escrever as traduções num documento. */
+export interface AplicacaoDaTraducao<T> {
+  /** O documento com as traduções escritas — o MESMO objecto quando nenhuma o
+   *  foi, pela mesma razão de sempre. */
+  doc: T;
+  /** Quantas foram mesmo escritas. */
+  escritos: number;
+  /** As que NÃO foram, porque o campo já não é o que era. Não é um erro: é o
+   *  campo a continuar por traduzir, que é o que ele passou a ser. */
+  ignorados: TraducaoEscrita[];
+}
+
+/**
+ * Escreve as traduções no documento COMO ELE ESTÁ AGORA.
+ *
+ * Campo a campo, e só quando o português ainda é O MESMO que foi mandado
+ * traduzir. Um campo que tenha mudado de sítio (um board arrastado, um grupo
+ * apagado) ou de texto durante a ida à rede não recebe nada — fica por
+ * traduzir, e é isso que o contador e o painel «Por traduzir» já dizem.
+ *
+ * ── PORQUE É QUE NÃO SE VERIFICA E PRONTO, ESCREVENDO O DOCUMENTO INTEIRO ──
+ *
+ * Porque o documento tem mais coisas do que prosa. Tem as fotografias dos mood
+ * boards, e as fotografias mexem-se enquanto se espera: ela carrega quatro
+ * fotos, tira uma, arruma a grelha por cor. Repor o documento de há dez
+ * segundos apaga tudo isso e a gravação automática grava logo a seguir a
+ * versão amputada — no `localStorage` e no servidor. Uma foto trocada numa
+ * proposta de casamento é pior do que uma frase mal traduzida.
+ *
+ * É a mesma disciplina que a cópia de fotos de um modelo parcial já segue no
+ * estúdio, escrita lá: «a troca é feita no documento INTEIRO e por caminho: se
+ * ela já tiver mexido no bloco entretanto (arrastado, removido uma foto), a
+ * troca acompanha na mesma em vez de escrever por cima do que ela fez».
+ */
+export function aplicarTraducao<T extends Partial<ProposalDoc>>(
+  doc: T,
+  escritas: readonly TraducaoEscrita[],
+): AplicacaoDaTraducao<T> {
+  let saida = doc;
+  let escritos = 0;
+  const ignorados: TraducaoEscrita[] = [];
+  for (const e of escritas) {
+    // A prova. Não é o índice que identifica o campo — é o texto que lá está.
+    if ((lerCampo(saida, e.campo) ?? "").trim() !== e.pt) {
+      ignorados.push(e);
+      continue;
+    }
+    saida = escreverEn(saida, e.campo, e.en);
+    escritos++;
+  }
+  return { doc: saida, escritos, ignorados };
 }
 
 /**
@@ -194,7 +415,7 @@ export async function traduzirParaIngles(
   motor: MotorDeTraducao,
 ): Promise<ResultadoDaTraducao> {
   const campos = camposPorTraduzir(doc);
-  if (campos.length === 0) return { doc, escritos: 0 };
+  if (campos.length === 0) return { doc, escritos: 0, escritas: [], naoVieram: 0 };
 
   // Os que vão mesmo ao serviço. Os outros — números, valores, datas, horas,
   // referências — ficam de fora (ver {@link precisaDeTraducao}) e são escritos
@@ -211,6 +432,8 @@ export async function traduzirParaIngles(
       return {
         doc,
         escritos: 0,
+        escritas: [],
+        naoVieram: 0,
         porqueFalhou: e instanceof Error ? e.message : "o serviço de tradução não respondeu",
       };
     }
@@ -224,6 +447,8 @@ export async function traduzirParaIngles(
     return {
       doc,
       escritos: 0,
+      escritas: [],
+      naoVieram: 0,
       porqueFalhou: `a tradução veio desalinhada (${
         Array.isArray(respostas) ? respostas.length : 0
       } textos para ${aPedir.length} campos)`,
@@ -231,13 +456,18 @@ export async function traduzirParaIngles(
   }
 
   let saida = doc;
-  let escritos = 0;
+  const escritas: TraducaoEscrita[] = [];
   let proximo = 0;
+  // Pedidos ao serviço que voltaram em branco. Ver {@link ResultadoDaTraducao}
+  // para o que isto vale, e porque é que não pode ficar por dizer.
+  let naoVieram = 0;
   for (const [i, campo] of campos.entries()) {
     let texto: string;
+    let foiPedido = false;
     if (aPedir[proximo] === i) {
       texto = typeof respostas[proximo] === "string" ? respostas[proximo].trim() : "";
       proximo++;
+      foiPedido = true;
     } else {
       // Não foi pedido porque não há nada a traduzir. Escrever o português na
       // caixa inglesa é exactamente o que o botão «Ficar em português» faz, e
@@ -248,9 +478,15 @@ export async function traduzirParaIngles(
     // Uma posição vazia fica por traduzir. Não é um buraco: no papel esse campo
     // cai para o português, e no ecrã continua a contar como falta — que é
     // exactamente o que é.
-    if (!texto) continue;
+    if (!texto) {
+      if (foiPedido) naoVieram++;
+      continue;
+    }
+    // O par (campo, português) fica guardado ao lado da tradução: é com ele que
+    // quem tem um documento VIVO à mão a consegue escrever sem deitar fora o
+    // que se fez entretanto. Ver {@link aplicarTraducao}.
+    escritas.push({ campo: campo.campo, pt: campo.texto, en: texto });
     saida = escreverEn(saida, campo.campo, texto);
-    escritos++;
   }
-  return { doc: saida, escritos };
+  return { doc: saida, escritos: escritas.length, escritas, naoVieram };
 }

@@ -45,7 +45,6 @@ const VISTAS: { rotulo: RegExp; nome: string }[] = [
   { rotulo: /^Propostas$/, nome: "propostas" },
   { rotulo: /^Calendário$/, nome: "calendario" },
   { rotulo: /^Tarefas$/, nome: "tarefas" },
-  { rotulo: /^Faturas$/, nome: "faturas" },
   { rotulo: /^Propostas Aceites$/, nome: "propostas-aceites" },
   { rotulo: /^Material$/, nome: "material" },
   { rotulo: /^Temas$/, nome: "temas" },

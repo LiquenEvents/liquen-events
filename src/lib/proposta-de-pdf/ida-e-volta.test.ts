@@ -614,7 +614,11 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
       "budgetRows[0].item",
       "budgetRows[0].price",
       "budgetRows[1].item",
-      "budgetRows[1].price",
+      // `budgetRows[1].price` fora, e a razão é uma correcção do DESENHO:
+      // «[Valor]» é o marcador que o estúdio semeia numa linha por orçamentar,
+      // e deixou de ser impresso — cai no «—», como o «[Valor Total]» já caía.
+      // Um marcador que sobrevive à ida e volta é um marcador que chegou ao
+      // papel do cliente; o que se confere aqui em baixo é o contrário disso.
       // `totalEstimatedText` fora, pela mesma razão do `totalText` na proposta
       // magra: também no modelo Organização a folha fecha na escada, e o número
       // grande é o «Total a pagar» e não o texto estimado composto no estúdio.
@@ -628,6 +632,9 @@ describe("ida e volta: gerar o PDF e voltar a lê-lo", () => {
     ]);
     console.log(tabela("organização", r));
     expect(r.acerto).toBe(1);
+    // O marcador não foi impresso, logo não volta: o que a folha mostrou
+    // naquela célula foi o traço de «ainda sem preço».
+    expect(lido.budgetRows?.[1]?.price ?? "").not.toContain("[Valor]");
     // A estimativa vale o mesmo depois da ida e volta, mudando embora de forma.
     const antes = resolveProposalMoney(doc);
     const depois = resolveProposalMoney(lido);

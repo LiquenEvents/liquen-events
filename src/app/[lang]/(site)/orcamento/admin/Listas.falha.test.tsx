@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
-import Faturas from "./Faturas";
 import Contratos from "./Contratos";
 import Tarefas from "./Tarefas";
 import Fornecedores from "./Fornecedores";
@@ -24,11 +23,9 @@ import type { Quote } from "@/lib/orcamento/types";
  * servidor em baixo, o `loading` caía, o array ficava vazio, e o ecrã desenhava
  * o seu estado vazio com toda a confiança e sem nenhum "tentar de novo".
  *
- * O caso mais caro é o das Faturas. Os três cartões de topo AFIRMAM
- * "Emitido 0,00 € · Pago 0,00 € · Em dívida 0,00 €" quando a verdade é que não
- * se conseguiu ler o livro. Zero euros em dívida é uma frase sobre o dinheiro
- * dela, e é falsa: com ela ao ecrã ninguém vai atrás de um saldo por cobrar.
- * Uma leitura falhada NUNCA pode desenhar um total em euros.
+ * A regra vale para qualquer destes ecrãs: uma leitura falhada NUNCA pode
+ * desenhar um total em euros nem um "não há nada aqui". (O ecrã de Faturas,
+ * que era o exemplo mais caro desta lista, saiu com a facturação.)
  *
  * Estes testes fazem a pergunta pelo lado de quem usa: com o servidor a
  * responder 500, o que é que o ecrã diz? Antes da correcção diziam todos
@@ -81,43 +78,6 @@ function montar(no: React.ReactNode) {
 async function esperarPeloAviso() {
   await waitFor(() => expect(screen.getByText(/Não foi possível ler/)).toBeTruthy());
 }
-
-describe("Faturas — quando o livro não se consegue ler", () => {
-  it("não afirma um único total em euros", async () => {
-    montar(<Faturas />);
-    await esperarPeloAviso();
-
-    // A afirmação que estava aqui: "Emitido 0,00 € · Pago 0,00 € · Em dívida
-    // 0,00 €", sobre um livro que ninguém conseguiu abrir.
-    expect(
-      screen.queryAllByText(/0,00/),
-      "um total de 0,00 € é uma afirmação sobre o dinheiro dela, e aqui seria falsa",
-    ).toHaveLength(0);
-    expect(screen.queryByText("Em dívida")).toBeNull();
-  });
-
-  it("diz que não conseguiu ler, e repete a frase do servidor", async () => {
-    montar(<Faturas />);
-    await esperarPeloAviso();
-
-    expect(screen.getByText(/Não foi possível ler as faturas/)).toBeTruthy();
-    expect(screen.getByText(EXPLICACAO)).toBeTruthy();
-    expect(screen.queryByText("Sem faturas ainda")).toBeNull();
-  });
-
-  it("oferece tentar de novo, e o botão volta mesmo a pedir", async () => {
-    montar(<Faturas />);
-    await esperarPeloAviso();
-
-    const antes = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
-    screen.getByRole("button", { name: "Tentar de novo" }).click();
-    await waitFor(() =>
-      expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
-        antes,
-      ),
-    );
-  });
-});
 
 describe("Contratos — quando a leitura falha", () => {
   it("não diz “Sem contratos ainda”", async () => {

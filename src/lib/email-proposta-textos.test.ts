@@ -29,8 +29,8 @@ describe("textosDoEmailDaProposta", () => {
       "Segue em anexo a proposta personalizada para o seu evento. Pode vê-la e responder online através do botão abaixo.",
     );
     expect(pt.introEmTexto).toBe("Segue em anexo a proposta personalizada para o seu evento.");
-    expect(pt.botao).toBe("Ver e responder à proposta →");
-    expect(pt.verOnline).toBe("Ver e responder online:");
+    expect(pt.botao).toBe("Ver a proposta →");
+    expect(pt.verOnline).toBe("Ver online:");
     expect(pt.nomeDoAnexo("q1")).toBe("Proposta-Liquen-q1.pdf");
   });
 

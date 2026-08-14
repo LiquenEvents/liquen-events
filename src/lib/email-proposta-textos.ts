@@ -82,8 +82,8 @@ const PT: TextosDoEmailDaProposta = {
   intro:
     "Segue em anexo a proposta personalizada para o seu evento. Pode vê-la e responder online através do botão abaixo.",
   introEmTexto: "Segue em anexo a proposta personalizada para o seu evento.",
-  botao: "Ver e responder à proposta →",
-  verOnline: "Ver e responder online:",
+  botao: "Ver a proposta →",
+  verOnline: "Ver online:",
   nomeDoAnexo: (ref) => nomeDoFicheiroDaProposta(ref, "pt"),
 };
 
@@ -94,8 +94,8 @@ const EN: TextosDoEmailDaProposta = {
   intro:
     "Please find attached the proposal we have prepared for your event. You can also view it and reply online using the button below.",
   introEmTexto: "Please find attached the proposal we have prepared for your event.",
-  botao: "View and reply to the proposal →",
-  verOnline: "View and reply online:",
+  botao: "View the proposal →",
+  verOnline: "View online:",
   /**
    * O nome do ficheiro também muda. Não é um enfeite: ela gera as duas versões
    * da mesma proposta (a portuguesa para os pais, a inglesa para o casal), e com

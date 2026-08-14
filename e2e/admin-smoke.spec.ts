@@ -110,8 +110,27 @@ test.describe("Back office — smoke", () => {
 
     for (const view of VIEWS) {
       await sidebar.getByRole("button", { name: view.nav }).click();
-      // Page heading (H1) confirms the lazy chunk mounted, not the skeleton.
+      // O <h1> diz que se CHEGOU ao destino — e mais nada.
+      //
+      // Estava aqui escrito que ele "confirma que o chunk montou, e não o
+      // esqueleto". Não confirma: o título é desenhado pelo AdminClient, no
+      // cabeçalho, a partir de `VIEW_TITLES`, e aparece no instante do clique
+      // com o chunk ainda a caminho. MEDIDO no passeio do telemóvel: com o
+      // <h1> já visível, a página tinha SETE elementos interactivos — os da
+      // navegação — e zero da vista.
+      //
+      // A prova de que a vista montou é o esqueleto ter SAÍDO (o `ViewSkeleton`
+      // marca-se com `data-view-skeleton`) e o <main> ter conteúdo próprio.
       await expect(page.getByRole("heading", { level: 1, name: view.heading })).toBeVisible();
+      await expect(
+        page.locator("[data-view-skeleton]"),
+        `"${view.heading.source}": o esqueleto ficou no ecrã — o chunk da vista não montou.`,
+      ).toHaveCount(0);
+      await expect
+        .poll(() => page.locator("main :is(a[href],button,input,select,textarea)").count(), {
+          message: `"${view.heading.source}": o <main> não tem nada de interactivo — a vista não montou.`,
+        })
+        .toBeGreaterThan(0);
       // No error boundary anywhere on the page for this view.
       await expect(errorBoundary).toHaveCount(0);
     }

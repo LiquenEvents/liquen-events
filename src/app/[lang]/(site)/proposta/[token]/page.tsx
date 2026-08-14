@@ -6,7 +6,6 @@ import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { SITE } from "@/lib/site";
 import { getDictionary, htmlLang, normalizeLocale, type Locale } from "@/lib/i18n";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
-import ProposalResponse from "./ProposalResponse";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -146,9 +145,16 @@ function Message({ title, body, lang }: { title: string; body: string; lang: str
           {title}
         </h1>
         <p className="text-foreground/72 text-sm leading-relaxed">{body}</p>
+        {/* O ÚNICO caminho que sobra nesta página, e por isso tem de se poder
+            carregar nele com um polegar. Medido num telemóvel: 252×16 px. O
+            texto é minúsculo (`text-xs` em maiúsculas) e está sozinho — não é
+            uma ligação no meio de uma frase, é O botão desta página, e quem
+            aqui chega já teve uma contrariedade.
+            `alvo-toque` é a classe da casa (globals.css): 44 px SÓ em ecrãs de
+            toque, portanto o portátil fica exactamente como estava. */}
         <a
           href={`mailto:${SITE.email}`}
-          className="inline-block mt-8 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
+          className="alvo-toque inline-flex items-center mt-8 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
         >
           {SITE.email}
         </a>
@@ -197,6 +203,29 @@ export default async function ProposalPage({
   const locale = idiomaDaProposta(proposal);
   const t = getDictionary(locale).proposta;
 
+  /**
+   * ── «OLÁ, .» ────────────────────────────────────────────────────────────
+   *
+   * O título era `{t.greeting}, {proposal.clientName.split(" ")[0]}.` e não
+   * tinha guarda nenhuma. Com o nome do cliente vazio — uma linha antiga em
+   * que `client_name` ficou a `null` (o `fromRow` traduz isso para `""`) — o
+   * casal abria o link do email e a primeira coisa que lia, em Playfair a 52
+   * px, era:
+   *
+   *     Olá, .
+   *
+   * E com o campo em falta de todo, o `.split` de `undefined` atirava: o casal
+   * apanhava a página de «Ocorreu um erro inesperado» em vez da proposta.
+   *
+   * Sem nome, cumprimenta-se na mesma — «Olá.» — que é uma frase inteira e não
+   * denuncia nada. Com nome, é exactamente o que sempre saiu.
+   */
+  const primeiroNome =
+    String(proposal.clientName ?? "")
+      .trim()
+      .split(/\s+/)[0] ?? "";
+  const saudacao = primeiroNome ? `${t.greeting}, ${primeiroNome}.` : `${t.greeting}.`;
+
   const cur = proposal.currency || "EUR";
   // Mirror the API's expiry rule (through the WHOLE of the last valid day, i.e.
   // 23:59:59) so the client sees an "expired" notice up front instead of only
@@ -226,7 +255,7 @@ export default async function ProposalPage({
             className="text-foreground/90 font-bold"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 5vw, 52px)" }}
           >
-            {t.greeting}, {proposal.clientName.split(" ")[0]}.
+            {saudacao}
           </h1>
           <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
             {t.intro}
@@ -326,14 +355,48 @@ export default async function ProposalPage({
           </p>
         )}
 
-        {/* Response */}
-        <ProposalResponse
-          token={token}
-          initialStatus={proposal.status}
-          expired={expired}
-          proposta={t}
-          percentagemDoSinal={depositPercentOf(proposal.doc as ProposalDoc | undefined)}
-        />
+        {/**
+         * ═══════════════════════════════════════════════════════════════════
+         * A RESPOSTA É POR EMAIL OU POR TELEFONE — NÃO POR BOTÃO
+         * ═══════════════════════════════════════════════════════════════════
+         *
+         * Havia aqui um formulário: «Aceitar proposta», «Recusar proposta»,
+         * uma caixa de termos e um campo de nome, e o clique gravava a decisão
+         * do casal no sistema.
+         *
+         * A dona da casa mandou tirá-lo, e a razão é do negócio: um casamento
+         * não se fecha num botão. Fecha-se numa conversa — e uma proposta
+         * «recusada» com um toque distraído no telemóvel é um negócio perdido
+         * sem ninguém ter falado com ninguém. Passa a dizer-se, com todas as
+         * letras, como se responde: escrever ou ligar.
+         *
+         * O PDF e a validade FICAM: esta página continua a ser onde o casal vê
+         * a proposta inteira quando já arquivou o email.
+         *
+         * A rota que gravava a resposta (`POST /api/proposta`) foi APAGADA, e
+         * não apenas escondida — enquanto existisse, uma ligação antiga numa
+         * caixa de correio continuava a poder gravar uma decisão que ninguém
+         * quis. Ver o teste `nada-de-aceitar-por-botao.test.tsx`.
+         */}
+        <div className="mt-10 border-t border-foreground/10 pt-8 text-center">
+          <p className="text-foreground/85 text-sm leading-relaxed">
+            {expired ? t.respostaExpirada : t.respostaComo}
+          </p>
+          <p className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <a
+              href={`mailto:${SITE.email}`}
+              className="alvo-toque text-moss text-sm tracking-wide hover:underline"
+            >
+              {SITE.email}
+            </a>
+            <a
+              href={`tel:${SITE.phone}`}
+              className="alvo-toque text-moss text-sm tracking-wide hover:underline"
+            >
+              {SITE.phoneDisplay}
+            </a>
+          </p>
+        </div>
 
         <p className="text-foreground/68 text-[11px] text-center mt-10 leading-relaxed">
           {t.footerNote}{" "}

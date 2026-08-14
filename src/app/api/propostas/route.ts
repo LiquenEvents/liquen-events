@@ -68,15 +68,14 @@ function resumir(p: Awaited<ReturnType<typeof listAllProposals>>[number]) {
  *                      Acompanhamento usa para perguntar «qual das versões é
  *                      que eles ficaram?» e a Análise para contar quantas
  *                      aceites tinham extras.
- *   · `pctSinal`     — a percentagem do sinal desta proposta. É a MESMA que as
- *                      rotas de facturação usam para emitir o sinal e o saldo
- *                      (`depositPercentOf`), e os ecrãs do back office —
- *                      Faturas, Pagamentos — precisam dela para prometerem o
- *                      número que o servidor vai mesmo emitir. Sem isto
- *                      dividiam 30/70 à letra: o formulário dizia «sinal
- *                      3.690,00 €» e no livro apareciam duas faturas de
- *                      6.150,00 €. Um número, não o documento — é para isto
- *                      que serve esta forma sem `doc`.
+ *   · `pctSinal`     — a percentagem do sinal desta proposta
+ *                      (`depositPercentOf`). É a que o cliente aceitou, e os
+ *                      ecrãs do back office — o painel de Pagamentos, o dossiê
+ *                      — precisam dela para sugerirem o valor certo. Sem isto
+ *                      dividiam 30/70 à letra: numa proposta de 50%, o atalho
+ *                      oferecia 3.690,00 € onde o combinado eram 6.150,00 €.
+ *                      Um número, não o documento — é para isto que serve esta
+ *                      forma sem `doc`.
  *
  * O campo `doc` é OMITIDO, não truncado: um documento pela metade é a espécie
  * de coisa que passa despercebida até alguém desenhar um PDF a partir dele.

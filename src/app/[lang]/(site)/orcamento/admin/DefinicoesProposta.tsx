@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ParametrosDeslocacao } from "@/lib/orcamento/deslocacao";
-import { custoPorKm, sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
+import { custoPorKm, kmSugerido, sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
 import { lerNumero, type LimitesDoNumero } from "@/lib/numero-escrito";
 import { porqueRecusou } from "@/lib/erro-do-servidor";
 import { Button, Card } from "./ui";
@@ -161,6 +161,66 @@ function Numero({
 }
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O CAMPO DA SEDE — TEXTO, E NÃO UMA LISTA PARA ESCOLHER
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Uma lista de localidades obrigaria a sede a ser uma das que já conhecemos, e
+ * era exactamente essa a queixa: «aquilo está apenas com algumas localidades».
+ * Texto livre aceita qualquer terra do país. O que a tabela de geografia sabe
+ * continua a servir — para SUGERIR quilómetros —, e quando não sabe, o ecrã
+ * di-lo em vez de ficar mudo.
+ *
+ * Não emite o valor quando o campo está vazio, pela mesma razão que o `Numero`:
+ * um campo apagado é uma edição a meio, e deixá-lo seguir era gravar uma sede
+ * em branco (ou, pior, deixar seguir a antiga com um «Guardado» a verde por
+ * cima). A frase fica no campo e é ela que trava o botão.
+ */
+function Texto({
+  label,
+  valor,
+  erro,
+  onChange,
+  onErro,
+  ajuda,
+  placeholder,
+}: {
+  label: string;
+  valor: string;
+  erro?: string;
+  onChange: (v: string) => void;
+  onErro: (porque: string | null) => void;
+  ajuda?: React.ReactNode;
+  placeholder?: string;
+}) {
+  const idErro = useId();
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[10px] tracking-[0.1em] uppercase text-foreground/50">{label}</span>
+      <input
+        type="text"
+        value={valor}
+        placeholder={placeholder}
+        aria-invalid={erro ? true : undefined}
+        aria-describedby={erro ? idErro : undefined}
+        onChange={(e) => {
+          const escrito = e.target.value;
+          onErro(escrito.trim() ? null : "Escreve a terra de onde parte a carrinha (ex.: Évora).");
+          onChange(escrito);
+        }}
+        className={`bo-input w-56 px-2.5 py-2 text-xs${erro ? " border-[#b5654a]" : ""}`}
+      />
+      {erro && (
+        <span id={idErro} className="text-[10px] leading-relaxed text-[#b5654a]">
+          {erro}
+        </span>
+      )}
+      {ajuda && <span className="text-[10px] leading-relaxed text-foreground/40">{ajuda}</span>}
+    </label>
+  );
+}
+
+/**
  * Os limites são os do servidor, campo a campo (ver `deslocacaoSchema` na rota
  * `/api/proposta-definicoes`). Estão aqui repetidos de propósito: o servidor
  * continua a ser quem decide — isto é só o ecrã a dizer a mesma coisa a tempo
@@ -188,6 +248,7 @@ const LIMITES: Record<string, LimitesDoNumero> = {
 /** Que campos pertencem a cada botão de gravar. */
 const CAMPOS_DE = {
   deslocacao: [
+    "base",
     "precoLitro",
     "consumoLPor100Km",
     "portagensPorKm",
@@ -279,7 +340,16 @@ export default function DefinicoesProposta() {
 
   const d = p.deslocacao;
   const custo = custoPorKm(d);
-  // Três destinos reais, para o número deixar de ser abstracto.
+  /**
+   * A tabela de geografia conhece a terra que ela escreveu como sede?
+   *
+   * `kmSugerido(base, base)` é zero quando conhece e `null` quando não — por
+   * isso a comparação é com `null` e não um `if` sobre o número, que trataria
+   * a casa a zero quilómetros de si própria como «não sei onde é».
+   */
+  const sedeConhecida = kmSugerido(d.base, d.base) !== null;
+  // Três destinos reais, para o número deixar de ser abstracto. Medidos a
+  // partir da sede escrita — mudá-la muda estes três antes de se gravar.
   const exemplos = ["Évora", "Palmela", "Porto"]
     .map((sitio) => ({ sitio, s: sugerirDeslocacao(sitio, d) }))
     .filter((x) => x.s !== null);
@@ -297,9 +367,9 @@ export default function DefinicoesProposta() {
           </span>
         </div>
         <p className="mt-1 text-xs leading-relaxed text-foreground/55">
-          A deslocação é uma conta: quilómetros de ida e volta a partir de Évora, vezes o custo de
-          cada quilómetro. O gasóleo muda todas as semanas — este número tem de ser teu, não do
-          programa.
+          A deslocação é uma conta: quilómetros de ida e volta a partir de{" "}
+          {d.base.trim() || "onde a casa está"}, vezes o custo de cada quilómetro. O gasóleo muda
+          todas as semanas — este número tem de ser teu, não do programa.
         </p>
 
         {desactualizado && (
@@ -309,6 +379,30 @@ export default function DefinicoesProposta() {
               : "O preço do gasóleo já tem algumas semanas. Vale a pena confirmá-lo: o desvio já se nota numa viagem ao Porto."}
           </p>
         )}
+
+        {/* ── DE ONDE PARTE A CARRINHA ───────────────────────────────────
+            Primeiro campo do grupo, e não um pormenor no fim: é ele que decide
+            o significado de todos os outros. A franquia são 40 km à volta
+            DAQUI, e os quilómetros de cada proposta contam-se DAQUI. */}
+        <div className="mt-4">
+          <Texto
+            label="Local da sede"
+            valor={d.base}
+            placeholder="Évora"
+            erro={porCorrigir.base}
+            onErro={(porque) => marcar("base", porque)}
+            onChange={(base) => setP({ ...p, deslocacao: { ...d, base } })}
+            ajuda="De onde a carrinha parte. É a partir daqui que se contam os quilómetros de cada proposta — e é à volta daqui que vale a isenção."
+          />
+          {!sedeConhecida && d.base.trim() && (
+            <p className="mt-2 max-w-prose rounded-xl border border-[#c08a3e]/40 bg-[#c08a3e]/[0.06] p-3 text-[11px] leading-relaxed text-[#8a6420]">
+              Fica gravado, mas não conheço essa terra na tabela de distâncias — por isso não
+              consigo sugerir quilómetros sozinho. Em cada proposta escreves tu os quilómetros no
+              painel da deslocação, e a conta faz-se na mesma. Se preferires que sugira, escreve
+              aqui a cidade ou vila mais próxima.
+            </p>
+          )}
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-4">
           <Numero
@@ -357,11 +451,21 @@ export default function DefinicoesProposta() {
             erro={porCorrigir.franquiaKm}
             onErro={(porque) => marcar("franquiaKm", porque)}
             onChange={(franquiaKm) => setP({ ...p, deslocacao: { ...d, franquiaKm } })}
-            ajuda="A isenção do distrito de Évora, que as condições prometem."
+            ajuda={`A isenção à volta de ${d.base.trim() || "casa"}, que as condições prometem.`}
           />
         </div>
 
-        <label className="mt-3 inline-flex items-center gap-2.5 py-1.5 cursor-pointer text-foreground/68">
+        {/* ── 227×30 NUM TELEMÓVEL ──────────────────────────────────────────
+            MEDIDO a 375 px com o auditor de `e2e/ergonomia-tactil.mjs`: o alvo
+            deste interruptor era 227×30 — abaixo dos 44 de altura. O quadrado
+            desenhado continua com 16 px; quem cresce é o RÓTULO à volta, que é
+            o que o HTML manda tocar (é o padrão que a lista de pedidos já
+            usava). `alvo-toque` só age sob `(pointer: coarse)`, portanto no
+            portátil esta linha fica exactamente como estava.
+
+            Não foi apanhado antes porque o passeio do telemóvel nunca visitava
+            as Definições — passou a visitar (ver `e2e/admin-mobile.spec.ts`). */}
+        <label className="alvo-toque !justify-start mt-3 inline-flex items-center gap-2.5 py-1.5 cursor-pointer text-foreground/68">
           <input
             type="checkbox"
             checked={d.idaEVolta}
@@ -381,15 +485,26 @@ export default function DefinicoesProposta() {
               {eur(custo.desgaste)})
             </span>
           </p>
-          <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-foreground/60">
-            {exemplos.map(({ sitio, s }) => (
-              <li key={sitio}>
-                <span className="text-foreground/45">{sitio}:</span>{" "}
-                <strong className="font-semibold text-foreground/85">{eur(s!.valor)}</strong>{" "}
-                <span className="text-foreground/40">({s!.formula})</span>
-              </li>
-            ))}
-          </ul>
+          {exemplos.length > 0 ? (
+            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-foreground/60">
+              {exemplos.map(({ sitio, s }) => (
+                <li key={sitio}>
+                  <span className="text-foreground/45">{sitio}:</span>{" "}
+                  <strong className="font-semibold text-foreground/85">{eur(s!.valor)}</strong>{" "}
+                  <span className="text-foreground/40">({s!.formula})</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            // Sem exemplos, o custo por quilómetro fica a ser um número
+            // abstracto — que era exactamente o que a pré-visualização veio
+            // resolver. Dizer porquê é melhor do que uma lista vazia.
+            <p className="mt-2 text-[11px] leading-relaxed text-foreground/45">
+              Sem uma sede que eu conheça não consigo dar exemplos em euros. O custo por quilómetro
+              acima continua a valer: multiplica-o pelos quilómetros que escreveres em cada
+              proposta.
+            </p>
+          )}
         </div>
 
         <div className="mt-3">

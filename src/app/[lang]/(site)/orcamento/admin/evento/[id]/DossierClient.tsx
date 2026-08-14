@@ -6,7 +6,6 @@ import type { Quote, ActivityEntry } from "@/lib/orcamento/types";
 import {
   deriveStage,
   computeEventMetrics,
-  reconcileFinance,
   nextAction,
   type DossierData,
 } from "@/lib/orcamento/dossier";
@@ -25,9 +24,9 @@ import CommsZone from "./CommsZone";
  * espelha a alteração no estado local (espelho otimista) para o cabeçalho, as
  * métricas e o stepper recalcularem ao vivo.
  *
- * Nenhuma importação de store server-only atravessa esta fronteira: proposta,
- * contrato e faturas chegam já reduzidos a dados serializáveis em `data`; o
- * link do portal chega cunhado em `portalUrl`.
+ * Nenhuma importação de store server-only atravessa esta fronteira: proposta e
+ * contrato chegam já reduzidos a dados serializáveis em `data`; o link do
+ * portal chega cunhado em `portalUrl`.
  */
 interface Props {
   data: DossierData;
@@ -46,13 +45,12 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
     return () => document.body.classList.remove("admin-mode");
   }, []);
 
-  // Estado vivo: a proposta/contrato/faturas não mudam por estas ferramentas
-  // (só a `quote`), por isso reconstruímos o DossierData com a quote atual.
+  // Estado vivo: a proposta/contrato não mudam por estas ferramentas (só a
+  // `quote`), por isso reconstruímos o DossierData com a quote atual.
   const live: DossierData = useMemo(() => ({ ...data, quote }), [data, quote]);
 
   const stage = useMemo(() => deriveStage(live), [live]);
   const metrics = useMemo(() => computeEventMetrics(live), [live]);
-  const reconciliation = useMemo(() => reconcileFinance(live), [live]);
   const next = useMemo(() => nextAction(stage, live), [stage, live]);
 
   // Espelho otimista — as ferramentas já persistiram; aqui só atualizamos o
@@ -195,12 +193,7 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem] gap-6 items-start">
           {/* Coluna principal */}
           <div className="flex flex-col gap-6 min-w-0">
-            <FinanceZone
-              quote={quote}
-              invoices={data.invoices}
-              reconciliation={reconciliation}
-              onQuoteChange={onQuoteChange}
-            />
+            <FinanceZone quote={quote} onQuoteChange={onQuoteChange} />
             <ProductionZone quote={quote} userName={userName} onQuoteChange={onQuoteChange} />
             <CommsZone
               quote={quote}

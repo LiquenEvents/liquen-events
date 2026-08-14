@@ -10,7 +10,7 @@ import type { Quote, Payment, Proposal } from "./types";
 
 /**
  * The contracted value the client actually pays is GROSS (com IVA), while the
- * "Preço final (sem IVA)" field (`quotedPrice`) is NET. Payments and invoices are
+ * "Preço final (sem IVA)" field (`quotedPrice`) is NET. Payments are
  * gross, so "em falta" must compare gross with gross. These tests pin the
  * net/IVA/gross decomposition and the effective-rate derivation.
  *
@@ -125,11 +125,10 @@ describe("computeEventMetrics — additive gross fields", () => {
       quote: makeQuote({ quotedPrice: 5000, priceBreakdown: undefined as never }),
       proposal: null,
       contract: null,
-      invoices: [],
     };
     const m = computeEventMetrics(d, new Date("2026-07-18T09:00:00Z"));
     // `contracted` deixou de ser o `quotedPrice` em bruto (sem IVA): era a única
-    // métrica que continuava a comparar-se com pagamentos/faturas com IVA. Hoje é
+    // métrica que continuava a comparar-se com pagamentos com IVA. Hoje é
     // o valor que o cliente paga — o mesmo que `contractedGross`.
     expect(m.contracted).toBe(6150);
     expect(m.contracted).toBe(m.contractedGross);
@@ -146,13 +145,13 @@ describe("computeEventMetrics — additive gross fields", () => {
  * preço cotado > estimativa), consoante o caminho por onde o negócio passou:
  *
  *   • proposta  → `proposal.total` = 24 600 € (BRUTO, de propósito: é dele que
- *                 saem o sinal de 30% e o PDF da fatura);
+ *                 sai o sinal de 30%);
  *   • preço cotado → `quote.quotedPrice` = 20 000 € (LÍQUIDO — o campo chama-se
  *                 "Preço final (sem IVA)" no ecrã);
  *   • estimativa → `priceBreakdown.total` = 24 600 € (BRUTO).
  *
  * Os três descrevem o MESMO dinheiro, mas o ramo do meio vinha ~23% abaixo. Como
- * o total contratado é comparado com pagamentos e faturas (sempre com IVA), o
+ * o total contratado é comparado com os pagamentos (sempre com IVA), o
  * limiar de "está pago" caía para os 20 000 € líquidos: bastavam 20 000 € para o
  * casamento aparecer concluído com 4 600 € por receber.
  */
@@ -189,7 +188,6 @@ describe("contractedTotal — os três ramos na MESMA unidade (com IVA)", () => 
         quote: { ...base, quotedPrice: LIQUIDO },
         proposal: proposta,
         contract: null,
-        invoices: [],
       };
     }
     if (fonte === "preco_cotado") {
@@ -197,7 +195,6 @@ describe("contractedTotal — os três ramos na MESMA unidade (com IVA)", () => 
         quote: { ...base, quotedPrice: LIQUIDO },
         proposal: null,
         contract: null,
-        invoices: [],
       };
     }
     return {
@@ -208,7 +205,6 @@ describe("contractedTotal — os três ramos na MESMA unidade (com IVA)", () => 
       },
       proposal: null,
       contract: null,
-      invoices: [],
     };
   }
 
@@ -243,20 +239,10 @@ describe("contractedTotal — os três ramos na MESMA unidade (com IVA)", () => 
     expect(deriveStage(d, DEPOIS_DO_EVENTO)).toBe("concluido");
   });
 
-  it("a percentagem paga compara com IVA dos dois lados (nunca 123%)", () => {
-    const d = casamento("preco_cotado");
-    d.invoices = [
-      {
-        id: "i1",
-        number: "FT 2026/0001",
-        kind: "total",
-        amount: BRUTO,
-        status: "paga",
-        issuedAt: "2026-09-01",
-      },
-    ];
+  it("a percentagem recebida compara com IVA dos dois lados (nunca 123%)", () => {
+    const d = casamento("preco_cotado", [pago("pagamento", BRUTO)]);
     const m = computeEventMetrics(d, DEPOIS_DO_EVENTO);
-    expect(m.ledgerPaid).toBe(BRUTO);
+    expect(m.paid).toBe(BRUTO);
     expect(m.pctPaid).toBe(1); // antes: 24 600 / 20 000 = 1,23
   });
 

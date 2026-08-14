@@ -64,16 +64,19 @@ function fmtDate(v?: string | null): string | null {
 
 /** Datas a fixar sob cada marco do stepper, quando existirem. */
 function stageDates(d: DossierData): Partial<Record<EventStage, string>> {
-  const sinalInv = d.invoices.find((i) => i.kind === "sinal" && i.status === "paga");
-  const saldoInv = d.invoices.find(
-    (i) => (i.kind === "saldo" || i.kind === "total") && i.status === "paga",
-  );
+  // As datas do sinal e do saldo vêm das linhas de pagamento — era o livro de
+  // faturas que as dava (a `paidAt` da factura), e ele saiu com a facturação.
+  // A linha de pagamento traz a data do dia em que o dinheiro entrou, que é
+  // precisamente o que estes marcos querem fixar.
+  const pagos = (d.quote.payments ?? []).filter((p) => p.paid);
+  const sinal = pagos.find((p) => p.kind === "sinal");
+  const saldo = pagos.find((p) => p.kind === "saldo");
   return {
     lead: d.quote.submittedAt,
     proposta_enviada: d.proposal?.sentAt,
     aceite: d.contract?.acceptedAt ?? d.proposal?.respondedAt,
-    sinal_pago: sinalInv?.paidAt,
-    concluido: saldoInv?.paidAt ?? d.quote.date,
+    sinal_pago: sinal?.date,
+    concluido: saldo?.date ?? d.quote.date,
   };
 }
 
@@ -133,8 +136,8 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
     switch (kind) {
       case "proposta":
         return "zone-comunicacao";
-      case "fatura_sinal":
-      case "fatura_saldo":
+      case "sinal":
+      case "saldo":
         return "zone-financeiro";
       case "producao":
       case "runsheet":

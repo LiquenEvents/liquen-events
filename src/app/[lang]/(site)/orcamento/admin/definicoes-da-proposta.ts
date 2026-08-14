@@ -40,7 +40,13 @@ function ler(): Promise<DefinicoesDaProposta> {
   promessa ??= fetch("/api/proposta-definicoes")
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => ({
-      deslocacao: j?.deslocacao ?? OMISSAO.deslocacao,
+      // Os valores de partida POR BAIXO do que o servidor mandou, e não em vez
+      // dele: uma resposta a que falte um campo — um servidor ainda por
+      // actualizar no meio de um deploy, uma linha gravada antes de esse campo
+      // existir — deixava o ecrã com um `undefined` no meio de uma frase e a
+      // conta sem saber de onde parte. Com a base por baixo, o que falta cai no
+      // que esse campo sempre significou.
+      deslocacao: { ...OMISSAO.deslocacao, ...(j?.deslocacao ?? {}) },
       margemMinima: typeof j?.margemMinima === "number" ? j.margemMinima : OMISSAO.margemMinima,
     }))
     .catch(() => OMISSAO);

@@ -163,7 +163,7 @@ export async function GET(request: NextRequest) {
     /**
      * A lista de temas é lida em quase todos os ecrãs e muda muito pouco —
      * exactamente o caso em que uma resposta condicional (ETag → 304) vale a
-     * pena, como já acontece em /api/propostas, /api/faturas e nas outras
+     * pena, como já acontece em /api/propostas e nas outras
      * listas do back office.
      *
      * Só que aqui o corpo NÃO se repete: cada capa e cada tira vêm num URL

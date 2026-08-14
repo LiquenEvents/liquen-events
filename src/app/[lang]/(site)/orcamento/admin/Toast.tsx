@@ -60,7 +60,27 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-[80] flex flex-col gap-2 pointer-events-none">
+      {/* ── O AVISO NÃO PODE POUSAR EM CIMA DA NAVEGAÇÃO ──────────────────
+          MEDIDO a 375×667: com `bottom-6` (24 px) a caixa do aviso acabava aos
+          635 px e a barra de baixo do telemóvel começa aos 610 — 25 px de
+          sobreposição, opaco sobre opaco, mesmo por cima dos ícones de «Visão
+          Geral» e «Pedidos» (que ficam nos primeiros ~20 px da barra). E é o
+          pior momento possível para tapar a navegação: o aviso aparece quando
+          alguma coisa falhou, que é quando ela quer sair dali.
+
+          A conta é a mesma que o `<main>` já faz para não esconder a última
+          linha da lista: a altura da barra, mais o entalhe, mais um respiro.
+          Acima de `lg` não há barra nenhuma e volta aos 24 px de sempre.
+
+          ── E A ALTURA VEM DO TOKEN, não de um «56px» escrito aqui ──────────
+          Estava escrito. Era a TERCEIRA cópia do mesmo número (o `<main>` tinha
+          as outras duas), e foi a que sobrou quando a barra cresceu para 72 px
+          ao levantar os rótulos de 8 px para o chão de 12: o aviso passou a
+          acabar aos 603 px com a barra a começar aos 594, ou seja a pousar-lhe
+          em cima — exactamente o defeito que este comentário diz ter corrigido.
+          Quem o apanhou foi o passeio `admin-mobile.spec.ts`, não os olhos.
+          Com `var(--bo-barra-inferior)` deixa de haver número para discordar. */}
+      <div className="fixed bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none lg:bottom-6">
         <div role="alert" aria-live="assertive" className="flex flex-col gap-2">
           {errorToasts.map((t) => (
             <ToastItem key={t.id} toast={t} onClose={() => remove(t.id)} />
@@ -142,9 +162,21 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         style={{ background: DOT[toast.kind] }}
       />
       <p className="flex-1 text-foreground/75 text-sm leading-snug">{toast.message}</p>
+      {/* ── 9×14 PX, E É O BOTÃO QUE FECHA UM AVISO ──────────────────────
+          MEDIDO a 375 px: nove píxeis de largura por catorze de altura. É o
+          alvo mais pequeno de todo o back office, e está no elemento que
+          aparece precisamente quando alguma coisa correu mal — «Não foi
+          possível guardar», «Não foi possível criar a tarefa». Num telemóvel
+          não havia como o fechar: restava esperar que se apagasse sozinho,
+          com o aviso pousado por cima do conteúdo até lá.
+
+          `alvo-toque` dá-lhe 44×44 só sob `(pointer: coarse)`; o `×` desenhado
+          continua do mesmo tamanho, e no portátil o aviso fica igual. O
+          `-mr-1.5` devolve ao aviso a largura que a caixa maior lhe tirava,
+          para o texto não encolher por causa disto. */}
       <button
         onClick={onClose}
-        className="text-foreground/40 hover:text-foreground/70 transition-colors text-sm leading-none shrink-0"
+        className="alvo-toque pointer-coarse:-mr-1.5 text-foreground/40 hover:text-foreground/70 transition-colors text-sm leading-none shrink-0"
         aria-label="Fechar"
       >
         ×

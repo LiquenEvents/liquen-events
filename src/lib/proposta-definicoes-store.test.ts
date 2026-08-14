@@ -52,6 +52,36 @@ describe("ler os parâmetros", () => {
     expect(p.deslocacao.franquiaKm).toBe(PARAMETROS_OMISSAO.franquiaKm);
   });
 
+  /**
+   * ── A SEDE É UMA DEFINIÇÃO COMO AS OUTRAS ───────────────────────────────
+   *
+   * Évora estava escrita à letra no código. Passa a ser o valor com que a
+   * definição nasce — e é isso que faz uma instalação que nunca lhe tocou
+   * continuar a calcular exactamente o que calculava.
+   */
+  it("sem nada gravado, a base é Évora", () => {
+    expect(parametrosDe([]).deslocacao.base).toBe("Évora");
+  });
+
+  it("uma base gravada ganha à de partida", () => {
+    const p = parametrosDe([linha("deslocacao", { base: "Setúbal" }, "2026-05-30T10:00:00Z")]);
+    expect(p.deslocacao.base).toBe("Setúbal");
+  });
+
+  it("uma base que não é texto útil volta a Évora, em vez de ficar vazia", () => {
+    // Uma base em branco não é uma escolha — é um campo por preencher, e com
+    // ela a conta da deslocação deixava de saber de onde parte.
+    for (const lixo of ["", "   ", 42, null, undefined, {}]) {
+      const p = parametrosDe([linha("deslocacao", { base: lixo }, "2026-05-30T10:00:00Z")]);
+      expect(p.deslocacao.base).toBe("Évora");
+    }
+  });
+
+  it("a base gravada com espaços a mais fica limpa", () => {
+    const p = parametrosDe([linha("deslocacao", { base: "  Évora  " }, "2026-05-30T10:00:00Z")]);
+    expect(p.deslocacao.base).toBe("Évora");
+  });
+
   it("o ida-e-volta é um sim/não e respeita-se mesmo quando é 'não'", () => {
     // `false` é um valor legítimo. Um `??` ingénuo trocava-o pelo de partida,
     // que é `true`, e a deslocação passava a cobrar o dobro contra a vontade

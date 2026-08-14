@@ -33,6 +33,8 @@ import {
   regioesDe,
   tomDeEspera,
 } from "@/lib/orcamento/espera";
+import { faltaODesfecho } from "@/lib/orcamento/desfecho";
+import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel, ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcamento/data";
@@ -91,7 +93,6 @@ import {
   FazerProposta,
   ProductionPlan,
   EmailTemplates,
-  Faturas,
   Contratos,
   Inventario,
   Material,
@@ -174,7 +175,7 @@ const DETAIL_TABS: { id: DetailTab; label: string; hint: string; icon: ReactNode
   {
     id: "financeiro",
     label: "Financeiro",
-    hint: "Preço, custos, margem, pagamentos e faturação.",
+    hint: "Preço, custos, margem e pagamentos.",
     icon: (
       <svg
         width="15"
@@ -239,7 +240,7 @@ function detailNextAction(quote: Quote): { label: string; hint: string; tab: Det
     case 2:
       return {
         label: "Registar pagamento",
-        hint: "Sinal, faturação e custos do evento",
+        hint: "Sinal, saldo e custos do evento",
         tab: "financeiro",
       };
     case 3:
@@ -329,6 +330,10 @@ function COLUNAS_DE_PEDIDOS(ctx: {
   toggleSelect: (id: string) => void;
   todayStr: string;
   atual?: string;
+  /** Quem está a marcar — vai para o histórico do pedido. */
+  userName: string;
+  /** O pedido gravado quando alguém marca o desfecho na própria linha. */
+  onDesfecho: (q: Quote) => void;
 }): Coluna<Quote>[] {
   const diasAEsperar = (q: Quote) =>
     Math.floor((Date.now() - new Date(q.submittedAt).getTime()) / 86400000);
@@ -369,7 +374,39 @@ function COLUNAS_DE_PEDIDOS(ctx: {
         </span>
       ),
     },
-    { chave: "estado", cabecalho: "Estado", celula: (q) => statusBadge(q.status) },
+    {
+      /**
+       * ── «JÁ RESPONDERAM?» TAMBÉM NO COMPUTADOR ─────────────────────────
+       *
+       * No telemóvel a lista é uma pilha de cartões e o gesto vive no cartão;
+       * no computador é ESTA tabela. Sem isto, o gesto existia no telemóvel e
+       * desaparecia no portátil onde ela trabalha o dia inteiro.
+       *
+       * Vai por baixo do próprio estado, e NÃO numa coluna nova ao fundo: a
+       * tabela já pede mais largura do que a caixa tem num portátil de 1440 (é
+       * por isso que a caixa rola), e uma coluna nova no fim nascia fora do
+       * ecrã — que é o oposto de «à frente dela no momento em que se lembra».
+       * A pergunta é sobre o estado; fica colada a ele.
+       */
+      chave: "estado",
+      cabecalho: "Estado",
+      celula: (q) => (
+        // Um `div` e não um `span`: o componente traz a sua própria caixa de
+        // bloco, e um `div` dentro de um `span` é HTML inválido — o browser
+        // desfaz o aninhamento e a célula parte-se ao meio.
+        <div className="min-w-[9rem]">
+          {statusBadge(q.status)}
+          {faltaODesfecho(q) && (
+            <PerguntaDeDesfecho
+              key={`desfecho-${q.id}`}
+              quote={q}
+              quem={ctx.userName}
+              onGravado={ctx.onDesfecho}
+            />
+          )}
+        </div>
+      ),
+    },
     {
       chave: "data",
       cabecalho: "Data do evento",
@@ -440,15 +477,21 @@ const QuoteCard = memo(function QuoteCard({
   isCurrent,
   isSelected,
   todayStr,
+  userName,
   onOpen,
   onToggle,
+  onDesfecho,
 }: {
   q: Quote;
   isCurrent: boolean;
   isSelected: boolean;
   todayStr: string;
+  /** Quem está a marcar — vai para o histórico do pedido. */
+  userName: string;
   onOpen: (q: Quote) => void;
   onToggle: (id: string) => void;
+  /** O pedido gravado quando alguém marca aqui o desfecho. */
+  onDesfecho: (q: Quote) => void;
 }) {
   const cat = CATEGORIES.find((c) => c.id === q.category);
   const et =
@@ -464,8 +507,24 @@ const QuoteCard = memo(function QuoteCard({
   const espera = diasDeEspera(q);
   const tom = espera === null ? null : tomDeEspera(espera);
   const ctx = contextoDeLocal(q);
+  /** Este cartão foi marcado agora, aqui. Ver o comentário lá em baixo. */
+  const [marcadoAqui, setMarcadoAqui] = useState(false);
   return (
-    <div className="relative">
+    /* ── A MOLDURA DO CARTÃO É ESTA CAIXA, E NÃO O BOTÃO LÁ DENTRO ──────────
+       Estava no `<button>`: o risco, o fundo branco e a sombra eram dele. Com a
+       pergunta «já responderam?» a ter de ficar FORA desse botão (um botão
+       dentro de outro é HTML inválido), o gesto ficava a flutuar por baixo do
+       cartão, em cima do fundo da página, como se pertencesse ao pedido
+       seguinte. A moldura sobe um nível e passa a abraçar os dois. */
+    <div
+      className={`relative rounded-xl border transition-all duration-200 motion-reduce:transition-none ${
+        isCurrent
+          ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
+          : isSelected
+            ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
+            : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
+      }`}
+    >
       {/* O `<input>` mede 16 px, mas quem se toca é o RÓTULO — o HTML manda o
           toque no rótulo activar o controlo. 24 px chegavam para o rato e não
           para o dedo; `alvo-toque` leva-o a 44 px no telemóvel sem mexer no
@@ -485,19 +544,32 @@ const QuoteCard = memo(function QuoteCard({
       <button
         type="button"
         onClick={() => onOpen(q)}
-        className={`w-full text-left p-5 pl-12 rounded-xl border transition-all duration-200 ${
-          isCurrent
-            ? "border-[#4d6350]/45 bg-[#4d6350]/[0.05] shadow-sm"
-            : isSelected
-              ? "border-[#4d6350]/30 bg-[#4d6350]/[0.03]"
-              : "border-foreground/[0.08] hover:border-foreground/[0.18] bg-white shadow-sm hover:shadow-md"
-        }`}
+        className="w-full text-left p-5 pl-12 rounded-xl"
       >
+        {/* ── A HIERARQUIA, E PORQUE É QUE ELA NÃO EXISTIA ─────────────────
+            Palavras dela: «o nome do casal tem o mesmo peso visual que o email,
+            que a categoria e que a referência». Medido, era mesmo: 14 / 12 / 10
+            / 9 px, todos no mesmo cinzento a rondar `/70`. Quatro degraus tão
+            juntos que o olho não os separa — e numa lista o que se faz é
+            VARRER, não ler.
+
+            A ordem que o cartão passa a dizer, e que é a ordem por que se usa:
+            o NOME (o que se procura) · o ESTADO e a ESPERA (o que decide) · o
+            contexto (confirma) · a REFERÊNCIA (um detalhe, e só serve depois de
+            já se saber qual é). Tamanho, peso e tom, os três a dizer o mesmo —
+            um só não chega. */}
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="min-w-0">
-            <p className="text-foreground/75 text-sm font-semibold truncate">{q.name}</p>
+            {/* Um tamanho só, sem variante `lg:`: este cartão NÃO EXISTE no
+                computador. O `TabelaOuCartoes` troca-o pela tabela a partir de
+                1024, portanto um `lg:` aqui seria uma regra que nunca chega a
+                aplicar-se — e a pior espécie de código morto é a que parece
+                cuidada. */}
+            <p className="text-[17px] font-semibold text-[var(--bo-text)] leading-snug truncate">
+              {q.name}
+            </p>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <p className="text-foreground/70 text-xs truncate">{q.email}</p>
+              <p className="text-[13px] bo-text-muted truncate">{q.email}</p>
               {q.assignedTo && (
                 <span className="shrink-0 text-[9px] tracking-[0.08em] uppercase px-1.5 py-0.5 rounded bg-[#4d6350]/10 text-[#4d6350] font-medium whitespace-nowrap">
                   {q.assignedTo}
@@ -563,22 +635,32 @@ const QuoteCard = memo(function QuoteCard({
             CORTADO, porque o `body` tem `overflow-x: clip` e não há como lá
             chegar. `gap-y-1` e não `gap-3` na vertical: a segunda linha é a
             continuação da mesma frase, não outro bloco. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-foreground/70 text-[10px]">
+        {/* NO TELEMÓVEL SEPARA O ESPAÇO, NÃO O RISCO.
+            Os riscos são elementos próprios entre cada facto, e numa fila que
+            QUEBRA (é o que esta faz num telemóvel) um deles fica a fechar a
+            linha: lia-se «Eventos Particulares | Casamentos |» com um risco
+            pendurado no fim, que parece um erro. Não há CSS que esconda só o
+            último de cada linha — a linha é decidida na disposição, não na
+            folha de estilo.
+            Por isso os riscos vivem a partir de `sm`, onde a fila NÃO quebra, e
+            no telemóvel separa-se com mais ar (`gap-x-4`), que é o que os
+            cartões bem desenhados fazem. */}
+        <div className="flex flex-wrap items-center gap-x-4 sm:gap-x-3 gap-y-1 bo-text-muted text-[10px]">
           <span>{cat?.label ?? "—"}</span>
           {et && (
             <>
-              <span className="w-px h-2.5 bg-foreground/12" />
+              <span className="hidden sm:block w-px h-2.5 bg-foreground/12" />
               <span>{et.label}</span>
             </>
           )}
-          <span className="w-px h-2.5 bg-foreground/12" />
+          <span className="hidden sm:block w-px h-2.5 bg-foreground/12" />
           <span>{q.guests} convidados</span>
           {/* ONDE É. A região reconhecida e a distância a Évora dizem, antes
               de abrir seja o que for, se aquele casamento é ali ao lado ou se
               obriga a dormir fora — que muda o preço e a equipa. */}
           {ctx.regiao && (
             <>
-              <span className="w-px h-2.5 bg-foreground/12" />
+              <span className="hidden sm:block w-px h-2.5 bg-foreground/12" />
               <span title={ctx.aproximado ? "Região, não morada" : undefined}>
                 {ctx.regiao}
                 {ctx.km !== null && ctx.km > 0 && ` · ≈ ${ctx.km} km`}
@@ -590,12 +672,17 @@ const QuoteCard = memo(function QuoteCard({
             if (!cd || cd.tone === "past") return null;
             return (
               <>
-                <span className="w-px h-2.5 bg-foreground/12" />
+                <span className="hidden sm:block w-px h-2.5 bg-foreground/12" />
+                {/* QUANDO É O EVENTO — «a data é o que decide». Era um de
+                    cinco factos todos iguais nesta fila; passa a ter peso
+                    sempre, e não só quando já está em cima. O vermelho continua
+                    reservado ao que urge: o peso diz «isto conta», a cor diz
+                    «isto conta AGORA», e as duas coisas não são a mesma. */}
                 <span
                   className={
                     cd.tone === "today" || cd.tone === "soon"
-                      ? "text-[#b5654a] font-medium"
-                      : "text-foreground/70"
+                      ? "text-[#b5654a] font-semibold"
+                      : "text-[var(--bo-text)] font-medium"
                   }
                 >
                   {cd.label}
@@ -635,20 +722,26 @@ const QuoteCard = memo(function QuoteCard({
           </div>
         )}
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-foreground/[0.07]">
-          <span className="text-foreground/40 text-[9px] font-mono tracking-tight" title={q.id}>
+          {/* A REFERÊNCIA É O FUNDO DA PILHA. `--bo-text-faint` é o degrau que
+              o `globals.css` descreve como «decorativo, nunca o único portador
+              de informação» — e é exactamente esse o papel dela: qualifica um
+              pedido que o nome, três linhas acima, já identificou. Sobe a 12 px
+              (estava a 9) porque quando SE PRECISA dela é para a ler letra a
+              letra ao telefone; o que a tira da frente é o tom, não o tamanho. */}
+          <span className="bo-text-faint text-[12px] font-mono tracking-tight" title={q.id}>
             Ref. {shortRef(q.id)}
           </span>
           <div className="flex items-center gap-3">
             {q.quotedPrice ? (
-              <span className="text-[#4d6350] text-xs font-semibold">
+              <span className="text-[#4d6350] text-[13px] font-semibold">
                 {formatPrice(q.quotedPrice)}
               </span>
             ) : q.priceBreakdown?.total ? (
-              <span className="text-foreground/70 text-xs">
+              <span className="bo-text-muted text-[13px]">
                 ≈ {formatPrice(q.priceBreakdown.rangeMin)}–{formatPrice(q.priceBreakdown.rangeMax)}
               </span>
             ) : null}
-            <span className="text-foreground/70 text-[10px]">
+            <span className="bo-text-faint text-[12px]">
               {new Date(q.submittedAt).toLocaleDateString("pt-PT", {
                 day: "numeric",
                 month: "short",
@@ -657,6 +750,33 @@ const QuoteCard = memo(function QuoteCard({
           </div>
         </div>
       </button>
+      {/* ── «JÁ RESPONDERAM?» ───────────────────────────────────────────────
+          FORA do botão do cartão, e é obrigatório que assim seja: um <button>
+          dentro de outro <button> é HTML inválido, o browser desfaz o aninhamento
+          e o que sai é um cartão partido em pedaços com o gesto a abrir o pedido
+          em vez de o marcar.
+
+          A moldura só existe quando há pergunta a fazer: um `div` com margem
+          desenhado à mesma em todos os cartões punha 16 px de vazio por baixo
+          de cada pedido novo da lista.
+
+          O `|| marcadoAqui` é o que impede a moldura de desaparecer NO INSTANTE
+          da marcação: assim que o servidor responde, o pedido deixa de ter
+          proposta enviada e a condição de cima passa a falsa. Sem a segunda
+          metade, o recibo («Marcado como perdido») e o campo do motivo — que é
+          opcional e vem DEPOIS — nasciam e morriam no mesmo render. */}
+      {(faltaODesfecho(q) || marcadoAqui) && (
+        <div className="px-5 pb-4 -mt-2">
+          <PerguntaDeDesfecho
+            quote={q}
+            quem={userName}
+            onGravado={(actualizado) => {
+              setMarcadoAqui(true);
+              onDesfecho(actualizado);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 });
@@ -767,6 +887,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [mineOnly, setMineOnly] = useState(false);
   const [search, setSearch] = useState("");
   /**
+   * O painel dos filtros está aberto? SÓ IMPORTA NO TELEMÓVEL.
+   *
+   * Medido a 390×844: os controlos comiam 52% do ecrã antes de aparecer um
+   * pedido. A partir de `lg` o painel é sempre visível por CSS e este estado
+   * não pinta nada — não há dois layouts, há um que recolhe.
+   *
+   * Começa fechado de propósito: a lista é o que se veio ver.
+   */
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  /**
    * A ordem por omissão é a ESPERA, não a data de entrada.
    *
    * "Mais recentes" põe à cabeça o que acabou de chegar — que é o que menos
@@ -776,7 +906,49 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [sort, setSort] = useState<
     "espera" | "recent" | "old" | "value" | "followup" | "eventdate"
   >("espera");
+  /**
+   * QUANTOS FILTROS ESTÃO A ESCONDER PEDIDOS NESTE MOMENTO.
+   *
+   * É o que o botão «Filtros» mostra ao lado do nome, e é o que torna honesto
+   * recolher os controlos: um filtro escondido E calado faz uma lista filtrada
+   * parecer uma lista vazia — e é assim que se perde um pedido e se responde
+   * tarde a um casamento.
+   *
+   * O que NÃO entra na conta, e porquê:
+   *   · a ORDENAÇÃO — muda a ordem, não tira nada da lista. Contá-la seria um
+   *     alarme falso, e um alarme falso gasta-se depressa (a mesma razão por
+   *     que o aviso laranja do orçamento se cala quando não há preços).
+   *   · o ESTADO, as ETIQUETAS e os ARQUIVADOS — continuam à vista em pastilhas
+   *     próprias, portanto já se vê que estão ligados. Contá-los era dizer duas
+   *     vezes a mesma coisa.
+   */
+  /**
+   * Está alguma coisa a esconder pedidos? (filtros + procura + estado + etiqueta)
+   *
+   * Serve o ecrã de lista vazia, que tem de saber distinguir «ainda não entrou
+   * nada» de «isto está filtrado». São perguntas diferentes: `filtrosActivos`
+   * conta só o que está DENTRO do painel recolhido, porque é isso que o botão
+   * anuncia; esta inclui também o que está à vista, porque para a lista vazia
+   * o que importa é se há ALGUMA razão para faltarem pedidos.
+   */
+  const filtrosActivos =
+    (mineOnly ? 1 : 0) +
+    (filterCategory !== "all" ? 1 : 0) +
+    (filterEspera !== "all" ? 1 : 0) +
+    (filterMes !== "all" ? 1 : 0) +
+    (filterRegiao !== "all" ? 1 : 0) +
+    (filterPlanner !== "all" ? 1 : 0);
+  const haFiltroAActuar =
+    filtrosActivos > 0 || search.trim() !== "" || filterStatus !== "all" || tagFilter !== null;
   const [saving, setSaving] = useState(false);
+  /**
+   * O id do pedido cujo desfecho acabou de ser marcado NO PAINEL.
+   *
+   * É um id e não um booleano: trocar de pedido tem de voltar a mostrar a
+   * pergunta, e um `true` esquecido deixava o recibo do casamento anterior em
+   * cima do pedido seguinte.
+   */
+  const [marcadoNoPainel, setMarcadoNoPainel] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editStatus, setEditStatus] = useState<QuoteStatus>("pendente");
@@ -1054,6 +1226,59 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   }, []);
 
   /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O PEDIDO QUE VOLTOU DE UMA MARCAÇÃO DE DESFECHO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Parece o {@link absorverDoServidor} e não é — e a diferença tem duas
+   * razões, uma de conteúdo e outra de forma.
+   *
+   * ── Conteúdo: aqui a marcação GANHA ────────────────────────────────────
+   * O `absorverDoServidor` é conservador de propósito: só acerta os campos que
+   * ela NÃO tocou, para uma gravação alheia não lhe apagar trabalho. Uma
+   * marcação de desfecho não é alheia — é ela, agora, a confirmar um estado e
+   * um valor que acabou de ler no ecrã. Esses dois campos passam a ser o que
+   * o servidor gravou, ponto.
+   *
+   * ── Forma: nada de `ref` ───────────────────────────────────────────────
+   * O `absorverDoServidor` lê o `selectedRef` para saber como o pedido estava
+   * antes. Passá-lo à fábrica das colunas — que é CHAMADA durante o desenho —
+   * fazia a regra `react-hooks` acusar leitura de `ref` no desenho. A regra
+   * tem razão na forma (ninguém garante que a fábrica não chama o que recebe),
+   * e a saída certa não é calá-la: é este caminho, que lê o `selected` do
+   * estado e não de um `ref`.
+   *
+   * Só mexe no formulário quando o pedido marcado é o que está ABERTO. Sem
+   * essa guarda, marcar o casamento da Ana na tabela escrevia o estado dela
+   * por cima do formulário do casamento do Rui, aberto ao lado.
+   */
+  const marcarDesfecho = useCallback(
+    (actualizado: Quote) => {
+      setQuotes((prev) => prev.map((q) => (q.id === actualizado.id ? actualizado : q)));
+      if (selected?.id !== actualizado.id) return;
+      setSelected(actualizado);
+      setEditStatus(actualizado.status);
+      setEditPrice(textoDoPreco(actualizado));
+      setEditLostReason(actualizado.lostReason ?? "");
+      /**
+       * ── O QUE AQUI NÃO SE FAZ, E PORQUÊ ──────────────────────────────────
+       * Não se mexe na linha de base da gravação automática
+       * (`escritoNoServidor`). Seria uma escrita num `ref` dentro do que a
+       * fábrica das colunas recebe, e é exactamente isso que faz a regra
+       * `react-hooks` acusar leitura de `ref` no desenho — o preço de a
+       * calar seria pior do que o defeito.
+       *
+       * O que se perde: quando o gesto grava um motivo de perda com o pedido
+       * ABERTO, a base fica um passo atrás e a gravação automática reenvia o
+       * MESMO motivo uma vez. É um PATCH repetido e idempotente, não uma
+       * perda: o `isDirty` não se acende (o campo e o pedido dizem o mesmo) e
+       * nada é apagado. Trocar isso pela regra desligada não valia a pena.
+       */
+    },
+    [selected?.id],
+  );
+
+  /**
    * Manda ao servidor SÓ o que foi tocado. Uma tentativa — a repetição é do
    * hook.
    */
@@ -1180,7 +1405,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   }, []);
 
   // Warm the caches of the high-traffic API views during idle after first
-  // paint, so the first click on Propostas / Faturas / Tarefas / Calendário is
+  // paint, so the first click on Propostas / Tarefas / Calendário is
   // instant instead of a cold round-trip. Uses the same shared cache the views
   // read from (useCachedList), so a warmed view renders immediately with no
   // skeleton. Cheap + non-blocking; skipped if already cached/in-flight.
@@ -1197,7 +1422,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       // números errados durante uma pintura. Quando passarem a `?semDoc=1`,
       // passam também a esta chave e voltam a aproveitar o aquecimento.
       prefetchList("propostas-leves", "/api/propostas?semDoc=1");
-      prefetchList("faturas", "/api/faturas");
       prefetchList("tarefas", "/api/tarefas");
       prefetchList("calendario", "/api/calendario");
     });
@@ -2467,7 +2691,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     material: "Material",
     temas: "Temas",
     estatisticas: "Estatísticas",
-    faturas: "Faturas",
     contratos: "Propostas Aceites",
     "modelos-email": "Modelos de email",
   };
@@ -2512,7 +2735,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     material: "O que vai nas carrinhas: ferramentas, consumíveis, escadotes",
     temas: "Fotos de inspiração por tema, prontas para as propostas",
     estatisticas: "Métricas e desempenho",
-    faturas: "Livro de faturação e pagamentos",
     contratos: "Aceitações de condições e estado de cada contrato",
     "modelos-email": "Emails reutilizáveis da equipa",
   };
@@ -2893,7 +3115,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <button
                   key={id}
                   onClick={() => setView(id)}
-                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
+                  className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] transition-colors ${
                     isActive ? "text-[var(--bo-accent)]" : "text-[var(--bo-text-faint)]"
                   }`}
                 >
@@ -2908,8 +3130,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   {/* `text-center` e `leading-tight`: com cinco células cada
                       uma fica com 75 px, e "Fazer proposta" precisa de partir
                       em duas linhas em vez de ser cortado a meio. 75 px continua
-                      bem acima dos 44 do alvo mínimo. */}
-                  <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center">
+                      bem acima dos 44 do alvo mínimo.
+
+                      DUAS LINHAS RESERVADAS EM TODAS AS CÉLULAS (`min-h-[2.2em]`),
+                      e não só na que parte. Sem isso, a célula mais alta empurra
+                      o seu ícone para cima e os cinco ícones da barra deixam de
+                      estar à mesma altura — lê-se como um desalinhamento, que é
+                      exactamente a queixa que trouxe este trabalho. Reservar o
+                      espaço em todas custa uns píxeis e devolve a linha direita. */}
+                  <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center min-h-[2.2em] flex items-start justify-center">
                     {navItem.label}
                   </span>
                 </button>
@@ -2920,7 +3149,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             <button
               onClick={() => setNavOpen(true)}
               aria-label="Mais destinos"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 min-h-[56px] transition-colors ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 px-1 min-h-[var(--bo-barra-inferior)] transition-colors ${
                 !BARRA_INFERIOR.includes(view)
                   ? "text-[var(--bo-accent)]"
                   : "text-[var(--bo-text-faint)]"
@@ -2938,7 +3167,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
                 <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
               </svg>
-              <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center">
+              {/* A mesma reserva de duas linhas das outras cinco células: esta
+                  é a sexta da mesma barra e tem de alinhar com elas. */}
+              <span className="text-[8px] tracking-wide uppercase font-medium leading-tight text-center min-h-[2.2em] flex items-start justify-center">
                 Mais
               </span>
             </button>
@@ -2946,9 +3177,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         </nav>
 
         {/* ── Main ── */}
-        {/* Bottom padding clears the real mobile nav height (56px + the notch
-            safe-area inset) so the last row never hides under the tab bar. */}
-        <div className="flex-1 min-w-0 flex flex-col pb-[calc(56px+env(safe-area-inset-bottom))] lg:pb-0">
+        {/* Bottom padding clears the real mobile nav height + the notch
+            safe-area inset, so the last row never hides under the tab bar.
+            A altura vem do token `--bo-barra-inferior` e não de um número
+            copiado: eram dois «56px» em ficheiros diferentes, e discordaram
+            assim que os rótulos da barra subiram ao chão de 12 px (a barra
+            passou a 71, o conteúdo continuou a guardar 56). Ver
+            `barra-inferior.test.tsx`. */}
+        <div className="flex-1 min-w-0 flex flex-col pb-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] lg:pb-0">
           {/* Top bar */}
           {/* A ESCADA DE PLANOS do back office, escrita uma vez para não voltar
               a colidir:
@@ -3175,6 +3411,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 onGoStats={() => setView("estatisticas")}
                 onGo={(v) => setView(v)}
                 onNew={() => setNewQuoteOpen(true)}
+                // Marcar «Ganho» na lista «à espera de resposta» da Visão Geral
+                // grava no servidor; sem isto, a lista continuava a mostrar o
+                // pedido pendurado e o ecrã ficava a dizer o contrário.
+                onQuoteAtualizado={marcarDesfecho}
               />
             </div>
           )}
@@ -3313,13 +3553,6 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             </div>
           )}
 
-          {/* ── Faturas ── */}
-          {view === "faturas" && (
-            <div className={`${VIEW_WRAP} view-in`}>
-              <Faturas quotes={quotes} />
-            </div>
-          )}
-
           {/* ── Contratos ── */}
           {view === "contratos" && (
             <div className={`${VIEW_WRAP} view-in`}>
@@ -3336,31 +3569,94 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
           {/* ── Pedidos ── */}
           <div className={`${VIEW_WRAP} ${view === "pedidos" ? "view-in" : "hidden"}`}>
-            {/* Controls */}
-            <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
-              <div className="relative flex-1 max-w-md">
-                <svg
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground/28"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
+            {/* ── OS CONTROLOS, E O ECRÃ QUE ELES COMIAM ───────────────────
+                Medido a 390×844: o primeiro cartão de pedido começava a 436 px.
+                Metade do telemóvel gasta em controlos antes de se ver aquilo a
+                que se veio — quatro filtros de larguras diferentes em três filas
+                irregulares.
+
+                A procura fica à vista, porque essa usa-se em todas as sessões.
+                O resto recolhe atrás de um botão que diz QUANTOS estão activos.
+                A partir de `lg` o painel é sempre visível e o botão desaparece:
+                no computador há largura para tudo numa fila, e era assim que já
+                estava. */}
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4 lg:mb-6">
+              <div className="flex items-center gap-2 lg:flex-1 lg:max-w-md">
+                <div className="relative flex-1">
+                  <svg
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-foreground/28"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+                  </svg>
+                  <input
+                    ref={searchRef}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    aria-label="Procurar pedidos por nome, email, local ou ID"
+                    /* ── O QUE ESTE CAMPO DIZIA, E O QUE CABIA ─────────────
+                       Era «Procurar por nome, email, local, ID…  ( / )», e a
+                       390 px aparecia cortado a meio, a acabar em «( /» — uma
+                       dica de atalho de TECLADO, num aparelho onde não há tecla
+                       nenhuma para carregar. Um rótulo cortado não ensina nada;
+                       ensina que a página está partida.
+                       A dica passa para um `kbd` que só existe onde há teclado,
+                       e o texto encolhe até caber ao lado do «Filtros». O que
+                       se pode procurar continua dito por inteiro no
+                       `aria-label`, que é quem serve o leitor de ecrã. */
+                    placeholder="Procurar pedidos…"
+                    className="w-full bg-white border border-foreground/[0.09] rounded-xl pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-foreground/25 shadow-sm transition-colors"
+                  />
+                  <kbd className="pointer-coarse:hidden absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-[var(--bo-hairline-strong)] px-1.5 py-0.5 text-[10px] text-[var(--bo-text-faint)] lg:block">
+                    /
+                  </kbd>
+                </div>
+                {/* O ABRIDOR. `lg:hidden` porque no computador o painel está
+                    sempre aberto e um botão que não faz nada é ruído. */}
+                <button
+                  type="button"
+                  onClick={() => setFiltrosAbertos((v) => !v)}
+                  aria-expanded={filtrosAbertos}
+                  aria-controls="painel-filtros-pedidos"
+                  className={`alvo-toque lg:hidden shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl border text-[13px] font-medium shadow-sm transition-colors ${
+                    filtrosActivos > 0
+                      ? "bg-[#4d6350] border-[#4d6350] text-white"
+                      : "bg-white border-foreground/[0.09] text-foreground/60"
+                  }`}
                 >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-                </svg>
-                <input
-                  ref={searchRef}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  aria-label="Procurar pedidos por nome, email, local ou ID"
-                  placeholder="Procurar por nome, email, local, ID…  ( / )"
-                  className="w-full bg-white border border-foreground/[0.09] rounded-xl pl-10 pr-3 py-2.5 text-sm text-foreground/70 placeholder-foreground/22 focus:outline-none focus:border-foreground/25 shadow-sm transition-colors"
-                />
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M3 5h18M6 12h12M10 19h4" />
+                  </svg>
+                  Filtros
+                  {filtrosActivos > 0 && (
+                    <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-white/25 px-1 text-[12px] font-semibold">
+                      {filtrosActivos}
+                    </span>
+                  )}
+                </button>
               </div>
-              <div className="flex gap-2 flex-wrap">
+              <div
+                id="painel-filtros-pedidos"
+                role="group"
+                aria-label="Filtros dos pedidos"
+                /* `hidden` a sério, e não `opacity-0`: fechado, também não se
+                   percorre com o teclado nem com o leitor de ecrã. */
+                className={`${filtrosAbertos ? "grid" : "hidden"} grid-cols-2 gap-2 lg:flex lg:flex-wrap`}
+              >
                 <button
                   onClick={() => setMineOnly((v) => !v)}
                   title={`Mostrar apenas pedidos atribuídos a ${userName}`}
@@ -3456,7 +3752,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   value={sort}
                   onChange={(e) => setSort(e.target.value as typeof sort)}
                   aria-label="Ordenar pedidos"
-                  className="flex-1 lg:flex-none bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
+                  /* `col-span-2` no telemóvel: «Quem espera há mais tempo» não
+                     cabe em meia largura, e um selector com o rótulo cortado
+                     não diz por que ordem a lista está. */
+                  className="col-span-2 flex-1 lg:flex-none bg-white border border-foreground/[0.09] rounded-xl px-3 py-2.5 text-xs text-foreground/70 focus:outline-none focus:border-foreground/25 shadow-sm"
                 >
                   <option value="espera">Quem espera há mais tempo</option>
                   <option value="recent">Mais recentes</option>
@@ -3499,13 +3798,26 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               </div>
             </div>
 
-            {/* Status filter */}
-            <div className="flex flex-wrap gap-1.5 mb-8">
+            {/* ── AS PASTILHAS DE ESTADO ───────────────────────────────────
+                Estas NÃO recolhem com as outras, e a diferença é de uso: são a
+                triagem («o que é novo? o que está à espera de resposta?»), não
+                um filtro de ocasião. Recolhê-las era esconder o gesto mais
+                repetido do ecrã.
+
+                O que muda é a forma: eram seis pastilhas a quebrar em duas
+                linhas (mais de 70 px), passam a UMA fila que se arrasta com o
+                polegar. Um contentor com scroll próprio é, aliás, a única
+                maneira de sair da margem que a auditoria de toque aceita — ver
+                `temScrollProprio` em `ergonomia-tactil.mjs`.
+
+                `py-1` não é enfeite: `overflow-x` recorta também na vertical, e
+                sem essa folga o anel de foco das pastilhas ficava cortado. */}
+            <div className="flex flex-nowrap lg:flex-wrap overflow-x-auto lg:overflow-visible gap-1.5 py-1 mb-5 lg:mb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {!showArchived && (
                 <>
                   <button
                     onClick={() => setFilterStatus("all")}
-                    className={`alvo-toque px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                    className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === "all" ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                   >
                     Todos · {statusCounts.activeTotal}
                   </button>
@@ -3515,7 +3827,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <button
                         key={s.id}
                         onClick={() => setFilterStatus(s.id)}
-                        className={`alvo-toque px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
+                        className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${filterStatus === s.id ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"}`}
                       >
                         {s.label} · {count}
                       </button>
@@ -3529,7 +3841,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     setShowArchived((v) => !v);
                     setFilterStatus("all");
                   }}
-                  className={`alvo-toque px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
+                  className={`alvo-toque shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-lg text-[10px] tracking-[0.1em] uppercase font-medium transition-all duration-150 ${showArchived ? "bg-[#1b2119] text-white shadow-sm" : "bg-foreground/[0.04] text-foreground/30 hover:bg-foreground/[0.07]"}`}
                 >
                   Arquivados · {archivedCount}
                 </button>
@@ -3679,18 +3991,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           <path d="M9 12h6M9 16h4" strokeLinecap="round" />
                         </svg>
                       }
-                      title={
-                        search.trim() || filterStatus !== "all"
-                          ? "Nenhum pedido corresponde"
-                          : "Sem pedidos ainda"
-                      }
+                      /* ── «VAZIA» E «FILTRADA» NÃO SÃO A MESMA COISA ───────
+                         A condição olhava só para a procura e para o estado, e
+                         ignorava os seis filtros do painel — que são
+                         precisamente os que passaram a estar RECOLHIDOS no
+                         telemóvel. O resultado era o pior ecrã possível: uma
+                         lista filtrada a dizer «Sem pedidos ainda», com os
+                         filtros fora de vista. Ela conclui que não entrou nada,
+                         fecha o telemóvel, e o pedido fica sem resposta.
+                         `filtrosActivos` é a mesma conta que o botão mostra —
+                         uma fonte, dois sítios. */
+                      title={haFiltroAActuar ? "Nenhum pedido corresponde" : "Sem pedidos ainda"}
                       hint={
-                        search.trim() || filterStatus !== "all"
-                          ? "Limpa a pesquisa ou o filtro para ver todos os pedidos."
+                        haFiltroAActuar
+                          ? "Limpa a pesquisa ou os filtros para ver todos os pedidos."
                           : "Os pedidos de orçamento do site aparecem aqui. Podes também criar um manualmente."
                       }
                       action={
-                        search.trim() || filterStatus !== "all"
+                        haFiltroAActuar
                           ? undefined
                           : { label: "+ Novo pedido", onClick: () => setNewQuoteOpen(true) }
                       }
@@ -3712,8 +4030,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         isCurrent={selected?.id === q.id}
                         isSelected={selectedIds.has(q.id)}
                         todayStr={todayStr}
+                        userName={userName}
                         onOpen={openQuoteStable}
                         onToggle={toggleSelect}
+                        onDesfecho={marcarDesfecho}
                       />
                     )}
                     aoAbrir={openQuoteStable}
@@ -3722,6 +4042,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       toggleSelect,
                       todayStr,
                       atual: selected?.id,
+                      userName,
+                      onDesfecho: marcarDesfecho,
                     })}
                   />
                 )}
@@ -3802,7 +4124,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                           </div>
                           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                             {/* Full-screen cockpit for this event — the one place that
-                              unifies proposta/contrato/faturas/produção. Primary. */}
+                              unifies proposta/contrato/pagamentos/produção. Primary. */}
                             <Link
                               href={`/${lang}/orcamento/admin/evento/${selected.id}`}
                               className="alvo-toque h-9 gap-2 rounded-xl bg-[#4d6350]/10 px-3.5 text-xs font-medium tracking-[0.02em] text-[#4d6350] motion-safe:transition-colors hover:bg-[#4d6350]/[0.16] inline-flex items-center"
@@ -4037,6 +4359,32 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-5 py-6 sm:px-7 sm:py-8">
                         {/* Ciclo de vida — em que fase está o pedido, num relance. */}
                         <LifecycleStepper quote={selected} />
+
+                        {/* ── «JÁ RESPONDERAM?», TAMBÉM AQUI ─────────────────
+                          O mesmo gesto do cartão da lista, no sítio onde ela
+                          está quando abre um pedido para lhe telefonar. Está em
+                          cima, antes de tudo o resto, porque é a única coisa que
+                          falta para os números serem verdade — e não em baixo,
+                          escondido no selector de estado do formulário de gestão
+                          (que continua a existir, e é por onde se CORRIGE um
+                          desfecho já marcado).
+
+                          `marcadoNoPainel` faz aqui o que o `marcadoAqui` faz no
+                          cartão: segura a moldura no instante em que o pedido
+                          deixa de ter proposta enviada, para o recibo e o campo
+                          opcional do motivo não desaparecerem ao nascer. */}
+                        {(faltaODesfecho(selected) || marcadoNoPainel === selected.id) && (
+                          <PerguntaDeDesfecho
+                            key={`desfecho-${selected.id}`}
+                            quote={selected}
+                            quem={userName}
+                            variante="painel"
+                            onGravado={(actualizado) => {
+                              setMarcadoNoPainel(actualizado.id);
+                              marcarDesfecho(actualizado);
+                            }}
+                          />
+                        )}
 
                         {/* Próxima ação — o único passo seguinte, em destaque. Abre a
                           ferramenta certa dentro da área avançada. */}
@@ -4737,9 +5085,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               {/* Plano &amp; dia do evento — occasional tools, collapsed so
                                   the tab opens short. Native <details> keeps every child
                                   mounted (hidden via CSS), so fetch/PATCH lifecycles are
-                                  untouched. */}
+                                  untouched.
+
+                                  O `alvo-toque` do interruptor não é cosmético:
+                                  MEDIDO a 375 px, este `<summary>` tinha 334×16
+                                  e é a única porta para o plano de decoração, o
+                                  cronograma e a lista de convidados. Um
+                                  `<summary>` não é `<button>` nem tem `role`,
+                                  por isso nenhuma auditoria de alvos o via —
+                                  agora vê (ver `e2e/ergonomia-tactil.mjs`). Só
+                                  cresce sob `(pointer: coarse)`; no portátil
+                                  fica como estava. */}
                               <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
                                   <svg
                                     className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
                                     width="14"
@@ -4815,15 +5173,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             >
                               {/* Cobrança — payments first (the key action), costs
                                   below. Eyebrow mirrors the other two panels. */}
-                              <p className="bo-eyebrow text-foreground/45">
-                                Pagamentos e faturação
-                              </p>
+                              <p className="bo-eyebrow text-foreground/45">Pagamentos</p>
 
-                              {/* Payments & invoicing */}
                               <PaymentsPanel
                                 key={`pay-${selected.id}`}
                                 quote={selected}
-                                showLedger
                                 onChange={(payments) => {
                                   setQuotes((prev) =>
                                     prev.map((q) =>
@@ -5017,7 +5371,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                               {/* Activity history — de-emphasised, collapsed by default. */}
                               <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
                                   <svg
                                     className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
                                     width="14"

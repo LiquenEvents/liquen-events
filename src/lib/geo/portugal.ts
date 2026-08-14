@@ -32,6 +32,14 @@
  * lidar com isso mostrando menos, nunca inventando. "Portugal" escrito no
  * campo do local é exatamente esse caso: não é uma morada, é a ausência de
  * uma — e é também o sinal de que o casamento pode ser à distância.
+ *
+ * ── A BASE NÃO ESTÁ ESCRITA AQUI ───────────────────────────────────────────
+ * Évora era o ponto de partida ESCRITO À LETRA neste módulo: havia um `EVORA`
+ * e um `kmDeEvora`, e quem quisesse medir a partir de outro sítio não tinha
+ * por onde. Agora o que o módulo sabe fazer é medir de um sítio QUALQUER para
+ * outro sítio qualquer (`kmEntre`), e Évora é só o valor com que a definição
+ * da sede nasce ({@link BASE_OMISSAO}). É o que permite mudar a casa de terra
+ * sem mexer no código — e sem que os números de quem não a mudou se mexam.
  */
 
 export interface Lugar {
@@ -300,19 +308,45 @@ export function kmPorEstrada(a: Lugar, b: Lugar): number | null {
   return Math.round((recta * 1.25) / 5) * 5;
 }
 
-/** Atalho para o caso mais comum: a que distância de casa fica isto. */
+/** A sede, enquanto lugar. Continua a existir porque é a base por omissão. */
 export const EVORA: Lugar = LUGARES.evora;
+
+/**
+ * A base com que a casa nasce: Évora.
+ *
+ * É TEXTO e não um `Lugar` de propósito — é isto que fica gravado nas
+ * definições, escrito por ela num campo, e passa pelo mesmo `localizar` que
+ * qualquer destino. Uma base escrita "evora" tem de valer o mesmo que "Évora",
+ * e é o `localizar` que garante isso, não uma regra à parte.
+ */
+export const BASE_OMISSAO = "Évora";
+
+/**
+ * Quilómetros de estrada entre dois sítios ESCRITOS À MÃO.
+ *
+ * `null` assim que um dos dois não se reconhece, ou quando a viagem cruza mar.
+ * Não há meio-termo: com uma ponta desconhecida não há distância nenhuma a
+ * dizer, e um palpite aqui é um preço errado na proposta.
+ */
+export function kmEntre(
+  base: string | null | undefined,
+  destino: string | null | undefined,
+): number | null {
+  const a = localizar(base);
+  const b = localizar(destino);
+  if (!a || !b) return null;
+  return kmPorEstrada(a.lugar, b.lugar);
+}
 
 /**
  * Distância de Évora ao que estiver escrito neste texto.
  *
- * `null` quando não se reconhece o sítio — e nesse caso quem chama mostra
- * menos, nunca um número inventado.
+ * Fica como atalho para os sítios que ainda medem a partir da sede por
+ * omissão (a etiqueta "≈ 120 km" da lista de pedidos). Quem sabe qual é a base
+ * — a conta da deslocação — usa o `kmEntre` e passa-a.
  */
 export function kmDeEvora(texto: string | null | undefined): number | null {
-  const l = localizar(texto);
-  if (!l) return null;
-  return kmPorEstrada(EVORA, l.lugar);
+  return kmEntre(BASE_OMISSAO, texto);
 }
 
 /** Só para os testes e para quem queira listar o que é conhecido. */

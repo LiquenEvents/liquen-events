@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Quote } from "@/lib/orcamento/types";
 import { transicaoDoPedido, type AcontecimentoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { getQuote, updateQuote, deleteQuote } from "@/lib/quotes-store";
+import { semearProducaoAoGanhar } from "@/lib/semear-producao";
 import { isAuthed } from "@/lib/admin-auth";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quoteUpdateSchema, firstError } from "@/lib/validation";
@@ -272,6 +273,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!updated) {
       return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
     }
+
+    /**
+     * GANHO À MÃO É GANHO À MESMA — E A PRODUÇÃO ARRANCA PREENCHIDA.
+     *
+     * Isto acontecia quando o cliente carregava em «Aceitar proposta» no link.
+     * Esse botão saiu (a resposta do casal passa a ser por email ou telefone),
+     * e o aceite passa a ser esta gravação: alguém marca o pedido como «Ganho».
+     * Sem esta chamada, a equipa perdia o plano de produção pré-preenchido e
+     * ninguém ligaria a perda ao botão que desapareceu.
+     *
+     * Só quando ESTE pedido põe o estado em «aceite» — pela mão dela ou pela
+     * transição automática de um pagamento recebido. Correr em cada gravação de
+     * um pedido já ganho era um ler-modificar-escrever a mais por cada tecla.
+     *
+     * Melhor esforço, e de propósito: o estado já está gravado: se a sementeira
+     * falhar, perde-se uma lista pré-preenchida, não o negócio.
+     */
+    if (updated.status === "aceite" && (updates as Partial<Quote>).status === "aceite") {
+      try {
+        await semearProducaoAoGanhar(id, new Date().toISOString());
+      } catch (e) {
+        log.error("orcamento PATCH: sementeira da produção falhou", e, { id });
+      }
+    }
+
     return NextResponse.json(updated);
   } catch (err) {
     log.error("orcamento PATCH falhou", err);
@@ -281,9 +307,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 // Hard delete — for junk/test leads. This is deliberately distinct from
 // archiving (PATCH { archived: true }), a reversible soft-delete that keeps the
-// record. Deleting only removes the quote itself: related invoices and
-// contracts are fiscal records and are intentionally left untouched. (Draft
-// proposals are left too — proposals-store exposes no clean delete helper.)
+// record. Deleting only removes the quote itself: the contracts and the already
+// issued invoices are fiscal records and are intentionally left untouched — the
+// invoices table outlives the invoicing code, which moved out of this app.
+// (Draft proposals are left too — proposals-store exposes no clean delete
+// helper.)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

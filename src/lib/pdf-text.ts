@@ -39,17 +39,92 @@ const WINANSI_EXTRA: ReadonlySet<number> = new Set([
  * office sabe qual está a produzir — a diferença não pode chegar ao PDF.
  */
 export function winAnsiSafe(input: string): string {
-  let out = "";
-  for (const ch of arrumar(input)) {
+  const cabe = (ch: string) => {
     const cp = ch.codePointAt(0) ?? 0;
-    const ok =
+    return (
       cp === 0x0a || // a quebra de linha: ver `RETORNOS` — virava «?» no papel
       (cp >= 0x20 && cp <= 0x7e) || // ASCII imprimível
       (cp >= 0xa0 && cp <= 0xff) || // Latin-1 (acentos PT incluídos)
-      WINANSI_EXTRA.has(cp); // pontuação tipográfica do CP1252
-    out += ok ? ch : "?";
+      WINANSI_EXTRA.has(cp) // pontuação tipográfica do CP1252
+    );
+  };
+  let out = "";
+  for (const ch of arrumar(input)) {
+    if (cabe(ch)) {
+      out += ch;
+      continue;
+    }
+    // Antes do «?», a letra sem o acento que a codificação não tem: «Wiśniewski»
+    // vale mais como «Wisniewski» do que como «Wi?niewski». Ver `semAcento`.
+    const base = semAcento(ch);
+    out += base && [...base].every(cabe) ? base : "?";
   }
   return out;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O APELIDO QUE PERDIA LETRAS — «Michał Wiśniewski» → «Micha Winiewski»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Nenhuma das duas fontes desta casa cobre o latino ESTENDIDO: a Carlito que o
+ * documento da proposta embute vem em subconjunto (329 glifos, o CP1252 e pouco
+ * mais) e as fontes-padrão do pdf-lib são WinAnsi por definição. Fora ficam o
+ * polaco (ł ś ń ż ę ć ź ą), o checo (ř ů), o húngaro (ő ű), o turco (ğ ş ı) e o
+ * romeno (ș ț) — letras que, à vista de quem escreve o nome no back office,
+ * são letras normais.
+ *
+ * O que acontecia a cada uma dessas letras era diferente conforme o caminho, e
+ * as duas coisas são más:
+ *
+ *   · no documento da proposta DESAPARECIA (é a regra do `textoParaFonte`, e
+ *     está certa para um emoji): o nome do casal saía «Micha Winiewski», em
+ *     corpo 52, no meio da capa;
+ *   · nos papéis desenhados com as fontes-padrão virava «?»: «Wi?niewski».
+ *
+ * Um nome próprio não é um emoji. Tirar-lhe o acento é o que qualquer pessoa
+ * faz quando o teclado não o tem, e é uma transformação EXACTA e reversível de
+ * ler: «ś» é, em Unicode, «s» mais um acento (NFD), e tirar o acento devolve
+ * a letra que lá está. Não há adivinhação nenhuma — é a mesma normalização que
+ * o `arrumar` já faz no outro sentido.
+ *
+ * As poucas letras que não se decompõem (o «ł» polaco, o «đ» croata, o «ı»
+ * turco) não têm acento nenhum para tirar: são um glifo próprio com uma base
+ * latina universalmente aceite, e essa base está escrita na tabela abaixo. Só
+ * lá entra o que não tem discussão.
+ *
+ * O que não for letra latina — o emoji, o «Ω», o «李» — continua exactamente
+ * como estava: cai no caminho de sempre de quem o chamou.
+ */
+const BASE_SEM_DECOMPOSICAO: Readonly<Record<string, string>> = {
+  Ł: "L",
+  ł: "l",
+  Đ: "D",
+  đ: "d",
+  Ħ: "H",
+  ħ: "h",
+  Ŧ: "T",
+  ŧ: "t",
+  ı: "i",
+  İ: "I",
+  Ø: "O",
+  ø: "o",
+  Ɖ: "D",
+  Ǥ: "G",
+  ǥ: "g",
+};
+
+/**
+ * A letra sem o acento, ou `""` quando não há letra latina nenhuma por baixo.
+ *
+ * Nunca lança e nunca inventa: devolve `""` para tudo o que não seja uma letra
+ * latina com decomposição (ou uma das poucas da tabela acima).
+ */
+function semAcento(ch: string): string {
+  const daTabela = BASE_SEM_DECOMPOSICAO[ch];
+  if (daTabela) return daTabela;
+  const decomposto = ch.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return decomposto && decomposto !== ch ? decomposto : "";
 }
 
 /**
@@ -122,7 +197,16 @@ const TRACOS: ReadonlyArray<[RegExp, string]> = [
 const RETORNOS = /\r\n?|[\u2028\u2029\u0085]/g;
 
 function arrumar(input: string): string {
-  let s = input
+  /**
+   * `String(input ?? "")` e não `input`: os tipos dizem que aqui só chega
+   * texto, e o que chega vem de um `doc` que ninguém validou campo a campo (o
+   * corpo de um pedido, um rascunho antigo do `localStorage`, uma cópia de
+   * segurança restaurada). Um campo em falta dava `undefined.normalize is not a
+   * function` — um 500 no botão «Gerar» por causa de uma propriedade que não
+   * estava lá. Esta função promete NÃO LANÇAR; passa a prometê-lo também
+   * quando lhe mentem sobre o tipo.
+   */
+  let s = String(input ?? "")
     .normalize("NFC")
     .replace(RETORNOS, "\n")
     .replace(INVISIVEIS, "")
@@ -156,6 +240,7 @@ function arrumar(input: string): string {
 export function textoParaFonte(fonte: unknown, input: string): string {
   const cobre = coberturaDaFonte(fonte);
   if (!cobre) return winAnsiSafe(input);
+  const temGlifo = (s: string) => [...s].every((c) => cobre(c.codePointAt(0) ?? 0));
   let out = "";
   for (const ch of arrumar(input)) {
     const cp = ch.codePointAt(0) ?? 0;
@@ -163,7 +248,17 @@ export function textoParaFonte(fonte: unknown, input: string): string {
       out += ch; // quebras e tabulações são tratadas por quem parte as linhas
       continue;
     }
-    if (cobre(cp)) out += ch;
+    if (cobre(cp)) {
+      out += ch;
+      continue;
+    }
+    // A Carlito embutida vem em SUBCONJUNTO e não tem o latino estendido: sem
+    // isto, «Michał Wiśniewski» sai «Micha Winiewski» na capa da proposta —
+    // letras a menos num nome próprio, em corpo 52, sem nada que o denuncie.
+    // Ver `semAcento`. O emoji e o que não é letra latina continuam a
+    // desaparecer, que é a regra escrita aqui em cima.
+    const base = semAcento(ch);
+    if (base && temGlifo(base)) out += base;
   }
   return out;
 }

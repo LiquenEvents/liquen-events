@@ -182,19 +182,10 @@ vi.mock("@/lib/material-lists-store", () =>
     },
   ),
 );
+// Só leitura: o módulo ficou reduzido ao que a cópia de segurança precisa
+// (ver o topo de `invoices-store.ts`) — a facturação saiu desta aplicação.
 vi.mock("@/lib/invoices-store", () =>
-  H.build("invoices-store", [
-    "listInvoices",
-    "listInvoicesForQuote",
-    "createInvoice",
-    "updateInvoice",
-    "deleteInvoice",
-    "getInvoice",
-    "nextInvoiceNumber",
-    "newInvoiceId",
-    "splitThirtySeventy",
-    "isUniqueViolation",
-  ]),
+  H.build("invoices-store", ["listInvoices", "isUniqueViolation"]),
 );
 vi.mock("@/lib/contracts-store", () =>
   H.build("contracts-store", [
@@ -359,7 +350,6 @@ vi.mock("@/lib/passkeys-store", async (orig) => ({
 vi.mock("sharp", () => ({ default: () => ({ metadata: async () => ({}) }) }));
 // PDF renderers — mocked so pdf-lib / sharp never load in the audit.
 vi.mock("@/lib/contract-pdf", () => H.build("contract-pdf", ["renderContractPdf"]));
-vi.mock("@/lib/invoice-pdf", () => H.build("invoice-pdf", ["renderInvoicePdf"]));
 vi.mock("@/lib/proposal-pdf", () => H.build("proposal-pdf", ["renderProposalPdf"]));
 vi.mock("@/lib/proposal-doc-pdf", () => H.build("proposal-doc-pdf", ["renderProposalDocPdf"]));
 vi.mock("@/lib/proposal-doc-render", () =>
@@ -452,8 +442,6 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./contratos/route", methods: ["GET"] },
   { path: "./contratos/[id]/pdf/route", methods: ["GET"] },
   { path: "./email-templates/route", methods: ["GET", "POST", "PUT"] },
-  { path: "./faturas/route", methods: ["GET", "POST"] },
-  { path: "./faturas/[id]/route", methods: ["GET", "PATCH", "DELETE"] },
   { path: "./fornecedores/route", methods: ["GET", "POST"] },
   { path: "./fornecedores/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./inbox/route", methods: ["GET"] },
@@ -482,7 +470,6 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // bilhetes podem ser emitidos.
   { path: "./orcamento/[id]/assets/url/route", methods: ["POST", "PUT"] },
   { path: "./orcamento/[id]/assets/importar/route", methods: ["POST"] },
-  { path: "./orcamento/[id]/fatura/route", methods: ["POST"] },
   { path: "./orcamento/[id]/mensagem/route", methods: ["POST"] },
   // Manda um modelo de email ao cliente (e, sem `enviar`, pré-visualiza-o com o
   // endereço dele lá dentro). Escreve para fora da casa — a barreira é a mesma
@@ -839,15 +826,21 @@ describe("TOKEN-guarded routes deny a bad token", () => {
     expect(calls).toEqual([]); // nunca chegou à proposta nem ao gerador
   });
 
-  it("POST /api/proposta (accept link) → 401 on a bad/forged token, no mutation", async () => {
-    const fn = await handler("./proposta/route", "POST");
-    const res = await fn(
-      req("POST", "/api/proposta", { token: "bad-token", action: "aceitar" }),
-      ctx(),
-    );
-    expect(res.status).toBe(401);
-    expect(calls).not.toContain("proposals-store.updateProposal");
-    expect(calls).not.toContain("contracts-store.createContractIfAbsent");
+  /**
+   * A ROTA DO ACEITE JÁ NÃO EXISTE, E É ISSO QUE SE AUDITA AGORA.
+   *
+   * Havia aqui um teste a provar que ela recusava um token forjado. Recusava —
+   * mas a dona da casa mandou tirar o botão de aceitar do lado do cliente («não
+   * quero que eles cliquem num botão para aceitarem a proposta»), e uma rota
+   * que grava decisões do casal não pode ficar de pé só porque estava bem
+   * guardada: uma ligação antiga numa caixa de correio continuava a poder
+   * escrever um «aceito» que ninguém quis.
+   *
+   * O guarda passa a ser a AUSÊNCIA. A prova de que nada foi esquecido está em
+   * `proposta/[token]/nada-de-aceitar-por-botao.test.ts`.
+   */
+  it("POST /api/proposta (o aceite do cliente) já não existe", async () => {
+    await expect(handler("./proposta/route", "POST")).rejects.toThrow();
   });
 });
 

@@ -157,12 +157,42 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
     }
 
-    const mail = await sendMail({
-      to: quote.email,
-      replyTo: MAIL_TO,
-      subject: preparado.assunto,
-      ...email,
-    });
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * UMA FALHA DE ENVIO NÃO É «ERRO AO PREPARAR O EMAIL»
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O `sendMail` ATIRA quando o servidor de correio não coopera: a ligação
+     * expira (o `mail.ts` corta aos 8 s), as credenciais são recusadas, a caixa
+     * do outro lado está cheia. A excepção subia ao `catch` do fim e a rota
+     * respondia 500 «Erro ao preparar o email» — uma frase falsa sobre a única
+     * parte que tinha corrido bem, e que a manda procurar o defeito no modelo.
+     *
+     * E o pior é o que ela faz a seguir: um erro que parece do modelo lê-se
+     * como «não saiu nada», e ela carrega outra vez. Num servidor lento — o
+     * caso mais provável — o primeiro email pode ter saído na mesma, e o
+     * cliente recebe o mesmo «Obrigado por nos ter escolhido» duas vezes.
+     *
+     * Passa a ser um facto contado na resposta (`emailed: false` + a frase),
+     * como já acontece com o SMTP por configurar. O ecrã já sabe escrever
+     * «o e-mail não saiu, o cliente não recebeu» no histórico a partir do
+     * `emailed`, e nada é gravado — que é a regra desta rota, escrita a seguir.
+     */
+    let mail = { sent: false };
+    let falhaDeEnvio: string | undefined;
+    try {
+      mail = await sendMail({
+        to: quote.email,
+        replyTo: MAIL_TO,
+        subject: preparado.assunto,
+        ...email,
+      });
+    } catch (e) {
+      log.error("modelo: o servidor de correio recusou o envio", e, { id, chave });
+      falhaDeEnvio =
+        "O servidor de correio não aceitou a mensagem — o cliente NÃO recebeu nada. " +
+        "Tenta outra vez daqui a pouco.";
+    }
 
     /**
      * O QUE FICA REGISTADO É O QUE O CLIENTE LEU — E SÓ SE ELE O LEU.
@@ -195,6 +225,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         ? {}
         : {
             emailError:
+              falhaDeEnvio ??
               "O envio de email não está configurado neste servidor — o cliente não recebeu nada.",
           }),
     });

@@ -49,7 +49,7 @@ const TaskRow = memo(function TaskRow({
        único com `min-w-0`, portanto o único que cede. Com `truncate` por cima,
        lia-se «Confirmar com a Herda…» dezasseis vezes seguidas.
 
-       A conversão é a que os cartões de Faturas já fazem — e faz-se com
+       A conversão é a que os outros cartões do back office já fazem — e faz-se com
        `flex-wrap` SOZINHO, sem ponto de corte por viewport: a fila quebra
        quando não cabe, que é a pergunta certa (a lição das linhas de grupo do
        estúdio, em MOBILE-AUDIT.md). O mínimo no título é o que faz o
@@ -533,7 +533,21 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
           </Button>
         </div>
         <details className="group mt-3">
-          <summary className="bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-foreground/55 hover:text-foreground/75 [&::-webkit-details-marker]:hidden">
+          {/* ── 122×15 NUM TELEMÓVEL ────────────────────────────────────────
+              MEDIDO a 375 px: este interruptor tinha 15 px de altura — um
+              terço do mínimo de 44 — e é a ÚNICA porta para o responsável, o
+              prazo e a área de uma tarefa nova. Num telemóvel, falhar-lhe o
+              toque é ficar sem esses campos.
+
+              Escapou a todos os varrimentos porque um `<summary>` não é
+              `<button>`, não tem `role` e não tem `tabindex` escrito: a rede da
+              ergonomia táctil não o via (agora vê — ver `ergonomia-tactil.mjs`).
+
+              `alvo-toque` cresce só sob `(pointer: coarse)`, portanto no
+              portátil a linha fica exactamente como estava; `!justify-start`
+              porque o conteúdo é uma seta e um rótulo alinhados à esquerda, e
+              a classe centra por omissão. */}
+          <summary className="alvo-toque !justify-start bo-eyebrow inline-flex cursor-pointer list-none items-center gap-1.5 text-foreground/55 hover:text-foreground/75 [&::-webkit-details-marker]:hidden">
             <svg
               width="12"
               height="12"

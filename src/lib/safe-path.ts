@@ -5,9 +5,9 @@
  * DENTRO do caminho do URL. E não é um segredo qualquer:
  *
  *   · `/proposta/<token>` autoriza ACEITAR a proposta (POST /api/proposta), e
- *     aceitar cria contrato e fatura de sinal — quem tiver o token pode assumir
+ *     aceitar cria o contrato — quem tiver o token pode assumir
  *     um compromisso financeiro em nome do cliente. Validade: 14 dias.
- *   · `/portal/<token>` abre a reserva inteira (proposta, contrato, faturas,
+ *   · `/portal/<token>` abre a reserva inteira (proposta, contrato,
  *     faseamento). Validade: 365 dias.
  *
  * Qualquer telemetria que reporte o caminho da página — Web Vitals, o

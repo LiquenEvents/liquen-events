@@ -4,7 +4,6 @@ import { readPortalToken } from "@/lib/portal-token";
 import { getQuote } from "@/lib/quotes-store";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote, getContractByProposal } from "@/lib/contracts-store";
-import { listInvoicesForQuote } from "@/lib/invoices-store";
 import { splitSinal } from "@/lib/money";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { getDictionary, htmlLang, normalizeLocale } from "@/lib/i18n";
@@ -178,25 +177,21 @@ export default async function PortalPage({
   const locale = proposal ? idiomaDaProposta(proposal) : doVisitante;
   const t = getDictionary(locale).portal;
 
-  const [contract, invoices] = await Promise.all([
-    acceptedContract
-      ? Promise.resolve(acceptedContract)
-      : proposal
-        ? getContractByProposal(proposal.id)
-        : Promise.resolve(null),
-    listInvoicesForQuote(quote.id),
-  ]);
+  const contract = acceptedContract
+    ? acceptedContract
+    : proposal
+      ? await getContractByProposal(proposal.id)
+      : null;
 
   const total = proposal?.total ?? 0;
   /**
    * ── O SINAL QUE O CLIENTE LÊ AQUI É O QUE LHE VAI SER FACTURADO ─────────
    *
-   * A percentagem do sinal é uma caixa editável na proposta e é ela que as
-   * rotas de facturação usam para emitir o sinal e o saldo
-   * (`depositPercentOf`). Este plano dividia sempre 30/70: numa proposta de
-   * 50%, o cliente abria o link privado, lia «Sinal (30%) 3.000,00 €» e depois
-   * recebia por email uma factura de 5.000 €. Este é precisamente o ecrã a que
-   * ele volta para confirmar o valor antes de transferir.
+   * A percentagem do sinal é uma caixa editável na proposta (`depositPercentOf`)
+   * e é o que o cliente vai transferir. Este plano dividia sempre 30/70: numa
+   * proposta de 50%, o cliente abria o link privado e lia «Sinal (30%)
+   * 3.000,00 €» quando o combinado eram 5.000 €. Este é precisamente o ecrã a
+   * que ele volta para confirmar o valor antes de transferir.
    */
   const depositPercent = depositPercentOf(proposal?.doc as ProposalDoc | undefined);
 
@@ -244,16 +239,6 @@ export default async function PortalPage({
       // Só oferecemos o PDF do contrato quando ele foi de facto assinado — o
       // endpoint só serve o aceite mais recente do pedido.
       contratoPdfHref={contract?.status === "aceite" ? `/api/portal/${token}/contrato-pdf` : null}
-      invoices={invoices.map((i) => ({
-        id: i.id,
-        number: i.number,
-        kind: i.kind,
-        amount: i.amount,
-        status: i.status,
-        issuedAt: fmtDate(i.issuedAt, t.dateLocale),
-        dueAt: fmtDate(i.dueAt, t.dateLocale),
-        paidAt: fmtDate(i.paidAt, t.dateLocale),
-      }))}
       schedule={proposal ? splitSinal(total, depositPercent) : null}
       depositPercent={depositPercent}
       currency={proposal?.currency || "EUR"}

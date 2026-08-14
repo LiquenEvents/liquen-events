@@ -8,6 +8,8 @@ import {
   round2,
   splitSinal,
   saldoAPartirDoSinal,
+  montantesEmIngles,
+  montanteNaLingua,
 } from "./money";
 import { winAnsiSafe } from "./pdf-text";
 
@@ -390,5 +392,95 @@ describe("sinal com percentagem configurável", () => {
       // seria muito pior do que um número grande.
       expect(Number.isFinite(saldoAPartirDoSinal(1000, 0))).toBe(true);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * O DINHEIRO NA FOLHA INGLESA — «4.600,00 €» → «€4,600.00»
+ *
+ * A decisão é da dona da casa: numa proposta inglesa o valor escreve-se à
+ * inglesa, com o símbolo à frente. O que torna isto delicado não é o formato —
+ * é que METADE do dinheiro desta folha é texto escrito por ela («Valor Total»,
+ * os adicionais, o preço estimado do modelo de Organização) e a outra metade
+ * são contas nossas. Converter só as contas dava «€4,600.00» e «4.600,00 €» na
+ * mesma coluna do mesmo quadro, que é pior do que não converter nada.
+ *
+ * Por isso a conversão trabalha sobre TEXTO JÁ ESCRITO, e reconhece um
+ * montante pelo símbolo de moeda colado a ele — a mesma regra de segurança do
+ * `milharesComPonto`: um ano, um número de documento ou uma contagem de
+ * convidados não têm um «€» atrás, e não são tocados.
+ */
+describe("os montantes na folha inglesa", () => {
+  it("põe o símbolo à frente e troca a pontuação", () => {
+    expect(montantesEmIngles("4.600,00 €")).toBe("€4,600.00");
+    expect(montantesEmIngles("150,00 €")).toBe("€150.00");
+    expect(montantesEmIngles("24.600,00 €")).toBe("€24,600.00");
+  });
+
+  it("agrupa os milhares que o português não agrupou", () => {
+    // O `Intl` de pt-PT não põe separador abaixo de cinco dígitos: um total nos
+    // milhares baixos chega aqui como «4600,00 €».
+    expect(montantesEmIngles("4600,00 €")).toBe("€4,600.00");
+    expect(montantesEmIngles("999,00 €")).toBe("€999.00");
+    expect(montantesEmIngles("1234567,89 €")).toBe("€1,234,567.89");
+  });
+
+  it("o espaço inquebrável que o Intl mete nos milhares também conta", () => {
+    expect(montantesEmIngles("24 600,00 €")).toBe("€24,600.00");
+  });
+
+  it("um montante sem cêntimos fica com os cêntimos que uma folha de dinheiro tem", () => {
+    expect(montantesEmIngles("2500 €")).toBe("€2,500.00");
+  });
+
+  it("o menos fica antes do símbolo, como em inglês", () => {
+    expect(montantesEmIngles("-150,00 €")).toBe("-€150.00");
+  });
+
+  it("converte todos os montantes de uma frase, não só o primeiro", () => {
+    expect(montantesEmIngles("Travel (150,00 €) and styling (1.200,00 €)")).toBe(
+      "Travel (€150.00) and styling (€1,200.00)",
+    );
+  });
+
+  it("a vírgula decimal de uma percentagem passa a ponto", () => {
+    // «VAT (23,5%)» numa folha inglesa é a vírgula portuguesa a aparecer onde
+    // um leitor inglês lê um separador de milhares.
+    expect(montantesEmIngles("VAT (23,5%)")).toBe("VAT (23.5%)");
+    expect(montantesEmIngles("VAT (23%)")).toBe("VAT (23%)");
+  });
+
+  it("o que NÃO é dinheiro não é tocado", () => {
+    // Sem símbolo de moeda colado, não há conversão: é isto que impede um ano,
+    // uma referência ou uma contagem de mudarem de forma.
+    for (const intacto of [
+      "LIQ-2026-0007",
+      "150 guests",
+      "11 October 2026",
+      "4.600",
+      "Quinta do Lago",
+      "—",
+      "",
+    ]) {
+      expect(montantesEmIngles(intacto)).toBe(intacto);
+    }
+  });
+
+  it("outra moeda mantém o seu símbolo, à frente na mesma", () => {
+    // Uma proposta antiga podia estar gravada noutra moeda (`Proposal.currency`).
+    expect(montantesEmIngles("1.200,00 $")).toBe("$1,200.00");
+  });
+
+  it("em português não se toca em nada", () => {
+    expect(montanteNaLingua("4.600,00 €", "pt")).toBe("4.600,00 €");
+    expect(montanteNaLingua("4.600,00 €", "en")).toBe("€4,600.00");
+  });
+
+  it("passar duas vezes pela conversão dá o mesmo", () => {
+    // O desenho do PDF passa por aqui em sítios encadeados; converter um valor
+    // já convertido não o pode estragar.
+    const uma = montantesEmIngles("4.600,00 €");
+    expect(montantesEmIngles(uma)).toBe(uma);
   });
 });

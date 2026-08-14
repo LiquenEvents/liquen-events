@@ -231,3 +231,60 @@ describe("POST /api/orcamento/[id]/modelo — o envio", () => {
     expect(quotes.update).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * UMA FALHA DE ENVIO NÃO É «ERRO AO PREPARAR O EMAIL»
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O `sendMail` só promete não atirar quando o SMTP está POR CONFIGURAR (é o que
+ * está escrito no `mail.ts`). Tudo o resto ATIRA: a ligação a expirar (corta aos
+ * 8 s), as credenciais recusadas, a caixa do cliente cheia. A excepção subia ao
+ * `catch` de topo e a rota respondia:
+ *
+ *     500  {"error":"Erro ao preparar o email"}
+ *
+ * Uma frase falsa sobre a única parte que tinha corrido bem — o modelo foi lido,
+ * os marcadores resolvidos, o corpo montado — e que a manda procurar o defeito
+ * no texto dela. Pior: um erro que parece do modelo lê-se como «não saiu nada»,
+ * e ela carrega outra vez; num servidor lento (o caso mais provável) o primeiro
+ * email pode ter saído na mesma e o cliente recebe o mesmo agradecimento duas
+ * vezes.
+ *
+ * A regra de não gravar um envio falhado mantém-se, e é a desta rota: aqui o
+ * texto continua inteiro no modelo, e uma linha no histórico sobre um email que
+ * ninguém recebeu é uma mentira que dura para sempre.
+ */
+describe("POST /api/orcamento/[id]/modelo — o servidor de correio a recusar", () => {
+  it("responde 200 com a verdade, e não 500 sobre a preparação", async () => {
+    authed.ok = true;
+    mail.send.mockRejectedValueOnce(new Error("connect ECONNREFUSED 1.2.3.4:465"));
+
+    const res = await POST(req({ chave: "agradecimento", enviar: true }), ctx("LIQ-1"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.emailed).toBe(false);
+    expect(String(body.emailError)).toMatch(/correio/i);
+    expect(String(body.emailError), "tem de dizer que o cliente NÃO recebeu").toMatch(/NÃO/);
+    expect(String(body.emailError), "não pode acusar o modelo, que estava bom").not.toMatch(
+      /preparar/i,
+    );
+  });
+
+  it("e continua a não gravar nada no histórico — ninguém recebeu", async () => {
+    authed.ok = true;
+    mail.send.mockRejectedValueOnce(new Error("Invalid login: 535 auth failed"));
+    await POST(req({ chave: "agradecimento", enviar: true }), ctx("LIQ-1"));
+    expect(quotes.update).not.toHaveBeenCalled();
+  });
+
+  it("com o SMTP por configurar, a frase é a outra — a de instalação", async () => {
+    authed.ok = true;
+    mail.send.mockResolvedValueOnce({ sent: false });
+    const res = await POST(req({ chave: "agradecimento", enviar: true }), ctx("LIQ-1"));
+    const body = await res.json();
+    expect(body.emailed).toBe(false);
+    expect(String(body.emailError)).toMatch(/não está configurado/i);
+  });
+});

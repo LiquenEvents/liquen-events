@@ -209,7 +209,7 @@ describe("invariante: as facturas de um aceite somam o total da proposta", () =>
   /**
    * O percurso real: a proposta é aceite, `/api/proposta` emite o sinal com
    * `splitSinal(proposal.total, depositPercentOf(doc))`, e mais tarde
-   * `/api/faturas/[id]` emite o saldo. Quando a proposta ainda existe e bate
+   * o saldo deriva do sinal. Quando a proposta ainda existe e bate
    * certo, o saldo é `total − sinal`; sem ela, é derivado do sinal facturado.
    * As duas parcelas têm de somar o total nos DOIS caminhos.
    */
@@ -715,7 +715,6 @@ describe("invariante: a margem compara receita líquida com custos líquidos", (
             }),
             proposal: propostaDe(base, taxa),
             contract: null,
-            invoices: [],
           };
           const m = computeEventMetrics(d);
           const esperada = round2(m.contractedNet - m.supplierCostsNet);

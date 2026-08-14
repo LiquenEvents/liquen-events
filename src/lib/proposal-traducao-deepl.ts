@@ -1,5 +1,5 @@
 import "server-only";
-import type { MotorDeTraducao } from "./proposal-traducao";
+import { emLotes, type MotorDeTraducao } from "./proposal-traducao";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -333,28 +333,14 @@ export const MAX_CARACTERES_POR_PEDIDO = 20_000;
 /**
  * Os lotes de um pedido, PELA ORDEM.
  *
- * Um texto sozinho maior do que o tecto vai à mesma, sozinho: cortá-lo era
- * devolver meia frase e deixá-lo de fora era devolver menos textos do que os
- * pedidos — o desalinhamento, que é o defeito que toda a gente aqui evita.
+ * A partição vem da fronteira (`emLotes`, em `proposal-traducao.ts`) e não é
+ * escrita aqui outra vez: há dois tectos no mesmo caminho — o desta API e o da
+ * nossa rota —, e dois partidores acabariam por discordar num deles. O que é
+ * daqui são os NÚMEROS; a regra é a mesma dos dois lados, incluindo a de que um
+ * texto sozinho maior do que o tecto vai à mesma, sozinho.
  */
-function emLotes(textos: string[]): string[][] {
-  const lotes: string[][] = [];
-  let lote: string[] = [];
-  let caracteres = 0;
-  for (const texto of textos) {
-    const cabe =
-      lote.length < MAX_TEXTOS_POR_PEDIDO && caracteres + texto.length <= MAX_CARACTERES_POR_PEDIDO;
-    if (lote.length > 0 && !cabe) {
-      lotes.push(lote);
-      lote = [];
-      caracteres = 0;
-    }
-    lote.push(texto);
-    caracteres += texto.length;
-  }
-  if (lote.length > 0) lotes.push(lote);
-  return lotes;
-}
+const emLotesDoDeepL = (textos: string[]): string[][] =>
+  emLotes(textos, MAX_TEXTOS_POR_PEDIDO, MAX_CARACTERES_POR_PEDIDO);
 
 /**
  * Um erro do serviço, com uma pergunta a mais: vale a pena insistir nos lotes
@@ -476,7 +462,7 @@ export function motorDeepL(chave: string, buscar: typeof fetch = fetch): MotorDe
     let algumPassou = false;
     let primeiroErro: unknown = null;
 
-    for (const lote of emLotes(textos)) {
+    for (const lote of emLotesDoDeepL(textos)) {
       const inicio = posicao;
       posicao += lote.length;
       if (primeiroErro instanceof ErroDoServico && primeiroErro.definitivo) continue;

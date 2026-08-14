@@ -27,7 +27,6 @@ import {
 const TODOS: AcontecimentoDoPedido[] = [
   "mensagem_enviada",
   "proposta_enviada",
-  "fatura_emitida",
   "pagamento_recebido",
   "contrato_registado",
 ];
@@ -73,15 +72,11 @@ describe("cada acontecimento leva o pedido ao seu estado", () => {
   });
 
   /**
-   * Os três acontecimentos do dinheiro dizem todos a mesma coisa: o trabalho é
-   * nosso. Não se manda uma factura a quem ainda está a pensar.
+   * Os dois acontecimentos do fecho dizem a mesma coisa: o trabalho é nosso.
+   * Ninguém transfere um sinal para quem ainda está a pensar.
    */
-  it("emitir uma fatura, receber um pagamento ou registar o contrato dão o pedido por ganho", () => {
-    for (const acontecimento of [
-      "fatura_emitida",
-      "pagamento_recebido",
-      "contrato_registado",
-    ] as const) {
+  it("receber um pagamento ou registar o contrato dão o pedido por ganho", () => {
+    for (const acontecimento of ["pagamento_recebido", "contrato_registado"] as const) {
       expect(estadoApos(acontecimento, "pendente")).toBe("aceite");
       expect(estadoApos(acontecimento, "em_revisao")).toBe("aceite");
       expect(estadoApos(acontecimento, "cotado")).toBe("aceite");
@@ -116,8 +111,8 @@ describe("cada acontecimento leva o pedido ao seu estado", () => {
  * decoração.
  */
 describe("o estado nunca anda para trás", () => {
-  it("emitir uma fatura num pedido já ganho não o põe outra vez em «Proposta enviada»", () => {
-    expect(estadoApos("fatura_emitida", "aceite")).toBeNull();
+  it("registar um pagamento num pedido já ganho não o põe outra vez em «Proposta enviada»", () => {
+    expect(estadoApos("pagamento_recebido", "aceite")).toBeNull();
   });
 
   it("mandar uma nota a um casamento já fechado não o desfecha", () => {
@@ -170,15 +165,15 @@ describe("a linha que fica no histórico", () => {
    */
   it("diz de onde veio, para onde foi e o que a causou", () => {
     const t = transicaoDoPedido({
-      acontecimento: "fatura_emitida",
+      acontecimento: "pagamento_recebido",
       estadoActual: "cotado",
-      detalhe: "FT 2026/0004 · 3 690,00 €",
+      detalhe: "sinal · 3 690,00 €",
       ...opcoes,
     });
     expect(t).not.toBeNull();
     expect(t!.status).toBe("aceite");
     expect(t!.entrada.summary).toBe(
-      "Proposta enviada → Ganho · fatura emitida (FT 2026/0004 · 3 690,00 €)",
+      "Proposta enviada → Ganho · pagamento recebido (sinal · 3 690,00 €)",
     );
   });
 
@@ -243,7 +238,7 @@ describe("a linha que fica no histórico", () => {
   });
 
   it("traz um identificador e uma hora próprios quando não lhos dão", () => {
-    const t = transicaoDoPedido({ acontecimento: "fatura_emitida", estadoActual: "pendente" });
+    const t = transicaoDoPedido({ acontecimento: "pagamento_recebido", estadoActual: "pendente" });
     expect(t!.entrada.id).toBeTruthy();
     expect(Number.isNaN(Date.parse(t!.entrada.at))).toBe(false);
   });
@@ -252,7 +247,7 @@ describe("a linha que fica no histórico", () => {
     // Uma entrada «Ganho → Ganho» no histórico seria ruído a esconder o que
     // interessa — e a lista dela já é longa.
     expect(
-      transicaoDoPedido({ acontecimento: "fatura_emitida", estadoActual: "aceite" }),
+      transicaoDoPedido({ acontecimento: "pagamento_recebido", estadoActual: "aceite" }),
     ).toBeNull();
   });
 });

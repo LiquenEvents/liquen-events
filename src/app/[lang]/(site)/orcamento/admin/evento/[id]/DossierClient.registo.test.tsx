@@ -65,7 +65,7 @@ const QUOTE = {
   quotedPrice: 10_000,
 } as unknown as Quote;
 
-const DADOS: DossierData = { quote: QUOTE, proposal: null, contract: null, invoices: [] };
+const DADOS: DossierData = { quote: QUOTE, proposal: null, contract: null };
 
 /** Responde à lista leve de propostas e devolve `estado` a qualquer PATCH. */
 function servirPatch(status: number, corpo: unknown = { error: "Sessão expirada" }) {

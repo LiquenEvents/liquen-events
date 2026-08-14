@@ -48,7 +48,7 @@ export default function MetricStrip({ metrics }: Props) {
     supplierCosts,
     supplierCostsNet,
     pctPaid,
-    ledgerPaid,
+    paid,
     countdownDays,
     rsvpConfirmed,
     rsvpTotal,
@@ -84,10 +84,18 @@ export default function MetricStrip({ metrics }: Props) {
         }
         tone={supplierCosts > 0 ? (margin >= 0 ? "text-[#4d6350]" : "text-[#b5654a]") : undefined}
       />
+      {/* «% Recebido», e já não «% Pago».
+          Esta célula lia o livro de faturas: era a fatia do contratado que
+          estava FACTURADA E MARCADA COMO PAGA. Sem livro, passa a ser a fatia
+          que está REGISTADA COMO RECEBIDA no painel de Pagamentos — a mesma
+          conta do «Recebido» logo abaixo dela, e o mesmo número para todo o
+          evento cujo dinheiro foi registado ali (que é o fluxo normal).
+          O rótulo muda com ela: pôr um número novo debaixo do rótulo antigo é
+          a maneira mais silenciosa de enganar quem o lê todos os dias. */}
       <Cell
-        label="% Pago"
+        label="% Recebido"
         value={contracted > 0 ? `${Math.round(pctPaid * 100)}%` : "—"}
-        sub={contracted > 0 ? `recebido ${eur0(ledgerPaid)}` : undefined}
+        sub={contracted > 0 ? `recebido ${eur0(paid)}` : undefined}
         tone={pctPaid >= 1 ? "text-[#4d6350]" : undefined}
       />
       <Cell

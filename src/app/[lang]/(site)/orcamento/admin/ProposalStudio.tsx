@@ -22,6 +22,7 @@ import {
 import {
   IDIOMA_POR_OMISSAO,
   dataDoEventoPorExtenso,
+  ehIdiomaDaProposta,
   referenciaDoDocumento,
   type IdiomaDaProposta,
 } from "@/lib/proposal-doc-textos";
@@ -143,7 +144,13 @@ import ThemePicker, { type ImportedImage, type ReservedImage } from "./ThemePick
 import ServicesEditor, { MoveBtns } from "./ServicesEditor";
 import CaixaInglesa from "./CaixaInglesa";
 import PorTraduzir from "./PorTraduzir";
-import { motorPelaRota, traducaoEstaLigada, traduzirParaIngles } from "@/lib/proposal-traducao";
+import {
+  aplicarTraducao,
+  estadoDaTraducao,
+  motorPelaRota,
+  traduzirParaIngles,
+  type EstadoDaTraducao,
+} from "@/lib/proposal-traducao";
 import { camposPorTraduzir, docTemIngles, escreverEn, lerEn } from "@/lib/proposal-doc-bilingue";
 import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
 import { Ajuda, Button, Card, Field, Segmented } from "./ui";
@@ -534,7 +541,24 @@ export function avisoDeConteudoIncompleto(emFalta: number, cortes: Corte[]): str
  * telemóvel — é a única forma de a informação mudar o que a pessoa faz a
  * seguir.
  */
-export type EstadoDaGravacaoNoEcra = "a-guardar" | "so-neste-computador" | "guardado";
+/**
+ * ── E O QUARTO, QUE É O DO DEPLOYMENT ─────────────────────────────────────
+ *
+ * `nao-dura-ao-deploy` é o desfecho do meio, e não é uma subtileza: a gravação
+ * CHEGOU ao servidor (não é `so-neste-computador` — noutro computador a
+ * proposta abre), e mesmo assim o próximo deploy leva-a, porque em produção sem
+ * base de dados o rascunho fica no disco da função.
+ *
+ * Precisa de palavras próprias exactamente por isso. «Guardado» era falso pelo
+ * lado do tempo, e «só neste computador» seria falso pelo lado do sítio —
+ * mandaria alguém copiar o trabalho para outra máquina, que é o gesto que não
+ * resolve nada aqui.
+ */
+export type EstadoDaGravacaoNoEcra =
+  | "a-guardar"
+  | "so-neste-computador"
+  | "nao-dura-ao-deploy"
+  | "guardado";
 
 export function textoDaGravacao(
   estado: EstadoDaGravacaoNoEcra,
@@ -553,6 +577,17 @@ export function textoDaGravacao(
       curto: "⚠ guardado só neste computador",
       longo: horas ? `guardado só neste computador às ${horas}` : "guardado só neste computador",
       leitor: "atenção: o rascunho está guardado só neste computador e não chegou ao servidor",
+    };
+  }
+  if (estado === "nao-dura-ao-deploy") {
+    // A hora fica, como no estado de cima e pela mesma razão. O que muda é a
+    // segunda metade da frase: o problema não é ONDE está, é ATÉ QUANDO.
+    return {
+      curto: "⚠ guardado até ao próximo deploy",
+      longo: horas
+        ? `guardado às ${horas}, num sítio que o próximo deploy apaga`
+        : "guardado num sítio que o próximo deploy apaga",
+      leitor: "atenção: o rascunho está guardado num sítio que o próximo deploy apaga",
     };
   }
   return { curto: "✓", longo: `guardado às ${horas}`, leitor: "rascunho guardado no servidor" };
@@ -719,7 +754,38 @@ const GRAVACAO_PAUSA_MS = 400;
 const GRAVACAO_TECTO_MS = 10000;
 
 export type ResultadoDaGravacao =
-  | { estado: "guardado"; updatedAt?: string; overwrote?: boolean; previousBy?: string }
+  | {
+      estado: "guardado";
+      updatedAt?: string;
+      overwrote?: boolean;
+      previousBy?: string;
+      /**
+       * O sítio onde ficou sobrevive a um deploy?
+       *
+       * ── PORQUE É QUE ISTO NÃO PODE FICAR DE FORA ────────────────────────
+       *
+       * Há um terceiro desfecho entre «guardado» e «não guardado», e é o que
+       * fez desaparecer uma proposta montada: produção sem Supabase escreve o
+       * rascunho no `data/app-state.json`, que em Vercel é o disco da função. A
+       * escrita ACONTECE — por isso a rota responde 200 e isto não é um
+       * `so-local` —, e o próximo deploy apaga-a. A rota diz-o desde sempre
+       * (`duradouro: false`, com a frase em `aviso`); era esta leitura que
+       * faltava, e sem ela o indicador escrevia «guardado às 14:32» por cima do
+       * trabalho de horas de alguém.
+       *
+       * As fotos em si não se perdem — os bytes estão no bucket. O que se perde
+       * é a MONTAGEM: quais entraram, por que ordem, em que mood board.
+       *
+       * `undefined` quando o servidor não o disse. Só um `false` explícito
+       * alarma: inventar um alarme a partir de uma ausência era pôr um aviso
+       * permanente em instalações sãs, que é como se ensina a ignorá-lo.
+       */
+      duradouro?: boolean;
+      /** A frase do servidor para o caso de cima — diz o que fazer e nomeia as
+       *  variáveis que o resolvem. Vem escrita de lá para não haver duas
+       *  versões da mesma verdade. */
+      aviso?: string;
+    }
   /** Não ficou no servidor. O trabalho está no ecrã e na cópia local — e é isso
    *  mesmo que a pessoa tem de ouvir, com estas palavras. */
   | { estado: "so-local"; porque?: string };
@@ -765,6 +831,8 @@ export async function gravarRascunhoNoServidor(
           updatedAt: typeof dados?.updatedAt === "string" ? dados.updatedAt : undefined,
           overwrote: Boolean(dados?.overwrote),
           previousBy: typeof dados?.previousBy === "string" ? dados.previousBy : undefined,
+          duradouro: typeof dados?.duradouro === "boolean" ? dados.duradouro : undefined,
+          aviso: typeof dados?.aviso === "string" ? dados.aviso : undefined,
         };
       }
       porque = typeof dados?.erro === "string" ? dados.erro : undefined;
@@ -840,6 +908,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }, []);
 
   const [doc, setDoc] = useState<StudioDoc>(() => initialDoc(quote));
+  /**
+   * O documento COMO ESTÁ AGORA, para quem volta de uma ida à rede.
+   *
+   * Uma função `async` guarda o `doc` que existia quando ela CARREGOU no botão.
+   * Se a resposta demorar segundos — e a tradução demora —, esse documento já é
+   * história: entretanto entraram fotos, saíram fotos, arrumou-se a grelha. Lê-lo
+   * para decidir o que dizer, ou pô-lo de volta no estado, é apagar tudo isso.
+   *
+   * Isto é só para LER (contar, comparar). Quem ESCREVE continua a escrever pela
+   * forma funcional do `setDoc`, que é a única que o React garante actualizada.
+   */
+  const docRef = useRef(doc);
+  useEffect(() => {
+    docRef.current = doc;
+  }, [doc]);
   const [copiarAberto, setCopiarAberto] = useState(false);
   /**
    * Os campos que vieram de OUTRA proposta e ainda não foram confirmados.
@@ -875,6 +958,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   /** Já dissemos isto em voz alta? O indicador diz-o sempre; o aviso grande
    *  aparece UMA vez, para não virar ruído a cada 800 ms. */
   const avisouSoLocal = useRef(false);
+  /**
+   * O rascunho CHEGOU ao servidor e o próximo deploy apaga-o (produção sem base
+   * de dados — ver `duradouro` em `ResultadoDaGravacao`). `aviso` é a frase que
+   * o servidor manda, com o nome das variáveis que resolvem.
+   */
+  const [naoDuraAoDeploy, setNaoDuraAoDeploy] = useState<{ aviso?: string } | null>(null);
+  /** O mesmo contrato do `avisouSoLocal`: o indicador di-lo sempre, o aviso
+   *  grande uma vez. */
+  const avisouNaoDura = useRef(false);
   /**
    * Quantas gravações estão AGORA a caminho do servidor.
    *
@@ -1079,11 +1171,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * O servidor tem serviço de tradução configurado?
    *
    * Pergunta-se, não se adivinha: a chave vive do lado do servidor e o estúdio
-   * corre no navegador, onde ela nunca pode chegar. Começa em `false` — o lado
-   * seguro: um botão desligado que diz porquê é melhor do que um botão que
+   * corre no navegador, onde ela nunca pode chegar. Começa em `"desligada"` — o
+   * lado seguro: um botão desligado que diz porquê é melhor do que um botão que
    * promete uma tradução que não vai acontecer.
+   *
+   * ── E SÃO TRÊS ESTADOS E NÃO DOIS, PORQUE A FRASE MUDA ────────────────────
+   *
+   * `"indisponivel"` — a pergunta não chegou a ter resposta — desliga o botão
+   * exactamente como `"desligada"`, e isso está certo. O que não pode ser igual
+   * é o que se lê por baixo: «ainda não está ligada neste servidor» é uma
+   * afirmação sobre a CONFIGURAÇÃO, e dita sobre uma sessão caducada manda-a
+   * procurar uma chave em falta em vez de recarregar a página.
    */
-  const [traducaoLigada, setTraducaoLigada] = useState(false);
+  const [traducao, setTraducao] = useState<EstadoDaTraducao>("desligada");
+  const traducaoLigada = traducao === "ligada";
   const [confirmSend, setConfirmSend] = useState(false);
   /**
    * ── A MENSAGEM QUE SEGUE COM A PROPOSTA ───────────────────────────────────
@@ -1385,6 +1486,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
          * documento restaurado acabou de acender (ver logo a seguir).
          */
         if (meta?.bilingue === true) setBilingue(true);
+        /**
+         * ── A LÍNGUA ESCOLHIDA VOLTA COM O RASCUNHO ─────────────────────────
+         *
+         * Aqui dentro, no efeito que corre uma vez só, pela razão que o bloco
+         * de cima conta.
+         *
+         * E ao contrário do interruptor bilingue, esta lê-se NOS DOIS SENTIDOS
+         * (`setIdiomaDoPdf(meta.idioma)` e não `if (…=== "en")`): o interruptor
+         * tem uma segunda fonte — o documento com traduções lá dentro acende-o
+         * sozinho —, a língua não tem nenhuma. Guardar só o «en» era guardar
+         * metade da escolha, e voltar atrás para português deixava de pegar.
+         *
+         * Porque é que isto tem de sobreviver: a língua vai GRAVADA com o
+         * envio. Decide o email que o casal recebe, o nome do anexo, a página
+         * onde ele responde e a segunda descarga. Reposta em silêncio, uma
+         * proposta escrita e revista em inglês seguia em português para um
+         * casal que não lê português — e no ecrã nada tinha dito que a escolha
+         * se perdeu. Rascunhos guardados antes disto existir não trazem o
+         * campo: abrem em português, que é o que já faziam.
+         */
+        if (ehIdiomaDaProposta(meta?.idioma)) setIdiomaDoPdf(meta.idioma);
       }
     } catch {
       /* ignore corrupt draft */
@@ -1449,6 +1571,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }, []);
 
   /**
+   * O rascunho chegou ao servidor, e o servidor disse que o sítio não dura.
+   *
+   * Mesmo desenho do `registarSoLocal`, e de propósito: o indicador passa a
+   * dizê-lo enquanto for verdade, e o aviso grande sai UMA vez. A frase é a do
+   * servidor — quem lê isto é quem vai ter com quem gere a instalação, e uma
+   * frase com o nome da variável poupa-lhe a viagem de descobrir qual é.
+   *
+   * NÃO se oferece «tentar outra vez»: a tentativa seguinte cai no mesmo disco.
+   * O que resolve isto é ligar a base de dados, e é isso que a frase diz.
+   */
+  const registarNaoDura = useCallback(
+    (aviso?: string) => {
+      setNaoDuraAoDeploy({ aviso });
+      if (avisouNaoDura.current) return;
+      avisouNaoDura.current = true;
+      toast(
+        aviso ??
+          "Este rascunho ficou guardado apenas no disco do servidor, que é apagado no próximo deploy.",
+        "error",
+      );
+    },
+    [toast],
+  );
+
+  /** O sítio voltou a durar (ligaram a base de dados). Limpa e rearma, pela
+   *  mesma razão do `marcarGuardadoNoServidor`. */
+  const marcarQueDura = useCallback(() => {
+    setNaoDuraAoDeploy(null);
+    avisouNaoDura.current = false;
+  }, []);
+
+  /**
    * Manda o rascunho ao servidor e ARRUMA a verdade que voltar: o carimbo, o
    * indicador, o aviso. Está num sítio só porque são dois os caminhos que
    * gravam — o debounce de cada alteração e o resgate da abertura — e um deles
@@ -1466,6 +1620,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         if (r.estado === "guardado") {
           if (r.updatedAt) serverStamp.current = r.updatedAt;
           marcarGuardadoNoServidor();
+          // Só um `false` EXPLÍCITO alarma — ver `duradouro`. Um servidor que
+          // não diga nada é tratado como sempre foi.
+          if (r.duradouro === false) registarNaoDura(r.aviso);
+          else marcarQueDura();
         } else {
           registarSoLocal(r.porque);
         }
@@ -1474,7 +1632,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         setAGravarNoServidor((n) => Math.max(0, n - 1));
       }
     },
-    [quote.id, marcarGuardadoNoServidor, registarSoLocal],
+    [quote.id, marcarGuardadoNoServidor, registarSoLocal, registarNaoDura, marcarQueDura],
   );
 
   // ── O rascunho que está no SERVIDOR ──
@@ -1683,15 +1841,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * Uma pergunta, uma vez, ao abrir. A chave vive do lado do servidor — nunca
    * pode chegar ao navegador —, portanto o estúdio não tem como saber sozinho.
    *
-   * Falhando (sem rede, sessão caducada), fica `false`, que é o lado seguro: o
-   * botão diz que não está ligada em vez de prometer uma tradução que não vai
-   * acontecer. Nada aqui lê o `localStorage`, e por isso não pisa o efeito de
-   * restauro (ver o bloco «CORRE UMA VEZ SÓ»).
+   * Falhando (sem rede, sessão caducada), o botão fica desligado — o lado
+   * seguro, e é o que já fazia. O que MUDOU é que a falha se distingue de um
+   * «não»: `"indisponivel"` e não `"desligada"`, para a frase por baixo do
+   * botão não culpar a configuração de um problema que não é dela. Nada aqui lê
+   * o `localStorage`, e por isso não pisa o efeito de restauro (ver o bloco
+   * «CORRE UMA VEZ SÓ»).
    */
   useEffect(() => {
     let vivo = true;
-    void traducaoEstaLigada().then((ligada) => {
-      if (vivo && ligada) setTraducaoLigada(true);
+    void estadoDaTraducao().then((estado) => {
+      if (vivo) setTraducao(estado);
     });
     return () => {
       vivo = false;
@@ -1838,6 +1998,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             // mesma quando o documento tem traduções lá dentro. Nenhum trabalho
             // dela depende de isto sobreviver.
             bilingue,
+            // A língua escolhida. Ao lado do rascunho e não dentro dele: não é
+            // conteúdo da proposta — o mesmo documento sai nas duas línguas —,
+            // é a escolha que ela fez para ESTE envio. E é a única das três
+            // linhas daqui que, perdida, muda o que o cliente recebe.
+            idioma: idiomaDoPdf,
           }),
         );
         setGravadoEm(new Date());
@@ -1886,6 +2051,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // O mesmo para o interruptor: sem ele aqui, ligá-lo e fechar o separador
     // devolvia o ecrã de uma língua só na abertura seguinte.
     bilingue,
+    // E o mesmo para a língua: sem ela aqui, escolher «Inglês» não voltava a
+    // agendar a gravação, e o `meta` guardado continuava a dizer «pt».
+    idiomaDoPdf,
     DRAFT_KEY,
     SIDE_KEY,
     quote.id,
@@ -3583,6 +3751,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * (`traduzirParaIngles`), e a razão está lá escrita: uma resposta a que
    * faltem textos punha a tradução de um campo noutro campo, em silêncio.
    * Falhando, o que se vê é uma frase a dizê-lo e o documento como estava.
+   *
+   * ── E O QUE ELA FIZER ENQUANTO A TRADUÇÃO VEM A CAMINHO ──────────────────
+   *
+   * Fica. O relato que trouxe isto, à letra: «quando alterou para inglês, deu,
+   * mas já estava a alterar fotos». A tradução DEU — e as fotos que ela mexeu
+   * nos segundos da ida à rede desapareceram, porque o que voltava era o
+   * documento de há dez segundos, posto de volta inteiro. A gravação automática
+   * gravava a versão amputada logo a seguir, no `localStorage` e no servidor:
+   * trabalho perdido nos dois sítios, sem uma palavra.
+   *
+   * Por isso o que se aplica NÃO é o documento traduzido: são as traduções, uma
+   * a uma, escritas no documento como ele estiver neste instante — e só nos
+   * campos cujo português ainda é o que foi mandado traduzir (ver
+   * `aplicarTraducao`). É a mesma disciplina da cópia de fotos de um modelo
+   * parcial, aqui ao lado.
    */
   async function traduzirTudo() {
     if (!traducaoLigada || aTraduzir) return;
@@ -3593,17 +3776,63 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         toast(`Não deu para traduzir: ${r.porqueFalhou}. O documento ficou como estava.`, "error");
         return;
       }
-      if (r.escritos === 0) {
+      // «Não havia nada por traduzir» só é verdade quando não se pediu nada ao
+      // serviço. Pedir e não receber é outra coisa — e dizer-lhe que não havia
+      // nada a fazer sobre uma proposta que ficou inteira em português é a
+      // mentira mais cara que este botão pode contar.
+      if (r.escritos === 0 && r.naoVieram === 0) {
         toast("Não havia nada por traduzir.", "info");
         return;
       }
-      setDoc(r.doc);
-      toast(
-        r.escritos === 1
-          ? "1 campo traduzido. Vale a pena passar os olhos."
-          : `${r.escritos} campos traduzidos. Vale a pena passar os olhos.`,
-        "success",
-      );
+      // O documento de AGORA, e não o que foi mandado traduzir. A contagem sai
+      // daqui; a escrita passa pela forma funcional, que é a que o React
+      // garante actualizada mesmo que este `ref` esteja um instante atrás.
+      const antes = docRef.current;
+      const aplicado = aplicarTraducao(antes, r.escritas);
+      setDoc((d) => (d === antes ? aplicado.doc : aplicarTraducao(d, r.escritas).doc));
+      if (aplicado.escritos > 0) {
+        toast(
+          aplicado.escritos === 1
+            ? "1 campo traduzido. Vale a pena passar os olhos."
+            : `${aplicado.escritos} campos traduzidos. Vale a pena passar os olhos.`,
+          "success",
+        );
+      }
+      /**
+       * ── O QUE FOI PEDIDO AO SERVIÇO E NÃO VOLTOU ─────────────────────────
+       *
+       * O motor manda os textos em lotes de 50 e um lote que falhe volta VAZIO
+       * nas suas posições, de propósito: os que já vieram não se deitam fora
+       * nem se pagam duas vezes. Só atira quando NENHUM lote passa.
+       *
+       * Sem esta frase, uma proposta grande com um 429 (ou uma quota que acaba
+       * no segundo lote) mostrava «50 campos traduzidos», a verde, e deixava 70
+       * em português sem uma palavra. Do lado dela isso é «não está a dar» —
+       * dá numa proposta pequena e não dá numa grande, e o número que aparece
+       * está certo.
+       *
+       * Diz-se também que vale a pena insistir, porque vale: o que já veio está
+       * escrito, e a carregada seguinte só manda o que falta.
+       */
+      if (r.naoVieram > 0) {
+        toast(
+          r.naoVieram === 1
+            ? "1 campo não voltou do serviço de tradução e ficou em português. Carrega outra vez — o que já veio fica como está."
+            : `${r.naoVieram} campos não voltaram do serviço de tradução e ficaram em português. Carrega outra vez — o que já veio fica como está.`,
+          "error",
+        );
+      }
+      // Os campos que mudaram debaixo da tradução ficam por traduzir, e é isso
+      // que eles são. Dizê-lo aqui evita a única leitura errada possível — «eu
+      // traduzi isto» sobre um campo que ficou em português.
+      if (aplicado.ignorados.length > 0) {
+        toast(
+          aplicado.ignorados.length === 1
+            ? "1 campo mudou enquanto a tradução vinha e ficou por traduzir."
+            : `${aplicado.ignorados.length} campos mudaram enquanto a tradução vinha e ficaram por traduzir.`,
+          "info",
+        );
+      }
     } finally {
       setATraduzir(false);
     }
@@ -4522,15 +4751,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <span aria-hidden="true">⇄</span>
                 {aTraduzir ? "A traduzir…" : "Traduzir para inglês"}
               </button>
-              {traducaoLigada ? (
+              {/* ── AS TRÊS FRASES, E PORQUE É QUE NÃO SÃO DUAS ─────────────
+                  O botão fica desligado nos dois casos maus, e isso está certo.
+                  A frase é que não pode ser a mesma: «ainda não está ligada
+                  neste servidor» é uma afirmação sobre a CONFIGURAÇÃO, e quem a
+                  lê ou vai pôr a chave ou desiste e escreve as caixas à mão.
+                  Dita sobre uma sessão caducada ou uma rede que caiu, manda-a
+                  resolver um problema que não existe enquanto o verdadeiro se
+                  cura recarregando a página. */}
+              {traducao === "ligada" ? (
                 <p className="text-[11px] leading-snug text-foreground/50">
                   Preenche as caixas «EN» que ainda estão vazias. O que já escreveste fica como está
                   — e vale a pena passar os olhos pelo que sair.
                 </p>
-              ) : (
+              ) : traducao === "desligada" ? (
                 <p className="text-[11px] leading-snug text-foreground/50">
                   A tradução automática ainda não está ligada neste servidor. Até lá, as caixas «EN»
                   escrevem-se à mão, e o que ficar em branco sai em português.
+                </p>
+              ) : (
+                <p className="text-[11px] leading-snug text-foreground/50">
+                  Não deu para saber se a tradução automática está ligada — o servidor não
+                  respondeu. Recarrega a página; se continuar assim, entretanto as caixas «EN»
+                  escrevem-se à mão e o que ficar em branco sai em português.
                 </p>
               )}
             </div>
@@ -6112,6 +6355,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 budgetCosts: custosDe(d as ProposalDoc).map((v, j) => (j === i ? custo : v)),
               }))
             }
+            /**
+             * Os quilómetros até ao local ficam no DOCUMENTO, não num estado
+             * do ecrã: é isso que os torna o número desta proposta e que
+             * impede que mudar a sede ou o preço do gasóleo lhes toque depois.
+             *
+             * `null` apaga o campo — «não decidi», e a tabela volta a sugerir.
+             * Escrever 0 aqui seria dizer «é em casa», que é outra coisa.
+             */
+            onKm={(km) =>
+              setDoc((d) => {
+                if (km === null) {
+                  const { kmDeslocacao: _fora, ...resto } = d;
+                  void _fora;
+                  return resto;
+                }
+                return { ...d, kmDeslocacao: km };
+              })
+            }
             onDeslocacao={(label, valueText) => {
               // Se já lá está uma linha de deslocação, actualiza-se essa em
               // vez de acrescentar uma segunda — duas linhas de deslocação
@@ -6721,7 +6982,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            de um toque que não pegou.
            A partir de `lg` a navegação passa a barra lateral e a folga deixa de
            fazer sentido. */
-        className="sticky bottom-[calc(56px+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3 lg:bottom-0"
+        /* Esta barra pousa EM CIMA da barra de destinos do telemóvel, portanto
+           a sua distância ao fundo é a altura dessa barra — que passou a viver
+           no token `--bo-barra-inferior`. Era a quarta cópia do «56px», e com a
+           barra a crescer para 72 px ficava a tapá-la. `lg:bottom-0` porque
+           acima de 1024 não há barra nenhuma por baixo. */
+        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3 lg:bottom-0"
       >
         {step === "conteudo" && (
           <>
@@ -6766,16 +7032,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   Preenche o conteúdo e avança para pré-visualizar.
                 </span>
               )}
-              {(gravadoEm || porGravar || soNesteComputador) &&
+              {(gravadoEm || porGravar || soNesteComputador || naoDuraAoDeploy) &&
                 (() => {
                   const estado: EstadoDaGravacaoNoEcra =
                     porGravar || aGravarNoServidor > 0
                       ? "a-guardar"
                       : soNesteComputador
                         ? "so-neste-computador"
-                        : "guardado";
+                        : // Depois do `so-neste-computador` e não antes: não
+                          // chegar ao servidor é pior do que chegar a um sítio
+                          // que não dura, e o indicador só diz uma coisa.
+                          naoDuraAoDeploy
+                          ? "nao-dura-ao-deploy"
+                          : "guardado";
                   const t = textoDaGravacao(estado, gravadoEm);
-                  const alarme = estado === "so-neste-computador";
+                  const alarme =
+                    estado === "so-neste-computador" || estado === "nao-dura-ao-deploy";
                   return (
                     <span
                       // O aviso não pode ter o cinzento discreto dos outros dois:
@@ -6788,9 +7060,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       }
                       aria-live={alarme ? "assertive" : "polite"}
                       title={
-                        alarme && soNesteComputador?.porque
+                        estado === "so-neste-computador" && soNesteComputador?.porque
                           ? `${t.longo} — ${soNesteComputador.porque}`
-                          : t.longo
+                          : estado === "nao-dura-ao-deploy" && naoDuraAoDeploy?.aviso
+                            ? `${t.longo} — ${naoDuraAoDeploy.aviso}`
+                            : t.longo
                       }
                     >
                       {/* No telemóvel os outros dois estados são um glifo; este

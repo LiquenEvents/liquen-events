@@ -218,3 +218,64 @@ export const eurDocumento = (n: number, moeda = "EUR"): string =>
       useGrouping: "always",
     }).format(n || 0),
   );
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O DINHEIRO NA FOLHA INGLESA — «4.600,00 €» → «€4,600.00»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Decisão da dona da casa: numa proposta inglesa o dinheiro escreve-se à
+ * inglesa, com o símbolo à frente. A folha portuguesa não muda nada.
+ *
+ * ── PORQUE É QUE ISTO TRABALHA SOBRE TEXTO, E NÃO SOBRE NÚMEROS ───────────
+ *
+ * Seria mais limpo formatar o número na origem. Só que METADE do dinheiro
+ * desta folha nunca foi número nosso: o «Valor Total», os valores adicionais e
+ * o preço estimado do modelo de Organização são CAMPOS LIVRES que ela escreve
+ * («2.950,79 €», «a partir de 4.600,00 €»). Converter só as nossas contas
+ * punha «€4,600.00» e «4.600,00 €» na mesma coluna do mesmo quadro — que é
+ * pior do que não converter nada, porque parece que os números vieram de
+ * sítios diferentes. Vieram; não se deve notar.
+ *
+ * ── COMO SE RECONHECE UM MONTANTE SEM ENGANO ──────────────────────────────
+ *
+ * Pelo SÍMBOLO DE MOEDA colado a ele, que é a mesma regra de segurança do
+ * {@link milharesComPonto}: um ano («2026»), uma referência («LIQ-2026-0007»),
+ * uma contagem de convidados ou uma data não têm um «€» atrás, e por isso não
+ * são tocados. O que não parece dinheiro fica exactamente como ela o escreveu.
+ *
+ * ── OS CÊNTIMOS APARECEM ──────────────────────────────────────────────────
+ *
+ * «2500 €» sai «€2,500.00». Numa folha de dinheiro as colunas alinham pelos
+ * cêntimos, e um valor sem eles fica a discordar dos vizinhos.
+ *
+ * ── E CONTINUA DESENHÁVEL ─────────────────────────────────────────────────
+ *
+ * Os três caracteres em jogo existem na codificação WinAnsi com que o pdf-lib
+ * desenha (a vírgula e o ponto são ASCII, o «€» é 0x80 no CP1252), e o
+ * resultado já não tem espaço nenhum entre o símbolo e o número — portanto
+ * desaparece também o risco de o «€» cair sozinho para a linha seguinte.
+ */
+const MONTANTE_PT = /(-?)(\d[\d.   ]*?)(?:,(\d{1,2}))?\s*([€$£])/g;
+
+/** A vírgula decimal de uma percentagem («23,5%»), que em inglês é ponto. */
+const PERCENTAGEM_PT = /(\d+),(\d+)(?=\s*%)/g;
+
+export function montantesEmIngles(texto: string): string {
+  return texto
+    .replace(
+      MONTANTE_PT,
+      (_todo, sinal: string, inteiros: string, centimos: string | undefined, simbolo: string) => {
+        const digitos = inteiros.replace(/[^\d]/g, "");
+        if (!digitos) return _todo;
+        const agrupados = digitos.replace(/\B(?=(\d{3})+$)/g, ",");
+        return `${sinal}${simbolo}${agrupados}.${(centimos ?? "").padEnd(2, "0")}`;
+      },
+    )
+    .replace(PERCENTAGEM_PT, "$1.$2");
+}
+
+/** O montante na língua do documento. Em português, nada muda. */
+export function montanteNaLingua(texto: string, idioma: "pt" | "en"): string {
+  return idioma === "en" ? montantesEmIngles(texto) : texto;
+}

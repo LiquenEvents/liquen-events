@@ -26,7 +26,6 @@ vi.mock("@/lib/proposals-store", () => ({
 vi.mock("next/image", () => ({ default: () => null }));
 // O bloco de resposta é um Client Component com estado próprio e testes seus;
 // aqui interessa a página, por isso entra como um marcador.
-vi.mock("./ProposalResponse", () => ({ default: () => <div data-testid="resposta" /> }));
 /**
  * O dicionário do duplo DEPENDE da língua, ao contrário do que estava aqui
  * antes (devolvia sempre o português). Sem isso, um teste sobre «esta página
@@ -56,6 +55,8 @@ vi.mock("@/lib/i18n", () => ({
             validoAte: "Valid until",
             verPdf: "View the full proposal (PDF)",
             footerNote: "…",
+            respostaComo: "Let us know by email or by phone whether you would like to go ahead.",
+            respostaExpirada: "This proposal is past its validity date.",
             dateLocale: "en-GB",
           }
         : {
@@ -75,6 +76,8 @@ vi.mock("@/lib/i18n", () => ({
             validoAte: "Válida até",
             verPdf: "Ver a proposta completa (PDF)",
             footerNote: "…",
+            respostaComo: "Diga-nos por e-mail ou por telefone se quer avançar com esta proposta.",
+            respostaExpirada: "O prazo de validade desta proposta já passou.",
             dateLocale: "pt-PT",
           },
   }),
@@ -124,8 +127,9 @@ describe("página pública da proposta — o botão do PDF", () => {
     db.proposal = proposta();
     await abrir();
     expect(screen.queryByRole("link", { name: /PDF/i })).toBeNull();
-    // E a página continua a servir para o que serve: rever o valor e responder.
-    expect(screen.getByTestId("resposta")).toBeTruthy();
+    // E a página continua a servir para o que serve: rever o valor e saber como
+    // responder — por email ou por telefone, que é a única forma que há.
+    expect(screen.getByText(/por e-mail ou por telefone/i)).toBeTruthy();
   });
 
   it("um token inválido não chega sequer a mostrar uma proposta", async () => {
@@ -250,5 +254,65 @@ describe("página pública da proposta — o título do separador", () => {
       params: Promise.resolve({ lang: "en", token: "mau" }),
     });
     expect(meta.title).toBe("Your proposal | Líquen Events");
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * «OLÁ, .» — O TÍTULO DA PÁGINA ONDE O CASAL DECIDE
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * O título era escrito a seco: `{t.greeting}, {proposal.clientName.split(" ")[0]}.`
+ *
+ * Com o nome do cliente vazio — uma linha em que `client_name` ficou a `null`,
+ * que o `fromRow` de `proposals-store` traduz para `""` — a primeira coisa que
+ * o casal lia ao abrir o link do email, em Playfair a 52 px, era «Olá, .».
+ * Medido no browser (390×844, a página servida em dev), antes da correcção:
+ *
+ *     H1 = "Olá, ."
+ *
+ * E com o campo AUSENTE de todo, o `.split` de `undefined` atirava — a página
+ * rebentava e o casal apanhava o ecrã «Ocorreu um erro inesperado» em vez da
+ * proposta que veio ver. Também medido, no registo do servidor:
+ *
+ *     TypeError: Cannot read properties of undefined (reading 'split')
+ *       at ProposalPage (page.tsx:229:48)
+ *
+ * Sem nome cumprimenta-se na mesma — «Olá.» é uma frase inteira e não denuncia
+ * que falta um dado. Com nome, nada muda: continua a ser o primeiro nome.
+ */
+describe("página pública da proposta — o cumprimento", () => {
+  it("cumprimenta pelo PRIMEIRO nome", async () => {
+    db.proposal = proposta({ clientName: "Ana Dias" });
+    await abrir();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Ana.");
+  });
+
+  it("sem nome nenhum, escreve «Olá.» — nunca «Olá, .»", async () => {
+    db.proposal = proposta({ clientName: "" });
+    await abrir();
+    const titulo = screen.getByRole("heading", { level: 1 }).textContent ?? "";
+    expect(titulo).toBe("Olá.");
+    expect(titulo, "a vírgula pendurada é o defeito").not.toContain(", .");
+  });
+
+  it("um nome só de espaços conta como nome nenhum", async () => {
+    db.proposal = proposta({ clientName: "   " });
+    await abrir();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá.");
+  });
+
+  it("sem o campo de todo, a página abre em vez de rebentar", async () => {
+    db.proposal = proposta({ clientName: undefined });
+    await abrir();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá.");
+    // E continua a ser a página da proposta, não uma página de erro.
+    expect(screen.getByText(/por e-mail ou por telefone/i)).toBeTruthy();
+  });
+
+  it("em inglês, a mesma regra", async () => {
+    db.proposal = proposta({ clientName: "", idioma: "en" });
+    await abrir("bom", "en");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Hello.");
   });
 });

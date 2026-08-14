@@ -2,19 +2,18 @@ import { describe, it, expect } from "vitest";
 import {
   deriveStage,
   computeEventMetrics,
-  reconcileFinance,
+  paidTotal,
   nextAction,
   countdownDays,
   type DossierData,
-  type DossierInvoice,
   type EventStage,
 } from "./dossier";
 import type { Quote, Proposal, Payment, EventSupplier, Guest } from "./types";
 
 /**
  * O modelo de domínio do Dossier é puro, por isso ganha cobertura exaustiva: a
- * máquina de estados `deriveStage` (toda a tabela, lead → concluído + perdido),
- * as métricas com IVA e a reconciliação livro-de-faturas vs pagamentos informais.
+ * máquina de estados `deriveStage` (toda a tabela, lead → concluído + perdido)
+ * e as métricas com IVA, que assentam todas no registo de pagamentos.
  * Todos os testes injectam um `today` fixo — nunca dependem do relógio real.
  */
 
@@ -89,14 +88,14 @@ function makeProposal(over: Partial<Proposal> = {}): Proposal {
   };
 }
 
-function invoice(over: Partial<DossierInvoice> = {}): DossierInvoice {
+/** Linha de pagamento RECEBIDA; os testes sobrepõem só o que importa. */
+function pago(over: Partial<Payment> = {}): Payment {
   return {
-    id: "i1",
-    number: "FT 2026/0001",
+    id: "pay1",
     kind: "sinal",
     amount: 6000,
-    status: "emitida",
-    issuedAt: "2026-02-05",
+    date: "2026-02-10",
+    paid: true,
     ...over,
   };
 }
@@ -106,7 +105,6 @@ function data(over: Partial<DossierData> = {}): DossierData {
     quote: makeQuote(),
     proposal: null,
     contract: null,
-    invoices: [],
     ...over,
   };
 }
@@ -165,10 +163,10 @@ describe("deriveStage", () => {
     expect(deriveStage(d, TODAY)).toBe("sinal_pago");
   });
 
-  it("em_producao: accepted AND sinal paid (via paid sinal invoice)", () => {
+  it("em_producao: accepted AND sinal paid", () => {
     const d = data({
+      quote: makeQuote({ payments: [pago({ kind: "sinal" })] }),
       proposal: makeProposal({ status: "aceite" }),
-      invoices: [invoice({ kind: "sinal", status: "paga" })],
     });
     expect(deriveStage(d, TODAY)).toBe("em_producao");
   });
@@ -183,9 +181,8 @@ describe("deriveStage", () => {
 
   it("concluido: event passed AND saldo paid", () => {
     const d = data({
-      quote: makeQuote({ date: "2026-07-01" }),
+      quote: makeQuote({ date: "2026-07-01", payments: [pago({ kind: "saldo", amount: 14000 })] }),
       proposal: makeProposal({ status: "aceite", total: 20000 }),
-      invoices: [invoice({ kind: "saldo", amount: 14000, status: "paga" })],
     });
     expect(deriveStage(d, TODAY)).toBe("concluido");
   });
@@ -196,21 +193,28 @@ describe("deriveStage", () => {
     // event reaches concluido (regression: `${date}T23:59:59` on a datetime → NaN
     // → eventPassed=false → stuck one stage back).
     const d = data({
-      quote: makeQuote({ date: "2026-07-01T18:30:00Z" }),
+      quote: makeQuote({
+        date: "2026-07-01T18:30:00Z",
+        payments: [pago({ kind: "saldo", amount: 14000 })],
+      }),
       proposal: makeProposal({ status: "aceite", total: 20000 }),
-      invoices: [invoice({ kind: "saldo", amount: 14000, status: "paga" })],
     });
     expect(deriveStage(d, TODAY)).toBe("concluido");
   });
 
-  it("concluido: event passed and ledgerPaid >= contracted total", () => {
+  it("concluido: rede de segurança — contratado coberto sem nenhuma linha «saldo»", () => {
+    // Ninguém rotulou a última parcela como saldo: são duas linhas «pagamento».
+    // O evento passou e o contratado está inteiro na mão — tem de fechar, senão
+    // o casamento fica preso em `em_producao` e acumula no quadro para sempre.
     const d = data({
-      quote: makeQuote({ date: "2026-07-01" }),
+      quote: makeQuote({
+        date: "2026-07-01",
+        payments: [
+          pago({ kind: "pagamento", amount: 6000 }),
+          pago({ id: "pay2", kind: "pagamento", amount: 14000 }),
+        ],
+      }),
       proposal: makeProposal({ status: "aceite", total: 20000 }),
-      invoices: [
-        invoice({ kind: "sinal", amount: 6000, status: "paga" }),
-        invoice({ id: "i2", kind: "saldo", amount: 14000, status: "paga" }),
-      ],
     });
     expect(deriveStage(d, TODAY)).toBe("concluido");
   });
@@ -242,9 +246,8 @@ describe("deriveStage", () => {
     // Sem `quote.date`: eventPassed=false e countdownDays=null, por isso a semana
     // do evento nunca dispara e a fase assenta em em_producao.
     const d = data({
-      quote: makeQuote({ date: "" }),
+      quote: makeQuote({ date: "", payments: [pago({ kind: "sinal" })] }),
       proposal: makeProposal({ status: "aceite" }),
-      invoices: [invoice({ kind: "sinal", status: "paga" })],
     });
     expect(deriveStage(d, TODAY)).toBe("em_producao");
   });
@@ -255,9 +258,8 @@ describe("deriveStage", () => {
     // dia mantém-no na semana do evento até à meia-noite seguinte.
     const afternoon = new Date("2026-07-18T15:00:00Z");
     const d = data({
-      quote: makeQuote({ date: "2026-07-18" }),
+      quote: makeQuote({ date: "2026-07-18", payments: [pago({ kind: "saldo", amount: 14000 })] }),
       proposal: makeProposal({ status: "aceite", total: 20000 }),
-      invoices: [invoice({ kind: "saldo", amount: 14000, status: "paga" })],
     });
     expect(countdownDays("2026-07-18", afternoon)).toBe(0);
     expect(deriveStage(d, afternoon)).toBe("semana_evento");
@@ -282,19 +284,24 @@ describe("computeEventMetrics", () => {
     { id: "g3", name: "Amigo C", party: 2, rsvp: "confirmado" },
   ];
 
-  it("computes contracted, ledger, margin, rsvp and countdown with IVA", () => {
+  it("computes contracted, paid, margin, rsvp and countdown with IVA", () => {
     const d = data({
-      quote: makeQuote({ date: "2026-07-25", eventSuppliers: suppliers, guestList: guests }),
+      quote: makeQuote({
+        date: "2026-07-25",
+        eventSuppliers: suppliers,
+        guestList: guests,
+        // Sinal recebido; saldo registado mas ainda POR receber — só o primeiro
+        // conta para o «Recebido» e para a percentagem.
+        payments: [
+          pago({ kind: "sinal", amount: 6000 }),
+          pago({ id: "pay2", kind: "saldo", amount: 14000, paid: false }),
+        ],
+      }),
       proposal: makeProposal({ total: 20000 }),
-      invoices: [
-        invoice({ kind: "sinal", amount: 6000, status: "paga" }),
-        invoice({ id: "i2", kind: "saldo", amount: 14000, status: "emitida" }),
-      ],
     });
     const m = computeEventMetrics(d, TODAY);
     expect(m.contracted).toBe(20000);
-    expect(m.ledgerIssued).toBe(20000); // both non-anulada
-    expect(m.ledgerPaid).toBe(6000);
+    expect(m.paid).toBe(6000);
     expect(m.pctPaid).toBeCloseTo(0.3, 5);
     expect(m.supplierCosts).toBe(4200 + 1500); // actualCost ?? estimatedCost
     // A margem corre em LÍQUIDO dos dois lados: a proposta de 20.000 € brutos
@@ -332,29 +339,47 @@ describe("computeEventMetrics", () => {
     const m = computeEventMetrics(d, TODAY);
     expect(m.supplierCosts).toBe(0);
     // 5 000 € é o "Preço final (sem IVA)". O valor CONTRATADO é o que o cliente
-    // paga (6 150 €), porque é com pagamentos e facturas que ele se compara; a
-    // MARGEM é sobre o líquido, e sem custos nenhuns é o preço todo.
+    // paga (6 150 €), porque é com os pagamentos que ele se compara; a MARGEM é
+    // sobre o líquido, e sem custos nenhuns é o preço todo.
     expect(m.contracted).toBe(6150);
     expect(m.margin).toBe(5000);
     expect(m.rsvpTotal).toBe(2); // 0 + 2
     expect(m.rsvpConfirmed).toBe(2); // party 0 contributes nothing
   });
 
-  it("excludes anulada invoices from ledgerIssued; pctPaid is 0 when nothing contracted", () => {
+  it("pctPaid é 0 quando não há nada contratado — nunca uma divisão por zero", () => {
     const d = data({
-      quote: makeQuote({ quotedPrice: undefined, priceBreakdown: undefined as never }),
-      invoices: [invoice({ status: "anulada", amount: 999 })],
+      quote: makeQuote({
+        quotedPrice: undefined,
+        priceBreakdown: undefined as never,
+        payments: [pago({ amount: 999 })],
+      }),
     });
     const m = computeEventMetrics(d, TODAY);
     expect(m.contracted).toBe(0);
-    expect(m.ledgerIssued).toBe(0);
+    expect(m.paid).toBe(999);
     expect(m.pctPaid).toBe(0);
+  });
+
+  it("pagamentos POR receber não contam para o recebido", () => {
+    const d = data({
+      quote: makeQuote({
+        payments: [
+          pago({ kind: "sinal", amount: 3690 }),
+          pago({ id: "pay2", kind: "saldo", amount: 8610, paid: false }),
+        ],
+      }),
+    });
+    const m = computeEventMetrics(d, TODAY);
+    expect(m.contracted).toBe(12300);
+    expect(m.paid).toBe(3690);
+    expect(m.pctPaid).toBeCloseTo(0.3, 5);
   });
 
   it("falls back quotedPrice → priceBreakdown.total when no proposal, sempre com IVA", () => {
     // O `quotedPrice` é líquido ("Preço final (sem IVA)") e o `priceBreakdown.total`
     // é bruto: o contratado converte o primeiro à taxa efetiva para os dois ramos
-    // saírem na MESMA unidade (com IVA) — é com ela que se comparam pagamentos.
+    // saírem na MESMA unidade (com IVA) — é com ela que se comparam os pagamentos.
     expect(
       computeEventMetrics(data({ quote: makeQuote({ quotedPrice: 15000 }) }), TODAY).contracted,
     ).toBe(18450); // 15 000 × 1,23
@@ -362,32 +387,49 @@ describe("computeEventMetrics", () => {
   });
 });
 
-describe("reconcileFinance", () => {
-  it("diverges when informal payments do not match the ledger", () => {
+describe("paidTotal — o «Recebido» de um evento", () => {
+  /**
+   * Esta era a suite do `reconcileFinance`, que confrontava o registo de
+   * pagamentos com o livro de facturas. O livro saiu com a facturação e a
+   * reconciliação com ele (ver a nota em `dossier.ts`); o que ficou a valer, e
+   * que aqueles testes cobriam pelo lado do registo, é ESTA conta — a que
+   * alimenta o «Recebido» do painel de Pagamentos, o «% Recebido» do dossiê e
+   * o «Recebido» da Visão Geral.
+   */
+  it("soma as linhas dadas por recebidas e ignora as que não estão", () => {
     const d = data({
       quote: makeQuote({
-        payments: [{ id: "p", kind: "sinal", amount: 6000, date: "2026-02-10", paid: true }],
+        payments: [
+          pago({ id: "p1", kind: "sinal", amount: 6000 }),
+          pago({ id: "p2", kind: "saldo", amount: 14000, paid: false }),
+        ],
       }),
-      invoices: [], // nothing issued in the ledger
     });
-    const r = reconcileFinance(d);
-    expect(r.informalPaid).toBe(6000);
-    expect(r.ledgerPaid).toBe(0);
-    expect(r.diverges).toBe(true);
+    expect(paidTotal(d.quote)).toBe(6000);
   });
 
-  it("agrees (no divergence) when both sides match to the cent", () => {
-    const d = data({
-      quote: makeQuote({
-        payments: [{ id: "p", kind: "sinal", amount: 6000, date: "2026-02-10", paid: true }],
-      }),
-      invoices: [invoice({ kind: "sinal", amount: 6000, status: "paga" })],
-    });
-    expect(reconcileFinance(d).diverges).toBe(false);
+  it("é 0 sem pagamentos nenhuns (e sem o campo sequer)", () => {
+    expect(paidTotal(makeQuote())).toBe(0);
+    expect(paidTotal(makeQuote({ payments: [] }))).toBe(0);
   });
 
-  it("does not diverge when both sides are empty", () => {
-    expect(reconcileFinance(data()).diverges).toBe(false);
+  it("arredonda aos cêntimos — um desvio de vírgula flutuante não deixa um evento aquém do total", () => {
+    const q = makeQuote({
+      payments: [pago({ id: "p1", amount: 0.1 }), pago({ id: "p2", amount: 0.2 })],
+    });
+    // 0.1 + 0.2 === 0.30000000000000004 em vírgula flutuante.
+    expect(paidTotal(q)).toBe(0.3);
+  });
+
+  it("conta todas as espécies — sinal, saldo e avulso", () => {
+    const q = makeQuote({
+      payments: [
+        pago({ id: "p1", kind: "sinal", amount: 3690 }),
+        pago({ id: "p2", kind: "pagamento", amount: 1000 }),
+        pago({ id: "p3", kind: "saldo", amount: 7610 }),
+      ],
+    });
+    expect(paidTotal(q)).toBe(12300);
   });
 });
 
@@ -395,39 +437,35 @@ describe("nextAction", () => {
   it("maps each stage to a sensible kind", () => {
     expect(nextAction("lead", data()).kind).toBe("proposta");
     expect(nextAction("proposta_enviada", data()).kind).toBe("portal");
-    expect(nextAction("aceite", data()).kind).toBe("fatura_sinal");
+    expect(nextAction("aceite", data()).kind).toBe("sinal");
     expect(nextAction("sinal_pago", data()).kind).toBe("producao");
     expect(nextAction("em_producao", data()).kind).toBe("producao");
     expect(nextAction("concluido", data()).kind).toBe("arquivar");
     expect(nextAction("perdido", data()).kind).toBe("none");
   });
 
-  it("semana_evento distinguishes unpaid saldo (fatura_saldo) from fully paid (runsheet)", () => {
-    const unpaid = data({ proposal: makeProposal({ total: 20000 }), invoices: [] });
-    expect(nextAction("semana_evento", unpaid).kind).toBe("fatura_saldo");
+  it("semana_evento distingue saldo por receber (saldo) de tudo recebido (runsheet)", () => {
+    const unpaid = data({ proposal: makeProposal({ total: 20000 }) });
+    expect(nextAction("semana_evento", unpaid).kind).toBe("saldo");
 
-    const paid = data({
+    const liquidado = data({
+      quote: makeQuote({ payments: [pago({ kind: "saldo", amount: 20000 })] }),
       proposal: makeProposal({ total: 20000 }),
-      invoices: [invoice({ kind: "total", amount: 20000, status: "paga" })],
     });
-    expect(nextAction("semana_evento", paid).kind).toBe("runsheet");
+    expect(nextAction("semana_evento", liquidado).kind).toBe("runsheet");
   });
 
   /**
-   * O DINHEIRO REGISTADO À MÃO TAMBÉM É DINHEIRO RECEBIDO.
+   * NÃO PEDIR DINHEIRO QUE JÁ ESTÁ NA CONTA.
    *
-   * `deriveStage` já o diz com todas as letras (é por isso que existe o
-   * `combinedPaidTotal`), e o painel de Pagamentos mostra o "Recebido" a partir
-   * do registo à mão — que é o caminho que o estúdio usa: recebe-se a
-   * transferência, marca-se a linha como paga, e a factura emite-se quando der.
-   *
-   * A próxima acção ficou a olhar só para o livro de faturas. Num casamento de
-   * 12.300 € integralmente pago e registado, na semana do evento, o cabeçalho
-   * mandava «Liquidar o saldo (70%) — falta liquidar o saldo antes do dia»:
-   * 8.610 € pedidos a um casal que já os tinha transferido.
+   * O erro histórico: a próxima acção olhava só para o livro de facturas, e num
+   * casamento de 12.300 € integralmente recebido e registado o cabeçalho
+   * mandava, na semana do evento, «Liquidar o saldo (70%)» — 8.610 € pedidos a
+   * um casal que já os tinha transferido. A fase e a frase têm de sair da mesma
+   * conta, que hoje é uma só.
    */
-  it("semana_evento: o saldo pago à mão já não pede para liquidar o saldo", () => {
-    const pago = data({
+  it("semana_evento: o saldo recebido e registado já não pede para liquidar o saldo", () => {
+    const liquidado = data({
       quote: makeQuote({
         date: "2026-07-22", // quatro dias depois do TODAY
         payments: [
@@ -436,11 +474,10 @@ describe("nextAction", () => {
         ],
       }),
       contract: { status: "aceite", acceptedAt: "2026-03-01T10:00:00Z" },
-      invoices: [],
     });
     // O contratado (com IVA) do `priceBreakdown` são 12.300 €, e é isso que
     // está registado como recebido.
-    expect(deriveStage(pago, TODAY)).toBe("semana_evento");
-    expect(nextAction("semana_evento", pago).kind).toBe("runsheet");
+    expect(deriveStage(liquidado, TODAY)).toBe("semana_evento");
+    expect(nextAction("semana_evento", liquidado).kind).toBe("runsheet");
   });
 });

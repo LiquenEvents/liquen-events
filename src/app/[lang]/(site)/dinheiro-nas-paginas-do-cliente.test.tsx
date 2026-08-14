@@ -47,7 +47,6 @@ vi.mock("@/lib/proposals-store", () => ({
   getProposalByQuote: vi.fn(async () => null),
 }));
 vi.mock("next/image", () => ({ default: () => null }));
-vi.mock("./proposta/[token]/ProposalResponse", () => ({ default: () => <div /> }));
 
 import ProposalPage from "./proposta/[token]/page";
 import PortalView from "./portal/[token]/PortalView";
@@ -139,7 +138,6 @@ function portal(over: Record<string, unknown> = {}) {
         pdfHref: null,
         contract: null,
         contratoPdfHref: null,
-        invoices: [{ id: "i1", number: "FT 2026/0007", amount: 7890, status: "paga" }],
         schedule: { sinal: 7380, saldo: 17220 },
         depositPercent: 30,
         currency: "EUR",
@@ -150,19 +148,19 @@ function portal(over: Record<string, unknown> = {}) {
 }
 
 describe("o portal do cliente", () => {
-  it("em INGLÊS escreve o dinheiro à portuguesa — como a factura que lá está", () => {
+  it("em INGLÊS escreve o dinheiro à portuguesa", () => {
     render(portal());
     const texto = naPagina();
 
     expect(texto).toContain(`24.600,00${EURO}`);
-    // O sinal, o saldo e o número da factura — todos na mesma folha.
+    // O total, o sinal e o saldo — todos na mesma folha e todos com a mesma
+    // pontuação, mesmo com a página em inglês.
     expect(texto).toContain(`7.380,00${EURO}`);
     expect(texto).toContain(`17.220,00${EURO}`);
-    expect(texto).toContain(`7.890,00${EURO}`);
 
     expect(texto).not.toContain("€24,600.00");
     expect(texto).not.toContain("24,600.00");
-    expect(texto).not.toContain(`7890,00${EURO}`);
+    expect(texto).not.toContain(`7380,00${EURO}`);
   });
 
   it("999 € continua sem separador", () => {

@@ -11,6 +11,7 @@ import {
   descreverTapado,
   TEXTO_MIN,
   abrirGaveta,
+  irParaDestinoMovel,
   NA_BARRA_DE_BAIXO,
 } from "./ergonomia-tactil.mjs";
 
@@ -158,6 +159,41 @@ async function garantirUmPedido(page: Page): Promise<void> {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ESPERAR PELA VISTA — e porque é que isto não é uma espera de conveniência
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `<h1>` NÃO prova que a vista montou. Ele é desenhado pelo AdminClient, no
+ * cabeçalho, a partir de uma tabela de títulos (`VIEW_TITLES`) — aparece no
+ * instante em que se toca no destino, com o chunk da vista ainda a caminho e o
+ * esqueleto no lugar do conteúdo.
+ *
+ * MEDIDO, e é o que obrigou a escrever isto: com o passeio a auditar logo a
+ * seguir ao `<h1>`, a auditoria das Tarefas via SETE elementos interactivos —
+ * os da navegação — e nenhum da vista. O `<summary>` «Detalhes (opcional)», de
+ * 15 px de altura, estava lá em baixo à espera de ser medido e nunca foi. O
+ * guarda `examinados > 0` dava-se por satisfeito com a moldura, portanto o
+ * passo passava, verde, sobre um ecrã que ainda não existia.
+ *
+ * Duas linhas resolvem-no: o esqueleto (`data-view-skeleton`, posto pelo
+ * `ViewSkeleton`) tem de ter saído, e o `<main>` tem de ter conteúdo próprio.
+ */
+async function esperarPelaVista(page: Page, label: string) {
+  await expect(
+    page.locator("[data-view-skeleton]"),
+    `"${label}": o esqueleto ainda está no ecrã — a vista não montou, e medi-la agora ` +
+      `mede a moldura da navegação em vez do conteúdo.`,
+  ).toHaveCount(0);
+  await expect
+    .poll(() => page.locator("main :is(a[href],button,input,select,textarea,summary)").count(), {
+      message:
+        `"${label}": o <main> não tem nada de interactivo. O <h1> vem do cabeçalho e aparece ` +
+        `sempre — não é prova de que a vista montou.`,
+    })
+    .toBeGreaterThan(0);
+}
+
+/**
  * As quatro regras de ergonomia táctil, numa vista.
  *
  * O que se mede e porquê está escrito em `ergonomia-tactil.mjs`, que é o mesmo
@@ -169,8 +205,12 @@ async function garantirUmPedido(page: Page): Promise<void> {
  * clip tira a barra de scroll e o número nunca cresce. Este é o teste que
  * mede a margem direita de cada elemento, que é o que se quer saber: o que
  * passa da margem fica cortado e inalcançável.
+ *
+ * Mede DEPOIS de a vista existir (`esperarPelaVista`): auditar uma vista que
+ * ainda não montou é auditar a navegação, e dá verde por engano.
  */
 async function expectErgonomiaTactil(page: Page, label: string) {
+  await esperarPelaVista(page, label);
   const r = (await page.evaluate(AUDITOR)) as {
     examinados: number;
     pequenos: Parameters<typeof descreverAlvo>[0][];
@@ -278,17 +318,29 @@ const NA_BARRA = new Set(NA_BARRA_DE_BAIXO);
 // (ver a nota em `nav.tsx`). Os ecrãs continuam a existir e a abrir por link
 // directo; o que este passeio verifica é a NAVEGAÇÃO, e um destino que já não
 // está na gaveta não pode ser visitado por ela.
+/**
+ * ── PORQUE É QUE «MATERIAL» E «DEFINIÇÕES» ENTRARAM AQUI ──────────────────
+ *
+ * Estavam os dois na gaveta e não estavam nesta lista. Uma vista que não é
+ * visitada não é medida, e o silêncio lia-se como aprovação: a caixa «Cobrar
+ * ida e volta» das Definições tinha um alvo de 227×30 — abaixo dos 44 — e
+ * nenhum relatório o dizia, porque nenhum passeio lá chegava.
+ *
+ * A regra que fica: esta lista é a gaveta INTEIRA mais a barra de baixo. Um
+ * destino novo em `nav.tsx` entra também aqui, senão nasce por medir.
+ */
 const VIEWS: { nav: RegExp; heading: RegExp }[] = [
   { nav: /^Visão Geral$/, heading: /^Visão Geral$/ },
   { nav: /^Pedidos$/, heading: /^Pedidos$/ },
   { nav: /^Fazer proposta$/, heading: /^Fazer proposta$/ },
   { nav: /^Propostas$/, heading: /^Propostas$/ },
-  { nav: /^Faturas$/, heading: /^Faturas$/ },
   { nav: /^Propostas Aceites$/, heading: /^Propostas Aceites$/ },
+  { nav: /^Material$/, heading: /^Material$/ },
   { nav: /^Calendário$/, heading: /^Calendário$/ },
   { nav: /^Temas$/, heading: /^Temas$/ },
   { nav: /^Tarefas$/, heading: /^Tarefas$/ },
   { nav: /^Estatísticas$/, heading: /^Estatísticas$/ },
+  { nav: /^Definições$/, heading: /^Definições$/ },
 ];
 
 test.describe("Back office — mobile", () => {
@@ -411,6 +463,186 @@ test.describe("Back office — mobile", () => {
     }
 
     expect(errors, `Unexpected runtime errors:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O PAINEL DO PEDIDO — o ecrã onde ela passa o dia, e que ninguém media
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O passeio de cima percorre as VISTAS. Nenhuma delas é o sítio onde o
+   * trabalho acontece: esse é o painel que abre quando se toca num pedido, com
+   * os separadores Produção, Financeiro e Fazer proposta. Uma lista de pedidos
+   * bem medida com um painel por medir é meia medição.
+   *
+   * O que a falta desta medição escondeu, tudo a 375 px:
+   *   · «Histórico de atividade» — interruptor de 334×16;
+   *   · «Plano de decoração, cronograma e convidados» — 334×16, e é a única
+   *     porta para o plano, o cronograma e os convidados;
+   *   · «Já pago», no registo de um pagamento — alvo de 163×18;
+   *   · «Hoje» e «Ontem», que datam o recebimento — 45×28 e 56×28, encostados.
+   *
+   * Fica em teste próprio e não dentro do de cima por uma razão prática: abrir
+   * um pedido MUDA o ecrã (a barra de baixo esconde-se, o painel toma conta da
+   * página), e um passeio de navegação que muda de estado a meio deixa de
+   * poder continuar a percorrer a navegação.
+   *
+   * O separador Financeiro é auditado pelos controlos do REGISTO DE PAGAMENTOS,
+   * medidos pelo nome. (O livro de faturas que lá viveu saiu do produto — a
+   * facturação passou a ser feita noutro programa.)
+   */
+  test("@movel phone: o painel de um pedido também se toca com o dedo", async ({ page }) => {
+    const errors = collectErrors(page);
+    await garantirUmPedido(page);
+    const loggedIn = await login(page);
+    if (process.env.CI) {
+      expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
+        true,
+      );
+    } else {
+      test.skip(!loggedIn, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+    }
+
+    await page
+      .getByRole("navigation", { name: /Destinos principais/i })
+      .getByRole("button", { name: /^Pedidos/ })
+      .tap();
+    await expect(page.getByRole("heading", { level: 1, name: /^Pedidos$/ })).toBeVisible();
+
+    // Um pedido a sério, e não um esqueleto: sem cartão na lista não há painel
+    // para medir, e saltar em silêncio seria o verde imaginário de sempre.
+    const cartoes = page.locator("main li button");
+    await expect(
+      cartoes.first(),
+      "Sem pedidos na lista — o painel do pedido não chega a ser medido.",
+    ).toBeVisible();
+    await cartoes.first().tap();
+
+    // O painel abriu quando a barra de gravação do pedido existe — é o pé do
+    // painel, e só é desenhado com um pedido adoptado.
+    const painel = page.getByRole("heading", { level: 2 }).first();
+    await expect(painel).toBeVisible();
+    await expectErgonomiaTactil(page, "pedido aberto");
+
+    // ── Separador Produção ────────────────────────────────────────────────
+    const producao = page.getByRole("tab", { name: /Produção/i });
+    await expect(producao, "O painel do pedido perdeu o separador «Produção».").toHaveCount(1);
+    await producao.tap();
+    await expectErgonomiaTactil(page, "pedido aberto → Produção");
+
+    // ── Separador Financeiro: os controlos do registo de pagamentos ───────
+    const financeiro = page.getByRole("tab", { name: /Financeiro/i });
+    await expect(financeiro, "O painel do pedido perdeu o separador «Financeiro».").toHaveCount(1);
+    await financeiro.tap();
+
+    for (const nome of [/^Já pago$/, /^Hoje$/, /^Ontem$/]) {
+      const alvo = page
+        .getByText(nome)
+        .first()
+        .or(page.getByRole("button", { name: nome }));
+      const controlo = page.getByRole("button", { name: nome });
+      const el = (await controlo.count()) ? controlo.first() : alvo.first();
+      await expect(el, `O registo de pagamentos perdeu o controlo ${nome.source}.`).toBeVisible();
+      const caixa = await el.boundingBox();
+      expect(
+        Math.round(caixa?.height ?? 0),
+        `«${nome.source}» tem ${Math.round(caixa?.height ?? 0)}px de altura — ` +
+          `abaixo dos ${ALVO_MIN} do dedo. É por aqui que se datam e se dão por recebidos os ` +
+          `pagamentos; errar o toque troca o dia, ou o valor.`,
+      ).toBeGreaterThanOrEqual(ALVO_MIN);
+    }
+
+    expect(errors, `Unexpected runtime errors:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O AVISO DE ERRO — o único ecrã que ninguém desenha para ser usado
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * As auditorias de alvos passeiam por ecrãs em repouso, e um aviso só existe
+   * depois de alguma coisa correr mal. Resultado: a caixa que aparece
+   * PRECISAMENTE quando ela precisa de reagir nunca foi medida — e tinha, as
+   * duas coisas, medidas a 375×667:
+   *
+   *   · o «×» que a fecha com 9×14 px, o alvo mais pequeno do back office. Num
+   *     telemóvel não havia como fechá-la: só esperar os 4 segundos;
+   *   · a caixa a acabar aos 635 px com a barra de navegação a começar aos 610
+   *     — 25 px de aviso opaco por cima dos ícones de «Visão Geral» e
+   *     «Pedidos». Tapar a navegação no momento em que ela quer sair dali.
+   *
+   * Como se provoca um aviso sem sujar dados: manda-se o servidor recusar a
+   * criação de uma tarefa. Nada é escrito — o pedido nem chega ao servidor —, e
+   * de caminho prova-se a outra metade, que é a que ela pediu: quando falha, o
+   * ecrã DIZ o que se passou, em português, em vez de fingir que correu bem.
+   */
+  test("@movel phone: um aviso de erro explica-se, fecha-se com o dedo e não tapa a navegação", async ({
+    page,
+  }) => {
+    const loggedIn = await login(page);
+    if (process.env.CI) {
+      expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
+        true,
+      );
+    } else {
+      test.skip(!loggedIn, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+    }
+
+    await irParaDestinoMovel(page, "Tarefas");
+    await expect(page.getByRole("heading", { level: 1, name: /^Tarefas$/ })).toBeVisible();
+
+    // O servidor recusa. NADA é gravado: a rota é interceptada no browser.
+    await page.route("**/api/tarefas**", async (rota) => {
+      if (rota.request().method() === "POST") {
+        await rota.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Erro interno" }),
+        });
+        return;
+      }
+      await rota.fallback();
+    });
+
+    await page
+      .getByPlaceholder(/O que há para fazer/i)
+      .first()
+      .fill("tarefa que não vai gravar");
+    await page
+      .getByRole("button", { name: /^Adicionar$/ })
+      .first()
+      .tap();
+
+    // 1. DIZ O QUE SE PASSOU, em português e sem código de erro.
+    const aviso = page.locator('[role="alert"] > div').first();
+    await expect(
+      aviso,
+      "A criação da tarefa falhou e o ecrã não disse nada — um erro calado leva-a a repetir.",
+    ).toBeVisible();
+    await expect(aviso).toContainText(/não foi possível/i);
+
+    // 2. NÃO TAPA A BARRA DE BAIXO.
+    const barra = page.getByRole("navigation", { name: /Destinos principais/i });
+    const caixaAviso = await aviso.boundingBox();
+    const caixaBarra = await barra.boundingBox();
+    expect(
+      Math.round((caixaAviso?.y ?? 0) + (caixaAviso?.height ?? 0)),
+      `O aviso acaba aos ${Math.round((caixaAviso?.y ?? 0) + (caixaAviso?.height ?? 0))}px e a ` +
+        `barra de navegação começa aos ${Math.round(caixaBarra?.y ?? 0)} — está a pousar-lhe em ` +
+        `cima, e é o pior momento para esconder a saída.`,
+    ).toBeLessThanOrEqual(Math.round(caixaBarra?.y ?? 0));
+
+    // 3. FECHA-SE COM O DEDO.
+    const fechar = aviso.getByRole("button", { name: /^Fechar$/ });
+    const caixaFechar = await fechar.boundingBox();
+    expect(
+      Math.min(Math.round(caixaFechar?.width ?? 0), Math.round(caixaFechar?.height ?? 0)),
+      `O «×» que fecha o aviso tem ${Math.round(caixaFechar?.width ?? 0)}×` +
+        `${Math.round(caixaFechar?.height ?? 0)}px — abaixo dos ${ALVO_MIN} do dedo. Sem ele, ` +
+        `fechar um aviso num telemóvel passa a ser esperar.`,
+    ).toBeGreaterThanOrEqual(ALVO_MIN);
+    await fechar.tap();
+    await expect(aviso).toHaveCount(0);
   });
 
   /**

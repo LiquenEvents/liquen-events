@@ -2,9 +2,11 @@ import { describe, it, expect, vi } from "vitest";
 import { withProposalDefaults, type ProposalDoc } from "./proposal-doc";
 import { camposPorTraduzir, lerEn } from "./proposal-doc-bilingue";
 import {
+  MAX_CARACTERES_POR_TRADUCAO,
+  MAX_TEXTOS_POR_TRADUCAO,
+  estadoDaTraducao,
   motorPelaRota,
   precisaDeTraducao,
-  traducaoEstaLigada,
   traduzirParaIngles,
   type MotorDeTraducao,
 } from "./proposal-traducao";
@@ -102,30 +104,150 @@ describe("o motor que fala com a rota", () => {
       /forma esperada/i,
     );
   });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A PROPOSTA GRANDE NÃO PODE SER A QUE NÃO DÁ
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A rota tem tectos por pedido — {@link MAX_TEXTOS_POR_TRADUCAO} textos e
+   * {@link MAX_CARACTERES_POR_TRADUCAO} caracteres — e responde 413 a quem os
+   * passar. Existem por uma boa razão: um pedido feito à mão com dez mil
+   * entradas gastava a quota do mês numa carregada.
+   *
+   * O comentário da rota diz que «a contagem é a mesma que o estúdio já
+   * respeita». Não respeitava: o estúdio mandava TODOS os campos num pedido só.
+   *
+   * E a margem não é teórica. Medido numa proposta pesada mas plausível — 8
+   * grupos de 8 rubricas com descrição, 12 mood boards, 40 linhas de orçamento
+   * — dá 218 campos. O tecto é 300. O sintoma seria o pior de todos para
+   * diagnosticar: dá em todas as propostas dela menos nas maiores, e nessas dá
+   * «Não deu para traduzir» com o documento intacto e nada a dizer porquê.
+   *
+   * A partição é a MESMA disciplina que o motor do DeepL já usa para os seus
+   * lotes de 50, e pela mesma razão: a ordem e o número de textos que voltam
+   * são o contrato desta fronteira e não podem mudar.
+   */
+  it("uma proposta maior do que o tecto vai em vários pedidos, e volta pela ordem", async () => {
+    const textos = Array.from({ length: 700 }, (_, i) => `Rubrica ${i + 1}`);
+    const lotes: string[][] = [];
+    const buscar = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      const lote = JSON.parse(String(init?.body)).textos as string[];
+      lotes.push(lote);
+      return resposta({ textos: lote.map((t) => `EN: ${t}`) });
+    });
+
+    const saida = await motorPelaRota(buscar as unknown as typeof fetch)(textos);
+
+    // Nenhum pedido passa o tecto — que é o que fazia a rota devolver 413.
+    expect(lotes.length).toBeGreaterThan(1);
+    for (const lote of lotes) {
+      expect(lote.length).toBeLessThanOrEqual(MAX_TEXTOS_POR_TRADUCAO);
+      expect(lote.reduce((n, t) => n + t.length, 0)).toBeLessThanOrEqual(
+        MAX_CARACTERES_POR_TRADUCAO,
+      );
+    }
+    // E o contrato da fronteira aguenta-se: o mesmo número, pela mesma ordem.
+    expect(saida).toEqual(textos.map((t) => `EN: ${t}`));
+  });
+
+  /**
+   * Um lote que falhe volta VAZIO nas suas posições em vez de deitar fora os
+   * que já vieram — a mesma regra do motor do DeepL, e agora contada no ecrã
+   * pelo `naoVieram` da fronteira. O que já foi traduzido foi pago; perdê-lo
+   * porque o pedido seguinte apanhou um 429 era pagá-lo outra vez.
+   */
+  it("um lote que falha não deita fora os que já vieram", async () => {
+    const textos = Array.from({ length: 400 }, (_, i) => `Rubrica ${i + 1}`);
+    let n = 0;
+    const buscar = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      const lote = JSON.parse(String(init?.body)).textos as string[];
+      n++;
+      if (n === 2) return resposta({ error: "foram pedidos traduções a mais" }, false, 502);
+      return resposta({ textos: lote.map((t) => `EN: ${t}`) });
+    });
+
+    const saida = await motorPelaRota(buscar as unknown as typeof fetch)(textos);
+    expect(saida).toHaveLength(400);
+    expect(saida[0]).toBe("EN: Rubrica 1");
+    // As posições do lote que falhou voltam vazias — é assim que a fronteira as
+    // deixa por traduzir em vez de as escrever trocadas.
+    expect(saida.filter((t) => t === "")).not.toEqual([]);
+  });
+
+  /** Se NENHUM lote passar, atira — o painel precisa da frase para ela poder
+   *  fazer alguma coisa, e «traduzi zero campos» sem uma palavra não é uma. */
+  it("se nenhum lote passar, atira com as palavras do servidor", async () => {
+    const textos = Array.from({ length: 400 }, (_, i) => `Rubrica ${i + 1}`);
+    const buscar = vi.fn(async () =>
+      resposta({ error: "a quota de tradução deste mês acabou" }, false, 502),
+    );
+    await expect(motorPelaRota(buscar as unknown as typeof fetch)(textos)).rejects.toThrow(
+      /quota/i,
+    );
+  });
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «NÃO ESTÁ LIGADA» E «NÃO SE CONSEGUIU PERGUNTAR» SÃO DUAS COISAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As duas desligam o botão, e é isso que está certo: prometer uma tradução que
+ * não vai acontecer é pior do que um botão parado. O que NÃO pode ser igual é a
+ * frase por baixo dele.
+ *
+ * «A tradução automática ainda não está ligada neste servidor» é uma afirmação
+ * sobre a CONFIGURAÇÃO — quem a lê vai à Vercel pôr a chave, ou desiste de
+ * traduzir e escreve as caixas à mão. Se a causa verdadeira for uma sessão
+ * caducada, uma rede que caiu ou um servidor que respondeu 500, essa frase
+ * manda-a resolver um problema que não existe enquanto o verdadeiro se cura
+ * recarregando a página.
+ *
+ * E é o caso que produz o relato «num ambiente diz uma coisa e no outro não
+ * diz nada»: em pré-visualização, uma chamada que falha lê-se como «não está
+ * configurado» quando o que aconteceu foi outra coisa.
+ */
 describe("saber se está ligada", () => {
   it("o servidor diz que sim", async () => {
     const buscar = vi.fn(
       async () => ({ ok: true, json: async () => ({ ligada: true }) }) as unknown as Response,
     );
-    expect(await traducaoEstaLigada(buscar as unknown as typeof fetch)).toBe(true);
+    expect(await estadoDaTraducao(buscar as unknown as typeof fetch)).toBe("ligada");
   });
 
   it("sem chave no servidor, diz que não — e é isso que desliga o botão", async () => {
     const buscar = vi.fn(
       async () => ({ ok: true, json: async () => ({ ligada: false }) }) as unknown as Response,
     );
-    expect(await traducaoEstaLigada(buscar as unknown as typeof fetch)).toBe(false);
+    expect(await estadoDaTraducao(buscar as unknown as typeof fetch)).toBe("desligada");
   });
 
-  it("a rede em baixo vale «não está ligada» — o lado seguro", async () => {
-    // Prometer uma tradução que não vai acontecer é pior do que um botão
-    // desligado: ela envia a proposta a acreditar que está traduzida.
+  it("a rede em baixo NÃO é «não está ligada» — é «não se conseguiu perguntar»", async () => {
     const buscar = vi.fn(async () => {
       throw new Error("sem rede");
     });
-    expect(await traducaoEstaLigada(buscar as unknown as typeof fetch)).toBe(false);
+    expect(await estadoDaTraducao(buscar as unknown as typeof fetch)).toBe("indisponivel");
+  });
+
+  it("uma sessão caducada também não é «não está ligada»", async () => {
+    // O 401 da rota é o back office a dizer «quem és tu?», e não o servidor a
+    // dizer «não tenho serviço de tradução». Confundi-los mandava-a procurar
+    // uma chave em falta quando o que ela tem de fazer é voltar a entrar.
+    const buscar = vi.fn(
+      async () =>
+        ({
+          ok: false,
+          status: 401,
+          json: async () => ({ error: "Não autorizado" }),
+        }) as unknown as Response,
+    );
+    expect(await estadoDaTraducao(buscar as unknown as typeof fetch)).toBe("indisponivel");
+  });
+
+  it("uma resposta que não é a esperada vale o mesmo — não se inventa um «não»", async () => {
+    const buscar = vi.fn(async () => ({ ok: true, json: async () => ({}) }) as unknown as Response);
+    expect(await estadoDaTraducao(buscar as unknown as typeof fetch)).toBe("indisponivel");
   });
 });
 
@@ -266,6 +388,52 @@ describe("traduzirParaIngles", () => {
     const primeiro = camposPorTraduzir(doc)[0].campo;
     expect(lerEn(traduzido, primeiro)).toBeUndefined();
     expect(camposPorTraduzir(traduzido)).toHaveLength(1);
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * METADE TRADUZIDA NÃO É UM SUCESSO, E TEM DE SE PODER DIZER
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O motor do DeepL manda os textos em LOTES de 50 e um lote que falhe volta
+   * VAZIO nas suas posições — de propósito, para não deitar fora os que já
+   * vieram. Só atira quando NENHUM lote passa.
+   *
+   * Consequência: numa proposta grande, um 429 a meio (ou uma quota que acaba
+   * no segundo lote) devolve os primeiros 50 campos traduzidos e os outros 70
+   * vazios, sem erro nenhum. A fronteira contava os escritos e calava-se sobre
+   * os outros — e o ecrã dizia «50 campos traduzidos», a verde.
+   *
+   * Do lado dela isso lê-se exactamente como «não está a dar»: dá numa proposta
+   * pequena e não dá numa grande, sem nada a explicar a diferença. E o pior é
+   * que o número está certo — o que falta é a outra metade da frase.
+   *
+   * Não é o mesmo que `porqueFalhou` (que é «não deu nada») nem que os campos
+   * que ela decidiu deixar em português (esses foram escritos). É uma terceira
+   * coisa: pedidos ao serviço, e não voltaram.
+   */
+  it("os campos que foram pedidos e não voltaram são CONTADOS, não calados", async () => {
+    const doc = proposta();
+    const pedidos = camposPorTraduzir(doc).filter((c) => precisaDeTraducao(c.texto)).length;
+    expect(pedidos).toBeGreaterThan(2);
+    // O primeiro lote passa, o resto volta vazio — a forma exacta de um 429 a
+    // meio de uma proposta grande.
+    const resultado = await traduzirParaIngles(doc, async (textos) =>
+      textos.map((t, i) => (i === 0 ? `EN: ${t}` : "")),
+    );
+    // Não é uma falha: o que veio, veio, e o documento fica com ele.
+    expect(resultado.porqueFalhou).toBeUndefined();
+    expect(resultado.escritos).toBeGreaterThan(0);
+    // E o resto tem de ser DITO, não deduzido do contador estar baixo.
+    expect(resultado.naoVieram).toBe(pedidos - 1);
+  });
+
+  it("e quando vem tudo, não há nada a dizer", async () => {
+    const doc = proposta();
+    const resultado = await traduzirParaIngles(doc, async (textos) =>
+      textos.map((t) => `EN: ${t}`),
+    );
+    expect(resultado.naoVieram).toBe(0);
   });
 
   it("um motor que rebenta não estraga o documento", async () => {
