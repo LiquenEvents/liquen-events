@@ -6313,7 +6313,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     </p>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                    {/* Os rótulos das colunas escondem-se onde as colunas não
+                        existem: abaixo de 640 px a linha passa a ser duas
+                        filas, e um cabeçalho de quatro colunas por cima disso
+                        seria uma legenda para uma grelha que não está lá. */}
+                    <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
                       <span>Descrição</span>
                       <span className="text-right">Valor (€)</span>
                       <span>IVA da linha</span>
@@ -6328,13 +6332,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       return (
                         <div
                           key={i}
-                          className="grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
+                          /**
+                           * ── A CAIXA DA DESCRIÇÃO COM 22 px ────────────────
+                           *
+                           * Medido a 375 px: as duas colunas fixas (7rem do
+                           * valor + 9rem do IVA) mais a coluna do botão comem
+                           * a largura toda, e ao `minmax(0,1fr)` da descrição
+                           * sobravam 22 px, uma caixa onde não cabe uma
+                           * palavra, no campo que dá nome à linha que o casal
+                           * vai ler.
+                           *
+                           * Abaixo de 640 px a linha passa a duas filas: a
+                           * descrição sozinha em cima, e o valor, o IVA e o
+                           * botão de apagar por baixo. Acima disso fica
+                           * exactamente como estava.
+                           */
+                          className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
                         >
                           {/* Um invólucro só para as duas caixas ficarem uma por
                               cima da outra DENTRO da primeira coluna — a linha é
                               uma grelha, e um filho solto abriria uma coluna
                               nova em vez de descer. */}
-                          <div className="min-w-0">
+                          <div className="col-span-2 min-w-0 sm:col-span-1">
                             <input
                               className="bo-input px-2.5 py-2 text-xs text-foreground/75"
                               value={ex.label}
@@ -7154,7 +7173,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            no token `--bo-barra-inferior`. Era a quarta cópia do «56px», e com a
            barra a crescer para 72 px ficava a tapá-la. `lg:bottom-0` porque
            acima de 1024 não há barra nenhuma por baixo. */
-        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3 lg:bottom-0"
+        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:py-3 lg:bottom-0"
       >
         {step === "conteudo" && (
           <>
@@ -7469,6 +7488,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Button>
         )}
       </div>
+
+      {/* NOTA SOBRE A BARRA ACIMA, medida a 375 px num iPhone SE:
+          o `flex-wrap` estava a partir de 640 px (`sm:flex-wrap`), e abaixo
+          disso a barra era uma fila rígida. No último passo ela leva o
+          «← Pré-visualizar» e o «Gerar e enviar ao cliente» lado a lado: 222 px
+          de botão numa barra de 351 px, com o botão a acabar em 390 px de um
+          ecrã de 375. O último toque de toda a jornada de escrever uma proposta
+          ficava cortado, e a 320 px faltavam 70 px.
+
+          O `flex-wrap` passa a valer em todas as larguras: quando não cabem
+          lado a lado, o botão principal desce para a linha de baixo, inteiro.
+          Acima de 640 px nada muda, porque aí já cabiam. */}
 
       {/* A fotografia em grande, com as setas a percorrer as deste board. */}
       {lupa && (
