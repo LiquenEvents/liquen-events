@@ -116,3 +116,8 @@ instagram-export/
 /e2e/fotos-poucas/
 /e2e/medicoes/
 /e2e/retratos/
+
+# Relatórios do Lighthouse (`lhci`): 14 MB de HTML e JSON por corrida, gerados
+# em qualquer medição local. São o RESULTADO de uma medição, não código, e o
+# que interessa deles são os números escritos no commit que os motivou.
+.lighthouseci/

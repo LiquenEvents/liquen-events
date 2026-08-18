@@ -231,11 +231,14 @@ export default async function DestinationPage({ params }: { params: Promise<{ la
             {c.regioesTitulo}
           </h2>
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {FOTOS.map((foto) => (
+            {FOTOS.map((foto, i) => (
               <div key={foto} className="relative aspect-[3/2] overflow-hidden bg-foreground/5">
                 <SafeImage
                   src={foto}
-                  alt=""
+                  // Distinct alt per photo: real portfolio content, not a
+                  // decorative band. No region claim here (unlike the polo
+                  // page) since these photos aren't tied to one place.
+                  alt={`${t.common.imageAlt.portfolioExemplo} ${i + 1}`}
                   fill
                   loading="lazy"
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
