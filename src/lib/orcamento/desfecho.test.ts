@@ -2,10 +2,13 @@ import { describe, it, expect } from "vitest";
 import type { Quote } from "./types";
 import {
   DIAS_ATE_PERGUNTAR,
+  MOTIVOS_DE_PERDA,
   aEsperaDeResposta,
   corpoDaMarcacao,
+  corpoDoMotivo,
   desfechoJaMarcado,
   diasSemResposta,
+  ehMotivoDeRecusa,
   faltaODesfecho,
   totalPendurado,
   valorConfirmado,
@@ -191,12 +194,59 @@ describe("corpoDaMarcacao", () => {
     expect("lostReason" in body).toBe(false);
   });
 
-  it("o motivo de perda vai só quando foi mesmo escrito", () => {
-    expect(corpoDaMarcacao({ desfecho: "perdido", motivo: "  ", ...comuns }).lostReason).toBe(
-      undefined,
-    );
-    expect(corpoDaMarcacao({ desfecho: "perdido", motivo: " Preço ", ...comuns }).lostReason).toBe(
-      "Preço",
-    );
+  it("o motivo de perda vai só quando foi mesmo escolhido — um dos cinco, não texto", () => {
+    expect(corpoDaMarcacao({ desfecho: "perdido", ...comuns }).lostReason).toBe(undefined);
+    const body = corpoDaMarcacao({ desfecho: "perdido", motivo: "preco", ...comuns });
+    expect(body.lostReason).toBe("preco");
+    expect("lostNote" in body).toBe(false);
+  });
+
+  it("a nota livre só vai junto de um motivo, e só quando escrita", () => {
+    expect(
+      corpoDaMarcacao({ desfecho: "perdido", motivo: "preco", nota: "  ", ...comuns }),
+    ).not.toHaveProperty("lostNote");
+    expect(
+      corpoDaMarcacao({
+        desfecho: "perdido",
+        motivo: "preco",
+        nota: " orçamento tinha metade ",
+        ...comuns,
+      }).lostNote,
+    ).toBe("orçamento tinha metade");
+  });
+
+  it("uma proposta ganha nunca leva motivo, mesmo que alguém o mande", () => {
+    const body = corpoDaMarcacao({
+      desfecho: "ganho",
+      valor: 4600,
+      motivo: "preco",
+      ...comuns,
+    });
+    expect("lostReason" in body).toBe(false);
+  });
+});
+
+describe("ehMotivoDeRecusa", () => {
+  it("reconhece as cinco opções fechadas, e mais nenhuma", () => {
+    for (const m of MOTIVOS_DE_PERDA) expect(ehMotivoDeRecusa(m)).toBe(true);
+    expect(ehMotivoDeRecusa("descontentamento geral")).toBe(false);
+    expect(ehMotivoDeRecusa("")).toBe(false);
+    expect(ehMotivoDeRecusa(undefined)).toBe(false);
+    expect(ehMotivoDeRecusa(null)).toBe(false);
+  });
+});
+
+describe("corpoDoMotivo", () => {
+  it("grava só o motivo — sem status, sem entrada no histórico", () => {
+    const body = corpoDoMotivo("data");
+    expect(body).toEqual({ lostReason: "data" });
+  });
+
+  it("leva a nota livre quando ela vem escrita", () => {
+    expect(corpoDoMotivo("outro", "  ")).toEqual({ lostReason: "outro" });
+    expect(corpoDoMotivo("outro", " escolheram fazer em casa ")).toEqual({
+      lostReason: "outro",
+      lostNote: "escolheram fazer em casa",
+    });
   });
 });

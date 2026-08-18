@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { Quote } from "@/lib/orcamento/types";
+import type { MotivoDeRecusa, Quote } from "@/lib/orcamento/types";
 import {
+  MOTIVOS_DE_PERDA,
+  NOME_DO_MOTIVO,
   corpoDaMarcacao,
+  corpoDoMotivo,
   desfechoJaMarcado,
   faltaODesfecho,
   valorConfirmado,
@@ -86,7 +89,8 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
   const [fase, setFase] = useState<Fase>({ tipo: "pergunta" });
   const [escrito, setEscrito] = useState(() => textoDoValor(quote));
   const [aviso, setAviso] = useState<string | null>(null);
-  const [motivo, setMotivo] = useState("");
+  const [notaMotivo, setNotaMotivo] = useState("");
+  const [motivoAGravar, setMotivoAGravar] = useState<MotivoDeRecusa | null>(null);
   const [motivoGravado, setMotivoGravado] = useState(false);
 
   const jaMarcado = fase.tipo === "marcado";
@@ -177,24 +181,35 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
     void marcar("ganho", lido.valor);
   }
 
-  /** O motivo de perda, gravado sozinho e sem tocar no estado. */
-  async function guardarMotivo() {
-    const texto = motivo.trim();
-    if (!texto) return;
+  /**
+   * O motivo de perda, gravado sozinho e sem tocar no estado — um dos cinco
+   * botões, nunca uma frase escrita à mão. É por AQUI que a contagem de
+   * `analise-de-propostas.ts` («perdi seis por preço este ano») deixa de ser
+   * uma frase impossível: o botão que se carrega é a mesma lista fechada
+   * (`MotivoDeRecusa`) que essa contagem lê — a rota propaga-o para a
+   * proposta mais recente do pedido. O detalhe em texto livre, quando há, vai
+   * junto no mesmo pedido, e vive à parte (`lostNote`), como já acontece do
+   * lado das propostas.
+   */
+  async function guardarMotivo(motivo: MotivoDeRecusa) {
+    setAviso(null);
+    setMotivoAGravar(motivo);
     try {
       const res = await fetch(`/api/orcamento/${quote.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lostReason: texto }),
+        body: JSON.stringify(corpoDoMotivo(motivo, notaMotivo)),
       });
       if (!res.ok) {
         setAviso(porqueNaoGravou(res.status));
+        setMotivoAGravar(null);
         return;
       }
       setMotivoGravado(true);
       onGravado((await res.json()) as Quote);
     } catch {
       setAviso("Não foi possível chegar ao servidor — verifica a ligação.");
+      setMotivoAGravar(null);
     }
   }
 
@@ -225,28 +240,31 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
             (motivoGravado ? (
               <p className="text-foreground/45 text-[11px]">Motivo guardado.</p>
             ) : (
-              <div className="flex flex-wrap items-end gap-2">
-                <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
-                  <span className="text-foreground/45 text-[10px] tracking-[0.1em] uppercase">
-                    Motivo (opcional)
-                  </span>
-                  <input
-                    type="text"
-                    value={motivo}
-                    maxLength={300}
-                    onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Ex.: preço, data, escolheram outro…"
-                    className="bo-input px-2.5 py-2 text-sm text-foreground/80"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => void guardarMotivo()}
-                  disabled={!motivo.trim()}
-                  className={`${botao} border-foreground/15 text-foreground/55 hover:border-foreground/30`}
-                >
-                  Guardar motivo
-                </button>
+              <div className="flex flex-col gap-2">
+                <span className="text-foreground/45 text-[10px] tracking-[0.1em] uppercase">
+                  Motivo (opcional)
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {MOTIVOS_DE_PERDA.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => void guardarMotivo(m)}
+                      disabled={motivoAGravar !== null}
+                      className={`${botao} border-foreground/15 text-foreground/55 hover:border-foreground/30`}
+                    >
+                      {motivoAGravar === m ? "A guardar…" : NOME_DO_MOTIVO[m]}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={notaMotivo}
+                  maxLength={300}
+                  onChange={(e) => setNotaMotivo(e.target.value)}
+                  placeholder="Detalhe opcional…"
+                  className="bo-input px-2.5 py-2 text-sm text-foreground/80"
+                />
               </div>
             ))}
         </div>
