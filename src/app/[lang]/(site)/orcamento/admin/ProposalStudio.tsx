@@ -134,6 +134,7 @@ import {
   removerLinha,
   somaDosExtrasSemIva,
   totaisDaProposta,
+  dinheiroDaProposta,
   asDuasFormas,
 } from "@/lib/proposal-budget";
 import { eur } from "@/lib/money";
@@ -2286,8 +2287,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     writeTotal(base > 0 ? amountParaBase(base, mode) : undefined, mode);
   }
 
-  // Split 30/70 sobre o BRUTO — o que o estúdio vê é o que será faturado.
-  const money = resolveProposalMoney(doc);
+  /**
+   * O dinheiro EFECTIVO deste documento: já com a regra dos valores adicionais
+   * aplicada (dentro do valor escrito, ou a somar-lhe). É o que o casal vai
+   * ver e pagar, portanto é o que o estúdio mostra e o que trava o envio.
+   *
+   * O `escrito` é o outro número, e existe para uma coisa só: o campo «Valor
+   * (sem IVA)» e o que se diz ao alinhá-lo com a soma das linhas. Aí o que
+   * interessa é o que ELA escreveu, não o total com os adicionais somados.
+   */
+  const money = dinheiroDaProposta(doc);
+  const escrito = resolveProposalMoney(doc);
   // A percentagem do sinal é do DOCUMENTO, e é a mesma que as rotas de
   // facturação leem quando emitem o sinal e o saldo (ver `depositPercentOf`).
   // Sem isso, a proposta dizia 40% e a factura saía a 30% — que é pior do que
@@ -4055,6 +4065,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           100,
       ) / 100;
     setDoc((d) => ({ ...d, budgetExtras: novos }));
+    /**
+     * Quando os adicionais SOMAM ao valor escrito, o campo do total é só dos
+     * serviços e não se mexe: acrescentar uma deslocação de 140 deixa os 3.000
+     * onde estão e faz o total subir para 3.140. Enquanto isto não existia, o
+     * campo era empurrado para cima e os serviços encolhiam por baixo — que é
+     * exactamente o quadro que ela viu e que não queria.
+     */
+    if (doc.budgetExtrasSomam) return;
     if (delta === 0) return;
     // Um total não pode ficar negativo por causa de um extra apagado.
     const base = Math.max(0, Math.round((parseMoneyText(totalInput) + delta) * 100) / 100);
@@ -6160,9 +6178,57 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   <span className="bo-eyebrow">Valores adicionais</span>
                   <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
                     Linhas mostradas na proposta antes do total (ex.: deslocação, coordenação,
-                    tecidos). <strong className="font-semibold">Somam ao total</strong> — e portanto
-                    ao sinal e à fatura.
+                    tecidos). Entram no sinal e no que o casal paga.
                   </p>
+                  {/**
+                   * A ESCOLHA QUE VALE DINHEIRO, FEITA À VISTA.
+                   *
+                   * Palavras dela, sobre uma proposta já enviada: «aparece
+                   * "Subtotal dos serviços 2.860" e depois "+140 de
+                   * deslocação". Está mal, porque nós tínhamos dito três mil
+                   * MAIS cento e quarenta, e depois mais o IVA.»
+                   *
+                   * As duas leituras são legítimas e a diferença é o que o
+                   * casal paga, por isso escolhe-se aqui, por proposta, e a
+                   * frase por baixo diz o que cada uma faz aos números que
+                   * estão neste ecrã. Uma proposta antiga não muda: nasceu
+                   * sem este campo e continua a ler-se como foi enviada.
+                   */}
+                  <div className="mb-3 flex flex-col gap-1.5">
+                    <label
+                      className="text-[9px] tracking-[0.2em] uppercase text-foreground/25"
+                      htmlFor="adicionais-modo"
+                    >
+                      O valor que escreveste em «Valor (sem IVA)»
+                    </label>
+                    <select
+                      id="adicionais-modo"
+                      className="bo-input alvo-toque px-2.5 py-2 text-xs"
+                      value={doc.budgetExtrasSomam ? "somam" : "dentro"}
+                      onChange={(e) =>
+                        setDoc((d) => ({ ...d, budgetExtrasSomam: e.target.value === "somam" }))
+                      }
+                    >
+                      <option value="dentro">já inclui estas linhas</option>
+                      <option value="somam">é só dos serviços, estas linhas somam-se</option>
+                    </select>
+                    <p className="text-xs leading-relaxed text-foreground/45">
+                      {doc.budgetExtrasSomam ? (
+                        <>
+                          Subtotal dos serviços{" "}
+                          <strong className="font-semibold">{eur(totais.servicos)}</strong>, mais{" "}
+                          {eur(totais.adicionais)} destas linhas, dá {eur(totais.total)} sem IVA e{" "}
+                          {eur(totais.aPagar)} a pagar.
+                        </>
+                      ) : (
+                        <>
+                          Estas linhas saem de dentro do valor: o subtotal dos serviços fica{" "}
+                          <strong className="font-semibold">{eur(totais.servicos)}</strong> e o
+                          total sem IVA continua {eur(totais.total)}.
+                        </>
+                      )}
+                    </p>
+                  </div>
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
                       <span>Descrição</span>
@@ -6486,9 +6552,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     onClick={() =>
                       pedirConfirmacaoDeDinheiro({
                         oQue: "o total",
-                        de: money.base,
+                        de: escrito.base,
                         para: desvio.sugerido,
-                        registo: `Total alinhado com a soma das linhas no estúdio: preço final de ${eur(money.base)} para ${eur(desvio.sugerido)}.`,
+                        registo: `Total alinhado com a soma das linhas no estúdio: preço final de ${eur(escrito.base)} para ${eur(desvio.sugerido)}.`,
                         motivo: "Total alinhado com a soma das linhas.",
                         aplicar: () => {
                           confirmado("totalAmount");

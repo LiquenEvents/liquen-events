@@ -8,6 +8,7 @@ import {
   resolveValidUntil,
   MAX_PROPOSAL_DOC_BYTES,
 } from "@/lib/proposal-doc";
+import { dinheiroDaProposta } from "@/lib/proposal-budget";
 import { isAuthed } from "@/lib/admin-auth";
 import { isMissingTable } from "@/lib/repository";
 import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
@@ -272,7 +273,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // `total` guardado é sempre o BRUTO, para que splitThirtySeventy(total)
     // devolva o sinal correto e o invoice-pdf (base = amount/(1+IVA)) fique
     // consistente. Se a proposta dizia "+ IVA", o valor é grossed-up aqui.
-    const money = resolveProposalMoney(doc);
+    // `dinheiroDaProposta` e não `resolveProposalMoney`: quando os valores
+    // adicionais somam ao valor escrito, o bruto que fica GRAVADO tem de os
+    // trazer. Senão o PDF dizia 3.862,20 € e o sinal continuava a ser calculado
+    // sobre 3.690 € — o documento e a cobrança a discordarem em silêncio.
+    const money = dinheiroDaProposta(doc);
     // Validade: honra uma data explícita no doc, senão hoje + validUntilDays
     // (30 por omissão) — o /proposta recusa aceitar uma proposta expirada.
     const validUntil = resolveValidUntil(doc);
