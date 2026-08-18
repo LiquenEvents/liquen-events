@@ -509,10 +509,24 @@ export default function Fornecedores() {
                         {s.category}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
+                    {/* `gap-1` (4px) ficava por baixo dos 8px mínimos entre estes
+                        três alvos depois de `alvo-toque` os levar a 44px cada —
+                        cresceram, mas continuavam colados. `gap-2` é o mesmo
+                        valor que as Tarefas usam para a linha equivalente. */}
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => patchSupplier(s.id, { preferred: !s.preferred })}
-                        className={`transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 hover:text-amber-400 opacity-0 group-hover:opacity-100"}`}
+                        /* ── OS TRÊS BOTÕES DESTA LINHA, NO DEDO ───────────────────
+                           Ficavam invisíveis (`opacity-0`, só `group-hover`) e com
+                           14×13 px de alvo — no telemóvel não há "hover", portanto
+                           não havia como marcar preferido, editar nem remover um
+                           fornecedor a partir daqui. `alvo-toque` (globals.css) dá
+                           os 44 px só no dedo; `opacity-100 sm:opacity-0
+                           sm:group-hover:opacity-100` mantém o desenho discreto no
+                           portátil (só aparece ao pairar) mas deixa sempre visível
+                           onde não há rato. Mesmo tratamento das Tarefas
+                           (Tarefas.tsx, «Editar tarefa» / «Eliminar»). */
+                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 hover:text-amber-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"}`}
                         title={s.preferred ? "Remover dos preferidos" : "Marcar como preferido"}
                       >
                         <svg
@@ -531,7 +545,7 @@ export default function Fornecedores() {
                       </button>
                       <button
                         onClick={() => startEdit(s)}
-                        className="text-foreground/20 hover:text-[#4d6350] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+                        className="alvo-toque p-1.5 text-foreground/20 hover:text-[#4d6350] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-all"
                         aria-label="Editar"
                       >
                         <svg
@@ -549,7 +563,7 @@ export default function Fornecedores() {
                       </button>
                       <button
                         onClick={() => remove(s.id)}
-                        className="text-foreground/20 hover:text-[#b5654a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+                        className="alvo-toque p-1.5 text-foreground/20 hover:text-[#b5654a] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-all"
                         aria-label="Remover"
                       >
                         ×
@@ -557,7 +571,7 @@ export default function Fornecedores() {
                     </div>
                   </div>
                   {/* Star rating */}
-                  <div className="flex items-center gap-0.5 mb-2">
+                  <div className="flex items-center gap-0.5 pointer-coarse:gap-2 mb-2">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
                         key={star}
@@ -569,7 +583,13 @@ export default function Fornecedores() {
                         onClick={() =>
                           patchSupplier(s.id, { rating: s.rating === star ? null : star })
                         }
-                        className="transition-colors focus:outline-none"
+                        /* MEDIDO a 375px: 13×13 px, 2px de uma estrela para a
+                           outra — o dedo não acerta na que quer, e acaba a
+                           mudar a avaliação para a errada. `alvo-toque` dá os
+                           44px só no dedo; o `gap-2` (8px, também só no dedo)
+                           separa uma caixa de 44 da vizinha, senão continuavam
+                           coladas mesmo maiores. */
+                        className="alvo-toque transition-colors focus:outline-none"
                         aria-label={`${star} estrela${star !== 1 ? "s" : ""}`}
                       >
                         <svg
@@ -595,7 +615,13 @@ export default function Fornecedores() {
                     {s.phone && (
                       <a
                         href={`tel:${s.phone}`}
-                        className="text-foreground/45 hover:text-[#4d6350] transition-colors"
+                        // MEDIDO: 309×16 px de alvo — é o número que liga a
+                        // chamada, e 16px de altura é fácil de errar por um
+                        // pixel e acabar a tocar na linha ao lado. `alvo-toque`
+                        // dá-lhe 44px de altura só no dedo (`justify-start`
+                        // porque, ao contrário dos botões de ícone, este texto
+                        // não deve ficar centrado).
+                        className="alvo-toque !justify-start text-foreground/45 hover:text-[#4d6350] transition-colors"
                       >
                         {s.phone}
                       </a>
