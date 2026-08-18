@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import { eventCountdown, randomId, todayKey } from "./util";
 import { eur0 as eur } from "@/lib/money";
 import type { ActivityEntry } from "@/lib/orcamento/types";
+import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { Card } from "./ui";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
@@ -166,7 +167,12 @@ const KanbanCard = memo(function KanbanCard({
       )}
       <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-foreground/[0.06]">
         {q.quotedPrice ? (
-          <span className="text-[#4d6350] text-xs font-semibold">{eur(q.quotedPrice)}</span>
+          // Com IVA, para bater com o «Total» da coluna e os KPIs do topo —
+          // o mesmo cartão não pode mostrar um número numa unidade e a coluna
+          // que o soma noutra.
+          <span className="text-[#4d6350] text-xs font-semibold">
+            {eur(contractedAmounts(q).gross)}
+          </span>
         ) : (
           <span className="text-foreground/40 text-[10px]">Sem valor</span>
         )}
@@ -363,9 +369,19 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
     let accepted = 0;
     let rejected = 0;
     for (const q of quotes) {
-      if (q.status === "cotado") proposta += q.quotedPrice ?? 0;
+      /**
+       * ── OS DOIS RAMOS NÃO ESTÃO NA MESMA UNIDADE ─────────────────────────
+       * `q.quotedPrice` é o campo «Preço final (SEM IVA)» do ecrã. Somá-lo
+       * directo e comparar com «Receita contratada» das Estatísticas (sempre
+       * COM IVA, via `computeEventMetrics().contracted`) mostrava dois números
+       * do mesmo negócio ~23% desencontrados — o IVA inteiro. Mesma cascata já
+       * usada em `Reminders.tsx`, `PaymentsPanel.tsx`, `Overview.tsx` e
+       * `StatsDashboard.tsx`: `contractedAmounts(q).gross`.
+       */
+      const contratado = q.quotedPrice != null ? contractedAmounts(q).gross : 0;
+      if (q.status === "cotado") proposta += contratado;
       if (q.status === "aceite") {
-        ganho += q.quotedPrice ?? 0;
+        ganho += contratado;
         accepted++;
       }
       if (q.status === "rejeitado") rejected++;
@@ -386,8 +402,8 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { v: String(summary.active), l: "Pedidos ativos" },
-          { v: eur(summary.proposta), l: "Em proposta" },
-          { v: eur(summary.ganho), l: "Ganho" },
+          { v: eur(summary.proposta), l: "Em proposta (com IVA)" },
+          { v: eur(summary.ganho), l: "Ganho (com IVA)" },
           { v: `${summary.winRate}%`, l: "Taxa de conversão" },
         ].map((k) => (
           <Card key={k.l} padding="sm" className="p-4 sm:p-5">
@@ -405,7 +421,12 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
       <div className="flex gap-3.5 overflow-x-auto pb-4 scroll-hide">
         {COLUMNS.map((col, colIndex) => {
           const items = byStatus[col.id] ?? [];
-          const value = items.reduce((s, q) => s + (q.quotedPrice ?? 0), 0);
+          // Mesma cascata do resumo acima — total da coluna COM IVA, não o
+          // «Preço final (sem IVA)» somado directo.
+          const value = items.reduce(
+            (s, q) => s + (q.quotedPrice != null ? contractedAmounts(q).gross : 0),
+            0,
+          );
           return (
             <div
               key={col.id}
@@ -476,7 +497,7 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
               {value > 0 && (
                 <div className="px-4 py-2.5 border-t border-foreground/[0.07] flex items-center justify-between">
                   <span className="text-foreground/30 text-[9px] tracking-[0.15em] uppercase">
-                    Total
+                    Total (com IVA)
                   </span>
                   <span className="text-foreground/55 text-[11px] font-semibold tabular-nums">
                     {eur(value)}

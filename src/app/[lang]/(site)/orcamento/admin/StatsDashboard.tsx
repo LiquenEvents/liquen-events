@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
-import { computeEventMetrics } from "@/lib/orcamento/dossier";
+import { computeEventMetrics, contractedAmounts } from "@/lib/orcamento/dossier";
 import { downloadCsv, quotesToCsvRows, paymentsToCsvRows, dateStamp } from "./export";
 import { eur0 as eur } from "@/lib/money";
 import { Button, Card, EmptyState, Segmented } from "./ui";
@@ -252,6 +252,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       guestsCount = 0;
     let pipelineSum = 0,
       wonSum = 0,
+      wonPricedCount = 0,
       thisMonth = 0;
     let respHoursSum = 0,
       respCount = 0;
@@ -292,9 +293,30 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         guestsSum += q.guests;
         guestsCount++;
       }
+      /**
+       * ── OS DOIS RAMOS NÃO ESTÃO NA MESMA UNIDADE ─────────────────────────
+       *
+       * `q.quotedPrice` é o campo «Preço final (SEM IVA)» do ecrã. Somá-lo
+       * directo aqui e comparar com «Receita contratada» (que vem de
+       * `computeEventMetrics().contracted`, sempre COM IVA) punha dois números
+       * da mesma página em unidades diferentes: um evento aceite a 20 000 € +
+       * IVA (24 600 € a receber) aparecia com «Ganho (aceite)» 20 000 € ao
+       * lado de «Receita contratada» 24 600 € — 4 600 € de diferença, o IVA
+       * inteiro, sistematicamente ~23% abaixo.
+       *
+       * A casa já tinha corrigido este mesmo erro em `Reminders.tsx`,
+       * `PaymentsPanel.tsx` e `Overview.tsx`. `contractedAmounts` é a mesma
+       * cascata: proposta > preço cotado > estimativa, sempre devolvida com
+       * IVA. Sem proposta à mão aqui, o ramo do `quotedPrice` deriva o bruto
+       * pela taxa efectiva do pedido — nunca uma conta nova.
+       */
+      const contratado = q.quotedPrice != null ? contractedAmounts(q).gross : 0;
       if (q.quotedPrice) {
-        if (q.status === "cotado") pipelineSum += q.quotedPrice;
-        if (q.status === "aceite") wonSum += q.quotedPrice;
+        if (q.status === "cotado") pipelineSum += contratado;
+        if (q.status === "aceite") {
+          wonSum += contratado;
+          wonPricedCount++;
+        }
       }
 
       const sd = new Date(q.submittedAt);
@@ -302,7 +324,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       const idx = monthIndex.get(`${sd.getFullYear()}-${sd.getMonth()}`);
       if (idx !== undefined) {
         months[idx].value++;
-        if (q.status === "aceite" && q.quotedPrice) months[idx].revenue += q.quotedPrice;
+        if (q.status === "aceite" && q.quotedPrice) months[idx].revenue += contratado;
       }
 
       // Response time: submitted → first reply (or last update)
@@ -414,7 +436,14 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
     const accepted = byStatus["aceite"] ?? 0;
     const decided = accepted + (byStatus["rejeitado"] ?? 0);
     const conversion = decided > 0 ? Math.round((accepted / decided) * 100) : 0;
-    const avgTicket = accepted > 0 ? wonSum / accepted : 0;
+    /**
+     * O denominador é quem TEM preço (`wonPricedCount`), não todos os
+     * aceites (`accepted`). `wonSum` só soma quem entrou no `if (q.quotedPrice)`
+     * acima; dividir pelo total de aceites metia no denominador negócios que
+     * não entraram no numerador, e o «Ticket médio» saía sistematicamente
+     * abaixo da verdade — mesmo defeito já corrigido em `Overview.tsx`.
+     */
+    const avgTicket = wonPricedCount > 0 ? wonSum / wonPricedCount : 0;
     const avgResp = respCount ? respHoursSum / respCount : 0;
     const avgRespLabel =
       respCount === 0
@@ -565,8 +594,8 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi value={String(stats.total)} label="Pedidos totais" accent />
         <Kpi value={`${stats.conversion}%`} label="Conversão" />
-        <Kpi value={eur(stats.pipelineSum)} label="Em proposta" />
-        <Kpi value={eur(stats.wonSum)} label="Ganho (aceite)" accent />
+        <Kpi value={eur(stats.pipelineSum)} label="Em proposta (com IVA)" />
+        <Kpi value={eur(stats.wonSum)} label="Ganho (aceite, com IVA)" accent />
       </div>
 
       {/* Secondary indicators — still here, just quieter */}
@@ -581,7 +610,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         <Kpi
           small
           value={stats.forecastRevenue > 0 ? eur(stats.forecastRevenue) : "—"}
-          label="Previsão pipeline"
+          label="Previsão pipeline (com IVA)"
         />
       </div>
 
@@ -606,7 +635,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               <div className="grid grid-cols-2 gap-3 mb-5">
                 <Kpi value={eur(stats.received)} label="Recebido" accent />
                 <Kpi value={eur(stats.outstanding)} label="A receber" />
-                <Kpi value={eur(stats.avgTicket)} label="Ticket médio" />
+                <Kpi value={eur(stats.avgTicket)} label="Ticket médio (com IVA)" />
                 {/* «Registado total», e já não «Faturado total». O número não
                     mudou — sempre foi recebido + a receber, somado das linhas
                     de pagamento (ver o cálculo acima), e nunca leu uma factura.
@@ -763,7 +792,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
           <Sub title="Pedidos por mês (últimos 8)">
             <VBars data={stats.months.map((m) => ({ label: m.label, value: m.value }))} />
           </Sub>
-          <Sub title="Receita ganha por mês (€)">
+          <Sub title="Receita ganha por mês (€, com IVA)">
             {stats.hasRevenue ? (
               <VBars
                 data={stats.months.map((m) => ({ label: m.label, value: Math.round(m.revenue) }))}
