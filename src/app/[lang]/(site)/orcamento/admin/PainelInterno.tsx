@@ -284,15 +284,25 @@ export default function PainelInterno({
         type="button"
         onClick={() => setAberto((v) => !v)}
         aria-expanded={aberto}
-        className="alvo-toque !justify-start flex w-full items-center gap-2 px-4 py-3 text-left"
+        // `flex-wrap`: a 375 px, o título («Só para ti»), a explicação
+        // («custos, margem…») e os selos de aviso viviam todos na MESMA linha,
+        // sem nenhum marcado `shrink-0` — o flexbox encolhia os três em
+        // conjunto, e o título (a peça mais curta) era o primeiro a chegar ao
+        // fundo do poço: 45×38 px, «Só para» numa linha e «ti» sozinho na de
+        // baixo. Com a quebra ligada e o título protegido (linha a seguir),
+        // quem sobra sem espaço é a explicação — que pode dar-se ao luxo de
+        // descer para a linha de baixo, e não de se partir a meio.
+        className="alvo-toque !justify-start flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 text-left"
       >
         <span aria-hidden="true" className="text-foreground/35">
           {aberto ? "▾" : "▸"}
         </span>
-        <span className="text-[11px] font-medium tracking-[0.12em] uppercase text-foreground/60">
+        {/* `shrink-0`: três palavras, e é o título da secção — não pode ser o
+            que cede espaço quando o resto da linha não cabe. */}
+        <span className="shrink-0 text-[11px] font-medium tracking-[0.12em] uppercase text-foreground/60">
           Só para ti
         </span>
-        <span className="text-[11px] text-foreground/40">
+        <span className="min-w-0 text-[11px] text-foreground/40">
           custos, margem, deslocação — nunca sai no PDF
         </span>
         {/* Os dois sinais que valem um olhar mesmo com o painel fechado. */}

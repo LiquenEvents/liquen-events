@@ -2805,6 +2805,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // está encostada — os 56 px da navegação, mais a área segura do iPhone.
       const porBaixo = Math.max(0, window.innerHeight - r.bottom);
       setFolgaDaBarra(Math.ceil(r.height + porBaixo + 12));
+      // ── E A MESMA MEDIDA SERVE A QUEM FLUTUA POR CIMA ──────────────────
+      // O aviso do `Toast.tsx` põe-se a uma distância fixa do fundo — a altura
+      // da navegação do telemóvel mais um respiro — e essa distância cai
+      // exactamente dentro desta barra, que pousa nessa mesma navegação. Sem
+      // isto, um aviso de gravação falhada nasce por cima do botão
+      // «Pré-visualizar» e come-lhe o toque durante quatro segundos.
+      // Publicamos a altura MEDIDA (a barra quebra em duas linhas quando o
+      // passo o pede, e aí é mais alta) para o aviso se afastar tanto quanto
+      // preciso e nem um pixel mais. Só existe enquanto o estúdio estiver
+      // aberto: a limpeza do efeito devolve-a a zero.
+      document.documentElement.style.setProperty("--bo-barra-accao", `${Math.ceil(r.height)}px`);
     };
     medir();
     const observador = new ResizeObserver(medir);
@@ -2813,6 +2824,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     return () => {
       observador.disconnect();
       window.removeEventListener("resize", medir);
+      document.documentElement.style.removeProperty("--bo-barra-accao");
     };
     // O passo muda o conteúdo da barra (e portanto a altura); remedir aí.
   }, [step]);
@@ -6846,6 +6858,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 }}
                 placeholder={String(DEFAULT_VALID_DAYS)}
                 aria-label="Dias de validade"
+                // ── O ÚLTIMO CAMPO DO PASSO, LOGO ACIMA DA BARRA FIXA ───────
+                // MEDIDO num iPhone SE (375×667), a fechar este campo com o
+                // teclado aberto (~260 px): o teclado mais a barra de acção
+                // fixa tapavam-lhe uma fatia. O `scroll-margin-bottom` sozinho
+                // não resolve — só entra em jogo se ALGUÉM pedir um scroll, e
+                // um toque para abrir o teclado não pede nenhum. Por isso o
+                // `onFocus`: ao ganhar foco (é aí que o teclado nasce), o
+                // campo centra-se a si próprio no que sobra de ecrã — que já
+                // é o ecrã COM o teclado, porque o foco só chega depois de o
+                // sistema o ter aberto. `scroll-mb-72` (18 px a mais do que os
+                // 260 do teclado) é o cinto e as calças: cobre também quem lá
+                // chega por um caminho que não é este foco (uma hiperligação
+                // com âncora, um leitor de ecrã a saltar directamente).
+                onFocus={(e) => e.currentTarget.scrollIntoView({ block: "center" })}
+                containerClassName="scroll-mb-72"
                 hint={
                   doc.validUntilDays ? (
                     <button
@@ -7262,6 +7289,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            no token `--bo-barra-inferior`. Era a quarta cópia do «56px», e com a
            barra a crescer para 72 px ficava a tapá-la. `lg:bottom-0` porque
            acima de 1024 não há barra nenhuma por baixo. */
+        /* ── O AVISO E A BARRA JÁ NÃO DISPUTAM A MESMA FAIXA ───────────────
+           MEDIDO a 375 px: um aviso («Este rascunho tinha sido alterado noutro
+           sítio…») nasce fixo 12 px acima da navegação do telemóvel, e esta
+           barra pousa nessa mesma navegação com ~64 px de altura — ou seja, o
+           aviso nascia DENTRO da faixa desta barra, em cima do botão
+           «Pré-visualizar» (`elementFromPoint` no centro do botão devolvia o
+           texto do aviso) durante os 4 s em que fica no ecrã.
+           A saída NÃO é levantar esta barra por cima do aviso: a barra é opaca
+           e mais alta do que ele, e o aviso — que é como o estúdio diz que uma
+           gravação falhou — desaparecia por completo no telemóvel. Quem se
+           afasta é o aviso: esta barra publica a sua altura medida em
+           `--bo-barra-accao` (ver o `ResizeObserver` lá em cima) e o
+           `Toast.tsx` soma-a à distância a que já se punha do fundo. Ficam os
+           dois visíveis, e nenhum tapa o outro. */
         className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:py-3 lg:bottom-0"
       >
         {step === "conteudo" && (
@@ -8035,7 +8076,20 @@ function Section({
   const corpoId = id ? `sec-${id}` : undefined;
   return (
     <Card className="mb-4" id={id ? `seccao-${id}` : undefined}>
-      <div className="mb-4 flex items-baseline justify-between gap-3">
+      {/* `flex-wrap`: SEM ela, um `nota` comprido («Mood boards», com "0
+          páginas · 0 fotos · PDF com cerca de 7" ao lado) e o título competiam
+          pela MESMA linha sem ninguém a ceder por inteiro — o `nota` já vinha
+          `shrink-0` (não podia encolher), portanto era sempre o título a levar
+          com o aperto. MEDIDO a 375 px: o botão do título ficava com 66×56 px
+          e o `h3` com 49×40 — «Mood boards» a partir-se em «Mood» / «boards».
+          «Só para ti», ao lado (`PainelInterno.tsx`), tinha o mesmo problema
+          por uma razão parecida.
+
+          Com a quebra ligada e o BOTÃO do título também `shrink-0` (a seguir),
+          o título deixa de ceder espaço nenhum: quando não cabem os dois lado
+          a lado, é o `nota` — que já não encolhe — a descer inteiro para a
+          linha de baixo, como já acontecia nas linhas de Serviços. */}
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         {id ? (
           <button
             type="button"
@@ -8046,8 +8100,10 @@ function Section({
                que a abre e fecha, e media 20 px de altura — metade do mínimo de
                44. Num telemóvel, abrir "Serviços" era acertar numa faixa da
                espessura de uma linha de texto. O `items-baseline` mantém-se para
-               a seta e o título continuarem alinhados pela base. */
-            className="alvo-toque group -my-1 flex items-baseline gap-2 py-2 text-left"
+               a seta e o título continuarem alinhados pela base.
+               `shrink-0`: ver o comentário acima do invólucro — o título nunca
+               é quem cede espaço a um `nota` comprido. */
+            className="alvo-toque group -my-1 flex shrink-0 items-baseline gap-2 py-2 text-left"
           >
             <span
               aria-hidden
@@ -8060,7 +8116,9 @@ function Section({
             </h3>
           </button>
         ) : (
-          <h3 className="font-display text-base leading-tight text-foreground/90">{title}</h3>
+          <h3 className="font-display shrink-0 text-base leading-tight text-foreground/90">
+            {title}
+          </h3>
         )}
         {nota && <span className="shrink-0 text-xs text-foreground/45">{nota}</span>}
         {accao && <div className="shrink-0">{accao}</div>}
