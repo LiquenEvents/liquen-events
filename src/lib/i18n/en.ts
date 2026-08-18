@@ -721,6 +721,11 @@ export const en: Dict = {
     eventFallbackParticular: "Event",
     semData: "Date to be confirmed",
     semLocal: "Location to be confirmed",
+    // Ver `pt.ts`: mesma frase para um token forjado e para um pedido apagado,
+    // de propósito, para nunca revelar se um identificador existe.
+    linkInvalidTitle: "This link is no longer valid",
+    linkInvalidBody:
+      "This link to your client area is no longer valid. Contact us and we will gladly send you a new one.",
     proposta: {
       title: "Proposal",
       statusLabel: "Status",

@@ -109,6 +109,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         // o modelo do sinal ser RECUSADO em vez de dizer «recebemos ».
         valor: sinal > 0 ? eurDocumento(sinal) : "",
       }),
+      // A língua do PEDIDO (`quote.locale`, gravada quando o formulário
+      // público foi submetido) — não a de quem está a carregar no botão. É a
+      // mesma fonte que a rota irmã da proposta usa para saber que um casal é
+      // inglês. Ausente (pedidos anteriores a este campo) cai no português de
+      // sempre, dentro de `modeloParaEnvioAPedido`.
+      quote.locale,
     );
 
     if (!preparado.ok) {

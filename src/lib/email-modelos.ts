@@ -342,10 +342,28 @@ export async function modeloParaEnvioAutomatico(
  * da proposta, não há texto da casa alternativo para estes momentos — e o
  * botão tem de mandar um email a sério, que ela acabou de ver na
  * pré-visualização antes de confirmar.
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * OS TRÊS SÓ EXISTEM EM PORTUGUÊS — E NÃO HÁ TEXTO DA CASA PARA ONDE CAIR
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * A proposta tem um recurso para um pedido inglês sem modelo inglês: cai no
+ * texto da casa, que existe nas duas línguas (`email-proposta-textos.ts`).
+ * Estes três («Sinal recebido», «Falta uma semana», «Agradecimento») não têm
+ * essa rede — são só o que ela escreveu no ecrã «Modelos de email», sempre em
+ * português. Mandar o modelo à mesma dava a um casal inglês «Sinal recebido,
+ * reserva confirmada» sem perceberem uma palavra.
+ *
+ * Por isso RECUSA-SE, como o botão já recusa um marcador sem valor: nenhum
+ * email sai, e a frase diz porquê e o que fazer. Ela está com o dedo no botão
+ * — o Mensageiro (`/api/orcamento/[id]/mensagem`) escreve-se à mão e já sai na
+ * língua do pedido, é o caminho que sobra até o ecrã dos modelos ganhar uma
+ * versão inglesa de cada um.
  */
 export async function modeloParaEnvioAPedido(
   chave: ChaveDeModelo,
   vars: Record<string, string>,
+  idioma?: string,
 ): Promise<ModeloPreparado> {
   const modelo = (await guardado(chave)) ?? semente(chave);
   if (!modelo) {
@@ -353,6 +371,17 @@ export async function modeloParaEnvioAPedido(
       ok: false,
       emFalta: [],
       motivo: `Não há nenhum modelo «${chave}». Cria-o em «Modelos de email».`,
+    };
+  }
+  if (idioma === "en") {
+    return {
+      ok: false,
+      emFalta: [],
+      motivo:
+        `O modelo «${modelo.name}» está escrito em português, e este pedido é em inglês — ` +
+        `enviá-lo mandava ao casal um email que não entende. O email NÃO foi enviado: escreve-lhe ` +
+        `antes pelo Mensageiro (já sai na língua certa), ou pede uma versão inglesa deste modelo ` +
+        `em «Modelos de email».`,
     };
   }
   return prepararModelo(modelo, vars);

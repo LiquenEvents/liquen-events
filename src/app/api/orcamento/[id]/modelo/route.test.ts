@@ -255,6 +255,53 @@ describe("POST /api/orcamento/[id]/modelo — o envio", () => {
  * texto continua inteiro no modelo, e uma linha no histórico sobre um email que
  * ninguém recebeu é uma mentira que dura para sempre.
  */
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * UM PEDIDO INGLÊS RECUSA O ENVIO — NÃO MANDA PORTUGUÊS
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * Os quatro modelos (`proposta-enviada`, `sinal-recebido`, `semana-evento`,
+ * `agradecimento`) só existem em português, e a rota nunca lia a língua do
+ * pedido — guardada em `quote.locale`. Um casal britânico cuja proposta foi
+ * escrita em inglês recebia «Sinal recebido, reserva confirmada» sem perceber
+ * uma palavra.
+ */
+describe("POST /api/orcamento/[id]/modelo — um pedido inglês", () => {
+  it("recusa o envio (400) em vez de mandar o modelo em português", async () => {
+    authed.ok = true;
+    quotes.actual = { ...PEDIDO, locale: "en" };
+    const res = await POST(req({ chave: "agradecimento", enviar: true }), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/inglês/i);
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+
+  it("a pré-visualização também recusa, com a mesma frase", async () => {
+    authed.ok = true;
+    quotes.actual = { ...PEDIDO, locale: "en" };
+    const res = await POST(req({ chave: "agradecimento" }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(false);
+    expect(data.motivo).toMatch(/inglês/i);
+  });
+
+  it("um pedido português (ou sem língua gravada) continua a enviar o modelo", async () => {
+    authed.ok = true;
+    quotes.actual = { ...PEDIDO, locale: "pt" };
+    const res1 = await POST(req({ chave: "agradecimento", enviar: true }), ctx("LIQ-1"));
+    expect(res1.status).toBe(200);
+    expect((await res1.json()).emailed).toBe(true);
+
+    quotes.actual = { ...PEDIDO };
+    delete (quotes.actual as { locale?: string }).locale;
+    const res2 = await POST(req({ chave: "agradecimento", enviar: true }), ctx("LIQ-1"));
+    expect(res2.status).toBe(200);
+    expect((await res2.json()).emailed).toBe(true);
+  });
+});
+
 describe("POST /api/orcamento/[id]/modelo — o servidor de correio a recusar", () => {
   it("responde 200 com a verdade, e não 500 sobre a preparação", async () => {
     authed.ok = true;

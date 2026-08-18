@@ -139,7 +139,25 @@ export default function PortalView({
   depositPercent,
   currency,
 }: PortalViewProps) {
-  const firstName = clientName?.trim().split(" ")[0] || clientName;
+  /**
+   * ── «OLÁ, .» ────────────────────────────────────────────────────────────
+   *
+   * Era `clientName?.trim().split(" ")[0] || clientName`. Com um nome vazio
+   * ("" — a mesma linha antiga em que `client_name` ficou a `null` e o
+   * `fromRow` traduz isso para `""`) o primeiro `split(" ")[0]` também dá
+   * `""`, que é falsy — e o `||` caía outra vez em `clientName`, ou seja em
+   * `""`. O casal abria o link do portal e a primeira coisa que lia, em
+   * Playfair a 52 px, era:
+   *
+   *     Olá, .
+   *
+   * A mesma avaria que a página da proposta já teve (ver o comentário lá, no
+   * componente `Message`), e a mesma solução: sem nome, cumprimenta-se na
+   * mesma — «Olá.» — que é uma frase inteira e não denuncia nada. Com nome, é
+   * exactamente o que sempre saiu.
+   */
+  const firstName = clientName?.trim().split(/\s+/)[0] || "";
+  const saudacao = firstName ? `${t.greeting}, ${firstName}.` : `${t.greeting}.`;
   // Os rótulos do faseamento trazem as duas percentagens — a do sinal e o que
   // sobra — para não poderem discordar do valor impresso ao lado.
   const pcts = { sinal: String(depositPercent), saldo: String(100 - depositPercent) };
@@ -161,7 +179,7 @@ export default function PortalView({
             className="text-foreground/90 font-bold"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 5vw, 52px)" }}
           >
-            {t.greeting}, {firstName}.
+            {saudacao}
           </h1>
           <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
             {t.intro}

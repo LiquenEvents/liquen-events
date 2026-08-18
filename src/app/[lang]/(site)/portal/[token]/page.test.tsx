@@ -13,7 +13,9 @@ const db = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/portal-token", () => ({
-  readPortalToken: vi.fn((t: string) => (t === "good" ? { quoteId: "q-1" } : null)),
+  readPortalToken: vi.fn((t: string) =>
+    t === "good" ? { quoteId: "q-1" } : t === "semquote" ? { quoteId: "q-fantasma" } : null,
+  ),
 }));
 vi.mock("@/lib/quotes-store", () => ({
   getQuote: vi.fn(async (id: string) => db.quotes.get(id) ?? null),
@@ -50,6 +52,12 @@ vi.mock("@/lib/i18n", () => ({
       eventFallbackEmpresa: locale === "en" ? "Corporate" : "Empresa",
       eventFallbackParticular: locale === "en" ? "Private" : "Particular",
       dateLocale: locale === "en" ? "en-GB" : "pt-PT",
+      linkInvalidTitle:
+        locale === "en" ? "This link is no longer valid" : "Este link já não é válido",
+      linkInvalidBody:
+        locale === "en"
+          ? "This link to your client area is no longer valid. Contact us and we will gladly send you a new one."
+          : "Este link para o seu espaço de cliente já não é válido. Contacte-nos e enviamos-lhe um novo com todo o gosto.",
     },
   }),
 }));
@@ -334,5 +342,62 @@ describe("Portal page — a língua é a da proposta", () => {
   it("sem proposta nenhuma, manda o visitante", async () => {
     const el = await PortalPage({ params: Promise.resolve({ lang: "en", token: "good" }) });
     expect((el as any).props.t.title).toBe("Client portal");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM LINK QUE JÁ NÃO ABRE NÃO É O 404 DE MARKETING
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Era `notFound()` nos dois casos — token inválido/expirado, e pedido apagado —
+ * e caía na página «Este caminho não existe… o seu próximo evento ainda está à
+ * espera de ser criado», com um botão «Pedir orçamento». Um casal que já é
+ * cliente (e cujo contrato está assinado) lia isso ao voltar ao PRÓPRIO portal
+ * um ano depois.
+ */
+describe("Portal page — link que já não abre", () => {
+  it("token inválido/forjado mostra uma mensagem cortês, não o 404 de marketing", async () => {
+    const el = await PortalPage({ params: Promise.resolve({ lang: "pt", token: "forjado" }) });
+    const props = (el as any).props;
+    expect(props.title).toBe("Este link já não é válido");
+    expect(props.body).toContain("Contacte-nos");
+    // Não é o vocabulário do 404 de marketing.
+    expect(props.body).not.toMatch(/orçamento|próximo evento/i);
+  });
+
+  it("um pedido apagado (token válido, pedido já não existe) mostra a MESMA mensagem", async () => {
+    const el = await PortalPage({ params: Promise.resolve({ lang: "pt", token: "semquote" }) });
+    const props = (el as any).props;
+    expect(props.title).toBe("Este link já não é válido");
+    expect(props.body).toContain("Contacte-nos");
+  });
+
+  /**
+   * A PROPRIEDADE em si: um link privado nunca pode dizer se um identificador
+   * existe. Se o forjado e o apagado dessem frases diferentes, dava para
+   * distinguir, por tentativa, um id que existe (mas foi apagado) de um que
+   * nunca existiu.
+   */
+  it("token forjado e pedido apagado são INDISTINGUÍVEIS", async () => {
+    const forjado = (
+      (await PortalPage({
+        params: Promise.resolve({ lang: "pt", token: "forjado" }),
+      })) as any
+    ).props;
+    const apagado = (
+      (await PortalPage({
+        params: Promise.resolve({ lang: "pt", token: "semquote" }),
+      })) as any
+    ).props;
+    expect(forjado.title).toBe(apagado.title);
+    expect(forjado.body).toBe(apagado.body);
+  });
+
+  it("segue a língua de quem visita — não há proposta de onde tirar outra", async () => {
+    const el = await PortalPage({ params: Promise.resolve({ lang: "en", token: "forjado" }) });
+    const props = (el as any).props;
+    expect(props.title).toBe("This link is no longer valid");
+    expect(props.lang).toBe("en");
   });
 });
