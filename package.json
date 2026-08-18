@@ -99,6 +99,7 @@
   },
   "overrides": {
     "sharp": "^0.35.0",
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.10",
+    "deepmerge-ts": "^8.0.1"
   }
 }
