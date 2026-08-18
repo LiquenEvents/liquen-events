@@ -21,6 +21,7 @@ import {
 } from "@/lib/proposal-doc";
 import {
   IDIOMA_POR_OMISSAO,
+  camposDoEventoNaLingua,
   dataDoEventoPorExtenso,
   ehIdiomaDaProposta,
   referenciaDoDocumento,
@@ -137,7 +138,8 @@ import {
   dinheiroDaProposta,
   asDuasFormas,
 } from "@/lib/proposal-budget";
-import { eur } from "@/lib/money";
+import { eur, eurDocumento, montanteNaLingua } from "@/lib/money";
+import { resumoDaPropostaParaCopiar } from "@/lib/email-proposta-textos";
 import { randomId } from "./util";
 import type { ActivityEntry, Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
@@ -1206,6 +1208,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * ecrã do passo 3 seria uma perda a mais que a anulação não sabia desfazer.
    */
   const [mensagemAoCliente, setMensagemAoCliente] = useState("");
+  /**
+   * O link de aceitação da proposta MAIS RECENTE que saiu mesmo para o
+   * cliente, para o botão «Copiar resumo». `null` até se saber que existe —
+   * nunca um link a adivinhar. Vem de duas fontes: a leitura ao abrir o
+   * estúdio (`GET`, em baixo — cobre reabrir o estúdio de uma proposta já
+   * enviada numa sessão anterior) e a resposta do próprio envio (`send`, mais
+   * abaixo — actualiza-o já, sem esperar por um segundo pedido).
+   */
+  const [linkDaProposta, setLinkDaProposta] = useState<string | null>(null);
   // Depois de um envio bem-sucedido, o formulário NÃO fica pronto a re-disparar:
   // mostra um estado de confirmação e exige uma escolha consciente para reenviar.
   const [sent, setSent] = useState(false);
@@ -2327,6 +2338,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // `splitSinal`: eram a mesma divisão feita em dois sítios, e duas
   // implementações da mesma divisão podem arredondar para lados diferentes.
   const split = { sinal: totais.sinal, saldo: totais.saldo };
+  /**
+   * O resumo para o botão «Copiar resumo» — três ou quatro linhas prontas a
+   * colar no WhatsApp. Os números são os de `totais` (`totaisDaProposta`),
+   * que é o MESMO bloco que a barra do fundo e o passo «Enviar» já mostram;
+   * não há aqui uma segunda conta.
+   *
+   * `eurDocumento` + `montanteNaLingua`: o mesmo par que o gerador do PDF usa
+   * para escrever o dinheiro na língua do documento (ver `money.ts`) — para o
+   * valor aqui não discordar do valor que o documento em anexo mostra.
+   */
+  const resumoParaCopiar = resumoDaPropostaParaCopiar(
+    {
+      clientNames: doc.clientNames ?? "",
+      eventDate: camposDoEventoNaLingua(doc, idiomaDoPdf).eventDate ?? "",
+      aPagar: montanteNaLingua(eurDocumento(totais.aPagar), idiomaDoPdf),
+      link: linkDaProposta ?? undefined,
+    },
+    idiomaDoPdf,
+  );
   // O desvio do total escrito à mão. Vive aqui em cima porque é lido em dois
   // sítios: na dica do campo e no aviso com o botão que o arruma.
   const desvio = desalinhamento(doc, money.base);
@@ -2897,6 +2927,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       );
     }
     toast("Versão reposta. Podes anular durante 10 segundos.", "info");
+  }
+
+  /**
+   * Insere o parágrafo do que mudou (painel Versões) na caixa "Mensagem para
+   * o cliente" — NUNCA directamente no email. É a mesma caixa que já viaja
+   * com o envio (ver `send`, mais abaixo), por isso não é preciso mais nada
+   * para ela poder acompanhar a proposta.
+   *
+   * Uma caixa vazia recebe o parágrafo tal como está. Uma caixa que já tem
+   * algo escrito por ela (uma nota pessoal, por exemplo) NÃO é substituída —
+   * o parágrafo entra a seguir, com uma linha em branco pelo meio, para não
+   * apagar trabalho.
+   */
+  function inserirParagrafoDoQueMudou(texto: string) {
+    setMensagemAoCliente((actual) => {
+      const escrita = actual.trim();
+      return escrita ? `${escrita}\n\n${texto}` : texto;
+    });
+    toast("Parágrafo inserido na mensagem para o cliente. Revê antes de enviar.", "info");
   }
 
   function clearDraft() {
@@ -4302,6 +4351,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       if (typeof data?.pdfBytes === "number") {
         apontarGeracao(totalDeFotos, Date.now() - comecou, data.pdfBytes);
       }
+      // O link desta proposta, já pronto para o botão «Copiar resumo» — sem
+      // esperar pela leitura de abertura (`GET`, aqui em cima) que já correu
+      // há minutos, antes de haver o que enviar.
+      if (typeof data?.acceptUrl === "string") setLinkDaProposta(data.acceptUrl);
       // A proposta ficou guardada em qualquer caso; a mensagem distingue enviada
       // por email vs guardada-mas-sem-email, para a equipa saber o que fazer.
       // O DOCUMENTO INCOMPLETO É O AVISO MAIS IMPORTANTE DOS TRÊS, por isso é o
@@ -4400,6 +4453,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       vivo = false;
     };
   }, []);
+
+  /**
+   * O link da proposta já enviada, lido UMA vez ao abrir o estúdio — para o
+   * botão «Copiar resumo» funcionar mesmo sem passar pelo «Enviar» nesta
+   * sessão (reabrir o estúdio de uma proposta enviada ontem, por exemplo).
+   * Se falhar, o botão simplesmente sai sem o link — o resumo continua a
+   * servir sem ele, que é o comportamento normal de uma proposta por enviar.
+   */
+  useEffect(() => {
+    let vivo = true;
+    fetch(`/api/orcamento/${quote.id}/proposta-doc`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { acceptUrl?: string | null } | null) => {
+        if (vivo && data?.acceptUrl) setLinkDaProposta(data.acceptUrl);
+      })
+      .catch(() => {
+        /* sem link, o resumo sai sem ele */
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [quote.id]);
 
   /** O documento copiado passa a ser este, com os campos a confirmar marcados. */
   /**
@@ -6799,6 +6874,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 A proposta foi gerada e enviada para {quote.email || "o cliente"}. Não precisas de
                 fazer mais nada.
               </p>
+              {/* ── QUANDO O CASAL PREFERE WHATSAPP ─────────────────────────
+                  A comunicação sai toda por email, e em Portugal é normal o
+                  casal preferir WhatsApp. É aqui, mesmo depois de enviar, que
+                  o link fica mais fresco — sem esperar por um segundo pedido. */}
+              <CopiarResumo texto={resumoParaCopiar} />
               <Button
                 variant="secondary"
                 size="sm"
@@ -6846,6 +6926,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   value={money.gross > 0 ? eur(split.sinal) : "—"}
                 />
               </dl>
+              {/* ── QUANDO O CASAL PREFERE WHATSAPP ───────────────────────
+                  Antes ainda de enviar: serve para uma revisão de uma
+                  proposta que já tinha ido antes (`linkDaProposta` de uma
+                  sessão anterior) — o resumo sai com esse link até haver um
+                  mais novo. */}
+              <div className="mt-3">
+                <CopiarResumo texto={resumoParaCopiar} />
+              </div>
               {/* ══════════════════════════════════════════════════════════
                   A LÍNGUA TAMBÉM SE ESCOLHE AQUI, ONDE SE ENVIA
                   ══════════════════════════════════════════════════════════
@@ -7025,6 +7113,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 quoteId={quote.id}
                 doc={doc as ProposalDoc}
                 onRestaurar={restaurarVersao}
+                // A língua escolhida ao lado (ver a Conferência, aqui em cima):
+                // o parágrafo do que mudou nasce na língua em que a proposta
+                // vai mesmo sair.
+                idioma={idiomaDoPdf}
+                onInserirNaMensagem={inserirParagrafoDoQueMudou}
               />
               {!canSend && fotosPorConfirmar === 0 && (
                 <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
@@ -7914,6 +8007,71 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline justify-between gap-3 border-b border-foreground/[0.06] pb-1.5">
       <dt className="text-foreground/45">{label}</dt>
       <dd className="text-right text-foreground/85">{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O BOTÃO «COPIAR RESUMO»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Três ou quatro linhas prontas a colar no WhatsApp (o texto já vem pronto de
+ * fora — `resumoDaPropostaParaCopiar` — este componente só sabe COPIAR, e o
+ * que fazer quando copiar falha).
+ *
+ * ── QUANDO A ÁREA DE TRANSFERÊNCIA FALHA ───────────────────────────────────
+ * O Safari recusa `navigator.clipboard.writeText` fora de um gesto directo do
+ * utilizador (um `await` a mais pelo meio já chega para deixar de contar como
+ * um), e há quem tenha as permissões desligadas. Nenhum dos dois pode virar um
+ * erro seco: o texto fica visível E SELECCIONADO, pronto a copiar à mão com
+ * Cmd/Ctrl+C — nunca uma mensagem a mandá-la "tentar outra vez" sem dar outra
+ * saída.
+ */
+function CopiarResumo({ texto }: { texto: string }) {
+  const { toast } = useToast();
+  const [falhou, setFalhou] = useState(false);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+
+  async function copiar() {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Sem área de transferência.");
+      await navigator.clipboard.writeText(texto);
+      setFalhou(false);
+      toast("Resumo copiado.", "success");
+    } catch {
+      setFalhou(true);
+    }
+  }
+
+  // A caixa só aparece quando falhou, e é aí que o texto se selecciona
+  // sozinho — é o gesto que substitui o botão que não funcionou.
+  useEffect(() => {
+    if (falhou) areaRef.current?.select();
+  }, [falhou]);
+
+  return (
+    <div>
+      <Button variant="ghost" size="sm" onClick={() => void copiar()}>
+        Copiar resumo
+      </Button>
+      {falhou && (
+        <div className="mt-2 max-w-md rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] p-3">
+          <p className="text-xs leading-relaxed text-foreground/70">
+            Não foi possível copiar automaticamente. O texto está seleccionado: copia com
+            Cmd/Ctrl+C.
+          </p>
+          <textarea
+            ref={areaRef}
+            aria-label="Resumo da proposta, para copiar à mão"
+            readOnly
+            value={texto}
+            onFocus={(e) => e.currentTarget.select()}
+            rows={4}
+            className="bo-input mt-2 w-full px-3 py-2 text-xs text-foreground/85"
+          />
+        </div>
+      )}
     </div>
   );
 }

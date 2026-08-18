@@ -36,7 +36,12 @@ const V2: VersaoEnviada = {
 /** O documento da última enviada, que a rota devolve com `?doc=`. */
 const ULTIMO = doc({ totalAmount: 9500, budgetItems: ["Flores"], budgetAmounts: [1800] });
 
-function montar(versoes: VersaoEnviada[], noEcra: ProposalDoc, onRestaurar = vi.fn()) {
+function montar(
+  versoes: VersaoEnviada[],
+  noEcra: ProposalDoc,
+  onRestaurar = vi.fn(),
+  extra: { idioma?: "pt" | "en"; onInserirNaMensagem?: (texto: string) => void } = {},
+) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
@@ -51,7 +56,15 @@ function montar(versoes: VersaoEnviada[], noEcra: ProposalDoc, onRestaurar = vi.
       return { ok: true, status: 200, json: async () => ({ ok: true, versoes }) };
     }),
   );
-  render(<Versoes quoteId="LIQ-1" doc={noEcra} onRestaurar={onRestaurar} />);
+  render(
+    <Versoes
+      quoteId="LIQ-1"
+      doc={noEcra}
+      onRestaurar={onRestaurar}
+      idioma={extra.idioma}
+      onInserirNaMensagem={extra.onInserirNaMensagem}
+    />,
+  );
   return onRestaurar;
 }
 
@@ -108,6 +121,62 @@ describe("o histórico", () => {
     expect(screen.getByText('Entrou "Arco floral"')).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Esconder o que mudou" }));
     expect(screen.queryByText('Entrou "Arco floral"')).toBeNull();
+  });
+});
+
+describe("o parágrafo do que mudou, para o email", () => {
+  it("sem onInserirNaMensagem, não aparece (um botão que não faz nada é pior que não haver botão)", async () => {
+    montar([V2, V1], doc({ totalAmount: 9500, budgetItems: ["Flores"], budgetAmounts: [2400] }));
+    await waitFor(() =>
+      expect(screen.getByText(/Uma alteração desde a última enviada/)).toBeTruthy(),
+    );
+    expect(screen.queryByText("Para o email")).toBeNull();
+  });
+
+  it("com onInserirNaMensagem e uma mudança real, oferece o parágrafo e insere-o ao clicar", async () => {
+    const onInserir = vi.fn();
+    montar(
+      [V2, V1],
+      doc({ totalAmount: 9500, budgetItems: ["Flores"], budgetAmounts: [2400] }),
+      vi.fn(),
+      { onInserirNaMensagem: onInserir },
+    );
+    await waitFor(() => expect(screen.getByText("Para o email")).toBeTruthy());
+    expect(screen.getByText(/houve alterações em o orçamento/)).toBeTruthy();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Inserir na mensagem para o cliente" }),
+    );
+    expect(onInserir).toHaveBeenCalledTimes(1);
+    expect(onInserir.mock.calls[0][0]).toMatch(/^Desde a última proposta: houve alterações/);
+  });
+
+  it("igual à última enviada: sem parágrafo nenhum, mesmo com onInserirNaMensagem", async () => {
+    const onInserir = vi.fn();
+    montar([V2, V1], ULTIMO, vi.fn(), { onInserirNaMensagem: onInserir });
+    await waitFor(() =>
+      expect(screen.getByText("Esta versão está igual à última enviada")).toBeTruthy(),
+    );
+    expect(screen.queryByText("Para o email")).toBeNull();
+  });
+
+  it("primeira proposta (sem envio anterior): sem painel, logo sem parágrafo", async () => {
+    montar([], doc({}), vi.fn(), { onInserirNaMensagem: vi.fn() });
+    await waitFor(() => expect(screen.queryByText("Versões enviadas")).toBeNull());
+    expect(screen.queryByText("Para o email")).toBeNull();
+  });
+
+  it("em inglês, o parágrafo sai em inglês", async () => {
+    montar(
+      [V2, V1],
+      doc({ totalAmount: 9500, budgetItems: ["Flores"], budgetAmounts: [2400] }),
+      vi.fn(),
+      { idioma: "en", onInserirNaMensagem: vi.fn() },
+    );
+    await waitFor(() => expect(screen.getByText("Para o email")).toBeTruthy());
+    expect(
+      screen.getByText(/Since the last proposal: there were changes to the budget/),
+    ).toBeTruthy();
   });
 });
 

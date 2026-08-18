@@ -36,6 +36,50 @@ export const runtime = "nodejs";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
+ * GET — O LINK DA PROPOSTA MAIS RECENTE REALMENTE ENVIADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Para o botão «Copiar resumo» do estúdio (ver `ProposalStudio.tsx`): três ou
+ * quatro linhas prontas a colar no WhatsApp, com o link de aceitação quando ele
+ * existe. O link é um token assinado (HMAC, `proposal-token.ts`) e só se
+ * calcula aqui, no servidor — o estúdio não tem o segredo para o construir
+ * sozinho, nem devia ter.
+ *
+ * Só a proposta REALMENTE enviada conta — `sentAt` só fica marcado quando o
+ * `sendMail` do POST aqui em baixo confirma que o correio saiu (ver a nota «O
+ * ESTADO NASCE "POR ENVIAR"»). Uma proposta gravada mas cujo email falhou não
+ * tem, aos olhos do resto do produto, um link que valha a pena dar ao casal —
+ * ele nunca chegou a recebê-lo.
+ *
+ * `acceptUrl: null` quando não há nenhuma — a primeira vez que se abre o
+ * estúdio para um pedido novo, por exemplo. O botão sabe ler isso: o resumo
+ * sai sem o link em vez de sair com um link partido.
+ */
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isAuthed(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  const { id } = await params;
+  try {
+    const propostas = await listProposalsForQuote(id);
+    const enviadas = propostas.filter((p): p is Proposal & { sentAt: string } => !!p.sentAt);
+    // A mais recente pelo momento em que SEGUIU, não pela criação: uma
+    // proposta reenviada (o "rascunho" que a nota da gravação reaproveita)
+    // pode ter sido criada há dias e enviada agora mesmo.
+    enviadas.sort((a, b) => +new Date(b.sentAt) - +new Date(a.sentAt));
+    const ultima = enviadas[0];
+    return NextResponse.json({
+      ok: true,
+      acceptUrl: ultima ? `${SITE.url}/proposta/${createProposalToken(ultima.id)}` : null,
+    });
+  } catch (err) {
+    log.error("proposta-doc GET falhou", err, { id });
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
  * «NÃO DÁ PARA MANDAR A PROPOSTA PARA O CLIENTE»
  * ════════════════════════════════════════════════════════════════════════════
  *
@@ -820,6 +864,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        */
       estado,
       ...(estadoError ? { estadoError } : {}),
+      /**
+       * O link de aceitação, só quando o email saiu mesmo (`estado ===
+       * "enviada"`) — para o botão «Copiar resumo» poder usá-lo já, sem um
+       * segundo pedido, mal este envio termine. `null` no caminho "gravada
+       * mas sem email": esse link nunca chegou ao casal, e dá-lo ao estúdio
+       * era oferecer para colar num WhatsApp um link que ninguém recebeu.
+       */
+      acceptUrl: estado === "enviada" ? acceptUrl : null,
       missingImages,
       truncations,
       // Quanto pesou este documento. O estúdio guarda-o com o tempo que a

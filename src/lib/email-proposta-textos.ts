@@ -3,6 +3,9 @@ import {
   IDIOMA_POR_OMISSAO,
   type IdiomaDaProposta,
 } from "./proposal-doc-textos";
+import type { Mudanca } from "./orcamento/diferencas";
+import type { ProposalMoney } from "./proposal-doc";
+import { eurDocumento, montanteNaLingua, round2 } from "./money";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -117,4 +120,185 @@ const EN: TextosDoEmailDaProposta = {
 export function textosDoEmailDaProposta(idioma: IdiomaDaProposta): TextosDoEmailDaProposta {
   const escolhida = ehIdiomaDaProposta(idioma) ? idioma : IDIOMA_POR_OMISSAO;
   return escolhida === "en" ? EN : PT;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   O RESUMO PARA COLAR NO WHATSAPP
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Toda a comunicação saía por email, e quando o casal prefere WhatsApp — o que
+   em Portugal é a norma, não a excepção — ela reescrevia à mão o que já está
+   no documento: o nome do casal, a data, o valor. Isto é só as PALAVRAS FIXAS
+   à volta desses números; os números em si (o `aPagar`) vêm de
+   `totaisDaProposta`, no estúdio, para nunca haver uma segunda conta.
+
+   O nome do casal e a data do evento não se traduzem — são texto dela, como em
+   todo o resto do documento (ver `proposal-doc-textos.ts`). Só os RÓTULOS
+   mudam de língua. */
+
+/** Os rótulos do resumo, para colar tal como estão. */
+const RESUMO_PT = {
+  titulo: "Proposta Líquen Events, ",
+  data: "Data do evento",
+  valor: "Valor a pagar",
+  link: "Proposta",
+  semData: "por marcar",
+};
+
+const RESUMO_EN = {
+  titulo: "Líquen Events proposal, ",
+  data: "Event date",
+  valor: "Amount to pay",
+  link: "Proposal",
+  semData: "to be confirmed",
+};
+
+/** O que o resumo precisa de saber, já calculado por quem chama. */
+export interface DadosDoResumoDaProposta {
+  /** O nome do casal, tal como está escrito no documento. */
+  clientNames: string;
+  /** A data do evento, tal como está escrita no documento (texto dela, não se
+   *  traduz). */
+  eventDate: string;
+  /** O valor a pagar, já formatado — sai de `totaisDaProposta(doc,
+   *  pctSinal).aPagar`, nunca de uma segunda conta feita aqui. */
+  aPagar: string;
+  /**
+   * O link de aceitação da proposta, só quando ela já foi enviada e tem um
+   * token válido. `undefined` (ou vazio) tira a linha do resumo em vez de
+   * deixar um link partido — um link que não abre é pior do que não haver
+   * nenhum, porque parece que a proposta desapareceu.
+   */
+  link?: string;
+}
+
+/**
+ * As três ou quatro linhas prontas a colar no WhatsApp: o nome do casal, a
+ * data, o valor a pagar, e o link, quando existe.
+ */
+export function resumoDaPropostaParaCopiar(
+  dados: DadosDoResumoDaProposta,
+  idioma: IdiomaDaProposta,
+): string {
+  const t = ehIdiomaDaProposta(idioma) && idioma === "en" ? RESUMO_EN : RESUMO_PT;
+  const nome = dados.clientNames.trim();
+  // Sem nome (não devia acontecer: o envio exige `clientNames`), a linha fica
+  // só com "Proposta Líquen Events" em vez de terminar numa vírgula a apontar
+  // para nada.
+  const linhas = [
+    nome ? `${t.titulo}${nome}` : t.titulo.replace(/,\s*$/, ""),
+    `${t.data}: ${dados.eventDate.trim() || t.semData}`,
+    `${t.valor}: ${dados.aPagar}`,
+  ];
+  if (dados.link?.trim()) linhas.push(`${t.link}: ${dados.link.trim()}`);
+  return linhas.join("\n");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   O PARÁGRAFO DO QUE MUDOU, PARA O EMAIL DA REVISÃO
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Uma proposta muda três vezes antes de fechar, e o email que a leva era
+   sempre o mesmo texto fixo — ela reescrevia de cabeça o que o painel Versões
+   já sabe, ou mandava sem dizer nada e deixava o casal a comparar dois PDFs.
+
+   Isto NÃO lista os itens um a um. Um nome de serviço («Arranjos de Mesa») é
+   texto dela, escrito numa língua só (`budgetItems` não tem segunda versão
+   inglesa — ver `proposal-doc-bilingue.ts`), e citá-lo dentro de um parágrafo
+   inglês misturava as duas línguas no meio da frase. O que se diz é a
+   CATEGORIA do que mudou («o orçamento», «os serviços») — sempre traduzível,
+   nunca errado — e o número que interessa mais: o total. O resto (que serviço
+   exactamente, que foto) está no PDF em anexo e na lista "Ver o que mudou" do
+   painel Versões, que ela pode copiar à mão para aqui se quiser ser mais
+   específica.
+
+   NASCE EDITÁVEL e nunca se envia sozinho: isto devolve TEXTO, para entrar na
+   caixa "Mensagem para o cliente" do estúdio — a mesma porta por onde as
+   sugestões da Ortografia (`Gralhas.tsx`) já entram nesta casa. Quem decide se
+   fica, se se apaga ou se se reescreve é ela, com o dedo no botão Enviar.
+
+   ── O DINHEIRO ─────────────────────────────────────────────────────────────
+   Os dois montantes vêm de `dinheiroDaProposta` (nunca `resolveProposalMoney`)
+   — a mesma correcção que `diferencas.ts` levou hoje pela mesma razão: ligar
+   ou desligar "os adicionais somam ao total" muda o que o casal paga sem
+   tocar no `totalAmount` escrito. Comparar o valor errado dizia "nada mudou no
+   total" a uma revisão que subia milhares de euros. */
+
+/** As categorias que interessam a um casal, e as duas línguas em que se dizem.
+ *  Fora, de propósito: "Total" (tem a sua própria frase, com os números) e
+ *  qualquer `onde` que uma versão futura de `diferencas.ts` venha a
+ *  acrescentar sem se registar aqui — cai fora do parágrafo em vez de aparecer
+ *  como categoria desconhecida. */
+const CATEGORIAS_DO_PARAGRAFO: Record<string, { pt: string; en: string }> = {
+  Orçamento: { pt: "o orçamento", en: "the budget" },
+  Serviços: { pt: "os serviços", en: "the services" },
+  "Mood boards": { pt: "os mood boards", en: "the mood boards" },
+  Capas: { pt: "as fotos de capa", en: "the cover photos" },
+  Condições: { pt: "as condições", en: "the terms" },
+  Evento: { pt: "os dados do evento", en: "the event details" },
+};
+
+/** "a, b e c" / "a, b and c" — a lista tal como se lê numa frase. */
+function juntarLista(partes: string[], idioma: "pt" | "en"): string {
+  if (partes.length <= 1) return partes[0] ?? "";
+  const ultima = partes.at(-1);
+  const resto = partes.slice(0, -1).join(", ");
+  return `${resto} ${idioma === "en" ? "and" : "e"} ${ultima}`;
+}
+
+/**
+ * O parágrafo do que mudou desde a última proposta enviada, nas duas línguas,
+ * ou `null` quando não há nada que valha a pena dizer.
+ *
+ * `null` acontece em dois casos: a primeira versão (`mudancas` vazio, não há
+ * "última" com quem comparar) e uma revisão cuja única mudança seja algo que
+ * este parágrafo não sabe dizer sem inventar (por exemplo, só o MODO de IVA
+ * mudou, e o casal continua a pagar exactamente o mesmo). Nenhum dos dois é um
+ * erro — é este ficheiro a preferir calar-se a arriscar uma frase errada.
+ */
+export function paragrafoDoQueMudou(
+  mudancas: Mudanca[],
+  dinheiro: { antes: ProposalMoney; depois: ProposalMoney },
+  idioma: IdiomaDaProposta,
+): string | null {
+  if (mudancas.length === 0) return null;
+  const lingua = ehIdiomaDaProposta(idioma) && idioma === "en" ? "en" : "pt";
+
+  // As categorias tocadas, pela ordem em que `diferencas` as produz (o
+  // dinheiro primeiro, o resto depois) — é a mesma ordem "da conversa" que o
+  // cabeçalho de `diferencas.ts` explica.
+  const categorias: string[] = [];
+  for (const m of mudancas) {
+    if (m.onde === "Total" || !CATEGORIAS_DO_PARAGRAFO[m.onde]) continue;
+    if (!categorias.includes(m.onde)) categorias.push(m.onde);
+  }
+
+  const diferenca = round2(dinheiro.depois.gross - dinheiro.antes.gross);
+  const totalMudou = Math.abs(diferenca) > 0.01;
+
+  const frases: string[] = [];
+  if (categorias.length > 0) {
+    const nomes = juntarLista(
+      categorias.map((c) => CATEGORIAS_DO_PARAGRAFO[c][lingua]),
+      lingua,
+    );
+    frases.push(
+      lingua === "en" ? `there were changes to ${nomes}` : `houve alterações em ${nomes}`,
+    );
+  }
+  if (totalMudou) {
+    // `montanteNaLingua` para escrever a inglesa em inglês, como o PDF já
+    // escreve o resto do dinheiro do documento (ver `money.ts`).
+    const antes = montanteNaLingua(eurDocumento(dinheiro.antes.gross), lingua);
+    const depois = montanteNaLingua(eurDocumento(dinheiro.depois.gross), lingua);
+    frases.push(
+      lingua === "en"
+        ? `the total went from ${antes} to ${depois}`
+        : `o total passou de ${antes} para ${depois}`,
+    );
+  }
+  if (frases.length === 0) return null;
+
+  const abre = lingua === "en" ? "Since the last proposal" : "Desde a última proposta";
+  return `${abre}: ${frases.join("; ")}.`;
 }

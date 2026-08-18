@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import { diferencas, type Mudanca } from "@/lib/orcamento/diferencas";
+import { dinheiroDaProposta } from "@/lib/proposal-budget";
+import { paragrafoDoQueMudou } from "@/lib/email-proposta-textos";
+import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { Button } from "./ui/Button";
 
 /**
@@ -33,6 +36,16 @@ import { Button } from "./ui/Button";
  * estúdio era o que chegasse EM ÚLTIMO. Ficava lá a proposta errada, sem nada
  * no ecrã a dizê-lo, e o que se gravava a seguir era essa. Agora só a última
  * pedida conta; as respostas atrasadas são deitadas fora.
+ *
+ * ── E DIZ AO EMAIL O QUE MUDOU, EM VEZ DE ELA REESCREVER DE CABEÇA ─────────
+ * As diferenças de cima já respondem à pergunta "o que é que eles vão ver de
+ * diferente?". A partir do segundo envio, este painel oferece a MESMA resposta
+ * como um parágrafo pronto para a caixa "Mensagem para o cliente" — «Desde a
+ * última proposta: ...» — em vez de ela ter de reler a lista e escrevê-lo à
+ * mão. Nasce editável e nunca se envia sozinho: o botão só INSERE o texto na
+ * caixa, pela mesma porta por onde as sugestões da Ortografia já entram nesta
+ * casa (`Gralhas.tsx`); apagar, reescrever ou deixar como está continua a ser
+ * decisão dela, com o dedo no botão Enviar.
  */
 
 /** Uma versão como a rota a devolve — sem o documento. */
@@ -51,6 +64,17 @@ interface Props {
   doc: ProposalDoc;
   /** Repõe uma versão antiga no estúdio. */
   onRestaurar: (doc: ProposalDoc) => void;
+  /** A língua em que esta proposta vai sair (ver o interruptor ao lado, no
+   *  estúdio) — o parágrafo do que mudou nasce nessa língua. Por omissão,
+   *  português: o mesmo que o resto do documento faz sem esta escolha. */
+  idioma?: IdiomaDaProposta;
+  /**
+   * Insere um texto na caixa "Mensagem para o cliente" do estúdio — usado
+   * pelo botão "Inserir no email" do parágrafo do que mudou. Sem esta prop
+   * (por exemplo, testes que só querem o histórico), o parágrafo não aparece:
+   * um botão que não faz nada é pior do que não haver botão.
+   */
+  onInserirNaMensagem?: (texto: string) => void;
 }
 
 const eur = (n: number) =>
@@ -70,7 +94,13 @@ const ESTADO: Record<string, string> = {
   rascunho: "Rascunho",
 };
 
-export default function Versoes({ quoteId, doc, onRestaurar }: Props) {
+export default function Versoes({
+  quoteId,
+  doc,
+  onRestaurar,
+  idioma = IDIOMA_POR_OMISSAO,
+  onInserirNaMensagem,
+}: Props) {
   const [versoes, setVersoes] = useState<VersaoEnviada[] | null>(null);
   const [erro, setErro] = useState(false);
   const [aRepor, setARepor] = useState<string | null>(null);
@@ -129,6 +159,29 @@ export default function Versoes({ quoteId, doc, onRestaurar }: Props) {
   }, [quoteId, ultimaId]);
 
   const porEnviar = useMemo(() => (ultimoDoc ? diferencas(ultimoDoc, doc) : []), [ultimoDoc, doc]);
+
+  /**
+   * O parágrafo do que mudou, pronto a inserir no email. `null` quando não há
+   * ainda um envio anterior com quem comparar (a primeira proposta não tem
+   * "desde a última"), quando nada mudou, ou quando a única mudança é algo que
+   * o parágrafo prefere calar a arriscar dizer mal (ver `paragrafoDoQueMudou`).
+   *
+   * `dinheiroDaProposta`, e não uma leitura crua dos totais: é a mesma
+   * correcção que as `diferencas` de cima já aplicam, pela mesma razão — os
+   * valores adicionais podem somar ao total sem tocar no `totalAmount`
+   * escrito.
+   */
+  const paragrafo = useMemo(
+    () =>
+      ultimoDoc
+        ? paragrafoDoQueMudou(
+            porEnviar,
+            { antes: dinheiroDaProposta(ultimoDoc), depois: dinheiroDaProposta(doc) },
+            idioma,
+          )
+        : null,
+    [ultimoDoc, doc, porEnviar, idioma],
+  );
 
   /** Qual foi o último pedido de reposição. Só esse pode escrever no estúdio. */
   const pedido = useRef(0);
@@ -204,6 +257,26 @@ export default function Versoes({ quoteId, doc, onRestaurar }: Props) {
                 </li>
               ))}
             </ul>
+          )}
+          {/* ── O PARÁGRAFO PRONTO PARA O EMAIL ─────────────────────────────
+              Só a partir do segundo envio (há `ultimoDoc`) e só quando há algo
+              que valha a pena dizer (`paragrafo` não é `null`). Insere na
+              caixa "Mensagem para o cliente"; nunca escreve directamente no
+              email que vai sair. */}
+          {paragrafo && onInserirNaMensagem && (
+            <div className="mt-3 border-t border-[#4d6350]/15 pt-3">
+              <p className="text-[11px] font-medium tracking-[0.08em] uppercase text-foreground/50">
+                Para o email
+              </p>
+              <p className="mt-1.5 text-xs leading-relaxed text-foreground/70">{paragrafo}</p>
+              <button
+                type="button"
+                onClick={() => onInserirNaMensagem(paragrafo)}
+                className="alvo-toque mt-2 text-[11px] font-medium text-[#4d6350] underline-offset-2 transition-colors hover:text-[#415440] hover:underline"
+              >
+                Inserir na mensagem para o cliente
+              </button>
+            </div>
           )}
         </div>
       )}
