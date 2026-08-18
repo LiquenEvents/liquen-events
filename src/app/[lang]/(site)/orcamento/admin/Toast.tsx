@@ -79,8 +79,21 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           acabar aos 603 px com a barra a começar aos 594, ou seja a pousar-lhe
           em cima — exactamente o defeito que este comentário diz ter corrigido.
           Quem o apanhou foi o passeio `admin-mobile.spec.ts`, não os olhos.
-          Com `var(--bo-barra-inferior)` deixa de haver número para discordar. */}
-      <div className="fixed bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none lg:bottom-6">
+          Com `var(--bo-barra-inferior)` deixa de haver número para discordar.
+
+          ── E HÁ UM ECRÃ COM UMA SEGUNDA BARRA POR CIMA DESSA ──────────────
+          O estúdio de propostas põe a sua acção principal («Pré-visualizar»,
+          «Gerar e enviar») numa barra que pousa em cima da navegação, com uns
+          64 px de altura. O aviso levantava-se 12 px do chão e nascia DENTRO
+          dessa faixa — em cima do botão, a apanhar-lhe o toque durante os 4 s
+          em que fica no ecrã. Medido a 375 px.
+          `--bo-barra-accao` é a altura MEDIDA dessa barra, publicada pelo
+          próprio estúdio enquanto está aberto (e ausente — logo, zero — em
+          todo o resto do back office, que não tem barra nenhuma ali). O aviso
+          soma-a e passa a pousar-lhe em cima, à vista, sem tapar nada. Acima
+          de `lg` a navegação do telemóvel desaparece mas a barra do estúdio
+          fica, encostada ao fundo: por isso o `lg:` também a soma. */}
+      <div className="fixed bottom-[calc(var(--bo-barra-inferior)+var(--bo-barra-accao,0px)+env(safe-area-inset-bottom)+0.75rem)] right-6 z-[80] flex flex-col gap-2 pointer-events-none lg:bottom-[calc(var(--bo-barra-accao,0px)+1.5rem)]">
         <div role="alert" aria-live="assertive" className="flex flex-col gap-2">
           {errorToasts.map((t) => (
             <ToastItem key={t.id} toast={t} onClose={() => remove(t.id)} />

@@ -79,6 +79,33 @@ describe("a barra de destinos do telemóvel", () => {
     );
   });
 
+  /**
+   * A SEGUNDA BARRA — a acção principal do estúdio — e quem lhe flutua por cima.
+   *
+   * O aviso do `Toast.tsx` põe-se a uma distância fixa do fundo: a altura da
+   * navegação do telemóvel mais um respiro de 12 px. Só que no estúdio de
+   * propostas há uma SEGUNDA barra pousada nessa navegação, com uns 64 px — e o
+   * aviso nascia lá dentro, em cima do botão «Pré-visualizar», a comer-lhe o
+   * toque durante os quatro segundos em que fica no ecrã. Medido a 375 px.
+   *
+   * A altura dessa segunda barra não é um número que se possa escrever aqui:
+   * ela quebra em duas linhas conforme o passo. Por isso é MEDIDA de um lado e
+   * lida do outro, através de `--bo-barra-accao`. Este teste guarda as duas
+   * pontas — se uma desaparecer, a outra fica a apontar para o vazio.
+   */
+  it("o aviso afasta-se também da barra de acção do estúdio", () => {
+    const TOAST = readFileSync(join(RAIZ, "Toast.tsx"), "utf8");
+    const ESTUDIO = readFileSync(join(RAIZ, "ProposalStudio.tsx"), "utf8");
+
+    // Quem lê: as duas posições do aviso (telemóvel e `lg`) somam a variável.
+    expect(TOAST).toMatch(/bottom-\[calc\(var\(--bo-barra-inferior\)\+var\(--bo-barra-accao,0px\)/);
+    expect(TOAST).toMatch(/lg:bottom-\[calc\(var\(--bo-barra-accao,0px\)/);
+
+    // Quem escreve: o estúdio publica a altura medida, e limpa-a ao sair.
+    expect(ESTUDIO).toContain('setProperty("--bo-barra-accao"');
+    expect(ESTUDIO).toContain('removeProperty("--bo-barra-accao")');
+  });
+
   it("a própria barra usa o token como altura mínima", () => {
     const i = ADMIN.indexOf('aria-label="Destinos principais"');
     expect(i).toBeGreaterThan(-1);

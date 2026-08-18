@@ -709,13 +709,32 @@ export default function ServicesEditor({
                                 <SortableRow
                                   key={iid}
                                   id={iid}
-                                  // `flex-wrap` só na proposta bilingue: é o que
-                                  // deixa a caixa inglesa descer para baixo da
-                                  // portuguesa. Sem ela, a linha é exactamente
-                                  // a de sempre — uma só, sem quebra possível.
-                                  className={`group/row flex items-center gap-1 rounded-md px-0.5 py-0.5 hover:bg-foreground/[0.03] focus-within:bg-foreground/[0.03] ${
-                                    bilingue ? "flex-wrap" : ""
-                                  }`}
+                                  // `flex-wrap`, SEMPRE — não só na proposta
+                                  // bilingue.
+                                  //
+                                  // MEDIDO a 375 px (iPhone SE), numa linha com
+                                  // as cinco ações visíveis (mover×2, duplicar,
+                                  // guardar na biblioteca, remover): os cinco
+                                  // botões de 44 px (o mínimo táctil, ver
+                                  // `.alvo-toque` em `globals.css`) somam 228 px
+                                  // — mais os 4 px dos `gap-1` entre eles — numa
+                                  // linha de 263 px. Sobravam 27 px para o nome
+                                  // do serviço: uma letra, «D» de «Decoração…».
+                                  // Sem preencher, com só quatro botões (sem o
+                                  // de guardar), sobravam 73 — na mesma, menos
+                                  // de um carácter por toque.
+                                  //
+                                  // Era `nowrap` fora da proposta bilingue "para
+                                  // a linha continuar a ser a de sempre" — mas a
+                                  // "de sempre" já não cabia: o `.alvo-toque`
+                                  // que dá 44 px aos ícones no dedo (correcto,
+                                  // é o mínimo da HIG) cresceu por baixo deste
+                                  // comentário sem ele ser revisto. O grupo, ao
+                                  // lado, já tinha a mesma quebra por a mesma
+                                  // razão (ver o comentário no título do
+                                  // grupo) — falta só aplicar aqui o que ali já
+                                  // estava certo.
+                                  className="group/row flex flex-wrap items-center gap-1 rounded-md px-0.5 py-0.5 hover:bg-foreground/[0.03] focus-within:bg-foreground/[0.03]"
                                 >
                                   {({ handleProps }) => (
                                     <>
@@ -726,7 +745,17 @@ export default function ServicesEditor({
                                       <input
                                         {...fieldProps(itemKey(iid, "label"))}
                                         ref={register(itemKey(iid, "label"))}
-                                        className={`${ROW_INPUT} flex-1`}
+                                        // `min-w-[8rem]`: sem mínimo, o `flex-1`
+                                        // sozinho não bastava para EMPURRAR as
+                                        // ações para a linha de baixo — um
+                                        // `<input>` sem `size` tem uma largura
+                                        // "preferida" pequena, e o cálculo de
+                                        // quebra do flexbox usa-a. Com o mínimo,
+                                        // as ações deixam de caber ao lado do
+                                        // nome e descem, inteiras, para a
+                                        // segunda linha — como já acontecia no
+                                        // título do grupo, aqui ao lado.
+                                        className={`${ROW_INPUT} min-w-[8rem] flex-1`}
                                         value={it.label}
                                         onChange={(e) =>
                                           updateItem(gi, ii, { label: e.target.value })
