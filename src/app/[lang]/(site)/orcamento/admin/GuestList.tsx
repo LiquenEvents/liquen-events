@@ -230,7 +230,7 @@ export default function GuestList({ quote, onChange }: Props) {
           {guests.map((g) => (
             <li
               key={g.id}
-              className="group flex items-center gap-2.5 rounded-xl border border-foreground/[0.07] bg-foreground/[0.02] px-3 py-2.5"
+              className="group flex flex-wrap items-center gap-2.5 rounded-xl border border-foreground/[0.07] bg-foreground/[0.02] px-3 py-2.5"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-foreground/80">{g.name}</p>
@@ -260,7 +260,16 @@ export default function GuestList({ quote, onChange }: Props) {
                 value={g.rsvp ?? ""}
                 onChange={(e) => setRsvpOf(g.id, e.target.value as RsvpStatus)}
                 aria-label={`Estado do RSVP de ${g.name}`}
-                className="bo-input w-[110px] shrink-0 px-2 py-1 text-[11px] font-medium"
+                // `text-xs` e não `text-[11px]`: a regra de `globals.css` que
+                // encolhe legendas (`.text-[11px]` etc.) para
+                // `--bo-fs-caption` a 1024px para baixo apanhava também este
+                // `<select>` — e ao ganhar por especificidade ao `select {
+                // font-size: 16px }` do mesmo ficheiro (que só existe para o
+                // Safari do iOS não ampliar a página ao focar), o campo ficava
+                // a 12px e o zoom automático voltava. `text-xs` não está na
+                // lista de classes que essa regra apanha, por isso o campo
+                // fica ao alcance da regra dos 16px em ecrãs de toque.
+                className="bo-input w-[110px] shrink-0 px-2 py-1 text-xs font-medium"
                 // `RSVP_META[g.rsvp].color` à bruta era `undefined.color` assim
                 // que aparecesse um valor de fora — uma linha antiga, uma
                 // migração, uma correcção feita à mão na base de dados. Num
@@ -278,7 +287,7 @@ export default function GuestList({ quote, onChange }: Props) {
               </select>
               <button
                 onClick={() => remove(g.id)}
-                className="shrink-0 rounded-md p-1 text-foreground/25 opacity-0 hover:text-[#8a2a22] focus-visible:opacity-100 motion-safe:transition-all group-hover:opacity-100"
+                className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 opacity-100 sm:opacity-0 hover:text-[#8a2a22] sm:focus-visible:opacity-100 motion-safe:transition-all sm:group-hover:opacity-100"
                 aria-label={`Remover ${g.name}`}
               >
                 <svg

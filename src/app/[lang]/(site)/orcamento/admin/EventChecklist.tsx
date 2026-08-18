@@ -269,7 +269,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                 )}
                 <button
                   onClick={() => remove(i.id)}
-                  className="shrink-0 rounded-md p-1 text-foreground/25 opacity-0 hover:text-[#8a2a22] focus-visible:opacity-100 motion-safe:transition-all group-hover:opacity-100"
+                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 opacity-100 sm:opacity-0 hover:text-[#8a2a22] sm:focus-visible:opacity-100 motion-safe:transition-all sm:group-hover:opacity-100"
                   aria-label={`Remover ${i.label}`}
                 >
                   <svg

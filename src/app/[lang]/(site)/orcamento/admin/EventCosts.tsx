@@ -227,7 +227,7 @@ export default function EventCosts({ quote, onChange }: Props) {
                 </button>
                 <button
                   onClick={() => remove(it.id)}
-                  className="shrink-0 text-foreground/25 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
+                  className="alvo-toque shrink-0 p-1 text-foreground/25 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                   aria-label="Remover"
                 >
                   <svg
