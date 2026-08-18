@@ -136,11 +136,13 @@ export default async function EstiloPage({
       <section className="py-20 lg:py-24">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {estilo.fotos.map((foto) => (
+            {estilo.fotos.map((foto, i) => (
               <div key={foto} className="relative aspect-[3/2] overflow-hidden bg-foreground/5">
                 <SafeImage
                   src={foto}
-                  alt=""
+                  // Distinct alt per photo: real portfolio content for this
+                  // style, not a decorative band.
+                  alt={`${t.common.imageAlt.portfolioExemplo}: ${c.h1} ${i + 1}`}
                   fill
                   loading="lazy"
                   sizes="(max-width: 640px) 100vw, 50vw"

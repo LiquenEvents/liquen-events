@@ -211,11 +211,14 @@ export default async function PoloPage({
             {en ? `Weddings in ${c.regiao}` : `Casamentos ${prep(c.regiao)}`}
           </h2>
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {polo.fotos.map((foto) => (
+            {polo.fotos.map((foto, i) => (
               <div key={foto} className="relative aspect-[3/2] overflow-hidden bg-foreground/5">
                 <SafeImage
                   src={foto}
-                  alt=""
+                  // Distinct alt per photo: this is a real portfolio grid (the
+                  // page's own point), not a decorative band, so alt="" left
+                  // the whole section silent for screen readers.
+                  alt={`${t.common.imageAlt.portfolioExemplo}: ${c.regiao} ${i + 1}`}
                   fill
                   loading="lazy"
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

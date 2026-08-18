@@ -96,6 +96,10 @@ export const pt = {
       clientesCorporate: "Evento corporativo decorado pela Líquen Events",
       clientesDinner: "Jantar de evento decorado pela Líquen Events",
       servicosEndOfDay: "Evento decorado pela Líquen Events ao final do dia",
+      // Base reutilizada nas grelhas de portefólio das páginas de anúncios
+      // (polo regional, destination, estilo): quem chama junta o contexto
+      // (região, estilo) e o número da foto para cada legenda ficar distinta.
+      portfolioExemplo: "Exemplo de decoração da Líquen Events",
       contactoBand: [
         "Cerimónia de casamento ao ar livre",
         "Casamento ao pôr do sol numa herdade",

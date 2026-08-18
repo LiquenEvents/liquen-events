@@ -96,6 +96,10 @@ export const en: Dict = {
       clientesCorporate: "Corporate event decorated by Líquen Events",
       clientesDinner: "Event dinner decorated by Líquen Events",
       servicosEndOfDay: "Event decorated by Líquen Events at the end of the day",
+      // Base reused across the ad-landing portfolio grids (regional hub,
+      // destination, style): callers append the context (region, style) and
+      // the photo number so each caption stays distinct.
+      portfolioExemplo: "Example of Líquen Events decoration",
       contactoBand: [
         "Outdoor wedding ceremony",
         "Wedding at sunset on an estate",
