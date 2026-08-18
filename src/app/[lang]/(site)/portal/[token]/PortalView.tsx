@@ -97,14 +97,21 @@ function Shell({ children, lang }: { children: React.ReactNode; lang: string }) 
          visitante). Sem isto, um leitor de ecrã lê o portal inglês com
          pronúncia portuguesa. */
       lang={lang}
-      className="min-h-[80vh] bg-surface flex flex-col items-center px-5 py-16 sm:py-24"
+      /*
+       * PADDING VERTICAL, MEDIDO E ENCOLHIDO — a mesma correção da página da
+       * proposta pública (ver o comentário lá). A 375×667 a saudação só
+       * começava depois de 64 px de reentrância mais o logótipo (64+40 px de
+       * margem) — quase metade do ecrã antes de "Olá,". O logótipo em si
+       * (tamanho, cor) não muda.
+       */
+      className="min-h-[80vh] bg-surface flex flex-col items-center px-5 py-10 sm:py-20"
     >
       <Image
         src="/logo-liquen.png"
         alt="Líquen Events"
         width={150}
         height={90}
-        className="object-contain h-16 w-auto mb-10 opacity-90"
+        className="object-contain h-16 w-auto mb-6 opacity-90"
       />
       {children}
     </section>

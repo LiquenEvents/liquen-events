@@ -120,14 +120,23 @@ function Shell({ children, lang }: { children: React.ReactNode; lang: string }) 
          um leitor de ecrã lê a proposta inglesa com pronúncia portuguesa —
          que é, ao pé da letra, incompreensível. */
       lang={lang}
-      className="min-h-[80vh] bg-surface flex flex-col items-center px-5 py-16 sm:py-24"
+      /*
+       * PADDING VERTICAL, MEDIDO E ENCOLHIDO.
+       *
+       * A 375×667: com `py-16` (64 px) mais o logótipo (64 px + 40 px de
+       * margem), a saudação só começava aos 291 px — quase metade do ecrã,
+       * ANTES da barra de navegação do site (que já mostra o mesmo logótipo
+       * lá em cima). `py-10` poupa 24 px em cima e 24 px em baixo sem tocar no
+       * logótipo em si (tamanho, cor, posição centrada mantêm-se).
+       */
+      className="min-h-[80vh] bg-surface flex flex-col items-center px-5 py-10 sm:py-20"
     >
       <Image
         src="/logo-liquen.png"
         alt="Líquen Events"
         width={150}
         height={90}
-        className="object-contain h-16 w-auto mb-10 opacity-90"
+        className="object-contain h-16 w-auto mb-6 opacity-90"
       />
       {children}
     </section>
