@@ -216,9 +216,13 @@ export default function PortalView({
                 </div>
               </div>
               {pdfHref && (
+                // O botão do PDF da proposta — medido a 375 px: 220×36 px, 8 px
+                // abaixo do mínimo de toque. `alvo-toque` só cresce em ecrãs de
+                // toque (o `inline-flex items-center justify-center` já cá
+                // estava, por isso o texto continua centrado).
                 <a
                   href={pdfHref}
-                  className="inline-flex items-center justify-center self-start rounded-md bg-moss px-5 py-2.5 text-white text-xs tracking-[0.06em] font-medium hover:bg-moss-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss transition-colors"
+                  className="alvo-toque inline-flex items-center justify-center self-start rounded-md bg-moss px-5 py-2.5 text-white text-xs tracking-[0.06em] font-medium hover:bg-moss-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss transition-colors"
                 >
                   {t.proposta.download}
                 </a>
@@ -241,9 +245,11 @@ export default function PortalView({
                 })}
               </p>
               {contratoPdfHref && (
+                // Mesma avaria e a mesma correção do botão do PDF da proposta,
+                // aqui em cima: 217×36 px medidos, 7 px abaixo do mínimo.
                 <a
                   href={contratoPdfHref}
-                  className="inline-flex items-center justify-center self-start rounded-md bg-moss px-5 py-2.5 text-white text-xs tracking-[0.06em] font-medium hover:bg-moss-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss transition-colors"
+                  className="alvo-toque inline-flex items-center justify-center self-start rounded-md bg-moss px-5 py-2.5 text-white text-xs tracking-[0.06em] font-medium hover:bg-moss-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss transition-colors"
                 >
                   {t.contrato.download}
                 </a>
@@ -296,11 +302,27 @@ export default function PortalView({
             <p className="text-foreground/62 text-[11px] tracking-[0.15em] uppercase mb-2">
               {t.proximos.contactTitle}
             </p>
+            {/* Os dois contactos finais — medidos a 375 px: 293×20 px cada,
+                empilhados a 4 px um do outro (`gap-1`). Sem alvo de toque
+                próprio, um dedo que erre o e-mail por uns pixels cai no
+                telefone por baixo. `alvo-toque` só cresce em ecrãs de toque. */}
             <div className="flex flex-col gap-1 text-sm">
-              <a href={`mailto:${SITE.email}`} className="text-moss hover:underline">
+              {/* `justify-start` cancela o `justify-content: center` que o
+                  `.alvo-toque` traz de fábrica — aqui a coluna estica a
+                  largura de cada âncora (flex-col ⇒ align-items: stretch), e
+                  sem isto o e-mail e o telefone saltavam do canto esquerdo,
+                  alinhados com "FALE CONNOSCO" por cima, para o meio da
+                  coluna. */}
+              <a
+                href={`mailto:${SITE.email}`}
+                className="alvo-toque inline-flex items-center justify-start text-moss hover:underline"
+              >
                 {SITE.email}
               </a>
-              <a href={`tel:${SITE.phone}`} className="text-moss hover:underline">
+              <a
+                href={`tel:${SITE.phone}`}
+                className="alvo-toque inline-flex items-center justify-start text-moss hover:underline"
+              >
                 {SITE.phoneDisplay}
               </a>
             </div>
