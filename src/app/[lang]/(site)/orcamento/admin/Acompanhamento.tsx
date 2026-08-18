@@ -246,29 +246,49 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ── O resumo: as duas perguntas de segunda-feira de manhã ────────── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Card padding="md">
+      {/*
+        ── O resumo: as duas perguntas de segunda-feira de manhã ──────────
+
+        TRÊS NÚMEROS EM LINHA, NO TELEMÓVEL TAMBÉM — não só a partir de `sm`
+        (640 px). Media a 375 px: as três empilhavam a toda a largura (343 px
+        cada), 20 px de reentrância à roda de um só número, e a soma das três
+        chegava aos 344 px de altura — mais de metade do ecrã (667 px) só para
+        mostrar "7", "4" e "0". A primeira proposta em aberto só começava aos
+        460 px.
+
+        O resto deste ecrã já resolveu o mesmo problema doutra maneira — as
+        linhas de três números do Faseamento (`PaymentsPanel.tsx`) e dos Custos
+        do Evento (`EventCosts.tsx`) usam sempre `grid-cols-3`, com `p-3` — e é
+        essa a régua que se segue aqui, com `padding="sm"` do `Card` (16 px, a
+        mesma que a Propostas.tsx já usa nos seus próprios cartões de resumo)
+        em vez do `md` por omissão (20–24 px).
+      */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card padding="sm">
           <p className="bo-eyebrow mb-1">Em aberto</p>
           <p className="text-2xl font-light text-foreground/85">{linhas.length}</p>
         </Card>
-        <Card padding="md">
+        <Card padding="sm">
           <p className="bo-eyebrow mb-1">Prazo a acabar</p>
           <p
             className={`text-2xl font-light ${expirando.length > 0 ? "text-[#b5654a]" : "text-foreground/85"}`}
           >
             {expirando.length}
           </p>
-          <p className="mt-1 text-[11px] text-foreground/45">Validade nos próximos 7 dias</p>
+          <p className="mt-1 text-[11px] leading-snug text-foreground/45">
+            Validade nos próximos 7 dias
+          </p>
         </Card>
-        <Card padding="md">
+        <Card padding="sm">
           <p className="bo-eyebrow mb-1">Seguimentos devidos</p>
           <p
             className={`text-2xl font-light ${devidos.length > 0 ? "text-[#c08a3e]" : "text-foreground/85"}`}
           >
             {devidos.length}
           </p>
-          <p className="mt-1 text-[11px] text-foreground/45">Marcados para hoje ou antes</p>
+          <p className="mt-1 text-[11px] leading-snug text-foreground/45">
+            Marcados para hoje ou antes
+          </p>
         </Card>
       </div>
 
