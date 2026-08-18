@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { Proposal } from "@/lib/orcamento/types";
+import { __resetListCache } from "./useCachedList";
 import AnalisePropostas from "./AnalisePropostas";
 
 /**
@@ -44,9 +45,28 @@ function montar(propostas: Proposal[]) {
   render(<AnalisePropostas />);
 }
 
+beforeEach(() => {
+  // A cache do `useCachedList` vive no MÓDULO e sobreviveria de um teste para o
+  // outro — cada um tem de começar da mesma folha.
+  __resetListCache();
+});
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+describe("a lista vem pela forma leve", () => {
+  it("pede /api/propostas?semDoc=1, e não a rota pesada", async () => {
+    montar([p({ status: "enviada" })]);
+    await waitFor(() => expect(screen.getByText("Propostas enviadas")).toBeTruthy());
+
+    const pedidos = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) =>
+      String(c[0]),
+    );
+    expect(pedidos.some((u) => u === "/api/propostas?semDoc=1")).toBe(true);
+    expect(pedidos.some((u) => u === "/api/propostas")).toBe(false);
+  });
 });
 
 describe("sem nada para dizer", () => {
@@ -85,12 +105,17 @@ describe("os motivos", () => {
 });
 
 describe("os extras", () => {
-  const comExtras = (over: Partial<Proposal> = {}) =>
-    p({
-      status: "aceite",
-      doc: { budgetItems: ["a", "b"], budgetOpcional: [false, true] } as Proposal["doc"],
+  /**
+   * A lista que este painel lê é a LEVE (`?semDoc=1`): não traz `doc`, traz
+   * `temOpcionais` já calculado a partir dele. Os testes simulam a resposta
+   * do servidor, não o componente — por isso constroem-na já na forma leve.
+   */
+  const comExtras = (over: Partial<Proposal> & { temOpcionais?: boolean } = {}) =>
+    ({
+      ...p({ status: "aceite" }),
+      temOpcionais: true,
       ...over,
-    });
+    }) as unknown as Proposal;
 
   it("conta sobre as registadas e diz quantas faltam", async () => {
     montar([

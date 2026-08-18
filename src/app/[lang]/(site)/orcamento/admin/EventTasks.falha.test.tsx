@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
+import { __resetListCache } from "./useCachedList";
 import EventTasks from "./EventTasks";
 import type { Quote } from "@/lib/orcamento/types";
 
@@ -34,6 +35,9 @@ const resposta = (ok: boolean, body: unknown, status = ok ? 200 : 500) =>
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  // A cache do `useCachedList` vive no MÓDULO e sobreviveria de um teste para o
+  // outro — cada um tem de começar da mesma folha.
+  __resetListCache();
   fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
 });

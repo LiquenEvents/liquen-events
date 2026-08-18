@@ -80,14 +80,23 @@ const STATUS_META: Record<ProposalStatus, { label: string; color: string }> = {
  * aquela tem 40»), e o que se passa é outra coisa: aquela proposta não tem
  * orçamento detalhado nenhum para contar.
  *
- * ── DE ONDE VÊM OS DADOS, E O QUE NÃO SE PODE MUDAR SEM MEXER AQUI ────────
+ * ── DE ONDE VÊM OS DADOS, E PORQUE É QUE ESTE ECRÃ FICOU DE FORA DA MUDANÇA
+ * PARA A ROTA LEVE ────────────────────────────────────────────────────────
  *
  * Isto lê o `doc`, e esta lista pede `/api/propostas` INTEIRO. Há uma forma
- * leve da mesma rota (`?semDoc=1`) que omite o documento de propósito — se um
- * dia este ecrã passar a usá-la para poupar bytes, todas as propostas do
- * estúdio voltam a dizer «—» sem nada rebentar. Nesse caso a contagem tem de
- * viajar no resumo (como já viajam `temDoc`, `temOpcionais` e `pctSinal`), e
- * não desaparecer.
+ * leve da mesma rota (`?semDoc=1`, chave "propostas-leves") que omite o
+ * documento de propósito, e a Acompanhamento e a Análise já passaram para
+ * ela: nenhuma das duas lia mais do que `opcionaisDe(doc)`, e a rota leve já
+ * calcula exactamente isso em `temOpcionais`.
+ *
+ * Este ecrã é diferente: a coluna «Rubricas» lê `doc.budgetItems.length`, e
+ * não há nenhum facto derivado equivalente na forma leve (só `temDoc`,
+ * `temOpcionais` e `pctSinal` viajam sem o documento). Mudar para lá dava
+ * sempre «—» em toda a proposta do estúdio, que é o formato de hoje: não é
+ * bem «nada rebenta», é a coluna deixar de dizer o que diz agora. O teste
+ * "a coluna conta o que está mesmo no documento" prende precisamente essa
+ * contagem, e é ele que confirma que este ecrã não pode fazer a mesma
+ * mudança sem primeiro a rota leve aprender a levar a contagem consigo.
  */
 function rubricasDe(p: Proposal): number | null {
   // O documento manda quando existe: uma proposta do estúdio tem sempre

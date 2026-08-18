@@ -4,6 +4,7 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import type { Proposal, Quote } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
+import { __resetListCache } from "./useCachedList";
 import Acompanhamento from "./Acompanhamento";
 
 /**
@@ -72,11 +73,37 @@ function montar(propostas: Proposal[], quotes: Quote[] = []) {
 
 beforeEach(() => {
   enviados = [];
+  // A cache do `useCachedList` vive no MÓDULO e sobreviveria de um teste para o
+  // outro — cada um tem de começar da mesma folha.
+  __resetListCache();
 });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A LISTA VEM PELA FORMA LEVE, NÃO PELA PESADA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Este painel não desenha o documento nenhum, mas pedia `/api/propostas`
+ * inteiro na mesma. Passa a pedir `?semDoc=1`, que a rota devolve sem os
+ * mood boards e as fotos de cada proposta, e usa a mesma chave de cache
+ * ("propostas-leves") que o AdminClient já aquece em ociosidade.
+ */
+describe("a lista vem pela forma leve", () => {
+  it("pede /api/propostas?semDoc=1, e não a rota pesada", async () => {
+    montar([proposta()]);
+    await waitFor(() => expect(screen.getByText("Ana e Rui")).toBeTruthy());
+
+    const pedidos = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) =>
+      String(c[0]),
+    );
+    expect(pedidos.some((u) => u === "/api/propostas?semDoc=1")).toBe(true);
+    expect(pedidos.some((u) => u === "/api/propostas")).toBe(false);
+  });
 });
 
 describe("o que mostra", () => {
@@ -212,16 +239,18 @@ describe("nada disto sai daqui", () => {
 });
 
 describe("qual das duas versões ficaram", () => {
-  const comExtras = (over: Partial<Proposal> = {}) =>
-    proposta({
-      status: "aceite",
-      doc: {
-        budgetItems: ["Cerimónia", "Arco floral"],
-        budgetAmounts: [4000, 1500],
-        budgetOpcional: [false, true],
-      } as Proposal["doc"],
+  /**
+   * A lista que este painel lê é a LEVE (`?semDoc=1`): não traz `doc`, traz
+   * `temOpcionais` já calculado a partir dele. Os testes simulam a resposta
+   * do servidor, não o componente — por isso constroem-na já na forma leve,
+   * como a rota a devolveria.
+   */
+  const comExtras = (over: Partial<Proposal> & { temOpcionais?: boolean } = {}) =>
+    ({
+      ...proposta({ status: "aceite" }),
+      temOpcionais: true,
       ...over,
-    });
+    }) as unknown as Proposal;
 
   it("pergunta pelas ganhas que tinham extras, mesmo não estando em aberto", async () => {
     // Uma proposta aceite não entra na lista de acompanhamento — não está em
@@ -242,7 +271,7 @@ describe("qual das duas versões ficaram", () => {
   });
 
   it("uma proposta ganha SEM extras não gera pergunta nenhuma", async () => {
-    montar([comExtras({ id: "p-sem", doc: { budgetItems: ["Cerimónia"] } as Proposal["doc"] })]);
+    montar([comExtras({ id: "p-sem", temOpcionais: false })]);
     // Sem extras não há duas versões para escolher, e uma pergunta sem resposta
     // possível ensina a passar os olhos por cima da secção.
     await waitFor(() => expect(screen.queryByText(/Ficaram com que versão/)).toBeNull());

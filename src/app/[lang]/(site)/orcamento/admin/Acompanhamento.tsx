@@ -17,6 +17,39 @@ import { AvisoDeFalha } from "./AvisoDeFalha";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
+ * A LISTA LEVE (`?semDoc=1`) EM VEZ DA PESADA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Este painel não desenha o documento nenhum. Pedia a lista inteira na mesma
+ * (`/api/propostas`, chave "propostas"), com todos os mood boards e todas as
+ * dezenas de caminhos de fotos de cada proposta lá dentro só para acabar sem
+ * os usar. A rota tem uma forma leve para isto mesmo (`?semDoc=1`), e o
+ * AdminClient já aquece a cache dela em ociosidade sob a chave
+ * "propostas-leves" (ver AdminClient.tsx): sem este ecrã pedir a mesma chave,
+ * esse aquecimento era deitado fora.
+ *
+ * A ÚNICA coisa que este painel tirava do documento era `opcionaisDe(p.doc)`,
+ * para saber se a proposta tinha extras marcados. A rota leve já calcula
+ * exactamente isso e chama-lhe `temOpcionais`, o mesmo facto, calculado do
+ * mesmo sítio, sem trazer o documento todo para o poder ler.
+ */
+type PropostaLeve = Omit<Proposal, "doc"> & { temOpcionais: boolean };
+
+/**
+ * A resposta de um PATCH (`/api/propostas/[id]`) continua a vir com o
+ * documento completo: só a LISTA é que veio pela rota leve. Para a
+ * guardar de volta na cache partilhada sem lhe voltar a colar o `doc`
+ * (o que reintroduzia o peso que a mudança acima existe para evitar),
+ * troca-se `doc` por `temOpcionais`, calculado da mesma forma que a rota o
+ * calcularia.
+ */
+function paraLeve(p: Proposal): PropostaLeve {
+  const { doc, ...resto } = p;
+  return { ...resto, temOpcionais: !!doc && opcionaisDe(doc).some(Boolean) };
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
  * ACOMPANHAMENTO — o que acontece depois de a proposta seguir
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -105,7 +138,7 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
     error,
     errorMessage,
     refresh,
-  } = useCachedList<Proposal[]>("propostas", "/api/propostas");
+  } = useCachedList<PropostaLeve[]>("propostas-leves", "/api/propostas?semDoc=1");
   const { toast } = useToast();
   const [aGravar, setAGravar] = useState<string | null>(null);
   /** Qual das linhas está com o formulário de "porque é que se perdeu" aberto. */
@@ -127,10 +160,7 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
   const porRegistar = useMemo(
     () =>
       (propostas ?? []).filter(
-        (p) =>
-          p.status === "aceite" &&
-          !p.versaoEscolhida &&
-          opcionaisDe(p.doc ?? { budgetItems: [] }).some(Boolean),
+        (p) => p.status === "aceite" && !p.versaoEscolhida && p.temOpcionais,
       ),
     [propostas],
   );
@@ -173,7 +203,10 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
           body: JSON.stringify(patch),
         });
         if (!res.ok) throw new Error("falhou");
-        const actualizada = (await res.json()) as Proposal;
+        // O PATCH devolve a proposta COMPLETA (com `doc`): esta lista só guarda
+        // a forma leve, por isso converte-se antes de voltar a pousá-la na
+        // cache. Sem isto, o `doc` inteiro reentrava aqui por uma porta lateral.
+        const actualizada = paraLeve((await res.json()) as Proposal);
         setData((prev) => (prev ?? []).map((p) => (p.id === id ? actualizada : p)));
         toast(comoDizer, "success");
       } catch {
