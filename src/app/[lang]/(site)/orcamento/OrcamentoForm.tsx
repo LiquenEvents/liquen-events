@@ -888,7 +888,10 @@ export default function OrcamentoForm({
         <div className="absolute inset-0 flex flex-col justify-between p-12 xl:p-16">
           <Link
             href={localizeHref("/", locale)}
-            className="text-cream/70 text-[11px] tracking-[0.3em] uppercase hover:text-cream transition-colors inline-flex items-center gap-2 w-fit"
+            // `alvo-toque`: MEDIDO a 375 px com toque emulado, 72×17 px — falha
+            // a altura mínima por mais de metade. É o único caminho de volta
+            // ao sítio a partir do painel de imagem num tablet de toque.
+            className="alvo-toque text-cream/70 text-[11px] tracking-[0.3em] uppercase hover:text-cream transition-colors inline-flex items-center gap-2 w-fit"
           >
             ← {to.back}
           </Link>
@@ -922,10 +925,14 @@ export default function OrcamentoForm({
           landmark, so this stays a plain <div> to avoid a nested/duplicate one. */}
       <div className="flex flex-col justify-center px-6 sm:px-10 lg:px-16 xl:px-24 py-16 lg:py-20">
         <div className="w-full max-w-xl mx-auto">
-          {/* Back link — mobile only; the desktop panel has its own. */}
+          {/* Back link — mobile only; the desktop panel has its own.
+              `alvo-toque`: MEDIDO a 375 px com toque emulado, 72×17 px (65×17
+              em inglês) — falha a altura mínima por mais de metade, e é o
+              único caminho de volta ao sítio a partir do formulário no
+              telemóvel. */}
           <Link
             href={localizeHref("/", locale)}
-            className="lg:hidden text-foreground/68 text-[11px] tracking-[0.3em] uppercase hover:text-moss transition-colors inline-flex items-center gap-2 mb-8"
+            className="alvo-toque lg:hidden text-foreground/68 text-[11px] tracking-[0.3em] uppercase hover:text-moss transition-colors inline-flex items-center gap-2 mb-8"
           >
             ← {to.back}
           </Link>
@@ -1105,7 +1112,10 @@ export default function OrcamentoForm({
                     className={`${ffInputCls} [color-scheme:light] ${dateFlexible ? "opacity-40" : ""}`}
                   />
                 </FloatingField>
-                <label className="mt-2 inline-flex items-center gap-2.5 py-1.5 min-h-[24px] cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
+                {/* `alvo-toque`: MEDIDO a 375 px com toque emulado, 132×29 px —
+                    falha a altura mínima. É o rótulo, não a caixa de 16 px lá
+                    dentro, que faz de alvo (mesmo mecanismo do back office). */}
+                <label className="alvo-toque mt-2 inline-flex items-center gap-2.5 py-1.5 min-h-[24px] cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
                   <input
                     type="checkbox"
                     checked={dateFlexible}
@@ -1146,7 +1156,9 @@ export default function OrcamentoForm({
                     placeholder={to.phPessoas}
                   />
                 </FloatingField>
-                <label className="mt-2 inline-flex items-center gap-2.5 py-1.5 min-h-[24px] cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
+                {/* `alvo-toque`: MEDIDO a 375 px com toque emulado, 105×29 px —
+                    mesma falha e mesma correcção do rótulo da data acima. */}
+                <label className="alvo-toque mt-2 inline-flex items-center gap-2.5 py-1.5 min-h-[24px] cursor-pointer text-foreground/68 hover:text-foreground/85 transition-colors">
                   <input
                     type="checkbox"
                     checked={guestsFlexible}
@@ -1446,7 +1458,11 @@ export default function OrcamentoForm({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => track("WhatsAppClick", { source: "form" })}
-                className="inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/68 hover:text-moss transition-colors"
+                // `alvo-toque`: MEDIDO a 375 px com toque emulado, 177×17 px
+                // (164×17 em inglês) — falha a altura mínima por mais de
+                // metade, ao lado do botão de enviar, a acção alternativa a
+                // quem prefere WhatsApp.
+                className="alvo-toque inline-flex items-center gap-2.5 text-[11px] tracking-[0.22em] uppercase text-foreground/68 hover:text-moss transition-colors"
               >
                 <WhatsAppIcon className="w-4 h-4 flex-shrink-0" />
                 {to.ouWhatsApp}
