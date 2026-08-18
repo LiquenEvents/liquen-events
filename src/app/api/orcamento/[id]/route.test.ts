@@ -73,8 +73,27 @@ vi.mock("@/lib/quotes-store", () => ({
  * caminho guardado — e este é o que herdou o trabalho do botão «Aceitar
  * proposta» que saiu.
  */
-const semeador = vi.hoisted(() => ({ semear: vi.fn(async () => {}) }));
-vi.mock("@/lib/semear-producao", () => ({ semearProducaoAoGanhar: semeador.semear }));
+const semeador = vi.hoisted(() => ({
+  semear: vi.fn(async () => {}),
+  prever: vi.fn(async () => ({
+    material: { linhas: 0, jaExiste: false },
+    montagem: { linhas: 0 },
+    calendario: { linhas: 0 },
+    pagamentos: { linhas: 0 },
+    haQualquerCoisaAGerar: false,
+  })),
+  gerar: vi.fn(async () => ({
+    material: { linhas: 0, preservadas: 0 },
+    montagem: { linhas: 0 },
+    calendario: { linhas: 0 },
+    pagamentos: { linhas: 0 },
+  })),
+}));
+vi.mock("@/lib/semear-producao", () => ({
+  semearProducaoAoGanhar: semeador.semear,
+  preverGeracaoDoEvento: semeador.prever,
+  gerarEventoAoGanhar: semeador.gerar,
+}));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: vi.fn(async () => rl.result),
@@ -104,13 +123,13 @@ vi.mock("@/lib/contracts-store", () => ({
   newContractId: () => "contrato-novo",
 }));
 
-import { GET, PATCH, DELETE } from "./route";
+import { GET, PATCH, DELETE, POST } from "./route";
 import { corpoDaMarcacao, corpoDoMotivo } from "@/lib/orcamento/desfecho";
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 /** O último patch que a rota mandou gravar. */
 const gravadoNaLoja = () => store.update.mock.calls.at(-1)?.[1] as Record<string, unknown>;
-function req(method: "GET" | "PATCH" | "DELETE", body?: unknown): NextRequest {
+function req(method: "GET" | "PATCH" | "DELETE" | "POST", body?: unknown): NextRequest {
   return new Request("https://liquen.test/api/orcamento/LIQ-1", {
     method,
     headers: { "Content-Type": "application/json" },
@@ -767,5 +786,92 @@ describe("PATCH /api/orcamento/[id] — o contrato nasce ao Ganho", () => {
 
     expect(res.status).toBe(200);
     expect(contratos.criar).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O PAINEL DE «GANHO»: PRÉVIA E GERAÇÃO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `POST /api/orcamento/[id]` é a porta nova: `{ acao: "prever" }` devolve as
+ * contagens sem escrever nada, `{ acao: "gerar" }` chama a geração a sério.
+ * A matemática de cada peça (material, montagem, calendário, pagamentos) tem
+ * os seus próprios testes em `semear-producao.test.ts`; aqui só se prende o
+ * que É desta rota: autenticação, o estado exigido, e QUAL função é chamada.
+ */
+describe("POST /api/orcamento/[id] — o painel de geração ao Ganho", () => {
+  it("requires authentication", async () => {
+    const res = await POST(req("POST", { acao: "prever" }), ctx("LIQ-1"));
+    expect(res.status).toBe(401);
+    expect(semeador.prever).not.toHaveBeenCalled();
+  });
+
+  it("recusa uma acção desconhecida", async () => {
+    authed.ok = true;
+    const res = await POST(req("POST", { acao: "apagar-tudo" }), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+  });
+
+  it("recusa um corpo mal formado em vez de rebentar", async () => {
+    authed.ok = true;
+    const bad = new Request("https://liquen.test/api/orcamento/LIQ-1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json{",
+    }) as unknown as NextRequest;
+    const res = await POST(bad, ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+  });
+
+  it("404 para um pedido que não existe", async () => {
+    authed.ok = true;
+    const res = await POST(req("POST", { acao: "prever" }), ctx("nope"));
+    expect(res.status).toBe(404);
+  });
+
+  it("recusa prever/gerar antes de o pedido estar «Ganho»", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    const res = await POST(req("POST", { acao: "prever" }), ctx("LIQ-1"));
+    expect(res.status).toBe(409);
+    expect(semeador.prever).not.toHaveBeenCalled();
+  });
+
+  it("'prever' chama preverGeracaoDoEvento e não gerarEventoAoGanhar", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    const res = await POST(req("POST", { acao: "prever" }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(semeador.prever).toHaveBeenCalledTimes(1);
+    expect(semeador.gerar).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({ haQualquerCoisaAGerar: false });
+  });
+
+  it("'gerar' chama gerarEventoAoGanhar e devolve o que nasceu", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    semeador.gerar.mockResolvedValueOnce({
+      material: { linhas: 3, preservadas: 0 },
+      montagem: { linhas: 2 },
+      calendario: { linhas: 4 },
+      pagamentos: { linhas: 2 },
+    });
+    const res = await POST(req("POST", { acao: "gerar" }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(semeador.gerar).toHaveBeenCalledTimes(1);
+    expect(semeador.prever).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({
+      calendario: { linhas: 4 },
+      pagamentos: { linhas: 2 },
+    });
+  });
+
+  it("um erro na geração devolve 500 em vez de rebentar sem resposta", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    semeador.gerar.mockRejectedValueOnce(new Error("falhou a ir buscar a proposta"));
+    const res = await POST(req("POST", { acao: "gerar" }), ctx("LIQ-1"));
+    expect(res.status).toBe(500);
   });
 });

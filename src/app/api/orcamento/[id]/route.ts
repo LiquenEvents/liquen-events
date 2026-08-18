@@ -3,7 +3,11 @@ import type { Proposal, Quote } from "@/lib/orcamento/types";
 import { transicaoDoPedido, type AcontecimentoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { ehMotivoDeRecusa } from "@/lib/orcamento/desfecho";
 import { getQuote, updateQuote, deleteQuote } from "@/lib/quotes-store";
-import { semearProducaoAoGanhar } from "@/lib/semear-producao";
+import {
+  semearProducaoAoGanhar,
+  preverGeracaoDoEvento,
+  gerarEventoAoGanhar,
+} from "@/lib/semear-producao";
 import { getProposalByQuote, updateProposal } from "@/lib/proposals-store";
 import { createContractIfAbsent, newContractId } from "@/lib/contracts-store";
 import { TERMS_VERSION, termosPara, termsToPlainText } from "@/lib/contract-terms";
@@ -439,6 +443,55 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json(updated);
   } catch (err) {
     log.error("orcamento PATCH falhou", err);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O PAINEL DE «GANHO»: O QUE VAI NASCER, E SÓ DEPOIS DE ELA CARREGAR EM GERAR
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * `PROPOSTA-ACEITE.md`: "Não vou gerar nada sem confirmação... Marcar como
+ * aceite mostra um painel com o que vai ser gerado e quantas linhas de cada;
+ * ela carrega em gerar." Duas acções no mesmo corpo — `{ acao: "prever" }`
+ * NÃO escreve nada; `{ acao: "gerar" }` escreve, e é chamável quantas vezes
+ * ela quiser sem duplicar (ver `gerarEventoAoGanhar`).
+ *
+ * Só faz sentido depois de o pedido estar «aceite» — antes disso não há
+ * total resolvido nem faz sentido nenhuma das quatro peças.
+ */
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isAuthed(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+  const { id } = await params;
+  const body = await request.json().catch(() => null);
+  const acao = body && typeof body === "object" ? (body as Record<string, unknown>).acao : null;
+  if (acao !== "prever" && acao !== "gerar") {
+    return NextResponse.json({ error: "acao tem de ser 'prever' ou 'gerar'" }, { status: 400 });
+  }
+
+  try {
+    const quote = await getQuote(id);
+    if (!quote) {
+      return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+    }
+    if (quote.status !== "aceite") {
+      return NextResponse.json(
+        { error: "O pedido ainda não está marcado como Ganho" },
+        { status: 409 },
+      );
+    }
+
+    if (acao === "prever") {
+      return NextResponse.json(await preverGeracaoDoEvento(quote));
+    }
+
+    const resultado = await gerarEventoAoGanhar(quote, new Date().toISOString());
+    return NextResponse.json(resultado);
+  } catch (err) {
+    log.error("orcamento POST (geração ao ganhar) falhou", err, { id });
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

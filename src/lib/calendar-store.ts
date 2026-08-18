@@ -62,3 +62,48 @@ export async function createCalendarEvent(
 }
 
 export const deleteCalendarEvent = (id: string): Promise<void> => repo.remove(id);
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A LIGAÇÃO A UM PEDIDO — SEM COLUNA NOVA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * `calendar_events` não tem `quote_id` (é «standalone», de propósito — ver o
+ * comentário do tipo, acima). A geração de datas-chave ao marcar «Ganho»
+ * precisa, na mesma, de saber SE JÁ GEROU uma dada chave para um dado pedido,
+ * para "gerar" duas vezes não duplicar a reunião, a encomenda de flores, a
+ * montagem e a desmontagem. Sem tabela nova, o elo é uma marca dentro da
+ * própria nota — que já é texto livre e já existe.
+ *
+ * Não aparece a quem lê a nota no calendário como um blob ilegível: é um
+ * sufixo depois de uma frase em português.
+ */
+function tagDeGeracao(quoteId: string, chave: string): string {
+  return `#gerado:${quoteId}:${chave}`;
+}
+
+/** A nota com que uma data-chave gerada automaticamente se identifica. */
+export function notaDeDataChaveGerada(quoteId: string, chave: string): string {
+  return `Gerado automaticamente ao marcar como ganho. ${tagDeGeracao(quoteId, chave)}`;
+}
+
+/**
+ * As chaves de data-chave já geradas para este pedido ("reuniao", "flores",
+ * "montagem", "desmontagem" — ver {@link import("./semear-producao").ANTECEDENCIAS_DATAS_CHAVE}).
+ *
+ * Devolve só as CHAVES, não os eventos inteiros: quem chama só precisa de
+ * saber "já gerei esta?" para não a repetir — nunca de reescrever um evento
+ * que ela já possa ter editado à mão (título, hora, nota).
+ */
+export async function chavesDeDatasJaGeradas(quoteId: string): Promise<Set<string>> {
+  const prefixo = tagDeGeracao(quoteId, "");
+  const eventos = await listCalendarEvents();
+  const chaves = new Set<string>();
+  for (const e of eventos) {
+    const nota = e.note ?? "";
+    const i = nota.indexOf(prefixo);
+    if (i === -1) continue;
+    chaves.add(nota.slice(i + prefixo.length));
+  }
+  return chaves;
+}
