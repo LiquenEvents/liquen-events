@@ -1305,10 +1305,90 @@ describe("os valores adicionais somam ao total", () => {
     return user;
   }
 
-  it("escrever 1550 num valor adicional leva o total de 6875 a 8425", async () => {
+  /**
+   * ── ESTE BLOCO DESCREVE A REGRA ANTIGA, E CONTINUA A DESCREVÊ-LA ─────────
+   *
+   * Uma proposta NOVA nasce hoje com «o valor escrito é só dos serviços, estas
+   * linhas somam-se» — foi o que a dona pediu, e está explicado no
+   * `seedDefaults`. Neste modo, escrever um adicional NÃO mexe no campo do
+   * valor: os 1.550 aparecem por baixo dos 6.875 e o total efectivo passa a
+   * 8.425.
+   *
+   * A regra antiga continua a existir, e continua a ser escolhível: o valor
+   * escrito JÁ INCLUI os adicionais, e por isso escrever um faz o campo subir
+   * para os incluir. É isso que estes testes prendem, e por isso trocam
+   * primeiro o selector. Sem esta troca, estariam a medir uma regra que já não
+   * é a de partida — e o teste seguinte, esse, mede a nova.
+   */
+  async function comOsAdicionaisDentroDoValor() {
+    const user = userEvent.setup();
+    await user.selectOptions(
+      await screen.findByLabelText(/Como contam os valores adicionais/i),
+      "dentro",
+    );
+  }
+
+  it("com os adicionais DENTRO do valor, escrever 1550 leva o campo de 6875 a 8425", async () => {
     desenhar(comPreco(6875));
+    // A troca vem ANTES de escrever: o selector diz como LER o valor escrito,
+    // não reinterpreta o que já foi escrito com a outra regra.
+    await comOsAdicionaisDentroDoValor();
     await escreverExtra("1550");
     expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("8425");
+  });
+
+  it("com os adicionais a somarem, o PREÇO FINAL do pedido leva-os", async () => {
+    /**
+     * ── A PEÇA QUE FALTAVA, E SEM ELA A MUDANÇA ESTRAGAVA OS NÚMEROS ───────
+     *
+     * O «Preço final (sem IVA)» do pedido é de onde a Visão Geral, as
+     * Estatísticas e o dossier leem o dinheiro dos pedidos que ainda não têm
+     * proposta enviada. Com os adicionais a somarem, o campo do estúdio passa a
+     * ser só os SERVIÇOS — e se fosse esse número a ir para o pedido, as
+     * deslocações desapareciam desses ecrãs em silêncio.
+     *
+     * Por isso o que viaja para o pedido é o efectivo: 6875 + 1550 = 8425.
+     */
+    const gravados: number[] = [];
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const corpo = String(init?.body ?? "");
+      if (String(url).includes("/api/orcamento/") && corpo.includes("quotedPrice")) {
+        const lido = JSON.parse(corpo) as { quotedPrice: number | null };
+        if (typeof lido.quotedPrice === "number") gravados.push(lido.quotedPrice);
+        return new Response(JSON.stringify({ ...quote, quotedPrice: lido.quotedPrice }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return originalFetch(url, init);
+    }) as typeof fetch;
+
+    try {
+      desenhar(comPreco(6875));
+      await escreverExtra("1550");
+      await waitFor(() => expect(gravados.at(-1)).toBe(8425), { timeout: 3000 });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("por omissão, os 1550 somam-se: o campo fica nos 6875 e o total vai a 8425", async () => {
+    // A regra que ela pediu, e que uma proposta nova passa a ter de partida:
+    // «não quero que a parte dos serviços apareça como base somada à
+    // deslocação; quero que seja três mil mais a deslocação».
+    desenhar(comPreco(6875));
+    await escreverExtra("1550");
+    // O campo do preço não mexe: continua a ser o dos SERVIÇOS.
+    expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("6875");
+    // E o quadro de totais soma os dois: 6875 de serviços mais 1550 da linha
+    // dão 8425 sem IVA, que é a conta que ela quer ver.
+    // `findAllByText`: estes números aparecem em mais do que um sítio do ecrã
+    // de propósito (o quadro de totais e a barra do fundo dizem o mesmo), e o
+    // que se está a afirmar é que aparecem, não que aparecem uma só vez.
+    expect((await screen.findAllByText(/6875,00/)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/1550,00/)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/8425,00/)).length).toBeGreaterThan(0);
   });
 
   /**
@@ -1318,6 +1398,9 @@ describe("os valores adicionais somam ao total", () => {
    */
   it("escrever tecla a tecla não soma quatro vezes", async () => {
     desenhar(comPreco(1000));
+    // Este caso descreve a regra em que o valor escrito JÁ INCLUI os
+    // adicionais, e por isso troca o selector antes de escrever.
+    await comOsAdicionaisDentroDoValor();
     await escreverExtra("100");
     expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("1100");
   });
@@ -1329,6 +1412,9 @@ describe("os valores adicionais somam ao total", () => {
    */
   it("apagar o valor adicional devolve o total ao que era — depois de confirmar", async () => {
     desenhar(comPreco(6875));
+    // Este caso descreve a regra em que o valor escrito JÁ INCLUI os
+    // adicionais, e por isso troca o selector antes de escrever.
+    await comOsAdicionaisDentroDoValor();
     const user = await escreverExtra("1550");
     expect(await screen.findByLabelText(/Valor \(sem IVA\)/i)).toHaveValue("8425");
     await user.click(await screen.findByRole("button", { name: /Remover linha adicional/i }));
@@ -1343,6 +1429,9 @@ describe("os valores adicionais somam ao total", () => {
 
   it("e cancelar deixa o total exactamente como estava", async () => {
     desenhar(comPreco(6875));
+    // Este caso descreve a regra em que o valor escrito JÁ INCLUI os
+    // adicionais, e por isso troca o selector antes de escrever.
+    await comOsAdicionaisDentroDoValor();
     const user = await escreverExtra("1550");
     await user.click(await screen.findByRole("button", { name: /Remover linha adicional/i }));
     await user.click(await screen.findByRole("button", { name: /^Cancelar$/ }));
@@ -1376,6 +1465,9 @@ describe("os valores adicionais somam ao total", () => {
   it("e chega ao PREÇO FINAL do pedido — é dele que sai a fatura", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     desenhar(comPreco(6875));
+    // Este caso descreve a regra em que o valor escrito JÁ INCLUI os
+    // adicionais, e por isso troca o selector antes de escrever.
+    await comOsAdicionaisDentroDoValor();
     await escreverExtra("1550");
     await vi.advanceTimersByTimeAsync(800);
     const gravacoes = fetchMock.mock.calls

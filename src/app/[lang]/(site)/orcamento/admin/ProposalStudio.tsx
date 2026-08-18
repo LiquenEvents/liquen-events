@@ -138,7 +138,7 @@ import {
   dinheiroDaProposta,
   asDuasFormas,
 } from "@/lib/proposal-budget";
-import { eur, eurDocumento, montanteNaLingua } from "@/lib/money";
+import { eur, eurDocumento, montanteNaLingua, round2 } from "@/lib/money";
 import { resumoDaPropostaParaCopiar } from "@/lib/email-proposta-textos";
 import { randomId } from "./util";
 import type { ActivityEntry, Quote } from "@/lib/orcamento/types";
@@ -329,6 +329,28 @@ function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
   // continua a ser um só, no total, tal como nas propostas dela.
   if (next.budgetItems.length === 0 && linhas.length > 0) {
     next = { ...next, budgetItems: [...linhas] };
+  }
+  /**
+   * ── OS ADICIONAIS SOMAM, NAS PROPOSTAS NOVAS ─────────────────────────────
+   *
+   * Palavras dela, a olhar para o quadro que dizia «Subtotal 2.860 +
+   * Deslocação 140 = Total 3.000»: «não quero que a parte dos serviços apareça
+   * como base somada à deslocação; quero que seja três mil mais a deslocação da
+   * equipa, que dá três mil e cento e quarenta».
+   *
+   * O selector por proposta continua a existir, e continua a poder ser mudado
+   * nos dois sentidos. O que muda é o lado para que ele nasce virado, porque
+   * ter de o trocar em cada proposta transforma a decisão dela num passo que se
+   * esquece — e um passo esquecido aqui é uma deslocação que a casa não cobra.
+   *
+   * ── E AS PROPOSTAS QUE JÁ EXISTEM ────────────────────────────────────────
+   * Não mudam. Isto só escreve quando o campo AINDA NÃO EXISTE no documento, e
+   * o `seedDefaults` só corre quando não há rascunho gravado. Uma proposta já
+   * enviada continua a ler-se exactamente como o casal a recebeu, e um rascunho
+   * a meio mantém a regra com que nasceu — quem a quiser mudar tem o selector.
+   */
+  if (next.budgetExtrasSomam === undefined) {
+    next = { ...next, budgetExtrasSomam: true };
   }
   // O valor vem do "Preço final (sem IVA)" do pedido, e é o mesmo número —
   // não há aqui um segundo. A condição `== null` que aqui estava era a origem
@@ -2253,6 +2275,47 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     return totalAmountParaBase(base, mode, money.vatRate);
   }
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O CAMPO DO ESTÚDIO E O PREÇO DO PEDIDO PODEM NÃO SER O MESMO NÚMERO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Enquanto os adicionais estavam DENTRO do valor escrito, eram o mesmo: ela
+   * escrevia 3.000, o pedido guardava 3.000, e a deslocação saía de lá de
+   * dentro.
+   *
+   * Com «estas linhas somam-se», o campo passa a ser SÓ os serviços e o que o
+   * casal paga é serviços mais adicionais. O «Preço final (sem IVA)» do pedido
+   * tem de continuar a ser o que o casal paga sem IVA — é dele que a Visão
+   * Geral, as Estatísticas e o dossier leem o dinheiro dos pedidos que ainda
+   * não têm proposta enviada. Guardar lá só os serviços fazia as deslocações
+   * DESAPARECEREM desses ecrãs, sem ninguém dar por isso.
+   *
+   * Por isso há duas conversões, e são inversas uma da outra:
+   *   escrito -> pedido   soma os adicionais
+   *   pedido  -> escrito  tira-os
+   *
+   * Quando os adicionais estão dentro do valor, as duas não fazem nada, e o
+   * comportamento é exactamente o de sempre.
+   */
+  function baseDoEcraParaOPedido(base: number): number {
+    if (!doc.budgetExtrasSomam) return base;
+    return round2(
+      base + somaDosExtrasSemIva(doc.budgetExtras, { mode: vatMode, vatRate: money.vatRate }),
+    );
+  }
+
+  function baseDoPedidoParaOEcra(base: number, d: StudioDoc): number {
+    if (!d.budgetExtrasSomam) return base;
+    const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
+    const semExtras = round2(
+      base - somaDosExtrasSemIva(d.budgetExtras, { mode, vatRate: d.vatRate ?? DEFAULT_VAT_RATE }),
+    );
+    // Nunca negativo: um pedido com preço mais baixo do que os adicionais
+    // escritos é um estado por arrumar, e o aviso de desalinhamento já o diz.
+    return semExtras > 0 ? semExtras : 0;
+  }
+
   /** O que se grava no pedido, com a mão travada: escrever "3000" são quatro
    *  teclas e não podem ser quatro gravações. */
   const gravarPreco = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2260,7 +2323,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *  servidor não disparar outra vez a sincronização e entrar em ciclo. */
   const precoEnviado = useRef<number | undefined>(quote.quotedPrice);
 
-  function persistirPreco(base: number | undefined) {
+  function persistirPreco(escrito: number | undefined, opcoes?: { jaEfectivo: boolean }) {
+    const base = escrito == null || opcoes?.jaEfectivo ? escrito : baseDoEcraParaOPedido(escrito);
     precoEnviado.current = base;
     if (gravarPreco.current) clearTimeout(gravarPreco.current);
     gravarPreco.current = setTimeout(async () => {
@@ -2598,12 +2662,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const doPedido = quote.quotedPrice;
     if (doPedido === precoEnviado.current) return;
     precoEnviado.current = doPedido;
-    setTotalInput(typeof doPedido === "number" && doPedido > 0 ? textoDoTotal(doPedido) : "");
     setDoc((d) => {
       const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
-      const amount =
+      // O pedido guarda o que o casal paga sem IVA; o campo do estúdio mostra
+      // só a parte dos serviços quando os adicionais somam. Ver o par de
+      // conversões acima.
+      const paraOEcra =
         typeof doPedido === "number" && doPedido > 0
-          ? totalAmountParaBase(doPedido, mode, d.vatRate ?? DEFAULT_VAT_RATE)
+          ? baseDoPedidoParaOEcra(doPedido, d)
+          : undefined;
+      setTotalInput(paraOEcra != null && paraOEcra > 0 ? textoDoTotal(paraOEcra) : "");
+      const amount =
+        paraOEcra != null && paraOEcra > 0
+          ? totalAmountParaBase(paraOEcra, mode, d.vatRate ?? DEFAULT_VAT_RATE)
           : undefined;
       const text = amount == null ? "" : mode === "acrescer" ? `${eur(amount)} + IVA` : eur(amount);
       return d.template === "organizacao"
@@ -4121,7 +4192,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
      * campo era empurrado para cima e os serviços encolhiam por baixo — que é
      * exactamente o quadro que ela viu e que não queria.
      */
-    if (doc.budgetExtrasSomam) return;
+    if (doc.budgetExtrasSomam) {
+      /**
+       * O campo não mexe, mas o PEDIDO tem de mexer.
+       *
+       * O «Preço final (sem IVA)» do pedido é de onde a Visão Geral, as
+       * Estatísticas e o dossier leem o dinheiro dos pedidos que ainda não têm
+       * proposta enviada. Se ele ficasse com os serviços apenas, uma deslocação
+       * de 140 € deixava de aparecer nesses ecrãs — e o pior de tudo é que
+       * desaparecia em silêncio, num número que já ninguém confere.
+       *
+       * A soma é feita com os adicionais NOVOS, e não com os que estão no
+       * documento: o `setDoc` acima é assíncrono, e ler `doc` aqui daria o
+       * estado anterior. É a mesma armadilha que o `delta` já evita.
+       */
+      const escrito = parseMoneyText(totalInput);
+      const efectivo = Math.round((escrito + somaDosExtrasSemIva(novos, contexto)) * 100) / 100;
+      persistirPreco(efectivo > 0 ? efectivo : undefined, { jaEfectivo: true });
+      return;
+    }
     if (delta === 0) return;
     // Um total não pode ficar negativo por causa de um extra apagado.
     const base = Math.max(0, Math.round((parseMoneyText(totalInput) + delta) * 100) / 100);
