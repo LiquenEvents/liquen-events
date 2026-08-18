@@ -17,6 +17,13 @@ primeiro os relatórios anteriores (`MOBILE-AUDIT`, `TOUCH-AUDIT`, `SECURITY-AUD
 4, 5, 6 e 12. O resto vem dos agentes com a referência de ficheiro que eles
 próprios citaram.
 
+> **Nota de actualização:** Este documento é o retrato de um MOMENTO, e o momento passou.
+> Foi revisto contra o código no commit 83c2fda. As entradas #1 e #2 da tabela de
+> prioridades, as duas marcadas como críticas, referem código que foi REMOVIDO:
+> `Faturas.tsx` (emissão de faturas removida do produto) e `api/proposta/route.ts`
+> (fluxo de aceitação do casal por botão removido). Ambas estão marcadas como
+> resolvidas por remoção nas secções respectivas.
+
 ---
 
 ## O que fazer primeiro, se for para escolher pouco
@@ -36,19 +43,17 @@ perda de trabalho:
 
 ## 1. DINHEIRO — o que está errado nas contas
 
-### 1.1 A fatura sai 23 % abaixo do devido · CRÍTICO · pequeno
-`Faturas.tsx:276` pré-preenche o valor com `q.quotedPrice`.
-`dossier.ts:138` diz, no próprio código: *«o `quotedPrice` é o campo "Preço final
-(sem IVA)", logo SEM IVA»*. `invoice-pdf.ts:22` declara: *`amount: number; //
-valor com IVA`*.
+### 1.1 A fatura sai 23 % abaixo do devido · **RESOLVIDO (removido)** · pequeno
+A emissão de faturas foi removida do produto. O componente `Faturas.tsx` e toda a
+funcionalidade de geração de facturas já não existem no código. O defeito descrito
+— `Faturas.tsx:276` pré-enchendo o valor com `q.quotedPrice` — desapareceu com a
+remoção dessa funcionalidade.
 
-Um casamento de 10.000 € + IVA gera uma fatura de 10.000 € **com IVA incluído**:
-base 8.130 € + IVA 1.870 €. **Faltam 2.300 €**, e o PDF fica internamente
-coerente, por isso nada acusa. Na mesma linha, o `?? q.priceBreakdown?.total`
-é bruto — os dois ramos do mesmo `??` estão em unidades diferentes.
-
-*Correcção:* usar `contractedAmounts(q).gross` e rotular "Total do evento (€, com IVA)".
-*A fazer hoje, sem código:* rever as faturas emitidas a partir da caixa "Evento".
+*Histórico (2026 e anterior):* O defeito consistia em pré-preencher o valor com
+`q.quotedPrice` (sem IVA), enquanto `invoice-pdf.ts:22` esperava `amount` com IVA
+incluído. Um casamento de 10.000 € + IVA geraria uma fatura de 10.000 € com IVA
+incluído, faltando 2.300 €. A correcção teria sido usar `contractedAmounts(q).gross`
+e rotular "Total do evento (€, com IVA)".
 
 ### 1.2 «Faturado total» e «Recebido» não olham para as faturas · alto · médio
 `Overview.tsx:850`, `StatsDashboard.tsx:584` somam só pagamentos escritos à mão.
@@ -110,10 +115,16 @@ resolução por relógio, só limpa o que o servidor confirmou).
 
 ## 3. O PERCURSO DA PROPOSTA
 
-### 3.1 O casal aceita e não recebe nada · alto · pequeno
-`api/proposta/route.ts:373`: `to: MAIL_TO`. Grava contrato, fatura de sinal e
-plano de produção — e avisa **só para dentro**. Ao casal, uma frase no ecrã. Sem
-contrato, sem valor do sinal, sem IBAN, sem link do portal.
+### 3.1 O casal aceita e não recebe nada · **RESOLVIDO (removido)** · pequeno
+O fluxo descrito foi removido: o botão que permitia o cliente aceitar a proposta
+directamente de um botão foi eliminado do código. Juntamente com ele desapareceu
+a rota `api/proposta/route.ts` e o defeito que descrevia. Existe um teste que
+impede o regresso dessa funcionalidade.
+
+*Histórico (2026 e anterior):* O defeito consistia em `api/proposta/route.ts:373`
+usar `to: MAIL_TO` e gravar contrato, fatura de sinal e plano de produção — e avisar
+**só para dentro**. Ao casal chegava apenas uma frase no ecrã, sem contrato, sem
+valor do sinal, sem IBAN, sem link do portal.
 
 ### 3.2 O seguimento marcado não chega aos lembretes · alto · pequeno
 Há **dois campos com o mesmo nome**: `types.ts:273` (pedido) e `:383` (proposta).
