@@ -226,6 +226,42 @@ describe("modeloParaEnvioAPedido — os botões dela", () => {
     if (r.ok) return;
     expect(r.emFalta).toContain("valor");
   });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS EMAILS DE ACOMPANHAMENTO SAEM SEMPRE EM PORTUGUÊS — E NÃO PODEM
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Ao contrário da proposta (que tem o texto da casa em inglês como rede),
+   * estes três modelos só existem em português. Um pedido inglês tem de
+   * RECUSAR o envio, não mandar português — um casal britânico não pode ler
+   * «Sinal recebido, reserva confirmada» sem perceber nada.
+   */
+  it("um pedido inglês recusa o envio, em vez de mandar português", async () => {
+    guardado.fn.mockResolvedValue(null);
+    const r = await modeloParaEnvioAPedido(
+      "sinal-recebido",
+      { nome: "Ana", valor: "1.500,00 €" },
+      "en",
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.motivo).toMatch(/inglês/i);
+    expect(r.motivo).toMatch(/não foi enviado/i);
+    expect(r.motivo).toContain("Sinal recebido");
+  });
+
+  it("um pedido português continua a usar o modelo, como sempre", async () => {
+    guardado.fn.mockResolvedValue(null);
+    const r = await modeloParaEnvioAPedido("agradecimento", { nome: "Ana" }, "pt");
+    expect(r.ok).toBe(true);
+  });
+
+  it("um pedido sem língua gravada (anterior ao campo) continua a usar o modelo", async () => {
+    guardado.fn.mockResolvedValue(null);
+    const r = await modeloParaEnvioAPedido("agradecimento", { nome: "Ana" }, undefined);
+    expect(r.ok).toBe(true);
+  });
 });
 
 describe("marcadoresDoPedido — de onde vêm os valores", () => {

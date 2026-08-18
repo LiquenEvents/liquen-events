@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
 import type { Quote, Task, TaskPriority } from "@/lib/orcamento/types";
 import { todayKey } from "./util";
 import { useToast } from "./Toast";
 import { Button, Field, EmptyState } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { useCachedList } from "./useCachedList";
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
   baixa: "#8a8a82",
@@ -29,66 +30,54 @@ interface Props {
 
 export default function EventTasks({ quote, userName }: Props) {
   const { toast } = useToast();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * A MESMA LISTA QUE O RESTO DO BACK OFFICE LÊ, FILTRADA POR ESTE EVENTO
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * Isto era um `fetch("/api/tarefas")` cru, feito de novo em CADA pedido
+   * aberto, fora da cache partilhada (`useCachedList`) que a vista global de
+   * Tarefas, a Agenda e os Lembretes já usam para a mesma lista. Abrir dez
+   * pedidos seguidos eram dez pedidos à rede pela MESMA lista inteira; agora
+   * só há um, e as vistas que abrirem depois leem-na já em cache.
+   *
+   * As escritas (marcar concluída, criar, apagar) têm de ir pelo `setData` do
+   * hook, e nunca por um `setState` só deste componente: é a mesma lista que a
+   * vista global e a Agenda leem, e um `setState` local desincronizava-as (ela
+   * risca uma tarefa aqui, volta à lista global, e a tarefa continua por
+   * fazer lá).
+   */
+  const {
+    data: allTasks,
+    setData: setAllTasks,
+    loading,
+    error: erro,
+    errorMessage: mensagemDeErro,
+    refresh: tentarDeNovo,
+  } = useCachedList<Task[]>("tarefas", "/api/tarefas");
+  const tasks = useMemo(
+    () => (allTasks ?? []).filter((t) => t.quoteId === quote.id),
+    [allTasks, quote.id],
+  );
+
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPriority, setNewPriority] = useState<TaskPriority>("normal");
   const [newDue, setNewDue] = useState("");
   const [busy, setBusy] = useState(false);
-  const [erro, setErro] = useState(false);
-  const [mensagemDeErro, setMensagemDeErro] = useState("");
-
-  /**
-   * A leitura não olhava para a resposta: um 500, as tabelas por instalar ou a
-   * rede em baixo caíam todos no mesmo `[]` de uma lista mesmo vazia, e o painel
-   * dizia "Sem tarefas ligadas a este evento". É a frase mais tranquilizadora
-   * deste ecrã e é o contrário do que se sabe — ela abre o evento na véspera da
-   * montagem, lê isso, e fecha o separador com o que falta fazer intacto do
-   * outro lado. Mesmo tratamento que a lista global de Tarefas e os
-   * Fornecedores: guardar a explicação do servidor e mostrar o `AvisoDeFalha`.
-   */
-  const carregar = useCallback(async () => {
-    try {
-      const res = await fetch("/api/tarefas");
-      if (!res.ok) {
-        const corpo = await res.json().catch(() => null);
-        const dito = typeof corpo?.error === "string" ? corpo.error : "";
-        throw new Error(dito || String(res.status));
-      }
-      const data: unknown = await res.json();
-      if (!Array.isArray(data)) throw new Error();
-      setTasks((data as Task[]).filter((t) => t.quoteId === quote.id));
-      setErro(false);
-      setMensagemDeErro("");
-    } catch (e) {
-      setErro(true);
-      setMensagemDeErro(e instanceof Error ? e.message : "");
-    } finally {
-      setLoading(false);
-    }
-  }, [quote.id]);
-
-  useEffect(() => {
-    setLoading(true);
-    void carregar();
-  }, [carregar]);
-
-  const tentarDeNovo = useCallback(() => {
-    setLoading(true);
-    void carregar();
-  }, [carregar]);
 
   async function toggleDone(task: Task) {
-    const next = { ...task, done: !task.done };
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? next : t)));
+    setAllTasks((prev) =>
+      (prev ?? []).map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)),
+    );
     const res = await fetch(`/api/tarefas/${task.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ done: !task.done }),
     }).catch(() => null);
     if (!res?.ok) {
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+      setAllTasks((prev) => (prev ?? []).map((t) => (t.id === task.id ? task : t)));
       toast("Não foi possível atualizar a tarefa. Tenta novamente.", "error");
     }
   }
@@ -114,7 +103,7 @@ export default function EventTasks({ quote, userName }: Props) {
       });
       const created = res.ok ? await res.json().catch(() => null) : null;
       if (created?.id) {
-        setTasks((prev) => [...prev, created]);
+        setAllTasks((prev) => [...(prev ?? []), created]);
         setNewTitle("");
         setNewPriority("normal");
         setNewDue("");
@@ -132,13 +121,12 @@ export default function EventTasks({ quote, userName }: Props) {
   async function removeTask(id: string) {
     const task = tasks.find((t) => t.id === id);
     if (task && !window.confirm(`Eliminar a tarefa "${task.title}"?`)) return;
-    const snapshot = tasks;
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setAllTasks((prev) => (prev ?? []).filter((t) => t.id !== id));
     try {
       const res = await fetch(`/api/tarefas/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
     } catch {
-      setTasks(snapshot);
+      if (task) setAllTasks((prev) => [...(prev ?? []), task]);
       toast("Não foi possível eliminar a tarefa. Tenta novamente.", "error");
     }
   }

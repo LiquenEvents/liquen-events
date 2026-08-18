@@ -976,6 +976,48 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // at once now — the management form always renders; only the heavier tool
   // groups (Produção / Financeiro / Comunicação) are tabbed for organisation.
   const [detailTab, setDetailTab] = useState<DetailTab>("comunicacao");
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * QUE SEPARADORES JÁ FORAM ABERTOS NESTE PEDIDO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Abrir um pedido montava os três separadores AO MESMO TEMPO: os doze
+   * `dynamic()` lá dentro (Produção tem seis, Financeiro dois, Comunicação
+   * quatro, entre `ProposalStudio` e `ProposalBuilder`) eram todos
+   * descarregados e arrancados de uma vez, mesmo para quem só queria ver um
+   * telefone. Cada separador só monta a sua ferramenta a PRIMEIRA vez que é
+   * aberto: o resto do tempo os dois que ninguém tocou nem chegam a existir
+   * no DOM.
+   *
+   * Uma vez aberto, um separador NUNCA desmonta ao trocar de separador (só
+   * fica escondido por `hidden`, como já estava) — é a mesma garantia de
+   * sempre, escrita ao lado de cada painel: trocar de separador não pode
+   * perder uma mensagem por enviar ou uma proposta a meio de editar. Cada um
+   * dos doze componentes foi visto antes desta mudança: guardam campos de
+   * formulário por gravar (um título de tarefa a meio, um nome de convidado),
+   * e nenhum é seguro para desmontar sozinho ao trocar de separador. Montar
+   * só à primeira abertura, e nunca mais desmontar, resolve os dois lados:
+   * poupa o que a maioria dos pedidos nunca chega a tocar, sem arriscar o que
+   * a mudança para `hidden` já protegia.
+   */
+  const [detailTabsVisitados, setDetailTabsVisitados] = useState<Set<DetailTab>>(
+    () => new Set([detailTab]),
+  );
+  /** Abre um separador do detalhe DO PEDIDO JÁ ABERTO: primeira vez que se vê
+   *  é primeira vez que monta. Usar sempre em vez de `setDetailTab` directo
+   *  para uma troca de separador. Para ABRIR um pedido (novo `selected`), usa
+   *  antes `abrirPrimeiroDetailTab` — essa RECOMEÇA a lista de visitados, esta
+   *  ACRESCENTA-lhe. */
+  const abrirDetailTab = useCallback((tab: DetailTab) => {
+    setDetailTab(tab);
+    setDetailTabsVisitados((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
+  }, []);
+  /** O pedido MUDOU: os separadores visitados do pedido anterior não dizem
+   *  nada sobre este. Recomeça a lista só com o separador de abertura. */
+  const abrirPrimeiroDetailTab = useCallback((tab: DetailTab) => {
+    setDetailTab(tab);
+    setDetailTabsVisitados(new Set([tab]));
+  }, []);
   // Comunicação tab shows one proposal tool by default (ProposalStudio); the
   // simpler price-table tool (ProposalBuilder) stays collapsed behind a link.
   const [showBuilder, setShowBuilder] = useState(false);
@@ -1837,8 +1879,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditEmail(q.email ?? "");
     setEditTelefone(q.phone ?? "");
     // Open on the tools tab that matches where this pedido is in its lifecycle.
+    // Pedido NOVO: os separadores visitados do anterior não valem para este.
     const target = detailNextAction(q).tab;
-    setDetailTab(target === "gestao" ? "comunicacao" : target);
+    abrirPrimeiroDetailTab(target === "gestao" ? "comunicacao" : target);
   }
   // Stable identity for the memoised QuoteCard's onOpen prop. openQuote is a
   // plain function (closes over discardGuard and many setters), so its reference
@@ -1892,7 +1935,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       setEditNome(data.quote.name ?? "");
       setEditEmail(data.quote.email ?? "");
       setEditTelefone(data.quote.phone ?? "");
-      setDetailTab("comunicacao");
+      // Pedido NOVO (é uma cópia): recomeça os separadores visitados.
+      abrirPrimeiroDetailTab("comunicacao");
       toast("Pedido duplicado — define a nova data", "success");
     } catch {
       toast("Não foi possível duplicar o pedido", "error");
@@ -4405,7 +4449,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                       block: "start",
                                     });
                                   } else {
-                                    setDetailTab(na.tab);
+                                    abrirDetailTab(na.tab);
                                     toolsRef.current?.scrollIntoView({
                                       behavior: "smooth",
                                       block: "start",
@@ -4983,13 +5027,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   aria-selected={active}
                                   aria-controls={`detail-panel-${tab.id}`}
                                   tabIndex={active ? 0 : -1}
-                                  onClick={() => setDetailTab(tab.id)}
+                                  onClick={() => abrirDetailTab(tab.id)}
                                   onKeyDown={(e) => {
                                     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
                                     e.preventDefault();
                                     const dir = e.key === "ArrowRight" ? 1 : -1;
                                     const nextIdx = (i + dir + arr.length) % arr.length;
-                                    setDetailTab(arr[nextIdx].id);
+                                    abrirDetailTab(arr[nextIdx].id);
                                     const tabs =
                                       e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
                                         '[role="tab"]',
@@ -5042,8 +5086,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                           {/* Coluna única — as ferramentas do separador ativo */}
                           <div className="flex min-w-0 flex-col gap-6">
-                            {/* Keep-alive: os três painéis ficam sempre montados e só
-                              escondidos (`hidden`), para nunca se perder trabalho a
+                            {/* Cada painel só monta as suas ferramentas na PRIMEIRA vez
+                              que se abre (`detailTabsVisitados`, ver a nota onde é
+                              declarado) — depois disso fica sempre montado e só
+                              escondido (`hidden`), para nunca se perder trabalho a
                               meio (mensagem por enviar, proposta em edição) ao trocar
                               de separador. */}
                             <div
@@ -5054,35 +5100,37 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               hidden={detailTab !== "producao"}
                               className="flex flex-col gap-6 focus:outline-none"
                             >
-                              {/* Preparação — the daily driver (tarefas + checklist),
-                                  always open and first. */}
-                              <p className="bo-eyebrow text-foreground/45">Preparação</p>
+                              {detailTabsVisitados.has("producao") && (
+                                <>
+                                  {/* Preparação — the daily driver (tarefas + checklist),
+                                      always open and first. */}
+                                  <p className="bo-eyebrow text-foreground/45">Preparação</p>
 
-                              {/* Tasks linked to this event */}
-                              <EventTasks
-                                key={`tasks-${selected.id}`}
-                                quote={selected}
-                                userName={userName}
-                              />
+                                  {/* Tasks linked to this event */}
+                                  <EventTasks
+                                    key={`tasks-${selected.id}`}
+                                    quote={selected}
+                                    userName={userName}
+                                  />
 
-                              {/* Production checklist */}
-                              <EventChecklist
-                                key={`cl-${selected.id}`}
-                                quote={selected}
-                                onChange={(checklist) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, checklist } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, checklist } : prev));
-                                }}
-                              />
+                                  {/* Production checklist */}
+                                  <EventChecklist
+                                    key={`cl-${selected.id}`}
+                                    quote={selected}
+                                    onChange={(checklist) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, checklist } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) => (prev ? { ...prev, checklist } : prev));
+                                    }}
+                                  />
 
-                              {/* Material que vai na carrinha */}
-                              <EventMaterial key={`mat-${selected.id}`} quote={selected} />
+                                  {/* Material que vai na carrinha */}
+                                  <EventMaterial key={`mat-${selected.id}`} quote={selected} />
 
-                              {/* Plano &amp; dia do evento — occasional tools, collapsed so
+                                  {/* Plano &amp; dia do evento — occasional tools, collapsed so
                                   the tab opens short. Native <details> keeps every child
                                   mounted (hidden via CSS), so fetch/PATCH lifecycles are
                                   untouched.
@@ -5096,71 +5144,77 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   agora vê (ver `e2e/ergonomia-tactil.mjs`). Só
                                   cresce sob `(pointer: coarse)`; no portátil
                                   fica como estava. */}
-                              <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
-                                  <svg
-                                    className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                  >
-                                    <path
-                                      d="m9 6 6 6-6 6"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                  </svg>
-                                  Plano de decoração, cronograma e convidados
-                                </summary>
-                                <div className="flex flex-col gap-6 pt-6">
-                                  {/* Decor production plan (sourcing → strike) */}
-                                  <ProductionPlan
-                                    key={`prod-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(productionPlan) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, productionPlan } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev ? { ...prev, productionPlan } : prev,
-                                      );
-                                    }}
-                                  />
+                                  <details className="group border-t border-foreground/10 pt-4">
+                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                      <svg
+                                        className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.8"
+                                      >
+                                        <path
+                                          d="m9 6 6 6-6 6"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                      Plano de decoração, cronograma e convidados
+                                    </summary>
+                                    <div className="flex flex-col gap-6 pt-6">
+                                      {/* Decor production plan (sourcing → strike) */}
+                                      <ProductionPlan
+                                        key={`prod-${selected.id}`}
+                                        quote={selected}
+                                        onChange={(productionPlan) => {
+                                          setQuotes((prev) =>
+                                            prev.map((q) =>
+                                              q.id === selected.id ? { ...q, productionPlan } : q,
+                                            ),
+                                          );
+                                          setSelected((prev) =>
+                                            prev ? { ...prev, productionPlan } : prev,
+                                          );
+                                        }}
+                                      />
 
-                                  {/* Day-of run sheet */}
-                                  <EventTimeline
-                                    key={`tl-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(timeline) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, timeline } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) => (prev ? { ...prev, timeline } : prev));
-                                    }}
-                                  />
+                                      {/* Day-of run sheet */}
+                                      <EventTimeline
+                                        key={`tl-${selected.id}`}
+                                        quote={selected}
+                                        onChange={(timeline) => {
+                                          setQuotes((prev) =>
+                                            prev.map((q) =>
+                                              q.id === selected.id ? { ...q, timeline } : q,
+                                            ),
+                                          );
+                                          setSelected((prev) =>
+                                            prev ? { ...prev, timeline } : prev,
+                                          );
+                                        }}
+                                      />
 
-                                  {/* Guest list / RSVP */}
-                                  <GuestList
-                                    key={`guests-${selected.id}`}
-                                    quote={selected}
-                                    onChange={(guestList) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id ? { ...q, guestList } : q,
-                                        ),
-                                      );
-                                      setSelected((prev) => (prev ? { ...prev, guestList } : prev));
-                                    }}
-                                  />
-                                </div>
-                              </details>
+                                      {/* Guest list / RSVP */}
+                                      <GuestList
+                                        key={`guests-${selected.id}`}
+                                        quote={selected}
+                                        onChange={(guestList) => {
+                                          setQuotes((prev) =>
+                                            prev.map((q) =>
+                                              q.id === selected.id ? { ...q, guestList } : q,
+                                            ),
+                                          );
+                                          setSelected((prev) =>
+                                            prev ? { ...prev, guestList } : prev,
+                                          );
+                                        }}
+                                      />
+                                    </div>
+                                  </details>
+                                </>
+                              )}
                             </div>
 
                             <div
@@ -5171,47 +5225,53 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               hidden={detailTab !== "financeiro"}
                               className="flex flex-col gap-6 focus:outline-none"
                             >
-                              {/* Cobrança — payments first (the key action), costs
+                              {detailTabsVisitados.has("financeiro") && (
+                                <>
+                                  {/* Cobrança — payments first (the key action), costs
                                   below. Eyebrow mirrors the other two panels. */}
-                              <p className="bo-eyebrow text-foreground/45">Pagamentos</p>
+                                  <p className="bo-eyebrow text-foreground/45">Pagamentos</p>
 
-                              <PaymentsPanel
-                                key={`pay-${selected.id}`}
-                                quote={selected}
-                                onChange={(payments) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, payments } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, payments } : prev));
-                                }}
-                                onContractRef={(ref) => {
-                                  const contractRef = ref || undefined;
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, contractRef } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, contractRef } : prev));
-                                }}
-                              />
+                                  <PaymentsPanel
+                                    key={`pay-${selected.id}`}
+                                    quote={selected}
+                                    onChange={(payments) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, payments } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) => (prev ? { ...prev, payments } : prev));
+                                    }}
+                                    onContractRef={(ref) => {
+                                      const contractRef = ref || undefined;
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, contractRef } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) =>
+                                        prev ? { ...prev, contractRef } : prev,
+                                      );
+                                    }}
+                                  />
 
-                              {/* Suppliers booked for this event + budget vs actual cost */}
-                              <EventCosts
-                                key={`costs-${selected.id}`}
-                                quote={selected}
-                                onChange={(eventSuppliers) => {
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, eventSuppliers } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) =>
-                                    prev ? { ...prev, eventSuppliers } : prev,
-                                  );
-                                }}
-                              />
+                                  {/* Suppliers booked for this event + budget vs actual cost */}
+                                  <EventCosts
+                                    key={`costs-${selected.id}`}
+                                    quote={selected}
+                                    onChange={(eventSuppliers) => {
+                                      setQuotes((prev) =>
+                                        prev.map((q) =>
+                                          q.id === selected.id ? { ...q, eventSuppliers } : q,
+                                        ),
+                                      );
+                                      setSelected((prev) =>
+                                        prev ? { ...prev, eventSuppliers } : prev,
+                                      );
+                                    }}
+                                  />
+                                </>
+                              )}
                             </div>
 
                             <div
@@ -5222,181 +5282,187 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                               hidden={detailTab !== "comunicacao"}
                               className="flex flex-col gap-6 focus:outline-none"
                             >
-                              {/* Step 1 — the proposal. One tool at a time: the detailed
+                              {detailTabsVisitados.has("comunicacao") && (
+                                <>
+                                  {/* Step 1 — the proposal. One tool at a time: the detailed
                                   Studio by default, or the quick price-table Builder —
                                   never both stacked on screen. The mode is an explicit,
                                   calm segmented choice so a newcomer sees both exist. */}
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
-                                <Segmented
-                                  ariaLabel="Tipo de proposta"
-                                  size="sm"
-                                  value={showBuilder ? "rapida" : "detalhada"}
-                                  onChange={(v) => setShowBuilder(v === "rapida")}
-                                  options={[
-                                    { value: "detalhada", label: "Detalhada" },
-                                    { value: "rapida", label: "Rápida" },
-                                  ]}
-                                />
-                              </div>
-                              <p className="-mt-3 text-xs leading-relaxed text-foreground/45">
-                                {showBuilder
-                                  ? "Rápida — uma tabela de preços simples, sem imagens nem PDF."
-                                  : "Detalhada — proposta completa em PDF, com capa, serviços e imagens."}
-                              </p>
-                              {!showBuilder ? (
-                                <>
-                                  <ProposalStudio
-                                    key={`studio-${selected.id}`}
+                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <p className="bo-eyebrow text-foreground/45">1 · A proposta</p>
+                                    <Segmented
+                                      ariaLabel="Tipo de proposta"
+                                      size="sm"
+                                      value={showBuilder ? "rapida" : "detalhada"}
+                                      onChange={(v) => setShowBuilder(v === "rapida")}
+                                      options={[
+                                        { value: "detalhada", label: "Detalhada" },
+                                        { value: "rapida", label: "Rápida" },
+                                      ]}
+                                    />
+                                  </div>
+                                  <p className="-mt-3 text-xs leading-relaxed text-foreground/45">
+                                    {showBuilder
+                                      ? "Rápida — uma tabela de preços simples, sem imagens nem PDF."
+                                      : "Detalhada — proposta completa em PDF, com capa, serviços e imagens."}
+                                  </p>
+                                  {!showBuilder ? (
+                                    <>
+                                      <ProposalStudio
+                                        key={`studio-${selected.id}`}
+                                        quote={selected}
+                                        quotes={activeQuotes}
+                                        // O valor é um só: o estúdio grava-o no
+                                        // pedido, e o "Preço final" aqui ao lado tem
+                                        // de mostrar o mesmo número sem ser preciso
+                                        // recarregar nada.
+                                        onQuoteUpdated={(q) => {
+                                          setQuotes((prev) =>
+                                            prev.map((x) => (x.id === q.id ? q : x)),
+                                          );
+                                          setSelected((prev) => (prev?.id === q.id ? q : prev));
+                                          // `textoDoPreco` e não a verdade do valor:
+                                          // um total de ZERO é um preço escrito, e
+                                          // lido como «sem preço» deixava o campo
+                                          // vazio sobre um pedido que tem 0 — a barra
+                                          // a pedir para gravar o que o estúdio
+                                          // acabou de gravar.
+                                          setEditPrice(textoDoPreco(q));
+                                        }}
+                                        onSent={() => {
+                                          setQuotes((prev) =>
+                                            prev.map((q) =>
+                                              q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                            ),
+                                          );
+                                          setSelected((prev) =>
+                                            prev ? { ...prev, status: "cotado" } : prev,
+                                          );
+                                          setEditStatus("cotado");
+                                          appendActivity(selected.id, [
+                                            {
+                                              id: randomId(),
+                                              at: new Date().toISOString(),
+                                              kind: "proposal_sent",
+                                              actor: userName,
+                                              summary: "Proposta enviada ao cliente (Studio)",
+                                            },
+                                          ]);
+                                        }}
+                                      />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ProposalBuilder
+                                        // A CHAVE, como todos os outros painéis do
+                                        // detalhe (`pay-`, `costs-`, `studio-`,
+                                        // `guests-`). Sem ela este era o único que
+                                        // NÃO remontava ao trocar de pedido: ficava
+                                        // com as linhas e os preços do cliente
+                                        // anterior e, 800 ms depois, a gravação
+                                        // automática escrevia-os no rascunho do
+                                        // cliente novo — que nunca os teve.
+                                        key={`builder-${selected.id}`}
+                                        quote={selected}
+                                        onSent={(total) => {
+                                          setQuotes((prev) =>
+                                            prev.map((q) =>
+                                              q.id === selected.id
+                                                ? { ...q, status: "cotado", quotedPrice: total }
+                                                : q,
+                                            ),
+                                          );
+                                          setSelected((prev) =>
+                                            prev
+                                              ? { ...prev, status: "cotado", quotedPrice: total }
+                                              : prev,
+                                          );
+                                          setEditStatus("cotado");
+                                          appendActivity(selected.id, [
+                                            {
+                                              id: randomId(),
+                                              at: new Date().toISOString(),
+                                              kind: "proposal_sent",
+                                              actor: userName,
+                                              summary: `Proposta enviada — ${eur(total)}`,
+                                            },
+                                          ]);
+                                        }}
+                                      />
+                                    </>
+                                  )}
+
+                                  {/* Step 2 — talk to the client. */}
+                                  <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
+                                    2 · Falar com o cliente
+                                  </p>
+                                  <ClientMessenger
+                                    key={selected.id}
                                     quote={selected}
-                                    quotes={activeQuotes}
-                                    // O valor é um só: o estúdio grava-o no
-                                    // pedido, e o "Preço final" aqui ao lado tem
-                                    // de mostrar o mesmo número sem ser preciso
-                                    // recarregar nada.
-                                    onQuoteUpdated={(q) => {
-                                      setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
-                                      setSelected((prev) => (prev?.id === q.id ? q : prev));
-                                      // `textoDoPreco` e não a verdade do valor:
-                                      // um total de ZERO é um preço escrito, e
-                                      // lido como «sem preço» deixava o campo
-                                      // vazio sobre um pedido que tem 0 — a barra
-                                      // a pedir para gravar o que o estúdio
-                                      // acabou de gravar.
-                                      setEditPrice(textoDoPreco(q));
-                                    }}
-                                    onSent={() => {
+                                    onSent={(messages, envio) => {
+                                      const prev_count = selected.messages?.length ?? 0;
                                       setQuotes((prev) =>
                                         prev.map((q) =>
-                                          q.id === selected.id ? { ...q, status: "cotado" } : q,
+                                          q.id === selected.id ? { ...q, messages } : q,
                                         ),
                                       );
-                                      setSelected((prev) =>
-                                        prev ? { ...prev, status: "cotado" } : prev,
-                                      );
-                                      setEditStatus("cotado");
-                                      appendActivity(selected.id, [
-                                        {
-                                          id: randomId(),
-                                          at: new Date().toISOString(),
-                                          kind: "proposal_sent",
-                                          actor: userName,
-                                          summary: "Proposta enviada ao cliente (Studio)",
-                                        },
-                                      ]);
+                                      setSelected((prev) => (prev ? { ...prev, messages } : prev));
+                                      if (messages.length > prev_count) {
+                                        appendActivity(selected.id, [
+                                          {
+                                            id: randomId(),
+                                            at: new Date().toISOString(),
+                                            kind: "message_sent",
+                                            actor: userName,
+                                            /**
+                                             * O QUE ACONTECEU, E NÃO O QUE SE QUIS FAZER.
+                                             *
+                                             * Um pedido que entrou por telefonema não tem
+                                             * email. A rota grava a mensagem à mesma e
+                                             * responde que o email NÃO saiu; o mensageiro
+                                             * diz-o a vermelho, mas o histórico ficava com
+                                             * «Mensagem enviada ao cliente» — e o histórico
+                                             * é o que se lê meses depois para saber o que se
+                                             * disse a quem. Mesma frase que a zona de
+                                             * comunicações do dossiê já usa.
+                                             */
+                                            summary: resumoDoEnvio(envio),
+                                          },
+                                        ]);
+                                      }
                                     }}
                                   />
-                                </>
-                              ) : (
-                                <>
-                                  <ProposalBuilder
-                                    // A CHAVE, como todos os outros painéis do
-                                    // detalhe (`pay-`, `costs-`, `studio-`,
-                                    // `guests-`). Sem ela este era o único que
-                                    // NÃO remontava ao trocar de pedido: ficava
-                                    // com as linhas e os preços do cliente
-                                    // anterior e, 800 ms depois, a gravação
-                                    // automática escrevia-os no rascunho do
-                                    // cliente novo — que nunca os teve.
-                                    key={`builder-${selected.id}`}
-                                    quote={selected}
-                                    onSent={(total) => {
-                                      setQuotes((prev) =>
-                                        prev.map((q) =>
-                                          q.id === selected.id
-                                            ? { ...q, status: "cotado", quotedPrice: total }
-                                            : q,
-                                        ),
-                                      );
-                                      setSelected((prev) =>
-                                        prev
-                                          ? { ...prev, status: "cotado", quotedPrice: total }
-                                          : prev,
-                                      );
-                                      setEditStatus("cotado");
-                                      appendActivity(selected.id, [
-                                        {
-                                          id: randomId(),
-                                          at: new Date().toISOString(),
-                                          kind: "proposal_sent",
-                                          actor: userName,
-                                          summary: `Proposta enviada — ${eur(total)}`,
-                                        },
-                                      ]);
-                                    }}
-                                  />
+
+                                  {/* Activity history — de-emphasised, collapsed by default. */}
+                                  <details className="group border-t border-foreground/10 pt-4">
+                                    <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
+                                      <svg
+                                        className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.8"
+                                      >
+                                        <path
+                                          d="m9 6 6 6-6 6"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                      Histórico de atividade
+                                    </summary>
+                                    <div className="pt-6">
+                                      <ActivityLog
+                                        quote={selected}
+                                        actor={userName}
+                                        onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                                      />
+                                    </div>
+                                  </details>
                                 </>
                               )}
-
-                              {/* Step 2 — talk to the client. */}
-                              <p className="bo-eyebrow border-t border-foreground/10 pt-6 text-foreground/45">
-                                2 · Falar com o cliente
-                              </p>
-                              <ClientMessenger
-                                key={selected.id}
-                                quote={selected}
-                                onSent={(messages, envio) => {
-                                  const prev_count = selected.messages?.length ?? 0;
-                                  setQuotes((prev) =>
-                                    prev.map((q) =>
-                                      q.id === selected.id ? { ...q, messages } : q,
-                                    ),
-                                  );
-                                  setSelected((prev) => (prev ? { ...prev, messages } : prev));
-                                  if (messages.length > prev_count) {
-                                    appendActivity(selected.id, [
-                                      {
-                                        id: randomId(),
-                                        at: new Date().toISOString(),
-                                        kind: "message_sent",
-                                        actor: userName,
-                                        /**
-                                         * O QUE ACONTECEU, E NÃO O QUE SE QUIS FAZER.
-                                         *
-                                         * Um pedido que entrou por telefonema não tem
-                                         * email. A rota grava a mensagem à mesma e
-                                         * responde que o email NÃO saiu; o mensageiro
-                                         * diz-o a vermelho, mas o histórico ficava com
-                                         * «Mensagem enviada ao cliente» — e o histórico
-                                         * é o que se lê meses depois para saber o que se
-                                         * disse a quem. Mesma frase que a zona de
-                                         * comunicações do dossiê já usa.
-                                         */
-                                        summary: resumoDoEnvio(envio),
-                                      },
-                                    ]);
-                                  }
-                                }}
-                              />
-
-                              {/* Activity history — de-emphasised, collapsed by default. */}
-                              <details className="group border-t border-foreground/10 pt-4">
-                                <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
-                                  <svg
-                                    className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                  >
-                                    <path
-                                      d="m9 6 6 6-6 6"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                  </svg>
-                                  Histórico de atividade
-                                </summary>
-                                <div className="pt-6">
-                                  <ActivityLog
-                                    quote={selected}
-                                    actor={userName}
-                                    onAddEntry={(entry) => appendActivity(selected.id, [entry])}
-                                  />
-                                </div>
-                              </details>
                             </div>
                           </div>
                         </div>

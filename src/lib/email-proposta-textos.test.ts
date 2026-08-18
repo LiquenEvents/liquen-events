@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { textosDoEmailDaProposta } from "./email-proposta-textos";
+import {
+  paragrafoDoQueMudou,
+  resumoDaPropostaParaCopiar,
+  textosDoEmailDaProposta,
+} from "./email-proposta-textos";
+import type { Mudanca } from "./orcamento/diferencas";
+import type { ProposalMoney } from "./proposal-doc";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -72,5 +78,151 @@ describe("textosDoEmailDaProposta", () => {
     // `idiomaDaProposta`, mas esta folha nunca pode devolver `undefined` e
     // fazer sair um email com buracos.
     expect(textosDoEmailDaProposta("fr" as never)).toEqual(pt);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O RESUMO PARA COLAR NO WHATSAPP
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+describe("resumoDaPropostaParaCopiar", () => {
+  const dados = {
+    clientNames: "Maria & Zé",
+    eventDate: "3 de julho de 2027",
+    aPagar: "3.690,00 €",
+  };
+
+  it("as três linhas, em português", () => {
+    const texto = resumoDaPropostaParaCopiar(dados, "pt");
+    expect(texto).toBe(
+      "Proposta Líquen Events, Maria & Zé\nData do evento: 3 de julho de 2027\nValor a pagar: 3.690,00 €",
+    );
+  });
+
+  it("as três linhas, em inglês, sem uma palavra portuguesa", () => {
+    const texto = resumoDaPropostaParaCopiar(dados, "en");
+    expect(texto).toBe(
+      "Líquen Events proposal, Maria & Zé\nEvent date: 3 de julho de 2027\nAmount to pay: 3.690,00 €",
+    );
+    // O nome e a data são texto dela — não se traduzem. Só os rótulos mudam.
+    for (const palavra of ["data do evento", "valor a pagar", "proposta líquen"]) {
+      expect(texto.toLowerCase()).not.toContain(palavra);
+    }
+  });
+
+  it("o link só entra quando existe", () => {
+    const sem = resumoDaPropostaParaCopiar(dados, "pt");
+    expect(sem).not.toContain("http");
+    const com = resumoDaPropostaParaCopiar(
+      { ...dados, link: "https://liquen-events.com/proposta/abc.sig" },
+      "pt",
+    );
+    expect(com.split("\n")).toHaveLength(4);
+    expect(com).toContain("Proposta: https://liquen-events.com/proposta/abc.sig");
+  });
+
+  it("um link em branco não deixa uma linha vazia a apontar para nada", () => {
+    const texto = resumoDaPropostaParaCopiar({ ...dados, link: "   " }, "pt");
+    expect(texto.split("\n")).toHaveLength(3);
+  });
+
+  it("sem data marcada, diz que está por marcar em vez de deixar a linha em branco", () => {
+    const texto = resumoDaPropostaParaCopiar({ ...dados, eventDate: "" }, "pt");
+    expect(texto).toContain("Data do evento: por marcar");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PARÁGRAFO DO QUE MUDOU
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+describe("paragrafoDoQueMudou", () => {
+  const money = (gross: number): ProposalMoney => ({
+    base: gross / 1.23,
+    vat: gross - gross / 1.23,
+    gross,
+    vatRate: 0.23,
+    mode: "incluido",
+  });
+
+  it("sem mudança nenhuma, não há parágrafo (primeira versão)", () => {
+    expect(paragrafoDoQueMudou([], { antes: money(3500), depois: money(3500) }, "pt")).toBeNull();
+  });
+
+  it("só o total muda: uma frase, em português", () => {
+    const mudancas: Mudanca[] = [
+      { onde: "Total", tipo: "alterado", texto: "O total passou de 3.500,00 € para 4.200,00 €" },
+    ];
+    const texto = paragrafoDoQueMudou(mudancas, { antes: money(3500), depois: money(4200) }, "pt");
+    expect(texto).toBe("Desde a última proposta: o total passou de 3.500,00 € para 4.200,00 €.");
+  });
+
+  it("categoria e total juntos, em inglês, sem travessão longo", () => {
+    const mudancas: Mudanca[] = [
+      { onde: "Total", tipo: "alterado", texto: "…" },
+      {
+        onde: "Orçamento",
+        tipo: "acrescentado",
+        texto: 'Entrou "Wedding Coordinator" por 1.500,00 €',
+      },
+    ];
+    const texto = paragrafoDoQueMudou(mudancas, { antes: money(3500), depois: money(5000) }, "en");
+    expect(texto).toBe(
+      "Since the last proposal: there were changes to the budget; the total went from €3,500.00 to €5,000.00.",
+    );
+    expect(texto).not.toContain("—");
+    // Nenhuma palavra portuguesa a meio da frase inglesa.
+    for (const palavra of ["orçamento", "última", "desde"]) {
+      expect(texto!.toLowerCase()).not.toContain(palavra);
+    }
+  });
+
+  it("duas categorias juntam-se com 'e' / 'and'", () => {
+    const mudancas: Mudanca[] = [
+      { onde: "Orçamento", tipo: "acrescentado", texto: "x" },
+      { onde: "Serviços", tipo: "acrescentado", texto: "y" },
+    ];
+    const pt = paragrafoDoQueMudou(mudancas, { antes: money(3500), depois: money(3500) }, "pt");
+    expect(pt).toBe("Desde a última proposta: houve alterações em o orçamento e os serviços.");
+    const en = paragrafoDoQueMudou(mudancas, { antes: money(3500), depois: money(3500) }, "en");
+    expect(en).toBe("Since the last proposal: there were changes to the budget and the services.");
+  });
+
+  it("só o MODO de IVA muda (o casal paga o mesmo): sem parágrafo, em vez de inventar uma frase", () => {
+    // `diferencas` regista este caso como uma mudança em "Total", mas o bruto
+    // não se mexe — não há um "passou de X para Y" honesto para dizer aqui.
+    const mudancas: Mudanca[] = [
+      {
+        onde: "Total",
+        tipo: "alterado",
+        texto: "O total passou a ser apresentado com IVA incluído",
+      },
+    ];
+    expect(
+      paragrafoDoQueMudou(mudancas, { antes: money(3500), depois: money(3500) }, "pt"),
+    ).toBeNull();
+  });
+
+  it("usa dinheiroDaProposta (o gross recebido), não uma conta própria", () => {
+    // Uma prova directa de que a frase usa exactamente os números que lhe são
+    // passados — que é o que `dinheiroDaProposta` (e não `resolveProposalMoney`)
+    // já corrige a montante, em `diferencas.ts`.
+    const mudancas: Mudanca[] = [{ onde: "Total", tipo: "alterado", texto: "…" }];
+    const texto = paragrafoDoQueMudou(
+      mudancas,
+      { antes: money(1000), depois: money(1906.5) },
+      "pt",
+    );
+    expect(texto).toContain("1.000,00 €");
+    expect(texto).toContain("1.906,50 €");
+  });
+
+  it("categoria desconhecida (uma versão futura de diferencas.ts) não rebenta, só não entra na frase", () => {
+    const mudancas: Mudanca[] = [{ onde: "Uma Categoria Nova", tipo: "alterado", texto: "x" }];
+    expect(
+      paragrafoDoQueMudou(mudancas, { antes: money(3500), depois: money(3500) }, "pt"),
+    ).toBeNull();
   });
 });

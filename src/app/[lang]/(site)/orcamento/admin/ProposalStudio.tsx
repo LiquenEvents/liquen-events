@@ -21,6 +21,7 @@ import {
 } from "@/lib/proposal-doc";
 import {
   IDIOMA_POR_OMISSAO,
+  camposDoEventoNaLingua,
   dataDoEventoPorExtenso,
   ehIdiomaDaProposta,
   referenciaDoDocumento,
@@ -134,9 +135,11 @@ import {
   removerLinha,
   somaDosExtrasSemIva,
   totaisDaProposta,
+  dinheiroDaProposta,
   asDuasFormas,
 } from "@/lib/proposal-budget";
-import { eur } from "@/lib/money";
+import { eur, eurDocumento, montanteNaLingua } from "@/lib/money";
+import { resumoDaPropostaParaCopiar } from "@/lib/email-proposta-textos";
 import { randomId } from "./util";
 import type { ActivityEntry, Quote } from "@/lib/orcamento/types";
 import { prepareImageWithThumb, type ImageKind } from "./image-prep";
@@ -1205,6 +1208,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * ecrã do passo 3 seria uma perda a mais que a anulação não sabia desfazer.
    */
   const [mensagemAoCliente, setMensagemAoCliente] = useState("");
+  /**
+   * O link de aceitação da proposta MAIS RECENTE que saiu mesmo para o
+   * cliente, para o botão «Copiar resumo». `null` até se saber que existe —
+   * nunca um link a adivinhar. Vem de duas fontes: a leitura ao abrir o
+   * estúdio (`GET`, em baixo — cobre reabrir o estúdio de uma proposta já
+   * enviada numa sessão anterior) e a resposta do próprio envio (`send`, mais
+   * abaixo — actualiza-o já, sem esperar por um segundo pedido).
+   */
+  const [linkDaProposta, setLinkDaProposta] = useState<string | null>(null);
   // Depois de um envio bem-sucedido, o formulário NÃO fica pronto a re-disparar:
   // mostra um estado de confirmação e exige uma escolha consciente para reenviar.
   const [sent, setSent] = useState(false);
@@ -2286,8 +2298,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     writeTotal(base > 0 ? amountParaBase(base, mode) : undefined, mode);
   }
 
-  // Split 30/70 sobre o BRUTO — o que o estúdio vê é o que será faturado.
-  const money = resolveProposalMoney(doc);
+  /**
+   * O dinheiro EFECTIVO deste documento: já com a regra dos valores adicionais
+   * aplicada (dentro do valor escrito, ou a somar-lhe). É o que o casal vai
+   * ver e pagar, portanto é o que o estúdio mostra e o que trava o envio.
+   *
+   * O `escrito` é o outro número, e existe para uma coisa só: o campo «Valor
+   * (sem IVA)» e o que se diz ao alinhá-lo com a soma das linhas. Aí o que
+   * interessa é o que ELA escreveu, não o total com os adicionais somados.
+   */
+  const money = dinheiroDaProposta(doc);
+  const escrito = resolveProposalMoney(doc);
   // A percentagem do sinal é do DOCUMENTO, e é a mesma que as rotas de
   // facturação leem quando emitem o sinal e o saldo (ver `depositPercentOf`).
   // Sem isso, a proposta dizia 40% e a factura saía a 30% — que é pior do que
@@ -2317,6 +2338,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // `splitSinal`: eram a mesma divisão feita em dois sítios, e duas
   // implementações da mesma divisão podem arredondar para lados diferentes.
   const split = { sinal: totais.sinal, saldo: totais.saldo };
+  /**
+   * O resumo para o botão «Copiar resumo» — três ou quatro linhas prontas a
+   * colar no WhatsApp. Os números são os de `totais` (`totaisDaProposta`),
+   * que é o MESMO bloco que a barra do fundo e o passo «Enviar» já mostram;
+   * não há aqui uma segunda conta.
+   *
+   * `eurDocumento` + `montanteNaLingua`: o mesmo par que o gerador do PDF usa
+   * para escrever o dinheiro na língua do documento (ver `money.ts`) — para o
+   * valor aqui não discordar do valor que o documento em anexo mostra.
+   */
+  const resumoParaCopiar = resumoDaPropostaParaCopiar(
+    {
+      clientNames: doc.clientNames ?? "",
+      eventDate: camposDoEventoNaLingua(doc, idiomaDoPdf).eventDate ?? "",
+      aPagar: montanteNaLingua(eurDocumento(totais.aPagar), idiomaDoPdf),
+      link: linkDaProposta ?? undefined,
+    },
+    idiomaDoPdf,
+  );
   // O desvio do total escrito à mão. Vive aqui em cima porque é lido em dois
   // sítios: na dica do campo e no aviso com o botão que o arruma.
   const desvio = desalinhamento(doc, money.base);
@@ -2887,6 +2927,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       );
     }
     toast("Versão reposta. Podes anular durante 10 segundos.", "info");
+  }
+
+  /**
+   * Insere o parágrafo do que mudou (painel Versões) na caixa "Mensagem para
+   * o cliente" — NUNCA directamente no email. É a mesma caixa que já viaja
+   * com o envio (ver `send`, mais abaixo), por isso não é preciso mais nada
+   * para ela poder acompanhar a proposta.
+   *
+   * Uma caixa vazia recebe o parágrafo tal como está. Uma caixa que já tem
+   * algo escrito por ela (uma nota pessoal, por exemplo) NÃO é substituída —
+   * o parágrafo entra a seguir, com uma linha em branco pelo meio, para não
+   * apagar trabalho.
+   */
+  function inserirParagrafoDoQueMudou(texto: string) {
+    setMensagemAoCliente((actual) => {
+      const escrita = actual.trim();
+      return escrita ? `${escrita}\n\n${texto}` : texto;
+    });
+    toast("Parágrafo inserido na mensagem para o cliente. Revê antes de enviar.", "info");
   }
 
   function clearDraft() {
@@ -4055,6 +4114,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           100,
       ) / 100;
     setDoc((d) => ({ ...d, budgetExtras: novos }));
+    /**
+     * Quando os adicionais SOMAM ao valor escrito, o campo do total é só dos
+     * serviços e não se mexe: acrescentar uma deslocação de 140 deixa os 3.000
+     * onde estão e faz o total subir para 3.140. Enquanto isto não existia, o
+     * campo era empurrado para cima e os serviços encolhiam por baixo — que é
+     * exactamente o quadro que ela viu e que não queria.
+     */
+    if (doc.budgetExtrasSomam) return;
     if (delta === 0) return;
     // Um total não pode ficar negativo por causa de um extra apagado.
     const base = Math.max(0, Math.round((parseMoneyText(totalInput) + delta) * 100) / 100);
@@ -4284,6 +4351,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       if (typeof data?.pdfBytes === "number") {
         apontarGeracao(totalDeFotos, Date.now() - comecou, data.pdfBytes);
       }
+      // O link desta proposta, já pronto para o botão «Copiar resumo» — sem
+      // esperar pela leitura de abertura (`GET`, aqui em cima) que já correu
+      // há minutos, antes de haver o que enviar.
+      if (typeof data?.acceptUrl === "string") setLinkDaProposta(data.acceptUrl);
       // A proposta ficou guardada em qualquer caso; a mensagem distingue enviada
       // por email vs guardada-mas-sem-email, para a equipa saber o que fazer.
       // O DOCUMENTO INCOMPLETO É O AVISO MAIS IMPORTANTE DOS TRÊS, por isso é o
@@ -4382,6 +4453,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       vivo = false;
     };
   }, []);
+
+  /**
+   * O link da proposta já enviada, lido UMA vez ao abrir o estúdio — para o
+   * botão «Copiar resumo» funcionar mesmo sem passar pelo «Enviar» nesta
+   * sessão (reabrir o estúdio de uma proposta enviada ontem, por exemplo).
+   * Se falhar, o botão simplesmente sai sem o link — o resumo continua a
+   * servir sem ele, que é o comportamento normal de uma proposta por enviar.
+   */
+  useEffect(() => {
+    let vivo = true;
+    fetch(`/api/orcamento/${quote.id}/proposta-doc`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { acceptUrl?: string | null } | null) => {
+        if (vivo && data?.acceptUrl) setLinkDaProposta(data.acceptUrl);
+      })
+      .catch(() => {
+        /* sem link, o resumo sai sem ele */
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [quote.id]);
 
   /** O documento copiado passa a ser este, com os campos a confirmar marcados. */
   /**
@@ -6160,11 +6253,71 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   <span className="bo-eyebrow">Valores adicionais</span>
                   <p className="mt-1.5 mb-3 text-xs leading-relaxed text-foreground/45">
                     Linhas mostradas na proposta antes do total (ex.: deslocação, coordenação,
-                    tecidos). <strong className="font-semibold">Somam ao total</strong> — e portanto
-                    ao sinal e à fatura.
+                    tecidos). Entram no sinal e no que o casal paga.
                   </p>
+                  {/**
+                   * A ESCOLHA QUE VALE DINHEIRO, FEITA À VISTA.
+                   *
+                   * Palavras dela, sobre uma proposta já enviada: «aparece
+                   * "Subtotal dos serviços 2.860" e depois "+140 de
+                   * deslocação". Está mal, porque nós tínhamos dito três mil
+                   * MAIS cento e quarenta, e depois mais o IVA.»
+                   *
+                   * As duas leituras são legítimas e a diferença é o que o
+                   * casal paga, por isso escolhe-se aqui, por proposta, e a
+                   * frase por baixo diz o que cada uma faz aos números que
+                   * estão neste ecrã. Uma proposta antiga não muda: nasceu
+                   * sem este campo e continua a ler-se como foi enviada.
+                   */}
+                  <div className="mb-3 flex flex-col gap-1.5">
+                    {/* Texto visível num `span` e nome acessível no próprio
+                        `select`, em vez de um `label` com as palavras «Valor
+                        (sem IVA)» lá dentro: essas são as palavras do CAMPO do
+                        total, e um segundo elemento a dizê-las tornava a
+                        procura por etiqueta ambígua. Dezanove testes do
+                        estúdio deixaram de encontrar o campo do preço por
+                        causa disso. */}
+                    <span
+                      aria-hidden="true"
+                      className="text-[9px] tracking-[0.2em] uppercase text-foreground/25"
+                    >
+                      O valor que escreveste em «Valor (sem IVA)»
+                    </span>
+                    <select
+                      id="adicionais-modo"
+                      aria-label="Como contam os valores adicionais no preço final"
+                      className="bo-input alvo-toque px-2.5 py-2 text-xs"
+                      value={doc.budgetExtrasSomam ? "somam" : "dentro"}
+                      onChange={(e) =>
+                        setDoc((d) => ({ ...d, budgetExtrasSomam: e.target.value === "somam" }))
+                      }
+                    >
+                      <option value="dentro">já inclui estas linhas</option>
+                      <option value="somam">é só dos serviços, estas linhas somam-se</option>
+                    </select>
+                    <p className="text-xs leading-relaxed text-foreground/45">
+                      {doc.budgetExtrasSomam ? (
+                        <>
+                          Subtotal dos serviços{" "}
+                          <strong className="font-semibold">{eur(totais.servicos)}</strong>, mais{" "}
+                          {eur(totais.adicionais)} destas linhas, dá {eur(totais.total)} sem IVA e{" "}
+                          {eur(totais.aPagar)} a pagar.
+                        </>
+                      ) : (
+                        <>
+                          Estas linhas saem de dentro do valor: o subtotal dos serviços fica{" "}
+                          <strong className="font-semibold">{eur(totais.servicos)}</strong> e o
+                          total sem IVA continua {eur(totais.total)}.
+                        </>
+                      )}
+                    </p>
+                  </div>
                   <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                    {/* Os rótulos das colunas escondem-se onde as colunas não
+                        existem: abaixo de 640 px a linha passa a ser duas
+                        filas, e um cabeçalho de quatro colunas por cima disso
+                        seria uma legenda para uma grelha que não está lá. */}
+                    <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
                       <span>Descrição</span>
                       <span className="text-right">Valor (€)</span>
                       <span>IVA da linha</span>
@@ -6179,13 +6332,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       return (
                         <div
                           key={i}
-                          className="grid grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
+                          /**
+                           * ── A CAIXA DA DESCRIÇÃO COM 22 px ────────────────
+                           *
+                           * Medido a 375 px: as duas colunas fixas (7rem do
+                           * valor + 9rem do IVA) mais a coluna do botão comem
+                           * a largura toda, e ao `minmax(0,1fr)` da descrição
+                           * sobravam 22 px, uma caixa onde não cabe uma
+                           * palavra, no campo que dá nome à linha que o casal
+                           * vai ler.
+                           *
+                           * Abaixo de 640 px a linha passa a duas filas: a
+                           * descrição sozinha em cima, e o valor, o IVA e o
+                           * botão de apagar por baixo. Acima disso fica
+                           * exactamente como estava.
+                           */
+                          className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_7rem_9rem_auto] items-center gap-2"
                         >
                           {/* Um invólucro só para as duas caixas ficarem uma por
                               cima da outra DENTRO da primeira coluna — a linha é
                               uma grelha, e um filho solto abriria uma coluna
                               nova em vez de descer. */}
-                          <div className="min-w-0">
+                          <div className="col-span-2 min-w-0 sm:col-span-1">
                             <input
                               className="bo-input px-2.5 py-2 text-xs text-foreground/75"
                               value={ex.label}
@@ -6486,9 +6654,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     onClick={() =>
                       pedirConfirmacaoDeDinheiro({
                         oQue: "o total",
-                        de: money.base,
+                        de: escrito.base,
                         para: desvio.sugerido,
-                        registo: `Total alinhado com a soma das linhas no estúdio: preço final de ${eur(money.base)} para ${eur(desvio.sugerido)}.`,
+                        registo: `Total alinhado com a soma das linhas no estúdio: preço final de ${eur(escrito.base)} para ${eur(desvio.sugerido)}.`,
                         motivo: "Total alinhado com a soma das linhas.",
                         aplicar: () => {
                           confirmado("totalAmount");
@@ -6725,6 +6893,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 A proposta foi gerada e enviada para {quote.email || "o cliente"}. Não precisas de
                 fazer mais nada.
               </p>
+              {/* ── QUANDO O CASAL PREFERE WHATSAPP ─────────────────────────
+                  A comunicação sai toda por email, e em Portugal é normal o
+                  casal preferir WhatsApp. É aqui, mesmo depois de enviar, que
+                  o link fica mais fresco — sem esperar por um segundo pedido. */}
+              <CopiarResumo texto={resumoParaCopiar} />
               <Button
                 variant="secondary"
                 size="sm"
@@ -6772,6 +6945,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   value={money.gross > 0 ? eur(split.sinal) : "—"}
                 />
               </dl>
+              {/* ── QUANDO O CASAL PREFERE WHATSAPP ───────────────────────
+                  Antes ainda de enviar: serve para uma revisão de uma
+                  proposta que já tinha ido antes (`linkDaProposta` de uma
+                  sessão anterior) — o resumo sai com esse link até haver um
+                  mais novo. */}
+              <div className="mt-3">
+                <CopiarResumo texto={resumoParaCopiar} />
+              </div>
               {/* ══════════════════════════════════════════════════════════
                   A LÍNGUA TAMBÉM SE ESCOLHE AQUI, ONDE SE ENVIA
                   ══════════════════════════════════════════════════════════
@@ -6951,6 +7132,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 quoteId={quote.id}
                 doc={doc as ProposalDoc}
                 onRestaurar={restaurarVersao}
+                // A língua escolhida ao lado (ver a Conferência, aqui em cima):
+                // o parágrafo do que mudou nasce na língua em que a proposta
+                // vai mesmo sair.
+                idioma={idiomaDoPdf}
+                onInserirNaMensagem={inserirParagrafoDoQueMudou}
               />
               {!canSend && fotosPorConfirmar === 0 && (
                 <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
@@ -6987,7 +7173,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
            no token `--bo-barra-inferior`. Era a quarta cópia do «56px», e com a
            barra a crescer para 72 px ficava a tapá-la. `lg:bottom-0` porque
            acima de 1024 não há barra nenhuma por baixo. */
-        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:flex-wrap sm:py-3 lg:bottom-0"
+        className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 -mx-1 mt-2 flex flex-wrap items-center gap-2 border-t border-foreground/10 bg-[var(--bo-surface,#ffffff)] px-1 py-2.5 shadow-[0_-8px_16px_-12px_rgba(42,38,32,0.25)] sm:py-3 lg:bottom-0"
       >
         {step === "conteudo" && (
           <>
@@ -7302,6 +7488,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Button>
         )}
       </div>
+
+      {/* NOTA SOBRE A BARRA ACIMA, medida a 375 px num iPhone SE:
+          o `flex-wrap` estava a partir de 640 px (`sm:flex-wrap`), e abaixo
+          disso a barra era uma fila rígida. No último passo ela leva o
+          «← Pré-visualizar» e o «Gerar e enviar ao cliente» lado a lado: 222 px
+          de botão numa barra de 351 px, com o botão a acabar em 390 px de um
+          ecrã de 375. O último toque de toda a jornada de escrever uma proposta
+          ficava cortado, e a 320 px faltavam 70 px.
+
+          O `flex-wrap` passa a valer em todas as larguras: quando não cabem
+          lado a lado, o botão principal desce para a linha de baixo, inteiro.
+          Acima de 640 px nada muda, porque aí já cabiam. */}
 
       {/* A fotografia em grande, com as setas a percorrer as deste board. */}
       {lupa && (
@@ -7840,6 +8038,71 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-baseline justify-between gap-3 border-b border-foreground/[0.06] pb-1.5">
       <dt className="text-foreground/45">{label}</dt>
       <dd className="text-right text-foreground/85">{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O BOTÃO «COPIAR RESUMO»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Três ou quatro linhas prontas a colar no WhatsApp (o texto já vem pronto de
+ * fora — `resumoDaPropostaParaCopiar` — este componente só sabe COPIAR, e o
+ * que fazer quando copiar falha).
+ *
+ * ── QUANDO A ÁREA DE TRANSFERÊNCIA FALHA ───────────────────────────────────
+ * O Safari recusa `navigator.clipboard.writeText` fora de um gesto directo do
+ * utilizador (um `await` a mais pelo meio já chega para deixar de contar como
+ * um), e há quem tenha as permissões desligadas. Nenhum dos dois pode virar um
+ * erro seco: o texto fica visível E SELECCIONADO, pronto a copiar à mão com
+ * Cmd/Ctrl+C — nunca uma mensagem a mandá-la "tentar outra vez" sem dar outra
+ * saída.
+ */
+function CopiarResumo({ texto }: { texto: string }) {
+  const { toast } = useToast();
+  const [falhou, setFalhou] = useState(false);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+
+  async function copiar() {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Sem área de transferência.");
+      await navigator.clipboard.writeText(texto);
+      setFalhou(false);
+      toast("Resumo copiado.", "success");
+    } catch {
+      setFalhou(true);
+    }
+  }
+
+  // A caixa só aparece quando falhou, e é aí que o texto se selecciona
+  // sozinho — é o gesto que substitui o botão que não funcionou.
+  useEffect(() => {
+    if (falhou) areaRef.current?.select();
+  }, [falhou]);
+
+  return (
+    <div>
+      <Button variant="ghost" size="sm" onClick={() => void copiar()}>
+        Copiar resumo
+      </Button>
+      {falhou && (
+        <div className="mt-2 max-w-md rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] p-3">
+          <p className="text-xs leading-relaxed text-foreground/70">
+            Não foi possível copiar automaticamente. O texto está seleccionado: copia com
+            Cmd/Ctrl+C.
+          </p>
+          <textarea
+            ref={areaRef}
+            aria-label="Resumo da proposta, para copiar à mão"
+            readOnly
+            value={texto}
+            onFocus={(e) => e.currentTarget.select()}
+            rows={4}
+            className="bo-input mt-2 w-full px-3 py-2 text-xs text-foreground/85"
+          />
+        </div>
+      )}
     </div>
   );
 }

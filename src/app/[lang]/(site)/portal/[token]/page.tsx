@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import Image from "next/image";
 import { readPortalToken } from "@/lib/portal-token";
 import { getQuote } from "@/lib/quotes-store";
 import { getProposal, getProposalByQuote } from "@/lib/proposals-store";
@@ -10,6 +10,7 @@ import { getDictionary, htmlLang, normalizeLocale } from "@/lib/i18n";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import type { Quote } from "@/lib/orcamento/types";
 import { eventTypeName, isQuoteOptionLabel } from "@/lib/orcamento/data";
+import { SITE } from "@/lib/site";
 import PortalView from "./PortalView";
 
 /**
@@ -130,6 +131,66 @@ function fmtDate(value: string | undefined | null, locale: string): string | nul
   return dt.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM LINK QUE JÁ NÃO ABRE NÃO É UMA PÁGINA QUE NUNCA EXISTIU
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto era `notFound()` — o 404 de marketing do site, com «esta página não
+ * existe… o seu próximo evento ainda está à espera de ser criado» e um botão
+ * para pedir orçamento (ver `NotFoundView.tsx`). Um casal que já reservou e
+ * ABRE O PRÓPRIO PORTAL um ano depois, ou cujo elo caiu porque o pedido foi
+ * arquivado, é tratado como um visitante perdido — a mesma casa que lhes tem o
+ * contrato assinado finge não os conhecer.
+ *
+ * A página da proposta (`proposta/[token]/page.tsx`) já resolve o mesmo caso
+ * com cortesia, e é esse o padrão que se reaproveita aqui: uma folha calma,
+ * com o logótipo, uma frase curta e o contacto directo por email — nada de
+ * botão «Pedir orçamento» a um cliente que já é cliente.
+ *
+ * ── A MESMA FRASE PARA OS DOIS CASOS ──────────────────────────────────────
+ *
+ * Ao contrário da página da proposta (que distingue «link inválido» de
+ * «proposta não encontrada» com frases diferentes), aqui as DUAS chamadas —
+ * token forjado/expirado e pedido apagado — usam o MESMO par de frases. É a
+ * propriedade que o `notFound()` original protegia («a private link must
+ * never reveal whether an id exists») e que se mantém: se a resposta a um
+ * token dissesse "expirado" e a outra "não encontrado", dava para distinguir,
+ * por tentativa, um identificador que existe (mas foi apagado) de um que nunca
+ * existiu. Uma frase só, para os dois.
+ */
+function Message({ title, body, lang }: { title: string; body: string; lang: string }) {
+  return (
+    <section
+      lang={lang}
+      className="min-h-[80vh] bg-surface flex flex-col items-center px-5 py-16 sm:py-24"
+    >
+      <Image
+        src="/logo-liquen.png"
+        alt="Líquen Events"
+        width={150}
+        height={90}
+        className="object-contain h-16 w-auto mb-10 opacity-90"
+      />
+      <div className="max-w-md text-center">
+        <h1
+          className="text-foreground/85 font-bold mb-4"
+          style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(26px, 4vw, 40px)" }}
+        >
+          {title}
+        </h1>
+        <p className="text-foreground/72 text-sm leading-relaxed">{body}</p>
+        <a
+          href={`mailto:${SITE.email}`}
+          className="alvo-toque inline-flex items-center mt-8 text-moss text-xs tracking-[0.2em] uppercase hover:underline"
+        >
+          {SITE.email}
+        </a>
+      </div>
+    </section>
+  );
+}
+
 export default async function PortalPage({
   params,
 }: {
@@ -139,13 +200,24 @@ export default async function PortalPage({
   /** A língua de quem visita: só vale enquanto não houver proposta. */
   const doVisitante = normalizeLocale(lang);
 
-  // Invalid/expired token → 404. A private link must never reveal whether an id
-  // exists, so a bad token is indistinguishable from a missing quote.
+  // Invalid/expired token, or the quote it points to gone → a courteous
+  // message, not the marketing 404 (ver o comentário junto ao `Message`, em
+  // cima). A private link must never reveal whether an id exists, so a bad
+  // token is indistinguishable from a missing quote: as DUAS chamadas usam o
+  // MESMO par de frases, na língua de quem visita (não há proposta ainda de
+  // onde tirar outra).
+  const semLink = () => {
+    const t = getDictionary(doVisitante).portal;
+    return (
+      <Message title={t.linkInvalidTitle} body={t.linkInvalidBody} lang={htmlLang(doVisitante)} />
+    );
+  };
+
   const claim = readPortalToken(token);
-  if (!claim) notFound();
+  if (!claim) return semLink();
 
   const quote = await getQuote(claim.quoteId);
-  if (!quote) notFound();
+  if (!quote) return semLink();
 
   // A fonte de verdade do portal é a proposta ACEITE, não a mais RECENTE: depois
   // do aceite a equipa pode rascunhar uma revisão da proposta, e o portal tem de

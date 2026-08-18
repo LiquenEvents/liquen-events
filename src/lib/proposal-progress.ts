@@ -1,5 +1,5 @@
-import { resolveProposalMoney, type ProposalDoc } from "./proposal-doc";
-import { desalinhamento } from "./proposal-budget";
+import { type ProposalDoc } from "./proposal-doc";
+import { desalinhamento, dinheiroDaProposta } from "./proposal-budget";
 
 /**
  * ONDE ESTOU, O QUE JÁ ESTÁ FEITO, E O QUE FALTA PARA PODER ENVIAR.
@@ -170,7 +170,7 @@ export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Imped
   //
   // Agora é a mesma função, com a mesma base, nos dois sítios — que é a razão
   // pela qual este módulo existe.
-  if (desalinhamento(doc, resolveProposalMoney(doc).base) !== null) {
+  if (desalinhamento(doc, dinheiroDaProposta(doc).base) !== null) {
     faltas.push({ seccao: "total", texto: "O total não bate com a soma das linhas", trava: false });
   }
 

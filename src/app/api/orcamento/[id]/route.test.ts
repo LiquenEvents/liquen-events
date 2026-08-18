@@ -2,53 +2,62 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 
 const authed = vi.hoisted(() => ({ ok: false }));
-const store = vi.hoisted(() => ({
-  get: vi.fn(async (id: string) =>
-    id === "LIQ-1"
-      ? {
-          id: "LIQ-1",
-          submittedAt: "2026-06-01T10:00:00.000Z",
-          name: "Ana Silva",
-          email: "ana@example.com",
-          phone: "910000000",
-          company: "ACME",
-          nif: "500000000",
-          notes: "segredo",
-          status: "pendente",
-          guests: 50,
-          date: "2026-09-01",
-          addons: [
-            {
-              id: "dj",
-              name: "DJ",
-              tier: "completo",
-              price: 900,
-              quantity: 1,
-              pricingType: "fixed",
-            },
-          ],
-          // Internal CRM data — must never appear in the public response.
-          adminNotes: "nota interna",
-          quotedPrice: 12500,
-          activityLog: [{ id: "a1", at: "2026-06-02", kind: "manual_note", summary: "interno" }],
-          messages: [{ at: "2026-06-02", body: "privado" }],
-          payments: [{ id: "p1", kind: "sinal", amount: 3000, date: "2026-06-05", paid: true }],
-          guestList: [{ id: "g1", name: "Convidado Secreto", party: 2, rsvp: "confirmado" }],
-          lostReason: "—",
-          assignedTo: "Catarina",
-          contractRef: "2026-042",
-          tags: ["VIP"],
-          // O que cada teste quiser que esteja GRAVADO. A transição automática
-          // de estado decide comparando o que vem no corpo com isto, por isso
-          // os testes dela precisam de mexer no pedido guardado.
-          ...store.override,
-        }
-      : null,
-  ),
-  override: {} as Record<string, unknown>,
-  update: vi.fn(async (id: string, patch: Record<string, unknown>) => ({ id, ...patch })),
-  remove: vi.fn(async (_id: string) => {}),
-}));
+const store = vi.hoisted(() => {
+  /**
+   * O registo GRAVADO — usado por `get` e, agora, por `update`, para que a
+   * loja falsa se comporte como a verdadeira: um PATCH que só muda um campo
+   * (o motivo, por exemplo) devolve o pedido inteiro com esse campo mudado, e
+   * não um objecto amputado a `{id, ...patch}`. Sem isto, ler `updated.status`
+   * depois de uma gravação que não mexe no estado dava sempre `undefined`.
+   */
+  const registo = () => ({
+    id: "LIQ-1",
+    submittedAt: "2026-06-01T10:00:00.000Z",
+    name: "Ana Silva",
+    email: "ana@example.com",
+    phone: "910000000",
+    company: "ACME",
+    nif: "500000000",
+    notes: "segredo",
+    status: "pendente",
+    guests: 50,
+    date: "2026-09-01",
+    addons: [
+      {
+        id: "dj",
+        name: "DJ",
+        tier: "completo",
+        price: 900,
+        quantity: 1,
+        pricingType: "fixed",
+      },
+    ],
+    // Internal CRM data — must never appear in the public response.
+    adminNotes: "nota interna",
+    quotedPrice: 12500,
+    activityLog: [{ id: "a1", at: "2026-06-02", kind: "manual_note", summary: "interno" }],
+    messages: [{ at: "2026-06-02", body: "privado" }],
+    payments: [{ id: "p1", kind: "sinal", amount: 3000, date: "2026-06-05", paid: true }],
+    guestList: [{ id: "g1", name: "Convidado Secreto", party: 2, rsvp: "confirmado" }],
+    lostReason: "—",
+    assignedTo: "Catarina",
+    contractRef: "2026-042",
+    tags: ["VIP"],
+    // O que cada teste quiser que esteja GRAVADO. A transição automática de
+    // estado decide comparando o que vem no corpo com isto, por isso os
+    // testes dela precisam de mexer no pedido guardado.
+    ...store.override,
+  });
+  return {
+    get: vi.fn(async (id: string) => (id === "LIQ-1" ? registo() : null)),
+    override: {} as Record<string, unknown>,
+    update: vi.fn(async (id: string, patch: Record<string, unknown>) => ({
+      ...registo(),
+      ...patch,
+    })),
+    remove: vi.fn(async (_id: string) => {}),
+  };
+});
 const rl = vi.hoisted(() => ({ result: { ok: true } as { ok: boolean; retryAfter?: number } }));
 vi.mock("@/lib/quotes-store", () => ({
   getQuote: store.get,
@@ -64,8 +73,27 @@ vi.mock("@/lib/quotes-store", () => ({
  * caminho guardado — e este é o que herdou o trabalho do botão «Aceitar
  * proposta» que saiu.
  */
-const semeador = vi.hoisted(() => ({ semear: vi.fn(async () => {}) }));
-vi.mock("@/lib/semear-producao", () => ({ semearProducaoAoGanhar: semeador.semear }));
+const semeador = vi.hoisted(() => ({
+  semear: vi.fn(async () => {}),
+  prever: vi.fn(async () => ({
+    material: { linhas: 0, jaExiste: false },
+    montagem: { linhas: 0 },
+    calendario: { linhas: 0 },
+    pagamentos: { linhas: 0 },
+    haQualquerCoisaAGerar: false,
+  })),
+  gerar: vi.fn(async () => ({
+    material: { linhas: 0, preservadas: 0 },
+    montagem: { linhas: 0 },
+    calendario: { linhas: 0 },
+    pagamentos: { linhas: 0 },
+  })),
+}));
+vi.mock("@/lib/semear-producao", () => ({
+  semearProducaoAoGanhar: semeador.semear,
+  preverGeracaoDoEvento: semeador.prever,
+  gerarEventoAoGanhar: semeador.gerar,
+}));
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: vi.fn(async () => rl.result),
@@ -73,13 +101,35 @@ vi.mock("@/lib/rate-limit", () => ({
   sweep: () => {},
 }));
 
-import { GET, PATCH, DELETE } from "./route";
-import { corpoDaMarcacao } from "@/lib/orcamento/desfecho";
+/**
+ * A proposta mais recente do pedido, espiada — e as duas ligações que
+ * dependem dela: a análise de propostas (que lê `Proposal.status` e
+ * `Proposal.lostReason`) e o contrato, que passa a nascer aqui.
+ */
+const propostas = vi.hoisted(() => ({
+  daQuote: null as null | Record<string, unknown>,
+  getByQuote: vi.fn(async (_qid: string) => propostas.daQuote),
+  update: vi.fn(async (id: string, patch: Record<string, unknown>) => ({ id, ...patch })),
+}));
+vi.mock("@/lib/proposals-store", () => ({
+  getProposalByQuote: propostas.getByQuote,
+  updateProposal: propostas.update,
+}));
+const contratos = vi.hoisted(() => ({
+  criar: vi.fn(async (c: Record<string, unknown>) => ({ created: true, contract: c })),
+}));
+vi.mock("@/lib/contracts-store", () => ({
+  createContractIfAbsent: contratos.criar,
+  newContractId: () => "contrato-novo",
+}));
+
+import { GET, PATCH, DELETE, POST } from "./route";
+import { corpoDaMarcacao, corpoDoMotivo } from "@/lib/orcamento/desfecho";
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 /** O último patch que a rota mandou gravar. */
 const gravadoNaLoja = () => store.update.mock.calls.at(-1)?.[1] as Record<string, unknown>;
-function req(method: "GET" | "PATCH" | "DELETE", body?: unknown): NextRequest {
+function req(method: "GET" | "PATCH" | "DELETE" | "POST", body?: unknown): NextRequest {
   return new Request("https://liquen.test/api/orcamento/LIQ-1", {
     method,
     headers: { "Content-Type": "application/json" },
@@ -91,7 +141,18 @@ beforeEach(() => {
   authed.ok = false;
   rl.result = { ok: true };
   store.override = {};
+  propostas.daQuote = null;
   vi.clearAllMocks();
+});
+
+/** A proposta base que os testes de propagação/contrato reutilizam. */
+const proposta = (over: Record<string, unknown> = {}) => ({
+  id: "prop-1",
+  quoteId: "LIQ-1",
+  clientName: "Ana Silva",
+  clientEmail: "ana@example.com",
+  status: "enviada",
+  ...over,
 });
 
 describe("GET /api/orcamento/[id] — PII protection", () => {
@@ -513,5 +574,304 @@ describe("marcar o desfecho pela pergunta do back office", () => {
     const escrito = gravadoNaLoja();
     expect(escrito.quotedPrice).toBe(0);
     expect(Object.keys(escrito)).not.toContain("valorGanho");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A ANÁLISE DE PROPOSTAS LÊ OUTRO LIVRO — ESTE PATCH TAMBÉM ESCREVE LÁ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `analise-de-propostas.ts` lê `Proposal.status` e `Proposal.lostReason`, não
+ * `Quote`. Sem esta propagação, marcar «Ganho» aqui deixava a proposta em
+ * «enviada» para sempre e a taxa de fecho ficava nula.
+ */
+describe("PATCH /api/orcamento/[id] — propaga o desfecho para a proposta", () => {
+  const corpo = (desfecho: "ganho" | "perdido", valor?: number, motivo?: "preco" | "data") =>
+    corpoDaMarcacao({
+      desfecho,
+      valor,
+      motivo,
+      quem: "Catarina",
+      quando: "2026-08-14T09:00:00.000Z",
+      id: () => "entrada-1",
+    });
+
+  it("marcar «Ganho» escreve status e respondedAt na proposta mais recente", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    propostas.daQuote = proposta();
+    await PATCH(req("PATCH", corpo("ganho", 4600)), ctx("LIQ-1"));
+
+    expect(propostas.getByQuote).toHaveBeenCalledWith("LIQ-1");
+    expect(propostas.update).toHaveBeenCalledWith(
+      "prop-1",
+      expect.objectContaining({ status: "aceite", respondedAt: expect.any(String) }),
+    );
+  });
+
+  it("marcar «Perdido» escreve rejeitada na proposta, sem lostReason quando não veio nenhum", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    propostas.daQuote = proposta();
+    await PATCH(req("PATCH", corpo("perdido")), ctx("LIQ-1"));
+
+    const patch = propostas.update.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    expect(patch).toMatchObject({ status: "rejeitada" });
+    expect("lostReason" in patch).toBe(false);
+  });
+
+  it("um motivo da lista fechada, mandado no próprio PATCH que perde, propaga", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    propostas.daQuote = proposta();
+    await PATCH(req("PATCH", corpo("perdido", undefined, "preco")), ctx("LIQ-1"));
+
+    expect(propostas.update).toHaveBeenCalledWith(
+      "prop-1",
+      expect.objectContaining({ status: "rejeitada", lostReason: "preco" }),
+    );
+  });
+
+  /**
+   * O segundo passo de `PerguntaDeDesfecho`: o pedido já ficou «rejeitado»
+   * num PATCH anterior, e chega só o motivo — sem `status` nenhum no corpo.
+   */
+  it("o motivo acrescentado DEPOIS (sem status no corpo) também propaga", async () => {
+    authed.ok = true;
+    store.override = { status: "rejeitado" };
+    propostas.daQuote = proposta({ status: "rejeitada" });
+    await PATCH(req("PATCH", corpoDoMotivo("data", "só tinham essa data livre")), ctx("LIQ-1"));
+
+    expect(propostas.update).toHaveBeenCalledWith("prop-1", {
+      lostReason: "data",
+      lostNote: "só tinham essa data livre",
+    });
+  });
+
+  /**
+   * `lostReason` também é editável em texto livre noutro sítio (o editor do
+   * pedido). Um texto fora da lista fechada não é uma das cinco palavras que
+   * a contagem sabe ler — propagá-lo por cima do que a proposta já tinha era
+   * estragar uma resposta com uma nota que não é dela.
+   */
+  it("um motivo em texto livre, fora da lista fechada, NÃO propaga para a proposta", async () => {
+    authed.ok = true;
+    store.override = { status: "rejeitado" };
+    propostas.daQuote = proposta({ status: "rejeitada" });
+    await PATCH(req("PATCH", { lostReason: "cancelaram tudo por causa da avó" }), ctx("LIQ-1"));
+
+    expect(propostas.update).not.toHaveBeenCalled();
+  });
+
+  it("sem proposta nenhuma para o pedido, não rebenta — só não há nada a propagar", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    propostas.daQuote = null;
+    const res = await PATCH(req("PATCH", corpo("ganho", 4600)), ctx("LIQ-1"));
+
+    expect(res.status).toBe(200);
+    expect(propostas.update).not.toHaveBeenCalled();
+  });
+
+  it("uma mudança de estado que NÃO é ganho nem perdido não mexe na proposta", async () => {
+    authed.ok = true;
+    store.override = { status: "pendente" };
+    propostas.daQuote = proposta();
+    await PATCH(req("PATCH", { status: "em_revisao" }), ctx("LIQ-1"));
+
+    expect(propostas.getByQuote).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O CONTRATO NASCE QUANDO A EQUIPA MARCA «GANHO» — POR ASSINAR
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `createContractIfAbsent` não tinha um único chamador de produção: nascia do
+ * botão de aceitar que saiu. Sem isto o PDF do contrato, os termos com versão
+ * e o botão do portal do casal ficavam órfãos para sempre.
+ */
+describe("PATCH /api/orcamento/[id] — o contrato nasce ao Ganho", () => {
+  const corpoGanho = (valor = 4600) =>
+    corpoDaMarcacao({
+      desfecho: "ganho",
+      valor,
+      quem: "Catarina",
+      quando: "2026-08-14T09:00:00.000Z",
+      id: () => "entrada-1",
+    });
+
+  it("marcar «Ganho» faz nascer o contrato — por assinar, sem fingir um aceite", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    propostas.daQuote = proposta();
+    await PATCH(req("PATCH", corpoGanho(4600)), ctx("LIQ-1"));
+
+    expect(contratos.criar).toHaveBeenCalledTimes(1);
+    const contrato = contratos.criar.mock.calls[0][0] as Record<string, unknown>;
+    expect(contrato).toMatchObject({
+      quoteId: "LIQ-1",
+      proposalId: "prop-1",
+      clientName: "Ana Silva",
+      clientEmail: "ana@example.com",
+      status: "pendente",
+    });
+    expect(typeof contrato.termsVersion).toBe("string");
+    expect(typeof contrato.termsSnapshot).toBe("string");
+    expect((contrato.termsSnapshot as string).length).toBeGreaterThan(0);
+    // Ninguém do lado do cliente assinou nada aqui — não se finge o aceite.
+    expect(contrato).not.toHaveProperty("acceptedAt");
+    expect(contrato).not.toHaveProperty("acceptedName");
+    expect(contrato).not.toHaveProperty("acceptedIp");
+  });
+
+  it("marcar «Perdido» não faz nascer contrato nenhum", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    propostas.daQuote = proposta();
+    await PATCH(
+      req(
+        "PATCH",
+        corpoDaMarcacao({
+          desfecho: "perdido",
+          quem: "Catarina",
+          quando: "2026-08-14T09:00:00.000Z",
+          id: () => "entrada-1",
+        }),
+      ),
+      ctx("LIQ-1"),
+    );
+
+    expect(contratos.criar).not.toHaveBeenCalled();
+  });
+
+  it("o selo do PDF viaja para o contrato quando a proposta o tem", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    propostas.daQuote = proposta({ pdfSha256: "abc123", pdfBytes: 45678 });
+    await PATCH(req("PATCH", corpoGanho()), ctx("LIQ-1"));
+
+    const contrato = contratos.criar.mock.calls[0][0] as Record<string, unknown>;
+    expect(contrato.propostaPdfSha256).toBe("abc123");
+    expect(contrato.propostaPdfBytes).toBe(45678);
+  });
+
+  it("sem selo na proposta, o contrato nasce sem selo — não se inventa um a posteriori", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    propostas.daQuote = proposta();
+    await PATCH(req("PATCH", corpoGanho()), ctx("LIQ-1"));
+
+    const contrato = contratos.criar.mock.calls[0][0] as Record<string, unknown>;
+    expect(contrato).not.toHaveProperty("propostaPdfSha256");
+    expect(contrato).not.toHaveProperty("propostaPdfBytes");
+  });
+
+  it("corrigir um pedido perdido para ganho também faz nascer o contrato", async () => {
+    authed.ok = true;
+    store.override = { status: "rejeitado" };
+    propostas.daQuote = proposta();
+    await PATCH(req("PATCH", corpoGanho(5000)), ctx("LIQ-1"));
+
+    expect(contratos.criar).toHaveBeenCalledTimes(1);
+  });
+
+  it("sem proposta para o pedido, não há contrato — mas o Ganho grava-se à mesma", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    propostas.daQuote = null;
+    const res = await PATCH(req("PATCH", corpoGanho()), ctx("LIQ-1"));
+
+    expect(res.status).toBe(200);
+    expect(contratos.criar).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O PAINEL DE «GANHO»: PRÉVIA E GERAÇÃO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `POST /api/orcamento/[id]` é a porta nova: `{ acao: "prever" }` devolve as
+ * contagens sem escrever nada, `{ acao: "gerar" }` chama a geração a sério.
+ * A matemática de cada peça (material, montagem, calendário, pagamentos) tem
+ * os seus próprios testes em `semear-producao.test.ts`; aqui só se prende o
+ * que É desta rota: autenticação, o estado exigido, e QUAL função é chamada.
+ */
+describe("POST /api/orcamento/[id] — o painel de geração ao Ganho", () => {
+  it("requires authentication", async () => {
+    const res = await POST(req("POST", { acao: "prever" }), ctx("LIQ-1"));
+    expect(res.status).toBe(401);
+    expect(semeador.prever).not.toHaveBeenCalled();
+  });
+
+  it("recusa uma acção desconhecida", async () => {
+    authed.ok = true;
+    const res = await POST(req("POST", { acao: "apagar-tudo" }), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+  });
+
+  it("recusa um corpo mal formado em vez de rebentar", async () => {
+    authed.ok = true;
+    const bad = new Request("https://liquen.test/api/orcamento/LIQ-1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json{",
+    }) as unknown as NextRequest;
+    const res = await POST(bad, ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+  });
+
+  it("404 para um pedido que não existe", async () => {
+    authed.ok = true;
+    const res = await POST(req("POST", { acao: "prever" }), ctx("nope"));
+    expect(res.status).toBe(404);
+  });
+
+  it("recusa prever/gerar antes de o pedido estar «Ganho»", async () => {
+    authed.ok = true;
+    store.override = { status: "cotado" };
+    const res = await POST(req("POST", { acao: "prever" }), ctx("LIQ-1"));
+    expect(res.status).toBe(409);
+    expect(semeador.prever).not.toHaveBeenCalled();
+  });
+
+  it("'prever' chama preverGeracaoDoEvento e não gerarEventoAoGanhar", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    const res = await POST(req("POST", { acao: "prever" }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(semeador.prever).toHaveBeenCalledTimes(1);
+    expect(semeador.gerar).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({ haQualquerCoisaAGerar: false });
+  });
+
+  it("'gerar' chama gerarEventoAoGanhar e devolve o que nasceu", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    semeador.gerar.mockResolvedValueOnce({
+      material: { linhas: 3, preservadas: 0 },
+      montagem: { linhas: 2 },
+      calendario: { linhas: 4 },
+      pagamentos: { linhas: 2 },
+    });
+    const res = await POST(req("POST", { acao: "gerar" }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(semeador.gerar).toHaveBeenCalledTimes(1);
+    expect(semeador.prever).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({
+      calendario: { linhas: 4 },
+      pagamentos: { linhas: 2 },
+    });
+  });
+
+  it("um erro na geração devolve 500 em vez de rebentar sem resposta", async () => {
+    authed.ok = true;
+    store.override = { status: "aceite" };
+    semeador.gerar.mockRejectedValueOnce(new Error("falhou a ir buscar a proposta"));
+    const res = await POST(req("POST", { acao: "gerar" }), ctx("LIQ-1"));
+    expect(res.status).toBe(500);
   });
 });

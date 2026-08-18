@@ -41,6 +41,8 @@ import {
   createCalendarEvent,
   listCalendarEvents,
   deleteCalendarEvent,
+  notaDeDataChaveGerada,
+  chavesDeDatasJaGeradas,
 } from "./calendar-store";
 
 beforeEach(() => {
@@ -268,5 +270,42 @@ describe("calendar mapper (camelCase ↔ snake_case)", () => {
       created_at: "2026-01-01T00:00:00.000Z",
     });
     expect(back.kind).toBe("not-a-kind");
+  });
+});
+
+/**
+ * A ligação a um pedido sem coluna nova — a marca embutida na nota que
+ * permite à geração de datas-chave saber "já gerei esta?" sem tabela extra.
+ */
+describe("chavesDeDatasJaGeradas — a ligação embutida na nota", () => {
+  it("está vazio quando não há nenhum evento gerado para o pedido", async () => {
+    expect(await chavesDeDatasJaGeradas("Q1")).toEqual(new Set());
+  });
+
+  it("reconhece uma chave gerada por notaDeDataChaveGerada", async () => {
+    await createCalendarEvent(
+      base({ title: "Reunião de confirmação", note: notaDeDataChaveGerada("Q1", "reuniao") }),
+    );
+    expect(await chavesDeDatasJaGeradas("Q1")).toEqual(new Set(["reuniao"]));
+  });
+
+  it("acumula várias chaves do mesmo pedido, e ignora eventos de outros pedidos", async () => {
+    await createCalendarEvent(base({ note: notaDeDataChaveGerada("Q1", "reuniao") }));
+    await createCalendarEvent(base({ note: notaDeDataChaveGerada("Q1", "flores") }));
+    await createCalendarEvent(base({ note: notaDeDataChaveGerada("Q2", "reuniao") }));
+    expect(await chavesDeDatasJaGeradas("Q1")).toEqual(new Set(["reuniao", "flores"]));
+    expect(await chavesDeDatasJaGeradas("Q2")).toEqual(new Set(["reuniao"]));
+  });
+
+  it("ignora eventos escritos à mão, sem a marca (nota livre ou vazia)", async () => {
+    await createCalendarEvent(base({ note: "Trazer amostras" }));
+    await createCalendarEvent(base({ note: undefined }));
+    expect(await chavesDeDatasJaGeradas("Q1")).toEqual(new Set());
+  });
+
+  it("não confunde o pedido Q1 com o pedido Q10 (prefixo exacto, não startsWith solto)", async () => {
+    await createCalendarEvent(base({ note: notaDeDataChaveGerada("Q10", "reuniao") }));
+    expect(await chavesDeDatasJaGeradas("Q1")).toEqual(new Set());
+    expect(await chavesDeDatasJaGeradas("Q10")).toEqual(new Set(["reuniao"]));
   });
 });

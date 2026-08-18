@@ -265,7 +265,11 @@ export default function MaterialListas() {
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-4">
                   <button
                     type="button"
-                    className="text-left font-medium"
+                    // MEDIDO a 375px: 168×26px — é o botão que abre CADA lista,
+                    // e ficava abaixo dos 44px mínimos. `alvo-toque` (globals.css)
+                    // dá-lhe 44px de altura só no dedo; `!justify-start` porque é
+                    // texto alinhado à esquerda, não um ícone a centrar.
+                    className="alvo-toque !justify-start text-left font-medium"
                     onClick={() => setAbertaId(aberta ? null : lista.id)}
                     aria-expanded={aberta}
                   >
@@ -369,7 +373,14 @@ export default function MaterialListas() {
                                   {PAX_EXEMPLO}
                                 </span>
                               ) : null}
-                              <label className="flex items-center gap-1.5 text-xs">
+                              {/* MEDIDO a 375px: o rótulo à volta da caixa
+                                  ("crítico") tem só 53×16px — abaixo dos
+                                  44px mínimos, e é o único caminho para marcar
+                                  ou desmarcar uma linha como crítica numa
+                                  lista base. `alvo-toque` cresce o RÓTULO (não
+                                  o quadrado, que fica com o desenho de
+                                  sempre) só no dedo. */}
+                              <label className="alvo-toque !justify-start flex items-center gap-1.5 text-xs">
                                 <input
                                   type="checkbox"
                                   checked={l.critical}

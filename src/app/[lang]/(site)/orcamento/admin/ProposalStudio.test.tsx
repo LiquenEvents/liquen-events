@@ -3236,6 +3236,118 @@ describe("gerar a proposta em inglês", () => {
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
+ * «COPIAR RESUMO» — PARA QUANDO O CASAL PREFERE WHATSAPP
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Toda a comunicação sai por email; o botão dá as três ou quatro linhas
+ * prontas a colar noutro sítio, com os números que o estúdio já tem
+ * (`totaisDaProposta`) — nunca uma conta nova.
+ */
+describe("o botão «Copiar resumo»", () => {
+  afterEach(() => {
+    // O `clipboard` não existe por omissão no ambiente de testes (é assim que
+    // se prova o caminho de recurso); o que um teste lhe põe não pode
+    // sobreviver para o seguinte.
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  /**
+   * A área de transferência a funcionar: `writeText` resolve.
+   *
+   * `userEvent.setup()` instala o SEU PRÓPRIO duplo de `navigator.clipboard`
+   * por omissão (`writeToClipboard: true`, para as suas APIs `.copy()` /
+   * `.paste()`) — e o instala DEPOIS de qualquer `Object.defineProperty` feito
+   * antes, apagando-o. Por isso o `user` nasce aqui, com essa instalação
+   * desligada, e só depois é que se define o duplo que os testes leem.
+   */
+  function comClipboardAFuncionar() {
+    const user = userEvent.setup({ writeToClipboard: false });
+    const writeText = vi.fn(async (_texto: string) => {});
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    return { user, writeText };
+  }
+
+  it("copia o nome, a data e o valor a pagar, sem link (a proposta ainda não foi enviada)", async () => {
+    seedDraft(1);
+    const { user, writeText } = comClipboardAFuncionar();
+    renderStudio();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+
+    await user.click(await screen.findByRole("button", { name: "Copiar resumo" }));
+
+    // O `writeText` é assíncrono; espera-se pelo aviso de sucesso antes de
+    // ler o que lhe foi passado, senão a asserção corre antes da promessa
+    // resolver.
+    await screen.findByText(/^Resumo copiado/);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const texto = writeText.mock.calls[0][0] as string;
+    expect(texto).toContain("Maria & Zé");
+    expect(texto).toContain("12 de setembro de 2026");
+    // 3.000 € + IVA (23%) = 3.690 €, o mesmo bloco que a barra do fundo e o
+    // resumo do passo mostram (`totaisDaProposta`).
+    expect(texto).toContain("3.690,00");
+    expect(texto).not.toContain("http");
+  });
+
+  it("depois de enviar, o resumo já leva o link — sem precisar de reabrir o estúdio", async () => {
+    seedDraft(1);
+    propostaDoc = reply({
+      json: {
+        ok: true,
+        emailed: true,
+        estado: "enviada",
+        acceptUrl: "https://liquen-events.com/proposta/abc.sig",
+      },
+    });
+    const { user, writeText } = comClipboardAFuncionar();
+    renderStudio();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await screen.findByRole("button", { name: "Enviar de novo / nova revisão" });
+
+    await user.click(screen.getByRole("button", { name: "Copiar resumo" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    const texto = writeText.mock.calls.at(-1)?.[0] as string;
+    expect(texto).toContain("https://liquen-events.com/proposta/abc.sig");
+  });
+
+  it("sem área de transferência (Safari sem gesto, permissões): nunca um erro seco, o texto fica visível e seleccionado", async () => {
+    seedDraft(1);
+    // O `userEvent.setup()` instala SEMPRE um `navigator.clipboard` seu
+    // (mesmo com `writeToClipboard: false`, que só desliga a escrita real por
+    // trás dos gestos de copiar/colar) — e é um duplo A FUNCIONAR, o que
+    // impediria precisamente o caminho de recurso que este teste prende.
+    // Tira-se a seguir, para o `navigator.clipboard` ficar por definir de
+    // propósito, como aconteceria num Safari sem o gesto ou sem permissões.
+    const user = userEvent.setup({ writeToClipboard: false });
+    Reflect.deleteProperty(navigator, "clipboard");
+    renderStudio();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+
+    await user.click(await screen.findByRole("button", { name: "Copiar resumo" }));
+
+    const caixa = (await screen.findByRole("textbox", {
+      name: "Resumo da proposta, para copiar à mão",
+    })) as HTMLTextAreaElement;
+    expect(caixa.tagName).toBe("TEXTAREA");
+    expect(caixa.value).toContain("Maria & Zé");
+    // Visível E seleccionada — pronta a copiar à mão com Cmd/Ctrl+C.
+    await waitFor(() => expect(caixa.selectionStart).toBe(0));
+    expect(caixa.selectionEnd).toBe(caixa.value.length);
+    // Nenhum aviso de erro seco: a caixa É a resposta. (O contentor
+    // `role="alert"` do `ToastProvider` existe sempre, vazio; o que se prova
+    // é que não tem NENHUM aviso lá dentro.)
+    expect(screen.queryByRole("alert")?.textContent ?? "").toBe("");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
  * A MENSAGEM QUE SEGUE COM A PROPOSTA
  * ════════════════════════════════════════════════════════════════════════════
  *

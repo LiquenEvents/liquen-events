@@ -167,10 +167,21 @@ const definicaoSchema = z.looseObject({
   updatedAt: stamp,
 });
 
+/**
+ * O nome do pedido, aparado, sem poder ficar vazio — como no `quoteUpdateSchema`
+ * (`validation.ts`, `name: trimmed(120).min(1)`). Este ficheiro validava-o com
+ * o `text()` genérico, que aceita `""`: era o único caminho por onde um pedido
+ * sem nome conseguia voltar a entrar (o formulário público e o painel já
+ * exigem um nome), e um pedido sem nome cumprimenta o casal no portal com
+ * «Olá, .» — ver a guarda em `PortalView.tsx`. Continua `nullish`: uma cópia
+ * de uma versão anterior a este campo não pode deixar de se poder repor.
+ */
+const nomeDoPedido = z.string().trim().min(1).max(300).nullish();
+
 const quoteSchema = z.looseObject({
   id,
   status: z.enum(["pendente", "em_revisao", "cotado", "aceite", "rejeitado"]),
-  name: text(300),
+  name: nomeDoPedido,
   email: text(300),
   submittedAt: stamp,
 });

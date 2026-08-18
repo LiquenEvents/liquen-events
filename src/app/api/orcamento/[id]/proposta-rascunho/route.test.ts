@@ -175,6 +175,46 @@ describe("PUT /api/orcamento/[id]/proposta-rascunho", () => {
     expect(st.save).toHaveBeenCalled();
   });
 
+  it("guarda a versão sobreposta antes de escrever por cima dela", async () => {
+    /**
+     * A última escrita continua a vencer — bloquear a edição de duas pessoas
+     * numa casa de três seria pior. O que não pode é o trabalho da outra
+     * pessoa deixar de existir: fica numa chave irmã, e a resposta diz onde,
+     * para o estúdio poder oferecer o resgate a quem está a olhar.
+     */
+    st.stored = {
+      doc: { ref: "a da tarde", moodBoards: [{ titulo: "Cerimónia" }] },
+      updatedAt: "2026-07-28T22:30:00.000Z",
+      savedBy: "Catarina",
+    };
+    const res = await PUT(
+      ...req("PUT", { doc: { ref: "a da manhã" }, baseUpdatedAt: "2026-07-28T22:00:00.000Z" }),
+    );
+    const body = await res.json();
+    expect(body.overwrote).toBe(true);
+    expect(body.resgate).toBe("q-1--sobreposto");
+    expect(body.resgateEm).toBe("2026-07-28T22:30:00.000Z");
+    // O documento que ia desaparecer foi guardado tal e qual, com o nome de
+    // quem o escreveu.
+    expect(st.save).toHaveBeenCalledWith(
+      "q-1--sobreposto",
+      { ref: "a da tarde", moodBoards: [{ titulo: "Cerimónia" }] },
+      "Catarina",
+    );
+    // E a escrita nova aconteceu na mesma.
+    expect(st.save).toHaveBeenCalledWith("q-1", { ref: "a da manhã" }, undefined);
+  });
+
+  it("não guarda resgate nenhum quando ninguém foi sobreposto", async () => {
+    st.stored = { doc: { ref: "a" }, updatedAt: "2026-07-28T22:30:00.000Z" };
+    const res = await PUT(
+      ...req("PUT", { doc: { ref: "b" }, baseUpdatedAt: "2026-07-28T22:30:00.000Z" }),
+    );
+    const body = await res.json();
+    expect(body.resgate).toBeUndefined();
+    expect(st.save).toHaveBeenCalledTimes(1);
+  });
+
   it("não avisa quando ninguém mexeu no meio", async () => {
     st.stored = { doc: { ref: "a" }, updatedAt: "2026-07-28T22:30:00.000Z" };
     const res = await PUT(

@@ -5,7 +5,7 @@ import {
   resolveProposalMoney,
   type ProposalDoc,
 } from "@/lib/proposal-doc";
-import { precosDe } from "@/lib/proposal-budget";
+import { dinheiroDaProposta, precosDe } from "@/lib/proposal-budget";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -184,8 +184,12 @@ export function diferencas(antes: ProposalDoc, depois: ProposalDoc): Mudanca[] {
   // ── O total ─────────────────────────────────────────────────────────────
   // Pelo BRUTO: é o que o cliente paga, e é o único número comparável quando
   // as duas versões não estão no mesmo modo de IVA (ver o cabeçalho).
-  const dinheiroAntes = resolveProposalMoney(antes);
-  const dinheiroDepois = resolveProposalMoney(depois);
+  // `dinheiroDaProposta` e não `resolveProposalMoney`: ligar ou desligar «os
+  // adicionais somam ao valor escrito» muda o que o casal paga sem tocar no
+  // `totalAmount`. Com a leitura crua, uma revisão que subia 1.906,50 € era
+  // resumida como «nada mudou no total» a quem a estava a rever.
+  const dinheiroAntes = dinheiroDaProposta(antes);
+  const dinheiroDepois = dinheiroDaProposta(depois);
   if (Math.abs(dinheiroAntes.gross - dinheiroDepois.gross) > 0.01) {
     m.push({
       onde: "Total",

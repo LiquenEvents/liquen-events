@@ -218,23 +218,46 @@ describe("marcar perdido", () => {
     libertar!();
   });
 
-  it("o motivo aparece depois, e é opcional", async () => {
+  /**
+   * O motivo passou a ser botões de uma lista fechada (`MotivoDeRecusa`), não
+   * uma caixa de texto: é o que faz «perdi seis por preço este ano» uma
+   * frase que a contagem de `analise-de-propostas.ts` consegue responder.
+   */
+  it("o motivo aparece depois, como botões — e é opcional", async () => {
     const user = userEvent.setup();
     respostas = [
       { ok: true, corpo: pedido() },
       { ok: true, corpo: pedido({ status: "rejeitado" }) },
-      { ok: true, corpo: pedido({ status: "rejeitado", lostReason: "Preço" }) },
+      { ok: true, corpo: pedido({ status: "rejeitado", lostReason: "preco" }) },
     ];
     render(<PerguntaDeDesfecho quote={pedido()} quem="Catarina" onGravado={vi.fn()} />);
 
     await user.click(screen.getByRole("button", { name: /^perdido$/i }));
-    await waitFor(() => expect(screen.getByLabelText(/motivo/i)).toBeInTheDocument());
-    expect(screen.getByLabelText(/motivo/i).closest("label")?.textContent).toMatch(/opcional/i);
+    await waitFor(() => expect(screen.getByText(/motivo.*opcional/i)).toBeInTheDocument());
+    const botaoPreco = screen.getByRole("button", { name: /^preço$/i });
+    expect(botaoPreco).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText(/motivo/i), "Preço");
-    await user.click(screen.getByRole("button", { name: /guardar motivo/i }));
+    await user.click(botaoPreco);
     await waitFor(() => expect(chamadas).toHaveLength(3));
-    expect(corpoDa(2)).toMatchObject({ lostReason: "Preço" });
+    expect(corpoDa(2)).toEqual({ lostReason: "preco" });
+  });
+
+  it("o detalhe livre viaja junto do botão que se carrega, à parte do motivo", async () => {
+    const user = userEvent.setup();
+    respostas = [
+      { ok: true, corpo: pedido() },
+      { ok: true, corpo: pedido({ status: "rejeitado" }) },
+      { ok: true, corpo: pedido({ status: "rejeitado", lostReason: "outro" }) },
+    ];
+    render(<PerguntaDeDesfecho quote={pedido()} quem="Catarina" onGravado={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /^perdido$/i }));
+    await waitFor(() => expect(screen.getByText(/motivo.*opcional/i)).toBeInTheDocument());
+    await user.type(screen.getByPlaceholderText(/detalhe/i), "escolheram fazer em casa");
+    await user.click(screen.getByRole("button", { name: /^outro$/i }));
+
+    await waitFor(() => expect(chamadas).toHaveLength(3));
+    expect(corpoDa(2)).toEqual({ lostReason: "outro", lostNote: "escolheram fazer em casa" });
   });
 });
 

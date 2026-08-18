@@ -7,6 +7,9 @@ const store = vi.hoisted(() => ({
   /** O nome do cliente no pedido. Um pedido criado a partir de um telefonema
    *  pode não ter nenhum — e é aí que o `{nome}` fica sem por onde se resolver. */
   nome: "Ana Silva" as string,
+  /** A língua do pedido (`quote.locale`), gravada quando o formulário público
+   *  foi submetido — ausente nos pedidos anteriores a esse campo. */
+  locale: undefined as string | undefined,
   get: vi.fn(async (id: string) =>
     id === "LIQ-1"
       ? {
@@ -14,6 +17,7 @@ const store = vi.hoisted(() => ({
           name: store.nome,
           email: "ana@x.pt",
           status: store.estado,
+          locale: store.locale,
           messages: [{ at: "t0", body: "old" }],
         }
       : null,
@@ -43,6 +47,7 @@ function req(body?: unknown): NextRequest {
 beforeEach(() => {
   authed.ok = false;
   store.nome = "Ana Silva";
+  store.locale = undefined;
   vi.clearAllMocks();
 });
 
@@ -389,5 +394,40 @@ describe("POST /api/orcamento/[id]/mensagem — sem nome, sem buraco", () => {
     store.nome = "Ana Silva";
     await POST(req({ message: "Olá {nome}, obrigada!" }), ctx("LIQ-1"));
     expect(texto()).toContain("Olá Ana, obrigada!");
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * O ASSUNTO SEGUE A LÍNGUA DO PEDIDO
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * A linha de assunto era escrita à mão, sempre em português, mesmo quando o
+ * pedido é inglês (`quote.locale === "en"`). O corpo é sempre o que ela
+ * escreveu — não se traduz, é dela — mas o assunto é fixo, e passa a existir
+ * nas duas línguas.
+ */
+describe("POST /api/orcamento/[id]/mensagem — o assunto segue a língua do pedido", () => {
+  const assunto = () => (mail.send.mock.calls.at(-1)![0] as { subject: string }).subject;
+
+  it("um pedido português leva o assunto de sempre", async () => {
+    authed.ok = true;
+    store.locale = "pt";
+    await POST(req({ message: "Olá!" }), ctx("LIQ-1"));
+    expect(assunto()).toBe("Líquen Events — sobre o seu pedido (LIQ-1)");
+  });
+
+  it("um pedido inglês leva o assunto em inglês", async () => {
+    authed.ok = true;
+    store.locale = "en";
+    await POST(req({ message: "Hello!" }), ctx("LIQ-1"));
+    expect(assunto()).toBe("Líquen Events — about your enquiry (LIQ-1)");
+  });
+
+  it("sem língua gravada (pedido anterior ao campo), cai no português", async () => {
+    authed.ok = true;
+    store.locale = undefined;
+    await POST(req({ message: "Olá!" }), ctx("LIQ-1"));
+    expect(assunto()).toBe("Líquen Events — sobre o seu pedido (LIQ-1)");
   });
 });

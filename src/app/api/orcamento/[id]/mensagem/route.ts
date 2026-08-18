@@ -13,6 +13,27 @@ function authorized(request: NextRequest): boolean {
   return isAuthed(request);
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ASSUNTO SEGUE A LÍNGUA DO PEDIDO, NÃO SÓ O CORPO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O corpo desta mensagem é sempre o que ela escreveu — não se traduz, é dela.
+ * Mas a LINHA DE ASSUNTO era escrita à mão, sempre em português, mesmo quando
+ * o resto do email (e o pedido) é inglês. Era a mesma avaria dos modelos
+ * automáticos, só que aqui não há "modelo" nenhum a recusar: é uma linha fixa,
+ * e a correcção é tê-la nas duas línguas.
+ *
+ * A língua vem de `quote.locale`, gravada quando o formulário público foi
+ * submetido — ausente nos pedidos anteriores a esse campo, e por isso cai no
+ * português de sempre.
+ */
+function assuntoDaMensagem(locale: string | undefined, id: string): string {
+  return locale === "en"
+    ? `Líquen Events — about your enquiry (${id})`
+    : `Líquen Events — sobre o seu pedido (${id})`;
+}
+
 // Reply to the client by email, from within the dashboard.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!authorized(request)) {
@@ -161,7 +182,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         mail = await sendMail({
           to: quote.email,
           replyTo: MAIL_TO,
-          subject: `Líquen Events — sobre o seu pedido (${id})`,
+          subject: assuntoDaMensagem(quote.locale, id),
           ...email,
         });
         if (!mail.sent) {

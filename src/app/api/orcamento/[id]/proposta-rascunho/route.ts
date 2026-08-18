@@ -129,6 +129,53 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const base = typeof body.baseUpdatedAt === "string" ? body.baseUpdatedAt : null;
     const overwrote = Boolean(current && base && current.updatedAt !== base);
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * ANTES DE ESCREVER POR CIMA, GUARDA-SE O QUE ESTAVA LÁ
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O cenário, verificado: a Ana abre o estúdio de manhã e deixa o separador
+     * aberto. A Catarina abre a MESMA proposta à tarde noutro computador,
+     * compõe dois mood boards e escreve os textos, com gravação automática a
+     * correr. A Ana volta ao portátil e escreve um carácter. Oitocentos
+     * milissegundos depois, o documento das nove da manhã é gravado por cima
+     * do das quatro da tarde.
+     *
+     * Isto era detectado (`overwrote`) e escrito na mesma, e o aviso chegava
+     * DEPOIS, uma vez por sessão, a dizer «ficou a tua versão». As duas horas
+     * de trabalho da outra pessoa não existiam em mais lado nenhum.
+     *
+     * Continua a escrever-se — bloquear a edição de duas pessoas numa casa de
+     * três é pior do que o problema, e essa decisão está explicada acima. O
+     * que muda é haver de onde resgatar: a versão que ia desaparecer fica numa
+     * chave irmã, e a resposta di-lo para o estúdio o poder dizer a quem está
+     * a olhar.
+     *
+     * UMA SÓ ranhura de resgate por rascunho, e de propósito: guardar todas as
+     * sobreposições enchia o `app_state` de documentos com mood boards lá
+     * dentro. A que interessa é sempre a última, porque é a única que ainda
+     * não foi vista por ninguém.
+     */
+    let resgate: string | null = null;
+    if (overwrote && current?.doc != null) {
+      const chaveDeResgate = `${chave}--sobreposto`;
+      const { persistencia: guardouOResgate } = await saveProposalDraft(
+        chaveDeResgate,
+        current.doc,
+        current.savedBy,
+      );
+      if (guardouOResgate.gravado) {
+        resgate = chaveDeResgate;
+      } else {
+        // Não se trava a gravação por causa do resgate: o trabalho de quem
+        // está a escrever AGORA não pode ficar refém de uma cópia falhada.
+        log.error("proposta-rascunho: a versão sobreposta não pôde ser guardada", null, {
+          id: chave,
+          motivo: guardouOResgate.motivo,
+        });
+      }
+    }
+
     const { draft: saved, persistencia } = await saveProposalDraft(
       chave,
       body.doc,
@@ -176,6 +223,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updatedAt: saved.updatedAt,
       overwrote,
       ...(overwrote && current?.savedBy ? { previousBy: current.savedBy } : {}),
+      ...(resgate ? { resgate, resgateEm: current?.updatedAt } : {}),
     } satisfies {
       ok: true;
       guardado: true;
@@ -185,6 +233,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updatedAt: string;
       overwrote: boolean;
       previousBy?: string;
+      resgate?: string;
+      resgateEm?: string;
     });
   } catch (err) {
     log.error("proposta-rascunho PUT falhou", err, { id });

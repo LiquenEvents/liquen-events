@@ -123,7 +123,7 @@ vi.mock("@/lib/mail", () => ({
   MAIL_TO: "team@example.com",
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 import { sendMail } from "@/lib/mail";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import { createProposal } from "@/lib/proposals-store";
@@ -1339,5 +1339,95 @@ describe("POST /api/orcamento/[id]/proposta-doc — «enviada» só quando o ema
     await POST(sendReq(baseDoc({ totalAmount: 4000 })), { params });
     expect(store.linhas.size).toBe(2);
     expect([...store.linhas.values()].every((p) => p.status === "enviada")).toBe(true);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O LINK DE ACEITAÇÃO, PARA O BOTÃO «COPIAR RESUMO» DO ESTÚDIO
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — acceptUrl na resposta do envio", () => {
+  beforeEach(() => {
+    store.linhas.clear();
+    store.attempts = 0;
+    store.failFirstWith = null;
+    vi.mocked(createProposal).mockImplementation(async (p: Proposal) => {
+      created.last = p;
+      store.linhas.set(p.id, { ...p });
+    });
+    vi.mocked(sendMail).mockResolvedValue({ sent: true });
+  });
+
+  it("o email a sair: o link vai na resposta, pronto a copiar", async () => {
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const body = await res.json();
+    expect(body.emailed).toBe(true);
+    expect(body.acceptUrl).toBe("https://liquen-events.com/proposta/tok");
+  });
+
+  it("SMTP em baixo: acceptUrl não vai — o casal nunca recebeu esse link", async () => {
+    vi.mocked(sendMail).mockResolvedValue({ sent: false });
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const body = await res.json();
+    expect(body.emailed).toBe(false);
+    expect(body.acceptUrl).toBeNull();
+  });
+});
+
+describe("GET /api/orcamento/[id]/proposta-doc — o link da última proposta REALMENTE enviada", () => {
+  function getReq(): NextRequest {
+    return new Request("https://liquen.test/api/orcamento/q1/proposta-doc", {
+      method: "GET",
+    }) as unknown as NextRequest;
+  }
+
+  beforeEach(() => {
+    store.linhas.clear();
+    store.attempts = 0;
+    store.failFirstWith = null;
+    vi.mocked(createProposal).mockImplementation(async (p: Proposal) => {
+      created.last = p;
+      store.linhas.set(p.id, { ...p });
+    });
+    vi.mocked(sendMail).mockResolvedValue({ sent: true });
+  });
+
+  it("um pedido novo, sem propostas: acceptUrl é null, não um erro", async () => {
+    const res = await GET(getReq(), { params });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, acceptUrl: null });
+  });
+
+  it("depois de um envio, devolve o mesmo link que foi para o email", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const res = await GET(getReq(), { params });
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.acceptUrl).toBe("https://liquen-events.com/proposta/tok");
+  });
+
+  it("uma proposta gravada mas nunca enviada (SMTP em baixo) não conta como enviada", async () => {
+    vi.mocked(sendMail).mockResolvedValue({ sent: false });
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const res = await GET(getReq(), { params });
+    expect((await res.json()).acceptUrl).toBeNull();
+  });
+
+  it("duas propostas enviadas: dá a mais recente", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    // A segunda proposta enviada é uma revisão nova, não uma reescrita da
+    // primeira (ver "mas uma proposta já enviada nunca é reescrita" acima).
+    await POST(sendReq(baseDoc({ totalAmount: 4000 })), { params });
+    expect(store.linhas.size).toBe(2);
+
+    const res = await GET(getReq(), { params });
+    const body = await res.json();
+    // As duas resolvem para o mesmo link neste duplo (`createProposalToken`
+    // está mockado para devolver sempre "tok"), mas o que se prova aqui é que
+    // a rota não rebenta com mais do que uma proposta enviada, e responde com
+    // uma só.
+    expect(body.ok).toBe(true);
+    expect(typeof body.acceptUrl).toBe("string");
   });
 });

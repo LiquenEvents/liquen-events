@@ -338,11 +338,20 @@ export default async function ProposalPage({
             têm nenhum e a página fica exatamente como estava. */}
         {proposal.doc && (
           <p className="mt-6 text-center">
+            {/* O ÚNICO botão da proposta em si — «decidir milhares de euros» e
+                depois não conseguir acertar no link do PDF no telemóvel. Media
+                num iPhone SE: 326×42 px, 2 px abaixo do mínimo de toque por
+                causa do `inline-block` (que nem sequer deixa o `min-height`
+                do `.alvo-toque` ter efeito — um alvo inline não tem caixa
+                para crescer). `alvo-toque` + `inline-flex items-center
+                justify-center` é o mesmo par que já funciona no CTA de email
+                da página de erro (`Message`, aqui em cima) — só cresce em
+                ecrãs de toque, o portátil fica exactamente como estava. */}
             <a
               href={`/api/proposta/${encodeURIComponent(token)}/pdf`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block rounded-md border border-moss/40 px-6 py-3 text-moss text-xs tracking-[0.2em] uppercase hover:bg-moss/8 transition-colors"
+              className="alvo-toque inline-flex items-center justify-center rounded-md border border-moss/40 px-6 py-3 text-moss text-xs tracking-[0.2em] uppercase hover:bg-moss/8 transition-colors"
             >
               {t.verPdf}
             </a>
@@ -400,7 +409,13 @@ export default async function ProposalPage({
 
         <p className="text-foreground/68 text-[11px] text-center mt-10 leading-relaxed">
           {t.footerNote}{" "}
-          <a href={`mailto:${SITE.email}`} className="text-moss hover:underline">
+          {/* Medido a 375 px: 140×14 px — um alvo de e-mail com 14 px de
+              altura, mais pequeno do que a polpa de um dedo consegue acertar
+              de propósito. `alvo-toque` só cresce em ecrãs de toque. */}
+          <a
+            href={`mailto:${SITE.email}`}
+            className="alvo-toque inline-flex items-center justify-center text-moss hover:underline"
+          >
             {SITE.email}
           </a>
         </p>

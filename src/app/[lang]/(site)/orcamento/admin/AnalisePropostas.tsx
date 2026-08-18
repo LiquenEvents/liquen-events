@@ -2,10 +2,54 @@
 
 import { useMemo } from "react";
 import type { Proposal } from "@/lib/orcamento/types";
-import { analisar, NOME_DO_MOTIVO } from "@/lib/orcamento/analise-de-propostas";
+import {
+  analisar,
+  NOME_DO_MOTIVO,
+  type AnaliseDeExtras,
+} from "@/lib/orcamento/analise-de-propostas";
 import { eur0 as eur } from "@/lib/money";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A LISTA LEVE (`?semDoc=1`) EM VEZ DA PESADA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Este painel também não desenha o documento nenhum. Pedia a lista inteira na
+ * mesma (chave "propostas"), com todos os mood boards e todos os caminhos de
+ * fotos de cada proposta lá dentro. A rota tem uma forma leve para isto
+ * (`?semDoc=1`, chave "propostas-leves"), já aquecida em ociosidade pelo
+ * AdminClient.
+ *
+ * `analisar()` (em analise-de-propostas.ts) chama `analisarExtras`, que lê
+ * `opcionaisDe(p.doc)` para saber quais aceites tinham extras marcados: a
+ * ÚNICA coisa que este painel tirava do documento, para a secção «Os extras
+ * vendem-se?». Sem o `doc`, essa chamada ia sempre dar zero. A rota leve já
+ * calcula o mesmo facto e chama-lhe `temOpcionais`; `extrasDe`, aqui em baixo,
+ * é a mesma conta de `analisarExtras`, só que a partir dele em vez do
+ * documento, sem tocar em `analise-de-propostas.ts`, que outras vistas ainda
+ * usam com a lista pesada.
+ */
+type PropostaLeve = Omit<Proposal, "doc"> & { temOpcionais: boolean };
+
+function extrasDe(propostas: PropostaLeve[]): AnaliseDeExtras | null {
+  const aceites = propostas.filter((p) => p.status === "aceite");
+  const comExtras = aceites.filter((p) => p.temOpcionais);
+  if (comExtras.length === 0) return null;
+
+  const levaramExtras = comExtras.filter((p) => p.versaoEscolhida === "extras").length;
+  const ficaramNaBase = comExtras.filter((p) => p.versaoEscolhida === "base").length;
+  const registadas = levaramExtras + ficaramNaBase;
+
+  return {
+    comExtras: comExtras.length,
+    levaramExtras,
+    ficaramNaBase,
+    porRegistar: comExtras.length - registadas,
+    taxa: registadas > 0 ? Math.round((levaramExtras / registadas) * 100) : null,
+  };
+}
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -40,8 +84,12 @@ export default function AnalisePropostas() {
     error,
     errorMessage,
     refresh,
-  } = useCachedList<Proposal[]>("propostas", "/api/propostas");
+  } = useCachedList<PropostaLeve[]>("propostas-leves", "/api/propostas?semDoc=1");
   const a = useMemo(() => analisar(propostas ?? []), [propostas]);
+  // `a.extras` sai sempre `null` a partir da lista leve (não tem `doc` para
+  // `analisarExtras` ler); `extrasDe` refaz a mesma conta a partir de
+  // `temOpcionais`. Ver a nota no topo do ficheiro.
+  const extras = useMemo(() => extrasDe(propostas ?? []), [propostas]);
 
   // Uma leitura falhada dava `a.enviadas === 0` e este painel desaparecia sem
   // uma palavra — dentro de uma secção chamada "Propostas" que fica aberta e
@@ -133,7 +181,7 @@ export default function AnalisePropostas() {
       )}
 
       {/* ── Os extras vendem-se? ───────────────────────────────────────── */}
-      {a.extras && (
+      {extras && (
         <section aria-labelledby="extras-titulo">
           <h3
             id="extras-titulo"
@@ -142,19 +190,19 @@ export default function AnalisePropostas() {
             Os extras vendem-se?
           </h3>
           <p className="text-sm leading-relaxed text-foreground/70">
-            {a.extras.taxa === null
-              ? `${a.extras.comExtras} ${a.extras.comExtras === 1 ? "proposta ganha tinha" : "propostas ganhas tinham"} extras, e nenhuma tem a versão registada.`
-              : `Das ${a.extras.levaramExtras + a.extras.ficaramNaBase} registadas, ${a.extras.levaramExtras} ${a.extras.levaramExtras === 1 ? "levou" : "levaram"} os extras — ${a.extras.taxa}%.`}
+            {extras.taxa === null
+              ? `${extras.comExtras} ${extras.comExtras === 1 ? "proposta ganha tinha" : "propostas ganhas tinham"} extras, e nenhuma tem a versão registada.`
+              : `Das ${extras.levaramExtras + extras.ficaramNaBase} registadas, ${extras.levaramExtras} ${extras.levaramExtras === 1 ? "levou" : "levaram"} os extras — ${extras.taxa}%.`}
           </p>
-          {a.extras.porRegistar > 0 && (
+          {extras.porRegistar > 0 && (
             <p className="mt-1 text-[11px] leading-relaxed text-foreground/45">
               {/* Sem mandar ninguém a lado nenhum: o Acompanhamento saiu do
                   menu a pedido dela, e uma indicação para um ecrã que já não
                   está lá é pior do que indicação nenhuma. O número continua a
                   dizer o que falta. */}
-              {a.extras.porRegistar === 1
+              {extras.porRegistar === 1
                 ? "Falta registar uma."
-                : `Faltam registar ${a.extras.porRegistar}.`}
+                : `Faltam registar ${extras.porRegistar}.`}
             </p>
           )}
         </section>

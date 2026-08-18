@@ -139,7 +139,25 @@ export default function PortalView({
   depositPercent,
   currency,
 }: PortalViewProps) {
-  const firstName = clientName?.trim().split(" ")[0] || clientName;
+  /**
+   * ── «OLÁ, .» ────────────────────────────────────────────────────────────
+   *
+   * Era `clientName?.trim().split(" ")[0] || clientName`. Com um nome vazio
+   * ("" — a mesma linha antiga em que `client_name` ficou a `null` e o
+   * `fromRow` traduz isso para `""`) o primeiro `split(" ")[0]` também dá
+   * `""`, que é falsy — e o `||` caía outra vez em `clientName`, ou seja em
+   * `""`. O casal abria o link do portal e a primeira coisa que lia, em
+   * Playfair a 52 px, era:
+   *
+   *     Olá, .
+   *
+   * A mesma avaria que a página da proposta já teve (ver o comentário lá, no
+   * componente `Message`), e a mesma solução: sem nome, cumprimenta-se na
+   * mesma — «Olá.» — que é uma frase inteira e não denuncia nada. Com nome, é
+   * exactamente o que sempre saiu.
+   */
+  const firstName = clientName?.trim().split(/\s+/)[0] || "";
+  const saudacao = firstName ? `${t.greeting}, ${firstName}.` : `${t.greeting}.`;
   // Os rótulos do faseamento trazem as duas percentagens — a do sinal e o que
   // sobra — para não poderem discordar do valor impresso ao lado.
   const pcts = { sinal: String(depositPercent), saldo: String(100 - depositPercent) };
@@ -161,7 +179,7 @@ export default function PortalView({
             className="text-foreground/90 font-bold"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 5vw, 52px)" }}
           >
-            {t.greeting}, {firstName}.
+            {saudacao}
           </h1>
           <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
             {t.intro}
@@ -198,9 +216,13 @@ export default function PortalView({
                 </div>
               </div>
               {pdfHref && (
+                // O botão do PDF da proposta — medido a 375 px: 220×36 px, 8 px
+                // abaixo do mínimo de toque. `alvo-toque` só cresce em ecrãs de
+                // toque (o `inline-flex items-center justify-center` já cá
+                // estava, por isso o texto continua centrado).
                 <a
                   href={pdfHref}
-                  className="inline-flex items-center justify-center self-start rounded-md bg-moss px-5 py-2.5 text-white text-xs tracking-[0.06em] font-medium hover:bg-moss-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss transition-colors"
+                  className="alvo-toque inline-flex items-center justify-center self-start rounded-md bg-moss px-5 py-2.5 text-white text-xs tracking-[0.06em] font-medium hover:bg-moss-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss transition-colors"
                 >
                   {t.proposta.download}
                 </a>
@@ -223,9 +245,11 @@ export default function PortalView({
                 })}
               </p>
               {contratoPdfHref && (
+                // Mesma avaria e a mesma correção do botão do PDF da proposta,
+                // aqui em cima: 217×36 px medidos, 7 px abaixo do mínimo.
                 <a
                   href={contratoPdfHref}
-                  className="inline-flex items-center justify-center self-start rounded-md bg-moss px-5 py-2.5 text-white text-xs tracking-[0.06em] font-medium hover:bg-moss-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss transition-colors"
+                  className="alvo-toque inline-flex items-center justify-center self-start rounded-md bg-moss px-5 py-2.5 text-white text-xs tracking-[0.06em] font-medium hover:bg-moss-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss transition-colors"
                 >
                   {t.contrato.download}
                 </a>
@@ -278,11 +302,27 @@ export default function PortalView({
             <p className="text-foreground/62 text-[11px] tracking-[0.15em] uppercase mb-2">
               {t.proximos.contactTitle}
             </p>
+            {/* Os dois contactos finais — medidos a 375 px: 293×20 px cada,
+                empilhados a 4 px um do outro (`gap-1`). Sem alvo de toque
+                próprio, um dedo que erre o e-mail por uns pixels cai no
+                telefone por baixo. `alvo-toque` só cresce em ecrãs de toque. */}
             <div className="flex flex-col gap-1 text-sm">
-              <a href={`mailto:${SITE.email}`} className="text-moss hover:underline">
+              {/* `justify-start` cancela o `justify-content: center` que o
+                  `.alvo-toque` traz de fábrica — aqui a coluna estica a
+                  largura de cada âncora (flex-col ⇒ align-items: stretch), e
+                  sem isto o e-mail e o telefone saltavam do canto esquerdo,
+                  alinhados com "FALE CONNOSCO" por cima, para o meio da
+                  coluna. */}
+              <a
+                href={`mailto:${SITE.email}`}
+                className="alvo-toque inline-flex items-center justify-start text-moss hover:underline"
+              >
                 {SITE.email}
               </a>
-              <a href={`tel:${SITE.phone}`} className="text-moss hover:underline">
+              <a
+                href={`tel:${SITE.phone}`}
+                className="alvo-toque inline-flex items-center justify-start text-moss hover:underline"
+              >
                 {SITE.phoneDisplay}
               </a>
             </div>

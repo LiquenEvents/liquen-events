@@ -83,8 +83,10 @@ jobs:
       - name: Cache das miniaturas pré-geradas
         uses: actions/cache@v4
         with:
-          path: .next/cache/pregen-gallery
-          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs') }}
+          path: |
+            .next/cache/pregen-gallery
+            .next/cache/pregen-logos
+          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs', 'scripts/pregen-logos.mjs') }}
           restore-keys: |
             pregen-${{ runner.os }}-
 
@@ -145,8 +147,10 @@ jobs:
       - name: Cache das miniaturas pré-geradas
         uses: actions/cache@v4
         with:
-          path: .next/cache/pregen-gallery
-          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs') }}
+          path: |
+            .next/cache/pregen-gallery
+            .next/cache/pregen-logos
+          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs', 'scripts/pregen-logos.mjs') }}
           restore-keys: |
             pregen-${{ runner.os }}-
 

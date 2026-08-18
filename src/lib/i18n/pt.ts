@@ -796,6 +796,17 @@ export const pt = {
     eventFallbackParticular: "Evento",
     semData: "Data a definir",
     semLocal: "Local a definir",
+    /**
+     * Um token de portal forjado E um pedido apagado caem AQUI, no mesmo par de
+     * frases — de propósito, e não por preguiça. Um link privado nunca pode
+     * dizer se um identificador existe: se a mensagem fosse diferente consoante
+     * o caso, quem tentasse tokens ao acaso aprendia, pela resposta, quais
+     * correspondiam a um pedido real. Ver o comentário junto ao uso, em
+     * `page.tsx`.
+     */
+    linkInvalidTitle: "Este link já não é válido",
+    linkInvalidBody:
+      "Este link para o seu espaço de cliente já não é válido. Contacte-nos e enviamos-lhe um novo com todo o gosto.",
     proposta: {
       title: "Proposta",
       statusLabel: "Estado",

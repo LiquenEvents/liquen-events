@@ -104,6 +104,34 @@ describe("nada no que sai para o cliente lhe pede para aceitar com um clique", (
     }
   });
 
+  it("o portal não promete, em nenhuma das línguas, um link para aceitar", () => {
+    /**
+     * A promessa vive em mais um sítio do que se pensava.
+     *
+     * Quando o botão saiu, a frase PORTUGUESA do portal foi corrigida e a
+     * INGLESA ficou como estava: «you can accept the terms through the link we
+     * sent you by email». O casal inglês procurava esse link em todos os emails
+     * e não o encontrava, porque ele deixou de existir — e a alternativa que
+     * existe, responder, não lhe era oferecida em lado nenhum.
+     *
+     * O teste de paridade do dicionário não apanha isto: compara as CHAVES das
+     * duas línguas, e a chave estava lá nas duas. O que divergiu foi o
+     * conteúdo. Por isso este bloco olha para o texto, e não para a estrutura.
+     */
+    for (const [idioma, dicionario] of [
+      ["pt", pt],
+      ["en", en],
+    ] as const) {
+      const corpo = dicionario.portal.contrato.pendingBody;
+      expect(corpo, `o portal ${idioma} manda o cliente aceitar por um link`).not.toMatch(
+        /through the link|no link|na ligação|através da ligação|accept the terms/i,
+      );
+      expect(corpo, `o portal ${idioma} não diz como responder`).toMatch(
+        idioma === "pt" ? /e-mail|telefone/i : /email|phone/i,
+      );
+    }
+  });
+
   it("os textos do formulário antigo saíram do dicionário", () => {
     // Deixá-los cá era deixar meio caminho andado para alguém voltar a ligar o
     // formulário sem dar por isso — e um dicionário que promete botões que não

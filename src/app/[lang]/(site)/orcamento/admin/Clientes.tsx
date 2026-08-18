@@ -6,6 +6,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Segmented, Toolbar } from "./ui";
 import { eur0 as eur } from "@/lib/money";
+import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { metaFor } from "./status-meta";
 
 // Unified status vocabulary (Novo / Aguardar resposta / Proposta enviada / Ganho / Perdido).
@@ -128,12 +129,21 @@ export default function Clientes({ quotes, onOpen }: Props) {
       }
       const c = map.get(key)!;
       c.quotes.push(q);
+      /**
+       * ── OS DOIS RAMOS NÃO ESTÃO NA MESMA UNIDADE ─────────────────────────
+       * `q.quotedPrice` é o campo «Preço final (SEM IVA)». Somá-lo directo
+       * desalinhava «Ganho» e «Pipeline» dos clientes com a «Receita
+       * contratada» das Estatísticas (sempre COM IVA) em ~23%, o IVA inteiro.
+       * Mesma cascata já usada em `Reminders.tsx`, `PaymentsPanel.tsx`,
+       * `Overview.tsx`, `StatsDashboard.tsx` e `Kanban.tsx`.
+       */
+      const contratado = q.quotedPrice != null ? contractedAmounts(q).gross : 0;
       if (q.status === "aceite" && q.quotedPrice) {
-        c.totalWon += q.quotedPrice;
+        c.totalWon += contratado;
         c.wonCount++;
       }
       if (q.status === "rejeitado") c.rejectedCount++;
-      if (q.status === "cotado" && q.quotedPrice) c.totalPipeline += q.quotedPrice;
+      if (q.status === "cotado" && q.quotedPrice) c.totalPipeline += contratado;
       const latestAt = q.lastUpdated ?? q.submittedAt;
       if (+new Date(latestAt) > +new Date(c.lastAt)) {
         c.lastAt = latestAt;
@@ -174,8 +184,8 @@ export default function Clientes({ quotes, onOpen }: Props) {
         "Email",
         "Telefone",
         "Pedidos",
-        "Ganho (€)",
-        "Pipeline (€)",
+        "Ganho (€, com IVA)",
+        "Pipeline (€, com IVA)",
         "Taxa conversão",
         "Último contacto",
       ],
@@ -491,8 +501,10 @@ export default function Clientes({ quotes, onOpen }: Props) {
                           </div>
                           <div className="text-right shrink-0">
                             {q.quotedPrice ? (
+                              // Com IVA — para bater com o «Ganho»/«Pipeline»
+                              // do cliente ali em cima, que somam o mesmo campo.
                               <span className="text-[#4d6350] text-xs font-medium">
-                                {eur(q.quotedPrice)}
+                                {eur(contractedAmounts(q).gross)}
                               </span>
                             ) : q.priceBreakdown?.total ? (
                               <span className="text-foreground/28 text-xs">

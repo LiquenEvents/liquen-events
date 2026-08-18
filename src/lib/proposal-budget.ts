@@ -2,9 +2,67 @@ import {
   DEFAULT_VAT_RATE,
   resolveProposalMoney,
   type ProposalDoc,
+  type ProposalMoney,
   type VatMode,
 } from "./proposal-doc";
 import { round2, splitSinal } from "./money";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O DINHEIRO DESTE DOCUMENTO, JÁ COM A REGRA DOS ADICIONAIS APLICADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * `resolveProposalMoney` sabe ler o campo do total e o modo de IVA. O que ele
+ * NÃO sabe é se os valores adicionais estão dentro desse número ou se lhe
+ * acrescem — isso é uma escolha por proposta (`budgetExtrasSomam`), e é esta
+ * função que a aplica. Quem quiser o dinheiro efectivo de um documento chama
+ * ESTA, não aquela; é a diferença entre o quadro fechar e o casal receber um
+ * total que não bate certo com o sinal.
+ *
+ * ── COMO SE SOMA, E PORQUE É QUE NÃO SE RECALCULA TUDO ────────────────────
+ * O modo «incluído» obtém o IVA por SUBTRACÇÃO, para as duas parcelas fecharem
+ * o bruto ao cêntimo (a razão está escrita em `resolveProposalMoney`).
+ * Recalcular `base x taxa` sobre a soma nova deitava fora esse cuidado e podia
+ * mexer um cêntimo no valor que ela escreveu. Por isso a parte escrita fica
+ * exactamente como estava, e o que se acrescenta é só o dos adicionais:
+ *
+ *     base  = base escrita  + adicionais
+ *     IVA   = IVA da escrita + adicionais x taxa
+ *     bruto = bruto escrito + adicionais + IVA dos adicionais
+ *
+ * O invariante `bruto === base + IVA` continua exacto, por construção — é
+ * verificável somando as três linhas acima.
+ */
+export function dinheiroDaProposta(
+  doc: Partial<
+    Pick<
+      ProposalDoc,
+      | "totalAmount"
+      | "totalVatMode"
+      | "vatRate"
+      | "totalText"
+      | "totalEstimatedText"
+      | "budgetExtras"
+      | "budgetExtrasSomam"
+    >
+  >,
+): ProposalMoney {
+  const money = resolveProposalMoney(doc);
+  if (!doc.budgetExtrasSomam) return money;
+  const adicionais = somaDosExtrasSemIva(doc.budgetExtras, {
+    mode: money.mode,
+    vatRate: money.vatRate,
+  });
+  if (adicionais === 0) return money;
+  const ivaDosAdicionais = round2(adicionais * money.vatRate);
+  return {
+    base: round2(money.base + adicionais),
+    vat: round2(money.vat + ivaDosAdicionais),
+    gross: round2(money.gross + adicionais + ivaDosAdicionais),
+    vatRate: money.vatRate,
+    mode: money.mode,
+  };
+}
 
 /**
  * O ORÇAMENTO QUE SE SOMA SOZINHO.
@@ -49,7 +107,12 @@ export type DocComLinhasETotal = Pick<
   Partial<
     Pick<
       ProposalDoc,
-      "totalAmount" | "totalVatMode" | "vatRate" | "totalText" | "totalEstimatedText"
+      | "totalAmount"
+      | "totalVatMode"
+      | "vatRate"
+      | "totalText"
+      | "totalEstimatedText"
+      | "budgetExtrasSomam"
     >
   >;
 
@@ -323,6 +386,13 @@ export function desalinhamento(
   const soma = somaDosServicos(doc);
   if (soma === null) return null;
   const { mode, vatRate } = resolveProposalMoney(doc);
+  /**
+   * Quando os adicionais SOMAM ao valor escrito, o campo do total já é só
+   * serviços: tirar-lhe os adicionais tirava-os duas vezes, e uma proposta
+   * certa passava a acusar a deslocação inteira de diferença. Quem chama passa
+   * a base efectiva (`dinheiroDaProposta(doc).base`), que nesse modo já traz os
+   * adicionais lá dentro — a subtracção volta a ser a mesma nos dois casos.
+   */
   const dosAdicionais = somaDosExtrasSemIva(doc.budgetExtras, { mode, vatRate });
   const total = round2(base - dosAdicionais);
   const diferenca = round2(total - soma);
@@ -330,7 +400,11 @@ export function desalinhamento(
   // `sugerido` e não `soma`: quem carrega em «Usar X» escreve no campo do
   // total, e esse campo inclui os adicionais. Oferecer a soma dos serviços
   // apagava a deslocação do preço final — e com ela do sinal e da factura.
-  return { soma, total, diferenca, sugerido: round2(soma + dosAdicionais) };
+  // `sugerido` é o que se escreve NO CAMPO ao carregar em «Usar X», e o campo
+  // muda de significado com o modo: com os adicionais lá dentro é a soma mais
+  // eles; com os adicionais a somar por fora é só a soma dos serviços.
+  const sugerido = doc.budgetExtrasSomam ? soma : round2(soma + dosAdicionais);
+  return { soma, total, diferenca, sugerido };
 }
 
 /**
@@ -471,7 +545,14 @@ export function totaisDaProposta(
   doc: DocComLinhasETotal,
   percentagemSinal: number,
 ): TotaisDaProposta {
-  const money = resolveProposalMoney(doc);
+  /**
+   * `dinheiroDaProposta` e não `resolveProposalMoney`: é aqui que a escolha
+   * «os adicionais somam ao valor escrito» entra nas contas. O `servicos`
+   * abaixo continua a ser `base - adicionais` nos DOIS modos, e dá o número
+   * certo em ambos — quando os adicionais somam, a base já os traz, e a
+   * subtracção devolve exactamente o valor que ela escreveu.
+   */
+  const money = dinheiroDaProposta(doc);
   const adicionais = somaDosExtrasSemIva(doc.budgetExtras, {
     mode: money.mode,
     vatRate: money.vatRate,

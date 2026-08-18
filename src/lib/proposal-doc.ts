@@ -598,6 +598,35 @@ export interface ProposalDoc {
   budgetExtras?: BudgetExtra[];
 
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS ADICIONAIS ESTÃO DENTRO DO VALOR ESCRITO, OU SOMAM-SE A ELE?
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * As duas leituras são legítimas e a diferença é dinheiro real, por isso é
+   * ela que escolhe e não o programa que adivinha.
+   *
+   *   `false` (omissão, e o que sempre se fez) — o valor escrito é o TOTAL, e
+   *   os adicionais já lá estão dentro. Escreve 3.000 com uma deslocação de
+   *   140, e o quadro diz «Subtotal dos serviços 2.860 + Deslocação 140 =
+   *   3.000». A deslocação SAI dos serviços.
+   *
+   *   `true` — o valor escrito são os SERVIÇOS, e os adicionais acrescem.
+   *   Escreve 3.000 com a mesma deslocação, e o quadro diz «Subtotal dos
+   *   serviços 3.000 + Deslocação 140 = 3.140», com o IVA por cima.
+   *
+   * Palavras dela, sobre o segundo caso: «nós tínhamos dito que era três mil
+   * mais cento e quarenta de deslocação, e depois mais o IVA».
+   *
+   * ── PORQUE É QUE VIVE NO DOCUMENTO E NÃO NAS DEFINIÇÕES ──────────────────
+   * Uma proposta já enviada tem de continuar a ler-se exactamente como foi
+   * enviada. Se isto fosse uma definição da casa, mudá-la reescrevia em
+   * silêncio o total de todas as propostas antigas — incluindo as que o casal
+   * tem no email, e as que já têm sinal pago sobre o total antigo. Guardado no
+   * documento, cada proposta fica com a regra com que nasceu.
+   */
+  budgetExtrasSomam?: boolean;
+
+  /**
    * Desenhar a linha «Total a pagar» a fechar o orçamento.
    *
    * DESLIGADA POR OMISSÃO. Esteve ligada, com o argumento de que a soma dos

@@ -1260,6 +1260,37 @@ describe("validação do ficheiro", () => {
     expect(result.errors.join(" ")).toMatch(/faltam conjuntos base/);
   });
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O NOME DO PEDIDO NÃO PODE FICAR VAZIO NUMA REPOSIÇÃO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Como no `quoteUpdateSchema` (`validation.ts`), que já recusa um `name`
+   * vazio nas escritas normais. Sem o mesmo `min(1)` aqui, uma cópia de
+   * segurança com `name: ""` (ou só espaços) repunha um pedido sem nome — e o
+   * portal desse pedido cumprimenta o casal com «Olá, .» (ver
+   * `PortalView.test.tsx`).
+   */
+  it("recusa um pedido com o nome VAZIO", async () => {
+    seedBusiness();
+    const copia = (await buildBackupPayload()) as Record<string, unknown>;
+    (copia.quotes as Record<string, unknown>[])[0].name = "";
+    const result = validateBackupFile(copia);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("impossível");
+    expect(result.errors.join(" ")).toMatch(/"Pedidos" \(quotes\) registo 0: name/);
+  });
+
+  it("recusa um pedido com o nome só de espaços", async () => {
+    seedBusiness();
+    const copia = (await buildBackupPayload()) as Record<string, unknown>;
+    (copia.quotes as Record<string, unknown>[])[0].name = "   ";
+    const result = validateBackupFile(copia);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("impossível");
+    expect(result.errors.join(" ")).toMatch(/"Pedidos" \(quotes\) registo 0: name/);
+  });
+
   it("recusa um conjunto com a FORMA errada, dizendo o conjunto e a linha", async () => {
     seedBusiness();
     const copia = (await buildBackupPayload()) as Record<string, unknown>;

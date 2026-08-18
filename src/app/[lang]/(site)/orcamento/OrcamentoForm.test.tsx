@@ -577,3 +577,31 @@ describe("OrcamentoForm — o contacto é email OU telemóvel, como no servidor"
     expect(screen.queryByText(to.avisoSemEmail)).toBeNull();
   });
 });
+
+/**
+ * MEDIDO a 375 px com toque emulado (Chromium, `hasTouch: true`): o link de
+ * voltar ao início e o link do WhatsApp mediam 72×17 e 177×17 px — bem abaixo
+ * dos 44×44 das Human Interface Guidelines, e nenhum dos dois é palavra a meio
+ * de uma frase (o primeiro é o único caminho de volta ao sítio no telemóvel;
+ * o segundo é a acção alternativa ao lado do botão de enviar). `.alvo-toque`
+ * (globals.css) já é o mecanismo da casa para isto — este teste só verifica
+ * que os dois continuam a declará-lo, porque o jsdom não faz disposição e não
+ * mede pixels; quem mede é `alvos-de-toque-do-sitio.test.tsx` + o guião
+ * Playwright, não este ficheiro.
+ */
+describe("OrcamentoForm — alvos de toque no telemóvel", () => {
+  it("o link de volta ao início declara alvo de 44 px", () => {
+    montar();
+    const links = screen.getAllByRole("link", { name: new RegExp(to.back, "i") });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.className).toMatch(/\balvo-toque\b/);
+    }
+  });
+
+  it("o link do WhatsApp, ao lado do botão de enviar, declara alvo de 44 px", () => {
+    montar();
+    const link = screen.getByRole("link", { name: new RegExp(to.ouWhatsApp, "i") });
+    expect(link.className).toMatch(/\balvo-toque\b/);
+  });
+});

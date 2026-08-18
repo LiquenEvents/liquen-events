@@ -1,5 +1,6 @@
-import type { ActivityEntry, Quote, QuoteStatus } from "./types";
+import type { ActivityEntry, MotivoDeRecusa, Quote, QuoteStatus } from "./types";
 import { parseMoney } from "@/app/[lang]/(site)/orcamento/admin/util";
+import { NOME_DO_MOTIVO } from "./analise-de-propostas";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -47,6 +48,29 @@ export const PALAVRA_DO_DESFECHO: Record<Desfecho, string> = {
   ganho: "Ganho",
   perdido: "Perdido",
 };
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O MOTIVO DA PERDA É UMA LISTA FECHADA — NÃO UMA CAIXA DE TEXTO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Este gesto gravava TEXTO LIVRE (`quote.lostReason`), enquanto a contagem de
+ * `analise-de-propostas.ts` lê `Proposal.lostReason`, que é a lista fechada
+ * `MotivoDeRecusa` — porque «perdi seis por preço este ano» só é uma frase
+ * possível se o motivo for sempre a mesma palavra. Os rótulos vêm de
+ * `NOME_DO_MOTIVO`, que é onde essa lista já vivia (do lado das propostas), e
+ * não se duplicam aqui: uma segunda lista das mesmas cinco palavras é uma
+ * lista à espera de divergir da primeira.
+ */
+export { NOME_DO_MOTIVO } from "./analise-de-propostas";
+
+/** As cinco opções, pela mesma ordem com que `NOME_DO_MOTIVO` as define. */
+export const MOTIVOS_DE_PERDA: MotivoDeRecusa[] = Object.keys(NOME_DO_MOTIVO) as MotivoDeRecusa[];
+
+/** É um dos cinco, e não qualquer texto que alguém tenha mandado à mão. */
+export function ehMotivoDeRecusa(v: unknown): v is MotivoDeRecusa {
+  return typeof v === "string" && (MOTIVOS_DE_PERDA as string[]).includes(v);
+}
 
 /**
  * A pergunta faz-se a este pedido?
@@ -200,13 +224,18 @@ export function corpoDaMarcacao(opts: {
   desfecho: Desfecho;
   /** Só no ganho: o valor confirmado, que passa a ser o `quotedPrice`. */
   valor?: number;
-  /** Só no perdido, e sempre opcional. */
-  motivo?: string;
+  /**
+   * Só no perdido, e sempre opcional — um dos cinco {@link MOTIVOS_DE_PERDA},
+   * nunca texto livre. O texto livre, quando há, vai em `nota`.
+   */
+  motivo?: MotivoDeRecusa;
+  /** O detalhe, quando o motivo sozinho não chega. Só vai junto de `motivo`. */
+  nota?: string;
   quem: string;
   quando: string;
   id: () => string;
 }): Record<string, unknown> {
-  const { desfecho, valor, motivo, quem, quando, id } = opts;
+  const { desfecho, valor, motivo, nota, quem, quando, id } = opts;
   const entrada: ActivityEntry = {
     id: id(),
     at: quando,
@@ -221,6 +250,26 @@ export function corpoDaMarcacao(opts: {
   if (desfecho === "ganho" && typeof valor === "number") body.quotedPrice = valor;
   // Um motivo em branco NÃO vai: mandá-lo como `null` apagaria um motivo
   // escrito antes, e «Perdido» não interroga ninguém.
-  if (desfecho === "perdido" && motivo && motivo.trim()) body.lostReason = motivo.trim();
+  if (desfecho === "perdido" && motivo) {
+    body.lostReason = motivo;
+    if (nota && nota.trim()) body.lostNote = nota.trim();
+  }
+  return body;
+}
+
+/**
+ * O corpo do PATCH que grava só o motivo — o segundo passo, opcional, que vem
+ * DEPOIS de marcar «Perdido». Sem `status` e sem entrada no histórico: o
+ * desfecho já ficou registado no primeiro passo (`corpoDaMarcacao`), e
+ * repeti-lo aqui duplicava a linha «Proposta enviada → Perdido».
+ *
+ * `motivo` é sempre um dos {@link MOTIVOS_DE_PERDA} — o botão que se carregou,
+ * não uma caixa de texto — e `nota` é o texto livre que o acompanha, quando
+ * há, exactamente como já acontece do lado das propostas
+ * (`Proposal.lostReason` / `Proposal.lostNote`).
+ */
+export function corpoDoMotivo(motivo: MotivoDeRecusa, nota?: string): Record<string, unknown> {
+  const body: Record<string, unknown> = { lostReason: motivo };
+  if (nota && nota.trim()) body.lostNote = nota.trim();
   return body;
 }

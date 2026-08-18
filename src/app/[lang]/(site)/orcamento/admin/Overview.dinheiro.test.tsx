@@ -112,13 +112,40 @@ describe("os três números em cima", () => {
     expect(within(painel).getByText(/pagamentos.*já.*recebidos/i)).toBeInTheDocument();
   });
 
-  it("os números são os mesmos que as contas do painel já faziam", () => {
+  it("os três números estão todos com IVA, que é a unidade do Recebido", () => {
     desenhar(quotes);
     const painel = screen.getByRole("group", { name: /dinheiro/i });
-    // Ganho = 8000 + 2000 (os dois aceites), À espera = 4600, Recebido = 600.
-    expect(within(painel).getByText("10 000 €")).toBeInTheDocument();
-    expect(within(painel).getByText("4600 €")).toBeInTheDocument();
+    /**
+     * O «Preço final» que ela escreve no ecrã é SEM IVA; as linhas de pagamento
+     * são COM IVA. Enquanto o Ganho somava um e o Recebido somava o outro, um
+     * casamento pago a 100% aparecia com Recebido 23% acima do Ganho — dois
+     * números que não podem estar certos ao mesmo tempo, na mesma fila.
+     *
+     * Ganho = (8000 + 2000) x 1,23 = 12.300 €. À espera = 4600 x 1,23 = 5658 €.
+     * Recebido = 600 €, que já era bruto e não muda.
+     */
+    expect(within(painel).getByText("12 300 €")).toBeInTheDocument();
+    expect(within(painel).getByText("5658 €")).toBeInTheDocument();
     expect(within(painel).getByText("600 €")).toBeInTheDocument();
+  });
+
+  it("um casamento pago por inteiro não mostra Recebido acima do Ganho", () => {
+    // O caso que denunciava a mistura de unidades, escrito como asserção: o
+    // sinal e o saldo somam exactamente o contratado com IVA.
+    desenhar([
+      pedido({
+        id: "todo-pago",
+        status: "aceite",
+        quotedPrice: 10000,
+        payments: [
+          { id: "s", kind: "sinal", amount: 3690, date: "2026-06-01", paid: true },
+          { id: "r", kind: "saldo", amount: 8610, date: "2026-08-01", paid: true },
+        ],
+      }),
+    ]);
+    const painel = screen.getByRole("group", { name: /dinheiro/i });
+    // 10.000 x 1,23 = 12.300, dos dois lados. O mesmo número, duas vezes.
+    expect(within(painel).getAllByText("12 300 €")).toHaveLength(2);
   });
 });
 

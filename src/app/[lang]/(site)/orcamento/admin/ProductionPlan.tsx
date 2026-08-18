@@ -150,9 +150,9 @@ export default function ProductionPlan({ quote, onChange }: Props) {
 
   return (
     <div className="border-t border-foreground/10 pt-5">
-      <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <p className="bo-eyebrow">Produção Decor</p>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {items.length > 0 && (
             <span className="rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
               {items.filter((i) => i.done).length}/{items.length} do plano
@@ -245,7 +245,7 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                         type="button"
                         onClick={() => removeItem(i.id)}
                         aria-label="Remover tarefa"
-                        className="shrink-0 text-foreground/20 hover:text-[#b5654a] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+                        className="alvo-toque shrink-0 p-1 text-foreground/20 hover:text-[#b5654a] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-all"
                       >
                         ×
                       </button>
