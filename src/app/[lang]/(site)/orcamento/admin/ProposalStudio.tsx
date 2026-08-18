@@ -6195,14 +6195,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                    * sem este campo e continua a ler-se como foi enviada.
                    */}
                   <div className="mb-3 flex flex-col gap-1.5">
-                    <label
+                    {/* Texto visível num `span` e nome acessível no próprio
+                        `select`, em vez de um `label` com as palavras «Valor
+                        (sem IVA)» lá dentro: essas são as palavras do CAMPO do
+                        total, e um segundo elemento a dizê-las tornava a
+                        procura por etiqueta ambígua. Dezanove testes do
+                        estúdio deixaram de encontrar o campo do preço por
+                        causa disso. */}
+                    <span
+                      aria-hidden="true"
                       className="text-[9px] tracking-[0.2em] uppercase text-foreground/25"
-                      htmlFor="adicionais-modo"
                     >
                       O valor que escreveste em «Valor (sem IVA)»
-                    </label>
+                    </span>
                     <select
                       id="adicionais-modo"
+                      aria-label="Como contam os valores adicionais no preço final"
                       className="bo-input alvo-toque px-2.5 py-2 text-xs"
                       value={doc.budgetExtrasSomam ? "somam" : "dentro"}
                       onChange={(e) =>

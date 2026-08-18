@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { totaisDaProposta, dinheiroDaProposta, type DocComLinhasETotal } from "./proposal-budget";
+import { totaisDasVersoes } from "./orcamento/versoes-da-proposta";
+import { diferencas } from "./orcamento/diferencas";
+import type { ProposalDoc } from "./proposal-doc";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -77,5 +80,45 @@ describe("os valores adicionais somam ao valor escrito", () => {
     const a = dinheiroDaProposta(proposta({ ...semExtras, budgetExtrasSomam: true }));
     const b = dinheiroDaProposta(proposta(semExtras));
     expect(a).toEqual(b);
+  });
+});
+
+describe("os outros sítios que leem dinheiro leem o mesmo", () => {
+  /**
+   * Dois agentes de verificação, a trabalhar separados, chegaram ao mesmo par
+   * de sítios que tinha ficado a ler o valor CRU em vez do efectivo. Estes
+   * dois testes existem para eles não voltarem a divergir.
+   */
+  const comOpcional = (somam: boolean) =>
+    ({
+      budgetItems: ["Decoração Cerimónia", "Arco de flores"],
+      budgetAmounts: [2000, 300],
+      budgetOpcional: [false, true],
+      budgetExtras: [deslocacao],
+      totalAmount: 3000,
+      totalVatMode: "acrescer",
+      vatRate: 0.23,
+      budgetExtrasSomam: somam,
+    }) as unknown as ProposalDoc;
+
+  it("«sem os extras assinalados» parte da mesma base que o quadro grande", () => {
+    // O bloco pequeno e o bloco grande saem no MESMO PDF. Enquanto o pequeno
+    // lia o valor cru, imprimia a proposta 140 € abaixo do quadro de cima.
+    const doc = comOpcional(true);
+    const grande = totaisDaProposta(doc, 30);
+    const pequeno = totaisDasVersoes(doc);
+    expect(pequeno).not.toBeNull();
+    expect(pequeno!.comExtras).toBe(grande.total);
+  });
+
+  it("o resumo do que mudou entre versões vê o dinheiro mudar", () => {
+    // Ligar a opção sobe o que o casal paga sem tocar no campo do total. Quem
+    // revê a proposta não pode ler «nada mudou».
+    const mudancas = diferencas(comOpcional(false), comOpcional(true));
+    const doTotal = mudancas.find((m) => m.onde === "Total");
+    // O espaço antes do símbolo é inquebrável (o `Intl` de pt-PT), por isso a
+    // asserção é sobre os números e não sobre a frase inteira.
+    expect(doTotal?.texto).toContain("3690,00");
+    expect(doTotal?.texto).toContain("3862,20");
   });
 });

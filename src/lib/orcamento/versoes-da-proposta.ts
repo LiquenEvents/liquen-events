@@ -1,5 +1,5 @@
-import { resolveProposalMoney, type ProposalDoc } from "@/lib/proposal-doc";
-import { precosDe } from "@/lib/proposal-budget";
+import { type ProposalDoc } from "@/lib/proposal-doc";
+import { dinheiroDaProposta, precosDe } from "@/lib/proposal-budget";
 import { round2 } from "@/lib/money";
 
 /**
@@ -111,12 +111,21 @@ type DocComTotais = Pick<ProposalDoc, "budgetItems" | "budgetAmounts" | "budgetO
  * já tem o dinheiro resolvido à mão passa `resolveProposalMoney(doc).base`, o
  * mesmo número por outro caminho.
  *
+ * A base por omissão sai de `dinheiroDaProposta`, e não de
+ * `resolveProposalMoney`: quando os valores adicionais SOMAM ao valor escrito
+ * (`budgetExtrasSomam`), a base efectiva traz a deslocação lá dentro. Com a
+ * leitura crua, o bloco «sem os extras assinalados» saía impresso abaixo do
+ * quadro grande do MESMO PDF — medido, 1.550 € de diferença numa proposta com
+ * uma deslocação desse valor. Dois totais no mesmo documento a discordarem é
+ * precisamente o defeito que este ficheiro foi escrito para não deixar
+ * acontecer.
+ *
  * `null` quando não há extras nenhuns — e nesse caso não há duas versões, há
  * uma proposta como as de sempre.
  */
 export function totaisDasVersoes(
   doc: DocComTotais,
-  baseSemIva: number = resolveProposalMoney(doc).base,
+  baseSemIva: number = dinheiroDaProposta(doc).base,
 ): Totais | null {
   const marcas = opcionaisDe(doc);
   const linhasExtra = marcas.filter(Boolean).length;
@@ -146,7 +155,10 @@ export function totaisDasVersoes(
   // como o sinal e o saldo fecham o total. Multiplicar as três parcelas cada
   // uma por sua conta deixava um cêntimo a sobrar de vez em quando, e um
   // cêntimo a sobrar num quadro de orçamento é uma pergunta ao telefone.
-  const dinheiro = resolveProposalMoney(doc);
+  // O mesmo dinheiro efectivo que a base acima: com os adicionais a somarem,
+  // o bruto da proposta inteira já os traz, e é esse que a factura, o contrato
+  // e o dossier lêem.
+  const dinheiro = dinheiroDaProposta(doc);
   const brutoComExtras = dinheiro.gross;
   const brutoExtras = round2(extras * (1 + dinheiro.vatRate));
   const brutoBase = Math.max(0, round2(brutoComExtras - brutoExtras));
