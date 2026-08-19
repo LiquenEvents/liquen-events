@@ -41,6 +41,7 @@ import {
   imgSrcDe,
   urlDeAmostra,
   CATALOGO,
+  type DiagnosticoDeFotos,
 } from "./diagnostico-de-fotos";
 
 const ORIGEM = "https://abcd1234.supabase.co";
@@ -48,13 +49,15 @@ const POLITICA_BOA = `default-src 'self'; img-src 'self' data: blob: ${ORIGEM}; 
 const POLITICA_MA = "default-src 'self'; img-src 'self' data: blob:; font-src 'self'";
 
 /** Um Storage de mentira que responde o que o teste mandar. */
-function storageFalso(op: {
-  buckets?: string[];
-  erroAoListarBuckets?: string;
-  pastas?: { name: string; id?: string }[];
-  ficheiros?: { name: string; id?: string }[];
-  erroAoAssinar?: string;
-} = {}) {
+function storageFalso(
+  op: {
+    buckets?: string[];
+    erroAoListarBuckets?: string;
+    pastas?: { name: string; id?: string }[];
+    ficheiros?: { name: string; id?: string }[];
+    erroAoAssinar?: string;
+  } = {},
+) {
   const buckets = op.buckets ?? [
     "proposal-assets",
     "proposal-thumbs",
@@ -69,14 +72,19 @@ function storageFalso(op: {
           : { data: buckets.map((name) => ({ name })), error: null },
       from: (bucket: string) => ({
         list: async (prefixo: string) => ({
-          data: prefixo === "" ? (op.pastas ?? [{ name: "p1" }]) : (op.ficheiros ?? [{ name: "a.jpg", id: "1" }]),
+          data:
+            prefixo === ""
+              ? (op.pastas ?? [{ name: "p1" }])
+              : (op.ficheiros ?? [{ name: "a.jpg", id: "1" }]),
           error: null,
         }),
         createSignedUrl: async (caminho: string) =>
           op.erroAoAssinar
             ? { data: null, error: { message: op.erroAoAssinar } }
             : {
-                data: { signedUrl: `${ORIGEM}/storage/v1/object/sign/${bucket}/${caminho}?token=t` },
+                data: {
+                  signedUrl: `${ORIGEM}/storage/v1/object/sign/${bucket}/${caminho}?token=t`,
+                },
                 error: null,
               },
       }),
@@ -93,7 +101,9 @@ beforeEach(() => {
   sb.actual = storageFalso();
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => new Response("x", { status: 200, headers: { "content-type": "image/jpeg" } })),
+    vi.fn(
+      async () => new Response("x", { status: 200, headers: { "content-type": "image/jpeg" } }),
+    ),
   );
 });
 
@@ -103,8 +113,8 @@ afterEach(() => {
   Object.assign(process.env, guardado);
 });
 
-const causas = (d: { avarias: { causa: string }[] }) => d.avarias.map((a) => a.causa);
-const verificacao = (d: { verificacoes: { nome: string }[] }, nome: string) =>
+const causas = (d: DiagnosticoDeFotos) => d.avarias.map((a) => a.causa);
+const verificacao = (d: DiagnosticoDeFotos, nome: string) =>
   d.verificacoes.find((v) => v.nome === nome);
 
 describe("diagnóstico de fotografias", () => {
@@ -168,7 +178,10 @@ describe("diagnóstico de fotografias", () => {
   });
 
   it("o URL assina bem e o ficheiro não está lá — e isso distingue-se", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 400 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 400 })),
+    );
     const d = await diagnosticarFotos({ politicaServida: POLITICA_BOA });
     expect(causas(d)).toContain("ficheiro-em-falta");
     expect(verificacao(d, "bytes")?.detalhe).toContain("400");

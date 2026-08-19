@@ -218,8 +218,7 @@ export function imgSrcDe(politica: string | null | undefined): string {
  * alojado — que é o que a política tem de cobrir de qualquer maneira.
  */
 export function urlDeAmostra(env: Record<string, string | undefined> = process.env): string {
-  const base =
-    env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL ?? "https://exemplo.supabase.co";
+  const base = env.SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL ?? "https://exemplo.supabase.co";
   try {
     return `${new URL(base).origin}/storage/v1/object/sign/${PROPOSAL_BUCKET}/x/y.jpg`;
   } catch {
@@ -393,9 +392,7 @@ async function primeiraFoto(
       const { data } = await sb.storage.from(bucket).list("", { limit: 20 });
       for (const pasta of data ?? []) {
         if (pasta.id) continue; // é um ficheiro à raiz, não uma pasta
-        const { data: dentro } = await sb.storage
-          .from(bucket)
-          .list(pasta.name, { limit: 10 });
+        const { data: dentro } = await sb.storage.from(bucket).list(pasta.name, { limit: 10 });
         const foto = (dentro ?? []).find((f) => /\.(jpe?g|png|webp)$/i.test(f.name));
         if (foto) return { bucket, caminho: `${pasta.name}/${foto.name}` };
       }
