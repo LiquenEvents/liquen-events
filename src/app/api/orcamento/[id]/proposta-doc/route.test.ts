@@ -918,7 +918,9 @@ describe("POST /api/orcamento/[id]/proposta-doc — o email sai na língua da pr
       params,
     });
     const pdf = enviado().attachments?.find((a) => a.filename.endsWith(".pdf"));
-    expect(pdf?.filename).toBe("Proposal-Liquen-q1.pdf");
+    // O nome leva o casal e a data do evento — o identificador do pedido só
+    // volta quando não há casal nenhum (ver `email-proposta-textos.test.ts`).
+    expect(pdf?.filename).toBe("Proposal-Liquen-Events-Maria-e-Ze-03-07-2027.pdf");
   });
 
   it("proposta portuguesa: o email de sempre, palavra por palavra", async () => {
@@ -932,7 +934,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — o email sai na língua da pr
     expect(email.html).toContain("Segue em anexo a proposta personalizada para o seu evento.");
     expect(email.html).toContain("Ver a proposta");
     expect(enviado().attachments?.find((a) => a.filename.endsWith(".pdf"))?.filename).toBe(
-      "Proposta-Liquen-q1.pdf",
+      "Proposta-Liquen-Events-Maria-e-Ze-03-07-2027.pdf",
     );
   });
 

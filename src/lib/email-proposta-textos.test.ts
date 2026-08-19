@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  nomeDoFicheiroDaProposta,
   paragrafoDoQueMudou,
   resumoDaPropostaParaCopiar,
   textosDoEmailDaProposta,
@@ -37,7 +38,9 @@ describe("textosDoEmailDaProposta", () => {
     expect(pt.introEmTexto).toBe("Segue em anexo a proposta personalizada para o seu evento.");
     expect(pt.botao).toBe("Ver a proposta →");
     expect(pt.verOnline).toBe("Ver online:");
-    expect(pt.nomeDoAnexo("q1")).toBe("Proposta-Liquen-q1.pdf");
+    // Sem nome de casal, o ficheiro continua a chamar-se pela referência —
+    // exactamente como a rota sempre o chamou.
+    expect(pt.nomeDoAnexo({ ref: "q1" })).toBe("Proposta-Liquen-q1.pdf");
   });
 
   it("o inglês está todo escrito, sem um campo por traduzir", () => {
@@ -51,7 +54,7 @@ describe("textosDoEmailDaProposta", () => {
     expect(en.introEmTexto).not.toBe(pt.introEmTexto);
     expect(en.botao).not.toBe(pt.botao);
     expect(en.verOnline).not.toBe(pt.verOnline);
-    expect(en.nomeDoAnexo("q1")).not.toBe(pt.nomeDoAnexo("q1"));
+    expect(en.nomeDoAnexo({ ref: "q1" })).not.toBe(pt.nomeDoAnexo({ ref: "q1" }));
   });
 
   it("e não tem uma palavra portuguesa lá dentro", () => {
@@ -70,7 +73,7 @@ describe("textosDoEmailDaProposta", () => {
   it("o anexo inglês distingue-se do português na pasta de transferências", () => {
     // Um casal que receba as duas versões (acontece: a portuguesa aos pais, a
     // inglesa ao casal) não pode ficar com «Proposta-Liquen-q1 (1).pdf».
-    expect(en.nomeDoAnexo("q1")).toBe("Proposal-Liquen-q1.pdf");
+    expect(en.nomeDoAnexo({ ref: "q1" })).toBe("Proposal-Liquen-q1.pdf");
   });
 
   it("o que não é uma língua conhecida cai no português", () => {
@@ -224,5 +227,71 @@ describe("paragrafoDoQueMudou", () => {
     expect(
       paragrafoDoQueMudou(mudancas, { antes: money(3500), depois: money(3500) }, "pt"),
     ).toBeNull();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O NOME DO FICHEIRO É O QUE O CASAL ARQUIVA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Era a referência INTERNA do pedido — em produção um `randomUUID()`. O casal
+ * ficava com `Proposta-Liquen-8f3c1a2e-….pdf` na pasta de transferências e
+ * reencaminhava-o aos pais com esse nome. A mesma decisão que já tinha tirado o
+ * identificador do email («o `randomUUID()` da nossa base não é referência de
+ * ninguém») não tinha chegado ao ficheiro.
+ */
+describe("o nome do ficheiro da proposta", () => {
+  it("leva a casa, o casal e a data do evento", () => {
+    expect(
+      nomeDoFicheiroDaProposta(
+        { clientNames: "Maria & Zé", eventDate: "12 de setembro de 2026", ref: "8f3c1a2e" },
+        "pt",
+      ),
+    ).toBe("Proposta-Liquen-Events-Maria-e-Ze-12-09-2026.pdf");
+  });
+
+  it("e em inglês distingue-se, para as duas versões não se atropelarem", () => {
+    // Ela manda a portuguesa aos pais e a inglesa ao casal; com o mesmo nome, a
+    // segunda ficava «(1).pdf» na pasta de quem as recebesse.
+    const dados = { clientNames: "Maria & Zé", eventDate: "12 de setembro de 2026", ref: "q1" };
+    expect(nomeDoFicheiroDaProposta(dados, "en")).toBe(
+      "Proposal-Liquen-Events-Maria-e-Ze-12-09-2026.pdf",
+    );
+    expect(nomeDoFicheiroDaProposta(dados, "en")).not.toBe(nomeDoFicheiroDaProposta(dados, "pt"));
+  });
+
+  it("nada de acentos, de «&» nem de espaços — o nome viaja num cabeçalho", () => {
+    const nome = nomeDoFicheiroDaProposta(
+      {
+        clientNames: "Maria da Conceição Gonçalves Ançã & Jean-François Ålström-Nørgaard",
+        eventDate: "12 de setembro de 2026",
+        ref: "q1",
+      },
+      "pt",
+    );
+    expect(nome, "só letras, números, hífenes e o ponto da extensão").toMatch(
+      /^[A-Za-z0-9-]+\.pdf$/,
+    );
+    // E não fica infinito: corta-se num hífen, nunca a meio de uma palavra.
+    expect(nome.length).toBeLessThan(90);
+    expect(nome).not.toMatch(/-\.pdf$/);
+  });
+
+  it("uma data que o estúdio não escreveu não entra no nome", () => {
+    // O campo é texto livre: «a definir», «Verão de 2027». O que não se
+    // reconhece fica de fora, em vez de ir para o nome do ficheiro como está.
+    expect(
+      nomeDoFicheiroDaProposta(
+        { clientNames: "Maria & Zé", eventDate: "a definir", ref: "q1" },
+        "pt",
+      ),
+    ).toBe("Proposta-Liquen-Events-Maria-e-Ze.pdf");
+  });
+
+  it("sem casal nenhum, volta à referência — e não a um nome vazio", () => {
+    expect(nomeDoFicheiroDaProposta({ clientNames: "   ", ref: "q1" }, "pt")).toBe(
+      "Proposta-Liquen-q1.pdf",
+    );
   });
 });

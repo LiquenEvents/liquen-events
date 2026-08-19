@@ -89,7 +89,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     // O nome é o mesmo do anexo que seguiu no email, para o ficheiro ser
     // reconhecível como o documento que o casal já tem.
     const ref = quote.id.replace(/[^A-Za-z0-9_-]/g, "");
-    return respostaPdf(request, pdf, { nome: nomeDoFicheiroDaProposta(ref, idioma) });
+    return respostaPdf(request, pdf, {
+      nome: nomeDoFicheiroDaProposta(
+        {
+          clientNames: proposal.doc?.clientNames,
+          eventDate: proposal.doc?.eventDate,
+          ref,
+        },
+        idioma,
+      ),
+    });
   } catch (err) {
     /**
      * A PROPOSTA SAIRIA COM FOTOS A MENOS — e por isso não sai.

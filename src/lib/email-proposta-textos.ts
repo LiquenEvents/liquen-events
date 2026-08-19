@@ -1,6 +1,7 @@
 import {
   ehIdiomaDaProposta,
   IDIOMA_POR_OMISSAO,
+  isoDaDataPorExtenso,
   type IdiomaDaProposta,
 } from "./proposal-doc-textos";
 import type { Mudanca } from "./orcamento/diferencas";
@@ -42,21 +43,103 @@ import { eurDocumento, montanteNaLingua, round2 } from "./money";
  */
 
 /**
- * O nome do ficheiro do PDF da proposta.
+ * ════════════════════════════════════════════════════════════════════════════
+ * O NOME DO FICHEIRO — QUE É O QUE O CLIENTE ARQUIVA
+ * ════════════════════════════════════════════════════════════════════════════
  *
  * Vive aqui — e não em cada rota — porque tem de ser O MESMO em três sítios: o
  * anexo do email, a descarga pelo link do casal e a descarga pelo portal. O
  * casal já tem um ficheiro na caixa de correio; o que descarrega meses depois
- * tem de ser reconhecível como o mesmo documento, e não um segundo ficheiro com
- * outro nome.
+ * tem de ser reconhecível como o mesmo documento, e não um segundo ficheiro
+ * com outro nome.
  *
- * «Liquen» sem acento, como sempre esteve: é um nome de ficheiro, e um acento
- * num anexo ainda hoje chega partido a alguns clientes de correio.
+ * ── O QUE ESTAVA LÁ ───────────────────────────────────────────────────────
+ * A referência INTERNA do pedido: `Proposta-Liquen-8f3c1a2e-….pdf` em
+ * produção, onde o identificador é um `randomUUID()`. Do lado do casal, o
+ * ficheiro que fica guardado na pasta de transferências e reencaminhado para
+ * os pais chama-se por um número que não é de ninguém — e que a rota irmã já
+ * tinha decidido não mostrar ao cliente («o `randomUUID()` da nossa base não é
+ * referência de ninguém»). O nome do ficheiro tinha ficado de fora dessa
+ * decisão.
+ *
+ * Passa a ser o que o casal reconhece: a casa, o nome deles e a data do
+ * evento — `Proposta-Liquen-Events-Maria-e-Ze-12-09-2026.pdf`.
+ *
+ * ── PORQUE É QUE NÃO LEVA ACENTOS NEM «&» ─────────────────────────────────
+ * «Liquen» sem acento é como sempre esteve, e a razão continua de pé: um
+ * acento num anexo ainda hoje chega partido a alguns clientes de correio. O
+ * mesmo nome viaja também num cabeçalho `Content-Disposition` (é assim que o
+ * link do casal e o portal o servem), e por isso fica-se por letras, números e
+ * hífenes — «Zé» é «Ze», o «&» é «e». O que se ganha em legibilidade perde-se
+ * todo se o ficheiro chegar com o nome partido a meio.
+ *
+ * ── E QUANDO NÃO HÁ NOME NENHUM ───────────────────────────────────────────
+ * Cai na referência, exactamente como antes. Um documento a meio de ser
+ * escrito não tem casal nem data, e um ficheiro chamado
+ * `Proposta-Liquen-Events-.pdf` era pior do que o identificador.
  */
-export function nomeDoFicheiroDaProposta(ref: string, idioma: IdiomaDaProposta): string {
-  return ehIdiomaDaProposta(idioma) && idioma === "en"
-    ? `Proposal-Liquen-${ref}.pdf`
-    : `Proposta-Liquen-${ref}.pdf`;
+export interface DadosDoNomeDoFicheiro {
+  /** «Maria & Zé», tal como está no documento. */
+  clientNames?: string;
+  /** «12 de setembro de 2026», tal como o estúdio a escreve. */
+  eventDate?: string;
+  /** A referência interna — o que fica no nome quando não há casal nenhum. */
+  ref: string;
+}
+
+/** Letras, números e hífenes, e mais nada — ver o porquê acima. */
+function paraNomeDeFicheiro(texto: string): string {
+  return (
+    texto
+      .normalize("NFD")
+      // Os diacríticos decompostos («é» → «e» + acento) saem aqui.
+      .replace(/[\u0300-\u036f]/g, "")
+      // Estes não se decompõem, e sem eles «Nørgaard» ficava «Nrgaard».
+      .replace(/[øØ]/g, "o")
+      .replace(/[æÆ]/g, "ae")
+      .replace(/ß/g, "ss")
+      .replace(/&/g, " e ")
+      .replace(/[^A-Za-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+  );
+}
+
+/** «12 de setembro de 2026» → «12-09-2026». Vazio para tudo o resto. */
+function dataParaNomeDeFicheiro(texto: string | undefined): string {
+  const iso = texto ? isoDaDataPorExtenso(texto) : null;
+  if (!iso) return "";
+  const [ano, mes, dia] = iso.split("-");
+  return `${dia}-${mes}-${ano}`;
+}
+
+/**
+ * Quanto do nome do casal cabe no ficheiro.
+ *
+ * Quarenta e quatro caracteres. «Maria da Conceição Gonçalves Ançã &
+ * Jean-François Ålström-Nørgaard» dá sessenta e seis depois de limpo, e com a
+ * casa e a data à volta o ficheiro passava dos noventa — deixa de caber na
+ * coluna do gestor de ficheiros, que é exactamente o problema que isto vem
+ * resolver. Aos quarenta e quatro sobrevivem os dois primeiros nomes, que é o
+ * que se diz ao telefone. Corta-se num hífen, nunca a meio de uma palavra.
+ */
+const MAX_NOME = 44;
+
+export function nomeDoFicheiroDaProposta(
+  dados: DadosDoNomeDoFicheiro,
+  idioma: IdiomaDaProposta,
+): string {
+  const prefixo = ehIdiomaDaProposta(idioma) && idioma === "en" ? "Proposal" : "Proposta";
+  const nomes = paraNomeDeFicheiro(dados.clientNames ?? "");
+  if (!nomes) return `${prefixo}-Liquen-${dados.ref}.pdf`;
+  const cortado =
+    nomes.length <= MAX_NOME
+      ? nomes
+      : nomes
+          .slice(0, MAX_NOME)
+          .replace(/-[^-]*$/, "")
+          .replace(/-+$/, "");
+  const data = dataParaNomeDeFicheiro(dados.eventDate);
+  return `${prefixo}-Liquen-Events-${cortado}${data ? `-${data}` : ""}.pdf`;
 }
 
 export interface TextosDoEmailDaProposta {
@@ -74,8 +157,8 @@ export interface TextosDoEmailDaProposta {
   botao: string;
   /** O que precede o endereço na versão em texto simples. */
   verOnline: string;
-  /** O nome do PDF em anexo, a partir da referência do pedido. */
-  nomeDoAnexo: (ref: string) => string;
+  /** O nome do PDF em anexo — ver {@link nomeDoFicheiroDaProposta}. */
+  nomeDoAnexo: (dados: DadosDoNomeDoFicheiro) => string;
 }
 
 const PT: TextosDoEmailDaProposta = {
@@ -87,7 +170,7 @@ const PT: TextosDoEmailDaProposta = {
   introEmTexto: "Segue em anexo a proposta personalizada para o seu evento.",
   botao: "Ver a proposta →",
   verOnline: "Ver online:",
-  nomeDoAnexo: (ref) => nomeDoFicheiroDaProposta(ref, "pt"),
+  nomeDoAnexo: (dados) => nomeDoFicheiroDaProposta(dados, "pt"),
 };
 
 const EN: TextosDoEmailDaProposta = {
@@ -105,7 +188,7 @@ const EN: TextosDoEmailDaProposta = {
    * o mesmo nome a segunda fica «Proposta-Liquen-q1 (1).pdf» na pasta de
    * transferências de quem as receba.
    */
-  nomeDoAnexo: (ref) => nomeDoFicheiroDaProposta(ref, "en"),
+  nomeDoAnexo: (dados) => nomeDoFicheiroDaProposta(dados, "en"),
 };
 
 /**

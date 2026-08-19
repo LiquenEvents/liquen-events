@@ -545,8 +545,13 @@ export function textosDaProposta(idioma: IdiomaDaProposta): TextosDoDocumento {
    proposta inglesa dizia «Batizado». */
 
 /** "12 de setembro de 2026" → "2026-09-12". `null` para tudo o resto — que é
- *  como se sabe que a data já não é a que o estúdio escreveu. */
-function isoDaDataPorExtenso(texto: string): string | null {
+ *  como se sabe que a data já não é a que o estúdio escreveu.
+ *
+ *  Exportada porque o NOME DO FICHEIRO da proposta também precisa da data do
+ *  evento (ver `email-proposta-textos.ts`), e uma segunda leitura da mesma
+ *  forma escrita era a garantia de que um dia divergiam — que é o mesmo
+ *  raciocínio que já prende esta função à `dataDoEventoPorExtenso`. */
+export function isoDaDataPorExtenso(texto: string): string | null {
   const m = /^(\d{1,2}) de ([a-zç]+) de (\d{4})$/i.exec(texto.trim());
   if (!m) return null;
   const mes = MESES_PT.indexOf(m[2].toLowerCase());

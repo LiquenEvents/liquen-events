@@ -767,7 +767,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               // versões (a portuguesa aos pais, a inglesa ao casal) e com o mesmo
               // nome a segunda fica «Proposta-Liquen-q1 (1).pdf» na pasta de quem
               // as receba, sem forma de saber qual é qual sem abrir as duas.
-              filename: t.nomeDoAnexo(id),
+              // O NOME é o do casal e o da data do evento, e não o
+              // identificador interno do pedido: é este ficheiro que fica na
+              // pasta de transferências deles e que é reencaminhado aos pais.
+              filename: t.nomeDoAnexo({
+                clientNames: doc.clientNames,
+                eventDate: doc.eventDate,
+                ref: id,
+              }),
               content: pdfBuffer,
               contentType: "application/pdf",
             },
