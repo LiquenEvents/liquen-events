@@ -57,6 +57,8 @@ const { default: PoloPage } = await import("./[polo]/page");
 const { default: DestinationPage } = await import("./destination/page");
 const { default: EstiloPage } = await import("./estilo/[estilo]/page");
 const { POLOS, ESTILOS } = await import("@/lib/ads/polos");
+const { default: VariantePage } = await import("../../s/[slug]/page");
+const { VARIANTES, fotosDaVariante } = await import("@/lib/meta/variantes");
 
 function imagensDe(el: ReactElement): HTMLImageElement[] {
   const html = renderToStaticMarkup(el);
@@ -107,6 +109,48 @@ describe("grelhas de portefólio das páginas de anúncios", () => {
       const alts = portefolio.map((img) => (img.getAttribute("alt") ?? "").trim());
       for (const alt of alts) expect(alt).not.toBe("");
       expect(new Set(alts).size).toBe(alts.length);
+    },
+  );
+
+  /**
+   * ── E A MESMA SECÇÃO NA PÁGINA DOS ANÚNCIOS DO INSTAGRAM ────────────────
+   *
+   * A varredura que apanhou as três grelhas de cima parou nas páginas de
+   * `/casamentos`. O ramo `/s/<slug>` — o destino do tráfego PAGO da Meta —
+   * tem a mesma secção («O TRABALHO»: quatro fotografias em grelha, sem
+   * legenda visível) e tinha exactamente o mesmo `alt=""`. E tinha-o também na
+   * CAPA, que ali não é decoração nenhuma: é a fotografia a ecrã inteiro que
+   * faz metade do argumento da página.
+   *
+   * Estas páginas são `noindex` de propósito, portanto o Google não é o
+   * argumento — o argumento é quem chega a uma landing page de anúncio com
+   * leitor de ecrã e não fica a saber que ali há sequer uma imagem.
+   */
+  it.each(["pt", "en"] as const)(
+    "%s: a variante social, capa e grelha do trabalho com legenda própria",
+    async (lang) => {
+      for (const v of VARIANTES) {
+        if (v.soEm && v.soEm !== lang) continue;
+        const el = await VariantePage({ params: Promise.resolve({ lang, slug: v.slug }) });
+        const imgs = imagensDe(el);
+        const contexto = `/${lang}/s/${v.slug}`;
+
+        // A capa: é a primeira imagem e é conteúdo, não fundo.
+        const capa = imgs.find((img) => (img.getAttribute("src") ?? "").includes(v.capa));
+        expect(capa, `${contexto}: a capa não apareceu no DOM`).toBeTruthy();
+        expect((capa?.getAttribute("alt") ?? "").trim(), `${contexto}: capa sem legenda`).not.toBe(
+          "",
+        );
+
+        // E a grelha do trabalho, com uma legenda distinta por fotografia. A
+        // capa sai da conta: nalgumas variantes a fotografia de capa é também
+        // uma das quatro da grelha, e apareceria duas vezes no DOM.
+        verificaLegendas(
+          fotosDaVariante(v),
+          imgs.filter((img) => img !== capa),
+          contexto,
+        );
+      }
     },
   );
 
