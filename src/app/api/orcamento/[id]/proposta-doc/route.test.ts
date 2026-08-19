@@ -149,11 +149,11 @@ function baseDoc(over: Record<string, unknown> = {}) {
   };
 }
 
-function sendReq(doc: Record<string, unknown>): NextRequest {
+function sendReq(doc: Record<string, unknown>, extra: Record<string, unknown> = {}): NextRequest {
   return new Request("https://liquen.test/api/orcamento/q1/proposta-doc", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode: "send", doc }),
+    body: JSON.stringify({ mode: "send", doc, ...extra }),
   }) as unknown as NextRequest;
 }
 
@@ -356,9 +356,74 @@ describe("POST /api/orcamento/[id]/proposta-doc — conteúdo CORTADO pelo desen
 
   it("o ENVIO também o devolve — dá para saltar a pré-visualização", async () => {
     renderMock.truncations = [{ where: "Campo «Local»", dropped: 1, unit: "linhas" }];
-    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    // Com a resposta já dada: o que se mede aqui é que a contagem VIAJA no
+    // envio (a pergunta é o teste a seguir).
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 }), { cortesConfirmados: true }), {
+      params,
+    });
     const body = await res.json();
     expect(body.truncations).toEqual(renderMock.truncations);
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O QUE FICOU CORTADO É UMA PERGUNTA, E NÃO UM AVISO DEPOIS DO EMAIL
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A contagem já viajava no envio — mas DENTRO da resposta, ou seja depois de
+   * o email ter saído. Ela lia «o nome do casal não cabe na capa» com o casal
+   * já a ter a proposta na caixa de correio, e um «&» solto no fim do nome.
+   *
+   * O que estes testes prendem é o instante: o PDF já está desenhado, a
+   * proposta ainda NÃO foi gravada, o email ainda NÃO saiu. E que a pergunta
+   * tem resposta — não é uma porta fechada, que é a regra dela sobre o envio.
+   */
+  it("pára ANTES de gravar e de enviar, e diz o que ficou cortado", async () => {
+    renderMock.truncations = [
+      { where: "Nome na capa", dropped: 2, unit: "linhas" },
+      { where: "Mood board «Cerimónia»", dropped: 3, unit: "fotos" },
+    ];
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status, "o envio seguiu sem perguntar nada").toBe(409);
+    const body = await res.json();
+    expect(body.precisaConfirmarCortes).toBe(true);
+    // A lista viaja inteira: é ela que o estúdio mostra, corte a corte.
+    expect(body.truncations).toEqual(renderMock.truncations);
+    // E nada aconteceu no mundo: nem proposta gravada, nem email enviado.
+    expect(createProposal, "gravou uma proposta antes de perguntar").not.toHaveBeenCalled();
+    expect(sendMail, "o email saiu antes de perguntar").not.toHaveBeenCalled();
+  });
+
+  it("com a resposta dada, segue na mesma — a pergunta não é uma recusa", async () => {
+    renderMock.truncations = [{ where: "Nome na capa", dropped: 2, unit: "linhas" }];
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 }), { cortesConfirmados: true }), {
+      params,
+    });
+    expect(res.status).toBe(200);
+    expect(sendMail).toHaveBeenCalled();
+    // E continua a dizer o que ficou de fora: quem confirmou tem de o ver
+    // escrito no fim, não só antes.
+    expect((await res.json()).truncations).toEqual(renderMock.truncations);
+  });
+
+  it("sem nada cortado, o envio não pergunta coisa nenhuma", async () => {
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    expect(sendMail).toHaveBeenCalled();
+  });
+
+  /**
+   * As FOTOS EM FALTA continuam a não travar nada. É uma decisão dela, escrita
+   * na rota: «recusar seria pior — ela fica sem nada e sem perceber porquê».
+   * Uma foto que não resolveu é uma avaria com segunda tentativa; um texto
+   * cortado é uma escolha de composição a morder o conteúdo.
+   */
+  it("uma foto em falta não faz pergunta nenhuma — segue, como sempre seguiu", async () => {
+    renderMock.missing = 2;
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    expect((await res.json()).missingImages).toBe(2);
+    expect(sendMail).toHaveBeenCalled();
   });
 });
 
@@ -853,7 +918,9 @@ describe("POST /api/orcamento/[id]/proposta-doc — o email sai na língua da pr
       params,
     });
     const pdf = enviado().attachments?.find((a) => a.filename.endsWith(".pdf"));
-    expect(pdf?.filename).toBe("Proposal-Liquen-q1.pdf");
+    // O nome leva o casal e a data do evento — o identificador do pedido só
+    // volta quando não há casal nenhum (ver `email-proposta-textos.test.ts`).
+    expect(pdf?.filename).toBe("Proposal-Liquen-Events-Maria-e-Ze-03-07-2027.pdf");
   });
 
   it("proposta portuguesa: o email de sempre, palavra por palavra", async () => {
@@ -867,7 +934,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — o email sai na língua da pr
     expect(email.html).toContain("Segue em anexo a proposta personalizada para o seu evento.");
     expect(email.html).toContain("Ver a proposta");
     expect(enviado().attachments?.find((a) => a.filename.endsWith(".pdf"))?.filename).toBe(
-      "Proposta-Liquen-q1.pdf",
+      "Proposta-Liquen-Events-Maria-e-Ze-03-07-2027.pdf",
     );
   });
 

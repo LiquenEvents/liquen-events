@@ -23,12 +23,17 @@ import type { NextRequest } from "next/server";
 const st = vi.hoisted(() => ({
   authed: true,
   dbConfigured: true,
-  miniatura: vi.fn(async (): Promise<Buffer | null> => Buffer.from("bytes-jpeg")),
+  miniatura: vi.fn(
+    async (): Promise<{ bytes: Buffer | null; motivo: string }> => ({
+      bytes: Buffer.from("bytes-jpeg"),
+      motivo: "ok",
+    }),
+  ),
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => st.authed }));
 vi.mock("@/lib/supabase", () => ({ isDatabaseConfigured: () => st.dbConfigured }));
-vi.mock("@/lib/derivadas", () => ({ miniaturaAPedido: st.miniatura }));
+vi.mock("@/lib/derivadas", () => ({ miniaturaAPedidoComMotivo: st.miniatura }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { GET } from "./route";
@@ -110,7 +115,7 @@ describe("GET /api/orcamento/[id]/miniatura", () => {
    * derivada que é, por definição, descartável.
    */
   it("404 quando a miniatura não deu — a célula cai para o original", async () => {
-    st.miniatura.mockResolvedValueOnce(null);
+    st.miniatura.mockResolvedValueOnce({ bytes: null, motivo: "original-em-falta" });
     const res = await GET(...pedido("q-1/a.jpg"));
     expect(res.status).toBe(404);
   });
@@ -121,5 +126,64 @@ describe("GET /api/orcamento/[id]/miniatura", () => {
     const res = await GET(...pedido("q-1/a.jpg"));
     expect(res.status).toBe(404);
     expect(log.error).toHaveBeenCalled();
+  });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * UM 404 MUDO EM PRODUÇÃO CUSTOU UM DIA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Esta rota é o URL PRINCIPAL de todas as fotografias sem miniatura
+   * guardada — é ela que o `/assets` devolve em `thumbUrl` (ver
+   * `miniaturaAPedidoUrl`). Quando ela responde 404, a célula cai para o
+   * original e, se esse também não vier, o ecrã diz «Imagem guardada / Não
+   * consegui mostrá-la neste ecrã» e MAIS NADA.
+   *
+   * O 404 fica — é deliberado, e é o que faz a célula ter plano B. O que não
+   * pode ficar é o silêncio: a resposta tem de dizer PORQUÊ, e o servidor tem
+   * de o registar. É a mesma decisão que a rota dos temas tomou.
+   */
+  it("cada recusa diz o motivo no cabeçalho", async () => {
+    st.authed = false;
+    expect((await GET(...pedido("q-1/a.jpg"))).headers.get("X-Motivo")).toBe("sem-sessao");
+
+    st.authed = true;
+    st.dbConfigured = false;
+    expect((await GET(...pedido("q-1/a.jpg"))).headers.get("X-Motivo")).toBe("sem-storage");
+
+    st.dbConfigured = true;
+    expect((await GET(...pedido("q-2/x.jpg", "q-1"))).headers.get("X-Motivo")).toBe(
+      "fora-do-pedido",
+    );
+    expect((await GET(...pedido("q-1/../q-2/x.jpg", "q-1"))).headers.get("X-Motivo")).toBe(
+      "caminho-invalido",
+    );
+  });
+
+  it("o 404 diz qual das causas foi, e regista-a", async () => {
+    const { log } = await import("@/lib/logger");
+    st.miniatura.mockResolvedValueOnce({ bytes: null, motivo: "original-em-falta" });
+    const res = await GET(...pedido("q-1/a.jpg"));
+    expect(res.status).toBe(404);
+    expect(res.headers.get("X-Motivo")).toBe("original-em-falta");
+    expect(log.warn).toHaveBeenCalled();
+  });
+
+  it("um `sharp` que rebenta é nomeado, e não confundido com uma foto em falta", async () => {
+    st.miniatura.mockResolvedValueOnce({ bytes: null, motivo: "sharp-falhou" });
+    const res = await GET(...pedido("q-1/a.jpg"));
+    expect(res.headers.get("X-Motivo")).toBe("sharp-falhou");
+  });
+
+  it("uma avaria inesperada também tem nome", async () => {
+    st.miniatura.mockRejectedValueOnce(new Error("sharp em baixo"));
+    const res = await GET(...pedido("q-1/a.jpg"));
+    expect(res.headers.get("X-Motivo")).toBe("avaria-inesperada");
+  });
+
+  it("a resposta boa não leva motivo nenhum", async () => {
+    const res = await GET(...pedido("q-1/a.jpg"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Motivo")).toBe(null);
   });
 });

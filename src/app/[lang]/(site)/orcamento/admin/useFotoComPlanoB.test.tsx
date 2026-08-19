@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach } from "vitest";
-import { useFotoComPlanoB } from "./useFotoComPlanoB";
+import { ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS, useFotoComPlanoB } from "./useFotoComPlanoB";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -24,8 +24,16 @@ import { useFotoComPlanoB } from "./useFotoComPlanoB";
  */
 
 /** Mostra o estado do hook em texto, para o teste o poder ler. */
-function Sonda({ url, planoB }: { url?: string; planoB?: string }) {
-  const { alvo, desistiu, aoFalhar } = useFotoComPlanoB(url, planoB);
+function Sonda({
+  url,
+  planoB,
+  naoInsistir,
+}: {
+  url?: string;
+  planoB?: string;
+  naoInsistir?: boolean;
+}) {
+  const { alvo, desistiu, aoFalhar } = useFotoComPlanoB(url, planoB, naoInsistir);
   return <button onClick={aoFalhar}>{desistiu ? "desistiu" : (alvo ?? "sem-alvo")}</button>;
 }
 
@@ -81,5 +89,90 @@ describe("useFotoComPlanoB", () => {
     expect(estado(), "a falha ficou gravada e o URL novo nem foi tentado").toBe(
       "assinatura-fresca",
     );
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * UMA PISCADELA NÃO É UMA AVARIA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Sem isto, «desistiu» era o fim: a única saída de uma célula morta era um
+   * dedo dela no botão, ou recarregar a página inteira. Numa grelha de nove
+   * fotografias, um segundo sem rede dava nove células mortas para sempre —
+   * que foi o que apareceu no telemóvel da dona do negócio.
+   */
+  it("dá uma segunda volta sozinha, e só uma", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<Sonda url="mini" planoB="original" />);
+      await falhar();
+      await falhar();
+      expect(estado()).toBe("desistiu");
+
+      await act(async () => {
+        vi.advanceTimersByTime(ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS + 10);
+      });
+      expect(estado(), "ficou em «desistiu» para sempre").toBe("mini");
+
+      // A segunda volta falha na mesma — e aí acabou mesmo: uma pasta apagada
+      // não pode pôr a grelha a pedir para sempre.
+      await falhar();
+      await falhar();
+      expect(estado()).toBe("desistiu");
+      await act(async () => {
+        vi.advanceTimersByTime(ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS * 5);
+      });
+      expect(estado(), "deu uma terceira volta — isto não pode ser um ciclo").toBe("desistiu");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /** O caso do telemóvel: o elevador, o comboio, sair do wi-fi. O browser sabe
+   *  quando a ligação voltou, e até aqui ninguém o ouvia. */
+  it("quando a rede volta, a célula volta com ela", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<Sonda url="mini" planoB="original" />);
+      await falhar();
+      await falhar();
+      // Gasta a volta automática, para o que se mede a seguir ser mesmo o
+      // ouvinte da rede e não a segunda volta a passar por ali.
+      await act(async () => {
+        vi.advanceTimersByTime(ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS + 10);
+      });
+      await falhar();
+      await falhar();
+      expect(estado()).toBe("desistiu");
+
+      await act(async () => {
+        window.dispatchEvent(new Event("online"));
+      });
+      expect(estado(), "a rede voltou e a célula continuou morta").toBe("mini");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * A recusa do próprio sítio (`img-src`) não muda por se insistir: a
+   * fotografia nem chega a ser pedida. Insistir é só barulho — e um botão que
+   * promete o que não pode dar é pior do que não haver botão.
+   */
+  it("com a recusa do sítio não insiste, nem por tempo nem por rede", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<Sonda url="mini" planoB="original" naoInsistir />);
+      await falhar();
+      await falhar();
+      expect(estado()).toBe("desistiu");
+      await act(async () => {
+        vi.advanceTimersByTime(ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS * 5);
+        window.dispatchEvent(new Event("online"));
+      });
+      expect(estado(), "insistiu numa recusa que dá sempre o mesmo").toBe("desistiu");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

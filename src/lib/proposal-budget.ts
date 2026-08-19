@@ -107,6 +107,10 @@ export type DocComLinhasETotal = Pick<
   Partial<
     Pick<
       ProposalDoc,
+      /** As linhas do modelo ORGANIZAÇÃO, que são as únicas com preço IMPRESSO
+       *  — ver {@link somaDasLinhasEstimadas}. Opcional porque o modelo de
+       *  Decoração não as tem, e não passa a ter por isto. */
+      | "budgetRows"
       | "totalAmount"
       | "totalVatMode"
       | "vatRate"
@@ -277,6 +281,84 @@ export function somaDosExtrasSemIva(
     return acc + (modo === "incluido" ? valor / (1 + taxa) : valor);
   }, 0);
   return round2(total);
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A COLUNA QUE O CASAL SOMA — E QUE NINGUÉM SOMAVA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * ── O QUE SAIU IMPRESSO ───────────────────────────────────────────────────
+ * Numa proposta do modelo ORGANIZAÇÃO gerada a sério, com quatro rubricas, a
+ * folha do orçamento dizia — nesta coluna, por esta ordem:
+ *
+ *     Coordenação e planeamento integral    6.500,00 €
+ *     Coordenação no dia do evento          1.850,00 € + IVA (a confirmar)
+ *     Gestão de fornecedores e contratos    —
+ *     Assessoria de imagem e papelaria
+ *     TOTAL (sem IVA)                      12.500,00 €
+ *
+ * 6.500 + 1.850 = 8.350. O total impresso são 12.500 — 4.150 € que a coluna
+ * não explica. As duas rubricas por orçamentar SÃO a diferença, mas isso não
+ * está escrito em lado nenhum: quem somar a coluna encontra um buraco e não
+ * tem como saber se é um preço que falta ou uma conta que está errada.
+ *
+ * ── PORQUE É QUE NÃO HAVIA AVISO ──────────────────────────────────────────
+ * `budgetRows` era lido NUM SÍTIO SÓ — a desenhar — e este ficheiro não tinha
+ * uma única ocorrência do nome. O modelo de DECORAÇÃO não pode ter este
+ * defeito: lá o subtotal é DERIVADO do total (`servicos = base − adicionais`)
+ * e a coluna de preços sai em branco, portanto não há dois números para
+ * divergirem. No de Organização há: valores escritos à mão numa coluna, e um
+ * total escrito à mão vinte pontos por baixo dela.
+ *
+ * ── O QUE SE COMPARA, E CONTRA O QUÊ ──────────────────────────────────────
+ * A coluna contra o SUBTOTAL (`servicos`), que é onde o quadro fecha por cima
+ * dos valores adicionais. É a mesma escolha do {@link desalinhamento} e pela
+ * mesma razão: os adicionais são impressos POR BAIXO do subtotal, em linhas
+ * próprias, e se só um dos lados os perdesse uma proposta certa passava a
+ * acusar a deslocação inteira de diferença.
+ *
+ * Os preços são TEXTO LIVRE («1.850,00 € + IVA (a confirmar)»), como os
+ * valores adicionais, e por isso são lidos pela MESMA regra
+ * ({@link somaDosExtrasSemIva}): o que a linha diz ganha, uma linha calada
+ * segue o modo do documento, e o resultado é sempre BASE — que é a unidade em
+ * que `servicos` está. Medido no caso simétrico: com uma leitura crua, uma
+ * proposta certa que se lê COM IVA (8.350 de base, 10.270,50 impressos)
+ * acusava 1.150 € de diferença que não existem.
+ *
+ * ── E QUANDO É QUE SE CALA ────────────────────────────────────────────────
+ * `null` — nada a dizer — quando NENHUMA rubrica tem preço legível. Essa é a
+ * folha de sempre: as rubricas por nome e a coluna em branco, como na proposta
+ * feita à mão e como o modelo de Decoração sai todos os dias. Sem um número
+ * impresso não há nada que contradiga o total, e, nas palavras dela, «um aviso
+ * que dispara em condições normais é um aviso que se aprende a ignorar».
+ *
+ * `semPreco` conta as rubricas que o casal vê SEM valor ao lado — é essa a
+ * frase que falta no papel, e é por isso que o aviso a diz.
+ */
+export function somaDasLinhasEstimadas(
+  doc: Pick<ProposalDoc, "budgetRows">,
+  contexto?: { mode?: VatMode; vatRate?: number },
+): { soma: number; comPreco: number; semPreco: number } | null {
+  // Uma linha sem nome NEM preço não chega ao papel como coisa nenhuma, e por
+  // isso não conta para «rubricas sem preço» — que é uma frase sobre o que o
+  // casal vê, não sobre o que está guardado.
+  const linhas = (doc.budgetRows ?? []).filter(
+    (r) => (r?.item ?? "").trim() !== "" || (r?.price ?? "").trim() !== "",
+  );
+  // O marcador «[Valor]» não tem número nenhum lá dentro, e por isso cai aqui
+  // do lado certo: é uma rubrica SEM preço, que é o que ela é no papel (o
+  // desenho imprime-lhe um «—»).
+  const comNumero = linhas.filter((r) => normalizarValor(r.price) !== null);
+  if (comNumero.length === 0) return null;
+  return {
+    soma: somaDosExtrasSemIva(
+      comNumero.map((r) => ({ label: r.item, valueText: r.price })),
+      contexto,
+    ),
+    comPreco: comNumero.length,
+    semPreco: linhas.length - comNumero.length,
+  };
 }
 
 /**
@@ -582,6 +664,40 @@ export function totaisDaProposta(
     porQueNaoFecha.push(
       `os valores adicionais (${adicionais}) valem mais do que o total (${money.base}), e o subtotal dos serviços sai negativo`,
     );
+  }
+  /**
+   * ── E A COLUNA DE PREÇOS DO MODELO ORGANIZAÇÃO ──────────────────────────
+   *
+   * As três verificações de cima são sobre contas NOSSAS, e fecham por
+   * construção. Esta é sobre números escritos à MÃO — a única coluna do
+   * documento em que um valor dela é impresso linha a linha — e pode não
+   * fechar por dados, não por código. Ver {@link somaDasLinhasEstimadas}: o
+   * caso medido são 6.500 + 1.850 impressos por baixo de um TOTAL de 12.500.
+   *
+   * `money.base > 0`: sem total escrito não há total impresso, e portanto não
+   * há contradição nenhuma a apontar — uma proposta a meio de ser escrita não
+   * pode acender avisos.
+   */
+  const estimadas = somaDasLinhasEstimadas(doc, { mode: money.mode, vatRate: money.vatRate });
+  if (estimadas && money.base > 0) {
+    const diferenca = round2(servicos - estimadas.soma);
+    // A mesma tolerância de um cêntimo do {@link desalinhamento}, e pela mesma
+    // razão: a soma é feita em vírgula flutuante e os dois lados foram
+    // escritos por uma pessoa.
+    if (Math.abs(diferenca) > 0.01) {
+      const semPreco =
+        estimadas.semPreco === 1
+          ? "1 rubrica sem preço"
+          : `${estimadas.semPreco} rubricas sem preço`;
+      porQueNaoFecha.push(
+        estimadas.semPreco > 0
+          ? // A frase diz as três coisas que o casal vê e não consegue ligar: o
+            // que a coluna soma, o que o quadro fecha, e quantas rubricas estão
+            // a esconder a diferença.
+            `as linhas do orçamento com preço somam ${estimadas.soma} e o quadro fecha em ${servicos} — ${semPreco}, e a diferença de ${Math.abs(diferenca)} não está escrita em lado nenhum`
+          : `as linhas do orçamento somam ${estimadas.soma} e o quadro fecha em ${servicos} (${Math.abs(diferenca)} de diferença)`,
+      );
+    }
   }
 
   return {

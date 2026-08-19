@@ -433,6 +433,12 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // nomes das variáveis a confirmar. E a verificação ESCREVE (é assim que ela é
   // honesta: tenta gravar e volta a ler). Sem sessão, nem se pergunta.
   { path: "./admin/armazenamento/route", methods: ["GET"] },
+  // «Porque é que as fotografias não aparecem?» — a rota que responde. Nomeia
+  // as variáveis do Supabase, os buckets, o papel da chave e a política de
+  // segurança que esta instalação serve: é o mapa da instalação, e vai buscar
+  // uma fotografia REAL ao Storage para a experimentar. Sem sessão, 401 antes
+  // de qualquer pergunta.
+  { path: "./admin/fotos-diagnostico/route", methods: ["GET"] },
   // O mesmo, do lado da Meta: o relatório e o envio dos casamentos fechados
   // trazem o valor de cada negócio. O POST é o que efectivamente ENVIA
   // conversões para fora — sem sessão não pode sequer ser tentado.

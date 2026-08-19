@@ -478,15 +478,23 @@ export function CelulaDeFoto({
         )}
       </div>
       {/* A PEGA. Alvo próprio de 44 px no dedo (`alvo-toque`), sempre visível
-          onde não há hover nenhum — no telemóvel, uma pega que só aparece ao
-          passar o rato é uma pega que não existe. */}
+          onde não há rato — no telemóvel, uma pega que só aparece ao passar o
+          rato é uma pega que não existe.
+
+          A pergunta é `com-rato` e não `(hover: none)`, pela mesma razão que a
+          barra de acções ao lado: um iPhone com AssistiveTouch, um iPad com
+          trackpad ou um portátil de ecrã táctil dizem `(hover: hover)` E
+          `(pointer: coarse)` — e com a regra antiga a pega ficava invisível num
+          aparelho onde o `alvo-toque` já lhe tinha dado 44 px de lado. Um
+          quadrado invisível de 44 px em cima da fotografia é pior do que uma
+          pega: apanha o toque e não diz nada. */}
       {!bloqueada && (
         <button
           type="button"
           {...attributes}
           {...listeners}
           aria-label={`Arrastar a fotografia ${ii + 1}`}
-          className="alvo-toque absolute top-1 right-1 z-20 flex h-6 w-6 cursor-grab items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white opacity-0 transition-opacity group-hover/foto:opacity-100 focus-visible:opacity-100 active:cursor-grabbing [@media(hover:none)]:opacity-100"
+          className="alvo-toque absolute top-1 right-1 z-20 flex h-6 w-6 cursor-grab items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white opacity-100 transition-opacity com-rato:opacity-0 com-rato:group-hover/foto:opacity-100 com-rato:focus-visible:opacity-100 active:cursor-grabbing"
         >
           <span aria-hidden="true">⠿</span>
         </button>

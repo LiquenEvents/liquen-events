@@ -3,6 +3,7 @@ import {
   AMOSTRAS_GUARDADAS,
   LIMITE_DE_ANEXO,
   comNovaAmostra,
+  orcamentoDeTempo,
   passaDoAnexo,
   tamanhoEmPalavras,
   tamanhoEstimado,
@@ -115,5 +116,56 @@ describe("as palavras", () => {
   it("o tamanho vem em português, com vírgula", () => {
     expect(tamanhoEmPalavras(2.4 * 1024 * 1024)).toBe("2,4 MB");
     expect(tamanhoEmPalavras(300 * 1024)).toBe("300 KB");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ORÇAMENTO DE TEMPO — O TECTO QUE A PROPOSTA NÃO SABE QUE TEM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Os números vêm de oito documentos gerados a sério (ver o bloco no
+ * `custo-do-pdf.ts`). O que estes testes prendem é a FORMA da conta: que a
+ * capa custa muito mais do que uma célula, que a rede entra por lotes de
+ * quatro, e que o aviso acende antes de a conta deixar de caber — não depois.
+ */
+describe("o orçamento de tempo de uma proposta", () => {
+  it("uma proposta normal fica com o tecto todo à frente", () => {
+    // 14 fotos + 2 tiras de capa: medido, 2,4 s de desenho e 1 a 2 de rede.
+    const o = orcamentoDeTempo(14, 2);
+    expect(o.aperta).toBe(false);
+    expect(o.msPessimista).toBeLessThan(o.tectoMs / 2);
+  });
+
+  it("as 80 fotografias do tecto do gerador chegam ao tecto da rota", () => {
+    // 78 de mood board + 2 tiras de capa. Medido: 7,6 s de desenho; a rede põe
+    // lá +6 a +12 s. O mau dia bate nos 20 s da rota.
+    const o = orcamentoDeTempo(78, 2);
+    expect(o.aperta, "a proposta maior que o gerador aceita não acendeu aviso nenhum").toBe(true);
+    expect(o.msPessimista).toBeGreaterThanOrEqual(o.tectoMs * 0.75);
+  });
+
+  it("uma tira de capa custa muito mais do que uma célula de mood board", () => {
+    // É a maior caixa do documento e é a que mais trabalho dá ao sharp: 590 ms
+    // contra 90. Sem esta diferença, uma proposta de duas fotos de capa e mais
+    // nada parecia grátis.
+    const soCapa = orcamentoDeTempo(0, 2).desenhoMs;
+    const soBoard = orcamentoDeTempo(2, 0).desenhoMs;
+    expect(soCapa).toBeGreaterThan(soBoard * 2);
+  });
+
+  it("a rede conta por LOTES de quatro, não por fotografia", () => {
+    // Quatro fotografias e uma custam a mesma ida — é o que a concorrência de
+    // 4 dos downloads quer dizer, e ignorá-lo multiplicava a estimativa por
+    // quatro nas propostas grandes.
+    const uma = orcamentoDeTempo(1, 0);
+    const quatro = orcamentoDeTempo(4, 0);
+    expect(quatro.msPessimista - quatro.desenhoMs).toBe(uma.msPessimista - uma.desenhoMs);
+  });
+
+  it("um documento sem fotografias nenhumas não gasta rede nenhuma", () => {
+    const o = orcamentoDeTempo(0, 0);
+    expect(o.msOptimista).toBe(o.desenhoMs);
+    expect(o.aperta).toBe(false);
   });
 });

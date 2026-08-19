@@ -189,13 +189,14 @@ describe("a miniatura contra a página do PDF", () => {
 
   it("escreve o sobretítulo que a página tem, e na mesma linha", async () => {
     const escritas = await paginaDoMoodBoard();
-    // É desenhado LETRA A LETRA — é assim que leva o espaçamento —, por isso
-    // não há nenhuma escrita com a palavra inteira.
-    const primeira = TXT.sobretitulo.texto[0].toUpperCase();
-    const letras = escritas.filter((e) => e.texto === primeira && e.y > PAGINA_H / 2);
-    expect(letras.length, "o PDF não escreveu o sobretítulo").toBeGreaterThan(0);
+    // Era desenhado LETRA A LETRA e este teste procurava a primeira delas. O
+    // espaçamento passou a ser o do PDF (`Tc`), e a palavra é agora UMA
+    // escrita — o que se procura é a palavra inteira, em capitulares.
+    const palavra = TXT.sobretitulo.texto.toUpperCase();
+    const escrita = escritas.find((e) => e.texto === palavra && e.y > PAGINA_H / 2);
+    expect(escrita, "o PDF não escreveu o sobretítulo").toBeTruthy();
     const previa = naPrevia(TXT.sobretitulo);
-    expect(Math.abs(naFolha(letras[0]) - previa)).toBeLessThan(TOLERANCIA);
+    expect(Math.abs(naFolha(escrita!) - previa)).toBeLessThan(TOLERANCIA);
   });
 
   it("a folha tem a proporção da página do documento", () => {

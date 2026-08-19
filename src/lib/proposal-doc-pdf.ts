@@ -9,6 +9,7 @@ import {
   closePath,
   clip,
   endPath,
+  setCharacterSpacing,
   type PDFFont,
   type PDFPage,
   type PDFImage,
@@ -51,6 +52,7 @@ import {
   PAGINA_W,
   PAGINA_H,
   PAGINA_M,
+  TOPO_DAS_FOTOS,
   TEXTO_DO_MOODBOARD as TXT,
   type CaixaPdf,
 } from "@/lib/proposal-geometria";
@@ -212,7 +214,20 @@ const MAX_ANNOTATION_LINES = TXT.legenda.maxLinhas;
  */
 export { caixasDaCapa, caixasDoCollage, type CaixaPdf };
 const MAX_EVENT_FIELD_LINES = 2; // cada campo da faixa de detalhes
-const MAX_COVER_NAME_LINES = 2; // nome do casal na capa
+/** O nome do casal na capa: TRÊS linhas, e não duas — ver o bloco «A CAPA NÃO
+ *  CORTA O NOME DO CASAL». */
+const MAX_COVER_NAME_LINES = 3;
+/** Até onde o nome encolhe antes de partir. Era 26, e era aí que ele era
+ *  cortado a meio; a 18 continua a ser o maior texto da folha. */
+const COVER_NAME_MIN = 18;
+/** As linhas de baixo da capa (tipo/data, local): duas, e o corpo mínimo. */
+const MAX_COVER_LINE_LINES = 2;
+const COVER_LINE_MIN = 8.5;
+/** O título e o subtítulo de um mood board: duas linhas, e até onde encolhem.
+ *  Ver o bloco «O CABEÇALHO DE UM MOOD BOARD CABE NA FOLHA». */
+const MAX_BOARD_HEAD_LINES = 2;
+const BOARD_TITLE_MIN = 14;
+const BOARD_SUB_MIN = 9.5;
 
 /** Uma perda por COMPOSIÇÃO: o conteúdo chegou inteiro ao gerador e o desenho
  *  não o mostra todo. Estruturada (e não uma frase feita) para o estúdio poder
@@ -543,7 +558,124 @@ async function drawCoverImage(
   return false;
 }
 
-function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TEXTO ESPAÇADO É UM TEXTO, E NÃO UMA FILA DE LETRAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «LÍQUEN EVENTS» no rodapé e «INSPIRAÇÃO» por cima de cada mood board eram
+ * desenhados GLIFO A GLIFO — um `drawText` por letra, com a posição calculada à
+ * mão. Funcionava no papel e não funcionava em mais lado nenhum:
+ *
+ *   · procurar «Líquen» DENTRO do PDF não encontrava nada (medido: zero
+ *     ocorrências nos oito ficheiros do relatório) — cada letra é uma corrida
+ *     de texto isolada, e nenhum motor de busca junta corridas;
+ *   · copiar do visualizador dava «L Í Q U E N   E V E N T S»;
+ *   · e cada palavra custava treze operadores de texto em vez de um, em todas
+ *     as páginas do documento.
+ *
+ * O PDF tem um operador para isto desde sempre — `Tc`, o espaçamento entre
+ * caracteres — e a pdf-lib exporta-o (`setCharacterSpacing`). É estado
+ * gráfico, por isso vai entre um `q` e um `Q`: sem eles, o espaçamento ficava
+ * ligado para o resto da página e o corpo do texto saía todo esparramado.
+ *
+ * ── A LARGURA CONTINUA A SER A MESMA ──────────────────────────────────────
+ * O `Tc` acrescenta o espaço DEPOIS de cada glifo, incluindo o último: o
+ * avanço total é `largura + espaçamento × n`. Para centrar, o que interessa é
+ * a tinta — `largura + espaçamento × (n − 1)` —, que é exactamente a conta que
+ * o desenho letra a letra já fazia. A palavra fica onde estava.
+ */
+function larguraEspacada(font: PDFFont, texto: string, size: number, tracking: number): number {
+  const n = [...texto].length;
+  return font.widthOfTextAtSize(texto, size) + tracking * Math.max(0, n - 1);
+}
+
+/** Desenha `texto` com espaçamento entre letras, numa só corrida de texto. */
+function drawEspacado(
+  p: PDFPage,
+  texto: string,
+  x: number,
+  y: number,
+  o: { font: PDFFont; size: number; color: ReturnType<typeof rgb>; tracking: number },
+): void {
+  p.pushOperators(pushGraphicsState(), setCharacterSpacing(o.tracking));
+  p.drawText(texto, { x, y, font: o.font, size: o.size, color: o.color });
+  p.pushOperators(popGraphicsState());
+}
+
+/**
+ * ── ONDE O DESENHO CORTA, O PAPEL DI-LO ────────────────────────────────────
+ *
+ * A composição tem limites — o nome da capa, os campos do evento, a legenda de
+ * um mood board — e o que passava deles acabava a meio da frase, sem sinal
+ * nenhum: «… ao casal. Linha». Quem lê não tem como distinguir «o texto acabou»
+ * de «o texto foi cortado», e é a mesma folha que vai para o cliente.
+ *
+ * O relatório de truncagens continua a contar tudo (é o que o estúdio lê antes
+ * de enviar); as reticências são para quem só tem o papel.
+ */
+const RETICENCIAS = "…";
+
+/** `texto` cortado à largura pedida, com «…» a dizer que foi cortado. */
+function comReticencias(
+  font: PDFFont,
+  texto: string,
+  size: number,
+  maxWidth: number,
+  tracking = 0,
+): string {
+  const safe = textoParaFonte(font, texto);
+  if (larguraEspacada(font, safe, size, tracking) <= maxWidth) return safe;
+  const cauda = textoParaFonte(font, RETICENCIAS);
+  let corte = safe;
+  while (corte.length > 1 && larguraEspacada(font, corte + cauda, size, tracking) > maxWidth) {
+    corte = corte.slice(0, -1);
+  }
+  // Sem a pontuação nem o espaço que ficaram pendurados no sítio do corte.
+  return corte.replace(/[\s.,;:·—–-]+$/u, "") + cauda;
+}
+
+/**
+ * Quebra `texto` e corta a `maxLinhas`, com «…» na última quando sobrou texto.
+ *
+ * Devolve também quantas linhas ficaram de fora, para quem chama as poder
+ * anotar no relatório — cortar em silêncio é o defeito, não a solução.
+ */
+function quebrarComReticencias(
+  font: PDFFont,
+  texto: string,
+  size: number,
+  maxWidth: number,
+  maxLinhas: number,
+  tracking = 0,
+): { linhas: string[]; cortadas: number } {
+  const todas = wrap(font, texto, size, maxWidth, tracking);
+  if (todas.length <= maxLinhas) return { linhas: todas, cortadas: 0 };
+  const linhas = todas.slice(0, maxLinhas);
+  const resto = todas.slice(maxLinhas).join(" ").trim();
+  // A última linha fica com o que couber dela mais o princípio do que se
+  // perdeu, e acaba em «…»: é o sinal de que há texto a seguir.
+  linhas[maxLinhas - 1] = comReticencias(
+    font,
+    `${linhas[maxLinhas - 1]} ${resto}`.trim(),
+    size,
+    maxWidth,
+    tracking,
+  );
+  return { linhas, cortadas: todas.length - maxLinhas };
+}
+
+function wrap(
+  font: PDFFont,
+  rawText: string,
+  size: number,
+  maxWidth: number,
+  /** O espaçamento entre letras, quando a linha vai ser desenhada espaçada.
+   *  Sem ele, uma capitular espaçada media-se estreita e desenhava-se larga —
+   *  foi assim que a linha do tipo e da data escorreu para fora do painel da
+   *  capa por cima das fotografias. */
+  tracking = 0,
+): string[] {
   // Sanitiza para WinAnsi antes de medir/quebrar — descrições e notas do
   // documento podem trazer caracteres que a Helvetica não codifica.
   const text = textoParaFonte(font, rawText);
@@ -553,7 +685,52 @@ function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): s
     let line = "";
     for (const w of words) {
       const test = line ? `${line} ${w}` : w;
-      if (font.widthOfTextAtSize(test, size) > maxWidth && line) {
+      if (larguraEspacada(font, test, size, tracking) > maxWidth && line) {
+        out.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+/**
+ * Quebra com RECUO DE PRIMEIRA LINHA — a primeira linha mais curta do que as
+ * seguintes, porque tem o rótulo a negro a ocupar-lhe o princípio.
+ *
+ * É a quebra das linhas de um serviço. Antes, TODAS as linhas eram quebradas à
+ * largura da primeira (a que sobra depois do rótulo) e as seguintes eram
+ * desenhadas mais à esquerda — o que lhes deixava largura a sobrar e nunca a
+ * faltar. Estava escrito no código que era «conservador de propósito», e o
+ * resultado no papel era uma mancha irregular: medido, uma linha a acabar em
+ * x=1154 e a seguinte em x=731, um buraco de 35% da largura no meio de um
+ * parágrafo.
+ *
+ * Medir cada linha à largura a que ela é DESENHADA não é menos conservador: é
+ * a mesma regra do resto do ficheiro — a altura que se mede é a altura que se
+ * desenha —, aplicada também à largura.
+ */
+function wrapComRecuo(
+  font: PDFFont,
+  rawText: string,
+  size: number,
+  larguraDaPrimeira: number,
+  larguraDasSeguintes: number,
+): string[] {
+  const text = textoParaFonte(font, rawText);
+  const out: string[] = [];
+  for (const paragraph of text.split("\n")) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let line = "";
+    for (const w of words) {
+      const test = line ? `${line} ${w}` : w;
+      // Só a PRIMEIRA linha de todas leva o recuo: é a única que é desenhada à
+      // frente do rótulo. Um parágrafo seguinte já começa à esquerda.
+      const largura = out.length === 0 ? larguraDaPrimeira : larguraDasSeguintes;
+      if (font.widthOfTextAtSize(test, size) > largura && line) {
         out.push(line);
         line = w;
       } else {
@@ -830,15 +1007,14 @@ export async function renderProposalDocPdfWithReport(
     const safe = textoParaFonte(fn, s);
     const sz = o.size ?? 10;
     if (o.tracking) {
-      // Letter-spaced small caps (eyebrows) — draw glyph by glyph.
-      let w = 0;
-      for (const ch of safe) w += fn.widthOfTextAtSize(ch, sz) + o.tracking;
-      w -= o.tracking;
-      let x = cx - w / 2;
-      for (const ch of safe) {
-        p.drawText(ch, { x, y, font: fn, size: sz, color: o.color ?? INK });
-        x += fn.widthOfTextAtSize(ch, sz) + o.tracking;
-      }
+      // Capitulares espaçadas — UMA corrida de texto, com o `Tc` do PDF a
+      // abrir as letras. Ver `drawEspacado`: é o que as torna pesquisáveis.
+      drawEspacado(p, safe, cx - larguraEspacada(fn, safe, sz, o.tracking) / 2, y, {
+        font: fn,
+        size: sz,
+        color: o.color ?? INK,
+        tracking: o.tracking,
+      });
       return;
     }
     p.drawText(safe, {
@@ -859,33 +1035,48 @@ export async function renderProposalDocPdfWithReport(
     textRight(p, refImpressa, W - M, H - M - 2, { size: 8, color: FAINT });
   };
 
+  /** Os rodapés à espera do número de folhas — ver o bloco dentro do `footer`. */
+  const rodapesPorNumerar: { p: PDFPage; folha: number }[] = [];
+
   // Calm footer: a pale hairline, quiet brand + email, plain page number. Called
   // on every content page so the document reads as one considered, paginated piece.
-  const footer = (p: PDFPage, pageNum: number) => {
+  const footer = (p: PDFPage) => {
     p.drawLine({
       start: { x: M, y: M - 12 },
       end: { x: W - M, y: M - 12 },
       thickness: 0.5,
       color: LINE,
     });
-    let bx = M;
-    for (const ch of "LÍQUEN EVENTS") {
-      p.drawText(ch, { x: bx, y: M - 26, font: f.bold, size: 6.5, color: FAINT });
-      bx += f.bold.widthOfTextAtSize(ch, 6.5) + 1.4;
-    }
-    textRight(p, SITE.email, W - M, M - 26, { size: 7, color: FAINT });
-    textCenter(p, String(pageNum).padStart(2, "0"), W / 2, M - 26, {
-      size: 7.5,
+    drawEspacado(p, textoParaFonte(f.bold, "LÍQUEN EVENTS"), M, M - 26, {
+      font: f.bold,
+      size: 6.5,
       color: FAINT,
+      tracking: 1.4,
     });
+    textRight(p, SITE.email, W - M, M - 26, { size: 7, color: FAINT });
+    /**
+     * ── «01 DE 09», E NÃO «01» ─────────────────────────────────────────────
+     *
+     * O número da folha sozinho não diz nada a quem imprime: com «01» não se
+     * sabe se o documento tem nove folhas ou vinte e uma, nem se chegaram
+     * todas. Falta o denominador — e o denominador só se sabe no fim.
+     *
+     * Por isso o rodapé fica com o SÍTIO marcado e é escrito na volta final,
+     * quando as páginas já existem todas (ver `rodapesPorNumerar`). É a única
+     * coisa deste documento que precisa de uma segunda passagem, e é barata:
+     * a pdf-lib guarda as páginas em memória até ao `save`.
+     *
+     * O número é o da FOLHA, contado a partir da capa: é o que se conta na
+     * mão. A capa e a contracapa não levam rodapé, mas contam — «02 de 09» na
+     * primeira folha de conteúdo é verdade, «01 de 07» não era.
+     */
+    rodapesPorNumerar.push({ p, folha: pdf.getPageCount() });
   };
 
   // A page frame = header + footer, returning the starting y for the body.
-  let pageNo = 0;
   const frame = (p: PDFPage): number => {
-    pageNo += 1;
     header(p);
-    footer(p, pageNo);
+    footer(p);
     return H - M - 84;
   };
 
@@ -893,11 +1084,13 @@ export async function renderProposalDocPdfWithReport(
   // than shouts. The one consistent "voice" for small labels across the document.
   const eyebrow = (p: PDFPage, s: string, x: number, y: number, color = FAINT, size?: number) => {
     const sz = size ?? T_CAPTION;
-    let cx = x;
-    for (const ch of textoParaFonte(f.bold, s.toUpperCase())) {
-      p.drawText(ch, { x: cx, y, font: f.bold, size: sz, color });
-      cx += f.bold.widthOfTextAtSize(ch, sz) + 2;
-    }
+    // Uma corrida de texto com o espaçamento do PDF — ver `drawEspacado`.
+    drawEspacado(p, textoParaFonte(f.bold, s.toUpperCase()), x, y, {
+      font: f.bold,
+      size: sz,
+      color,
+      tracking: 2,
+    });
   };
   /**
    * ── AS SECÇÕES SÃO NUMERADAS, COMO NA FOLHA DELA ──────────────────────────
@@ -1011,31 +1204,145 @@ export async function renderProposalDocPdfWithReport(
     });
     p.drawRectangle({ x: cx - 26, y: 324, width: 52, height: 1.1, color: rgb(0.72, 0.6, 0.34) });
 
-    // Couple/client name — shrink-to-fit, then wrap to two lines as a last resort
-    // so long names never overflow the trim or the centre band.
+    /* ═══════════════════════════════════════════════════════════════════════
+       A CAPA NÃO CORTA O NOME DO CASAL
+       ═══════════════════════════════════════════════════════════════════════
+
+       Com «Maria da Conceição Gonçalves Ançã & Jean-François Ålström-Nørgaard»,
+       a capa imprimia
+
+           Maria da Conceição
+           Gonçalves Ançã &
+
+       — o noivo desaparecia e a capa ACABAVA NUM «&». O nome encolhia de 52
+       para 26 e era cortado às duas linhas; o corte era anotado no relatório,
+       que é lido no estúdio, e o PDF saía na mesma.
+
+       Três degraus, por esta ordem, e nenhum deles deixa o nome a meio:
+
+        1. ENCOLHER até 18 (era 26). Os oito pontos que faltavam são a
+           diferença entre caber e não caber na esmagadora maioria dos nomes
+           compridos — 61 caracteres cabem em duas linhas a 18.
+        2. TRÊS LINHAS em vez de duas. A capa tem lugar: entre a régua dourada
+           (324) e a linha do tipo/data (214) há 110 pontos, e três linhas a 18
+           ocupam 38.
+        3. E só se nem assim couber, O NOME MAIS CURTO — «Maria &
+           Jean-François» em vez de meio nome seguido de um «&» solto. Um nome
+           encurtado lê-se como uma escolha; um nome cortado lê-se como avaria.
+
+       Continua a ser anotado no relatório, porque continua a faltar conteúdo à
+       folha — o que deixa de haver é uma capa errada. */
+    /** O primeiro nome de cada lado do «&» — o nome por que o casal se trata. */
+    const nomeCurtoDoCasal = (completo: string): string => {
+      const lados = completo.split(/\s*&\s*/).filter((l) => l.trim());
+      if (lados.length < 2) return "";
+      const curto = lados.map((l) => l.trim().split(/\s+/)[0]).join(" & ");
+      return curto === completo.trim() ? "" : curto;
+    };
     // Sanitiza para WinAnsi ANTES de medir: widthOfTextAtSize lança em glifos
     // fora do WinAnsi (emoji/CJK num nome de cliente), o que rebentaria o PDF
     // inteiro aqui na capa em vez de degradar graciosamente.
     const names = textoParaFonte(f.serif, doc.clientNames || "");
     const maxNameW = (hasImgs ? W * 0.34 : W * 0.72) - 16;
     let nameSize = 52;
-    while (nameSize > 26 && f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) nameSize -= 2;
+    while (
+      nameSize > COVER_NAME_MIN &&
+      f.serif.widthOfTextAtSize(names, nameSize) > maxNameW
+    )
+      nameSize -= 2;
     if (f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) {
-      // Duas linhas é o que a capa comporta; um nome que peça mais é cortado —
-      // e um nome cortado na capa é a primeira coisa que o cliente vê.
-      const nl = clampLines(
-        wrap(f.serif, names, nameSize, maxNameW),
-        MAX_COVER_NAME_LINES,
-        "Nome na capa",
-      );
-      let ny = 278;
-      for (const ln of nl) {
+      const inteiro = wrap(f.serif, names, nameSize, maxNameW);
+      let linhas = inteiro;
+      if (linhas.length > MAX_COVER_NAME_LINES) {
+        const curto = nomeCurtoDoCasal(names);
+        const doCurto = curto ? wrap(f.serif, curto, nameSize, maxNameW) : [];
+        if (doCurto.length && doCurto.length <= MAX_COVER_NAME_LINES) linhas = doCurto;
+      }
+      // O que ainda assim não couber é cortado — mas com «…», que é o que
+      // distingue «o nome acabou» de «o nome foi cortado».
+      if (linhas.length > MAX_COVER_NAME_LINES) {
+        const corte = quebrarComReticencias(
+          f.serif,
+          linhas.join(" "),
+          nameSize,
+          maxNameW,
+          MAX_COVER_NAME_LINES,
+        );
+        linhas = corte.linhas;
+      }
+      note("Nome na capa", inteiro.length - linhas.length, "linhas");
+      // O bloco fica centrado no MESMO sítio, seja com duas linhas ou com três:
+      // 278 é onde a primeira das duas era desenhada.
+      const avanco = nameSize * 1.05;
+      let ny = 278 + ((linhas.length - 2) * avanco) / 2;
+      for (const ln of linhas) {
         textCenter(p, ln, cx, ny, { font: f.serif, size: nameSize, color: CREAM });
-        ny -= nameSize * 1.05;
+        ny -= avanco;
       }
     } else {
       textCenter(p, names, cx, 262, { font: f.serif, size: nameSize, color: CREAM });
     }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       AS TRÊS LINHAS DA CAPA CABEM NO PAINEL ESCURO
+       ═══════════════════════════════════════════════════════════════════════
+
+       O nome já tinha largura máxima e quebra; o tipo, a data e o local não
+       tinham NADA. Eram desenhados centrados, sem medida e sem quebra, e
+       escorriam para os dois lados por cima das duas fotografias da capa —
+       medido pela sonda de transbordos, num caso com um local por extenso:
+
+           p1  x 155.6 → 686.3   «Casamento civil com cerimónia simbólica…»
+           p1  x 162.0 → 679.9   «Herdade da Fonte Santa de Vale de Água…»
+
+       O painel escuro tem 286 pontos. Estas duas linhas ocupavam 530 e 518,
+       ilegíveis por cima das fotos — e um local com o nome de uma herdade por
+       extenso chega lá sozinho.
+
+       Passam a ter a MESMA regra do nome: a largura do painel, encolher, e
+       quebrar em duas linhas antes de cortar. E o bloco desce como cresce — a
+       linha do local segue a última linha do tipo/data, em vez de lhe ficar por
+       cima. */
+    /** Uma linha centrada da capa: encolhe, quebra, e nunca sai do painel. */
+    const linhaDaCapa = (
+      texto: string,
+      base: number,
+      o: { font: PDFFont; size: number; color: ReturnType<typeof rgb>; tracking?: number },
+      onde: string,
+    ): number => {
+      const tracking = o.tracking ?? 0;
+      let size = o.size;
+      const cabe = (t: string, sz: number) =>
+        larguraEspacada(o.font, textoParaFonte(o.font, t), sz, tracking) <= maxNameW;
+      // ── O CASO NORMAL SAI TAL E QUAL ────────────────────────────────────
+      // A linha que já cabia é desenhada COMO ELA A ESCREVEU, sem passar pela
+      // quebra: o `wrap` parte por espaços e volta a juntar com UM só, e isso
+      // comia o «   ·   » largo que separa o tipo da data em todas as capas.
+      // Encolher e quebrar é o caminho de excepção, não o de todos os dias.
+      if (cabe(texto, size)) {
+        textCenter(p, texto, cx, base, { font: o.font, size, color: o.color, tracking: o.tracking });
+        return base;
+      }
+      while (size > COVER_LINE_MIN && !cabe(texto, size)) size -= 0.5;
+      // A quebra mede COM o espaçamento entre letras — é assim que a linha vai
+      // ser desenhada, e medir sem ele era o que a punha por cima das fotos.
+      const { linhas, cortadas } = quebrarComReticencias(
+        o.font,
+        texto,
+        size,
+        maxNameW,
+        MAX_COVER_LINE_LINES,
+        tracking,
+      );
+      note(onde, cortadas, "linhas");
+      let y = base;
+      for (const ln of linhas) {
+        textCenter(p, ln, cx, y, { font: o.font, size, color: o.color, tracking: o.tracking });
+        y -= size * 1.25;
+      }
+      // Onde a linha seguinte pode começar: a base menos o que este bloco gastou.
+      return base - (linhas.length - 1) * size * 1.25;
+    };
 
     // `.trim()` nas três linhas, e não a caixa em bruto: um campo com um espaço
     // lá dentro é «verdadeiro» para o `if` — foi assim que o «Note:» sozinho
@@ -1045,10 +1352,21 @@ export async function renderProposalDocPdfWithReport(
       .map((s) => (s ?? "").trim())
       .filter(Boolean)
       .join("   ·   ");
+    let capaY = 214;
     if (sub)
-      textCenter(p, sub, cx, 214, { font: f.reg, size: 11, color: CREAM_DIM, tracking: 1.4 });
+      capaY = linhaDaCapa(
+        sub,
+        capaY,
+        { font: f.reg, size: 11, color: CREAM_DIM, tracking: 1.4 },
+        "Tipo e data na capa",
+      );
     if ((doc.location ?? "").trim())
-      textCenter(p, doc.location.trim(), cx, 194, { font: f.serifIt, size: 11, color: FAINT });
+      linhaDaCapa(
+        doc.location.trim(),
+        capaY - 20,
+        { font: f.serifIt, size: 11, color: FAINT },
+        "Local na capa",
+      );
   }
 
   // ── Page 2 — Apresentação + Serviços ──
@@ -1129,16 +1447,39 @@ export async function renderProposalDocPdfWithReport(
     // impresso numa folha que vai para o cliente.
     const details = campos.filter(([, v]) => (v ?? "").trim().length > 0);
 
+    /* ── OS VALORES ALINHAM TODOS NA MESMA COLUNA ──────────────────────────
+       Cada valor começava logo a seguir ao SEU rótulo, e quando um campo
+       passava a duas linhas a segunda alinhava pelo fim desse rótulo: «Número
+       de Convidados:» continuava em x=277 e «Cerimónia:» em x=193. Duas
+       continuações, dois recuos diferentes, nenhum alinhado a nada — e a
+       apresentação, que é uma lista de «rótulo: valor», lia-se como texto solto
+       em vez de um quadro.
+
+       Mede-se o rótulo mais largo UMA vez e é aí que todos os valores começam.
+       É o que a folha dela faz, e é o que faz uma lista parecer uma lista. */
+    const vx =
+      M +
+      Math.max(
+        0,
+        ...details.map(([chave]) =>
+          f.bold.widthOfTextAtSize(textoParaFonte(f.bold, `${t.campos[chave]}:  `), CAMPO_CORPO),
+        ),
+      );
     for (const [chave, valor] of details) {
       const marca = `${t.campos[chave]}:`;
-      const vx = M + f.bold.widthOfTextAtSize(textoParaFonte(f.bold, `${marca} `), CAMPO_CORPO);
       // Duas linhas por campo — um local com nome comprido ("Herdade da …,
-      // Reguengos de Monsaraz") pede três e perdia o resto.
-      const linhas = clampLines(
-        wrap(f.reg, valor, CAMPO_CORPO, M + CAMPO_MEDIDA - vx),
+      // Reguengos de Monsaraz") pede três e perdia o resto. O que passa disso é
+      // anotado E leva «…»: quem só tem o papel não tinha como saber que o
+      // campo estava cortado.
+      const corte = quebrarComReticencias(
+        f.reg,
+        valor,
+        CAMPO_CORPO,
+        M + CAMPO_MEDIDA - vx,
         MAX_EVENT_FIELD_LINES,
-        `Campo «${pt.campos[chave]}»`,
       );
+      note(`Campo «${pt.campos[chave]}»`, corte.cortadas, "linhas");
+      const linhas = corte.linhas;
       ensure(CAMPO_AVANCO + (linhas.length - 1) * CAMPO_ENTRELINHA);
       text(p, marca, M, y, { font: f.bold, size: CAMPO_CORPO, color: INK });
       linhas.forEach((ln, j) => {
@@ -1172,8 +1513,43 @@ export async function renderProposalDocPdfWithReport(
        como erro. */
     const descSize = org ? 9.5 : T_BODY;
     const DESC_X = M + 24;
-    const AVANCO_1 = descSize + 6; // avanço depois da primeira linha de um item
-    const AVANCO_N = descSize + 5; // avanço depois de cada linha seguinte
+    /* ── A MEDIDA DE LEITURA DA LISTA DE SERVIÇOS ──────────────────────────
+       A descrição de um serviço era quebrada a `W − M − dx`: da margem
+       esquerda à margem direita da folha, que numa A4 AO BAIXO são 706 pontos
+       e, a corpo 10, à volta de 110 caracteres por linha.
+
+       O próprio ficheiro escreve, na definição do `MEASURE`, que «long lines
+       (~120+ chars edge-to-edge) are the biggest DIY tell» — e a lista de
+       Serviços era, com a legenda dos mood boards, a linha mais comprida do
+       documento. As duas medidas mais longas da folha eram precisamente as que
+       o comentário manda não deixar acontecer.
+
+       550 é a medida que a apresentação, as notas do orçamento e agora a
+       legenda já usam: o documento passa a ter UMA medida para o texto corrido.
+       O que isto custa é altura — mais linhas por serviço —, e é por isso que
+       está medido no relatório. */
+    const MEDIDA_DOS_SERVICOS = MEASURE + 120;
+    /** Onde a mancha do texto de um serviço acaba. */
+    const DESC_FIM = DESC_X + MEDIDA_DOS_SERVICOS;
+    /* ── A LISTA TEM DE SE LER COMO LISTA ──────────────────────────────────
+       O avanço depois da PRIMEIRA linha de um serviço era 16 e o das seguintes
+       15. Um ponto — e ao contrário: um serviço de uma linha era seguido de 16
+       e a última linha de um serviço de três era seguida de 15. Ou seja, o
+       branco entre DUAS LINHAS DO MESMO SERVIÇO e o branco entre DOIS SERVIÇOS
+       eram, na prática, o mesmo branco.
+
+       É isso que faz uma lista ler-se como lista, e não é só estética: o leitor
+       de PDF desta casa (`proposta-de-pdf`) remonta os serviços a partir dos
+       saltos verticais, precisamente porque «uma lista composta deixa mais
+       espaço entre dois itens do que entre duas linhas do mesmo item». Sem
+       essa diferença, ele tem de adivinhar por outra via — se a linha de cima
+       está cheia — e uma medida de leitura mais curta deixa de a encher.
+
+       Agora são dois números diferentes e o maior é o que separa serviços: 15
+       entre linhas, mais 4 de ar entre serviços. Custa três pontos por
+       serviço. */
+    const AVANCO_N = descSize + 5; // avanço de uma linha para a seguinte
+    const AR_ENTRE_ITENS = 4; // o ar a mais que separa dois serviços
     const ALTURA_TITULO = 22; // avanço depois do título de um grupo
     /** Nunca menos de duas linhas de cada lado de uma quebra. */
     const MIN_LINHAS = 2;
@@ -1185,9 +1561,11 @@ export async function renderProposalDocPdfWithReport(
      * se desenha, por construção. Medir num sítio e desenhar noutro é como isto
      * se estragou da primeira vez.
      *
-     * (As linhas seguintes são desenhadas em `DESC_X`, mais à esquerda do que a
-     * medida que as quebrou — sobra-lhes largura, nunca falta. Conservador de
-     * propósito: transbordar seria pior do que uma linha curta.)
+     * As linhas seguintes são desenhadas em `DESC_X` e são quebradas à largura
+     * que TÊM aí — ver `wrapComRecuo`. Eram quebradas à largura da primeira (a
+     * que sobra depois do rótulo) e desenhadas mais à esquerda, o que lhes
+     * deixava largura a sobrar: uma linha acabava em x=1154 e a seguinte em
+     * x=731, um buraco de 35% da largura no meio do parágrafo.
      */
     const medirItem = (it: { label?: string; desc?: string }) => {
       /**
@@ -1216,15 +1594,19 @@ export async function renderProposalDocPdfWithReport(
       // opcional (ela escreve linhas que são só uma frase), a pontuação que o
       // acompanha é que não pode sobreviver-lhe.
       if (!rotulo) {
-        return { lab: "", dx: DESC_X, lines: wrap(f.reg, it.desc, descSize, W - M - DESC_X) };
+        return { lab: "", dx: DESC_X, lines: wrap(f.reg, it.desc, descSize, MEDIDA_DOS_SERVICOS) };
       }
       // Sanitiza aqui também: `lab` é medido diretamente com
       // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
       const lab = textoParaFonte(f.bold, `${it.label}: `);
       const dx = DESC_X + f.bold.widthOfTextAtSize(lab, descSize);
-      return { lab, dx, lines: wrap(f.reg, it.desc, descSize, W - M - dx) };
+      return {
+        lab,
+        dx,
+        lines: wrapComRecuo(f.reg, it.desc, descSize, DESC_FIM - dx, MEDIDA_DOS_SERVICOS),
+      };
     };
-    const alturaItem = (n: number) => AVANCO_1 + Math.max(0, n - 1) * AVANCO_N;
+    const alturaItem = (n: number) => n * AVANCO_N + AR_ENTRE_ITENS;
     /** A altura de uma página inteira de corpo — o tecto do que se pode exigir
      *  a um `ensure`. Sem isto, um item mais alto do que uma página pedia uma
      *  página nova para sempre. */
@@ -1249,7 +1631,7 @@ export async function renderProposalDocPdfWithReport(
       p.drawCircle({ x: M + 12, y: y + 3, size: 1.5, color: MUTED });
       if (lab) text(p, lab, DESC_X, y, { font: f.bold, size: descSize });
       text(p, lines[0] ?? "", lab ? dx : DESC_X, y, { size: descSize });
-      y -= AVANCO_1;
+      y -= AVANCO_N;
       for (let i = 1; i < lines.length; i++) {
         /**
          * Só chega aqui um item mais alto do que uma página inteira — raro, mas
@@ -1261,6 +1643,7 @@ export async function renderProposalDocPdfWithReport(
         text(p, lines[i], DESC_X, y, { size: descSize });
         y -= AVANCO_N;
       }
+      y -= AR_ENTRE_ITENS;
     };
 
     /**
@@ -1476,6 +1859,115 @@ export async function renderProposalDocPdfWithReport(
     });
   };
 
+  /* ═══════════════════════════════════════════════════════════════════════════
+     O CABEÇALHO DE UM MOOD BOARD CABE NA FOLHA
+     ═══════════════════════════════════════════════════════════════════════════
+
+     O título era desenhado a corpo 24 numa linha só, sem medida e sem quebra —
+     e o subtítulo a 13, com o mesmo nada. Medido pela sonda de transbordos, com
+     um título de 124 caracteres:
+
+         p3  x 68.0 → 848.2   «Decoração Floral Integral da Cerimónia, do Copo
+                               d'Água…»  passa a margem direita em 74,3 pt
+
+     A folha tem 841,89 de largura. O título não passava a margem: passava O
+     PAPEL. Onde ele acaba não há nada — nem margem, nem folha.
+
+     ── A BANDA ONDE ISTO VIVE ─────────────────────────────────────────────────
+     O cabeçalho de uma página de inspiração é uma faixa fechada dos dois lados:
+     por cima está o sobretítulo («INSPIRAÇÃO»), por baixo está o topo da
+     primeira fila de fotografias. São sessenta pontos, e é aí que o título e o
+     subtítulo têm de caber.
+
+     Três degraus, por esta ordem:
+
+      1. ENCOLHER até caber numa linha (24 → 14 no título, 13 → 9,5 no
+         subtitulo). É o degrau que resolve o caso medido: 124 caracteres cabem
+         a 21 pontos, numa linha, sem partir nada.
+      2. QUEBRAR em duas linhas, à medida da mancha.
+      3. DESCER o bloco inteiro até onde as fotografias deixarem — e, se ainda
+         assim não couber, ir tirando linhas (com «…», que diz que foram
+         tiradas).
+
+     ── E O CASO NORMAL SAI EXACTAMENTE ONDE SAÍA ────────────────────────────
+     O bloco é ancorado pela ÚLTIMA linha e cresce PARA CIMA. Com um título e um
+     subtítulo de uma linha cada, as duas linhas de base dão 451,28 e 431,28 —
+     os mesmos números que a geometria escreve e que a pré-visualização do
+     estúdio lê. Uma miniatura que deixasse de ser fiel é pior do que não haver
+     miniatura nenhuma. */
+  const cabecalhoDoBoard = (pg: PDFPage, titulo: string, subtitulo: string, boardName: string) => {
+    const LARGURA = W - 2 * M;
+    /** O tecto: a linha de base do sobretítulo, menos o ar que os separa. */
+    const TECTO = TXT.sobretitulo.base - 3.5;
+    /** O chão: o topo da primeira fila de fotografias, com um fio de ar. */
+    const CHAO_DO_BOARD = TOPO_DAS_FOTOS + 4;
+    const temSub = !!subtitulo;
+    /** Onde assenta a ÚLTIMA linha do bloco — a de sempre. O bloco cresce para
+     *  cima a partir daqui, e por isso o caso normal não se mexe um ponto. */
+    const baseHistorica = temSub ? TXT.subtitulo.base : TXT.titulo.base;
+
+    /** Quantas linhas dá este texto neste corpo. */
+    const linhasEm = (texto: string, size: number) =>
+      wrap(f.serifIt, texto, size, LARGURA).length;
+
+    // O subtítulo encolhe pelo seu lado: é o texto secundário da página, e a
+    // altura que ele ocupa é o que sobra para o título.
+    let sSize = TXT.subtitulo.tamanho;
+    while (temSub && sSize > BOARD_SUB_MIN && linhasEm(subtitulo, sSize) > MAX_BOARD_HEAD_LINES) {
+      sSize -= 0.5;
+    }
+    const sub = temSub
+      ? quebrarComReticencias(f.serifIt, subtitulo, sSize, LARGURA, MAX_BOARD_HEAD_LINES)
+      : { linhas: [] as string[], cortadas: 0 };
+    /** O ar entre a última linha do título e a primeira do subtítulo. Nos
+     *  corpos de omissão dá os 20 pontos que separam as duas linhas de base. */
+    const AR = sSize + 7;
+    const alturaDoSub = temSub ? (sub.linhas.length - 1) * sSize * 1.2 + AR : 0;
+
+    /** O bloco cabe na banda com este corpo e este número de linhas? E quanto
+     *  é que tem de descer para lá caber? */
+    const naBanda = (size: number, linhas: number) => {
+      const acima = alturaDoSub + (linhas - 1) * size * 1.2;
+      // `size * 0.8` é a altura da maiúscula mais a folga — o que a linha de
+      // cima ocupa ACIMA da sua linha de base.
+      const topo = baseHistorica + acima + size * 0.8;
+      const descida = Math.min(
+        Math.max(0, topo - TECTO),
+        Math.max(0, baseHistorica - CHAO_DO_BOARD),
+      );
+      return { cabe: topo - descida <= TECTO, descida };
+    };
+
+    // O título fica no MAIOR corpo em que caiba — na largura E na banda. Descer
+    // até ao mínimo por causa da largura, quando o que apertava era a altura,
+    // dava um título de 14 pontos com a palavra «Dia» sozinha na segunda linha.
+    let tSize = TXT.titulo.tamanho;
+    while (
+      tSize > BOARD_TITLE_MIN &&
+      (linhasEm(titulo, tSize) > MAX_BOARD_HEAD_LINES ||
+        !naBanda(tSize, linhasEm(titulo, tSize)).cabe)
+    ) {
+      tSize -= 0.5;
+    }
+    const tit = quebrarComReticencias(f.serifIt, titulo, tSize, LARGURA, MAX_BOARD_HEAD_LINES);
+    const { descida } = naBanda(tSize, tit.linhas.length);
+
+    note(`Título do mood board ${boardName}`, tit.cortadas, "linhas");
+    note(`Subtítulo do mood board ${boardName}`, sub.cortadas, "linhas");
+
+    const baseUltima = baseHistorica - descida;
+    let y = baseUltima + alturaDoSub + (tit.linhas.length - 1) * tSize * 1.2;
+    for (const ln of tit.linhas) {
+      text(pg, ln, M, y, { font: f.serifIt, size: tSize, color: INK });
+      y -= tSize * 1.2;
+    }
+    let ys = baseUltima + (sub.linhas.length - 1) * sSize * 1.2;
+    for (const ln of sub.linhas) {
+      text(pg, ln, M, ys, { font: f.serifIt, size: sSize, color: MUTED });
+      ys -= sSize * 1.2;
+    }
+  };
+
   // ── Mood board pages (skip empty boards — never show a client a placeholder) ──
   // Os rótulos do relatório saem do documento PORTUGUÊS: quem o lê é o estúdio,
   // e é lá que ela vai procurar o board pelo nome que lhe deu.
@@ -1502,23 +1994,6 @@ export async function renderProposalDocPdfWithReport(
       undefined,
       TXT.sobretitulo.tamanho,
     );
-    text(p, mb.title, M, TXT.titulo.base, {
-      font: f.serifIt,
-      size: TXT.titulo.tamanho,
-      color: INK,
-    });
-    // O subtítulo, quando existe. Na proposta feita à mão é o «Ramo de Noiva (a
-    // definir com a Noiva)» por baixo de «Complementos dos Noivos»: o título diz
-    // o capítulo, o subtítulo diz o que aquelas fotos são e o que ainda está por
-    // decidir. Na mesma serifa da marca — a manuscrita da folha antiga não se
-    // replica.
-    if (mb.subtitulo?.trim()) {
-      text(p, mb.subtitulo.trim(), M, TXT.subtitulo.base, {
-        font: f.serifIt,
-        size: TXT.subtitulo.tamanho,
-        color: MUTED,
-      });
-    }
     // Como o mood board se chama num aviso. Sem título, vale a posição — a que
     // ele ocupa NO DOCUMENTO e não a página por que saiu, porque é assim que
     // ela o encontra no estúdio, contado a partir de 1.
@@ -1528,6 +2003,12 @@ export async function renderProposalDocPdfWithReport(
     // existe com esse nome.
     const tituloPt = (docPt.moodBoards[bi]?.title ?? "").trim();
     const boardName = tituloPt ? `«${tituloPt}»` : `${bi + 1}`;
+    // O subtítulo, quando existe. Na proposta feita à mão é o «Ramo de Noiva (a
+    // definir com a Noiva)» por baixo de «Complementos dos Noivos»: o título diz
+    // o capítulo, o subtítulo diz o que aquelas fotos são e o que ainda está por
+    // decidir. Na mesma serifa da marca — a manuscrita da folha antiga não se
+    // replica.
+    cabecalhoDoBoard(p, mb.title ?? "", (mb.subtitulo ?? "").trim(), boardName);
     await drawCollage(
       pdf,
       p,
@@ -1567,10 +2048,62 @@ export async function renderProposalDocPdfWithReport(
      * lá dentro continua a sair como o escreveu.
      */
     const semMarcador = (v: string) => (/^\[[^\]]*\]$/.test(v.trim()) ? "" : v);
+    /**
+     * A RESSALVA que ela escreveu num valor — o que lá está além do número e
+     * além do IVA.
+     *
+     *   «12.500,00 € + IVA (a confirmar consoante a distância final)»
+     *       → «a confirmar consoante a distância final»
+     *   «950,50 € + IVA»  → «»   (não há ressalva; não se imprime nada)
+     *   «12.500,00 €»     → «»
+     *
+     * Três coisas caem, por esta ordem, e cada uma por uma razão diferente:
+     *
+     *  1. O NÚMERO — com os separadores e a moeda que venha agarrada. Vai para
+     *     a coluna da direita, na unidade do bloco, e não se repete no nome.
+     *  2. O «+ IVA». Não se perde nada: a escada por baixo diz «TOTAL (sem
+     *     IVA)», «IVA (23%)» e «Total a pagar», que é a mesma informação dita
+     *     pelas nossas contas e não por um pedaço de texto livre. E há uma
+     *     razão dura para o tirar: numa proposta INGLESA, o «+ IVA» dela
+     *     chegava ao papel em português por cima de uma folha que diz «VAT».
+     *  3. Os parênteses à volta do que sobra, se ela já lá os tiver posto —
+     *     senão saía «(( a confirmar ))».
+     *
+     * O que fica é a CONDIÇÃO, que é a única parte que só ela sabe e que o
+     * documento não diz por si. Não se interpreta: só se separa.
+     */
+    const ressalvaDoValor = (texto: string): string => {
+      const semNumero = (texto ?? "")
+        .trim()
+        .replace(/^[^\d+-]*[-+]?\d[\d\s.,\u00a0]*\s*(€|eur(?:os?)?)?\s*/i, "")
+        .trim();
+      const semIva = semNumero.replace(/^[+\s]*(iva|vat)\b\s*/i, "").trim();
+      const sobra = semIva.replace(/^[\s,;:·—–-]+/u, "").trim();
+      return /^\([\s\S]*\)$/.test(sobra) ? sobra.slice(1, -1).trim() : sobra;
+    };
     const totalStr = semMarcador(orgT ? (doc.totalEstimatedText ?? "") : doc.totalText);
-    // O rótulo do total de Decoração é um campo do estúdio, e nasce preenchido
-    // («Valor Total Decoração»): traduz-se enquanto for o que lá nasceu, e sai
-    // tal e qual assim que ela lhe mexer (ver `rotuloDoTotalNaLingua`).
+    /* O rótulo do total de Decoração é um campo do estúdio, e nasce preenchido
+       («Valor Total Decoração»): traduz-se enquanto for o que lá nasceu, e sai
+       tal e qual assim que ela lhe mexer (ver `rotuloDoTotalNaLingua`).
+
+       ── PORQUE É QUE ELE NÃO É O RÓTULO DO NÚMERO GRANDE ────────────────────
+       Foi proposto (A9 do IDEIAS-PDF.md): «Valor Total Decoração 5.904,00 €»
+       em vez de «Total a pagar», por o campo dela nunca chegar ao papel quando
+       há um total estruturado. NÃO SE FEZ, e a razão é a objecção C2 do próprio
+       relatório, que se confirma ao olhar para a folha:
+
+       O número grande é o último degrau de uma escada que diz «TOTAL (sem
+       IVA)», «IVA (23%)» e «Total a pagar». Cada um desses rótulos diz a
+       UNIDADE do número que tem ao lado — é isso que os torna uma escada e não
+       três valores. «Valor Total Decoração» não diz unidade nenhuma: encostado
+       ao fundo da mesma escada, lê-se como um QUARTO número, e o casal fica
+       sem saber qual é o que transfere. É exactamente o defeito que esta escada
+       veio corrigir (ver a nota da proposta da Tara e do Marty, aqui em baixo).
+
+       E não é uma decisão de composição: é dela. A pergunta — «quer o seu
+       rótulo no número grande, ou quer o "Total a pagar" que não deixa
+       dúvidas?» — tem de lhe ser feita, e a folha em que o rótulo dela JÁ sai
+       (a proposta sem total estruturado) continua como estava. */
     const totalLbl = orgT ? t.totalEstimado : rotuloDoTotalNaLingua(doc, idioma);
     const boxW = MEASURE;
     const boxH = 50;
@@ -1598,17 +2131,47 @@ export async function renderProposalDocPdfWithReport(
       });
     };
 
-    // Column header row — bold sentence-case (matching the studio's sample
-    // proposals: "Item" / "Preço Estimado (€)"), one pale rule underneath.
-    text(p, t.colunaItem, M, y, { font: f.serifB, size: 11, color: INK });
-    textRight(p, orgT ? t.colunaPrecoEstimado : t.colunaPreco, M + boxW, y, {
-      font: f.serifB,
-      size: 11,
-      color: INK,
-    });
-    y -= 14;
-    p.drawLine({ start: { x: M, y }, end: { x: M + boxW, y }, thickness: 0.5, color: LINE });
-    y -= 22;
+    /* ═══════════════════════════════════════════════════════════════════════
+       O CABEÇALHO DO QUADRO VIAJA COM O QUADRO
+       ═══════════════════════════════════════════════════════════════════════
+
+       Quando o quadro parte, a folha seguinte abria com uma rubrica solta: sem
+       o «Item / Preço (€)», sem título de secção, sem nada que dissesse que
+       aquilo era a continuação de um orçamento. Quem vira a página encontra uma
+       frase no topo de uma folha branca.
+
+       Agora o cabeçalho é uma função e é redesenhado em cada folha nova, com a
+       palavra que diz de onde vem.
+
+       ── PORQUE É QUE O «(cont.)» NÃO ESTÁ NO DICIONÁRIO ────────────────────
+       É a MESMA abreviatura nas duas línguas — «cont.» de continuação e
+       «cont.» de continued —, exactamente como a marca «extra» das linhas
+       opcionais, que também é a mesma nas duas e está escrita no dicionário
+       com o mesmo valor dos dois lados. */
+    const cabecalhoDoQuadro = (continuacao = false) => {
+      if (continuacao) {
+        // Em capitulares pálidas, como todos os sobretítulos deste documento —
+        // e não em serifa de corpo 13. Diz o mesmo e custa dez pontos a menos
+        // de folha, que é o que decide se a cauda ainda cabe nesta página.
+        eyebrow(p, `${t.tituloOrcamento} (cont.)`, M, y);
+        y -= 12;
+      }
+      // Column header row — bold sentence-case (matching the studio's sample
+      // proposals: "Item" / "Preço Estimado (€)"), one pale rule underneath.
+      text(p, t.colunaItem, M, y, { font: f.serifB, size: 11, color: INK });
+      textRight(p, orgT ? t.colunaPrecoEstimado : t.colunaPreco, M + boxW, y, {
+        font: f.serifB,
+        size: 11,
+        color: INK,
+      });
+      y -= 14;
+      p.drawLine({ start: { x: M, y }, end: { x: M + boxW, y }, thickness: 0.5, color: LINE });
+      y -= 22;
+    };
+    /** O que o cabeçalho repetido gasta numa folha nova: a palavra, as duas
+     *  legendas e a régua. */
+    const ALTURA_DO_CABECALHO_CONT = 12 + 14 + 22;
+    cabecalhoDoQuadro();
 
     /**
      * Muda de página quando o que vem a seguir não cabe acima do chão da mancha.
@@ -1627,12 +2190,93 @@ export async function renderProposalDocPdfWithReport(
       }
     };
 
+    /* ═══════════════════════════════════════════════════════════════════════
+       O QUADRO PARTE-SE COM REGRA DE VIÚVA E ÓRFÃ
+       ═══════════════════════════════════════════════════════════════════════
+
+       Cada linha decidia sozinha se cabia. Medido no caso longo, com quinze
+       rubricas: a folha do orçamento levava as rubricas 1 a 14 e a seguinte
+       abria com
+
+           Rubrica de orçamento número 15
+
+       sozinha, sem cabeçalho, sem título e sem marca de continuação. Fiz a
+       conta: depois da rubrica 14 sobravam 90 pontos acima do chão e a linha
+       seguinte pedia 20 — o chão está a 74. Faltaram QUATRO PONTOS.
+
+       A regra passa a ser a das listas: nunca UMA linha sozinha numa folha. Se
+       ao partir sobrasse uma, leva-se a anterior com ela.
+
+       ── E É DECIDIDA PARA O QUADRO INTEIRO, NÃO LINHA A LINHA ──────────────
+       Uma quebra que se desfaz obriga a refazer todas as que vêm a seguir: por
+       isso reparte-se primeiro (sem desenhar nada), aplica-se a regra, e só
+       depois se desenha. A repartição corre outra vez de cada vez que a regra
+       muda uma quebra, porque mudar uma pode criar outra.
+
+       ── O QUE NÃO SE CORRIGE, E PORQUÊ ────────────────────────────────────
+       A viúva do outro lado — UMA rubrica sozinha no fundo da PRIMEIRA folha —
+       não se corrige aqui: empurrá-la deixava o cabeçalho de secção e o
+       «Item / Preço (€)» sozinhos numa folha, que é pior do que o defeito. E
+       não acontece: o quadro abre com mais de 380 pontos livres, que dão para
+       dezanove rubricas. */
+    /** Nunca menos de duas rubricas numa folha de continuação. */
+    const MIN_RUBRICAS = 2;
+    interface LinhaDoQuadro {
+      /** O que o `y` desce ao desenhar esta linha. */
+      altura: number;
+      /** O que tem de caber acima do chão para ela ser desenhada aqui. */
+      reserva: number;
+      desenhar: () => void;
+    }
+    const desenharQuadro = (linhas: LinhaDoQuadro[]) => {
+      if (!linhas.length) return;
+      const yInicial = y;
+      const TOPO = H - M - 64;
+      /** Que rubricas ficam em cada folha, dadas as quebras já forçadas. */
+      const repartir = (forcadas: ReadonlySet<number>): number[][] => {
+        const paginas: number[][] = [[]];
+        let yy = yInicial;
+        for (let i = 0; i < linhas.length; i++) {
+          if (i > 0 && (forcadas.has(i) || yy - linhas[i].reserva < CHAO)) {
+            paginas.push([]);
+            yy = TOPO - ALTURA_DO_CABECALHO_CONT;
+          }
+          paginas[paginas.length - 1].push(i);
+          yy -= linhas[i].altura;
+        }
+        return paginas;
+      };
+      const forcadas = new Set<number>();
+      let paginas = repartir(forcadas);
+      // Uma volta por rubrica é tecto de sobra: cada volta ou corrige uma folha
+      // ou pára. Sem tecto, um caso que não convergisse ficava em ciclo.
+      for (let volta = 0; volta < linhas.length; volta++) {
+        const orfa = paginas.findIndex((pg, k) => k > 0 && pg.length < MIN_RUBRICAS);
+        if (orfa < 0) break;
+        const primeira = paginas[orfa][0];
+        // Nunca se recua para a rubrica 0: isso mandava o quadro inteiro para a
+        // folha seguinte e deixava o cabeçalho de secção sozinho.
+        if (primeira - 1 <= 0 || forcadas.has(primeira - 1)) break;
+        forcadas.add(primeira - 1);
+        paginas = repartir(forcadas);
+      }
+      for (const [k, pagina] of paginas.entries()) {
+        if (k > 0) {
+          p = pdf.addPage([W, H]);
+          frame(p);
+          y = TOPO;
+          cabecalhoDoQuadro(true);
+        }
+        for (const i of pagina) linhas[i].desenhar();
+      }
+    };
+
     // Reserve room on the right of each row for the price/value column so a long
     // item name wraps onto extra lines instead of running through the amount (and
     // on into the "Notas importantes" column). ~120pt covers "12.500,00 € + IVA".
     const PRICE_COL = 120;
     if (orgT) {
-      for (const r of doc.budgetRows ?? []) {
+      const rubricas: LinhaDoQuadro[] = (doc.budgetRows ?? []).map((r) => {
         /**
          * ── A COLUNA DE PREÇO É A MESMA COLUNA DOS TOTAIS ──────────────────
          *
@@ -1651,18 +2295,26 @@ export async function renderProposalDocPdfWithReport(
          *
          * Passa pelo `dinheiro` como tudo o resto que é montante nesta folha.
          *
-         * ── E O MARCADOR CAI NO MESMO TRAÇO QUE O TOTAL ────────────────────
+         * ── «AINDA SEM PREÇO» DIZ-SE DE UMA MANEIRA SÓ ────────────────────
          *
-         * «[Valor]» é o que o estúdio semeia numa linha por orçamentar. O total
-         * já se defendia dele (ver `semMarcador`, dez linhas acima, com a razão
-         * escrita); esta coluna não, e é a mesma folha a chegar ao mesmo casal
-         * com um modelo por preencher impresso.
+         * «[Valor]» é o que o estúdio semeia numa linha por orçamentar, e não
+         * pode chegar ao papel — nem em português por cima de uma folha
+         * inglesa. Cai fora, e isso não muda.
          *
-         * O marcador cai no MESMO «—» que o total já desenha — que é o que diz
-         * «ainda não há preço» sem dizer ao cliente que recebeu um modelo. Uma
-         * célula genuinamente VAZIA continua vazia: é assim que esta folha sai
-         * há anos, e encher todas as linhas por orçamentar com traços era mudar
-         * o desenho de um documento que ninguém pediu para mudar.
+         * O que muda é o que fica no lugar dele. Saía um «—», e a célula
+         * genuinamente VAZIA saía vazia: duas rubricas seguidas, a mesma
+         * situação — ainda não há preço —, dois desenhos na mesma folha. Foi
+         * medido na proposta de Organização do relatório, linhas 3 e 4.
+         *
+         * As duas passam a ser a mesma: EM BRANCO. Não é uma escolha entre
+         * duas igualmente boas — o travessão numa coluna de dinheiro tanto se
+         * lê como «zero» como «por definir», e a célula vazia é como esta folha
+         * sai há anos. O que se corrigiu foi a incoerência, e corrigiu-se para
+         * o lado que já era o dela.
+         *
+         * (O TOTAL continua a desenhar «—» quando não há número: ali a linha
+         * existe e tem de dizer alguma coisa. Aqui a linha é a rubrica, e a
+         * rubrica está escrita.)
          */
         const escrito = (r.price ?? "").trim();
         const preco = semMarcador(escrito).trim();
@@ -1679,21 +2331,27 @@ export async function renderProposalDocPdfWithReport(
          * desenhado, e é essa a largura que se tira ao nome. O caso normal não
          * muda um ponto — só um preço acima dos 120 aperta a coluna da esquerda.
          */
-        const impresso = escrito ? (preco ? dinheiro(preco) : "—") : "";
+        const impresso = preco ? dinheiro(preco) : "";
         const larguraDoPreco = impresso
           ? f.reg.widthOfTextAtSize(textoParaFonte(f.reg, impresso), 10.5) + 12
           : 0;
         const lines = wrap(f.reg, r.item, 10.5, boxW - Math.max(PRICE_COL, larguraDoPreco));
-        budgetBreak(Math.max(20, lines.length * 15));
-        lines.forEach((ln, i) => {
-          text(p, ln, M, y, { size: 10.5, color: INK });
-          if (i === 0 && impresso) {
-            textRight(p, impresso, M + boxW, y, { size: 10.5, color: MUTED });
-          }
-          y -= 15;
-        });
-        y -= 5;
-      }
+        return {
+          altura: lines.length * 15 + 5,
+          reserva: Math.max(20, lines.length * 15),
+          desenhar: () => {
+            lines.forEach((ln, i) => {
+              text(p, ln, M, y, { size: 10.5, color: INK });
+              if (i === 0 && impresso) {
+                textRight(p, impresso, M + boxW, y, { size: 10.5, color: MUTED });
+              }
+              y -= 15;
+            });
+            y -= 5;
+          },
+        };
+      });
+      desenharQuadro(rubricas);
     } else {
       // As linhas assinaladas como EXTRA saem marcadas, para o casal poder ler
       // a proposta uma vez e ver as duas versões nela. A marca é uma palavra à
@@ -1716,6 +2374,7 @@ export async function renderProposalDocPdfWithReport(
       // maneira de isto poder mentir sobre dinheiro.
       const ordemDasLinhas = ordemDasLinhasDoOrcamento;
       notaDeOrdem("Orçamento", docPt.budgetItems, ordemDasLinhas);
+      const rubricas: LinhaDoQuadro[] = [];
       ordemDasLinhas.forEach((i) => {
         const it = doc.budgetItems[i];
         /**
@@ -1737,16 +2396,46 @@ export async function renderProposalDocPdfWithReport(
         // que a separa do nome — a marca é curta nas duas línguas («extra»), e
         // o teste de transbordos confirma-o.
         const lines = wrap(f.reg, it, 10.5, boxW - (marcas[i] ? 46 : 0));
-        budgetBreak(Math.max(20, lines.length * 15));
-        lines.forEach((ln, j) => {
-          text(p, ln, M, y, { size: 10.5, color: INK });
-          if (j === 0 && marcas[i]) {
-            textRight(p, t.marcaExtra, M + boxW, y, { size: 9, color: MUTED });
-          }
-          y -= 15;
+        rubricas.push({
+          altura: lines.length * 15 + 5,
+          reserva: Math.max(20, lines.length * 15),
+          desenhar: () => {
+            lines.forEach((ln, j) => {
+              text(p, ln, M, y, { size: 10.5, color: INK });
+              if (j === 0 && marcas[i]) {
+                textRight(p, t.marcaExtra, M + boxW, y, { size: 9, color: MUTED });
+              }
+              y -= 15;
+            });
+            y -= 5;
+          },
         });
-        y -= 5;
       });
+      desenharQuadro(rubricas);
+    }
+
+    /* ── A RÉGUA ENTRE A ÚLTIMA RUBRICA E A SOMA ────────────────────────────
+       «Decor Jantar» e «TOTAL (sem IVA)» colavam-se: quinze pontos de avanço
+       entre a última linha do quadro e a primeira da soma, os mesmos quinze que
+       separam duas rubricas. O total lia-se como mais uma linha do quadro — e
+       é a linha que o casal procura primeiro.
+
+       Um fio pálido à largura do quadro, com seis pontos de ar de cada lado:
+       doze pontos ao todo, que é o preço de o quadro acabar antes de a soma
+       começar. Sem rubricas nenhumas não se desenha nada — um fio a fechar um
+       quadro vazio é tinta a dizer coisa nenhuma. */
+    const houveRubricas = orgT
+      ? (doc.budgetRows ?? []).length > 0
+      : doc.budgetItems.some((it) => (it ?? "").trim());
+    if (houveRubricas) {
+      y -= 6;
+      p.drawLine({
+        start: { x: M, y: y + 8 },
+        end: { x: M + boxW, y: y + 8 },
+        thickness: 0.5,
+        color: LINE,
+      });
+      y -= 6;
     }
 
     /**
@@ -1873,10 +2562,37 @@ export async function renderProposalDocPdfWithReport(
       for (const ex of extras) {
         const cru = normalizarValor(ex.valueText);
         const base = somaDosExtrasSemIva([ex], { mode: totais.modo, vatRate: totais.taxa });
-        const dito =
-          cru !== null && round2(cru) !== base
-            ? `${ex.label} (${dinheiro(ex.valueText.trim())})`
-            : ex.label;
+        /* ═════════════════════════════════════════════════════════════════
+           A RESSALVA QUE ELA ESCREVE NUM VALOR É SEMPRE IMPRESSA
+           ═════════════════════════════════════════════════════════════════
+
+           Escrito no estúdio, num adicional:
+
+               12.500,00 € + IVA (a confirmar consoante a distância final)
+
+           O PDF imprimia «+ 12.500,00 €» e DEITAVA FORA a condição inteira. O
+           número estava certo — o IVA é somado no bloco — mas a ressalva, que é
+           sobre dinheiro e é dela, não chegava ao cliente.
+
+           A causa: o texto dela só aparecia quando o número CRU diferia da base
+           («75,00 €» numa proposta com IVA incluído vale 60,98 de base, e aí a
+           folha dizia os dois). Quando não diferia, o ramo de baixo escrevia só
+           o rótulo — e com ele ia tudo o que ela tinha escrito ao lado do
+           número.
+
+           Agora: o que ela escreveu ALÉM do número vai sempre para o papel, ao
+           lado do nome, entre parênteses. É onde a informação pertence — a
+           dizer o que aquele valor é, não a fingir que é uma parcela desta
+           soma, que continua a ser a que fecha as contas.
+
+           E é a mesma regra que o modelo de Organização já tinha: lá,
+           «1.850,00 € + IVA (a confirmar)» é impresso inteiro na linha. A mesma
+           frase, escrita pela mesma pessoa, era tratada de duas maneiras
+           conforme o modelo. */
+        const escritoDela = (ex.valueText ?? "").trim();
+        const mostraTudo = cru === null || round2(cru) !== base;
+        const aoLado = mostraTudo ? dinheiro(escritoDela) : ressalvaDoValor(escritoDela);
+        const dito = aoLado ? `${ex.label} (${aoLado})` : ex.label;
         const lines = wrap(f.reg, dito, 10.5, boxW - PRICE_COL);
         budgetBreak(Math.max(18, lines.length * 14));
         lines.forEach((ln, i) => {
@@ -2201,9 +2917,54 @@ export async function renderProposalDocPdfWithReport(
     const colX = [M, M + colW + gutter];
     let col = 0;
     let y = yTop;
-    for (const c of fixos.condicoesGerais) {
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       AS DUAS COLUNAS EQUILIBRAM-SE
+       ═══════════════════════════════════════════════════════════════════════
+
+       Enchia-se a coluna da esquerda até transbordar e o resto caía na direita.
+       Com o texto da casa, medido: OITO cláusulas à esquerda e DUAS à direita —
+       a esquerda descia até y=650 e a direita parava a 445. Duas colunas com o
+       dobro de tinta numa delas não se leem como duas colunas: leem-se como
+       uma coluna com um apêndice.
+
+       Mede-se cada cláusula ANTES (com a mesma quebra com que vai ser
+       desenhada, que é a regra desta folha) e escolhe-se o corte que deixa as
+       duas metades mais parecidas — sem nunca passar a altura da coluna.
+
+       ── SÓ QUANDO CABE EM DUAS COLUNAS ────────────────────────────────────
+       Uma lista que precise de mais de uma folha volta ao comportamento de
+       encher e transbordar: aí não há nada a equilibrar, há páginas a
+       preencher, e um corte «bonito» na primeira folha só empurraria a última
+       cláusula para uma folha nova. */
+    const alturaDaClausula = (c: string) => wrap(f.reg, c, 9, colW - 14).length * 12 + 8;
+    const alturas = fixos.condicoesGerais.map(alturaDaClausula);
+    const somaTotal = alturas.reduce((a, b) => a + b, 0);
+    const alturaDaColuna = yTop - (M + 4);
+    /** Quantas cláusulas ficam na coluna da esquerda. `null` = não se equilibra
+     *  (não cabe em duas colunas), enche-se como antes. */
+    let corte: number | null = null;
+    if (somaTotal <= 2 * alturaDaColuna) {
+      let melhorDesvio = Infinity;
+      let acumulado = 0;
+      for (let i = 0; i < alturas.length; i++) {
+        acumulado += alturas[i];
+        if (acumulado > alturaDaColuna) break;
+        // O resto tem de caber na coluna da direita — senão o «equilíbrio»
+        // atirava cláusulas para uma folha nova.
+        if (somaTotal - acumulado > alturaDaColuna) continue;
+        const desvio = Math.abs(acumulado - (somaTotal - acumulado));
+        if (desvio < melhorDesvio) {
+          melhorDesvio = desvio;
+          corte = i + 1;
+        }
+      }
+    }
+
+    for (const [i, c] of fixos.condicoesGerais.entries()) {
       const lines = wrap(f.reg, c, 9, colW - 14);
-      if (y - lines.length * 12 - 6 < M + 4) {
+      const transborda = y - lines.length * 12 - 6 < M + 4;
+      if (transborda || (corte !== null && col === 0 && i === corte)) {
         // Column full → next column, or a new page after the second column.
         if (col === 0) {
           col = 1;
@@ -2213,6 +2974,9 @@ export async function renderProposalDocPdfWithReport(
           frame(p);
           col = 0;
           y = H - M - 64;
+          // Numa folha nova volta-se a encher: o corte foi calculado para a
+          // primeira, e aplicá-lo aqui partia a coluna no sítio errado.
+          corte = null;
         }
       }
       const x = colX[col];
@@ -2411,6 +3175,92 @@ export async function renderProposalDocPdfWithReport(
       textCenter(p, ln, cx, sy, { font: f.serifIt, size: 10.5, color: CREAM_DIM });
       sy -= 10.5 * 1.3;
     }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       A PÁGINA ONDE O CASAL FECHA O DOCUMENTO DIZ COMO RESPONDER
+       ═══════════════════════════════════════════════════════════════════════
+
+       A contracapa era um agradecimento, o logótipo e o slogan: nem email, nem
+       telefone, nem prazo. Quem chega ao fim de uma proposta de vinte mil euros
+       e decide responder tem de voltar atrás quatro folhas — ou procurar o
+       email antigo com que a recebeu.
+
+       Duas linhas, em corpo pequeno e no cinzento discreto do slogan: como
+       falar connosco, e até quando a proposta é a proposta. A VALIDADE é a
+       mesma frase e a mesma data que os «Próximos Passos» dizem lá atrás — é o
+       único elemento do documento que cria urgência, e estava perdida a meio de
+       uma lista de três pontos.
+
+       Não muda a identidade da folha: o painel escuro, a marca e o slogan ficam
+       onde estavam, e isto vem por baixo, no ar que já lá estava. */
+    let cy = sy - 20;
+    const fecho = [
+      `${SITE.email}   ·   ${SITE.phoneDisplay}`,
+      t.passoValidade(t.data(resolveValidUntil(doc))),
+    ];
+    for (const linha of fecho) {
+      for (const ln of wrap(f.reg, linha, 8.5, bandW)) {
+        textCenter(p, ln, cx, cy, { font: f.reg, size: 8.5, color: CREAM_DIM });
+        cy -= 12;
+      }
+      cy -= 6;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     A SEGUNDA PASSAGEM — SÓ O RODAPÉ, E SÓ PORQUE PRECISA DELA
+     ═══════════════════════════════════════════════════════════════════════════
+
+     O documento é composto numa passagem, da primeira folha à última, e é isso
+     que o mantém simples. Uma coisa só não se consegue assim: quantas folhas
+     tem o documento. Escreve-se agora, com as páginas todas feitas e antes do
+     `save` — que é o único momento em que a resposta existe. */
+  {
+    const totalDeFolhas = String(pdf.getPageCount()).padStart(2, "0");
+    for (const { p, folha } of rodapesPorNumerar) {
+      textCenter(
+        p,
+        `${String(folha).padStart(2, "0")} ${t.deFolhas(totalDeFolhas)}`,
+        W / 2,
+        M - 26,
+        { size: 7.5, color: FAINT },
+      );
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     AS PROPRIEDADES DO DOCUMENTO — QUEM O ESCREVEU, E SOBRE QUEM
+     ═══════════════════════════════════════════════════════════════════════════
+
+     Estavam vazias, e um PDF com as propriedades vazias não fica neutro: fica
+     assinado pela biblioteca que o desenhou. Abrir o ficheiro e ler «Autor:
+     pdf-lib» num documento de vinte mil euros é a diferença entre uma empresa e
+     um gerador — e é o que o cliente vê no separador do browser, no gestor de
+     ficheiros e ao arquivar o anexo.
+
+     Nada disto muda o papel: é o que está À VOLTA do papel. O título é o que
+     aparece no separador; o assunto é o que um arquivo lê; as palavras-chave
+     são o que uma busca no computador dela encontra. A língua é a do documento
+     — um leitor de ecrã que a saiba pronuncia «Décoration» à francesa e
+     «Decoração» à portuguesa por causa desta linha.
+  */
+  {
+    const quem = (doc.clientNames ?? "").trim();
+    // «Proposta · Decoração» / «Proposal · Planning» — a MESMA frase que a capa
+    // imprime, e já traduzida. Um título escrito à parte era uma segunda
+    // verdade sobre o que este documento é.
+    const oQue = doc.template === "organizacao" ? t.capaOrganizacao : t.capaDecoracao;
+    pdf.setTitle(quem ? `${oQue} — ${quem}` : oQue);
+    pdf.setAuthor(SITE.name);
+    pdf.setSubject(
+      [oQue, quem, (evento.eventDate ?? "").trim(), (doc.location ?? "").trim()]
+        .filter(Boolean)
+        .join(" · "),
+    );
+    pdf.setKeywords([SITE.name, oQue, quem, doc.ref ?? ""].filter(Boolean));
+    pdf.setCreator(SITE.name);
+    pdf.setProducer(SITE.name);
+    pdf.setLanguage(idioma === "en" ? "en-GB" : "pt-PT");
   }
 
   if (semRedimensionar > 0) {
@@ -2472,11 +3322,24 @@ async function drawCollage(
   // up front so the collage reserves exactly the height the caption needs. Capped
   // at 5 lines so a very long note never crowds out the photos — o que passa
   // disso é anotado, não desaparece calado.
-  const annAll = mb.annotation
-    ? wrap(f.serifIt, mb.annotation, TXT.legenda.tamanho, W - 2 * M)
-    : [];
-  note(`Descrição do mood board ${boardName}`, annAll.length - MAX_ANNOTATION_LINES, "linhas");
-  const annLines = annAll.slice(0, MAX_ANNOTATION_LINES);
+  // A MEDIDA É A DO DOCUMENTO, e não a folha toda: 550 pontos em vez de 706 —
+  // ~100 caracteres por linha em vez de ~150, que era a linha mais comprida
+  // deste documento. Vive na geometria, ao lado do tecto de linhas, porque a
+  // miniatura do estúdio tem de reservar às fotos a mesma altura. Ver lá.
+  //
+  // E o que for cortado LEVA «…»: com dez linhas escritas saíam cinco, e a
+  // última acabava em «… ao casal. Linha» — sem nada a dizer que faltava texto.
+  const ann = mb.annotation
+    ? quebrarComReticencias(
+        f.serifIt,
+        mb.annotation,
+        TXT.legenda.tamanho,
+        TXT.legenda.medida,
+        MAX_ANNOTATION_LINES,
+      )
+    : { linhas: [] as string[], cortadas: 0 };
+  note(`Descrição do mood board ${boardName}`, ann.cortadas, "linhas");
+  const annLines = ann.linhas;
   const annH = alturaDaLegenda(annLines.length);
   const bottom = M + annH;
   // O collage tem lugar para MOOD_BOARD_MAX_IMAGES fotos. As restantes JÁ

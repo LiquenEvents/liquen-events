@@ -82,7 +82,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
     // O NOME é o mesmo com que o ficheiro seguiu no email: o casal tem-no na
     // caixa de correio e tem de reconhecer o que descarrega como o mesmo.
-    return respostaPdf(request, pdf, { nome: nomeDoFicheiroDaProposta(ref, idioma) });
+    return respostaPdf(request, pdf, {
+      nome: nomeDoFicheiroDaProposta(
+        {
+          clientNames: proposal.doc?.clientNames,
+          eventDate: proposal.doc?.eventDate,
+          ref,
+        },
+        idioma,
+      ),
+    });
   } catch (err) {
     /**
      * A PROPOSTA SAIRIA COM FOTOS A MENOS — e por isso não sai.

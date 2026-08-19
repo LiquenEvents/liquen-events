@@ -1,6 +1,15 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useToast } from "./Toast";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import {
@@ -78,6 +87,7 @@ import {
 import { fotosQueDestoam, ordemPorCor } from "@/lib/cor-dominante";
 import {
   comNovaAmostra,
+  orcamentoDeTempo,
   passaDoAnexo,
   tamanhoEmPalavras,
   tamanhoEstimado,
@@ -1141,6 +1151,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const [assetOriginais, setAssetOriginais] = useState<Record<string, string>>({});
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS URL QUE ESTA SESSÃO JÁ VIU MORRER
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O `urlAindaBom` prefere o URL guardado ao fresco «enquanto servir», e quem
+   * decide se serve é o prazo escrito no token. Isso está certo para o caso que
+   * ele veio resolver (não deitar fora assinaturas boas e pagar trinta
+   * downloads ao reabrir um rascunho) e está errado para este: um URL pode ter
+   * o prazo em dia e mesmo assim dar 403 ou 404 — pasta mudada, objecto que
+   * nunca chegou a subir, chave do bucket rodada.
+   *
+   * Sem esta memória o «Tentar novamente» de uma célula morta era um beco
+   * fechado a três voltas: ia buscar a lista outra vez, recebia URLs frescos,
+   * e o mapa PREFERIA o mesmo URL morto que já tinha — a `string` não mudava,
+   * portanto o `useFotoComPlanoB` não via URL novo, portanto não recomeçava
+   * nada. O botão pedia ao servidor e não podia usar o que ele respondia.
+   *
+   * Uma `ref` e não estado: só é lida DENTRO da hidratação, e um redesenho por
+   * cada foto que morre numa grelha de vinte e quatro era um redesenho por
+   * nada.
+   */
+  const urlsMortos = useRef<Set<string>>(new Set());
+  /** Esta célula provou que este URL não abre. Ver `urlsMortos`. */
+  const marcarUrlMorto = useCallback((url: string) => {
+    urlsMortos.current.add(url);
+  }, []);
+  /**
    * A cor dominante de cada fotografia, `caminho → "#rrggbb"`.
    *
    * Vem do servidor (que a leu da linha da foto), e não de um `canvas` daqui:
@@ -1243,6 +1280,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const [traducao, setTraducao] = useState<EstadoDaTraducao>("desligada");
   const traducaoLigada = traducao === "ligada";
   const [confirmSend, setConfirmSend] = useState(false);
+  /**
+   * O que a composição cortou no documento que estava a seguir — `null`
+   * enquanto ninguém perguntou nada.
+   *
+   * Não é um estado de erro: é uma pergunta que o servidor devolveu com o PDF
+   * já desenhado e nada ainda gravado nem enviado. Ver `send`.
+   */
+  const [cortesPorConfirmar, setCortesPorConfirmar] = useState<Corte[] | null>(null);
   /**
    * ── A MENSAGEM QUE SEGUE COM A PROPOSTA ───────────────────────────────────
    *
@@ -1874,6 +1919,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             setEstadoDosUrls("pronto");
             return;
           }
+          /**
+           * O guardado só conta se ainda for um candidato: um URL que uma
+           * célula desta sessão já viu morrer (403/404) não pode ganhar ao
+           * fresco só por ter o prazo em dia. Ver `urlsMortos`.
+           */
+          const vivo_ = (u?: string) => (u && urlsMortos.current.has(u) ? undefined : u);
           setAssetUrls((prev) => {
             const next = { ...prev };
             // A miniatura ganha ao original: é este o caminho que corre quando se
@@ -1887,7 +1938,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             // `assinatura.ts` para porque é que não bastava substituir sempre.
             for (const im of imgs)
               if (im.path && im.url)
-                next[im.path] = urlAindaBom(next[im.path], im.thumbUrl || im.url);
+                next[im.path] = urlAindaBom(vivo_(next[im.path]), im.thumbUrl || im.url);
             return next;
           });
           // O original fica guardado à parte, para a célula ter para onde cair
@@ -1895,7 +1946,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           setAssetOriginais((prev) => {
             const next = { ...prev };
             for (const im of imgs)
-              if (im.path && im.url) next[im.path] = urlAindaBom(next[im.path], im.url);
+              if (im.path && im.url) next[im.path] = urlAindaBom(vivo_(next[im.path]), im.url);
             return next;
           });
           // As cores não expiram (não são URLs assinados): uma vez conhecidas,
@@ -3924,6 +3975,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       className?: string;
       as?: "input" | "textarea";
       rows?: number;
+      /** A caixa cresce com o texto, a partir de uma linha — ver `CaixaInglesa`. */
+      cresce?: boolean;
       readOnly?: boolean;
       placeholder?: string;
     } = {},
@@ -4450,7 +4503,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }
   }
 
-  async function send() {
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * ENVIAR, DEPOIS DE VER O QUE FICA DE FORA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O gerador diz o que a composição cortou — o nome do casal que não coube na
+   * capa, a sétima foto de um mood board, a legenda que acaba a meio da frase.
+   * Isso chegava aqui DENTRO da resposta do envio, ou seja depois de o email
+   * ter saído: ela lia o aviso com o casal já a ter o documento.
+   *
+   * Agora o servidor pára e pergunta (409, `precisaConfirmarCortes`), e este
+   * é o segundo clique: o mesmo envio, com a resposta dada. Não é um botão
+   * diferente nem um caminho diferente — é o mesmo, com `cortesConfirmados`.
+   */
+  async function send(cortesConfirmados = false) {
     if (busy) return;
     // A trava do envio é o `canSend` (o botão nem chega a estar ligado), mas
     // repete-se aqui: entre carregar em "Enviar" e carregar em "Confirmar" pode
@@ -4499,10 +4566,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           // vazio a viajar. A mensagem acompanha ESTE envio; o documento que
           // fica guardado é o mesmo com ela ou sem ela.
           ...(mensagemAoCliente.trim() ? { mensagem: mensagemAoCliente.trim() } : {}),
+          // Só viaja quando é «sim»: um campo a dizer `false` em todos os
+          // envios normais era um campo a mais a explicar a quem lesse a rota.
+          ...(cortesConfirmados ? { cortesConfirmados: true } : {}),
         }),
       });
       const data = await res.json().catch(() => null);
+      /**
+       * ── O ENVIO PAROU PARA PERGUNTAR ────────────────────────────────────
+       *
+       * O documento está desenhado e a proposta ainda não foi gravada nem
+       * enviada: o servidor devolveu 409 com o que a composição cortou. Isto
+       * NÃO é uma falha — é a única altura em que voltar atrás não custa nada,
+       * e por isso não passa pelo `throw` (que pinta tudo de vermelho e diz
+       * «não foi possível enviar»).
+       */
+      if (res.status === 409 && data?.precisaConfirmarCortes) {
+        setCortesPorConfirmar(normalizaCortes(data.truncations));
+        return;
+      }
       if (!res.ok) throw new Error(data?.error || porqueFalhouOEnvio(res.status));
+      setCortesPorConfirmar(null);
       // O envio também ensina a estimativa. Os bytes vêm do servidor: o PDF do
       // envio não passa pelo browser (segue em anexo), portanto sem esta linha
       // metade das gerações não ensinava nada.
@@ -5166,6 +5250,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           planoB={assetOriginais[path]}
                           estadoDosUrls={estadoDosUrls}
                           aoTentarDeNovo={() => void hidratarAssets()}
+                          aoMorrer={marcarUrlMorto}
                           // As capas são duas e estão no topo do passo: nunca
                           // esperam pela fila das fotos que estão fora do ecrã.
                           priority
@@ -5609,10 +5694,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                   </div>
                                 ) : (
                                   <>
-                                    <textarea
+                                    {/* Cresce com o texto — ver `DescricaoQueCresce`.
+                                        Uma altura fixa de duas linhas escondia
+                                        154 px dos 224 desta descrição, medidos a
+                                        390 px. */}
+                                    <DescricaoQueCresce
                                       className={`${INPUT_SM} mb-2 w-full resize-none leading-relaxed`}
-                                      rows={2}
-                                      value={b.annotation ?? ""}
+                                      valor={b.annotation ?? ""}
                                       onChange={(e) =>
                                         updateBoard(bi, { annotation: e.target.value })
                                       }
@@ -5626,7 +5714,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       {
                                         className: `${INPUT_SM} mb-2 w-full resize-none leading-relaxed`,
                                         as: "textarea",
-                                        rows: 2,
+                                        // A inglesa cresce com a portuguesa: são
+                                        // «a mesma caixa em duas línguas», e uma
+                                        // delas a esconder 206 px deixava de o
+                                        // ser. A `CaixaInglesa` já sabia fazê-lo.
+                                        cresce: true,
                                       },
                                     )}
                                     {/* ── A PÁGINA ESTÁ A FICAR CHEIA ─────────
@@ -5738,6 +5830,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             planoB={assetOriginais[path]}
                                             estadoDosUrls={estadoDosUrls}
                                             aoTentarDeNovo={() => void hidratarAssets()}
+                                            aoMorrer={marcarUrlMorto}
                                             // A PRIMEIRA DOBRA do primeiro
                                             // board. Medido: sem prioridade
                                             // nenhuma, as 24 células repartiam
@@ -7107,7 +7200,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             split={split}
             pctSinal={pctSinal}
           />
-          <CustoDaGeracao fotos={totalDeFotos} amostras={amostras} />
+          <CustoDaGeracao
+            fotos={totalDeFotos}
+            capas={doc.coverImages.filter(Boolean).length}
+            amostras={amostras}
+          />
         </div>
       )}
 
@@ -7688,14 +7785,54 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <Button variant="ghost" onClick={() => setStep("prever")}>
               ← Pré-visualizar
             </Button>
-            {confirmSend ? (
+            {/* ── O QUE FICA DE FORA, PERGUNTADO ANTES DE SEGUIR ──────────
+                O servidor desenhou o documento, viu o que a composição cortou
+                e parou. O email ainda não saiu e a proposta ainda não foi
+                gravada — é o último instante em que voltar atrás não custa
+                nada. A frase de cada corte é a mesma que o aviso da
+                pré-visualização usa; o que muda é a altura em que aparece. */}
+            {cortesPorConfirmar ? (
+              <div className="ml-auto flex flex-col items-end gap-2">
+                <div className="max-w-lg rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/75">
+                  <p className="font-medium">O documento sai com conteúdo cortado:</p>
+                  <ul className="mt-1 flex flex-col gap-0.5">
+                    {cortesPorConfirmar.map((c) => (
+                      <li key={`${c.where}:${c.unit}`}>· {fraseDeCorte(c)}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-foreground/55">
+                    Volta ao conteúdo para encurtar o que ficou cortado, ou envia assim mesmo se for
+                    de propósito.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    variant="primary"
+                    onClick={() => void send(true)}
+                    disabled={busy !== null}
+                    loading={busy === "send"}
+                  >
+                    {busy === "send" ? "A enviar…" : "Enviar assim mesmo"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setCortesPorConfirmar(null);
+                      setStep("conteudo");
+                    }}
+                  >
+                    Voltar e corrigir
+                  </Button>
+                </div>
+              </div>
+            ) : confirmSend ? (
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 <span className="text-sm text-foreground/60">
                   Enviar para {quote.email || "o cliente"}?
                 </span>
                 <Button
                   variant="primary"
-                  onClick={send}
+                  onClick={() => void send()}
                   disabled={busy !== null}
                   loading={busy === "send"}
                 >
@@ -8006,6 +8143,66 @@ function BarraDaSeleccao({
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
+ * UMA DESCRIÇÃO QUE SE VÊ INTEIRA — A CAIXA É QUE CRESCE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A descrição de um mood board tinha `rows={2}` e o resto rolava lá dentro.
+ * MEDIDO a 390 px, na proposta de que a dona do negócio mandou fotografia:
+ *
+ *     campo (pt)   70 px de altura   224 px de conteúdo   →  154 px escondidos
+ *     campo (en)   70 px de altura   276 px de conteúdo   →  206 px escondidos
+ *
+ * Sessenta e nove por cento do texto português fora de vista, e sete por cento
+ * do que se vê é meia frase — a captura lê-se «…cores escolhida pelos noivos,
+ * em jarras de vidro que podem ser transparentes ou de cor . Integração de
+ * velas…», com o princípio cortado por cima. Uma barra de deslocação dentro de
+ * uma caixa de 70 px, num telemóvel, não é uma forma de ler: é texto invisível
+ * com um sinal de que existe.
+ *
+ * Uma linha por omissão (uma caixa vazia é mais pequena do que era) e cresce
+ * com o que lá está. É o mesmo remédio — e a mesma conta das bordas — do
+ * `CampoQueCresce` do `ServicesEditor` e do `TextareaQueCresce` da
+ * `CaixaInglesa`; aqui não se importa de nenhum dos dois porque nenhum deles é
+ * exportado e um export só para quatro linhas ataria o estúdio ao editor de
+ * serviços.
+ *
+ * `useLayoutEffect` e não `useEffect`: com o segundo, a caixa aparecia com uma
+ * linha e saltava para as suas à frente de quem escreve.
+ */
+function DescricaoQueCresce({
+  valor,
+  ...resto
+}: Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "rows" | "ref"> & {
+  valor: string;
+}) {
+  const meu = useRef<HTMLTextAreaElement | null>(null);
+  useLayoutEffect(() => {
+    const el = meu.current;
+    if (!el) return;
+    // ── VAZIA É UMA LINHA, E ISSO TEVE DE SER DITO ────────────────────────
+    // MEDIDO: um `<textarea>` VAZIO com este `placeholder` («Descrição
+    // (opcional) — ex.: runner floral com hortênsias verdes…») devolve
+    // `scrollHeight: 120` no Chrome — o placeholder é maquetizado como texto e
+    // conta. Uma caixa vazia abria com 122 px, quase o dobro dos 70 que tinha
+    // antes desta correcção. Sem altura escrita à mão, o `rows={1}` manda, e o
+    // mínimo de toque (44 px, globals.css) faz o resto.
+    if (valor === "") {
+      el.style.height = "";
+      return;
+    }
+    el.style.height = "auto";
+    // `scrollHeight` conta o conteúdo e o `padding` e NÃO conta a borda; com o
+    // `box-sizing: border-box` do Tailwind, escrevê-lo tal e qual em `height`
+    // faz a borda comer dois píxeis ao texto. Somar `offsetHeight -
+    // clientHeight` devolve o número exacto — a mesma conta, e a mesma medição,
+    // do `CampoQueCresce`.
+    el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
+  }, [valor]);
+  return <textarea {...resto} value={valor} rows={1} ref={meu} />;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
  * O QUE SE PODE FAZER A UMA FOTOGRAFIA, SEM A TIRAR DE LÁ PRIMEIRO
  * ════════════════════════════════════════════════════════════════════════════
  *
@@ -8044,10 +8241,46 @@ function BarraDaSeleccao({
  *   · com dedo  — UM «⋯» de 44 px no canto da miniatura, que abre a folha
  *                 inferior com as sete acções escritas por extenso.
  *
- * Tudo em CSS (`[@media(hover:none)]:hidden` / `[@media(hover:hover)]:hidden`)
- * e não com o `usePodeEsconderNoHover()`: um hook lê `false` no servidor e no
- * primeiro desenho, e o computador via o «⋯» a piscar antes de a barra
- * aparecer. A media query não tem primeiro desenho errado.
+ * Tudo em CSS e não com o `usePodeEsconderNoHover()`: um hook lê `false` no
+ * servidor e no primeiro desenho, e o computador via o «⋯» a piscar antes de a
+ * barra aparecer. A media query não tem primeiro desenho errado.
+ *
+ * ── E A PERGUNTA É `com-rato`, NÃO `(hover: none)` — ISTO VOLTOU ──────────
+ *
+ * A barra voltou a aparecer por cima das células, e a dona do negócio mandou a
+ * fotografia. A causa é uma pergunta MAL PARTIDA em duas: a barra escondia-se
+ * com `(hover: none)`, mas o tamanho dos botões cresce com `(pointer: coarse)`
+ * (`.alvo-toque`, em globals.css). São duas perguntas diferentes, e há
+ * aparelhos que respondem SIM à segunda e NÃO à primeira: um iPhone ou um iPad
+ * com AssistiveTouch, com rato ou com trackpad ligados, e um portátil de ecrã
+ * táctil. Nesses, `(hover: none)` é falso — a barra fica — e
+ * `(pointer: coarse)` é verdadeiro — cada ícone salta de 24 px para 44.
+ *
+ * MEDIDO num Chromium com `primaryPointerType=coarse` e `primaryHoverType=hover`,
+ * a 390 px, na proposta das capturas (nove fotos, um mood board):
+ *
+ *     célula                                   89 × 104 px
+ *     barra                                    89 × 328 px
+ *     sobe acima do topo da própria célula         209 px
+ *     cada um dos sete botões                   44 × 44 px
+ *     «⋯» (o caminho do dedo)               display: none
+ *     pedaços de texto tapados                          5
+ *
+ * — incluindo o «Imagem guardada» e o «Não consegui mostrá-la neste ecrã.» da
+ * própria célula. E, mesmo a `opacity: 0`, a barra continua a APANHAR o toque:
+ * `elementFromPoint` no meio do «Tentar novamente» devolvia o botão «Mover para
+ * trás». O botão que explica a avaria estava debaixo de um botão invisível.
+ *
+ * A casa já tem a pergunta inteira, e é uma só: `com-rato`
+ * (`(hover: hover) and (pointer: fine)`, globals.css). Os dois lados penduram-se
+ * nela — `hidden com-rato:flex` na barra, `com-rato:hidden` no «⋯» — pela razão
+ * escrita lá: um browser que não perceba de ponteiros mostra as DUAS formas,
+ * feio mas inteiro, em vez de não mostrar nenhuma.
+ *
+ * E os sete botões da barra deixaram de ser `alvo-toque`. A barra só existe
+ * onde há rato, e com rato o mínimo de 44 px nunca se aplica — mas era ele que,
+ * quando a media query falhava, transformava 7 × 24 px numa coluna de 328. Sem
+ * ele, o pior caso deixa de poder acontecer.
  *
  * ── E REMOVER FICOU MAIS DIFÍCIL DE ACERTAR POR ENGANO, NÃO MAIS FÁCIL ─────
  * Estava um × de 44 px encostado ao ✓ de escolher, dentro de uma célula de 84 —
@@ -8093,8 +8326,13 @@ function AccoesDaFoto({
   onRemover: () => void;
 }) {
   const [folhaAberta, setFolhaAberta] = useState(false);
+  /* SEM `alvo-toque`, e é o coração da correcção: esta barra só existe onde há
+     rato (`com-rato`), e ali o mínimo de 44 px nunca se aplicaria de qualquer
+     maneira. O que ele fazia era garantir que, no dia em que a media query
+     falhasse, sete ícones de 24 px se tornassem sete quadrados de 44 — que é a
+     coluna de 328 px medida em cima. */
   const botao =
-    "alvo-toque flex h-6 w-6 items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white transition-colors hover:bg-black/75 disabled:opacity-30";
+    "flex h-6 w-6 items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white transition-colors hover:bg-black/75 disabled:opacity-30";
 
   /* A MESMA lista para os dois caminhos. Duas listas seriam duas versões da
      verdade — a acção acrescentada num sítio e esquecida no outro é a forma
@@ -8156,15 +8394,19 @@ function AccoesDaFoto({
   return (
     <>
       {/* ── O CAMINHO DO DEDO: um alvo, e as sete acções por extenso ────────
-          `hidden [@media(hover:none)]:flex` — só existe onde não há rato. Fica
-          no canto inferior direito da miniatura e mede 44 px numa célula de
-          84×72: cabe, e é o único que cabe. */}
+          `flex com-rato:hidden` — existe por omissão e desaparece só onde há
+          MESMO rato. Antes era `hidden [@media(hover:none)]:flex`, e num
+          telemóvel com trackpad ou AssistiveTouch (onde `(hover: none)` é
+          falso) isto ficava em `display: none`: sem barra utilizável e sem
+          «⋯», a célula não tinha acção nenhuma. Fica no canto inferior direito
+          da miniatura e mede 44 px numa célula de 84×72: cabe, e é o único que
+          cabe. */}
       <button
         type="button"
         onClick={() => setFolhaAberta(true)}
         aria-label={`Acções de ${nome}`}
         aria-haspopup="dialog"
-        className="alvo-toque pointer-events-auto absolute right-0.5 bottom-0.5 z-20 hidden h-11 w-11 items-center justify-center rounded-lg bg-black/60 text-white transition-colors [@media(hover:none)]:flex"
+        className="alvo-toque pointer-events-auto absolute right-0.5 bottom-0.5 z-20 flex h-11 w-11 items-center justify-center rounded-lg bg-black/60 text-white transition-colors com-rato:hidden"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <circle cx="5" cy="12" r="1.8" />
@@ -8217,9 +8459,9 @@ function AccoesDaFoto({
       </FolhaOuDialogo>
 
       {/* ── O CAMINHO DO RATO: a barra de sempre, ao pixel ──────────────────
-          `[@media(hover:none)]:hidden` no lugar do antigo `:opacity-100`. Onde
-          há rato, nada nesta barra mudou. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 transition-opacity group-hover/foto:opacity-100 focus-within:opacity-100 [@media(hover:none)]:hidden">
+          `hidden com-rato:flex`: não existe até haver rato — nem desenhada nem
+          a apanhar toques. Onde há rato, nada nesta barra mudou. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 transition-opacity group-hover/foto:opacity-100 focus-within:opacity-100 com-rato:flex">
         <span className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5">
           <button
             type="button"
@@ -8697,11 +8939,31 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
   );
 }
 
-function CustoDaGeracao({ fotos, amostras }: { fotos: number; amostras: AmostraDeGeracao[] }) {
+function CustoDaGeracao({
+  fotos,
+  capas,
+  amostras,
+}: {
+  fotos: number;
+  /** As tiras da capa — contam à parte porque custam seis vezes mais do que
+   *  uma célula de mood board (medido: 590 ms contra 90). */
+  capas: number;
+  amostras: AmostraDeGeracao[];
+}) {
   if (fotos === 0) return null;
   const ms = tempoEstimado(fotos, amostras);
   const bytes = tamanhoEstimado(fotos, amostras);
   const pesado = passaDoAnexo(bytes);
+  /**
+   * ── E O TECTO DA ROTA, QUE É OUTRA COISA ────────────────────────────────
+   *
+   * O tempo acima é o que ELA espera, medido daqui. Este é o que o SERVIDOR
+   * gasta — e o servidor tem um tecto que ela não tem como saber: as rotas que
+   * redesenham o documento para o casal morrem aos 20 segundos. Não é a mesma
+   * conta nem a mesma pergunta, e por isso não se mistura com a frase de cima:
+   * uma diz «vais esperar isto», a outra diz «isto está a chegar ao limite».
+   */
+  const orcamento = orcamentoDeTempo(fotos, capas);
   // Com medições, diz-se que são medições — «cerca de» com uma amostra atrás é
   // outra coisa do que «cerca de» com um modelo por omissão.
   const medido = amostras.length >= 2;
@@ -8720,6 +8982,18 @@ function CustoDaGeracao({ fotos, amostras }: { fotos: number; amostras: AmostraD
             param nos 8 MB, e o anexo viaja ~33% maior do que o ficheiro. Tira algumas fotografias
             das páginas mais cheias. O link da proposta continua a servir na mesma, com o PDF
             inteiro do outro lado.
+          </span>
+        </p>
+      )}
+      {orcamento.aperta && (
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70">
+          <span aria-hidden="true">⚠</span>
+          <span>
+            Com esta quantidade de fotografias, o servidor demora{" "}
+            {tempoEmPalavras(orcamento.msOptimista)} a {tempoEmPalavras(orcamento.msPessimista)} a
+            desenhar o documento — e a página onde o casal o abre desiste aos 20 segundos. O PDF do
+            envio sai na mesma (tem mais tempo); quem pode ficar sem ele é o casal, ao carregar no
+            link. Tira algumas fotografias das páginas mais cheias.
           </span>
         </p>
       )}
@@ -9134,6 +9408,103 @@ function SelectorDeLayout({
   );
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANDO NÃO É A FOTOGRAFIA — É O SÍTIO QUE NÃO A DEIXA APARECER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma célula que não desenha nada podia ser três coisas (ver os «três estados»
+ * mais abaixo); afinal são quatro, e a quarta é de outra natureza.
+ *
+ * A `Content-Security-Policy` deste sítio traz uma directiva `img-src`, e ela
+ * nomeia de onde é que uma imagem pode vir. Quando a origem do Storage não está
+ * na lista, o browser RECUSA a fotografia — e recusa-a antes de a pedir. Não há
+ * pedido, não há código de estado, não há linha no painel de rede e não há nada
+ * para o servidor registar: do lado do JavaScript o único sinal é o `onerror`
+ * do `<img>`, exactamente igual ao de um 404. Foi assim que uma proposta com as
+ * fotografias todas guardadas e a sair bem no PDF apareceu no telemóvel dela
+ * com nove células a dizer «Não consegui mostrá-la neste ecrã».
+ *
+ * As duas avarias têm donos e remédios OPOSTOS — uma resolve-se com um botão de
+ * tentar outra vez, a outra nunca, por mais vezes que se carregue — e por isso
+ * não podem dizer a mesma frase. Um «Tentar novamente» que vai falhar sempre da
+ * mesma maneira é uma promessa vazia, e é pior do que não haver botão nenhum.
+ *
+ * ── COMO É QUE SE SABE ────────────────────────────────────────────────────
+ * O browser diz, e ninguém o ouvia: `document.addEventListener(
+ * "securitypolicyviolation", …)`. MEDIDO no Chromium, com `img-src 'self'
+ * data:` e duas imagens de outra origem: dois eventos, `violatedDirective` e
+ * `effectiveDirective` os dois `"img-src"`, e o `blockedURI` INTEIRO — caminho
+ * e token incluídos.
+ *
+ * ── E CASA-SE POR ORIGEM, NÃO POR URL ─────────────────────────────────────
+ * Porque o `blockedURI` inteiro é o caso do Chromium, e não a regra: a norma
+ * deixa o browser entregá-lo cortado à origem (é o que o WebKit faz em vários
+ * casos, e o telemóvel dela é um iPhone). Casar por URL completo funcionaria na
+ * máquina onde isto se mediu e falhava calado onde interessa. A origem é o que
+ * os dois formatos têm em comum, e chega: quem recusa uma fotografia do Storage
+ * recusa-as todas.
+ *
+ * E se nem a origem der para ler (um `blockedURI` vazio, ou o literal
+ * `"self"`), fica a marca sem morada — e aí é o ECRÃ inteiro que passa a dizer
+ * isto, em vez de uma célula. Uma célula morta ao mesmo tempo que o browser
+ * anuncia uma recusa de `img-src` é a mesma avaria com altíssima probabilidade;
+ * calar-se seria voltar à frase errada, que é o defeito que isto veio corrigir.
+ *
+ * Vive fora do React, como a fila das imagens e pela mesma razão: o evento é do
+ * documento, é um só, e um ouvinte por célula numa grelha de vinte e quatro
+ * eram vinte e quatro ouvintes para a mesma notícia.
+ */
+const origensRecusadasPelaPolitica = new Set<string>();
+/** Houve uma recusa de `img-src` que não deu para atribuir a uma origem. */
+let houveRecusaSemMorada = false;
+const ouvintesDaRecusa = new Set<() => void>();
+let escutaDaPoliticaLigada = false;
+
+function origemDe(url: string | undefined): string {
+  if (!url || typeof window === "undefined") return "";
+  try {
+    return new URL(url, window.location.href).origin;
+  } catch {
+    return "";
+  }
+}
+
+function ligarEscutaDaPolitica(): void {
+  if (escutaDaPoliticaLigada || typeof document === "undefined") return;
+  escutaDaPoliticaLigada = true;
+  document.addEventListener("securitypolicyviolation", (e) => {
+    // `effectiveDirective` é o nome moderno e `violatedDirective` o antigo; os
+    // browsers não concordam sobre qual preenchem, e um deles pode vir com a
+    // lista de origens colada («img-src 'self' data:»). Daí o `startsWith`.
+    const directiva = e.effectiveDirective || e.violatedDirective || "";
+    if (!directiva.startsWith("img-src")) return;
+    const origem = origemDe(e.blockedURI);
+    if (origem && origem !== window.location.origin) origensRecusadasPelaPolitica.add(origem);
+    else houveRecusaSemMorada = true;
+    for (const avisar of ouvintesDaRecusa) avisar();
+  });
+}
+
+function subscreverRecusa(avisar: () => void): () => void {
+  ligarEscutaDaPolitica();
+  ouvintesDaRecusa.add(avisar);
+  return () => {
+    ouvintesDaRecusa.delete(avisar);
+  };
+}
+
+/** Esta fotografia foi recusada pelas regras do próprio sítio? */
+function useRecusaDaPolitica(url?: string): boolean {
+  const ler = useCallback(
+    () => houveRecusaSemMorada || origensRecusadasPelaPolitica.has(origemDe(url)),
+    [url],
+  );
+  // No servidor não há política nem recusa nenhuma — e não pode haver desencontro
+  // de hidratação por causa disto.
+  return useSyncExternalStore(subscreverRecusa, ler, () => false);
+}
+
 function Thumb({
   url,
   planoB,
@@ -9147,6 +9518,7 @@ function Thumb({
   onde = "estúdio",
   estadoDosUrls = "pronto",
   aoTentarDeNovo,
+  aoMorrer,
   priority = false,
   // `refDoc` e não `ref`: o React trata `ref` como prop especial, e uma string
   // ali dentro é o padrão antigo das string refs, que ele recusa.
@@ -9159,6 +9531,11 @@ function Thumb({
   estadoDosUrls?: EstadoDosUrls;
   /** Ir buscar os URL outra vez, a pedido dela. */
   aoTentarDeNovo?: () => void;
+  /**
+   * Este URL não abre — dito ao estúdio, para a hidratação seguinte deixar de
+   * o preferir ao fresco. Ver `urlsMortos`.
+   */
+  aoMorrer?: (url: string) => void;
   /** Está na primeira dobra: não espera pela fila nem pelo `lazy`. */
   priority?: boolean;
   onRemove: () => void;
@@ -9209,13 +9586,22 @@ function Thumb({
    */
   semRemover?: boolean;
 }) {
+  /**
+   * Não foi a fotografia: foi este sítio que a recusou. Ver a escuta acima.
+   *
+   * Perguntado com `planoB ?? url` e ANTES da cascata, de propósito: a resposta
+   * é por ORIGEM, e as duas moradas desta foto têm a mesma — portanto sabe-se
+   * já, sem esperar pelo `ultimoAlvo`, e a cascata pode receber a resposta em
+   * vez de gastar uma volta a descobrir o que já se sabia.
+   */
+  const recusadaPeloSitio = useRecusaDaPolitica(planoB ?? url);
   const {
     alvo,
     desistiu: failed,
     aoFalhar,
     tentarDeNovo,
     ultimoAlvo,
-  } = useFotoComPlanoB(url, planoB);
+  } = useFotoComPlanoB(url, planoB, recusadaPeloSitio);
 
   /**
    * UMA FOTO A CAMINHO NÃO É UMA FOTO PARTIDA.
@@ -9271,13 +9657,37 @@ function Thumb({
    * momento raro em que as assinaturas se renovam.
    */
   const [temVez, setTemVez] = useState(false);
+  /**
+   * O mesmo, numa referência, para o efeito o poder ler sem o ter nas
+   * dependências — tê-lo lá faria a própria concessão da vez desmontar o
+   * efeito e largá-la no instante seguinte.
+   */
+  const temVezRef = useRef(false);
   /** A fotografia já está no ecrã — é o que apaga o esqueleto por cima. */
   const [pintada, setPintada] = useState(false);
   const largarVez = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (!pesada) return;
+    /**
+     * ── UM LUGAR NA FILA POR CÉLULA, E SÓ ENQUANTO SERVE PARA ALGUMA COISA ──
+     *
+     * `temVez` não volta a `false` depois do primeiro arranque (é deliberado —
+     * ver acima), e portanto o `src` desta célula JÁ é o alvo e o download já
+     * começou. Uma célula que volte aqui — porque o URL foi reassinado, porque
+     * a cascata caiu para o original, porque ela carregou em «Tentar
+     * novamente» — pedia na mesma vez, e ficava com um dos TRÊS lugares sem
+     * precisar dele: o download dela já ia a caminho, e o lugar só se largava
+     * ao fim de `ESPERA_MAXIMA_MS` (30 s).
+     *
+     * Numa grelha onde as fotos falham em cadeia é o pior momento possível
+     * para isso: as três vagas ficam com células que não estão à espera de
+     * nada, e as que ainda não têm um único pixel no ecrã esperam meio minuto
+     * por uma vaga que já não é vaga nenhuma. A fila existe para reger quem
+     * ainda não começou.
+     */
+    if (!pesada || temVezRef.current) return;
     let temporizador = 0;
     const largar = pedirVezDeImagemPesada(() => {
+      temVezRef.current = true;
       setTemVez(true);
       // Rede de segurança: um pedido que nunca termina não pode ficar com a vez
       // para sempre.
@@ -9314,6 +9724,18 @@ function Thumb({
   useEffect(() => {
     if (semRemedio && ultimoAlvo) {
       void relatarFalhaDeImagem({ onde, ref: refDoc, url: ultimoAlvo });
+      // E fica sabido AQUI dentro também: sem isto, a leitura seguinte da
+      // lista devolvia URLs frescos e o mapa continuava a preferir este, que
+      // acabou de dar erro. Ver `urlsMortos` no estúdio.
+      //
+      // MENOS quando quem recusou foi o sítio: aí o URL está impecável e
+      // marcá-lo como morto fazia a hidratação seguinte deitar fora
+      // assinaturas boas — trinta downloads a mais para corrigir um problema
+      // que não é do endereço.
+      if (!recusadaPeloSitio) {
+        aoMorrer?.(ultimoAlvo);
+        if (url && url !== ultimoAlvo) aoMorrer?.(url);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [semRemedio]);
@@ -9430,16 +9852,76 @@ function Thumb({
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 p-1 text-center text-[9px] leading-tight text-foreground/40">
-          {semRemedio ? (
+          {semRemedio && recusadaPeloSitio ? (
+            /* ── NÃO É A FOTOGRAFIA: É O SÍTIO ──────────────────────────────
+               Sem botão de tentar outra vez, e é a diferença que interessa: a
+               recusa não muda por se insistir. O «Abrir ficheiro» fica, e
+               funciona — abrir o endereço noutro separador é uma navegação, e
+               as regras que barram uma imagem DENTRO desta página não têm nada
+               a dizer sobre isso.
+
+               A frase não diz «política», nem «directiva», nem o nome da
+               regra: quem lê isto quer saber se a fotografia se perdeu (não se
+               perdeu) e se o problema é dela (não é). O resto está escrito no
+               `title` e, por extenso, no comentário da escuta lá em cima. */
             <>
-              <span className="font-medium text-foreground/55">Imagem guardada</span>
-              {/* A frase antiga acabava aqui, e era um beco: a foto estava lá,
-                  havia coisas a fazer, e o ecrã não oferecia nenhuma. */}
-              <span>Não consegui mostrá-la neste ecrã.</span>
+              <span className="font-medium text-foreground/55">Fotografia guardada</span>
+              {/* Curta porque tem de CABER: a caixa tem 104 px de altura e
+                  `overflow-hidden`, e a frase inteira levava o «Abrir ficheiro»
+                  para fora do corte. A explicação toda vai no `title` — é a
+                  mesma decisão, e a mesma medição, do ramo «não veio na lista». */}
+              <span title="A fotografia está guardada e inteira — sai bem no PDF. Quem a recusou aqui foi este site, por uma definição dele. Insistir dá sempre o mesmo.">
+                O site não a deixa aparecer.
+              </span>
+              {ultimoAlvo && (
+                <a
+                  href={ultimoAlvo}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 underline underline-offset-2 text-foreground/60 hover:text-foreground/80"
+                >
+                  Abrir ficheiro
+                </a>
+              )}
+            </>
+          ) : semRemedio ? (
+            <>
+              {/* ── E TEM DE CABER NA CAIXA ────────────────────────────────
+                  MEDIDO a 390 px, numa célula de 89 × 104 px: a etiqueta, a
+                  frase, o botão e o link somavam 128 px de conteúdo e a caixa
+                  tem `overflow-hidden` — 24 px cortados em baixo, e o que
+                  ficava de fora era o «Abrir ficheiro». A última saída de uma
+                  célula morta estava a ser cortada pela explicação de por que
+                  é que ela morreu.
+
+                  A frase passa para o `title`, exactamente como no ramo «não
+                  veio na lista», que já tinha aprendido isto à sua custa: numa
+                  caixa desta altura, cada linha custa uma coisa que já lá
+                  estava. */}
+              <span
+                className="font-medium text-foreground/55"
+                title="A fotografia está guardada. Não consegui mostrá-la neste ecrã."
+              >
+                Imagem guardada
+              </span>
               <span className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                {/* ── E TENTA MESMO ALGUMA COISA DIFERENTE ──────────────────
+                    MEDIDO com a rede a devolver 503: o botão antigo repetia,
+                    ao byte, os dois URL que acabavam de falhar — nenhum
+                    pedido novo com um endereço novo. Contra a causa mais
+                    provável de uma grelha inteira morta — assinaturas que já
+                    não servem — isso é um botão que não pode funcionar.
+
+                    Agora são as duas coisas, por esta ordem: pedir ao
+                    servidor a lista outra vez (URLs frescos, e a memória dos
+                    mortos garante que o mapa os aceita) e recomeçar a cascata
+                    desta célula. */}
                 <button
                   type="button"
-                  onClick={tentarDeNovo}
+                  onClick={() => {
+                    aoTentarDeNovo?.();
+                    tentarDeNovo();
+                  }}
                   className="rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-foreground/[0.06]"
                 >
                   Tentar novamente

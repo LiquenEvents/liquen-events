@@ -1,6 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+/**
+ * Quanto tempo se espera antes da SEGUNDA volta à cascata.
+ *
+ * Dois segundos: o suficiente para uma rede móvel que piscou já ter voltado, e
+ * pouco de mais para quem está a olhar para a grelha. Não é uma reserva
+ * infinita — dá-se UMA volta a mais e mais nenhuma, senão uma pasta mesmo
+ * apagada punha a grelha a pedir para sempre.
+ */
+export const ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS = 2_000;
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
@@ -31,16 +41,83 @@ import { useState } from "react";
  * um ciclo entre os dois módulos. A regra é de quem desenha uma foto, não do
  * estúdio; sai para onde qualquer um a possa ler.
  */
-export function useFotoComPlanoB(url?: string, planoB?: string) {
+export function useFotoComPlanoB(
+  url?: string,
+  planoB?: string,
+  /**
+   * Não insistir: já se sabe que insistir dá sempre o mesmo.
+   *
+   * O caso é um só e é o das regras do próprio sítio (`img-src`): a fotografia
+   * nem chega a ser pedida, e portanto nem a segunda volta nem a rede a voltar
+   * mudam alguma coisa. MEDIDO com nove células recusadas: 54 recusas sem esta
+   * trava, 117 com a segunda volta a correr para nada.
+   */
+  naoInsistir = false,
+) {
   const [tentativa, setTentativa] = useState<"principal" | "planoB" | "desistiu">("principal");
   // Ajustar o estado DURANTE o render, e não num efeito: é o que evita a
   // célula piscar o aviso de erro durante um fotograma antes de voltar a
   // tentar. É o padrão que o React documenta para estado derivado de props.
   const [urlVisto, setUrlVisto] = useState(url);
+  /**
+   * Quantas VOLTAS à cascata já se deram nesta fotografia. Zera com um URL
+   * novo — outro URL é outra fotografia para efeitos de tentativas.
+   */
+  const [voltas, setVoltas] = useState(0);
   if (urlVisto !== url) {
     setUrlVisto(url);
     setTentativa("principal");
+    setVoltas(0);
   }
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * UMA SEGUNDA VOLTA, SOZINHA — PORQUE UMA PISCADELA NÃO É UMA AVARIA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Este ficheiro abre a dizer que o erro antigo era **gravar uma falha como se
+   * fosse um facto** — e depois fazia exactamente isso: chegado a «desistiu»,
+   * nada voltava a olhar para a fotografia sem um dedo dela em cima do botão.
+   *
+   * E as tentativas eram MENOS do que parecem. Contadas no código:
+   *
+   *   · com miniatura e original diferentes — DUAS (a miniatura, o original);
+   *   · sem miniatura, ou com a miniatura igual ao original — UMA.
+   *
+   * Uma. Um instante sem rede, um 503 de um Storage a arrancar, uma resposta
+   * estragada servida por um service worker, e a célula ficava morta até alguém
+   * recarregar a página inteira.
+   *
+   * Uma volta a mais, e só uma, dois segundos depois. É o que separa a rede que
+   * piscou (recupera sozinha, sem ninguém dar por nada) da pasta que não está
+   * lá (continua a acabar em «desistiu», com o botão e o «Abrir ficheiro»).
+   */
+  useEffect(() => {
+    if (naoInsistir || tentativa !== "desistiu" || voltas >= 1) return;
+    const t = setTimeout(() => {
+      setVoltas((v) => v + 1);
+      setTentativa("principal");
+    }, ESPERA_ANTES_DA_SEGUNDA_VOLTA_MS);
+    return () => clearTimeout(t);
+  }, [tentativa, voltas, naoInsistir]);
+
+  /**
+   * ── E QUANDO A REDE VOLTA, A CÉLULA VOLTA COM ELA ─────────────────────────
+   *
+   * O caso que o telemóvel tem e o computador não: sair do wi-fi, o elevador, o
+   * comboio. O navegador SABE quando a ligação voltou e diz — e até aqui
+   * ninguém o ouvia. Uma grelha morta ficava morta com a rede de volta, e a
+   * única saída era recarregar a página e pagar os downloads todos outra vez.
+   *
+   * Não gasta nada enquanto está viva: o ouvinte só existe em «desistiu».
+   */
+  useEffect(() => {
+    if (naoInsistir || tentativa !== "desistiu") return;
+    const voltar = () => setTentativa("principal");
+    window.addEventListener("online", voltar);
+    return () => window.removeEventListener("online", voltar);
+  }, [tentativa, naoInsistir]);
+
   return {
     /** O URL a pedir agora, ou `undefined` se já não há por onde tentar. */
     alvo: tentativa === "planoB" ? planoB : url,
@@ -66,6 +143,11 @@ export function useFotoComPlanoB(url?: string, planoB?: string) {
      * qualquer desses casos a foto está lá e a célula é a única coisa a dizer
      * que não. O botão custa uma linha e poupa um recarregamento da página.
      */
-    tentarDeNovo: () => setTentativa("principal"),
+    tentarDeNovo: () => {
+      // As voltas automáticas voltam à conta: um pedido dela é um recomeço, não
+      // a continuação do que já se tentou sozinho.
+      setVoltas(0);
+      setTentativa("principal");
+    },
   };
 }

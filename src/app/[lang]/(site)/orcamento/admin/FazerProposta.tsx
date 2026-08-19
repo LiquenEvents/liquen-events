@@ -6,7 +6,7 @@ import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { Button, Card, EmptyState } from "./ui";
 import { ProposalStudio } from "./lazy";
 import AvisoDataOcupada from "./AvisoDataOcupada";
-import { choquesDeData } from "@/lib/orcamento/choque-de-datas";
+import { choquesDeData, gravidade } from "@/lib/orcamento/choque-de-datas";
 
 /**
  * FAZER PROPOSTA — um ecrã com um trabalho só.
@@ -36,10 +36,25 @@ import { choquesDeData } from "@/lib/orcamento/choque-de-datas";
  * alcançável, para refazer ou rever, mas não disputa a atenção.
  */
 
-/** Os mesmos rótulos e cores dos estados usados no resto do back office. */
+/**
+ * UM SÓ SISTEMA DE ESTADOS.
+ *
+ * Os mesmos rótulos do resto do back office, e uma rampa de cor só: o mesmo
+ * verde da casa a ganhar corpo à medida que o pedido avança no funil — Novo,
+ * Aguardar resposta, Proposta enviada, Ganho. «Perdido» sai da rampa e fica
+ * cinzento, que é o que ele é: fora do funil.
+ *
+ * «Novo» era o único cinzento no meio de quatro verdes, o que o lia como
+ * "apagado" quando é precisamente o que ainda está todo por fazer. Passa a ser
+ * o primeiro degrau da rampa, com um anel fino a marcá-lo como o que espera
+ * por ela.
+ */
 const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
-  pendente: { label: "Novo", classe: "bg-foreground/10 text-foreground/50" },
-  em_revisao: { label: "Aguardar resposta", classe: "bg-[#4d6350]/15 text-[#4d6350]" },
+  pendente: {
+    label: "Novo",
+    classe: "bg-[#4d6350]/10 text-[#4d6350] ring-1 ring-inset ring-[#4d6350]/30",
+  },
+  em_revisao: { label: "Aguardar resposta", classe: "bg-[#4d6350]/18 text-[#4d6350]" },
   cotado: { label: "Proposta enviada", classe: "bg-[#4d6350]/25 text-[#4d6350]" },
   aceite: { label: "Ganho", classe: "bg-[#4d6350]/35 text-[#4d6350]" },
   rejeitado: { label: "Perdido", classe: "bg-foreground/[0.08] text-foreground/30" },
@@ -48,6 +63,28 @@ const ESTADO: Record<QuoteStatus, { label: string; classe: string }> = {
 /** Estados que ainda não têm proposta enviada — os que este ecrã existe para
  *  despachar. */
 const A_ESPERA: QuoteStatus[] = ["pendente", "em_revisao"];
+
+/**
+ * A FILA DE FILTROS — e porque é que não há um «Todos».
+ *
+ * A lista misturava novos, enviados e perdidos, e um casamento que se perdeu há
+ * seis meses ficava entre dois que esperam proposta hoje. Estas pastilhas são a
+ * triagem: a fila é a ordem do funil, e cada uma diz quantos lá estão.
+ *
+ * Por omissão fica em «Activos», que é tudo menos os perdidos. Não se chama
+ * «Todos» de propósito — chamar-lhe «Todos» e depois esconder uma parte seria
+ * mentir na etiqueta. Quem quiser ver os perdidos toca na pastilha deles; não
+ * há nenhum trabalho que se faça com perdidos e activos misturados, que é
+ * exactamente a queixa que deu origem a isto.
+ */
+const FILTROS: { id: QuoteStatus; label: string }[] = [
+  { id: "pendente", label: "Novo" },
+  { id: "em_revisao", label: "Aguardar resposta" },
+  { id: "cotado", label: "Proposta enviada" },
+  { id: "aceite", label: "Ganho" },
+];
+
+type Filtro = QuoteStatus | "activos";
 
 function tipoDeEvento(q: Quote): string {
   if (q.category && q.eventType) {
@@ -89,6 +126,7 @@ export default function FazerProposta({
   onQuoteUpdated,
 }: Props) {
   const [procura, setProcura] = useState("");
+  const [filtro, setFiltro] = useState<Filtro>("activos");
   // O mesmo padrão do resto do back office: a escrita responde já, e o
   // filtro sobre a lista toda corre com prioridade mais baixa.
   const procuraAdiada = useDeferredValue(procura);
@@ -98,7 +136,15 @@ export default function FazerProposta({
     [quotes, selectedId],
   );
 
-  const lista = useMemo(() => {
+  /**
+   * O que a procura deixou passar — antes de o filtro de estado entrar.
+   *
+   * É daqui que saem as contagens das pastilhas, e é de propósito: as contagens
+   * dizem quantos há DENTRO do que ela procurou. Contadas sobre a lista toda,
+   * uma pastilha diria «Novo · 12» e ao tocar-lhe apareceria um só — o que
+   * procurou.
+   */
+  const procurados = useMemo(() => {
     const t = procuraAdiada.trim().toLowerCase();
     const bate = (q: Quote) =>
       !t ||
@@ -121,6 +167,22 @@ export default function FazerProposta({
       });
   }, [quotes, procuraAdiada]);
 
+  const contagens = useMemo(() => {
+    const por: Record<string, number> = {};
+    for (const q of procurados) por[q.status] = (por[q.status] ?? 0) + 1;
+    return { por, activos: procurados.filter((q) => q.status !== "rejeitado").length };
+  }, [procurados]);
+
+  const perdidos = contagens.por.rejeitado ?? 0;
+
+  const lista = useMemo(
+    () =>
+      procurados.filter((q) =>
+        filtro === "activos" ? q.status !== "rejeitado" : q.status === filtro,
+      ),
+    [procurados, filtro],
+  );
+
   const porFazer = useMemo(
     () => quotes.filter((q) => !q.archived && A_ESPERA.includes(q.status)).length,
     [quotes],
@@ -137,9 +199,15 @@ export default function FazerProposta({
    * Corre sobre a lista já filtrada, não sobre as centenas todas.
    */
   const comChoque = useMemo(() => {
-    const ids = new Set<string>();
-    for (const q of lista) if (choquesDeData(q, quotes).length > 0) ids.add(q.id);
-    return ids;
+    const por = new Map<string, "aviso" | "grave">();
+    for (const q of lista) {
+      const cs = choquesDeData(q, quotes);
+      if (cs.length === 0) continue;
+      // A pior das colisões manda na cor. Um dia com dois eventos, um deles
+      // difícil de conciliar, não é «amarelo» só porque o outro era fácil.
+      por.set(q.id, cs.some((c) => gravidade(c) === "grave") ? "grave" : "aviso");
+    }
+    return por;
   }, [lista, quotes]);
 
   // ── Com cliente escolhido: o ecrã é o estúdio ────────────────────────────
@@ -217,7 +285,62 @@ export default function FazerProposta({
         </div>
       </Card>
 
-      {lista.length === 0 ? (
+      {/* ── A FILA DE ESTADOS ────────────────────────────────────────────
+          Uma fila só, que se arrasta com o polegar. Seis pastilhas a quebrar
+          em duas linhas gastam ecrã que aqui não sobra, e um contentor com
+          scroll próprio é a única forma de sair da margem que a auditoria de
+          toque aceita — a mesma escolha, e o mesmo desenho, da fila de estados
+          dos Pedidos (`AdminClient.tsx`).
+
+          `py-1` não é enfeite: `overflow-x` recorta também na vertical, e sem
+          essa folga o anel de foco das pastilhas ficava cortado. */}
+      {procurados.length > 0 && (
+        <div
+          role="group"
+          aria-label="Filtrar por estado"
+          className="-mt-1 flex flex-nowrap gap-1.5 overflow-x-auto py-1 lg:flex-wrap lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {[
+            { id: "activos" as Filtro, label: "Activos", n: contagens.activos },
+            ...FILTROS.map((f) => ({
+              id: f.id as Filtro,
+              label: f.label,
+              n: contagens.por[f.id] ?? 0,
+            })),
+            // «Perdido» só existe na fila quando há algum. Uma pastilha a zero
+            // é um convite para um ecrã vazio.
+            ...(perdidos > 0 ? [{ id: "rejeitado" as Filtro, label: "Perdido", n: perdidos }] : []),
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFiltro(f.id)}
+              aria-pressed={filtro === f.id}
+              className={`alvo-toque shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition-all duration-150 ${
+                filtro === f.id
+                  ? "bg-[#1b2119] text-white shadow-sm"
+                  : "bg-foreground/[0.04] text-foreground/40 hover:bg-foreground/[0.07] hover:text-foreground/65"
+              }`}
+            >
+              {f.label} · {f.n}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {lista.length === 0 && procurados.length > 0 ? (
+        // Há pedidos — foi a pastilha que os deixou de fora. Dizer «ainda não há
+        // pedidos» aqui seria mandá-la criar um cliente que ela já tem.
+        <EmptyState
+          title="Nada neste estado"
+          description={`Não há pedidos em «${
+            filtro === "activos"
+              ? "Activos"
+              : (ESTADO[filtro as QuoteStatus]?.label ?? String(filtro))
+          }»${procura ? " dentro do que procuraste" : ""}.`}
+          action={{ label: "Ver os activos", onClick: () => setFiltro("activos") }}
+        />
+      ) : lista.length === 0 ? (
         <EmptyState
           title={procura ? "Ninguém com esse nome" : "Ainda não há pedidos"}
           description={
@@ -231,6 +354,7 @@ export default function FazerProposta({
         <ul className="flex flex-col gap-2">
           {lista.map((q) => {
             const espera = A_ESPERA.includes(q.status);
+            const choque = comChoque.get(q.id);
             const e = ESTADO[q.status] ?? {
               // Um estado que não conheçamos mostra-se cru e em cinzento, em vez
               // de rebentar o ecrã inteiro — a razão está em `status-meta.ts`.
@@ -248,7 +372,37 @@ export default function FazerProposta({
                       : "border-foreground/[0.06] bg-foreground/[0.015] hover:border-foreground/20"
                   }`}
                 >
-                  <span className="flex w-full flex-wrap items-center justify-between gap-2">
+                  {/* AS ETIQUETAS VÊM PRIMEIRO, E É DE PROPÓSITO.
+                      Estavam à direita do nome, e num ecrã de 390 px «Aguardar
+                      resposta» encostado à direita do cartão lia-se como um
+                      botão — parecia haver ali uma acção que não existe. E
+                      «Data ocupada», que é a informação com mais dinheiro em
+                      jogo desta lista, ficava a seguir ao nome, apagada, e
+                      muitas vezes na segunda linha depois de quebrar.
+
+                      Passam a uma linha própria no topo do cartão, sempre no
+                      mesmo sítio: primeiro o alerta de data, depois o estado. O
+                      nome fica com o cartão todo para si — que é também o que
+                      lhe devolve os caracteres que o truncar comia. */}
+                  <span className="flex w-full flex-col gap-1.5">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      {choque && (
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] uppercase ring-1 ring-inset ${
+                            choque === "grave"
+                              ? "bg-[#b5654a]/15 text-[#8a4632] ring-[#b5654a]/45"
+                              : "bg-[#c08a3e]/18 text-[#8a6420] ring-[#c08a3e]/45"
+                          }`}
+                        >
+                          Data ocupada
+                        </span>
+                      )}
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-medium tracking-[0.08em] uppercase ${e.classe}`}
+                      >
+                        {e.label}
+                      </span>
+                    </span>
                     <span className="min-w-0">
                       <span
                         className={`block truncate text-sm font-medium ${espera ? "text-foreground/85" : "text-foreground/55"}`}
@@ -258,18 +412,6 @@ export default function FazerProposta({
                       <span className="mt-0.5 block truncate text-xs text-foreground/45">
                         {tipoDeEvento(q)} · {dataLegivel(q.date)}
                         {q.location ? ` · ${q.location}` : ""}
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1.5">
-                      {comChoque.has(q.id) && (
-                        <span className="rounded-full bg-[#c08a3e]/15 px-2.5 py-1 text-[10px] font-medium tracking-[0.08em] uppercase text-[#8a6420]">
-                          Data ocupada
-                        </span>
-                      )}
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-medium tracking-[0.08em] uppercase ${e.classe}`}
-                      >
-                        {e.label}
                       </span>
                     </span>
                   </span>

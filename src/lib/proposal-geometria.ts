@@ -162,9 +162,21 @@ export type LayoutDeMoodboard = "filas" | "fila-unica" | "mosaico" | "destaque" 
  *  nome próprio só para se distinguir, à leitura, de uma caixa de fotografia. */
 type Area = CaixaPdf;
 
+/**
+ * O TOPO da primeira fila de fotografias de um mood board.
+ *
+ * Estava escrito dentro do `areaDoMoodboard` e mais ninguém lhe podia chegar. É
+ * o CHÃO do cabeçalho da página — o título e o subtítulo têm de caber entre o
+ * sobretítulo e esta linha, e quem os compõe (o gerador do PDF) precisa de
+ * saber onde ela está. Escrever o número outra vez lá era ter duas verdades
+ * sobre a mesma linha: é exactamente o defeito que este módulo existe para não
+ * haver.
+ */
+export const TOPO_DAS_FOTOS = PAGINA_H - PAGINA_M - 112;
+
 /** A área útil de um mood board, em pontos. É onde todos os layouts cabem. */
 function areaDoMoodboard(alturaAnotacao: number): Area {
-  const top = PAGINA_H - PAGINA_M - 112;
+  const top = TOPO_DAS_FOTOS;
   const bottom = PAGINA_M + alturaAnotacao;
   return { x: PAGINA_M, y: bottom, w: PAGINA_W - 2 * PAGINA_M, h: top - bottom };
 }
@@ -226,8 +238,33 @@ export const TEXTO_DO_MOODBOARD = {
   legenda: {
     tamanho: 11,
     entrelinha: 15,
-    /** O que passa disto é anotado como cortado, não desaparece calado. */
-    maxLinhas: 5,
+    /**
+     * ── A MEDIDA DE LEITURA DA LEGENDA ────────────────────────────────────
+     *
+     * Era a folha toda entre margens — 706 pontos, que a corpo 11 dão perto de
+     * 150 caracteres por linha. É a linha mais comprida do documento inteiro, e
+     * o próprio gerador tem escrito lá dentro que «long lines (~120+ chars
+     * edge-to-edge) are the biggest DIY tell».
+     *
+     * 550 é a MESMA medida das notas do orçamento e dos campos da apresentação:
+     * o documento passa a ter uma medida só para o texto corrido, que é o que
+     * uma folha composta tem.
+     *
+     * Vive AQUI, e não no gerador, porque a estimativa de linhas da miniatura
+     * (`linhasDaLegendaAprox`) tem de partir pela mesma largura: uma legenda
+     * que dá quatro linhas na folha e três na miniatura reserva às fotografias
+     * uma altura que elas não vão ter.
+     */
+    medida: 550,
+    /**
+     * O que passa disto é anotado como cortado, não desaparece calado.
+     *
+     * Seis e não cinco: a medida encurtou 22%, e o mesmo texto que dava cinco
+     * linhas passa a dar seis. Manter o tecto em cinco era encurtar a medida à
+     * custa do que chega ao casal — e o que aqui se queria era a linha mais
+     * curta, não a legenda mais curta.
+     */
+    maxLinhas: 6,
     /** O ar entre a última linha e a margem de baixo. */
     folga: 12,
     /** Sem legenda continua a reservar-se um fio, para as fotos não colarem. */
@@ -280,7 +317,7 @@ export function linhasDaLegendaAprox(texto: string | undefined): number {
   if (!texto) return 0;
   // 0,5 em por caractere: a média de um texto em caixa mista na Carlito, que é
   // uma fonte de largura Calibri. Não se finge mais precisão do que esta.
-  const porLinha = Math.max(1, Math.floor((PAGINA_W - 2 * PAGINA_M) / (L.tamanho * 0.5)));
+  const porLinha = Math.max(1, Math.floor(L.medida / (L.tamanho * 0.5)));
   let linhas = 0;
   for (const paragrafo of texto.split("\n")) {
     let atual = 0;
