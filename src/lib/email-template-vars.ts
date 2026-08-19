@@ -202,7 +202,22 @@ export interface EntradaDosValores {
  * Carrelhas Das Neves Da Palma Gaspar,» já saiu mesmo assim num email da casa.
  */
 export function primeiroNome(nome: string | undefined | null): string {
-  return String(nome ?? "").trim().split(/\s+/)[0] ?? "";
+  const inteiro = String(nome ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!inteiro) return "";
+  // UM CASAL SÃO DUAS PESSOAS, e a saudação tem de as apanhar às duas.
+  // «Marta Sofia Gaspar e João Pedro Pereira» não pode virar «Marta»: metade
+  // do casal desaparecia do «Olá». Corta-se pela conjunção e fica o primeiro
+  // nome de cada um — «Marta e João», que é como eles se tratam.
+  const partes = inteiro.split(/\s+(?:e|&|and)\s+/i);
+  if (partes.length > 1) {
+    return partes
+      .map((parte) => parte.trim().split(" ")[0])
+      .filter(Boolean)
+      .join(" e ");
+  }
+  return inteiro.split(" ")[0] ?? "";
 }
 
 /** A data como se escreve («12 de setembro de 2026»), ou VAZIO. */

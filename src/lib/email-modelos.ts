@@ -3,10 +3,15 @@ import { htmlToPlainText } from "./email-template-format";
 import {
   DEFAULT_TEMPLATES,
   getTemplate,
+  idFisico,
   MERGE_FIELDS,
+  MODELOS_DE_ORIGEM,
   renderTemplate,
   type EmailTemplate,
+  type IdiomaDoModelo,
 } from "./email-templates-store";
+import { renderizarAssunto, renderizarCorpo, variaveisPorPreencher } from "./email-template-engine";
+import { primeiroNome, REMETENTE_POR_OMISSAO, VARIAVEIS } from "./email-template-vars";
 import { dataIso } from "./validation";
 import { log } from "./logger";
 
@@ -228,10 +233,68 @@ function marcadoresUsados(...fontes: string[]): string[] {
 }
 
 const rotuloDoCampo = (chave: string): string =>
-  MERGE_FIELDS.find((f) => f.key === chave)?.label.toLowerCase() ?? chave;
+  VARIAVEIS.find((v) => v.chave === chave)?.rotulo ??
+  MERGE_FIELDS.find((f) => f.key === chave)?.label.toLowerCase() ??
+  chave;
 
 const juntar = (partes: string[]): string =>
   partes.length <= 1 ? (partes[0] ?? "") : `${partes.slice(0, -1).join(", ")} e ${partes.at(-1)}`;
+
+/** Um modelo do dialecto novo reconhece-se pelas chavetas duplas. */
+export function ehDialectoNovo(...fontes: string[]): boolean {
+  return fontes.some((f) => String(f ?? "").includes("{{"));
+}
+
+/**
+ * O caminho do dialecto novo. Tem a mesma forma que o antigo — desenha, ou
+ * recusa com uma frase que nomeia o que falta — e duas diferenças que são o
+ * ponto todo dos blocos condicionais:
+ *
+ *   • uma variável vazia GUARDADA pelo seu próprio `{{#se}}` não é uma falta:
+ *     ela já escreveu o que fazer sem esse dado. Recusar era discutir uma
+ *     decisão tomada, e obrigá-la a preencher a data para poder mandar um
+ *     email que ela própria redigiu para o caso de não haver data.
+ *   • o corpo VAZIO só se sabe depois de desenhar: um modelo inteiro dentro
+ *     de um `{{#se}}` falso não escreve nada, e um email em branco não sai.
+ */
+function prepararDialectoNovo(
+  modelo: EmailTemplate,
+  assunto: string,
+  corpo: string,
+  vars: Record<string, string>,
+): ModeloPreparado {
+  const emFalta = variaveisPorPreencher(assunto, vars);
+  for (const k of variaveisPorPreencher(corpo, vars)) if (!emFalta.includes(k)) emFalta.push(k);
+  if (emFalta.length) {
+    const nomes = emFalta.map((k) => `${rotuloDoCampo(k)} ({{${k}}})`);
+    return {
+      ok: false,
+      emFalta,
+      motivo: `O modelo «${modelo.name}» usa ${juntar(nomes)}, e este pedido não tem ${
+        emFalta.length > 1 ? "esses dados" : "esse dado"
+      }. O email NÃO foi enviado — preenche ${
+        emFalta.length > 1 ? "os campos" : "o campo"
+      } no pedido, ou envolve ${
+        emFalta.length > 1 ? "os marcadores" : "o marcador"
+      } num bloco {{#se …}} para o modelo saber o que fazer sem ${
+        emFalta.length > 1 ? "eles" : "ele"
+      }, e volta a tentar.`,
+    };
+  }
+
+  const html = renderizarCorpo(corpo, vars);
+  const texto = textoDoCorpo(html);
+  if (texto.trim() === "") {
+    return {
+      ok: false,
+      emFalta: [],
+      motivo:
+        `O modelo «${modelo.name}» não escreveu nada com os dados deste pedido — tudo o que ele ` +
+        `tem está dentro de blocos {{#se …}} que ficaram fechados. O email NÃO foi enviado.`,
+    };
+  }
+  return { ok: true, assunto: renderizarAssunto(assunto, vars), html, texto };
+}
 
 /**
  * O modelo pronto a entregar ao `emailAoCliente` — ou a recusa, com a frase
@@ -263,6 +326,21 @@ export function prepararModelo(
     };
   }
 
+  /**
+   * ── DOIS DIALECTOS, UM DE CADA VEZ ──────────────────────────────────────
+   *
+   * Os modelos antigos são escritos com `{marcador}`; os novos com
+   * `{{variavel}}` e blocos `{{#se}}`. Um modelo usa UM dos dois, e é o
+   * próprio texto que o diz: se tem chavetas duplas, é do novo.
+   *
+   * Não se corre a substituição antiga por cima da nova, e a razão vê-se num
+   * exemplo: o `\{(\w+)\}` do dialecto antigo casa com o `{cliente_nome}` que
+   * está DENTRO de um `{{cliente_nome}}`, e o que saía era «Proposta {Marta}»
+   * — o nome do cliente entre chavetas, na primeira linha que ele lê. Uma
+   * escolha, nunca as duas.
+   */
+  if (ehDialectoNovo(assunto, corpo)) return prepararDialectoNovo(modelo, assunto, corpo, vars);
+
   const emFalta = marcadoresUsados(assunto, corpo).filter(
     (k) => String(vars[k] ?? "").trim() === "",
   );
@@ -292,20 +370,46 @@ export function prepararModelo(
 
 /** O que está GUARDADO, ou nada. Uma avaria a ler (tabela em falta, base fora)
  *  não pode ser uma excepção que suba: quem chama tem sempre um recurso. */
-async function guardado(chave: ChaveDeModelo): Promise<EmailTemplate | null> {
+async function guardado(
+  chave: ChaveDeModelo | string,
+  idioma: IdiomaDoModelo = "pt",
+): Promise<EmailTemplate | null> {
   try {
-    return await getTemplate(chave);
+    return await getTemplate(idFisico(chave, idioma));
   } catch (e) {
     log.warn("modelos de email: não foi possível ler o modelo guardado", {
       chave,
+      idioma,
       erro: String(e),
     });
     return null;
   }
 }
 
-const semente = (chave: ChaveDeModelo): EmailTemplate | null =>
-  DEFAULT_TEMPLATES.find((t) => t.key === chave) ?? null;
+/**
+ * A semente deste modelo NESTA LÍNGUA, ou nada.
+ *
+ * Os quatro modelos antigos só têm semente portuguesa; os três novos têm as
+ * duas. Um `null` do lado inglês é uma resposta verdadeira — «não há versão
+ * inglesa deste modelo» — e é o que faz a recusa acontecer em vez de sair
+ * português para um casal que não o lê.
+ */
+const semente = (chave: ChaveDeModelo | string, idioma: IdiomaDoModelo = "pt"): EmailTemplate | null => {
+  const nova = MODELOS_DE_ORIGEM.find((m) => m.chave === chave);
+  if (nova) {
+    const lado = nova[idioma];
+    if (!lado.subject.trim() && !lado.body.trim()) return null;
+    return {
+      key: idFisico(chave, idioma),
+      name: nova.nome,
+      subject: lado.subject,
+      body: lado.body,
+      updatedAt: "1970-01-01T00:00:00.000Z",
+    };
+  }
+  if (idioma === "en") return null;
+  return DEFAULT_TEMPLATES.find((t) => t.key === chave) ?? null;
+};
 
 /**
  * O modelo para o caminho AUTOMÁTICO (a proposta que segue). `null` quer dizer
@@ -319,10 +423,18 @@ const semente = (chave: ChaveDeModelo): EmailTemplate | null =>
  * dela que sai.
  */
 export async function modeloParaEnvioAutomatico(
-  chave: ChaveDeModelo,
+  chave: ChaveDeModelo | string,
   vars: Record<string, string>,
+  /**
+   * A língua do cliente. OPCIONAL, e por omissão português — as rotas que já
+   * chamam isto não passam nada e não podem mudar de comportamento por causa
+   * desta linha. Quem passar `"en"` vai buscar a versão inglesa GUARDADA; se
+   * ela não existir, continua a sair `null`, que quer dizer «sai o texto da
+   * casa», e o texto da casa existe nas duas línguas.
+   */
+  idioma: IdiomaDoModelo = "pt",
 ): Promise<{ assunto: string; html: string; texto: string } | null> {
-  const modelo = await guardado(chave);
+  const modelo = await guardado(chave, idioma);
   if (!modelo) return null;
   const pronto = prepararModelo(modelo, vars);
   if (!pronto.ok) {
@@ -330,6 +442,7 @@ export async function modeloParaEnvioAutomatico(
     // ela guardou um modelo e o email que saiu não foi o dela.
     log.warn("modelos de email: modelo guardado não utilizável, sai o texto da casa", {
       chave,
+      idioma,
       emFalta: pronto.emFalta.join(","),
     });
     return null;
@@ -361,27 +474,41 @@ export async function modeloParaEnvioAutomatico(
  * versão inglesa de cada um.
  */
 export async function modeloParaEnvioAPedido(
-  chave: ChaveDeModelo,
+  chave: ChaveDeModelo | string,
   vars: Record<string, string>,
   idioma?: string,
 ): Promise<ModeloPreparado> {
-  const modelo = (await guardado(chave)) ?? semente(chave);
+  const lingua: IdiomaDoModelo = idioma === "en" ? "en" : "pt";
+  const modelo = (await guardado(chave, lingua)) ?? semente(chave, lingua);
   if (!modelo) {
+    // ── A RECUSA INGLESA, AGORA COM SAÍDA ────────────────────────────────
+    //
+    // Isto recusava SEMPRE um pedido inglês, porque não havia onde guardar a
+    // versão inglesa de um modelo. Agora há — é o separador «EN» do ecrã dos
+    // modelos —, e a recusa passa a ser a resposta verdadeira a uma coisa
+    // concreta: esta versão ainda não está escrita.
+    //
+    // O que NÃO mudou, e não muda: não se traduz à máquina o texto dela, e não
+    // se manda português a quem pediu em inglês. Das duas, a que menos
+    // surpreende quem RECEBE continua a ser não mandar nada e dizer porquê.
+    if (lingua === "en") {
+      // Pelo NOME e não pela chave: quem lê isto é ela, a meio de um envio, e
+      // «sinal-recebido» é o nome que a base de dados lhe dá — não o que está
+      // escrito na lista do ecrã onde ela o vai procurar.
+      const nome = semente(chave, "pt")?.name ?? String(chave);
+      return {
+        ok: false,
+        emFalta: [],
+        motivo:
+          `Este pedido é em inglês e ainda não há versão inglesa do modelo «${nome}». O email ` +
+          `NÃO foi enviado — escreve-a em «Modelos de email» (separador EN), ou escreve ao casal ` +
+          `pelo Mensageiro, que já sai na língua do pedido.`,
+      };
+    }
     return {
       ok: false,
       emFalta: [],
       motivo: `Não há nenhum modelo «${chave}». Cria-o em «Modelos de email».`,
-    };
-  }
-  if (idioma === "en") {
-    return {
-      ok: false,
-      emFalta: [],
-      motivo:
-        `O modelo «${modelo.name}» está escrito em português, e este pedido é em inglês — ` +
-        `enviá-lo mandava ao casal um email que não entende. O email NÃO foi enviado: escreve-lhe ` +
-        `antes pelo Mensageiro (já sai na língua certa), ou pede uma versão inglesa deste modelo ` +
-        `em «Modelos de email».`,
     };
   }
   return prepararModelo(modelo, vars);
@@ -437,6 +564,53 @@ export function marcadoresDoPedido(
     link: "",
     valor: "",
   };
+  for (const [k, v] of Object.entries(extra)) if (v !== undefined) base[k] = v;
+
+  /**
+   * ── A PONTE PARA AS VARIÁVEIS NOVAS ─────────────────────────────────────
+   *
+   * As rotas que mandam correio (`api/orcamento/**`) chamam isto e passam as
+   * chaves antigas. Elas não são minhas para mudar, e mudar-lhes a assinatura
+   * a meio de outra pessoa corrigir defeitos lá dentro era pedir um conflito.
+   *
+   * Então o mesmo mapa passa a trazer OS DOIS nomes para o mesmo dado: quem
+   * escrever um modelo novo tem as variáveis novas a funcionar hoje, pelas
+   * rotas que já existem, sem que uma linha delas mude.
+   *
+   * O QUE FALTA — e falta de propósito, porque exige tocar-lhes — são os dados
+   * que estas rotas nunca calcularam: o tipo de evento, a validade, a
+   * percentagem do sinal e a mensagem pessoal. Ficam VAZIOS, que é o que os
+   * blocos `{{#se}}` sabem tratar, e a lista exacta do que acrescentar em cada
+   * rota vai no relatório.
+   *
+   * O `remetente_nome` é o caso que não se resolve por ponte nenhuma: NÃO HÁ
+   * nenhuma chave antiga de onde ele possa vir, e é assim que tem de ser. Sai
+   * o nome da casa até alguém o indicar por `extra`, e nunca — em caminho
+   * nenhum deste ficheiro — o nome de quem recebe.
+   */
+  // O NOME INTEIRO, e não o `base.nome` — esse já vem cortado no primeiro nome
+  // pelo dialecto antigo, e o `{{cliente_nome_completo}}` prometia o contrário.
+  // Quem chama pode substituí-lo por `extra.nome` (é o que a rota da proposta
+  // faz, com os nomes do CASAL em vez de quem preencheu o formulário).
+  const completo = String(extra.nome ?? pedido.name ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+  const novas: Record<string, string> = {
+    cliente_nome: primeiroNome(completo),
+    cliente_nome_completo: completo,
+    evento_tipo: "",
+    evento_data: base.data_evento ?? "",
+    evento_local: base.local ?? "",
+    valor_total: base.valor ?? "",
+    validade_data: "",
+    sinal_percentagem: "",
+    link_proposta: base.link ?? "",
+    mensagem_pessoal: "",
+    remetente_nome: REMETENTE_POR_OMISSAO,
+  };
+  for (const [k, v] of Object.entries(novas)) if (base[k] === undefined) base[k] = v;
+  // Um `extra` escrito já com os nomes novos ganha — é como quem chama diz
+  // «este dado é este», e é por aqui que o `remetente_nome` verdadeiro entra.
   for (const [k, v] of Object.entries(extra)) if (v !== undefined) base[k] = v;
   return base;
 }

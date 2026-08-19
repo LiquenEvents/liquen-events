@@ -122,3 +122,16 @@ describe("os valores", () => {
     expect(VARIAVEIS.find((x) => x.chave === "cliente_nome")?.grupo).toBe("cliente");
   });
 });
+
+describe("um casal são duas pessoas", () => {
+  it("mantém os dois no cumprimento", () => {
+    expect(primeiroNome("Marta Sofia Gaspar e João Pedro Pereira")).toBe("Marta e João");
+    expect(primeiroNome("Marta & João Pereira")).toBe("Marta e João");
+  });
+  it("uma pessoa só continua a ser um nome só", () => {
+    expect(primeiroNome("Marta Sofia Gaspar")).toBe("Marta");
+  });
+  it("não confunde um «e» que faz parte do nome", () => {
+    expect(primeiroNome("Maria Estrela")).toBe("Maria");
+  });
+});
