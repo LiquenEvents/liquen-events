@@ -9,6 +9,7 @@ import {
   closePath,
   clip,
   endPath,
+  setCharacterSpacing,
   type PDFFont,
   type PDFPage,
   type PDFImage,
@@ -543,6 +544,105 @@ async function drawCoverImage(
   return false;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TEXTO ESPAÇADO É UM TEXTO, E NÃO UMA FILA DE LETRAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «LÍQUEN EVENTS» no rodapé e «INSPIRAÇÃO» por cima de cada mood board eram
+ * desenhados GLIFO A GLIFO — um `drawText` por letra, com a posição calculada à
+ * mão. Funcionava no papel e não funcionava em mais lado nenhum:
+ *
+ *   · procurar «Líquen» DENTRO do PDF não encontrava nada (medido: zero
+ *     ocorrências nos oito ficheiros do relatório) — cada letra é uma corrida
+ *     de texto isolada, e nenhum motor de busca junta corridas;
+ *   · copiar do visualizador dava «L Í Q U E N   E V E N T S»;
+ *   · e cada palavra custava treze operadores de texto em vez de um, em todas
+ *     as páginas do documento.
+ *
+ * O PDF tem um operador para isto desde sempre — `Tc`, o espaçamento entre
+ * caracteres — e a pdf-lib exporta-o (`setCharacterSpacing`). É estado
+ * gráfico, por isso vai entre um `q` e um `Q`: sem eles, o espaçamento ficava
+ * ligado para o resto da página e o corpo do texto saía todo esparramado.
+ *
+ * ── A LARGURA CONTINUA A SER A MESMA ──────────────────────────────────────
+ * O `Tc` acrescenta o espaço DEPOIS de cada glifo, incluindo o último: o
+ * avanço total é `largura + espaçamento × n`. Para centrar, o que interessa é
+ * a tinta — `largura + espaçamento × (n − 1)` —, que é exactamente a conta que
+ * o desenho letra a letra já fazia. A palavra fica onde estava.
+ */
+function larguraEspacada(font: PDFFont, texto: string, size: number, tracking: number): number {
+  const n = [...texto].length;
+  return font.widthOfTextAtSize(texto, size) + tracking * Math.max(0, n - 1);
+}
+
+/** Desenha `texto` com espaçamento entre letras, numa só corrida de texto. */
+function drawEspacado(
+  p: PDFPage,
+  texto: string,
+  x: number,
+  y: number,
+  o: { font: PDFFont; size: number; color: ReturnType<typeof rgb>; tracking: number },
+): void {
+  p.pushOperators(pushGraphicsState(), setCharacterSpacing(o.tracking));
+  p.drawText(texto, { x, y, font: o.font, size: o.size, color: o.color });
+  p.pushOperators(popGraphicsState());
+}
+
+/**
+ * ── ONDE O DESENHO CORTA, O PAPEL DI-LO ────────────────────────────────────
+ *
+ * A composição tem limites — o nome da capa, os campos do evento, a legenda de
+ * um mood board — e o que passava deles acabava a meio da frase, sem sinal
+ * nenhum: «… ao casal. Linha». Quem lê não tem como distinguir «o texto acabou»
+ * de «o texto foi cortado», e é a mesma folha que vai para o cliente.
+ *
+ * O relatório de truncagens continua a contar tudo (é o que o estúdio lê antes
+ * de enviar); as reticências são para quem só tem o papel.
+ */
+const RETICENCIAS = "…";
+
+/** `texto` cortado à largura pedida, com «…» a dizer que foi cortado. */
+function comReticencias(font: PDFFont, texto: string, size: number, maxWidth: number): string {
+  const safe = textoParaFonte(font, texto);
+  if (font.widthOfTextAtSize(safe, size) <= maxWidth) return safe;
+  const cauda = textoParaFonte(font, RETICENCIAS);
+  let corte = safe;
+  while (corte.length > 1 && font.widthOfTextAtSize(corte + cauda, size) > maxWidth) {
+    corte = corte.slice(0, -1);
+  }
+  // Sem a pontuação nem o espaço que ficaram pendurados no sítio do corte.
+  return corte.replace(/[\s.,;:·—–-]+$/u, "") + cauda;
+}
+
+/**
+ * Quebra `texto` e corta a `maxLinhas`, com «…» na última quando sobrou texto.
+ *
+ * Devolve também quantas linhas ficaram de fora, para quem chama as poder
+ * anotar no relatório — cortar em silêncio é o defeito, não a solução.
+ */
+function quebrarComReticencias(
+  font: PDFFont,
+  texto: string,
+  size: number,
+  maxWidth: number,
+  maxLinhas: number,
+): { linhas: string[]; cortadas: number } {
+  const todas = wrap(font, texto, size, maxWidth);
+  if (todas.length <= maxLinhas) return { linhas: todas, cortadas: 0 };
+  const linhas = todas.slice(0, maxLinhas);
+  const resto = todas.slice(maxLinhas).join(" ").trim();
+  // A última linha fica com o que couber dela mais o princípio do que se
+  // perdeu, e acaba em «…»: é o sinal de que há texto a seguir.
+  linhas[maxLinhas - 1] = comReticencias(
+    font,
+    `${linhas[maxLinhas - 1]} ${resto}`.trim(),
+    size,
+    maxWidth,
+  );
+  return { linhas, cortadas: todas.length - maxLinhas };
+}
+
 function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
   // Sanitiza para WinAnsi antes de medir/quebrar — descrições e notas do
   // documento podem trazer caracteres que a Helvetica não codifica.
@@ -830,15 +930,14 @@ export async function renderProposalDocPdfWithReport(
     const safe = textoParaFonte(fn, s);
     const sz = o.size ?? 10;
     if (o.tracking) {
-      // Letter-spaced small caps (eyebrows) — draw glyph by glyph.
-      let w = 0;
-      for (const ch of safe) w += fn.widthOfTextAtSize(ch, sz) + o.tracking;
-      w -= o.tracking;
-      let x = cx - w / 2;
-      for (const ch of safe) {
-        p.drawText(ch, { x, y, font: fn, size: sz, color: o.color ?? INK });
-        x += fn.widthOfTextAtSize(ch, sz) + o.tracking;
-      }
+      // Capitulares espaçadas — UMA corrida de texto, com o `Tc` do PDF a
+      // abrir as letras. Ver `drawEspacado`: é o que as torna pesquisáveis.
+      drawEspacado(p, safe, cx - larguraEspacada(fn, safe, sz, o.tracking) / 2, y, {
+        font: fn,
+        size: sz,
+        color: o.color ?? INK,
+        tracking: o.tracking,
+      });
       return;
     }
     p.drawText(safe, {
@@ -859,33 +958,48 @@ export async function renderProposalDocPdfWithReport(
     textRight(p, refImpressa, W - M, H - M - 2, { size: 8, color: FAINT });
   };
 
+  /** Os rodapés à espera do número de folhas — ver o bloco dentro do `footer`. */
+  const rodapesPorNumerar: { p: PDFPage; folha: number }[] = [];
+
   // Calm footer: a pale hairline, quiet brand + email, plain page number. Called
   // on every content page so the document reads as one considered, paginated piece.
-  const footer = (p: PDFPage, pageNum: number) => {
+  const footer = (p: PDFPage) => {
     p.drawLine({
       start: { x: M, y: M - 12 },
       end: { x: W - M, y: M - 12 },
       thickness: 0.5,
       color: LINE,
     });
-    let bx = M;
-    for (const ch of "LÍQUEN EVENTS") {
-      p.drawText(ch, { x: bx, y: M - 26, font: f.bold, size: 6.5, color: FAINT });
-      bx += f.bold.widthOfTextAtSize(ch, 6.5) + 1.4;
-    }
-    textRight(p, SITE.email, W - M, M - 26, { size: 7, color: FAINT });
-    textCenter(p, String(pageNum).padStart(2, "0"), W / 2, M - 26, {
-      size: 7.5,
+    drawEspacado(p, textoParaFonte(f.bold, "LÍQUEN EVENTS"), M, M - 26, {
+      font: f.bold,
+      size: 6.5,
       color: FAINT,
+      tracking: 1.4,
     });
+    textRight(p, SITE.email, W - M, M - 26, { size: 7, color: FAINT });
+    /**
+     * ── «01 DE 09», E NÃO «01» ─────────────────────────────────────────────
+     *
+     * O número da folha sozinho não diz nada a quem imprime: com «01» não se
+     * sabe se o documento tem nove folhas ou vinte e uma, nem se chegaram
+     * todas. Falta o denominador — e o denominador só se sabe no fim.
+     *
+     * Por isso o rodapé fica com o SÍTIO marcado e é escrito na volta final,
+     * quando as páginas já existem todas (ver `rodapesPorNumerar`). É a única
+     * coisa deste documento que precisa de uma segunda passagem, e é barata:
+     * a pdf-lib guarda as páginas em memória até ao `save`.
+     *
+     * O número é o da FOLHA, contado a partir da capa: é o que se conta na
+     * mão. A capa e a contracapa não levam rodapé, mas contam — «02 de 09» na
+     * primeira folha de conteúdo é verdade, «01 de 07» não era.
+     */
+    rodapesPorNumerar.push({ p, folha: pdf.getPageCount() });
   };
 
   // A page frame = header + footer, returning the starting y for the body.
-  let pageNo = 0;
   const frame = (p: PDFPage): number => {
-    pageNo += 1;
     header(p);
-    footer(p, pageNo);
+    footer(p);
     return H - M - 84;
   };
 
@@ -893,11 +1007,13 @@ export async function renderProposalDocPdfWithReport(
   // than shouts. The one consistent "voice" for small labels across the document.
   const eyebrow = (p: PDFPage, s: string, x: number, y: number, color = FAINT, size?: number) => {
     const sz = size ?? T_CAPTION;
-    let cx = x;
-    for (const ch of textoParaFonte(f.bold, s.toUpperCase())) {
-      p.drawText(ch, { x: cx, y, font: f.bold, size: sz, color });
-      cx += f.bold.widthOfTextAtSize(ch, sz) + 2;
-    }
+    // Uma corrida de texto com o espaçamento do PDF — ver `drawEspacado`.
+    drawEspacado(p, textoParaFonte(f.bold, s.toUpperCase()), x, y, {
+      font: f.bold,
+      size: sz,
+      color,
+      tracking: 2,
+    });
   };
   /**
    * ── AS SECÇÕES SÃO NUMERADAS, COMO NA FOLHA DELA ──────────────────────────
@@ -2411,6 +2527,62 @@ export async function renderProposalDocPdfWithReport(
       textCenter(p, ln, cx, sy, { font: f.serifIt, size: 10.5, color: CREAM_DIM });
       sy -= 10.5 * 1.3;
     }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     A SEGUNDA PASSAGEM — SÓ O RODAPÉ, E SÓ PORQUE PRECISA DELA
+     ═══════════════════════════════════════════════════════════════════════════
+
+     O documento é composto numa passagem, da primeira folha à última, e é isso
+     que o mantém simples. Uma coisa só não se consegue assim: quantas folhas
+     tem o documento. Escreve-se agora, com as páginas todas feitas e antes do
+     `save` — que é o único momento em que a resposta existe. */
+  {
+    const totalDeFolhas = String(pdf.getPageCount()).padStart(2, "0");
+    for (const { p, folha } of rodapesPorNumerar) {
+      textCenter(
+        p,
+        `${String(folha).padStart(2, "0")} ${t.deFolhas(totalDeFolhas)}`,
+        W / 2,
+        M - 26,
+        { size: 7.5, color: FAINT },
+      );
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     AS PROPRIEDADES DO DOCUMENTO — QUEM O ESCREVEU, E SOBRE QUEM
+     ═══════════════════════════════════════════════════════════════════════════
+
+     Estavam vazias, e um PDF com as propriedades vazias não fica neutro: fica
+     assinado pela biblioteca que o desenhou. Abrir o ficheiro e ler «Autor:
+     pdf-lib» num documento de vinte mil euros é a diferença entre uma empresa e
+     um gerador — e é o que o cliente vê no separador do browser, no gestor de
+     ficheiros e ao arquivar o anexo.
+
+     Nada disto muda o papel: é o que está À VOLTA do papel. O título é o que
+     aparece no separador; o assunto é o que um arquivo lê; as palavras-chave
+     são o que uma busca no computador dela encontra. A língua é a do documento
+     — um leitor de ecrã que a saiba pronuncia «Décoration» à francesa e
+     «Decoração» à portuguesa por causa desta linha.
+  */
+  {
+    const quem = (doc.clientNames ?? "").trim();
+    // «Proposta · Decoração» / «Proposal · Planning» — a MESMA frase que a capa
+    // imprime, e já traduzida. Um título escrito à parte era uma segunda
+    // verdade sobre o que este documento é.
+    const oQue = doc.template === "organizacao" ? t.capaOrganizacao : t.capaDecoracao;
+    pdf.setTitle(quem ? `${oQue} — ${quem}` : oQue);
+    pdf.setAuthor(SITE.name);
+    pdf.setSubject(
+      [oQue, quem, (evento.eventDate ?? "").trim(), (doc.location ?? "").trim()]
+        .filter(Boolean)
+        .join(" · "),
+    );
+    pdf.setKeywords([SITE.name, oQue, quem, doc.ref ?? ""].filter(Boolean));
+    pdf.setCreator(SITE.name);
+    pdf.setProducer(SITE.name);
+    pdf.setLanguage(idioma === "en" ? "en-GB" : "pt-PT");
   }
 
   if (semRedimensionar > 0) {

@@ -18,6 +18,7 @@ const doc = withProposalDefaults({
   location: "Monte da Oliveirinha, Évora",
   guests: "80 pax",
   servico: "Organização integral",
+  moodBoards: [],
   coverImages: ["", ""],
   serviceGroups: [
     {

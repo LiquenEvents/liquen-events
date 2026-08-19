@@ -282,6 +282,18 @@ export interface TextosDoDocumento {
   readonly email: string;
   readonly telefone: string;
 
+  /**
+   * O rodapé de cada folha: «01 de 09».
+   *
+   * É FUNÇÃO e não uma palavra solta de propósito. O que muda de língua é o
+   * «de»/«of», e uma entrada de duas letras não se pode procurar dentro de um
+   * PDF — «de» está dentro de metade das palavras da folha. Como função, o
+   * varrimento de `proposal-doc-textos.test.ts` parte a frase pelo argumento e
+   * descarta os pedaços com menos de quatro caracteres, que é exactamente o que
+   * esta cola é.
+   */
+  readonly deFolhas: (total: string) => string;
+
   // ── Contracapa ──
   readonly obrigada: string;
   readonly agradecimento: string;
@@ -378,6 +390,8 @@ const PT: TextosDoDocumento = {
   contactos: "Contactos",
   email: "Email",
   telefone: "Telefone",
+
+  deFolhas: (total) => `de ${total}`,
 
   obrigada: "OBRIGADA",
   agradecimento: "Por nos deixarem fazer parte deste momento.",
@@ -485,6 +499,8 @@ const EN: TextosDoDocumento = {
   contactos: "Contact",
   email: "Email",
   telefone: "Phone",
+
+  deFolhas: (total) => `of ${total}`,
 
   obrigada: "THANK YOU",
   agradecimento: "For letting us be part of this moment.",
