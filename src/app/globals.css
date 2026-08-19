@@ -569,8 +569,18 @@ body {
      que se TOCA para começar a escrever, e os do back office ficavam em 37–40 px
      — abaixo dos 44. Fora os que não são caixas de escrever: um checkbox tem o
      seu quadrado desenhado e quem cresce é o rótulo à volta (ver `.alvo-toque`
-     no rótulo da lista de pedidos), e um campo escondido não tem tamanho. */
+     no rótulo da lista de pedidos), e um campo escondido não tem tamanho.
+
+     ── E O `textarea` ENTROU NESTA LISTA DEPOIS, POR UMA RAZÃO MEDIDA ───────
+     Faltava, e ninguém deu por isso enquanto as caixas de escrever foram
+     todas `input`. No dia em que o nome de um serviço passou a `textarea`
+     (para o texto deixar de ser cortado a meio), a linha caiu para **34 px**
+     — o passeio `admin-mobile.spec.ts` apanhou-a no CI, com o nome à frente:
+     «259x34px "Linha 1 do grupo 1"». Um `textarea` é tão «coisa em que se
+     toca para escrever» como um `input`; a lista é que tinha ficado pela
+     forma antiga. */
   input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  textarea,
   select {
     min-height: 44px;
   }
