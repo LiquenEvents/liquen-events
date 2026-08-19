@@ -305,7 +305,12 @@ export default function Contratos() {
                         href={`/api/contratos/${c.id}/pdf`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex h-9 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
+                        // `pointer-coarse:h-11`, como o `ui/Button.tsx` já faz
+                        // sozinho: este link está escrito à mão e ficava de
+                        // fora. Media 46,9 × 36 px no telemóvel, ao lado do
+                        // "Ver termos", que tem 44 — os dois estão na mesma
+                        // linha e não tinham a mesma altura.
+                        className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
                         title="Descarregar contrato em PDF"
                       >
                         PDF
@@ -388,7 +393,10 @@ export default function Contratos() {
                                 href={`/api/contratos/${c.id}/pdf`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex h-8 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
+                                // A mesma correcção da versão em cartão: num
+                                // tablet (que é um ecrã largo COM dedo) esta
+                                // tabela é a que se vê, e 32 px não é um alvo.
+                                className="inline-flex h-8 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
                                 title="Descarregar contrato em PDF"
                               >
                                 PDF

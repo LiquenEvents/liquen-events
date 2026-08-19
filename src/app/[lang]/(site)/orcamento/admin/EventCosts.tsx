@@ -149,7 +149,11 @@ export default function EventCosts({ quote, onChange }: Props) {
   }
 
   return (
-    <div className="border-t border-foreground/10 pt-6">
+    // `@container`: os três quadrados de número aqui em baixo reagem à largura
+    // DESTE painel, não à da janela — ele vive no dossier, onde a coluna lateral
+    // lhe rouba largura sem a janela encolher. É o mesmo que o `PaymentsPanel`
+    // já faz, e pela mesma razão.
+    <div className="@container border-t border-foreground/10 pt-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Fornecedores &amp; Custos</p>
         {items.length > 0 && (
@@ -161,7 +165,17 @@ export default function EventCosts({ quote, onChange }: Props) {
 
       {/* Margin summary — the headline number. Receita/Custos/Margem na mesma base
           (sem IVA) para reconciliarem no ecrã; o valor com IVA vai por baixo. */}
-      <div className="mb-5 grid grid-cols-3 gap-2.5">
+      {/* ── DUAS COLUNAS PRIMEIRO, TRÊS SÓ QUANDO CABEM ────────────────────
+          Três colunas fixas partiam os números no telemóvel — o defeito que o
+          `PaymentsPanel` tinha na mesma linha de código, encontrado ao lado e
+          relatado por quem não lhe podia mexer. Medido a 375 px, com o painel
+          a 343: 68 px de caixa por célula, e «18 415,00 €» precisa de 82. O
+          número transbordava para cima do vizinho — e estes são a receita, o
+          custo e a margem, ou seja, os três números por que ela decide se o
+          evento vale a pena.
+          O limiar é o mesmo do painel dos pagamentos (26 rem, medido no
+          contentor) para os dois não divergirem. No computador nada muda. */}
+      <div className="mb-5 grid grid-cols-2 @min-[26rem]:grid-cols-3 gap-2.5">
         <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
           <p className="text-sm font-semibold text-foreground/80 tabular-nums">
             {eur2(totals.revenueNet)}
@@ -184,7 +198,10 @@ export default function EventCosts({ quote, onChange }: Props) {
             c/ IVA {eur2(totals.actual)}
           </p>
         </div>
-        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
+        {/* A Margem atravessa as duas colunas na linha de baixo: é o número
+            que decide, e uma linha só para ele é a leitura que já tinha no
+            computador — melhor do que ficar sozinho a meia largura. */}
+        <div className="col-span-2 @min-[26rem]:col-span-1 rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
           <p
             className={`text-sm font-semibold tabular-nums ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"}`}
           >
