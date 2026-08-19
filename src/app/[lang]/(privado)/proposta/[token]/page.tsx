@@ -6,6 +6,8 @@ import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { SITE } from "@/lib/site";
 import { getDictionary, htmlLang, normalizeLocale, type Locale } from "@/lib/i18n";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
+import { fotosDaProposta } from "@/lib/proposta-fotos";
+import Documento from "./Documento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -252,6 +254,25 @@ export default async function ProposalPage({
       .split(/\s+/)[0] ?? "";
   const saudacao = primeiroNome ? `${t.greeting}, ${primeiroNome}.` : `${t.greeting}.`;
 
+  /**
+   * AS FOTOGRAFIAS, ASSINADAS AQUI E NÃO POR UM PEDIDO DO NAVEGADOR.
+   *
+   * A página é `force-dynamic`, portanto isto corre a cada visita e o HTML sai
+   * já com os endereços lá dentro: a primeira fotografia começa a descarregar
+   * no primeiro fotograma, sem uma ida ao servidor pelo meio. A alternativa —
+   * pintar a página e só depois pedir os URLs — é uma cascata de dois saltos
+   * antes de o primeiro pixel de fotografia sequer ser pedido, num telemóvel,
+   * numa página cuja razão de ser são as fotografias.
+   *
+   * A rota `/api/proposta/[token]/fotos` existe para DEPOIS (as assinaturas da
+   * Biblioteca valem 6 horas) e usa esta mesma função. Uma função, duas portas.
+   *
+   * Melhor esforço declarado: um Storage em baixo devolve uma lista sem
+   * endereços e a página desenha o documento na mesma, sem a galeria — o casal
+   * continua a ler a proposta e a poder abrir o PDF.
+   */
+  const fotos = proposal.doc ? await fotosDaProposta(proposal.doc) : [];
+
   const cur = proposal.currency || "EUR";
   // Mirror the API's expiry rule (through the WHOLE of the last valid day, i.e.
   // 23:59:59) so the client sees an "expired" notice up front instead of only
@@ -272,7 +293,17 @@ export default async function ProposalPage({
 
   return (
     <Shell lang={htmlLang(locale)}>
-      <div className="w-full max-w-2xl">
+      {/* A MEDIDA DA PÁGINA.
+
+          `max-w-2xl` (672 px) é a medida de leitura de uma folha de texto, e
+          era o que esta página era. Com o documento vivo lá dentro deixou de
+          chegar: a galeria de inspiração precisa de largura para as
+          fotografias serem grandes, que é a razão de tudo isto existir. A
+          página passa a `max-w-5xl` (1024 px) QUANDO há documento, e o
+          `Documento` prende a prosa a `max-w-2xl` por dentro — cada coisa com
+          a largura que lhe serve, em vez de uma só para as duas. Sem
+          documento, a página fica exactamente como estava. */}
+      <div className={`w-full ${proposal.doc ? "max-w-5xl" : "max-w-2xl"}`}>
         <header className="text-center mb-10">
           <p className="text-foreground/68 text-[10px] tracking-[0.45em] uppercase mb-3">
             {t.eyebrow}
@@ -288,9 +319,26 @@ export default async function ProposalPage({
           </p>
         </header>
 
-        {/* Line items */}
-        <div className="border border-foreground/10 rounded-lg overflow-hidden bg-surface-raised/30">
-          {/* O CABEÇALHO SÓ APARECE SE HOUVER LINHAS PARA PÔR POR BAIXO.
+        {/* ── O DOCUMENTO INTEIRO, QUANDO ELE EXISTE ──────────────────────
+            Palavras dela: «46 fotos de mood board comprimidas em páginas A4
+            ficam pequenas, quando o trabalho é visual e merece ecrã inteiro.»
+
+            Esta página mostrava um total, um IVA e um botão para descarregar o
+            PDF. O documento está guardado (`proposals.doc`) desde que o estúdio
+            passou a gravá-lo, e passa a ser desenhado aqui — os serviços, os
+            mood boards em ecrã inteiro, o orçamento e as condições. O PDF FICA
+            exactamente como está, e o botão para ele também: um casal que só
+            queira o PDF nunca precisa de rolar esta página.
+
+            Sem documento — as propostas anteriores à coluna e as de linhas do
+            back office — desenha-se o quadro de sempre, sem uma diferença. */}
+        {proposal.doc ? (
+          <Documento doc={proposal.doc} idioma={locale} fotos={fotos} token={token} />
+        ) : (
+          <>
+            {/* Line items */}
+            <div className="border border-foreground/10 rounded-lg overflow-hidden bg-surface-raised/30">
+              {/* O CABEÇALHO SÓ APARECE SE HOUVER LINHAS PARA PÔR POR BAIXO.
 
               Uma proposta feita no estúdio grava sempre `lineItems: []` (ver
               api/orcamento/[id]/proposta-doc/route.ts) — o detalhe dos serviços
@@ -300,58 +348,65 @@ export default async function ProposalPage({
               NADA por baixo, e logo a seguir o total a pagar. É a página mais
               cara do produto para dar má impressão, e dava-a a toda a gente que
               recebe uma proposta do estúdio. */}
-          {proposal.lineItems.length > 0 && (
-            <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/68 text-[10px] tracking-[0.2em] uppercase">
-              <span className="flex-1">{t.tableDescricao}</span>
-              <span className="w-12 text-center">{t.tableQt}</span>
-              <span className="w-28 text-right">{t.tableValor}</span>
-            </div>
-          )}
-          {proposal.lineItems.map((it, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-3 px-5 py-3.5 border-b border-foreground/6 last:border-0"
-            >
-              <span className="flex-1 text-foreground/75 text-sm">{it.description}</span>
-              <span className="w-12 text-center text-foreground/72 text-sm tabular-nums">
-                {it.qty}
-              </span>
-              <span className="w-28 text-right text-foreground/75 text-sm tabular-nums">
-                {eur(it.qty * it.unitPrice, cur)}
-              </span>
-            </div>
-          ))}
+              {proposal.lineItems.length > 0 && (
+                <div className="hidden sm:flex items-center gap-3 px-5 py-3 border-b border-foreground/8 text-foreground/68 text-[10px] tracking-[0.2em] uppercase">
+                  <span className="flex-1">{t.tableDescricao}</span>
+                  <span className="w-12 text-center">{t.tableQt}</span>
+                  <span className="w-28 text-right">{t.tableValor}</span>
+                </div>
+              )}
+              {proposal.lineItems.map((it, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 px-5 py-3.5 border-b border-foreground/6 last:border-0"
+                >
+                  <span className="flex-1 text-foreground/75 text-sm">{it.description}</span>
+                  <span className="w-12 text-center text-foreground/72 text-sm tabular-nums">
+                    {it.qty}
+                  </span>
+                  <span className="w-28 text-right text-foreground/75 text-sm tabular-nums">
+                    {eur(it.qty * it.unitPrice, cur)}
+                  </span>
+                </div>
+              ))}
 
-          {/* Totals */}
-          <div className="px-5 py-4 bg-foreground/[0.03] flex flex-col gap-1.5">
-            <div className="flex justify-between text-xs">
-              <span className="text-foreground/72">{t.subtotal}</span>
-              <span className="text-foreground/72 tabular-nums">{eur(proposal.subtotal, cur)}</span>
+              {/* Totals */}
+              <div className="px-5 py-4 bg-foreground/[0.03] flex flex-col gap-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-foreground/72">{t.subtotal}</span>
+                  <span className="text-foreground/72 tabular-nums">
+                    {eur(proposal.subtotal, cur)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-foreground/72">
+                    {t.iva} ({Math.round(proposal.vatRate * 100)}%)
+                  </span>
+                  <span className="text-foreground/72 tabular-nums">{eur(proposal.vat, cur)}</span>
+                </div>
+                <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-foreground/10">
+                  <span className="text-foreground/70 text-sm font-medium">{t.total}</span>
+                  <span
+                    className="text-moss font-bold tabular-nums"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(20px, 3vw, 28px)",
+                    }}
+                  >
+                    {eur(proposal.total, cur)}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-foreground/72">
-                {t.iva} ({Math.round(proposal.vatRate * 100)}%)
-              </span>
-              <span className="text-foreground/72 tabular-nums">{eur(proposal.vat, cur)}</span>
-            </div>
-            <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-foreground/10">
-              <span className="text-foreground/70 text-sm font-medium">{t.total}</span>
-              <span
-                className="text-moss font-bold tabular-nums"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 3vw, 28px)" }}
-              >
-                {eur(proposal.total, cur)}
-              </span>
-            </div>
-          </div>
-        </div>
 
-        {proposal.notes && (
-          <div className="mt-5 border-l-2 border-moss/40 pl-5 py-1">
-            <p className="text-foreground/72 text-sm leading-relaxed whitespace-pre-wrap">
-              {proposal.notes}
-            </p>
-          </div>
+            {proposal.notes && (
+              <div className="mt-5 border-l-2 border-moss/40 pl-5 py-1">
+                <p className="text-foreground/72 text-sm leading-relaxed whitespace-pre-wrap">
+                  {proposal.notes}
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         {/* O DOCUMENTO COMPLETO, na página onde se decide.
