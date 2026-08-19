@@ -313,10 +313,25 @@ test.describe("D3 · alvos de 13 px", () => {
               altura: Math.round(r.height),
             };
           })
-          .filter((a) => a.rotulo === "Editar tarefa" || a.rotulo === "Eliminar"),
+          .filter((a) => a.rotulo === "Editar tarefa" || a.rotulo === "Eliminar")
+          // A fila de ícones da linha continua no DOM sem rato — vive dentro de
+          // um `hidden com-rato:contents`, portanto está lá e mede 0×0. Medir um
+          // elemento que não é desenhado é medir nada, e foi o que fez este
+          // passeio falhar com «mede 0×0» depois de encontrar o item certo no
+          // menu. Ficam os que o ecrã desenha; que os DOIS lá estejam é o que a
+          // asserção a seguir garante.
+          .filter((a) => a.largura > 0 && a.altura > 0),
       );
 
       expect(alvos.length, "não há linhas de tarefa para medir").toBeGreaterThan(0);
+      // E as duas acções têm mesmo de estar alcançáveis — não basta uma delas
+      // sobreviver. Sem isto, uma acção que desaparecesse do menu passava aqui
+      // em silêncio, que é o defeito oposto ao que este ficheiro vigia.
+      const rotulos = new Set(alvos.map((a) => a.rotulo));
+      expect([...rotulos].sort(), "faltou uma das duas acções da linha de tarefa").toEqual([
+        "Editar tarefa",
+        "Eliminar",
+      ]);
       // O dedo é grosso: sem isto, `(pointer: coarse)` não é verdade e a
       // medição é a do rato — que não é o que se está a provar.
       expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
