@@ -215,6 +215,25 @@ let traducaoResponde: (textos: string[]) => Response = (textos) =>
   reply({ json: { textos: textos.map((t) => `EN: ${t}`) } });
 /** As fotos que o servidor conhece para este pedido (`GET /assets`). */
 let assetsServidor: { path: string; url: string; thumbUrl?: string; cor?: string }[] = [];
+/**
+ * O `/assets` FALHA (Storage em baixo, sessão caducada, rede a cair).
+ *
+ * É o caso que deixava a grelha inteira com caixas cinzentas a dizer «Imagem»,
+ * para sempre e sem uma palavra — ver o bloco «porque é que ela não vê as
+ * fotografias».
+ */
+let assetsFalham = false;
+/** Segura a resposta do `/assets`, para se poder olhar para o ecrã ENQUANTO a
+ *  lista vem a caminho. É nesse intervalo que ela tirou as capturas. */
+let travaDosAssets: Promise<void> | null = null;
+function segurarOsAssets(): () => void {
+  let abrir = () => {};
+  travaDosAssets = new Promise<void>((r) => (abrir = r));
+  return () => {
+    abrir();
+    travaDosAssets = null;
+  };
+}
 /** Tudo o que saiu daqui — é onde se lê o que foi GRAVADO e o que foi ENVIADO. */
 let pedidos: { url: string; init?: RequestInit }[] = [];
 const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -253,7 +272,11 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   // As fotos que o SERVIDOR conhece para este pedido, com as assinaturas
   // frescas. É por aqui que a grelha volta a ter miniaturas num navegador que
   // nunca viu esta proposta — ver «o mesmo pedido, no outro endereço».
-  if (url.includes("/assets")) return reply({ json: { images: assetsServidor } });
+  if (url.includes("/assets")) {
+    if (travaDosAssets) await travaDosAssets;
+    if (assetsFalham) return reply({ ok: false, status: 500 });
+    return reply({ json: { images: assetsServidor } });
+  }
   return reply({ json: { images: [] } });
 });
 
@@ -280,6 +303,8 @@ beforeEach(() => {
   modelosServidor = [];
   copiaServidor = {};
   assetsServidor = [];
+  assetsFalham = false;
+  travaDosAssets = null;
   traducaoLigadaNoServidor = false;
   traducaoResponde = (textos) => reply({ json: { textos: textos.map((t) => `EN: ${t}`) } });
   fetchMock.mockClear();
@@ -4467,5 +4492,155 @@ describe("a lista das fotos e o que sobrevive a um deployment", () => {
     expect(
       await screen.findAllByText(/apagado no próximo deploy/i, undefined, { timeout: 3000 }),
     ).not.toEqual([]);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * PORQUE É QUE ELA NÃO VÊ AS FOTOGRAFIAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «estava a ver, pelo back office, se conseguia ver as imagens
+ * quando estava a fazer a proposta e não consigo» — em 4G, e nas capturas cada
+ * célula era uma caixa cinzenta com a palavra «Imagem».
+ *
+ * Essa caixa era o ramo em que a célula NÃO TEM URL. Num telemóvel que nunca
+ * abriu esta proposta não há `localStorage` nenhum: o mapa dos URL começa
+ * vazio, e tudo depende de uma leitura só (`GET /assets`). Ela era silenciosa
+ * nos dois sentidos — enquanto vinha a caminho, e quando não vinha de todo.
+ *
+ * MEDIDO no estúdio a 1,6 Mbps, telemóvel de 375×667, 24 células sem
+ * miniatura: as **24 caixas cinzentas** no instante em que a lista chega, a
+ * primeira fotografia pintada aos **34,0 s**, a grelha que está no ecrã só
+ * completa aos **67,6 s**, e 1099 KB por célula (26,4 MB nas 24) para caixas de
+ * 174 px. Com miniatura: 20 KB por célula, 0,4 MB, e tudo o que está no ecrã
+ * pintado aos **2,5 s**.
+ */
+describe("porque é que ela não vê as fotografias", () => {
+  const celulas = () => Array.from(document.querySelectorAll<HTMLElement>("[data-foto]"));
+  const comSrc = () =>
+    Array.from(document.querySelectorAll<HTMLImageElement>("[data-foto] img")).filter((i) =>
+      i.getAttribute("src"),
+    );
+
+  /**
+   * O ramo «a caminho». A célula não pode dizer o mesmo que uma célula
+   * avariada: uma caixa parada com «Imagem» lê-se como «esta foto não existe»,
+   * e foi essa leitura que fez concluir que não se via nada.
+   */
+  it("enquanto a lista vem a caminho, a célula diz que está a carregar — não «Imagem»", async () => {
+    seedDraft(3);
+    const abrirOsAssets = segurarOsAssets();
+    renderStudio();
+    await waitFor(() => expect(celulas()).toHaveLength(3));
+
+    for (const c of celulas()) {
+      expect(c.querySelector("[data-a-carregar]")).not.toBeNull();
+      // A palavra sozinha era tudo o que havia. Não pode voltar.
+      expect(c.textContent?.trim()).not.toBe("Imagem");
+    }
+
+    abrirOsAssets();
+  });
+
+  /**
+   * O ramo «não veio». Era um `return` mudo: a célula ficava cinzenta para
+   * sempre, sem explicação e sem saída, e a única forma de tentar outra vez era
+   * recarregar a página inteira — em 4G, com tudo o que isso custa.
+   */
+  it("quando a lista FALHA, a célula diz-o e dá um botão para tentar outra vez", async () => {
+    seedDraft(2);
+    assetsFalham = true;
+    renderStudio();
+
+    const aviso = await screen.findAllByText(/Não carregou/i);
+    expect(aviso.length).toBeGreaterThan(0);
+
+    // E o botão pede MESMO a lista outra vez — com a resposta boa, as fotos
+    // aparecem sem recarregar nada.
+    assetsFalham = false;
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/0.jpg", thumbUrl: "https://sb/mini-0.jpg" },
+      { path: "board/foto-1.jpg", url: "https://sb/1.jpg", thumbUrl: "https://sb/mini-1.jpg" },
+    ];
+    await userEvent.click(
+      screen.getAllByRole("button", { name: /Ir buscar outra vez as fotografias/i })[0],
+    );
+
+    await waitFor(() => {
+      const fontes = comSrc().map((i) => i.getAttribute("src"));
+      expect(fontes.filter((f) => f?.includes("mini-")).length).toBe(2);
+    });
+  });
+
+  /**
+   * A MINIATURA GANHA AO ORIGINAL, e o original fica como plano B.
+   *
+   * É a diferença entre 20 KB e 1099 KB por célula — e, com 24 células, entre
+   * 0,4 MB e 26,4 MB.
+   */
+  it("a célula desenha a miniatura, e não o original", async () => {
+    seedDraft(1);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/original.jpg", thumbUrl: "https://sb/mini.jpg" },
+    ];
+    renderStudio();
+    await waitFor(() => expect(comSrc()).toHaveLength(1));
+    expect(comSrc()[0].getAttribute("src")).toBe("https://sb/mini.jpg");
+  });
+
+  /**
+   * ── A FILA ────────────────────────────────────────────────────────────────
+   *
+   * Uma foto sem derivada leve puxa o ORIGINAL. Vinte e quatro ao mesmo tempo
+   * repartem o canal e acabam TODAS no fim: medido, a primeira só aos 30 s. A
+   * fila deixa passar três de cada vez — e as da primeira dobra não esperam por
+   * ninguém, porque são as que ela está a olhar.
+   *
+   * O que se conta aqui são os `src` POSTOS: um `src` posto é um download
+   * começado, e é por isso que uma célula à espera de vez fica sem ele.
+   */
+  it("com 24 fotos SEM miniatura, não são 24 downloads ao mesmo tempo", async () => {
+    seedDraft(24);
+    assetsServidor = Array.from({ length: 24 }, (_, i) => ({
+      path: `board/foto-${i}.jpg`,
+      url: `https://sb/original-${i}.jpg`,
+    }));
+    renderStudio();
+    await waitFor(() => expect(celulas()).toHaveLength(24));
+    // Sem miniatura, o `url` do servidor É o original: todas as células
+    // esperam pela vez, incluindo as da primeira dobra (a prioridade não fura a
+    // fila — medido, furá-la punha a primeira fotografia aos 32,0 s em vez dos
+    // 16,0 s a que chega com o tecto de três).
+    await waitFor(() => expect(comSrc().length).toBeGreaterThan(0));
+    expect(comSrc().length).toBeLessThanOrEqual(3);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A LISTA VEIO VAZIA — QUE NÃO É A MESMA COISA QUE A LISTA NÃO TER VINDO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * `listProposalImages` devolve `[]` quando não alcança o bucket, em vez de
+ * atirar. Do lado do estúdio isso chega como um 200 com zero fotografias: a
+ * hidratação dá-se por concluída e o mapa dos URL fica vazio.
+ *
+ * As células ficavam cinzentas com a palavra «Imagem» — exactamente o mesmo
+ * ecrã de quando a leitura falha, e exactamente o mesmo de quando a foto ainda
+ * vem a caminho. Três causas, um só ecrã, nenhuma saída.
+ */
+describe("uma foto do documento que não veio na lista do servidor", () => {
+  it("di-lo, e não fica cinzenta a dizer «Imagem»", async () => {
+    seedDraft(2);
+    // O servidor responde bem — e não conhece nenhuma destas fotos.
+    assetsServidor = [];
+    renderStudio();
+
+    const aviso = await screen.findAllByText(/Não veio na lista/i);
+    expect(aviso.length).toBeGreaterThan(0);
+    // E não é a etiqueta da leitura falhada: as duas causas têm respostas
+    // diferentes do lado de quem as vai investigar.
+    expect(screen.queryByText(/Não carregou/i)).toBeNull();
   });
 });

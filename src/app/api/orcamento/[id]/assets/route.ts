@@ -31,20 +31,9 @@ const MAX_BYTES = 12 * 1024 * 1024; // 12 MB per image
 const MAX_PIXELS = 50_000_000;
 const OK_TYPES = /^image\/(jpe?g|png|webp)$/i;
 
-/**
- * As fotos ESCOLHIDAS DA BIBLIOTECA que este pedido usa, com URL fresco.
- *
- * Vivem no bucket dos temas e não na pasta do pedido, por isso a listagem da
- * pasta não as vê — e sem isto uma proposta reaberta noutro aparelho mostrava
- * as células dos mood boards vazias. Onde estão elas escritas: no documento
- * gravado da proposta e no rascunho do estúdio, que é exactamente onde o
- * `theme-materializar` também as vai procurar.
- *
- * Melhor esforço do princípio ao fim: sem base de dados, ou com uma proposta
- * que ainda não existe, devolve uma lista vazia e a página comporta-se como
- * antes desta funcionalidade.
- */
-async function fotosDaBibliotecaDoPedido(quoteId: string) {
+/** O documento gravado e o rascunho — os dois sítios onde as referências das
+ *  fotografias desta proposta podem estar escritas. */
+async function documentosDoPedido(quoteId: string): Promise<unknown[]> {
   const docs: unknown[] = [];
   try {
     const p = await getProposalByQuote(quoteId);
@@ -58,8 +47,79 @@ async function fotosDaBibliotecaDoPedido(quoteId: string) {
   } catch {
     /* sem rascunho */
   }
+  return docs;
+}
+
+/** `<pasta>/<ficheiro>.jpg` — a forma de um caminho no bucket das propostas. */
+const CAMINHO_DE_FOTO = /^[A-Za-z0-9_-]+\/[^/]+\.(?:jpe?g|png|webp)$/i;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA FOTO DESTE DOCUMENTO QUE MORA NA PASTA DE OUTRO PEDIDO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A listagem do Storage é POR PASTA: `listProposalImages(id)` só vê
+ * `<id>/…`. Quem assinava tudo o resto era o ramo da Biblioteca, e esse só
+ * conhece as referências `tema:`.
+ *
+ * Fica um buraco no meio: um caminho `<outroPedido>/<uuid>.jpg` escrito no
+ * documento — uma proposta copiada em que a recópia das fotos não chegou a
+ * correr, ou correu a meio — não é assinado por NINGUÉM. A célula fica sem URL,
+ * e o que se via era uma caixa cinzenta com a palavra «Imagem», que é
+ * exactamente o sintoma que a dona do negócio descreveu. Sem retorno, sem
+ * explicação e sem forma de distinguir isto de uma foto que ainda vem a
+ * caminho.
+ *
+ * Assinar é o que devolve a fotografia ao ecrã. O ficheiro está lá — o que
+ * faltava era alguém perguntar por ele.
+ *
+ * ── PORQUE É QUE ISTO NÃO ABRE UMA PORTA ──────────────────────────────────
+ * Os caminhos saem do DOCUMENTO desta proposta, escrito no back office, e não
+ * de nada que venha no pedido; e a rota inteira é `isAuthed`. É a mesma
+ * confiança que o ramo da Biblioteca já deposita nas referências `tema:`.
+ */
+function fotosDeOutraPasta(docs: unknown[], quoteId: string): string[] {
+  const safeId = quoteId.replace(/[^a-zA-Z0-9_-]/g, "");
+  const fora = new Set<string>();
+  const percorrer = (v: unknown): void => {
+    if (typeof v === "string") {
+      if (CAMINHO_DE_FOTO.test(v) && !v.startsWith(`${safeId}/`)) fora.add(v);
+      return;
+    }
+    if (Array.isArray(v)) {
+      for (const x of v) percorrer(x);
+      return;
+    }
+    if (v && typeof v === "object") for (const x of Object.values(v)) percorrer(x);
+  };
+  for (const d of docs) percorrer(d);
+  return [...fora];
+}
+
+/**
+ * As fotos deste pedido que NÃO estão na pasta dele, com URL fresco.
+ *
+ * Duas famílias, e a listagem da pasta não vê nenhuma delas:
+ *
+ *   · as ESCOLHIDAS DA BIBLIOTECA (`tema:<pasta>/<x>.jpg`), que vivem no bucket
+ *     dos temas — sem isto, uma proposta reaberta noutro aparelho mostrava as
+ *     células dos mood boards vazias;
+ *   · as que ficaram na pasta de OUTRO PEDIDO — ver `fotosDeOutraPasta`.
+ *
+ * Onde estão umas e outras escritas: no documento gravado da proposta e no
+ * rascunho do estúdio, que é exactamente onde o `theme-materializar` também as
+ * vai procurar.
+ *
+ * Melhor esforço do princípio ao fim: sem base de dados, ou com uma proposta
+ * que ainda não existe, devolve uma lista vazia e a página comporta-se como
+ * antes desta funcionalidade.
+ */
+async function fotosForaDaPastaDoPedido(quoteId: string) {
+  const docs = await documentosDoPedido(quoteId);
   const refs = new Set<string>();
   for (const d of docs) for (const r of refsDeTemaNoDoc(d)) refs.add(r);
+  // E as fotos que estão na pasta de OUTRO pedido — ver `fotosDeOutraPasta`.
+  for (const r of fotosDeOutraPasta(docs, quoteId)) refs.add(r);
   if (refs.size === 0) return [];
 
   const lista = [...refs];
@@ -74,14 +134,40 @@ async function fotosDaBibliotecaDoPedido(quoteId: string) {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA CAIXA DE 174 px NUNCA PODE PEDIR UMA FOTOGRAFIA DE 1707 px
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As fotografias carregadas depois de as miniaturas existirem trazem `thumbUrl`
+ * — o URL assinado do bucket das miniaturas, ~20 KB. As que ficaram para trás
+ * não têm nenhuma, e para essas o estúdio caía para o ORIGINAL.
+ *
+ * O que isso custa, medido no estúdio a 1,6 Mbps com 24 células:
+ *
+ *     com miniatura      20 KB por célula   →   0,4 MB nas 24, 1.ª foto aos  2,5 s
+ *     sem miniatura    1099 KB por célula   →  26,4 MB nas 24, 1.ª foto aos 34,0 s
+ *
+ * Este endereço fabrica a miniatura em falta À PRIMEIRA VEZ que alguém a pede,
+ * e guarda-a (ver a rota `miniatura`). Portanto a lista deixa de ter buracos:
+ * TODAS as fotos vêm com uma derivada leve para a grelha, e o original fica
+ * onde deve ficar — no `url`, que é o plano B da célula e o que a lupa abre.
+ *
+ * Não é assinatura nenhuma: é o nosso próprio servidor, e a sessão do back
+ * office vai no `<img>` como em qualquer pedido da mesma origem.
+ */
+function miniaturaAPedidoUrl(id: string, path: string): string {
+  return `/api/orcamento/${encodeURIComponent(id)}/miniatura?ref=${encodeURIComponent(path)}`;
+}
+
+/**
  * List every image already uploaded for this quote (each with a fresh signed
  * URL), so the studio can re-offer them on any device and re-preview images
  * whose cached URL is gone. Admin-only; returns an empty list when Storage
  * isn't configured rather than erroring.
  *
- * Junta as duas famílias — a pasta do pedido e as referências à Biblioteca —
- * numa lista só, porque o estúdio guarda um mapa `caminho → URL` e não precisa
- * de saber a diferença.
+ * Junta as famílias todas — a pasta do pedido, as referências à Biblioteca e as
+ * fotos que ficaram na pasta de outro pedido — numa lista só, porque o estúdio
+ * guarda um mapa `caminho → URL` e não precisa de saber a diferença.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) {
@@ -91,7 +177,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const [proprias, daBiblioteca] = await Promise.all([
       listProposalImages(id),
-      fotosDaBibliotecaDoPedido(id),
+      fotosForaDaPastaDoPedido(id),
     ]);
     const imagens = [...proprias, ...daBiblioteca];
     // AS CORES, num pedido só para todas.
@@ -108,7 +194,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ok: true,
       images: imagens.map((im) => {
         const cor = cores.get(im.path);
-        return cor ? { ...im, cor } : im;
+        const comCor = cor ? { ...im, cor } : im;
+        return im.thumbUrl ? comCor : { ...comCor, thumbUrl: miniaturaAPedidoUrl(id, im.path) };
       }),
     });
   } catch (err) {

@@ -38,8 +38,10 @@ import {
 import { ehRefDeTema } from "@/lib/theme-ref";
 import { linhasDeOrcamento } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel, ceremonyTypeLabel, eventTypeName } from "@/lib/orcamento/data";
+import { log } from "@/lib/logger";
 import { urlAindaBom } from "./assinatura";
 import { relatarFalhaDeImagem } from "./relatar-falha";
+import { pedirVezDeImagemPesada, ESPERA_MAXIMA_MS } from "./fila-de-imagens";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
 import Gralhas from "./Gralhas";
@@ -259,6 +261,15 @@ function initialDoc(quote: Quote): StudioDoc {
 
 /** Passos do fluxo guiado do estúdio. */
 type Step = "conteudo" | "prever" | "enviar";
+/**
+ * Em que pé está a leitura dos URL das fotografias.
+ *
+ * Três estados e não um booleano, porque a diferença entre «vem a caminho» e
+ * «não veio» é a diferença entre esperar e agir — e era exactamente essa que o
+ * ecrã não tinha (ver `estadoDosUrls`).
+ */
+type EstadoDosUrls = "a-caminho" | "pronto" | "falhou";
+
 const STEPS: { id: Step; n: string; label: string }[] = [
   { id: "conteudo", n: "1", label: "Conteúdo" },
   { id: "prever", n: "2", label: "Pré-visualizar" },
@@ -1095,6 +1106,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // path → signed url, so freshly-uploaded images render as thumbnails.
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A HIDRATAÇÃO OU CORREU, OU AINDA VAI A CAMINHO, OU FALHOU — E ISSO VÊ-SE
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «estava a ver, pelo back office, se conseguia ver as imagens
+   * quando estava a fazer a proposta e não consigo» — e, nas capturas, células
+   * cinzentas com a palavra «Imagem».
+   *
+   * Essa caixa é o ramo do `Thumb` em que NÃO HÁ URL. Num telemóvel que nunca
+   * abriu esta proposta não há `localStorage` nenhum, portanto o mapa começa
+   * vazio e as células dependem inteiramente desta única leitura. E ela era
+   * silenciosa nos dois sentidos: enquanto ia a caminho a célula dizia
+   * «Imagem», e se falhasse (`!res.ok`, sessão caducada, rede a cair) a função
+   * fazia `return` e a célula dizia «Imagem» PARA SEMPRE. As duas coisas com o
+   * mesmo aspecto, e nenhuma delas com uma explicação ou uma saída.
+   *
+   * Com isto, a célula sabe distinguir «vem a caminho» de «não veio», e há um
+   * botão para tentar outra vez em vez de recarregar a página.
+   */
+  const [estadoDosUrls, setEstadoDosUrls] = useState<EstadoDosUrls>("a-caminho");
+  /**
    * O ORIGINAL de cada foto — o plano B da célula.
    *
    * O `assetUrls` guarda o que é MELHOR desenhar (a miniatura, quando existe).
@@ -1815,13 +1847,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const hidratarAssets = useCallback(
     async (vivo: () => boolean = () => true) => {
       {
+        // «A caminho» também no reenvio: uma segunda tentativa que aparecesse
+        // como «falhou» até responder era um botão que parece não fazer nada.
+        setEstadoDosUrls("a-caminho");
         try {
           const res = await fetch(`/api/orcamento/${quote.id}/assets`);
-          if (!res.ok) return;
+          if (!res.ok) {
+            // Um 401 (sessão caducada) e um 500 (Storage em baixo) davam os
+            // dois a mesma coisa: nada. O registo diz qual foi, e o ecrã diz
+            // que não conseguiu — em vez de o esconder atrás de uma caixa
+            // cinzenta que se lê como «esta foto não existe».
+            log.warn("estúdio: não deu para ir buscar as fotografias", {
+              estado: res.status,
+            });
+            if (vivo()) setEstadoDosUrls("falhou");
+            return;
+          }
           const data = await res.json().catch(() => null);
           const imgs: { path: string; url: string; thumbUrl?: string; cor?: string }[] =
             Array.isArray(data?.images) ? data.images : [];
-          if (!vivo() || imgs.length === 0) return;
+          if (!vivo()) return;
+          // Zero fotografias É uma resposta: uma proposta sem fotos nenhumas
+          // não tem células, e um pedido que respondeu vazio não é um pedido
+          // que falhou.
+          if (imgs.length === 0) {
+            setEstadoDosUrls("pronto");
+            return;
+          }
           setAssetUrls((prev) => {
             const next = { ...prev };
             // A miniatura ganha ao original: é este o caminho que corre quando se
@@ -1853,8 +1905,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             for (const im of imgs) if (im.path && im.cor) next[im.path] = im.cor;
             return next;
           });
-        } catch {
-          /* offline / storage unavailable — the studio still works with uploads */
+          setEstadoDosUrls("pronto");
+        } catch (e) {
+          // Offline, ou o Storage em baixo. O estúdio continua a servir para
+          // carregar fotos — o que não continua a servir é fingir que as que já
+          // lá estão simplesmente não existem.
+          log.warn("estúdio: não deu para ir buscar as fotografias", { erro: String(e) });
+          if (vivo()) setEstadoDosUrls("falhou");
         }
       }
     },
@@ -5107,6 +5164,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         <Thumb
                           url={assetUrls[path]}
                           planoB={assetOriginais[path]}
+                          estadoDosUrls={estadoDosUrls}
+                          aoTentarDeNovo={() => void hidratarAssets()}
+                          // As capas são duas e estão no topo do passo: nunca
+                          // esperam pela fila das fotos que estão fora do ecrã.
+                          priority
                           onRemove={() => removeCoverAt(idx)}
                           // A forma REAL da tira de capa, e não um 4:3 que o
                           // documento nunca desenha. Ver `aspeto` em `Thumb`.
@@ -5674,6 +5736,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           <Thumb
                                             url={assetUrls[path]}
                                             planoB={assetOriginais[path]}
+                                            estadoDosUrls={estadoDosUrls}
+                                            aoTentarDeNovo={() => void hidratarAssets()}
+                                            // A PRIMEIRA DOBRA do primeiro
+                                            // board. Medido: sem prioridade
+                                            // nenhuma, as 24 células repartiam
+                                            // o canal e a primeira fotografia
+                                            // só aparecia aos 34,0 s. Estas
+                                            // quatro são as que ela está mesmo
+                                            // a olhar quando desce às fotos.
+                                            priority={bi === 0 && ii < 4}
                                             onde="mood-board"
                                             refDoc={path}
                                             // A remoção mudou-se para a barra de acções, que
@@ -8495,10 +8567,15 @@ function PreviewThumb({
   pendente?: boolean;
 }) {
   const { alvo, desistiu: failed, aoFalhar } = useFotoComPlanoB(url, planoB);
+  /** A fotografia já está no ecrã — é o que apaga o esqueleto por cima. */
+  const [pintada, setPintada] = useState(false);
+  // Enquanto não está pintada, esta caixa dizia «Imagem» e mais nada — o mesmo
+  // ecrã que uma foto avariada dá. Ver `Thumb` para o porquê de isto importar.
+  const aCarregar = !pintada && !failed;
   return (
     <div
-      aria-busy={pendente || undefined}
-      className={`aspect-[4/3] overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04] ${
+      aria-busy={pendente || aCarregar || undefined}
+      className={`relative aspect-[4/3] overflow-hidden rounded-lg border border-foreground/[0.1] bg-foreground/[0.04] ${
         pendente ? "opacity-45" : ""
       }`}
     >
@@ -8507,21 +8584,30 @@ function PreviewThumb({
         <img
           src={alvo}
           alt=""
-          // Cada célula puxa o ORIGINAL — medido, 1130 KB por foto para uma
-          // caixa de 174 px (ver IMAGES-BEFORE.md). Enquanto as propostas não
-          // tiverem miniaturas próprias, `lazy` é o que impede as células fora
-          // do ecrã de disputarem a ligação com as que estão à vista: sem isto
-          // a primeira imagem só terminava aos 35 s em 4G, porque esperava
-          // pelas outras vinte e três.
+          // Este resumo vive no fim do passo, e as suas duas células estão
+          // quase sempre fora do ecrã quando a página abre: `lazy` é o que
+          // impede que disputem a ligação com as fotos que ela está a ver.
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover"
+          // A `ref` E o `onLoad`, pela razão que o `medir` do `Thumb` explica:
+          // uma imagem vinda da cache pode já estar completa quando o `onLoad`
+          // é ligado, e aí só a referência a apanha.
+          ref={(img) => {
+            if (img?.complete && img.naturalWidth > 0) setPintada(true);
+          }}
+          onLoad={() => setPintada(true)}
           onError={aoFalhar}
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-[0.15em] text-foreground/30">
-          Imagem
-        </div>
+        !aCarregar && (
+          <div className="flex h-full w-full items-center justify-center text-[9px] uppercase tracking-[0.15em] text-foreground/30">
+            Imagem
+          </div>
+        )
+      )}
+      {aCarregar && (
+        <span className="bo-skeleton pointer-events-none absolute inset-0" aria-hidden />
       )}
     </div>
   );
@@ -9059,6 +9145,9 @@ function Thumb({
   pendente = false,
   semRemover = false,
   onde = "estúdio",
+  estadoDosUrls = "pronto",
+  aoTentarDeNovo,
+  priority = false,
   // `refDoc` e não `ref`: o React trata `ref` como prop especial, e uma string
   // ali dentro é o padrão antigo das string refs, que ele recusa.
   refDoc,
@@ -9066,6 +9155,12 @@ function Thumb({
   url?: string;
   /** O ORIGINAL, para quando a miniatura não existir. Ver `assetOriginais`. */
   planoB?: string;
+  /** Em que pé está a leitura dos URL — ver `estadoDosUrls` no estúdio. */
+  estadoDosUrls?: EstadoDosUrls;
+  /** Ir buscar os URL outra vez, a pedido dela. */
+  aoTentarDeNovo?: () => void;
+  /** Está na primeira dobra: não espera pela fila nem pelo `lazy`. */
+  priority?: boolean;
   onRemove: () => void;
   className?: string;
   /**
@@ -9121,7 +9216,6 @@ function Thumb({
     tentarDeNovo,
     ultimoAlvo,
   } = useFotoComPlanoB(url, planoB);
-  const src = useSrcSemPiscar(alvo);
 
   /**
    * UMA FOTO A CAMINHO NÃO É UMA FOTO PARTIDA.
@@ -9133,6 +9227,87 @@ function Thumb({
    * oportunidade nova.
    */
   const semRemedio = failed && !pendente;
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A CÉLULA QUE PUXA O ORIGINAL ESPERA PELA VEZ
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * «Pesada» é `alvo === planoB`, e é literalmente isso: o URL que esta célula
+   * está prestes a pedir É o do original. Acontece nos dois casos que importam
+   * — a foto não tem derivada leve nenhuma, ou a que tinha falhou e a cascata
+   * caiu para o original (`useFotoComPlanoB`). É o caso caro: medido no estúdio
+   * a 1,6 Mbps com 24 células, cada original pesa **1099 KB** (26,4 MB nas 24),
+   * a primeira fotografia chega aos **34,0 s** e a grelha que está no ecrã só
+   * fica completa aos **67,6 s** — porque as vinte e quatro repartem o mesmo
+   * canal e acabam todas no fim. Com a fila: 13,3 MB e 49,4 s.
+   *
+   * A fila (`fila-de-imagens`) deixa passar três de cada vez, pela ordem da
+   * grelha. É o mesmo desenho que a Biblioteca de Temas já usa, e é lá que está
+   * medido o que ele vale: a primeira foto passou de 26 s para 1,4 s.
+   *
+   * ── A PRIORIDADE NÃO FURA A FILA ──────────────────────────────────────────
+   * A primeira versão deixava as células da primeira dobra passar à frente sem
+   * pedir vez. MEDIDO: quatro prioritárias mais três da fila são sete originais
+   * em voo, e a grelha do ecrã ficou completa aos **56,5 s** contra os 49,4 s
+   * do tecto de três. Com sete a repartir o canal, cada uma continua a esperar
+   * pelas outras seis.
+   *
+   * A ordem da fila JÁ é a ordem da grelha (as células pedem vez pela ordem em
+   * que montam), portanto as de cima são servidas primeiro sem precisarem de
+   * excepção. O que a prioridade faz é o que deve fazer: `eager` e
+   * `fetchPriority="high"`, para o navegador não as adiar nem as despriorizar.
+   * É também o que a Biblioteca de Temas faz, e é lá que está medido o que
+   * vale — a primeira foto passou de 26 s para 1,4 s.
+   */
+  const pesada = alvo != null && alvo === planoB;
+  /**
+   * A vez, uma vez por célula e para sempre.
+   *
+   * Não volta a `false` quando o URL é reassinado, e é deliberado: mandar de
+   * volta para a fila uma célula que JÁ tem fotografia no ecrã apagava-a — e
+   * uma foto que desaparece para voltar igual é exactamente o salto que este
+   * ecrã não pode ter (ver `useSrcSemPiscar`). O custo é um download a mais no
+   * momento raro em que as assinaturas se renovam.
+   */
+  const [temVez, setTemVez] = useState(false);
+  /** A fotografia já está no ecrã — é o que apaga o esqueleto por cima. */
+  const [pintada, setPintada] = useState(false);
+  const largarVez = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!pesada) return;
+    let temporizador = 0;
+    const largar = pedirVezDeImagemPesada(() => {
+      setTemVez(true);
+      // Rede de segurança: um pedido que nunca termina não pode ficar com a vez
+      // para sempre.
+      temporizador = window.setTimeout(() => largarVez.current?.(), ESPERA_MAXIMA_MS);
+    });
+    largarVez.current = () => {
+      window.clearTimeout(temporizador);
+      largar();
+    };
+    return () => {
+      largarVez.current?.();
+      largarVez.current = null;
+    };
+    // `alvo` nas dependências para uma foto reassinada voltar a pedir vez em
+    // vez de ficar com um URL que o Storage já recusa.
+  }, [pesada, alvo]);
+  const largarAVez = () => {
+    largarVez.current?.();
+    largarVez.current = null;
+  };
+  /**
+   * O URL EFECTIVO — e é aqui que a fila vale alguma coisa.
+   *
+   * Uma célula à espera de vez fica sem URL nenhum. Não basta não desenhar a
+   * imagem: o `useSrcSemPiscar` PRÉ-CARREGA o que lhe passarem (`new Image()`),
+   * e passar-lhe o alvo enquanto ela espera era começar o download que a fila
+   * está ali para adiar — a fila ficava a contar vezes e o canal continuava
+   * repartido pelas vinte e quatro.
+   */
+  const src = useSrcSemPiscar(pesada && !temVez ? undefined : alvo);
 
   // O registo sai UMA vez por célula que desiste, com o caminho e o código de
   // estado — que é o que nem ela nem eu tínhamos quando isto apareceu.
@@ -9160,12 +9335,57 @@ function Thumb({
     if (!img?.complete) return;
     const { naturalWidth: w, naturalHeight: h } = img;
     if (w > 0 && h > 0) medidaRef.current?.(w / h);
+    // E JÁ ESTÁ PINTADA. Uma imagem servida da cache pode chegar completa antes
+    // de o `onLoad` ter a quem tocar — e sem isto o esqueleto por cima ficava
+    // lá para sempre, sobre uma fotografia que está a ser desenhada por baixo.
+    if (w > 0) setPintada(true);
   }, []);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS TRÊS ESTADOS DE UMA CÉLULA SEM FOTOGRAFIA, QUE ERAM UM SÓ
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Tudo o que não fosse uma imagem pintada dava a MESMA caixa cinzenta com a
+   * palavra «Imagem». As capturas dela mostram exactamente isso — e essa caixa
+   * pode querer dizer três coisas com três respostas diferentes:
+   *
+   *   · a caminho     → esperar (medido: a primeira foto sem miniatura demorou
+   *                     34,0 s em 4G, e a grelha do ecrã 67,6 s);
+   *   · não veio      → tentar outra vez a leitura da lista;
+   *   · não abre      → tentar outra vez ESTA foto, ou abri-la à parte.
+   *
+   * Uma caixa parada com «Imagem» é indistinguível de uma que falhou, e foi
+   * isso que fez a dona do negócio concluir que não conseguia ver as
+   * fotografias — quando, em parte, o que se passava era estarem a caminho.
+   */
+  /**
+   * Não há URL, e a leitura da lista JÁ ACABOU — portanto não vem mais nenhum.
+   *
+   * Duas maneiras de aqui chegar, e as duas davam a mesma caixa cinzenta com a
+   * palavra «Imagem»: a leitura falhou (rede, sessão caducada, Storage em
+   * baixo), ou a leitura correu e esta fotografia não veio na lista. A segunda
+   * é a mais traiçoeira — o `listProposalImages` devolve `[]` em vez de atirar
+   * quando não alcança o bucket, e uma grelha inteira sem uma única fotografia
+   * lia-se como «as fotos desapareceram».
+   */
+  const semUrlEFalhou = !alvo && estadoDosUrls !== "a-caminho";
+  const desenhaImagem = Boolean(src) && !semRemedio;
+  const aCarregar = !pintada && !semRemedio && !semUrlEFalhou;
+
   return (
     <div
       // `aria-busy` e não só a opacidade: quem não vê a célula esbatida tem de
       // saber na mesma que esta foto ainda está a entrar (a pastilha «X a
       // caminho» diz o total, isto diz QUAL).
+      //
+      // SÓ o `pendente`, e é deliberado: aqui `aria-busy` quer dizer «esta foto
+      // ainda não está na proposta», que é um estado do NEGÓCIO. Juntar-lhe «os
+      // bytes ainda vêm a caminho» dava o mesmo sinal a duas coisas com
+      // consequências opostas — uma impede o envio, a outra passa sozinha — e
+      // os testes que lêem este atributo para contar fotos por confirmar
+      // passariam a contar fotos que já lá estão. Quem diz que a fotografia vem
+      // a caminho é o esqueleto, que é visível e não precisa de ser lido.
       aria-busy={pendente || undefined}
       // A PEGA DOS TESTES. Uma célula de foto identificava-se pelo seu «×» —
       // e o × saiu daqui para a barra de acções, que é visível ao toque. Um
@@ -9180,7 +9400,7 @@ function Thumb({
         foraDoPdf ? "border-[#8a2a22]/60 opacity-60" : "border-foreground/[0.1]"
       } ${pendente ? "opacity-45" : ""} ${aspeto ? "self-start" : ""} ${className}`}
     >
-      {src && !semRemedio ? (
+      {desenhaImagem ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
@@ -9188,20 +9408,28 @@ function Thumb({
           // A forma desta fotografia sai desta imagem, que já cá está e já foi
           // descodificada — ver `onMedida`.
           ref={medir}
-          onLoad={(e) => medir(e.currentTarget)}
-          // Cada célula puxa o ORIGINAL — medido, 1130 KB por foto para uma
-          // caixa de 174 px (ver IMAGES-BEFORE.md). Enquanto as propostas não
-          // tiverem miniaturas próprias, `lazy` é o que impede as células fora
-          // do ecrã de disputarem a ligação com as que estão à vista: sem isto
-          // a primeira imagem só terminava aos 35 s em 4G, porque esperava
-          // pelas outras vinte e três.
-          loading="lazy"
+          onLoad={(e) => {
+            largarAVez();
+            setPintada(true);
+            medir(e.currentTarget);
+          }}
+          // As PESADAS são geridas pela fila; pô-las também em `lazy` fazia uma
+          // célula fora do ecrã ficar com a vez sem chegar a pedir nada. As
+          // leves (a miniatura, ~20 KB) continuam em `lazy`, que é o que impede
+          // as fotos dos boards lá de baixo de disputarem o canal com as que
+          // estão à vista. E a primeira dobra não espera por nenhum dos dois.
+          loading={pesada || priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
           decoding="async"
           className="h-full w-full object-cover"
-          onError={aoFalhar}
+          onError={(e) => {
+            largarAVez();
+            aoFalhar();
+            void e;
+          }}
         />
       ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center text-[9px] leading-relaxed text-foreground/40">
+        <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 p-1 text-center text-[9px] leading-tight text-foreground/40">
           {semRemedio ? (
             <>
               <span className="font-medium text-foreground/55">Imagem guardada</span>
@@ -9228,10 +9456,66 @@ function Thumb({
                 )}
               </span>
             </>
-          ) : (
-            <span className="tracking-[0.15em] uppercase text-foreground/30">Imagem</span>
-          )}
+          ) : semUrlEFalhou ? (
+            /* ── NÃO HÁ URL, E NÃO VAI HAVER ────────────────────────────────
+               Este é o ramo que ela viu — só que dizia «Imagem» e mais nada. A
+               fotografia está guardada; o que falhou foi a leitura da lista.
+               Dizê-lo, e dar um botão, é a diferença entre um ecrã avariado e
+               um ecrã que explica.
+
+               ── PORQUE É QUE A FRASE É TÃO CURTA ────────────────────────────
+               MEDIDO a 375 px: uma célula de um mood board com oito fotos tem
+               ~110×75 px, e a caixa tem `overflow-hidden`. A primeira versão
+               dizia «Não consegui ir buscar as fotografias desta proposta.» —
+               quatro linhas a 9 px mais o botão, e o que se via na captura era
+               «as fotografias desta», com a primeira linha E o botão cortados.
+               Uma explicação que não cabe não é uma explicação: é a mesma caixa
+               cinzenta com outras palavras.
+
+               Cabe uma etiqueta e o botão. A frase inteira vai no `title` e no
+               `aria-label` do botão — que é onde ainda serve para alguma coisa
+               (leitor de ecrã, rato) sem roubar o espaço a quem só precisa de
+               saber que ISTO FALHOU e onde carregar. */
+            <>
+              {/* Sem ícone: MEDIDO, o ⚠ ocupava a linha que faltava ao botão e
+                  a captura mostrava o «Tentar» encostado ao corte de baixo. Numa
+                  caixa de 75 px, cada linha custa uma coisa que já lá estava. */}
+              <span
+                className="font-medium text-foreground/55"
+                title={
+                  estadoDosUrls === "falhou"
+                    ? "Não consegui ir buscar as fotografias desta proposta."
+                    : "Esta fotografia está no documento, mas não veio na lista que o servidor devolveu."
+                }
+              >
+                {estadoDosUrls === "falhou" ? "Não carregou" : "Não veio na lista"}
+              </span>
+              {aoTentarDeNovo && (
+                <button
+                  type="button"
+                  onClick={aoTentarDeNovo}
+                  aria-label="Ir buscar outra vez as fotografias desta proposta"
+                  className="mt-0.5 rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-foreground/[0.06]"
+                >
+                  Tentar
+                </button>
+              )}
+            </>
+          ) : null}
         </div>
+      )}
+      {/* ── ENQUANTO A FOTOGRAFIA VEM ─────────────────────────────────────
+          Por CIMA e em posição absoluta, e não no fluxo: pôr o esqueleto no
+          lugar da imagem obrigava a célula a mudar de conteúdo no instante em
+          que a foto chega, e o `src` está posto muito antes de os bytes
+          chegarem — a caixa ficava cinzenta e calada durante os 34 s medidos.
+          Assim há sempre alguma coisa a dizer «isto está a acontecer». */}
+      {aCarregar && (
+        <span
+          className="bo-skeleton pointer-events-none absolute inset-0"
+          aria-hidden
+          data-a-carregar=""
+        />
       )}
       {/* Sobreposta, nunca no fluxo: a célula tem de ter exatamente o mesmo
           tamanho antes e depois de a foto assentar. */}
