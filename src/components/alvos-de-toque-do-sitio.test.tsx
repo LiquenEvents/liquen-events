@@ -19,6 +19,8 @@ import Home from "@/app/[lang]/(site)/page";
 import Contacto from "@/app/[lang]/(site)/contacto/page";
 import Destination from "@/app/[lang]/(site)/casamentos/destination/page";
 import ServicoDetalhe from "@/app/[lang]/(site)/servicos/[slug]/page";
+import Polo from "@/app/[lang]/(site)/casamentos/[polo]/page";
+import Estilo from "@/app/[lang]/(site)/casamentos/estilo/[estilo]/page";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -387,6 +389,38 @@ describe("as páginas públicas, pelas âncoras que escrevem", () => {
       await verificarPagina(
         `/${lang}/servicos/casamentos`,
         await ServicoDetalhe({ params: Promise.resolve({ lang, slug: "casamentos" }) }),
+      );
+    });
+
+    /**
+     * ── AS DUAS PÁGINAS DE CAMPANHA QUE FALTAVAM AQUI ──────────────────────
+     *
+     * O `destination` já estava; o PÓLO e o ESTILO não — e são 13 + 3 páginas,
+     * vezes dois idiomas, todas destinos de anúncios pagos. MEDIDO num Chromium
+     * a 375 px com toque emulado, na versão servida em produção:
+     *
+     *   /casamentos/alentejo            «Formulário completo»  189×17
+     *                                   «+351 919 259 820»     137×17
+     *                                   «Portefólio»            96×17
+     *   /casamentos/estilo/minimalista  treze ligações de região, 15 px de
+     *                                   altura cada («Alentejo» 82×15,
+     *                                   «Comporta, Melides e Troia» 237×15, …)
+     *
+     * Em ambos os casos são as ÚNICAS saídas de quem chega ao fim da página sem
+     * ter preenchido o formulário do topo. Um pólo chega para prender as treze:
+     * a página é uma só, com os dados a mudar.
+     */
+    it(`/${lang}/casamentos/alentejo — um pólo`, async () => {
+      await verificarPagina(
+        `/${lang}/casamentos/alentejo`,
+        await Polo({ params: Promise.resolve({ lang, polo: "alentejo" }) }),
+      );
+    });
+
+    it(`/${lang}/casamentos/estilo/minimalista`, async () => {
+      await verificarPagina(
+        `/${lang}/casamentos/estilo/minimalista`,
+        await Estilo({ params: Promise.resolve({ lang, estilo: "minimalista" }) }),
       );
     });
   }

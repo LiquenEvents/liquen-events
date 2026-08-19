@@ -162,12 +162,28 @@ export default async function EstiloPage({
           <h2 className="text-[20px] sm:text-[24px] font-bold uppercase tracking-display">
             {en ? "Where are you getting married?" : "Onde vai casar?"}
           </h2>
-          <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-3 text-[12px] tracking-[0.2em] uppercase">
+          {/*
+            `alvo-toque` nos treze. MEDIDO num Chromium a 375 px com toque
+            emulado: cada uma destas ligações media **15 px de altura**
+            («Alentejo» 82×15, «Comporta, Melides e Troia» 237×15, …), contra os
+            44 px que a casa exige (TOUCH-AUDIT.md).
+            
+            São a ÚNICA navegação interna desta página — o comentário aqui em
+            cima di-lo por extenso —, e a página recebe tráfego pago. Treze
+            ligações de 15 px, empilhadas com 12 px de intervalo, é uma lista em
+            que o dedo acerta na linha errada.
+            
+            A dispensa de «palavra sublinhada numa frase» (WCAG 2.5.8) não se
+            aplica: é uma lista de destinos, não prosa. O que as fazia escapar é
+            o mesmo de sempre — `alvos-de-toque-do-sitio.test.tsx` não monta
+            esta página.
+          */}
+          <ul className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-1 text-[12px] tracking-[0.2em] uppercase">
             {POLOS.map((polo) => (
               <li key={polo.slug}>
                 <Link
                   href={localizeHref(caminhoPolo(polo.slug), locale)}
-                  className="underline hover:text-moss"
+                  className="alvo-toque underline hover:text-moss"
                 >
                   {conteudoPolo(polo, locale).eyebrow}
                 </Link>

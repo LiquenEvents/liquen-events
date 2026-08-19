@@ -128,7 +128,30 @@ export function repartirContacto(v: string): { email: string; telefone: string }
 const CAMPO =
   "w-full bg-transparent border-b border-foreground/25 py-3 text-[16px] " +
   "focus:outline-none focus:border-moss transition-colors placeholder:text-foreground/35";
-const ROTULO = "block text-[10px] tracking-[0.25em] uppercase text-foreground/50 mb-1";
+/**
+ * O RÓTULO DE CADA CAMPO — E PORQUE É QUE PASSOU DE `/50` PARA `/70`
+ *
+ * MEDIDO com o axe (WCAG 1.4.3, nível AA) num telemóvel de 375 px, em
+ * `/s/comporta` e em `/en/s/portugal`:
+ *
+ *   label[for=…-data]      #95928f sobre #ffffff  →  3,09:1
+ *   label[for=…-local]     idem
+ *   label[for=…-nome]      idem
+ *   label[for=…-contacto]  idem
+ *
+ * O mínimo é 4,5:1. `/70` dá #6b6a68 sobre branco, 5,4:1.
+ *
+ * Não é uma questão de conformidade: são os quatro rótulos do único formulário
+ * de uma página que recebe tráfego PAGO, escritos a 10 px em maiúsculas com
+ * `tracking` largo — o pior caso que há para ler — e olhados quase sempre num
+ * telemóvel, muitas vezes na rua. Quem não distingue o que cada campo pede não
+ * o preenche: fecha.
+ *
+ * A bateria de acessibilidade (`e2e/a11y.spec.ts`) nunca chegou aqui — visita
+ * nove endereços e nenhum deles é `/s/*` nem `/orcamento`. Era por isso que
+ * isto estava invisível.
+ */
+const ROTULO = "block text-[10px] tracking-[0.25em] uppercase text-foreground/70 mb-1";
 
 export default function PedidoRelampago({
   locale,
@@ -362,12 +385,40 @@ export default function PedidoRelampago({
             // números e com `@`.
             type="text"
             required
-            autoComplete="tel email"
+            /**
+             * `on`, e não `"tel email"`.
+             *
+             * A intenção de `"tel email"` lê-se bem — «isto é um telemóvel OU um
+             * email» — mas não é HTML válido: o atributo é uma lista de fichas
+             * de autopreenchimento com uma gramática fixa, onde `tel` e `email`
+             * são dois NOMES DE CAMPO e nunca podem estar lado a lado. MEDIDO
+             * com o axe em `/s/comporta` e `/en/s/portugal`:
+             *   [serious] autocomplete-valid — «the autocomplete attribute is
+             *   incorrectly formatted»
+             *
+             * Um atributo que o browser não consegue analisar não é neutro: ou
+             * o ignora (e fica-se à mercê das heurísticas dele) ou o trata como
+             * `off`. Aqui isso custa dinheiro — é o ÚNICO campo de contacto de
+             * uma página que recebe tráfego pago, e escrever um email à mão num
+             * telemóvel é exactamente onde se desiste de um formulário de
+             * quatro campos.
+             *
+             * `on` é a ficha que existe para este caso: diz «preenche, o campo
+             * não tem um nome canónico». Não se escolhe `tel` nem `email`
+             * porque escolher um deles é sugerir o errado a metade das pessoas.
+             */
+            autoComplete="on"
             placeholder={textos.contactoPlaceholder}
             aria-describedby={`${id}-contacto-ajuda`}
             className={CAMPO}
           />
-          <p id={`${id}-contacto-ajuda`} className="mt-1.5 text-[11px] text-foreground/45">
+          {/*
+            `/68` e não `/45`. MEDIDO com o axe: a `/45` sai #9f9d9b sobre
+            branco — 2,7:1, quando o mínimo AA é 4,5:1. Esta é a linha que
+            explica que serve tanto um telemóvel como um email, e é a que
+            desfaz a hesitação em frente ao único campo de contacto da página.
+          */}
+          <p id={`${id}-contacto-ajuda`} className="mt-1.5 text-[11px] text-foreground/68">
             {textos.contactoAjuda}
           </p>
         </div>
@@ -406,7 +457,13 @@ export default function PedidoRelampago({
         {aEnviar ? textos.aSubmeter : textos.submeter}
       </button>
 
-      <p className="mt-4 text-[11px] leading-relaxed text-foreground/45">
+      {/*
+        `/68` e não `/45`. MEDIDO com o axe: #9f9d9b sobre branco dá 2,7:1, e o
+        mínimo AA é 4,5:1. É a linha do consentimento — a que diz o que se faz
+        com os dados que a pessoa acabou de escrever, mesmo por baixo do botão
+        de enviar. Uma nota legal ilegível não é uma nota legal.
+      */}
+      <p className="mt-4 text-[11px] leading-relaxed text-foreground/68">
         {textos.privacidade}{" "}
         <a href={localizeHref("/privacidade", locale)} className="underline hover:text-moss">
           {textos.privacidadeLink}

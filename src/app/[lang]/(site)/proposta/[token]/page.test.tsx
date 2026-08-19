@@ -230,6 +230,14 @@ describe("página pública da proposta — a língua é a da proposta", () => {
  * É o que aparece na lista de separadores e no histórico do navegador. Um
  * casal inglês com «A sua proposta | Líquen Events» no separador está a ler a
  * primeira coisa do produto na língua errada.
+ *
+ * O TÍTULO É `{ absolute }` E NÃO TEXTO SIMPLES, e a diferença não é de forma:
+ * entregue como texto simples, o layout de raiz aplicava-lhe por cima o seu
+ * `template: "%s | Líquen Events"` e a marca saía DUAS VEZES no separador
+ * («A sua proposta | Líquen Events | Líquen Events» — medido num Chromium).
+ * Estas asserções passam a ler o valor pelo que ele é. Ver
+ * `src/app/[lang]/(site)/titulos-do-cliente.test.ts`, que prende as quatro
+ * combinações de página e idioma.
  */
 describe("página pública da proposta — o título do separador", () => {
   it("segue a língua da proposta", async () => {
@@ -237,7 +245,7 @@ describe("página pública da proposta — o título do separador", () => {
     const meta = await pagina.generateMetadata({
       params: Promise.resolve({ lang: "pt", token: "bom" }),
     });
-    expect(meta.title).toBe("Your proposal | Líquen Events");
+    expect(meta.title).toEqual({ absolute: "Your proposal | Líquen Events" });
   });
 
   it("e continua a não ser indexado, em língua nenhuma", async () => {
@@ -253,7 +261,7 @@ describe("página pública da proposta — o título do separador", () => {
     const meta = await pagina.generateMetadata({
       params: Promise.resolve({ lang: "en", token: "mau" }),
     });
-    expect(meta.title).toBe("Your proposal | Líquen Events");
+    expect(meta.title).toEqual({ absolute: "Your proposal | Líquen Events" });
   });
 });
 
