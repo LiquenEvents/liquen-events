@@ -1,10 +1,7 @@
 import "server-only";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { esc, MAIL_TO, type Attachment } from "./mail";
 import { SITE } from "./site";
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "./email-logo";
-import { log } from "./logger";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -65,85 +62,27 @@ import { log } from "./logger";
 export const ASSINATURA_NOME = "Catarina Gaspar";
 export const ASSINATURA_CARGO = "Manager";
 
-/** Referência `cid:` do banner (o logótipo tem a sua, no `email-logo.ts`). */
-export const BANNER_EMAIL_CID = "liquen-banner";
-
 /**
- * O BANNER É UM FICHEIRO QUE SE LARGA, NÃO CÓDIGO QUE SE ESCREVE.
+ * ── O BANNER FOI-SE, E NÃO VOLTA POR SE LARGAR UM FICHEIRO ────────────────
  *
- * Ainda não existe. Quando existir, basta pô-lo em `public/email/` com um
- * destes nomes e passa a ir em todos os emails — sem tocar em código, sem
- * constante nenhuma para regenerar. Enquanto não estiver lá, a assinatura
- * fecha no rodapé e não fica nem espaço vazio nem imagem partida: o bloco do
- * banner simplesmente não é escrito, e nenhum `<img>` é emitido.
+ * Havia aqui um segundo bloco de imagem no fim da assinatura: bastava pôr um
+ * `banner-liquen-email.png` em `public/email/` e ele passava a ir em todos os
+ * emails, sem tocar em código. O ficheiro foi lá posto, e o que chegava à caixa
+ * do cliente era um rectângulo verde de 560×140 (~200 px de altura no
+ * telemóvel) com o logótipo outra vez — o mesmo logótipo que está três linhas
+ * acima, no topo da assinatura. Metade da peça era verde vazio.
  *
- * O PNG é o nome preferido; o JPEG está aceite porque é o que costuma sair de
- * quem desenha a peça, e um ficheiro certo com a extensão «errada» calado é
- * como se perde uma tarde.
+ * Tirou-se o FICHEIRO e tirou-se o MECANISMO, e a segunda metade é que é a
+ * correcção: só apagar o PNG deixava a porta aberta para o próximo que largasse
+ * um ficheiro com aquele nome — o banner voltava a todos os emails sem que
+ * ninguém tivesse escrito uma linha, que foi exactamente como ele apareceu.
  *
- * Medidas recomendadas: 1120×280 px no ficheiro, para sair nítido nos ecrãs de
- * alta densidade, apresentado a 560×140 (é a largura do corpo destes emails).
- * Abaixo de ~120KB — vai em TODOS os emails.
+ * Se um dia houver uma peça gráfica que valha o peso (vai em TODOS os envios) e
+ * que diga alguma coisa que a assinatura ainda não diz, escreve-se aqui, à
+ * vista, com o `cid:` e o anexo ao lado — como o logótipo. Uma imagem que entra
+ * no correio da casa é uma decisão, não um efeito secundário de copiar um
+ * ficheiro para uma pasta.
  */
-const BANNER_NOMES = ["banner-liquen-email.png", "banner-liquen-email.jpg"] as const;
-export const BANNER_EMAIL_FICHEIRO = BANNER_NOMES[0];
-
-/** Largura de apresentação do banner: a mesma do corpo destes emails. */
-const BANNER_LARGURA = 560;
-const BANNER_ALTURA = 140;
-
-/** Acima disto o banner passa a pesar mais do que tudo o resto da mensagem. */
-const BANNER_TECTO_BYTES = 200_000;
-
-type BannerLido = { conteudo: Buffer; tipo: string };
-
-/**
- * Lido do disco UMA vez e guardado — incluindo a ausência (`null`). Um
- * `readFileSync` por email seria uma ida ao disco em cada envio para, na
- * esmagadora maioria das vezes, confirmar que o ficheiro continua a não
- * existir. O ficheiro só muda com um deploy novo, que traz um processo novo.
- */
-let bannerCache: BannerLido | null | undefined;
-
-function bannerDoEmail(): BannerLido | null {
-  if (bannerCache !== undefined) return bannerCache;
-  for (const nome of BANNER_NOMES) {
-    try {
-      const conteudo = readFileSync(path.join(process.cwd(), "public", "email", nome));
-      if (conteudo.byteLength > BANNER_TECTO_BYTES) {
-        // Vai na mesma — um banner que não aparece por causa de um limite que
-        // ninguém vê é pior do que um email pesado —, mas fica registado para
-        // quem for ver porque é que o correio engordou.
-        //
-        // O tamanho MEDIDO não entra aqui, e é de propósito: o `log.warn`
-        // acaba no webhook de alertas (`logger.ts`), que serializa o contexto
-        // para dentro de um `fetch`. Um valor lido do disco a viajar para fora
-        // é um rasto que o CodeQL segue e assinala — «file data in outbound
-        // network request» —, e ainda que aqui seja inofensivo (um comprimento,
-        // de um ficheiro nosso, para o nosso alerta), um aviso de segurança que
-        // se aprende a ignorar deixa de servir para alguma coisa. O nome e o
-        // tecto são constantes nossas e chegam para saber o que fazer; o
-        // tamanho vê-se no ficheiro. NÃO voltes a pôr aqui o `byteLength`.
-        log.warn("assinatura: o banner do email é grande demais", {
-          ficheiro: nome,
-          tecto: BANNER_TECTO_BYTES,
-        });
-      }
-      bannerCache = { conteudo, tipo: nome.endsWith(".png") ? "image/png" : "image/jpeg" };
-      return bannerCache;
-    } catch {
-      // Não está lá (ou não se consegue ler): passa ao nome seguinte. A falta
-      // do banner é o estado NORMAL de hoje, não uma avaria — nada a registar.
-    }
-  }
-  bannerCache = null;
-  return null;
-}
-
-/** Só para os testes: obriga a próxima leitura a ir outra vez ao disco. */
-export function esquecerBannerDoEmail(): void {
-  bannerCache = undefined;
-}
 
 type Rede = { nome: string; url: string };
 
@@ -182,7 +121,6 @@ const LIGACAO = "#1155cc";
  * para trás — uma cruz vermelha na caixa de correio do cliente.
  */
 export function assinaturaDeEmail(): { html: string; texto: string; anexos: Attachment[] } {
-  const banner = bannerDoEmail();
   const redes = redesConfiguradas();
   const dominio = SITE.url.replace(/^https?:\/\//, "");
 
@@ -200,14 +138,6 @@ export function assinaturaDeEmail(): { html: string; texto: string; anexos: Atta
         )}</td></tr>`
     : "";
 
-  // Sem banner NÃO se escreve linha nenhuma — nem um `<td>` vazio, que numa
-  // tabela de email deixa na mesma um degrau de espaço por baixo da assinatura.
-  const linhaBanner = banner
-    ? `<tr><td style="padding-top:18px">
-           <img src="cid:${BANNER_EMAIL_CID}" alt="Líquen Events" width="${BANNER_LARGURA}" height="${BANNER_ALTURA}" style="display:block;width:100%;max-width:${BANNER_LARGURA}px;height:auto;border:0;border-radius:8px">
-         </td></tr>`
-    : "";
-
   const html = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-top:28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
   <tr><td class="em-hair" style="border-top:1px solid ${RISCO};padding-top:18px">
     <img src="cid:${EMAIL_LOGO_CID}" alt="Líquen Events" width="96" height="48" style="display:block;width:96px;height:48px;border:0">
@@ -222,7 +152,6 @@ export function assinaturaDeEmail(): { html: string; texto: string; anexos: Atta
     <div style="mso-line-height-rule:exactly;line-height:21px;font-size:13px">${ligacao(SITE.url, dominio)}</div>
   </td></tr>
   ${linhaRedes}
-  ${linhaBanner}
 </table>`;
 
   // Coerente com o HTML, e não uma versão pobre dele: quem lê em texto tem de
@@ -240,18 +169,10 @@ export function assinaturaDeEmail(): { html: string; texto: string; anexos: Atta
     ...(redes.length ? ["", ...redes.map((r) => `${r.nome}: ${r.url}`)] : []),
   ].join("\n");
 
+  // Só o logótipo. Buffer novo a cada chamada — o porquê está no
+  // `emailLogoAttachment`: o nodemailer consome o conteúdo, e um Buffer
+  // partilhado ia vazio no segundo envio.
   const anexos: Attachment[] = [emailLogoAttachment()];
-  if (banner) {
-    anexos.push({
-      // Buffer novo a cada chamada, pela mesma razão que está escrita no
-      // `emailLogoAttachment`: o nodemailer consome o conteúdo, e um Buffer
-      // partilhado ia vazio no segundo envio.
-      filename: BANNER_EMAIL_FICHEIRO,
-      content: Buffer.from(banner.conteudo),
-      contentType: banner.tipo,
-      cid: BANNER_EMAIL_CID,
-    });
-  }
 
   return { html, texto, anexos };
 }
@@ -270,7 +191,7 @@ export function assinaturaDeEmail(): { html: string; texto: string; anexos: Atta
  *
  * Quem tiver anexos próprios (o PDF da proposta, o do recibo) junta-os aos
  * `attachments` devolvidos, em vez de os substituir — substituí-los deixava o
- * logótipo e o banner de fora e punha duas cruzes vermelhas no email.
+ * logótipo de fora e punha uma cruz vermelha no email.
  */
 export function emailAoCliente({ html, texto }: { html: string; texto: string }): {
   html: string;

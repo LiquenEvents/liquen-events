@@ -1,46 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-// O ficheiro do banner ainda NÃO existe no repositório, e é isso que este teste
-// tem de conseguir simular nos dois sentidos: sem ele (o estado de hoje) e com
-// ele (o dia em que ela o largar em `public/email/`). Mexer no disco de verdade
-// deixava um ficheiro para trás que passaria a ir em todos os emails.
-const disco = vi.hoisted(() => ({ ficheiros: new Map<string, Buffer>() }));
-vi.mock("node:fs", async (original) => {
-  const real = await original<typeof import("node:fs")>();
-  return {
-    ...real,
-    default: real,
-    readFileSync: (p: Parameters<typeof real.readFileSync>[0], ...resto: unknown[]) => {
-      const nome = String(p).split("/").pop() ?? "";
-      const guardado = disco.ficheiros.get(nome);
-      if (guardado) return guardado;
-      if (String(p).includes("/public/email/")) throw new Error("ENOENT");
-      return (real.readFileSync as (...a: unknown[]) => Buffer)(p, ...resto);
-    },
-  };
-});
+import { describe, it, expect } from "vitest";
 
 import {
   assinaturaDeEmail,
   emailAoCliente,
-  esquecerBannerDoEmail,
   ASSINATURA_NOME,
   ASSINATURA_CARGO,
-  BANNER_EMAIL_CID,
-  BANNER_EMAIL_FICHEIRO,
 } from "./email-assinatura";
 import { SITE } from "./site";
 import { MAIL_TO } from "./mail";
 import { EMAIL_LOGO_CID } from "./email-logo";
-
-beforeEach(() => {
-  disco.ficheiros.clear();
-  esquecerBannerDoEmail();
-});
-afterEach(() => {
-  disco.ficheiros.clear();
-  esquecerBannerDoEmail();
-});
 
 describe("assinaturaDeEmail", () => {
   it("assina sempre com o mesmo nome e cargo da casa", () => {
@@ -105,28 +73,18 @@ describe("assinaturaDeEmail", () => {
     expect(html).not.toContain("LinkedIn");
   });
 
-  describe("banner", () => {
-    it("sem ficheiro, sai sem imagem partida e sem espaço vazio", () => {
-      const { html, anexos } = assinaturaDeEmail();
-      expect(html).not.toContain(BANNER_EMAIL_CID);
-      expect(html).not.toContain("banner");
-      expect(anexos).toHaveLength(1);
-    });
-
-    it("basta largar o ficheiro em public/email/ para passar a ir", () => {
-      disco.ficheiros.set(BANNER_EMAIL_FICHEIRO, Buffer.from("PNG-a-fingir"));
-      const { html, anexos } = assinaturaDeEmail();
-      expect(html).toContain(`cid:${BANNER_EMAIL_CID}`);
-      const anexo = anexos.find((a) => a.cid === BANNER_EMAIL_CID);
-      expect(anexo?.contentType).toBe("image/png");
-      expect(anexo?.filename).toBe(BANNER_EMAIL_FICHEIRO);
-    });
-
-    it("aceita o mesmo banner em JPEG, com o tipo certo", () => {
-      disco.ficheiros.set("banner-liquen-email.jpg", Buffer.from("JPEG-a-fingir"));
-      const anexo = assinaturaDeEmail().anexos.find((a) => a.cid === BANNER_EMAIL_CID);
-      expect(anexo?.contentType).toBe("image/jpeg");
-    });
+  /**
+   * O banner era um rectângulo verde de 560×140 no fim de cada email, com o
+   * logótipo repetido — o mesmo que já está no topo da assinatura. Foi-se, e
+   * com ele o mecanismo que o trazia de volta a quem largasse um ficheiro em
+   * `public/email/`. Uma imagem por email, e é a do logótipo.
+   */
+  it("fecha na assinatura: uma só imagem, e nenhum banner", () => {
+    const { html, anexos } = assinaturaDeEmail();
+    expect(anexos).toHaveLength(1);
+    expect(anexos[0].cid).toBe(EMAIL_LOGO_CID);
+    expect(html).not.toContain("banner");
+    expect(html.match(/<img/g) ?? []).toHaveLength(1);
   });
 });
 
