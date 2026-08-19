@@ -59,7 +59,7 @@ vi.mock("next/image", () => ({
   default: (p: Record<string, unknown>) => <span data-logotipo={String(p.alt ?? "")} />,
 }));
 
-const AdminLogin = (await import("./AdminLogin")).default;
+const { default: AdminLogin, deslocamentoParaOTeclado } = await import("./AdminLogin");
 
 /** Um `fetch` que regista o que lhe mandaram e responde o que se lhe disser. */
 let pedidos: { url: string; body: Record<string, unknown> }[] = [];
@@ -398,5 +398,140 @@ describe("o que o Bloco 1 deixou, e continua de pé", () => {
     // errada. São dois `<form>` irmãos, e têm de continuar a sê-lo.
     expect(formularioDaRecuperacao).not.toBe(campoDaEntrada.closest("form"));
     expect(formularioDaRecuperacao.querySelector("form")).toBeNull();
+  });
+});
+
+// ── O telemóvel: o teclado, os alvos e onde caem as recusas ────────────────
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE SÓ SE VÊ COM UM TECLADO POR CIMA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Estes três não são de gosto: cada um corresponde a um número medido a
+ * 375×667 (iPhone SE), com toque, e está escrito no `AdminLogin.tsx` ao lado da
+ * cura. Aqui prova-se a parte que jsdom consegue provar — a conta, a classe e a
+ * ORDEM no documento —, porque a parte que falta (píxeis) já foi medida e o que
+ * se perde primeiro numa reorganização é isto.
+ */
+
+describe("o teclado do telemóvel não pode tapar o que se vai tocar a seguir", () => {
+  /**
+   * Os números são os do iPhone SE com o teclado aberto: janela de layout de
+   * 667 px, janela visual de 407 (o teclado com a barra de sugestões come 260).
+   */
+  const VISIVEL = 407;
+
+  it("puxa o botão de submeter para dentro da parte visível", () => {
+    // Medido antes da correcção: campo 382,9–427,8 e botão 503,8–551,8, com a
+    // linha do teclado nos 407 — os dois por baixo dela.
+    const d = deslocamentoParaOTeclado({
+      campo: { top: 382.9, bottom: 427.8 },
+      accao: { bottom: 551.8 },
+      alturaVisivel: VISIVEL,
+    });
+    expect(d).toBe(157); // 551,8 + 12 de folga − 407
+    // E depois de rolar esse tanto, tudo cabe.
+    expect(551.8 - d).toBeLessThanOrEqual(VISIVEL);
+    expect(382.9 - d).toBeGreaterThan(0);
+  });
+
+  it("quando os dois não cabem, ganha o campo — nunca o empurra para fora pelo topo", () => {
+    // Um formulário mais alto do que o que sobra do ecrã: o botão fica de fora,
+    // mas o campo em que se está a escrever tem de ficar à vista.
+    const d = deslocamentoParaOTeclado({
+      campo: { top: 100, bottom: 145 },
+      accao: { bottom: 600 },
+      alturaVisivel: VISIVEL,
+    });
+    expect(d).toBe(88); // 100 − 12, e não os 205 que o botão pedia
+    expect(100 - d).toBe(12);
+  });
+
+  it("sobe a página quando o campo está meio fora pelo topo", () => {
+    const d = deslocamentoParaOTeclado({
+      campo: { top: 4, bottom: 49 },
+      accao: { bottom: 120 },
+      alturaVisivel: VISIVEL,
+    });
+    expect(d).toBe(-8);
+  });
+
+  it("não mexe em nada quando já está tudo à vista", () => {
+    expect(
+      deslocamentoParaOTeclado({
+        campo: { top: 120, bottom: 165 },
+        accao: { bottom: 240 },
+        alturaVisivel: VISIVEL,
+      }),
+    ).toBe(0);
+  });
+
+  it("sem botão nenhum, basta o campo caber", () => {
+    expect(
+      deslocamentoParaOTeclado({
+        campo: { top: 380, bottom: 425 },
+        accao: null,
+        alturaVisivel: VISIVEL,
+      }),
+    ).toBe(30); // 425 + 12 − 407
+  });
+});
+
+describe("o caminho de quem trocou de telemóvel abre-se com o dedo", () => {
+  it("o resumo «Mudaste de telemóvel?» tem o alvo de 44 px da casa", () => {
+    montar();
+    const resumo = screen.getByText(/Mudaste de telemóvel ou de computador\?/i);
+    // Media 293×16 px a 375×667 — a altura da própria letra —, e é a única
+    // porta para as instruções de registo de um aparelho novo.
+    expect(resumo.tagName).toBe("SUMMARY");
+    expect(resumo).toHaveClass("alvo-toque");
+  });
+});
+
+describe("a recusa aparece onde os olhos já estão", () => {
+  it("a falha do aparelho fica junto ao botão do aparelho, e não lá em baixo", async () => {
+    const u = userEvent.setup();
+    passkeys.entrar.mockRejectedValueOnce(
+      Object.assign(new Error("Serviço de passkeys indisponível."), { name: "Error" }),
+    );
+    montar();
+    await u.click(screen.getByRole("button", { name: /Entrar com este dispositivo/i }));
+    const aviso = await screen.findByRole("alert");
+    expect(aviso).toHaveTextContent(/indisponível/i);
+    // Medido: no sítio antigo — dentro do formulário — a mensagem nascia aos
+    // 782,8 px num ecrã de 667. Tem de vir ANTES do formulário no documento.
+    const formulario = campoDaSenha().closest("form")!;
+    expect(
+      aviso.compareDocumentPosition(formulario) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(formulario.contains(aviso)).toBe(false);
+  });
+
+  it("a recusa da palavra-passe continua dentro do formulário, por cima do botão", async () => {
+    const u = userEvent.setup();
+    servir({ ok: false, status: 401, body: { error: "Credenciais incorretas" } });
+    montar();
+    await u.type(screen.getByLabelText(/O teu email/i), "ninguem@exemplo.pt");
+    await u.type(campoDaSenha(), "errada-de-certeza{Enter}");
+    const aviso = await screen.findByRole("alert");
+    const formulario = campoDaSenha().closest("form")!;
+    expect(formulario.contains(aviso)).toBe(true);
+    const submeter = screen.getByRole("button", { name: /Entrar com palavra-passe/i });
+    expect(aviso.compareDocumentPosition(submeter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("submeter a palavra-passe limpa a recusa que tinha vindo do aparelho", async () => {
+    const u = userEvent.setup();
+    passkeys.entrar.mockRejectedValueOnce(new Error("Serviço de passkeys indisponível."));
+    montar();
+    await u.click(screen.getByRole("button", { name: /Entrar com este dispositivo/i }));
+    await screen.findByRole("alert");
+    servir({ ok: false, status: 401, body: { error: "Credenciais incorretas" } });
+    await u.type(screen.getByLabelText(/O teu email/i), "ninguem@exemplo.pt");
+    await u.type(campoDaSenha(), "errada{Enter}");
+    const aviso = await screen.findByRole("alert");
+    expect(aviso).toHaveTextContent("Credenciais incorretas");
+    expect(campoDaSenha().closest("form")!.contains(aviso)).toBe(true);
   });
 });

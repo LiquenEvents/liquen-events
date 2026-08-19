@@ -117,6 +117,22 @@ export default function AdminLogin() {
   const [code, setCode] = useState("");
   const [needs2fa, setNeeds2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * DE QUAL DAS DUAS PORTAS VEIO O ERRO.
+   *
+   * Havia um sítio só para a mensagem — dentro do formulário, por cima do botão
+   * de submeter — e a entrada por dispositivo escrevia lá a dela. MEDIDO a
+   * 375×667: o botão «Entrar com este dispositivo» está a 473–521 px do topo,
+   * portanto à vista; a mensagem nascia aos 782,8 px, ou seja 116 px ABAIXO da
+   * borda de baixo do ecrã. Quem tocasse no botão e o servidor recusasse o
+   * desafio via o botão voltar ao normal e mais nada — o ecrã dizia que não
+   * tinha acontecido nada, e o que tinha acontecido era uma recusa.
+   *
+   * Com isto a mensagem fica encostada ao botão que a produziu, que é onde os
+   * olhos já estão. Uma variável e não duas mensagens: o texto continua a ser
+   * um só, e quem submete a palavra-passe volta a pô-lo no sítio de sempre.
+   */
+  const [erroNoDispositivo, setErroNoDispositivo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [aEntrarComDispositivo, setAEntrarComDispositivo] = useState(false);
   /** Bloco 3: escrever às cegas no telemóvel é das coisas mais irritantes. */
@@ -139,7 +155,14 @@ export default function AdminLogin() {
 
   useEffect(() => {
     document.body.classList.add("admin-mode");
-    return () => document.body.classList.remove("admin-mode");
+    return () => {
+      document.body.classList.remove("admin-mode");
+      // O espaço aberto para o teclado (ver `seguirOTeclado`) é do <body>, que
+      // sobrevive a esta página. Sair com um campo em foco — que é exactamente
+      // o que acontece a quem entra com o Enter — deixava-o lá para o back
+      // office inteiro herdar.
+      abrirEspaco(0);
+    };
   }, []);
 
   useEffect(() => {
@@ -271,6 +294,7 @@ export default function AdminLogin() {
     if (aEntrarComDispositivo || loading) return;
     setAEntrarComDispositivo(true);
     setError(null);
+    setErroNoDispositivo(false);
     try {
       await entrarComDispositivo({ manterSessao });
       entrou();
@@ -278,7 +302,10 @@ export default function AdminLogin() {
       // Cancelar não é falhar: `mensagemDeErro` devolve null e o ecrã fica
       // como estava, sem aviso vermelho por a pessoa ter mudado de ideias.
       const msg = mensagemDeErro(err);
-      if (msg) setError(msg);
+      if (msg) {
+        setErroNoDispositivo(true);
+        setError(msg);
+      }
       setAEntrarComDispositivo(false);
     }
   }
@@ -290,6 +317,7 @@ export default function AdminLogin() {
     if (loading) return;
     setLoading(true);
     setError(null);
+    setErroNoDispositivo(false);
     // A cerimónia do autofill fica pendurada à espera de uma escolha que já não
     // vai acontecer — e uma cerimónia viva impede a próxima de arrancar.
     cancelarCerimonia();
@@ -429,6 +457,11 @@ export default function AdminLogin() {
                 {aEntrarComDispositivo ? "A confirmar…" : "Entrar com este dispositivo"}
               </Button>
 
+              {/* A recusa do aparelho fica AQUI, e não lá em baixo no
+                  formulário. Ver `erroNoDispositivo`: a 375×667 a outra
+                  posição caía 116 px abaixo da borda do ecrã. */}
+              {error && erroNoDispositivo && <AvisoDeRecusa texto={error} className="mt-2" />}
+
               {/* Uma linha, e não três. O que a pessoa precisa de saber para
                   decidir se carrega é o gesto que lhe vai ser pedido. */}
               <p className="mt-2 text-center text-xs leading-relaxed text-foreground/45">
@@ -446,7 +479,12 @@ export default function AdminLogin() {
           )}
 
           {/* ── 2. A PALAVRA-PASSE, a alternativa ────────────────────────── */}
-          <form onSubmit={submit} className="flex flex-col gap-3.5" onFocus={aoFocarCampo}>
+          <form
+            onSubmit={submit}
+            className="flex flex-col gap-3.5"
+            onFocus={aoFocarCampo}
+            onBlur={aoSairDoCampo}
+          >
             <Field
               label="O teu email"
               name="email"
@@ -566,16 +604,7 @@ export default function AdminLogin() {
               />
             )}
 
-            {error && (
-              <p
-                role="alert"
-                aria-live="assertive"
-                className="flex items-start gap-1.5 text-sm leading-relaxed text-[#8a2a22]"
-              >
-                <span aria-hidden="true">⚠</span>
-                <span>{error}</span>
-              </p>
-            )}
+            {error && !erroNoDispositivo && <AvisoDeRecusa texto={error} />}
 
             {/* ── Manter a sessão iniciada ──────────────────────────────────
                 Com a duração dita por extenso: «manter-me com sessão iniciada»
@@ -659,6 +688,7 @@ export default function AdminLogin() {
               onSubmit={pedirLigacao}
               className="mt-5 flex flex-col gap-3 border-t border-foreground/10 pt-5"
               onFocus={aoFocarCampo}
+              onBlur={aoSairDoCampo}
             >
               <p className="text-xs leading-relaxed text-foreground/55">
                 Escreve o teu email e enviamos-te uma ligação para definires uma palavra-passe nova.
@@ -725,7 +755,14 @@ export default function AdminLogin() {
               o browser trata do resto. */}
           {temPasskeys && (
             <details className="group mt-5 border-t border-foreground/10 pt-4">
-              <summary className="cursor-pointer list-none text-xs font-medium text-foreground/60 underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-foreground/85 hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm">
+              {/* `alvo-toque`: MEDIDO a 375×667 com toque emulado, este resumo
+                  dava 293×16 px. Dezasseis píxeis de altura — a altura da
+                  própria letra — e é o único caminho para o que está lá dentro,
+                  numa página onde quem chega é precisamente quem trocou de
+                  telemóvel. A classe põe-lhe os 44 px do dedo (e só no dedo:
+                  `(pointer: coarse)`, ver globals.css), sem mexer na letra nem
+                  no sublinhado. Passa a 232×44. */}
+              <summary className="alvo-toque cursor-pointer list-none text-xs font-medium text-foreground/60 underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-foreground/85 hover:decoration-foreground/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/45 focus-visible:ring-offset-2 focus-visible:rounded-sm">
                 Mudaste de telemóvel ou de computador?
               </summary>
               <p className="mt-2 text-xs leading-relaxed text-foreground/55">
@@ -747,6 +784,26 @@ export default function AdminLogin() {
 
 // ── Peças pequenas ─────────────────────────────────────────────────────────
 
+/**
+ * A frase de recusa, escrita uma vez e mostrada em dois sítios.
+ *
+ * `aria-live="assertive"` nos dois: para quem ouve o ecrã, o sítio não muda
+ * nada — a mensagem é lida assim que aparece. Quem ganha com a mudança de
+ * lugar é quem VÊ, e é por isso que ela existe.
+ */
+function AvisoDeRecusa({ texto, className = "" }: { texto: string; className?: string }) {
+  return (
+    <p
+      role="alert"
+      aria-live="assertive"
+      className={`flex items-start gap-1.5 text-sm leading-relaxed text-[#8a2a22] ${className}`}
+    >
+      <span aria-hidden="true">⚠</span>
+      <span>{texto}</span>
+    </p>
+  );
+}
+
 /** O destino pedido no URL, já limpo. Só corre no browser. */
 function lerDestinoDoUrl(): string | null {
   try {
@@ -757,7 +814,7 @@ function lerDestinoDoUrl(): string | null {
 }
 
 /**
- * O CAMPO FOCADO TEM DE FICAR ACIMA DO TECLADO.
+ * O CAMPO FOCADO E O BOTÃO TÊM DE FICAR ACIMA DO TECLADO.
  *
  * No telemóvel o teclado tapa a metade de baixo do ecrã, e o cartão desta
  * página é alto: com a fotografia em faixa no topo, o campo da palavra-passe e
@@ -765,11 +822,52 @@ function lerDestinoDoUrl(): string | null {
  * vista, mas encosta-o à borda — o que deixa o botão de submeter escondido, e o
  * gesto seguinte é sempre esse.
  *
- * `block: "center"` põe o campo a meio do que sobra do ecrã, portanto o botão
- * logo abaixo fica à vista. Os 300 ms são o tempo da animação de abertura do
- * teclado no iOS: antes disso a área visível ainda é a antiga e a conta sai
- * errada. Só com o dedo — com rato não há teclado a tapar nada e mexer no
- * scroll seria movimento que ninguém pediu.
+ * ── O QUE ESTAVA AQUI, E PORQUE É QUE NÃO CHEGAVA ─────────────────────────
+ * Estava `scrollIntoView({ block: "center" })`, com a razão escrita de que o
+ * meio do ecrã deixa o botão à vista. MEDIDO num iPhone SE (375×667, teclado
+ * com barra de sugestões = 260 px, portanto 407 px visíveis), com a janela
+ * visual encolhida como o iOS a encolhe — a de LAYOUT fica nos 667, e é essa
+ * que o `scrollIntoView` conta:
+ *
+ *                              campo (topo–fundo)   botão (topo–fundo)
+ *   palavra-passe focada           382,9–427,8         503,8–551,8
+ *   código de 2FA focado           383,6–428,4         586,2–634,2
+ *   email da recuperação           405,1–449,9         461,9–505,9
+ *
+ * Com a linha do teclado nos 407, os TRÊS campos acabavam por baixo dela e os
+ * três botões estavam inteiros dentro do teclado. Ou seja: não é que o botão se
+ * perdesse — perdia-se o próprio campo que se acabou de tocar.
+ *
+ * Duas razões, e nenhuma se via a olho:
+ *
+ *  1. `block: "center"` centra na área de leitura, e esta folha tem
+ *     `scroll-padding-top: 9rem` (globals.css). O «meio» deixa de ser 333 e
+ *     passa a ser 405 — já dentro do teclado.
+ *  2. E mesmo o meio verdadeiro não chegava: do topo do campo do 2FA ao fundo
+ *     do botão «Verificar» vão 251 px, que não cabem por baixo de 333.
+ *
+ * ── O QUE PASSOU A FAZER ──────────────────────────────────────────────────
+ * Deixa de se pedir uma posição ao browser e passa a fazer-se a conta com a
+ * medida que interessa: `visualViewport.height`, que é a única que sabe do
+ * teclado (no iOS a janela de layout não encolhe; a visual sim). Rola-se o
+ * necessário — nem mais — para o fundo do BOTÃO de submeter desse formulário
+ * caber acima do teclado, e nunca ao ponto de empurrar o campo para fora pelo
+ * topo. A conta está em `deslocamentoParaOTeclado`, à parte e sem DOM, para
+ * poder ser provada com números.
+ *
+ * O botão vem do `closest("form")`: cada formulário desta página tem um só, e
+ * assim o da recuperação é servido pela mesma regra sem a repetir.
+ *
+ * ── QUANDO É QUE SE MEDE ──────────────────────────────────────────────────
+ * Os 300 ms de antes eram um palpite sobre a animação do teclado do iOS. Ficam,
+ * como rede para quem não tenha `visualViewport` (e para o caso de o teclado já
+ * estar aberto, em que não há evento nenhum), mas quem manda é o `resize` da
+ * janela visual — que é o aviso de que o teclado abriu, dado pelo próprio
+ * browser. Deixa de se ouvir ao fim de 1,5 s: passado isso, um `resize` é a
+ * pessoa a rodar o telemóvel, e aí mexer no scroll era movimento que ninguém
+ * pediu.
+ *
+ * Só com o dedo — com rato não há teclado a tapar nada.
  *
  * No `onFocus` do `<form>` e não em cada campo: o evento borbulha, e assim um
  * campo acrescentado amanhã (o do 2FA, por exemplo) fica coberto sem ter de se
@@ -780,9 +878,104 @@ function aoFocarCampo(e: React.FocusEvent<HTMLFormElement>) {
   if (!alvo?.matches?.("input, textarea, select")) return;
   if (typeof window === "undefined") return;
   if (!window.matchMedia?.("(pointer: coarse)").matches) return;
+  seguirOTeclado(alvo);
+}
+
+/** Espaço entre o que tem de ficar à vista e a borda (do ecrã ou do teclado). */
+const FOLGA_DO_TECLADO = 12;
+
+/**
+ * QUANTO É PRECISO ROLAR, em píxeis, para o campo e o seu botão caberem.
+ *
+ * Sem DOM de propósito: é a única parte disto que se pode provar com números
+ * num teste, e é onde estavam os dois enganos que o comentário acima descreve.
+ *
+ * Positivo rola para baixo, negativo para cima, zero fica quieto. A ORDEM das
+ * duas regras é o que importa: primeiro puxa-se o fundo do botão para dentro,
+ * depois nunca se deixa o topo do campo sair — quando os dois não cabem, ganha
+ * o campo, porque é nele que se está a escrever.
+ */
+export function deslocamentoParaOTeclado({
+  campo,
+  accao,
+  alturaVisivel,
+  folga = FOLGA_DO_TECLADO,
+}: {
+  campo: { top: number; bottom: number };
+  accao: { bottom: number } | null;
+  alturaVisivel: number;
+  folga?: number;
+}): number {
+  const fundo = Math.max(campo.bottom, accao?.bottom ?? campo.bottom);
+  let deslocamento = 0;
+  if (fundo + folga > alturaVisivel) deslocamento = fundo + folga - alturaVisivel;
+  if (campo.top - deslocamento < folga) deslocamento = campo.top - folga;
+  return Math.round(deslocamento);
+}
+
+/**
+ * ── E A PÁGINA TEM DE TER PARA ONDE ROLAR ─────────────────────────────────
+ *
+ * A conta acima diz quanto rolar; não diz que a página consiga. MEDIDO a
+ * 375×667 depois da primeira metade da correcção, com o teclado nos 260 px: o
+ * botão «Entrar» pedia a posição 497,8 e o documento só dava 475 de scroll
+ * máximo (1142 de altura menos 667 de ecrã). Faltavam 23 px, e no painel de
+ * recuperação — em que a acção está quase no fim da página — faltavam 83.
+ *
+ * No Android isto não acontece: lá a janela de LAYOUT encolhe com o teclado, e
+ * o alcance do scroll cresce sozinho os mesmos píxeis que o teclado ocupa. No
+ * iOS a de layout fica quieta, e é essa diferença que se repõe aqui — o mesmo
+ * número, medido no próprio momento (`innerHeight - visualViewport.height`), em
+ * espaço no fundo do documento. Zero no Android, porque lá a subtracção já dá
+ * zero: a mesma linha serve os dois sem perguntar qual é qual.
+ *
+ * O espaço fica ATRÁS do teclado, portanto ninguém o vê, e sai assim que o
+ * último campo perde o foco.
+ */
+function espacoDoTeclado(): number {
+  const janelaVisual = window.visualViewport;
+  if (!janelaVisual) return 0;
+  return Math.max(0, Math.round(window.innerHeight - janelaVisual.height));
+}
+
+function abrirEspaco(px: number): void {
+  document.body.style.paddingBottom = px > 0 ? `${px}px` : "";
+}
+
+/** O foco saiu de todos os campos: o espaço deixa de fazer falta. */
+function aoSairDoCampo(e: React.FocusEvent<HTMLFormElement>) {
+  if (typeof window === "undefined") return;
+  if (!(e.target as HTMLElement)?.matches?.("input, textarea, select")) return;
+  // No tempo de um `focusout` o foco seguinte ainda não assentou. Espera-se um
+  // tique: se calhou noutro campo, o espaço continua a ser preciso.
   window.setTimeout(() => {
-    alvo.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, 300);
+    if (document.activeElement?.matches?.("input, textarea, select")) return;
+    abrirEspaco(0);
+  }, 0);
+}
+
+/** A parte com DOM: mede, decide quando, e rola. */
+function seguirOTeclado(alvo: HTMLElement) {
+  const janelaVisual = window.visualViewport;
+  const ajustar = () => {
+    // O foco pode já ter saído (a pessoa tocou noutro sítio enquanto o teclado
+    // abria). Rolar aí é mexer no ecrã por causa de um campo que já não conta.
+    if (!alvo.isConnected || document.activeElement !== alvo) return;
+    // O espaço PRIMEIRO: sem ele o `scrollBy` a seguir é limitado pelo fundo do
+    // documento e a conta certa dá na mesma um botão meio tapado.
+    abrirEspaco(espacoDoTeclado());
+    const botao = alvo.closest("form")?.querySelector<HTMLElement>('button[type="submit"]');
+    const deslocamento = deslocamentoParaOTeclado({
+      campo: alvo.getBoundingClientRect(),
+      accao: botao?.getBoundingClientRect() ?? null,
+      alturaVisivel: janelaVisual?.height ?? window.innerHeight,
+    });
+    if (Math.abs(deslocamento) > 1) window.scrollBy({ top: deslocamento, behavior: "smooth" });
+  };
+  window.setTimeout(ajustar, 300);
+  if (!janelaVisual) return;
+  janelaVisual.addEventListener("resize", ajustar);
+  window.setTimeout(() => janelaVisual.removeEventListener("resize", ajustar), 1500);
 }
 
 function OlhoAberto() {
