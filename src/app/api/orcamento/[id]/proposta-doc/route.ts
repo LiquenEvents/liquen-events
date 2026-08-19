@@ -28,6 +28,7 @@ import { textosDoEmailDaProposta } from "@/lib/email-proposta-textos";
 import { createProposalToken } from "@/lib/proposal-token";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
+import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
 import { marcadoresDoPedido, modeloParaEnvioAutomatico } from "@/lib/email-modelos";
 import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
@@ -711,9 +712,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * O português é, palavra por palavra, o que sempre saiu daqui.
      */
     const t = textosDoEmailDaProposta(idioma);
+    /**
+     * Quem assina é quem carregou em «Enviar», não a casa. O nome que vai para
+     * a protecção é o do DOCUMENTO (o casal), que é quem lê este email — e não
+     * o `quote.name`, que pode ser a mãe da noiva. Ver `email-assinatura.ts`.
+     */
+    const quem = {
+      nome: nomeDeQuemEnvia(request),
+      destinatario: String(doc.clientNames ?? "").trim() || quote.name,
+    };
+
     const email = doModelo
-      ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto })
+      ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto, quem })
       : emailAoCliente({
+          quem,
           html: `<h2 style="font-size:18px;margin:0 0 12px">${esc(t.titulo)}</h2>
         <p style="font-size:14px;line-height:1.6">${esc(t.ola)} ${esc(doc.clientNames)},</p>
         ${mensagem ? `${paragrafosDaMensagem(mensagem)}\n        ` : ""}<p style="font-size:14px;line-height:1.6">${esc(t.intro)}</p>

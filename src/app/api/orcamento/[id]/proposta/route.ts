@@ -7,6 +7,7 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
+import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
 import { marcadoresDoPedido, modeloParaEnvioAutomatico } from "@/lib/email-modelos";
 import { SITE } from "@/lib/site";
 import { createProposalToken } from "@/lib/proposal-token";
@@ -199,9 +200,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       marcadoresDoPedido(quote, { link: acceptUrl, valor: eurDocumento(total) }),
     );
 
+    /**
+     * Quem assina este email é quem carregou no botão, não a casa — e o nome
+     * do casal vai junto só para a protecção: nenhum email pode sair assinado
+     * com o nome de quem o vai ler (ver `email-assinatura.ts`).
+     */
+    const quem = { nome: nomeDeQuemEnvia(request), destinatario: quote.name };
+
     const email = doModelo
-      ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto })
+      ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto, quem })
       : emailAoCliente({
+          quem,
           html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
       <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(primeiroNome)},</p>
       <p style="font-size:14px;line-height:1.6;color:#333">

@@ -1,11 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("./logger", () => ({ log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 import {
   assinaturaDeEmail,
+  assinanteDoEmail,
   emailAoCliente,
   ASSINATURA_NOME,
   ASSINATURA_CARGO,
 } from "./email-assinatura";
+import { log } from "./logger";
 import { SITE } from "./site";
 import { MAIL_TO } from "./mail";
 import { EMAIL_LOGO_CID } from "./email-logo";
@@ -111,5 +115,97 @@ describe("emailAoCliente", () => {
     expect(html).not.toContain("display:flex");
     expect(html).not.toContain("display:grid");
     expect(html).not.toContain("<style");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUEM ASSINA É QUEM ENVIOU — E NUNCA, NUNCA, QUEM RECEBE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O nome era fixo: saísse o email de quem saísse, assinava a Catarina. Com mais
+ * do que uma conta no back office (`admin-auth`), isso deixou de ser verdade —
+ * quem escreve ao casal assina o que escreveu.
+ *
+ * E a protecção, que é a razão pela qual isto se mexeu: chegou a sair um email
+ * com DUAS assinaturas contraditórias, uma delas com o nome da própria pessoa
+ * que o recebeu. A causa estava no corpo (um `{nome}` no rodapé de um modelo
+ * guardado no back office, ver `email-modelos.ts`) e não aqui — mas a regra
+ * vale na mesma, e vale para sempre: nenhum email pode sair assinado com o nome
+ * de quem o vai ler.
+ */
+describe("quem assina", () => {
+  beforeEach(() => {
+    vi.mocked(log.warn).mockClear();
+  });
+
+  it("assina com o nome de quem tem a sessão iniciada", () => {
+    const { html, texto } = assinaturaDeEmail({ nome: "Rui Belo" });
+    expect(html).toContain("Rui Belo");
+    expect(texto).toContain("Rui Belo");
+    expect(html).not.toContain(ASSINATURA_NOME);
+  });
+
+  it("sem sessão (o formulário público) assina a casa, com o cargo", () => {
+    const { html, texto } = assinaturaDeEmail();
+    expect(html).toContain(ASSINATURA_NOME);
+    expect(html).toContain(ASSINATURA_CARGO);
+    expect(texto).toContain(ASSINATURA_CARGO);
+  });
+
+  /** «Manager» é o cargo DELA. Debaixo de outro nome era uma promoção
+   *  inventada pelo software — melhor nenhum cargo do que um cargo falso. */
+  it("o cargo da casa não acompanha um nome que não é o da casa", () => {
+    const { html, texto } = assinaturaDeEmail({ nome: "Rui Belo" });
+    expect(html).not.toContain(ASSINATURA_CARGO);
+    expect(texto).not.toContain(ASSINATURA_CARGO);
+  });
+
+  /** A conta dela pode chamar-se só «Catarina». Continua a ser ela. */
+  it("o cargo acompanha o primeiro nome da conta da casa", () => {
+    expect(assinanteDoEmail({ nome: "Catarina" }).cargo).toBe(ASSINATURA_CARGO);
+    expect(assinanteDoEmail({ nome: "catarina gaspar" }).cargo).toBe(ASSINATURA_CARGO);
+  });
+
+  it("nunca assina com o nome de quem recebe — cai para o da casa e regista", () => {
+    const { nome, cargo } = assinanteDoEmail({
+      nome: "Mónica Teófilo",
+      destinatario: "Mónica Teófilo",
+    });
+    expect(nome).toBe(ASSINATURA_NOME);
+    expect(cargo).toBe(ASSINATURA_CARGO);
+    expect(vi.mocked(log.warn)).toHaveBeenCalledTimes(1);
+  });
+
+  /** Acentos, maiúsculas e espaços a mais não podem ser a porta do lado. */
+  it("a protecção não se desfaz com acentos, maiúsculas nem espaços", () => {
+    expect(
+      assinanteDoEmail({ nome: "  MÓNICA   teofilo ", destinatario: "Monica Teófilo" }).nome,
+    ).toBe(ASSINATURA_NOME);
+  });
+
+  /** Nomes diferentes não podem accionar a protecção — senão ninguém assina. */
+  it("deixa passar um nome que só se parece com o do destinatário", () => {
+    expect(assinanteDoEmail({ nome: "Mónica Teófilo", destinatario: "Mónica Teixeira" }).nome).toBe(
+      "Mónica Teófilo",
+    );
+    expect(vi.mocked(log.warn)).not.toHaveBeenCalled();
+  });
+
+  /** O registo não pode levar os nomes: vai para o webhook de alertas. */
+  it("regista a ocorrência sem escrever lá os nomes", () => {
+    assinanteDoEmail({ nome: "Mónica Teófilo", destinatario: "Mónica Teófilo" });
+    const [mensagem, contexto] = vi.mocked(log.warn).mock.calls[0];
+    expect(JSON.stringify([mensagem, contexto])).not.toMatch(/Mónica|Teófilo/i);
+  });
+
+  it("o emailAoCliente leva a assinatura de quem envia até ao fim", () => {
+    const { html, text } = emailAoCliente({
+      html: "<p>Segue.</p>",
+      texto: "Segue.",
+      quem: { nome: "Rui Belo", destinatario: "Mónica Teófilo" },
+    });
+    expect(html).toContain("Rui Belo");
+    expect(text).toContain("Rui Belo");
   });
 });

@@ -2,6 +2,7 @@ import "server-only";
 import { esc, MAIL_TO, type Attachment } from "./mail";
 import { SITE } from "./site";
 import { EMAIL_LOGO_CID, emailLogoAttachment } from "./email-logo";
+import { log } from "./logger";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -15,11 +16,20 @@ import { EMAIL_LOGO_CID, emailLogoAttachment } from "./email-logo";
  * única: mudar aqui muda em todos os emails, e um caminho novo que use o
  * {@link emailAoCliente} leva a assinatura sem ter de se lembrar dela.
  *
- * ── O QUE ESTÁ AQUI FIXO, E PORQUÊ ────────────────────────────────────────
+ * ── QUEM ASSINA: QUEM ENVIOU, COM A CASA COMO RECURSO ─────────────────────
  *
- * O nome e o cargo são da CASA, não de quem tem a sessão iniciada. É sempre a
- * mesma pessoa a assinar, independentemente de quem carregou no botão — é uma
- * assinatura de empresa, não um crachá de utilizador.
+ * Era fixo — assinava sempre «Catarina Gaspar», saísse o email de quem saísse.
+ * Fazia sentido quando havia uma conta; com várias (`admin-auth.ts`) deixou de
+ * fazer: quem escreve ao casal assina o que escreveu, e o casal responde a uma
+ * pessoa. O nome vem da sessão (ver `email-quem-assina.ts`), e o da casa é o
+ * recurso — para o correio que ninguém enviou à mão (a confirmação automática
+ * do formulário público) e para quando a sessão não traz nome.
+ *
+ * O CARGO continua a ser um só e é dela. Não acompanha outro nome: «Manager»
+ * debaixo do nome de outra pessoa é uma promoção inventada pelo software, e
+ * nenhum cargo é melhor do que um cargo falso. O dia em que as contas tiverem
+ * um campo `cargo` (`ADMIN_USERS`, no `admin-auth.ts`) é o dia em que isto
+ * deixa de ser preciso.
  *
  * Os CONTACTOS não estão escritos aqui: vêm do `SITE`/`MAIL_TO`. É de
  * propósito e não é zelo — a assinatura que ela usa hoje no telemóvel tem
@@ -58,9 +68,78 @@ import { EMAIL_LOGO_CID, emailLogoAttachment } from "./email-logo";
  * ela preferir o desenho ao peso.
  */
 
-/** Quem assina. Da casa, sempre a mesma — nunca de quem tem a sessão aberta. */
+/** Quem assina quando não há sessão com nome — e quem assina a protecção. */
 export const ASSINATURA_NOME = "Catarina Gaspar";
 export const ASSINATURA_CARGO = "Manager";
+
+/** Um nome não vai além disto na assinatura: cabe numa linha em qualquer ecrã. */
+const MAXIMO_NOME = 60;
+
+export interface QuemAssina {
+  /** O nome de quem tem a sessão iniciada. Vazio → assina a casa. */
+  nome?: string;
+  /**
+   * O nome de quem RECEBE. Não aparece em lado nenhum do email: existe só para
+   * a protecção abaixo poder comparar os dois.
+   */
+  destinatario?: string;
+}
+
+/**
+ * Dois nomes comparam-se sem acentos, sem maiúsculas e sem pontuação: «MÓNICA
+ * Teófilo», «monica teofilo» e «Mónica  Teófilo.» são a mesma pessoa, e a
+ * protecção não pode desfazer-se por causa de um acento que alguém não escreveu
+ * no formulário.
+ */
+function normalizarNome(v: unknown): string {
+  return String(v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * NENHUM EMAIL SAI ASSINADO COM O NOME DE QUEM O VAI LER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Saiu um email a uma cliente com duas assinaturas contraditórias, e uma delas
+ * era o nome DELA. A causa estava no corpo — um `{nome}` que ficou no rodapé de
+ * um modelo guardado no back office (ver `email-modelos.ts`), e portanto texto
+ * dela, não código nosso —, mas a regra vale à mesma e vale daqui para a
+ * frente: se o nome de quem assina for o nome de quem recebe, alguma coisa se
+ * trocou pelo caminho, e o que se faz nesse caso não é adivinhar — é assinar a
+ * casa, que nunca está errada, e deixar rasto.
+ *
+ * O rasto NÃO leva os nomes. O `log.warn` acaba no webhook de alertas
+ * (`logger.ts`), que serializa o contexto para dentro de um `fetch`: o nome de
+ * uma cliente não sai daqui para fora por causa de um aviso. Saber que
+ * aconteceu, e em que envio, chega para ir ver.
+ */
+export function assinanteDoEmail(quem: QuemAssina = {}): { nome: string; cargo: string } {
+  const daCasa = { nome: ASSINATURA_NOME, cargo: ASSINATURA_CARGO };
+
+  const candidato = String(quem.nome ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAXIMO_NOME);
+  if (!candidato) return daCasa;
+
+  const destinatario = normalizarNome(quem.destinatario);
+  if (destinatario && destinatario === normalizarNome(candidato)) {
+    log.warn("assinatura: o nome de quem envia era igual ao do destinatário — assinou a casa");
+    return daCasa;
+  }
+
+  // O cargo é dela e só acompanha o nome dela — incluindo quando a conta se
+  // chama só «Catarina» e a assinatura da casa é «Catarina Gaspar».
+  const nome = normalizarNome(candidato);
+  const casa = normalizarNome(ASSINATURA_NOME);
+  const ehDaCasa = nome === casa || casa.startsWith(`${nome} `);
+  return { nome: candidato, cargo: ehDaCasa ? ASSINATURA_CARGO : "" };
+}
 
 /**
  * ── O BANNER FOI-SE, E NÃO VOLTA POR SE LARGAR UM FICHEIRO ────────────────
@@ -120,12 +199,24 @@ const LIGACAO = "#1155cc";
  * abrir a porta a um email com um `<img>` a apontar para um anexo que ficou
  * para trás — uma cruz vermelha na caixa de correio do cliente.
  */
-export function assinaturaDeEmail(): { html: string; texto: string; anexos: Attachment[] } {
+export function assinaturaDeEmail(quem: QuemAssina = {}): {
+  html: string;
+  texto: string;
+  anexos: Attachment[];
+} {
+  const assinante = assinanteDoEmail(quem);
   const redes = redesConfiguradas();
   const dominio = SITE.url.replace(/^https?:\/\//, "");
 
   const ligacao = (href: string, texto: string) =>
     `<a class="em-link" href="${esc(href)}" style="color:${LIGACAO};text-decoration:underline">${esc(texto)}</a>`;
+
+  // Sem cargo NÃO se escreve a linha — um `<div>` vazio deixa na mesma um
+  // degrau de espaço por baixo do nome, e um degrau que só aparece a algumas
+  // pessoas é do género de defeito que ninguém consegue descrever ao telefone.
+  const linhaCargo = assinante.cargo
+    ? `<div class="em-muted" style="color:${CINZA};font-size:13px;font-style:italic;mso-line-height-rule:exactly;line-height:19px">${esc(assinante.cargo)}</div>`
+    : "";
 
   const linhaRedes = redes.length
     ? `<tr><td style="padding-top:12px">${redes
@@ -143,8 +234,8 @@ export function assinaturaDeEmail(): { html: string; texto: string; anexos: Atta
     <img src="cid:${EMAIL_LOGO_CID}" alt="Líquen Events" width="96" height="48" style="display:block;width:96px;height:48px;border:0">
   </td></tr>
   <tr><td style="padding-top:14px">
-    <div class="em-strong" style="color:${TINTA};font-size:15px;font-weight:700;mso-line-height-rule:exactly;line-height:20px">${esc(ASSINATURA_NOME)}</div>
-    <div class="em-muted" style="color:${CINZA};font-size:13px;font-style:italic;mso-line-height-rule:exactly;line-height:19px">${esc(ASSINATURA_CARGO)}</div>
+    <div class="em-strong" style="color:${TINTA};font-size:15px;font-weight:700;mso-line-height-rule:exactly;line-height:20px">${esc(assinante.nome)}</div>
+    ${linhaCargo}
   </td></tr>
   <tr><td style="padding-top:12px">
     <div style="mso-line-height-rule:exactly;line-height:21px"><a class="em-strong" href="tel:${esc(SITE.phone)}" style="color:${TINTA};text-decoration:none;font-size:13px;white-space:nowrap">${esc(SITE.phoneDisplay)}</a></div>
@@ -159,8 +250,8 @@ export function assinaturaDeEmail(): { html: string; texto: string; anexos: Atta
   // muito é, por si só, um sinal de spam.
   const texto = [
     "--",
-    ASSINATURA_NOME,
-    ASSINATURA_CARGO,
+    assinante.nome,
+    ...(assinante.cargo ? [assinante.cargo] : []),
     SITE.name,
     "",
     SITE.phoneDisplay,
@@ -193,12 +284,21 @@ export function assinaturaDeEmail(): { html: string; texto: string; anexos: Atta
  * `attachments` devolvidos, em vez de os substituir — substituí-los deixava o
  * logótipo de fora e punha uma cruz vermelha no email.
  */
-export function emailAoCliente({ html, texto }: { html: string; texto: string }): {
+export function emailAoCliente({
+  html,
+  texto,
+  quem,
+}: {
+  html: string;
+  texto: string;
+  /** Quem envia (e quem recebe, para a protecção). Ausente → assina a casa. */
+  quem?: QuemAssina;
+}): {
   html: string;
   text: string;
   attachments: Attachment[];
 } {
-  const assinatura = assinaturaDeEmail();
+  const assinatura = assinaturaDeEmail(quem);
   return {
     html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:${TINTA}">
 ${html}

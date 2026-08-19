@@ -4,6 +4,7 @@ import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
+import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
 
@@ -123,9 +124,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // assinatura vêm do `emailAoCliente`, que é a mesma para todo o correio que
     // sai daqui para fora. O rodapé escrito à mão que aqui estava era uma de
     // cinco cópias da mesma linha.
+    // Quem assina é quem escreveu — este é o mais pessoal do correio que sai
+    // daqui. O nome do cliente vai para a protecção, não para o email.
     const email = emailAoCliente({
       html: `<p style="font-size:14px;line-height:1.7;color:#2a2620;white-space:pre-wrap">${esc(message)}</p>`,
       texto: message,
+      quem: { nome: nomeDeQuemEnvia(request), destinatario: quote.name },
     });
 
     /**
