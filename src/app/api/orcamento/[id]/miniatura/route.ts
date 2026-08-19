@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/supabase";
-import { miniaturaAPedido } from "@/lib/derivadas";
+import { miniaturaAPedidoComMotivo } from "@/lib/derivadas";
 import { ehRefDeTema } from "@/lib/theme-ref";
 import { log } from "@/lib/logger";
 
@@ -51,20 +51,39 @@ export const maxDuration = 30;
  * guardada — sem `sharp` nenhum.
  *
  * ── O QUE ACONTECE QUANDO NÃO DÁ ──────────────────────────────────────────
- * 404, e mais nada. A célula tem plano B (`useFotoComPlanoB`) e cai para o
- * original — que é exactamente o comportamento de antes desta rota existir.
- * Um erro aqui nunca pode ser uma foto que desaparece.
+ * 404 — e o 404 FICA. A célula tem plano B (`useFotoComPlanoB`) e cai para o
+ * original, que é exactamente o comportamento de antes desta rota existir. Um
+ * erro aqui nunca pode ser uma foto que desaparece.
+ *
+ * O QUE NÃO FICA É O SILÊNCIO. Este endereço é o URL PRINCIPAL de todas as
+ * fotografias sem miniatura guardada (o `/assets` devolve-o em `thumbUrl`), e
+ * era «404, e mais nada» para seis avarias com resoluções diferentes. Quando
+ * o plano B também não vem — foi o que aconteceu em produção, com a política
+ * de segurança a recusar o Storage —, a única coisa que sobrava no mundo era
+ * uma célula a dizer «não consegui mostrá-la». Do lado do servidor, nada.
+ *
+ * Por isso toda a recusa leva agora `X-Motivo` e fica registada. O cabeçalho
+ * está no `curl -I` de quem investiga e nos registos da plataforma; o ecrã não
+ * muda de comportamento com ele, que é como tem de ser.
  */
+/** A recusa, com o motivo onde quem investiga o encontra. */
+function recusa(motivo: string, mensagem: string, estado: number): NextResponse {
+  return NextResponse.json(
+    { error: mensagem, motivo },
+    { status: estado, headers: { "X-Motivo": motivo } },
+  );
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    return recusa("sem-sessao", "Não autorizado", 401);
   }
   if (!isDatabaseConfigured()) {
-    return NextResponse.json({ error: "Armazenamento indisponível." }, { status: 503 });
+    return recusa("sem-storage", "Armazenamento indisponível.", 503);
   }
   const { id } = await params;
   const ref = request.nextUrl.searchParams.get("ref") ?? "";
-  if (!ref) return NextResponse.json({ error: "Falta o `ref`." }, { status: 400 });
+  if (!ref) return recusa("sem-ref", "Falta o `ref`.", 400);
 
   /**
    * O GUARDA: uma sessão de admin não é autorização para ler a pasta de
@@ -80,16 +99,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "");
   const daBiblioteca: boolean = ehRefDeTema(ref);
   if (!daBiblioteca && !ref.startsWith(`${safeId}/`)) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+    return recusa("fora-do-pedido", "Não autorizado", 403);
   }
   if (ref.includes("..")) {
-    return NextResponse.json({ error: "Caminho inválido." }, { status: 400 });
+    return recusa("caminho-invalido", "Caminho inválido.", 400);
   }
 
   try {
-    const bytes = await miniaturaAPedido(ref);
+    const { bytes, motivo, detalhe } = await miniaturaAPedidoComMotivo(ref);
     // «Não deu» não é erro do lado dela: a célula cai para o original sozinha.
-    if (!bytes) return new NextResponse(null, { status: 404 });
+    // Mas passa a ficar DITO qual das causas foi — no cabeçalho, para quem
+    // estiver a olhar para a rede, e nos registos, para quem só lá chega no dia
+    // seguinte.
+    if (!bytes) {
+      log.warn("miniatura: não foi servida", { id, ref, motivo, detalhe });
+      return new NextResponse(null, { status: 404, headers: { "X-Motivo": motivo } });
+    }
     return new NextResponse(new Uint8Array(bytes), {
       status: 200,
       headers: {
@@ -101,7 +126,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
     });
   } catch (e) {
-    log.error("miniatura: falhou", e, { id });
-    return new NextResponse(null, { status: 404 });
+    log.error("miniatura: falhou", e, { id, ref });
+    return new NextResponse(null, {
+      status: 404,
+      headers: { "X-Motivo": "avaria-inesperada" },
+    });
   }
 }

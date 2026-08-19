@@ -295,26 +295,73 @@ async function gerarUma(
  * chama cai para o original, que é o comportamento de sempre.
  */
 export async function miniaturaAPedido(caminho: string): Promise<Buffer | null> {
+  return (await miniaturaAPedidoComMotivo(caminho)).bytes;
+}
+
+/**
+ * ── PORQUE É QUE ISTO PASSOU A DIZER O MOTIVO ─────────────────────────────
+ *
+ * Este endereço é o URL PRINCIPAL de todas as fotografias que ainda não têm
+ * miniatura guardada: é ele que o `/assets` devolve em `thumbUrl` (ver
+ * `miniaturaAPedidoUrl`). Um `null` seco daqui vira um 404 na rota, a célula
+ * cai para o original e — se esse também não vier — o ecrã diz «Imagem
+ * guardada / Não consegui mostrá-la neste ecrã» e mais nada.
+ *
+ * Era isso que estava: seis avarias diferentes — sem Storage, caminho
+ * inválido, o original que já não lá está, o Storage sem responder, o `sharp`
+ * sem a sua biblioteca nativa — todas indistinguíveis, todas caladas. Em
+ * produção isso custou um dia a diagnosticar.
+ *
+ * O 404 FICA: é ele que faz a célula ter plano B, e uma derivada é por
+ * definição descartável. O que muda é o silêncio.
+ */
+export type MotivoDaMiniatura =
+  | "ok"
+  | "sem-storage"
+  | "caminho-invalido"
+  | "original-em-falta"
+  | "storage-sem-resposta"
+  | "sharp-falhou";
+
+export interface ResultadoDaMiniatura {
+  bytes: Buffer | null;
+  motivo: MotivoDaMiniatura;
+  /** O que o Storage ou o `sharp` disseram, para os registos. Nunca para o ecrã. */
+  detalhe?: string;
+}
+
+export async function miniaturaAPedidoComMotivo(caminho: string): Promise<ResultadoDaMiniatura> {
   const sb = getSupabase();
-  if (!sb || !caminho) return null;
+  if (!sb || !caminho) return { bytes: null, motivo: "sem-storage" };
   const daBiblioteca = ehRefDeTema(caminho);
   const origem = daBiblioteca ? THEME_BUCKET : PROPOSAL_BUCKET;
   const destino = daBiblioteca ? THEME_THUMB_BUCKET : PROPOSAL_THUMB_BUCKET;
   const chave = daBiblioteca ? caminhoDoRefDeTema(caminho) : caminho;
-  if (!chave || chave.includes("..")) return null;
+  if (!chave || chave.includes("..")) return { bytes: null, motivo: "caminho-invalido" };
 
   // Já lá está? É o caso normal a partir da segunda vez, e custa um download em
   // vez de um download + um `sharp` + um upload.
   try {
     const { data } = await sb.storage.from(destino).download(chave);
-    if (data) return Buffer.from(await data.arrayBuffer());
+    if (data) return { bytes: Buffer.from(await data.arrayBuffer()), motivo: "ok" };
   } catch {
     /* segue para gerar */
   }
 
   try {
     const { data, error } = await sb.storage.from(origem).download(chave);
-    if (error || !data) return null;
+    if (error || !data) {
+      // Duas coisas diferentes com a mesma cara, e com resoluções opostas: o
+      // ficheiro que já não está no bucket, e o Storage que não respondeu. A
+      // primeira é uma foto a recuperar; a segunda é um projecto em pausa.
+      const dito = error?.message ?? "sem dados";
+      const semResposta = /fetch failed|network|timeout|ENOTFOUND|ECONNREFUSED/i.test(dito);
+      return {
+        bytes: null,
+        motivo: semResposta ? "storage-sem-resposta" : "original-em-falta",
+        detalhe: dito,
+      };
+    }
     const bytes = Buffer.from(await data.arrayBuffer());
     // Os MESMOS números do lote e do navegador (`image-worker.ts`): uma
     // miniatura fabricada aqui tem de ser indistinguível de uma fabricada lá,
@@ -345,9 +392,13 @@ export async function miniaturaAPedido(caminho: string): Promise<Buffer | null> 
     } else {
       await uploadProposalThumb(chave, derivada, "image/jpeg");
     }
-    return derivada;
+    return { bytes: derivada, motivo: "ok" };
   } catch (e) {
-    log.warn("derivadas: miniatura a pedido falhou", { caminho: chave, erro: String(e) });
-    return null;
+    // Chegar aqui é quase sempre o `sharp`: o download já respondeu acima. É a
+    // mesma avaria que deitou /api/temas abaixo (o `.so` do libvips que não
+    // viaja com a função), e por isso tem nome próprio em vez de um `null`.
+    const dito = e instanceof Error ? e.message : String(e);
+    log.warn("derivadas: miniatura a pedido falhou", { caminho: chave, erro: dito });
+    return { bytes: null, motivo: "sharp-falhou", detalhe: dito.slice(0, 300) };
   }
 }
