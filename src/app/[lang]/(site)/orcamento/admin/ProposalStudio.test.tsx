@@ -184,6 +184,27 @@ function reply(body: {
 
 /** O que a rota `proposta-doc` devolve neste teste (pré-visualização e envio). */
 let propostaDoc: Response = reply({ headers: {}, json: { ok: true, emailed: true } });
+/**
+ * O RASCUNHO DO EMAIL que o servidor prepara para o passo 3.
+ *
+ * `null` = a rota falha (409, rede em baixo): o painel do email mostra a frase
+ * e o envio segue sem corpo, exactamente como antes deste ecrã existir.
+ */
+let rascunhoDoEmail: Record<string, unknown> | null = {
+  rascunho: {
+    chave: "registo-formal",
+    nome: "Registo formal",
+    assunto: "A vossa proposta — Líquen Events",
+    texto: "Olá Maria & Zé,\n\nSegue a proposta: {{link_proposta}}",
+    origem: "guardado",
+    avisos: [],
+  },
+  porPreencher: [],
+  porOmissao: "registo-formal",
+  remetente: "Catarina Gaspar",
+  destinatario: { nome: "Maria & Zé", email: "cliente@exemplo.pt" },
+  modelos: [{ chave: "registo-formal", nome: "Registo formal", temEsteIdioma: true }],
+};
 /** O rascunho que o SERVIDOR tem guardado (null = não tem nenhum). */
 let rascunhoServidor: { doc: unknown; updatedAt: string } | null = null;
 /**
@@ -241,6 +262,16 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
   const metodo = init?.method ?? "GET";
   pedidos.push({ url, init });
   if (url.includes("proposta-doc")) return propostaDoc;
+  // Antes do `proposta-rascunho`: os dois têm «rascunho» no nome.
+  if (url.includes("email-rascunho")) {
+    return rascunhoDoEmail
+      ? reply({ json: rascunhoDoEmail })
+      : reply({
+          ok: false,
+          status: 409,
+          json: { error: "Não há nenhum modelo «registo-formal»." },
+        });
+  }
   if (url.includes("proposta-rascunho")) {
     // A leitura RESPONDE, mesmo quando não há rascunho nenhum — «não há» é uma
     // resposta e é diferente de «não se conseguiu perguntar». É essa diferença
@@ -297,6 +328,21 @@ beforeEach(() => {
   gravacaoDoRascunho = () =>
     reply({ json: { ok: true, guardado: true, updatedAt: new Date().toISOString() } });
   leituraDoRascunhoFalha = false;
+  rascunhoDoEmail = {
+    rascunho: {
+      chave: "registo-formal",
+      nome: "Registo formal",
+      assunto: "A vossa proposta — Líquen Events",
+      texto: "Olá Maria & Zé,\n\nSegue a proposta: {{link_proposta}}",
+      origem: "guardado",
+      avisos: [],
+    },
+    porPreencher: [],
+    porOmissao: "registo-formal",
+    remetente: "Catarina Gaspar",
+    destinatario: { nome: "Maria & Zé", email: "cliente@exemplo.pt" },
+    modelos: [{ chave: "registo-formal", nome: "Registo formal", temEsteIdioma: true }],
+  };
   versoesServidor = [];
   docsDeVersao = {};
   propostasServidor = [];
@@ -3802,7 +3848,12 @@ describe("a mensagem pessoal que segue com a proposta", () => {
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
-    expect(screen.getByText(/assinatura da Líquen/i)).toBeTruthy();
+    // A frase é a da AJUDA DESTA CAIXA e não uma qualquer no ecrã: o passo
+    // «Enviar» ganhou o painel do email, que também diz — e bem — que a
+    // assinatura da casa entra sozinha. Sem este aperto, o teste passava a ser
+    // verdadeiro por causa do painel do lado e deixava de guardar esta caixa.
+    const ajuda = caixa().getAttribute("aria-describedby");
+    expect(document.getElementById(ajuda ?? "")?.textContent).toMatch(/assinatura da Líquen/i);
   });
 
   /**
@@ -4998,5 +5049,106 @@ describe("o estúdio no telemóvel: fotos, acções e descrições", () => {
     const antes = leituras();
     await userEvent.click(botao);
     await waitFor(() => expect(leituras()).toBeGreaterThan(antes));
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O EMAIL QUE ELA LÊ NO ECRÃ É O EMAIL QUE SAI
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel do email (`EmailDoEnvio`) prepara o texto; é o ESTÚDIO que o envia.
+ * Estes testes prendem essa junta — a que não se vê em nenhum dos dois lados
+ * sozinho: o que está na caixa quando ela carrega em Enviar é o que viaja, e
+ * quando não há texto nenhum o envio é byte a byte o de antes deste ecrã.
+ */
+describe("o email do passo 3 viaja com o envio", () => {
+  const caixaDoEmail = () => screen.getByLabelText("Texto do email") as HTMLTextAreaElement;
+
+  function envio(): Record<string, unknown> {
+    return JSON.parse(corpos("proposta-doc", "POST").at(-1) ?? "{}");
+  }
+
+  async function irParaEnviar(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+  }
+
+  async function enviar(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+  }
+
+  it("o texto que está na caixa é o que segue, com o assunto e o modelo", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaEnviar(user);
+    await waitFor(() => expect(caixaDoEmail().value).toContain("Olá Maria & Zé,"));
+    await enviar(user);
+
+    await waitFor(() => expect(envio().mode).toBe("send"));
+    expect(envio().corpo).toContain("Olá Maria & Zé,");
+    expect(envio().assunto).toBe("A vossa proposta — Líquen Events");
+    // A chave do modelo vai para a CÓPIA do envio — não escolhe texto nenhum.
+    expect(envio().modelo).toBe("registo-formal");
+  });
+
+  it("o que ela reescreve é o que viaja", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaEnviar(user);
+    await waitFor(() => expect(caixaDoEmail().value).toContain("Olá"));
+    await user.clear(caixaDoEmail());
+    await user.type(caixaDoEmail(), "Escrevi isto à mão.");
+    await enviar(user);
+
+    await waitFor(() => expect(envio().corpo).toBe("Escrevi isto à mão."));
+  });
+
+  /**
+   * CONTROLO POSITIVO das duas ausências abaixo: os testes acima provam que o
+   * campo VIAJA quando há texto. Sem rascunho preparado, o pedido tem de sair
+   * exactamente como saía antes deste ecrã existir — uma rota que passasse a
+   * EXIGIR o corpo partia tudo o que já a chama.
+   */
+  it("sem texto preparado, o envio não leva corpo nenhum", async () => {
+    rascunhoDoEmail = null;
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaEnviar(user);
+    await waitFor(() => expect(screen.getByText(/Não há nenhum modelo/)).toBeTruthy());
+    await enviar(user);
+
+    await waitFor(() => expect(envio().mode).toBe("send"));
+    expect(envio()).not.toHaveProperty("corpo");
+    expect(envio()).not.toHaveProperty("assunto");
+  });
+
+  /**
+   * Com o texto editável, o que segue é o TEXTO. Uma nota pessoal que não
+   * apareça lá dentro não chega ao casal — e ela via-a no ecrã, escrita.
+   */
+  it("avisa quando a nota pessoal não está no texto do email", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaEnviar(user);
+    await waitFor(() => expect(caixaDoEmail().value).toContain("Olá"));
+    await user.type(screen.getByLabelText("Mensagem para o cliente"), "Foi um gosto conhecer-vos.");
+    expect(await screen.findByText(/Esta nota não aparece no texto do email/)).toBeTruthy();
+  });
+
+  /** O controlo positivo do aviso acima: escrita DENTRO do texto, cala-se. */
+  it("não avisa quando a nota está lá dentro", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaEnviar(user);
+    await waitFor(() => expect(caixaDoEmail().value).toContain("Olá"));
+    await user.type(caixaDoEmail(), " Foi um gosto conhecer-vos.");
+    await user.type(screen.getByLabelText("Mensagem para o cliente"), "Foi um gosto conhecer-vos.");
+    expect(screen.queryByText(/Esta nota não aparece no texto do email/)).toBeNull();
   });
 });

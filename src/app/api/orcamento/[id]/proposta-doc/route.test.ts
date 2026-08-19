@@ -122,6 +122,15 @@ vi.mock("@/lib/mail", () => ({
       .replace(/'/g, "&#39;"),
   MAIL_TO: "team@example.com",
 }));
+/**
+ * A CÓPIA DO QUE SEGUIU.
+ *
+ * Duplo e não o verdadeiro: o verdadeiro escreve no `app_state` (base de
+ * dados). O que interessa aqui é o QUE se guarda — e que se guarda só depois de
+ * o correio ter sido aceite.
+ */
+const copia = vi.hoisted(() => ({ registar: vi.fn(async () => ({ gravado: true })) }));
+vi.mock("@/lib/envios-de-proposta", () => ({ registarEnvio: copia.registar }));
 
 import { GET, POST } from "./route";
 import { sendMail } from "@/lib/mail";
@@ -1546,5 +1555,166 @@ describe("GET /api/orcamento/[id]/proposta-doc — o link da última proposta RE
     // uma só.
     expect(body.ok).toBe(true);
     expect(typeof body.acceptUrl).toBe("string");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ECRÃ DE ENVIO CHEGA À ROTA: O LINK, O ASSUNTO E A CÓPIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O corpo passou a vir de uma caixa, e o rascunho que a enche traz lá dentro o
+ * `{{link_proposta}}` — o marcador que não pode ser resolvido antes de a
+ * proposta existir (ver `email-ligacao-reservada.ts`). Estes testes prendem os
+ * três fios que faltavam atar: o marcador vira endereço, o assunto que ela viu
+ * é o assunto que sai, e o que seguiu fica guardado.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — o que vem do ecrã de envio", () => {
+  const modeloGuardado = (subject: string, body: string) => ({
+    key: "proposta-enviada",
+    name: "Proposta enviada",
+    subject,
+    body,
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+  const enviado = () =>
+    vi.mocked(sendMail).mock.calls.at(-1)![0] as unknown as {
+      subject: string;
+      html: string;
+      text: string;
+      attachments?: { filename: string }[];
+    };
+
+  it("o {{link_proposta}} do rascunho vira o endereço assinado desta proposta", async () => {
+    await POST(
+      sendReq(baseDoc({ totalAmount: 3000 }), {
+        corpo: "Olá Maria & Zé,\n\nA proposta está aqui: {{link_proposta}}\n\nAté já.",
+      }),
+      { params },
+    );
+    const email = enviado();
+    expect(email.text).toContain("https://liquen-events.com/proposta/tok");
+    expect(email.text).not.toContain("{{link_proposta}}");
+    expect(email.html).not.toContain("link_proposta");
+  });
+
+  /** Todas as ocorrências: um segundo marcador por trocar era o «Olá ,» desta
+   *  funcionalidade com outro nome. */
+  it("troca o marcador em todas as ocorrências, não só na primeira", async () => {
+    await POST(
+      sendReq(baseDoc({ totalAmount: 3000 }), {
+        corpo: "Aqui: {{link_proposta}}\n\nE outra vez: {{link_proposta}}",
+      }),
+      { params },
+    );
+    expect(enviado().text.match(/liquen-events\.com\/proposta\/tok/g)).toHaveLength(2);
+  });
+
+  /**
+   * CONTROLO POSITIVO da afirmação de ausência acima: um corpo SEM marcador
+   * nenhum não pode ganhar um link que ninguém pediu — é o caminho de todos os
+   * envios anteriores a este ecrã existir.
+   */
+  it("um corpo sem marcador não ganha link nenhum", async () => {
+    await POST(
+      sendReq(baseDoc({ totalAmount: 3000 }), { corpo: "Olá,\n\nFalamos amanhã ao telefone." }),
+      { params },
+    );
+    expect(enviado().text).toContain("Falamos amanhã ao telefone.");
+    // A moldura da casa continua a fechar o email, e só ela é que traz endereços.
+    expect(enviado().html).not.toContain("/proposta/tok");
+  });
+
+  it("o assunto que ela viu no ecrã é o assunto que sai", async () => {
+    modelo.get.mockResolvedValue(modeloGuardado("O assunto do modelo", "<p>Texto do modelo.</p>"));
+    await POST(
+      sendReq(baseDoc({ totalAmount: 3000 }), {
+        corpo: "Escrevi isto à mão.",
+        assunto: "A vossa proposta — Líquen Events",
+      }),
+      { params },
+    );
+    expect(enviado().subject).toBe("A vossa proposta — Líquen Events");
+  });
+
+  /** O assunto anda com o corpo. Sozinho não conta: seria reescrever a linha
+   *  de assunto de um email cujo texto ninguém tinha visto. */
+  it("um assunto sem corpo não muda nada", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { assunto: "Um assunto qualquer" }), {
+      params,
+    });
+    expect(enviado().subject).toBe("Proposta para o seu evento — Líquen Events");
+  });
+
+  it("um assunto com uma quebra de linha não abre um cabeçalho novo", async () => {
+    await POST(
+      sendReq(baseDoc({ totalAmount: 3000 }), {
+        corpo: "Escrevi isto à mão.",
+        assunto: "Proposta\nBcc: outro@exemplo.pt",
+      }),
+      { params },
+    );
+    expect(enviado().subject).not.toContain("\n");
+    expect(enviado().subject).toBe("Proposta Bcc: outro@exemplo.pt");
+  });
+
+  it("guarda a cópia do que seguiu: para quem, de que modelo, com que texto e que anexo", async () => {
+    await POST(
+      sendReq(baseDoc({ totalAmount: 3000 }), {
+        corpo: "Olá Maria & Zé,\n\nA proposta está aqui: {{link_proposta}}",
+        assunto: "A vossa proposta",
+        modelo: "registo-formal",
+      }),
+      { params },
+    );
+    expect(copia.registar).toHaveBeenCalledTimes(1);
+    const [pedido, envio] = copia.registar.mock.calls[0] as unknown as [
+      string,
+      Record<string, string> & { anexo?: { nome: string; bytes: number } },
+    ];
+    expect(pedido).toBe("q1");
+    expect(envio.para).toBe("cliente@example.com");
+    expect(envio.modelo).toBe("registo-formal");
+    expect(envio.idioma).toBe("pt");
+    expect(envio.assunto).toBe("A vossa proposta");
+    // O corpo TAL E QUAL, já com a ligação resolvida — é o que se quer reler
+    // daqui a três semanas.
+    expect(envio.texto).toContain("Olá Maria & Zé,");
+    expect(envio.texto).toContain("https://liquen-events.com/proposta/tok");
+    expect(envio.texto).not.toContain("{{link_proposta}}");
+    expect(envio.anexo?.nome).toContain(".pdf");
+    expect(envio.anexo?.bytes).toBeGreaterThan(0);
+    expect(typeof envio.enviadoEm).toBe("string");
+    expect(envio.propostaId).toBeTruthy();
+  });
+
+  /**
+   * A cópia é do que SAIU. Sem correio aceite não há nada para copiar — e uma
+   * linha a dizer que seguiu era a mesma mentira do estado «enviada» que esta
+   * rota já corrigiu noutro sítio.
+   *
+   * O teste acima é o CONTROLO POSITIVO desta ausência: com o mesmo pedido e o
+   * correio a funcionar, a cópia é gravada uma vez.
+   */
+  it("não guarda cópia nenhuma quando o email não saiu", async () => {
+    vi.mocked(sendMail).mockResolvedValueOnce({ sent: false } as never);
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { corpo: "Escrevi isto à mão." }), {
+      params,
+    });
+    expect(copia.registar).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A cópia NÃO É RASTREIO, e a maneira de isso não escorregar é a cópia não
+   * poder deitar o envio abaixo: quando ela falha, o email já saiu.
+   */
+  it("uma falha a guardar a cópia não estraga um envio que já aconteceu", async () => {
+    copia.registar.mockRejectedValueOnce(new Error("app_state em baixo") as never);
+    const res = await POST(
+      sendReq(baseDoc({ totalAmount: 3000 }), { corpo: "Escrevi isto à mão." }),
+      { params },
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).emailed).toBe(true);
   });
 });

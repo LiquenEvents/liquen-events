@@ -713,6 +713,32 @@ body {
 body {
   overflow-x: clip;
 }
+/* ── E A REDE PRECISAVA DE UM NÓ ────────────────────────────────────────────
+   `overflow: clip` só existe no Safari a partir do 16. Num iPhone mais antigo
+   a declaração é INVÁLIDA e o browser deita-a fora inteira — não fica `clip`,
+   não fica `hidden`, não fica nada. A rede de segurança simplesmente não
+   existe nesses aparelhos, e qualquer coisa que passe da margem passa a poder
+   ser arrastada para o lado: o conteúdo encosta-se, e ao lado fica uma folha
+   branca.
+
+   Foi assim que ela o viu, e foi por isso que eu não o vi: o Chromium suporta
+   `clip`, e num Chromium a mesma página mede 390 px de largura em 390 px de
+   ecrã, com zero elementos a passar a margem — medido a 320, 360, 375 e 390.
+
+   O `hidden` faz o mesmo trabalho e é entendido em todo o lado. Não é ele o
+   escolhido acima por uma razão real: `overflow: hidden` no `body` cria um
+   contentor de scroll e estraga o `position: sticky` de quem esteja dentro.
+   Por isso entra SÓ onde o `clip` não chega — nos aparelhos onde a alternativa
+   não era `sticky` a funcionar, era rede nenhuma.
+
+   Isto trata o sintoma e assume-se como tal: o que passa da margem no aparelho
+   dela ainda não está identificado, porque não se reproduz aqui. Enquanto não
+   estiver, é melhor a página não se deixar arrastar. */
+@supports not (overflow-x: clip) {
+  body {
+    overflow-x: hidden;
+  }
+}
 /* Tactile feedback on touch devices (there's no hover to rely on) */
 @media (hover: none) and (pointer: coarse) {
   a:active,

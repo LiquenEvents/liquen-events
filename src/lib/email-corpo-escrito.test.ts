@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  assuntoEscritoAMao,
   corpoEscritoAMao,
   excedeOTecto,
+  MAXIMO_ASSUNTO_ESCRITO,
   MAXIMO_CORPO_ESCRITO,
   paragrafosDeTexto,
 } from "./email-corpo-escrito";
@@ -81,5 +83,55 @@ describe("paragrafosDeTexto", () => {
   it("é o mesmo tratamento, para quem só quer o markup", () => {
     expect(paragrafosDeTexto("Olá.")).toContain("<p ");
     expect(paragrafosDeTexto("")).toBe("");
+  });
+});
+
+describe("assuntoEscritoAMao", () => {
+  it("devolve o assunto tal e qual quando é uma frase normal", () => {
+    expect(assuntoEscritoAMao("A vossa proposta — Líquen Events")).toBe(
+      "A vossa proposta — Líquen Events",
+    );
+  });
+
+  /**
+   * A ausência é o estado NORMAL: um envio sem assunto editado tem de sair
+   * exactamente como saía antes desta caixa existir.
+   *
+   * CONTROLO POSITIVO na primeira linha — sem ele, uma função que devolvesse
+   * `null` a tudo passava neste teste com louvor.
+   */
+  it("vazio, só espaços, ou o que não é texto: null", () => {
+    expect(assuntoEscritoAMao("Proposta")).toBe("Proposta"); // controlo positivo
+    expect(assuntoEscritoAMao("")).toBeNull();
+    expect(assuntoEscritoAMao("   \n  ")).toBeNull();
+    expect(assuntoEscritoAMao(undefined)).toBeNull();
+    expect(assuntoEscritoAMao(42)).toBeNull();
+    expect(assuntoEscritoAMao({ assunto: "Proposta" })).toBeNull();
+  });
+
+  /**
+   * ── A QUEBRA DE LINHA NUM ASSUNTO NÃO É UMA QUEBRA DE LINHA ──────────────
+   *
+   * É o fim do cabeçalho `Subject:` e o princípio de outro qualquer. Um `\n`
+   * seguido de `Bcc:` num assunto que passasse tal e qual é uma cópia deste
+   * email para quem quer que a escreva.
+   */
+  it("colapsa as quebras de linha: o assunto sai numa linha só", () => {
+    const sujo = "Proposta\nBcc: outro@exemplo.pt\r\npara o vosso casamento";
+    const limpo = assuntoEscritoAMao(sujo)!;
+    expect(limpo).not.toContain("\n");
+    expect(limpo).not.toContain("\r");
+    expect(limpo).toBe("Proposta Bcc: outro@exemplo.pt para o vosso casamento");
+  });
+
+  it("tira as marcas invisíveis que sobrevivem ao escape", () => {
+    const limpo = assuntoEscritoAMao("Pro\u202Eposta\u0007")!;
+    expect(limpo).not.toMatch(SUJIDADE);
+    expect(limpo).toContain("Pro");
+  });
+
+  it("corta no tecto em vez de deixar passar um texto", () => {
+    const enorme = "a".repeat(MAXIMO_ASSUNTO_ESCRITO + 50);
+    expect(assuntoEscritoAMao(enorme)).toHaveLength(MAXIMO_ASSUNTO_ESCRITO);
   });
 });

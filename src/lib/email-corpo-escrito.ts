@@ -1,5 +1,6 @@
 import "server-only";
 import { esc } from "./mail";
+import { MAXIMO_ASSUNTO_ESCRITO, MAXIMO_CORPO_ESCRITO } from "./email-limites";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -51,7 +52,6 @@ import { esc } from "./mail";
  * impede que o corpo de um pedido faça passear megabytes por dentro do escape,
  * da geração do PDF e do SMTP.
  */
-export const MAXIMO_CORPO_ESCRITO = 10_000;
 
 /**
  * Marcas bidireccionais e caracteres de controlo. Sobrevivem ao `esc` — não são
@@ -128,3 +128,47 @@ export function corpoEscritoAMao(valor: unknown): CorpoEscrito | null {
   if (!html) return null;
   return { html, texto };
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ASSUNTO QUE VEM DO ECRÃ DE ENVIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O corpo passou a ser o que está na caixa; o ASSUNTO tinha ficado para trás —
+ * saía o do modelo «proposta-enviada» ou o da casa, mesmo quando o ecrã de
+ * envio mostrava o assunto de outro modelo. Duas linhas para o mesmo email, e a
+ * que o casal lê antes de abrir era a que não estava à vista.
+ *
+ * Anda SEMPRE com o corpo, e é uma condição e não uma coincidência: assunto e
+ * corpo vêm do mesmo rascunho, e aceitar um assunto solto era deixar reescrever
+ * a linha de assunto de um email cujo texto ninguém tinha visto.
+ *
+ * ── PORQUE É QUE ISTO COLAPSA AS QUEBRAS DE LINHA ─────────────────────────
+ *
+ * Um assunto é UM cabeçalho SMTP. Um `\n` lá dentro não é uma quebra de linha:
+ * é o fim do cabeçalho `Subject:` e o princípio de outro qualquer que quem
+ * escreveu decidir — um `Bcc:` incluído. É a razão por que aqui não basta o
+ * `limpar` (que deixa passar o `\n`, e bem, porque no CORPO as quebras dela são
+ * significado): num assunto colapsam-se todos em espaço, e o que sobra é uma
+ * linha só.
+ */
+
+/** Quanto assunto cabe. Uma caixa de correio mostra 60 a 80 caracteres; 200 dá
+ *  folga a quem escreva uma frase inteira sem deixar passar um texto. */
+
+/**
+ * O assunto escrito à mão, ou `null` quando não vem nenhum.
+ *
+ * `null` é o estado NORMAL — um envio sem assunto editado comporta-se como
+ * antes desta caixa existir. Vazio, só com espaços, ou de um tipo que não é
+ * texto: tudo `null`, nunca uma excepção.
+ */
+export function assuntoEscritoAMao(valor: unknown): string | null {
+  const numaLinha = limpar(valor).replace(/\s+/g, " ").trim();
+  if (!numaLinha) return null;
+  return numaLinha.slice(0, MAXIMO_ASSUNTO_ESCRITO);
+}
+
+// Reexportados para quem já os importava daqui: a regra continua a ser lida
+// de um sítio só (`email-limites.ts`), que é o que o browser também pode ler.
+export { MAXIMO_ASSUNTO_ESCRITO, MAXIMO_CORPO_ESCRITO };

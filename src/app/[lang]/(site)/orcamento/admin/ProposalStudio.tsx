@@ -53,6 +53,7 @@ import { relatarFalhaDeImagem } from "./relatar-falha";
 import { pedirVezDeImagemPesada, ESPERA_MAXIMA_MS } from "./fila-de-imagens";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
+import EmailDoEnvio from "./EmailDoEnvio";
 import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
 import PreviaDaPagina from "./PreviaDaPagina";
@@ -1307,6 +1308,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * ecrã do passo 3 seria uma perda a mais que a anulação não sabia desfazer.
    */
   const [mensagemAoCliente, setMensagemAoCliente] = useState("");
+  /**
+   * ── O EMAIL QUE VAI SAIR ─────────────────────────────────────────────────
+   *
+   * O corpo, o assunto e o modelo de que eles partem vivem AQUI e não dentro do
+   * `EmailDoEnvio`, por uma razão só: é este componente que carrega no botão, e
+   * o que se envia tem de ser o que está na caixa nesse instante. O ecrã do
+   * email preenche-os a partir do servidor e deixa-os editar; o `send` lê-os.
+   *
+   * Como a mensagem pessoal, não fazem parte do `doc`: são deste envio.
+   */
+  const [corpoDoEmail, setCorpoDoEmail] = useState("");
+  const [assuntoDoEmail, setAssuntoDoEmail] = useState("");
+  const [modeloDoEmail, setModeloDoEmail] = useState("");
+  /**
+   * Quantos bytes tinha o PDF da ÚLTIMA pré-visualização, para o ecrã do email
+   * poder confirmar o tamanho do anexo com um número medido em vez de estimado.
+   * `null` para quem foi direito ao passo 3 sem gerar nada — aí fica a
+   * estimativa, e diz-se que é uma estimativa.
+   */
+  const [bytesDoPdf, setBytesDoPdf] = useState<number | null>(null);
   /**
    * O link de aceitação da proposta MAIS RECENTE que saiu mesmo para o
    * cliente, para o botão «Copiar resumo». `null` até se saber que existe —
@@ -4461,6 +4482,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // A geração que acabou de acontecer ensina a próxima estimativa: quantas
       // fotos, quanto tempo, quantos bytes. Medido, não estimado.
       apontarGeracao(totalDeFotos, Date.now() - comecou, blob.size);
+      // …e o mesmo número serve o ecrã do email, que confirma o anexo antes de
+      // ele seguir: aqui é MEDIDO, e não a estimativa que se mostra sem isto.
+      setBytesDoPdf(blob.size);
       // Descarregar o PDF (anexo) em vez de abrir numa aba nova: a CSP do site
       // (object-src 'none', sem frame-src) bloqueia mostrar um blob:PDF numa aba
       // ou iframe, o que fazia "não acontecer nada". Um download nunca é
@@ -4566,6 +4590,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           // vazio a viajar. A mensagem acompanha ESTE envio; o documento que
           // fica guardado é o mesmo com ela ou sem ela.
           ...(mensagemAoCliente.trim() ? { mensagem: mensagemAoCliente.trim() } : {}),
+          /**
+           * ── O EMAIL QUE ELA LEU NO ECRÃ É O EMAIL QUE SAI ────────────────
+           *
+           * O corpo e o assunto viajam JUNTOS e só quando há corpo: é o par que
+           * veio do mesmo rascunho, e a rota recusa um assunto solto (ver o
+           * `assuntoEscritoAMao`). Sem corpo — um estúdio antigo, uma leitura do
+           * rascunho que falhou — nada disto vai e o email sai exactamente como
+           * saía: o modelo dela, ou o texto da casa.
+           *
+           * O `modelo` não escolhe texto nenhum. Vai para a CÓPIA do envio, para
+           * daqui a três semanas se saber de que texto é que este partiu.
+           */
+          ...(corpoDoEmail.trim()
+            ? {
+                corpo: corpoDoEmail,
+                ...(assuntoDoEmail.trim() ? { assunto: assuntoDoEmail } : {}),
+                ...(modeloDoEmail ? { modelo: modeloDoEmail } : {}),
+              }
+            : {}),
           // Só viaja quando é «sim»: um campo a dizer `false` em todos os
           // envios normais era um campo a mais a explicar a quem lesse a rota.
           ...(cortesConfirmados ? { cortesConfirmados: true } : {}),
@@ -7374,7 +7417,58 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     </span>
                   </p>
                 )}
+                {/* ── A NOTA QUE NÃO APARECE NO TEXTO ───────────────────────
+                    Com o email editável, o que segue é o TEXTO da caixa de
+                    baixo. Um modelo que cite a nota pessoal já a tem lá dentro
+                    (o rascunho resolve-a); um que não a cite deixa-a de fora,
+                    e a rota nem sequer a acrescenta — ganha o mais específico,
+                    que é o corpo escrito.
+
+                    Sem este aviso, ela escrevia a nota, via-a no ecrã, e o
+                    casal recebia um email sem ela. */}
+                {mensagemAoCliente.trim() &&
+                  corpoDoEmail.trim() &&
+                  !corpoDoEmail.includes(mensagemAoCliente.trim()) && (
+                    <p
+                      aria-live="polite"
+                      className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-[#8a6420]"
+                    >
+                      <span aria-hidden="true">⚠</span>
+                      <span>
+                        Esta nota não aparece no texto do email aqui em baixo — e é esse texto que
+                        segue. Escreve-a lá dentro, onde a quiseres.
+                      </span>
+                    </p>
+                  )}
               </div>
+
+              {/* ══════════════════════════════════════════════════════════
+                  O EMAIL, ANTES DE ALGUÉM CARREGAR EM ENVIAR
+                  ══════════════════════════════════════════════════════════
+
+                  Depois da mensagem (que é um dos dados de que o texto parte) e
+                  ANTES da conferência: a passagem de olhos do documento e a do
+                  email fazem-se seguidas, com o dedo já a caminho do botão.
+
+                  O `activo` existe porque este passo fica MONTADO enquanto se
+                  escreve o conteúdo — sem ele, cada tecla do passo 1 mandava
+                  uma leitura do rascunho para o servidor. */}
+              <EmailDoEnvio
+                quoteId={quote.id}
+                doc={doc as ProposalDoc}
+                idioma={idiomaDoPdf}
+                mensagem={mensagemAoCliente}
+                activo={step === "enviar"}
+                corpo={corpoDoEmail}
+                onCorpo={setCorpoDoEmail}
+                assunto={assuntoDoEmail}
+                onAssunto={setAssuntoDoEmail}
+                onModelo={setModeloDoEmail}
+                // Medido quando houve pré-visualização; estimado quando não —
+                // e o ecrã diz qual dos dois é.
+                bytesDoAnexo={bytesDoPdf ?? tamanhoEstimado(totalDeFotos, amostras)}
+                bytesMedidos={bytesDoPdf !== null}
+              />
               {/* As fotos a caminho têm a sua própria linha, e não a genérica
                   dos campos por preencher: aqui não há nada a fazer senão
                   esperar uns segundos — dizer-lhe para "preencher" seria
