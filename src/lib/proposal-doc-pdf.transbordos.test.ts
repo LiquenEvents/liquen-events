@@ -41,6 +41,27 @@ import type { IdiomaDaProposta } from "./proposal-doc-textos";
  * `paginacao.test.ts`, e é informação mais fiável do que a que se lê de volta
  * (as fontes vão em subconjunto e os glifos deixam de ser legíveis).
  *
+ * ── PORQUE É QUE ISTO NÃO É UM TESTE DE IMAGEM (B14) ──────────────────────
+ *
+ * Rasterizar as páginas e compará-las com uma referência aprovada apanharia
+ * duas coisas que os números não apanham: uma linha em cima de outra e uma cor
+ * errada. A primeira está aqui em baixo, medida das instruções de desenho e
+ * sem um único píxel ({@link sobreposicoesDe}); a segunda é uma constante do
+ * gerador, e lê-se do `drawText` como tudo o resto.
+ *
+ * O que sobrava não compensava o que custava:
+ *
+ * · as referências são imagens BINÁRIAS no repositório e teriam de ser
+ *   reaprovadas a cada mudança de composição — e a composição está a mudar
+ *   agora (o relatório tem uma dúzia de correcções tipográficas por fazer).
+ *   Uma bateria de imagens que se reaprova todas as semanas é uma bateria que
+ *   se reaprova sem olhar, e isso é pior do que não a ter;
+ * · a rasterização depende do ambiente (versão do libvips, do motor de fontes,
+ *   do processador). Um vermelho que só aparece no CI ensina a ignorar o CI;
+ * · e custa dez a vinte segundos por corrida, numa bateria que já demora.
+ *
+ * Fica escrito para não voltar a ser proposto sem estas três respostas.
+ *
  * ── A LISTA DE CONHECIDOS ─────────────────────────────────────────────────
  *
  * Dois defeitos do relatório (D2 e D3) vivem na COMPOSIÇÃO e ainda não têm
@@ -483,6 +504,53 @@ const conhecido = (t: Transbordo) =>
     (c) => c.porque === t.porque && c.onde === t.onde && t.texto.startsWith(c.comeca),
   );
 
+/**
+ * ── UMA LINHA POR CIMA DE OUTRA ───────────────────────────────────────────
+ *
+ * É o defeito que os números não apanham e que um teste de imagem apanharia:
+ * duas linhas desenhadas no mesmo sítio. Não é preciso rasterizar página
+ * nenhuma para o ver — duas caixas de texto que se cruzam são duas caixas de
+ * texto que se cruzam, e as caixas saem das mesmas medições de largura que o
+ * resto deste ficheiro usa.
+ *
+ * Compara-se linha a linha (já juntas, ver {@link linhasDe}), por página. O
+ * documento tem sítios onde duas coisas partilham a MESMA altura de propósito
+ * — o nome de uma rubrica à esquerda e o preço dela à direita, o rótulo de um
+ * total e o seu número — e esses não se cruzam: é exactamente a distinção que
+ * o teste do quadro de Organização já faz («um preço comprido aperta a coluna
+ * do nome em vez de lhe passar por cima»), aqui alargada ao documento todo.
+ *
+ * O que ela NÃO vê, e é justo dizê-lo: duas escritas na MESMA linha de base e
+ * encavalitadas uma na outra são juntas por {@link linhasDe} antes de aqui
+ * chegarem — para quem lê são uma linha só, ilegível, mas não são duas caixas
+ * a cruzarem-se. Esse caso é o da coluna do preço, e tem o seu próprio teste,
+ * que mede onde uma acaba e a outra começa.
+ */
+function sobreposicoesDe(escritas: Escrita[]): string[] {
+  const linhas = linhasDe(escritas).filter((e) => e.texto.trim());
+  const achados: string[] = [];
+  for (let i = 0; i < linhas.length; i++) {
+    for (let j = i + 1; j < linhas.length; j++) {
+      const a = linhas[i];
+      const b = linhas[j];
+      if (a.pagina !== b.pagina) continue;
+      const ca = caixaDaEscrita(a);
+      const cb = caixaDaEscrita(b);
+      if (
+        ca.x0 < cb.x1 - FOLGA &&
+        ca.x1 > cb.x0 + FOLGA &&
+        ca.y0 < cb.y1 - FOLGA &&
+        ca.y1 > cb.y0 + FOLGA
+      ) {
+        achados.push(
+          `p${a.pagina + 1}: «${a.texto.slice(0, 40)}» por cima de «${b.texto.slice(0, 40)}»`,
+        );
+      }
+    }
+  }
+  return achados;
+}
+
 const emPalavras = (t: Transbordo) =>
   `[${t.onde}] «${t.texto.slice(0, 60)}» ${t.porque}${t.quanto > 0 ? ` (${t.quanto.toFixed(1)} pt)` : ""}`;
 
@@ -514,6 +582,24 @@ describe("nada é desenhado fora do papel, da mancha, nem por cima de uma foto",
     const novos = transbordosDe(d, capasDe(d.paginas)).filter((t) => !conhecido(t));
     expect(novos.map(emPalavras), "transbordos que ainda não estavam na lista").toEqual([]);
   });
+
+  /**
+   * ── E NENHUMA LINHA CAI EM CIMA DE OUTRA ───────────────────────────────
+   *
+   * Aqui não há lista de conhecidos: hoje não acontece em documento nenhum,
+   * incluindo o dos casos-limite. Fica preso a zero.
+   */
+  for (const [nome, fabricar, idioma] of [
+    ["uma proposta como as verdadeiras", curta, "pt"],
+    ["valores de sete dígitos e rubricas compridas", numerosGrandes, "pt"],
+    ["o modelo de Organização", organizacao, "pt"],
+    ["os casos-limite", limites, "pt"],
+  ] as const) {
+    it(`${nome}: nenhuma linha é desenhada por cima de outra`, async () => {
+      const d = await desenhoDe(fabricar(), idioma);
+      expect(sobreposicoesDe(d.escritas), "linhas sobrepostas").toEqual([]);
+    });
+  }
 
   /**
    * ── E A LISTA NÃO PODE MENTIR ──────────────────────────────────────────
@@ -561,5 +647,15 @@ describe("nada é desenhado fora do papel, da mancha, nem por cima de uma foto",
       new Set([0, 2]),
     );
     expect(achados.map((t) => t.porque)).toContain("sai pela direita do PAPEL");
+
+    // E vê uma linha em cima de outra: a mesma coluna, seis pontos de
+    // distância, num corpo de 24 — que é o defeito de entrelinha que um teste
+    // de imagem apanharia.
+    expect(sobreposicoesDe([escrita, { ...escrita, y: escrita.y + 6 }])).toHaveLength(1);
+    // Duas coisas à MESMA altura mas em colunas diferentes NÃO se cruzam — é o
+    // caso do nome de uma rubrica e do preço dela, e não pode acender nada.
+    expect(sobreposicoesDe([escrita, { ...escrita, x: escrita.x + 400 }])).toEqual([]);
+    // Nem duas linhas seguidas com a entrelinha normal.
+    expect(sobreposicoesDe([escrita, { ...escrita, y: escrita.y - 30 }])).toEqual([]);
   });
 });
