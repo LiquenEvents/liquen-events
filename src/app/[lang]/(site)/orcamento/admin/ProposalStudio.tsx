@@ -1,6 +1,15 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useToast } from "./Toast";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import {
@@ -1142,6 +1151,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const [assetOriginais, setAssetOriginais] = useState<Record<string, string>>({});
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS URL QUE ESTA SESSÃO JÁ VIU MORRER
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O `urlAindaBom` prefere o URL guardado ao fresco «enquanto servir», e quem
+   * decide se serve é o prazo escrito no token. Isso está certo para o caso que
+   * ele veio resolver (não deitar fora assinaturas boas e pagar trinta
+   * downloads ao reabrir um rascunho) e está errado para este: um URL pode ter
+   * o prazo em dia e mesmo assim dar 403 ou 404 — pasta mudada, objecto que
+   * nunca chegou a subir, chave do bucket rodada.
+   *
+   * Sem esta memória o «Tentar novamente» de uma célula morta era um beco
+   * fechado a três voltas: ia buscar a lista outra vez, recebia URLs frescos,
+   * e o mapa PREFERIA o mesmo URL morto que já tinha — a `string` não mudava,
+   * portanto o `useFotoComPlanoB` não via URL novo, portanto não recomeçava
+   * nada. O botão pedia ao servidor e não podia usar o que ele respondia.
+   *
+   * Uma `ref` e não estado: só é lida DENTRO da hidratação, e um redesenho por
+   * cada foto que morre numa grelha de vinte e quatro era um redesenho por
+   * nada.
+   */
+  const urlsMortos = useRef<Set<string>>(new Set());
+  /** Esta célula provou que este URL não abre. Ver `urlsMortos`. */
+  const marcarUrlMorto = useCallback((url: string) => {
+    urlsMortos.current.add(url);
+  }, []);
+  /**
    * A cor dominante de cada fotografia, `caminho → "#rrggbb"`.
    *
    * Vem do servidor (que a leu da linha da foto), e não de um `canvas` daqui:
@@ -1883,6 +1919,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             setEstadoDosUrls("pronto");
             return;
           }
+          /**
+           * O guardado só conta se ainda for um candidato: um URL que uma
+           * célula desta sessão já viu morrer (403/404) não pode ganhar ao
+           * fresco só por ter o prazo em dia. Ver `urlsMortos`.
+           */
+          const vivo_ = (u?: string) => (u && urlsMortos.current.has(u) ? undefined : u);
           setAssetUrls((prev) => {
             const next = { ...prev };
             // A miniatura ganha ao original: é este o caminho que corre quando se
@@ -1896,7 +1938,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             // `assinatura.ts` para porque é que não bastava substituir sempre.
             for (const im of imgs)
               if (im.path && im.url)
-                next[im.path] = urlAindaBom(next[im.path], im.thumbUrl || im.url);
+                next[im.path] = urlAindaBom(vivo_(next[im.path]), im.thumbUrl || im.url);
             return next;
           });
           // O original fica guardado à parte, para a célula ter para onde cair
@@ -1904,7 +1946,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           setAssetOriginais((prev) => {
             const next = { ...prev };
             for (const im of imgs)
-              if (im.path && im.url) next[im.path] = urlAindaBom(next[im.path], im.url);
+              if (im.path && im.url) next[im.path] = urlAindaBom(vivo_(next[im.path]), im.url);
             return next;
           });
           // As cores não expiram (não são URLs assinados): uma vez conhecidas,
@@ -5208,6 +5250,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           planoB={assetOriginais[path]}
                           estadoDosUrls={estadoDosUrls}
                           aoTentarDeNovo={() => void hidratarAssets()}
+                          aoMorrer={marcarUrlMorto}
                           // As capas são duas e estão no topo do passo: nunca
                           // esperam pela fila das fotos que estão fora do ecrã.
                           priority
@@ -5787,6 +5830,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             planoB={assetOriginais[path]}
                                             estadoDosUrls={estadoDosUrls}
                                             aoTentarDeNovo={() => void hidratarAssets()}
+                                            aoMorrer={marcarUrlMorto}
                                             // A PRIMEIRA DOBRA do primeiro
                                             // board. Medido: sem prioridade
                                             // nenhuma, as 24 células repartiam
@@ -9364,6 +9408,103 @@ function SelectorDeLayout({
   );
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANDO NÃO É A FOTOGRAFIA — É O SÍTIO QUE NÃO A DEIXA APARECER
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma célula que não desenha nada podia ser três coisas (ver os «três estados»
+ * mais abaixo); afinal são quatro, e a quarta é de outra natureza.
+ *
+ * A `Content-Security-Policy` deste sítio traz uma directiva `img-src`, e ela
+ * nomeia de onde é que uma imagem pode vir. Quando a origem do Storage não está
+ * na lista, o browser RECUSA a fotografia — e recusa-a antes de a pedir. Não há
+ * pedido, não há código de estado, não há linha no painel de rede e não há nada
+ * para o servidor registar: do lado do JavaScript o único sinal é o `onerror`
+ * do `<img>`, exactamente igual ao de um 404. Foi assim que uma proposta com as
+ * fotografias todas guardadas e a sair bem no PDF apareceu no telemóvel dela
+ * com nove células a dizer «Não consegui mostrá-la neste ecrã».
+ *
+ * As duas avarias têm donos e remédios OPOSTOS — uma resolve-se com um botão de
+ * tentar outra vez, a outra nunca, por mais vezes que se carregue — e por isso
+ * não podem dizer a mesma frase. Um «Tentar novamente» que vai falhar sempre da
+ * mesma maneira é uma promessa vazia, e é pior do que não haver botão nenhum.
+ *
+ * ── COMO É QUE SE SABE ────────────────────────────────────────────────────
+ * O browser diz, e ninguém o ouvia: `document.addEventListener(
+ * "securitypolicyviolation", …)`. MEDIDO no Chromium, com `img-src 'self'
+ * data:` e duas imagens de outra origem: dois eventos, `violatedDirective` e
+ * `effectiveDirective` os dois `"img-src"`, e o `blockedURI` INTEIRO — caminho
+ * e token incluídos.
+ *
+ * ── E CASA-SE POR ORIGEM, NÃO POR URL ─────────────────────────────────────
+ * Porque o `blockedURI` inteiro é o caso do Chromium, e não a regra: a norma
+ * deixa o browser entregá-lo cortado à origem (é o que o WebKit faz em vários
+ * casos, e o telemóvel dela é um iPhone). Casar por URL completo funcionaria na
+ * máquina onde isto se mediu e falhava calado onde interessa. A origem é o que
+ * os dois formatos têm em comum, e chega: quem recusa uma fotografia do Storage
+ * recusa-as todas.
+ *
+ * E se nem a origem der para ler (um `blockedURI` vazio, ou o literal
+ * `"self"`), fica a marca sem morada — e aí é o ECRÃ inteiro que passa a dizer
+ * isto, em vez de uma célula. Uma célula morta ao mesmo tempo que o browser
+ * anuncia uma recusa de `img-src` é a mesma avaria com altíssima probabilidade;
+ * calar-se seria voltar à frase errada, que é o defeito que isto veio corrigir.
+ *
+ * Vive fora do React, como a fila das imagens e pela mesma razão: o evento é do
+ * documento, é um só, e um ouvinte por célula numa grelha de vinte e quatro
+ * eram vinte e quatro ouvintes para a mesma notícia.
+ */
+const origensRecusadasPelaPolitica = new Set<string>();
+/** Houve uma recusa de `img-src` que não deu para atribuir a uma origem. */
+let houveRecusaSemMorada = false;
+const ouvintesDaRecusa = new Set<() => void>();
+let escutaDaPoliticaLigada = false;
+
+function origemDe(url: string | undefined): string {
+  if (!url || typeof window === "undefined") return "";
+  try {
+    return new URL(url, window.location.href).origin;
+  } catch {
+    return "";
+  }
+}
+
+function ligarEscutaDaPolitica(): void {
+  if (escutaDaPoliticaLigada || typeof document === "undefined") return;
+  escutaDaPoliticaLigada = true;
+  document.addEventListener("securitypolicyviolation", (e) => {
+    // `effectiveDirective` é o nome moderno e `violatedDirective` o antigo; os
+    // browsers não concordam sobre qual preenchem, e um deles pode vir com a
+    // lista de origens colada («img-src 'self' data:»). Daí o `startsWith`.
+    const directiva = e.effectiveDirective || e.violatedDirective || "";
+    if (!directiva.startsWith("img-src")) return;
+    const origem = origemDe(e.blockedURI);
+    if (origem && origem !== window.location.origin) origensRecusadasPelaPolitica.add(origem);
+    else houveRecusaSemMorada = true;
+    for (const avisar of ouvintesDaRecusa) avisar();
+  });
+}
+
+function subscreverRecusa(avisar: () => void): () => void {
+  ligarEscutaDaPolitica();
+  ouvintesDaRecusa.add(avisar);
+  return () => {
+    ouvintesDaRecusa.delete(avisar);
+  };
+}
+
+/** Esta fotografia foi recusada pelas regras do próprio sítio? */
+function usarRecusaDaPolitica(url?: string): boolean {
+  const ler = useCallback(
+    () => houveRecusaSemMorada || origensRecusadasPelaPolitica.has(origemDe(url)),
+    [url],
+  );
+  // No servidor não há política nem recusa nenhuma — e não pode haver desencontro
+  // de hidratação por causa disto.
+  return useSyncExternalStore(subscreverRecusa, ler, () => false);
+}
+
 function Thumb({
   url,
   planoB,
@@ -9377,6 +9518,7 @@ function Thumb({
   onde = "estúdio",
   estadoDosUrls = "pronto",
   aoTentarDeNovo,
+  aoMorrer,
   priority = false,
   // `refDoc` e não `ref`: o React trata `ref` como prop especial, e uma string
   // ali dentro é o padrão antigo das string refs, que ele recusa.
@@ -9389,6 +9531,11 @@ function Thumb({
   estadoDosUrls?: EstadoDosUrls;
   /** Ir buscar os URL outra vez, a pedido dela. */
   aoTentarDeNovo?: () => void;
+  /**
+   * Este URL não abre — dito ao estúdio, para a hidratação seguinte deixar de
+   * o preferir ao fresco. Ver `urlsMortos`.
+   */
+  aoMorrer?: (url: string) => void;
   /** Está na primeira dobra: não espera pela fila nem pelo `lazy`. */
   priority?: boolean;
   onRemove: () => void;
@@ -9439,13 +9586,22 @@ function Thumb({
    */
   semRemover?: boolean;
 }) {
+  /**
+   * Não foi a fotografia: foi este sítio que a recusou. Ver a escuta acima.
+   *
+   * Perguntado com `planoB ?? url` e ANTES da cascata, de propósito: a resposta
+   * é por ORIGEM, e as duas moradas desta foto têm a mesma — portanto sabe-se
+   * já, sem esperar pelo `ultimoAlvo`, e a cascata pode receber a resposta em
+   * vez de gastar uma volta a descobrir o que já se sabia.
+   */
+  const recusadaPeloSitio = usarRecusaDaPolitica(planoB ?? url);
   const {
     alvo,
     desistiu: failed,
     aoFalhar,
     tentarDeNovo,
     ultimoAlvo,
-  } = useFotoComPlanoB(url, planoB);
+  } = useFotoComPlanoB(url, planoB, recusadaPeloSitio);
 
   /**
    * UMA FOTO A CAMINHO NÃO É UMA FOTO PARTIDA.
@@ -9501,13 +9657,37 @@ function Thumb({
    * momento raro em que as assinaturas se renovam.
    */
   const [temVez, setTemVez] = useState(false);
+  /**
+   * O mesmo, numa referência, para o efeito o poder ler sem o ter nas
+   * dependências — tê-lo lá faria a própria concessão da vez desmontar o
+   * efeito e largá-la no instante seguinte.
+   */
+  const temVezRef = useRef(false);
   /** A fotografia já está no ecrã — é o que apaga o esqueleto por cima. */
   const [pintada, setPintada] = useState(false);
   const largarVez = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (!pesada) return;
+    /**
+     * ── UM LUGAR NA FILA POR CÉLULA, E SÓ ENQUANTO SERVE PARA ALGUMA COISA ──
+     *
+     * `temVez` não volta a `false` depois do primeiro arranque (é deliberado —
+     * ver acima), e portanto o `src` desta célula JÁ é o alvo e o download já
+     * começou. Uma célula que volte aqui — porque o URL foi reassinado, porque
+     * a cascata caiu para o original, porque ela carregou em «Tentar
+     * novamente» — pedia na mesma vez, e ficava com um dos TRÊS lugares sem
+     * precisar dele: o download dela já ia a caminho, e o lugar só se largava
+     * ao fim de `ESPERA_MAXIMA_MS` (30 s).
+     *
+     * Numa grelha onde as fotos falham em cadeia é o pior momento possível
+     * para isso: as três vagas ficam com células que não estão à espera de
+     * nada, e as que ainda não têm um único pixel no ecrã esperam meio minuto
+     * por uma vaga que já não é vaga nenhuma. A fila existe para reger quem
+     * ainda não começou.
+     */
+    if (!pesada || temVezRef.current) return;
     let temporizador = 0;
     const largar = pedirVezDeImagemPesada(() => {
+      temVezRef.current = true;
       setTemVez(true);
       // Rede de segurança: um pedido que nunca termina não pode ficar com a vez
       // para sempre.
@@ -9544,6 +9724,18 @@ function Thumb({
   useEffect(() => {
     if (semRemedio && ultimoAlvo) {
       void relatarFalhaDeImagem({ onde, ref: refDoc, url: ultimoAlvo });
+      // E fica sabido AQUI dentro também: sem isto, a leitura seguinte da
+      // lista devolvia URLs frescos e o mapa continuava a preferir este, que
+      // acabou de dar erro. Ver `urlsMortos` no estúdio.
+      //
+      // MENOS quando quem recusou foi o sítio: aí o URL está impecável e
+      // marcá-lo como morto fazia a hidratação seguinte deitar fora
+      // assinaturas boas — trinta downloads a mais para corrigir um problema
+      // que não é do endereço.
+      if (!recusadaPeloSitio) {
+        aoMorrer?.(ultimoAlvo);
+        if (url && url !== ultimoAlvo) aoMorrer?.(url);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [semRemedio]);
@@ -9660,16 +9852,60 @@ function Thumb({
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 p-1 text-center text-[9px] leading-tight text-foreground/40">
-          {semRemedio ? (
+          {semRemedio && recusadaPeloSitio ? (
+            /* ── NÃO É A FOTOGRAFIA: É O SÍTIO ──────────────────────────────
+               Sem botão de tentar outra vez, e é a diferença que interessa: a
+               recusa não muda por se insistir. O «Abrir ficheiro» fica, e
+               funciona — abrir o endereço noutro separador é uma navegação, e
+               as regras que barram uma imagem DENTRO desta página não têm nada
+               a dizer sobre isso.
+
+               A frase não diz «política», nem «directiva», nem o nome da
+               regra: quem lê isto quer saber se a fotografia se perdeu (não se
+               perdeu) e se o problema é dela (não é). O resto está escrito no
+               `title` e, por extenso, no comentário da escuta lá em cima. */
+            <>
+              <span className="font-medium text-foreground/55">Fotografia guardada</span>
+              <span
+                title="A fotografia está guardada e inteira — sai bem no PDF. Quem a recusou aqui foi este site, por uma definição dele. Insistir dá sempre o mesmo."
+              >
+                O site não a deixou aparecer aqui. É uma definição do site, não a fotografia.
+              </span>
+              {ultimoAlvo && (
+                <a
+                  href={ultimoAlvo}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 underline underline-offset-2 text-foreground/60 hover:text-foreground/80"
+                >
+                  Abrir ficheiro
+                </a>
+              )}
+            </>
+          ) : semRemedio ? (
             <>
               <span className="font-medium text-foreground/55">Imagem guardada</span>
               {/* A frase antiga acabava aqui, e era um beco: a foto estava lá,
                   havia coisas a fazer, e o ecrã não oferecia nenhuma. */}
               <span>Não consegui mostrá-la neste ecrã.</span>
               <span className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                {/* ── E TENTA MESMO ALGUMA COISA DIFERENTE ──────────────────
+                    MEDIDO com a rede a devolver 503: o botão antigo repetia,
+                    ao byte, os dois URL que acabavam de falhar — nenhum
+                    pedido novo com um endereço novo. Contra a causa mais
+                    provável de uma grelha inteira morta — assinaturas que já
+                    não servem — isso é um botão que não pode funcionar.
+
+                    Agora são as duas coisas, por esta ordem: pedir ao
+                    servidor a lista outra vez (URLs frescos, e a memória dos
+                    mortos garante que o mapa os aceita) e recomeçar a cascata
+                    desta célula. */}
                 <button
                   type="button"
-                  onClick={tentarDeNovo}
+                  onClick={() => {
+                    aoTentarDeNovo?.();
+                    tentarDeNovo();
+                  }}
                   className="rounded border border-foreground/20 px-1.5 py-0.5 text-[9px] text-foreground/70 hover:bg-foreground/[0.06]"
                 >
                   Tentar novamente
