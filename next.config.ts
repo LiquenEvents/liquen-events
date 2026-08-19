@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import bundleAnalyzer from "@next/bundle-analyzer";
+import { origensDeImagem } from "./src/lib/csp-imagens";
 
 const nextConfig: NextConfig = {
   // O SELO DE DESENVOLVIMENTO DO NEXT TAPA A NAVEGAÇÃO DO TELEMÓVEL.
@@ -244,30 +245,52 @@ const nextConfig: NextConfig = {
     const metaImg = temMeta ? " https://www.facebook.com" : "";
     const metaConnect = temMeta ? " https://www.facebook.com" : "";
 
-    // Image hosts the BROWSER loads via <img>: proposal cover/mood-board images
-    // are served as signed URLs from Supabase Storage, and the (optional) gallery
-    // CDN. Without these in img-src the browser blocks them and the thumbnail
-    // renders as a broken image. Derive exact origins from env so the policy
-    // stays as tight as possible (empty when unconfigured).
-    const imgOrigins = Array.from(
-      new Set(
-        [
-          process.env.SUPABASE_URL,
-          process.env.NEXT_PUBLIC_SUPABASE_URL,
-          process.env.NEXT_PUBLIC_IMAGE_CDN,
-        ]
-          .map((v) => {
-            if (!v) return "";
-            try {
-              return new URL(v).origin;
-            } catch {
-              return "";
-            }
-          })
-          .filter(Boolean),
-      ),
-    ).join(" ");
-    const imgExtra = imgOrigins ? ` ${imgOrigins}` : "";
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * AS FOTOGRAFIAS DOS MOOD BOARDS DESAPARECERAM TODAS — ERA ESTA LINHA
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Todas as fotos do estúdio de propostas são `<img>` apontados a URLs
+     * assinados do Storage do Supabase. O browser só as vai buscar se a
+     * `img-src` NOMEAR essa origem — e quando não nomeia não há pedido
+     * nenhum: nem código de estado, nem registo no servidor, nem sequer uma
+     * entrada no painel de rede. Só a célula a dizer «Imagem guardada / Não
+     * consegui mostrá-la neste ecrã». Em TODAS as células, porque o que
+     * falha não é a fotografia: é a política.
+     *
+     * O QUE ESTAVA AQUI derivava a origem do ambiente e, quando não a
+     * encontrava, escrevia `""` — uma política sintacticamente perfeita que
+     * apaga o produto inteiro, em silêncio.
+     *
+     * E o momento em que isto é lido é o que fecha a armadilha: o
+     * `headers()` corre UMA VEZ, no build, e o resultado vai inteiro para o
+     * `.next/routes-manifest.json`, que é de onde a política é servida
+     * depois. MEDIDO no build que estava nesta árvore:
+     *
+     *     img-src 'self' data: blob: https://www.googletagmanager.com …
+     *
+     * — sem uma única origem do Supabase. Um build sem `SUPABASE_URL` no
+     * ambiente publica um sítio onde nenhuma fotografia de proposta aparece,
+     * com o Storage, as assinaturas e o servidor todos impecáveis. O
+     * `Dockerfile` deste repositório é esse caso: a etapa `builder` corre
+     * `npm run build` sem receber variável nenhuma.
+     *
+     * A regra — e o curinga de recurso, que é o que impede o silêncio — vive
+     * em `src/lib/csp-imagens.ts`, para o diagnóstico de fotografias
+     * (`/api/admin/fotos-diagnostico`) responder sobre a MESMA política que é
+     * servida, e não sobre uma cópia dela.
+     */
+    const imagens = origensDeImagem(process.env);
+    const imgExtra = ` ${imagens.origens.join(" ")}`;
+    if (imagens.usouCuringa) {
+      // Dito ao build, uma vez, e com o nome da variável em falta: um build
+      // que degrada em silêncio é como esta avaria chegou à produção.
+      console.warn(
+        "[csp] Sem SUPABASE_URL no ambiente do build: a img-src fica com " +
+          `${imagens.origens.join(" ")} em vez da origem exacta do Storage. ` +
+          "Define SUPABASE_URL no ambiente de BUILD (não só no de execução).",
+      );
+    }
 
     // Browser-side connections. Everything third-party runs SERVER-side with
     // non-public env (Supabase service key, Sentry DSN, Slack/Discord webhooks),
