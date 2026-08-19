@@ -596,14 +596,33 @@ alter table public.proposal_themes add column if not exists photo_order jsonb;
 -- nem todas as instalações têm): a verificação da aplicação é mais estrita e
 -- é ela que impede "Itália" ao lado de "Italia".
 --
--- ATENÇÃO: numa base já em uso, este índice NÃO se aplica se já existirem
--- duplicados — a criação falha e o resto do ficheiro não corre. Encontre-os e
--- renomeie/apague primeiro:
+-- ── O AVISO QUE ERA SÓ UM COMENTÁRIO ────────────────────────────────────
+-- Dizia aqui: numa base já em uso este índice NÃO se aplica se já existirem
+-- nomes duplicados. Verdade — e o que o comentário não dizia é o que isso
+-- CUSTA: o `create unique index` aborta a transação, e o resto do ficheiro
+-- deixa de correr. Mediu-se o que fica por criar a partir deste ponto: seis
+-- colunas de `proposal_themes` (kind, filter_rule, favorito, arquivado,
+-- manual_paths, ordem), a biblioteca de fotografias inteira (três tabelas), os
+-- contratos, o Inbox, as passkeys, as restrições e TODO o `enable row level
+-- security` do fim. Uma instalação parada aqui parece feita — a lista de temas
+-- até se lê na mesma — e vai partindo uma funcionalidade de cada vez, sem
+-- ninguém ligar o defeito a um índice que falhou há semanas.
+--
+-- Por isso o índice passa a ser uma TENTATIVA: se houver duplicados, deixa um
+-- aviso (visível no SQL Editor) e o ficheiro segue. O que fica por garantir é
+-- só a unicidade — que as rotas POST /api/temas e PATCH /api/temas/[id] já
+-- verificam antes de escrever —, e resolve-se renomeando os duplicados e
+-- correndo o ficheiro outra vez, que é o que a consulta abaixo serve para
+-- encontrar:
 --   select lower(btrim(name)) as nome, count(*), array_agg(id)
 --     from public.proposal_themes
 --    group by 1 having count(*) > 1;
-create unique index if not exists proposal_themes_name_uk
-  on public.proposal_themes (lower(btrim(name)));
+do $$ begin
+  create unique index if not exists proposal_themes_name_uk
+    on public.proposal_themes (lower(btrim(name)));
+exception when others then
+  raise warning 'proposal_themes_name_uk não criado (%). Há temas com o mesmo nome: renomeie-os e volte a correr este ficheiro. O resto do schema continuou.', sqlerrm;
+end $$;
 
 -- ── Contratos / aceitação de Termos & Condições ─────────────────
 -- Registo, por proposta, da aceitação das condições pelo cliente ao confirmar

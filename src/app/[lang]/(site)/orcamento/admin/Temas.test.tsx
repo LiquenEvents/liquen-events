@@ -1843,3 +1843,99 @@ describe("Grelha de fotos de um tema — ergonomia de toque", () => {
     }
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ECRÃ TEM DE DIZER O QUE FALHOU — não «não foi possível»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «nós tínhamos já imensos temas lá, e diz que não é possível
+ * carregar os temas». Era esse o desenho: só um 503 punha uma instrução no
+ * ecrã; TUDO o resto — sete das nove maneiras de esta leitura falhar — ia para
+ * um toast que dizia «Não foi possível carregar os temas.» e desaparecia.
+ *
+ * Um toast é bom para «gravado»; é péssimo para uma instrução. Estes testes
+ * prendem a regra nova: qualquer recusa fica NO ECRÃ, com o título e a frase
+ * que a rota mandar — e quando não vem corpo nenhum (um 504 do intermediário, o
+ * caso que nem a rota consegue explicar) fica lá o número da resposta, que é o
+ * que ela cita a pedir ajuda.
+ */
+describe("quando a lista não vem, o ecrã diz porquê", () => {
+  it("mostra o título e a frase que a rota mandou, e não um toast", async () => {
+    route("GET /api/temas", () =>
+      bad(503, {
+        titulo: "A base de dados não respondeu",
+        error: "O projecto pode estar em pausa. Abre o painel do Supabase e carrega em «Restore».",
+      }),
+    );
+
+    renderTemas();
+    await act(async () => {});
+
+    expect(await screen.findByText("A base de dados não respondeu")).toBeInTheDocument();
+    expect(screen.getByText(/Restore/)).toBeInTheDocument();
+    // A frase antiga não pode voltar por porta nenhuma.
+    expect(screen.queryByText(/Não foi possível carregar os temas/)).toBeNull();
+    // E o ecrã não pode, por baixo do aviso, afirmar seja o que for sobre os
+    // dados dela — nem «nunca tiveste temas» nem «estão todos arquivados».
+    expect(screen.queryByText("Ainda não há temas")).toBeNull();
+    expect(screen.queryByText(/Todos os temas estão arquivados/)).toBeNull();
+  });
+
+  it("um 500 com causa nomeada também fica no ecrã", async () => {
+    route("GET /api/temas", () =>
+      bad(500, {
+        titulo: "Falha inesperada ao ler os temas",
+        error: "Envia esta linha a quem trata da aplicação — XX000 HTTP 500: internal error.",
+      }),
+    );
+
+    renderTemas();
+    await act(async () => {});
+
+    expect(await screen.findByText("Falha inesperada ao ler os temas")).toBeInTheDocument();
+    expect(screen.getByText(/XX000/)).toBeInTheDocument();
+  });
+
+  it("sem corpo nenhum (504 do intermediário) diz na mesma o que se sabe", async () => {
+    route("GET /api/temas", () => ({
+      ok: false,
+      status: 504,
+      json: async () => {
+        throw new SyntaxError("Unexpected token '<'");
+      },
+    }));
+
+    renderTemas();
+    await act(async () => {});
+
+    expect(await screen.findByText("O servidor demorou demasiado")).toBeInTheDocument();
+    expect(screen.getByText(/504/)).toBeInTheDocument();
+    expect(screen.queryByText(/Não foi possível carregar os temas/)).toBeNull();
+  });
+});
+
+describe("criar um tema com a instalação por acabar", () => {
+  it("o impedimento vai para o cartão, com título e frase — não um cartão vazio", async () => {
+    route("GET /api/temas", () => ok([]));
+    route("POST /api/temas", () =>
+      bad(503, {
+        titulo: "Falta um passo de instalação",
+        error: "A Biblioteca de Temas ainda não está criada na base de dados. Corre db/schema.sql.",
+      }),
+    );
+
+    renderTemas();
+    await act(async () => {});
+
+    fireEvent.click(screen.getByRole("button", { name: "Novo tema" }));
+    const campo = screen.getByLabelText(/Nome do tema/);
+    fireEvent.change(campo, { target: { value: "Itália" } });
+    await act(async () => {
+      fireEvent.keyDown(campo, { key: "Enter" });
+    });
+
+    expect(await screen.findByText("Falta um passo de instalação")).toBeInTheDocument();
+    expect(screen.getByText(/db\/schema\.sql/)).toBeInTheDocument();
+  });
+});

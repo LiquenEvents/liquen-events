@@ -135,3 +135,49 @@ export function porqueFalhou(erro: unknown, recurso: string): string {
   if (!texto || FRASES_DO_BROWSER.test(texto)) return recurso;
   return texto;
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANDO NEM SEQUER VEM UM CORPO: dizer o que se sabe, que é o estado
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As rotas desta casa mandam sempre a razão no corpo — mas há recusas que não
+ * passam pelas rotas. Um 504 do intermediário (a função passou do tempo), um
+ * 502, uma página de erro da plataforma: o corpo é HTML, o `res.json()` estoira
+ * e o que restava era a frase de reserva do ecrã, «Não foi possível carregar os
+ * temas», que não nomeia nada.
+ *
+ * A medição que obrigou a isto: das nove maneiras de a lista de temas falhar,
+ * as que não chegam a entrar na rota — tempo esgotado do lado da plataforma —
+ * são precisamente as que davam essa frase, e são as únicas em que o número da
+ * resposta é a ÚNICA pista que existe. Por isso ele entra na frase: é o que ela
+ * copia para uma mensagem a pedir ajuda.
+ */
+export function tituloDaRecusa(status: number): string {
+  if (status === 401 || status === 403) return "A sessão expirou";
+  if (status === 404) return "O servidor não encontrou esta função";
+  if (status === 408 || status === 504) return "O servidor demorou demasiado";
+  if (status === 429) return "Pedidos a mais em pouco tempo";
+  if (status >= 500) return "O servidor não conseguiu responder";
+  return "O servidor recusou o pedido";
+}
+
+export function textoDaRecusa(status: number): string {
+  if (status === 401 || status === 403) {
+    return "A tua sessão de administração já não é válida. Volta a entrar e recarrega a página.";
+  }
+  if (status === 408 || status === 504) {
+    return (
+      `O servidor demorou tempo demais a responder (${status}) e o pedido foi cortado a meio. ` +
+      "Recarrega a página. Nada se perdeu — isto foi uma leitura, e os dados estão guardados."
+    );
+  }
+  if (status === 429) {
+    return "Foram feitos pedidos a mais em pouco tempo. Espera um minuto e recarrega a página.";
+  }
+  return (
+    `O servidor respondeu ${status} e sem explicação nenhuma no corpo — o que quase sempre ` +
+    "quer dizer que o pedido nem chegou à aplicação. Recarrega a página; se continuar, dá " +
+    `este número (${status}) a quem trata da aplicação. Nada foi apagado.`
+  );
+}

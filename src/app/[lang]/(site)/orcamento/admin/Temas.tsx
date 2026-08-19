@@ -16,6 +16,7 @@ import {
   type ThemeDuplicate,
 } from "@/lib/theme-types";
 import { fingerprintBlob } from "@/lib/theme-fingerprint";
+import { textoDaRecusa, tituloDaRecusa } from "@/lib/erro-do-servidor";
 import { useToast } from "./Toast";
 import { prepareImageWithThumb } from "./image-prep";
 import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
@@ -688,10 +689,25 @@ export default function Temas() {
   // Filtrar fora da tecla: com poucos temas é imperceptível, e mantém o campo
   // instantâneo quando a lista cresce (é o mesmo padrão do Inventário).
   const deferredSearch = useDeferredValue(search);
-  // Impedimento que a equipa PODE resolver (tipicamente: o schema ainda não foi
-  // corrido no Supabase). Fica no ecrã, com o passo a dar — um toast que
-  // desaparece não serve para uma instrução.
-  const [blocked, setBlocked] = useState<string | null>(null);
+  /**
+   * A lista não veio — e porquê. Fica no ecrã, com o passo a dar: um toast que
+   * desaparece não serve para uma instrução.
+   *
+   * ── PORQUE É QUE ISTO DEIXOU DE SER SÓ O 503 ──────────────────────────────
+   * Era: 503 com corpo → cartão no ecrã; TUDO o resto → um toast que dizia «Não
+   * foi possível carregar os temas.» e ia-se embora. Contadas as maneiras de
+   * esta leitura falhar, nove: duas caíam no cartão e as outras SETE naquele
+   * toast — a chave recusada, o projecto em pausa, a consulta fora de tempo,
+   * uma sessão caducada. Nenhuma delas se resolve olhando para o ecrã, e o ecrã
+   * era a única coisa que ela tinha.
+   *
+   * Agora qualquer recusa fica no cartão, com o título e a frase que a rota
+   * manda (ver `respostaDeAvaria` em src/app/api/temas/route.ts). Os textos de
+   * reserva aqui em baixo são só para o que nem sequer chega em JSON — um 504
+   * do intermediário, uma página de erro —, e mesmo esses dizem o estado HTTP,
+   * que é o que se cita a pedir ajuda.
+   */
+  const [blocked, setBlocked] = useState<{ titulo: string; texto: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -701,17 +717,27 @@ export default function Temas() {
           setThemes(await res.json());
           setBlocked(null);
         } else {
-          const data = await res.json().catch(() => null);
-          if (res.status === 503 && data?.error) setBlocked(data.error);
-          else toast(data?.error || "Não foi possível carregar os temas.", "error");
+          const data = (await res.json().catch(() => null)) as {
+            error?: string;
+            titulo?: string;
+          } | null;
+          setBlocked({
+            titulo: data?.titulo || tituloDaRecusa(res.status),
+            texto: data?.error || textoDaRecusa(res.status),
+          });
         }
       } catch {
-        toast("Erro de ligação ao carregar os temas.", "error");
+        setBlocked({
+          titulo: "Sem ligação ao servidor",
+          texto:
+            "O pedido dos temas não chegou a sair deste computador. Verifica a ligação à " +
+            "internet e recarrega a página. Nada se perdeu — os temas estão no servidor.",
+        });
       } finally {
         setLoading(false);
       }
     })();
-  }, [toast]);
+  }, []);
 
   async function create() {
     // O Enter no campo do nome não passa pelo botão (que já está desativado
@@ -728,8 +754,13 @@ export default function Temas() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        if (res.status === 503 && data?.error) setBlocked(data.error);
-        else toast(data?.error || "Não foi possível criar o tema.", "error");
+        // O 503 da criação é o mesmo impedimento de instalação da leitura, e
+        // vai para o mesmo cartão — com o título que a rota mandar. O resto
+        // continua num toast: numa ESCRITA que ela acabou de pedir, a queixa
+        // pertence ao lado do botão em que carregou.
+        if (res.status === 503 && data?.error) {
+          setBlocked({ titulo: data.titulo || tituloDaRecusa(res.status), texto: data.error });
+        } else toast(data?.error || "Não foi possível criar o tema.", "error");
         return;
       }
       setBlocked(null);
@@ -884,8 +915,10 @@ export default function Temas() {
     <div>
       {blocked && (
         <Card padding="sm" className="mb-6 border-[#8a6d2f]/30 bg-[#f6efe1]/60">
-          <p className="bo-eyebrow mb-1.5 text-[#8a6d2f]">Falta um passo de instalação</p>
-          <p className="text-sm leading-relaxed text-foreground/75">{blocked}</p>
+          {/* O título vem da causa: dizer "Falta um passo de instalação" a quem
+              tem é o projecto em pausa manda-a correr o schema por nada. */}
+          <p className="bo-eyebrow mb-1.5 text-[#8a6d2f]">{blocked.titulo}</p>
+          <p className="text-sm leading-relaxed text-foreground/75">{blocked.texto}</p>
         </Card>
       )}
 
@@ -1057,7 +1090,13 @@ export default function Temas() {
           ))}
           <p className="sr-only">A carregar temas…</p>
         </div>
-      ) : themes.length === 0 ? (
+      ) : blocked && themes.length === 0 ? null : themes.length === 0 ? (
+        /* A lista vazia POR AVARIA não é uma lista vazia, e é por isso que o
+           ramo de cima corta aqui. O cartão do topo já diz que a leitura
+           falhou; deixar correr esta cascata punha por baixo dele «Ainda não há
+           temas» — ou, com o filtro de arquivados, «Todos os temas estão
+           arquivados» —, que é exactamente o susto que se está a corrigir: o
+           ecrã a afirmar sobre os dados dela uma coisa que não sabe. */
         <Card padding="none">
           <EmptyState
             icon={FolderIcon}
