@@ -653,6 +653,82 @@ describe("total desalinhado da soma das linhas", () => {
   });
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A COLUNA DE PREÇOS DE ORGANIZAÇÃO, DESALINHADA, VISTA ANTES DE ENVIAR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O caso é o de uma proposta gerada a sério: 6.500 + 1.850 impressos numa
+ * coluna, por baixo de um TOTAL de 12.500. São 4.150 € que o casal encontra ao
+ * somar a coluna e que o documento não explica.
+ *
+ * A verificação vive em `totaisDaProposta` (com o porquê ao lado), e o que
+ * ESTE teste prende é a outra metade: que ela apareça AQUI, no ecrã onde os
+ * números se escrevem, e não só no registo do servidor depois de o PDF estar
+ * feito. Um aviso que só se lê depois de o documento sair não é uma rede.
+ */
+describe("as linhas de Organização que não somam o total", () => {
+  /** O rascunho da proposta do relatório, à letra. */
+  function seedOrganizacao(over: Record<string, unknown> = {}) {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "organizacao",
+        ref: "PO Organização",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: [],
+        budgetRows: [
+          { item: "Coordenação e planeamento integral", price: "6.500,00 €" },
+          { item: "Coordenação no dia do evento", price: "1.850,00 € + IVA (a confirmar)" },
+          { item: "Gestão de fornecedores e contratos", price: "[Valor]" },
+          { item: "Assessoria de imagem e papelaria", price: "" },
+        ],
+        coverImages: ["", ""],
+        totalEstimatedText: "12.500,00 €",
+        totalAmount: 12500,
+        totalVatMode: "acrescer",
+        ...over,
+      }),
+    );
+  }
+
+  it("acende o aviso no bloco de totais, com os três números", async () => {
+    seedOrganizacao();
+    renderStudio();
+    const aviso = await screen.findByText(/As contas não fecham/);
+    // O que a coluna soma, o que o quadro fecha, e a diferença que fica por
+    // explicar — as três coisas que o casal vê e não consegue ligar.
+    expect(aviso.textContent).toContain("8350");
+    expect(aviso.textContent).toContain("12500");
+    expect(aviso.textContent).toContain("4150");
+  });
+
+  it("uma proposta em que a coluna fecha não acende nada", async () => {
+    // 7.890 + 2.500 = 10.390. É o caso normal, e o caso normal tem de ser
+    // silencioso: um aviso que dispara em condições normais aprende-se a
+    // ignorar.
+    seedOrganizacao({
+      budgetRows: [
+        { item: "Planeamento integral", price: "7890,00 €" },
+        { item: "Coordenação no dia", price: "2.500,00 €" },
+      ],
+      totalEstimatedText: "10.390,00 €",
+      totalAmount: 10390,
+    });
+    renderStudio();
+    // O bloco de totais está lá (é o que garante que se estaria a ver o aviso
+    // se ele existisse) e o aviso não.
+    expect(await screen.findByText("Totais")).toBeTruthy();
+    expect(screen.queryByText(/As contas não fecham/)).toBeNull();
+  });
+});
+
 describe("pontos de decoração escolhidos no pedido", () => {
   const comEscolhas = {
     ...quote,

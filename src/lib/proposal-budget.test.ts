@@ -1016,3 +1016,175 @@ describe("o sinal é calculado sobre o total COM IVA", () => {
     }
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A COLUNA DE PREÇOS DO MODELO ORGANIZAÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O caso está medido, e é o de uma proposta gerada a sério: quatro rubricas,
+ * duas com preço e duas sem, por baixo de um total escrito à mão.
+ *
+ *     Coordenação e planeamento integral    6.500,00 €
+ *     Coordenação no dia do evento          1.850,00 € + IVA (a confirmar)
+ *     Gestão de fornecedores e contratos    —
+ *     Assessoria de imagem e papelaria
+ *     TOTAL (sem IVA)                      12.500,00 €
+ *
+ * 6.500 + 1.850 = 8.350. O total impresso são 12.500: 4.150 € que a coluna não
+ * explica a quem a somar. Enquanto `budgetRows` foi lido NUM SÍTIO SÓ — a
+ * desenhar —, nada comparava as duas coisas, e esta proposta saiu.
+ */
+describe("as linhas de Organização somam o que o quadro fecha — ou dizem porque não", () => {
+  /** A proposta do relatório, à letra. */
+  const organizacao = (over: Partial<ProposalDoc> = {}) =>
+    ({
+      budgetItems: [],
+      budgetAmounts: [],
+      budgetExtras: [],
+      budgetRows: [
+        { item: "Coordenação e planeamento integral", price: "6.500,00 €" },
+        { item: "Coordenação no dia do evento", price: "1.850,00 € + IVA (a confirmar)" },
+        { item: "Gestão de fornecedores e contratos", price: "[Valor]" },
+        { item: "Assessoria de imagem e papelaria", price: "" },
+      ],
+      totalAmount: 12500,
+      totalVatMode: "acrescer",
+      ...over,
+    }) as Parameters<typeof totaisDaProposta>[0];
+
+  it("6.500 + 1.850 por baixo de um TOTAL de 12.500 não fecha, e diz os três números", () => {
+    const t = totaisDaProposta(organizacao(), 30);
+    expect(t.fecha, "a proposta do relatório passou sem aviso nenhum").toBe(false);
+    const porque = t.porQueNaoFecha.join(" · ");
+    expect(porque, "a soma das linhas impressas").toContain("8350");
+    expect(porque, "o total que o quadro fecha").toContain("12500");
+    expect(porque, "a diferença que o casal encontra ao somar a coluna").toContain("4150");
+    // As duas rubricas por orçamentar são a explicação que falta no papel — e
+    // é isso que distingue este aviso de «alguém enganou-se numa conta».
+    expect(porque, "as rubricas sem preço").toMatch(/2 rubricas sem preço/);
+  });
+
+  it("e não muda um único número impresso", () => {
+    // A regra da casa: uma verificação que altere um valor é pior do que não
+    // existir. Os seis números do bloco são os mesmos com e sem as linhas.
+    const com = totaisDaProposta(organizacao(), 30);
+    const sem = totaisDaProposta(organizacao({ budgetRows: [] }), 30);
+    for (const campo of [
+      "servicos",
+      "adicionais",
+      "total",
+      "iva",
+      "aPagar",
+      "sinal",
+      "saldo",
+    ] as const) {
+      expect(com[campo], `o ${campo} mudou por causa da verificação`).toBe(sem[campo]);
+    }
+    expect(sem.fecha, "uma proposta sem linhas não tem coluna para desalinhar").toBe(true);
+  });
+
+  it("quando a coluna FECHA, cala-se — é o caso normal", () => {
+    // 7.890 + 2.500 = 10.390, que é o total. É a proposta de Organização dos
+    // testes do gerador, e nenhuma proposta certa pode acender um aviso.
+    const t = totaisDaProposta(
+      organizacao({
+        budgetRows: [
+          { item: "Planeamento integral", price: "7890,00 €" },
+          { item: "Coordenação no dia", price: "2.500,00 €" },
+        ],
+        totalAmount: 10390,
+      }),
+      30,
+    );
+    expect(t.porQueNaoFecha).toEqual([]);
+    expect(t.fecha).toBe(true);
+  });
+
+  it("uma coluna INTEIRAMENTE sem preços não é um desalinhamento", () => {
+    // É a folha de sempre: as rubricas por nome e a coluna em branco (é assim
+    // que a proposta feita à mão sai, e é assim que o modelo Decoração sai
+    // todos os dias). Sem nenhum número impresso não há soma que contradiga o
+    // total — e um aviso que dispara em condições normais aprende-se a ignorar.
+    const t = totaisDaProposta(
+      organizacao({
+        budgetRows: [
+          { item: "Coordenação e planeamento integral", price: "" },
+          { item: "Gestão de fornecedores", price: "[Valor]" },
+        ],
+      }),
+      30,
+    );
+    expect(t.porQueNaoFecha).toEqual([]);
+  });
+
+  it("sem total escrito não há nada com que comparar", () => {
+    // Uma proposta a meio: as rubricas já têm preço e o total ainda é
+    // «[Valor Total]». O papel não imprime total nenhum, portanto não há
+    // contradição nenhuma para apontar.
+    const t = totaisDaProposta(
+      organizacao({
+        totalAmount: undefined,
+        totalVatMode: undefined,
+        totalEstimatedText: "[Valor Total]",
+      }),
+      30,
+    );
+    expect(t.porQueNaoFecha).toEqual([]);
+  });
+
+  it("o «+ IVA» de uma linha lê-se como o resto do dinheiro escrito à mão", () => {
+    // A mesma regra dos valores adicionais (`somaDosExtrasSemIva`): o que a
+    // linha DIZ ganha, e uma linha calada segue o modo do documento. Aqui o
+    // documento lê-se COM IVA, portanto «6.150,00 €» calado vale 5.000 de base
+    // e a linha que diz «+ IVA» vale os 3.350 que escreve — 8.350 ao todo, que
+    // é o total. Se a leitura fosse crua, esta proposta certa acusava 1.150 €.
+    const t = totaisDaProposta(
+      organizacao({
+        budgetRows: [
+          { item: "Planeamento", price: "6.150,00 €" },
+          { item: "Coordenação", price: "3.350,00 € + IVA" },
+        ],
+        totalAmount: 10270.5, // 8.350 × 1,23
+        totalVatMode: "incluido",
+      }),
+      30,
+    );
+    expect(t.total).toBe(8350);
+    expect(t.porQueNaoFecha).toEqual([]);
+  });
+
+  it("os adicionais saem dos dois lados, como em `desalinhamento`", () => {
+    // A deslocação é impressa POR BAIXO do subtotal, não dentro da coluna: se
+    // só um dos lados a perdesse, uma proposta certa acusava a deslocação
+    // inteira de diferença. O que se compara é a coluna com o SUBTOTAL.
+    const t = totaisDaProposta(
+      organizacao({
+        budgetRows: [{ item: "Planeamento integral", price: "8.350,00 €" }],
+        budgetExtras: [{ label: "Deslocação da equipa", valueText: "500,00 €" }],
+        totalAmount: 8850,
+      }),
+      30,
+    );
+    expect(t.servicos).toBe(8350);
+    expect(t.adicionais).toBe(500);
+    expect(t.porQueNaoFecha).toEqual([]);
+  });
+
+  it("o modelo Decoração continua a não ter coluna nenhuma para verificar", () => {
+    // `budgetRows` é só do modelo de Organização. Uma proposta de Decoração com
+    // preços por linha INTERNOS (`budgetAmounts`) não imprime número nenhum na
+    // coluna, e o aviso dela já existe e é outro (`desalinhamento`).
+    const t = totaisDaProposta(
+      {
+        budgetItems: ["Decoração Cerimónia", "Decoração Jantar"],
+        budgetAmounts: [1000, 2000],
+        budgetExtras: [],
+        totalAmount: 12500,
+        totalVatMode: "acrescer",
+      } as Parameters<typeof totaisDaProposta>[0],
+      30,
+    );
+    expect(t.porQueNaoFecha).toEqual([]);
+  });
+});
