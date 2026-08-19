@@ -9866,8 +9866,12 @@ function Thumb({
                `title` e, por extenso, no comentário da escuta lá em cima. */
             <>
               <span className="font-medium text-foreground/55">Fotografia guardada</span>
+              {/* Curta porque tem de CABER: a caixa tem 104 px de altura e
+                  `overflow-hidden`, e a frase inteira levava o «Abrir ficheiro»
+                  para fora do corte. A explicação toda vai no `title` — é a
+                  mesma decisão, e a mesma medição, do ramo «não veio na lista». */}
               <span title="A fotografia está guardada e inteira — sai bem no PDF. Quem a recusou aqui foi este site, por uma definição dele. Insistir dá sempre o mesmo.">
-                O site não a deixou aparecer aqui. É uma definição do site, não a fotografia.
+                O site não a deixa aparecer.
               </span>
               {ultimoAlvo && (
                 <a
@@ -9882,10 +9886,24 @@ function Thumb({
             </>
           ) : semRemedio ? (
             <>
-              <span className="font-medium text-foreground/55">Imagem guardada</span>
-              {/* A frase antiga acabava aqui, e era um beco: a foto estava lá,
-                  havia coisas a fazer, e o ecrã não oferecia nenhuma. */}
-              <span>Não consegui mostrá-la neste ecrã.</span>
+              {/* ── E TEM DE CABER NA CAIXA ────────────────────────────────
+                  MEDIDO a 390 px, numa célula de 89 × 104 px: a etiqueta, a
+                  frase, o botão e o link somavam 128 px de conteúdo e a caixa
+                  tem `overflow-hidden` — 24 px cortados em baixo, e o que
+                  ficava de fora era o «Abrir ficheiro». A última saída de uma
+                  célula morta estava a ser cortada pela explicação de por que
+                  é que ela morreu.
+
+                  A frase passa para o `title`, exactamente como no ramo «não
+                  veio na lista», que já tinha aprendido isto à sua custa: numa
+                  caixa desta altura, cada linha custa uma coisa que já lá
+                  estava. */}
+              <span
+                className="font-medium text-foreground/55"
+                title="A fotografia está guardada. Não consegui mostrá-la neste ecrã."
+              >
+                Imagem guardada
+              </span>
               <span className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
                 {/* ── E TENTA MESMO ALGUMA COISA DIFERENTE ──────────────────
                     MEDIDO com a rede a devolver 503: o botão antigo repetia,

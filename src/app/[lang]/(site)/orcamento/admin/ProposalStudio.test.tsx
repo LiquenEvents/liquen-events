@@ -4937,7 +4937,11 @@ describe("o estúdio no telemóvel: fotos, acções e descrições", () => {
     await waitFor(() => expect(document.querySelector("[data-foto] img")).not.toBeNull());
     await morrer();
     await morrer();
-    expect(await screen.findByText(/Não consegui mostrá-la neste ecrã/i)).toBeTruthy();
+    // Sem notícias do browser, é o ramo de sempre: «Imagem guardada» e um
+    // botão para tentar outra vez.
+    expect(await screen.findByText(/Imagem guardada/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Tentar novamente" })).not.toBeNull();
+    expect(screen.queryByText(/O site não a deixa aparecer/i)).toBeNull();
 
     // O browser anuncia a recusa — com o `blockedURI` CORTADO À ORIGEM.
     await act(async () => {
@@ -4951,10 +4955,13 @@ describe("o estúdio no telemóvel: fotos, acções e descrições", () => {
     });
 
     expect(
-      await screen.findByText(/O site não a deixou aparecer aqui/i),
+      await screen.findByText(/O site não a deixa aparecer/i),
       "a célula continuou a acusar a fotografia de uma coisa que não é dela",
     ).toBeTruthy();
-    expect(screen.queryByText(/Não consegui mostrá-la neste ecrã/i)).toBeNull();
+    expect(
+      screen.queryByText(/Imagem guardada/i),
+      "continuou no ramo do ficheiro que não veio",
+    ).toBeNull();
     expect(
       screen.queryByRole("button", { name: "Tentar novamente" }),
       "um botão que não pode funcionar é uma promessa vazia",
