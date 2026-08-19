@@ -314,6 +314,35 @@ export const COLUNAS: Record<Densidade, string> = {
 };
 
 /**
+ * AS COLUNAS DA GRELHA DE FOTOS DE UM TEMA — e porque são DUAS no telemóvel.
+ *
+ * Medido a 375 px (iPhone SE) com três colunas: cada célula ficava com
+ * 97,7×97,7 px, e a 320 px com 79×79. Dentro dessa célula vivem TRÊS botões de
+ * 28×28 — ampliar, mover para o início e remover — que num ecrã de toque estão
+ * sempre visíveis (`[@media(hover:none)]:opacity-100`), porque sem passar o
+ * rato não há outra forma de lá chegar. Três alvos de 28 px, ou seja dois
+ * terços do mínimo de 44, e o × que APAGA a foto é um deles.
+ *
+ * Pô-los nos 44 px que a casa exige (`.alvo-toque`) não cabia em 98 px: os
+ * dois de baixo ficariam a 2 px um do outro e a foto desaparecia debaixo dos
+ * botões. Por isso a grelha passa a duas colunas onde o telemóvel é estreito —
+ * célula de 150,5 px a 375 e 123 px a 320, com 54 px e 27 px de folga entre os
+ * botões de baixo — e volta às três colunas a partir de 26rem (416 px), que é
+ * onde a célula (111 px) ainda as comporta.
+ *
+ * A biblioteca não fica mais curta de percorrer: são as mesmas fotos, maiores.
+ * É a mesma decisão que o `COLUNAS` acima já tinha tomado para os cartões.
+ *
+ * O `sm` passou de cinco colunas para quatro pela mesma conta, um degrau
+ * acima: num tablet de 640 px as cinco davam células de 105 px, e aí os dois
+ * botões de baixo ficavam a 7 px um do outro — abaixo dos 8 px de intervalo
+ * mínimo entre alvos. Com quatro são 133 px de célula e 37 px de intervalo. As
+ * cinco voltam em `md`, onde há largura para elas.
+ */
+export const GRELHA_DE_FOTOS =
+  "grid grid-cols-2 gap-2 min-[26rem]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6";
+
+/**
  * "há 3 dias", "hoje" — a data como se fala, para o cartão poder dizer o que
  * está vivo e o que está parado sem gastar uma linha inteira com um formato
  * completo. Datas futuras (relógios trocados) contam como hoje, em vez de
@@ -2647,7 +2676,7 @@ function ThemeFolder({
             <button
               type="button"
               onClick={() => setRenaming(true)}
-              className="font-display text-xl text-foreground/85 hover:text-[#4d6350]"
+              className="alvo-toque font-display text-xl text-foreground/85 hover:text-[#4d6350]"
               title="Renomear tema"
             >
               {theme.name}
@@ -3006,7 +3035,7 @@ function ThemeFolder({
         }`}
       >
         {loading ? (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
+          <div className={GRELHA_DE_FOTOS}>
             {Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className="bo-skeleton aspect-square rounded-lg" aria-hidden />
             ))}
@@ -3032,7 +3061,7 @@ function ThemeFolder({
           </div>
         ) : (
           <>
-            <div className="grid select-none grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
+            <div className={`select-none ${GRELHA_DE_FOTOS}`}>
               {/* AS FOTOS QUE ELA ACABOU DE LARGAR, já à vista, ainda a
                   caminho do servidor. Não são selecionáveis nem removíveis
                   (ainda não existem lá), e o leitor de ecrã segue a barra de
@@ -3157,13 +3186,22 @@ function ThemeFolder({
                         Capa
                       </span>
                     )}
+                    {/* ── OS TRÊS BOTÕES DA CÉLULA, E O `alvo-toque` ──────────
+                        Desenhados a 28×28 (`h-7 w-7`), que é a densidade certa
+                        com rato. Com o dedo eram dois terços do mínimo de 44 px
+                        — e num ecrã de toque estão os três SEMPRE visíveis,
+                        portanto o × que apaga a foto ficava a 28 px do ⤢ que só
+                        a amplia. `.alvo-toque` só cresce sob `(pointer:
+                        coarse)`; o portátil fica exactamente como estava. A
+                        largura para eles caberem vem da grelha de duas colunas
+                        — ver `GRELHA_DE_FOTOS`. */}
                     {i > 0 && (
                       <button
                         type="button"
                         onClick={() => moveTo(i, 0)}
                         aria-label={`Mover a foto ${i + 1} para o início`}
                         title="Mover para o início"
-                        className="absolute bottom-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                        className="alvo-toque absolute bottom-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                       >
                         ↑
                       </button>
@@ -3179,7 +3217,7 @@ function ThemeFolder({
                       }}
                       aria-label={`Ver a foto ${i + 1} em grande`}
                       title="Ver em grande"
-                      className="absolute left-1 bottom-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                      className="alvo-toque absolute left-1 bottom-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                     >
                       ⤢
                     </button>
@@ -3189,7 +3227,7 @@ function ThemeFolder({
                       aria-label={`Remover foto ${i + 1} de ${images.length}`}
                       // Num ecrã tátil não há "passar o rato": aí o × está sempre
                       // visível, senão a foto não se conseguia remover de todo.
-                      className="absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                      className="alvo-toque absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                     >
                       ×
                     </button>

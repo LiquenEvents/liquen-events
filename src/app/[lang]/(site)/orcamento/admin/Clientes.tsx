@@ -241,7 +241,19 @@ export default function Clientes({ quotes, onOpen }: Props) {
               type="button"
               onClick={() => setVipOnly((v) => !v)}
               aria-pressed={vipOnly}
-              className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium motion-safe:transition-colors ${
+              // ── `pointer-coarse:h-11`, E É O MESMO QUE O VIZINHO JÁ FAZ ───
+              // MEDIDO a 375×667 e a 320×667, com toque emulado: **69×36 px**.
+              // Oito abaixo do mínimo de 44 — e, pior, oito abaixo do
+              // `Segmented` que está ENCOSTADO a ele nesta mesma linha, que
+              // serve `h-9 pointer-coarse:h-11` e portanto já cresce para 44
+              // no dedo. Um filtro e a ordenação lado a lado, com alturas
+              // diferentes: o dedo que falha o VIP acerta no «Recentes».
+              //
+              // A correcção é copiar a regra do vizinho em vez de inventar
+              // outra — assim os dois sobem juntos e não voltam a divergir.
+              // Com rato ficam ambos em 36 px, que é a densidade calma que
+              // esta barra quer no portátil.
+              className={`inline-flex h-9 pointer-coarse:h-11 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium motion-safe:transition-colors ${
                 vipOnly
                   ? "bg-[#d6ab3a]/15 text-[#b88f28] shadow-[0_1px_2px_rgba(42,38,32,0.06)]"
                   : "bg-foreground/[0.04] text-foreground/55 hover:bg-foreground/[0.07] hover:text-foreground/75"
@@ -396,11 +408,29 @@ export default function Clientes({ quotes, onOpen }: Props) {
               {isOpen && (
                 <div className="border-t border-foreground/[0.07]">
                   {/* Contact bar */}
+                  {/* ── OS TRÊS ATALHOS DE CONTACTO LEVAM `alvo-toque` ───────
+                      MEDIDO a 375×667 e a 320×667, com toque emulado, com o
+                      cliente aberto: telefone **78×16 px**, email
+                      **171×16 px**, WhatsApp **75×16 px**. Dezasseis píxeis de
+                      altura — pouco mais de um terço do mínimo de 44 — em três
+                      links empilhados a 8 px uns dos outros (`gap-y-2`).
+
+                      É a barra mais irónica do back office: ligar, escrever e
+                      mandar WhatsApp ao cliente são as três coisas que só se
+                      fazem MESMO com o telemóvel na mão, e eram os três alvos
+                      mais pequenos de toda a vista. Um deles — o `tel:` — abre
+                      o marcador do telefone; falhar por um pixel e acertar no
+                      `mailto:` do lado troca uma chamada por um rascunho de
+                      email.
+
+                      `alvo-toque` cresce só no dedo, portanto a barra fina do
+                      portátil não muda. A altura de linha do texto continua a
+                      ser a mesma; o que cresce é a caixa em que se toca. */}
                   <div className="px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs bg-foreground/[0.015] border-b border-foreground/[0.05]">
                     {c.phone && (
                       <a
                         href={`tel:${c.phone}`}
-                        className="text-foreground/45 hover:text-[#4d6350] transition-colors flex items-center gap-1"
+                        className="alvo-toque text-foreground/45 hover:text-[#4d6350] transition-colors flex items-center gap-1"
                       >
                         <svg
                           width="11"
@@ -419,7 +449,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
                     {c.email && (
                       <a
                         href={`mailto:${c.email}`}
-                        className="text-[#4d6350]/80 hover:text-[#4d6350] transition-colors flex items-center gap-1"
+                        className="alvo-toque text-[#4d6350]/80 hover:text-[#4d6350] transition-colors flex items-center gap-1"
                       >
                         <svg
                           width="11"
@@ -441,7 +471,7 @@ export default function Clientes({ quotes, onOpen }: Props) {
                         href={`https://wa.me/${waPhone.replace("+", "")}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-75 transition-opacity flex items-center gap-1"
+                        className="alvo-toque text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-75 transition-opacity flex items-center gap-1"
                       >
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.31-1.96 1.36-.5.05-.96.24-3.23-.67-2.73-1.08-4.46-3.86-4.6-4.04-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.95-2.25.24-.27.53-.34.7-.34.18 0 .35 0 .5.01.16.01.38-.06.6.46.23.54.77 1.87.84 2 .07.14.11.3.02.48-.09.18-.13.29-.27.45-.13.16-.28.35-.4.47-.13.13-.27.28-.12.54.15.27.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.58.75 1.85.88.27.13.45.2.52.31.07.11.07.64-.17 1.32Z" />

@@ -143,3 +143,47 @@ describe("os quatro atalhos do topo", () => {
     expect(grelha.className).toMatch(/lg:flex-wrap/);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «…ESTE MÊSDEFINIR META» — O TÍTULO E A ACÇÃO ESTAVAM COLADOS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO no navegador, com toque emulado, na Visão Geral:
+ *
+ *   · a 375 px — **1 px** entre o fim do título e o princípio do botão
+ *   · a 320 px — **0 px**
+ *
+ * Lia-se «Meta de receita (com IVA) — este mêsDefinir meta»: uma frase só,
+ * sem se perceber onde acaba a legenda e começa a coisa em que se toca.
+ *
+ * A causa é um `justify-between` sem `gap`. Ele não SEPARA nada — só empurra
+ * os dois filhos para os extremos —, e quando o título cresce até lá, encostam.
+ * O título é longo por uma boa razão (o «(com IVA)», que a nota ao lado do
+ * código explica) e o botão troca de palavra («Definir»/«Editar»), portanto o
+ * encosto não é o acidente de um texto: é o estado normal desta linha num ecrã
+ * estreito.
+ *
+ * Depois, nos mesmos dois ecrãs: **12 px** de folga. O título quebra linha (já
+ * o fazia a 320) e o botão fica de uma linha só — daí o `shrink-0`, sem o qual
+ * o `gap` saía do botão e «Definir meta» partia-se em «Definir» / «meta», que é
+ * o mesmo defeito de legibilidade mudado de sítio.
+ *
+ * No computador não muda nada: aí sobram mais de 200 px e o `gap` nunca aperta.
+ */
+describe("a meta de receita — o título não encosta ao botão", () => {
+  const botaoDaMeta = () => screen.getByRole("button", { name: /^(Definir|Editar) meta$/ });
+
+  it("a linha do título abre folga entre os dois", () => {
+    desenhar();
+    const linha = botaoDaMeta().parentElement!;
+    // `justify-between` sozinho não separa: só encosta cada um ao seu extremo.
+    expect(linha.className).toMatch(/\bjustify-between\b/);
+    expect(linha.className).toMatch(/\bgap-3\b/);
+  });
+
+  it("quem quebra linha é o título, não o rótulo do botão", () => {
+    desenhar();
+    expect(botaoDaMeta().className).toMatch(/\bshrink-0\b/);
+  });
+});

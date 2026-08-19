@@ -111,7 +111,12 @@ export default function Servicos() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-[11px] text-foreground/55">
+            {/* 111×19 medidos a 375 px: o alvo de um checkbox é o RÓTULO
+                inteiro (o HTML manda o toque no rótulo activar o controlo), e
+                era o rótulo que estava baixo — não a caixa. `alvo-toque` no
+                `label`, como nas listas base do Material, cresce o alvo sem
+                mexer no quadrado desenhado. */}
+            <label className="alvo-toque !justify-start flex items-center gap-2 text-[11px] text-foreground/55">
               <input
                 type="checkbox"
                 checked={mostrarArquivados}

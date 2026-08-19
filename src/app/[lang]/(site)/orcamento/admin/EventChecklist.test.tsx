@@ -110,3 +110,54 @@ describe("Checklist do evento — duas marcações ao mesmo tempo", () => {
     expect(screen.getByText(/Não foi possível guardar a checklist/)).toBeTruthy();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ALVO DE TOQUE DA CAIXA DE MARCAR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Este ecrã usa-se DE PÉ, no local do evento, com o telemóvel numa mão: riscar
+ * um item é o gesto mais repetido que tem. Medida a 375 px com a checklist
+ * cheia, a caixa dava 20×20 px — menos de metade dos 44 do mínimo das Human
+ * Interface Guidelines, e falhá-la marca o item ao lado.
+ *
+ * ── PORQUE É QUE ISTO OLHA PARA UMA CLASSE E NÃO PARA UM TAMANHO ──────────
+ * Os 44 px vêm de `.alvo-toque` (globals.css), que só existe dentro de
+ * `@media (pointer: coarse)`. O jsdom não carrega o CSS da folha nem avalia
+ * media queries — `getBoundingClientRect()` devolve zeros aqui. Medir o
+ * tamanho a sério é trabalho do passeio `e2e/admin-mobile.spec.ts`, que corre
+ * num browser verdadeiro com `hasTouch`.
+ *
+ * O que ESTE teste guarda é a outra metade, e é a que se perde numa
+ * refactorização distraída: que o botão continua a ser quem leva a classe, e
+ * que o quadrado desenhado continua num filho. Trocar os dois — pôr o
+ * `alvo-toque` no `span` de dentro — deixa o ecrã igual no portátil e devolve
+ * os 20 px no telemóvel, sem nenhum teste a queixar-se.
+ */
+describe("Checklist do evento — o alvo de toque da caixa de marcar", () => {
+  it("o alvo é o botão, e o quadrado desenhado vive dentro dele", () => {
+    montar(ITENS);
+
+    const caixa = caixaDe("Confirmar catering");
+    expect(caixa.tagName).toBe("BUTTON");
+    // O botão é o alvo: é ele que cresce para os 44 px sob dedo.
+    expect(caixa.className).toContain("alvo-toque");
+
+    // E o quadrado de 20 px (`h-5 w-5`) é um FILHO — se subir para o botão,
+    // volta a ser o botão a ter 20 px e a classe deixa de servir para nada.
+    const quadrado = caixa.querySelector(".h-5.w-5");
+    expect(quadrado).not.toBeNull();
+    expect(caixa.className).not.toContain("h-5");
+  });
+
+  it("o rótulo que abre a edição também é um alvo de 44 px", () => {
+    montar(ITENS);
+
+    // O rótulo é a porta para editar o texto do item, e media 197×39 px.
+    // `getAllByTitle`: há um por linha da checklist, e o primeiro serve.
+    const rotulo = screen.getAllByTitle("Editar item")[0];
+    expect(rotulo.className).toContain("alvo-toque");
+    // Centrado por omissão pela classe; este texto é corrido e fica à esquerda.
+    expect(rotulo.className).toContain("!justify-start");
+  });
+});

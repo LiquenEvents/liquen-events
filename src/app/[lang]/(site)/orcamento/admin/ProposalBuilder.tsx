@@ -656,20 +656,43 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         )}
       </div>
 
-      {/* Line items */}
-      <div className="flex flex-col gap-2 mb-2">
-        <div className="flex gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+      {/*
+        Line items
+
+        ── PORQUE É QUE A LINHA SE PARTE EM DUAS NO TELEMÓVEL ────────────────
+        As três colunas fixas (Qt. 64 px, Unit. € 96 px, remover 40 px) mais os
+        intervalos comem 224 px da linha, aconteça o que acontecer. Medido no
+        iPhone SE (375 px), com este painel a 292 px: sobravam 68 px para a
+        DESCRIÇÃO — o campo onde se escreve "Decoração floral de cerimónia".
+        Com 68 px vêem-se quatro letras de cada vez, e a coluna que manda na
+        proposta era a mais pequena das quatro.
+
+        Abaixo de 24 rem a descrição passa a ocupar a linha inteira e os
+        números vão para a linha de baixo. O limiar é uma *container query*
+        (a largura DESTE painel, não a da janela) porque ele vive na gaveta do
+        pedido, que muda de largura com o ecrã: medido, o painel tem 292 px a
+        375, 469 px a 768, 661 px a 1024 e 444 px a 1280 — todos acima das 24
+        rem, portanto no computador nada se mexe.
+
+        O cabeçalho desaparece com a linha única, como o `@max-[36rem]:hidden`
+        do `PaymentsPanel` já fazia: uma fila de títulos por cima de campos que
+        já não estão debaixo dela mente mais do que a ausência dela. Os campos
+        continuam a ter nome para quem ouve — os rótulos são `sr-only`, não
+        inexistentes.
+      */}
+      <div className="@container flex flex-col gap-2 mb-2">
+        <div className="hidden @min-[24rem]:flex gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-foreground/55">
           <span className="flex-1">Descrição</span>
           <span className="w-16 text-center">Qt.</span>
           <span className="w-24 text-right">Unit. €</span>
           <span className="w-10" />
         </div>
         {items.map((it, i) => (
-          <div key={i} className="flex gap-2 items-center">
+          <div key={i} className="flex flex-wrap @min-[24rem]:flex-nowrap gap-2 items-center">
             <Field
               hideLabel
               label={`Descrição da linha ${i + 1}`}
-              containerClassName="flex-1 min-w-0"
+              containerClassName="w-full min-w-0 @min-[24rem]:w-auto @min-[24rem]:flex-1"
               value={it.description}
               onChange={(e) => update(i, { description: e.target.value })}
               placeholder="Ex.: Decoração floral"
@@ -699,7 +722,11 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
               onClick={() => removeRow(i)}
               disabled={items.length === 1}
               aria-label="Remover linha"
-              className="h-10 w-10 shrink-0 px-0 text-lg"
+              // A altura já vinha do `ui/Button.tsx` (`pointer-coarse:h-11`); a
+              // largura ficava presa em `w-10`. Medido no telemóvel: 40 × 44 —
+              // quatro píxeis a menos do que o mínimo, num botão que apaga uma
+              // linha de orçamento.
+              className="h-10 w-10 pointer-coarse:w-11 shrink-0 px-0 text-lg"
             >
               ×
             </Button>

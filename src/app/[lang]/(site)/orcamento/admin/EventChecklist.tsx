@@ -176,13 +176,17 @@ export default function EventChecklist({ quote, onChange }: Props) {
               style={{ width: `${pct}%` }}
             />
           </div>
+          {/* Os três botões desta barra mediam 27 px de altura a 375 px — e
+              dois deles são destrutivos («Limpar concluídas» apaga, «Marcar
+              todas» risca a lista inteira). `alvo-toque` põe-nos nos 44 sob
+              dedo e deixa o portátil como estava. */}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={markAll}
                 disabled={doneCount === items.length}
-                className="rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 disabled:pointer-events-none disabled:opacity-40 motion-safe:transition-colors"
+                className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 disabled:pointer-events-none disabled:opacity-40 motion-safe:transition-colors"
               >
                 Marcar todas
               </button>
@@ -191,7 +195,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
                   type="button"
                   onClick={clearCompleted}
                   onBlur={() => setConfirmClear(false)}
-                  className={`rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] motion-safe:transition-colors ${
+                  className={`alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] motion-safe:transition-colors ${
                     confirmClear
                       ? "bg-[#b5654a]/10 text-[#b5654a] hover:bg-[#b5654a]/[0.16]"
                       : "text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75"
@@ -207,7 +211,7 @@ export default function EventChecklist({ quote, onChange }: Props) {
               <button
                 type="button"
                 onClick={addTemplateItems}
-                className="rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 motion-safe:transition-colors"
+                className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 motion-safe:transition-colors"
               >
                 Adicionar itens do modelo ({missingFromTemplate.length})
               </button>
@@ -219,28 +223,50 @@ export default function EventChecklist({ quote, onChange }: Props) {
                 key={i.id}
                 className="group flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-foreground/[0.02]"
               >
+                {/* ── O ALVO CRESCE, O QUADRADO NÃO ────────────────────────
+                    Medido a 375 px com a checklist cheia: este botão dava
+                    20×20 px. É menos de metade dos 44 do mínimo, e é a caixa
+                    que ela risca DE PÉ, no local, com o telemóvel numa mão —
+                    o gesto mais repetido deste ecrã e aquele em que acertar
+                    ao lado marca o item errado.
+
+                    Cresce o BOTÃO (`alvo-toque`, só sob `pointer: coarse`) e
+                    o quadrado desenhado passa para o `span` de dentro, que
+                    fica nos mesmos 20 px. É a regra que o `globals.css` já
+                    escreve ao lado da classe: quem cresce é o alvo, não o
+                    desenho. No portátil nada muda. */}
                 <button
                   onClick={() => toggle(i.id)}
                   role="checkbox"
                   aria-checked={i.done}
                   aria-label={i.label}
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border motion-safe:transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
-                    i.done
-                      ? "border-[#4d6350] bg-[#4d6350]"
-                      : "border-foreground/30 hover:border-[#4d6350]/60"
-                  }`}
+                  className="alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55"
                 >
-                  {i.done && (
-                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                      <path
-                        d="M2 6l2.5 2.5L10 3"
-                        stroke="white"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
+                  <span
+                    className={`flex h-5 w-5 items-center justify-center rounded-md border motion-safe:transition-colors ${
+                      i.done
+                        ? "border-[#4d6350] bg-[#4d6350]"
+                        : "border-foreground/30 hover:border-[#4d6350]/60"
+                    }`}
+                  >
+                    {i.done && (
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M2 6l2.5 2.5L10 3"
+                          stroke="white"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </span>
                 </button>
                 {editingId === i.id ? (
                   <input
@@ -260,7 +286,11 @@ export default function EventChecklist({ quote, onChange }: Props) {
                     type="button"
                     onClick={() => startEdit(i)}
                     title="Editar item"
-                    className={`flex-1 rounded-md text-left text-sm leading-snug decoration-dotted underline-offset-2 hover:underline ${
+                    // 197×39 medidos a 375 px: o rótulo é a porta para editar
+                    // o item e ficava 5 px abaixo do mínimo. `!justify-start`
+                    // porque `alvo-toque` centra por omissão e este texto é
+                    // corrido, alinhado à esquerda.
+                    className={`alvo-toque !justify-start flex-1 rounded-md text-left text-sm leading-snug decoration-dotted underline-offset-2 hover:underline ${
                       i.done ? "text-foreground/35 line-through" : "text-foreground/75"
                     }`}
                   >

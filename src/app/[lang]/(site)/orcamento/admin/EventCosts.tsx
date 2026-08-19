@@ -149,7 +149,11 @@ export default function EventCosts({ quote, onChange }: Props) {
   }
 
   return (
-    <div className="border-t border-foreground/10 pt-6">
+    // `@container`: os três quadrados de número aqui em baixo reagem à largura
+    // DESTE painel, não à da janela — ele vive no dossier, onde a coluna lateral
+    // lhe rouba largura sem a janela encolher. É o mesmo que o `PaymentsPanel`
+    // já faz, e pela mesma razão.
+    <div className="@container border-t border-foreground/10 pt-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Fornecedores &amp; Custos</p>
         {items.length > 0 && (
@@ -161,7 +165,17 @@ export default function EventCosts({ quote, onChange }: Props) {
 
       {/* Margin summary — the headline number. Receita/Custos/Margem na mesma base
           (sem IVA) para reconciliarem no ecrã; o valor com IVA vai por baixo. */}
-      <div className="mb-5 grid grid-cols-3 gap-2.5">
+      {/* ── DUAS COLUNAS PRIMEIRO, TRÊS SÓ QUANDO CABEM ────────────────────
+          Três colunas fixas partiam os números no telemóvel — o defeito que o
+          `PaymentsPanel` tinha na mesma linha de código, encontrado ao lado e
+          relatado por quem não lhe podia mexer. Medido a 375 px, com o painel
+          a 343: 68 px de caixa por célula, e «18 415,00 €» precisa de 82. O
+          número transbordava para cima do vizinho — e estes são a receita, o
+          custo e a margem, ou seja, os três números por que ela decide se o
+          evento vale a pena.
+          O limiar é o mesmo do painel dos pagamentos (26 rem, medido no
+          contentor) para os dois não divergirem. No computador nada muda. */}
+      <div className="mb-5 grid grid-cols-2 @min-[26rem]:grid-cols-3 gap-2.5">
         <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
           <p className="text-sm font-semibold text-foreground/80 tabular-nums">
             {eur2(totals.revenueNet)}
@@ -184,7 +198,10 @@ export default function EventCosts({ quote, onChange }: Props) {
             c/ IVA {eur2(totals.actual)}
           </p>
         </div>
-        <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
+        {/* A Margem atravessa as duas colunas na linha de baixo: é o número
+            que decide, e uma linha só para ele é a leitura que já tinha no
+            computador — melhor do que ficar sozinho a meia largura. */}
+        <div className="col-span-2 @min-[26rem]:col-span-1 rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] p-3 text-center">
           <p
             className={`text-sm font-semibold tabular-nums ${totals.margin >= 0 ? "text-[#4d6350]" : "text-[#8a2a22]"}`}
           >
@@ -214,16 +231,32 @@ export default function EventCosts({ quote, onChange }: Props) {
                   <p className="truncate text-sm font-medium text-foreground/80">{it.name}</p>
                   <p className="text-[11px] text-foreground/45">{it.category}</p>
                 </div>
+                {/* Parece uma pastilha de estado, mas é um botão: cada toque
+                    faz rodar contactado → confirmado → pago. Media 27 px de
+                    altura a 375 px (49 a 88 de largura, conforme a palavra), e
+                    fica encostado ao «Remover» da mesma linha — falhar-lhe o
+                    alvo é apagar o fornecedor.
+
+                    A cor pintada fica no `span`, e não no botão: com o fundo
+                    no alvo de 44 px a pastilha passava a ser um bloco de cor
+                    do tamanho de um botão principal, e esta é uma marca de
+                    estado, não a acção mais importante da linha. Assim o
+                    desenho fica igual ao que era e só o alvo cresce — a mesma
+                    divisão das caixas de marcar deste dossier. */}
                 <button
                   onClick={() => cycleStatus(it)}
-                  className="shrink-0 rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] motion-safe:transition-opacity hover:opacity-80"
-                  style={{
-                    background: `${metaFor(STATUS_META, it.status).color}18`,
-                    color: metaFor(STATUS_META, it.status).color,
-                  }}
+                  className="alvo-toque shrink-0 motion-safe:transition-opacity hover:opacity-80"
                   title="Clica para mudar o estado"
                 >
-                  {metaFor(STATUS_META, it.status).label}
+                  <span
+                    className="rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.1em]"
+                    style={{
+                      background: `${metaFor(STATUS_META, it.status).color}18`,
+                      color: metaFor(STATUS_META, it.status).color,
+                    }}
+                  >
+                    {metaFor(STATUS_META, it.status).label}
+                  </span>
                 </button>
                 <button
                   onClick={() => remove(it.id)}

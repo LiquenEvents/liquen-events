@@ -131,6 +131,14 @@ export default function GuestList({ quote, onChange }: Props) {
     <section className="border-t border-foreground/10 pt-6">
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="bo-eyebrow">Lista de Convidados</p>
+        {/* ── OS DOIS BOTÕES DE ÍCONE DESTA BARRA ──────────────────────────
+            O `ui/Button` já dá os 44 px de ALTURA sob dedo
+            (`pointer-coarse:h-11`), mas estes são só ícone e levam `px-2`
+            para ficarem compactos — medidos a 375 px davam 39 px de LARGURA.
+            Altura certa, largura curta: o alvo continuava por baixo do
+            mínimo no eixo que ninguém tinha medido. `alvo-toque` trata do
+            `min-width`, e os dois estão colados um ao outro (`gap-1`), que é
+            o caso em que falhar a largura acerta no vizinho. */}
         {guests.length > 0 && (
           <div className="flex items-center gap-1">
             <Button
@@ -158,7 +166,7 @@ export default function GuestList({ quote, onChange }: Props) {
                   />
                 </svg>
               }
-              className="px-2"
+              className="px-2 alvo-toque"
             />
             <Button
               variant="ghost"
@@ -184,7 +192,7 @@ export default function GuestList({ quote, onChange }: Props) {
                   <rect x="6" y="14" width="12" height="7" rx="1" />
                 </svg>
               }
-              className="px-2"
+              className="px-2 alvo-toque"
             />
             <span className="ml-1 shrink-0 rounded-full bg-foreground/[0.05] px-2.5 py-1 text-[11px] tabular-nums text-foreground/55">
               {guests.length} {guests.length === 1 ? "grupo" : "grupos"}

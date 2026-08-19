@@ -398,8 +398,27 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
       {/* ── Resumo — as três respostas que importam, numa linha ──
           Recebido = pagamentos marcados como pagos (atualiza ao vivo). "Em
           falta" é o herói quando há dinheiro por receber; quando está tudo
-          recebido vira um estado calmo de confirmação. */}
-      <div className="grid grid-cols-3 gap-2.5 mb-1.5">
+          recebido vira um estado calmo de confirmação.
+
+          ── PORQUE É QUE AS TRÊS COLUNAS TÊM UM LIMIAR ─────────────────────
+          Três colunas fixas partiam os números no telemóvel. Medido num
+          iPhone SE (375 px), com este painel a 343 px de largura: cada célula
+          dava 68 px de conteúdo, e "22 650,45 €" precisa de 94 px, o "Em
+          falta" (que é maior, `text-lg`) precisa de 106 px, e a linha do IVA
+          partia-se em QUATRO. O número transbordava da célula e ia por cima da
+          vizinha — e é este o número que ela lê para decidir se já pode
+          facturar.
+
+          Duas colunas dão 142 px de conteúdo a cada uma, que chega com folga
+          para os dois. As três só voltam quando o PAINEL (não a janela: ele
+          vive no dossier, no separador Financeiro e no estúdio) tem 26 rem —
+          3 × 130 px de célula mais os intervalos, que é o mínimo em que o "Em
+          falta" cabe inteiro.
+
+          O "Em falta" atravessa as duas colunas em baixo, e não fica meio a
+          meio com o "Recebido": é o herói deste bloco, e uma linha só para ele
+          é a leitura que já tinha no computador. */}
+      <div className="grid grid-cols-2 @min-[26rem]:grid-cols-3 gap-2.5 mb-1.5">
         <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.02] p-3 text-center">
           <p className="text-base font-semibold tabular-nums text-foreground/85">{eur2(total)}</p>
           <p className="text-foreground/40 text-[9px] tracking-[0.2em] uppercase mt-1">
@@ -416,7 +435,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           <p className="text-foreground/40 text-[9px] tracking-[0.2em] uppercase mt-1">Recebido</p>
         </div>
         {allReceived ? (
-          <div className="rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.05] p-3 text-center flex flex-col items-center justify-center">
+          <div className="col-span-2 @min-[26rem]:col-span-1 rounded-xl border border-[#4d6350]/25 bg-[#4d6350]/[0.05] p-3 text-center flex flex-col items-center justify-center">
             <p className="text-sm font-semibold text-[#4d6350] inline-flex items-center gap-1.5">
               Tudo recebido
               <svg
@@ -435,7 +454,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
           </div>
         ) : (
           <div
-            className={`rounded-xl border p-3 text-center ${
+            className={`col-span-2 @min-[26rem]:col-span-1 rounded-xl border p-3 text-center ${
               outstanding > 0
                 ? "border-[#b5654a]/35 bg-[#b5654a]/[0.05]"
                 : "border-foreground/[0.06] bg-foreground/[0.02]"
@@ -735,7 +754,13 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   onClick={() => startEdit(p)}
                   aria-label={`Editar valor de ${KIND_LABEL[p.kind]}, ${eur2(p.amount)}`}
                   title="Clica para editar o valor"
-                  className={`rounded-md px-1.5 py-1 text-xs font-semibold tabular-nums text-right hover:bg-foreground/[0.06] ${
+                  // `pointer-coarse:min-h-11` e não `alvo-toque`: a classe da
+                  // casa põe `justify-content: center`, e este número está
+                  // alinhado à DIREITA para bater certo com a coluna do
+                  // formulário por cima. Media 137,5 × 24 px no telemóvel — é o
+                  // botão que abre a edição do valor, e 24 px é meia polpa de
+                  // dedo.
+                  className={`rounded-md px-1.5 py-1 pointer-coarse:min-h-11 text-xs font-semibold tabular-nums text-right hover:bg-foreground/[0.06] ${
                     p.paid ? "text-[#4d6350]" : "text-foreground/55"
                   }`}
                 >
@@ -762,7 +787,10 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                 aria-label={`Estado de ${KIND_LABEL[p.kind]} ${eur2(p.amount)}`}
                 onClick={() => togglePaid(p)}
                 title={p.paid ? "Pago — clique para pôr pendente" : "Pendente — clique para pago"}
-                className={`rounded-md px-1.5 py-0.5 text-[9px] tracking-[0.1em] uppercase text-center motion-safe:transition-colors ${
+                // Media 137,5 × 23,2 px no telemóvel. É o interruptor de
+                // "Pago/Pendente" — o gesto que muda o Recebido lá em cima — e
+                // fica encostado ao × de remover.
+                className={`rounded-md px-1.5 py-0.5 pointer-coarse:min-h-11 text-[9px] tracking-[0.1em] uppercase text-center motion-safe:transition-colors ${
                   p.paid
                     ? "bg-[#4d6350]/15 text-[#4d6350] hover:bg-[#4d6350]/25"
                     : "bg-foreground/[0.06] text-foreground/50 hover:bg-foreground/[0.12]"
@@ -785,7 +813,12 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                     <button
                       type="button"
                       onClick={() => remove(p)}
-                      className="text-foreground/45 hover:text-[#b5654a] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-all p-1"
+                      // 18,4 × 33,6 px medidos no telemóvel, a 2 px do
+                      // interruptor de Pago. Apagar um pagamento por engano é
+                      // apagar dinheiro do registo, e é o alvo mais pequeno da
+                      // linha — aqui a centragem do `alvo-toque` é a certa,
+                      // porque o conteúdo é um símbolo.
+                      className="alvo-toque text-foreground/45 hover:text-[#b5654a] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-all p-1"
                       aria-label={`Remover ${KIND_LABEL[p.kind]} ${eur2(p.amount)}`}
                     >
                       ×

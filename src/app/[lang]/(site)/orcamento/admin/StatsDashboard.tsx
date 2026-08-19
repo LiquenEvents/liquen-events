@@ -203,6 +203,24 @@ function Section({
   );
 }
 
+/**
+ * OS QUADRADOS DE NÚMERO DENTRO DE UMA SECÇÃO — porque não são dois a 320 px.
+ *
+ * As secções («Dinheiro», «Rentabilidade») já gastam 24 px de cada lado
+ * (`px-6`), e cada quadrado gasta mais 20 (`p-5`). Medido a 320 px, sobravam
+ * 71 px de largura útil por quadrado, e um total de seis algarismos precisa de
+ * 109: «202 889 €» passava 17 px PARA ALÉM da borda do quadrado, que tem
+ * `overflow-hidden` — ou seja, o € desaparecia. «164 950 €» perdia 13 px, e o
+ * rótulo «Custo fornecedores» era cortado a 78 px de texto em 71 de caixa.
+ *
+ * A 375 px (o ecrã de referência) o mesmo número cabe com 10 px de folga, e é
+ * por isso que a segunda coluna só sai abaixo de 22rem (352 px): quem tem
+ * telemóvel estreito lê o número inteiro, e quem tem 375 continua a ver a
+ * grelha de dois que sempre viu. Os quadrados de topo, esses, nunca estiveram
+ * em causa — vivem fora da secção e têm 124 px úteis.
+ */
+const QUADRADOS_DE_NUMERO = "grid grid-cols-1 min-[22rem]:grid-cols-2 gap-3";
+
 // A lightweight titled block used inside a Section — no border of its own, so
 // grouped charts read as one calm panel instead of nested cards.
 function Sub({ title, children }: { title: string; children: React.ReactNode }) {
@@ -632,7 +650,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         <Section title="Dinheiro" hint="Pagamentos registados nos pedidos." defaultOpen>
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-8">
             <Sub title="Recebido e a receber">
-              <div className="grid grid-cols-2 gap-3 mb-5">
+              <div className={`${QUADRADOS_DE_NUMERO} mb-5`}>
                 <Kpi value={eur(stats.received)} label="Recebido" accent />
                 <Kpi value={eur(stats.outstanding)} label="A receber" />
                 <Kpi value={eur(stats.avgTicket)} label="Ticket médio (com IVA)" />
@@ -712,7 +730,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
           <Sub title="Eventos ganhos">
             {stats.hasProfit ? (
               <>
-                <div className="grid grid-cols-2 gap-3">
+                <div className={QUADRADOS_DE_NUMERO}>
                   <Kpi
                     value={eur(stats.profitability.contracted)}
                     label="Receita contratada"
