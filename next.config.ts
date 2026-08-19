@@ -145,7 +145,46 @@ const nextConfig: NextConfig = {
    * mostra-o na mesma.
    */
   outputFileTracingIncludes: {
-    "/**": ["public/email/**/*"],
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O BINÁRIO DO `sharp` TEM DE VIAJAR COM A FUNÇÃO — não viajava
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Em produção, o back office deixou de conseguir listar os TEMAS. O que os
+     * registos do Vercel diziam não era um erro de base de dados nenhum:
+     *
+     *   Failed to handle /api/temas
+     *   Error: Could not load the "sharp" module using the linux-x64 runtime
+     *   ERR_DLOPEN_FAILED: libvips-cpp.so.8.18.3: cannot open shared object
+     *   file: No such file or directory
+     *
+     * Ou seja: a função rebentava INTEIRA (`FUNCTION_INVOCATION_FAILED`) antes
+     * de chegar ao código da rota — e é por isso que o ecrã não conseguia
+     * dizer o que se passava, e que a lista aparecia vazia como se os temas
+     * dela tivessem desaparecido. Não tinham.
+     *
+     * E a rota dos temas nem sequer usa `sharp`: o empacotador junta rotas em
+     * pedaços partilhados, e basta que o pedaço onde ela caiu referencie o
+     * módulo para o carregamento ser tentado.
+     *
+     * ── PORQUE É QUE FALTAVA ─────────────────────────────────────────────
+     * O `sharp` está em `serverExternalPackages` (ver acima, com a razão): não
+     * é empacotado, é carregado de `node_modules` em tempo de execução. Quem
+     * decide então o que vai dentro da função é o rastreador de ficheiros, que
+     * segue `import`/`require` — e o `.so` do libvips não é importado por
+     * ninguém: é aberto por `dlopen` a partir do binário, já em execução. O
+     * rastreador não tem como o ver, e deixava-o para trás.
+     *
+     * As duas linhas abaixo são os dois pacotes que compõem o `sharp` no
+     * Linux x64 (o alvo do Vercel): o vínculo Node e a biblioteca nativa que
+     * ele abre. Com `/**` porque o pedaço partilhado pode cair em qualquer
+     * rota — foi precisamente o que aconteceu com `/api/temas`.
+     */
+    "/**": [
+      "public/email/**/*",
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+    ],
   },
 
   experimental: {
