@@ -70,6 +70,40 @@ export type ImagePlacement = "cover" | "collage";
  *
  * Não subir estes valores sem medir: o peso do PDF é ~95% streams de imagem e
  * cresce com o QUADRADO do DPI.
+ *
+ * ── MEDIDO, E POR ISSO NÃO SE MEXEU (nem para baixo nem para cima) ────────
+ *
+ * A capa a 150 DPI em vez de 160 foi proposta com a regra da casa à frente («o
+ * olho resolve ~150 DPI a 30 cm»), e a 200 foi proposta em sentido contrário,
+ * por causa da impressão. Medi as duas, com seis fotografias reais do
+ * repositório, na caixa da tira da capa (277,8 × 595,3 pt) e com estas mesmas
+ * opções de JPEG:
+ *
+ *     130 DPI   502×1075   810 KB    65% do que está hoje
+ *     150 DPI   579×1240  1084 KB    88%      (−12%)
+ *     160 DPI   617×1323  1239 KB   100%      ← o que está
+ *     200 DPI   772×1654  2003 KB   162%      (+62%)
+ *
+ * E o que se perde ao descer, comparando as duas versões levadas ao mesmo
+ * raster: **5,0% de diferença média por píxel** (máxima 210/255, nos
+ * contornos). Para escala: a segunda compressão que o caminho da miniatura já
+ * impõe às células dos mood boards custa 1,4% — ou seja, descer a capa para
+ * 150 DPI tira três vezes e meia mais detalhe do que a única perda que o
+ * documento já aceita, e tira-o à primeira coisa que o cliente vê e à única
+ * que ele pode querer imprimir.
+ *
+ * O que se ganhava: ~55 KB numa proposta de 714 KB, num anexo cujo tecto
+ * prático (`LIMITE_DE_ANEXO`, 8 MB) está a mais de dez vezes de distância. O
+ * peso do PDF, medido de ponta a ponta, não é um problema desta aplicação:
+ * o pior caso possível do gerador — 80 fotografias — dá 2,65 MB.
+ *
+ * Subir para 200 tem o problema simétrico e um pior: +62% de bytes E +62% de
+ * trabalho do `sharp` na caixa mais cara do documento, quando a proposta
+ * grande já está encostada ao tecto de tempo da rota (ver `custo-do-pdf.ts`,
+ * `orcamentoDeTempo`).
+ *
+ * Conclusão: 160 e 130 ficam como estão. Fica escrito para não ser proposto
+ * outra vez sem números novos.
  */
 const PLACEMENT_DPI: Record<ImagePlacement, number> = {
   cover: 160,
@@ -544,6 +578,21 @@ export async function garantirFormatoImprimivel(
  * O ganho desta função não era poupar bytes num objecto de 12 KB: era tirar a
  * TRANSPARÊNCIA de todas as páginas. A 300 DPI continuam a sair 2,4× menos
  * pixéis do que os 720 que lá estavam, e a máscara alfa desaparece à mesma.
+ *
+ * ── E O LOGÓTIPO DA CAPA, QUE CONTINUA A 350 DPI ─────────────────────────
+ *
+ * Medido no ficheiro gerado: o da capa sai 720×430 px para ser desenhado com
+ * 148 pt de largura — 350 DPI, os pixéis com que o ficheiro nasceu. Não passa
+ * por aqui de propósito (a razão está no gerador: achatá-lo contra o
+ * verde-escuro desenha um rectângulo visível à volta da marca), e redimensioná-lo
+ * SEM achatar — que resolveria o DPI sem esse problema — obriga a mexer no
+ * ponto de desenho.
+ *
+ * Não se fez, e a razão é a mesma que deixou a capa a 160 DPI (ver
+ * `PLACEMENT_DPI`): o que está em causa são uns poucos KB num ficheiro que tem
+ * dez vezes de folga até ao limite de anexo, contra tirar definição a uma
+ * marca de traço fino na primeira página. Fica escrito com o número ao lado
+ * para quem um dia mexer no desenho da capa: é uma linha, e o ganho é esse.
  */
 const LOGO_DPI = 300;
 
