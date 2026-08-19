@@ -31,6 +31,12 @@ import { emailAoCliente } from "@/lib/email-assinatura";
 import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
 import { marcadoresDoPedido, modeloParaEnvioAutomatico, textoDoCorpo } from "@/lib/email-modelos";
 import { arrumarLigacao, ROTULO_DA_PROPOSTA } from "@/lib/email-ligacoes";
+import {
+  corpoEscritoAMao,
+  excedeOTecto,
+  MAXIMO_CORPO_ESCRITO,
+  paragrafosDeTexto,
+} from "@/lib/email-corpo-escrito";
 import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
 
@@ -106,33 +112,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export const maxDuration = 60;
 
 /**
- * ════════════════════════════════════════════════════════════════════════════
- * O TEXTO QUE ELA ESCREVEU, EM HTML QUE NÃO SE PARTE
- * ════════════════════════════════════════════════════════════════════════════
+ * O texto que ela escreveu, em HTML que não se parte.
  *
- * A mensagem pessoal é TEXTO escrito à mão numa caixa — não é marcação. Um
- * «arco & flores» ou um «<3» num email HTML sem escape dá, na melhor das
- * hipóteses, um símbolo que desaparece; na pior, uma etiqueta aberta que come o
- * resto da mensagem (o botão da proposta incluído). Por isso passa toda pelo
- * `esc`, e só DEPOIS de escapada é que se lhe acrescenta marcação nossa.
- *
- * As quebras de linha dela têm de sobreviver: num `<p>` sem tratamento, o
- * navegador de correio junta tudo numa só linha e o que ela escreveu em três
- * parágrafos chega como um bloco. Linha em branco = parágrafo novo; quebra
- * simples = `<br>`, que é a leitura que qualquer pessoa faz de uma caixa de
- * texto.
- *
- * `white-space:pre-wrap` teria feito o mesmo com menos código, e não serve
- * aqui: o Outlook (motor Word) ignora-o, e é onde metade destes emails abre.
+ * Era uma função escrita aqui; mudou-se inteira para o `email-corpo-escrito`,
+ * onde tem agora um segundo utilizador (o corpo que quem envia escreve à mão) e
+ * onde está a razão por extenso: uma caixa de texto é TEXTO, escapa-se tudo e
+ * só depois se lhe acrescenta marcação nossa. Duas cópias do mesmo tratamento
+ * eram duas oportunidades para uma delas ficar sem escape.
  */
-function paragrafosDaMensagem(texto: string): string {
-  return texto
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => `<p style="font-size:14px;line-height:1.6">${esc(p).replace(/\n/g, "<br>")}</p>`)
-    .join("\n        ");
-}
+const paragrafosDaMensagem = paragrafosDeTexto;
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!isAuthed(request)) {
@@ -151,6 +139,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       doc?: ProposalDoc;
       idioma?: unknown;
       mensagem?: unknown;
+      /** O corpo do email reescrito por quem envia — ver a nota mais abaixo.
+       *  Ausente em todos os pedidos anteriores a esta caixa existir. */
+      corpo?: unknown;
       /** «Já vi o que fica cortado, envia à mesma» — ver a pergunta antes do
        *  envio, mais abaixo. Só `true` conta: qualquer outra coisa é «ainda
        *  não respondeu». */
@@ -167,6 +158,42 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * deste ficheiro: uma proposta que não segue é um negócio parado.
      */
     const mensagem = typeof body?.mensagem === "string" ? body.mensagem.trim() : "";
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O CORPO ESCRITO À MÃO — O MODELO É O PONTO DE PARTIDA, NÃO A PALAVRA FINAL
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Quem envia pode reescrever o corpo do email antes de carregar em Enviar,
+     * e é esse que sai. O tratamento — escape, tecto, parágrafos — está todo no
+     * `email-corpo-escrito`: é texto de uma caixa, não é marcação, e a razão
+     * está escrita lá.
+     *
+     * SEM `corpo`, nada disto acontece e o email é byte a byte o que era: o
+     * texto da casa com a mensagem pessoal dela, ou o modelo, pelas mesmas
+     * regras de sempre (a nota longa está mais abaixo). Uma rota que passasse a
+     * EXIGIR o corpo de fora partia tudo o que já a chama, a começar pela
+     * pré-visualização.
+     *
+     * Com `corpo`, a MENSAGEM PESSOAL fica de fora do email — e a regra que se
+     * segue é a mesma de sempre, só com mais um degrau em cima: ganha a mais
+     * específica. Quem está a escrever o corpo inteiro já lá põe a nota pessoal
+     * onde quiser; acrescentá-la outra vez a seguir dava-lhe o texto a dobrar.
+     * E a MOLDURA continua a fechar sempre no `emailAoCliente`, corpo escrito à
+     * mão ou não: a assinatura é da casa e entra uma só vez.
+     */
+    const corpoCru = body?.corpo;
+    if (excedeOTecto(corpoCru)) {
+      return NextResponse.json(
+        {
+          error:
+            `O texto do email é demasiado longo (o máximo são ${MAXIMO_CORPO_ESCRITO} caracteres). ` +
+            `Encurta-o e volta a enviar — não foi enviado nada.`,
+        },
+        { status: 400 },
+      );
+    }
+    const escrito = corpoEscritoAMao(corpoCru);
 
     /**
      * ══════════════════════════════════════════════════════════════════════
@@ -675,14 +702,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * O caminho por direito é o ecrã dos modelos ganhar uma versão inglesa de
      * cada modelo. É trabalho de interface e é uma decisão dela; até lá, isto.
      */
-    if (idioma !== "pt" && !mensagem) {
+    if (idioma !== "pt" && !mensagem && !escrito) {
       log.warn(
         "proposta-doc: proposta noutra língua — o modelo «proposta-enviada» não é consultado, sai o texto da casa",
         { id, idioma },
       );
     }
     const doModelo =
-      mensagem || idioma !== "pt"
+      escrito || mensagem || idioma !== "pt"
         ? null
         : await modeloParaEnvioAutomatico(
             "proposta-enviada",
@@ -736,28 +763,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const corpoDoModelo =
       doModelo && arrumarLigacao(doModelo.html, { url: acceptUrl, rotulo: ROTULO_DA_PROPOSTA });
 
-    const email = corpoDoModelo
-      ? emailAoCliente({ html: corpoDoModelo, texto: textoDoCorpo(corpoDoModelo), quem })
-      : emailAoCliente({
-          quem,
-          html: `<h2 style="font-size:18px;margin:0 0 12px">${esc(t.titulo)}</h2>
+    const email = escrito
+      ? emailAoCliente({ html: escrito.html, texto: escrito.texto, quem })
+      : corpoDoModelo
+        ? emailAoCliente({ html: corpoDoModelo, texto: textoDoCorpo(corpoDoModelo), quem })
+        : emailAoCliente({
+            quem,
+            html: `<h2 style="font-size:18px;margin:0 0 12px">${esc(t.titulo)}</h2>
         <p style="font-size:14px;line-height:1.6">${esc(t.ola)} ${esc(doc.clientNames)},</p>
         ${mensagem ? `${paragrafosDaMensagem(mensagem)}\n        ` : ""}<p style="font-size:14px;line-height:1.6">${esc(t.intro)}</p>
         <p style="margin:24px 0"><a href="${acceptUrl}" style="display:inline-block;background:#637a5f;color:#f7f4ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">${esc(t.botao)}</a></p>`,
-          texto: [
-            t.titulo,
-            "",
-            `${t.ola} ${doc.clientNames},`,
-            "",
-            // Tal e qual, com as quebras dela: escapar é uma preocupação de HTML, e
-            // aqui só se lhe acrescenta a linha em branco que a separa do resto.
-            // A mensagem pessoal não se traduz em língua nenhuma — é dela, como
-            // os títulos e as legendas do documento.
-            ...(mensagem ? [mensagem, ""] : []),
-            t.introEmTexto,
-            `${t.verOnline} ${acceptUrl}`,
-          ].join("\n"),
-        });
+            texto: [
+              t.titulo,
+              "",
+              `${t.ola} ${doc.clientNames},`,
+              "",
+              // Tal e qual, com as quebras dela: escapar é uma preocupação de HTML, e
+              // aqui só se lhe acrescenta a linha em branco que a separa do resto.
+              // A mensagem pessoal não se traduz em língua nenhuma — é dela, como
+              // os títulos e as legendas do documento.
+              ...(mensagem ? [mensagem, ""] : []),
+              t.introEmTexto,
+              `${t.verOnline} ${acceptUrl}`,
+            ].join("\n"),
+          });
 
     // A proposta JÁ foi guardada acima. O envio do email é um passo separado: se
     // falhar (SMTP em baixo, credenciais erradas, email do cliente inválido) NÃO

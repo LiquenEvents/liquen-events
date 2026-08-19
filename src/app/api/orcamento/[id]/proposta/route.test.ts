@@ -633,6 +633,77 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     expect(email.text).not.toMatch(/[<>]/);
   });
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O CORPO ESCRITO À MÃO GANHA AO MODELO — E A SUA AUSÊNCIA NÃO MUDA NADA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O modelo passa a ser o ponto de partida: quem envia reescreve o corpo antes
+   * de carregar em Enviar, e é esse que sai. O que NÃO pode mudar é o envio sem
+   * corpo nenhum — que é todo o correio que hoje sai daqui.
+   */
+  it("com corpo escrito à mão, é ele que sai — e o modelo fica de fora", async () => {
+    authed.ok = true;
+    modelo.get.mockResolvedValue(modeloGuardado("A sua proposta", `<p>Texto do modelo dela.</p>`));
+    await POST(
+      req("POST", { ...validItems, corpo: "Olá Ana,\nComo combinámos.\n\nAté já!" }),
+      ctx("LIQ-1"),
+    );
+    const email = enviado();
+    expect(email.html).toContain("Olá Ana,<br>Como combinámos.");
+    expect(email.html).toContain("Até já!");
+    expect(email.html).not.toContain("Texto do modelo dela.");
+    expect(email.text).toContain("Olá Ana,\nComo combinámos.");
+    // O ASSUNTO não se toca: continua a ser o dela.
+    expect(email.subject).toBe("A sua proposta");
+  });
+
+  /**
+   * O ESCAPE não se mede aqui, e é de propósito: este ficheiro troca o `esc`
+   * pela identidade (ver o `vi.mock` de `@/lib/mail` lá em cima) para os testes
+   * poderem ler os nomes por extenso, portanto um teste de escape nesta rota
+   * ficava verde a dizer o contrário do que se passa em produção. Quem o prova é
+   * o `email-corpo-escrito.test.ts`, com o `esc` verdadeiro — e a rota irmã
+   * (`proposta-doc`), que não mexe no `esc`.
+   *
+   * O que se mede aqui é o que É desta rota: as quebras de linha dela chegam ao
+   * email em parágrafos, e não coladas num bloco só.
+   */
+  it("as quebras de linha dela chegam ao email em parágrafos", async () => {
+    authed.ok = true;
+    await POST(req("POST", { ...validItems, corpo: "Um.\n\nDois." }), ctx("LIQ-1"));
+    expect(enviado().html.match(/<p style="font-size:14px;line-height:1.6">/g)).toHaveLength(2);
+  });
+
+  /** A moldura da casa fecha sempre — um corpo escrito à mão não a substitui. */
+  it("a assinatura da casa continua a fechar o email, e uma só vez", async () => {
+    authed.ok = true;
+    await POST(req("POST", { ...validItems, corpo: "Olá!" }), ctx("LIQ-1"));
+    const email = enviado();
+    expect(email.html).toContain("Catarina Gaspar");
+    expect(email.html.match(/Catarina Gaspar/g)).toHaveLength(1);
+    expect(email.html).toContain("cid:liquen-logo");
+  });
+
+  it("um corpo vazio ou só com espaços é como não vir nenhum", async () => {
+    authed.ok = true;
+    await POST(req("POST", { ...validItems, corpo: "   \n\n " }), ctx("LIQ-1"));
+    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+  });
+
+  /**
+   * Recusa-se, não se corta: um email cortado a meio de uma frase chega ao
+   * cliente com ar de avaria e ninguém do lado de cá dá por isso.
+   */
+  it("um corpo acima do tecto é recusado com 400, e não se grava proposta nenhuma", async () => {
+    authed.ok = true;
+    const res = await POST(req("POST", { ...validItems, corpo: "a".repeat(10_001) }), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/demasiado longo/i);
+    expect(mail.send).not.toHaveBeenCalled();
+    expect(proposals.create).not.toHaveBeenCalled();
+  });
+
   it("um modelo guardado VAZIO não manda um email em branco — recorre ao texto da casa", async () => {
     authed.ok = true;
     modelo.get.mockResolvedValue(modeloGuardado("A sua proposta", `<div>\n  <p>   </p>\n</div>`));
