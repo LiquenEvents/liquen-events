@@ -2489,8 +2489,27 @@ describe("textoDoTotal", () => {
     expect(parseMoneyText(textoDoTotal(2460))).toBe(2460);
   });
 
-  it("é o `String(n)` que estava lá que falha — é essa a razão desta função", () => {
-    expect(parseMoneyText(String(3355.98))).toBe(335598);
+  /**
+   * ── A REDE DE BAIXO MUDOU; ESTA CONTINUA A FAZER FALTA ───────────────────
+   *
+   * Este teste afirmava que `parseMoneyText(String(3355.98))` dava 335 598 —
+   * era esse o defeito que obrigou a escrever o `textoDoTotal`. Deixou de ser
+   * verdade: o leitor passou a aceitar as duas escritas (ver o comentário em
+   * `proposal-doc.ts`, escrito quando se descobriu que uma proposta INGLESA
+   * importada valia três euros), e um ponto seguido de um ou dois dígitos é
+   * hoje um decimal.
+   *
+   * O `textoDoTotal` fica na mesma, e não por hábito: o campo é o que ELA lê.
+   * Um total escrito «3355.98» num ecrã português está errado à vista de
+   * qualquer pessoa daqui, mesmo que a máquina já o entenda. E há uma escrita
+   * que continua a ter uma só leitura possível — «3.000» são três mil, nunca
+   * três —, portanto quem escreve no campo tem de escrever português.
+   */
+  it("o leitor já aguenta o `String(n)`, mas o campo continua a mostrar português", () => {
+    expect(parseMoneyText(String(3355.98))).toBe(3355.98);
+    expect(textoDoTotal(3355.98)).toBe("3355,98");
+    // E a escrita ambígua continua a ler-se como sempre se leu por cá.
+    expect(parseMoneyText("3.000")).toBe(3000);
   });
 });
 

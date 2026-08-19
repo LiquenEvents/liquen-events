@@ -8,7 +8,7 @@ import BarraFixa from "@/components/meta/BarraFixa";
 import VideoCiclo from "@/components/meta/VideoCiclo";
 import PedidoRelampago, { RELAMPAGO_PT, RELAMPAGO_EN } from "@/components/meta/PedidoRelampago";
 import { blurFor } from "@/lib/blur";
-import { normalizeLocale } from "@/lib/i18n";
+import { getDictionary, normalizeLocale } from "@/lib/i18n";
 import { localizeHref } from "@/lib/i18n/config";
 import { SITE } from "@/lib/site";
 import {
@@ -18,6 +18,7 @@ import {
   ganchoNoIdioma,
   fotosDaVariante,
   espacosDaVariante,
+  regiaoDaVariante,
 } from "@/lib/meta/variantes";
 
 /**
@@ -173,6 +174,10 @@ export default async function PaginaSocial({
   const en = locale === "en";
   const contexto = `s/${slug}`;
   const fotos = fotosDaVariante(variante);
+  // Para as legendas das fotografias (ver a grelha do trabalho, mais abaixo):
+  // esta página é o destino de tráfego PAGO, e as fotografias são o argumento.
+  const t = getDictionary(locale);
+  const regiao = regiaoDaVariante(variante, locale);
   const espacos = espacosDaVariante(variante);
   const anos = new Date().getFullYear() - Number(SITE.founded);
 
@@ -189,7 +194,13 @@ export default async function PaginaSocial({
         <div className="absolute inset-0">
           <HeroImage
             src={variante.capa}
-            alt=""
+            /* A capa não é decoração: é uma fotografia de um trabalho da casa,
+               e é ela que faz metade do argumento desta página. Com `alt=""`
+               quem ouve o ecrã chegava a uma landing page de anúncio e não
+               ficava a saber que ali estava sequer uma imagem — o mesmo defeito
+               que as grelhas de portefólio das páginas de casamentos já
+               levaram, e pela mesma razão. */
+            alt={`${t.common.imageAlt.portfolioExemplo}: ${regiao}`}
             fill
             priority
             fetchPriority="high"
@@ -298,7 +309,11 @@ export default async function PaginaSocial({
               <div key={foto} className="relative aspect-[4/5] overflow-hidden bg-foreground/5">
                 <SafeImage
                   src={foto}
-                  alt=""
+                  // Legenda distinta por fotografia — é uma grelha de
+                  // portefólio a sério (o ponto desta secção), não uma faixa
+                  // decorativa. É a mesma forma que as páginas de casamentos
+                  // usam: base traduzida do dicionário, mais o contexto.
+                  alt={`${t.common.imageAlt.portfolioExemplo}: ${regiao} ${i + 1}`}
                   fill
                   loading={i < 2 ? "eager" : "lazy"}
                   sizes="(max-width: 640px) 50vw, 320px"
