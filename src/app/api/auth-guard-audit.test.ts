@@ -713,6 +713,10 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       "./portal/[token]/proposta-pdf/route",
       "./portal/[token]/contrato-pdf/route",
       "./proposta/[token]/pdf/route",
+      // As fotografias da proposta, assinadas para quem tem o token. Mesmo
+      // modelo de confiança do PDF ao lado — e ver menos do que ele, que já
+      // leva os mesmos ficheiros embutidos.
+      "./proposta/[token]/fotos/route",
       "./proposta/route",
       "./cron/reminders/route",
       "./cron/inbox-check/route",
@@ -859,6 +863,20 @@ describe("TOKEN-guarded routes deny a bad token", () => {
     const res = await fn(req("GET"), ctx());
     expect(res.status).toBe(404);
     expect(calls).toEqual([]); // nunca chegou à proposta nem ao gerador
+  });
+
+  it("GET /api/proposta/[token]/fotos → 404 on a bad token, e não assina nada", async () => {
+    /**
+     * A rota que assina as fotografias para o casal. Um token forjado não pode
+     * produzir um único URL assinado — e o que se afirma não é só o 404: é que
+     * NADA correu antes dele. Um caminho assinado por engano é um ficheiro do
+     * bucket privado a ficar acessível durante o prazo da assinatura, e a
+     * Biblioteca de Temas é o activo do estúdio inteiro.
+     */
+    const fn = await handler("./proposta/[token]/fotos/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).toBe(404);
+    expect(calls).toEqual([]); // nunca chegou à proposta nem ao Storage
   });
 
   /**
