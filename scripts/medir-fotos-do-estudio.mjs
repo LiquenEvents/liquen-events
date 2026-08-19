@@ -18,7 +18,7 @@
  *   node scripts/medir-fotos-do-estudio.mjs assets-falha   falha
  *
  *   BASE_URL   o servidor  (por omissão http://localhost:3132)
- *   SAIDA      onde escreve o JSON e a captura (/tmp/medicao-fotos-estudio)
+ *   SAIDA      onde escreve o JSON e a captura (por omissão, uma pasta nova)
  *   CHROMIUM   caminho do executável, quando não é o do Playwright
  *
  * Abre o estúdio a sério (não uma página nua), com 24 fotos num rascunho
@@ -46,7 +46,16 @@
  * URL e começa a corrida dos bytes, que é o que se está a medir.
  */
 import { chromium } from "@playwright/test";
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  existsSync,
+  statSync,
+} from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
 
@@ -54,7 +63,19 @@ import sharp from "sharp";
 // página que não hidrata não tem grelha nenhuma para medir.
 const RAIZ = process.cwd();
 const BASE = process.env.BASE_URL ?? "http://localhost:3132";
-const SAIDA = process.env.SAIDA ?? "/tmp/medicao-fotos-estudio";
+/**
+ * ONDE ESTE GUIÃO ESCREVE.
+ *
+ * Com `SAIDA` definida, é lá — é assim que se compara duas corridas na mesma
+ * pasta. Sem ela, uma pasta NOVA de cada vez, criada por `mkdtemp`.
+ *
+ * O caminho fixo em `/tmp` que aqui estava foi apanhado pelo CodeQL, e a
+ * queixa é justa mesmo num guião de medição: numa máquina partilhada,
+ * qualquer processo pode deixar lá um atalho com o nome que nós vamos usar, e
+ * a escrita segue o atalho para onde ele apontar. `mkdtemp` cria a pasta com
+ * um sufixo aleatório e falha se já existir — não há nome para adivinhar.
+ */
+const SAIDA = process.env.SAIDA ?? mkdtempSync(path.join(os.tmpdir(), "medicao-fotos-estudio-"));
 /** Vinte e quatro: o mesmo número da linha de base em `IMAGES-BEFORE.md`. */
 const CELULAS = 24;
 
