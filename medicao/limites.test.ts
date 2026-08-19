@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { writeFileSync, readdirSync, readFileSync, statSync, mkdirSync } from "node:fs";
+import { writeFileSync, readdirSync, readFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { renderProposalDocPdfWithReport } from "@/lib/proposal-doc-pdf";
 import { withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
@@ -9,7 +9,9 @@ const RAIZ = process.cwd();
 const SAIDA = path.join(RAIZ, "medicao", "saida", "limites");
 mkdirSync(SAIDA, { recursive: true });
 const DIR = path.join(RAIZ, "public", "imagens");
-const cat = readdirSync(DIR).filter((f) => /\.jpe?g$/i.test(f)).sort();
+const cat = readdirSync(DIR)
+  .filter((f) => /\.jpe?g$/i.test(f))
+  .sort();
 const foto = (i: number) =>
   `data:image/jpeg;base64,${readFileSync(path.join(DIR, cat[i % cat.length])).toString("base64")}`;
 
@@ -35,7 +37,9 @@ casos.ref_enorme = {
     ...base,
     ref: "PO Decoração Casamento Maria da Conceição Gonçalves Ançã Ribeiro da Silva & Jean-François Ålström-Nørgaard van der Berg 12.09.2026 — versão 3 revista",
     coverImages: [foto(0), foto(1)],
-    serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] }],
+    serviceGroups: [
+      { letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] },
+    ],
     moodBoards: [],
     budgetItems: ["Decor Cerimónia"],
     totalText: "4800,00 € + IVA",
@@ -49,14 +53,20 @@ casos.moodboard_textos = {
   doc: withProposalDefaults({
     ...base,
     coverImages: ["", ""],
-    serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] }],
+    serviceGroups: [
+      { letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] },
+    ],
     moodBoards: [
       {
         title: LONGO,
         subtitulo:
           "Ramo de Noiva (a definir com a Noiva), com alfazema, olival, eucalipto cinerea e rosa de jardim colhida na manhã do evento",
         images: [foto(2), foto(3), foto(4)],
-        annotation: Array.from({ length: 10 }, (_, i) => `Linha número ${i + 1} da descrição desta página de inspiração, escrita com o comprimento que ela costuma escrever quando quer explicar a paleta ao casal.`).join(" "),
+        annotation: Array.from(
+          { length: 10 },
+          (_, i) =>
+            `Linha número ${i + 1} da descrição desta página de inspiração, escrita com o comprimento que ela costuma escrever quando quer explicar a paleta ao casal.`,
+        ).join(" "),
       },
     ],
     budgetItems: ["Decor Cerimónia"],
@@ -73,7 +83,9 @@ casos.dinheiro_texto = {
     coverImages: ["", ""],
     totalLabel:
       "Investimento Total em Decoração Floral, Iluminação Técnica, Mobiliário e Têxteis (chave na mão)",
-    serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] }],
+    serviceGroups: [
+      { letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] },
+    ],
     moodBoards: [],
     budgetItems: [
       "Decoração Floral Integral da Cerimónia, do Copo d'Água, do Jantar e da Festa com flor natural da época",
@@ -82,7 +94,8 @@ casos.dinheiro_texto = {
     budgetAmounts: [12500, null],
     budgetExtras: [
       {
-        label: "Deslocação da equipa Líquen ao Alentejo Central, ida e volta, com pernoita para seis pessoas",
+        label:
+          "Deslocação da equipa Líquen ao Alentejo Central, ida e volta, com pernoita para seis pessoas",
         valueText: "12.500,00 € + IVA (a confirmar consoante a distância final)",
       },
       { label: "Sem valor nenhum", valueText: "" },
@@ -105,7 +118,11 @@ casos.caracteres = {
     guests: "80 pax\nsegunda linha",
     coverImages: [foto(0), ""],
     serviceGroups: [
-      { letter: "a)", title: "Decoração 🌸", items: [{ label: "Cerimónia ✿", desc: "Arco floral — “aspas curvas”, ½, ±, №, ﬁ." }] },
+      {
+        letter: "a)",
+        title: "Decoração 🌸",
+        items: [{ label: "Cerimónia ✿", desc: "Arco floral — “aspas curvas”, ½, ±, №, ﬁ." }],
+      },
     ],
     moodBoards: [{ title: "Inspiração 🌿 Ωμέγα", images: [foto(2), foto(3)] }],
     budgetItems: ["Decor 🌷 Cerimónia"],
@@ -121,7 +138,9 @@ casos.foto_morta = {
   doc: withProposalDefaults({
     ...base,
     coverImages: [corrompida, foto(1)],
-    serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] }],
+    serviceGroups: [
+      { letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] },
+    ],
     moodBoards: [{ title: "Inspiração", images: [foto(2), corrompida, foto(3), corrompida] }],
     budgetItems: ["Decor Cerimónia"],
     totalText: "4800,00 € + IVA",
@@ -159,7 +178,9 @@ casos.campos_compridos = {
       "Cerimónia civil simbólica celebrada por uma amiga do casal, ao pôr do sol, junto ao lago, com música ao vivo de quarteto de cordas e leitura de votos escritos pelos noivos",
     time: "Chegada dos convidados às 15h30, cerimónia às 16h00, copo d'água às 17h30 e jantar às 20h00",
     coverImages: ["", ""],
-    serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] }],
+    serviceGroups: [
+      { letter: "a)", title: "Decoração", items: [{ label: "Cerimónia", desc: "Arco floral." }] },
+    ],
     moodBoards: [],
     budgetItems: ["Decor Cerimónia"],
     totalText: "4800,00 € + IVA",

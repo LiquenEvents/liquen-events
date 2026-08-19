@@ -35,12 +35,6 @@ function foto(i: number): string {
 function fotos(inicio: number, quantas: number): string[] {
   return Array.from({ length: quantas }, (_, k) => foto(inicio + k));
 }
-function bytesDasFotos(inicio: number, quantas: number): number {
-  let s = 0;
-  for (let k = 0; k < quantas; k++) s += catalogo[(inicio + k) % catalogo.length].bytes;
-  return s;
-}
-
 const base = {
   template: "decoracao" as const,
   ref: "PO Decoração Casamento Maria & Zé 12.09.2026",
@@ -248,7 +242,7 @@ describe("medição do PDF de proposta", () => {
         reordenacoes: r.reordenacoes,
       };
       linhas.push(linha);
-      // eslint-disable-next-line no-console
+       
       console.log(JSON.stringify(linha));
       writeFileSync(path.join(SAIDA, "medicao.json"), JSON.stringify(linhas, null, 2));
     });
