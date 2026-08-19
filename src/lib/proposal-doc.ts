@@ -979,15 +979,79 @@ export function stripPendingImages<
   return out;
 }
 
-/** Extrai o primeiro número monetário de texto livre pt-PT
- *  ("3.000,00 € + IVA" → 3000; "14.700,00 €" → 14700). Só isto — a
- *  interpretação do IVA fica a cargo de {@link resolveProposalMoney}. */
+/**
+ * Extrai o primeiro número monetário de texto livre
+ * ("3.000,00 € + IVA" → 3000; "14.700,00 €" → 14700). Só isto — a
+ * interpretação do IVA fica a cargo de {@link resolveProposalMoney}.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * PORQUE É QUE ISTO TAMBÉM TEM DE LER INGLÊS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Lia só português — ponto a separar milhares, vírgula decimal. E a casa
+ * ESCREVE em inglês: o `montantesEmIngles` (money.ts) troca os separadores
+ * quando a proposta sai na versão inglesa. Fechando o círculo, com a função
+ * antiga:
+ *
+ *     3.000,00 €      → «€3,000.00»      → relido  3
+ *     14.700,00 €     → «€14,700.00»     → relido  14,7
+ *     1.234.567,89 €  → «€1,234,567.89»  → relido  1,23
+ *     850,50 €        → «€850.50»        → relido  85 050   ← cem vezes MAIS
+ *
+ * Não é hipótese de laboratório: o leitor de propostas em PDF
+ * (`proposta-de-pdf/campos.ts`) chama isto com o texto do total lido da folha,
+ * e uma proposta inglesa importada valia três euros — ou cem vezes o que
+ * estava impresso, que é pior, porque três euros salta à vista e 85 050 € tem
+ * o ar de um número a sério.
+ *
+ * ── COMO SE DECIDE QUAL É O SEPARADOR DECIMAL ─────────────────────────────
+ *
+ *  1. Espaços (normais ou duros) são SEMPRE milhares. «1 500,00» é português
+ *     de tipografia e não tem outra leitura possível.
+ *  2. Se aparecerem os dois sinais, o DECIMAL é o último — é o que distingue
+ *     «1.234.567,89» de «1,234,567.89» sem ter de adivinhar a língua.
+ *  3. Se aparecer só um, e ele separar grupos certinhos de três dígitos até ao
+ *     fim (`3.000`, `1,234,567`), são milhares. Dinheiro tem no máximo dois
+ *     decimais, portanto três dígitos a seguir ao sinal nunca são cêntimos.
+ *  4. Caso contrário é o decimal — inclusive `3355.98`, que antes se lia como
+ *     335 598. Ninguém escreve trezentos e trinta e cinco mil e seiscentos
+ *     assim; quem o escreve é o `String()` do JavaScript.
+ *
+ * O `textoDoTotal` do estúdio continua a existir e continua a escrever em
+ * português: o campo é o que ELA lê, e um total escrito «3355.98» num ecrã
+ * português é uma coisa que não se mostra. O que aqui muda é a leitura ser
+ * tolerante — deixa de haver um número que entra certo e sai mil vezes maior.
+ */
 export function parseMoneyText(text: string | undefined): number {
   if (!text) return 0;
-  const m = text.match(/\d[\d.\s]*(?:,\d{1,2})?/);
+  // Um número com os dois separadores lá dentro; as pontas são sempre dígitos,
+  // para não apanhar o ponto final de uma frase nem a vírgula que a segue.
+  const m = text.match(/\d(?:[\d.,\s\u00a0]*\d)?/);
   if (!m) return 0;
-  const norm = m[0].replace(/[.\s]/g, "").replace(",", ".");
-  return Number.parseFloat(norm) || 0;
+
+  const bruto = m[0].replace(/[\s\u00a0]/g, "");
+  const ultimoPonto = bruto.lastIndexOf(".");
+  const ultimaVirgula = bruto.lastIndexOf(",");
+
+  /** O sinal separa grupos de três até ao fim? Então são milhares. */
+  const soMilhares = (sinal: "." | ","): boolean =>
+    new RegExp(`^\\d{1,3}(?:\\${sinal}\\d{3})+$`).test(bruto);
+
+  let decimal: number;
+  if (ultimoPonto >= 0 && ultimaVirgula >= 0) {
+    decimal = Math.max(ultimoPonto, ultimaVirgula);
+  } else if (ultimaVirgula >= 0) {
+    decimal = soMilhares(",") ? -1 : ultimaVirgula;
+  } else if (ultimoPonto >= 0) {
+    decimal = soMilhares(".") ? -1 : ultimoPonto;
+  } else {
+    decimal = -1;
+  }
+
+  const inteiros = (decimal < 0 ? bruto : bruto.slice(0, decimal)).replace(/[.,]/g, "");
+  const centimos = decimal < 0 ? "" : bruto.slice(decimal + 1).replace(/[.,]/g, "");
+  const n = Number.parseFloat(`${inteiros || "0"}.${centimos || "0"}`);
+  return Number.isFinite(n) ? n : 0;
 }
 
 /** Deteta, em texto livre, uma anotação do tipo "+ IVA" / "acresce IVA" /

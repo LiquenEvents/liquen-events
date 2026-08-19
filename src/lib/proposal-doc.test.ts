@@ -16,7 +16,7 @@ import {
   withProposalDefaults,
   type ProposalDoc,
 } from "./proposal-doc";
-import { round2 } from "./money";
+import { round2, montantesEmIngles, eur } from "./money";
 
 describe("proposal-doc — parseMoneyText (pt-PT free text)", () => {
   it("extracts a euro amount with '+ IVA' trailing", () => {
@@ -45,6 +45,47 @@ describe("proposal-doc — parseMoneyText (pt-PT free text)", () => {
 
   it("reads the first number when several appear", () => {
     expect(parseMoneyText("Decor 3.000,00 € + extras 500,00 €")).toBe(3000);
+  });
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O CÍRCULO FECHADO: A CASA ESCREVE EM INGLÊS E TINHA DE SABER RELER
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O `montantesEmIngles` (money.ts) troca os separadores quando a proposta
+   * sai na versão inglesa, e o leitor de PDF (`proposta-de-pdf/campos.ts`)
+   * volta a passar esse texto por aqui. Com o leitor antigo, só de português:
+   *
+   *     3.000,00 €     → «€3,000.00»     → 3
+   *     14.700,00 €    → «€14,700.00»    → 14,7
+   *     1.234.567,89 € → «€1,234,567.89» → 1,23
+   *     850,50 €       → «€850.50»       → 85 050   ← cem vezes MAIS
+   *
+   * O último é o que assusta: três euros salta à vista, oitenta e cinco mil
+   * tem o ar de um número a sério. Este teste é o círculo: escreve-se em
+   * inglês com a função da casa e relê-se com esta, e tem de voltar o mesmo
+   * número.
+   */
+  it("lê a escrita inglesa que a própria casa produz, e devolve o mesmo número", () => {
+    for (const n of [3000, 14700, 1234567.89, 850.5, 0.5, 99999.99]) {
+      expect(parseMoneyText(montantesEmIngles(`${eur(n)}`))).toBe(n);
+    }
+  });
+
+  it("decide o separador decimal pela forma, não pela língua", () => {
+    // Os dois sinais: manda o último.
+    expect(parseMoneyText("1.234.567,89")).toBe(1234567.89);
+    expect(parseMoneyText("1,234,567.89")).toBe(1234567.89);
+    // Um só, a separar grupos de três até ao fim: são milhares. Dinheiro tem
+    // no máximo dois decimais, portanto três dígitos nunca são cêntimos.
+    expect(parseMoneyText("3.000")).toBe(3000);
+    expect(parseMoneyText("3,000")).toBe(3000);
+    // Um só, com um ou dois dígitos a seguir: é o decimal.
+    expect(parseMoneyText("3355.98")).toBe(3355.98);
+    expect(parseMoneyText("3355,98")).toBe(3355.98);
+    expect(parseMoneyText("2.5")).toBe(2.5);
+    // Espaços são sempre milhares, nas duas línguas.
+    expect(parseMoneyText("1 234 567,89")).toBe(1234567.89);
   });
 });
 
