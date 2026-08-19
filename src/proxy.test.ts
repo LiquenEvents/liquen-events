@@ -56,7 +56,7 @@ describe("proxy — /admin short link", () => {
  * `-` nem `_` — MEDIDO: 535 em 2000 assinaturas, 26,8% —, o caminho acaba em
  * ponto seguido de alfanuméricos e o `isNonLocalized` lê-o como um ficheiro
  * estático. Sem reescrita, `/proposta/<token>` já não casa com
- * `[lang]/(site)/proposta/[token]`: cai no apanha-tudo e o casal recebe a
+ * `[lang]/(privado)/proposta/[token]`: cai no apanha-tudo e o casal recebe a
  * página de 404 em vez da proposta.
  *
  * Uma em cada quatro propostas enviadas. Não falha sempre, e é por isso que
