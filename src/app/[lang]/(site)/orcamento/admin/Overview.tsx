@@ -532,7 +532,23 @@ const MetaReceita = memo(function MetaReceita({
 
   return (
     <div className="bo-card p-4">
-      <div className="flex items-center justify-between mb-3">
+      {/* ── `gap-3`: O TÍTULO E A ACÇÃO ESTAVAM COLADOS ────────────────────
+          MEDIDO num telemóvel, com toque emulado: a 375 px sobrava **1 px**
+          entre o fim do título e o princípio do botão; a 320 px sobravam
+          **0 px**. Lia-se «…este mêsDefinir meta», uma frase só, sem se
+          perceber onde acaba a legenda e começa a coisa em que se toca.
+
+          Um `justify-between` sem `gap` não separa nada: só empurra os dois
+          para os extremos, e quando o título cresce até lá, encostam. O
+          título é longo por uma boa razão (o «(com IVA)» a seguir aqui em
+          baixo), e o botão muda de palavra («Definir»/«Editar»), portanto o
+          encosto não é um acidente de um texto — é o estado normal desta
+          linha num ecrã estreito.
+
+          Com `gap-3` o título cede primeiro (quebra linha, que já fazia a
+          320 px) e ficam sempre 12 px entre os dois. No computador não muda
+          nada: aí sobram mais de 200 px e o `gap` nunca chega a apertar. */}
+      <div className="flex items-center justify-between gap-3 mb-3">
         {/* A meta mede-se contra o mesmo «Ganho» da fila de cima, que passou a
             ser com IVA. Dizê-lo aqui é o que impede a barra de parecer mais
             fácil de encher sem nada ter mudado do lado do negócio. */}
@@ -543,7 +559,13 @@ const MetaReceita = memo(function MetaReceita({
               setGoalInput(goal > 0 ? String(goal) : "");
               setEditingGoal(true);
             }}
-            className={`alvo-toque text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
+            // `shrink-0` para que quem quebra linha seja o TÍTULO e não a
+            // acção: sem ele, o `gap-3` acima tirava os 12 px ao botão e
+            // «Definir meta» partia-se em duas linhas («Definir» / «meta»),
+            // que é o mesmo defeito de legibilidade noutro sítio. O título é
+            // uma legenda e quebra bem; o rótulo do botão são duas palavras
+            // que se lêem de uma vez.
+            className={`alvo-toque shrink-0 text-foreground/40 text-[10px] tracking-[0.12em] uppercase hover:text-[#4d6350] transition-colors motion-reduce:transition-none rounded ${FOCUS_RING}`}
           >
             {goal > 0 ? "Editar meta" : "Definir meta"}
           </button>

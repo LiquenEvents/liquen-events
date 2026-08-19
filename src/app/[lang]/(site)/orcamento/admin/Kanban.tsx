@@ -192,7 +192,27 @@ const KanbanCard = memo(function KanbanCard({
               fire on touch screens, so phones get ‹ › buttons to move
               the card between columns. Hidden on desktop (drag + arrow
               keys cover it there). */}
-          <div className="flex items-center gap-1 lg:hidden">
+          {/* ── `alvo-toque` NOS DOIS, E A FOLGA ENTRE ELES ─────────────────
+              MEDIDO a 375×667 e a 320×667, com toque emulado: cada um destes
+              botões dava **36×36 px** — oito abaixo do mínimo de 44 —, com
+              4 px a separá-los nas colunas do meio, onde aparecem os dois.
+
+              Não é um botão qualquer a ficar pequeno: ISTO É a única forma de
+              mover um cartão num telemóvel. O arrasto HTML5 não dispara em
+              ecrã táctil — é o que este comentário aqui em cima já diz —,
+              portanto quem tem o dedo tem estes dois botões e mais nada. Eram
+              o alvo mais pequeno de uma vista inteira, e o mais necessário.
+
+              `alvo-toque` (globals.css) leva-os a 44×44 SÓ com dedo: o
+              `min-width`/`min-height` ganha ao `w-9 h-9`, e com rato as
+              medidas de 36 px — que são a densidade calma do quadro no
+              portátil — ficam exactamente como estavam. A folga sobe a 8 px
+              pelo mesmo caminho e pela mesma razão: dois alvos de 44 px a
+              4 px um do outro são um alvo de 92 px com uma fronteira
+              invisível a meio, e enganar-se aqui manda o pedido para a coluna
+              errada. Cabe: a linha do cartão tem 228 px e a barra passa de
+              76 para 96. */}
+          <div className="flex items-center gap-1 pointer-coarse:gap-2 lg:hidden">
             {colIndex > 0 && (
               <button
                 onClick={(e) => {
@@ -200,7 +220,7 @@ const KanbanCard = memo(function KanbanCard({
                   onMove(q, -1);
                 }}
                 aria-label="Mover para a coluna anterior"
-                className="w-9 h-9 rounded-lg flex items-center justify-center bg-foreground/[0.05] text-foreground/40 active:bg-foreground/10"
+                className="alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-foreground/[0.05] text-foreground/40 active:bg-foreground/10"
               >
                 <svg
                   width="11"
@@ -223,7 +243,7 @@ const KanbanCard = memo(function KanbanCard({
                   onMove(q, 1);
                 }}
                 aria-label="Mover para a coluna seguinte"
-                className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#4d6350]/10 text-[#4d6350] active:bg-[#4d6350]/20"
+                className="alvo-toque w-9 h-9 rounded-lg flex items-center justify-center bg-[#4d6350]/10 text-[#4d6350] active:bg-[#4d6350]/20"
               >
                 <svg
                   width="11"
