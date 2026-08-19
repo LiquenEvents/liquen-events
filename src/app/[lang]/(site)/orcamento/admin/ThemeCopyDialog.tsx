@@ -260,7 +260,9 @@ export default function ThemeCopyDialog({
             onClick={onClose}
             disabled={running}
             aria-label="Fechar"
-            className="bo-text-muted rounded-lg p-1.5 hover:bg-foreground/[0.06] hover:text-foreground/70 disabled:opacity-40"
+            // 30×30 medidos a 375 px, como o gémeo no `ThemePicker` — abaixo
+            // dos 44 px que a casa exige ao dedo, e é a saída do diálogo.
+            className="alvo-toque bo-text-muted rounded-lg p-1.5 hover:bg-foreground/[0.06] hover:text-foreground/70 disabled:opacity-40"
           >
             <svg
               width="18"

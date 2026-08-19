@@ -10,6 +10,7 @@ import {
 } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
 import Temas, {
+  GRELHA_DE_FOTOS,
   contarFotosDaBiblioteca,
   desdeQuando,
   mergePage,
@@ -1759,5 +1760,50 @@ describe("temPoucasFotos", () => {
   it("cala-se quando não se sabe quantas são", () => {
     // Um aviso a partir do que não se sabe é um aviso errado.
     expect(temPoucasFotos({ imageCount: null })).toBe(false);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A GRELHA AO DEDO — o que se mede com uma régua, guardado com uma asserção
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Medido no telemóvel (Chromium a 375×667, `hasTouch`), antes desta rede
+ * existir: a grelha dava três colunas de 97,7 px e cada célula levava TRÊS
+ * botões de 28×28 sempre visíveis — dois terços do mínimo de 44 px que a casa
+ * exige a um alvo de toque, e um deles apaga a foto.
+ *
+ * O jsdom não sabe medir nada: não há CSS, não há `(pointer: coarse)`, e um
+ * `getBoundingClientRect` devolve zeros. Por isso o que se guarda aqui são as
+ * DUAS decisões de que o tamanho depende — a grelha começar em duas colunas e
+ * cada botão trazer a classe `.alvo-toque` —, que é o que uma alteração
+ * distraída apagaria. A medição verdadeira está na régua; isto é o alarme.
+ */
+describe("Grelha de fotos de um tema — ergonomia de toque", () => {
+  it("começa em DUAS colunas e só chega a três quando há largura", () => {
+    // Duas colunas a 375 px dão células de 150,5 px, que é o que permite três
+    // alvos de 44 px sem eles se tocarem. As três colunas voltam a 26rem.
+    expect(GRELHA_DE_FOTOS).toContain("grid-cols-2");
+    expect(GRELHA_DE_FOTOS).toContain("min-[26rem]:grid-cols-3");
+    // A três colunas SEM condição nenhuma é exactamente o defeito medido.
+    expect(GRELHA_DE_FOTOS).not.toMatch(/(^|\s)grid-cols-3(\s|$)/);
+  });
+
+  it("dá 44 px de alvo aos três botões de cada foto", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 3 }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 3, true), total: 3 }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    // A segunda foto, porque o "mover para o início" não existe na primeira.
+    for (const nome of [
+      /^Ver a foto 2 em grande$/,
+      /^Remover foto 2 de 3$/,
+      /^Mover a foto 2 para o início$/,
+    ]) {
+      const botao = screen.getByRole("button", { name: nome });
+      expect(botao.className, `${nome} sem alvo de 44 px`).toContain("alvo-toque");
+    }
   });
 });

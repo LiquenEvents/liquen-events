@@ -1646,7 +1646,9 @@ export default function ThemePicker({
             type="button"
             onClick={dismiss}
             aria-label="Fechar"
-            className="bo-text-muted rounded-lg p-1.5 hover:bg-foreground/[0.06] hover:text-foreground/70"
+            // 30×30 medidos a 375 px — e é a porta de saída de um diálogo que
+            // ocupa o ecrã inteiro no telemóvel. `.alvo-toque` só cresce ao dedo.
+            className="alvo-toque bo-text-muted rounded-lg p-1.5 hover:bg-foreground/[0.06] hover:text-foreground/70"
           >
             <svg
               width="18"
@@ -1873,7 +1875,14 @@ export default function ThemePicker({
                         tabIndex={i === focusIndex ? 0 : -1}
                         aria-label={`Ver a foto ${i + 1} em grande`}
                         onClick={() => setPreviewIndex(i)}
-                        className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                        // 24×24 medidos a 375 px, num ecrã onde a lupa está
+                        // SEMPRE visível (não há passar o rato) e é a única
+                        // forma de ver a foto antes de a escolher. `.alvo-toque`
+                        // leva-a aos 44 px só sob `(pointer: coarse)` — a
+                        // célula tem 106 px, e o resto continua a ser o alvo da
+                        // escolha. Mesmo remendo que os botões da grelha de
+                        // Temas.
+                        className="alvo-toque absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                       >
                         <svg
                           width="13"

@@ -55,6 +55,31 @@ const ROTULO = {
   moodboard: { um: "mood board", inserir: "De um modelo…", guardar: "Guardar como modelo" },
 } as const;
 
+/**
+ * O PAINEL QUE CAÍA PARA FORA DO ECRÃ.
+ *
+ * Medido a 375 px, no estúdio, com «De um modelo…» aberto: o invólucro destes
+ * botões começa em x = 204, e um painel de 288 px (`w-72`) ancorado à ESQUERDA
+ * dele acabava em x = 492 — 117 px para lá da margem. E como o `body` tem
+ * `overflow-x: clip`, esses 117 px não são arrastáveis: ficam CORTADOS. O que
+ * lá estava escrito era a lista de modelos guardados e, quando não há nenhum, a
+ * frase que explica como se guarda o primeiro — lida pela metade.
+ *
+ * Ancorado à DIREITA, o painel cresce para dentro do ecrã — que é o que os
+ * outros menus do back office já faziam (`ui/MenuDeAccoes`, `MoreMenu`). Só
+ * isso não chegava: a 320 px o invólucro acaba em x = 205, e 288 px de painel
+ * a crescer para a esquerda saíam 83 px pelo OUTRO lado. Daí o tecto de 60vw
+ * enquanto o ecrã é de telemóvel — 192 px a 320 e 225 px a 375, ou seja nunca
+ * menos do que os 192 px (`min-w-48`) que o menu de acções da casa já usa. A
+ * partir de `sm` o tecto sai e o painel volta aos 288 px de sempre.
+ *
+ * Não é posicionamento a sério (isso pedia JavaScript a medir o gatilho); é a
+ * garantia, em CSS, de que o que está escrito lá dentro se lê inteiro.
+ */
+const PAINEL_SUSPENSO =
+  "absolute top-full right-0 z-30 mt-1 w-72 max-w-[60vw] sm:max-w-none " +
+  "rounded-xl border border-foreground/10 bg-background shadow-lg";
+
 export default function ModelosParciais({
   tipo,
   onInserir,
@@ -180,7 +205,7 @@ export default function ModelosParciais({
       )}
 
       {aberto && (
-        <div className="absolute top-full left-0 z-30 mt-1 w-72 rounded-xl border border-foreground/10 bg-background p-1 shadow-lg">
+        <div className={PAINEL_SUSPENSO + " p-1"}>
           {naoDeuParaLer ? (
             <p className="px-3 py-2 text-xs text-[#a03123]">
               Não deu para ler os modelos guardados. Volta a tentar — os que tinhas continuam lá.
@@ -222,7 +247,7 @@ export default function ModelosParciais({
       )}
 
       {aGuardar && (
-        <div className="absolute top-full left-0 z-30 mt-1 w-72 rounded-xl border border-foreground/10 bg-background p-3 shadow-lg">
+        <div className={PAINEL_SUSPENSO + " p-3"}>
           <label className="block text-[11px] text-foreground/55" htmlFor={`mp-${tipo}`}>
             Nome do modelo
           </label>
