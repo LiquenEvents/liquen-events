@@ -665,6 +665,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      *
      * Das duas, ganha a mais específica: a mensagem foi escrita há um minuto
      * para este casal; o modelo serve todos. O ecrã dos modelos di-lo.
+     *
+     * ── E DESDE QUE HÁ UM TERCEIRO ────────────────────────────────────────
+     *
+     * Esta escolha entre «ou o modelo, ou a mensagem» nasceu de uma limitação
+     * que já não é a única saída: o corpo de um modelo é markup opaco e não há
+     * onde lá dentro enfiar a mensagem sem adivinhar. Com o CORPO a poder vir
+     * escrito à mão (mais acima), quem quiser a nota no meio do texto escreve-a
+     * lá, no sítio que quiser, e não fica dependente de nenhuma das duas.
+     *
+     * Fica na mesma, e não por inércia: é o que acontece a um envio que venha
+     * SEM corpo escrito — que é todo o correio que hoje sai, incluindo a
+     * pré-visualização e tudo o que já chama esta rota. A regra passa a ter
+     * três degraus, e é sempre a mesma regra: ganha a mais específica. Corpo
+     * escrito à mão > mensagem pessoal > modelo > texto da casa.
      */
     /**
      * ══════════════════════════════════════════════════════════════════════
