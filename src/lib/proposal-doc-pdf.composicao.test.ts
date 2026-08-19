@@ -321,6 +321,130 @@ describe("a legenda de um mood board", () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   O CORPO DO DOCUMENTO — A MEDIDA E O ALINHAMENTO
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+describe("os campos da apresentação", () => {
+  /**
+   * Cada valor começava a seguir ao SEU rótulo: «Número de Convidados:»
+   * continuava em x=277 e «Cerimónia:» em x=193 — duas continuações, dois
+   * recuos, nenhum alinhado a nada.
+   */
+  it("alinham todos numa coluna só", async () => {
+    const escritas = await desenhar(
+      proposta({ ceremony: "Civil, simbólica", time: "16h00", servico: "Decor e flores" }),
+    );
+    const valores = ["Maria & Zé", "Casamento", "12 de setembro de 2026", "80 pax", "16h00"]
+      .map((v) => escritas.find((e) => e.texto === v && e.tamanho === 11))
+      .filter(Boolean);
+    expect(valores.length, "não se encontraram os campos").toBeGreaterThan(3);
+    const xs = new Set(valores.map((e) => Math.round(e!.x * 10)));
+    expect(xs.size, `os valores começam em ${xs.size} colunas diferentes`).toBe(1);
+  });
+});
+
+describe("a lista de serviços", () => {
+  const servicoComprido = () =>
+    proposta({
+      serviceGroups: [
+        {
+          letter: "a)",
+          title: "Decoração Floral de Casamento",
+          items: [
+            {
+              label: "Cerimónia",
+              desc:
+                "Arco floral com flor natural da época, passadeira com pétalas," +
+                " composições baixas nas mesas de apoio ao serviço, jarras de vidro" +
+                " antigo com alfazema e olival colhidos na manhã do evento, e velas" +
+                " de cera natural em suportes de ferro forjado ao longo do corredor" +
+                " central da capela e do adro exterior.",
+            },
+          ],
+        },
+      ],
+    });
+
+  /**
+   * O ficheiro define `MEASURE = 430` com o comentário «long lines (~120+ chars
+   * edge-to-edge) are the biggest DIY tell» — e a lista de Serviços quebrava a
+   * `W − M − dx`, à volta de 110 caracteres por linha.
+   */
+  /** Só as linhas da descrição do serviço — a folha dos Serviços, corpo 10. */
+  const linhasDoServico = (escritas: Escrita[]) => {
+    const pagina = escritas.find((e) => e.texto === "2. Serviços")?.pagina;
+    return escritas.filter((e) => e.pagina === pagina && e.tamanho === 10 && e.texto.length > 30);
+  };
+
+  it("tem medida de leitura, e não a folha toda", async () => {
+    const escritas = await desenhar(servicoComprido());
+    const doServico = linhasDoServico(escritas);
+    expect(doServico.length, "o serviço não partiu em linhas").toBeGreaterThan(1);
+    for (const e of doServico) {
+      expect(e.x + e.largura, `«${e.texto.slice(0, 30)}…» chega a x=${e.x + e.largura}`)
+        .toBeLessThanOrEqual(M + 24 + 550 + 0.5);
+    }
+  });
+
+  /**
+   * As linhas de continuação eram quebradas à largura da PRIMEIRA (a que sobra
+   * depois do rótulo) e desenhadas mais à esquerda: sobrava-lhes largura, e a
+   * mancha ficava com um buraco no meio do parágrafo.
+   */
+  it("as linhas de continuação enchem a largura a que são desenhadas", async () => {
+    const escritas = await desenhar(servicoComprido());
+    const doServico = linhasDoServico(escritas).sort((a, b) => b.y - a.y);
+    // Todas menos a última (que acaba onde o texto acaba) têm de encher a
+    // medida: mais de 90% da largura que lhes cabe.
+    const seguintes = doServico.slice(1, -1);
+    expect(seguintes.length, "o serviço não deu linhas de continuação suficientes").toBeGreaterThan(
+      0,
+    );
+    for (const e of seguintes) {
+      expect(e.largura / 550, `a linha «${e.texto.slice(0, 30)}…» enche pouco`).toBeGreaterThan(0.9);
+    }
+  });
+});
+
+describe("as Condições Gerais", () => {
+  /**
+   * Enchia-se a esquerda e transbordava para a direita: oito cláusulas de um
+   * lado e duas do outro, a esquerda a descer até y=650 e a direita a parar a
+   * 445.
+   */
+  it("equilibram as duas colunas", async () => {
+    const escritas = await desenhar(proposta());
+    const pagina = escritas.find((e) => e.texto === "4. Condições Gerais")?.pagina;
+    expect(pagina, "não se encontrou a página das Condições Gerais").toBeTypeOf("number");
+    const daFolha = escritas.filter((e) => e.pagina === pagina && e.y > M && e.tamanho === 9);
+    const esquerda = daFolha.filter((e) => e.x < W / 2);
+    const direita = daFolha.filter((e) => e.x >= W / 2);
+    expect(esquerda.length, "a coluna esquerda está vazia").toBeGreaterThan(0);
+    expect(direita.length, "a coluna direita está vazia").toBeGreaterThan(0);
+    const fundo = (col: Escrita[]) => Math.min(...col.map((e) => e.y));
+    expect(
+      Math.abs(fundo(esquerda) - fundo(direita)),
+      `esquerda acaba em ${fundo(esquerda).toFixed(0)}, direita em ${fundo(direita).toFixed(0)}`,
+    ).toBeLessThan(60);
+  });
+});
+
+describe("a contracapa", () => {
+  /** Era um agradecimento sem email, sem telefone e sem prazo. */
+  it("diz como responder e até quando", async () => {
+    const escritas = await desenhar(proposta());
+    const ultima = Math.max(...escritas.map((e) => e.pagina));
+    const texto = escritas
+      .filter((e) => e.pagina === ultima)
+      .map((e) => e.texto)
+      .join(" ");
+    expect(texto).toContain(SITE.email);
+    expect(texto).toContain(SITE.phoneDisplay);
+    expect(texto).toMatch(/válida até/);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
    O DINHEIRO NO PAPEL
    ═══════════════════════════════════════════════════════════════════════════ */
 

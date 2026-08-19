@@ -697,6 +697,51 @@ function wrap(
   return out;
 }
 
+/**
+ * Quebra com RECUO DE PRIMEIRA LINHA — a primeira linha mais curta do que as
+ * seguintes, porque tem o rótulo a negro a ocupar-lhe o princípio.
+ *
+ * É a quebra das linhas de um serviço. Antes, TODAS as linhas eram quebradas à
+ * largura da primeira (a que sobra depois do rótulo) e as seguintes eram
+ * desenhadas mais à esquerda — o que lhes deixava largura a sobrar e nunca a
+ * faltar. Estava escrito no código que era «conservador de propósito», e o
+ * resultado no papel era uma mancha irregular: medido, uma linha a acabar em
+ * x=1154 e a seguinte em x=731, um buraco de 35% da largura no meio de um
+ * parágrafo.
+ *
+ * Medir cada linha à largura a que ela é DESENHADA não é menos conservador: é
+ * a mesma regra do resto do ficheiro — a altura que se mede é a altura que se
+ * desenha —, aplicada também à largura.
+ */
+function wrapComRecuo(
+  font: PDFFont,
+  rawText: string,
+  size: number,
+  larguraDaPrimeira: number,
+  larguraDasSeguintes: number,
+): string[] {
+  const text = textoParaFonte(font, rawText);
+  const out: string[] = [];
+  for (const paragraph of text.split("\n")) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let line = "";
+    for (const w of words) {
+      const test = line ? `${line} ${w}` : w;
+      // Só a PRIMEIRA linha de todas leva o recuo: é a única que é desenhada à
+      // frente do rótulo. Um parágrafo seguinte já começa à esquerda.
+      const largura = out.length === 0 ? larguraDaPrimeira : larguraDasSeguintes;
+      if (font.widthOfTextAtSize(test, size) > largura && line) {
+        out.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
 /** Como {@link renderProposalDocPdfWithReport}, mas só os bytes — para quem não
  *  tem a quem dar o relatório (a pré-visualização de desenvolvimento). */
 export async function renderProposalDocPdf(
@@ -1402,16 +1447,39 @@ export async function renderProposalDocPdfWithReport(
     // impresso numa folha que vai para o cliente.
     const details = campos.filter(([, v]) => (v ?? "").trim().length > 0);
 
+    /* ── OS VALORES ALINHAM TODOS NA MESMA COLUNA ──────────────────────────
+       Cada valor começava logo a seguir ao SEU rótulo, e quando um campo
+       passava a duas linhas a segunda alinhava pelo fim desse rótulo: «Número
+       de Convidados:» continuava em x=277 e «Cerimónia:» em x=193. Duas
+       continuações, dois recuos diferentes, nenhum alinhado a nada — e a
+       apresentação, que é uma lista de «rótulo: valor», lia-se como texto solto
+       em vez de um quadro.
+
+       Mede-se o rótulo mais largo UMA vez e é aí que todos os valores começam.
+       É o que a folha dela faz, e é o que faz uma lista parecer uma lista. */
+    const vx =
+      M +
+      Math.max(
+        0,
+        ...details.map(([chave]) =>
+          f.bold.widthOfTextAtSize(textoParaFonte(f.bold, `${t.campos[chave]}:  `), CAMPO_CORPO),
+        ),
+      );
     for (const [chave, valor] of details) {
       const marca = `${t.campos[chave]}:`;
-      const vx = M + f.bold.widthOfTextAtSize(textoParaFonte(f.bold, `${marca} `), CAMPO_CORPO);
       // Duas linhas por campo — um local com nome comprido ("Herdade da …,
-      // Reguengos de Monsaraz") pede três e perdia o resto.
-      const linhas = clampLines(
-        wrap(f.reg, valor, CAMPO_CORPO, M + CAMPO_MEDIDA - vx),
+      // Reguengos de Monsaraz") pede três e perdia o resto. O que passa disso é
+      // anotado E leva «…»: quem só tem o papel não tinha como saber que o
+      // campo estava cortado.
+      const corte = quebrarComReticencias(
+        f.reg,
+        valor,
+        CAMPO_CORPO,
+        M + CAMPO_MEDIDA - vx,
         MAX_EVENT_FIELD_LINES,
-        `Campo «${pt.campos[chave]}»`,
       );
+      note(`Campo «${pt.campos[chave]}»`, corte.cortadas, "linhas");
+      const linhas = corte.linhas;
       ensure(CAMPO_AVANCO + (linhas.length - 1) * CAMPO_ENTRELINHA);
       text(p, marca, M, y, { font: f.bold, size: CAMPO_CORPO, color: INK });
       linhas.forEach((ln, j) => {
@@ -1445,8 +1513,43 @@ export async function renderProposalDocPdfWithReport(
        como erro. */
     const descSize = org ? 9.5 : T_BODY;
     const DESC_X = M + 24;
-    const AVANCO_1 = descSize + 6; // avanço depois da primeira linha de um item
-    const AVANCO_N = descSize + 5; // avanço depois de cada linha seguinte
+    /* ── A MEDIDA DE LEITURA DA LISTA DE SERVIÇOS ──────────────────────────
+       A descrição de um serviço era quebrada a `W − M − dx`: da margem
+       esquerda à margem direita da folha, que numa A4 AO BAIXO são 706 pontos
+       e, a corpo 10, à volta de 110 caracteres por linha.
+
+       O próprio ficheiro escreve, na definição do `MEASURE`, que «long lines
+       (~120+ chars edge-to-edge) are the biggest DIY tell» — e a lista de
+       Serviços era, com a legenda dos mood boards, a linha mais comprida do
+       documento. As duas medidas mais longas da folha eram precisamente as que
+       o comentário manda não deixar acontecer.
+
+       550 é a medida que a apresentação, as notas do orçamento e agora a
+       legenda já usam: o documento passa a ter UMA medida para o texto corrido.
+       O que isto custa é altura — mais linhas por serviço —, e é por isso que
+       está medido no relatório. */
+    const MEDIDA_DOS_SERVICOS = MEASURE + 120;
+    /** Onde a mancha do texto de um serviço acaba. */
+    const DESC_FIM = DESC_X + MEDIDA_DOS_SERVICOS;
+    /* ── A LISTA TEM DE SE LER COMO LISTA ──────────────────────────────────
+       O avanço depois da PRIMEIRA linha de um serviço era 16 e o das seguintes
+       15. Um ponto — e ao contrário: um serviço de uma linha era seguido de 16
+       e a última linha de um serviço de três era seguida de 15. Ou seja, o
+       branco entre DUAS LINHAS DO MESMO SERVIÇO e o branco entre DOIS SERVIÇOS
+       eram, na prática, o mesmo branco.
+
+       É isso que faz uma lista ler-se como lista, e não é só estética: o leitor
+       de PDF desta casa (`proposta-de-pdf`) remonta os serviços a partir dos
+       saltos verticais, precisamente porque «uma lista composta deixa mais
+       espaço entre dois itens do que entre duas linhas do mesmo item». Sem
+       essa diferença, ele tem de adivinhar por outra via — se a linha de cima
+       está cheia — e uma medida de leitura mais curta deixa de a encher.
+
+       Agora são dois números diferentes e o maior é o que separa serviços: 15
+       entre linhas, mais 4 de ar entre serviços. Custa três pontos por
+       serviço. */
+    const AVANCO_N = descSize + 5; // avanço de uma linha para a seguinte
+    const AR_ENTRE_ITENS = 4; // o ar a mais que separa dois serviços
     const ALTURA_TITULO = 22; // avanço depois do título de um grupo
     /** Nunca menos de duas linhas de cada lado de uma quebra. */
     const MIN_LINHAS = 2;
@@ -1458,9 +1561,11 @@ export async function renderProposalDocPdfWithReport(
      * se desenha, por construção. Medir num sítio e desenhar noutro é como isto
      * se estragou da primeira vez.
      *
-     * (As linhas seguintes são desenhadas em `DESC_X`, mais à esquerda do que a
-     * medida que as quebrou — sobra-lhes largura, nunca falta. Conservador de
-     * propósito: transbordar seria pior do que uma linha curta.)
+     * As linhas seguintes são desenhadas em `DESC_X` e são quebradas à largura
+     * que TÊM aí — ver `wrapComRecuo`. Eram quebradas à largura da primeira (a
+     * que sobra depois do rótulo) e desenhadas mais à esquerda, o que lhes
+     * deixava largura a sobrar: uma linha acabava em x=1154 e a seguinte em
+     * x=731, um buraco de 35% da largura no meio do parágrafo.
      */
     const medirItem = (it: { label?: string; desc?: string }) => {
       /**
@@ -1489,15 +1594,19 @@ export async function renderProposalDocPdfWithReport(
       // opcional (ela escreve linhas que são só uma frase), a pontuação que o
       // acompanha é que não pode sobreviver-lhe.
       if (!rotulo) {
-        return { lab: "", dx: DESC_X, lines: wrap(f.reg, it.desc, descSize, W - M - DESC_X) };
+        return { lab: "", dx: DESC_X, lines: wrap(f.reg, it.desc, descSize, MEDIDA_DOS_SERVICOS) };
       }
       // Sanitiza aqui também: `lab` é medido diretamente com
       // widthOfTextAtSize (que lança em glifos fora do WinAnsi).
       const lab = textoParaFonte(f.bold, `${it.label}: `);
       const dx = DESC_X + f.bold.widthOfTextAtSize(lab, descSize);
-      return { lab, dx, lines: wrap(f.reg, it.desc, descSize, W - M - dx) };
+      return {
+        lab,
+        dx,
+        lines: wrapComRecuo(f.reg, it.desc, descSize, DESC_FIM - dx, MEDIDA_DOS_SERVICOS),
+      };
     };
-    const alturaItem = (n: number) => AVANCO_1 + Math.max(0, n - 1) * AVANCO_N;
+    const alturaItem = (n: number) => n * AVANCO_N + AR_ENTRE_ITENS;
     /** A altura de uma página inteira de corpo — o tecto do que se pode exigir
      *  a um `ensure`. Sem isto, um item mais alto do que uma página pedia uma
      *  página nova para sempre. */
@@ -1522,7 +1631,7 @@ export async function renderProposalDocPdfWithReport(
       p.drawCircle({ x: M + 12, y: y + 3, size: 1.5, color: MUTED });
       if (lab) text(p, lab, DESC_X, y, { font: f.bold, size: descSize });
       text(p, lines[0] ?? "", lab ? dx : DESC_X, y, { size: descSize });
-      y -= AVANCO_1;
+      y -= AVANCO_N;
       for (let i = 1; i < lines.length; i++) {
         /**
          * Só chega aqui um item mais alto do que uma página inteira — raro, mas
@@ -1534,6 +1643,7 @@ export async function renderProposalDocPdfWithReport(
         text(p, lines[i], DESC_X, y, { size: descSize });
         y -= AVANCO_N;
       }
+      y -= AR_ENTRE_ITENS;
     };
 
     /**
@@ -2788,9 +2898,54 @@ export async function renderProposalDocPdfWithReport(
     const colX = [M, M + colW + gutter];
     let col = 0;
     let y = yTop;
-    for (const c of fixos.condicoesGerais) {
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       AS DUAS COLUNAS EQUILIBRAM-SE
+       ═══════════════════════════════════════════════════════════════════════
+
+       Enchia-se a coluna da esquerda até transbordar e o resto caía na direita.
+       Com o texto da casa, medido: OITO cláusulas à esquerda e DUAS à direita —
+       a esquerda descia até y=650 e a direita parava a 445. Duas colunas com o
+       dobro de tinta numa delas não se leem como duas colunas: leem-se como
+       uma coluna com um apêndice.
+
+       Mede-se cada cláusula ANTES (com a mesma quebra com que vai ser
+       desenhada, que é a regra desta folha) e escolhe-se o corte que deixa as
+       duas metades mais parecidas — sem nunca passar a altura da coluna.
+
+       ── SÓ QUANDO CABE EM DUAS COLUNAS ────────────────────────────────────
+       Uma lista que precise de mais de uma folha volta ao comportamento de
+       encher e transbordar: aí não há nada a equilibrar, há páginas a
+       preencher, e um corte «bonito» na primeira folha só empurraria a última
+       cláusula para uma folha nova. */
+    const alturaDaClausula = (c: string) => wrap(f.reg, c, 9, colW - 14).length * 12 + 8;
+    const alturas = fixos.condicoesGerais.map(alturaDaClausula);
+    const somaTotal = alturas.reduce((a, b) => a + b, 0);
+    const alturaDaColuna = yTop - (M + 4);
+    /** Quantas cláusulas ficam na coluna da esquerda. `null` = não se equilibra
+     *  (não cabe em duas colunas), enche-se como antes. */
+    let corte: number | null = null;
+    if (somaTotal <= 2 * alturaDaColuna) {
+      let melhorDesvio = Infinity;
+      let acumulado = 0;
+      for (let i = 0; i < alturas.length; i++) {
+        acumulado += alturas[i];
+        if (acumulado > alturaDaColuna) break;
+        // O resto tem de caber na coluna da direita — senão o «equilíbrio»
+        // atirava cláusulas para uma folha nova.
+        if (somaTotal - acumulado > alturaDaColuna) continue;
+        const desvio = Math.abs(acumulado - (somaTotal - acumulado));
+        if (desvio < melhorDesvio) {
+          melhorDesvio = desvio;
+          corte = i + 1;
+        }
+      }
+    }
+
+    for (const [i, c] of fixos.condicoesGerais.entries()) {
       const lines = wrap(f.reg, c, 9, colW - 14);
-      if (y - lines.length * 12 - 6 < M + 4) {
+      const transborda = y - lines.length * 12 - 6 < M + 4;
+      if (transborda || (corte !== null && col === 0 && i === corte)) {
         // Column full → next column, or a new page after the second column.
         if (col === 0) {
           col = 1;
@@ -2800,6 +2955,9 @@ export async function renderProposalDocPdfWithReport(
           frame(p);
           col = 0;
           y = H - M - 64;
+          // Numa folha nova volta-se a encher: o corte foi calculado para a
+          // primeira, e aplicá-lo aqui partia a coluna no sítio errado.
+          corte = null;
         }
       }
       const x = colX[col];
@@ -2997,6 +3155,36 @@ export async function renderProposalDocPdfWithReport(
     for (const ln of wrap(f.serifIt, t.slogan ?? SITE.slogan, 10.5, bandW)) {
       textCenter(p, ln, cx, sy, { font: f.serifIt, size: 10.5, color: CREAM_DIM });
       sy -= 10.5 * 1.3;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       A PÁGINA ONDE O CASAL FECHA O DOCUMENTO DIZ COMO RESPONDER
+       ═══════════════════════════════════════════════════════════════════════
+
+       A contracapa era um agradecimento, o logótipo e o slogan: nem email, nem
+       telefone, nem prazo. Quem chega ao fim de uma proposta de vinte mil euros
+       e decide responder tem de voltar atrás quatro folhas — ou procurar o
+       email antigo com que a recebeu.
+
+       Duas linhas, em corpo pequeno e no cinzento discreto do slogan: como
+       falar connosco, e até quando a proposta é a proposta. A VALIDADE é a
+       mesma frase e a mesma data que os «Próximos Passos» dizem lá atrás — é o
+       único elemento do documento que cria urgência, e estava perdida a meio de
+       uma lista de três pontos.
+
+       Não muda a identidade da folha: o painel escuro, a marca e o slogan ficam
+       onde estavam, e isto vem por baixo, no ar que já lá estava. */
+    let cy = sy - 20;
+    const fecho = [
+      `${SITE.email}   ·   ${SITE.phoneDisplay}`,
+      t.passoValidade(t.data(resolveValidUntil(doc))),
+    ];
+    for (const linha of fecho) {
+      for (const ln of wrap(f.reg, linha, 8.5, bandW)) {
+        textCenter(p, ln, cx, cy, { font: f.reg, size: 8.5, color: CREAM_DIM });
+        cy -= 12;
+      }
+      cy -= 6;
     }
   }
 
