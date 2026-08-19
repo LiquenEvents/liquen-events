@@ -5,6 +5,7 @@ import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import { Button } from "./ui";
 import { RichEmailEditor, type RichEmailEditorHandle } from "./RichEmailEditor";
+import EmailTemplatesBilingue from "./EmailTemplatesBilingue";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import {
   extractSimpleText,
@@ -197,7 +198,7 @@ function modelosComRascunho(chaves: string[]): Set<string> {
   return out;
 }
 
-export default function EmailTemplates() {
+function EditorClassico() {
   const { toast } = useToast();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -828,6 +829,59 @@ export default function EmailTemplates() {
           Seleciona um modelo para editar.
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * DOIS EDITORES, E PORQUE É QUE O ANTIGO NÃO SE DEITOU FORA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O separador «Modelos» é o novo: as duas línguas, o menu de variáveis por
+ * grupos, os blocos condicionais, a pré-visualização com um pedido a sério, o
+ * envio de teste e o histórico com reversão.
+ *
+ * O «Editor clássico» é este ficheiro, tal e qual, e fica por três razões
+ * concretas — nenhuma delas nostalgia:
+ *
+ *  1. É ELE QUE TEM O EDITOR VISUAL (negritos, listas, ligações). O ecrã novo
+ *     edita o markup directamente; tirar-lhe o editor visual sem lho dar era
+ *     uma troca em que ela perdia.
+ *  2. É ELE QUE TEM O RASCUNHO LOCAL, com o trabalho por publicar de quem
+ *     estiver a meio de escrever quando isto for para produção. Desligá-lo
+ *     fazia desaparecer esse trabalho do ecrã sem o apagar do navegador — a
+ *     pior das duas coisas.
+ *  3. Os quatro modelos antigos usam o dialecto `{marcador}`, que continua a
+ *     ser servido e enviado como sempre. Este editor é o que os conhece.
+ *
+ * As duas metades gravam na MESMA tabela e o português de um modelo é a mesma
+ * linha nas duas: o que se publicar num vê-se no outro.
+ */
+export default function EmailTemplates() {
+  const [vista, setVista] = useState<"modelos" | "classico">("modelos");
+  const separador = (chave: "modelos" | "classico", rotulo: string) => (
+    <button
+      role="tab"
+      aria-selected={vista === chave}
+      onClick={() => setVista(chave)}
+      className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
+        vista === chave
+          ? "bg-[#5F7C66] text-white"
+          : "bg-[#5F7C66]/10 text-[#5F7C66] hover:bg-[#5F7C66]/20"
+      }`}
+    >
+      {rotulo}
+    </button>
+  );
+  return (
+    <div>
+      {/* Empilha e embrulha a 390 px como tudo o resto deste ecrã. */}
+      <div className="flex flex-wrap gap-1.5 mb-4" role="tablist" aria-label="Editor de modelos">
+        {separador("modelos", "Modelos")}
+        {separador("classico", "Editor clássico")}
+      </div>
+      {vista === "modelos" ? <EmailTemplatesBilingue /> : <EditorClassico />}
     </div>
   );
 }

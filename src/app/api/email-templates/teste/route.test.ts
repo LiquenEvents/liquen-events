@@ -2,10 +2,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 
 const authed = vi.hoisted(() => ({ ok: true }));
+interface Enviado {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}
 const correio = vi.hoisted(() => ({
-  enviar: vi.fn(async () => ({ sent: true })),
+  enviar: vi.fn(async (_args: unknown) => ({ sent: true })),
   MAIL_TO: "liquen.alentejo@gmail.com",
 }));
+/** O que o correio recebeu na chamada `n`, já com forma. */
+const enviadoNa = (n: number): Enviado => correio.enviar.mock.calls[n]![0] as Enviado;
 const dados = vi.hoisted(() => ({
   valores: {
     cliente_nome: "Marta",
@@ -60,12 +68,12 @@ describe("envio de teste", () => {
   it("por omissão vai para a caixa da casa", async () => {
     const r = await POST(req(modelo));
     expect(r.status).toBe(200);
-    expect(correio.enviar.mock.calls[0][0].to).toBe(correio.MAIL_TO);
+    expect(enviadoNa(0).to).toBe(correio.MAIL_TO);
   });
 
   it("o assunto leva sempre «[TESTE]» à frente", async () => {
     await POST(req(modelo));
-    expect(correio.enviar.mock.calls[0][0].subject).toBe("[TESTE] Proposta Marta");
+    expect(enviadoNa(0).subject).toBe("[TESTE] Proposta Marta");
   });
 
   it("RECUSA enviar para o cliente do pedido que se está a ver", async () => {
@@ -77,7 +85,7 @@ describe("envio de teste", () => {
 
   it("usa os dados REAIS do pedido — inclusive o bloco da data em falta", async () => {
     await POST(req(modelo));
-    const enviado = correio.enviar.mock.calls[0][0];
+    const enviado = enviadoNa(0);
     expect(enviado.html).toContain("Olá Marta,");
     expect(enviado.html).toContain("Aguardamos a data.");
     expect(enviado.html).not.toContain("{{");

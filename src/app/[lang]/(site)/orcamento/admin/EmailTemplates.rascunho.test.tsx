@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import EmailTemplates from "./EmailTemplates";
@@ -69,12 +69,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const renderModelos = () =>
-  render(
+/**
+ * O ecrã dos modelos passou a ter dois separadores — «Modelos» (bilingue) e
+ * «Editor clássico». Estes testes são do CLÁSSICO, e por isso entram nele
+ * antes de mais nada. O separador que abre é o outro, de propósito: é o novo
+ * que tem as duas línguas, a pré-visualização com dados reais e o histórico.
+ */
+const renderModelos = () => {
+  const resultado = render(
     <ToastProvider>
       <EmailTemplates />
     </ToastProvider>,
   );
+  fireEvent.click(screen.getByRole("tab", { name: /editor clássico/i }));
+  return resultado;
+};
 
 const assunto = () => screen.getByLabelText(/assunto/i) as HTMLInputElement;
 const naLista = (nome: string) => screen.getByRole("button", { name: new RegExp(nome, "i") });
