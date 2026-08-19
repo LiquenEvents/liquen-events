@@ -204,6 +204,123 @@ describe("a capa", () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   A PÁGINA DE INSPIRAÇÃO
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const TITULO_ENORME =
+  "Decoração Floral Integral da Cerimónia, do Copo d'Água, do Jantar e da Festa" +
+  " com Flor Natural da Época Colhida no Próprio Dia";
+
+describe("o cabeçalho de um mood board", () => {
+  /**
+   * Medido pela sonda de transbordos: o título era desenhado a 24 numa linha
+   * só, sem medida e sem quebra, e acabava em x=848,2 — 74,3 pontos para lá da
+   * margem, e SEIS pontos para lá do papel (a folha tem 841,89).
+   */
+  it("nunca sai do papel — nem do lado direito da mancha", async () => {
+    const escritas = await desenhar(
+      proposta({
+        moodBoards: [
+          {
+            title: TITULO_ENORME,
+            subtitulo:
+              "Ramo de Noiva (a definir com a Noiva), com alfazema, olival," +
+              " eucalipto cinerea e rosa de jardim colhida na manhã do evento",
+            images: [FOTO, FOTO],
+            layout: "filas",
+          },
+        ],
+      }),
+    );
+    for (const e of escritas) {
+      expect(e.x + e.largura, `«${e.texto}» acaba em x=${(e.x + e.largura).toFixed(1)}`).toBeLessThanOrEqual(W - M + 0.5);
+    }
+  });
+
+  /**
+   * E não é só não transbordar: o cabeçalho tem de ficar ACIMA da primeira fila
+   * de fotografias — a banda entre o sobretítulo e as fotos é o que ele tem.
+   */
+  it("fica na banda entre o sobretítulo e as fotografias", async () => {
+    const escritas = await desenhar(
+      proposta({
+        moodBoards: [{ title: TITULO_ENORME, images: [FOTO, FOTO], layout: "filas" }],
+      }),
+    );
+    // A página do mood board é a que tem o sobretítulo «INSPIRAÇÃO».
+    const pagina = escritas.find((e) => e.texto === "INSPIRAÇÃO")?.pagina;
+    expect(pagina, "não se encontrou a página de inspiração").toBeTypeOf("number");
+    const doTitulo = escritas.filter((e) => e.pagina === pagina && e.tamanho >= 12);
+    expect(doTitulo.length).toBeGreaterThan(0);
+    // TOPO_DAS_FOTOS = H − M − 112. Nada do cabeçalho desce até lá.
+    for (const e of doTitulo) expect(e.y).toBeGreaterThanOrEqual(H - M - 112);
+  });
+
+  /** O título que já cabia continua exactamente onde estava — a miniatura do
+   *  estúdio lê as mesmas linhas de base. */
+  it("um título normal não se mexe um ponto", async () => {
+    const escritas = await desenhar(
+      proposta({
+        moodBoards: [
+          { title: "Cerimónia", subtitulo: "Ramo de Noiva", images: [FOTO], layout: "filas" },
+        ],
+      }),
+    );
+    expect(escritas.find((e) => e.texto === "Cerimónia" && e.tamanho === 24)?.y).toBeCloseTo(
+      H - M - 76,
+      3,
+    );
+    expect(escritas.find((e) => e.texto === "Ramo de Noiva")?.y).toBeCloseTo(H - M - 96, 3);
+  });
+});
+
+describe("a legenda de um mood board", () => {
+  /**
+   * Com dez linhas escritas saíam cinco, e a última acabava em «… ao casal.
+   * Linha» — a meio da frase, sem sinal nenhum de que faltava texto.
+   */
+  it("quando é cortada, di-lo com «…»", async () => {
+    const legenda = Array.from(
+      { length: 12 },
+      (_, i) =>
+        `Linha número ${i + 1} da descrição desta página de inspiração, escrita com o` +
+        " comprimento que ela costuma escrever quando quer explicar a paleta ao casal.",
+    ).join(" ");
+    const escritas = await desenhar(
+      proposta({ moodBoards: [{ title: "Paleta", annotation: legenda, images: [FOTO], layout: "filas" }] }),
+    );
+    const daLegenda = escritas.filter((e) => e.tamanho === 11 && e.texto.length > 20);
+    expect(daLegenda.length, "não se encontrou a legenda").toBeGreaterThan(0);
+    const ultima = daLegenda.reduce((a, b) => (b.y < a.y ? b : a));
+    expect(ultima.texto.endsWith("…"), `a última linha acaba em «${ultima.texto.slice(-24)}»`).toBe(
+      true,
+    );
+  });
+
+  /** E a medida é a do documento (550), e não a folha toda (706). */
+  it("não corre a folha de margem a margem", async () => {
+    const escritas = await desenhar(
+      proposta({
+        moodBoards: [
+          {
+            title: "Paleta",
+            annotation:
+              "Verdes suaves, brancos quebrados e um toque de terracotta nas velas e nos" +
+              " têxteis da mesa, com alfazema e olival colhidos na manhã do evento e um" +
+              " ramo de rosa de jardim para a noiva.",
+            images: [FOTO],
+            layout: "filas",
+          },
+        ],
+      }),
+    );
+    const daLegenda = escritas.filter((e) => e.tamanho === 11 && e.texto.length > 20);
+    expect(daLegenda.length).toBeGreaterThan(1);
+    for (const e of daLegenda) expect(e.largura).toBeLessThanOrEqual(550);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
    O ACABAMENTO DO DOCUMENTO
    ═══════════════════════════════════════════════════════════════════════════ */
 

@@ -52,6 +52,7 @@ import {
   PAGINA_W,
   PAGINA_H,
   PAGINA_M,
+  TOPO_DAS_FOTOS,
   TEXTO_DO_MOODBOARD as TXT,
   type CaixaPdf,
 } from "@/lib/proposal-geometria";
@@ -222,6 +223,11 @@ const COVER_NAME_MIN = 18;
 /** As linhas de baixo da capa (tipo/data, local): duas, e o corpo mínimo. */
 const MAX_COVER_LINE_LINES = 2;
 const COVER_LINE_MIN = 8.5;
+/** O título e o subtítulo de um mood board: duas linhas, e até onde encolhem.
+ *  Ver o bloco «O CABEÇALHO DE UM MOOD BOARD CABE NA FOLHA». */
+const MAX_BOARD_HEAD_LINES = 2;
+const BOARD_TITLE_MIN = 14;
+const BOARD_SUB_MIN = 9.5;
 
 /** Uma perda por COMPOSIÇÃO: o conteúdo chegou inteiro ao gerador e o desenho
  *  não o mostra todo. Estruturada (e não uma frase feita) para o estúdio poder
@@ -1743,6 +1749,115 @@ export async function renderProposalDocPdfWithReport(
     });
   };
 
+  /* ═══════════════════════════════════════════════════════════════════════════
+     O CABEÇALHO DE UM MOOD BOARD CABE NA FOLHA
+     ═══════════════════════════════════════════════════════════════════════════
+
+     O título era desenhado a corpo 24 numa linha só, sem medida e sem quebra —
+     e o subtítulo a 13, com o mesmo nada. Medido pela sonda de transbordos, com
+     um título de 124 caracteres:
+
+         p3  x 68.0 → 848.2   «Decoração Floral Integral da Cerimónia, do Copo
+                               d'Água…»  passa a margem direita em 74,3 pt
+
+     A folha tem 841,89 de largura. O título não passava a margem: passava O
+     PAPEL. Onde ele acaba não há nada — nem margem, nem folha.
+
+     ── A BANDA ONDE ISTO VIVE ─────────────────────────────────────────────────
+     O cabeçalho de uma página de inspiração é uma faixa fechada dos dois lados:
+     por cima está o sobretítulo («INSPIRAÇÃO»), por baixo está o topo da
+     primeira fila de fotografias. São sessenta pontos, e é aí que o título e o
+     subtítulo têm de caber.
+
+     Três degraus, por esta ordem:
+
+      1. ENCOLHER até caber numa linha (24 → 14 no título, 13 → 9,5 no
+         subtitulo). É o degrau que resolve o caso medido: 124 caracteres cabem
+         a 21 pontos, numa linha, sem partir nada.
+      2. QUEBRAR em duas linhas, à medida da mancha.
+      3. DESCER o bloco inteiro até onde as fotografias deixarem — e, se ainda
+         assim não couber, ir tirando linhas (com «…», que diz que foram
+         tiradas).
+
+     ── E O CASO NORMAL SAI EXACTAMENTE ONDE SAÍA ────────────────────────────
+     O bloco é ancorado pela ÚLTIMA linha e cresce PARA CIMA. Com um título e um
+     subtítulo de uma linha cada, as duas linhas de base dão 451,28 e 431,28 —
+     os mesmos números que a geometria escreve e que a pré-visualização do
+     estúdio lê. Uma miniatura que deixasse de ser fiel é pior do que não haver
+     miniatura nenhuma. */
+  const cabecalhoDoBoard = (pg: PDFPage, titulo: string, subtitulo: string, boardName: string) => {
+    const LARGURA = W - 2 * M;
+    /** O tecto: a linha de base do sobretítulo, menos o ar que os separa. */
+    const TECTO = TXT.sobretitulo.base - 3.5;
+    /** O chão: o topo da primeira fila de fotografias, com um fio de ar. */
+    const CHAO_DO_BOARD = TOPO_DAS_FOTOS + 4;
+    const temSub = !!subtitulo;
+    /** Onde assenta a ÚLTIMA linha do bloco — a de sempre. O bloco cresce para
+     *  cima a partir daqui, e por isso o caso normal não se mexe um ponto. */
+    const baseHistorica = temSub ? TXT.subtitulo.base : TXT.titulo.base;
+
+    /** Quantas linhas dá este texto neste corpo. */
+    const linhasEm = (texto: string, size: number) =>
+      wrap(f.serifIt, texto, size, LARGURA).length;
+
+    // O subtítulo encolhe pelo seu lado: é o texto secundário da página, e a
+    // altura que ele ocupa é o que sobra para o título.
+    let sSize = TXT.subtitulo.tamanho;
+    while (temSub && sSize > BOARD_SUB_MIN && linhasEm(subtitulo, sSize) > MAX_BOARD_HEAD_LINES) {
+      sSize -= 0.5;
+    }
+    const sub = temSub
+      ? quebrarComReticencias(f.serifIt, subtitulo, sSize, LARGURA, MAX_BOARD_HEAD_LINES)
+      : { linhas: [] as string[], cortadas: 0 };
+    /** O ar entre a última linha do título e a primeira do subtítulo. Nos
+     *  corpos de omissão dá os 20 pontos que separam as duas linhas de base. */
+    const AR = sSize + 7;
+    const alturaDoSub = temSub ? (sub.linhas.length - 1) * sSize * 1.2 + AR : 0;
+
+    /** O bloco cabe na banda com este corpo e este número de linhas? E quanto
+     *  é que tem de descer para lá caber? */
+    const naBanda = (size: number, linhas: number) => {
+      const acima = alturaDoSub + (linhas - 1) * size * 1.2;
+      // `size * 0.8` é a altura da maiúscula mais a folga — o que a linha de
+      // cima ocupa ACIMA da sua linha de base.
+      const topo = baseHistorica + acima + size * 0.8;
+      const descida = Math.min(
+        Math.max(0, topo - TECTO),
+        Math.max(0, baseHistorica - CHAO_DO_BOARD),
+      );
+      return { cabe: topo - descida <= TECTO, descida };
+    };
+
+    // O título fica no MAIOR corpo em que caiba — na largura E na banda. Descer
+    // até ao mínimo por causa da largura, quando o que apertava era a altura,
+    // dava um título de 14 pontos com a palavra «Dia» sozinha na segunda linha.
+    let tSize = TXT.titulo.tamanho;
+    while (
+      tSize > BOARD_TITLE_MIN &&
+      (linhasEm(titulo, tSize) > MAX_BOARD_HEAD_LINES ||
+        !naBanda(tSize, linhasEm(titulo, tSize)).cabe)
+    ) {
+      tSize -= 0.5;
+    }
+    const tit = quebrarComReticencias(f.serifIt, titulo, tSize, LARGURA, MAX_BOARD_HEAD_LINES);
+    const { descida } = naBanda(tSize, tit.linhas.length);
+
+    note(`Título do mood board ${boardName}`, tit.cortadas, "linhas");
+    note(`Subtítulo do mood board ${boardName}`, sub.cortadas, "linhas");
+
+    const baseUltima = baseHistorica - descida;
+    let y = baseUltima + alturaDoSub + (tit.linhas.length - 1) * tSize * 1.2;
+    for (const ln of tit.linhas) {
+      text(pg, ln, M, y, { font: f.serifIt, size: tSize, color: INK });
+      y -= tSize * 1.2;
+    }
+    let ys = baseUltima + (sub.linhas.length - 1) * sSize * 1.2;
+    for (const ln of sub.linhas) {
+      text(pg, ln, M, ys, { font: f.serifIt, size: sSize, color: MUTED });
+      ys -= sSize * 1.2;
+    }
+  };
+
   // ── Mood board pages (skip empty boards — never show a client a placeholder) ──
   // Os rótulos do relatório saem do documento PORTUGUÊS: quem o lê é o estúdio,
   // e é lá que ela vai procurar o board pelo nome que lhe deu.
@@ -1769,23 +1884,6 @@ export async function renderProposalDocPdfWithReport(
       undefined,
       TXT.sobretitulo.tamanho,
     );
-    text(p, mb.title, M, TXT.titulo.base, {
-      font: f.serifIt,
-      size: TXT.titulo.tamanho,
-      color: INK,
-    });
-    // O subtítulo, quando existe. Na proposta feita à mão é o «Ramo de Noiva (a
-    // definir com a Noiva)» por baixo de «Complementos dos Noivos»: o título diz
-    // o capítulo, o subtítulo diz o que aquelas fotos são e o que ainda está por
-    // decidir. Na mesma serifa da marca — a manuscrita da folha antiga não se
-    // replica.
-    if (mb.subtitulo?.trim()) {
-      text(p, mb.subtitulo.trim(), M, TXT.subtitulo.base, {
-        font: f.serifIt,
-        size: TXT.subtitulo.tamanho,
-        color: MUTED,
-      });
-    }
     // Como o mood board se chama num aviso. Sem título, vale a posição — a que
     // ele ocupa NO DOCUMENTO e não a página por que saiu, porque é assim que
     // ela o encontra no estúdio, contado a partir de 1.
@@ -1795,6 +1893,12 @@ export async function renderProposalDocPdfWithReport(
     // existe com esse nome.
     const tituloPt = (docPt.moodBoards[bi]?.title ?? "").trim();
     const boardName = tituloPt ? `«${tituloPt}»` : `${bi + 1}`;
+    // O subtítulo, quando existe. Na proposta feita à mão é o «Ramo de Noiva (a
+    // definir com a Noiva)» por baixo de «Complementos dos Noivos»: o título diz
+    // o capítulo, o subtítulo diz o que aquelas fotos são e o que ainda está por
+    // decidir. Na mesma serifa da marca — a manuscrita da folha antiga não se
+    // replica.
+    cabecalhoDoBoard(p, mb.title ?? "", (mb.subtitulo ?? "").trim(), boardName);
     await drawCollage(
       pdf,
       p,
@@ -2795,11 +2899,24 @@ async function drawCollage(
   // up front so the collage reserves exactly the height the caption needs. Capped
   // at 5 lines so a very long note never crowds out the photos — o que passa
   // disso é anotado, não desaparece calado.
-  const annAll = mb.annotation
-    ? wrap(f.serifIt, mb.annotation, TXT.legenda.tamanho, W - 2 * M)
-    : [];
-  note(`Descrição do mood board ${boardName}`, annAll.length - MAX_ANNOTATION_LINES, "linhas");
-  const annLines = annAll.slice(0, MAX_ANNOTATION_LINES);
+  // A MEDIDA É A DO DOCUMENTO, e não a folha toda: 550 pontos em vez de 706 —
+  // ~100 caracteres por linha em vez de ~150, que era a linha mais comprida
+  // deste documento. Vive na geometria, ao lado do tecto de linhas, porque a
+  // miniatura do estúdio tem de reservar às fotos a mesma altura. Ver lá.
+  //
+  // E o que for cortado LEVA «…»: com dez linhas escritas saíam cinco, e a
+  // última acabava em «… ao casal. Linha» — sem nada a dizer que faltava texto.
+  const ann = mb.annotation
+    ? quebrarComReticencias(
+        f.serifIt,
+        mb.annotation,
+        TXT.legenda.tamanho,
+        TXT.legenda.medida,
+        MAX_ANNOTATION_LINES,
+      )
+    : { linhas: [] as string[], cortadas: 0 };
+  note(`Descrição do mood board ${boardName}`, ann.cortadas, "linhas");
+  const annLines = ann.linhas;
   const annH = alturaDaLegenda(annLines.length);
   const bottom = M + annH;
   // O collage tem lugar para MOOD_BOARD_MAX_IMAGES fotos. As restantes JÁ
