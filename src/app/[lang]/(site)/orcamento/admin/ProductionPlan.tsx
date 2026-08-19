@@ -216,24 +216,33 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                 <div className="flex flex-col gap-0.5">
                   {itens.map((i) => (
                     <div key={i.id} className="group flex items-center gap-2.5 py-1.5">
+                      {/* 16×16 medidos a 375 px — a mais pequena caixa de
+                          marcar do dossier, pouco mais de um terço dos 44 do
+                          mínimo. Mesma correcção da checklist do evento:
+                          cresce o botão, o quadrado desenhado fica nos 16 no
+                          `span` de dentro. */}
                       <button
                         onClick={() => toggle(i.id)}
                         role="checkbox"
                         aria-checked={i.done}
                         aria-label={i.label}
-                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${i.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
+                        className="alvo-toque shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55"
                       >
-                        {i.done && (
-                          <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
-                            <path
-                              d="M2 6l2.5 2.5L10 3"
-                              stroke="white"
-                              strokeWidth="1.6"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        )}
+                        <span
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${i.done ? "bg-[#4d6350] border-[#4d6350]" : "border-foreground/25 hover:border-[#4d6350]/60"}`}
+                        >
+                          {i.done && (
+                            <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+                              <path
+                                d="M2 6l2.5 2.5L10 3"
+                                stroke="white"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          )}
+                        </span>
                       </button>
                       <span
                         className={`flex-1 text-sm ${i.done ? "text-foreground/35 line-through" : "text-foreground/70"}`}

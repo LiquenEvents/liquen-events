@@ -475,7 +475,18 @@ function Catalogo() {
             Abaixo do mínimo ({emFalta.length})
           </Button>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        {/* ── `flex-wrap`, e a razão é medida ──────────────────────────────
+            "Exportar" + "Importar CSV" + "Adicionar" somam ~331 px com os
+            intervalos, e este era o único `flex` do ecrã sem quebra de linha
+            (o `Toolbar` à volta já quebra, e as Listas base e as Regras — que
+            partilham a página — não tinham o problema). A 320 px isso
+            empurrava o documento para 337: a página inteira passava a medir
+            mais do que o ecrã, e como o `body` tem `overflow-x: clip` o que
+            saía não ficava por arrastar, ficava CORTADO — o "Adicionar", que
+            é o botão que cria material.
+            Com `flex-wrap` os três passam à linha de baixo quando não cabem.
+            A 375 px nada muda: aí cabem. */}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" onClick={exportar}>
             Exportar
           </Button>

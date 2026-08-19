@@ -277,28 +277,41 @@ export default function EventTasks({ quote, userName }: Props) {
                   : "border-foreground/[0.08] bg-white shadow-[0_1px_2px_rgba(42,38,32,0.04)] hover:shadow"
               }`}
             >
+              {/* 18×18 medidos a 375 px. É a caixa que fecha uma tarefa do
+                  evento — mesma correcção da checklist: o alvo cresce para os
+                  44 sob dedo, o quadrado desenhado (e a cor da prioridade que
+                  ele carrega) fica nos 18 no `span` de dentro.
+                  A linha é `items-start`, portanto o alvo alto empurrava o
+                  quadrado para baixo do início do título. O `-mt-3` repõe-lhe
+                  o alinhamento e vai com a variante `pointer-coarse:` — sem
+                  ela, no portátil (onde o botão continua com 18 px) a margem
+                  negativa puxava o quadrado para fora da linha. */}
               <button
                 onClick={() => toggleDone(task)}
-                className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border-[1.5px] motion-safe:transition-colors"
-                style={{
-                  borderColor: task.done ? "#4d6350" : PRIORITY_COLOR[task.priority],
-                  background: task.done ? "#4d635014" : "transparent",
-                }}
+                className="alvo-toque mt-0.5 shrink-0 pointer-coarse:-mt-3"
                 aria-label={task.done ? "Marcar como pendente" : "Marcar como concluída"}
               >
-                {task.done && (
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    stroke="#4d6350"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  >
-                    <path d="M2.5 6l2.5 2.5L9.5 3" />
-                  </svg>
-                )}
+                <span
+                  className="flex h-[18px] w-[18px] items-center justify-center rounded-md border-[1.5px] motion-safe:transition-colors"
+                  style={{
+                    borderColor: task.done ? "#4d6350" : PRIORITY_COLOR[task.priority],
+                    background: task.done ? "#4d635014" : "transparent",
+                  }}
+                >
+                  {task.done && (
+                    <svg
+                      width="11"
+                      height="11"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      stroke="#4d6350"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    >
+                      <path d="M2.5 6l2.5 2.5L9.5 3" />
+                    </svg>
+                  )}
+                </span>
               </button>
               <div className="min-w-0 flex-1">
                 <p

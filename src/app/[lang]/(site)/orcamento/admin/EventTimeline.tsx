@@ -145,7 +145,9 @@ export default function EventTimeline({ quote, onChange }: Props) {
               onClick={() => printRunSheet(quote)}
               title="Imprimir guião do dia"
               aria-label="Imprimir guião do dia"
-              className="rounded-lg p-1.5 text-foreground/40 hover:bg-foreground/[0.06] hover:text-foreground/75 motion-safe:transition-colors"
+              // 27×27 medidos a 375 px — um botão de ícone sem rótulo, que é
+              // a classe de alvo mais fácil de falhar com o polegar.
+              className="alvo-toque rounded-lg p-1.5 text-foreground/40 hover:bg-foreground/[0.06] hover:text-foreground/75 motion-safe:transition-colors"
             >
               <svg
                 width="15"
@@ -216,7 +218,15 @@ export default function EventTimeline({ quote, onChange }: Props) {
                     type="button"
                     onClick={() => startEdit(i.id, "time", i.time)}
                     title="Editar hora"
-                    className="w-12 shrink-0 rounded-md pt-0.5 text-right text-xs font-semibold tabular-nums text-[#4d6350] decoration-dotted underline-offset-2 hover:underline"
+                    // ── OS TRÊS BOTÕES DESTA LINHA SÃO EDIÇÕES A SÉRIO ─────
+                    // Medidos a 375 px com o guião cheio: a hora dava 48×18,
+                    // o momento 155×39 e o responsável 155×16. Os três abrem
+                    // um campo de edição, e o guião do dia é lido e corrigido
+                    // no local, de pé. `alvo-toque` põe-nos nos 44 sob dedo.
+                    // `!justify-end` mantém a hora encostada à direita (a
+                    // classe centra por omissão) e `pt-0.5` sai porque a
+                    // centragem vertical passa a ser dela.
+                    className="alvo-toque !justify-end w-12 shrink-0 rounded-md text-right text-xs font-semibold tabular-nums text-[#4d6350] decoration-dotted underline-offset-2 hover:underline"
                   >
                     {i.time}
                   </button>
@@ -238,7 +248,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                       type="button"
                       onClick={() => startEdit(i.id, "title", i.title)}
                       title="Editar momento"
-                      className="block w-full rounded-md text-left text-sm leading-snug text-foreground/80 decoration-dotted underline-offset-2 hover:underline"
+                      className="alvo-toque !justify-start w-full rounded-md text-left text-sm leading-snug text-foreground/80 decoration-dotted underline-offset-2 hover:underline"
                     >
                       {i.title}
                     </button>
@@ -260,7 +270,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
                         type="button"
                         onClick={() => startEdit(i.id, "owner", i.owner ?? "")}
                         title="Editar responsável"
-                        className="mt-0.5 block w-full rounded-md text-left text-xs text-foreground/45 decoration-dotted underline-offset-2 hover:underline"
+                        className="alvo-toque !justify-start mt-0.5 w-full rounded-md text-left text-xs text-foreground/45 decoration-dotted underline-offset-2 hover:underline"
                       >
                         {i.owner}
                       </button>

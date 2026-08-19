@@ -214,16 +214,32 @@ export default function EventCosts({ quote, onChange }: Props) {
                   <p className="truncate text-sm font-medium text-foreground/80">{it.name}</p>
                   <p className="text-[11px] text-foreground/45">{it.category}</p>
                 </div>
+                {/* Parece uma pastilha de estado, mas é um botão: cada toque
+                    faz rodar contactado → confirmado → pago. Media 27 px de
+                    altura a 375 px (49 a 88 de largura, conforme a palavra), e
+                    fica encostado ao «Remover» da mesma linha — falhar-lhe o
+                    alvo é apagar o fornecedor.
+
+                    A cor pintada fica no `span`, e não no botão: com o fundo
+                    no alvo de 44 px a pastilha passava a ser um bloco de cor
+                    do tamanho de um botão principal, e esta é uma marca de
+                    estado, não a acção mais importante da linha. Assim o
+                    desenho fica igual ao que era e só o alvo cresce — a mesma
+                    divisão das caixas de marcar deste dossier. */}
                 <button
                   onClick={() => cycleStatus(it)}
-                  className="shrink-0 rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.1em] motion-safe:transition-opacity hover:opacity-80"
-                  style={{
-                    background: `${metaFor(STATUS_META, it.status).color}18`,
-                    color: metaFor(STATUS_META, it.status).color,
-                  }}
+                  className="alvo-toque shrink-0 motion-safe:transition-opacity hover:opacity-80"
                   title="Clica para mudar o estado"
                 >
-                  {metaFor(STATUS_META, it.status).label}
+                  <span
+                    className="rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.1em]"
+                    style={{
+                      background: `${metaFor(STATUS_META, it.status).color}18`,
+                      color: metaFor(STATUS_META, it.status).color,
+                    }}
+                  >
+                    {metaFor(STATUS_META, it.status).label}
+                  </span>
                 </button>
                 <button
                   onClick={() => remove(it.id)}

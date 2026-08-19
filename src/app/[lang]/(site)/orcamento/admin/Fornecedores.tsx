@@ -629,7 +629,12 @@ export default function Fornecedores() {
                     {s.email && (
                       <a
                         href={`mailto:${s.email}`}
-                        className="text-foreground/45 hover:text-[#4d6350] transition-colors truncate"
+                        // O MESMO 309×16 do telefone aqui em cima, e a mesma
+                        // correcção: o irmão foi tratado e este ficou para
+                        // trás, na mesma coluna e à distância de um dedo.
+                        // `truncate` fica — os emails destes fornecedores
+                        // passam da largura da coluna.
+                        className="alvo-toque !justify-start text-foreground/45 hover:text-[#4d6350] transition-colors truncate"
                       >
                         {s.email}
                       </a>
