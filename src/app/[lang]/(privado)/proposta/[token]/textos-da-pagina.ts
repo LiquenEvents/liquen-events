@@ -28,8 +28,15 @@ export interface TextosDaPagina {
   fechar: string;
   anterior: string;
   seguinte: string;
-  /** «Fotografia 3 de 12» — o que o leitor de ecrã anuncia ao mudar de foto. */
-  contagem: (i: number, total: number) => string;
+  /**
+   * «Fotografia 3 de 12» — o que o leitor de ecrã anuncia ao mudar de foto.
+   *
+   * É um MOLDE com `{i}` e `{n}`, e não uma função, porque isto atravessa a
+   * fronteira servidor→cliente: uma função não se serializa, e o React
+   * rebentaria a passá-la como propriedade a um Client Component. Ver
+   * {@link contar}.
+   */
+  contagem: string;
   /** A célula que não conseguiu mostrar a fotografia. */
   fotoFalhou: string;
   /** O botão que volta a pedir as assinaturas ao servidor. */
@@ -46,7 +53,7 @@ const PT: TextosDaPagina = {
   fechar: "Fechar",
   anterior: "Fotografia anterior",
   seguinte: "Fotografia seguinte",
-  contagem: (i, total) => `Fotografia ${i} de ${total}`,
+  contagem: "Fotografia {i} de {n}",
   fotoFalhou: "Não foi possível mostrar esta fotografia.",
   recarregarFotos: "Voltar a carregar as fotografias",
   nestaPagina: "Nesta página",
@@ -59,7 +66,7 @@ const EN: TextosDaPagina = {
   fechar: "Close",
   anterior: "Previous photo",
   seguinte: "Next photo",
-  contagem: (i, total) => `Photo ${i} of ${total}`,
+  contagem: "Photo {i} of {n}",
   fotoFalhou: "This photo could not be shown.",
   recarregarFotos: "Load the photos again",
   nestaPagina: "On this page",
@@ -69,4 +76,9 @@ const EN: TextosDaPagina = {
 
 export function textosDaPagina(idioma: IdiomaDaProposta): TextosDaPagina {
   return idioma === "en" ? EN : PT;
+}
+
+/** O molde da contagem preenchido — a única forma de o ler, dos dois lados. */
+export function contar(molde: string, i: number, n: number): string {
+  return molde.replace("{i}", String(i)).replace("{n}", String(n));
 }
