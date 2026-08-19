@@ -532,12 +532,25 @@ describe("relatório de conteúdo CORTADO pelo desenho", () => {
   });
 
   it("o nome do casal cortado na CAPA é dito (é a primeira coisa que o cliente vê)", async () => {
-    // Com fotos na capa, o nome vive na banda central estreita: um nome de
-    // casal a sério pede três linhas a 26pt e a capa desenha duas.
+    /**
+     * ── O QUE MUDOU, E PORQUÊ ────────────────────────────────────────────
+     *
+     * Este teste usava «Maria Madalena Rebocho & José Francisco Themudo» —
+     * quarenta e sete caracteres — e exigia que a capa o CORTASSE, porque a
+     * capa encolhia o nome só até 26 e depois partia-o em duas linhas.
+     *
+     * Esse era o defeito, e é o que deixou de acontecer: o nome encolhe até 18
+     * e cabe em três linhas, e nomes desse tamanho passam a sair inteiros (a
+     * capa acabava num «&» com o noivo desaparecido). O que se prende aqui
+     * continua a ser o mesmo — que o corte, QUANDO acontece, é DITO — mas
+     * agora é preciso um nome que não caiba mesmo.
+     */
     const photo = await photoB64();
     const doc = {
       ...decoracaoDoc(),
-      clientNames: "Maria Madalena Rebocho & José Francisco Themudo",
+      clientNames:
+        "Maria Madalena Rebocho de Vasconcelos e Sousa Coutinho de Albuquerque " +
+        "& José Francisco Themudo de Mendonça Furtado de Mesquita Bourbon",
       coverImages: [photo, photo],
     };
     const { truncations } = await renderProposalDocPdfWithReport(doc);
@@ -545,6 +558,17 @@ describe("relatório de conteúdo CORTADO pelo desenho", () => {
     expect(corte).toBeDefined();
     expect(corte?.unit).toBe("linhas");
     expect(corte?.dropped).toBeGreaterThan(0);
+  });
+
+  /** E o nome que ANTES era cortado sai agora inteiro — é o ponto da mudança. */
+  it("um nome de casal a sério cabe na capa inteiro", async () => {
+    const photo = await photoB64();
+    const { truncations } = await renderProposalDocPdfWithReport({
+      ...decoracaoDoc(),
+      clientNames: "Maria Madalena Rebocho & José Francisco Themudo",
+      coverImages: [photo, photo],
+    });
+    expect(truncations.find((t) => t.where === "Nome na capa")).toBeUndefined();
   });
 
   it("o nome que cabe em duas linhas na capa não é relatado", async () => {

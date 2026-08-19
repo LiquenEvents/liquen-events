@@ -117,6 +117,92 @@ function proposta(over: Record<string, unknown> = {}): ProposalDoc {
   } as Parameters<typeof withProposalDefaults>[0]);
 }
 
+/**
+ * Uma fotografia mínima, para a capa ter as duas tiras e o painel escuro
+ * existir. PNG de 2×2 escrito à mão — o desenho só precisa de bytes que o
+ * `pdf-lib` saiba embutir.
+ */
+const FOTO =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGP8//8/AzJgYkAFhPgAZfIDPXf2ZL4AAAAASUVORK5CYII=";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A CAPA — A PRIMEIRA COISA QUE O CLIENTE VÊ
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Medido no relatório, com um nome de 61 caracteres e um local por extenso:
+
+     · a capa imprimia «Maria da Conceição / Gonçalves Ançã &» — o noivo
+       desaparecia e a folha acabava num «&»;
+     · a linha do tipo/data ia de x=155,6 a x=686,3 e a do local de 162 a 679,9,
+       as duas por cima das fotografias, num painel que tem 286 pontos.
+
+   O painel escuro vai de `(W − W×0,34)/2` a `(W + W×0,34)/2`. Como TUDO o que
+   a capa escreve é centrado na folha, basta olhar para o `x` de cada escrita:
+   se o lado esquerdo cabe, o direito cabe por simetria. */
+
+const NOME_COMPRIDO = "Maria da Conceição Gonçalves Ançã & Jean-François Ålström-Nørgaard";
+const PAINEL_ESQUERDO = (W - W * 0.34) / 2;
+
+/** Só o que a capa escreve — a página 0, e sem o rodapé (que ela não tem). */
+async function daCapa(over: Record<string, unknown> = {}): Promise<Escrita[]> {
+  const escritas = await desenhar(
+    proposta({ coverImages: [FOTO, FOTO], clientNames: NOME_COMPRIDO, ...over }),
+  );
+  return escritas.filter((e) => e.pagina === 0);
+}
+
+describe("a capa", () => {
+  it("escreve o nome do casal INTEIRO — e nunca acaba num «&»", async () => {
+    const escritas = await daCapa();
+    const nome = escritas
+      .filter((e) => e.tamanho >= 18 && e.y > 200 && e.y < 320)
+      .map((e) => e.texto);
+    expect(nome.length, "a capa não escreveu o nome").toBeGreaterThan(0);
+    expect(nome.join(" ")).toContain("Jean-François");
+    for (const linha of nome) {
+      expect(linha.trim().endsWith("&"), `a linha «${linha}» acaba num «&»`).toBe(false);
+    }
+  });
+
+  it("não escreve nada por cima das fotografias — tudo dentro do painel", async () => {
+    const escritas = await daCapa({
+      eventType: "Casamento civil com cerimónia simbólica ao pôr do sol no lago",
+      location:
+        "Herdade da Fonte Santa de Vale de Água, Estrada Nacional 380," +
+        " Reguengos de Monsaraz, Alentejo Central, Portugal",
+    });
+    for (const e of escritas) {
+      expect(
+        e.x,
+        `«${e.texto}» começa em x=${e.x.toFixed(1)}, fora do painel (${PAINEL_ESQUERDO.toFixed(1)})`,
+      ).toBeGreaterThanOrEqual(PAINEL_ESQUERDO);
+    }
+  });
+
+  /**
+   * O «   ·   » largo entre o tipo e a data é dela, e a quebra come-o (o `wrap`
+   * parte por espaços e volta a juntar com um só). A linha que já cabia tem de
+   * sair TAL E QUAL — encolher e quebrar é o caminho de excepção.
+   */
+  it("a linha que já cabia sai exactamente como era", async () => {
+    const escritas = await desenhar(proposta({ coverImages: [FOTO, FOTO] }));
+    const daPrimeira = escritas.filter((e) => e.pagina === 0).map((e) => e.texto);
+    expect(daPrimeira).toContain("Casamento   ·   12 de setembro de 2026");
+    expect(daPrimeira).toContain("Monte da Oliveirinha, Évora");
+  });
+
+  /** O que ainda assim não couber é anotado — o estúdio tem de saber. */
+  it("o que não couber continua a ser anotado no relatório", async () => {
+    const { truncations } = await renderProposalDocPdfWithReport(
+      proposta({
+        coverImages: [FOTO, FOTO],
+        clientNames: `${NOME_COMPRIDO} ${NOME_COMPRIDO} ${NOME_COMPRIDO}`,
+      }),
+    );
+    expect(truncations.some((t) => t.where.includes("Nome na capa"))).toBe(true);
+  });
+});
+
 /* ═══════════════════════════════════════════════════════════════════════════
    O ACABAMENTO DO DOCUMENTO
    ═══════════════════════════════════════════════════════════════════════════ */

@@ -213,7 +213,15 @@ const MAX_ANNOTATION_LINES = TXT.legenda.maxLinhas;
  */
 export { caixasDaCapa, caixasDoCollage, type CaixaPdf };
 const MAX_EVENT_FIELD_LINES = 2; // cada campo da faixa de detalhes
-const MAX_COVER_NAME_LINES = 2; // nome do casal na capa
+/** O nome do casal na capa: TRÊS linhas, e não duas — ver o bloco «A CAPA NÃO
+ *  CORTA O NOME DO CASAL». */
+const MAX_COVER_NAME_LINES = 3;
+/** Até onde o nome encolhe antes de partir. Era 26, e era aí que ele era
+ *  cortado a meio; a 18 continua a ser o maior texto da folha. */
+const COVER_NAME_MIN = 18;
+/** As linhas de baixo da capa (tipo/data, local): duas, e o corpo mínimo. */
+const MAX_COVER_LINE_LINES = 2;
+const COVER_LINE_MIN = 8.5;
 
 /** Uma perda por COMPOSIÇÃO: o conteúdo chegou inteiro ao gerador e o desenho
  *  não o mostra todo. Estruturada (e não uma frase feita) para o estúdio poder
@@ -603,12 +611,18 @@ function drawEspacado(
 const RETICENCIAS = "…";
 
 /** `texto` cortado à largura pedida, com «…» a dizer que foi cortado. */
-function comReticencias(font: PDFFont, texto: string, size: number, maxWidth: number): string {
+function comReticencias(
+  font: PDFFont,
+  texto: string,
+  size: number,
+  maxWidth: number,
+  tracking = 0,
+): string {
   const safe = textoParaFonte(font, texto);
-  if (font.widthOfTextAtSize(safe, size) <= maxWidth) return safe;
+  if (larguraEspacada(font, safe, size, tracking) <= maxWidth) return safe;
   const cauda = textoParaFonte(font, RETICENCIAS);
   let corte = safe;
-  while (corte.length > 1 && font.widthOfTextAtSize(corte + cauda, size) > maxWidth) {
+  while (corte.length > 1 && larguraEspacada(font, corte + cauda, size, tracking) > maxWidth) {
     corte = corte.slice(0, -1);
   }
   // Sem a pontuação nem o espaço que ficaram pendurados no sítio do corte.
@@ -627,8 +641,9 @@ function quebrarComReticencias(
   size: number,
   maxWidth: number,
   maxLinhas: number,
+  tracking = 0,
 ): { linhas: string[]; cortadas: number } {
-  const todas = wrap(font, texto, size, maxWidth);
+  const todas = wrap(font, texto, size, maxWidth, tracking);
   if (todas.length <= maxLinhas) return { linhas: todas, cortadas: 0 };
   const linhas = todas.slice(0, maxLinhas);
   const resto = todas.slice(maxLinhas).join(" ").trim();
@@ -639,11 +654,22 @@ function quebrarComReticencias(
     `${linhas[maxLinhas - 1]} ${resto}`.trim(),
     size,
     maxWidth,
+    tracking,
   );
   return { linhas, cortadas: todas.length - maxLinhas };
 }
 
-function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): string[] {
+function wrap(
+  font: PDFFont,
+  rawText: string,
+  size: number,
+  maxWidth: number,
+  /** O espaçamento entre letras, quando a linha vai ser desenhada espaçada.
+   *  Sem ele, uma capitular espaçada media-se estreita e desenhava-se larga —
+   *  foi assim que a linha do tipo e da data escorreu para fora do painel da
+   *  capa por cima das fotografias. */
+  tracking = 0,
+): string[] {
   // Sanitiza para WinAnsi antes de medir/quebrar — descrições e notas do
   // documento podem trazer caracteres que a Helvetica não codifica.
   const text = textoParaFonte(font, rawText);
@@ -653,7 +679,7 @@ function wrap(font: PDFFont, rawText: string, size: number, maxWidth: number): s
     let line = "";
     for (const w of words) {
       const test = line ? `${line} ${w}` : w;
-      if (font.widthOfTextAtSize(test, size) > maxWidth && line) {
+      if (larguraEspacada(font, test, size, tracking) > maxWidth && line) {
         out.push(line);
         line = w;
       } else {
@@ -1127,31 +1153,145 @@ export async function renderProposalDocPdfWithReport(
     });
     p.drawRectangle({ x: cx - 26, y: 324, width: 52, height: 1.1, color: rgb(0.72, 0.6, 0.34) });
 
-    // Couple/client name — shrink-to-fit, then wrap to two lines as a last resort
-    // so long names never overflow the trim or the centre band.
+    /* ═══════════════════════════════════════════════════════════════════════
+       A CAPA NÃO CORTA O NOME DO CASAL
+       ═══════════════════════════════════════════════════════════════════════
+
+       Com «Maria da Conceição Gonçalves Ançã & Jean-François Ålström-Nørgaard»,
+       a capa imprimia
+
+           Maria da Conceição
+           Gonçalves Ançã &
+
+       — o noivo desaparecia e a capa ACABAVA NUM «&». O nome encolhia de 52
+       para 26 e era cortado às duas linhas; o corte era anotado no relatório,
+       que é lido no estúdio, e o PDF saía na mesma.
+
+       Três degraus, por esta ordem, e nenhum deles deixa o nome a meio:
+
+        1. ENCOLHER até 18 (era 26). Os oito pontos que faltavam são a
+           diferença entre caber e não caber na esmagadora maioria dos nomes
+           compridos — 61 caracteres cabem em duas linhas a 18.
+        2. TRÊS LINHAS em vez de duas. A capa tem lugar: entre a régua dourada
+           (324) e a linha do tipo/data (214) há 110 pontos, e três linhas a 18
+           ocupam 38.
+        3. E só se nem assim couber, O NOME MAIS CURTO — «Maria &
+           Jean-François» em vez de meio nome seguido de um «&» solto. Um nome
+           encurtado lê-se como uma escolha; um nome cortado lê-se como avaria.
+
+       Continua a ser anotado no relatório, porque continua a faltar conteúdo à
+       folha — o que deixa de haver é uma capa errada. */
+    /** O primeiro nome de cada lado do «&» — o nome por que o casal se trata. */
+    const nomeCurtoDoCasal = (completo: string): string => {
+      const lados = completo.split(/\s*&\s*/).filter((l) => l.trim());
+      if (lados.length < 2) return "";
+      const curto = lados.map((l) => l.trim().split(/\s+/)[0]).join(" & ");
+      return curto === completo.trim() ? "" : curto;
+    };
     // Sanitiza para WinAnsi ANTES de medir: widthOfTextAtSize lança em glifos
     // fora do WinAnsi (emoji/CJK num nome de cliente), o que rebentaria o PDF
     // inteiro aqui na capa em vez de degradar graciosamente.
     const names = textoParaFonte(f.serif, doc.clientNames || "");
     const maxNameW = (hasImgs ? W * 0.34 : W * 0.72) - 16;
     let nameSize = 52;
-    while (nameSize > 26 && f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) nameSize -= 2;
+    while (
+      nameSize > COVER_NAME_MIN &&
+      f.serif.widthOfTextAtSize(names, nameSize) > maxNameW
+    )
+      nameSize -= 2;
     if (f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) {
-      // Duas linhas é o que a capa comporta; um nome que peça mais é cortado —
-      // e um nome cortado na capa é a primeira coisa que o cliente vê.
-      const nl = clampLines(
-        wrap(f.serif, names, nameSize, maxNameW),
-        MAX_COVER_NAME_LINES,
-        "Nome na capa",
-      );
-      let ny = 278;
-      for (const ln of nl) {
+      const inteiro = wrap(f.serif, names, nameSize, maxNameW);
+      let linhas = inteiro;
+      if (linhas.length > MAX_COVER_NAME_LINES) {
+        const curto = nomeCurtoDoCasal(names);
+        const doCurto = curto ? wrap(f.serif, curto, nameSize, maxNameW) : [];
+        if (doCurto.length && doCurto.length <= MAX_COVER_NAME_LINES) linhas = doCurto;
+      }
+      // O que ainda assim não couber é cortado — mas com «…», que é o que
+      // distingue «o nome acabou» de «o nome foi cortado».
+      if (linhas.length > MAX_COVER_NAME_LINES) {
+        const corte = quebrarComReticencias(
+          f.serif,
+          linhas.join(" "),
+          nameSize,
+          maxNameW,
+          MAX_COVER_NAME_LINES,
+        );
+        linhas = corte.linhas;
+      }
+      note("Nome na capa", inteiro.length - linhas.length, "linhas");
+      // O bloco fica centrado no MESMO sítio, seja com duas linhas ou com três:
+      // 278 é onde a primeira das duas era desenhada.
+      const avanco = nameSize * 1.05;
+      let ny = 278 + ((linhas.length - 2) * avanco) / 2;
+      for (const ln of linhas) {
         textCenter(p, ln, cx, ny, { font: f.serif, size: nameSize, color: CREAM });
-        ny -= nameSize * 1.05;
+        ny -= avanco;
       }
     } else {
       textCenter(p, names, cx, 262, { font: f.serif, size: nameSize, color: CREAM });
     }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       AS TRÊS LINHAS DA CAPA CABEM NO PAINEL ESCURO
+       ═══════════════════════════════════════════════════════════════════════
+
+       O nome já tinha largura máxima e quebra; o tipo, a data e o local não
+       tinham NADA. Eram desenhados centrados, sem medida e sem quebra, e
+       escorriam para os dois lados por cima das duas fotografias da capa —
+       medido pela sonda de transbordos, num caso com um local por extenso:
+
+           p1  x 155.6 → 686.3   «Casamento civil com cerimónia simbólica…»
+           p1  x 162.0 → 679.9   «Herdade da Fonte Santa de Vale de Água…»
+
+       O painel escuro tem 286 pontos. Estas duas linhas ocupavam 530 e 518,
+       ilegíveis por cima das fotos — e um local com o nome de uma herdade por
+       extenso chega lá sozinho.
+
+       Passam a ter a MESMA regra do nome: a largura do painel, encolher, e
+       quebrar em duas linhas antes de cortar. E o bloco desce como cresce — a
+       linha do local segue a última linha do tipo/data, em vez de lhe ficar por
+       cima. */
+    /** Uma linha centrada da capa: encolhe, quebra, e nunca sai do painel. */
+    const linhaDaCapa = (
+      texto: string,
+      base: number,
+      o: { font: PDFFont; size: number; color: ReturnType<typeof rgb>; tracking?: number },
+      onde: string,
+    ): number => {
+      const tracking = o.tracking ?? 0;
+      let size = o.size;
+      const cabe = (t: string, sz: number) =>
+        larguraEspacada(o.font, textoParaFonte(o.font, t), sz, tracking) <= maxNameW;
+      // ── O CASO NORMAL SAI TAL E QUAL ────────────────────────────────────
+      // A linha que já cabia é desenhada COMO ELA A ESCREVEU, sem passar pela
+      // quebra: o `wrap` parte por espaços e volta a juntar com UM só, e isso
+      // comia o «   ·   » largo que separa o tipo da data em todas as capas.
+      // Encolher e quebrar é o caminho de excepção, não o de todos os dias.
+      if (cabe(texto, size)) {
+        textCenter(p, texto, cx, base, { font: o.font, size, color: o.color, tracking: o.tracking });
+        return base;
+      }
+      while (size > COVER_LINE_MIN && !cabe(texto, size)) size -= 0.5;
+      // A quebra mede COM o espaçamento entre letras — é assim que a linha vai
+      // ser desenhada, e medir sem ele era o que a punha por cima das fotos.
+      const { linhas, cortadas } = quebrarComReticencias(
+        o.font,
+        texto,
+        size,
+        maxNameW,
+        MAX_COVER_LINE_LINES,
+        tracking,
+      );
+      note(onde, cortadas, "linhas");
+      let y = base;
+      for (const ln of linhas) {
+        textCenter(p, ln, cx, y, { font: o.font, size, color: o.color, tracking: o.tracking });
+        y -= size * 1.25;
+      }
+      // Onde a linha seguinte pode começar: a base menos o que este bloco gastou.
+      return base - (linhas.length - 1) * size * 1.25;
+    };
 
     // `.trim()` nas três linhas, e não a caixa em bruto: um campo com um espaço
     // lá dentro é «verdadeiro» para o `if` — foi assim que o «Note:» sozinho
@@ -1161,10 +1301,21 @@ export async function renderProposalDocPdfWithReport(
       .map((s) => (s ?? "").trim())
       .filter(Boolean)
       .join("   ·   ");
+    let capaY = 214;
     if (sub)
-      textCenter(p, sub, cx, 214, { font: f.reg, size: 11, color: CREAM_DIM, tracking: 1.4 });
+      capaY = linhaDaCapa(
+        sub,
+        capaY,
+        { font: f.reg, size: 11, color: CREAM_DIM, tracking: 1.4 },
+        "Tipo e data na capa",
+      );
     if ((doc.location ?? "").trim())
-      textCenter(p, doc.location.trim(), cx, 194, { font: f.serifIt, size: 11, color: FAINT });
+      linhaDaCapa(
+        doc.location.trim(),
+        capaY - 20,
+        { font: f.serifIt, size: 11, color: FAINT },
+        "Local na capa",
+      );
   }
 
   // ── Page 2 — Apresentação + Serviços ──
