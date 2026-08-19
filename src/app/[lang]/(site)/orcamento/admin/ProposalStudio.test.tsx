@@ -949,6 +949,77 @@ describe("aviso antes de a proposta seguir para o cliente", () => {
     expect(texto).toMatch(/1 foto não entrou \(não foi possível ir buscá-la ou desenhá-la\)/);
     expect(texto).toMatch(/Campo «Local»: 1 linha cortada/);
   });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O QUE FICA CORTADO É UMA PERGUNTA ANTES DO EMAIL, NÃO UM AVISO DEPOIS
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O teste acima é o mundo antigo: o aviso chegava com o email já fora. O
+   * servidor passa a parar antes de gravar e de enviar (409), e o que se prende
+   * aqui é o que ela vê e o que acontece a seguir — a lista do que ficou de
+   * fora, e um segundo clique que envia com a resposta dada.
+   */
+  it("pergunta antes de enviar, com o que ficou cortado à vista", async () => {
+    seedDraft(2);
+    propostaDoc = reply({
+      ok: false,
+      status: 409,
+      json: {
+        error: "O documento sai com conteúdo cortado.",
+        precisaConfirmarCortes: true,
+        truncations: [
+          { where: "Nome na capa", dropped: 2, unit: "linhas" },
+          { where: "Mood board «Cerimónia»", dropped: 3, unit: "fotos" },
+        ],
+      },
+    });
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+
+    // A pergunta, com os dois cortes escritos por extenso.
+    expect(await screen.findByText(/O documento sai com conteúdo cortado/)).toBeTruthy();
+    expect(screen.getByText(/Nome na capa: 2 linhas cortadas/)).toBeTruthy();
+    expect(screen.getByText(/Mood board «Cerimónia»: 3 fotos não entram no PDF/)).toBeTruthy();
+    // E não se disfarça de avaria: não há «não foi possível enviar» nenhum.
+    expect(screen.queryByText(/Não foi possível enviar/)).toBeNull();
+    // O envio parou mesmo: o passo não ficou dado por feito.
+    expect(screen.queryByRole("button", { name: /Voltar ao conteúdo/ })).toBeNull();
+
+    // O segundo clique é o mesmo envio, com a resposta dada.
+    propostaDoc = reply({ json: { ok: true, emailed: true } });
+    await user.click(await screen.findByRole("button", { name: /Enviar assim mesmo/ }));
+    await screen.findByRole("button", { name: /Voltar ao conteúdo/ });
+    const enviados = corpos("proposta-doc", "POST").map((c) => JSON.parse(c || "{}"));
+    expect(enviados.at(-1)?.cortesConfirmados, "o segundo envio não levou a resposta").toBe(true);
+    // E o primeiro NÃO a levava — senão a pergunta nunca chegaria a ser feita.
+    expect(enviados.at(-2)?.cortesConfirmados).toBeUndefined();
+  });
+
+  it("«voltar e corrigir» leva ao conteúdo e não envia nada", async () => {
+    seedDraft(2);
+    propostaDoc = reply({
+      ok: false,
+      status: 409,
+      json: {
+        precisaConfirmarCortes: true,
+        truncations: [{ where: "Nome na capa", dropped: 2, unit: "linhas" }],
+      },
+    });
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Confirmar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Voltar e corrigir/ }));
+
+    // Um envio só — o que fez a pergunta.
+    expect(corpos("proposta-doc", "POST")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /Voltar ao conteúdo/ })).toBeNull();
+  });
 });
 
 /**

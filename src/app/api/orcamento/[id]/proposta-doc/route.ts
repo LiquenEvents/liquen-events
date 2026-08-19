@@ -149,6 +149,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       doc?: ProposalDoc;
       idioma?: unknown;
       mensagem?: unknown;
+      /** «Já vi o que fica cortado, envia à mesma» — ver a pergunta antes do
+       *  envio, mais abaixo. Só `true` conta: qualquer outra coisa é «ainda
+       *  não respondeu». */
+      cortesConfirmados?: unknown;
     } | null;
     const raw = body?.doc;
     const mode = body?.mode === "send" ? "send" : "preview";
@@ -310,6 +314,56 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           "X-Conteudo-Cortado": Buffer.from(JSON.stringify(truncations), "utf8").toString("base64"),
         },
       });
+    }
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O QUE FICOU CORTADO É UMA PERGUNTA ANTES DE SEGUIR, NÃO UM AVISO DEPOIS
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O relatório de truncagens já existia e já viajava — mas no ENVIO chegava
+     * ao estúdio DENTRO da resposta, ou seja depois de o email ter saído. Ela
+     * lia «o nome do casal não cabe na capa» com o casal já a ter a proposta na
+     * caixa de correio, e o nome cortado a acabar num «&» solto.
+     *
+     * Agora o envio pára aqui e pergunta. O PDF já está desenhado (custou o
+     * que custou), a proposta ainda NÃO foi gravada e o email ainda NÃO saiu:
+     * é o último instante em que voltar atrás não custa nada a ninguém.
+     *
+     * ── PORQUE É QUE NÃO RECUSA ──────────────────────────────────────────
+     *
+     * Porque uma truncagem pode ser deliberada — uma legenda comprida de
+     * propósito, um mood board com mais fotos do que a página leva. A regra
+     * dela é a de sempre e está escrita duas dezenas de linhas acima: «uma
+     * proposta que não sai é pior do que uma proposta com um aviso», e
+     * «recusar seria pior — ela fica sem nada e sem perceber porquê». Por isso
+     * isto não é uma porta fechada: é uma pergunta com resposta. O estúdio
+     * mostra o que ficou de fora e reenvia com `cortesConfirmados`.
+     *
+     * 409 e não 400: o pedido está bem formado e o servidor fez o trabalho
+     * todo — o que falta é uma decisão de quem envia. É o código que o estúdio
+     * distingue de uma avaria (ver `porqueFalhouOEnvio`).
+     *
+     * As FOTOS EM FALTA não passam por aqui, e é de propósito: essas são uma
+     * AVARIA (a foto devia estar e não está), já têm segunda tentativa aqui em
+     * cima, e a decisão escrita é que o envio não trava por causa delas.
+     */
+    const cortesConfirmados = body?.cortesConfirmados === true;
+    if (mode === "send" && truncations.length > 0 && !cortesConfirmados) {
+      log.warn("proposta-doc: envio parado para confirmar o que ficou cortado", {
+        id,
+        cortado: truncations.map((t) => `${t.where}: -${t.dropped} ${t.unit}`),
+      });
+      return NextResponse.json(
+        {
+          error: "O documento sai com conteúdo cortado.",
+          // O nome do campo é a pergunta: quem chama esta rota à mão percebe o
+          // que lhe falta sem ter de ler o código.
+          precisaConfirmarCortes: true,
+          truncations,
+        },
+        { status: 409 },
+      );
     }
 
     // ── Send ──

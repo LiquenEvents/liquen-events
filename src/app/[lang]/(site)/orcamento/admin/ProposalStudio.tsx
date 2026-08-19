@@ -1244,6 +1244,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const traducaoLigada = traducao === "ligada";
   const [confirmSend, setConfirmSend] = useState(false);
   /**
+   * O que a composição cortou no documento que estava a seguir — `null`
+   * enquanto ninguém perguntou nada.
+   *
+   * Não é um estado de erro: é uma pergunta que o servidor devolveu com o PDF
+   * já desenhado e nada ainda gravado nem enviado. Ver `send`.
+   */
+  const [cortesPorConfirmar, setCortesPorConfirmar] = useState<Corte[] | null>(null);
+  /**
    * ── A MENSAGEM QUE SEGUE COM A PROPOSTA ───────────────────────────────────
    *
    * Palavras dela: «quando eu vou enviar a proposta, quero que também dê para
@@ -4450,7 +4458,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }
   }
 
-  async function send() {
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * ENVIAR, DEPOIS DE VER O QUE FICA DE FORA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O gerador diz o que a composição cortou — o nome do casal que não coube na
+   * capa, a sétima foto de um mood board, a legenda que acaba a meio da frase.
+   * Isso chegava aqui DENTRO da resposta do envio, ou seja depois de o email
+   * ter saído: ela lia o aviso com o casal já a ter o documento.
+   *
+   * Agora o servidor pára e pergunta (409, `precisaConfirmarCortes`), e este
+   * é o segundo clique: o mesmo envio, com a resposta dada. Não é um botão
+   * diferente nem um caminho diferente — é o mesmo, com `cortesConfirmados`.
+   */
+  async function send(cortesConfirmados = false) {
     if (busy) return;
     // A trava do envio é o `canSend` (o botão nem chega a estar ligado), mas
     // repete-se aqui: entre carregar em "Enviar" e carregar em "Confirmar" pode
@@ -4499,10 +4521,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           // vazio a viajar. A mensagem acompanha ESTE envio; o documento que
           // fica guardado é o mesmo com ela ou sem ela.
           ...(mensagemAoCliente.trim() ? { mensagem: mensagemAoCliente.trim() } : {}),
+          // Só viaja quando é «sim»: um campo a dizer `false` em todos os
+          // envios normais era um campo a mais a explicar a quem lesse a rota.
+          ...(cortesConfirmados ? { cortesConfirmados: true } : {}),
         }),
       });
       const data = await res.json().catch(() => null);
+      /**
+       * ── O ENVIO PAROU PARA PERGUNTAR ────────────────────────────────────
+       *
+       * O documento está desenhado e a proposta ainda não foi gravada nem
+       * enviada: o servidor devolveu 409 com o que a composição cortou. Isto
+       * NÃO é uma falha — é a única altura em que voltar atrás não custa nada,
+       * e por isso não passa pelo `throw` (que pinta tudo de vermelho e diz
+       * «não foi possível enviar»).
+       */
+      if (res.status === 409 && data?.precisaConfirmarCortes) {
+        setCortesPorConfirmar(normalizaCortes(data.truncations));
+        return;
+      }
       if (!res.ok) throw new Error(data?.error || porqueFalhouOEnvio(res.status));
+      setCortesPorConfirmar(null);
       // O envio também ensina a estimativa. Os bytes vêm do servidor: o PDF do
       // envio não passa pelo browser (segue em anexo), portanto sem esta linha
       // metade das gerações não ensinava nada.
@@ -7688,14 +7727,54 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <Button variant="ghost" onClick={() => setStep("prever")}>
               ← Pré-visualizar
             </Button>
-            {confirmSend ? (
+            {/* ── O QUE FICA DE FORA, PERGUNTADO ANTES DE SEGUIR ──────────
+                O servidor desenhou o documento, viu o que a composição cortou
+                e parou. O email ainda não saiu e a proposta ainda não foi
+                gravada — é o último instante em que voltar atrás não custa
+                nada. A frase de cada corte é a mesma que o aviso da
+                pré-visualização usa; o que muda é a altura em que aparece. */}
+            {cortesPorConfirmar ? (
+              <div className="ml-auto flex flex-col items-end gap-2">
+                <div className="max-w-lg rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/75">
+                  <p className="font-medium">O documento sai com conteúdo cortado:</p>
+                  <ul className="mt-1 flex flex-col gap-0.5">
+                    {cortesPorConfirmar.map((c) => (
+                      <li key={`${c.where}:${c.unit}`}>· {fraseDeCorte(c)}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-foreground/55">
+                    Volta ao conteúdo para encurtar o que ficou cortado, ou envia assim mesmo se for
+                    de propósito.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    variant="primary"
+                    onClick={() => void send(true)}
+                    disabled={busy !== null}
+                    loading={busy === "send"}
+                  >
+                    {busy === "send" ? "A enviar…" : "Enviar assim mesmo"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setCortesPorConfirmar(null);
+                      setStep("conteudo");
+                    }}
+                  >
+                    Voltar e corrigir
+                  </Button>
+                </div>
+              </div>
+            ) : confirmSend ? (
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 <span className="text-sm text-foreground/60">
                   Enviar para {quote.email || "o cliente"}?
                 </span>
                 <Button
                   variant="primary"
-                  onClick={send}
+                  onClick={() => void send()}
                   disabled={busy !== null}
                   loading={busy === "send"}
                 >
