@@ -2082,9 +2082,28 @@ export async function renderProposalDocPdfWithReport(
       return /^\([\s\S]*\)$/.test(sobra) ? sobra.slice(1, -1).trim() : sobra;
     };
     const totalStr = semMarcador(orgT ? (doc.totalEstimatedText ?? "") : doc.totalText);
-    // O rótulo do total de Decoração é um campo do estúdio, e nasce preenchido
-    // («Valor Total Decoração»): traduz-se enquanto for o que lá nasceu, e sai
-    // tal e qual assim que ela lhe mexer (ver `rotuloDoTotalNaLingua`).
+    /* O rótulo do total de Decoração é um campo do estúdio, e nasce preenchido
+       («Valor Total Decoração»): traduz-se enquanto for o que lá nasceu, e sai
+       tal e qual assim que ela lhe mexer (ver `rotuloDoTotalNaLingua`).
+
+       ── PORQUE É QUE ELE NÃO É O RÓTULO DO NÚMERO GRANDE ────────────────────
+       Foi proposto (A9 do IDEIAS-PDF.md): «Valor Total Decoração 5.904,00 €»
+       em vez de «Total a pagar», por o campo dela nunca chegar ao papel quando
+       há um total estruturado. NÃO SE FEZ, e a razão é a objecção C2 do próprio
+       relatório, que se confirma ao olhar para a folha:
+
+       O número grande é o último degrau de uma escada que diz «TOTAL (sem
+       IVA)», «IVA (23%)» e «Total a pagar». Cada um desses rótulos diz a
+       UNIDADE do número que tem ao lado — é isso que os torna uma escada e não
+       três valores. «Valor Total Decoração» não diz unidade nenhuma: encostado
+       ao fundo da mesma escada, lê-se como um QUARTO número, e o casal fica
+       sem saber qual é o que transfere. É exactamente o defeito que esta escada
+       veio corrigir (ver a nota da proposta da Tara e do Marty, aqui em baixo).
+
+       E não é uma decisão de composição: é dela. A pergunta — «quer o seu
+       rótulo no número grande, ou quer o "Total a pagar" que não deixa
+       dúvidas?» — tem de lhe ser feita, e a folha em que o rótulo dela JÁ sai
+       (a proposta sem total estruturado) continua como estava. */
     const totalLbl = orgT ? t.totalEstimado : rotuloDoTotalNaLingua(doc, idioma);
     const boxW = MEASURE;
     const boxH = 50;
