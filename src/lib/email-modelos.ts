@@ -394,7 +394,10 @@ async function guardado(
  * inglesa deste modelo» — e é o que faz a recusa acontecer em vez de sair
  * português para um casal que não o lê.
  */
-const semente = (chave: ChaveDeModelo | string, idioma: IdiomaDoModelo = "pt"): EmailTemplate | null => {
+const semente = (
+  chave: ChaveDeModelo | string,
+  idioma: IdiomaDoModelo = "pt",
+): EmailTemplate | null => {
   const nova = MODELOS_DE_ORIGEM.find((m) => m.chave === chave);
   if (nova) {
     const lado = nova[idioma];

@@ -139,17 +139,20 @@ export const VARIAVEIS: VariavelDoModelo[] = [
   },
 ];
 
-export const VARIAVEIS_POR_GRUPO: { grupo: GrupoDeVariavel; titulo: string; itens: VariavelDoModelo[] }[] =
-  (["cliente", "evento", "proposta", "remetente"] as GrupoDeVariavel[]).map((grupo) => ({
-    grupo,
-    titulo: {
-      cliente: "Cliente",
-      evento: "Evento",
-      proposta: "Proposta",
-      remetente: "Quem assina",
-    }[grupo],
-    itens: VARIAVEIS.filter((v) => v.grupo === grupo),
-  }));
+export const VARIAVEIS_POR_GRUPO: {
+  grupo: GrupoDeVariavel;
+  titulo: string;
+  itens: VariavelDoModelo[];
+}[] = (["cliente", "evento", "proposta", "remetente"] as GrupoDeVariavel[]).map((grupo) => ({
+  grupo,
+  titulo: {
+    cliente: "Cliente",
+    evento: "Evento",
+    proposta: "Proposta",
+    remetente: "Quem assina",
+  }[grupo],
+  itens: VARIAVEIS.filter((v) => v.grupo === grupo),
+}));
 
 /** Os valores de exemplo do catálogo, para a pré-visualização sem proposta. */
 export const VALORES_DE_EXEMPLO: Record<string, string> = Object.fromEntries(

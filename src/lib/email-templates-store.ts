@@ -320,8 +320,7 @@ export interface VersaoDeModelo {
 const paragrafo = (html: string) =>
   `<p style="font-size:14px;line-height:1.6;margin:0 0 16px;color:#2a2620">${html}</p>`;
 
-const ligacao = (texto: string) =>
-  `<a href="{{link_proposta}}" style="color:#637a5f">${texto}</a>`;
+const ligacao = (texto: string) => `<a href="{{link_proposta}}" style="color:#637a5f">${texto}</a>`;
 
 /**
  * ── A MENSAGEM PESSOAL DENTRO DO MODELO ───────────────────────────────────

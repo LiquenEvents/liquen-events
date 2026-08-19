@@ -124,7 +124,9 @@ function analisar(fonte: string): Analise {
   // O que ficou aberto fecha-se no fim do texto, do mais interior para fora.
   while (pilha.length) {
     const aberto = pilha.pop()!;
-    erros.push(`«${aberto.origem}» ficou por fechar (falta o {{/${aberto.negado ? "se_nao" : "se"}}}).`);
+    erros.push(
+      `«${aberto.origem}» ficou por fechar (falta o {{/${aberto.negado ? "se_nao" : "se"}}}).`,
+    );
     const pai = pilha.length ? pilha[pilha.length - 1].filhos : raiz;
     pai.push({ tipo: "bloco", negado: aberto.negado, nome: aberto.nome, filhos: aberto.filhos });
   }
