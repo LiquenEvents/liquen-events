@@ -603,6 +603,36 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     expect(enviado().text).toContain(esperado);
   });
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O ENDEREÇO NÃO SE ESCREVE POR EXTENSO NA CARA DO CLIENTE
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Os dois editores de modelos escrevem o link como `<a href="{link}">{link}
+   * </a>`, e o modelo por omissão também. O que chegava ao casal eram quatro
+   * linhas de caracteres aleatórios — o desenho de uma mensagem de phishing, e
+   * um dos padrões que os filtros de spam penalizam.
+   */
+  it("o token gigante fica só no href — o que se lê é uma frase", async () => {
+    authed.ok = true;
+    modelo.get.mockResolvedValue(
+      modeloGuardado("A sua proposta", `<p>Veja aqui: <a href="{link}">{link}</a></p>`),
+    );
+    const res = await POST(req("POST", validItems), ctx("LIQ-1"));
+    const { id: proposalId } = await res.json();
+    const esperado = `${SITE.url}/proposta/tok:${proposalId}`;
+    const email = enviado();
+    expect(email.html).toContain(`href="${esperado}"`);
+    expect(email.html).toContain(">Ver a proposta online<");
+    // Fora do href não sobra nenhum endereço a fazer de texto.
+    expect(email.html.replace(/href="[^"]*"/g, "")).not.toContain(esperado);
+    // E a versão em texto simples diz o MESMO — duas alternativas que divergem
+    // são, por si só, um sinal de spam.
+    expect(email.text).toContain("Ver a proposta online");
+    expect(email.text).toContain(esperado);
+    expect(email.text).not.toMatch(/[<>]/);
+  });
+
   it("um modelo guardado VAZIO não manda um email em branco — recorre ao texto da casa", async () => {
     authed.ok = true;
     modelo.get.mockResolvedValue(modeloGuardado("A sua proposta", `<div>\n  <p>   </p>\n</div>`));

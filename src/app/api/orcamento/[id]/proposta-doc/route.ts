@@ -29,7 +29,8 @@ import { createProposalToken } from "@/lib/proposal-token";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
 import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
-import { marcadoresDoPedido, modeloParaEnvioAutomatico } from "@/lib/email-modelos";
+import { marcadoresDoPedido, modeloParaEnvioAutomatico, textoDoCorpo } from "@/lib/email-modelos";
+import { arrumarLigacao, ROTULO_DA_PROPOSTA } from "@/lib/email-ligacoes";
 import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
 
@@ -722,8 +723,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       destinatario: String(doc.clientNames ?? "").trim() || quote.name,
     };
 
-    const email = doModelo
-      ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto, quem })
+    /**
+     * O corpo dela, com o endereço arrumado: o token gigante fica no `href` e o
+     * que se lê é uma frase. O porquê inteiro (e porque é que isto acontece no
+     * envio e não no modelo guardado) está no `email-ligacoes.ts`.
+     *
+     * O texto simples volta a derivar-se do HTML JÁ arrumado, e não do que o
+     * modelo trazia: as duas alternativas de um email têm de dizer o mesmo, e
+     * uma que ainda mostrasse o endereço nu enquanto a outra mostra a frase era
+     * a divergência que os filtros de spam medem.
+     */
+    const corpoDoModelo =
+      doModelo && arrumarLigacao(doModelo.html, { url: acceptUrl, rotulo: ROTULO_DA_PROPOSTA });
+
+    const email = corpoDoModelo
+      ? emailAoCliente({ html: corpoDoModelo, texto: textoDoCorpo(corpoDoModelo), quem })
       : emailAoCliente({
           quem,
           html: `<h2 style="font-size:18px;margin:0 0 12px">${esc(t.titulo)}</h2>
