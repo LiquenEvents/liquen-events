@@ -17,6 +17,19 @@ import { render } from "@testing-library/react";
  *   · os Web Vitals, que gravam o caminho nos registos de produção da Vercel.
  *
  * Estes testes falham se qualquer um dos três voltar a deixar passar o token.
+ *
+ * ── A REGRA DOS WEB VITALS ENDURECEU ──────────────────────────────────────
+ *
+ * Este ficheiro exigia, para o `WebVitals`, que a baliza SAÍSSE mas já sem o
+ * token. Era a defesa certa contra a fuga do segredo e continua a sê-lo — só
+ * que não chegava: uma baliza limpa continua a dizer «abriu-se uma página de
+ * proposta, a esta hora, nesta ligação», e a regra do produto sobre estas
+ * páginas é não registar a abertura de todo.
+ *
+ * Portanto o que aqui se exige agora é mais forte: nestas rotas **não sai
+ * baliza nenhuma**. Uma baliza que não existe não pode levar o token, o que
+ * mantém a garantia antiga por construção. A limpeza do caminho continua a ser
+ * exercida no caso público, que é onde ela passou a ser a única defesa.
  */
 
 const PORTAL_TOKEN =
@@ -170,7 +183,7 @@ describe("Analytics (Plausible) — não é montado nas rotas com token", () => 
   });
 });
 
-describe("WebVitals — a baliza nunca leva o token", () => {
+describe("WebVitals — nas rotas com token não se mede nada", () => {
   let beacon: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -184,8 +197,17 @@ describe("WebVitals — a baliza nunca leva o token", () => {
     vi.resetModules();
   });
 
-  /** Corre o WebVitals num dado caminho e devolve os corpos balizados. */
+  /**
+   * Corre o `WebVitals` num dado caminho e devolve os corpos balizados.
+   *
+   * O caminho é posto nos DOIS sítios de propósito, e é aqui que este ficheiro
+   * já se enganou uma vez: o `usePathname` fingido é quem a guarda lê, e o
+   * `location.pathname` é o que entra no corpo da baliza. Mexer só no segundo
+   * deixava a guarda a ver o caminho do teste ANTERIOR — e o caso público
+   * falhava por uma razão que não tinha nada que ver com o que ele mede.
+   */
   async function beaconedBodies(path: string): Promise<string[]> {
+    pathname.value = path;
     window.history.replaceState({}, "", path);
     // web-vitals é importado dinamicamente; devolvemos callbacks que disparam já.
     vi.doMock("web-vitals", () => {
@@ -199,18 +221,22 @@ describe("WebVitals — a baliza nunca leva o token", () => {
     return beacon.mock.calls.map((c) => String(c[1]));
   }
 
-  it("reporta o caminho já sem o token em /portal/<token>", async () => {
+  it("não manda baliza nenhuma em /portal/<token>", async () => {
     const bodies = await beaconedBodies(`/portal/${PORTAL_TOKEN}`);
-    expect(bodies.length).toBeGreaterThan(0);
-    for (const b of bodies) {
-      expect(b).not.toContain(PORTAL_TOKEN);
-      expect(b).toContain("/portal/[token]");
-    }
+    expect(bodies, "mediu-se a abertura de uma página privada").toEqual([]);
   });
 
-  it("reporta o caminho intacto numa rota normal", async () => {
+  it("não manda baliza nenhuma em /proposta/<token>", async () => {
+    const bodies = await beaconedBodies(`/proposta/${PROPOSAL_TOKEN}`);
+    expect(bodies, "mediu-se a abertura de uma página privada").toEqual([]);
+  });
+
+  it("continua a medir — e a limpar o caminho — numa rota normal", async () => {
+    // Controlo positivo: sem ele, os dois casos de cima passavam por o medidor
+    // não medir nada em lado nenhum.
     const bodies = await beaconedBodies("/galeria");
     expect(bodies.length).toBeGreaterThan(0);
     expect(bodies[0]).toContain("/galeria");
+    expect(bodies[0]).not.toContain(PORTAL_TOKEN);
   });
 });
