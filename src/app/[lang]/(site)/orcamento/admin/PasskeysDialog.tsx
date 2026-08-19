@@ -207,9 +207,15 @@ export default function PasskeysDialog({ open, onClose, toast }: Props) {
               Entrar sem palavra-passe, com o rosto ou a impressão digital do aparelho.
             </p>
           </div>
+          {/* O × media 12×18 px a 375 px: é um caractere de texto, e a caixa
+              era do tamanho da letra. `alvo-toque` dá-lhe os 44×44 sem lhe
+              mudar o aspecto — o × continua do mesmo tamanho, cresce a área
+              em que o dedo acerta. Aqui o fundo também fecha, mas o fundo é
+              uma faixa estreita num ecrã de 375 px onde a folha ocupa quase
+              tudo; este botão é a saída que está sempre no mesmo sítio. */}
           <button
             onClick={onClose}
-            className="text-lg leading-none text-foreground/30 transition-colors hover:text-foreground/60"
+            className="alvo-toque text-lg leading-none text-foreground/30 transition-colors hover:text-foreground/60"
             aria-label="Fechar"
           >
             ×

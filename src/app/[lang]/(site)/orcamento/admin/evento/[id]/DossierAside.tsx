@@ -38,18 +38,37 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
       {/* Contacto */}
       <div className="bo-card p-5">
         <p className="bo-eyebrow mb-3">Contacto</p>
+        {/* ── OS TRÊS ALVOS QUE SÓ EXISTEM NO TELEMÓVEL ──────────────────────
+            Medidos a 375 px: o email 301×16, o telefone 63×16, o WhatsApp
+            76×19. Dezasseis píxeis de altura — pouco mais de um terço do
+            mínimo — em três links que são, dos alvos deste dossier, os que
+            MAIS pertencem a um telemóvel: `mailto:`, `tel:` e o WhatsApp
+            abrem a aplicação do aparelho. Num portátil são texto que se lê;
+            aqui são a forma de ligar ao cliente.
+
+            `alvo-toque` põe o chão de 44 px onde se toca. `!justify-start`
+            porque a classe centra o conteúdo por omissão (é feita para botões
+            de ícone) e estes são itens de uma coluna `flex`, portanto
+            esticados à largura do cartão: sem isto o email saltava para o meio
+            da caixa. É o mesmo par que a gaveta de navegação já usa.
+
+            A letra e a cor não mudam — cresce a CAIXA, não o desenho. */}
         <div className="flex flex-col gap-2">
           <a
             href={`mailto:${quote.email}`}
-            className="text-[#4d6350] text-xs hover:underline truncate"
+            className="alvo-toque !justify-start text-[#4d6350] text-xs hover:underline"
           >
-            {quote.email}
+            {/* O `truncate` mudou-se para cá: num `inline-flex` (que é o que o
+                `alvo-toque` faz do link) o corte com reticências não pega no
+                próprio link — precisa de um filho que possa encolher, daí o
+                `min-w-0`. Antes estava no `<a>`, onde era inerte. */}
+            <span className="min-w-0 truncate">{quote.email}</span>
           </a>
           {quote.phone && (
             <div className="flex items-center gap-2 flex-wrap">
               <a
                 href={`tel:${quote.phone}`}
-                className="text-foreground/55 text-xs hover:text-foreground/75"
+                className="alvo-toque !justify-start text-foreground/55 text-xs hover:text-foreground/75"
               >
                 {quote.phone}
               </a>
@@ -57,7 +76,7 @@ export default function DossierAside({ quote, actor, onAddEntry }: Props) {
                 href={`https://wa.me/${wa}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-80 transition-opacity"
+                className="alvo-toque !justify-start inline-flex items-center gap-1 text-[#4d6350] text-[10px] tracking-[0.08em] uppercase hover:opacity-80 transition-opacity"
                 title="Abrir conversa no WhatsApp"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
