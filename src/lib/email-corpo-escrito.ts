@@ -1,5 +1,6 @@
 import "server-only";
 import { esc } from "./mail";
+import { MAXIMO_ASSUNTO_ESCRITO, MAXIMO_CORPO_ESCRITO } from "./email-limites";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -51,7 +52,6 @@ import { esc } from "./mail";
  * impede que o corpo de um pedido faça passear megabytes por dentro do escape,
  * da geração do PDF e do SMTP.
  */
-export const MAXIMO_CORPO_ESCRITO = 10_000;
 
 /**
  * Marcas bidireccionais e caracteres de controlo. Sobrevivem ao `esc` — não são
@@ -155,7 +155,6 @@ export function corpoEscritoAMao(valor: unknown): CorpoEscrito | null {
 
 /** Quanto assunto cabe. Uma caixa de correio mostra 60 a 80 caracteres; 200 dá
  *  folga a quem escreva uma frase inteira sem deixar passar um texto. */
-export const MAXIMO_ASSUNTO_ESCRITO = 200;
 
 /**
  * O assunto escrito à mão, ou `null` quando não vem nenhum.
@@ -169,3 +168,7 @@ export function assuntoEscritoAMao(valor: unknown): string | null {
   if (!numaLinha) return null;
   return numaLinha.slice(0, MAXIMO_ASSUNTO_ESCRITO);
 }
+
+// Reexportados para quem já os importava daqui: a regra continua a ser lida
+// de um sítio só (`email-limites.ts`), que é o que o browser também pode ler.
+export { MAXIMO_ASSUNTO_ESCRITO, MAXIMO_CORPO_ESCRITO };

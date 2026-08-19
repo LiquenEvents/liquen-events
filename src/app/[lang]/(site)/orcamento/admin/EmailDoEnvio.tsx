@@ -5,7 +5,10 @@ import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
 import { MARCADOR_DA_LIGACAO, temLigacaoDaProposta } from "@/lib/email-ligacao-reservada";
-import { MAXIMO_CORPO_ESCRITO } from "@/lib/email-corpo-escrito";
+// `email-limites` e NÃO `email-corpo-escrito`: aquele é `server-only` e
+// arrasta o nodemailer para dentro do pacote do browser. Ver o cabeçalho do
+// `email-limites.ts` — foi assim que o build parou.
+import { MAXIMO_CORPO_ESCRITO } from "@/lib/email-limites";
 import { tamanhoEmPalavras } from "@/lib/custo-do-pdf";
 import { Button, Field } from "./ui";
 
