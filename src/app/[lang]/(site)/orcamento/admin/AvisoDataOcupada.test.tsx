@@ -107,6 +107,30 @@ describe("AvisoDataOcupada", () => {
     expect(abrir).toHaveBeenCalledWith(outro.id);
   });
 
+  /**
+   * ── O ALVO DE TOQUE NÃO PODE PARTIR A FRASE ────────────────────────────
+   *
+   * `alvo-toque` põe `display: inline-flex` no dedo (globals.css). Num
+   * contentor de flex cada filho de primeiro nível vira uma COLUNA — e esta
+   * linha é uma frase, «Nome · na véspera (data)», em dois `<span>`.
+   *
+   * MEDIDO a 375×667 com toque emulado, numa caixa de 343 px: o nome ficava em
+   * x=13 com 173 px de largura e o resto em x=186 com 144, cada metade a
+   * quebrar por sua conta e o «·» a meio do nada. Com um invólucro só há um
+   * item de flex e o texto volta a correr: x=13 para os dois, 175,6 e 265,4.
+   *
+   * Em jsdom não há largura nenhuma para medir; o que se prende é a ESTRUTURA
+   * que produz aquele número — o botão tem de ter UM filho, não dois.
+   */
+  it("a linha clicável leva um invólucro só, para o alvo de toque não a partir em duas colunas", () => {
+    const alvo = pedido();
+    const outro = pedido({ name: "Marta e João", status: "aceite" });
+    render(<AvisoDataOcupada quote={alvo} quotes={[alvo, outro]} onAbrir={() => {}} />);
+    const botao = screen.getByRole("button", { name: /Marta e João/ });
+    expect(botao).toHaveClass("alvo-toque");
+    expect(botao.children).toHaveLength(1);
+  });
+
   it("quando não se sabe onde é, diz isso em vez de mostrar zero km", () => {
     const alvo = pedido({ location: "Portugal" });
     const outro = pedido({ status: "aceite", location: "Évora" });

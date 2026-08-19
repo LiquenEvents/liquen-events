@@ -89,15 +89,39 @@ export default function AvisoDataOcupada({ quote, quotes, onAbrir }: Props) {
           <ul className="mt-3 flex flex-col gap-2.5">
             {choques.map((c) => {
               const grave = gravidade(c) === "grave";
+              /**
+               * UM INVÓLUCRO SÓ, E É POR CAUSA DO DEDO.
+               *
+               * Estas duas metades são uma frase — «Casamento de Marta e
+               * Gonçalo · na véspera (12 set. 2026)» — e têm de correr como
+               * texto. Quando a linha é clicável leva `alvo-toque`, e essa
+               * classe põe `display: inline-flex` no toque (globals.css, e é a
+               * terceira vez que este repositório apanha a mesma armadilha).
+               * Num contentor de flex cada `<span>` passa a ser uma COLUNA.
+               *
+               * MEDIDO a 375×667 com toque emulado, numa caixa de 343 px:
+               *
+               *                    nome                    « · na véspera …»
+               *   antes    x=13  largura 173 (3 linhas)   x=186 largura 144
+               *   depois   x=13  largura 175,6            x=13  largura 265,4
+               *
+               * Isto é: a frase partia-se em duas colunas lado a lado, cada uma
+               * a quebrar por sua conta, e o «·» que as separa ficava a meio do
+               * nada. Com rato — sem `inline-flex` — corria sempre bem, que é
+               * porque isto nunca se viu no portátil.
+               *
+               * Com um invólucro só há UM item de flex, e lá dentro o texto
+               * volta a ser texto. O alvo mantém os 44 px.
+               */
               const linha = (
-                <>
+                <span>
                   <span className="font-medium text-foreground/85">{c.outro.name}</span>
                   <span className="text-foreground/45">
                     {" · "}
                     {PROXIMIDADE[c.proximidade]}
                     {c.proximidade !== "mesmo-dia" && ` (${dataCurta(c.outro.date)})`}
                   </span>
-                </>
+                </span>
               );
               return (
                 <li

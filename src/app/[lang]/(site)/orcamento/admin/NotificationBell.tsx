@@ -145,6 +145,12 @@ export default function NotificationBell() {
       <Button
         variant="subtle"
         size="sm"
+        // MEDIDO a 375 px: 41×44. O rótulo é `hidden sm:inline`, portanto no
+        // telemóvel sobra o sino sozinho dentro dos `px-3` do tamanho `sm` —
+        // três píxeis abaixo do mínimo na largura. A altura já vem dos 44 do
+        // `ui/Button.tsx`; falta-lhe a largura, e só onde há dedo. É o mesmo
+        // remendo, e pela mesma razão, que o abridor do `MoreMenu` já leva.
+        className="pointer-coarse:min-w-11"
         iconLeft={<BellIcon />}
         onClick={async () => {
           /**
@@ -193,6 +199,9 @@ export default function NotificationBell() {
     <Button
       variant="secondary"
       size="sm"
+      // O mesmo 41×44 do ramo de cima, e pela mesma razão: sem rótulo no
+      // telemóvel, o sino fica com a largura dos `px-3` e mais nada.
+      className="pointer-coarse:min-w-11"
       iconLeft={<BellIcon />}
       onClick={enable}
       disabled={state === "denied"}

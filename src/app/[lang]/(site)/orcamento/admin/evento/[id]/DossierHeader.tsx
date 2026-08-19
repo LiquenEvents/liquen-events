@@ -15,9 +15,14 @@ import { eventTagLabel } from "@/lib/orcamento/data";
 import { downloadEventIcs, printEventDossier, printRunSheet } from "../../export";
 import { Button } from "../../ui";
 
-/** Ghost-style toolbar control shared by the header's link + button actions. */
+/** Ghost-style toolbar control shared by the header's link + button actions.
+ *
+ * `alvo-toque` porque o rótulo é `hidden sm:inline`: num telemóvel isto fica
+ * uma seta de 14 px com `px-3` à volta, e media 38×32 — a caixa mais pequena
+ * desta barra. Os `h-8` continuam a mandar no rato; a classe só põe o chão de
+ * 44×44 onde se toca com o dedo, sem mexer no desenho. */
 const TOOL_LINK =
-  "inline-flex items-center gap-2 h-8 px-3 rounded-xl text-xs font-medium text-foreground/55 " +
+  "alvo-toque inline-flex items-center gap-2 h-8 px-3 rounded-xl text-xs font-medium text-foreground/55 " +
   "hover:bg-foreground/[0.06] hover:text-foreground/80 motion-safe:transition-colors " +
   "motion-safe:duration-150";
 
@@ -154,9 +159,20 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
         {/* Linha 1 — voltar + título + próxima ação */}
         <div className="flex flex-col lg:flex-row lg:items-start gap-5">
           <div className="min-w-0 flex-1">
+            {/* A ÚNICA SAÍDA DESTE ECRÃ, e media 65×16 px.
+                O dossier vive numa rota própria (`evento/[id]`), fora do
+                `AdminClient`: aqui não há barra de baixo nem gaveta — medido,
+                as duas dão `false`. Este link é o único caminho de volta ao
+                back office, e tinha 16 px de altura, pouco mais de um terço do
+                mínimo, encostado ao topo do ecrã.
+
+                Um alvo falhado noutro sítio custa um toque repetido; falhado
+                aqui, custa procurar como se sai de um ecrã que não tem outra
+                porta. `alvo-toque` dá-lhe 44 px de altura sem lhe mexer na
+                letra nem na cor. */}
             <Link
               href={`/${lang}/orcamento/admin`}
-              className="inline-flex items-center gap-1.5 text-foreground/45 text-xs font-medium hover:text-[#4d6350] motion-safe:transition-colors mb-3"
+              className="alvo-toque !justify-start inline-flex items-center gap-1.5 text-foreground/45 text-xs font-medium hover:text-[#4d6350] motion-safe:transition-colors mb-3"
             >
               <svg
                 width="14"
@@ -186,12 +202,24 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 nada que gere dinheiro (sinal/saldo são emitidos noutro lado).
                 Ícones sempre visíveis, rótulos escondidos em ecrãs pequenos,
                 tal como o cabeçalho da administração. */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-4">
+            {/* MEDIDO a 375 px: os quatro botões desta barra ficam sem rótulo
+                (`hidden sm:inline`) e mediam 38 px de largura, a 6 px uns dos
+                outros — quatro alvos abaixo do mínimo, encostados, e três
+                deles IMPRIMEM ou descarregam. Falhar o toque aqui manda um
+                dossier inteiro para a impressora.
+
+                O `alvo-toque` de cada botão dá-lhes os 44 px de largura; este
+                `pointer-coarse:gap-2` dá os 8 px de folga entre eles. Somados,
+                os cinco alvos e as folgas ocupam ~269 dos 343 px da coluna,
+                portanto continua tudo numa linha só — o `flex-wrap` não chega
+                a ser preciso. Com rato fica exactamente como estava. */}
+            <div className="flex flex-wrap items-center gap-1.5 pointer-coarse:gap-2 mt-4">
               {/* Copiar link do portal — ação principal da estúdio para
                   partilhar o portal privado com o cliente, por isso destacada. */}
               <Button
                 variant={copied ? "primary" : "subtle"}
                 size="sm"
+                className="alvo-toque"
                 onClick={copyPortalLink}
                 aria-live="polite"
                 title="Copiar o link privado do portal do cliente para a área de transferência"
@@ -264,6 +292,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
               <Button
                 variant="ghost"
                 size="sm"
+                className="alvo-toque"
                 onClick={() => printEventDossier(quote)}
                 title="Imprimir dossier completo do evento (contacto, financeiro, cronograma, convidados)"
                 iconLeft={
@@ -291,6 +320,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
               <Button
                 variant="ghost"
                 size="sm"
+                className="alvo-toque"
                 onClick={() => printRunSheet(quote)}
                 title="Imprimir o guião do dia (cronograma e checklist do evento)"
                 iconLeft={
@@ -321,6 +351,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="alvo-toque"
                   onClick={() => downloadEventIcs(quote)}
                   title="Descarregar .ics para adicionar ao calendário (Google/Apple/Outlook)"
                   iconLeft={
@@ -355,12 +386,19 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
               {next.label}
             </p>
             <p className="text-foreground/55 text-xs leading-relaxed mb-4">{next.hint}</p>
+            {/* O botão da próxima acção media 148×40 — quatro píxeis abaixo do
+                mínimo, e é o alvo que este cartão inteiro existe para oferecer.
+                `pointer-coarse:h-11` é o mesmo degrau que o `ui/Button.tsx` já
+                dá aos tamanhos `sm` e `md`; estes três estão escritos à mão e
+                por isso ficaram de fora. Os três estados (portal, zona,
+                desactivado) sobem juntos: um cartão onde a altura do botão
+                muda com o estado lê-se como um salto. */}
             {next.kind === "portal" ? (
               <a
                 href={portalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 h-10 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
+                className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
               >
                 {next.label}
                 <svg
@@ -379,7 +417,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
               <button
                 type="button"
                 onClick={() => onScrollTo(zone)}
-                className="inline-flex items-center gap-2 h-10 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
+                className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
               >
                 {next.label}
                 <svg
@@ -400,7 +438,7 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 type="button"
                 disabled
                 title="Disponível na fase de ações rápidas"
-                className="inline-flex items-center gap-2 h-10 px-4 bg-white/10 text-white/45 text-sm font-medium rounded-xl cursor-not-allowed"
+                className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-white/10 text-white/45 text-sm font-medium rounded-xl cursor-not-allowed"
               >
                 {next.label}
               </button>

@@ -18,7 +18,25 @@ export default function AdminLoading() {
     // funciona sem JS de qualquer maneira, mas a alça fica pela mesma razão que
     // as outras — quem lá chegar sem JS vê o que há, não um esqueleto eterno.
     <div
-      className="ecra-de-espera min-h-screen bg-surface flex"
+      /**
+       * `-mt-24`: MEDIDO a 375×667. O `<main>` público tem `pt-24` (96 px) e
+       * o globals.css diz, por extenso, que o `padding-top: 0` da classe
+       * `admin-mode` saiu de lá para o `className` de CADA raiz do back
+       * office, porque a classe só entra num efeito e o salto valia 0,128 de
+       * CLS. Esta raiz — a PRIMEIRA que ela vê, antes de haver ecrã nenhum —
+       * ficou sem o `-mt-24`:
+       *
+       *                        cabeçalho do esqueleto   cabeçalho a sério
+       *   antes                      y = 96 px                y = 0
+       *   depois                     y = 0                    y = 0
+       *
+       * Ou seja: o esqueleto desenhava-se 96 px mais abaixo do que a coisa
+       * que vinha a seguir, e ao chegar o back office (ou o ecrã de entrada,
+       * que também traz o seu `-mt-24`) tudo subia esses 96 px de uma vez. Era
+       * exactamente o salto que aquele comentário do globals.css descreve, no
+       * único sítio onde ainda faltava a cura.
+       */
+      className="ecra-de-espera -mt-24 min-h-screen bg-surface flex"
       role="status"
       aria-busy="true"
       aria-label="A carregar o back office"

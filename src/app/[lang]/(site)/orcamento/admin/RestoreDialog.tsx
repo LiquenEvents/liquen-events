@@ -289,10 +289,16 @@ function RestoreDialogInner({ onClose, toast }: Omit<Props, "open">) {
               Escreve por cima dos dados actuais. Faz primeiro uma cópia do estado de agora.
             </p>
           </div>
+          {/* 12×18 px, medido a 375 px — e neste diálogo pesa mais do que no
+              das passkeys: o fundo NÃO fecha (não há `onClick` no scrim, de
+              propósito, para não se perder uma reposição a meio) e o Escape
+              precisa de um teclado que um telemóvel não tem. Restava este ×,
+              com um terço da largura mínima, como única saída para um dedo.
+              `alvo-toque` põe-lhe os 44×44; o desenho fica igual. */}
           <button
             onClick={onClose}
             disabled={fase === "a-repor"}
-            className="text-lg leading-none text-foreground/30 transition-colors hover:text-foreground/60 disabled:opacity-30"
+            className="alvo-toque text-lg leading-none text-foreground/30 transition-colors hover:text-foreground/60 disabled:opacity-30"
             aria-label="Fechar"
           >
             ×
