@@ -440,6 +440,45 @@ describe("total desalinhado da soma das linhas", () => {
     expect(await screen.findByText(/a soma dos serviços está incompleta/i)).toBeTruthy();
   });
 
+  /**
+   * ── «0 DE 4 LINHAS COM PREÇO» NUMA PROPOSTA QUE ESTÁ CERTA ───────────────
+   * Palavras dela, de uma fotografia do telemóvel: o contador lia-se como
+   * erro. E lia-se bem — «0 de 2» tem a forma de um contador por preencher.
+   * Só que há propostas em que as linhas NUNCA levam valor: o preço vive no
+   * total e as linhas são a lista do que está incluído, que é o formato das
+   * propostas desta casa há anos.
+   *
+   * Distingue-se por um facto, não por um palpite: nenhuma linha com preço E
+   * um total escrito.
+   */
+  it("com o preço só no total, diz onde ele está em vez de contar «0 de 2»", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: ["Decor Cerimónia", "Decor Jantar"],
+        budgetAmounts: [null, null],
+        coverImages: ["", ""],
+        totalAmount: 12500,
+        totalVatMode: "acrescer",
+        totalLabel: "Valor Total Decoração",
+      }),
+    );
+    renderStudio();
+    expect(
+      await screen.findByText("Preço definido no total — as linhas não levam valor"),
+    ).toBeTruthy();
+    expect(screen.queryByText("0 de 2 linhas com preço")).toBeNull();
+  });
+
   it("com todas as linhas orçamentadas, não avisa de soma incompleta", async () => {
     seedComPrecos(3250);
     renderStudio();

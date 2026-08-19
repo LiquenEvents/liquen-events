@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -100,6 +100,81 @@ const ICON_BTN =
   "hover:bg-foreground/[0.07] hover:text-foreground/90 disabled:opacity-30 " +
   "disabled:hover:bg-transparent disabled:cursor-not-allowed transition-colors";
 
+/** Os campos onde se escreve: o marcador continua a ser um `<input>` («a)» tem
+ *  três caracteres e nunca cresce), o resto passou a `<textarea>`. */
+type CampoDeEscrita = HTMLInputElement | HTMLTextAreaElement;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O NOME DO SERVIÇO DEIXA DE ACABAR A MEIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, de uma fotografia do ecrã: «Decoração Floral do Casamen».
+ * Num `<input>` o texto que não cabe não existe — desliza para fora e a única
+ * maneira de o ler é pôr o cursor lá dentro e navegar às cegas. MEDIDO a
+ * 375 px: a caixa do nome tem 259 px de texto útil, e os nomes reais desta casa
+ * andam nos 40 a 50 caracteres, ou seja cerca de 300 px. Falta sempre.
+ *
+ * Um `<textarea>` de UMA linha que cresce com o que lá está resolve-o sem tirar
+ * nada: fechado ocupa exactamente a mesma altura que o `<input>` ocupava, e
+ * quando o texto passa da linha abre a segunda em vez de o esconder.
+ *
+ * ── O ENTER CONTINUA A SER «LINHA SEGUINTE» ───────────────────────────────
+ * É a razão pela qual isto não era um `<textarea>` desde o princípio. Aqui o
+ * Enter é o atalho mais usado do editor (ver o cabeçalho do ficheiro), e num
+ * `<textarea>` seria uma quebra de linha DENTRO do nome do serviço — que
+ * seguia assim para o PDF. Por isso o Enter é travado no próprio campo, sempre,
+ * com ou sem Shift, antes de o resto acontecer. O `Ctrl+Enter` de gravar não é
+ * afectado: travar o comportamento por omissão não impede o evento de subir
+ * até ao ouvinte da secção.
+ */
+function CampoQueCresce({
+  aoEscrever,
+  valor,
+  ...resto
+}: Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "rows" | "ref"> & {
+  valor: string;
+  /** O `ref` do editor, para o foco poder ir para uma linha acabada de nascer. */
+  aoEscrever: (el: CampoDeEscrita | null) => void;
+}) {
+  const meu = useRef<HTMLTextAreaElement | null>(null);
+
+  // A altura mede-se DEPOIS de o texto estar no nó e ANTES de o browser
+  // pintar: com `useEffect` a caixa aparecia com uma linha e saltava para duas
+  // à frente de quem estava a escrever.
+  useLayoutEffect(() => {
+    const el = meu.current;
+    if (!el) return;
+    el.style.height = "auto";
+    // `scrollHeight` conta o conteúdo e o `padding`, e NÃO conta a borda; com o
+    // `box-sizing: border-box` do Tailwind, escrevê-lo tal e qual em `height`
+    // faz a borda comer dois píxeis ao conteúdo. MEDIDO a 1280 px: a caixa do
+    // nome ficava com 32 px onde o `<input>` tinha 34, e a secção «Serviços»
+    // encolhia 66 px no computador — que é onde nada podia mudar. Somar
+    // `offsetHeight - clientHeight` (as bordas) devolve o número exacto.
+    el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
+  }, [valor]);
+
+  return (
+    <textarea
+      {...resto}
+      value={valor}
+      rows={1}
+      ref={(el) => {
+        meu.current = el;
+        aoEscrever(el);
+      }}
+      onKeyDown={(e) => {
+        // Ver o cabeçalho: no nome de um serviço, o Enter nunca é uma quebra
+        // de linha. Trava-se aqui, e o significado («abre a linha seguinte»)
+        // fica onde sempre esteve, nos `onItemKeyDown`/`onGroupKeyDown`.
+        if (e.key === "Enter") e.preventDefault();
+        resto.onKeyDown?.(e);
+      }}
+    />
+  );
+}
+
 const LETTERS = "abcdefghijklmnopqrstuvwxyz";
 /** O marcador que a numeração automática daria à posição `i`. */
 const autoLetter = (i: number) => `${LETTERS[i] ?? ""})`;
@@ -169,7 +244,7 @@ export default function ServicesEditor({
 }: ServicesEditorProps) {
   // Campos por chave estável, para o foco poder ir para uma linha que ACABOU de
   // nascer (o nó só existe depois do render seguinte).
-  const inputs = useRef(new Map<string, HTMLInputElement>());
+  const inputs = useRef(new Map<string, CampoDeEscrita>());
   const pendingFocus = useRef<FocusTarget>(null);
   /** Onde estava o cursor quando a última ação começou — para o anular o devolver. */
   const activeKey = useRef<string | null>(null);
@@ -221,11 +296,11 @@ export default function ServicesEditor({
 
   // A MESMA função de ref por chave: uma função nova a cada render faria o React
   // desligar e religar todos os campos em cada tecla escrita.
-  const refCache = useRef(new Map<string, (el: HTMLInputElement | null) => void>());
+  const refCache = useRef(new Map<string, (el: CampoDeEscrita | null) => void>());
   const register = useCallback((key: string) => {
     let cb = refCache.current.get(key);
     if (!cb) {
-      cb = (el: HTMLInputElement | null) => {
+      cb = (el: CampoDeEscrita | null) => {
         if (el) inputs.current.set(key, el);
         else inputs.current.delete(key);
       };
@@ -428,7 +503,7 @@ export default function ServicesEditor({
     ii: number,
     field: "label" | "desc",
     text: string,
-    el: HTMLInputElement,
+    el: CampoDeEscrita,
   ) {
     const lines = text.split(/\r?\n/).map(cleanPastedLine).filter(Boolean);
     if (lines.length === 0) return;
@@ -470,7 +545,7 @@ export default function ServicesEditor({
   }
 
   function onItemKeyDown(
-    e: React.KeyboardEvent<HTMLInputElement>,
+    e: React.KeyboardEvent<CampoDeEscrita>,
     gi: number,
     ii: number,
     field: "label" | "desc",
@@ -508,7 +583,7 @@ export default function ServicesEditor({
   }
 
   function onGroupKeyDown(
-    e: React.KeyboardEvent<HTMLInputElement>,
+    e: React.KeyboardEvent<CampoDeEscrita>,
     gi: number,
     field: "letter" | "title",
   ) {
@@ -599,7 +674,19 @@ export default function ServicesEditor({
         if (key) activeKey.current = key;
       }}
     >
-      <p className="-mt-2 mb-3 text-xs leading-relaxed text-foreground/50">
+      {/* ── ATALHOS DE TECLADO NUM APARELHO SEM TECLADO ────────────────────
+          `max-md:hidden`: abaixo de 768 px esta linha dizia «Enter abre a linha
+          seguinte · Alt+↑/↓ move · Ctrl+Z anula» a quem não tem nenhuma dessas
+          teclas. MEDIDO a 375 px: 60 px de altura (três linhas de texto) no
+          topo da secção mais escrita da casa, gastos a explicar gestos que ali
+          não existem.
+
+          Não se perde nenhuma acção ao escondê-la — todas têm botão:
+          «+ Adicionar linha» faz o que o Enter faz, as setas de cada linha
+          fazem o que o Alt+↑/↓ faz, e o «Desfazer» do cabeçalho do estúdio faz
+          o que o Ctrl+Z faz. É por isso que isto se pode esconder em vez de ter
+          de ser substituído. */}
+      <p className="max-md:hidden -mt-2 mb-3 text-xs leading-relaxed text-foreground/50">
         <strong className="font-semibold text-foreground/70">Enter</strong> abre a linha seguinte ·{" "}
         <strong className="font-semibold text-foreground/70">Enter numa linha vazia</strong> abre um
         grupo novo · <strong className="font-semibold text-foreground/70">Alt+↑/↓</strong> move ·{" "}
@@ -644,11 +731,11 @@ export default function ServicesEditor({
                           title="Marcador do grupo — numera-se sozinho (a, b, c…); escreva por cima para fixar outro."
                           aria-label={`Marcador do grupo ${gi + 1} — numera-se sozinho`}
                         />
-                        <input
+                        <CampoQueCresce
                           {...fieldProps(groupKey(gid))}
-                          ref={register(groupKey(gid))}
-                          className={`${ROW_INPUT} min-w-[12rem] flex-1 font-medium`}
-                          value={g.title}
+                          aoEscrever={register(groupKey(gid))}
+                          className={`${ROW_INPUT} min-w-[12rem] flex-1 resize-none font-medium`}
+                          valor={g.title}
                           onChange={(e) => updateGroup(gi, { title: e.target.value })}
                           // A pega do aviso de ortografia — ver `chaveDoCampo`.
                           data-campo={`grupoTitulo:${gi}`}
@@ -667,7 +754,9 @@ export default function ServicesEditor({
                             valor={g.titleEn ?? ""}
                             onChange={(texto) => updateGroup(gi, { titleEn: texto })}
                             porTraduzir={!!g.title.trim() && !(g.titleEn ?? "").trim()}
-                            className={`${ROW_INPUT} min-w-[12rem] flex-1 font-medium`}
+                            as="textarea"
+                            cresce
+                            className={`${ROW_INPUT} min-w-[12rem] flex-1 resize-none font-medium`}
                             placeholder="Wedding Floral Design"
                           />
                         )}
@@ -742,9 +831,9 @@ export default function ServicesEditor({
                                         {...handleProps}
                                         label={`Arrastar linha ${ii + 1} do grupo ${gi + 1}`}
                                       />
-                                      <input
+                                      <CampoQueCresce
                                         {...fieldProps(itemKey(iid, "label"))}
-                                        ref={register(itemKey(iid, "label"))}
+                                        aoEscrever={register(itemKey(iid, "label"))}
                                         // `min-w-[8rem]`: sem mínimo, o `flex-1`
                                         // sozinho não bastava para EMPURRAR as
                                         // ações para a linha de baixo — um
@@ -755,8 +844,8 @@ export default function ServicesEditor({
                                         // nome e descem, inteiras, para a
                                         // segunda linha — como já acontecia no
                                         // título do grupo, aqui ao lado.
-                                        className={`${ROW_INPUT} min-w-[8rem] flex-1`}
-                                        value={it.label}
+                                        className={`${ROW_INPUT} min-w-[8rem] flex-1 resize-none`}
+                                        valor={it.label}
                                         onChange={(e) =>
                                           updateItem(gi, ii, { label: e.target.value })
                                         }
@@ -782,16 +871,36 @@ export default function ServicesEditor({
                                           porTraduzir={
                                             !!it.label.trim() && !(it.labelEn ?? "").trim()
                                           }
-                                          className={`${ROW_INPUT} flex-1`}
+                                          as="textarea"
+                                          cresce
+                                          className={`${ROW_INPUT} flex-1 resize-none`}
                                           placeholder="Ceremony Decor"
                                         />
                                       )}
                                       {showDesc && (
-                                        <input
+                                        <CampoQueCresce
                                           {...fieldProps(itemKey(iid, "desc"))}
-                                          ref={register(itemKey(iid, "desc"))}
-                                          className={`${ROW_INPUT} flex-1`}
-                                          value={it.desc ?? ""}
+                                          aoEscrever={register(itemKey(iid, "desc"))}
+                                          /* ── DUAS CAIXAS A DIVIDIR 259 px ─────────────────
+                                             MEDIDO a 375 px, template Organização (o que tem
+                                             descrição), numa linha a sério: o nome do serviço
+                                             ficava com 128 px e a descrição com 127, lado a
+                                             lado. A 16 px de letra são catorze caracteres —
+                                             «Arco floral de» de um nome de 49. A 320 px a
+                                             descrição ficava com 72: oito caracteres. Escrever
+                                             ali é escrever por uma frincha, e é O ECRÃ MAIS
+                                             ESCRITO DA CASA.
+
+                                             `max-sm:min-w-full` põe a descrição sozinha na
+                                             linha de baixo — 259 px cada uma, o dobro. É a
+                                             mesma manobra que a caixa inglesa aqui ao lado já
+                                             faz com o `basis-full`, e é `max-sm:` de propósito:
+                                             acima de 640 px, onde ela trabalha a sério, não há
+                                             uma única propriedade nova a aplicar-se (medido a
+                                             640, 768 e 1280: 132, 196 e 200 px, iguais aos de
+                                             antes ao pixel). */
+                                          className={`${ROW_INPUT} max-sm:min-w-full flex-1 resize-none`}
+                                          valor={it.desc ?? ""}
                                           onChange={(e) =>
                                             updateItem(gi, ii, { desc: e.target.value })
                                           }
@@ -818,7 +927,9 @@ export default function ServicesEditor({
                                           porTraduzir={
                                             !!(it.desc ?? "").trim() && !(it.descEn ?? "").trim()
                                           }
-                                          className={`${ROW_INPUT} flex-1`}
+                                          as="textarea"
+                                          cresce
+                                          className={`${ROW_INPUT} flex-1 resize-none`}
                                         />
                                       )}
                                       <div className={ROW_ACTIONS}>

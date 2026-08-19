@@ -297,3 +297,37 @@ describe("ergonomia táctil", () => {
     ).toBeGreaterThan(0);
   });
 });
+
+describe("o nome do serviço cabe todo", () => {
+  /**
+   * ── PORQUE É QUE ISTO É UM `<textarea>` E NÃO UM `<input>` ────────────────
+   * Palavras dela, de uma fotografia do telemóvel: «Decoração Floral do
+   * Casamen». Num `<input>`, o texto que não cabe não existe — desliza para
+   * fora e só se lê pondo o cursor lá dentro. MEDIDO a 375 px: a caixa tem
+   * 241 px de texto útil e um nome desta casa pede 388 — 147 px de letra, umas
+   * duas dúzias de caracteres, escondidos sem nada a dizê-lo.
+   *
+   * O `<textarea>` de uma linha que cresce mostra-os. O que este teste prende é
+   * o preço que isso NÃO pode ter: o Enter é o atalho mais usado do editor, e
+   * num `<textarea>` seria uma quebra de linha dentro do nome do serviço — que
+   * seguia assim para o PDF.
+   */
+  it("é uma caixa que cresce, e o Enter continua a abrir a linha seguinte em vez de partir o nome", async () => {
+    render(<Host initial={grupo([""])} />);
+    const user = userEvent.setup();
+
+    const campo = linha(1);
+    expect(campo.tagName).toBe("TEXTAREA");
+
+    await user.click(campo);
+    await user.keyboard("Arco floral de cerimónia em tons de branco e verde{Enter}");
+
+    // O nome ficou inteiro e numa peça só — sem a quebra que um `<textarea>`
+    // teria posto lá.
+    expect(linha(1).value).toBe("Arco floral de cerimónia em tons de branco e verde");
+    expect(linha(1).value).not.toContain("\n");
+    // E o Enter fez o que sempre fez.
+    expect(linhas()).toHaveLength(2);
+    expect(document.activeElement).toBe(linha(2));
+  });
+});
