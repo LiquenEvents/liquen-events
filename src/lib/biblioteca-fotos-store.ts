@@ -173,6 +173,57 @@ export async function coresDeCaminhos(paths: readonly string[]): Promise<Map<str
   return saida;
 }
 
+/** A forma de uma fotografia, em pixels do ficheiro guardado. */
+export interface FormaDaFoto {
+  largura: number;
+  altura: number;
+}
+
+/**
+ * AS FORMAS de um conjunto de caminhos, num pedido só.
+ *
+ * O terceiro gémeo do `lqipsDeCaminhos` e do `coresDeCaminhos`, com a mesma
+ * consulta por PASTA e a mesma promessa de nunca lançar.
+ *
+ * ── PARA QUE SERVE, E PORQUE É QUE NÃO É UM ENFEITE ───────────────────────
+ *
+ * A página da proposta desenha até 46 fotografias numa grelha fluida. Sem
+ * saber a forma de cada uma ANTES de ela chegar, o navegador desenha a célula
+ * com altura zero e volta a arrumar a página a cada fotografia que aterra —
+ * quarenta e seis saltos por baixo do dedo de quem está a ler. Com a forma,
+ * cada célula nasce com a altura certa e nada se mexe.
+ *
+ * A alternativa era ler as dimensões do FICHEIRO, e essa custa descarregar 46
+ * imagens no servidor para desenhar uma página. Isto custa uma consulta.
+ *
+ * Uma foto sem linha, ou anterior a estas colunas, não entra no mapa: a célula
+ * dela cai para a proporção por omissão da grelha. Trata-se o caso, não se
+ * assume.
+ */
+export async function formasDeCaminhos(
+  paths: readonly string[],
+): Promise<Map<string, FormaDaFoto>> {
+  const saida = new Map<string, FormaDaFoto>();
+  if (paths.length === 0) return saida;
+  const pastas = new Set(paths.map((p) => p.split("/")[0]).filter(Boolean));
+  const querido = new Set(paths);
+  try {
+    const listas = await Promise.all(
+      [...pastas].map((pasta) => repo.where("pasta", pasta, (f) => f.pasta === pasta)),
+    );
+    for (const f of listas.flat()) {
+      // As duas, ou nenhuma: meia forma não dá proporção nenhuma e uma altura
+      // de zero é pior do que não saber.
+      if (f.largura && f.altura && querido.has(f.path)) {
+        saida.set(f.path, { largura: f.largura, altura: f.altura });
+      }
+    }
+  } catch {
+    /* sem formas — a grelha desenha-se na mesma, com a proporção por omissão */
+  }
+  return saida;
+}
+
 /** Apaga a linha (as etiquetas vão atrás, por `on delete cascade`). Chamada
  *  quando a FOTO sai do bucket — nunca ao contrário. */
 export const deleteFoto = (path: string): Promise<void> => repo.remove(path);

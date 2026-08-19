@@ -48,7 +48,7 @@ vi.mock("@/lib/proposals-store", () => ({
 }));
 vi.mock("next/image", () => ({ default: () => null }));
 
-import ProposalPage from "./proposta/[token]/page";
+import ProposalPage from "../(privado)/proposta/[token]/page";
 import PortalView from "./portal/[token]/PortalView";
 
 /** A proposta de 24 600 €: base 20 000, IVA 4 600 — os três da mesma coluna. */
