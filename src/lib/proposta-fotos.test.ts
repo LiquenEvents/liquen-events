@@ -27,7 +27,9 @@ vi.mock("@/lib/proposal-storage", () => ({
   }),
 }));
 vi.mock("@/lib/biblioteca-fotos-store", () => ({
-  formasDeCaminhos: vi.fn(async () => new Map([["ped-42/aaa.jpg", { largura: 1600, altura: 900 }]])),
+  formasDeCaminhos: vi.fn(
+    async () => new Map([["ped-42/aaa.jpg", { largura: 1600, altura: 900 }]]),
+  ),
   lqipsDeCaminhos: vi.fn(async () => new Map()),
 }));
 

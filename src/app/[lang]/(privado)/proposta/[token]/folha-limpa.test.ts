@@ -54,10 +54,7 @@ function layoutsDaRota(paginaAbsoluta: string): string[] {
   return encontrados;
 }
 
-const A_PAGINA = join(
-  process.cwd(),
-  "src/app/[lang]/(privado)/proposta/[token]/page.tsx",
-);
+const A_PAGINA = join(process.cwd(), "src/app/[lang]/(privado)/proposta/[token]/page.tsx");
 const UMA_PAGINA_DO_SITIO = join(process.cwd(), "src/app/[lang]/(site)/page.tsx");
 
 describe("a página da proposta é folha limpa", () => {

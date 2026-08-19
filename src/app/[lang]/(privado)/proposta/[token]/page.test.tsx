@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * A PÁGINA ONDE O CASAL DECIDE.
@@ -322,5 +324,39 @@ describe("página pública da proposta — o cumprimento", () => {
     db.proposal = proposta({ clientName: "", idioma: "en" });
     await abrir("bom", "en");
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Hello.");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * NENHUMA IMAGEM DE PARTILHA — E O CONTROLO POSITIVO QUE PROVA QUE HERDAVA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A afirmação é uma AUSÊNCIA, e uma ausência afirma-se mal: um `openGraph`
+ * simplesmente não declarado também não tem imagens NESTE objecto — e sai com
+ * imagem à mesma, porque o layout de raiz define as dela e o Next herda-as.
+ *
+ * Por isso o teste tem duas metades: a página tem de DECLARAR os dois blocos
+ * (é o que substitui os do layout), e o layout de raiz tem de continuar a
+ * declarar imagens (é o que torna a declaração daqui necessária). O dia em que
+ * o layout deixar de as ter, a segunda metade falha e alguém relê isto.
+ */
+describe("a proposta nunca leva imagem de partilha", () => {
+  it("declara `openGraph` e `twitter` SEM imagens", async () => {
+    db.proposal = proposta({ doc: { ref: "PO Decoração" } });
+    const meta = await pagina.generateMetadata({
+      params: Promise.resolve({ lang: "pt", token: "bom" }),
+    });
+    expect(meta.openGraph).toBeDefined();
+    expect(meta.openGraph?.images).toEqual([]);
+    expect(meta.twitter).toBeDefined();
+    expect(meta.twitter?.images).toEqual([]);
+  });
+
+  it("CONTROLO POSITIVO: sem esta declaração, herdaria as do layout de raiz", async () => {
+    const fonte = readFileSync(join(process.cwd(), "src/app/[lang]/layout.tsx"), "utf8");
+    // O layout de raiz continua a dar imagem de partilha a quem não a recusa.
+    expect(fonte).toMatch(/openGraph:[\s\S]{0,600}images:/);
+    expect(fonte).toMatch(/twitter:[\s\S]{0,300}images:/);
   });
 });

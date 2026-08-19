@@ -28,9 +28,7 @@ const BOARD: BoardParaEcra = {
 };
 
 const desenhar = (board: BoardParaEcra = BOARD) =>
-  render(
-    <Inspiracao boards={[board]} fotosIniciais={FOTOS} token="tk" textos={T} />,
-  );
+  render(<Inspiracao boards={[board]} fotosIniciais={FOTOS} token="tk" textos={T} />);
 
 /** A lupa, quando está aberta. */
 const lupa = () => screen.queryByRole("dialog");
@@ -141,9 +139,11 @@ describe("a lupa", () => {
 
 describe("quando as assinaturas morrem", () => {
   it("o botão volta a pedi-las — e nunca manda um caminho ao servidor", async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_url: string) => ({
       ok: true,
-      json: async () => ({ fotos: [{ id: "a", miniatura: "mini/a-nova", original: "orig/a-nova" }] }),
+      json: async () => ({
+        fotos: [{ id: "a", miniatura: "mini/a-nova", original: "orig/a-nova" }],
+      }),
     }));
     vi.stubGlobal("fetch", fetchMock);
     desenhar();
@@ -156,7 +156,10 @@ describe("quando as assinaturas morrem", () => {
     expect(url).not.toContain("path");
     await waitFor(() =>
       expect(
-        screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")?.getAttribute("src"),
+        screen
+          .getAllByRole("button", { name: /Ampliar/ })[0]
+          .querySelector("img")
+          ?.getAttribute("src"),
       ).toBe("mini/a-nova"),
     );
   });

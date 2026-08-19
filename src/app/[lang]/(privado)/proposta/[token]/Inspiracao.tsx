@@ -298,8 +298,7 @@ function Celula({
     foto?.miniatura ?? foto?.original,
     foto?.original,
   );
-  const proporcao =
-    foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : undefined;
+  const proporcao = foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : undefined;
 
   return (
     <figure className="foto-inteira m-0">
@@ -307,7 +306,7 @@ function Celula({
         type="button"
         onClick={(e) => aoAmpliar(e.currentTarget)}
         disabled={!alvo || desistiu}
-        aria-label={`${textos.ampliar} — ${rotulo}`}
+        aria-label={`${textos.ampliar}: ${rotulo}`}
         className="group focus-visible:outline-moss relative block w-full cursor-zoom-in overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-moss)_12%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default"
         style={proporcao ? { aspectRatio: proporcao } : undefined}
       >

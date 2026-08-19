@@ -233,6 +233,16 @@ export default function Documento({
   );
   const quantosExtras = rubricas.filter((r) => r.extra).length;
   const taxa = `${Math.round(totais.taxa * 100)}%`;
+  /**
+   * O total como o estúdio o escreveu, quando não há euros que se consigam
+   * somar (uma proposta a meio, ou um total escrito «a definir»).
+   *
+   * Vazio quer dizer que não há nada a dizer, e então NÃO SE DIZ: aqui esteve
+   * um travessão de reserva («—»), que numa folha de vinte mil euros é um
+   * rótulo de total seguido de um traço. Um rótulo sem número não informa
+   * ninguém e assusta toda a gente.
+   */
+  const totalEscrito = ((org ? doc.totalEstimatedText : doc.totalText) ?? "").trim();
   /** O «+ IVA» que TEM de aparecer quando o total escrito não o diz. */
   const comIvaDito = (texto: string) =>
     totais.modo === "acrescer" && !/\+\s*(iva|vat)/i.test(texto) ? `${texto} ${t.maisIva}` : texto;
@@ -474,17 +484,19 @@ export default function Documento({
           /* Sem euros que se consigam somar — uma proposta a meio, ou um total
              escrito «a definir» — imprime-se o que o estúdio escreveu, com o
              «+ IVA» garantido. Não se inventa uma escada de zeros. */
-          <div className="border-foreground/15 mt-8 flex items-baseline justify-between gap-4 border-t pt-4">
-            <span className="text-foreground/75 text-sm font-medium">
-              {rotuloDoTotalNaLingua(doc, idioma)}
-            </span>
-            <span
-              className="text-moss"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 3vw, 28px)" }}
-            >
-              {comIvaDito((org ? doc.totalEstimatedText : doc.totalText) || "—")}
-            </span>
-          </div>
+          totalEscrito && (
+            <div className="border-foreground/15 mt-8 flex items-baseline justify-between gap-4 border-t pt-4">
+              <span className="text-foreground/75 text-sm font-medium">
+                {rotuloDoTotalNaLingua(doc, idioma)}
+              </span>
+              <span
+                className="text-moss"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 3vw, 28px)" }}
+              >
+                {comIvaDito(totalEscrito)}
+              </span>
+            </div>
+          )
         )}
 
         {doc.budgetNote?.trim() && (

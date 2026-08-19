@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { readProposalToken } from "@/lib/proposal-token";
 import { getProposal } from "@/lib/proposals-store";
-import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { SITE } from "@/lib/site";
 import { getDictionary, htmlLang, normalizeLocale, type Locale } from "@/lib/i18n";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
@@ -102,6 +101,39 @@ export async function generateMetadata({
      */
     title: { absolute: tituloDoSeparador(locale) },
     robots: { index: false, follow: false },
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * ESTA ROTA NUNCA TEM IMAGEM DE PARTILHA. NUNCA.
+     * ═══════════════════════════════════════════════════════════════════════
+     *
+     * E não bastava «não pôr nenhuma»: as etiquetas de partilha do layout de
+     * raiz são HERDADAS por quem não as declara. MEDIDO no `layout.tsx`
+     * (linhas 159 e 177): ele define `openGraph.images` e
+     * `twitter.images` com o `SITE.ogImage`, portanto este link privado
+     * estava a sair com uma imagem de partilha e com o título «A sua proposta»
+     * a acompanhá-la.
+     *
+     * O que isso custa: o casal reencaminha o link por WhatsApp, iMessage ou
+     * Slack, e o serviço de mensagens vai buscar a etiqueta e GUARDA-A num
+     * servidor que não é dela. O `noindex` não alcança essa cache — ele fala
+     * com motores de busca, e um pré-visualizador de mensagens não é um. Uma
+     * imagem de partilha bonita é, precisamente, a coisa que se espalha.
+     *
+     * Declarar os dois blocos com `images: []` é o que os SUBSTITUI. Um bloco
+     * declarado por uma página substitui o do layout por inteiro — é essa a
+     * regra de resolução do Next, e é por isso que isto não é um adorno.
+     *
+     * Se um dia se quiser cá pôr a fotografia da capa da proposta: não.
+     */
+    openGraph: {
+      title: tituloDoSeparador(locale),
+      images: [],
+    },
+    twitter: {
+      card: "summary",
+      title: tituloDoSeparador(locale),
+      images: [],
+    },
   };
 }
 

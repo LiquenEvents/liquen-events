@@ -70,9 +70,7 @@ const desenhar = (over: Partial<ProposalDoc> = {}, idioma: "pt" | "en" = "pt") =
 describe("as secções e a ordem", () => {
   it("sai pela ordem do documento — apresentação, serviços, inspiração, orçamento, condições", () => {
     desenhar();
-    const titulos = screen
-      .getAllByRole("heading", { level: 2 })
-      .map((h) => h.textContent?.trim());
+    const titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent?.trim());
     expect(titulos).toEqual([
       "Apresentação",
       "Serviços",
@@ -184,12 +182,7 @@ describe("as fotografias", () => {
 
   it("um board sem uma única foto resolvida não chega a aparecer", () => {
     render(
-      <Documento
-        doc={DOC}
-        idioma="pt"
-        fotos={[{ id: "c0", miniatura: "mini/capa" }]}
-        token="tk"
-      />,
+      <Documento doc={DOC} idioma="pt" fotos={[{ id: "c0", miniatura: "mini/capa" }]} token="tk" />,
     );
     expect(screen.queryByRole("heading", { name: "Inspiração" })).toBeNull();
     // E o índice também não promete o que não existe.
