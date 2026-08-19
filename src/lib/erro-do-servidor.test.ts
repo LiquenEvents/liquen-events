@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { erroDoServidorEmPortugues, porqueRecusou } from "./erro-do-servidor";
+import { erroDoServidorEmPortugues, porqueFalhou, porqueRecusou } from "./erro-do-servidor";
 import { firstError, quoteUpdateSchema } from "./validation";
 
 /**
@@ -62,5 +62,44 @@ describe("ler a recusa de uma resposta", () => {
       },
     } as unknown as Response;
     expect(await porqueRecusou(r)).toBeNull();
+  });
+});
+
+/**
+ * A falha de rede não tem servidor do outro lado — e o que o browser lança
+ * está em inglês. Estes testes são a rede que impede essa frase de voltar ao
+ * ecrã: cada um deles vem de uma medição feita no back office a correr.
+ */
+describe("a ligação que caiu", () => {
+  it("o «Failed to fetch» do Chrome dá lugar à frase de quem chama", () => {
+    // Exactamente o que o ecrã das Definições mostrava, medido com a ligação
+    // cortada a meio do PUT: um aviso a dizer «Failed to fetch».
+    const doBrowser = new TypeError("Failed to fetch");
+    expect(porqueFalhou(doBrowser, "Não foi possível guardar.")).toBe("Não foi possível guardar.");
+  });
+
+  it("o «Load failed» do Safari e o do Firefox também", () => {
+    expect(porqueFalhou(new TypeError("Load failed"), "recurso")).toBe("recurso");
+    expect(
+      porqueFalhou(new Error("NetworkError when attempting to fetch resource."), "recurso"),
+    ).toBe("recurso");
+  });
+
+  it("a frase desta casa passa intacta — é ela que nomeia o campo", () => {
+    // O `throw new Error(porqueRecusou(res))` de quem chama: já está em
+    // português e já diz o que está mal. Substituí-la seria perder informação.
+    const daCasa = new Error("O número não pode ser inferior a 0.");
+    expect(porqueFalhou(daCasa, "Não foi possível guardar.")).toBe(
+      "O número não pode ser inferior a 0.",
+    );
+  });
+
+  it("um erro sem mensagem nenhuma não deixa o ecrã em branco", () => {
+    expect(porqueFalhou(new Error(""), "Não foi possível guardar.")).toBe(
+      "Não foi possível guardar.",
+    );
+    expect(porqueFalhou("uma coisa que nem Error é", "Não foi possível guardar.")).toBe(
+      "Não foi possível guardar.",
+    );
   });
 });

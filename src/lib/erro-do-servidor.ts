@@ -86,3 +86,52 @@ export async function porqueRecusou(res: Response): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FALHA QUE NÃO VEIO DO SERVIDOR — porque nem sequer chegou lá
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `porqueRecusou` acima trata da RESPOSTA. Falta o caso em que resposta não
+ * há nenhuma: o wi-fi caiu, o telemóvel saiu de rede, o servidor não atendeu.
+ * Aí o `fetch` LANÇA, e o que ele lança é um `Error` como outro qualquer —
+ * com uma `message` escrita pelo browser, em inglês, e diferente em cada um:
+ *
+ *   Chrome   `Failed to fetch`
+ *   Safari   `Load failed`
+ *   Firefox  `NetworkError when attempting to fetch resource.`
+ *
+ * ── O QUE ISTO ESTAVA A FAZER, MEDIDO ─────────────────────────────────────
+ * Em Definições, cortada a ligação a meio do «Guardar deslocação», o aviso que
+ * aparecia no ecrã era, literalmente, **«Failed to fetch»**. O mesmo ao criar
+ * um pedido novo. Duas coisas de uma vez: uma frase inglesa num back office
+ * português, e — pior — uma frase que não diz o que interessa, que é **o valor
+ * NÃO ficou gravado**.
+ *
+ * E o texto de recurso que estava escrito para este caso nunca chegava a ser
+ * usado: `e instanceof Error ? e.message : "Não foi possível guardar."` — a
+ * falha de rede TAMBÉM é um `Error`, portanto o ramo da direita é código morto.
+ *
+ * ── PORQUE É QUE ISTO NÃO É UMA LISTA DE MENSAGENS DE ERRO ────────────────
+ * Não se traduz nada nem se inventa catálogo nenhum: o que esta função faz é
+ * distinguir DUAS ORIGENS. Se a mensagem foi escrita nesta casa (o
+ * `throw new Error(porqueRecusou(res))` de quem chama), passa tal e qual —
+ * porque já está na língua certa e já nomeia o campo. Se veio da biblioteca do
+ * browser, é substituída pela frase de recurso de quem chama, que é quem sabe
+ * o que se estava a tentar fazer («Não foi possível guardar.»).
+ *
+ * O reconhecimento é por FORMA e não por texto exacto: qualquer `TypeError`
+ * conta (é o que os três browsers lançam), e as três frases conhecidas contam
+ * mesmo quando reembrulhadas. Uma frase inglesa desconhecida que escape a isto
+ * volta a aparecer no ecrã — e é assim que se dá por ela.
+ */
+const FRASES_DO_BROWSER =
+  /^(failed to fetch|load failed|networkerror when attempting to fetch resource\.?|network request failed|the network connection was lost\.?|the internet connection appears to be offline\.?)$/i;
+
+export function porqueFalhou(erro: unknown, recurso: string): string {
+  if (erro instanceof TypeError) return recurso;
+  if (!(erro instanceof Error)) return recurso;
+  const texto = erro.message.trim();
+  if (!texto || FRASES_DO_BROWSER.test(texto)) return recurso;
+  return texto;
+}

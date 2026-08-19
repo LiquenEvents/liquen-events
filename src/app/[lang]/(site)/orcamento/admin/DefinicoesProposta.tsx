@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ParametrosDeslocacao } from "@/lib/orcamento/deslocacao";
 import { custoPorKm, kmSugerido, sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
 import { lerNumero, type LimitesDoNumero } from "@/lib/numero-escrito";
-import { porqueRecusou } from "@/lib/erro-do-servidor";
+import { porqueFalhou, porqueRecusou } from "@/lib/erro-do-servidor";
 import { Button, Card } from "./ui";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
@@ -321,7 +321,12 @@ export default function DefinicoesProposta() {
         setP((await res.json()) as Parametros);
         toast("Guardado. As propostas seguintes já usam estes valores.", "success");
       } catch (e) {
-        toast(e instanceof Error ? e.message : "Não foi possível guardar.", "error");
+        // Medido com a ligação cortada a meio do PUT: o aviso que aparecia no
+        // ecrã era «Failed to fetch» — a frase do browser, em inglês, e que não
+        // diz o que interessa (o valor NÃO ficou gravado). O `porqueFalhou`
+        // separa a queixa desta casa, que passa intacta, da do browser, que dá
+        // lugar a esta frase.
+        toast(porqueFalhou(e, "Não foi possível guardar. Verifica a ligação."), "error");
       } finally {
         setAGravar(false);
       }
