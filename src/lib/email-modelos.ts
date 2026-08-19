@@ -1,5 +1,5 @@
 import "server-only";
-import { htmlToPlainText } from "./email-template-format";
+import { construirCorpoDeModelo, htmlToPlainText } from "./email-template-format";
 import {
   DEFAULT_TEMPLATES,
   getTemplate,
@@ -401,12 +401,12 @@ const semente = (
   const nova = MODELOS_DE_ORIGEM.find((m) => m.chave === chave);
   if (nova) {
     const lado = nova[idioma];
-    if (!lado.subject.trim() && !lado.body.trim()) return null;
+    if (!lado.subject.trim() && !lado.texto.trim()) return null;
     return {
       key: idFisico(chave, idioma),
       name: nova.nome,
       subject: lado.subject,
-      body: lado.body,
+      body: construirCorpoDeModelo(lado.texto),
       updatedAt: "1970-01-01T00:00:00.000Z",
     };
   }

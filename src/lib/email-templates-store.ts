@@ -1,5 +1,6 @@
 import "server-only";
 import { esc } from "./mail";
+import { construirCorpoDeModelo } from "./email-template-format";
 import { createRepository, type Mapper } from "./repository";
 
 /**
@@ -317,99 +318,99 @@ export interface VersaoDeModelo {
   body: string;
 }
 
-const paragrafo = (html: string) =>
-  `<p style="font-size:14px;line-height:1.6;margin:0 0 16px;color:#2a2620">${html}</p>`;
-
-const ligacao = (texto: string) => `<a href="{{link_proposta}}" style="color:#637a5f">${texto}</a>`;
-
 /**
- * ── A MENSAGEM PESSOAL DENTRO DO MODELO ───────────────────────────────────
+ * ── A FORMA EDITÁVEL DE UM MODELO É TEXTO ─────────────────────────────────
  *
- * A rota `proposta-doc` explica que, quando ela escreve uma mensagem para
- * acompanhar UMA proposta, o modelo fica de fora — porque o corpo de um modelo
- * é markup opaco e não há onde lá enfiar a mensagem sem adivinhar. Adivinhar
- * era mesmo a única alternativa, e despejá-la no fim punha-a depois do botão
- * onde muita gente já carregou.
+ * Os modelos deixam de ser escritos em HTML e passam a ser escritos em TEXTO,
+ * com parágrafos separados por linhas em branco. O HTML continua a existir —
+ * é o que vai no email — mas é DERIVADO, e o texto de origem viaja dentro do
+ * corpo, intacto, no marcador que o `email-template-format` já usava.
  *
- * O `{{mensagem_pessoal}}` desfaz o nó pelo lado certo: deixa de se adivinhar
- * porque É ELA QUE DIZ ONDE. Nestes modelos de origem está logo a seguir ao
- * cumprimento — o mesmo sítio que o texto da casa lhe dá — e dentro de um
- * `{{#se}}`, para que um envio sem mensagem não deixe um parágrafo vazio.
+ * A razão é o ecrã de envio: o modelo resolve-se com os dados daquele casal e
+ * o resultado aparece numa caixa que se pode editar antes de mandar. Um corpo
+ * que só exista como HTML com estilos em linha não se deixa editar por uma
+ * pessoa — e quem o vai editar é a Catarina, ao telemóvel, entre dois eventos.
  *
- * O que falta para isto valer no envio a sério é a rota da proposta passar a
- * mensagem para os valores em vez de desistir do modelo. Essa mudança é de UMA
- * LINHA e está noutro território — fica no relatório com ficheiro e linha.
+ * Resolver o TEXTO e não o HTML tem uma segunda vantagem que não é pequena: os
+ * blocos condicionais passam a poder apanhar parágrafos inteiros com a linha
+ * em branco a seguir, e é isso que faz o texto sem data ficar com o mesmo
+ * espaçamento do texto com data. Ver a linha em branco dentro do `{{/se_nao}}`.
  */
-const MENSAGEM_PESSOAL = `{{#se mensagem_pessoal}}${paragrafo("{{mensagem_pessoal}}")}{{/se}}`;
+const ligacao = "{{link_proposta}}";
+
+export interface LadoDeOrigem {
+  subject: string;
+  /** O TEXTO de origem. O `body` (HTML) é derivado dele — ver acima. */
+  texto: string;
+}
 
 export interface ModeloDeOrigem {
   chave: string;
   nome: string;
   descricao: string;
-  pt: { subject: string; body: string };
-  en: { subject: string; body: string };
+  pt: LadoDeOrigem;
+  en: LadoDeOrigem;
 }
 
 /**
- * OS TRÊS DE ORIGEM. São ELA a escrever, não nós a redigir por ela: o «Registo
- * formal» é, palavra por palavra, o email que ela já manda hoje.
+ * OS TRÊS DE ORIGEM, e o primeiro é O QUE ABRE.
  *
- * O TRATAMENTO É «VOSSO», COM MAIÚSCULA, e não é gralha nenhuma — é como ela
- * trata o casal. Há um teste que falha se alguém o «corrigir».
+ * O «Registo formal» é ELA a escrever, palavra por palavra: é o email que ela
+ * já manda hoje, e já foi usado em propostas verdadeiras. Não se melhora, não
+ * se encurta, não se lhe «arruma» a pontuação. O TRATAMENTO É «VOSSO», COM
+ * MAIÚSCULA — é a voz dela, e há um teste que falha se alguém o «corrigir».
+ *
+ * A única coisa que muda entre o que está aqui e o que o casal lê são as
+ * variáveis e os blocos condicionais.
  */
 export const MODELOS_DE_ORIGEM: ModeloDeOrigem[] = [
   {
     chave: "registo-formal",
     nome: "Registo formal",
     descricao:
-      "O tom que já usas: a proposta segue em anexo, com a ligação para a ver online. É o modelo " +
-      "de partida para a maioria dos envios.",
+      "O texto que já usas, e o que abre por omissão no envio. A proposta segue em anexo, com a " +
+      "ligação para a ver online.",
     pt: {
       subject: "Proposta de decoração | Líquen Events",
-      body: [
-        paragrafo("Olá {{cliente_nome}}, boa tarde,"),
-        MENSAGEM_PESSOAL,
-        paragrafo(
-          "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo " +
-            "orçamento{{#se evento_local}} para o {{evento_tipo}} no {{evento_local}}{{/se}}" +
-            "{{#se evento_data}}, a {{evento_data}}{{/se}}.",
-        ),
-        // O parágrafo INTEIRO dentro do bloco, e não só o texto: um `<p>` que
-        // sobrasse vazio abria um buraco branco no meio do email.
-        `{{#se_nao evento_data}}${paragrafo(
-          "Ainda aguardamos a informação relativamente à data, mas podemos depois acrescentá-la à proposta.",
-        )}{{/se_nao}}`,
-        paragrafo(
-          `A proposta segue em anexo e pode também ser consultada aqui: ${ligacao("Ver a proposta online")}`,
-        ),
-        paragrafo(
-          "Estamos ao Vosso dispor para esclarecimento de alguma dúvida ou questão, ou adaptação e " +
-            "ajuste de alguma ideia ou outras sugestões de decor.",
-        ),
-        paragrafo("Obrigada, agradecemos a atenção e aguardamos o Vosso feedback."),
+      texto: [
+        "Olá {{cliente_nome}}, boa tarde,",
+        "",
+        "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento" +
+          "{{#se evento_local}} para o {{evento_tipo}} no {{evento_local}}{{/se}}" +
+          "{{#se evento_data}}, a {{evento_data}}{{/se}}.",
+        "",
+        // A LINHA EM BRANCO VAI DENTRO DO BLOCO, e é por isso que ela está
+        // escrita assim: sem data, sai o parágrafo e o espaço a seguir; com
+        // data, não sobra nem o parágrafo nem uma linha vazia a mais.
+        "{{#se_nao evento_data}}Ainda aguardamos a informação relativamente à data, mas podemos " +
+          "depois acrescentá-la à proposta.",
+        "",
+        `{{/se_nao}}A proposta segue em anexo e pode também ser consultada aqui: ${ligacao}`,
+        "",
+        "Estamos ao Vosso dispor para esclarecimento de alguma dúvida ou questão, ou adaptação e " +
+          "ajuste de alguma ideia ou outras sugestões de decor.",
+        "",
+        "Obrigada, agradecemos a atenção e aguardamos o Vosso feedback.",
       ].join("\n"),
     },
     en: {
       subject: "Decoration proposal | Líquen Events",
-      body: [
-        paragrafo("Dear {{cliente_nome}}, good afternoon,"),
-        MENSAGEM_PESSOAL,
-        paragrafo(
-          "As requested, we are sending our decoration proposal and respective quote" +
-            "{{#se evento_local}} for the {{evento_tipo}} at {{evento_local}}{{/se}}" +
-            "{{#se evento_data}}, on {{evento_data}}{{/se}}.",
-        ),
-        `{{#se_nao evento_data}}${paragrafo(
-          "We are still awaiting the date; we can add it to the proposal later on.",
-        )}{{/se_nao}}`,
-        paragrafo(
-          `The proposal is attached and can also be viewed here: ${ligacao("View the proposal online")}`,
-        ),
-        paragrafo(
-          "We remain at your disposal for any question, or for adjusting any idea or suggesting " +
-            "other decor options.",
-        ),
-        paragrafo("Thank you for your time — we look forward to your feedback."),
+      texto: [
+        "Dear {{cliente_nome}}, good afternoon,",
+        "",
+        "As requested, we are sending our decoration proposal and respective quote" +
+          "{{#se evento_local}} for the {{evento_tipo}} at {{evento_local}}{{/se}}" +
+          "{{#se evento_data}}, on {{evento_data}}{{/se}}.",
+        "",
+        "{{#se_nao evento_data}}We are still awaiting the date; we can add it to the proposal " +
+          "later on.",
+        "",
+        `{{/se_nao}}The proposal is attached and can also be viewed here: ${ligacao}`,
+        "",
+        "We remain at your disposal for any question, or for adjusting any idea or suggesting " +
+          "other decor options.",
+        "",
+        "Thank you for your time — we look forward to your feedback.",
       ].join("\n"),
     },
   },
@@ -421,68 +422,56 @@ export const MODELOS_DE_ORIGEM: ModeloDeOrigem[] = [
       "validade. Para quando queres que o essencial se leia sem abrir o anexo.",
     pt: {
       subject: "Proposta de decoração | Líquen Events",
-      body: [
-        paragrafo("Olá {{cliente_nome}}, boa tarde,"),
-        MENSAGEM_PESSOAL,
-        paragrafo(
-          "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo " +
-            "orçamento{{#se evento_local}} para o {{evento_tipo}} no {{evento_local}}{{/se}}" +
-            "{{#se evento_data}}, a {{evento_data}}{{/se}}.",
-        ),
-        `{{#se_nao evento_data}}${paragrafo(
-          "Ainda aguardamos a informação relativamente à data, mas podemos depois acrescentá-la à proposta.",
-        )}{{/se_nao}}`,
-        // Cada linha do resumo dentro do seu bloco: um resumo com «Local:» sem
-        // local ao lado é pior do que um resumo com uma linha a menos.
-        paragrafo(
-          [
-            "{{#se evento_tipo}}<strong>Evento:</strong> {{evento_tipo}}<br>{{/se}}",
-            "{{#se evento_data}}<strong>Data:</strong> {{evento_data}}<br>{{/se}}",
-            "{{#se evento_local}}<strong>Local:</strong> {{evento_local}}<br>{{/se}}",
-            "{{#se valor_total}}<strong>Valor total (c/ IVA):</strong> {{valor_total}}<br>{{/se}}",
-            "{{#se validade_data}}<strong>Válida até:</strong> {{validade_data}}{{/se}}",
-          ].join(""),
-        ),
-        paragrafo(
-          `A proposta segue em anexo e pode também ser consultada aqui: ${ligacao("Ver a proposta online")}`,
-        ),
-        paragrafo(
-          "Estamos ao Vosso dispor para esclarecimento de alguma dúvida ou questão, ou adaptação e " +
-            "ajuste de alguma ideia ou outras sugestões de decor.",
-        ),
-        paragrafo("Obrigada, agradecemos a atenção e aguardamos o Vosso feedback."),
+      texto: [
+        "Olá {{cliente_nome}}, boa tarde,",
+        "",
+        "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento" +
+          "{{#se evento_local}} para o {{evento_tipo}} no {{evento_local}}{{/se}}" +
+          "{{#se evento_data}}, a {{evento_data}}{{/se}}.",
+        "",
+        "{{#se_nao evento_data}}Ainda aguardamos a informação relativamente à data, mas podemos " +
+          "depois acrescentá-la à proposta.",
+        "",
+        // Cada linha do resumo dentro do seu bloco: um «Local:» sem local ao
+        // lado é pior do que um resumo com uma linha a menos.
+        "{{/se_nao}}{{#se evento_tipo}}Evento: {{evento_tipo}}\n{{/se}}" +
+          "{{#se evento_data}}Data: {{evento_data}}\n{{/se}}" +
+          "{{#se evento_local}}Local: {{evento_local}}\n{{/se}}" +
+          "{{#se valor_total}}Valor total (c/ IVA): {{valor_total}}\n{{/se}}" +
+          "{{#se validade_data}}Válida até: {{validade_data}}{{/se}}",
+        "",
+        `A proposta segue em anexo e pode também ser consultada aqui: ${ligacao}`,
+        "",
+        "Estamos ao Vosso dispor para esclarecimento de alguma dúvida ou questão, ou adaptação e " +
+          "ajuste de alguma ideia ou outras sugestões de decor.",
+        "",
+        "Obrigada, agradecemos a atenção e aguardamos o Vosso feedback.",
       ].join("\n"),
     },
     en: {
       subject: "Decoration proposal | Líquen Events",
-      body: [
-        paragrafo("Dear {{cliente_nome}}, good afternoon,"),
-        MENSAGEM_PESSOAL,
-        paragrafo(
-          "As requested, we are sending our decoration proposal and respective quote" +
-            "{{#se evento_local}} for the {{evento_tipo}} at {{evento_local}}{{/se}}" +
-            "{{#se evento_data}}, on {{evento_data}}{{/se}}.",
-        ),
-        `{{#se_nao evento_data}}${paragrafo(
-          "We are still awaiting the date; we can add it to the proposal later on.",
-        )}{{/se_nao}}`,
-        paragrafo(
-          [
-            "{{#se evento_tipo}}<strong>Event:</strong> {{evento_tipo}}<br>{{/se}}",
-            "{{#se evento_data}}<strong>Date:</strong> {{evento_data}}<br>{{/se}}",
-            "{{#se evento_local}}<strong>Venue:</strong> {{evento_local}}<br>{{/se}}",
-            "{{#se valor_total}}<strong>Total (incl. VAT):</strong> {{valor_total}}<br>{{/se}}",
-            "{{#se validade_data}}<strong>Valid until:</strong> {{validade_data}}{{/se}}",
-          ].join(""),
-        ),
-        paragrafo(
-          `The proposal is attached and can also be viewed here: ${ligacao("View the proposal online")}`,
-        ),
-        paragrafo(
-          "We remain at your disposal for any question, or for adjusting any idea or suggesting " +
-            "other decor options.",
-        ),
-        paragrafo("Thank you for your time — we look forward to your feedback."),
+      texto: [
+        "Dear {{cliente_nome}}, good afternoon,",
+        "",
+        "As requested, we are sending our decoration proposal and respective quote" +
+          "{{#se evento_local}} for the {{evento_tipo}} at {{evento_local}}{{/se}}" +
+          "{{#se evento_data}}, on {{evento_data}}{{/se}}.",
+        "",
+        "{{#se_nao evento_data}}We are still awaiting the date; we can add it to the proposal " +
+          "later on.",
+        "",
+        "{{/se_nao}}{{#se evento_tipo}}Event: {{evento_tipo}}\n{{/se}}" +
+          "{{#se evento_data}}Date: {{evento_data}}\n{{/se}}" +
+          "{{#se evento_local}}Venue: {{evento_local}}\n{{/se}}" +
+          "{{#se valor_total}}Total (incl. VAT): {{valor_total}}\n{{/se}}" +
+          "{{#se validade_data}}Valid until: {{validade_data}}{{/se}}",
+        "",
+        `The proposal is attached and can also be viewed here: ${ligacao}`,
+        "",
+        "We remain at your disposal for any question, or for adjusting any idea or suggesting " +
+          "other decor options.",
+        "",
+        "Thank you for your time — we look forward to your feedback.",
       ].join("\n"),
     },
   },
@@ -494,34 +483,28 @@ export const MODELOS_DE_ORIGEM: ModeloDeOrigem[] = [
       "email só precisa de entregar a proposta.",
     pt: {
       subject: "A Vossa proposta | Líquen Events",
-      body: [
-        paragrafo("Olá {{cliente_nome}},"),
-        MENSAGEM_PESSOAL,
-        paragrafo(
-          `Segue a nossa proposta${"{{#se evento_data}}"} para {{evento_data}}${"{{/se}}"}: ` +
-            `${ligacao("Ver a proposta online")}`,
-        ),
-        paragrafo(
-          "{{#se valor_total}}Valor total, com IVA: <strong>{{valor_total}}</strong>.{{/se}}" +
-            "{{#se validade_data}} Válida até {{validade_data}}.{{/se}}",
-        ),
-        paragrafo("Ficamos a aguardar o Vosso feedback."),
+      texto: [
+        "Olá {{cliente_nome}},",
+        "",
+        `Segue a nossa proposta{{#se evento_data}} para {{evento_data}}{{/se}}: ${ligacao}`,
+        "",
+        "{{#se valor_total}}Valor total, com IVA: {{valor_total}}.{{/se}}" +
+          "{{#se validade_data}} Válida até {{validade_data}}.{{/se}}",
+        "",
+        "Ficamos a aguardar o Vosso feedback.",
       ].join("\n"),
     },
     en: {
       subject: "Your proposal | Líquen Events",
-      body: [
-        paragrafo("Dear {{cliente_nome}},"),
-        MENSAGEM_PESSOAL,
-        paragrafo(
-          `Here is our proposal${"{{#se evento_data}}"} for {{evento_data}}${"{{/se}}"}: ` +
-            `${ligacao("View the proposal online")}`,
-        ),
-        paragrafo(
-          "{{#se valor_total}}Total, including VAT: <strong>{{valor_total}}</strong>.{{/se}}" +
-            "{{#se validade_data}} Valid until {{validade_data}}.{{/se}}",
-        ),
-        paragrafo("We look forward to your feedback."),
+      texto: [
+        "Dear {{cliente_nome}},",
+        "",
+        `Here is our proposal{{#se evento_data}} for {{evento_data}}{{/se}}: ${ligacao}`,
+        "",
+        "{{#se valor_total}}Total, including VAT: {{valor_total}}.{{/se}}" +
+          "{{#se validade_data}} Valid until {{validade_data}}.{{/se}}",
+        "",
+        "We look forward to your feedback.",
       ].join("\n"),
     },
   },
@@ -541,11 +524,15 @@ const origensAntigas = (): ModeloDeOrigem[] =>
     chave: d.key,
     nome: d.name,
     descricao: "",
-    pt: { subject: d.subject, body: d.body },
-    en: { subject: "", body: "" },
+    // Os antigos são HTML escrito à mão e ficam como estão: o `texto` deles é
+    // o próprio HTML, e quem os quiser editar tem o editor clássico. Convertê-
+    // los aqui era reescrever, à socapa, quatro textos que ela já publicou.
+    pt: { subject: d.subject, texto: d.body },
+    en: { subject: "", texto: "" },
   }));
 
-const TODAS_AS_ORIGENS = (): ModeloDeOrigem[] => [...origensAntigas(), ...MODELOS_DE_ORIGEM];
+/** Os NOVOS primeiro: o «Registo formal» é o que abre. */
+const TODAS_AS_ORIGENS = (): ModeloDeOrigem[] => [...MODELOS_DE_ORIGEM, ...origensAntigas()];
 
 const ladoVazio = (): LadoDoModelo => ({ subject: "", body: "", updatedAt: "" });
 
@@ -561,10 +548,10 @@ export async function listarModelos(): Promise<ModeloBilingue[]> {
   const actuais = new Map<string, EmailTemplate>();
   for (const l of linhas) if (!ehLinhaDeVersao(l.key)) actuais.set(l.key, l);
 
-  const lado = (guardado: EmailTemplate | undefined, origem: { subject: string; body: string }) =>
+  const lado = (guardado: EmailTemplate | undefined, origem: LadoDeOrigem) =>
     guardado
       ? { subject: guardado.subject, body: guardado.body, updatedAt: guardado.updatedAt }
-      : { subject: origem.subject, body: origem.body, updatedAt: "" };
+      : { subject: origem.subject, body: construirCorpoDeModelo(origem.texto), updatedAt: "" };
 
   const saida: ModeloBilingue[] = [];
   const vistas = new Set<string>();

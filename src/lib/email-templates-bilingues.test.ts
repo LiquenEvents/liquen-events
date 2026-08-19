@@ -69,29 +69,30 @@ describe("os modelos de origem", () => {
     expect(MODELOS_DE_ORIGEM).toHaveLength(3);
     for (const m of MODELOS_DE_ORIGEM) {
       expect(m.pt.subject.trim()).not.toBe("");
-      expect(m.pt.body.trim()).not.toBe("");
+      expect(m.pt.texto.trim()).not.toBe("");
       expect(m.en.subject.trim()).not.toBe("");
-      expect(m.en.body.trim()).not.toBe("");
+      expect(m.en.texto.trim()).not.toBe("");
     }
   });
 
   it("o «registo formal» trata o casal por «Vosso», com maiúscula — é a voz dela", () => {
     const formal = MODELOS_DE_ORIGEM.find((m) => m.chave === "registo-formal")!;
-    expect(formal.pt.body).toContain("Vosso dispor");
-    expect(formal.pt.body).toContain("Vosso feedback");
-    expect(formal.pt.body).not.toMatch(/vosso (dispor|feedback)/);
+    expect(formal.pt.texto).toContain("Vosso dispor");
+    expect(formal.pt.texto).toContain("Vosso feedback");
+    expect(formal.pt.texto).not.toMatch(/vosso (dispor|feedback)/);
   });
 
   it("o «registo formal» usa blocos condicionais para a data em falta", () => {
     const formal = MODELOS_DE_ORIGEM.find((m) => m.chave === "registo-formal")!;
-    expect(formal.pt.body).toContain("{{#se evento_data}}");
-    expect(formal.pt.body).toContain("{{#se_nao evento_data}}");
+    expect(formal.pt.texto).toContain("{{#se evento_data}}");
+    expect(formal.pt.texto).toContain("{{#se_nao evento_data}}");
   });
 
   it("nenhum modelo de origem assina com o nome do cliente", () => {
     for (const m of MODELOS_DE_ORIGEM) {
       for (const lado of [m.pt, m.en]) {
-        expect(lado.body).not.toMatch(/\{\{\s*cliente_nome[a-z_]*\s*\}\}\s*<\/p>\s*$/);
+        // A última linha de um modelo é a despedida, nunca o nome de quem recebe.
+        expect(lado.texto.trimEnd()).not.toMatch(/\{\{\s*cliente_nome[a-z_]*\s*\}\}$/);
       }
     }
   });
