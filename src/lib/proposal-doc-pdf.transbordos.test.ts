@@ -64,8 +64,9 @@ import type { IdiomaDaProposta } from "./proposal-doc-textos";
  *
  * ── A LISTA DE CONHECIDOS ─────────────────────────────────────────────────
  *
- * Dois defeitos do relatório (D2 e D3) vivem na COMPOSIÇÃO e ainda não têm
- * correcção. Estão em {@link CONHECIDOS}, um a um, com o nome de quem os
+ * Dois defeitos do relatório (D2 e D3) viviam na COMPOSIÇÃO e já foram
+ * corrigidos — a lista {@link CONHECIDOS} está VAZIA, que é o estado mais forte
+ * que esta sonda pode ter. Quando havia entradas, cada uma trazia o nome de quem os
  * desenha. A regra deste ficheiro é «nada de NOVO»: um transbordo que não
  * esteja nessa lista deita o teste abaixo. Cada entrada sai da lista no dia em
  * que a composição a corrigir — e a partir daí não pode voltar.
@@ -470,34 +471,27 @@ const limites = () =>
  * entrada sai daqui quando a composição a corrigir, e a partir desse dia o
  * defeito não pode voltar sem que este ficheiro fique vermelho.
  *
- * · **D2** — o tipo de evento, a data e o local são escritos no painel da capa
- *   centrados, SEM largura máxima e sem quebra, e escorrem para os dois lados
- *   por cima das fotografias. Correcção: A2 do relatório (a mesma regra de
- *   largura que o nome do casal já tem).
- * · **D3** — o título e o subtítulo de um mood board são desenhados a 24 pt sem
- *   quebra e sem encolhimento; com 124 caracteres passam a margem E o papel.
- *   Correcção: A3 do relatório.
+ * ── E A LISTA ESVAZIOU-SE ────────────────────────────────────────────────
+ *
+ * Nasceu com três entradas, e hoje não tem nenhuma. Ficam aqui escritas porque
+ * o que esta lista vale é a HISTÓRIA: uma sonda que só diz «está tudo bem» não
+ * prova que alguma vez esteve mal.
+ *
+ * · **D2** — o tipo de evento, a data e o local eram escritos no painel da capa
+ *   centrados, SEM largura máxima e sem quebra, e escorriam para os dois lados
+ *   por cima das fotografias. Corrigido pela A2: a mesma regra de largura que o
+ *   nome do casal já tinha.
+ * · **D3** — o título e o subtítulo de um mood board eram desenhados a 24 pt sem
+ *   quebra e sem encolhimento; com 124 caracteres passavam a margem E o papel —
+ *   seis pontos fora da folha. Corrigido pela A3: cabem na banda entre o
+ *   sobretítulo e o topo das fotografias.
+ *
+ * A lista vazia é o estado mais forte que esta sonda pode ter, e é o teste de
+ * baixo que a mantém honesta: uma entrada que deixe de corresponder a um
+ * transbordo real fica vermelha a dizer que se apague. Foi exactamente assim
+ * que estas três saíram — não foi ninguém a lembrar-se.
  */
-const CONHECIDOS: { porque: string; onde: string; comeca: string; defeito: string }[] = [
-  {
-    defeito: "D2 — o tipo/data da capa, centrado sem largura máxima",
-    porque: "é desenhado POR CIMA de uma fotografia",
-    onde: "capa",
-    comeca: "Casamento civil",
-  },
-  {
-    defeito: "D2 — o local da capa, centrado sem largura máxima",
-    porque: "é desenhado POR CIMA de uma fotografia",
-    onde: "capa",
-    comeca: "Herdade da Fonte Santa",
-  },
-  {
-    defeito: "D3 — o título do mood board, a 24 pt sem quebra",
-    porque: "sai pela direita do PAPEL",
-    onde: "conteúdo",
-    comeca: "Decoração Floral Integral",
-  },
-];
+const CONHECIDOS: { porque: string; onde: string; comeca: string; defeito: string }[] = [];
 
 const conhecido = (t: Transbordo) =>
   CONHECIDOS.some(
