@@ -197,7 +197,16 @@ vi.mock("@/lib/contracts-store", () =>
   ]),
 );
 vi.mock("@/lib/email-templates-store", () =>
-  H.build("email-templates-store", ["listTemplatesWithDefaults", "upsertTemplate"]),
+  H.build("email-templates-store", [
+    "listTemplatesWithDefaults",
+    "upsertTemplate",
+    "listarModelos",
+    "guardarModelo",
+    "listarVersoes",
+    "reverterPara",
+    "idFisico",
+    "MODELOS_DE_ORIGEM",
+  ]),
 );
 vi.mock("@/lib/message-links-store", () =>
   H.build("message-links-store", [
@@ -448,6 +457,21 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./contratos/route", methods: ["GET"] },
   { path: "./contratos/[id]/pdf/route", methods: ["GET"] },
   { path: "./email-templates/route", methods: ["GET", "POST", "PUT"] },
+  // Os modelos nas duas línguas: o corpo é o texto que sai para clientes na
+  // hora seguinte, e a leitura devolve-o inteiro. Sem sessão, nem uma coisa
+  // nem outra.
+  { path: "./email-templates/bilingues/route", methods: ["GET", "POST", "PUT"] },
+  // O histórico guarda as versões anteriores do texto dela, e o POST REPÕE uma
+  // delas — muda o que sai para clientes.
+  { path: "./email-templates/versoes/route", methods: ["GET", "POST"] },
+  // A pré-visualização com dados reais: devolve a lista de pedidos e, de um
+  // deles, o nome do casal, a data, o local e o valor. É a carteira de
+  // clientes; sem sessão não sai daqui.
+  { path: "./email-templates/dados/route", methods: ["GET"] },
+  // O rascunho que o ecrã de envio abre — leva os dados do casal lá dentro.
+  { path: "./email-templates/rascunho/route", methods: ["GET"] },
+  // ENVIA correio a sério. É a rota deste conjunto com mais a perder.
+  { path: "./email-templates/teste/route", methods: ["POST"] },
   { path: "./fornecedores/route", methods: ["GET", "POST"] },
   { path: "./fornecedores/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./inbox/route", methods: ["GET"] },

@@ -3,12 +3,15 @@ import type { QuoteMessage } from "@/lib/orcamento/types";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { sendMail, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
+import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
 import {
   ehModeloAPedido,
   marcadoresDoPedido,
   modeloParaEnvioAPedido,
   MODELOS_A_PEDIDO,
+  textoDoCorpo,
 } from "@/lib/email-modelos";
+import { arrumarLigacao, ROTULO_DO_PORTAL } from "@/lib/email-ligacoes";
 import { eurDocumento } from "@/lib/money";
 import { createPortalToken } from "@/lib/portal-token";
 import { portalPath } from "@/lib/portal-link";
@@ -142,7 +145,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
     }
 
-    const email = emailAoCliente({ html: preparado.html, texto: preparado.texto });
+    /**
+     * O link do portal também leva um token, e também não se escreve por
+     * extenso ao cliente — ver `email-ligacoes.ts`. O texto simples deriva do
+     * HTML já arrumado, para as duas versões dizerem o mesmo.
+     *
+     * Quem assina é quem carregou no botão. Ver `email-assinatura.ts`.
+     */
+    const corpo = arrumarLigacao(preparado.html, { url: portalUrl, rotulo: ROTULO_DO_PORTAL });
+    const email = emailAoCliente({
+      html: corpo,
+      texto: textoDoCorpo(corpo),
+      quem: { nome: nomeDeQuemEnvia(request), destinatario: quote.name },
+    });
 
     /**
      * Um pedido que entrou por TELEFONEMA tem `email: ""` — o formulário

@@ -7,7 +7,10 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
-import { marcadoresDoPedido, modeloParaEnvioAutomatico } from "@/lib/email-modelos";
+import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
+import { marcadoresDoPedido, modeloParaEnvioAutomatico, textoDoCorpo } from "@/lib/email-modelos";
+import { arrumarLigacao, ROTULO_DA_PROPOSTA } from "@/lib/email-ligacoes";
+import { corpoEscritoAMao, excedeOTecto, MAXIMO_CORPO_ESCRITO } from "@/lib/email-corpo-escrito";
 import { SITE } from "@/lib/site";
 import { createProposalToken } from "@/lib/proposal-token";
 import { isAuthed } from "@/lib/admin-auth";
@@ -73,6 +76,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!parsed.success) {
       return NextResponse.json({ error: firstError(parsed.error) }, { status: 400 });
     }
+    /**
+     * O corpo escrito por quem envia. Lê-se do corpo CRU do pedido e não do
+     * `parsed.data`: o esquema de validação é partilhado com quem só grava
+     * propostas, e este campo diz respeito ao email, não à proposta.
+     *
+     * O tecto verifica-se AQUI, antes de se desenhar o PDF: recusar depois de
+     * gastar o desenho é gastar por nada, e a recusa é a mesma.
+     */
+    const corpoCru = (body as { corpo?: unknown } | null)?.corpo;
+    if (excedeOTecto(corpoCru)) {
+      return NextResponse.json(
+        {
+          error:
+            `O texto do email é demasiado longo (o máximo são ${MAXIMO_CORPO_ESCRITO} caracteres). ` +
+            `Encurta-o e volta a enviar — não foi enviado nada.`,
+        },
+        { status: 400 },
+      );
+    }
+
     const lineItems = parsed.data.lineItems.filter((it) => it.description && it.qty > 0);
 
     if (lineItems.length === 0) {
@@ -199,10 +222,59 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       marcadoresDoPedido(quote, { link: acceptUrl, valor: eurDocumento(total) }),
     );
 
-    const email = doModelo
-      ? emailAoCliente({ html: doModelo.html, texto: doModelo.texto })
-      : emailAoCliente({
-          html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
+    /**
+     * Quem assina este email é quem carregou no botão, não a casa — e o nome
+     * do casal vai junto só para a protecção: nenhum email pode sair assinado
+     * com o nome de quem o vai ler (ver `email-assinatura.ts`).
+     */
+    const quem = { nome: nomeDeQuemEnvia(request), destinatario: quote.name };
+
+    /**
+     * O corpo dela, com o endereço arrumado: o token gigante fica no `href` e o
+     * que se lê é uma frase. O porquê inteiro (e porque é que isto acontece no
+     * envio e não no modelo guardado) está no `email-ligacoes.ts`.
+     *
+     * O texto simples volta a derivar-se do HTML JÁ arrumado, e não do que o
+     * modelo trazia: as duas alternativas de um email têm de dizer o mesmo, e
+     * uma que ainda mostrasse o endereço nu enquanto a outra mostra a frase era
+     * a divergência que os filtros de spam medem.
+     */
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O CORPO ESCRITO À MÃO GANHA A TUDO — E A SUA AUSÊNCIA NÃO MUDA NADA
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O modelo passa a ser o PONTO DE PARTIDA e não a palavra final: quem envia
+     * pode reescrever o corpo antes de carregar em Enviar, e é esse que sai. O
+     * tratamento (escape, tecto, parágrafos) está todo no `email-corpo-escrito`
+     * — é texto de uma caixa, não é marcação, e a razão está escrita lá.
+     *
+     * SEM `corpo` no pedido — que é todo o correio que hoje sai daqui — nada
+     * disto acontece e o email é byte a byte o que era: o modelo dela, ou o
+     * texto da casa. Uma rota que passasse a EXIGIR o corpo de fora partia tudo
+     * o que já a chama.
+     *
+     * O ASSUNTO não se toca: continua a ser o do modelo dela quando é o modelo
+     * que manda o assunto, e o da casa quando não é. Aqui reescreve-se o corpo,
+     * não o email inteiro.
+     *
+     * E a moldura continua a fechar sempre no `emailAoCliente`: o corpo é o que
+     * vem de fora, a assinatura é da casa e entra uma só vez — incluindo a
+     * protecção que impede um email de sair assinado com o nome de quem o vai
+     * ler, que é exactamente o caso de quem escreve à pressa.
+     */
+    const escrito = corpoEscritoAMao(corpoCru);
+
+    const corpoDoModelo =
+      doModelo && arrumarLigacao(doModelo.html, { url: acceptUrl, rotulo: ROTULO_DA_PROPOSTA });
+
+    const email = escrito
+      ? emailAoCliente({ html: escrito.html, texto: escrito.texto, quem })
+      : corpoDoModelo
+        ? emailAoCliente({ html: corpoDoModelo, texto: textoDoCorpo(corpoDoModelo), quem })
+        : emailAoCliente({
+            quem,
+            html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
       <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(primeiroNome)},</p>
       <p style="font-size:14px;line-height:1.6;color:#333">
         Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento,
@@ -215,23 +287,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       <p style="font-size:14px;line-height:1.6;color:#333">
         Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.
       </p>`,
-          texto: [
-            "A sua proposta — Líquen Events",
-            "",
-            `Olá ${primeiroNome},`,
-            "",
-            `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eurDocumento(total)} (IVA incluído).`,
-            proposal.validUntil
-              ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
-              : "",
-            "",
-            `Ver e responder à proposta online: ${acceptUrl}`,
-            "",
-            "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
-          ]
-            .filter((line) => line !== "")
-            .join("\n"),
-        });
+            texto: [
+              "A sua proposta — Líquen Events",
+              "",
+              `Olá ${primeiroNome},`,
+              "",
+              `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eurDocumento(total)} (IVA incluído).`,
+              proposal.validUntil
+                ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
+                : "",
+              "",
+              `Ver e responder à proposta online: ${acceptUrl}`,
+              "",
+              "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
+            ]
+              .filter((line) => line !== "")
+              .join("\n"),
+          });
 
     // Persist the proposal BEFORE emailing. The email carries a signed accept
     // link; sending it before the proposal exists means that link 404s the moment

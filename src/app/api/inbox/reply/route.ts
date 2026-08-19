@@ -4,6 +4,7 @@ import { isAuthed } from "@/lib/admin-auth";
 import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
+import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -113,6 +114,25 @@ function cabecalhosDeConversa(inReplyTo: unknown, references: unknown): Record<s
   return headers;
 }
 
+/**
+ * O NOME dentro de um destinatário, quando ele o traz.
+ *
+ * A caixa devolve o remetente como o cabeçalho o traz — «Mónica Teófilo
+ * <monica@…>» —, e é esse nome que a protecção da assinatura precisa de
+ * comparar: nenhum email pode sair assinado com o nome de quem o vai ler (ver
+ * `email-assinatura.ts`). Um endereço nu não tem nome nenhum e devolve vazio,
+ * que a protecção lê como «não há nada a comparar».
+ */
+function nomeDoDestinatario(to: string): string {
+  const angulo = to.indexOf("<");
+  if (angulo < 0) return "";
+  return to
+    .slice(0, angulo)
+    .replace(/^["'\s]+|["'\s]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function POST(request: NextRequest) {
   if (!isAuthed(request)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -154,6 +174,8 @@ export async function POST(request: NextRequest) {
     const email = emailAoCliente({
       html: `<p style="font-size:14px;line-height:1.7;color:#2a2620;white-space:pre-wrap">${esc(message)}</p>`,
       texto: message,
+      // Quem assina é quem está a responder da caixa, não a casa.
+      quem: { nome: nomeDeQuemEnvia(request), destinatario: nomeDoDestinatario(to) },
     });
 
     const conversa = cabecalhosDeConversa(parsed.data.inReplyTo, parsed.data.references);

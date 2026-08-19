@@ -1,46 +1,18 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// O ficheiro do banner ainda NÃO existe no repositório, e é isso que este teste
-// tem de conseguir simular nos dois sentidos: sem ele (o estado de hoje) e com
-// ele (o dia em que ela o largar em `public/email/`). Mexer no disco de verdade
-// deixava um ficheiro para trás que passaria a ir em todos os emails.
-const disco = vi.hoisted(() => ({ ficheiros: new Map<string, Buffer>() }));
-vi.mock("node:fs", async (original) => {
-  const real = await original<typeof import("node:fs")>();
-  return {
-    ...real,
-    default: real,
-    readFileSync: (p: Parameters<typeof real.readFileSync>[0], ...resto: unknown[]) => {
-      const nome = String(p).split("/").pop() ?? "";
-      const guardado = disco.ficheiros.get(nome);
-      if (guardado) return guardado;
-      if (String(p).includes("/public/email/")) throw new Error("ENOENT");
-      return (real.readFileSync as (...a: unknown[]) => Buffer)(p, ...resto);
-    },
-  };
-});
+vi.mock("./logger", () => ({ log: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 import {
   assinaturaDeEmail,
+  assinanteDoEmail,
   emailAoCliente,
-  esquecerBannerDoEmail,
   ASSINATURA_NOME,
   ASSINATURA_CARGO,
-  BANNER_EMAIL_CID,
-  BANNER_EMAIL_FICHEIRO,
 } from "./email-assinatura";
+import { log } from "./logger";
 import { SITE } from "./site";
 import { MAIL_TO } from "./mail";
 import { EMAIL_LOGO_CID } from "./email-logo";
-
-beforeEach(() => {
-  disco.ficheiros.clear();
-  esquecerBannerDoEmail();
-});
-afterEach(() => {
-  disco.ficheiros.clear();
-  esquecerBannerDoEmail();
-});
 
 describe("assinaturaDeEmail", () => {
   it("assina sempre com o mesmo nome e cargo da casa", () => {
@@ -105,28 +77,18 @@ describe("assinaturaDeEmail", () => {
     expect(html).not.toContain("LinkedIn");
   });
 
-  describe("banner", () => {
-    it("sem ficheiro, sai sem imagem partida e sem espaço vazio", () => {
-      const { html, anexos } = assinaturaDeEmail();
-      expect(html).not.toContain(BANNER_EMAIL_CID);
-      expect(html).not.toContain("banner");
-      expect(anexos).toHaveLength(1);
-    });
-
-    it("basta largar o ficheiro em public/email/ para passar a ir", () => {
-      disco.ficheiros.set(BANNER_EMAIL_FICHEIRO, Buffer.from("PNG-a-fingir"));
-      const { html, anexos } = assinaturaDeEmail();
-      expect(html).toContain(`cid:${BANNER_EMAIL_CID}`);
-      const anexo = anexos.find((a) => a.cid === BANNER_EMAIL_CID);
-      expect(anexo?.contentType).toBe("image/png");
-      expect(anexo?.filename).toBe(BANNER_EMAIL_FICHEIRO);
-    });
-
-    it("aceita o mesmo banner em JPEG, com o tipo certo", () => {
-      disco.ficheiros.set("banner-liquen-email.jpg", Buffer.from("JPEG-a-fingir"));
-      const anexo = assinaturaDeEmail().anexos.find((a) => a.cid === BANNER_EMAIL_CID);
-      expect(anexo?.contentType).toBe("image/jpeg");
-    });
+  /**
+   * O banner era um rectângulo verde de 560×140 no fim de cada email, com o
+   * logótipo repetido — o mesmo que já está no topo da assinatura. Foi-se, e
+   * com ele o mecanismo que o trazia de volta a quem largasse um ficheiro em
+   * `public/email/`. Uma imagem por email, e é a do logótipo.
+   */
+  it("fecha na assinatura: uma só imagem, e nenhum banner", () => {
+    const { html, anexos } = assinaturaDeEmail();
+    expect(anexos).toHaveLength(1);
+    expect(anexos[0].cid).toBe(EMAIL_LOGO_CID);
+    expect(html).not.toContain("banner");
+    expect(html.match(/<img/g) ?? []).toHaveLength(1);
   });
 });
 
@@ -153,5 +115,97 @@ describe("emailAoCliente", () => {
     expect(html).not.toContain("display:flex");
     expect(html).not.toContain("display:grid");
     expect(html).not.toContain("<style");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUEM ASSINA É QUEM ENVIOU — E NUNCA, NUNCA, QUEM RECEBE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O nome era fixo: saísse o email de quem saísse, assinava a Catarina. Com mais
+ * do que uma conta no back office (`admin-auth`), isso deixou de ser verdade —
+ * quem escreve ao casal assina o que escreveu.
+ *
+ * E a protecção, que é a razão pela qual isto se mexeu: chegou a sair um email
+ * com DUAS assinaturas contraditórias, uma delas com o nome da própria pessoa
+ * que o recebeu. A causa estava no corpo (um `{nome}` no rodapé de um modelo
+ * guardado no back office, ver `email-modelos.ts`) e não aqui — mas a regra
+ * vale na mesma, e vale para sempre: nenhum email pode sair assinado com o nome
+ * de quem o vai ler.
+ */
+describe("quem assina", () => {
+  beforeEach(() => {
+    vi.mocked(log.warn).mockClear();
+  });
+
+  it("assina com o nome de quem tem a sessão iniciada", () => {
+    const { html, texto } = assinaturaDeEmail({ nome: "Rui Belo" });
+    expect(html).toContain("Rui Belo");
+    expect(texto).toContain("Rui Belo");
+    expect(html).not.toContain(ASSINATURA_NOME);
+  });
+
+  it("sem sessão (o formulário público) assina a casa, com o cargo", () => {
+    const { html, texto } = assinaturaDeEmail();
+    expect(html).toContain(ASSINATURA_NOME);
+    expect(html).toContain(ASSINATURA_CARGO);
+    expect(texto).toContain(ASSINATURA_CARGO);
+  });
+
+  /** «Manager» é o cargo DELA. Debaixo de outro nome era uma promoção
+   *  inventada pelo software — melhor nenhum cargo do que um cargo falso. */
+  it("o cargo da casa não acompanha um nome que não é o da casa", () => {
+    const { html, texto } = assinaturaDeEmail({ nome: "Rui Belo" });
+    expect(html).not.toContain(ASSINATURA_CARGO);
+    expect(texto).not.toContain(ASSINATURA_CARGO);
+  });
+
+  /** A conta dela pode chamar-se só «Catarina». Continua a ser ela. */
+  it("o cargo acompanha o primeiro nome da conta da casa", () => {
+    expect(assinanteDoEmail({ nome: "Catarina" }).cargo).toBe(ASSINATURA_CARGO);
+    expect(assinanteDoEmail({ nome: "catarina gaspar" }).cargo).toBe(ASSINATURA_CARGO);
+  });
+
+  it("nunca assina com o nome de quem recebe — cai para o da casa e regista", () => {
+    const { nome, cargo } = assinanteDoEmail({
+      nome: "Mónica Teófilo",
+      destinatario: "Mónica Teófilo",
+    });
+    expect(nome).toBe(ASSINATURA_NOME);
+    expect(cargo).toBe(ASSINATURA_CARGO);
+    expect(vi.mocked(log.warn)).toHaveBeenCalledTimes(1);
+  });
+
+  /** Acentos, maiúsculas e espaços a mais não podem ser a porta do lado. */
+  it("a protecção não se desfaz com acentos, maiúsculas nem espaços", () => {
+    expect(
+      assinanteDoEmail({ nome: "  MÓNICA   teofilo ", destinatario: "Monica Teófilo" }).nome,
+    ).toBe(ASSINATURA_NOME);
+  });
+
+  /** Nomes diferentes não podem accionar a protecção — senão ninguém assina. */
+  it("deixa passar um nome que só se parece com o do destinatário", () => {
+    expect(assinanteDoEmail({ nome: "Mónica Teófilo", destinatario: "Mónica Teixeira" }).nome).toBe(
+      "Mónica Teófilo",
+    );
+    expect(vi.mocked(log.warn)).not.toHaveBeenCalled();
+  });
+
+  /** O registo não pode levar os nomes: vai para o webhook de alertas. */
+  it("regista a ocorrência sem escrever lá os nomes", () => {
+    assinanteDoEmail({ nome: "Mónica Teófilo", destinatario: "Mónica Teófilo" });
+    const [mensagem, contexto] = vi.mocked(log.warn).mock.calls[0];
+    expect(JSON.stringify([mensagem, contexto])).not.toMatch(/Mónica|Teófilo/i);
+  });
+
+  it("o emailAoCliente leva a assinatura de quem envia até ao fim", () => {
+    const { html, text } = emailAoCliente({
+      html: "<p>Segue.</p>",
+      texto: "Segue.",
+      quem: { nome: "Rui Belo", destinatario: "Mónica Teófilo" },
+    });
+    expect(html).toContain("Rui Belo");
+    expect(text).toContain("Rui Belo");
   });
 });

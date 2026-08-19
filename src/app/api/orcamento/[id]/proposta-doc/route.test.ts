@@ -1202,6 +1202,56 @@ describe("POST /api/orcamento/[id]/proposta-doc — o modelo «proposta-enviada�
   });
 
   /**
+   * O botão que ela usa todos os dias manda o mesmo modelo que a rota irmã — e
+   * o endereço tem de sair arrumado nos dois sítios, senão o que o casal recebe
+   * passa a depender do botão em que ela carregou. Ver `email-ligacoes.ts`.
+   */
+  it("o token gigante fica só no href, aqui como na rota irmã", async () => {
+    modelo.get.mockResolvedValue(
+      modeloGuardado("A sua proposta", `<p>Veja: <a href="{link}">{link}</a></p>`),
+    );
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const email = enviado();
+    expect(email.html).toContain('href="https://liquen-events.com/proposta/tok"');
+    expect(email.html).toContain(">Ver a proposta online<");
+    expect(email.html.replace(/href="[^"]*"/g, "")).not.toContain("/proposta/tok");
+    expect(email.text).toContain("Ver a proposta online");
+    expect(email.text).toContain("https://liquen-events.com/proposta/tok");
+  });
+
+  /**
+   * O corpo escrito à mão é o degrau de cima: ganha ao modelo E à mensagem
+   * pessoal. Quem escreve o corpo inteiro já lá põe a nota onde quiser —
+   * acrescentá-la outra vez a seguir dava-lhe o texto a dobrar.
+   */
+  it("o corpo escrito à mão ganha ao modelo e à mensagem pessoal", async () => {
+    modelo.get.mockResolvedValue(modeloGuardado("A sua proposta", `<p>Texto do modelo dela.</p>`));
+    await POST(
+      sendReq(baseDoc({ totalAmount: 3000 }), {
+        mensagem: "Uma nota pessoal.",
+        corpo: "Olá Maria & Zé,\n\nEscrevi isto à mão.",
+      }),
+      { params },
+    );
+    const email = enviado();
+    expect(email.html).toContain("Olá Maria &amp; Zé,");
+    expect(email.html).toContain("Escrevi isto à mão.");
+    expect(email.html).not.toContain("Texto do modelo dela.");
+    expect(email.html).not.toContain("Uma nota pessoal.");
+    expect(email.text).toContain("Olá Maria & Zé,");
+    // A moldura da casa fecha na mesma, e uma só vez.
+    expect(email.html.match(/Catarina Gaspar/g)).toHaveLength(1);
+  });
+
+  it("sem corpo escrito à mão, o envio é exactamente o que era", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { mensagem: "Uma nota pessoal." }), {
+      params,
+    });
+    expect(enviado().html).toContain("Uma nota pessoal.");
+    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+  });
+
+  /**
    * A MENSAGEM DELA GANHA AO MODELO, E NÃO É INDECISÃO.
    *
    * O texto da casa foi desenhado à volta da mensagem pessoal: ela entra logo

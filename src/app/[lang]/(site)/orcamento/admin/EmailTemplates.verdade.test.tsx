@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ToastProvider } from "./Toast";
 import EmailTemplates from "./EmailTemplates";
 
@@ -58,12 +58,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const montar = () =>
-  render(
+/**
+ * Dois separadores agora: «Modelos» (bilingue) e «Editor clássico». As
+ * promessas que estes testes prendem são as do CLÁSSICO, que é quem serve os
+ * quatro modelos antigos — entra-se nele antes de mais nada.
+ */
+const montar = () => {
+  const resultado = render(
     <ToastProvider>
       <EmailTemplates />
     </ToastProvider>,
   );
+  fireEvent.click(screen.getByRole("tab", { name: /editor clássico/i }));
+  return resultado;
+};
 
 describe("Modelos de email — o que o ecrã diz sobre cada modelo", () => {
   it("já não diz que o sinal, a semana e o agradecimento saem sozinhos", async () => {

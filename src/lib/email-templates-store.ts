@@ -1,5 +1,6 @@
 import "server-only";
 import { esc } from "./mail";
+import { construirCorpoDeModelo } from "./email-template-format";
 import { createRepository, type Mapper } from "./repository";
 
 /**
@@ -214,4 +215,481 @@ export function renderTemplate(
       key in vars ? (escapar ? esc(vars[key]) : String(vars[key] ?? "")) : "",
     );
   return { subject: replace(t.subject, false), body: replace(t.body, true) };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OS MODELOS BILINGUES, E O HISTÓRICO — SEM MEXER NO ESQUEMA
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// As propostas são bilingues e o email tem de seguir a língua do cliente. O
+// histórico de versões tem de deixar voltar atrás. Nenhuma das duas coisas
+// cabe nas colunas que a tabela `email_templates` tem hoje (`id`, `name`,
+// `subject`, `body`, `updated_at`) — mas as duas cabem em LINHAS.
+//
+// ── PORQUÊ LINHAS E NÃO COLUNAS NOVAS ─────────────────────────────────────
+//
+// Uma coluna nova (`body_en`, ou um `versoes` em JSON) é uma migração, e uma
+// migração é uma coisa que ela quer aprovar antes — e com razão: é o género de
+// mudança que corre bem em nove instalações e deixa a décima sem conseguir
+// gravar um email. O que aqui se faz não toca no esquema:
+//
+//   • o INGLÊS de um modelo é outra linha, com o `id` sufixado por `@en`;
+//   • cada VERSÃO antiga é outra linha, com o `id` sufixado por `#v<instante>`.
+//
+// As colunas que uma versão precisa são exactamente as que a tabela já tem —
+// assunto, corpo, nome, e um instante. Não há nada a acrescentar.
+//
+// ── O QUE ISTO CUSTA, DITO POR EXTENSO ────────────────────────────────────
+//
+// A tabela passa a ter mais linhas, e a cópia de segurança lê-a inteira (tecto
+// de 20 MB, ver `api/email-templates/route.ts`). Por isso o {@link MAX_VERSOES}
+// existe e é apertado: dez versões por modelo e por língua, as mais antigas
+// caem. Com o tecto de 20 000 caracteres por corpo, o pior caso de um modelo
+// são ~440 KB — folgado, e limitado por construção.
+//
+// O caminho por direito continua a ser uma tabela `email_template_versions`
+// com o seu `template_id` e a sua data. Fica escrito no relatório com a forma
+// que teria; até ela aprovar a migração, isto funciona hoje e não perde nada.
+
+export type IdiomaDoModelo = "pt" | "en";
+
+/** O separador da língua e o das versões. Nenhum aparece numa chave nossa. */
+const SUFIXO_EN = "@en";
+const SUFIXO_VERSAO = "#v";
+
+/** Quantas versões antigas se guardam, por modelo e por língua. */
+export const MAX_VERSOES = 10;
+
+/** O `id` da linha onde este modelo, nesta língua, está guardado. */
+export function idFisico(chave: string, idioma: IdiomaDoModelo): string {
+  return idioma === "en" ? `${chave}${SUFIXO_EN}` : chave;
+}
+
+/** O `id` da linha de uma versão arquivada. */
+export function idDeVersao(chave: string, idioma: IdiomaDoModelo, instante: string): string {
+  return `${idFisico(chave, idioma)}${SUFIXO_VERSAO}${instante}`;
+}
+
+export function ehLinhaDeVersao(id: string): boolean {
+  return String(id ?? "").includes(SUFIXO_VERSAO);
+}
+
+/** De volta às três partes. Uma chave sem sufixos é portuguesa e é actual. */
+export function decomporId(id: string): {
+  chave: string;
+  idioma: IdiomaDoModelo;
+  versaoEm: string | null;
+} {
+  let resto = String(id ?? "");
+  let versaoEm: string | null = null;
+  const corte = resto.indexOf(SUFIXO_VERSAO);
+  if (corte !== -1) {
+    versaoEm = resto.slice(corte + SUFIXO_VERSAO.length);
+    resto = resto.slice(0, corte);
+  }
+  const idioma: IdiomaDoModelo = resto.endsWith(SUFIXO_EN) ? "en" : "pt";
+  const chave = idioma === "en" ? resto.slice(0, -SUFIXO_EN.length) : resto;
+  return { chave, idioma, versaoEm };
+}
+
+export interface LadoDoModelo {
+  subject: string;
+  body: string;
+  /** Vazio enquanto esta língua nunca foi guardada (está a sair a de origem). */
+  updatedAt: string;
+}
+
+export interface ModeloBilingue {
+  chave: string;
+  nome: string;
+  /** Onde é que ele é usado, em português de quem o vai escrever. */
+  descricao: string;
+  pt: LadoDoModelo;
+  en: LadoDoModelo;
+}
+
+export interface VersaoDeModelo {
+  chave: string;
+  idioma: IdiomaDoModelo;
+  /** O instante em que este texto DEIXOU de ser o actual. */
+  versaoEm: string;
+  nome: string;
+  subject: string;
+  body: string;
+}
+
+/**
+ * ── A FORMA EDITÁVEL DE UM MODELO É TEXTO ─────────────────────────────────
+ *
+ * Os modelos deixam de ser escritos em HTML e passam a ser escritos em TEXTO,
+ * com parágrafos separados por linhas em branco. O HTML continua a existir —
+ * é o que vai no email — mas é DERIVADO, e o texto de origem viaja dentro do
+ * corpo, intacto, no marcador que o `email-template-format` já usava.
+ *
+ * A razão é o ecrã de envio: o modelo resolve-se com os dados daquele casal e
+ * o resultado aparece numa caixa que se pode editar antes de mandar. Um corpo
+ * que só exista como HTML com estilos em linha não se deixa editar por uma
+ * pessoa — e quem o vai editar é a Catarina, ao telemóvel, entre dois eventos.
+ *
+ * Resolver o TEXTO e não o HTML tem uma segunda vantagem que não é pequena: os
+ * blocos condicionais passam a poder apanhar parágrafos inteiros com a linha
+ * em branco a seguir, e é isso que faz o texto sem data ficar com o mesmo
+ * espaçamento do texto com data. Ver a linha em branco dentro do `{{/se_nao}}`.
+ */
+const ligacao = "{{link_proposta}}";
+
+export interface LadoDeOrigem {
+  subject: string;
+  /** O TEXTO de origem. O `body` (HTML) é derivado dele — ver acima. */
+  texto: string;
+}
+
+export interface ModeloDeOrigem {
+  chave: string;
+  nome: string;
+  descricao: string;
+  pt: LadoDeOrigem;
+  en: LadoDeOrigem;
+}
+
+/**
+ * OS TRÊS DE ORIGEM, e o primeiro é O QUE ABRE.
+ *
+ * O «Registo formal» é ELA a escrever, palavra por palavra: é o email que ela
+ * já manda hoje, e já foi usado em propostas verdadeiras. Não se melhora, não
+ * se encurta, não se lhe «arruma» a pontuação. O TRATAMENTO É «VOSSO», COM
+ * MAIÚSCULA — é a voz dela, e há um teste que falha se alguém o «corrigir».
+ *
+ * A única coisa que muda entre o que está aqui e o que o casal lê são as
+ * variáveis e os blocos condicionais.
+ */
+export const MODELOS_DE_ORIGEM: ModeloDeOrigem[] = [
+  {
+    chave: "registo-formal",
+    nome: "Registo formal",
+    descricao:
+      "O texto que já usas, e o que abre por omissão no envio. A proposta segue em anexo, com a " +
+      "ligação para a ver online.",
+    pt: {
+      subject: "Proposta de decoração | Líquen Events",
+      texto: [
+        "Olá {{cliente_nome}}, boa tarde,",
+        "",
+        "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento" +
+          "{{#se evento_local}} para o {{evento_tipo}} no {{evento_local}}{{/se}}" +
+          "{{#se evento_data}}, a {{evento_data}}{{/se}}.",
+        "",
+        // A LINHA EM BRANCO VAI DENTRO DO BLOCO, e é por isso que ela está
+        // escrita assim: sem data, sai o parágrafo e o espaço a seguir; com
+        // data, não sobra nem o parágrafo nem uma linha vazia a mais.
+        "{{#se_nao evento_data}}Ainda aguardamos a informação relativamente à data, mas podemos " +
+          "depois acrescentá-la à proposta.",
+        "",
+        `{{/se_nao}}A proposta segue em anexo e pode também ser consultada aqui: ${ligacao}`,
+        "",
+        "Estamos ao Vosso dispor para esclarecimento de alguma dúvida ou questão, ou adaptação e " +
+          "ajuste de alguma ideia ou outras sugestões de decor.",
+        "",
+        "Obrigada, agradecemos a atenção e aguardamos o Vosso feedback.",
+      ].join("\n"),
+    },
+    en: {
+      subject: "Decoration proposal | Líquen Events",
+      texto: [
+        "Dear {{cliente_nome}}, good afternoon,",
+        "",
+        "As requested, we are sending our decoration proposal and respective quote" +
+          "{{#se evento_local}} for the {{evento_tipo}} at {{evento_local}}{{/se}}" +
+          "{{#se evento_data}}, on {{evento_data}}{{/se}}.",
+        "",
+        "{{#se_nao evento_data}}We are still awaiting the date; we can add it to the proposal " +
+          "later on.",
+        "",
+        `{{/se_nao}}The proposal is attached and can also be viewed here: ${ligacao}`,
+        "",
+        "We remain at your disposal for any question, or for adjusting any idea or suggesting " +
+          "other decor options.",
+        "",
+        "Thank you for your time — we look forward to your feedback.",
+      ].join("\n"),
+    },
+  },
+  {
+    chave: "resumo-evento",
+    nome: "Com resumo do evento",
+    descricao:
+      "O mesmo que o registo formal, mais um bloco com o tipo, a data, o local, o valor e a " +
+      "validade. Para quando queres que o essencial se leia sem abrir o anexo.",
+    pt: {
+      subject: "Proposta de decoração | Líquen Events",
+      texto: [
+        "Olá {{cliente_nome}}, boa tarde,",
+        "",
+        "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento" +
+          "{{#se evento_local}} para o {{evento_tipo}} no {{evento_local}}{{/se}}" +
+          "{{#se evento_data}}, a {{evento_data}}{{/se}}.",
+        "",
+        "{{#se_nao evento_data}}Ainda aguardamos a informação relativamente à data, mas podemos " +
+          "depois acrescentá-la à proposta.",
+        "",
+        // Cada linha do resumo dentro do seu bloco: um «Local:» sem local ao
+        // lado é pior do que um resumo com uma linha a menos.
+        "{{/se_nao}}{{#se evento_tipo}}Evento: {{evento_tipo}}\n{{/se}}" +
+          "{{#se evento_data}}Data: {{evento_data}}\n{{/se}}" +
+          "{{#se evento_local}}Local: {{evento_local}}\n{{/se}}" +
+          "{{#se valor_total}}Valor total (c/ IVA): {{valor_total}}\n{{/se}}" +
+          "{{#se validade_data}}Válida até: {{validade_data}}{{/se}}",
+        "",
+        `A proposta segue em anexo e pode também ser consultada aqui: ${ligacao}`,
+        "",
+        "Estamos ao Vosso dispor para esclarecimento de alguma dúvida ou questão, ou adaptação e " +
+          "ajuste de alguma ideia ou outras sugestões de decor.",
+        "",
+        "Obrigada, agradecemos a atenção e aguardamos o Vosso feedback.",
+      ].join("\n"),
+    },
+    en: {
+      subject: "Decoration proposal | Líquen Events",
+      texto: [
+        "Dear {{cliente_nome}}, good afternoon,",
+        "",
+        "As requested, we are sending our decoration proposal and respective quote" +
+          "{{#se evento_local}} for the {{evento_tipo}} at {{evento_local}}{{/se}}" +
+          "{{#se evento_data}}, on {{evento_data}}{{/se}}.",
+        "",
+        "{{#se_nao evento_data}}We are still awaiting the date; we can add it to the proposal " +
+          "later on.",
+        "",
+        "{{/se_nao}}{{#se evento_tipo}}Event: {{evento_tipo}}\n{{/se}}" +
+          "{{#se evento_data}}Date: {{evento_data}}\n{{/se}}" +
+          "{{#se evento_local}}Venue: {{evento_local}}\n{{/se}}" +
+          "{{#se valor_total}}Total (incl. VAT): {{valor_total}}\n{{/se}}" +
+          "{{#se validade_data}}Valid until: {{validade_data}}{{/se}}",
+        "",
+        `The proposal is attached and can also be viewed here: ${ligacao}`,
+        "",
+        "We remain at your disposal for any question, or for adjusting any idea or suggesting " +
+          "other decor options.",
+        "",
+        "Thank you for your time — we look forward to your feedback.",
+      ].join("\n"),
+    },
+  },
+  {
+    chave: "curto",
+    nome: "Curto",
+    descricao:
+      "Três linhas, a ligação, o valor e a validade. Para quando já falaste com o cliente e o " +
+      "email só precisa de entregar a proposta.",
+    pt: {
+      subject: "A Vossa proposta | Líquen Events",
+      texto: [
+        "Olá {{cliente_nome}},",
+        "",
+        `Segue a nossa proposta{{#se evento_data}} para {{evento_data}}{{/se}}: ${ligacao}`,
+        "",
+        "{{#se valor_total}}Valor total, com IVA: {{valor_total}}.{{/se}}" +
+          "{{#se validade_data}} Válida até {{validade_data}}.{{/se}}",
+        "",
+        "Ficamos a aguardar o Vosso feedback.",
+      ].join("\n"),
+    },
+    en: {
+      subject: "Your proposal | Líquen Events",
+      texto: [
+        "Dear {{cliente_nome}},",
+        "",
+        `Here is our proposal{{#se evento_data}} for {{evento_data}}{{/se}}: ${ligacao}`,
+        "",
+        "{{#se valor_total}}Total, including VAT: {{valor_total}}.{{/se}}" +
+          "{{#se validade_data}} Valid until {{validade_data}}.{{/se}}",
+        "",
+        "We look forward to your feedback.",
+      ].join("\n"),
+    },
+  },
+];
+
+/**
+ * Os modelos ANTIGOS vistos como bilingues: o português é o que eles têm, o
+ * inglês nasce vazio.
+ *
+ * Vazio e não traduzido: traduzir à máquina o texto dela é exactamente o que
+ * esta casa se recusa a fazer nos documentos. Enquanto o lado inglês estiver
+ * vazio, quem envia sabe que não há versão inglesa — que é a verdade — em vez
+ * de mandar ao casal uma tradução que ninguém leu.
+ */
+const origensAntigas = (): ModeloDeOrigem[] =>
+  DEFAULT_TEMPLATES.map((d) => ({
+    chave: d.key,
+    nome: d.name,
+    descricao: "",
+    // Os antigos são HTML escrito à mão e ficam como estão: o `texto` deles é
+    // o próprio HTML, e quem os quiser editar tem o editor clássico. Convertê-
+    // los aqui era reescrever, à socapa, quatro textos que ela já publicou.
+    pt: { subject: d.subject, texto: d.body },
+    en: { subject: "", texto: "" },
+  }));
+
+/** Os NOVOS primeiro: o «Registo formal» é o que abre. */
+const TODAS_AS_ORIGENS = (): ModeloDeOrigem[] => [...MODELOS_DE_ORIGEM, ...origensAntigas()];
+
+const ladoVazio = (): LadoDoModelo => ({ subject: "", body: "", updatedAt: "" });
+
+/**
+ * Os modelos, nas duas línguas, com o que está guardado por cima do de origem.
+ *
+ * O guardado ganha SEMPRE, e por lado: um modelo com o português já escrito
+ * por ela e o inglês ainda por escrever mostra o dela à esquerda e o de origem
+ * à direita, que é o que se quer ver para o poder acabar.
+ */
+export async function listarModelos(): Promise<ModeloBilingue[]> {
+  const linhas = await repo.list();
+  const actuais = new Map<string, EmailTemplate>();
+  for (const l of linhas) if (!ehLinhaDeVersao(l.key)) actuais.set(l.key, l);
+
+  const lado = (guardado: EmailTemplate | undefined, origem: LadoDeOrigem) =>
+    guardado
+      ? { subject: guardado.subject, body: guardado.body, updatedAt: guardado.updatedAt }
+      : { subject: origem.subject, body: construirCorpoDeModelo(origem.texto), updatedAt: "" };
+
+  const saida: ModeloBilingue[] = [];
+  const vistas = new Set<string>();
+  for (const origem of TODAS_AS_ORIGENS()) {
+    vistas.add(origem.chave);
+    vistas.add(idFisico(origem.chave, "en"));
+    saida.push({
+      chave: origem.chave,
+      nome: origem.nome,
+      descricao: origem.descricao,
+      pt: lado(actuais.get(origem.chave), origem.pt),
+      en: lado(actuais.get(idFisico(origem.chave, "en")), origem.en),
+    });
+  }
+  // Modelos criados por ela, que não são de origem nenhuma.
+  for (const [id, guardado] of actuais) {
+    if (vistas.has(id)) continue;
+    const { chave, idioma } = decomporId(id);
+    if (vistas.has(chave)) continue;
+    const jaLa = saida.find((m) => m.chave === chave);
+    const destino = jaLa ?? {
+      chave,
+      nome: guardado.name || chave,
+      descricao: "",
+      pt: ladoVazio(),
+      en: ladoVazio(),
+    };
+    destino[idioma] = {
+      subject: guardado.subject,
+      body: guardado.body,
+      updatedAt: guardado.updatedAt,
+    };
+    if (!jaLa) saida.push(destino);
+  }
+  return saida;
+}
+
+/** Um instante livre para arquivar — o mesmo milissegundo pode repetir-se. */
+function instanteLivre(ocupados: Set<string>, partida: string): string {
+  let t = Date.parse(partida);
+  if (!Number.isFinite(t)) t = Date.now();
+  let iso = new Date(t).toISOString();
+  while (ocupados.has(iso)) iso = new Date(++t).toISOString();
+  return iso;
+}
+
+/**
+ * Guardar um lado de um modelo, ARQUIVANDO antes o que lá estava.
+ *
+ * O arquivo é o histórico: guarda-se o texto que DEIXA de ser o actual, com o
+ * instante em que deixou de o ser. Um texto igual ao que já lá estava não gera
+ * versão nenhuma — um «Guardar» sem alterações não é um ponto na história.
+ */
+export async function guardarModelo(entrada: {
+  chave: string;
+  nome: string;
+  idioma: IdiomaDoModelo;
+  subject: string;
+  body: string;
+}): Promise<EmailTemplate> {
+  const id = idFisico(entrada.chave, entrada.idioma);
+  const anterior = await repo.get(id);
+
+  if (anterior && (anterior.subject !== entrada.subject || anterior.body !== entrada.body)) {
+    const versoes = await listarVersoes(entrada.chave, entrada.idioma);
+    const instante = instanteLivre(
+      new Set(versoes.map((v) => v.versaoEm)),
+      anterior.updatedAt || new Date().toISOString(),
+    );
+    await repo.create({
+      key: idDeVersao(entrada.chave, entrada.idioma, instante),
+      name: anterior.name,
+      subject: anterior.subject,
+      body: anterior.body,
+      updatedAt: instante,
+    });
+    // As mais antigas caem. Ver o tecto e a razão no cabeçalho desta secção.
+    const todas = [...versoes.map((v) => v.versaoEm), instante].sort();
+    for (const velha of todas.slice(0, Math.max(0, todas.length - MAX_VERSOES))) {
+      await repo.remove(idDeVersao(entrada.chave, entrada.idioma, velha));
+    }
+  }
+
+  const entidade: EmailTemplate = {
+    key: id,
+    name: entrada.nome,
+    subject: entrada.subject,
+    body: entrada.body,
+    updatedAt: new Date().toISOString(),
+  };
+  if (anterior) {
+    const actualizado = await repo.update(id, entidade);
+    return actualizado ?? entidade;
+  }
+  await repo.create(entidade);
+  return entidade;
+}
+
+/** O histórico deste modelo nesta língua, do mais recente para o mais antigo. */
+export async function listarVersoes(
+  chave: string,
+  idioma: IdiomaDoModelo,
+): Promise<VersaoDeModelo[]> {
+  const prefixo = `${idFisico(chave, idioma)}${SUFIXO_VERSAO}`;
+  const linhas = await repo.list();
+  return linhas
+    .filter((l) => l.key.startsWith(prefixo))
+    .map((l) => ({
+      chave,
+      idioma,
+      versaoEm: l.key.slice(prefixo.length),
+      nome: l.name,
+      subject: l.subject,
+      body: l.body,
+    }))
+    .sort((a, b) => b.versaoEm.localeCompare(a.versaoEm));
+}
+
+/**
+ * Voltar a uma versão. `null` quando ela já não existe (caiu pelo tecto, ou o
+ * ecrã ficou aberto enquanto outra pessoa gravava) — e nesse caso NÃO se toca
+ * em nada: repor um texto adivinhado era pior do que dizer que não dá.
+ *
+ * A reversão é ela própria uma gravação, portanto o texto que estava a sair
+ * até agora fica no histórico. Voltar atrás nunca é um caminho sem regresso.
+ */
+export async function reverterPara(
+  chave: string,
+  idioma: IdiomaDoModelo,
+  versaoEm: string,
+): Promise<EmailTemplate | null> {
+  const versao = (await listarVersoes(chave, idioma)).find((v) => v.versaoEm === versaoEm);
+  if (!versao) return null;
+  return guardarModelo({
+    chave,
+    nome: versao.nome,
+    idioma,
+    subject: versao.subject,
+    body: versao.body,
+  });
 }

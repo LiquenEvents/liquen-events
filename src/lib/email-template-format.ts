@@ -262,3 +262,79 @@ export function insertToken(
   const text = value.slice(0, s) + token + value.slice(e);
   return { text, caret: s + token.length };
 }
+
+// ── O corpo de um modelo escrito em TEXTO ──────────────────────────────────
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * DO TEXTO DELA PARA O HTML — SEM PARTIR OS BLOCOS AO MEIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `buildSimpleEmailHtml` embrulha cada parágrafo num `<p>` e serve bem o
+ * dialecto antigo. Com blocos condicionais deixa de servir, e a razão é
+ * mecânica: um bloco que comece num parágrafo e feche no seguinte fica com o
+ * `</p><p>` LÁ DENTRO. Quando a condição é falsa, esse markup desaparece com
+ * ele e o email sai com um `<p>` aberto que ninguém fecha.
+ *
+ * Isto resolve-o pelo sítio certo: as etiquetas de bloco que estejam ENCOSTADAS
+ * ao princípio ou ao fim de um parágrafo saem para FORA do `<p>`. O bloco passa
+ * a envolver parágrafos inteiros, que é o que ela quer dizer quando escreve
+ * «este parágrafo só aparece se não houver data».
+ *
+ * O texto de origem vai inteiro no marcador, como sempre foi: é dele que sai a
+ * caixa editável do ecrã de envio, e ele nunca é adivinhado de volta do HTML.
+ */
+
+/** Uma etiqueta de bloco: `{{#se x}}`, `{{#se_nao x}}`, `{{/se}}`, `{{/se_nao}}`. */
+const ETIQUETA_DE_BLOCO =
+  /\{\{\s*(?:#se_nao|#se)(?:\s+[A-Za-z_][A-Za-z0-9_]*)?\s*\}\}|\{\{\s*\/se_nao\s*\}\}|\{\{\s*\/se\s*\}\}/;
+
+/** Corre as etiquetas de bloco encostadas a uma das pontas para fora do `<p>`. */
+function desencostarBlocos(paragrafo: string): { antes: string; meio: string; depois: string } {
+  let meio = paragrafo;
+  let antes = "";
+  let depois = "";
+  for (;;) {
+    const m = ETIQUETA_DE_BLOCO.exec(meio);
+    if (!m || m.index !== 0) break;
+    antes += m[0];
+    meio = meio.slice(m[0].length).replace(/^[ \t]+/, "");
+  }
+  for (;;) {
+    const todas = [...meio.matchAll(new RegExp(ETIQUETA_DE_BLOCO, "g"))];
+    const ultima = todas.at(-1);
+    if (!ultima || ultima.index + ultima[0].length !== meio.length) break;
+    depois = ultima[0] + depois;
+    meio = meio.slice(0, ultima.index).replace(/[ \t]+$/, "");
+  }
+  return { antes, meio, depois };
+}
+
+/**
+ * O corpo HTML de um modelo escrito em texto, com o texto de origem guardado
+ * no marcador para poder voltar inteiro.
+ */
+export function construirCorpoDeModelo(texto: string): string {
+  const marcador = `<!-- liquen:simple:v1:${toBase64(texto)} -->`;
+  const paragrafos = String(texto ?? "")
+    .split(/\n[ \t]*\n/)
+    .map((p) => p.replace(/^\n+|\n+$/g, "").trim())
+    .filter((p) => p.length > 0)
+    .map((cru) => {
+      const { antes, meio, depois } = desencostarBlocos(cru);
+      if (!meio) return `${antes}${depois}`;
+      const dentro = esc(meio)
+        .replace(/\n/g, "<br>")
+        // As chavetas não levam escape — não têm nada que escapar —, mas o
+        // `esc` mexe no `&` e nas aspas, e uma etiqueta de bloco não as tem.
+        .replace(
+          /\{\{\s*link_proposta\s*\}\}/g,
+          '<a href="{{link_proposta}}" style="color:#637a5f">{{link_proposta}}</a>',
+        );
+      return `${antes}  <p style="font-size:14px;line-height:1.6;margin:0 0 16px;color:#2a2620">${dentro}</p>${depois}`;
+    })
+    .join("\n");
+  // SEM MOLDURA E SEM RODAPÉ: a moldura da casa e a assinatura entram uma só
+  // vez, no fim, pelo `emailAoCliente`. Ver `email-modelos.ts`.
+  return `${marcador}\n${paragrafos}`;
+}

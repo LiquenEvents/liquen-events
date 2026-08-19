@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { capturarClique } from "@/lib/ads/click-id";
+import { isTokenRoute } from "@/lib/safe-path";
 
 /** sessionStorage key holding the visitor's first-touch acquisition source. */
 export const LEAD_SOURCE_KEY = "liquen-lead-source";
@@ -17,9 +19,27 @@ export const LEAD_SOURCE_KEY = "liquen-lead-source";
  *
  * Renders nothing and is independent of Plausible, so attribution works whether
  * or not cookieless analytics is enabled.
+ *
+ * ── NAS ROTAS COM TOKEN NÃO SE CAPTURA NADA ───────────────────────────────
+ *
+ * A proposta e o portal do casal são páginas privadas. Nem uma coisa nem
+ * outra do que está aqui em baixo faz sentido lá: quem abre o link de uma
+ * proposta não é um visitante a chegar de uma campanha — é um casal a quem já
+ * se mandou a proposta por email, e o pedido dele já existe há semanas.
+ *
+ * Portanto isto não é só inútil: é escrever no telemóvel de um cliente
+ * (`localStorage`, com a janela de 90 dias do identificador de clique pago)
+ * a partir de uma página onde a regra do produto é não recolher sinal nenhum
+ * que ele não tenha dado de propósito.
+ *
+ * Mesma guarda do `Analytics`, do `GoogleTag` e do `WebVitals` — `isTokenRoute`
+ * em `safe-path.ts`, para a regra viver num sítio só.
  */
 export default function LeadSourceCapture() {
+  const pathname = usePathname();
+
   useEffect(() => {
+    if (isTokenRoute(pathname)) return;
     // O identificador do clique pago é guardado SEMPRE, e antes de tudo o
     // resto: vive em localStorage com a janela de 90 dias da Google, e não em
     // sessionStorage como a atribuição acima. São coisas diferentes com prazos
@@ -65,6 +85,6 @@ export default function LeadSourceCapture() {
     } catch {
       /* sessionStorage unavailable (private mode) — skip attribution silently */
     }
-  }, []);
+  }, [pathname]);
   return null;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 
 const authed = vi.hoisted(() => ({ ok: false }));
 const store = vi.hoisted(() => ({
@@ -25,7 +25,13 @@ const store = vi.hoisted(() => ({
   update: vi.fn(async (id: string, patch: Record<string, unknown>) => ({ id, ...patch })),
 }));
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_opts?: unknown) => ({ sent: true })) }));
-vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
+/** Quem tem a sessão iniciada, tal como o token assinado a traria. */
+const sessao = vi.hoisted(() => ({ nome: "" as string }));
+vi.mock("@/lib/admin-auth", () => ({
+  isAuthed: () => authed.ok,
+  ADMIN_COOKIE: "liquen_admin",
+  readSession: (token: string | undefined) => (token ? { name: sessao.nome } : null),
+}));
 vi.mock("@/lib/quotes-store", () => ({ getQuote: store.get, updateQuote: store.update }));
 vi.mock("@/lib/mail", () => ({
   sendMail: mail.send,
@@ -48,6 +54,7 @@ beforeEach(() => {
   authed.ok = false;
   store.nome = "Ana Silva";
   store.locale = undefined;
+  sessao.nome = "";
   vi.clearAllMocks();
 });
 
@@ -429,5 +436,52 @@ describe("POST /api/orcamento/[id]/mensagem — o assunto segue a língua do ped
     store.locale = undefined;
     await POST(req({ message: "Olá!" }), ctx("LIQ-1"));
     expect(assunto()).toBe("Líquen Events — sobre o seu pedido (LIQ-1)");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A ASSINATURA É DE QUEM ESCREVEU — E NUNCA DE QUEM RECEBE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O fecho vem todo do `emailAoCliente` (ver `email-assinatura.ts`); o que se
+ * mede aqui é a única coisa que esta rota decide — QUEM lhe passa como
+ * assinante e como destinatário. Sem estas duas linhas certas, a assinatura
+ * certa não serve de nada.
+ */
+describe("POST /api/orcamento/[id]/mensagem — quem assina", () => {
+  /** Um pedido a sério, com cookies — o `req()` acima é um `Request` nu. */
+  function pedidoComSessao(mensagem: string): NextRequest {
+    const r = new NextRequest("https://liquen.test/api/orcamento/LIQ-1/mensagem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: mensagem }),
+    });
+    r.cookies.set("liquen_admin", "um-token-qualquer");
+    return r;
+  }
+
+  const enviado = () => mail.send.mock.calls[0][0] as { html: string; text: string };
+
+  it("assina com o nome de quem tem a sessão iniciada", async () => {
+    authed.ok = true;
+    sessao.nome = "Rui Belo";
+    await POST(pedidoComSessao("Olá!"), ctx("LIQ-1"));
+    expect(enviado().html).toContain("Rui Belo");
+    expect(enviado().text).toContain("Rui Belo");
+    expect(enviado().html).not.toContain("Catarina Gaspar");
+  });
+
+  /**
+   * A protecção, vista de ponta a ponta: uma conta chamada como a cliente não
+   * pode fazer sair um email onde ela se assina a si própria.
+   */
+  it("com o nome igual ao do cliente, assina a casa", async () => {
+    authed.ok = true;
+    store.nome = "Ana Silva";
+    sessao.nome = "ana  silva";
+    await POST(pedidoComSessao("Olá!"), ctx("LIQ-1"));
+    expect(enviado().html).toContain("Catarina Gaspar");
+    expect(enviado().html).not.toMatch(/>ana {2}silva</i);
   });
 });
