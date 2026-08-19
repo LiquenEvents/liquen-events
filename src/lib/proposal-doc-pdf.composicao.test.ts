@@ -321,6 +321,147 @@ describe("a legenda de um mood board", () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   O DINHEIRO NO PAPEL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+describe("a ressalva que ela escreve num valor adicional", () => {
+  /**
+   * Escrito no estúdio: «12.500,00 € + IVA (a confirmar consoante a distância
+   * final)». O PDF imprimia «+ 12.500,00 €» e deitava fora a condição inteira.
+   * O número estava certo; a ressalva — que é sobre dinheiro — não chegava ao
+   * cliente.
+   */
+  it("chega sempre ao papel, ao lado do nome", async () => {
+    const escritas = await desenhar(
+      proposta({
+        budgetExtras: [
+          {
+            label: "Deslocação da equipa",
+            valueText: "1.250,00 € + IVA (a confirmar consoante a distância final)",
+          },
+        ],
+      }),
+    );
+    const texto = escritas.map((e) => e.texto).join(" ");
+    expect(texto).toContain("a confirmar consoante a distância final");
+  });
+
+  /**
+   * E um valor que é TEXTO — «a definir com o cliente» — deixa de sair como um
+   * travessão mudo na coluna: o travessão fica, e ao lado do nome vai o que ela
+   * escreveu.
+   */
+  it("um valor que não é um número também é dito", async () => {
+    const escritas = await desenhar(
+      proposta({ budgetExtras: [{ label: "Cenografia", valueText: "a definir com o cliente" }] }),
+    );
+    expect(escritas.map((e) => e.texto).join(" ")).toContain("a definir com o cliente");
+  });
+
+  /**
+   * O «+ IVA» sozinho NÃO é ressalva nenhuma: a escada por baixo já diz «TOTAL
+   * (sem IVA)», «IVA (23%)» e «Total a pagar». E numa folha inglesa chegava ao
+   * papel em português.
+   */
+  it("«+ IVA» sozinho não vai — a escada já o diz, e em inglês diz «VAT»", async () => {
+    for (const idioma of ["pt", "en"] as const) {
+      const escritas = await desenhar(
+        proposta({ budgetExtras: [{ label: "Coordenação", valueText: "950,50 € + IVA" }] }),
+        idioma,
+      );
+      expect(escritas.some((e) => e.texto === "Coordenação")).toBe(true);
+      expect(escritas.some((e) => e.texto.includes("Coordenação (+"))).toBe(false);
+    }
+  });
+});
+
+describe("o quadro do orçamento", () => {
+  /** Quinze rubricas: a folha seguinte abria com UMA sozinha, por 4 pontos. */
+  const comQuinzeRubricas = () =>
+    proposta({
+      budgetItems: Array.from({ length: 15 }, (_, i) => `Rubrica de orçamento número ${i + 1}`),
+      budgetExtras: [{ label: "Deslocação da equipa Líquen", valueText: "896,00 €" }],
+      totalText: "9.375,00 € + IVA",
+      totalAmount: 9375,
+    });
+
+  /** Onde caiu cada rubrica, por página. */
+  const rubricasPorPagina = (escritas: Escrita[]) => {
+    const porPagina = new Map<number, string[]>();
+    for (const e of escritas) {
+      if (!/^Rubrica de orçamento número \d+$/.test(e.texto)) continue;
+      porPagina.set(e.pagina, [...(porPagina.get(e.pagina) ?? []), e.texto]);
+    }
+    return [...porPagina.entries()].sort((a, b) => a[0] - b[0]);
+  };
+
+  it("nunca deixa uma rubrica sozinha na folha seguinte", async () => {
+    const paginas = rubricasPorPagina(await desenhar(comQuinzeRubricas()));
+    expect(paginas.length, "o quadro não se partiu — o caso não está a ser exercitado").toBe(2);
+    for (const [pagina, rubricas] of paginas) {
+      expect(rubricas.length, `a folha ${pagina + 1} leva uma rubrica sozinha`).toBeGreaterThan(1);
+    }
+  });
+
+  it("quando parte, o cabeçalho das colunas vai com ele — e diz que é continuação", async () => {
+    const escritas = await desenhar(comQuinzeRubricas());
+    const paginas = rubricasPorPagina(escritas);
+    const segunda = paginas[1][0];
+    const daSegunda = escritas.filter((e) => e.pagina === segunda).map((e) => e.texto);
+    expect(daSegunda, "a folha de continuação não repete o cabeçalho").toContain("Item");
+    expect(daSegunda).toContain("Preço (€)");
+    expect(
+      daSegunda.some((t) => t.toUpperCase().includes("CONT.")),
+      "a folha de continuação não diz que vem de trás",
+    ).toBe(true);
+  });
+
+  /**
+   * «Decor Jantar» e «TOTAL (sem IVA)» colavam-se: quinze pontos, os mesmos que
+   * separam duas rubricas, e o total lia-se como mais uma linha do quadro.
+   */
+  it("separa a última rubrica da soma", async () => {
+    const escritas = await desenhar(proposta());
+    const ultima = escritas.find((e) => e.texto === "Decor Jantar");
+    const soma = escritas.find((e) => e.texto === "TOTAL (sem IVA)");
+    expect(ultima, "não se encontrou a última rubrica").toBeDefined();
+    expect(soma, "não se encontrou o TOTAL").toBeDefined();
+    expect(ultima!.pagina).toBe(soma!.pagina);
+    expect(
+      ultima!.y - soma!.y,
+      "a última rubrica e o TOTAL estão à distância de duas linhas do quadro",
+    ).toBeGreaterThanOrEqual(24);
+  });
+
+  /**
+   * ── «AINDA SEM PREÇO» DE UMA MANEIRA SÓ ─────────────────────────────────
+   * Na proposta de Organização, a rubrica com o marcador `[Valor]` imprimia
+   * «—» e a rubrica com o preço em branco não imprimia nada. Duas linhas
+   * seguidas, a mesma situação, dois desenhos.
+   */
+  it("no modelo Organização, «sem preço» desenha-se sempre igual", async () => {
+    const escritas = await desenhar(
+      proposta({
+        template: "organizacao",
+        totalEstimatedText: "12.500,00 €",
+        totalAmount: 12500,
+        totalVatMode: "incluido",
+        budgetRows: [
+          { item: "Coordenação e planeamento integral", price: "6.500,00 €" },
+          { item: "Gestão de fornecedores e contratos", price: "[Valor]" },
+          { item: "Assessoria de imagem e papelaria", price: "" },
+        ],
+      }),
+    );
+    // O marcador nunca chega ao papel...
+    expect(escritas.some((e) => e.texto.includes("[Valor]"))).toBe(false);
+    // ...e as duas rubricas sem preço saem da mesma maneira: sem célula.
+    const quadro = escritas.filter((e) => e.tamanho === 10.5);
+    expect(quadro.some((e) => e.texto === "—")).toBe(false);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
    O ACABAMENTO DO DOCUMENTO
    ═══════════════════════════════════════════════════════════════════════════ */
 

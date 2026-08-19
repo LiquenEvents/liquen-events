@@ -1938,6 +1938,39 @@ export async function renderProposalDocPdfWithReport(
      * lá dentro continua a sair como o escreveu.
      */
     const semMarcador = (v: string) => (/^\[[^\]]*\]$/.test(v.trim()) ? "" : v);
+    /**
+     * A RESSALVA que ela escreveu num valor — o que lá está além do número e
+     * além do IVA.
+     *
+     *   «12.500,00 € + IVA (a confirmar consoante a distância final)»
+     *       → «a confirmar consoante a distância final»
+     *   «950,50 € + IVA»  → «»   (não há ressalva; não se imprime nada)
+     *   «12.500,00 €»     → «»
+     *
+     * Três coisas caem, por esta ordem, e cada uma por uma razão diferente:
+     *
+     *  1. O NÚMERO — com os separadores e a moeda que venha agarrada. Vai para
+     *     a coluna da direita, na unidade do bloco, e não se repete no nome.
+     *  2. O «+ IVA». Não se perde nada: a escada por baixo diz «TOTAL (sem
+     *     IVA)», «IVA (23%)» e «Total a pagar», que é a mesma informação dita
+     *     pelas nossas contas e não por um pedaço de texto livre. E há uma
+     *     razão dura para o tirar: numa proposta INGLESA, o «+ IVA» dela
+     *     chegava ao papel em português por cima de uma folha que diz «VAT».
+     *  3. Os parênteses à volta do que sobra, se ela já lá os tiver posto —
+     *     senão saía «(( a confirmar ))».
+     *
+     * O que fica é a CONDIÇÃO, que é a única parte que só ela sabe e que o
+     * documento não diz por si. Não se interpreta: só se separa.
+     */
+    const ressalvaDoValor = (texto: string): string => {
+      const semNumero = (texto ?? "")
+        .trim()
+        .replace(/^[^\d+-]*[-+]?\d[\d\s.,\u00a0]*\s*(€|eur(?:os?)?)?\s*/i, "")
+        .trim();
+      const semIva = semNumero.replace(/^[+\s]*(iva|vat)\b\s*/i, "").trim();
+      const sobra = semIva.replace(/^[\s,;:·—–-]+/u, "").trim();
+      return /^\([\s\S]*\)$/.test(sobra) ? sobra.slice(1, -1).trim() : sobra;
+    };
     const totalStr = semMarcador(orgT ? (doc.totalEstimatedText ?? "") : doc.totalText);
     // O rótulo do total de Decoração é um campo do estúdio, e nasce preenchido
     // («Valor Total Decoração»): traduz-se enquanto for o que lá nasceu, e sai
@@ -1969,17 +2002,47 @@ export async function renderProposalDocPdfWithReport(
       });
     };
 
-    // Column header row — bold sentence-case (matching the studio's sample
-    // proposals: "Item" / "Preço Estimado (€)"), one pale rule underneath.
-    text(p, t.colunaItem, M, y, { font: f.serifB, size: 11, color: INK });
-    textRight(p, orgT ? t.colunaPrecoEstimado : t.colunaPreco, M + boxW, y, {
-      font: f.serifB,
-      size: 11,
-      color: INK,
-    });
-    y -= 14;
-    p.drawLine({ start: { x: M, y }, end: { x: M + boxW, y }, thickness: 0.5, color: LINE });
-    y -= 22;
+    /* ═══════════════════════════════════════════════════════════════════════
+       O CABEÇALHO DO QUADRO VIAJA COM O QUADRO
+       ═══════════════════════════════════════════════════════════════════════
+
+       Quando o quadro parte, a folha seguinte abria com uma rubrica solta: sem
+       o «Item / Preço (€)», sem título de secção, sem nada que dissesse que
+       aquilo era a continuação de um orçamento. Quem vira a página encontra uma
+       frase no topo de uma folha branca.
+
+       Agora o cabeçalho é uma função e é redesenhado em cada folha nova, com a
+       palavra que diz de onde vem.
+
+       ── PORQUE É QUE O «(cont.)» NÃO ESTÁ NO DICIONÁRIO ────────────────────
+       É a MESMA abreviatura nas duas línguas — «cont.» de continuação e
+       «cont.» de continued —, exactamente como a marca «extra» das linhas
+       opcionais, que também é a mesma nas duas e está escrita no dicionário
+       com o mesmo valor dos dois lados. */
+    const cabecalhoDoQuadro = (continuacao = false) => {
+      if (continuacao) {
+        // Em capitulares pálidas, como todos os sobretítulos deste documento —
+        // e não em serifa de corpo 13. Diz o mesmo e custa dez pontos a menos
+        // de folha, que é o que decide se a cauda ainda cabe nesta página.
+        eyebrow(p, `${t.tituloOrcamento} (cont.)`, M, y);
+        y -= 12;
+      }
+      // Column header row — bold sentence-case (matching the studio's sample
+      // proposals: "Item" / "Preço Estimado (€)"), one pale rule underneath.
+      text(p, t.colunaItem, M, y, { font: f.serifB, size: 11, color: INK });
+      textRight(p, orgT ? t.colunaPrecoEstimado : t.colunaPreco, M + boxW, y, {
+        font: f.serifB,
+        size: 11,
+        color: INK,
+      });
+      y -= 14;
+      p.drawLine({ start: { x: M, y }, end: { x: M + boxW, y }, thickness: 0.5, color: LINE });
+      y -= 22;
+    };
+    /** O que o cabeçalho repetido gasta numa folha nova: a palavra, as duas
+     *  legendas e a régua. */
+    const ALTURA_DO_CABECALHO_CONT = 12 + 14 + 22;
+    cabecalhoDoQuadro();
 
     /**
      * Muda de página quando o que vem a seguir não cabe acima do chão da mancha.
@@ -1998,12 +2061,93 @@ export async function renderProposalDocPdfWithReport(
       }
     };
 
+    /* ═══════════════════════════════════════════════════════════════════════
+       O QUADRO PARTE-SE COM REGRA DE VIÚVA E ÓRFÃ
+       ═══════════════════════════════════════════════════════════════════════
+
+       Cada linha decidia sozinha se cabia. Medido no caso longo, com quinze
+       rubricas: a folha do orçamento levava as rubricas 1 a 14 e a seguinte
+       abria com
+
+           Rubrica de orçamento número 15
+
+       sozinha, sem cabeçalho, sem título e sem marca de continuação. Fiz a
+       conta: depois da rubrica 14 sobravam 90 pontos acima do chão e a linha
+       seguinte pedia 20 — o chão está a 74. Faltaram QUATRO PONTOS.
+
+       A regra passa a ser a das listas: nunca UMA linha sozinha numa folha. Se
+       ao partir sobrasse uma, leva-se a anterior com ela.
+
+       ── E É DECIDIDA PARA O QUADRO INTEIRO, NÃO LINHA A LINHA ──────────────
+       Uma quebra que se desfaz obriga a refazer todas as que vêm a seguir: por
+       isso reparte-se primeiro (sem desenhar nada), aplica-se a regra, e só
+       depois se desenha. A repartição corre outra vez de cada vez que a regra
+       muda uma quebra, porque mudar uma pode criar outra.
+
+       ── O QUE NÃO SE CORRIGE, E PORQUÊ ────────────────────────────────────
+       A viúva do outro lado — UMA rubrica sozinha no fundo da PRIMEIRA folha —
+       não se corrige aqui: empurrá-la deixava o cabeçalho de secção e o
+       «Item / Preço (€)» sozinhos numa folha, que é pior do que o defeito. E
+       não acontece: o quadro abre com mais de 380 pontos livres, que dão para
+       dezanove rubricas. */
+    /** Nunca menos de duas rubricas numa folha de continuação. */
+    const MIN_RUBRICAS = 2;
+    interface LinhaDoQuadro {
+      /** O que o `y` desce ao desenhar esta linha. */
+      altura: number;
+      /** O que tem de caber acima do chão para ela ser desenhada aqui. */
+      reserva: number;
+      desenhar: () => void;
+    }
+    const desenharQuadro = (linhas: LinhaDoQuadro[]) => {
+      if (!linhas.length) return;
+      const yInicial = y;
+      const TOPO = H - M - 64;
+      /** Que rubricas ficam em cada folha, dadas as quebras já forçadas. */
+      const repartir = (forcadas: ReadonlySet<number>): number[][] => {
+        const paginas: number[][] = [[]];
+        let yy = yInicial;
+        for (let i = 0; i < linhas.length; i++) {
+          if (i > 0 && (forcadas.has(i) || yy - linhas[i].reserva < CHAO)) {
+            paginas.push([]);
+            yy = TOPO - ALTURA_DO_CABECALHO_CONT;
+          }
+          paginas[paginas.length - 1].push(i);
+          yy -= linhas[i].altura;
+        }
+        return paginas;
+      };
+      const forcadas = new Set<number>();
+      let paginas = repartir(forcadas);
+      // Uma volta por rubrica é tecto de sobra: cada volta ou corrige uma folha
+      // ou pára. Sem tecto, um caso que não convergisse ficava em ciclo.
+      for (let volta = 0; volta < linhas.length; volta++) {
+        const orfa = paginas.findIndex((pg, k) => k > 0 && pg.length < MIN_RUBRICAS);
+        if (orfa < 0) break;
+        const primeira = paginas[orfa][0];
+        // Nunca se recua para a rubrica 0: isso mandava o quadro inteiro para a
+        // folha seguinte e deixava o cabeçalho de secção sozinho.
+        if (primeira - 1 <= 0 || forcadas.has(primeira - 1)) break;
+        forcadas.add(primeira - 1);
+        paginas = repartir(forcadas);
+      }
+      for (const [k, pagina] of paginas.entries()) {
+        if (k > 0) {
+          p = pdf.addPage([W, H]);
+          frame(p);
+          y = TOPO;
+          cabecalhoDoQuadro(true);
+        }
+        for (const i of pagina) linhas[i].desenhar();
+      }
+    };
+
     // Reserve room on the right of each row for the price/value column so a long
     // item name wraps onto extra lines instead of running through the amount (and
     // on into the "Notas importantes" column). ~120pt covers "12.500,00 € + IVA".
     const PRICE_COL = 120;
     if (orgT) {
-      for (const r of doc.budgetRows ?? []) {
+      const rubricas: LinhaDoQuadro[] = (doc.budgetRows ?? []).map((r) => {
         /**
          * ── A COLUNA DE PREÇO É A MESMA COLUNA DOS TOTAIS ──────────────────
          *
@@ -2022,18 +2166,26 @@ export async function renderProposalDocPdfWithReport(
          *
          * Passa pelo `dinheiro` como tudo o resto que é montante nesta folha.
          *
-         * ── E O MARCADOR CAI NO MESMO TRAÇO QUE O TOTAL ────────────────────
+         * ── «AINDA SEM PREÇO» DIZ-SE DE UMA MANEIRA SÓ ────────────────────
          *
-         * «[Valor]» é o que o estúdio semeia numa linha por orçamentar. O total
-         * já se defendia dele (ver `semMarcador`, dez linhas acima, com a razão
-         * escrita); esta coluna não, e é a mesma folha a chegar ao mesmo casal
-         * com um modelo por preencher impresso.
+         * «[Valor]» é o que o estúdio semeia numa linha por orçamentar, e não
+         * pode chegar ao papel — nem em português por cima de uma folha
+         * inglesa. Cai fora, e isso não muda.
          *
-         * O marcador cai no MESMO «—» que o total já desenha — que é o que diz
-         * «ainda não há preço» sem dizer ao cliente que recebeu um modelo. Uma
-         * célula genuinamente VAZIA continua vazia: é assim que esta folha sai
-         * há anos, e encher todas as linhas por orçamentar com traços era mudar
-         * o desenho de um documento que ninguém pediu para mudar.
+         * O que muda é o que fica no lugar dele. Saía um «—», e a célula
+         * genuinamente VAZIA saía vazia: duas rubricas seguidas, a mesma
+         * situação — ainda não há preço —, dois desenhos na mesma folha. Foi
+         * medido na proposta de Organização do relatório, linhas 3 e 4.
+         *
+         * As duas passam a ser a mesma: EM BRANCO. Não é uma escolha entre
+         * duas igualmente boas — o travessão numa coluna de dinheiro tanto se
+         * lê como «zero» como «por definir», e a célula vazia é como esta folha
+         * sai há anos. O que se corrigiu foi a incoerência, e corrigiu-se para
+         * o lado que já era o dela.
+         *
+         * (O TOTAL continua a desenhar «—» quando não há número: ali a linha
+         * existe e tem de dizer alguma coisa. Aqui a linha é a rubrica, e a
+         * rubrica está escrita.)
          */
         const escrito = (r.price ?? "").trim();
         const preco = semMarcador(escrito).trim();
@@ -2050,21 +2202,27 @@ export async function renderProposalDocPdfWithReport(
          * desenhado, e é essa a largura que se tira ao nome. O caso normal não
          * muda um ponto — só um preço acima dos 120 aperta a coluna da esquerda.
          */
-        const impresso = escrito ? (preco ? dinheiro(preco) : "—") : "";
+        const impresso = preco ? dinheiro(preco) : "";
         const larguraDoPreco = impresso
           ? f.reg.widthOfTextAtSize(textoParaFonte(f.reg, impresso), 10.5) + 12
           : 0;
         const lines = wrap(f.reg, r.item, 10.5, boxW - Math.max(PRICE_COL, larguraDoPreco));
-        budgetBreak(Math.max(20, lines.length * 15));
-        lines.forEach((ln, i) => {
-          text(p, ln, M, y, { size: 10.5, color: INK });
-          if (i === 0 && impresso) {
-            textRight(p, impresso, M + boxW, y, { size: 10.5, color: MUTED });
-          }
-          y -= 15;
-        });
-        y -= 5;
-      }
+        return {
+          altura: lines.length * 15 + 5,
+          reserva: Math.max(20, lines.length * 15),
+          desenhar: () => {
+            lines.forEach((ln, i) => {
+              text(p, ln, M, y, { size: 10.5, color: INK });
+              if (i === 0 && impresso) {
+                textRight(p, impresso, M + boxW, y, { size: 10.5, color: MUTED });
+              }
+              y -= 15;
+            });
+            y -= 5;
+          },
+        };
+      });
+      desenharQuadro(rubricas);
     } else {
       // As linhas assinaladas como EXTRA saem marcadas, para o casal poder ler
       // a proposta uma vez e ver as duas versões nela. A marca é uma palavra à
@@ -2087,6 +2245,7 @@ export async function renderProposalDocPdfWithReport(
       // maneira de isto poder mentir sobre dinheiro.
       const ordemDasLinhas = ordemDasLinhasDoOrcamento;
       notaDeOrdem("Orçamento", docPt.budgetItems, ordemDasLinhas);
+      const rubricas: LinhaDoQuadro[] = [];
       ordemDasLinhas.forEach((i) => {
         const it = doc.budgetItems[i];
         /**
@@ -2108,16 +2267,46 @@ export async function renderProposalDocPdfWithReport(
         // que a separa do nome — a marca é curta nas duas línguas («extra»), e
         // o teste de transbordos confirma-o.
         const lines = wrap(f.reg, it, 10.5, boxW - (marcas[i] ? 46 : 0));
-        budgetBreak(Math.max(20, lines.length * 15));
-        lines.forEach((ln, j) => {
-          text(p, ln, M, y, { size: 10.5, color: INK });
-          if (j === 0 && marcas[i]) {
-            textRight(p, t.marcaExtra, M + boxW, y, { size: 9, color: MUTED });
-          }
-          y -= 15;
+        rubricas.push({
+          altura: lines.length * 15 + 5,
+          reserva: Math.max(20, lines.length * 15),
+          desenhar: () => {
+            lines.forEach((ln, j) => {
+              text(p, ln, M, y, { size: 10.5, color: INK });
+              if (j === 0 && marcas[i]) {
+                textRight(p, t.marcaExtra, M + boxW, y, { size: 9, color: MUTED });
+              }
+              y -= 15;
+            });
+            y -= 5;
+          },
         });
-        y -= 5;
       });
+      desenharQuadro(rubricas);
+    }
+
+    /* ── A RÉGUA ENTRE A ÚLTIMA RUBRICA E A SOMA ────────────────────────────
+       «Decor Jantar» e «TOTAL (sem IVA)» colavam-se: quinze pontos de avanço
+       entre a última linha do quadro e a primeira da soma, os mesmos quinze que
+       separam duas rubricas. O total lia-se como mais uma linha do quadro — e
+       é a linha que o casal procura primeiro.
+
+       Um fio pálido à largura do quadro, com seis pontos de ar de cada lado:
+       doze pontos ao todo, que é o preço de o quadro acabar antes de a soma
+       começar. Sem rubricas nenhumas não se desenha nada — um fio a fechar um
+       quadro vazio é tinta a dizer coisa nenhuma. */
+    const houveRubricas = orgT
+      ? (doc.budgetRows ?? []).length > 0
+      : doc.budgetItems.some((it) => (it ?? "").trim());
+    if (houveRubricas) {
+      y -= 6;
+      p.drawLine({
+        start: { x: M, y: y + 8 },
+        end: { x: M + boxW, y: y + 8 },
+        thickness: 0.5,
+        color: LINE,
+      });
+      y -= 6;
     }
 
     /**
@@ -2244,10 +2433,37 @@ export async function renderProposalDocPdfWithReport(
       for (const ex of extras) {
         const cru = normalizarValor(ex.valueText);
         const base = somaDosExtrasSemIva([ex], { mode: totais.modo, vatRate: totais.taxa });
-        const dito =
-          cru !== null && round2(cru) !== base
-            ? `${ex.label} (${dinheiro(ex.valueText.trim())})`
-            : ex.label;
+        /* ═════════════════════════════════════════════════════════════════
+           A RESSALVA QUE ELA ESCREVE NUM VALOR É SEMPRE IMPRESSA
+           ═════════════════════════════════════════════════════════════════
+
+           Escrito no estúdio, num adicional:
+
+               12.500,00 € + IVA (a confirmar consoante a distância final)
+
+           O PDF imprimia «+ 12.500,00 €» e DEITAVA FORA a condição inteira. O
+           número estava certo — o IVA é somado no bloco — mas a ressalva, que é
+           sobre dinheiro e é dela, não chegava ao cliente.
+
+           A causa: o texto dela só aparecia quando o número CRU diferia da base
+           («75,00 €» numa proposta com IVA incluído vale 60,98 de base, e aí a
+           folha dizia os dois). Quando não diferia, o ramo de baixo escrevia só
+           o rótulo — e com ele ia tudo o que ela tinha escrito ao lado do
+           número.
+
+           Agora: o que ela escreveu ALÉM do número vai sempre para o papel, ao
+           lado do nome, entre parênteses. É onde a informação pertence — a
+           dizer o que aquele valor é, não a fingir que é uma parcela desta
+           soma, que continua a ser a que fecha as contas.
+
+           E é a mesma regra que o modelo de Organização já tinha: lá,
+           «1.850,00 € + IVA (a confirmar)» é impresso inteiro na linha. A mesma
+           frase, escrita pela mesma pessoa, era tratada de duas maneiras
+           conforme o modelo. */
+        const escritoDela = (ex.valueText ?? "").trim();
+        const mostraTudo = cru === null || round2(cru) !== base;
+        const aoLado = mostraTudo ? dinheiro(escritoDela) : ressalvaDoValor(escritoDela);
+        const dito = aoLado ? `${ex.label} (${aoLado})` : ex.label;
         const lines = wrap(f.reg, dito, 10.5, boxW - PRICE_COL);
         budgetBreak(Math.max(18, lines.length * 14));
         lines.forEach((ln, i) => {
