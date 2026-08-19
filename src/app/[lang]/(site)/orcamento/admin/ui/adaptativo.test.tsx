@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -183,43 +185,70 @@ describe("MenuDeAccoes", () => {
   ];
 
   /**
-   * A regra que este componente existe para aplicar: num ecrã táctil, "aparece
-   * no hover" quer dizer "não existe".
+   * ── A REGRA MUDOU DE LÍNGUA, E OS TESTES TÊM DE MUDAR COM ELA ─────────────
+   *
+   * A pergunta é a mesma — «há rato?» — mas deixou de ser feita em JavaScript
+   * (`usePodeEsconderNoHover()`) e passou a ser feita em CSS (`com-rato:`, em
+   * globals.css). O motivo está medido lá: o hook devolve `false` no servidor,
+   * portanto o primeiro desenho no computador mostrava as acções todas e o
+   * segundo escondia-as — um piscar por linha, em cada carregamento.
+   *
+   * O jsdom não avalia media queries sobre classes, por isso o que estes três
+   * testes afirmam é o CONTRATO das classes. Cada um guarda uma metade
+   * diferente da regra, e nenhum deles passa por acidente.
    */
-  it("num ecrã de dedo, as acções estão visíveis — nunca escondidas no hover", async () => {
-    simularAparelho(TELEMOVEL);
-    render(<MenuDeAccoes accoes={ACCOES} sobre="Terracotta" soltasNoEcraGrande={1} />);
-    const duplicar = await screen.findByRole("button", { name: "Duplicar" });
-    expect(duplicar.className).toContain("opacity-100");
-    expect(duplicar.className).not.toContain("opacity-0");
-  });
 
-  it("com rato, escondem-se até se passar por cima", async () => {
-    simularAparelho(DESKTOP);
-    render(<MenuDeAccoes accoes={ACCOES} sobre="Terracotta" soltasNoEcraGrande={1} />);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Duplicar" }).className).toContain(
-        "opacity-0 group-hover:opacity-100",
-      ),
-    );
+  /** As classes NÃO podem depender do aparelho: é essa a diferença entre a
+   *  decisão estar no CSS e estar no JavaScript, e é o que impede o piscar. */
+  it("as classes são as mesmas no telemóvel, no iPad e no computador", async () => {
+    const lidas: string[] = [];
+    for (const aparelho of [TELEMOVEL, IPAD, DESKTOP]) {
+      simularAparelho(aparelho);
+      render(<MenuDeAccoes accoes={ACCOES} sobre="Terracotta" soltasNoEcraGrande={1} />);
+      lidas.push((await screen.findByRole("button", { name: "Duplicar" })).className);
+      cleanup();
+    }
+    expect(new Set(lidas).size).toBe(1);
   });
 
   /**
-   * Um iPad é largo E de dedo. Esconder por LARGURA acertava nos dois casos
-   * comuns e falhava exactamente neste.
+   * A acção é VISÍVEL POR OMISSÃO, e o esconderijo é só uma variante por cima.
    *
-   * A asserção é sobre `opacity-0` e NÃO sobre `opacity-100`: a variante
-   * escondida é `opacity-0 group-hover:opacity-100`, ou seja contém a cadeia
-   * "opacity-100" na mesma. Procurar por ela dava um teste que passava dos dois
-   * lados — foi o que aconteceu à primeira versão deste ficheiro, e só se viu
-   * ao partir o código de propósito para o ver falhar.
+   * A asserção olha para a classe INTEIRA e não para um pedaço dela: a cadeia
+   * "opacity-0" também aparece dentro de "com-rato:opacity-0", por isso um
+   * `toContain` passava dos dois lados e não guardava nada. Foi este o engano
+   * da primeira versão deste ficheiro, e só se viu ao partir o código de
+   * propósito para o ver falhar.
    */
-  it("um tablet com dedo conta como dedo, mesmo sendo largo", async () => {
-    simularAparelho(IPAD);
+  it("a acção é visível por omissão — o esconderijo é que é a excepção", async () => {
+    simularAparelho(TELEMOVEL);
     render(<MenuDeAccoes accoes={ACCOES} sobre="Terracotta" soltasNoEcraGrande={1} />);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Duplicar" }).className).not.toContain("opacity-0"),
+    const classes = (await screen.findByRole("button", { name: "Duplicar" })).className.split(
+      /\s+/,
     );
+    expect(classes).toContain("opacity-100");
+    expect(classes).not.toContain("opacity-0");
+    expect(classes).toContain("com-rato:opacity-0");
+    expect(classes).toContain("com-rato:group-hover:opacity-100");
+  });
+
+  /**
+   * E o esconderijo pergunta pelo PONTEIRO, não pela largura.
+   *
+   * Sem este teste, `com-rato` podia ser redefinido como `(min-width: 640px)`
+   * e os dois de cima continuavam verdes — o iPad em retrato voltava a perder
+   * as acções todas e ninguém dava por isso. É a ponta que fecha o par: o nome
+   * da variante aqui, a media query em globals.css.
+   */
+  it("«com rato» é uma pergunta sobre o ponteiro, e não sobre a largura", async () => {
+    // Caminho a partir da raiz do projecto: no jsdom o `import.meta.url` não é
+    // um `file:`, portanto um URL relativo não resolve.
+    const css = await readFile(join(process.cwd(), "src/app/globals.css"), "utf8");
+    const linha = css.split("\n").find((l) => l.startsWith("@custom-variant com-rato"));
+    expect(linha, "globals.css tem de definir a variante `com-rato`").toBeTruthy();
+    expect(linha).toContain("hover: hover");
+    expect(linha).toContain("pointer: fine");
+    expect(linha).not.toContain("width");
   });
 
   it("o menu tem nome próprio — dez na mesma página não se chamam todos 'Acções'", async () => {

@@ -5,10 +5,44 @@ import type { PropItem } from "@/lib/inventory-types";
 import { PROP_CATEGORIES } from "@/lib/inventory-types";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
-import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
+import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import ModoDeCarga from "./ModoDeCarga";
+
+/* Os dois ícones da linha, escritos uma vez: servem os botões soltos da tabela
+   do computador e os itens do menu «⋯» de quem não tem rato. */
+const LapisIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+  </svg>
+);
+
+const CruzIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M18 6 6 18M6 6l12 12" />
+  </svg>
+);
 
 type Condition = PropItem["condition"];
 
@@ -227,6 +261,24 @@ export default function Inventario() {
     setEditingId(i.id);
     setEditForm(fromItem(i));
   }
+
+  /**
+   * As acções de uma linha, como DADOS — a forma é de quem as desenha.
+   *
+   * Estão aqui para que os dois ícones da tabela e os dois itens do menu «⋯»
+   * não possam divergir: é a MESMA lista, e nenhum dos dois desenhos pode
+   * ganhar uma acção que o outro não tenha.
+   */
+  const accoesDe = (i: PropItem): AccaoDeItem[] => [
+    { id: "editar", rotulo: "Editar", icone: LapisIcon, onAccao: () => startEdit(i) },
+    {
+      id: "remover",
+      rotulo: "Remover",
+      icone: CruzIcon,
+      destrutiva: true,
+      onAccao: () => remove(i.id),
+    },
+  ];
 
   function exportCsv() {
     const rows: (string | number)[][] = [
@@ -774,46 +826,48 @@ export default function Inventario() {
                       </td>
                       <td className="px-4 py-3.5 text-foreground/50">{i.location || "—"}</td>
                       <td className="px-4 py-3.5">
-                        <div className="flex items-center justify-end gap-1">
+                        {/* ══ AS ACÇÕES DA LINHA, EM DUAS FORMAS ══════════════
+                            Esta tabela só aparece a partir de `md` (768 px);
+                            abaixo disso o mesmo inventário desenha-se em cartões
+                            com «Editar» e «Remover» escritos por extenso.
+
+                            MEDIDO a 768×1024 com dedo — um iPad em retrato, que
+                            é EXACTAMENTE a largura onde a tabela entra: os 20
+                            botões da tabela estavam lá, com a tabela visível, e
+                            ZERO deles apareciam. Só tinham `opacity-0
+                            group-hover:opacity-100`, sem escapatória nenhuma —
+                            nem sequer a do `sm:` que os outros ecrãs tinham.
+                            Sem rato não há como pedir um hover: naquele
+                            aparelho, editar e remover um adereço a partir da
+                            tabela não existiam.
+
+                            COM RATO fica o que estava: dois ícones que aparecem
+                            ao pairar sobre a linha.
+                            SEM RATO fica um «⋯», com «Remover» lá dentro,
+                            separado e a vermelho. Um alvo em vez de dois numa
+                            célula de tabela, e o que apaga deixa de estar
+                            encostado ao que edita. */}
+                        <div className="hidden com-rato:flex items-center justify-end gap-1">
                           <button
                             onClick={() => startEdit(i)}
-                            className="text-foreground/25 hover:text-[#4d6350] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            className="alvo-toque text-foreground/25 hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                             aria-label="Editar"
                           >
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
-                            </svg>
+                            {LapisIcon}
                           </button>
                           <button
                             onClick={() => remove(i.id)}
-                            className="text-foreground/25 hover:text-[#8a2a22] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            className="alvo-toque text-foreground/25 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                             aria-label="Remover"
                           >
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M18 6 6 18M6 6l12 12" />
-                            </svg>
+                            {CruzIcon}
                           </button>
                         </div>
+                        <MenuDeAccoes
+                          className="com-rato:hidden justify-end"
+                          sobre={i.name}
+                          accoes={accoesDe(i)}
+                        />
                       </td>
                     </tr>
                   ),

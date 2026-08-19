@@ -220,6 +220,164 @@ export function isPersistenceUnavailable(err: unknown): boolean {
   );
 }
 
+// ── O QUE MAIS PODE CORRER MAL ENTRE AQUI E O POSTGRES ────────────────────
+//
+// Os dois reconhecedores acima cobrem as duas INSTALAÇÕES incompletas. Tudo o
+// resto caía no mesmo `500 "Erro interno"` — e a medição que obrigou a isto foi
+// esta: das nove avarias que se conseguem provocar contra um Supabase de
+// mentira, SETE saíam com essa frase. Uma chave rejeitada, um projecto em
+// pausa, uma consulta que estoirou o tempo e uma leitura negada pelo RLS são
+// quatro problemas com quatro resoluções diferentes, e chegavam ao ecrã como o
+// mesmo nada.
+//
+// A forma do erro que sai do postgrest-js foi medida caso a caso (o mesmo
+// cliente real, contra um servidor local que responde o que o Supabase
+// responde). Duas surpresas guiam o que se segue:
+//
+//   1. Quando o corpo NÃO é JSON — um projecto em pausa devolve HTML, tal como
+//      um 502 de um intermediário —, o erro chega SEM código nenhum: só
+//      `{ message: "<html>…" }`. Só a frase o distingue.
+//   2. Quando a ligação nem chega a abrir, o postgrest-js tenta três vezes com
+//      espera entre elas: medi 8 s até desistir contra uma porta fechada, e o
+//      que sai é `{ message: "TypeError: fetch failed", code: "" }`. Também
+//      aqui só a frase o distingue — e esses 8 s são metade do orçamento de uma
+//      função, que é a outra razão para isto ter nome próprio.
+
+/** O SQLSTATE / código do PostgREST, quando o erro traz algum. */
+function codigoDoErro(err: unknown): string {
+  if (!err || typeof err !== "object") return "";
+  const c = (err as { code?: unknown }).code;
+  return typeof c === "string" ? c : "";
+}
+
+/** A frase do erro, sempre uma string (mesmo quando não há erro nenhum). */
+function mensagemDoErro(err: unknown): string {
+  if (!err || typeof err !== "object") return typeof err === "string" ? err : "";
+  const m = (err as { message?: unknown }).message;
+  return typeof m === "string" ? m : "";
+}
+
+/**
+ * O estado HTTP da resposta que produziu o erro — ver `comEstadoHttp`, que o
+ * cola ao erro no ponto onde ele ainda se sabe. Sem isto um 401 e um 500
+ * chegam cá indistinguíveis, porque o `PostgrestError` não o transporta.
+ */
+function estadoDoErro(err: unknown): number | null {
+  if (!err || typeof err !== "object") return null;
+  const s = (err as { status?: unknown }).status;
+  return typeof s === "number" ? s : null;
+}
+
+/**
+ * As chaves do Supabase existem mas foram RECUSADAS — chave errada, chave
+ * rodada no painel e não actualizada no Vercel, ou a sessão do PostgREST
+ * expirada.
+ *
+ * Não é o mesmo que "faltam as chaves" (`isPersistenceUnavailable`): ali não há
+ * base de dados nenhuma configurada, aqui há e ela diz que não. E não é uma
+ * avaria: alguém tem de ir colar a chave certa, o que é um passo, não um
+ * mistério.
+ */
+export function isCredencialRecusada(err: unknown): boolean {
+  const codigo = codigoDoErro(err);
+  if (codigo === "PGRST301" || codigo === "PGRST302" || codigo === "42501") return false;
+  const estado = estadoDoErro(err);
+  const msg = mensagemDoErro(err);
+  if (/invalid api key|no api key found|jwt (expired|invalid)|invalid jwt/i.test(msg)) return true;
+  // Um 401/403 do PostgREST sem código é sempre autenticação — a autorização
+  // dentro da base de dados chega com SQLSTATE (42501, tratado à parte).
+  return (estado === 401 || estado === 403) && !codigo;
+}
+
+/** A sessão do PostgREST caducou (PGRST301/302). Mesma resolução da chave
+ *  recusada, frase própria porque a causa é outra. */
+export function isSessaoExpirada(err: unknown): boolean {
+  const codigo = codigoDoErro(err);
+  return codigo === "PGRST301" || codigo === "PGRST302";
+}
+
+/**
+ * Não se chegou a falar com a base de dados: ligação recusada, DNS morto, ou —
+ * o caso que mais acontece a um projecto pequeno — o Supabase EM PAUSA, que
+ * responde uma página HTML em vez de JSON.
+ *
+ * O reconhecimento é pela FRASE porque é só isso que sobra: ver a nota acima,
+ * medida contra o cliente real.
+ */
+export function isBaseInacessivel(err: unknown): boolean {
+  const msg = mensagemDoErro(err);
+  if (!msg) return false;
+  // O corpo não era JSON: quem respondeu não foi o PostgREST.
+  if (/^\s*</.test(msg) || /<html|<!doctype/i.test(msg)) return true;
+  return /fetch failed|fetcherror|network|econnrefused|enotfound|eai_again|etimedout|econnreset|socket hang up|und_err|terminated/i.test(
+    msg,
+  );
+}
+
+/**
+ * A consulta foi ao ar por tempo: o `statement_timeout` do Postgres (57014) ou
+ * o do pgbouncer. Numa tabela pequena isto quer dizer base sobrecarregada, e a
+ * resolução — voltar a tentar, ver o estado do projecto — não tem nada a ver
+ * com a de uma instalação incompleta.
+ */
+export function isTempoEsgotado(err: unknown): boolean {
+  const codigo = codigoDoErro(err);
+  if (codigo === "57014" || codigo === "57P01" || codigo === "08006") return true;
+  return /statement timeout|canceling statement|query timeout|timeout expired/i.test(
+    mensagemDoErro(err),
+  );
+}
+
+/**
+ * A base de dados leu o pedido e RECUSOU-O: `permission denied` (42501), que é
+ * o que uma política de RLS ou um `revoke` produzem quando o papel usado não é
+ * o `service_role`.
+ *
+ * Atenção ao irmão silencioso deste erro, que NÃO passa por aqui: com RLS
+ * ligado e SEM política nenhuma, o Postgres não recusa — devolve zero linhas.
+ * Uma leitura com a chave errada responde 200 e uma lista vazia, e é por isso
+ * que a rota tem de olhar também para o PAPEL da chave (ver
+ * `papelDaChaveSupabase`): sem isso, "a Biblioteca está vazia" e "a Biblioteca
+ * está escondida de ti" são o mesmo ecrã.
+ */
+export function isLeituraNegada(err: unknown): boolean {
+  return codigoDoErro(err) === "42501" || /permission denied/i.test(mensagemDoErro(err));
+}
+
+/**
+ * O erro reduzido a uma linha que se possa MOSTRAR — código, estado e frase,
+ * cortada. Existe para que um 500 nunca mais seja anónimo: mesmo quando não
+ * reconhecemos a causa, quem está no ecrã leva consigo o que perguntar.
+ *
+ * Cortada a 200 caracteres porque o que interessa vem sempre à cabeça (o
+ * Postgres põe a causa na primeira frase) e porque isto vai para um cartão de
+ * aviso, não para os registos — esses levam o erro inteiro.
+ */
+export function descricaoTecnica(err: unknown): string {
+  const partes: string[] = [];
+  const codigo = codigoDoErro(err);
+  const estado = estadoDoErro(err);
+  if (codigo) partes.push(codigo);
+  if (estado !== null) partes.push(`HTTP ${estado}`);
+  const msg = mensagemDoErro(err) || String(err);
+  const etiqueta = partes.length ? `${partes.join(" ")}: ` : "";
+  return `${etiqueta}${msg}`.slice(0, 200);
+}
+
+/**
+ * Cola o estado HTTP ao erro do PostgREST, no único sítio onde ele ainda se
+ * sabe: o `PostgrestError` traz código, frase e dicas, mas não o estado — e sem
+ * ele um 401 (chave recusada) e um 500 (avaria) chegam a quem decide como o
+ * mesmo objecto. Não substitui um estado que já lá venha.
+ */
+function comEstadoHttp<E>(error: E, status: number | undefined): E {
+  if (error && typeof error === "object" && typeof status === "number") {
+    const alvo = error as { status?: unknown };
+    if (alvo.status === undefined) alvo.status = status;
+  }
+  return error;
+}
+
 /**
  * Erro de chave duplicada com a FORMA do que o Postgres devolve (SQLSTATE
  * 23505), para o backend de ficheiro poder recusar um id repetido tal como a
@@ -273,8 +431,8 @@ export class SupabaseBackend<T> implements Backend<T> {
     const ordered = this.m.order
       ? base.order(this.m.order.column, { ascending: this.m.order.ascending })
       : base;
-    const { data, error } = await (limit != null ? ordered.limit(limit) : ordered);
-    if (error) throw error;
+    const { data, error, status } = await (limit != null ? ordered.limit(limit) : ordered);
+    if (error) throw comEstadoHttp(error, status);
     const rows = data ?? [];
     // Only an EXPLICIT opt-in limit can truncate — and never silently: a full
     // page is the signal that real pagination is needed.
@@ -288,12 +446,12 @@ export class SupabaseBackend<T> implements Backend<T> {
   }
 
   async get(id: string): Promise<T | null> {
-    const { data, error } = await this.sb
+    const { data, error, status } = await this.sb
       .from(this.m.table)
       .select(this.colsWithStamp)
       .eq(this.idCol, id)
       .maybeSingle();
-    if (error) throw error;
+    if (error) throw comEstadoHttp(error, status);
     if (!data) return null;
     const entity = this.map(data);
     if (this.m.touch && entity && typeof entity === "object") {
@@ -308,14 +466,14 @@ export class SupabaseBackend<T> implements Backend<T> {
     const q = this.m.order
       ? base.order(this.m.order.column, { ascending: this.m.order.ascending })
       : base;
-    const { data, error } = await q;
-    if (error) throw error;
+    const { data, error, status } = await q;
+    if (error) throw comEstadoHttp(error, status);
     return (data ?? []).map(this.map);
   }
 
   async insert(entity: T): Promise<void> {
-    const { error } = await this.sb.from(this.m.table).insert(this.m.toRow(entity));
-    if (error) throw error;
+    const { error, status } = await this.sb.from(this.m.table).insert(this.m.toRow(entity));
+    if (error) throw comEstadoHttp(error, status);
   }
 
   async persist(id: string, merged: T, cas?: T): Promise<void> {
@@ -328,19 +486,19 @@ export class SupabaseBackend<T> implements Backend<T> {
     if (stamp !== undefined) {
       const base = this.sb.from(this.m.table).update(row).eq(this.idCol, id);
       const guarded = stamp === null ? base.is("updated_at", null) : base.eq("updated_at", stamp);
-      const { data, error } = await guarded.select(this.idCol);
-      if (error) throw error;
+      const { data, error, status } = await guarded.select(this.idCol);
+      if (error) throw comEstadoHttp(error, status);
       if (!data?.length) throw new ConflictError<T>(id, { table: this.m.table, attempted: merged });
       return;
     }
 
-    const { error } = await this.sb.from(this.m.table).update(row).eq(this.idCol, id);
-    if (error) throw error;
+    const { error, status } = await this.sb.from(this.m.table).update(row).eq(this.idCol, id);
+    if (error) throw comEstadoHttp(error, status);
   }
 
   async remove(id: string): Promise<void> {
-    const { error } = await this.sb.from(this.m.table).delete().eq(this.idCol, id);
-    if (error) throw error;
+    const { error, status } = await this.sb.from(this.m.table).delete().eq(this.idCol, id);
+    if (error) throw comEstadoHttp(error, status);
   }
 }
 

@@ -9,8 +9,14 @@ import type { NextRequest } from "next/server";
 const st = vi.hoisted(() => ({
   authed: false,
   dbConfigured: true,
+  /** O documento gravado da proposta (null = não há). */
+  doc: null as unknown,
   upload: vi.fn(async (id: string) => ({ path: `${id}/x.jpg`, url: "https://signed/x.jpg" })),
-  list: vi.fn(async (id: string) => [{ path: `${id}/x.jpg`, url: "https://signed/x.jpg" }]),
+  list: vi.fn(
+    async (id: string): Promise<{ path: string; url: string; thumbUrl?: string }[]> => [
+      { path: `${id}/x.jpg`, url: "https://signed/x.jpg" },
+    ],
+  ),
   /** A conversão à porta: o que não é JPEG/PNG sai daqui já em JPEG. A real usa
    *  sharp (que este ficheiro mocka), por isso mocka-se a FRONTEIRA — o que
    *  interessa aqui é o que a rota GUARDA. */
@@ -26,7 +32,20 @@ vi.mock("@/lib/supabase", () => ({ isDatabaseConfigured: () => st.dbConfigured }
 vi.mock("@/lib/proposal-storage", () => ({
   uploadProposalImage: st.upload,
   listProposalImages: st.list,
+  // As assinaturas em lote, que é por onde passam as fotos que NÃO estão na
+  // pasta deste pedido (as da Biblioteca e as que ficaram noutra pasta).
+  signProposalPaths: vi.fn(
+    async (refs: string[]) => new Map(refs.map((r) => [r, `https://signed/${r}`])),
+  ),
+  signProposalThumbs: vi.fn(async () => new Map<string, string>()),
+  uploadProposalThumb: vi.fn(async () => ""),
 }));
+/** O documento gravado desta proposta — é aí que estão escritas as referências
+ *  das fotos que a listagem da pasta não vê. */
+vi.mock("@/lib/proposals-store", () => ({
+  getProposalByQuote: vi.fn(async () => (st.doc ? { doc: st.doc } : null)),
+}));
+vi.mock("@/lib/proposal-drafts", () => ({ getProposalDraft: vi.fn(async () => null) }));
 // `motivoDaRecusa` é PURO (olha para os bytes e diz porque não servem) e é o
 // que escolhe a frase que a pessoa lê. Fica o real: substituí-lo era testar a
 // rota contra um diagnóstico inventado.
@@ -63,6 +82,7 @@ function uploadReq(files: File[], id = "q-1"): [NextRequest, { params: Promise<{
 beforeEach(() => {
   st.authed = true;
   st.dbConfigured = true;
+  st.doc = null;
   vi.clearAllMocks();
 });
 
@@ -191,8 +211,52 @@ describe("GET /api/orcamento/[id]/assets", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.images).toEqual([{ path: "q-42/x.jpg", url: "https://signed/x.jpg" }]);
+    expect(body.images).toEqual([
+      {
+        path: "q-42/x.jpg",
+        url: "https://signed/x.jpg",
+        // A foto do armazém não tem miniatura guardada (é uma das antigas): a
+        // lista NÃO a deixa sair sem uma derivada leve — ver abaixo.
+        thumbUrl: "/api/orcamento/q-42/miniatura?ref=q-42%2Fx.jpg",
+      },
+    ]);
     expect(st.list).toHaveBeenCalledWith("q-42");
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * NENHUMA FOTO SAI DESTA LISTA SEM UMA DERIVADA LEVE
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Uma foto sem `thumbUrl` faz a grelha do estúdio cair para o ORIGINAL.
+   * Medido a 1,6 Mbps com 24 células: 1099 KB por célula (26,4 MB nas 24) e a
+   * primeira fotografia pintada aos 34,0 s — para caixas de 174 px. Com
+   * miniatura: 20 KB por célula e a primeira aos 2,5 s.
+   *
+   * As fotos carregadas depois das miniaturas trazem a sua e ficam com o URL
+   * assinado do Storage (nada muda para elas). As antigas passam a sair com o
+   * endereço que a fabrica à primeira vez que alguém olha.
+   */
+  it("uma foto SEM miniatura guardada sai com a miniatura a pedido", async () => {
+    st.list.mockResolvedValueOnce([{ path: "q-9/antiga.jpg", url: "https://signed/antiga.jpg" }]);
+    const [req, ctx] = getReq("q-9");
+    const body = await (await GET(req, ctx)).json();
+    expect(body.images[0].thumbUrl).toBe("/api/orcamento/q-9/miniatura?ref=q-9%2Fantiga.jpg");
+    // E o ORIGINAL continua onde estava: é o plano B da célula e o que a lupa
+    // abre. Uma miniatura no lugar do original seria uma foto pixelizada no
+    // ecrã grande.
+    expect(body.images[0].url).toBe("https://signed/antiga.jpg");
+  });
+
+  it("uma foto COM miniatura guardada mantém o URL assinado do Storage", async () => {
+    st.list.mockResolvedValueOnce([
+      { path: "q-9/nova.jpg", url: "https://signed/nova.jpg", thumbUrl: "https://signed/mini.jpg" },
+    ]);
+    const [req, ctx] = getReq("q-9");
+    const body = await (await GET(req, ctx)).json();
+    // Sem desvio pelo nosso servidor: o Storage serve-a directamente, como
+    // sempre serviu.
+    expect(body.images[0].thumbUrl).toBe("https://signed/mini.jpg");
   });
 
   it("returns an empty list (200) when storage is unavailable", async () => {
@@ -208,6 +272,30 @@ describe("GET /api/orcamento/[id]/assets", () => {
    * O handler não tinha `try/catch`: um Storage a ATIRAR (que não é o mesmo que
    * devolver uma lista vazia) saía como 500 anónimo e sem nada nos registos.
    */
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * UMA FOTO DO DOCUMENTO QUE MORA NA PASTA DE OUTRO PEDIDO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A listagem do Storage é POR PASTA: `listProposalImages("q-1")` só vê
+   * `q-1/…`. Quem assinava o resto era o ramo da Biblioteca, e esse só conhece
+   * as referências `tema:`. Um caminho `q-antigo/x.jpg` escrito no documento —
+   * uma proposta copiada em que a recópia das fotos não chegou ao fim — não era
+   * assinado por ninguém, e a célula ficava sem URL: caixa cinzenta com a
+   * palavra «Imagem», que é o sintoma que a dona do negócio descreveu.
+   */
+  it("assina uma foto do documento que ficou na pasta de outro pedido", async () => {
+    st.doc = { moodBoards: [{ images: ["q-antigo/copiada.jpg", "q-1/propria.jpg"] }] };
+    st.list.mockResolvedValueOnce([{ path: "q-1/propria.jpg", url: "https://signed/propria" }]);
+    const [req, ctx] = getReq("q-1");
+    const body = await (await GET(req, ctx)).json();
+    const caminhos = body.images.map((i: { path: string }) => i.path);
+    expect(caminhos).toContain("q-antigo/copiada.jpg");
+    // E a da própria pasta continua a vir pelo caminho de sempre — sem
+    // duplicados: quem já está na listagem não passa por aqui outra vez.
+    expect(caminhos.filter((c: string) => c === "q-1/propria.jpg")).toHaveLength(1);
+  });
+
   it("um Storage que rebenta dá um 500 registado, não um 500 anónimo", async () => {
     const { log } = await import("@/lib/logger");
     st.list.mockRejectedValueOnce(new Error("Storage em baixo"));

@@ -73,7 +73,19 @@ export async function generateMetadata({
     /* uma leitura que falhe não pode deitar abaixo o título: fica o visitante */
   }
   return {
-    title: getDictionary(locale).portal.title,
+    /**
+     * `absolute`, pela mesma razão que na página da proposta: os dois textos do
+     * dicionário — «Portal do Cliente da Líquen Events» e «Líquen Events Client
+     * Portal» — JÁ NOMEIAM A MARCA, e o `template: "%s | Líquen Events"` do
+     * layout de raiz acrescentava-a outra vez.
+     *
+     * MEDIDO no separador do browser, em `/portal/<token>`:
+     *   <title>Portal do Cliente da Líquen Events | Líquen Events</title>
+     *
+     * Este é o ecrã a que o cliente VOLTA — o separador é o que ele reconhece
+     * entre dez abertos, e é a linha que fica no marcador.
+     */
+    title: { absolute: getDictionary(locale).portal.title },
     robots: { index: false, follow: false },
   };
 }

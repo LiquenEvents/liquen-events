@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { Button, Field } from "./ui";
+import { porqueFalhou } from "@/lib/erro-do-servidor";
 
 interface Props {
   open: boolean;
@@ -80,7 +81,12 @@ export default function NewQuoteModal({ open, onClose, onCreated, existingQuotes
       setF({ ...EMPTY });
       onClose();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Erro ao criar", "error");
+      // A mesma medição das Definições, feita aqui: com a ligação em baixo, o
+      // aviso deste diálogo era «Failed to fetch». E vale para duas falhas, não
+      // uma — o `res.json()` acima também lança quando o corpo não é JSON (um
+      // 502 de um intermediário devolve HTML), e essa mensagem é igualmente do
+      // browser e igualmente inglesa.
+      toast(porqueFalhou(e, "Não foi possível criar o pedido. Verifica a ligação."), "error");
     } finally {
       setSaving(false);
     }

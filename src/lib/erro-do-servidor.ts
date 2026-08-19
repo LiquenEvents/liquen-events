@@ -86,3 +86,98 @@ export async function porqueRecusou(res: Response): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FALHA QUE NÃO VEIO DO SERVIDOR — porque nem sequer chegou lá
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O `porqueRecusou` acima trata da RESPOSTA. Falta o caso em que resposta não
+ * há nenhuma: o wi-fi caiu, o telemóvel saiu de rede, o servidor não atendeu.
+ * Aí o `fetch` LANÇA, e o que ele lança é um `Error` como outro qualquer —
+ * com uma `message` escrita pelo browser, em inglês, e diferente em cada um:
+ *
+ *   Chrome   `Failed to fetch`
+ *   Safari   `Load failed`
+ *   Firefox  `NetworkError when attempting to fetch resource.`
+ *
+ * ── O QUE ISTO ESTAVA A FAZER, MEDIDO ─────────────────────────────────────
+ * Em Definições, cortada a ligação a meio do «Guardar deslocação», o aviso que
+ * aparecia no ecrã era, literalmente, **«Failed to fetch»**. O mesmo ao criar
+ * um pedido novo. Duas coisas de uma vez: uma frase inglesa num back office
+ * português, e — pior — uma frase que não diz o que interessa, que é **o valor
+ * NÃO ficou gravado**.
+ *
+ * E o texto de recurso que estava escrito para este caso nunca chegava a ser
+ * usado: `e instanceof Error ? e.message : "Não foi possível guardar."` — a
+ * falha de rede TAMBÉM é um `Error`, portanto o ramo da direita é código morto.
+ *
+ * ── PORQUE É QUE ISTO NÃO É UMA LISTA DE MENSAGENS DE ERRO ────────────────
+ * Não se traduz nada nem se inventa catálogo nenhum: o que esta função faz é
+ * distinguir DUAS ORIGENS. Se a mensagem foi escrita nesta casa (o
+ * `throw new Error(porqueRecusou(res))` de quem chama), passa tal e qual —
+ * porque já está na língua certa e já nomeia o campo. Se veio da biblioteca do
+ * browser, é substituída pela frase de recurso de quem chama, que é quem sabe
+ * o que se estava a tentar fazer («Não foi possível guardar.»).
+ *
+ * O reconhecimento é por FORMA e não por texto exacto: qualquer `TypeError`
+ * conta (é o que os três browsers lançam), e as três frases conhecidas contam
+ * mesmo quando reembrulhadas. Uma frase inglesa desconhecida que escape a isto
+ * volta a aparecer no ecrã — e é assim que se dá por ela.
+ */
+const FRASES_DO_BROWSER =
+  /^(failed to fetch|load failed|networkerror when attempting to fetch resource\.?|network request failed|the network connection was lost\.?|the internet connection appears to be offline\.?)$/i;
+
+export function porqueFalhou(erro: unknown, recurso: string): string {
+  if (erro instanceof TypeError) return recurso;
+  if (!(erro instanceof Error)) return recurso;
+  const texto = erro.message.trim();
+  if (!texto || FRASES_DO_BROWSER.test(texto)) return recurso;
+  return texto;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANDO NEM SEQUER VEM UM CORPO: dizer o que se sabe, que é o estado
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As rotas desta casa mandam sempre a razão no corpo — mas há recusas que não
+ * passam pelas rotas. Um 504 do intermediário (a função passou do tempo), um
+ * 502, uma página de erro da plataforma: o corpo é HTML, o `res.json()` estoira
+ * e o que restava era a frase de reserva do ecrã, «Não foi possível carregar os
+ * temas», que não nomeia nada.
+ *
+ * A medição que obrigou a isto: das nove maneiras de a lista de temas falhar,
+ * as que não chegam a entrar na rota — tempo esgotado do lado da plataforma —
+ * são precisamente as que davam essa frase, e são as únicas em que o número da
+ * resposta é a ÚNICA pista que existe. Por isso ele entra na frase: é o que ela
+ * copia para uma mensagem a pedir ajuda.
+ */
+export function tituloDaRecusa(status: number): string {
+  if (status === 401 || status === 403) return "A sessão expirou";
+  if (status === 404) return "O servidor não encontrou esta função";
+  if (status === 408 || status === 504) return "O servidor demorou demasiado";
+  if (status === 429) return "Pedidos a mais em pouco tempo";
+  if (status >= 500) return "O servidor não conseguiu responder";
+  return "O servidor recusou o pedido";
+}
+
+export function textoDaRecusa(status: number): string {
+  if (status === 401 || status === 403) {
+    return "A tua sessão de administração já não é válida. Volta a entrar e recarrega a página.";
+  }
+  if (status === 408 || status === 504) {
+    return (
+      `O servidor demorou tempo demais a responder (${status}) e o pedido foi cortado a meio. ` +
+      "Recarrega a página. Nada se perdeu — isto foi uma leitura, e os dados estão guardados."
+    );
+  }
+  if (status === 429) {
+    return "Foram feitos pedidos a mais em pouco tempo. Espera um minuto e recarrega a página.";
+  }
+  return (
+    `O servidor respondeu ${status} e sem explicação nenhuma no corpo — o que quase sempre ` +
+    "quer dizer que o pedido nem chegou à aplicação. Recarrega a página; se continuar, dá " +
+    `este número (${status}) a quem trata da aplicação. Nada foi apagado.`
+  );
+}

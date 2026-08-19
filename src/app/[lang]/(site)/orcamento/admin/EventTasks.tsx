@@ -350,9 +350,21 @@ export default function EventTasks({ quote, userName }: Props) {
                   )}
                 </div>
               </div>
+              {/* ── O ALVO QUE NÃO EXISTIA EM LADO NENHUM ──────────────────────
+                  Este era o pior dos sete: não tinha sequer a escapatória por
+                  largura que os outros tinham. `opacity-0 group-hover` e mais
+                  nada — MEDIDO em 7 linhas, ZERO visíveis a 375×667 COM DEDO e
+                  ZERO a 768×1024 com dedo. Num ecrã táctil não há hover, por
+                  isso não havia como descobrir que a tarefa se podia remover:
+                  ali, esta acção não existia de todo.
+
+                  `com-rato:` (globals.css) esconde só onde há mesmo rato — no
+                  portátil o botão continua a aparecer ao pairar, exactamente
+                  como aparecia. E `alvo-toque` porque, quando finalmente
+                  aparecia, media 13×13 px contra os 44 da casa. */}
               <button
                 onClick={() => removeTask(task.id)}
-                className="mt-0.5 shrink-0 text-foreground/25 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
+                className="alvo-toque mt-0.5 shrink-0 text-foreground/25 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                 aria-label="Remover tarefa"
               >
                 <svg

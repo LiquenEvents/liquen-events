@@ -810,6 +810,14 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                   </button>
                 ) : (
                   <>
+                    {/* MEDIDO a 768×1024 com dedo (o iPad em retrato): 8 destes botões e
+                        ZERO visíveis. 768 passa dos 640 do `sm:`, portanto `sm:opacity-0`
+                        disparava — e sem rato não há como o revelar. A pergunta certa é sobre o
+                        PONTEIRO, não sobre a largura: `com-rato:` (globals.css) esconde só onde
+                        há mesmo rato, e a 375 e a 768 com dedo ficam os 8 visíveis.
+
+                        Fica um ícone e não um menu «⋯»: com UMA acção por linha, o menu custa
+                        os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                     <button
                       type="button"
                       onClick={() => remove(p)}
@@ -818,7 +826,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
                       // apagar dinheiro do registo, e é o alvo mais pequeno da
                       // linha — aqui a centragem do `alvo-toque` é a certa,
                       // porque o conteúdo é um símbolo.
-                      className="alvo-toque text-foreground/45 hover:text-[#b5654a] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-all p-1"
+                      className="alvo-toque text-foreground/45 hover:text-[#b5654a] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all p-1"
                       aria-label={`Remover ${KIND_LABEL[p.kind]} ${eur2(p.amount)}`}
                     >
                       ×

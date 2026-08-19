@@ -5,7 +5,7 @@ import type { Task, TaskPriority } from "@/lib/orcamento/types";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
 import { todayKey } from "./util";
-import { Button, Card, EmptyState, Field } from "./ui";
+import { Button, Card, EmptyState, Field, MenuDeAccoes, type AccaoDeItem } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { metaFor } from "./status-meta";
@@ -19,6 +19,42 @@ const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
 const AREAS = ["Comercial", "Produção", "Decoração", "Financeiro", "Logística", "Geral"];
 
 const PRIORITY_ORDER: Record<TaskPriority, number> = { alta: 0, normal: 1, baixa: 2 };
+
+/* Os dois ícones da linha, escritos uma vez: o mesmo desenho serve os botões
+   soltos do computador e os itens do menu «⋯» do dedo. */
+const LapisIcon = (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+  </svg>
+);
+
+const CaixoteIcon = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    aria-hidden="true"
+  >
+    <path
+      d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 /**
  * Uma linha da lista, memoizada.
@@ -153,59 +189,88 @@ const TaskRow = memo(function TaskRow({
             {metaFor(PRIORITY_META, t.priority).label}
           </span>
         )}
-        {!t.done && (
-          <button
-            onClick={() => onEdit(t)}
-            /* ── UM ALVO DE 13 PX AO LADO DE «ELIMINAR» ──────────────────────
-               MEDIDO num 390×844 com `(pointer: coarse)`: este botão dava
-               13×13 px e o de eliminar 14×14, a 12 px um do outro. O mínimo da
-               casa é 44 (`.alvo-toque` em globals.css, e é lá que ele existe —
-               só no dedo, para o portátil manter a densidade que tem); o da
-               WCAG 2.2 AA é 24, e com rato nem isso se cumpria.
+        {/* ══ AS ACÇÕES DA TAREFA, EM DUAS FORMAS ═══════════════════════════
+            A mesma lista desenhada de duas maneiras, e quem escolhe é o CSS
+            (`com-rato:` / `sem-rato:`, globals.css) — não o JavaScript, para
+            não haver um primeiro desenho errado a piscar antes do certo.
 
-               `alvo-toque` resolve o dedo; o `p-1.5` resolve o rato — leva o
-               desenho de 13 para 25 px SEM crescer a linha (a coluna do título
-               já mede 34) e sem margens negativas, que era o que voltaria a
-               encostar os dois um ao outro. O ícone continua com 13 px. */
-            className="alvo-toque p-1.5 text-foreground/20 hover:text-[#4d6350] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
-            aria-label="Editar tarefa"
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            COM RATO: os dois ícones soltos, revelados ao pairar. É o desenho
+            que estava, e fica byte a byte igual.
+
+            SEM RATO: um «⋯» só. MEDIDO a 375×667 com dedo: 40 alvos de 44 px
+            visíveis ao mesmo tempo em 20 linhas, dois por linha, dentro de uma
+            fila que já tinha o título, o prazo, a área e a prioridade. Com o
+            menu passam a 20 — um por linha.
+
+            E MEDIDO a 768×1024 com dedo (o iPad em retrato): ZERO dos 40
+            visíveis. 768 passa dos 640 do `sm:` sem ganhar rato nenhum,
+            portanto `sm:opacity-0` disparava e não havia como o desfazer —
+            editar e eliminar uma tarefa não existiam ali. Esse era o defeito
+            grave; o de cima é o que se vê.
+
+            «Eliminar» vai para dentro do menu, com separador e a vermelho:
+            no dedo, apagar encostado a editar é um engano à espera. */}
+        {/* `com-rato:contents` e não `com-rato:flex`: a caixa existe para poder
+            desaparecer sem rato, mas COM rato tem de desaparecer ela própria —
+            com `display: contents` os dois botões voltam a ser filhos directos
+            da fila, com o espaçamento da fila. MEDIDO com `flex`: 5959 píxeis
+            diferentes a 1280×900, porque um `gap-2` novo se metia onde o
+            `gap-x-3` da linha mandava. É o mesmo truque que o `sm:contents`
+            aqui ao lado já usa, e pela mesma razão. */}
+        <div className="hidden com-rato:contents">
+          {!t.done && (
+            <button
+              onClick={() => onEdit(t)}
+              /* ── UM ALVO DE 13 PX AO LADO DE «ELIMINAR» ──────────────────────
+                 MEDIDO num 390×844 com `(pointer: coarse)`: este botão dava
+                 13×13 px e o de eliminar 14×14, a 12 px um do outro. O mínimo da
+                 casa é 44 (`.alvo-toque` em globals.css, e é lá que ele existe —
+                 só no dedo, para o portátil manter a densidade que tem); o da
+                 WCAG 2.2 AA é 24, e com rato nem isso se cumpria.
+
+                 `alvo-toque` resolve o dedo; o `p-1.5` resolve o rato — leva o
+                 desenho de 13 para 25 px SEM crescer a linha (a coluna do título
+                 já mede 34) e sem margens negativas, que era o que voltaria a
+                 encostar os dois um ao outro. O ícone continua com 13 px. */
+              className="alvo-toque p-1.5 text-foreground/20 hover:text-[#4d6350] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+              aria-label="Editar tarefa"
             >
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
-            </svg>
-          </button>
-        )}
-        <button
-          onClick={() => onRemove(t.id)}
-          // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
-          // este é o que apaga, portanto é o que mais custa acertar ao lado.
-          className="alvo-toque p-1.5 text-foreground/20 hover:text-[#b5654a] transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
-          aria-label="Eliminar"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
+              {LapisIcon}
+            </button>
+          )}
+          <button
+            onClick={() => onRemove(t.id)}
+            // O mesmo tratamento do «Editar tarefa» acima, e pela mesma razão —
+            // este é o que apaga, portanto é o que mais custa acertar ao lado.
+            className="alvo-toque p-1.5 text-foreground/20 hover:text-[#b5654a] transition-colors opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 shrink-0"
+            aria-label="Eliminar"
           >
-            <path
-              d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+            {CaixoteIcon}
+          </button>
+        </div>
+        <MenuDeAccoes
+          className="com-rato:hidden shrink-0"
+          sobre={t.title}
+          accoes={[
+            ...(t.done
+              ? []
+              : [
+                  {
+                    id: "editar",
+                    rotulo: "Editar tarefa",
+                    icone: LapisIcon,
+                    onAccao: () => onEdit(t),
+                  } satisfies AccaoDeItem,
+                ]),
+            {
+              id: "eliminar",
+              rotulo: "Eliminar",
+              icone: CaixoteIcon,
+              destrutiva: true,
+              onAccao: () => onRemove(t.id),
+            },
+          ]}
+        />
       </div>
     </div>
   );

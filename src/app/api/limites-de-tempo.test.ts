@@ -87,6 +87,18 @@ const PESADAS: { rota: string; faz: string; minimo: number }[] = [
     faz: "o DELETE copia as fotos referenciadas para as propostas e apaga a pasta",
     minimo: 30,
   },
+  // A terceira vaga, e esta era uma LEITURA — o que a fazia parecer leve.
+  // Palavras dela: «diz que não é possível carregar os temas». A lista faz uma
+  // listagem do Storage POR TEMA mais três assinaturas em bloco: com trinta
+  // temas são trinta e três idas à rede, e uma só que se arraste (medi 8 s até
+  // o cliente do Supabase desistir de uma porta fechada) leva os dez segundos
+  // por diante. O que chega ao ecrã é um 504 do intermediário, sem corpo JSON
+  // nenhum — a única falha que nem a rota consegue explicar.
+  {
+    rota: "temas",
+    faz: "lista os temas: uma listagem do Storage por tema + três assinaturas em bloco",
+    minimo: 30,
+  },
   {
     rota: "orcamento/[id]/proposta",
     faz: "desenha o PDF da proposta e envia-o por email, em anexo",

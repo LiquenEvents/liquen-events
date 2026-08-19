@@ -276,24 +276,62 @@ test.describe("D3 · alvos de 13 px", () => {
 
       await page.getByRole("button", { name: /Mais destinos/i }).click();
       await irPara(page, "Tarefas");
-      await expect(page.getByRole("button", { name: "Editar tarefa" }).first()).toBeVisible();
+
+      /* ── AS DUAS ACÇÕES MUDARAM DE SÍTIO, E A PROVA MUDA COM ELAS ──────────
+         Este passeio procurava os dois ícones soltos na linha. Deixaram de lá
+         estar NO DEDO: a fila de ícones é `hidden com-rato:contents` e, sem
+         rato, as duas acções vivem dentro do menu «⋯» (`MenuDeAccoes`).
+
+         A razão está escrita no `Tarefas.tsx`: com seis acções por linha todas
+         visíveis ao mesmo tempo, a 390 px não cabia nada — e «Eliminar»
+         encostado a «Editar» é um engano à espera de acontecer.
+
+         O que este teste prova NÃO muda: as duas acções têm de ser alcançáveis
+         com o dedo e ter os 44 px da casa. Muda o caminho — abre-se o menu, e
+         medem-se lá dentro. Se um dia voltarem para a linha, este teste falha e
+         obriga a olhar, que é o que se quer dele. */
+      await page
+        .getByRole("button", { name: /^Acções de / })
+        .first()
+        .click();
+      await expect(page.getByRole("menuitem", { name: "Editar tarefa" })).toBeVisible();
 
       const alvos = await page.evaluate(() =>
         [
+          // Dentro do menu o nome do item é o TEXTO (é assim que um leitor de
+          // ecrã o anuncia); na linha, quando há rato, é o `aria-label` do
+          // ícone. Aceitam-se os dois, e o rótulo lido é o que existir.
           ...document.querySelectorAll(
-            'button[aria-label="Editar tarefa"], button[aria-label="Eliminar"]',
+            '[role="menuitem"], button[aria-label="Editar tarefa"], button[aria-label="Eliminar"]',
           ),
-        ].map((b) => {
-          const r = b.getBoundingClientRect();
-          return {
-            rotulo: b.getAttribute("aria-label") ?? "",
-            largura: Math.round(r.width),
-            altura: Math.round(r.height),
-          };
-        }),
+        ]
+          .map((b) => {
+            const r = b.getBoundingClientRect();
+            return {
+              rotulo: (b.getAttribute("aria-label") ?? b.textContent ?? "").trim(),
+              largura: Math.round(r.width),
+              altura: Math.round(r.height),
+            };
+          })
+          .filter((a) => a.rotulo === "Editar tarefa" || a.rotulo === "Eliminar")
+          // A fila de ícones da linha continua no DOM sem rato — vive dentro de
+          // um `hidden com-rato:contents`, portanto está lá e mede 0×0. Medir um
+          // elemento que não é desenhado é medir nada, e foi o que fez este
+          // passeio falhar com «mede 0×0» depois de encontrar o item certo no
+          // menu. Ficam os que o ecrã desenha; que os DOIS lá estejam é o que a
+          // asserção a seguir garante.
+          .filter((a) => a.largura > 0 && a.altura > 0),
       );
 
       expect(alvos.length, "não há linhas de tarefa para medir").toBeGreaterThan(0);
+      // E as duas acções têm mesmo de estar alcançáveis — não basta uma delas
+      // sobreviver. Sem isto, uma acção que desaparecesse do menu passava aqui
+      // em silêncio, que é o defeito oposto ao que este ficheiro vigia.
+      const rotulos = new Set(alvos.map((a) => a.rotulo));
+      expect([...rotulos].sort(), "faltou uma das duas acções da linha de tarefa").toEqual([
+        "Editar tarefa",
+        "Eliminar",
+      ]);
       // O dedo é grosso: sem isto, `(pointer: coarse)` não é verdade e a
       // medição é a do rato — que não é o que se está a provar.
       expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);

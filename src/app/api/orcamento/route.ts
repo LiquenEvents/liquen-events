@@ -150,10 +150,22 @@ function mensagemDeLimite(segundos: number, locale: Locale): string {
     : `Demasiados pedidos a partir desta ligação. Tente novamente daqui a ${quanto}, ou fale connosco pelo WhatsApp.`;
 }
 
+/**
+ * O 503 é a ÚNICA recusa em que se sabe, com certeza, que o pedido se perdeu:
+ * não ficou gravado em lado nenhum E o email à equipa também não saiu (ver o
+ * ramo `if (!avisada)`, mais abaixo). Todas as outras — o 400, o 429, a rede a
+ * cair — deixam a pessoa a poder tentar outra vez e chegar lá.
+ *
+ * Era, no entanto, a frase mais fraca das três. Dizia «contacte-nos
+ * diretamente» sem dizer POR ONDE, enquanto a do 429 aqui em cima e a que o
+ * formulário mostra quando a rede cai (`to.error`, no dicionário) nomeiam as
+ * duas o WhatsApp. Quem acaba de escrever dez campos e lê que se perderam não
+ * vai procurar o canal: fecha. O canal tem de estar na frase.
+ */
 function mensagemSemRegisto(locale: Locale): string {
   return locale === "en"
-    ? "We couldn't record your request. Please try again in a moment, or contact us directly."
-    : "Não foi possível registar o seu pedido. Tente novamente dentro de momentos ou contacte-nos diretamente.";
+    ? "We couldn't record your request. Please try again in a moment, or send us a message on WhatsApp — we'll pick it up from there."
+    : "Não foi possível registar o seu pedido. Tente novamente dentro de momentos, ou fale connosco pelo WhatsApp — tratamos dele por aí.";
 }
 
 /**

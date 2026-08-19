@@ -4,7 +4,7 @@ import { useMemo, useState, useDeferredValue } from "react";
 import type { Supplier } from "@/lib/orcamento/types";
 import { downloadCsv, dateStamp } from "./export";
 import { SkeletonCard } from "./Skeleton";
-import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
+import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useToast } from "./Toast";
@@ -38,6 +38,57 @@ const EMPTY_FORM = {
  */
 type PatchFornecedor = { [K in keyof Supplier]?: Supplier[K] | null };
 
+/* Os três ícones da linha, escritos uma vez: o mesmo desenho serve os botões
+   soltos do computador e os itens do menu «⋯» do dedo. */
+const EstrelaIcon = (cheia: boolean) => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill={cheia ? "currentColor" : "none"}
+    stroke="currentColor"
+    strokeWidth="1.8"
+    aria-hidden="true"
+  >
+    <path
+      d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const LapisIcon = (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+  </svg>
+);
+
+const CaixoteIcon = (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+  </svg>
+);
+
 const PlusIcon = (
   <svg
     width="16"
@@ -68,6 +119,30 @@ export default function Fornecedores() {
   const dSearch = useDeferredValue(search);
   const [cat, setCat] = useState("Todos");
   const [adding, setAdding] = useState(false);
+
+  /**
+   * As acções de uma ficha, como DADOS — a forma é de quem as desenha.
+   *
+   * Estão aqui e não em linha para que os três ícones do computador e os três
+   * itens do menu «⋯» do dedo não possam divergir: é a MESMA lista, e nenhum
+   * dos dois desenhos pode ganhar uma acção que o outro não tenha.
+   */
+  const accoesDe = (s: Supplier): AccaoDeItem[] => [
+    {
+      id: "preferido",
+      rotulo: s.preferred ? "Remover dos preferidos" : "Marcar como preferido",
+      icone: EstrelaIcon(!!s.preferred),
+      onAccao: () => patchSupplier(s.id, { preferred: !s.preferred }),
+    },
+    { id: "editar", rotulo: "Editar", icone: LapisIcon, onAccao: () => startEdit(s) },
+    {
+      id: "remover",
+      rotulo: "Remover",
+      icone: CaixoteIcon,
+      destrutiva: true,
+      onAccao: () => remove(s.id),
+    },
+  ];
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_FORM);
@@ -509,66 +584,57 @@ export default function Fornecedores() {
                         {s.category}
                       </p>
                     </div>
-                    {/* `gap-1` (4px) ficava por baixo dos 8px mínimos entre estes
-                        três alvos depois de `alvo-toque` os levar a 44px cada —
-                        cresceram, mas continuavam colados. `gap-2` é o mesmo
-                        valor que as Tarefas usam para a linha equivalente. */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    {/* ══ AS ACÇÕES DA FICHA, EM DUAS FORMAS ════════════════════
+                        A mesma lista de acções desenhada de duas maneiras, e a
+                        escolha é do CSS — o `com-rato:`/`sem-rato:` de
+                        globals.css — para não haver um primeiro desenho errado
+                        a piscar antes do certo.
+
+                        COM RATO: três ícones soltos, que aparecem ao pairar.
+                        É o desenho que estava e que fica byte a byte igual.
+
+                        SEM RATO: um «⋯» só. MEDIDO a 375×667 com dedo — os três
+                        alvos de 44 px deixavam 153 px de coluna ao nome do
+                        fornecedor, e é disto que a fotografia da queixa era. Com
+                        um alvo em vez de três, a coluna do nome passa a 257 px.
+
+                        E a 768×1024 com dedo (o iPad em retrato) os três não
+                        apareciam DE TODO: 4 de 36 visíveis, e os 4 eram estrelas
+                        de fichas já preferidas, que nunca passaram pelo
+                        `sm:opacity-0`. Era esse o defeito grave — funcional, não
+                        estético.
+
+                        «Remover» vai para dentro do menu, com separador e a
+                        vermelho (ver `MenuDeAccoes`): no dedo, apagar ao lado de
+                        editar é um engano à espera de acontecer. */}
+                    <div className="hidden com-rato:flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => patchSupplier(s.id, { preferred: !s.preferred })}
-                        /* ── OS TRÊS BOTÕES DESTA LINHA, NO DEDO ───────────────────
-                           Ficavam invisíveis (`opacity-0`, só `group-hover`) e com
-                           14×13 px de alvo — no telemóvel não há "hover", portanto
-                           não havia como marcar preferido, editar nem remover um
-                           fornecedor a partir daqui. `alvo-toque` (globals.css) dá
-                           os 44 px só no dedo; `opacity-100 sm:opacity-0
-                           sm:group-hover:opacity-100` mantém o desenho discreto no
-                           portátil (só aparece ao pairar) mas deixa sempre visível
-                           onde não há rato. Mesmo tratamento das Tarefas
-                           (Tarefas.tsx, «Editar tarefa» / «Eliminar»). */
-                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 hover:text-amber-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"}`}
+                        className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
                         title={s.preferred ? "Remover dos preferidos" : "Marcar como preferido"}
                       >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill={s.preferred ? "currentColor" : "none"}
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                        >
-                          <path
-                            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
+                        {EstrelaIcon(!!s.preferred)}
                       </button>
                       <button
                         onClick={() => startEdit(s)}
-                        className="alvo-toque p-1.5 text-foreground/20 hover:text-[#4d6350] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+                        className="alvo-toque p-1.5 text-foreground/20 hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                         aria-label="Editar"
                       >
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
-                        </svg>
+                        {LapisIcon}
                       </button>
                       <button
                         onClick={() => remove(s.id)}
-                        className="alvo-toque p-1.5 text-foreground/20 hover:text-[#b5654a] opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+                        className="alvo-toque p-1.5 text-foreground/20 hover:text-[#b5654a] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-all"
                         aria-label="Remover"
                       >
                         ×
                       </button>
                     </div>
+                    <MenuDeAccoes
+                      className="com-rato:hidden shrink-0"
+                      sobre={s.name}
+                      accoes={accoesDe(s)}
+                    />
                   </div>
                   {/* Star rating */}
                   <div className="flex items-center gap-0.5 pointer-coarse:gap-2 mb-2">

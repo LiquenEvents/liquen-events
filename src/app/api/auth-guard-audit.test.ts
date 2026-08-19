@@ -469,6 +469,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // o Storage e copiam bytes para a pasta do pedido. Sem sessão, nem os
   // bilhetes podem ser emitidos.
   { path: "./orcamento/[id]/assets/url/route", methods: ["POST", "PUT"] },
+  // Fabrica a miniatura em falta de uma foto do pedido (e guarda-a). Lê o
+  // Storage do pedido e escreve no bucket das miniaturas — a mesma barreira das
+  // outras rotas de fotografias, e por isso na mesma tabela.
+  { path: "./orcamento/[id]/miniatura/route", methods: ["GET"] },
   { path: "./orcamento/[id]/assets/importar/route", methods: ["POST"] },
   { path: "./orcamento/[id]/mensagem/route", methods: ["POST"] },
   // Manda um modelo de email ao cliente (e, sem `enviar`, pré-visualiza-o com o

@@ -237,10 +237,28 @@ export default async function PoloPage({
       <section className="bg-surface border-t border-foreground/8 py-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <p className="text-[15px] text-foreground/70">{textos.completo}</p>
-          <div className="flex flex-wrap gap-x-8 gap-y-3 text-[11px] tracking-[0.25em] uppercase">
+          {/*
+            `alvo-toque` nos três, e não é acabamento: MEDIDO num Chromium a
+            375 px com toque emulado, na página servida em produção —
+              «Formulário completo»  189×17
+              «+351 919 259 820»     137×17
+              «Portefólio»            96×17
+            O mínimo da casa é 44 px de altura (TOUCH-AUDIT.md), e estes três
+            são as ÚNICAS saídas de quem chega ao fim de uma landing page paga
+            sem ter preenchido o formulário do topo: o formulário longo, o
+            telefone e o portefólio. Dezassete píxeis de altura num dedo é um
+            toque que falha e não se repete.
+            
+            A dispensa de «palavra sublinhada dentro de uma frase» (WCAG 2.5.8)
+            NÃO se aplica: isto é uma fila de três acções autónomas num `flex`,
+            não prosa. O que os fazia escapar às baterias é outra coisa — o
+            `alvos-de-toque-do-sitio.test.tsx` monta a Home, o Contacto, a
+            Destination e um Serviço, e nunca esta página.
+          */}
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 text-[11px] tracking-[0.25em] uppercase">
             <Link
               href={localizeHref("/orcamento", locale) + "?tipo=casamentos"}
-              className="underline hover:text-moss"
+              className="alvo-toque underline hover:text-moss"
             >
               {en ? "Full quote form" : "Formulário completo"}
             </Link>
@@ -248,11 +266,14 @@ export default async function PoloPage({
               event="PhoneClick"
               trackProps={{ origem: `polo:${polo.slug}` }}
               href={`tel:${SITE.phone}`}
-              className="underline hover:text-moss"
+              className="alvo-toque underline hover:text-moss"
             >
               {SITE.phoneDisplay}
             </TrackedAnchor>
-            <Link href={localizeHref("/galeria", locale)} className="underline hover:text-moss">
+            <Link
+              href={localizeHref("/galeria", locale)}
+              className="alvo-toque underline hover:text-moss"
+            >
               {en ? "Portfolio" : "Portefólio"}
             </Link>
           </div>

@@ -128,8 +128,36 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Install Playwright browser
+      # ── O PASSO QUE COMEU 45 MINUTOS SEM CORRER UM TESTE ──────────────────
+      # Duas corridas seguidas foram CANCELADAS por esgotarem o tecto do job, e
+      # nenhuma delas chegou a executar um teste. Os registos dizem onde:
+      #
+      #   Get:5 https://archive.ubuntu.com/ubuntu noble-security InRelease
+      #   [44 minutos de silêncio]
+      #   ##[error]The operation was canceled.
+      #   Terminate orphan process: npm exec playwright install --with-deps
+      #
+      # O `--with-deps` instala bibliotecas do sistema com o apt, e o espelho de
+      # pacotes do runner (`azure.archive.ubuntu.com`) estava a responder `Ign:`
+      # a tudo. Sem tecto próprio, esse passo fica pendurado até o JOB inteiro
+      # ser cortado — e o que se perde não é o passo, é a bateria toda de
+      # passeios, que nem chega a arrancar.
+      #
+      # Duas mudanças, e a segunda é a que interessa: um tecto de 8 minutos para
+      # a falha ser rápida, e um caminho alternativo SEM apt. A imagem
+      # `ubuntu-latest` já traz as bibliotecas de que o Chromium precisa; o
+      # `--with-deps` é cinto e suspensórios, não o único caminho. Com o espelho
+      # em baixo, os testes correm à mesma.
+      - name: Install Playwright browser (com dependências do sistema)
+        id: navegador
+        timeout-minutes: 8
+        continue-on-error: true
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright browser (sem apt, se o espelho estiver em baixo)
+        if: steps.navegador.outcome != 'success'
+        timeout-minutes: 5
+        run: npx playwright install chromium
 
       # ── A CACHE DAS DERIVADAS ──────────────────────────────────────────────
       # Sem isto, cada corrida re-encoda as 2785 miniaturas do zero. Enquanto

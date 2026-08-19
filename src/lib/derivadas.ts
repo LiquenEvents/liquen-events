@@ -1,8 +1,18 @@
 import "server-only";
 import sharp from "sharp";
 import { getSupabase } from "@/lib/supabase";
-import { PROPOSAL_BUCKET, PROPOSAL_THUMB_BUCKET } from "@/lib/proposal-storage";
-import { THEME_BUCKET, THEME_THUMB_BUCKET, THEME_MICRO_BUCKET } from "@/lib/theme-ref";
+import {
+  PROPOSAL_BUCKET,
+  PROPOSAL_THUMB_BUCKET,
+  uploadProposalThumb,
+} from "@/lib/proposal-storage";
+import {
+  THEME_BUCKET,
+  THEME_THUMB_BUCKET,
+  THEME_MICRO_BUCKET,
+  ehRefDeTema,
+  caminhoDoRefDeTema,
+} from "@/lib/theme-ref";
 import { log } from "@/lib/logger";
 
 /**
@@ -59,17 +69,27 @@ export const LOTE = 25;
  * trocado aqui produziria derivadas num sítio onde ninguém as vai procurar, e
  * a grelha continuaria lenta com o painel a dizer que estava tudo bem.
  */
+/**
+ * O lado e a qualidade da MINIATURA, num sítio só.
+ *
+ * Estavam escritos duas vezes (uma por família) e agora são lidos também pela
+ * geração a pedido (`miniaturaAPedido`). Três cópias do mesmo 400/78 seriam
+ * três oportunidades de a mesma fotografia sair diferente conforme o caminho
+ * por onde foi fabricada.
+ */
+const MINIATURA = { lado: 400, qualidade: 78 } as const;
+
 const FAMILIAS = [
   {
     origem: THEME_BUCKET,
     derivadas: [
-      { bucket: THEME_THUMB_BUCKET, lado: 400, qualidade: 78 },
+      { bucket: THEME_THUMB_BUCKET, ...MINIATURA },
       { bucket: THEME_MICRO_BUCKET, lado: 96, qualidade: 65 },
     ],
   },
   {
     origem: PROPOSAL_BUCKET,
-    derivadas: [{ bucket: PROPOSAL_THUMB_BUCKET, lado: 400, qualidade: 78 }],
+    derivadas: [{ bucket: PROPOSAL_THUMB_BUCKET, ...MINIATURA }],
   },
 ] as const;
 
@@ -246,5 +266,88 @@ async function gerarUma(
     return !erroSubida;
   } catch {
     return false;
+  }
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MINIATURA DE UMA FOTO SÓ, FABRICADA À PRIMEIRA VEZ QUE ALGUÉM OLHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O lote de cima trata da biblioteca inteira, e trata bem — mas é um BOTÃO, e
+ * um botão que ninguém carregou não gerou miniatura nenhuma. Enquanto isso, a
+ * grelha do estúdio de propostas cai para o ORIGINAL: medido num telemóvel a
+ * 1,6 Mbps, cada célula puxa **1099 KB** (26,4 MB nas 24), a primeira
+ * fotografia chega aos **34,0 s** e a grelha que está no ecrã só fica completa
+ * aos **67,6 s**. Com miniatura: 20 KB, e 2,5 s. Uma proposta antiga é o caso
+ * onde isso acontece, e é o caso mais comum: as fotos que ela já lá tem foram
+ * carregadas antes de as miniaturas existirem.
+ *
+ * Isto gera UMA, a pedido, e **guarda-a** no bucket das miniaturas. Portanto o
+ * custo paga-se uma vez por fotografia e não uma vez por abertura: da segunda
+ * vez em diante o `listProposalImages` já a encontra e devolve o URL assinado
+ * directo do Storage, sem passar por aqui.
+ *
+ * Devolve os bytes para quem chama os poder servir já — se fosse só «gera», a
+ * rota tinha de descarregar do Storage aquilo que acabou de lá pôr.
+ *
+ * `null` quer dizer «não deu», e não é motivo para erro nenhum a jusante: quem
+ * chama cai para o original, que é o comportamento de sempre.
+ */
+export async function miniaturaAPedido(caminho: string): Promise<Buffer | null> {
+  const sb = getSupabase();
+  if (!sb || !caminho) return null;
+  const daBiblioteca = ehRefDeTema(caminho);
+  const origem = daBiblioteca ? THEME_BUCKET : PROPOSAL_BUCKET;
+  const destino = daBiblioteca ? THEME_THUMB_BUCKET : PROPOSAL_THUMB_BUCKET;
+  const chave = daBiblioteca ? caminhoDoRefDeTema(caminho) : caminho;
+  if (!chave || chave.includes("..")) return null;
+
+  // Já lá está? É o caso normal a partir da segunda vez, e custa um download em
+  // vez de um download + um `sharp` + um upload.
+  try {
+    const { data } = await sb.storage.from(destino).download(chave);
+    if (data) return Buffer.from(await data.arrayBuffer());
+  } catch {
+    /* segue para gerar */
+  }
+
+  try {
+    const { data, error } = await sb.storage.from(origem).download(chave);
+    if (error || !data) return null;
+    const bytes = Buffer.from(await data.arrayBuffer());
+    // Os MESMOS números do lote e do navegador (`image-worker.ts`): uma
+    // miniatura fabricada aqui tem de ser indistinguível de uma fabricada lá,
+    // ou a mesma foto muda de aspecto conforme o caminho por onde veio.
+    const derivada = await sharp(bytes)
+      .rotate()
+      .resize(MINIATURA.lado, MINIATURA.lado, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: MINIATURA.qualidade, mozjpeg: true })
+      .toBuffer();
+    // Guardar é melhor esforço: falhar aqui só quer dizer que a próxima
+    // abertura volta a pagar o `sharp`. NUNCA impede esta de ser servida.
+    //
+    // Pelo `uploadProposalThumb` e não por um `upload` cru, para a família das
+    // propostas: é ele que GARANTE O BUCKET. Numa instalação onde nunca foi
+    // carregada uma foto com miniatura, o `proposal-thumbs` ainda não existe —
+    // e sem isto cada abertura voltava a pagar o `sharp` de cada fotografia,
+    // para sempre, sem nada no ecrã a dizer porquê.
+    if (daBiblioteca) {
+      const { error: erroSubida } = await sb.storage
+        .from(destino)
+        .upload(chave, derivada, { contentType: "image/jpeg", upsert: false });
+      if (erroSubida && !/exist/i.test(erroSubida.message)) {
+        log.warn("derivadas: miniatura a pedido não ficou guardada", {
+          destino,
+          erro: erroSubida.message,
+        });
+      }
+    } else {
+      await uploadProposalThumb(chave, derivada, "image/jpeg");
+    }
+    return derivada;
+  } catch (e) {
+    log.warn("derivadas: miniatura a pedido falhou", { caminho: chave, erro: String(e) });
+    return null;
   }
 }

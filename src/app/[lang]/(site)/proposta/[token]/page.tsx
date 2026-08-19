@@ -81,7 +81,24 @@ export async function generateMetadata({
     /* fica a língua do visitante */
   }
   return {
-    title: tituloDoSeparador(locale),
+    /**
+     * `absolute` — o título já vem com a marca lá dentro (ver
+     * `tituloDoSeparador`), e entregá-lo como texto simples fazia o layout de
+     * raiz aplicar-lhe por cima o seu `template: "%s | Líquen Events"`.
+     *
+     * MEDIDO no separador do browser, em `/proposta/<token>`:
+     *   <title>A sua proposta | Líquen Events | Líquen Events</title>
+     * e, em inglês, «Your proposal | Líquen Events | Líquen Events».
+     *
+     * É o mesmo defeito que `casamentos/titulos.test.ts` documenta e prende
+     * para as 34 páginas de campanha — só que ali custa caracteres na SERP e
+     * aqui custa noutro sítio: esta página não se indexa (`noindex`), mas é a
+     * PRIMEIRA coisa que o casal lê do produto pago. O título é o que fica no
+     * separador, no histórico e no marcador de quem guarda a proposta para
+     * voltar a ela, e a marca escrita duas vezes lê-se como descuido logo à
+     * entrada do documento que pede uma assinatura.
+     */
+    title: { absolute: tituloDoSeparador(locale) },
     robots: { index: false, follow: false },
   };
 }
