@@ -32,11 +32,14 @@ import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
 import { marcadoresDoPedido, modeloParaEnvioAutomatico, textoDoCorpo } from "@/lib/email-modelos";
 import { arrumarLigacao, ROTULO_DA_PROPOSTA } from "@/lib/email-ligacoes";
 import {
+  assuntoEscritoAMao,
   corpoEscritoAMao,
   excedeOTecto,
   MAXIMO_CORPO_ESCRITO,
   paragrafosDeTexto,
 } from "@/lib/email-corpo-escrito";
+import { resolverLigacaoDaProposta } from "@/lib/email-ligacao-reservada";
+import { registarEnvio } from "@/lib/envios-de-proposta";
 import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
 
@@ -142,6 +145,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       /** O corpo do email reescrito por quem envia — ver a nota mais abaixo.
        *  Ausente em todos os pedidos anteriores a esta caixa existir. */
       corpo?: unknown;
+      /** A linha de assunto que o ecrã de envio mostrou. Só conta com `corpo`
+       *  — ver o `assuntoEscritoAMao`. */
+      assunto?: unknown;
+      /** A chave do modelo de que o corpo partiu («registo-formal»), para a
+       *  CÓPIA do envio. Não escolhe texto nenhum: o texto é o `corpo`. */
+      modelo?: unknown;
       /** «Já vi o que fica cortado, envia à mesma» — ver a pergunta antes do
        *  envio, mais abaixo. Só `true` conta: qualquer outra coisa é «ainda
        *  não respondeu». */
@@ -193,7 +202,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         { status: 400 },
       );
     }
-    const escrito = corpoEscritoAMao(corpoCru);
+    /**
+     * O `corpoEscritoAMao` desceu para depois do `acceptUrl`, e não é arrumação:
+     * o corpo que vem do ecrã de envio traz lá dentro o `{{link_proposta}}`, e o
+     * endereço que o substitui só existe depois de a proposta estar gravada.
+     * Aqui em cima já só fica a recusa por tamanho — que se faz ANTES de se
+     * desenhar o PDF, porque recusar depois é gastar o desenho por nada.
+     */
 
     /**
      * ══════════════════════════════════════════════════════════════════════
@@ -615,6 +630,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O MARCADOR DA LIGAÇÃO, TROCADO PELO ENDEREÇO QUE JÁ EXISTE
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O ecrã de envio abre com o corpo já resolvido — o nome do casal, a data, o
+     * valor — com uma excepção de facto: a `{{link_proposta}}`. O endereço é
+     * assinado sobre o ID DA PROPOSTA, e a proposta nasce aqui, três linhas
+     * acima. O porquê inteiro (e as saídas que se recusaram) está no
+     * `email-ligacao-reservada.ts`.
+     *
+     * Isto NÃO é voltar ao interpretador: não se analisa fonte nenhuma nem se lê
+     * mapa de valores. Troca-se UM texto que fomos nós que lá pusemos por UM
+     * endereço que o servidor acabou de assinar. Um `{{cliente_nome}}` escrito
+     * na caixa sai tal e qual, como sairia qualquer outra palavra.
+     *
+     * A guarda do `typeof` é a de sempre: o `resolverLigacaoDaProposta` faz
+     * `String(...)`, e sem ela um `corpo: 42` de um cliente avariado passava a
+     * ser o texto «42» — um email com um número por corpo.
+     */
+    const corpoComLigacao =
+      typeof corpoCru === "string" ? resolverLigacaoDaProposta(corpoCru, acceptUrl) : corpoCru;
+    const escrito = corpoEscritoAMao(corpoComLigacao);
+
+    /**
+     * O assunto que o ecrã mostrou. ANDA COM O CORPO, e é condição e não
+     * coincidência: os dois vêm do mesmo rascunho, e um assunto solto era
+     * reescrever a linha que o casal lê antes de abrir um email cujo texto
+     * ninguém viu. Sem corpo escrito, o assunto continua a ser o do modelo dela
+     * (quando é o modelo que sai) ou o da casa, na língua da proposta.
+     */
+    const assuntoDoEcra = escrito ? assuntoEscritoAMao(body?.assunto) : null;
     // Só o corpo: a moldura, a assinatura da casa e os anexos da marca vêm do
     // `email-assinatura` — o mesmo fecho de todo o correio que sai daqui.
     /**
@@ -777,6 +825,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const corpoDoModelo =
       doModelo && arrumarLigacao(doModelo.html, { url: acceptUrl, rotulo: ROTULO_DA_PROPOSTA });
 
+    /**
+     * O nome do ficheiro que fica na pasta de transferências deles — o mesmo
+     * que segue no anexo e o mesmo que a cópia do envio guarda. Uma segunda
+     * chamada ao `nomeDoAnexo` mais abaixo era uma segunda oportunidade para as
+     * duas discordarem, e a cópia passava a falar de um ficheiro que não seguiu.
+     */
+    const nomeDoAnexo = t.nomeDoAnexo({
+      clientNames: doc.clientNames,
+      eventDate: doc.eventDate,
+      ref: id,
+    });
+
     const email = escrito
       ? emailAoCliente({ html: escrito.html, texto: escrito.texto, quem })
       : corpoDoModelo
@@ -824,7 +884,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           // e a linha que o cliente lê antes de abrir também tem de ser.
           // …e o assunto da CASA vem na língua da proposta, como o corpo: é a
           // única linha que o casal lê antes de decidir se abre.
-          subject: doModelo?.assunto ?? t.assunto,
+          // …e o assunto ESCRITO no ecrã de envio ganha aos dois: é o que ela
+          // leu com o dedo no botão. Ver o `assuntoEscritoAMao`.
+          subject: assuntoDoEcra ?? doModelo?.assunto ?? t.assunto,
           html: email.html,
           text: email.text,
           // O PDF junta-se aos anexos da assinatura; substituí-los deixava o
@@ -839,11 +901,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               // O NOME é o do casal e o da data do evento, e não o
               // identificador interno do pedido: é este ficheiro que fica na
               // pasta de transferências deles e que é reencaminhado aos pais.
-              filename: t.nomeDoAnexo({
-                clientNames: doc.clientNames,
-                eventDate: doc.eventDate,
-                ref: id,
-              }),
+              filename: nomeDoAnexo,
               content: pdfBuffer,
               contentType: "application/pdf",
             },
@@ -881,6 +939,49 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let estado = proposal.status;
     if (emailed) {
       const sentAt = new Date().toISOString();
+
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * A CÓPIA DO QUE SEGUIU — E O QUE ELA NÃO É
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * «O que é que nós lhes escrevemos?», três semanas depois, ao telefone.
+       * Desde que o corpo passou a ser editável no ecrã de envio, essa pergunta
+       * não tinha resposta em lado nenhum: o modelo guardado é o ponto de
+       * partida e pode ter mudado, e o rascunho do estúdio é o documento, não o
+       * email. Fica aqui o que saiu — ver `envios-de-proposta.ts`.
+       *
+       * NÃO É RASTREIO, e é decisão dela: não há «aberto em», «lido às» nem
+       * «carregou no link», e não pode passar a haver. Tudo o que se guarda são
+       * factos do lado de cá — o que nós mandámos, quando, e quem carregou no
+       * botão.
+       *
+       * DEPOIS de o correio ter sido aceite (`emailed`), e sem `await` que
+       * possa deitar o pedido abaixo: o `registarEnvio` nunca lança, mas um
+       * `catch` à volta custa uma linha e vale a garantia — do lado dela, a
+       * proposta seguiu, e um erro aqui só a fazia carregar em Enviar outra vez.
+       */
+      try {
+        await registarEnvio(id, {
+          enviadoEm: sentAt,
+          para: String(quote.email ?? ""),
+          porQuem: quem.nome,
+          // A chave do modelo de onde o corpo partiu, para se saber de que
+          // texto se partiu. Vazia quando o envio não passou pelo ecrã novo.
+          modelo: typeof body?.modelo === "string" ? body.modelo : "",
+          idioma: idioma === "en" ? "en" : "pt",
+          assunto: assuntoDoEcra ?? doModelo?.assunto ?? t.assunto,
+          // O CORPO tal e qual, em texto, já com a ligação resolvida. Sem corpo
+          // escrito à mão fica o texto simples do email que saiu — é o que há, e
+          // é o que se quer reler.
+          texto: escrito ? escrito.texto : email.text,
+          anexo: { nome: nomeDoAnexo, bytes: pdfBuffer.byteLength },
+          propostaId: proposal.id,
+        });
+      } catch (e) {
+        log.error("proposta-doc: o email saiu mas a cópia não ficou guardada", e, { id });
+      }
+
       try {
         const gravado = await updateProposal(proposal.id, { status: "enviada", sentAt });
         if (!gravado) throw new Error("proposta não encontrada ao marcar como enviada");
