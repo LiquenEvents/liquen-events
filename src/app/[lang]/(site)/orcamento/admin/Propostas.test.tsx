@@ -166,7 +166,19 @@ describe("Propostas — a lista muda de forma", () => {
     expect(screen.getByText("Cliente Correcto")).toBeTruthy();
   });
 
-  /** Num ecrã táctil, uma acção escondida no hover não existe. */
+  /**
+   * Num ecrã táctil, uma acção escondida no hover não existe.
+   *
+   * A pergunta deixou de ser feita em JavaScript e passou a ser feita em CSS
+   * (`com-rato:`, globals.css) — o hook lia `false` no servidor e o computador
+   * piscava. Isso muda o que este teste pode afirmar: o jsdom não avalia media
+   * queries sobre classes, portanto o que se verifica é o CONTRATO das classes.
+   *
+   * `opacity-0` NU é o que estava errado: é visível por omissão que o menu tem
+   * de ser. `com-rato:opacity-0` contém a cadeia "opacity-0", por isso a
+   * asserção tem de olhar para a palavra inteira e não para um pedaço dela —
+   * um `toContain` simples passava dos dois lados e não guardava nada.
+   */
   it("as acções continuam alcançáveis sem rato", async () => {
     simularAparelho(375, true);
     render(
@@ -176,7 +188,13 @@ describe("Propostas — a lista muda de forma", () => {
     );
     await waitFor(() => expect(screen.getByText("Cliente Correcto")).toBeTruthy());
     const menu = screen.getByRole("button", { name: "Acções de Cliente Correcto" });
-    expect(menu.className).not.toContain("opacity-0");
+    const classes = menu.className.split(/\s+/);
+    expect(classes).toContain("opacity-100");
+    expect(classes).not.toContain("opacity-0");
+    // E o esconderijo do computador continua lá, atrás do PONTEIRO e não da
+    // largura: sem isto, "sempre visível" também passaria por regressão.
+    expect(classes).toContain("com-rato:opacity-0");
+    expect(classes).toContain("com-rato:group-hover:opacity-100");
   });
 });
 

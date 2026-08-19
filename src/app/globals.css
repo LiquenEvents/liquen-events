@@ -56,6 +56,69 @@
   --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   COM RATO / SEM RATO — a pergunta certa sobre uma acção escondida
+   ════════════════════════════════════════════════════════════════════════════
+
+   Uma acção que só aparece ao passar o rato por cima precisa de UMA condição
+   para existir: que haja rato. A escapatória estava presa à LARGURA (`sm:`,
+   640 px), e a largura não responde a essa pergunta — responde a outra.
+
+   MEDIDO, com os dois lados do mesmo engano:
+
+   · 768×1024 com dedo (o iPad em retrato) — 768 passa dos 640 sem ganhar rato
+     nenhum, portanto `sm:opacity-0` disparava e a escapatória do dedo nunca
+     chegava. Alvos de acção visíveis: 4 de 36 nos Fornecedores (e os 4 são
+     estrelas de preferidos, que nem por lá passam), 0 de 40 nas Tarefas,
+     0 de 20 na tabela do Inventário e 0 de 86 no dossier. Sem rato não há
+     como as revelar: ali, aquelas acções NÃO EXISTIAM. Isto é funcional.
+
+   · 375×667 com dedo — o outro lado: todas as acções de todas as linhas
+     visíveis ao mesmo tempo, 36 alvos de 44 px a espremer a coluna do nome
+     dos Fornecedores até 153 px. Isto é estético, e foi disto que a dona do
+     negócio se queixou, com fotografias.
+
+   Os dois defeitos são o mesmo erro visto de dois lados, e por isso têm uma
+   correcção só: perguntar pelo PONTEIRO.
+
+   `(hover: hover) and (pointer: fine)` são as DUAS metades e são precisas as
+   duas. Um portátil com ecrã táctil tem `hover: hover` (o trackpad) E
+   `pointer: coarse`; um telemóvel ligado a um monitor tem o contrário. Cada
+   metade sozinha acerta nos dois casos comuns e falha nos dois interessantes.
+
+   ── PORQUE É QUE ISTO É CSS, E NÃO O HOOK ──────────────────────────────────
+   `usePodeEsconderNoHover()` (ui/adaptativo.ts) responde à mesma pergunta em
+   JavaScript, e continua a servir para diferenças ESTRUTURAIS. Aqui não serve:
+   o hook lê `false` no servidor — tem de ler, ou há desencontro de hidratação
+   — portanto o primeiro desenho do computador mostra as acções todas e o
+   segundo esconde-as. Um piscar em cada linha, em cada carregamento. Em CSS a
+   media query já é verdadeira quando o primeiro píxel é pintado.
+
+   ── COMO SE USA ────────────────────────────────────────────────────────────
+   `opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100` — visível
+   por omissão, discreta só onde há mesmo rato. E, quando o desenho troca de
+   FORMA (ícones soltos ↔ um menu «⋯», ver ui/MenuDeAccoes.tsx):
+   `hidden com-rato:flex` na forma do computador e `com-rato:hidden` na outra.
+
+   ── PORQUE É QUE OS DOIS LADOS SE PENDURAM NO `com-rato` ───────────────────
+   `sem-rato` está definida, é a negação exacta, e o código NÃO a usa. A
+   assimetria é deliberada: `(hover: hover) and (pointer: fine)` é sintaxe
+   antiga e entende-se em toda a parte, enquanto `@media not (…)` é de Media
+   Queries 4 — e um browser que não a perceba deita fora o bloco inteiro.
+
+   Escrita como está, o pior caso é um browser que não perceba nada de
+   ponteiros: aparecem as DUAS formas, feio mas inteiro. Se a forma do dedo
+   dependesse do `sem-rato`, esse mesmo browser não mostrava NENHUMA e ficava-se
+   sem acções — que é exactamente o defeito que isto veio corrigir. Entre falhar
+   para o feio e falhar para o vazio, falha-se para o feio.
+
+   ARMADILHA, e custou uma medição impossível: depois de mexer aqui, o
+   Turbopack serviu HTML com as classes novas e CSS sem as regras — os dois
+   desenhos apareciam ao mesmo tempo. `rm -rf .next` e reiniciar o servidor.
+   Se o resultado for impossível, é isto. */
+@custom-variant com-rato (@media (hover: hover) and (pointer: fine));
+@custom-variant sem-rato (@media not ((hover: hover) and (pointer: fine)));
+
 /* ── Hero type scale — single source of truth for the marketing page heroes.
    Each page had hardcoded a near-identical but drifting clamp() inline
    (56/54/58px mins, 10/10.5vw, 150/148/132px maxes), so heroes that were meant

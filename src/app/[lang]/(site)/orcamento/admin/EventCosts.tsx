@@ -258,9 +258,17 @@ export default function EventCosts({ quote, onChange }: Props) {
                     {metaFor(STATUS_META, it.status).label}
                   </span>
                 </button>
+                {/* MEDIDO a 768×1024 com dedo (o iPad em retrato): 9 destes botões e
+                      ZERO visíveis. 768 passa dos 640 do `sm:`, portanto `sm:opacity-0`
+                      disparava — e sem rato não há como o revelar. A pergunta certa é sobre o
+                      PONTEIRO, não sobre a largura: `com-rato:` (globals.css) esconde só onde
+                      há mesmo rato, e a 375 e a 768 com dedo ficam os 9 visíveis.
+
+                      Fica um ícone e não um menu «⋯»: com UMA acção por linha, o menu custa
+                      os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(it.id)}
-                  className="alvo-toque shrink-0 p-1 text-foreground/25 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
+                  className="alvo-toque shrink-0 p-1 text-foreground/25 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                   aria-label="Remover"
                 >
                   <svg

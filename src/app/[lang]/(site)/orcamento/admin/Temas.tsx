@@ -18,7 +18,7 @@ import {
 import { fingerprintBlob } from "@/lib/theme-fingerprint";
 import { useToast } from "./Toast";
 import { prepareImageWithThumb } from "./image-prep";
-import { Button, Card, EmptyState, Field, Toolbar } from "./ui";
+import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import ImagemComPlanoB from "./ImagemComPlanoB";
@@ -318,9 +318,10 @@ export const COLUNAS: Record<Densidade, string> = {
  *
  * Medido a 375 px (iPhone SE) com três colunas: cada célula ficava com
  * 97,7×97,7 px, e a 320 px com 79×79. Dentro dessa célula vivem TRÊS botões de
- * 28×28 — ampliar, mover para o início e remover — que num ecrã de toque estão
- * sempre visíveis (`[@media(hover:none)]:opacity-100`), porque sem passar o
- * rato não há outra forma de lá chegar. Três alvos de 28 px, ou seja dois
+ * 28×28 — ampliar, mover para o início e remover — que onde não há rato estão
+ * sempre visíveis (hoje `com-rato:opacity-0`; era um `@media (hover: none)`,
+ * que deixava de fora o portátil com ecrã táctil), porque sem passar o rato
+ * não há outra forma de lá chegar. Três alvos de 28 px, ou seja dois
  * terços do mínimo de 44, e o × que APAGA a foto é um deles.
  *
  * Pô-los nos 44 px que a casa exige (`.alvo-toque`) não cabia em 98 px: os
@@ -624,6 +625,65 @@ export default function Temas() {
       }
     },
     [toast],
+  );
+
+  /**
+   * As acções de um cartão de tema, como DADOS — a forma é de quem as desenha.
+   *
+   * Estão aqui para que os dois ícones do computador e os dois itens do menu
+   * «⋯» do dedo não possam divergir: é a MESMA lista, e nenhum dos dois
+   * desenhos pode ganhar uma acção que o outro não tenha.
+   */
+  const accoesDoTema = useCallback(
+    (t: ThemeSummary): AccaoDeItem[] => [
+      {
+        id: "favorito",
+        rotulo: t.favorito ? "Desafixar" : "Fixar no topo",
+        icone: (
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill={t.favorito ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="1.7"
+            aria-hidden="true"
+          >
+            <path
+              d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8Z"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ),
+        onAccao: () => alternarMarca(t, "favorito"),
+      },
+      {
+        id: "arquivar",
+        rotulo: t.arquivado ? "Repor na lista" : "Arquivar",
+        icone: (
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            aria-hidden="true"
+          >
+            {t.arquivado ? (
+              <path d="M12 19V7m0 0-4 4m4-4 4 4M4 4h16" strokeLinecap="round" />
+            ) : (
+              <>
+                <path d="M4 8h16v11H4z" strokeLinejoin="round" />
+                <path d="M3 4h18v4H3zM10 12h4" strokeLinecap="round" />
+              </>
+            )}
+          </svg>
+        ),
+        onAccao: () => alternarMarca(t, "arquivado"),
+      },
+    ],
+    [alternarMarca],
   );
   // Filtrar fora da tecla: com poucos temas é imperceptível, e mantém o campo
   // instantâneo quando a lista cresce (é o mesmo padrão do Inventário).
@@ -1028,7 +1088,20 @@ export default function Temas() {
                dentro de outro botão é HTML inválido, e o resultado prático é
                que fixar um tema abria-o a seguir. */
             <div key={t.id} role="group" aria-label={t.name} className="group relative">
-              <div className="absolute right-2 top-2 z-10 flex gap-1">
+              {/* ══ AS ACÇÕES DO CARTÃO, EM DUAS FORMAS ═══════════════════
+                  MEDIDO a 375×667 com dedo: dois alvos de 44 px sobre um cartão
+                  de 165,5 px de largura — 55,6 % da largura do cartão tapada
+                  pelos botões, e a capa do tema por baixo deles. Com um «⋯» só
+                  passa a 26,6 %.
+
+                  Quem escolhe a forma é o CSS (`com-rato:` / `sem-rato:`, ver
+                  globals.css) e não o JavaScript: o hook lê `false` no servidor
+                  e o computador piscava — desenhava as duas acções e escondia-as
+                  a seguir, uma vez por cartão.
+
+                  Nenhuma das duas apaga nada (arquivar é arrumar, não apagar —
+                  daí não haver aqui nada marcado como destrutivo). */}
+              <div className="absolute right-2 top-2 z-10 hidden com-rato:flex gap-1">
                 <button
                   type="button"
                   /* Sem o nome do tema no rótulo: o cartão está dentro de um
@@ -1039,12 +1112,16 @@ export default function Temas() {
                   aria-pressed={!!t.favorito}
                   title={t.favorito ? "Desafixar" : "Fixar no topo"}
                   onClick={() => alternarMarca(t, "favorito")}
-                  /* Um favorito JÁ FIXADO vê-se sempre; os outros só aparecem
-                     com o rato em cima — mas em ecrã táctil não há rato, e aí
-                     estão sempre visíveis (`pointer-coarse`), senão a
-                     funcionalidade não existia no telemóvel. */
-                  className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 backdrop-blur-sm transition-opacity pointer-coarse:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 ${
-                    t.favorito ? "opacity-100 text-[#8a6d2f]" : "opacity-0 text-foreground/45"
+                  /* Um favorito JÁ FIXADO vê-se sempre — a estrela acesa é o
+                     que diz que está fixado, esconder--la apagava a informação.
+                     Por isso é ele que NÃO leva variante nenhuma: fica em
+                     `opacity-100` em toda a parte. Os outros escondem-se só
+                     onde há rato, que é onde o `group-hover` os pode trazer de
+                     volta. */
+                  className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm transition-opacity ${
+                    t.favorito
+                      ? "text-[#8a6d2f]"
+                      : "text-foreground/45 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
                   }`}
                 >
                   <svg
@@ -1066,7 +1143,7 @@ export default function Temas() {
                   aria-label={t.arquivado ? "Repor na lista" : "Arquivar"}
                   title={t.arquivado ? "Repor na lista" : "Arquivar (não apaga nada)"}
                   onClick={() => alternarMarca(t, "arquivado")}
-                  className="alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 text-foreground/45 opacity-0 backdrop-blur-sm transition-opacity pointer-coarse:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+                  className="alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 text-foreground/45 backdrop-blur-sm transition-opacity opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
                 >
                   <svg
                     width="15"
@@ -1086,6 +1163,16 @@ export default function Temas() {
                     )}
                   </svg>
                 </button>
+              </div>
+              {/* Sem rato: um «⋯» só, com as mesmas duas acções lá dentro.
+                  O `absolute` vai numa caixa à volta e não no próprio
+                  `MenuDeAccoes`: ele já se dá a si mesmo um `relative` (é o que
+                  ancora a gaveta) e, entre dois utilitários de `position` na
+                  mesma classe, quem ganha é a ordem do Tailwind e não a ordem
+                  em que estão escritos. MEDIDO antes de o separar: o menu
+                  esticava-se aos 165,5 px do cartão inteiro. */}
+              <div className="absolute right-2 top-2 z-10 com-rato:hidden">
+                <MenuDeAccoes sobre={t.name} accoes={accoesDoTema(t)} />
               </div>
               <button
                 type="button"
@@ -3175,7 +3262,7 @@ function ThemeFolder({
                         className={`absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border text-[11px] leading-none motion-safe:transition-opacity ${
                           isSelected
                             ? "border-[#4d6350] bg-[#4d6350] text-white opacity-100"
-                            : "border-white/70 bg-black/35 text-transparent opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
+                            : "border-white/70 bg-black/35 text-transparent opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100"
                         }`}
                       >
                         ✓
@@ -3186,22 +3273,38 @@ function ThemeFolder({
                         Capa
                       </span>
                     )}
-                    {/* ── OS TRÊS BOTÕES DA CÉLULA, E O `alvo-toque` ──────────
+                    {/* ── OS TRÊS BOTÕES DA CÉLULA ────────────────────────────
                         Desenhados a 28×28 (`h-7 w-7`), que é a densidade certa
-                        com rato. Com o dedo eram dois terços do mínimo de 44 px
-                        — e num ecrã de toque estão os três SEMPRE visíveis,
-                        portanto o × que apaga a foto ficava a 28 px do ⤢ que só
-                        a amplia. `.alvo-toque` só cresce sob `(pointer:
-                        coarse)`; o portátil fica exactamente como estava. A
+                        com rato; `.alvo-toque` leva-os a 44 sob `(pointer:
+                        coarse)` e o portátil fica exactamente como estava. A
                         largura para eles caberem vem da grelha de duas colunas
-                        — ver `GRELHA_DE_FOTOS`. */}
+                        — ver `GRELHA_DE_FOTOS`.
+
+                        O `@media (hover: none)` que aqui estava era a pergunta
+                        QUASE certa, e o «quase» é o defeito: um portátil com
+                        ecrã táctil responde `hover: hover` (tem trackpad) E
+                        `pointer: coarse` (tem dedo). Nesse, os três continuavam
+                        escondidos atrás de um hover que o dedo não sabe fazer —
+                        mover, ampliar e remover uma foto não existiam ali.
+                        `com-rato:` exige as DUAS metades, e é por isso que o
+                        apanha.
+
+                        Ficam os três SOLTOS, e não dentro de um «⋯». Duas
+                        razões medidas: cada um é o ÚNICO caminho de dedo para o
+                        que faz (o arrasto de reordenar é HTML5 e não pega no
+                        telemóvel; o Alt+setas precisa de teclado), e a célula é
+                        `overflow-hidden` — recorta a foto aos cantos redondos —,
+                        portanto uma gaveta aberta cá dentro sairia cortada.
+                        MEDIDO a 375×667 com dedo: os três tapam 25,6 % de uma
+                        célula de 150,5 px, e é o preço de nada ficar
+                        inalcançável. */}
                     {i > 0 && (
                       <button
                         type="button"
                         onClick={() => moveTo(i, 0)}
                         aria-label={`Mover a foto ${i + 1} para o início`}
                         title="Mover para o início"
-                        className="alvo-toque absolute bottom-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                        className="alvo-toque absolute bottom-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-100 motion-safe:transition-opacity com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100"
                       >
                         ↑
                       </button>
@@ -3217,7 +3320,7 @@ function ThemeFolder({
                       }}
                       aria-label={`Ver a foto ${i + 1} em grande`}
                       title="Ver em grande"
-                      className="alvo-toque absolute left-1 bottom-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                      className="alvo-toque absolute left-1 bottom-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-100 motion-safe:transition-opacity com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100"
                     >
                       ⤢
                     </button>
@@ -3227,7 +3330,7 @@ function ThemeFolder({
                       aria-label={`Remover foto ${i + 1} de ${images.length}`}
                       // Num ecrã tátil não há "passar o rato": aí o × está sempre
                       // visível, senão a foto não se conseguia remover de todo.
-                      className="alvo-toque absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                      className="alvo-toque absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-sm leading-none text-white opacity-100 motion-safe:transition-opacity com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:group-focus-within:opacity-100 com-rato:focus-visible:opacity-100"
                     >
                       ×
                     </button>

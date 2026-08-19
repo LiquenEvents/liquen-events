@@ -220,9 +220,45 @@ function renderTemas() {
   );
 }
 
+/**
+ * O CARTÃO de um tema — e não o «⋯» que está por cima dele.
+ *
+ * Cada cartão passou a ter um menu de acções cujo nome acessível é «Acções de
+ * Terracotta». A partir daí `/Terracotta/` deixou de identificar UM botão e
+ * passou a identificar dois, e 47 testes deste ficheiro pararam com «Found
+ * multiple elements».
+ *
+ * A correcção é tornar o selector PRECISO, não afrouxá-lo: o cartão é o botão
+ * que abre a pasta, o menu é o que tem `aria-haspopup="menu"`. Um
+ * `getAllByRole(...)[0]` também passava, mas passava por acaso — ficava
+ * dependente da ordem do DOM e calava-se no dia em que ela mudasse. Este
+ * rebenta com uma frase inteligível se algum dia houver zero ou dois cartões.
+ */
+function soCartoes(bs: HTMLElement[], name: RegExp): HTMLElement {
+  const cartoes = bs.filter((b) => b.getAttribute("aria-haspopup") !== "menu");
+  if (cartoes.length !== 1)
+    throw new Error(`Esperava UM cartão para ${name}; encontrei ${cartoes.length}.`);
+  return cartoes[0];
+}
+
+function cartaoDoTema(name: RegExp): HTMLElement {
+  return soCartoes(screen.getAllByRole("button", { name }), name);
+}
+
+async function acharCartaoDoTema(name: RegExp): Promise<HTMLElement> {
+  return soCartoes(await screen.findAllByRole("button", { name }), name);
+}
+
+/** Há um cartão deste tema na lista? (O «⋯» não conta como cartão.) */
+function haCartaoDoTema(name: RegExp): boolean {
+  return screen
+    .queryAllByRole("button", { name })
+    .some((b) => b.getAttribute("aria-haspopup") !== "menu");
+}
+
 /** Abre a pasta de um tema e espera que a leitura das fotos assente. */
 async function openFolder(name: RegExp) {
-  fireEvent.click(await screen.findByRole("button", { name }));
+  fireEvent.click(await acharCartaoDoTema(name));
   await screen.findByRole("button", { name: "Eliminar tema" });
   await act(async () => {});
   await settlePhotos();
@@ -421,8 +457,8 @@ describe("Biblioteca de Temas — estado sob concorrência", () => {
     // Só agora o servidor recusa a eliminação.
     await release("DELETE /api/temas/t1");
 
-    expect(screen.getByRole("button", { name: /Terracotta/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Itália/ })).toBeInTheDocument();
+    expect(haCartaoDoTema(/Terracotta/)).toBe(true);
+    expect(haCartaoDoTema(/Itália/)).toBe(true);
   });
 
   it("não cria dois temas quando o Enter é carregado duas vezes", async () => {
@@ -525,7 +561,7 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
     );
 
     renderTemas();
-    fireEvent.click(await screen.findByRole("button", { name: /Terracotta/ }));
+    fireEvent.click(await acharCartaoDoTema(/Terracotta/));
     await screen.findByRole("button", { name: "Eliminar tema" });
     await act(async () => {});
 
@@ -555,7 +591,7 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
     );
 
     renderTemas();
-    fireEvent.click(await screen.findByRole("button", { name: /Terracotta/ }));
+    fireEvent.click(await acharCartaoDoTema(/Terracotta/));
     await screen.findByRole("button", { name: "Eliminar tema" });
     await act(async () => {});
 
@@ -586,7 +622,7 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
     try {
       renderTemas();
       await tick();
-      fireEvent.click(screen.getByRole("button", { name: /Terracotta/ }));
+      fireEvent.click(cartaoDoTema(/Terracotta/));
       await tick();
       // A primeira página não leva companhia: pedir as duas ao mesmo tempo era
       // fazer exatamente o que este trabalho veio corrigir.
@@ -630,7 +666,7 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
     try {
       renderTemas();
       await tick();
-      fireEvent.click(screen.getByRole("button", { name: /Terracotta/ }));
+      fireEvent.click(cartaoDoTema(/Terracotta/));
       await tick();
       await tick(2000);
       expect(callsTo("GET /api/temas/t1/imagens")).toBe(2); // a adiantada
@@ -713,16 +749,16 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
     await act(async () => {
       fireEvent.change(field, { target: { value: "ITALIA" } });
     });
-    expect(screen.getByRole("button", { name: /Itália/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Terracotta/ })).not.toBeInTheDocument();
+    expect(haCartaoDoTema(/Itália/)).toBe(true);
+    expect(haCartaoDoTema(/Terracotta/)).toBe(false);
 
     // A nota é muitas vezes como o tema é lembrado.
     await act(async () => {
       fireEvent.change(field, { target: { value: "tons quentes" } });
     });
-    expect(screen.getByRole("button", { name: /Terracotta/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Praia/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Boho/ })).not.toBeInTheDocument();
+    expect(haCartaoDoTema(/Terracotta/)).toBe(true);
+    expect(haCartaoDoTema(/Praia/)).toBe(true);
+    expect(haCartaoDoTema(/Boho/)).toBe(false);
   });
 });
 

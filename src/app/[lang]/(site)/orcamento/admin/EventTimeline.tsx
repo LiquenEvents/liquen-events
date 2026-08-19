@@ -277,9 +277,17 @@ export default function EventTimeline({ quote, onChange }: Props) {
                     )
                   )}
                 </div>
+                {/* MEDIDO a 768×1024 com dedo (o iPad em retrato): 10 destes botões e
+                      ZERO visíveis. 768 passa dos 640 do `sm:`, portanto `sm:opacity-0`
+                      disparava — e sem rato não há como o revelar. A pergunta certa é sobre o
+                      PONTEIRO, não sobre a largura: `com-rato:` (globals.css) esconde só onde
+                      há mesmo rato, e a 375 e a 768 com dedo ficam os 10 visíveis.
+
+                      Fica um ícone e não um menu «⋯»: com UMA acção por linha, o menu custa
+                      os mesmos 44 px e cobra um toque a mais para chegar ao mesmo sítio. */}
                 <button
                   onClick={() => remove(i.id)}
-                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 opacity-100 sm:opacity-0 hover:text-[#8a2a22] sm:focus-visible:opacity-100 motion-safe:transition-all sm:group-hover:opacity-100"
+                  className="alvo-toque shrink-0 rounded-md p-1 text-foreground/25 opacity-100 com-rato:opacity-0 hover:text-[#8a2a22] com-rato:focus-visible:opacity-100 motion-safe:transition-all com-rato:group-hover:opacity-100"
                   aria-label={`Remover ${i.time} ${i.title}`}
                 >
                   <svg

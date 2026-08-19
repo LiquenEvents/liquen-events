@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { usePodeEsconderNoHover } from "./adaptativo";
 import { cn } from "./cn";
 
 /**
@@ -18,6 +17,18 @@ import { cn } from "./cn";
  * com ecrã táctil é largo e tem dedo, e um monitor grande ligado a um telemóvel
  * é estreito e tem rato. Esconder por largura acertava nos dois casos comuns e
  * falhava nos dois interessantes.
+ *
+ * ── E A DECISÃO É EM CSS, NÃO EM JAVASCRIPT ─────────────────────────────────
+ * Isto lia `usePodeEsconderNoHover()`, que responde à mesma pergunta — e que
+ * continua a ser a ferramenta certa para diferenças ESTRUTURAIS. Aqui era a
+ * errada: o hook devolve `false` no servidor (tem de devolver, senão há
+ * desencontro de hidratação), portanto o primeiro desenho no computador
+ * mostrava as acções todas e o segundo escondia-as. MEDIDO: um piscar em cada
+ * linha, em cada carregamento — numa tabela de trinta linhas, trinta.
+ *
+ * As variantes `com-rato:` / `sem-rato:` (globals.css) fazem o mesmo teste,
+ * mas a media query já é verdadeira quando o primeiro píxel é pintado. Zero
+ * JavaScript, zero piscar, e o mesmo desenho do lado do servidor.
  */
 
 export interface AccaoDeItem {
@@ -49,7 +60,6 @@ export function MenuDeAccoes({
   soltasNoEcraGrande = 0,
   className,
 }: MenuDeAccoesProps) {
-  const podeEsconder = usePodeEsconderNoHover();
   const [aberto, setAberto] = useState(false);
   const caixaRef = useRef<HTMLDivElement>(null);
   const abridorRef = useRef<HTMLButtonElement>(null);
@@ -108,10 +118,8 @@ export function MenuDeAccoes({
           className={cn(
             "alvo-toque flex h-11 w-11 items-center justify-center rounded-lg transition-opacity disabled:opacity-30",
             a.destrutiva ? "text-[#8a3d2f]" : "text-foreground/45 hover:text-foreground/70",
-            // O coração deste componente: só se esconde quando há mesmo hover.
-            podeEsconder
-              ? "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-              : "opacity-100",
+            // O coração deste componente: só se esconde onde há mesmo rato.
+            "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100",
           )}
         >
           {a.icone ?? a.rotulo.slice(0, 1)}
@@ -129,9 +137,11 @@ export function MenuDeAccoes({
             onClick={() => setAberto((v) => !v)}
             className={cn(
               "alvo-toque flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 transition-opacity hover:text-foreground/70",
-              podeEsconder && !aberto
-                ? "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                : "opacity-100",
+              // Aberto fica sempre visível: escondê-lo por baixo do seu próprio
+              // menu deixava o menu a flutuar sem nada que o segurasse.
+              aberto
+                ? "opacity-100"
+                : "opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100",
             )}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
