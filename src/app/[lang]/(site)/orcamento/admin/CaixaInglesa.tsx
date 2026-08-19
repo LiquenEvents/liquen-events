@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
 import { chaveDoCampo, type CampoDeTexto } from "@/lib/proposal-ortografia";
 
 /**
@@ -30,6 +31,28 @@ import { chaveDoCampo, type CampoDeTexto } from "@/lib/proposal-ortografia";
  * a contagem que ela lê no passo seguinte não ser a primeira vez que ouve falar
  * do assunto.
  */
+/**
+ * Um `<textarea>` de uma linha que cresce com o que lá está.
+ *
+ * A altura mede-se no `useLayoutEffect` e não no `useEffect`: com o segundo, a
+ * caixa aparecia com uma linha e saltava para duas à frente de quem escreve.
+ * É o mesmo remédio que o `CampoQueCresce` do `ServicesEditor` usa — aqui não
+ * se importa de lá porque estes dois ficheiros não se conhecem, e um import só
+ * para quatro linhas ataria a caixa inglesa ao editor de serviços.
+ */
+function TextareaQueCresce(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    // As bordas somam-se ao `scrollHeight` — ver a mesma conta, e a medição que
+    // a obrigou, no `CampoQueCresce` do `ServicesEditor`.
+    el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
+  }, [props.value]);
+  return <textarea {...props} ref={ref} rows={1} />;
+}
+
 export default function CaixaInglesa({
   campo,
   rotulo,
@@ -38,6 +61,7 @@ export default function CaixaInglesa({
   className,
   as = "input",
   rows,
+  cresce = false,
   readOnly,
   porTraduzir,
   placeholder,
@@ -53,6 +77,19 @@ export default function CaixaInglesa({
   className?: string;
   as?: "input" | "textarea";
   rows?: number;
+  /**
+   * A caixa cresce com o texto, a partir de UMA linha.
+   *
+   * Para as caixas que acompanham um campo que também cresce — o nome de um
+   * serviço, por exemplo. Sem isto, a portuguesa abria a segunda linha e a
+   * inglesa ao lado continuava a esconder o texto: as duas deixavam de ser «a
+   * mesma caixa em duas línguas», que é a única razão de a inglesa herdar a
+   * classe da outra.
+   *
+   * Desligado por omissão: as caixas de duas linhas fixas que já existem (a
+   * nota do orçamento, por exemplo) ficam exactamente como estão.
+   */
+  cresce?: boolean;
   readOnly?: boolean;
   /** Há português escrito e esta caixa está vazia. */
   porTraduzir?: boolean;
@@ -86,7 +123,11 @@ export default function CaixaInglesa({
         EN
       </span>
       {as === "textarea" ? (
-        <textarea {...comuns} rows={rows ?? 2} />
+        cresce ? (
+          <TextareaQueCresce {...comuns} />
+        ) : (
+          <textarea {...comuns} rows={rows ?? 2} />
+        )
       ) : (
         <input {...comuns} type="text" />
       )}

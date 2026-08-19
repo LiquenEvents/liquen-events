@@ -329,8 +329,34 @@ export default function PainelInterno({
             </p>
           ) : (
             <>
-              <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_5rem] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
-                <span>Linha</span>
+              {/* ══════════════════════════════════════════════════════════
+                  O NOME DA LINHA TINHA 13 px
+                  ══════════════════════════════════════════════════════════
+
+                  MEDIDO a 375 px, com o painel aberto sobre um orçamento de 15
+                  linhas: as três colunas fixas (6rem do preço + 6rem do custo +
+                  5rem da margem = 272 px) mais os três intervalos de 8 px comem
+                  296 dos 309 px do painel. Ao `minmax(0,1fr)` do NOME sobravam
+                  TREZE. Os nomes reais pediam entre 178 e 318 px — ou seja, o
+                  que se via do nome era nada, e o que ela tinha à frente era
+                  uma coluna de reticências ao lado de caixas de custo.
+
+                  Escrever um custo ao lado de um nome que não se lê é o género
+                  de ecrã que produz o custo certo na linha errada.
+
+                  Abaixo de 640 px a linha passa a duas filas: o nome sozinho em
+                  cima, com a largura toda, e o preço, o custo e a margem por
+                  baixo — que é a ordem por que se lê, e a mesma manobra que as
+                  linhas dos valores adicionais já fazem no estúdio. Acima de
+                  640 px a grelha das quatro colunas fica exactamente como
+                  estava.
+
+                  O cabeçalho acompanha a mesma grelha (o «Linha» também ocupa a
+                  fila inteira no telemóvel): um cabeçalho de quatro colunas por
+                  cima de linhas de duas filas seria uma legenda para uma tabela
+                  que ali não está. */}
+              <div className="grid grid-cols-[minmax(0,1fr)_6rem_5rem] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25 sm:grid-cols-[minmax(0,1fr)_6rem_6rem_5rem]">
+                <span className="col-span-3 sm:col-span-1">Linha</span>
                 <span className="text-right">Preço</span>
                 <span className="text-right">Custo</span>
                 <span className="text-right">Margem</span>
@@ -341,8 +367,11 @@ export default function PainelInterno({
                   const h = porChave.get(chaveDoServico(item ?? ""));
                   return (
                     <div key={i}>
-                      <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_5rem] items-center gap-2">
-                        <span className="truncate text-xs text-foreground/70">
+                      <div className="grid grid-cols-[minmax(0,1fr)_6rem_5rem] items-center gap-x-2 gap-y-1 sm:grid-cols-[minmax(0,1fr)_6rem_6rem_5rem]">
+                        {/* `col-span-3` no telemóvel: a fila de cima é só o
+                            nome, e com 309 px de largura o `truncate` já quase
+                            nunca corta — os nomes desta casa pedem 178 a 318. */}
+                        <span className="col-span-3 truncate text-xs text-foreground/70 sm:col-span-1">
                           {item || <span className="text-foreground/30">(sem nome)</span>}
                         </span>
                         <span className="text-right text-xs text-foreground/55">

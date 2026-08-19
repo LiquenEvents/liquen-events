@@ -156,7 +156,7 @@ import {
 } from "@/lib/proposal-traducao";
 import { camposPorTraduzir, docTemIngles, escreverEn, lerEn } from "@/lib/proposal-doc-bilingue";
 import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
-import { Ajuda, Button, Card, Field, Segmented } from "./ui";
+import { Ajuda, Button, Card, Field, FolhaOuDialogo, Segmented } from "./ui";
 
 /**
  * Visual editor for the studio's multi-page proposal PDF. Produces a
@@ -5649,6 +5649,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           accoes={
                                             fechado ? null : (
                                               <AccoesDaFoto
+                                                nome={`Fotografia ${ii + 1} de «${b.title || "mood board sem título"}»`}
                                                 podeRecuar={ii > 0}
                                                 podeAvancar={ii < b.images.length - 1}
                                                 seleccionada={seleccionadas.has(`${bi}:${ii}`)}
@@ -6265,10 +6266,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         A soma mudou-se para o bloco de totais (que a mostra
                         pela ordem do PDF); aqui fica a única coisa que este
                         sítio pode responder melhor do que ele — quantas destas
-                        caixas estão mesmo preenchidas. */}
-                    {contagem.total > 0 && (
-                      <span className="text-xs text-foreground/55">{contagem.frase}</span>
-                    )}
+                        caixas estão mesmo preenchidas.
+
+                        ── «0 DE 4 LINHAS COM PREÇO» NÃO É UM AVISO ──────────
+                        Palavras dela sobre uma proposta CORRECTA: o contador
+                        lia-se como erro. E lia-se bem — «0 de 4» tem a forma
+                        de um contador por preencher, mas há propostas em que
+                        as linhas NUNCA levam valor: o preço vive no total e as
+                        linhas são a lista do que está incluído. É, aliás, o
+                        formato das propostas dela há anos.
+
+                        As duas situações distinguem-se por um facto e não por
+                        um palpite: nenhuma linha com preço E um total escrito é
+                        «o preço está no total»; nenhuma linha com preço e nenhum
+                        total é «ainda não comecei», e aí um contador a zero
+                        também não diz nada que se aproveite. O contador fica
+                        para o caso em que ele responde mesmo a alguma coisa —
+                        quando há preços por linha para contar. */}
+                    {contagem.total > 0 &&
+                      (contagem.comPreco === 0 && parseMoneyText(totalInput) > 0 ? (
+                        <span className="text-xs text-foreground/55">
+                          Preço definido no total — as linhas não levam valor
+                        </span>
+                      ) : contagem.comPreco > 0 ? (
+                        <span className="text-xs text-foreground/55">{contagem.frase}</span>
+                      ) : null)}
                   </div>
                   {/* ── UMAS COM PREÇO, OUTRAS SEM: A SOMA ESTÁ INCOMPLETA ──
                       É o caso que mente sem parecer. Nenhuma linha com preço é
@@ -6371,18 +6393,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                    * sem este campo e continua a ler-se como foi enviada.
                    */}
                   <div className="mb-3 flex flex-col gap-1.5">
-                    {/* Texto visível num `span` e nome acessível no próprio
+                    {/* ── A EXPLICAÇÃO SAIU DE DENTRO DO `<option>` ─────────
+                        MEDIDO a 375 px: a opção mais comprida — «é só dos
+                        serviços, estas linhas somam-se» — precisa de 231 px de
+                        letra numa caixa cujo texto tem 261 px de largura útil,
+                        mas o `<select>` do iOS reserva ainda a seta e as
+                        margens, e um `<option>` NÃO QUEBRA LINHA: a frase saía
+                        cortada a meio, e o que se lia era «é só dos serviços,
+                        estas linh…». Uma escolha que vale dinheiro não pode
+                        ler-se por metade.
+
+                        As opções passam a nomear o modo em duas ou três
+                        palavras, e a explicação — que é uma frase, e as frases
+                        pertencem ao texto corrido — desce para debaixo do
+                        campo, onde pode quebrar à vontade e onde já estavam os
+                        números que ela confere.
+
+                        Texto visível num `span` e nome acessível no próprio
                         `select`, em vez de um `label` com as palavras «Valor
                         (sem IVA)» lá dentro: essas são as palavras do CAMPO do
                         total, e um segundo elemento a dizê-las tornava a
                         procura por etiqueta ambígua. Dezanove testes do
                         estúdio deixaram de encontrar o campo do preço por
-                        causa disso. */}
+                        causa disso. A frase de apoio aqui em baixo pode
+                        dizê-las — é um `<p>`, e `findByLabelText` não lê
+                        parágrafos. */}
                     <span
                       aria-hidden="true"
                       className="text-[9px] tracking-[0.2em] uppercase text-foreground/25"
                     >
-                      O valor que escreveste em «Valor (sem IVA)»
+                      Como contam no preço final
                     </span>
                     <select
                       id="adicionais-modo"
@@ -6393,20 +6433,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         setDoc((d) => ({ ...d, budgetExtrasSomam: e.target.value === "somam" }))
                       }
                     >
-                      <option value="dentro">já inclui estas linhas</option>
-                      <option value="somam">é só dos serviços, estas linhas somam-se</option>
+                      <option value="dentro">Já incluídas no valor</option>
+                      <option value="somam">Somam ao valor</option>
                     </select>
                     <p className="text-xs leading-relaxed text-foreground/45">
                       {doc.budgetExtrasSomam ? (
                         <>
-                          Subtotal dos serviços{" "}
+                          O valor que escreveste em «Valor (sem IVA)» é só dos serviços, e estas
+                          linhas somam-se a ele. Subtotal dos serviços{" "}
                           <strong className="font-semibold">{eur(totais.servicos)}</strong>, mais{" "}
                           {eur(totais.adicionais)} destas linhas, dá {eur(totais.total)} sem IVA e{" "}
                           {eur(totais.aPagar)} a pagar.
                         </>
                       ) : (
                         <>
-                          Estas linhas saem de dentro do valor: o subtotal dos serviços fica{" "}
+                          O valor que escreveste em «Valor (sem IVA)» já inclui estas linhas: o
+                          subtotal dos serviços fica{" "}
                           <strong className="font-semibold">{eur(totais.servicos)}</strong> e o
                           total sem IVA continua {eur(totais.total)}.
                         </>
@@ -7900,10 +7942,47 @@ function BarraDaSeleccao({
  * que não existe; e no computador era a única resposta para «esta foto está no
  * sítio errado», o que fazia de remover a ferramenta para tudo.
  *
- * ── PORQUE É QUE ESTÁ SEMPRE VISÍVEL AO TOQUE ─────────────────────────────
- * `[@media(hover:none)]:opacity-100`. Onde há rato, a barra aparece ao passar
- * por cima e a grelha fica limpa; onde não há, está lá. A alternativa —
- * revelá-la com um toque longo — obrigava a descobrir que o toque longo existe.
+ * ── PORQUE É QUE COM RATO ESTÁ NUMA BARRA E AO TOQUE NUM «⋯» ──────────────
+ *
+ * MEDIDO a 375 px, template Decoração, dois mood boards com 3 e 4 fotografias,
+ * proposta bilingue ligada — o ecrã de que a dona do negócio mandou fotografia:
+ *
+ *     célula da miniatura            84 × 72 px
+ *     botão (o `alvo-toque` no dedo) 44 × 44 px
+ *     sete botões, a quebrar         84 × 328 px
+ *     sobe acima da própria foto        256 px
+ *     z-index                              20
+ *
+ * Sete alvos de 44 px NÃO CABEM numa célula de 84: o `flex-wrap` empilhava-os
+ * numa coluna quatro vezes e meia mais alta do que a miniatura, e o
+ * `absolute bottom-0` fazia essa coluna crescer PARA CIMA, por cima do que
+ * estivesse lá — com `z-20`, portanto por cima e não por baixo. Com sete
+ * fotografias na página eram sete colunas de quadrados escuros a atravessar o
+ * subtítulo, a caixa EN e a descrição. Medido: 13 pedaços de texto tapados,
+ * entre eles «Two columns with Roman vase…» com 53 × 29 px de letra por baixo
+ * de um quadrado preto.
+ *
+ * A regra antiga (`[@media(hover:none)]:opacity-100`) estava certa no
+ * princípio — num ecrã táctil, «aparece no hover» quer dizer «não existe» — e
+ * errada no resultado: tornou visíveis sete botões que não têm onde caber.
+ *
+ * Agora a FORMA muda com o apontador, e não só a opacidade:
+ *   · com rato  — a barra de sete ícones de 24 px, revelada ao passar por
+ *                 cima, exactamente como sempre esteve;
+ *   · com dedo  — UM «⋯» de 44 px no canto da miniatura, que abre a folha
+ *                 inferior com as sete acções escritas por extenso.
+ *
+ * Tudo em CSS (`[@media(hover:none)]:hidden` / `[@media(hover:hover)]:hidden`)
+ * e não com o `usePodeEsconderNoHover()`: um hook lê `false` no servidor e no
+ * primeiro desenho, e o computador via o «⋯» a piscar antes de a barra
+ * aparecer. A media query não tem primeiro desenho errado.
+ *
+ * ── E REMOVER FICOU MAIS DIFÍCIL DE ACERTAR POR ENGANO, NÃO MAIS FÁCIL ─────
+ * Estava um × de 44 px encostado ao ✓ de escolher, dentro de uma célula de 84 —
+ * dois alvos a 4 px um do outro, num sítio onde o dedo tapa os dois. Passa a
+ * ser uma linha escrita «Remover fotografia», em baixo, separada por um traço
+ * das que não apagam nada, e a vermelho. É a mesma regra que o `MenuDeAccoes`
+ * já aplica às linhas das tabelas.
  *
  * ── AS SETAS NÃO SÃO UM ADORNO ────────────────────────────────────────────
  * São o caminho do teclado (e do dedo trémulo). Arrastar exige apontar, mover e
@@ -7911,6 +7990,7 @@ function BarraDaSeleccao({
  * dez vezes seguidas ao afinar uma página.
  */
 function AccoesDaFoto({
+  nome = "esta fotografia",
   podeRecuar,
   podeAvancar,
   principal,
@@ -7923,6 +8003,10 @@ function AccoesDaFoto({
   onSeleccionar,
   onRemover,
 }: {
+  /** Como se chama esta fotografia na folha do telemóvel («Fotografia 2 de
+   *  Decoração Cerimónia»). Sete linhas escritas precisam de dizer a QUEM se
+   *  aplicam — a barra de ícones não precisava, porque está em cima da foto. */
+  nome?: string;
   podeRecuar: boolean;
   podeAvancar: boolean;
   /** `undefined` = esta disposição não tem lugar de destaque; o botão não aparece. */
@@ -7936,74 +8020,199 @@ function AccoesDaFoto({
   onSeleccionar: () => void;
   onRemover: () => void;
 }) {
+  const [folhaAberta, setFolhaAberta] = useState(false);
   const botao =
     "alvo-toque flex h-6 w-6 items-center justify-center rounded-md bg-black/55 text-[11px] leading-none text-white transition-colors hover:bg-black/75 disabled:opacity-30";
+
+  /* A MESMA lista para os dois caminhos. Duas listas seriam duas versões da
+     verdade — a acção acrescentada num sítio e esquecida no outro é a forma
+     mais barata de o telemóvel voltar a ficar para trás. */
+  const accoes: {
+    id: string;
+    rotulo: string;
+    glifo: string;
+    onAccao: () => void;
+    desativada?: boolean;
+    activa?: boolean;
+    destrutiva?: boolean;
+  }[] = [
+    {
+      id: "recuar",
+      rotulo: "Mover para trás",
+      glifo: "←",
+      onAccao: onRecuar,
+      desativada: !podeRecuar,
+    },
+    {
+      id: "avancar",
+      rotulo: "Mover para a frente",
+      glifo: "→",
+      onAccao: onAvancar,
+      desativada: !podeAvancar,
+    },
+    { id: "ampliar", rotulo: "Ver em grande", glifo: "⤢", onAccao: onAmpliar },
+    { id: "substituir", rotulo: "Trocar por outra fotografia", glifo: "⇄", onAccao: onSubstituir },
+    ...(principal !== undefined
+      ? [
+          {
+            id: "principal",
+            rotulo: principal
+              ? "Deixar de ser a fotografia principal"
+              : "Fotografia principal desta página",
+            glifo: "★",
+            onAccao: onPrincipal,
+            activa: principal,
+          },
+        ]
+      : []),
+    {
+      id: "seleccionar",
+      rotulo: seleccionada ? "Retirar da selecção" : "Escolher para mover em conjunto",
+      glifo: "✓",
+      onAccao: onSeleccionar,
+      activa: seleccionada,
+    },
+    {
+      id: "remover",
+      rotulo: "Remover fotografia",
+      glifo: "×",
+      onAccao: onRemover,
+      destrutiva: true,
+    },
+  ];
+
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 transition-opacity group-hover/foto:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
-      <span className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5">
-        <button
-          type="button"
-          className={botao}
-          onClick={onRecuar}
-          disabled={!podeRecuar}
-          aria-label="Mover para trás"
-        >
-          <span aria-hidden="true">←</span>
-        </button>
-        <button
-          type="button"
-          className={botao}
-          onClick={onAvancar}
-          disabled={!podeAvancar}
-          aria-label="Mover para a frente"
-        >
-          <span aria-hidden="true">→</span>
-        </button>
-        <button type="button" className={botao} onClick={onAmpliar} aria-label="Ver em grande">
-          <span aria-hidden="true">⤢</span>
-        </button>
-        <button
-          type="button"
-          className={botao}
-          onClick={onSubstituir}
-          aria-label="Trocar por outra fotografia"
-        >
-          <span aria-hidden="true">⇄</span>
-        </button>
-        {principal !== undefined && (
+    <>
+      {/* ── O CAMINHO DO DEDO: um alvo, e as sete acções por extenso ────────
+          `hidden [@media(hover:none)]:flex` — só existe onde não há rato. Fica
+          no canto inferior direito da miniatura e mede 44 px numa célula de
+          84×72: cabe, e é o único que cabe. */}
+      <button
+        type="button"
+        onClick={() => setFolhaAberta(true)}
+        aria-label={`Acções de ${nome}`}
+        aria-haspopup="dialog"
+        className="alvo-toque pointer-events-auto absolute right-0.5 bottom-0.5 z-20 hidden h-11 w-11 items-center justify-center rounded-lg bg-black/60 text-white transition-colors [@media(hover:none)]:flex"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <circle cx="5" cy="12" r="1.8" />
+          <circle cx="12" cy="12" r="1.8" />
+          <circle cx="19" cy="12" r="1.8" />
+        </svg>
+      </button>
+
+      <FolhaOuDialogo
+        aberto={folhaAberta}
+        onFechar={() => setFolhaAberta(false)}
+        titulo={nome}
+        descricao="O que se pode fazer a esta fotografia."
+        largura="sm"
+      >
+        <div className="flex flex-col">
+          {accoes.map((a, i) => {
+            // Um traço antes da primeira que apaga: é o que impede o toque
+            // distraído em «Remover» quando se queria a linha de cima.
+            const primeiraDestrutiva =
+              a.destrutiva && !accoes.slice(0, i).some((x) => x.destrutiva);
+            return (
+              <button
+                key={a.id}
+                type="button"
+                disabled={a.desativada}
+                onClick={() => {
+                  setFolhaAberta(false);
+                  a.onAccao();
+                }}
+                className={`alvo-toque !justify-start flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition-colors disabled:opacity-30 ${
+                  a.destrutiva
+                    ? "text-[#8a3d2f] hover:bg-[#8a3d2f]/[0.07]"
+                    : "text-foreground/80 hover:bg-foreground/[0.05]"
+                } ${primeiraDestrutiva ? "mt-1 border-t border-foreground/[0.08] pt-3" : ""}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[13px] ${
+                    a.activa ? "bg-[#4d6350] text-white" : "bg-foreground/[0.06] text-foreground/60"
+                  }`}
+                >
+                  {a.glifo}
+                </span>
+                {a.rotulo}
+              </button>
+            );
+          })}
+        </div>
+      </FolhaOuDialogo>
+
+      {/* ── O CAMINHO DO RATO: a barra de sempre, ao pixel ──────────────────
+          `[@media(hover:none)]:hidden` no lugar do antigo `:opacity-100`. Onde
+          há rato, nada nesta barra mudou. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 transition-opacity group-hover/foto:opacity-100 focus-within:opacity-100 [@media(hover:none)]:hidden">
+        <span className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5">
           <button
             type="button"
-            className={`${botao} ${principal ? "bg-[#4d6350]" : ""}`}
-            onClick={onPrincipal}
-            aria-pressed={principal}
-            aria-label={
-              principal
-                ? "Deixar de ser a fotografia principal"
-                : "Fotografia principal desta página"
-            }
+            className={botao}
+            onClick={onRecuar}
+            disabled={!podeRecuar}
+            aria-label="Mover para trás"
           >
-            <span aria-hidden="true">★</span>
+            <span aria-hidden="true">←</span>
           </button>
-        )}
-        <button
-          type="button"
-          className={`${botao} ${seleccionada ? "bg-[#4d6350]" : ""}`}
-          onClick={onSeleccionar}
-          aria-pressed={seleccionada}
-          aria-label={seleccionada ? "Retirar da selecção" : "Escolher para mover em conjunto"}
-        >
-          <span aria-hidden="true">✓</span>
-        </button>
-        <button
-          type="button"
-          className={`${botao} hover:bg-[#8a2a22]`}
-          onClick={onRemover}
-          aria-label="Remover fotografia"
-        >
-          <span aria-hidden="true">×</span>
-        </button>
-      </span>
-    </div>
+          <button
+            type="button"
+            className={botao}
+            onClick={onAvancar}
+            disabled={!podeAvancar}
+            aria-label="Mover para a frente"
+          >
+            <span aria-hidden="true">→</span>
+          </button>
+          <button type="button" className={botao} onClick={onAmpliar} aria-label="Ver em grande">
+            <span aria-hidden="true">⤢</span>
+          </button>
+          <button
+            type="button"
+            className={botao}
+            onClick={onSubstituir}
+            aria-label="Trocar por outra fotografia"
+          >
+            <span aria-hidden="true">⇄</span>
+          </button>
+          {principal !== undefined && (
+            <button
+              type="button"
+              className={`${botao} ${principal ? "bg-[#4d6350]" : ""}`}
+              onClick={onPrincipal}
+              aria-pressed={principal}
+              aria-label={
+                principal
+                  ? "Deixar de ser a fotografia principal"
+                  : "Fotografia principal desta página"
+              }
+            >
+              <span aria-hidden="true">★</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className={`${botao} ${seleccionada ? "bg-[#4d6350]" : ""}`}
+            onClick={onSeleccionar}
+            aria-pressed={seleccionada}
+            aria-label={seleccionada ? "Retirar da selecção" : "Escolher para mover em conjunto"}
+          >
+            <span aria-hidden="true">✓</span>
+          </button>
+          <button
+            type="button"
+            className={`${botao} hover:bg-[#8a2a22]`}
+            onClick={onRemover}
+            aria-label="Remover fotografia"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </span>
+      </div>
+    </>
   );
 }
 
@@ -8132,7 +8341,24 @@ function Section({
   );
 }
 
-/** Indicador de passos "1 · Conteúdo → 2 · Pré-visualizar → 3 · Enviar". */
+/**
+ * Indicador de passos "1 · Conteúdo → 2 · Pré-visualizar → 3 · Enviar".
+ *
+ * ── NO TELEMÓVEL, OS NÚMEROS E SÓ O NOME DO PASSO ONDE SE ESTÁ ────────────
+ * MEDIDO a 375 px: os três botões com os nomes por extenso, mais as duas setas
+ * e os intervalos, pedem 396 px de fila num espaço de 343 — a fila quebrava e
+ * o «3 Enviar» ficava sozinho numa segunda linha, sem seta a ligá-lo, a
+ * parecer outra coisa em vez do terceiro passo.
+ *
+ * O nome dos passos onde NÃO se está passa a `sr-only` abaixo de 640 px: fica
+ * o número, que é o que dá o sentido de percurso, e o passo activo continua a
+ * dizer o nome — que é a única pergunta a que isto responde quando se está a
+ * meio («onde estou?»). Acima de 640 px não muda nada.
+ *
+ * `sr-only` e NÃO `hidden`: `display: none` tira o texto da árvore de
+ * acessibilidade, e o botão passava a chamar-se «2» para quem usa leitor de
+ * ecrã — e para os testes que o procuram por «Pré-visualizar».
+ */
 function StepNav({
   step,
   onSelect,
@@ -8165,7 +8391,10 @@ function StepNav({
               >
                 {sent && s.id === "enviar" ? "✓" : s.n}
               </span>
-              {s.label}
+              {/* Um `span` só, com o rótulo INTEIRO lá dentro. Partir a frase
+                  em pedaços dentro de um `inline-flex` põe cada pedaço na sua
+                  própria coluna — «Pré-» e «visualizar» separados. */}
+              <span className={active ? undefined : "max-sm:sr-only"}>{s.label}</span>
             </button>
             {i < STEPS.length - 1 && (
               <span aria-hidden="true" className="text-foreground/20">
