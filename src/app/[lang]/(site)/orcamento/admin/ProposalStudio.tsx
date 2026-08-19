@@ -9495,7 +9495,7 @@ function subscreverRecusa(avisar: () => void): () => void {
 }
 
 /** Esta fotografia foi recusada pelas regras do próprio sítio? */
-function usarRecusaDaPolitica(url?: string): boolean {
+function useRecusaDaPolitica(url?: string): boolean {
   const ler = useCallback(
     () => houveRecusaSemMorada || origensRecusadasPelaPolitica.has(origemDe(url)),
     [url],
@@ -9594,7 +9594,7 @@ function Thumb({
    * já, sem esperar pelo `ultimoAlvo`, e a cascata pode receber a resposta em
    * vez de gastar uma volta a descobrir o que já se sabia.
    */
-  const recusadaPeloSitio = usarRecusaDaPolitica(planoB ?? url);
+  const recusadaPeloSitio = useRecusaDaPolitica(planoB ?? url);
   const {
     alvo,
     desistiu: failed,
@@ -9866,9 +9866,7 @@ function Thumb({
                `title` e, por extenso, no comentário da escuta lá em cima. */
             <>
               <span className="font-medium text-foreground/55">Fotografia guardada</span>
-              <span
-                title="A fotografia está guardada e inteira — sai bem no PDF. Quem a recusou aqui foi este site, por uma definição dele. Insistir dá sempre o mesmo."
-              >
+              <span title="A fotografia está guardada e inteira — sai bem no PDF. Quem a recusou aqui foi este site, por uma definição dele. Insistir dá sempre o mesmo.">
                 O site não a deixou aparecer aqui. É uma definição do site, não a fotografia.
               </span>
               {ultimoAlvo && (

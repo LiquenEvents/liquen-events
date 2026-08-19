@@ -4823,3 +4823,173 @@ describe("uma foto do documento que não veio na lista do servidor", () => {
     expect(screen.queryByText(/Não carregou/i)).toBeNull();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ESTÚDIO NO TELEMÓVEL DELA — as três coisas de que ela mandou fotografia
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Um bloco só, no fim do ficheiro e de propósito: são três defeitos vistos no
+ * mesmo ecrã, a 390 px, na mesma proposta.
+ */
+describe("o estúdio no telemóvel: fotos, acções e descrições", () => {
+  /** A barra dos sete ícones — encontrada pelo primeiro botão dela. */
+  const barraDasAccoes = () =>
+    document.querySelector('button[aria-label="Mover para trás"]')?.closest("div") ?? null;
+
+  /**
+   * ── A BARRA QUE VOLTOU A TAPAR A CÉLULA ──────────────────────────────────
+   *
+   * Estava escondida com `[@media(hover:none)]` e os botões cresciam com
+   * `(pointer: coarse)` (`.alvo-toque`) — duas perguntas diferentes sobre o
+   * mesmo aparelho. Num iPhone com AssistiveTouch, num iPad com trackpad ou
+   * num portátil de ecrã táctil, a primeira responde NÃO e a segunda SIM: a
+   * barra fica e cada ícone salta de 24 px para 44. MEDIDO a 390 px nesse
+   * aparelho: 89 × 328 px por cima de uma célula de 89 × 104, a subir 209 px
+   * acima dela, com cinco pedaços de texto tapados.
+   *
+   * Aqui prende-se a REGRA, que é o que não pode voltar a divergir: a barra
+   * pergunta pelo ponteiro inteiro (`com-rato`) e os botões dela não são alvos
+   * de toque — porque uma barra que só existe com rato não precisa de 44 px,
+   * e foi esse mínimo que a transformou numa coluna.
+   */
+  it("a barra de acções não existe sem rato, e os botões dela não são alvos de toque", async () => {
+    seedDraft(1);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/0.jpg", thumbUrl: "https://sb/mini-0.jpg" },
+    ];
+    renderStudio();
+    await waitFor(() => expect(barraDasAccoes()).not.toBeNull());
+
+    const barra = barraDasAccoes()!;
+    const classes = barra.className;
+    expect(classes, "a barra tem de estar escondida por omissão").toContain("hidden");
+    expect(classes, "e só aparecer onde há MESMO rato").toContain("com-rato:flex");
+    expect(
+      classes,
+      "`(hover: none)` é metade da pergunta — a que falha no aparelho que trouxe isto",
+    ).not.toContain("hover:none");
+
+    for (const b of Array.from(barra.querySelectorAll("button"))) {
+      expect(
+        b.className,
+        `«${b.getAttribute("aria-label")}» é da barra do rato e não pode ser um alvo de 44 px`,
+      ).not.toContain("alvo-toque");
+    }
+
+    // E o caminho do dedo existe por omissão: é ele que fica quando a barra sai.
+    const pontos = document.querySelector('button[aria-label^="Acções de"]')!;
+    expect(pontos.className).toContain("com-rato:hidden");
+    expect(pontos.className).toContain("alvo-toque");
+  });
+
+  /**
+   * ── A DESCRIÇÃO QUE CORTAVA TEXTO A MEIO ─────────────────────────────────
+   *
+   * `rows={2}` e o resto a rolar por dentro. MEDIDO a 390 px: 70 px de caixa
+   * para 224 px de texto português (154 px escondidos) e 276 de inglês (206
+   * escondidos). O jsdom não maquetiza, portanto o que se prende aqui é a
+   * causa e não o efeito: a altura deixa de estar escrita no `rows`.
+   */
+  it("a descrição do mood board não abre com altura fixa", async () => {
+    seedDraft(1, { annotation: "uma descrição comprida ".repeat(12) });
+    renderStudio();
+    const campo = await waitFor(() => {
+      const c = document.querySelector<HTMLTextAreaElement>('[data-campo="boardNota:0"]');
+      expect(c).not.toBeNull();
+      return c!;
+    });
+    expect(campo.rows, "a altura volta a estar presa a duas linhas").toBe(1);
+  });
+
+  /**
+   * ── «GUARDADA MAS NÃO A CONSIGO MOSTRAR» QUANDO NÃO FOI ISSO ─────────────
+   *
+   * Uma `img-src` que não nomeia a origem do Storage faz o browser recusar a
+   * fotografia ANTES de a pedir: sem pedido, sem código de estado, só o
+   * `onerror` — igual, do lado do JavaScript, a um 404. E o remédio é o
+   * oposto: um «Tentar novamente» vai falhar exactamente da mesma maneira
+   * todas as vezes.
+   *
+   * O casamento é por ORIGEM, e é isso que este teste prende: o `blockedURI`
+   * vem inteiro no Chromium mas a norma deixa entregá-lo cortado à origem — e
+   * o telemóvel dela é um iPhone.
+   */
+  it("distingue «o sítio recusou» de «o ficheiro não veio»", async () => {
+    seedDraft(1);
+    assetsServidor = [
+      {
+        path: "board/foto-0.jpg",
+        url: "https://storage.exemplo/0.jpg",
+        thumbUrl: "https://storage.exemplo/mini-0.jpg",
+      },
+    ];
+    renderStudio();
+
+    // As duas moradas falham, como falham quando o browser as recusa.
+    const morrer = async () => {
+      const img = document.querySelector<HTMLImageElement>("[data-foto] img");
+      if (!img) return;
+      await act(async () => {
+        img.dispatchEvent(new Event("error"));
+      });
+    };
+    await waitFor(() => expect(document.querySelector("[data-foto] img")).not.toBeNull());
+    await morrer();
+    await morrer();
+    expect(await screen.findByText(/Não consegui mostrá-la neste ecrã/i)).toBeTruthy();
+
+    // O browser anuncia a recusa — com o `blockedURI` CORTADO À ORIGEM.
+    await act(async () => {
+      const e = new Event("securitypolicyviolation");
+      Object.assign(e, {
+        blockedURI: "https://storage.exemplo",
+        effectiveDirective: "img-src",
+        violatedDirective: "img-src",
+      });
+      document.dispatchEvent(e);
+    });
+
+    expect(
+      await screen.findByText(/O site não a deixou aparecer aqui/i),
+      "a célula continuou a acusar a fotografia de uma coisa que não é dela",
+    ).toBeTruthy();
+    expect(screen.queryByText(/Não consegui mostrá-la neste ecrã/i)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Tentar novamente" }),
+      "um botão que não pode funcionar é uma promessa vazia",
+    ).toBeNull();
+  });
+
+  /**
+   * ── O BOTÃO QUE NÃO PODIA FUNCIONAR ──────────────────────────────────────
+   *
+   * MEDIDO com a rede a devolver 503: o «Tentar novamente» repetia, ao byte,
+   * os dois URL que acabavam de falhar. Contra a causa mais provável de uma
+   * grelha inteira morta — assinaturas que já não servem — isso é um botão
+   * que não pode funcionar por construção.
+   */
+  it("o «Tentar novamente» de uma célula morta vai buscar assinaturas frescas", async () => {
+    seedDraft(1);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/0.jpg", thumbUrl: "https://sb/mini-0.jpg" },
+    ];
+    renderStudio();
+    const morrer = async () => {
+      const img = document.querySelector<HTMLImageElement>("[data-foto] img");
+      if (!img) return;
+      await act(async () => {
+        img.dispatchEvent(new Event("error"));
+      });
+    };
+    await waitFor(() => expect(document.querySelector("[data-foto] img")).not.toBeNull());
+    await morrer();
+    await morrer();
+    const botao = await screen.findByRole("button", { name: "Tentar novamente" });
+
+    const leituras = () => pedidos.filter((p) => p.url.includes("/assets")).length;
+    const antes = leituras();
+    await userEvent.click(botao);
+    await waitFor(() => expect(leituras()).toBeGreaterThan(antes));
+  });
+});
