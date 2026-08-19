@@ -5,11 +5,7 @@ import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import { Button } from "./ui";
 import { insertToken } from "@/lib/email-template-format";
-import {
-  renderizarAssunto,
-  renderizarCorpo,
-  validarModelo,
-} from "@/lib/email-template-engine";
+import { renderizarAssunto, renderizarCorpo, validarModelo } from "@/lib/email-template-engine";
 import {
   VALORES_DE_EXEMPLO,
   VARIAVEIS_POR_GRUPO,
@@ -631,8 +627,8 @@ export default function EmailTemplatesBilingue() {
                   </ul>
                 )}
                 <p className="text-[11px] text-foreground/40 mt-2 leading-relaxed">
-                  Guardam-se as últimas 10 versões de cada língua. Repor é ele próprio desfazível:
-                  o texto que está a sair agora fica no histórico.
+                  Guardam-se as últimas 10 versões de cada língua. Repor é ele próprio desfazível: o
+                  texto que está a sair agora fica no histórico.
                 </p>
               </div>
             )}

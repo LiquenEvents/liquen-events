@@ -106,9 +106,9 @@ describe("os valores", () => {
   });
 
   it("a percentagem do sinal leva o símbolo", () => {
-    expect(construirValores({ ...base, proposta: { sinalPercentagem: 30 } }).sinal_percentagem).toBe(
-      "30%",
-    );
+    expect(
+      construirValores({ ...base, proposta: { sinalPercentagem: 30 } }).sinal_percentagem,
+    ).toBe("30%");
   });
 
   it("todas as variáveis do catálogo têm uma chave no mapa", () => {

@@ -155,7 +155,8 @@ describe("histórico e reversão", () => {
 
   it("as versões vêm da mais recente para a mais antiga", async () => {
     const comum = { chave: "curto", nome: "Curto", idioma: "pt" as const };
-    for (const n of ["a", "b", "c"]) await guardarModelo({ ...comum, subject: n, body: `<p>${n}</p>` });
+    for (const n of ["a", "b", "c"])
+      await guardarModelo({ ...comum, subject: n, body: `<p>${n}</p>` });
     const versoes = await listarVersoes("curto", "pt");
     expect(versoes.map((v) => v.subject)).toEqual(["b", "a"]);
   });
@@ -169,9 +170,27 @@ describe("histórico e reversão", () => {
   });
 
   it("o histórico do português não se mistura com o do inglês", async () => {
-    await guardarModelo({ chave: "curto", nome: "C", idioma: "pt", subject: "p1", body: "<p>p1</p>" });
-    await guardarModelo({ chave: "curto", nome: "C", idioma: "pt", subject: "p2", body: "<p>p2</p>" });
-    await guardarModelo({ chave: "curto", nome: "C", idioma: "en", subject: "e1", body: "<p>e1</p>" });
+    await guardarModelo({
+      chave: "curto",
+      nome: "C",
+      idioma: "pt",
+      subject: "p1",
+      body: "<p>p1</p>",
+    });
+    await guardarModelo({
+      chave: "curto",
+      nome: "C",
+      idioma: "pt",
+      subject: "p2",
+      body: "<p>p2</p>",
+    });
+    await guardarModelo({
+      chave: "curto",
+      nome: "C",
+      idioma: "en",
+      subject: "e1",
+      body: "<p>e1</p>",
+    });
     expect(await listarVersoes("curto", "pt")).toHaveLength(1);
     expect(await listarVersoes("curto", "en")).toHaveLength(0);
   });
@@ -190,7 +209,13 @@ describe("histórico e reversão", () => {
   });
 
   it("reverter para uma versão que não existe devolve null e não mexe em nada", async () => {
-    await guardarModelo({ chave: "curto", nome: "C", idioma: "pt", subject: "x", body: "<p>x</p>" });
+    await guardarModelo({
+      chave: "curto",
+      nome: "C",
+      idioma: "pt",
+      subject: "x",
+      body: "<p>x</p>",
+    });
     expect(await reverterPara("curto", "pt", "2020-01-01T00:00:00.000Z")).toBeNull();
     expect((await listarModelos()).find((m) => m.chave === "curto")!.pt.subject).toBe("x");
   });

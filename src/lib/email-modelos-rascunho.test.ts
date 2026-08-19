@@ -2,15 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const get = vi.fn(async () => null);
 vi.mock("./email-templates-store", async () => {
-  const real = await vi.importActual<typeof import("./email-templates-store")>(
-    "./email-templates-store",
-  );
+  const real =
+    await vi.importActual<typeof import("./email-templates-store")>("./email-templates-store");
   return { ...real, getTemplate: get };
 });
 
-const { rascunhoParaEnvio, corpoEnviavel, MODELO_POR_OMISSAO } = await import(
-  "./email-modelos-rascunho"
-);
+const { rascunhoParaEnvio, corpoEnviavel, MODELO_POR_OMISSAO } =
+  await import("./email-modelos-rascunho");
 const { construirValores } = await import("./email-template-vars");
 
 const LINK = "https://liquenevents.pt/proposta/abc";
@@ -121,7 +119,11 @@ describe("o rascunho que abre no envio", () => {
   });
 
   it("um modelo que não existe naquela língua diz-se, não se inventa", async () => {
-    const r = await rascunhoParaEnvio({ chave: "sinal-recebido", idioma: "en", valores: valores(true) });
+    const r = await rascunhoParaEnvio({
+      chave: "sinal-recebido",
+      idioma: "en",
+      valores: valores(true),
+    });
     expect("erro" in r).toBe(true);
   });
 });

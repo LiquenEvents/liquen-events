@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const get = vi.fn();
 vi.mock("./email-templates-store", async () => {
-  const real = await vi.importActual<typeof import("./email-templates-store")>(
-    "./email-templates-store",
-  );
+  const real =
+    await vi.importActual<typeof import("./email-templates-store")>("./email-templates-store");
   return { ...real, getTemplate: get };
 });
 
