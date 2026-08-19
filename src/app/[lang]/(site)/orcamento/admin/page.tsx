@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type { QuoteSummary } from "@/lib/orcamento/types";
 import AdminClient from "./AdminClient";
+import MedidorDeTransbordo from "./MedidorDeTransbordo";
 import AdminLogin from "./AdminLogin";
 import { ToastProvider } from "./Toast";
 import { RegistoDeGravacoesProvider } from "./registo-de-gravacoes";
@@ -57,6 +58,11 @@ export default async function AdminPage() {
     <ToastProvider>
       <RegistoDeGravacoesProvider>
         <AdminClient initialQuotes={quotes} userName={userName} />
+        {/* Instrumento, não funcionalidade: só aparece com `?medir=1` no
+            endereço. Ver o cabeçalho do ficheiro — existe porque o transbordo
+            horizontal que ela vê no iPhone não se reproduz em Chromium, e a
+            única medição que vale é a que corre no aparelho dela. */}
+        <MedidorDeTransbordo />
       </RegistoDeGravacoesProvider>
     </ToastProvider>
   );
