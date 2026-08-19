@@ -114,7 +114,11 @@ export async function rascunhoParaEnvio(opcoes: {
 
   let fonteAssunto = "";
   let fonteTexto = "";
-  let nome = chave;
+  // Sem valor inicial de propósito: os dois caminhos abaixo ou lhe dão nome, ou
+  // saem com erro. Um `= chave` aqui nunca chegava a ser lido, e um valor morto
+  // à espera é o que faz alguém acrescentar um terceiro caminho sem reparar que
+  // se esqueceu de o preencher — aqui isso passa a não compilar.
+  let nome: string;
   let deOnde: "guardado" | "origem" = "origem";
 
   let guardado = null;
