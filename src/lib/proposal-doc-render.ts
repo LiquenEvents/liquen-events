@@ -32,6 +32,7 @@ import {
   pixelsForBox,
   type TargetPixels,
 } from "@/lib/proposal-image";
+import { TECTO_DA_ROTA_MS } from "@/lib/custo-do-pdf";
 import { log } from "@/lib/logger";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 
@@ -452,6 +453,14 @@ export async function renderStoredProposalDocPdfWithReport(
   // cancelamento) + event-token substitution so the caller only supplies what
   // varies per event.
   const withDefaults = withProposalDefaults(doc);
+  /**
+   * ── O RELÓGIO ARRANCA AQUI ──────────────────────────────────────────────
+   *
+   * Daqui para baixo está tudo o que a função gasta: as idas ao armazenamento
+   * e o desenho. É o número que se compara com o tecto da rota — ver o aviso
+   * no fim desta função.
+   */
+  const comecou = Date.now();
   const { doc: resolved, missing } = await resolveImages(withDefaults);
   // As duas contagens não se sobrepõem: o gerador só vê as fotos que
   // RESOLVERAM (as outras já foram descartadas aqui e contadas em `missing`),
@@ -479,6 +488,38 @@ export async function renderStoredProposalDocPdfWithReport(
   if (truncations.length > 0) {
     log.error("proposal-doc-render: PDF gerado com conteúdo CORTADO", null, {
       cortado: truncations.map((t) => `${t.where}: -${t.dropped} ${t.unit}`),
+      ref: doc.ref,
+    });
+  }
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * QUANTO FALTAVA PARA A FUNÇÃO SER MORTA — MEDIDO, E NÃO ADIVINHADO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * As duas rotas que redesenham este documento para o CASAL declaram
+   * `maxDuration = 20`. Ao fim desses vinte segundos a plataforma mata a
+   * função, e o que aparece do outro lado não é um erro que se perceba: é um
+   * pedido que falha sem dizer porquê, na página onde o casal ia ver a
+   * proposta. Nunca se observou a acontecer — o que existe é a aritmética
+   * (7,6 s de desenho para 80 fotografias, mais 6 a 12 s de armazenamento) a
+   * dizer que a proposta grande está encostada ao tecto.
+   *
+   * Este registo é a diferença entre saber isso no dia em que acontecer a ela
+   * e saber antes. Custa dois `Date.now()` e uma comparação, e o caminho
+   * normal — uma proposta de seis a catorze fotografias, dois a cinco
+   * segundos — não escreve nada.
+   *
+   * Três quartos do tecto e não o tecto inteiro: quando a conta JÁ não cabe,
+   * não há registo nenhum para ler — a função foi morta a meio.
+   */
+  const demorou = Date.now() - comecou;
+  if (demorou >= TECTO_DA_ROTA_MS * 0.75) {
+    log.warn("proposal-doc-render: a geração está a encostar-se ao tecto da rota", {
+      ms: demorou,
+      tectoMs: TECTO_DA_ROTA_MS,
+      fotos:
+        withDefaults.coverImages.filter(Boolean).length +
+        withDefaults.moodBoards.reduce((s, b) => s + (b.images?.length ?? 0), 0),
       ref: doc.ref,
     });
   }

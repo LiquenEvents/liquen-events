@@ -78,6 +78,7 @@ import {
 import { fotosQueDestoam, ordemPorCor } from "@/lib/cor-dominante";
 import {
   comNovaAmostra,
+  orcamentoDeTempo,
   passaDoAnexo,
   tamanhoEmPalavras,
   tamanhoEstimado,
@@ -7146,7 +7147,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             split={split}
             pctSinal={pctSinal}
           />
-          <CustoDaGeracao fotos={totalDeFotos} amostras={amostras} />
+          <CustoDaGeracao
+            fotos={totalDeFotos}
+            capas={doc.coverImages.filter(Boolean).length}
+            amostras={amostras}
+          />
         </div>
       )}
 
@@ -8776,11 +8781,31 @@ function MargemDoNegocio({ doc }: { doc: ProposalDoc }) {
   );
 }
 
-function CustoDaGeracao({ fotos, amostras }: { fotos: number; amostras: AmostraDeGeracao[] }) {
+function CustoDaGeracao({
+  fotos,
+  capas,
+  amostras,
+}: {
+  fotos: number;
+  /** As tiras da capa — contam à parte porque custam seis vezes mais do que
+   *  uma célula de mood board (medido: 590 ms contra 90). */
+  capas: number;
+  amostras: AmostraDeGeracao[];
+}) {
   if (fotos === 0) return null;
   const ms = tempoEstimado(fotos, amostras);
   const bytes = tamanhoEstimado(fotos, amostras);
   const pesado = passaDoAnexo(bytes);
+  /**
+   * ── E O TECTO DA ROTA, QUE É OUTRA COISA ────────────────────────────────
+   *
+   * O tempo acima é o que ELA espera, medido daqui. Este é o que o SERVIDOR
+   * gasta — e o servidor tem um tecto que ela não tem como saber: as rotas que
+   * redesenham o documento para o casal morrem aos 20 segundos. Não é a mesma
+   * conta nem a mesma pergunta, e por isso não se mistura com a frase de cima:
+   * uma diz «vais esperar isto», a outra diz «isto está a chegar ao limite».
+   */
+  const orcamento = orcamentoDeTempo(fotos, capas);
   // Com medições, diz-se que são medições — «cerca de» com uma amostra atrás é
   // outra coisa do que «cerca de» com um modelo por omissão.
   const medido = amostras.length >= 2;
@@ -8799,6 +8824,18 @@ function CustoDaGeracao({ fotos, amostras }: { fotos: number; amostras: AmostraD
             param nos 8 MB, e o anexo viaja ~33% maior do que o ficheiro. Tira algumas fotografias
             das páginas mais cheias. O link da proposta continua a servir na mesma, com o PDF
             inteiro do outro lado.
+          </span>
+        </p>
+      )}
+      {orcamento.aperta && (
+        <p className="mt-1.5 flex items-start gap-1.5 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/70">
+          <span aria-hidden="true">⚠</span>
+          <span>
+            Com esta quantidade de fotografias, o servidor demora{" "}
+            {tempoEmPalavras(orcamento.msOptimista)} a {tempoEmPalavras(orcamento.msPessimista)} a
+            desenhar o documento — e a página onde o casal o abre desiste aos 20 segundos. O PDF do
+            envio sai na mesma (tem mais tempo); quem pode ficar sem ele é o casal, ao carregar no
+            link. Tira algumas fotografias das páginas mais cheias.
           </span>
         </p>
       )}

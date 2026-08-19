@@ -729,6 +729,38 @@ describe("as linhas de Organização que não somam o total", () => {
   });
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O TECTO DE TEMPO, DITO ANTES DE SE BATER NELE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As rotas que redesenham o documento para o CASAL morrem aos 20 segundos, e
+ * uma proposta no tecto do gerador (80 fotografias) gasta 7,6 s a desenhar
+ * mais 6 a 12 s a ir buscar as fotos ao armazenamento. A conta é do
+ * `custo-do-pdf.ts`, com os números medidos; o que se prende aqui é que ela
+ * chega ao ecrã onde as fotografias se escolhem — e não ao registo do servidor
+ * no dia em que a página do casal falhar.
+ */
+describe("o aviso de tempo antes de gerar", () => {
+  it("uma proposta no tecto do gerador avisa que a página do casal pode desistir", async () => {
+    seedDraft(78);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    expect(await screen.findByText(/desiste aos 20 segundos/)).toBeTruthy();
+  });
+
+  it("uma proposta normal não diz nada sobre tempo nenhum", async () => {
+    seedDraft(6);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^2\s*Pré-visualizar$/ }));
+    // A frase da estimativa continua lá — é o aviso do tecto que não aparece.
+    expect(await screen.findByText(/Gerar este PDF demora/)).toBeTruthy();
+    expect(screen.queryByText(/desiste aos 20 segundos/)).toBeNull();
+  });
+});
+
 describe("pontos de decoração escolhidos no pedido", () => {
   const comEscolhas = {
     ...quote,

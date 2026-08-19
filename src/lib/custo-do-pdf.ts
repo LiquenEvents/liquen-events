@@ -161,3 +161,107 @@ export function tamanhoEmPalavras(bytes: number): string {
 export function passaDoAnexo(bytes: number): boolean {
   return bytes >= LIMITE_DE_ANEXO * 0.94;
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O ORÇAMENTO DE TEMPO DE UMA PROPOSTA — E O TECTO QUE ELA NÃO SABE QUE TEM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As funções acima respondem a «quanto tempo vou esperar?», a partir das
+ * gerações desta instalação. Esta responde a outra pergunta, que ninguém fazia:
+ * **isto ainda cabe no tempo que a plataforma dá à função?**
+ *
+ * ── O TECTO ───────────────────────────────────────────────────────────────
+ * As duas rotas que voltam a DESENHAR o documento para o casal — o link da
+ * proposta e o portal — declaram `maxDuration = 20`. Vinte segundos, e ao fim
+ * deles a função é morta: o que aparece do outro lado não é um erro que se
+ * perceba, é um pedido que falhou sem dizer porquê. O envio tem 60, que é
+ * outro tecto e é o folgado; o apertado é o do casal, e é por isso que é este
+ * o número que aqui está.
+ *
+ * ── O MODELO, MEDIDO ──────────────────────────────────────────────────────
+ * Oito documentos gerados a sério, com fotografias reais, cronometrados só no
+ * DESENHO (sharp + pdf-lib, sem ir buscar nada ao armazenamento):
+ *
+ *      fotos   desenho medido
+ *          0        329 ms
+ *          6      1 914 ms
+ *         42      4 513 ms
+ *         80      7 631 ms
+ *
+ * A recta que sai daqui: **330 ms fixos, ~90 ms por fotografia de mood board e
+ * ~590 ms por cada tira de capa** — a capa é a maior caixa do documento e é a
+ * que mais trabalho dá ao `sharp`. Nos casos grandes o modelo fica ACIMA do
+ * medido (8,5 s calculados contra 7,6 s medidos nas 80 fotos), e fica de
+ * propósito: um orçamento de tempo que peca por baixo não serve para avisar.
+ *
+ * ── E A REDE, QUE NÃO ESTÁ NO MEDIDO ──────────────────────────────────────
+ * Aquilo tudo foi medido com as fotografias já em memória. Em produção há que
+ * ir buscá-las ao armazenamento, **quatro de cada vez**, e cada uma custa 300
+ * a 600 ms com um URL assinado. Para 80 fotografias são vinte lotes: +6 s no
+ * bom dia, +12 s no mau. É isso que faz a conta fechar em
+ *
+ *     80 fotos:  7,6 s de desenho + 6 a 12 s de rede  =  14 a 20 s   ← o tecto
+ *
+ * Uma proposta de oitenta fotografias está encostada ao tecto. Não é uma
+ * observação de produção: é aritmética sobre medições — e é exactamente por
+ * isso que tem de aparecer ANTES, no ecrã onde as fotos se escolhem, e não
+ * depois, quando a rota morrer com uma proposta a meio.
+ */
+
+/** O tecto das rotas que redesenham o PDF para o casal (`maxDuration = 20`). */
+export const TECTO_DA_ROTA_MS = 20_000;
+
+/** Quantas fotografias se vão buscar ao armazenamento ao mesmo tempo. */
+const LOTE_DO_STORAGE = 4;
+
+/** O custo de uma ida ao armazenamento, do bom dia ao mau. */
+const MS_POR_FOTO_NO_STORAGE = { optimista: 300, pessimista: 600 };
+
+/** O modelo do desenho, medido (ver o bloco acima). */
+const DESENHO = { msFixo: 330, msPorFotoDeBoard: 90, msPorTiraDeCapa: 590 };
+
+export interface OrcamentoDeTempo {
+  /** Só o desenho — sharp e pdf-lib, sem rede. */
+  desenhoMs: number;
+  /** O total no bom dia e no mau, já com as idas ao armazenamento. */
+  msOptimista: number;
+  msPessimista: number;
+  /** O tecto contra o qual isto se compara. */
+  tectoMs: number;
+  /**
+   * O pior caso já passa de três quartos do tecto?
+   *
+   * Três quartos e não o tecto inteiro: um aviso que só acende quando a conta
+   * JÁ não cabe chega tarde — a proposta que interessa avisar é a que está a
+   * caminho de não caber. E o pior caso, e não o médio, porque é o mau dia que
+   * mata a função.
+   */
+  aperta: boolean;
+}
+
+/**
+ * Quanto tempo esta proposta vai custar ao servidor, e quanto lhe sobra.
+ *
+ * @param fotosDeBoard as fotografias dos mood boards.
+ * @param tirasDeCapa as fotografias da capa (0, 1 ou 2) — custam seis vezes
+ *        mais do que uma célula de mood board, e por isso contam à parte.
+ */
+export function orcamentoDeTempo(fotosDeBoard: number, tirasDeCapa: number): OrcamentoDeTempo {
+  const board = Math.max(0, fotosDeBoard);
+  const capa = Math.max(0, tirasDeCapa);
+  const desenhoMs = Math.round(
+    DESENHO.msFixo + DESENHO.msPorFotoDeBoard * board + DESENHO.msPorTiraDeCapa * capa,
+  );
+  // Quatro de cada vez: o que custa é o número de LOTES, não o de fotografias.
+  const lotes = Math.ceil((board + capa) / LOTE_DO_STORAGE);
+  const msOptimista = desenhoMs + lotes * MS_POR_FOTO_NO_STORAGE.optimista;
+  const msPessimista = desenhoMs + lotes * MS_POR_FOTO_NO_STORAGE.pessimista;
+  return {
+    desenhoMs,
+    msOptimista,
+    msPessimista,
+    tectoMs: TECTO_DA_ROTA_MS,
+    aperta: msPessimista >= TECTO_DA_ROTA_MS * 0.75,
+  };
+}
