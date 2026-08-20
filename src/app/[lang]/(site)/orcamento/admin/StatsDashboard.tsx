@@ -111,7 +111,13 @@ function VBars({
             className="flex-1 flex flex-col items-center gap-2 group"
             title={`${d.label}: ${valueLabel}`}
           >
-            <span className="text-foreground/45 text-[10px] tabular-nums opacity-0 group-hover:opacity-100 transition-opacity motion-reduce:transition-none">
+            <span
+              /* Os números só existiam com rato: no telemóvel este painel era um
+               conjunto de barras sem um único valor à vista, e o `title` do
+               contentor também só serve o rato. À vista no dedo, escondido
+               até ao hover só onde há rato — o par da casa (globals.css:98). */
+              className="text-foreground/45 text-[10px] tabular-nums opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 transition-opacity motion-reduce:transition-none"
+            >
               {valueLabel}
             </span>
             <div

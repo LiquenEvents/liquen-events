@@ -35,6 +35,7 @@ import {
 } from "@/lib/orcamento/espera";
 import { faltaODesfecho } from "@/lib/orcamento/desfecho";
 import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
+import PainelGeracaoAoGanhar from "./PainelGeracaoAoGanhar";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY, PACKAGES } from "@/lib/orcamento/data";
 import { rotularPontos } from "@/lib/orcamento/decoracao";
 import { guestRangeLabel, ceremonyTypeLabel, spaceTypeLabel } from "@/lib/orcamento/data";
@@ -89,6 +90,7 @@ import {
   Tarefas,
   Fornecedores,
   StatsDashboard,
+  FechosMeta,
   ProposalBuilder,
   ProposalStudio,
   FazerProposta,
@@ -1842,6 +1844,27 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     }
   }
 
+  /**
+   * Voltar a ler o pedido INTEIRO do servidor, ignorando a cache de sessão.
+   *
+   * O `comPedidoInteiro` guarda o que já leu (`completos`) para não repetir a
+   * ida ao servidor a cada abertura. Isso é certo para abrir; é errado depois
+   * de uma acção que muda o pedido do lado de LÁ — a geração ao ganhar escreve
+   * o plano de montagem e as linhas de sinal e saldo no próprio pedido, e sem
+   * esta releitura o painel de Pagamentos ao lado continuava vazio até ela
+   * fechar e reabrir a ficha.
+   *
+   * Melhor esforço: uma leitura que falhe deixa o ecrã como estava. O trabalho
+   * foi feito no servidor de qualquer maneira.
+   */
+  async function recarregarPedido(id: string) {
+    const actual = quotes.find((q) => q.id === id);
+    if (!actual) return;
+    completos.current.delete(id);
+    const inteiro = await comPedidoInteiro(actual);
+    if (inteiro) absorverDoServidor(inteiro);
+  }
+
   async function openQuote(pedido: Quote) {
     if (!discardGuard()) return;
     // Remember who opened the detail so focus can return there on close.
@@ -3574,6 +3597,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "estatisticas" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <StatsDashboard quotes={activeQuotes} />
+              {/* Os casamentos fechados que têm de voltar à Meta. Vive aqui e
+                  não nas Definições porque é uma leitura de desempenho, e
+                  porque é neste ecrã que ela olha para o que a publicidade
+                  trouxe — ver o cabeçalho de `FechosMeta`. */}
+              <div className="mt-6">
+                <FechosMeta />
+              </div>
             </div>
           )}
 
@@ -4430,6 +4460,38 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                             }}
                           />
                         )}
+
+                        {/* ── O QUE NASCE COM O «GANHO» ────────────────────
+                          Marcar «Ganho» semeia sozinho DUAS das quatro peças —
+                          o plano de montagem e a checklist genérica. As outras
+                          duas, a lista de MATERIAL e as DATAS-CHAVE no
+                          calendário, mais as linhas de SINAL e SALDO, só saem
+                          de `POST /api/orcamento/[id]` com `{acao:"gerar"}`, e
+                          o único ecrã que o pedia não estava montado em lado
+                          nenhum — o próprio ficheiro admite-o em comentário.
+
+                          Resultado: por cada casamento ganho, ela refazia à
+                          mão a lista de material, metia as datas-chave uma a
+                          uma e criava as linhas de sinal e saldo. O Dossier
+                          chegava a dizer «Registar o sinal (30%)» a apontar
+                          para um painel de Pagamentos vazio.
+
+                          O painel só se desenha a si próprio quando o pedido
+                          está `aceite` (é o que ele faz na primeira linha), por
+                          isso montá-lo aqui não acrescenta ruído a mais nenhum
+                          estado. Fica ao lado da pergunta do desfecho, que é
+                          onde o «Ganho» acabou de ser dado. */}
+                        <PainelGeracaoAoGanhar
+                          key={`geracao-${selected.id}`}
+                          quote={selected}
+                          onGerado={() => {
+                            // O plano de montagem e os pagamentos vivem no
+                            // PRÓPRIO pedido: sem esta releitura, o painel de
+                            // Pagamentos ao lado continuava vazio até ela
+                            // fechar e reabrir a ficha.
+                            void recarregarPedido(selected.id);
+                          }}
+                        />
 
                         {/* Próxima ação — o único passo seguinte, em destaque. Abre a
                           ferramenta certa dentro da área avançada. */}

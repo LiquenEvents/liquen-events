@@ -294,3 +294,95 @@ describe("PaymentsPanel — o sinal sugerido é o da proposta", () => {
     );
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * DE ONDE ESTA LISTA FOI COPIADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel copia `quote.payments` uma vez, ao montar, e ao gravar manda a lista
+ * INTEIRA — portanto a gravação é «substitui a lista de pagamentos por esta».
+ * Uma cópia de há duas horas escrevia por cima do que entretanto aconteceu: um
+ * sinal dado por recebido no portátil voltava a «por receber» quando ela tocava
+ * o telemóvel à tarde, com as duas gravações a responder 200.
+ *
+ * O ecrã passa a DIZER de onde copiou; o servidor recusa com 409 quando essa
+ * base já não é a que tem guardada (ver `api/orcamento/[id]/route.ts`).
+ */
+describe("PaymentsPanel — a base de que a lista partiu", () => {
+  /** Corpo `base` do último PATCH ao orçamento. */
+  function lastBase(): { payments?: Payment[] } {
+    const calls = fetchMock.mock.calls.filter((c) => String(c[0]).startsWith("/api/orcamento/"));
+    const last = calls[calls.length - 1];
+    return JSON.parse(String((last[1] as RequestInit).body)).base as { payments?: Payment[] };
+  }
+
+  const P0: Payment = { id: "p0", kind: "sinal", amount: 100, date: "2026-01-10", paid: true };
+
+  it("manda a lista de que partiu, e não a que está a gravar", async () => {
+    const user = userEvent.setup();
+    renderPanel(makeQuote([P0]));
+
+    await user.type(screen.getByLabelText("Valor em euros"), "1500{Enter}");
+
+    await waitFor(() => expect(lastSavedPayments()).toHaveLength(2));
+    // A base é o que estava ANTES desta gravação — uma linha, não duas.
+    expect(lastBase().payments).toEqual([P0]);
+  });
+
+  it("dois registos seguidos: o segundo declara o que o primeiro deixou", async () => {
+    const user = userEvent.setup();
+    renderPanel(makeQuote([P0]));
+
+    await user.type(screen.getByLabelText("Valor em euros"), "1500{Enter}");
+    await waitFor(() => expect(lastSavedPayments()).toHaveLength(2));
+    const primeira = lastSavedPayments();
+
+    await user.type(screen.getByLabelText("Valor em euros"), "2500{Enter}");
+    await waitFor(() => expect(lastSavedPayments()).toHaveLength(3));
+
+    // Sem isto, o segundo pedido declarava a versão de antes do primeiro e o
+    // servidor recusava-o — uma colisão inventada, dela consigo própria.
+    expect(lastBase().payments).toEqual(primeira);
+  });
+
+  it("num 409, adopta a lista do servidor em vez de insistir", async () => {
+    const user = userEvent.setup();
+    const doServidor: Payment[] = [
+      { ...P0, paid: true },
+      { id: "outro", kind: "pagamento", amount: 500, date: "2026-02-01", paid: true },
+    ];
+    fetchMock.mockImplementation(
+      async () =>
+        ({
+          ok: false,
+          status: 409,
+          json: async () => ({ error: "mudou", current: { payments: doServidor } }),
+        }) as unknown as Response,
+    );
+    const onChange = vi.fn();
+    renderPanel(makeQuote([P0]), onChange);
+
+    await user.type(screen.getByLabelText("Valor em euros"), "1500{Enter}");
+
+    // O painel fica com o que o SERVIDOR tem — não com o que ela tinha.
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(doServidor));
+    expect(await screen.findByText(/alterados noutro sítio/i)).toBeTruthy();
+    // E NÃO oferece «Repetir»: repetir era escrever por cima do trabalho da
+    // outra pessoa, que é o que este guarda existe para impedir.
+    expect(screen.queryByRole("button", { name: /repetir/i })).toBeNull();
+  });
+
+  it("numa falha de rede continua a reverter e a oferecer «Repetir»", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation(async () => {
+      throw new Error("rede");
+    });
+    renderPanel(makeQuote([P0]));
+
+    await user.type(screen.getByLabelText("Valor em euros"), "1500{Enter}");
+
+    // Controlo positivo do par acima: o caminho antigo não mudou.
+    expect(await screen.findByRole("button", { name: /repetir/i })).toBeTruthy();
+  });
+});

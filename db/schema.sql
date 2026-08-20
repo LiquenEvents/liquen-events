@@ -157,6 +157,25 @@ alter table public.proposals add column if not exists versao_em timestamptz;
 -- identidade do CONTEÚDO, e serve para comparar.
 alter table public.contracts add column if not exists proposta_versao_selo text;
 alter table public.contracts add column if not exists proposta_versao_numero integer;
+
+-- ── UM ACEITE QUE ACONTECEU FORA DAQUI ────────────────────────────────────
+-- Um contrato nasce `pendente` porque este sistema não presenciou o sim: o
+-- botão de aceitar pelo link foi retirado (decisão dela — «um casamento não se
+-- fecha num botão»), e o que existe é uma conversa, um email, um papel
+-- assinado. Sem uma porta para registar isso, NENHUM contrato chegava alguma
+-- vez a `aceite`, e o portal do casal nunca oferecia o contrato em PDF.
+--
+-- `registado_por` é o nome de quem, na casa, registou; `registado_como` é como
+-- a casa soube («assinado em papel», «por email a 12/05»). Juntos são o que
+-- distingue este aceite de um aceite ELECTRÓNICO — e é por eles que o PDF do
+-- contrato decide qual bloco imprimir, para não afirmar uma assinatura
+-- electrónica que ninguém deu.
+--
+-- Idempotentes e sem `not null`: os contratos anteriores ficam a null, que se
+-- lê como «não foi registado à mão» — e são precisamente os que, se algum dia
+-- houve aceite pelo botão antigo, têm `accepted_ip` e nome escrito pelo casal.
+alter table public.contracts add column if not exists registado_por text;
+alter table public.contracts add column if not exists registado_como text;
 alter table public.proposals drop constraint if exists proposals_idioma_chk;
 alter table public.proposals add constraint proposals_idioma_chk
   check (idioma is null or idioma in ('pt','en')) not valid;

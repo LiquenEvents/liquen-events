@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 import type { Proposal } from "@/lib/orcamento/types";
 import { splitThirtySeventy } from "@/lib/money";
+import { resolveValidUntil } from "@/lib/proposal-doc";
 
 // ── Mock the auth + data layer + heavy PDF/mail side effects; keep the money
 //    math (proposal-doc) and the route logic real ──
@@ -1750,6 +1751,19 @@ describe("POST /api/orcamento/[id]/proposta-doc — a versão da proposta", () =
     const doc = baseDoc({ totalAmount: 3000 });
     await POST(sendReq(doc), { params });
     const primeira = created.last!;
+    /**
+     * Envelhecer o `sentAt` é O QUE TORNA ESTE TESTE SOBRE VERSÕES.
+     *
+     * Sem isto, o segundo envio cai na trava de repetição (mesmo documento, há
+     * menos de três minutos — ver «envio repetido», mais abaixo) e não chega a
+     * gravar nada: o teste passaria a medir a trava e não a numeração. Aqui o
+     * caso é o legítimo — «perdi o email, podes reenviar?» — e o que se prova é
+     * que a linha nova reaproveita o número e o selo da anterior.
+     */
+    store.linhas.set(primeira.id, {
+      ...store.linhas.get(primeira.id)!,
+      sentAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+    });
     await POST(sendReq(doc), { params });
     const segunda = created.last!;
 
@@ -1796,5 +1810,118 @@ describe("POST /api/orcamento/[id]/proposta-doc — a versão da proposta", () =
     await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
     await POST(sendReq(baseDoc({ totalAmount: 3000 }), { idioma: "en" }), { params });
     expect(created.last!.versaoNumero).toBe(2);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O MESMO ENVIO DUAS VEZES NÃO SÃO DOIS EMAILS AO CASAL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO antes desta trava: dois envios do mesmo documento davam 2 propostas
+ * gravadas e 2 emails ao casal — com DOIS links de aceitação diferentes, e duas
+ * linhas «versão 1» para o mesmo casamento no quadro.
+ *
+ * E o caminho provável nem são dois separadores: o `fetch` do envio não tem
+ * tecto de tempo próprio, a rede tosse, o ecrã diz «Erro ao enviar» e repõe o
+ * botão — e ela carrega outra vez enquanto o primeiro pedido ainda corre.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — envio repetido", () => {
+  it("o segundo envio do mesmo documento não manda um segundo email", async () => {
+    const doc = baseDoc({ totalAmount: 3000 });
+    await POST(sendReq(doc), { params });
+    const primeira = created.last!;
+    const emailsDepoisDoPrimeiro = vi.mocked(sendMail).mock.calls.length;
+
+    const res = await POST(sendReq(doc), { params });
+    expect(res.status).toBe(200);
+    const corpo = await res.json();
+
+    // Nem segundo email, nem segunda linha.
+    expect(vi.mocked(sendMail).mock.calls.length).toBe(emailsDepoisDoPrimeiro);
+    expect(store.linhas.size).toBe(1);
+    // Responde sobre a proposta que JÁ seguiu, com o link que o casal recebeu.
+    expect(corpo.id).toBe(primeira.id);
+    expect(corpo.repetido).toBe(true);
+    expect(corpo.estado).toBe("enviada");
+    expect(corpo.acceptUrl).toContain("/proposta/");
+    expect(corpo.repetidoAviso).toMatch(/já tinha seguido/i);
+  });
+
+  it("mexer no documento entre os dois envios é um envio a sério", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const emails = vi.mocked(sendMail).mock.calls.length;
+
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3500 })), { params });
+    const corpo = await res.json();
+
+    // Controlo positivo da trava acima: o que muda o selo continua a sair.
+    expect(vi.mocked(sendMail).mock.calls.length).toBe(emails + 1);
+    expect(store.linhas.size).toBe(2);
+    expect(corpo.repetido).toBeUndefined();
+  });
+
+  it("passada a janela, reenviar a mesma proposta volta a ser possível", async () => {
+    const doc = baseDoc({ totalAmount: 3000 });
+    await POST(sendReq(doc), { params });
+    const emails = vi.mocked(sendMail).mock.calls.length;
+
+    // «Perdi o email, podes reenviar?» — quatro minutos depois, é legítimo.
+    const primeira = [...store.linhas.values()][0];
+    store.linhas.set(primeira.id, {
+      ...primeira,
+      sentAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+    });
+
+    const res = await POST(sendReq(doc), { params });
+    const corpo = await res.json();
+    expect(vi.mocked(sendMail).mock.calls.length).toBe(emails + 1);
+    expect(corpo.repetido).toBeUndefined();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A VALIDADE NÃO PODE ANDAR COM O CALENDÁRIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O estúdio escreve o PRAZO («válida por 60 dias»), não a data — e a data era
+ * calculada em dois sítios: aqui, para a coluna `valid_until`, e outra vez
+ * DENTRO do desenhador, que corre a cada descarga do PDF pelo link do casal.
+ *
+ * MEDIDO antes desta correcção: proposta enviada a 20-06-2026 gravava
+ * `valid_until = 2026-08-19`; o mesmo PDF, descarregado pelo link a
+ * 20-08-2026, imprimia «válida até 19 de outubro de 2026». Mais 61 dias — e
+ * mais um por cada dia que passasse.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — a validade fica congelada", () => {
+  it("a data entra no DOCUMENTO guardado, e é a mesma da coluna", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const p = created.last!;
+    expect(p.doc?.validUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // As duas datas deixam de poder divergir: a coluna lê-se do documento.
+    expect(p.doc?.validUntil).toBe(p.validUntil);
+  });
+
+  it("redesenhar o documento daqui a um ano dá exactamente a mesma data", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const guardado = created.last!.doc!;
+    const daquiAUmAno = new Date(Date.now() + 365 * 24 * 60 * 60_000);
+    // É o que o desenhador do PDF faz a cada descarga (`proposal-doc-pdf.ts`).
+    expect(resolveValidUntil(guardado, daquiAUmAno)).toBe(guardado.validUntil);
+  });
+
+  it("uma data escrita à mão continua a mandar", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000, validUntil: "2027-01-31" })), { params });
+    expect(created.last!.doc?.validUntil).toBe("2027-01-31");
+    expect(created.last!.validUntil).toBe("2027-01-31");
+  });
+
+  it("o prazo escrito no estúdio é respeitado (controlo positivo)", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000, validUntilDays: 15 })), { params });
+    const guardado = created.last!.doc!;
+    // 15 dias, não os 60 por omissão — senão o teste acima passava por acaso.
+    expect(guardado.validUntil).toBe(resolveValidUntil({ validUntilDays: 15 }));
+    expect(guardado.validUntil).not.toBe(resolveValidUntil({ validUntilDays: 60 }));
   });
 });

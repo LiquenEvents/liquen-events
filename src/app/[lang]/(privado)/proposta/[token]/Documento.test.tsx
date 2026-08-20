@@ -320,3 +320,63 @@ describe("um documento a meio não desenha cabeçalhos vazios", () => {
     expect(screen.getByText("Ana & Rui")).toBeTruthy();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O DINHEIRO QUE ELA ESCREVEU À MÃO SEGUE A MESMA LÍNGUA DO RESTO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O cabeçalho do `Documento.tsx` já dizia que «metade dos montantes é TEXTO
+ * LIVRE escrito por ela à portuguesa» e que a conversão os trata da mesma
+ * maneira. Dizia — e não tratava. MEDIDO, mesma linha, mesmo documento:
+ *
+ *          PDF                 esta página
+ *   pt   + 1.550,00 €          1550,00 €
+ *   en   + €1,550.00           1550,00 € + IVA
+ *
+ * Na folha inglesa a coluna ficava «€10,950.00 · 1550,00 € + IVA ·
+ * €12,500.00», e «1550,00» lido à inglesa é um euro e cinquenta e cinco —
+ * factor mil, na linha que ela acrescentou para cobrar a deslocação.
+ */
+describe("o dinheiro escrito à mão", () => {
+  const COM_EXTRAS = {
+    budgetExtras: [{ label: "Deslocação equipa", valueText: "1550,00 €" }],
+    budgetRows: [{ item: "Arco floral", price: "2400,00 €" }],
+    totalText: "15375,00 €",
+  } as unknown as Partial<ProposalDoc>;
+
+  it("agrupa os milhares como o PDF, em português", () => {
+    desenhar(COM_EXTRAS);
+    expect(screen.getByText("1.550,00 €")).toBeTruthy();
+    expect(screen.getByText("2.400,00 €")).toBeTruthy();
+    // Controlo positivo: a forma antiga, sem separador, deixou de aparecer.
+    expect(screen.queryByText("1550,00 €")).toBeNull();
+  });
+
+  it("na folha inglesa passa a inglês, como tudo o resto", () => {
+    desenhar(COM_EXTRAS, "en");
+    expect(screen.getByText("€1,550.00")).toBeTruthy();
+    expect(screen.getByText("€2,400.00")).toBeTruthy();
+    // O que estava lá antes — português no meio de números ingleses.
+    expect(screen.queryByText("1550,00 €")).toBeNull();
+  });
+
+  it("um texto que já vem agrupado passa incólume", () => {
+    // Um número que não existe em mais lado nenhum do documento base: um teste
+    // que rebenta por excesso de acertos não prova nada sobre o que se quer.
+    desenhar({
+      totalText: "",
+      budgetExtras: [{ label: "Extra", valueText: "9.876,00 €" }],
+    } as unknown as Partial<ProposalDoc>);
+    expect(screen.getByText("9.876,00 €")).toBeTruthy();
+  });
+
+  it("uma linha sem preço continua sem preço — não vira «0,00 €»", () => {
+    desenhar({
+      totalText: "",
+      budgetRows: [{ item: "A combinar", price: "" }],
+    } as unknown as Partial<ProposalDoc>);
+    expect(screen.getByText("A combinar")).toBeTruthy();
+    expect(screen.queryByText("0,00 €")).toBeNull();
+  });
+});

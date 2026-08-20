@@ -269,6 +269,36 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // cancelamento) + event-token substitution so the UI only sends what varies.
     const doc = withProposalDefaults(raw);
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * A VALIDADE CONGELA-SE AQUI, DENTRO DO DOCUMENTO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O estúdio escreve o PRAZO («válida por 60 dias»), não a data. A data era
+     * calculada em dois sítios separados — aqui, para a coluna
+     * `proposals.valid_until`, e outra vez DENTRO do desenhador
+     * (`resolveValidUntil(doc)`, em `proposal-doc-pdf.ts`) — e o desenhador
+     * corre outra vez a CADA descarga do PDF pelo link do casal.
+     *
+     * MEDIDO: proposta enviada a 20-06-2026 grava `valid_until = 2026-08-19`;
+     * o mesmo PDF, descarregado pelo link a 20-08-2026, imprime «válida até 19
+     * de outubro de 2026». **Mais 61 dias, e mais um por cada dia que passa.**
+     * O casal ficava com dois PDF do mesmo documento a dizer coisas
+     * diferentes — o anexo do email e o do link —, e a página a marcar
+     * «expirada» com um botão ao lado a entregar um PDF que dizia o contrário.
+     *
+     * A correcção é a mesma que o `kmDeslocacao` já usa e explica: o que é um
+     * FACTO deste documento escreve-se DENTRO dele, e a partir daí mudar o
+     * relógio deixa de lhe tocar. `resolveValidUntil` honra uma data explícita
+     * no `doc`, portanto isto é idempotente: quem redesenhar amanhã, ou daqui
+     * a um ano, obtém exactamente a mesma folha.
+     *
+     * É escrito ANTES de o PDF ser desenhado, de propósito: assim o anexo que
+     * segue no email e o documento que fica guardado são o mesmo, por
+     * construção, e não por coincidência de terem sido feitos no mesmo minuto.
+     */
+    doc.validUntil = resolveValidUntil(doc);
+
     // O documento passou a ser GUARDADO (coluna `proposals.doc`), por isso o
     // tamanho deixou de ser um detalhe do pedido e passou a ser uma linha na
     // base de dados e uma linha na cópia de segurança. Medido: 4,3 KB de texto
@@ -581,6 +611,66 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     proposal.versaoEm = versao.mudou
       ? new Date().toISOString()
       : (maisRecente?.versaoEm ?? new Date().toISOString());
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O MESMO ENVIO DUAS VEZES NÃO SÃO DOIS EMAILS AO CASAL
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * MEDIDO: dois envios em voo do mesmo documento davam 2 propostas gravadas
+     * e 2 emails ao casal — com DOIS links de aceitação diferentes, e duas
+     * linhas «versão 1» para o mesmo casamento no quadro.
+     *
+     * E o caminho provável nem são dois separadores. É este: o `fetch` do
+     * envio não tem tecto de tempo próprio, a rede tosse, o ecrã diz «Erro ao
+     * enviar a proposta» e repõe o botão — e ela carrega outra vez, enquanto o
+     * primeiro pedido continua a correr do lado de cá e acaba por enviar.
+     *
+     * A trava que existia era o `busy` do estúdio: estado de React, vale só
+     * naquele separador, e o `catch` de rede rearma-o. Não chega.
+     *
+     * A trava daqui é sobre o CONTEÚDO, e é por isso que só agora se pode
+     * fazer: o selo de versão diz se este documento é o mesmo que já seguiu.
+     * Se já seguiu, com o mesmo selo, há menos de {@link JANELA_DE_REPETICAO_MS},
+     * isto é uma repetição — devolve-se o que aconteceu da primeira vez, com o
+     * link que o casal recebeu, e NÃO se envia nada.
+     *
+     * A janela é curta de propósito. Reenviar a mesma proposta é uma coisa
+     * legítima e acontece («perdi o email, podes reenviar?»), e três minutos
+     * depois volta a ser possível sem nada no caminho. O que a janela apanha é
+     * o dedo duas vezes no mesmo botão, que é outra coisa.
+     */
+    const JANELA_DE_REPETICAO_MS = 3 * 60_000;
+    const jaSeguiu = irmasAnteriores.find(
+      (p) =>
+        p.status === "enviada" &&
+        !!p.versaoSelo &&
+        p.versaoSelo === proposal.versaoSelo &&
+        !!p.sentAt &&
+        Date.now() - Date.parse(p.sentAt) < JANELA_DE_REPETICAO_MS,
+    );
+    if (jaSeguiu) {
+      log.warn("proposta-doc: envio repetido do mesmo documento — não se enviou outra vez", {
+        id,
+        proposta: jaSeguiu.id,
+      });
+      return NextResponse.json({
+        ok: true,
+        id: jaSeguiu.id,
+        emailed: true,
+        estado: "enviada",
+        /** O link que o casal RECEBEU — não um segundo, que ninguém tem. */
+        acceptUrl: `${SITE.url}/proposta/${createProposalToken(jaSeguiu.id)}`,
+        missingImages,
+        truncations,
+        pdfBytes: pdfBuffer.byteLength,
+        /** Para o ecrã poder dizer o que aconteceu em vez de fingir um envio. */
+        repetido: true,
+        repetidoAviso:
+          "Esta proposta já tinha seguido para o cliente há instantes, com este mesmo " +
+          "documento. Não foi enviada outra vez — o link é o mesmo que ele recebeu.",
+      });
+    }
 
     // A proposta fica guardada COM o documento (`doc`): é a única cópia
     // DURÁVEL do que seguiu para o cliente (o rascunho do estúdio vive em

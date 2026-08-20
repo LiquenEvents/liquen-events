@@ -35,7 +35,9 @@ const quotes = vi.hoisted(() => ({
 }));
 const proposals = vi.hoisted(() => ({
   create: vi.fn(async (_p?: unknown) => {}),
-  listForQuote: vi.fn(async () => [{ id: "p-existing", quoteId: "LIQ-1" }]),
+  listForQuote: vi.fn(
+    async (): Promise<Record<string, unknown>[]> => [{ id: "p-existing", quoteId: "LIQ-1" }],
+  ),
   /**
    * A segunda escrita: a que marca a proposta como enviada DEPOIS de o email
    * sair. O estado deixou de ser decidido na criação — ver a nota na rota.
@@ -787,5 +789,72 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     const res = await POST(req("POST", validItems), ctx("LIQ-1"));
     expect(res.status).toBe(200);
     expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM REENVIO REAPROVEITA A PROPOSTA POR ENVIAR — NÃO CRIA OUTRA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta rota criava sempre um identificador novo. Cada tentativa falhada
+ * deixava uma linha a mais para o mesmo negócio — e isso não é só ruído no
+ * ecrã «Propostas»: o `getProposalByQuote` devolve A MAIS RECENTE, portanto um
+ * rascunho falhado do construtor, criado depois da proposta que o casal
+ * recebeu, passava a ser o documento oficial do pedido. É dele que o portal do
+ * casal mostra o total, e é dele que o contrato congela o selo e a versão.
+ *
+ * A própria mensagem de erro desta rota já prometia o contrário: «Reenvia daqui
+ * a pouco: é a mesma proposta, não se cria outra.»
+ */
+describe("POST /api/orcamento/[id]/proposta — o reenvio não duplica", () => {
+  beforeEach(() => {
+    authed.ok = true;
+  });
+
+  const porEnviar = {
+    id: "p-rascunho",
+    quoteId: "LIQ-1",
+    status: "rascunho",
+    createdAt: "2026-05-01T09:00:00.000Z",
+  };
+
+  it("reaproveita a proposta que ficou por enviar", async () => {
+    proposals.listForQuote.mockResolvedValueOnce([porEnviar]);
+    const res = await POST(req("POST", validItems), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    // Nem linha nova, nem identificador novo.
+    expect(proposals.create).not.toHaveBeenCalled();
+    expect(proposals.update).toHaveBeenCalledWith(
+      "p-rascunho",
+      expect.objectContaining({ id: "p-rascunho", status: "rascunho" }),
+    );
+  });
+
+  it("a data de nascimento é a da PRIMEIRA tentativa", async () => {
+    proposals.listForQuote.mockResolvedValueOnce([porEnviar]);
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    // Reescrevê-la fazia a linha reaproveitada saltar para a frente de
+    // propostas mais recentes — e a mais recente é a que o portal mostra.
+    expect(proposals.update).toHaveBeenCalledWith(
+      "p-rascunho",
+      expect.objectContaining({ createdAt: "2026-05-01T09:00:00.000Z" }),
+    );
+  });
+
+  it("uma proposta JÁ ENVIADA não é reaproveitada (controlo positivo)", async () => {
+    proposals.listForQuote.mockResolvedValueOnce([
+      { id: "p-enviada", quoteId: "LIQ-1", status: "enviada", createdAt: "2026-05-01T09:00:00Z" },
+    ]);
+    await POST(req("POST", validItems), ctx("LIQ-1"));
+    // Uma revisão depois de a proposta ter seguido é uma proposta NOVA.
+    expect(proposals.create).toHaveBeenCalled();
+  });
+
+  it("se a leitura das irmãs falhar, cria-se na mesma — não se trava o envio", async () => {
+    proposals.listForQuote.mockRejectedValueOnce(new Error("base em baixo"));
+    const res = await POST(req("POST", validItems), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(proposals.create).toHaveBeenCalled();
   });
 });

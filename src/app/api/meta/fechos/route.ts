@@ -91,15 +91,56 @@ async function reunir() {
   return { resultado, valorTotal, jaEnviados };
 }
 
+/**
+ * O MESMO RELATÓRIO, EM JSON — E SEM UMA LINHA DE DADOS PESSOAIS
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * O ecrã das Estatísticas mostra isto e oferece o botão de enviar. Não pode
+ * ler o texto do relatório: precisa dos números um a um (quantos, quanto
+ * valem, quantos dias faltam ao mais urgente) para poder dizer «faltam 2
+ * dias» em vez de imprimir um parágrafo.
+ *
+ * ⚠ O QUE NÃO SAI DAQUI: os eventos trazem o email, o telefone e o nome do
+ * casal em claro (a cifragem acontece só no `construirEvento`, à saída para a
+ * Meta). Serializar `resultado.eventos` seria mandar isso tudo para o
+ * browser. Sai a referência, o valor e a data de fecho — nada mais.
+ */
+function emJson(resultado: Awaited<ReturnType<typeof reunir>>["resultado"], valorTotal: number) {
+  return {
+    examinados: resultado.examinados,
+    valorTotal,
+    diasAceites: DIAS_ACEITES,
+    configurada: !!process.env.META_DATASET_ID && !!process.env.META_CAPI_ACCESS_TOKEN,
+    aEnviar: resultado.eventos.map((e) => ({
+      ref: (e.contexto ?? "").replace("casamento-fechado:", ""),
+      valor: e.valor ?? 0,
+      // Segundos UNIX, como o evento. É daqui que o ecrã tira os dias que
+      // faltam para a janela da Meta fechar.
+      fechadoEm: e.quando,
+    })),
+    excluidos: resultado.excluidos,
+  };
+}
+
 export async function GET(req: NextRequest) {
   if (!(await isAuthed(req))) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
   try {
     const { resultado, valorTotal } = await reunir();
+    // `new URL(req.url)` e não `req.nextUrl`: esta rota também é chamada com um
+    // `Request` normal (o painel do back office, os testes), e o `nextUrl` só
+    // existe no embrulho do Next.
+    if (new URL(req.url).searchParams.get("formato") === "json") {
+      return NextResponse.json(emJson(resultado, valorTotal), {
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
     const rodape =
-      "\nPara enviar mesmo:\n" +
-      "    curl -X POST -b <cookie de sessao> .../api/meta/fechos\n" +
+      // O `curl` que aqui estava era uma barreira, nao uma instrucao: pedia o
+      // cookie da sessao, e por isso o envio nunca acontecia. O gesto vive
+      // agora num botao — ver `FechosMeta.tsx`.
+      "\nPara enviar: back office -> Estatisticas -> Casamentos fechados - Meta.\n" +
       `\nA Meta recusa eventos com mais de ${DIAS_ACEITES} dias. Corre isto pelo menos\n` +
       "uma vez por semana, ou os casamentos que fecharem entretanto nao contam.\n";
     return new NextResponse(relatorio(resultado, valorTotal) + rodape, {

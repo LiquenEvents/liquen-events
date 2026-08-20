@@ -110,8 +110,43 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const vat = subtotal * vatRate;
     const total = subtotal + vat;
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * UM REENVIO REAPROVEITA A PROPOSTA POR ENVIAR — NÃO CRIA OUTRA
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Esta rota criava sempre `randomUUID()`. A irmã do estúdio já não fazia
+     * isso, e a razão está escrita lá: uma proposta que ficou gravada mas cujo
+     * email não saiu tem de ser REAPROVEITADA no reenvio, senão cada tentativa
+     * deixa uma linha nova para o mesmo negócio.
+     *
+     * O que isso custava aqui, e não é só ruído no ecrã «Propostas»: o
+     * `getProposalByQuote` devolve A MAIS RECENTE, portanto um rascunho
+     * falhado do construtor, criado depois da proposta que o casal recebeu,
+     * passava a ser o documento oficial do pedido — é dele que o portal do
+     * casal mostra o total, e é dele que o contrato congela o selo e a versão.
+     * O documento errado a servir de prova.
+     *
+     * E a própria mensagem de erro desta rota já PROMETIA este comportamento:
+     * «Reenvia daqui a pouco: é a mesma proposta, não se cria outra.» Passa a
+     * ser verdade.
+     *
+     * Melhor esforço declarado: se a leitura das irmãs falhar, cria-se uma
+     * proposta nova — que é exactamente o que a rota fazia antes — em vez de
+     * travar um envio por causa de uma consulta.
+     */
+    let porEnviar: Proposal | null = null;
+    try {
+      porEnviar =
+        (await listProposalsForQuote(id))
+          .filter((p) => p.status === "rascunho")
+          .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0] ?? null;
+    } catch (e) {
+      log.warn("proposta: não deu para procurar uma proposta por enviar", { id, erro: e });
+    }
+
     const proposal: Proposal = {
-      id: randomUUID(),
+      id: porEnviar?.id ?? randomUUID(),
       quoteId: id,
       clientName: quote.name,
       clientEmail: quote.email,
@@ -148,7 +183,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        * onde está também o reaproveitamento da proposta por enviar no reenvio.
        */
       status: "rascunho",
-      createdAt: new Date().toISOString(),
+      // A data de nascimento é a da PRIMEIRA tentativa: é ela que ordena as
+      // propostas do pedido, e reescrevê-la a cada reenvio fazia a linha
+      // reaproveitada saltar para a frente de propostas mais recentes.
+      createdAt: porEnviar?.createdAt ?? new Date().toISOString(),
     };
 
     // Event metadata for the PDF header
@@ -310,7 +348,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // the client clicks "accept". A persistence failure here is fatal — we do not
     // send an un-acceptable proposal.
     try {
-      await createProposal(proposal);
+      // A mesma linha quando é um reenvio; uma nova quando não é.
+      await (porEnviar ? updateProposal(proposal.id, proposal) : createProposal(proposal));
     } catch (e) {
       log.error("guardar proposta falhou", e, { id });
       return NextResponse.json(

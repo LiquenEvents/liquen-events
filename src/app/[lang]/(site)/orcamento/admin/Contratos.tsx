@@ -11,6 +11,7 @@ import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Toolbar } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { useToast } from "./Toast";
 
 // Estado do contrato → rótulo + paleta. Aceite usa o musgo (positivo); pendente
 // fica esbatido, à espera da assinatura do cliente. Mesma linguagem cromática
@@ -69,6 +70,95 @@ function StatusChip({ status }: { status: ContractStatus }) {
     >
       {s.label}
     </span>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * MARCAR UM CONTRATO COMO ASSINADO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Não havia porta nenhuma: os contratos nasciam `pendente` e ficavam lá para
+ * sempre. O que isso apagava, na prática — o portal do casal nunca oferecia o
+ * contrato em PDF, o filtro «Aceite» ficava vazio, o contador dizia sempre 0, e
+ * o congelamento da proposta aceite não podia correr.
+ *
+ * O CAMPO DO «COMO» É OBRIGATÓRIO, e é o coração disto. Este sistema não
+ * presenciou o sim — o botão de aceitar pelo link foi retirado, «um casamento
+ * não se fecha num botão» — portanto o que se grava não é uma assinatura
+ * electrónica: é o registo de que ela aconteceu, feito por alguém com nome, e
+ * com a frase que diz onde procurar a prova. Sem essa frase ficava um estado
+ * sem nada por trás, e o PDF do contrato ficava a afirmar um aceite que
+ * ninguém consegue mostrar.
+ */
+function RegistarAceite({ contrato, feito }: { contrato: Contract; feito: () => void }) {
+  const { toast } = useToast();
+  const [aberto, setAberto] = useState(false);
+  const [como, setComo] = useState("");
+  const [aGravar, setAGravar] = useState(false);
+
+  if (contrato.status === "aceite") return null;
+
+  async function registar() {
+    if (aGravar) return;
+    const texto = como.trim();
+    if (!texto) {
+      toast("Diz como é que o aceite aconteceu — é o que dá valor ao registo.", "error");
+      return;
+    }
+    setAGravar(true);
+    try {
+      const res = await fetch(`/api/contratos/${encodeURIComponent(contrato.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ como: texto }),
+      });
+      // O corpo lê-se com cuidado: um 502/504 devolve HTML e o interpretador
+      // atira — a frase crua dele não pode chegar ao ecrã dela.
+      const corpo = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(corpo?.error || `O servidor respondeu ${res.status}.`);
+      setAberto(false);
+      setComo("");
+      toast("Contrato marcado como assinado.", "success");
+      feito();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Não foi possível registar o aceite.", "error");
+    } finally {
+      setAGravar(false);
+    }
+  }
+
+  if (!aberto) {
+    return (
+      <Button size="sm" variant="ghost" onClick={() => setAberto(true)}>
+        Marcar como assinado
+      </Button>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex w-full flex-wrap items-center gap-2">
+      <input
+        type="text"
+        autoFocus
+        value={como}
+        onChange={(e) => setComo(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void registar();
+          if (e.key === "Escape") setAberto(false);
+        }}
+        maxLength={300}
+        aria-label="Como é que o aceite aconteceu"
+        placeholder="Como? Ex.: assinado em papel, entregue a 12/05"
+        className="bo-input min-w-0 flex-1 px-3 py-2 text-xs"
+      />
+      <Button size="sm" onClick={() => void registar()} disabled={aGravar}>
+        {aGravar ? "A registar…" : "Registar"}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setAberto(false)} disabled={aGravar}>
+        Cancelar
+      </Button>
+    </div>
   );
 }
 
@@ -253,7 +343,11 @@ export default function Contratos() {
             title={contracts.length === 0 ? "Sem contratos ainda" : "Nenhum contrato encontrado"}
             description={
               contracts.length === 0
-                ? "Os contratos surgem aqui quando um cliente aceita a proposta pelo link público."
+                ? // O botão de aceitar pelo link foi RETIRADO — «um casamento não se
+                  // fecha num botão» — e esta frase ficou a descrever um caminho
+                  // que já não existe. Um ecrã vazio que explica mal é pior do
+                  // que um ecrã vazio: manda esperar por uma coisa que nunca vem.
+                  "Os contratos aparecem aqui quando um pedido é marcado como Ganho. Depois de o casal assinar, marca-o aqui como assinado."
                 : "Tenta outra pesquisa ou estado."
             }
           />
@@ -315,6 +409,7 @@ export default function Contratos() {
                       >
                         PDF
                       </a>
+                      <RegistarAceite contrato={c} feito={refresh} />
                     </div>
                     {isOpen && (
                       <div className="mt-3">
@@ -401,6 +496,7 @@ export default function Contratos() {
                               >
                                 PDF
                               </a>
+                              <RegistarAceite contrato={c} feito={refresh} />
                             </div>
                           </td>
                         </tr>

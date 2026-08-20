@@ -59,8 +59,13 @@ precisam.
 
 ### Passo 5 — a rotina semanal, que não é opcional
 
-**Uma vez por semana**, abre `liquen-events.com/api/meta/fechos` (com sessão de
-administração). Lê o relatório. Se houver casamentos a enviar, faz o envio.
+**Uma vez por semana**, abre o back office → **Estatísticas**. No fim da
+página está «Casamentos fechados · Meta»: diz quantos há por enviar, quanto
+valem, e quantos dias faltam antes de a Meta deixar de os aceitar. Se houver
+algum, carrega em **Enviar à Meta** e confirma.
+
+(O relatório em texto continua em `liquen-events.com/api/meta/fechos`, para
+quem quiser ver os detalhes de tudo o que ficou de fora.)
 
 Isto **não é** como as conversões offline do Google, que se podiam acumular e
 carregar uma vez por mês. **A Meta recusa eventos de fecho com mais de sete

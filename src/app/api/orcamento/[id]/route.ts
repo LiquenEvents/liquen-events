@@ -17,6 +17,7 @@ import { rateLimit, clientIp, sweep } from "@/lib/rate-limit";
 import { quoteUpdateSchema, firstError } from "@/lib/validation";
 import { eur } from "@/lib/money";
 import { log } from "@/lib/logger";
+import { canonizar } from "@/lib/proposta-versao";
 
 // The store is server-only and reaches for node:crypto — pin the Node runtime.
 export const runtime = "nodejs";
@@ -187,6 +188,49 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * DE QUE VERSÃO É QUE ESTA LISTA FOI COPIADA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O painel de Pagamentos e a Checklist copiam a colecção INTEIRA para estado
+   * interno quando abrem, e ao gravar mandam-na inteira de volta. Isso quer
+   * dizer que a gravação não é «marca este pagamento como recebido» — é
+   * «substitui a lista de pagamentos por esta». Uma cópia de há duas horas
+   * escreve por cima de tudo o que entretanto aconteceu.
+   *
+   * MEDIDO, e sem corrida nenhuma: o painel aberto de manhã no telemóvel, um
+   * pagamento dado por recebido no portátil ao meio-dia, e um toque no
+   * telemóvel à tarde — o `paid: true` volta a `false` e as linhas novas
+   * desaparecem. As duas gravações respondem 200. Ninguém vê nada.
+   *
+   * O `updated_at` do `Repository` NÃO apanha isto, e é por isso que este
+   * guarda tem de existir: o bloqueio optimista relê e volta a tentar, e o que
+   * ele volta a aplicar é a MESMA substituição completa. O resultado final é
+   * byte a byte igual ao da escrita cega. É a mesma armadilha que o
+   * `email-templates-store.ts` já descreve por extenso.
+   *
+   * A correcção é o ecrã DIZER de onde copiou. Manda em `base` a colecção tal
+   * como a leu, e o servidor compara-a com a que tem guardada: se alguém lhe
+   * mexeu no meio, recusa com 409 e devolve as duas versões (a resposta da
+   * casa — ver `respostaDeConflito`).
+   *
+   * Comparação por forma CANÓNICA (chaves ordenadas), e não por `JSON.stringify`
+   * simples: a mesma lista com as chaves escritas por outra ordem — uma ida e
+   * volta pelo `jsonb` do Postgres chega para isso — dava uma colisão falsa, e
+   * um aviso que aparece sem razão é um aviso que se aprende a ignorar.
+   *
+   * `base` NÃO entra no `picked`: não é campo do pedido e nunca é gravado.
+   */
+  const baseBruta = "base" in body ? (body as Record<string, unknown>).base : undefined;
+  const base = (baseBruta && typeof baseBruta === "object" ? baseBruta : {}) as Record<
+    string,
+    unknown
+  >;
+  /** As colecções que se mandam INTEIRAS e que, por isso, se podem sobrepor. */
+  const COLECCOES_INTEIRAS = ["payments", "checklist", "productionPlan", "guestList"] as const;
+  const aConferir = COLECCOES_INTEIRAS.filter((campo) => campo in picked && campo in base);
+
+  /**
    * O texto livre do motivo de perda — não é campo do PEDIDO, é campo da
    * PROPOSTA (`Proposal.lostNote`), e é lá que a análise o vai buscar. `Quote`
    * não tem `lostNote` de propósito: dois sítios a guardar a mesma nota
@@ -233,9 +277,44 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const querAppend = !!activityLogAppend && activityLogAppend.length > 0;
     const podeMudarEstado =
       !estadoEscolhidoAMao && ("payments" in picked || "contractRef" in picked);
-    const current = querAppend || podeMudarEstado ? await getQuote(id) : null;
-    if ((querAppend || podeMudarEstado) && !current) {
+    const precisaDoActual = querAppend || podeMudarEstado || aConferir.length > 0;
+    const current = precisaDoActual ? await getQuote(id) : null;
+    if (precisaDoActual && !current) {
       return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
+    }
+
+    /**
+     * A CONFERÊNCIA DA BASE — ver o comentário longo lá em cima.
+     *
+     * Só recusa quando o ecrã DIZ de onde copiou e essa base já não é a que
+     * está guardada. Um cliente que não mande `base` continua a gravar como
+     * sempre gravou: isto acrescenta uma protecção a quem a pede, e não parte
+     * nada de quem ainda não a manda.
+     */
+    if (current && aConferir.length > 0) {
+      const igual = (a: unknown, b: unknown) =>
+        JSON.stringify(canonizar(a ?? [])) === JSON.stringify(canonizar(b ?? []));
+      const mexido = aConferir.filter(
+        (campo) => !igual(base[campo], (current as unknown as Record<string, unknown>)[campo]),
+      );
+      if (mexido.length > 0) {
+        log.warn("orcamento PATCH: gravação recusada, a lista mudou por baixo", {
+          id,
+          campos: mexido,
+        });
+        return NextResponse.json(
+          {
+            error:
+              "Isto foi alterado noutro sítio depois de este ecrã ter aberto. " +
+              "Recarrega para veres o que está guardado — o que escreveste está aqui em baixo.",
+            /** O que o servidor tem AGORA, para o ecrã se pôr em dia. */
+            current,
+            /** O que esta gravação queria escrever, para não se perder na recusa. */
+            submetido: picked,
+          },
+          { status: 409 },
+        );
+      }
     }
 
     if (current && querAppend) {

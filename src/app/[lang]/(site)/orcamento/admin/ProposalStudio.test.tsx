@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import ProposalStudio, {
@@ -208,6 +208,16 @@ let rascunhoDoEmail: Record<string, unknown> | null = {
 /** O rascunho que o SERVIDOR tem guardado (null = não tem nenhum). */
 let rascunhoServidor: { doc: unknown; updatedAt: string } | null = null;
 /**
+ * Um portão para segurar a LEITURA do rascunho.
+ *
+ * O merge do rascunho chega 100–300 ms depois de o ecrã abrir, e é nessa
+ * janela que ela começa a escrever. Sem uma forma de segurar a resposta, o
+ * duplo devolve-a antes de o teste conseguir carregar uma tecla — e o defeito
+ * que se quer prender fica por fora do alcance do teste.
+ */
+let portaoDoRascunho: Promise<void> | null = null;
+let abrirPortaoDoRascunho: (() => void) | null = null;
+/**
  * O que o servidor responde ao PUT do rascunho.
  *
  * Por omissão GUARDA — que é o caso normal, e era o que este duplo não fazia:
@@ -277,6 +287,7 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     // resposta e é diferente de «não se conseguiu perguntar». É essa diferença
     // que decide se o estúdio pode reenviar o que tem preso no navegador.
     if (metodo === "GET") {
+      if (portaoDoRascunho) await portaoDoRascunho;
       return leituraDoRascunhoFalha
         ? reply({ ok: false })
         : reply({ json: { ok: true, draft: rascunhoServidor } });
@@ -325,6 +336,8 @@ beforeEach(() => {
   pedidos = [];
   propostaDoc = reply({ headers: {}, json: { ok: true, emailed: true } });
   rascunhoServidor = null;
+  portaoDoRascunho = null;
+  abrirPortaoDoRascunho = null;
   gravacaoDoRascunho = () =>
     reply({ json: { ok: true, guardado: true, updatedAt: new Date().toISOString() } });
   leituraDoRascunhoFalha = false;
@@ -5477,5 +5490,202 @@ describe("o dia ocupado, a partir da data escrita na proposta", () => {
       expect(screen.getByLabelText("Data")).toHaveValue("20 de setembro de 2026"),
     );
     expect(screen.queryByText(/Já há um evento nesta data/)).toBeNull();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE ELA ESCREVE NO PRIMEIRO SEGUNDO NÃO É APAGADO PELO RASCUNHO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O estúdio vai buscar o rascunho ao servidor ao abrir, e o merge chega
+ * 100–300 ms depois. Era `{ ...d, ...doServidor }` — campo a campo, o servidor
+ * ganhava. Se ela começasse a escrever nessa janela, o PRINCÍPIO do que
+ * escreveu era apagado.
+ *
+ * MEDIDO no produto, oito rondas a escrever `ABCDEFGHIJKLMNOPQRST` meio
+ * segundo depois de o ecrã abrir: SETE perderam texto. Ficaram coisas como
+ * `HIJKLMNOPQRST`, `MNOPQRST`, `QRST`. Em quatro caixas diferentes — e a
+ * «Cerimónia» chegou a ficar COMPLETAMENTE vazia. Sem erro e sem aviso: a
+ * frase fica truncada pela frente, e é assim que vai no PDF para o casal.
+ */
+describe("o rascunho do servidor não escreve por cima de quem está a escrever", () => {
+  function rascunhoComTudoPreenchido() {
+    rascunhoServidor = {
+      updatedAt: new Date().toISOString(),
+      doc: {
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Herdade do Servidor",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalLabel: "Valor Total Decoração",
+      },
+    };
+  }
+
+  /** Segura a leitura do rascunho até o teste a soltar. */
+  function segurarORascunho() {
+    portaoDoRascunho = new Promise<void>((resolver) => {
+      abrirPortaoDoRascunho = resolver;
+    });
+  }
+
+  it("o que ela escreveu no Local fica — e o resto do rascunho entra à mesma", async () => {
+    rascunhoComTudoPreenchido();
+    segurarORascunho();
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={quote} />
+      </ToastProvider>,
+    );
+
+    const local = await screen.findByLabelText("Local");
+    await user.clear(local);
+    await user.type(local, "Monte da Oliveirinha");
+
+    // Agora o rascunho chega — a corrida, encenada.
+    abrirPortaoDoRascunho?.();
+
+    // Prova que o merge CORREU MESMO: um campo em que ela não tocou passa a
+    // ter o valor do servidor. Sem isto, o teste passava por não ter havido
+    // corrida nenhuma — que é a forma mais fácil de ele deixar de servir.
+    await waitFor(() => expect(screen.getByLabelText("Convidados")).toHaveValue("80 pax"));
+
+    // E o que ela escreveu continua inteiro.
+    expect(local).toHaveValue("Monte da Oliveirinha");
+  });
+
+  it("num campo em que ela NÃO tocou, o rascunho manda (controlo positivo)", async () => {
+    rascunhoComTudoPreenchido();
+    segurarORascunho();
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={quote} />
+      </ToastProvider>,
+    );
+
+    const local = await screen.findByLabelText("Local");
+    await user.clear(local);
+    await user.type(local, "Monte da Oliveirinha");
+    abrirPortaoDoRascunho?.();
+
+    // O «Tipo de evento» não foi tocado: o rascunho tem de o preencher.
+    await waitFor(() => expect(screen.getByLabelText("Tipo de evento")).toHaveValue("Casamento"));
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ABRIR UM PEDIDO SÓ PARA LER NÃO É TRABALHO POR GRAVAR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O estúdio abre, semeia o que vem do PEDIDO (os pontos de decoração que o
+ * casal marcou, o preço final, a regra dos adicionais) — e essa semeadura
+ * mexia no documento. O efeito que vigia o documento não distingue quem lhe
+ * mexeu: marcava «por gravar», gravava no `localStorage`, e mandava um PUT do
+ * rascunho ao servidor.
+ *
+ * Duas consequências, e a segunda é a que custa:
+ *
+ *   1. Uma linha de rascunho gravada em cada pedido que ela ABRE para ler.
+ *   2. O «Guardar tudo (1)» aceso por nada, várias vezes por hora — e um
+ *      alarme que mente é um alarme que se deixa de ver. É esse botão que ela
+ *      olha antes de fechar o portátil.
+ *
+ * A semeadura é DERIVADA do pedido: reabrir produz exactamente o mesmo
+ * documento. Não há nada para perder em não a gravar — e quando ela escrever
+ * a primeira letra, grava-se tudo, semeadura incluída.
+ */
+describe("abrir um pedido só para ler não é trabalho por gravar", () => {
+  /** O debounce da gravação é de 800 ms. Isto passa-o com folga. */
+  const passarODebounce = () => new Promise((r) => setTimeout(r, 1400));
+
+  it("não manda rascunho nenhum ao servidor", async () => {
+    renderStudio();
+    await screen.findByRole("heading", { name: "Mood boards" });
+    await passarODebounce();
+    expect(corpos("proposta-rascunho")).toEqual([]);
+  });
+
+  it("não deixa cópia local de um documento que ela não escreveu", async () => {
+    renderStudio();
+    await screen.findByRole("heading", { name: "Mood boards" });
+    await passarODebounce();
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+
+  it("e o indicador cala-se — não diz «guardado» ao que não foi feito", async () => {
+    renderStudio();
+    await screen.findByRole("heading", { name: "Mood boards" });
+    await passarODebounce();
+    expect(screen.queryByTitle(/a guardar/i)).toBeNull();
+    expect(screen.queryByTitle(/guardado às/i)).toBeNull();
+  });
+
+  it("um clique que não muda nada continua a não gravar", async () => {
+    // O gesto FECHA a janela de abertura, mas não é o gesto que decide: o que
+    // decide é o documento ser igual ao que se abriu. Sem isto, tocar no ecrã
+    // para ler acendia o alarme na mesma — e era esse o defeito.
+    const user = userEvent.setup();
+    renderStudio();
+    await user.click(await screen.findByRole("heading", { name: "Mood boards" }));
+    await passarODebounce();
+    expect(corpos("proposta-rascunho")).toEqual([]);
+  });
+
+  it("escrita SEM teclas — preenchimento automático — também conta (controlo positivo)", async () => {
+    // Nem toda a escrita passa por uma tecla: o preenchimento automático do
+    // browser, um gestor de palavras-passe e a ditadura de voz põem o valor e
+    // disparam só `input`. Se a abertura só fechasse com `keydown`, esse texto
+    // ficava por gravar — e foi assim que o passeio automático das propostas
+    // apanhou este buraco.
+    renderStudio();
+    const local = (await screen.findByLabelText("Local")) as HTMLInputElement;
+    fireEvent.input(local, { target: { value: "Herdade do Automático" } });
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    expect(corpos("proposta-rascunho").at(-1)).toContain("Herdade do Automático");
+  });
+
+  it("mas com rascunho GUARDADO, abrir continua a gravar (controlo positivo)", async () => {
+    // A fronteira. Abrir um pedido virgem é semear o que veio do pedido — e
+    // isso re-deriva-se ao reabrir. Abrir um pedido COM rascunho é outra coisa:
+    // o restauro CORRIGE o que lá está (tira marcadores de fotos que nunca
+    // chegaram a existir, acerta o total pelo «Preço final» do pedido), e uma
+    // correcção que não fica gravada é uma correcção que se volta a fazer
+    // amanhã. Ver também «um marcador deixado num rascunho antigo» e «o preço
+    // do pedido sobrevive ao rascunho do servidor».
+    seedDraft(1);
+    renderStudio();
+    await screen.findByRole("heading", { name: "Mood boards" });
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+  });
+
+  it("à PRIMEIRA letra dela, grava tudo — semeadura incluída (controlo positivo)", async () => {
+    // Sem esta, a correcção podia ser «nunca gravar», que é muito pior do que
+    // o defeito.
+    const user = userEvent.setup();
+    renderStudio();
+    await user.type(await screen.findByLabelText("Local"), "Évora");
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    const gravado = JSON.parse(corpos("proposta-rascunho").at(-1) ?? "{}");
+    expect(gravado.doc.location).toBe("Évora");
+    // A semeadura vai lá dentro: é o grupo de serviços que o estúdio abre.
+    expect(gravado.doc.serviceGroups.length).toBeGreaterThan(0);
+    expect(localStorage.getItem(DRAFT_KEY)).toContain("Évora");
   });
 });

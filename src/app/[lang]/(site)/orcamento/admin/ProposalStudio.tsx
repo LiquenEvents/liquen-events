@@ -10,6 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import { useToast } from "./Toast";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import {
@@ -560,42 +561,12 @@ function fraseDeCorte(c: Corte): string {
 }
 
 /**
- * ════════════════════════════════════════════════════════════════════════════
- * O QUE FALHOU, QUANDO O SERVIDOR NEM CHEGA A EXPLICAR-SE
- * ════════════════════════════════════════════════════════════════════════════
- *
- * Todas as falhas do envio caíam na MESMA frase de oito palavras — «Não foi
- * possível enviar a proposta.» — porque o código lia a explicação do corpo da
- * resposta, e as falhas que não trazem corpo nenhum ficavam sem nada.
- *
- * A pior delas é o TEMPO ESGOTADO: a plataforma mata a função e responde com
- * uma página de erro que não é sequer JSON. Do lado dela, um botão que roda e
- * uma frase que não distingue «a base recusou» de «demorou demais» de «não
- * estás autenticada». Foi com essa frase que este problema chegou até mim, e é
- * também por isso que demorou a ser encontrado.
- *
- * O código de estado não é um detalhe técnico a esconder: é a única coisa que
- * distingue estes casos, e cada um tem uma acção diferente do outro lado.
+ * O helper vive num módulo PRÓPRIO, e não dentro do Estúdio, por uma razão de
+ * peso: o construtor de preços (`ProposalBuilder`) precisa dele e é montado
+ * SEMPRE, enquanto o Estúdio entra por `dynamic()`. Importá-lo de lá arrastava
+ * o Estúdio inteiro para o pacote inicial do back office.
  */
-export function porqueFalhouOEnvio(status: number): string {
-  if (status === 504 || status === 502 || status === 408) {
-    return (
-      "O servidor demorou demasiado a preparar a proposta e desistiu a meio. " +
-      "Propostas com muitas fotografias demoram mais — tenta outra vez; se voltar a " +
-      "acontecer, tira algumas fotos dos mood boards."
-    );
-  }
-  if (status === 401 || status === 403) {
-    return "A sessão expirou. Volta a entrar e tenta de novo — o rascunho está guardado.";
-  }
-  if (status === 413) {
-    return "A proposta é grande demais para ser guardada. Tira algumas fotos ou encurta os textos.";
-  }
-  if (status === 503) {
-    return "O serviço não está disponível neste momento. Tenta daqui a pouco.";
-  }
-  return `Não foi possível enviar a proposta (erro ${status}).`;
-}
+export { porqueFalhouOEnvio };
 
 /**
  * A frase única do aviso, ou `null` quando o documento vai completo.
@@ -1730,6 +1701,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       if (daProposta && daProposta > 0) persistirPreco(daProposta);
     }
     hydrated.current = true;
+    // SÓ quando não havia rascunho nenhum. Ver o bloco «A ABERTURA TAMBÉM NÃO
+    // É TRABALHO POR GRAVAR»: abrir um pedido virgem é semear o que veio do
+    // pedido, e isso não se grava; abrir um pedido COM rascunho é outra coisa
+    // — o restauro corrige o que lá está (tira marcadores provisórios de fotos
+    // que nunca chegaram a existir, acerta o total pelo «Preço final» do
+    // pedido) e essas correcções TÊM de ficar gravadas.
+    if (!hadDraft) aAbrir.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1943,8 +1921,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const doPedido = quote.quotedPrice;
       const mandaOPedido = typeof doPedido === "number" && doPedido > 0;
       const doDoServidor = draft.doc as Partial<StudioDoc>;
+      /**
+       * ── E OS CAMPOS EM QUE ELA JÁ ESTÁ COM AS MÃOS FICAM DE FORA ────────
+       *
+       * Ver o bloco do `camposTocados`, mais abaixo. Sem isto, escrever no
+       * primeiro segundo depois de o ecrã abrir perdia o princípio da frase —
+       * medido, sete rondas em oito.
+       */
+      const semOsQueElaTocou = Object.fromEntries(
+        Object.entries(doDoServidor).filter(([chave]) => !camposTocados.current.has(chave)),
+      ) as Partial<StudioDoc>;
+      // A abertura ACABA AQUI quando há rascunho no servidor.
+      //
+      // Sem isto, o que este merge produz — o rascunho do servidor com o preço
+      // do pedido por cima, e sem os marcadores provisórios — ficava por
+      // gravar: era «a abertura», e a abertura não se grava. Mas isto não é
+      // uma abertura derivada do pedido, é trabalho vindo de outro dispositivo
+      // com uma correcção aplicada em cima. Ver o bloco «A ABERTURA TAMBÉM NÃO
+      // É TRABALHO POR GRAVAR».
+      aAbrir.current = false;
       setDoc((d) => {
-        const merged = { ...d, ...doDoServidor };
+        const merged = { ...d, ...semOsQueElaTocou };
         const limpo = stripPendingImages({
           ...merged,
           coverImages: normaliseCoverImages(merged.coverImages),
@@ -1957,7 +1954,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // enquanto quiser dizer «isto não é teu».
       setPorConfirmar(new Set());
       const base = mandaOPedido ? doPedido : baseDoDoc(doDoServidor);
-      if (base != null) setTotalInput(textoDoTotal(base));
+      if (base != null && !camposTocados.current.has("__total")) {
+        setTotalInput(textoDoTotal(base));
+      }
       // O documento do servidor pode trazer traduções que este computador nunca
       // viu — é o caso de abrir a proposta noutro portátil. As caixas inglesas
       // acendem-se, pela mesma razão do restauro local.
@@ -2130,24 +2129,110 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *
    * Saltar a primeira passagem não adia nada do que interessa: o restauro (ou
    * o `seedDefaults`, quando não há rascunho) muda o documento e faz este
-   * efeito correr outra vez — aí sim, com a versão boa à mão. E quando o
-   * restauro não muda nada, não há mesmo nada por gravar: é o caso que o
-   * comentário de cima descreve, o de cada troca de separador pagar um PUT
-   * para reescrever o que já lá estava.
+   * efeito correr outra vez — aí sim, com a versão boa à mão. O que essa
+   * segunda passagem NÃO é está logo a seguir.
    */
   const montagem = useRef(true);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A ABERTURA TAMBÉM NÃO É TRABALHO POR GRAVAR
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A segunda passagem deste efeito é sempre a da ABERTURA: o restauro do
+   * rascunho, ou — quando não há rascunho — o `seedDefaults` com o que veio do
+   * PEDIDO (os pontos de decoração que o casal marcou, o preço final, a regra
+   * dos adicionais). Nenhuma dessas coisas foi escrita por ela, e marcá-las
+   * como trabalho por gravar custava duas coisas:
+   *
+   *   1. cada pedido ABERTO PARA LER deixava uma linha de rascunho gravada, e
+   *      cada troca de separador pagava um PUT para reescrever o que já lá
+   *      estava — que é o que o comentário de cima já descrevia;
+   *   2. o «Guardar tudo (1)» acendia por nada, várias vezes por hora. É esse
+   *      botão que ela olha antes de fechar o portátil, e um alarme que mente é
+   *      um alarme que se deixa de ver.
+   *
+   * Nada se perde: a semeadura é DERIVADA do pedido e reabrir volta a produzir
+   * o mesmo documento, e o restauro é a leitura do que já está gravado. Assim
+   * que ela escrever a primeira letra, grava-se tudo — semeadura incluída.
+   *
+   * ── PORQUE É QUE ISTO NÃO PODE ENGOLIR TRABALHO A SÉRIO ───────────────────
+   *
+   * O silêncio só vale enquanto o documento for IGUAL ao da abertura, e só até
+   * à primeira gravação. Depois de haver rascunho gravado, voltar ao estado de
+   * abertura é uma alteração como outra qualquer — e tem de ser gravada, senão
+   * o que fica no servidor é a versão do meio.
+   */
+  const aAbrir = useRef(false);
+  const marcaDaAbertura = useRef<string | null>(null);
+  const jaGravou = useRef(false);
+  /** O que se compara com a abertura: só o que é TRABALHO DELA. Os mapas de
+   *  apoio (`assetUrls`, `themeOrigins`) ficam de fora de propósito — são
+   *  memória de endereços que a hidratação vai buscar ao servidor, e mudam
+   *  sozinhos depois de o ecrã abrir. */
+  const marcaDoTrabalho = useCallback(
+    () => JSON.stringify([doc, refEdited, mensagemAoCliente, bilingue, idiomaDoPdf]),
+    [doc, refEdited, mensagemAoCliente, bilingue, idiomaDoPdf],
+  );
+  /** Não há nada por gravar: o que está no ecrã é a abertura, e ainda não se
+   *  gravou nada. Vale para o indicador E para a gravação — se só valesse para
+   *  o indicador, o alarme calava-se e o PUT continuava a sair, que é meia
+   *  correcção com o aspecto de uma inteira. */
+  const nadaPorGravar = useCallback(
+    // `null` (a marca ainda não foi tirada) NUNCA é igual a uma marca: quando
+    // há rascunho guardado a abertura não se marca de todo, e o estúdio grava
+    // como sempre gravou.
+    () => !jaGravou.current && marcaDaAbertura.current === marcaDoTrabalho(),
+    [marcaDoTrabalho],
+  );
+  /**
+   * E a abertura acaba no PRIMEIRO GESTO DELA — não num relógio.
+   *
+   * É o único sinal honesto: um relógio ou uma contagem de passagens fazia a
+   * fronteira depender da velocidade da rede desta manhã, e a partir daí
+   * haveria manhãs em que a primeira letra escrita não contava como trabalho.
+   * Daqui para a frente, tudo o que mexer no documento é dela até prova em
+   * contrário.
+   */
+  useEffect(() => {
+    const fechar = () => {
+      aAbrir.current = false;
+    };
+    // `input` e `change` estão aqui por uma razão que não é teórica: nem toda a
+    // escrita passa por uma tecla. O preenchimento automático do browser, um
+    // gestor de palavras-passe, a ditadura de voz e os passeios automáticos
+    // escrevem o valor e disparam só `input` — sem `keydown`. Sem estes dois,
+    // esse texto ficava do lado da «abertura» e não era gravado.
+    const gestos = ["pointerdown", "keydown", "input", "change", "drop", "paste"] as const;
+    for (const g of gestos) window.addEventListener(g, fechar, true);
+    return () => {
+      for (const g of gestos) window.removeEventListener(g, fechar, true);
+    };
+  }, []);
+
   useEffect(() => {
     if (!hydrated.current) return;
     if (montagem.current) {
       montagem.current = false;
       return;
     }
+    if (aAbrir.current) {
+      // Enquanto durar a abertura, o que está no ecrã É a abertura. Não se
+      // fixa na primeira passagem porque a abertura não é uma: o restauro (ou
+      // a semeadura) é a primeira, e atrás dela vêm as derivadas — os
+      // identificadores estáveis dos grupos e das linhas, o merge do rascunho
+      // do servidor, as fotos que a hidratação vai buscar. Nenhuma delas é
+      // trabalho dela, e fixar a marca antes de todas fazia o alarme acender
+      // por causa de um `id` que o próprio estúdio acabou de escrever.
+      marcaDaAbertura.current = marcaDoTrabalho();
+      return;
+    }
+    if (nadaPorGravar()) return;
     porGravarRef.current = true;
     setPorGravar(true);
     // A mensagem do envio conta como trabalho por gravar: sem ela nesta lista, o
     // indicador dizia «guardado às 14:32» com o texto dela ainda por escrever no
     // rascunho — e é essa frase que faz uma pessoa fechar o portátil descansada.
-  }, [doc, assetUrls, themeOrigins, refEdited, mensagemAoCliente, bilingue]);
+  }, [doc, assetUrls, themeOrigins, refEdited, mensagemAoCliente, bilingue, nadaPorGravar]);
 
   useEffect(() => {
     if (!hydrated.current) return;
@@ -2237,6 +2322,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           }),
         );
         setGravadoEm(new Date());
+        // A partir daqui há rascunho gravado, e voltar ao estado de abertura
+        // deixa de ser «nada por gravar» — ver o bloco da abertura.
+        jaGravou.current = true;
         porGravarRef.current = false;
         setPorGravar(false);
       } catch {
@@ -2266,6 +2354,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       })();
     };
     flushDraft.current = save;
+    // A abertura não se grava. O `flushDraft` fica montado à mesma — o
+    // Ctrl/Cmd+Enter dos Serviços tem de continuar a poder gravar à ordem —,
+    // mas o relógio dos 800 ms não arranca por causa de um documento que
+    // ninguém escreveu. Ver o bloco «A ABERTURA TAMBÉM NÃO É TRABALHO POR
+    // GRAVAR».
+    if (nadaPorGravar()) return;
     const t = setTimeout(save, 800);
     return () => clearTimeout(t);
   }, [
@@ -2290,6 +2384,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     quote.id,
     toast,
     enviarParaServidor,
+    nadaPorGravar,
   ]);
 
   /**
@@ -2421,7 +2516,37 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     },
   });
 
-  const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O QUE ELA JÁ ESCREVEU NÃO É SUBSTITUÍDO PELO RASCUNHO QUE VEM A CAMINHO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O estúdio vai buscar o rascunho ao servidor ao abrir, e o merge chega
+   * 100–300 ms depois. Até aqui esse merge era `{ ...d, ...doServidor }` —
+   * campo a campo, o servidor ganhava. Se ela começasse a escrever nesse
+   * primeiro segundo, o princípio do que escreveu era apagado.
+   *
+   * MEDIDO: escrever `ABCDEFGHIJKLMNOPQRST` meio segundo depois de o ecrã
+   * abrir, oito rondas — SETE perderam texto. Ficaram coisas como
+   * `HIJKLMNOPQRST`, `MNOPQRST`, `QRST`. Em quatro caixas diferentes, e uma
+   * delas (a «Cerimónia») ficou COMPLETAMENTE vazia. Não há erro nem aviso: a
+   * frase fica truncada pela frente e é assim que vai no PDF para o casal.
+   *
+   * Guarda-se aqui QUE CAMPOS ela tocou desde que o ecrã abriu. O merge
+   * continua a trazer tudo o resto do rascunho — as fotos, as condições, as
+   * traduções feitas noutro computador — e deixa em paz só aquilo em que ela
+   * está com as mãos.
+   *
+   * Só marcam os caminhos por onde a PESSOA escreve (`patch` e o editor de
+   * serviços). Os `setDoc` do sistema — semear os textos fixos, aplicar o
+   * preço do pedido, o próprio merge — não marcam nada, de propósito.
+   */
+  const camposTocados = useRef<Set<string>>(new Set());
+
+  const patch = (p: Partial<StudioDoc>) => {
+    for (const chave of Object.keys(p)) camposTocados.current.add(chave);
+    setDoc((d) => ({ ...d, ...p }));
+  };
 
   // ── Total estruturado + IVA ──
   // O modo efetivo: explícito no doc, senão detetado a partir do texto livre
@@ -2546,6 +2671,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }
 
   function onTotalInput(raw: string) {
+    // O total não vive no `doc` (é um texto à parte), mas a regra é a mesma:
+    // ver `camposTocados`. Sem esta marca, o merge do rascunho reescrevia a
+    // caixa do total a meio de ela estar a escrever o valor.
+    camposTocados.current.add("__total");
     setTotalInput(raw);
     const base = raw.trim() === "" ? undefined : parseMoneyText(raw);
     writeTotal(base == null ? undefined : amountParaBase(base, vatMode), vatMode);
@@ -3606,6 +3735,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // Aqui fica só a ponte para o documento.
   const setServiceGroups = useCallback(
     (update: (prev: StudioDoc["serviceGroups"]) => StudioDoc["serviceGroups"]) => {
+      // Ver `camposTocados`: o editor de serviços é o outro caminho por onde a
+      // PESSOA escreve, e é onde o texto perdido foi medido primeiro.
+      camposTocados.current.add("serviceGroups");
       setDoc((d) => {
         const next = update(d.serviceGroups);
         return next === d.serviceGroups ? d : { ...d, serviceGroups: next };
@@ -4819,6 +4951,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // uma proposta em aberto, por isso isto não pode passar em silêncio —
         // reenviar acerta o estado e reaproveita a MESMA proposta.
         toast(data.estadoError, "error");
+      } else if (typeof data?.repetidoAviso === "string") {
+        /**
+         * O servidor reconheceu isto como uma REPETIÇÃO e não enviou nada
+         * (mesmo documento, há menos de três minutos). Acontece quando a rede
+         * tosse a meio, o ecrã diz que falhou, e ela carrega outra vez — o
+         * primeiro pedido acabou por seguir. Dizer «Proposta enviada» aqui era
+         * verdade só por acidente; dizer o que aconteceu é o que a impede de
+         * ficar à espera de perceber porque é que há duas linhas no quadro.
+         */
+        toast(data.repetidoAviso, "success");
       } else if (saiu) {
         toast("Proposta enviada ao cliente", "success");
       } else {
@@ -10381,7 +10523,27 @@ function Thumb({
           type="button"
           onClick={onRemove}
           aria-label="Remover imagem"
-          className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white text-xs leading-none opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+          /**
+           * ── INVISÍVEL E TOCÁVEL AO MESMO TEMPO ────────────────────────
+           *
+           * Isto era `opacity-0 group-hover:opacity-100`. Num ecrã táctil não
+           * há hover nenhum, portanto o botão NUNCA se via — e `opacity: 0`
+           * não desliga o toque: um dedo no canto da miniatura apagava a
+           * fotografia sem que nada tivesse aparecido primeiro. É o único
+           * botão destrutivo do back office assim, e no telemóvel o engano nem
+           * se desfaz (o Cmd+Z do estúdio não existe lá).
+           *
+           * O par é o da casa (`globals.css:98`), e é o mesmo que o
+           * `ServicesEditor` e os `Fornecedores` já usam: à vista no dedo,
+           * escondido até ao hover só onde HÁ rato.
+           *
+           * 20 px é menos de metade do mínimo de toque, e o `alvo-toque` (44
+           * px) não serve aqui: a miniatura tem pouco mais de 100 px de largo
+           * e um alvo de 44 px no canto engolia um terço dela — num botão que
+           * APAGA, um alvo grande de mais é tão mau como um pequeno de mais.
+           * 32 px no dedo é o meio-termo, e é o que cabe.
+           */
+          className="absolute top-1 right-1 flex h-5 w-5 pointer-coarse:h-8 pointer-coarse:w-8 items-center justify-center rounded-full bg-black/55 text-white text-xs leading-none opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-opacity"
         >
           ×
         </button>
