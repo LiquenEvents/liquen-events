@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
+import { parseMoney } from "./util";
 import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
 import { Card, Field, Button, EmptyState } from "@/app/[lang]/(site)/orcamento/admin/ui";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -241,6 +242,30 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
   const [validUntil, setValidUntil] = useState(inicial.validUntil);
   const [notes, setNotes] = useState(inicial.notes);
   const [sending, setSending] = useState(false);
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O PREÇO ZERAVA QUANDO ELA ESCREVIA A VÍRGULA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O campo era `type="number"` com `Number(e.target.value)`. Num
+   * `input type="number"` a norma manda o browser apagar o valor sempre que o
+   * conteúdo não é um número de vírgula flutuante VÁLIDO — e válido, em HTML,
+   * quer dizer com PONTO. A tecla decimal do teclado português é a vírgula.
+   * Ela escrevia `150,50`, o `.value` vinha vazio, `Number("")` é `0`, e o
+   * preço ficava a zero num orçamento que seguia para o cliente.
+   *
+   * O resto do back office já fazia o contrário em mais de vinte sítios:
+   * `type="text"` + `inputMode="decimal"` + `parseMoney` (que entende
+   * «1.500», «1500,50» e «1 500€»). Este campo de dinheiro ficou de fora.
+   *
+   * Guarda-se o TEXTO enquanto ela escreve — só de uma linha, que é quanto um
+   * teclado alcança de cada vez — porque «150,» tem de continuar a ler-se
+   * «150,» e não voltar a «150» a meio da palavra. O modelo recebe o número
+   * assim que ele é legível; o que não for legível não apaga o que lá estava.
+   */
+  const [precoEmEdicao, setPrecoEmEdicao] = useState<{ i: number; texto: string } | null>(null);
+  /** O número do modelo como se escreve cá: `150,5`, não `150.5`. */
+  const precoEscrito = (n: number) => String(n ?? 0).replace(".", ",");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
     total: number;
@@ -764,10 +789,17 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
               hideLabel
               label={`Preço unitário da linha ${i + 1}`}
               containerClassName="w-24"
-              type="number"
-              min={0}
-              value={it.unitPrice}
-              onChange={(e) => update(i, { unitPrice: Number(e.target.value) })}
+              type="text"
+              inputMode="decimal"
+              value={precoEmEdicao?.i === i ? precoEmEdicao.texto : precoEscrito(it.unitPrice)}
+              onChange={(e) => {
+                const texto = e.target.value;
+                setPrecoEmEdicao({ i, texto });
+                const n = parseMoney(texto);
+                // Um texto ainda por acabar («150,») não apaga o que lá está.
+                if (n !== undefined) update(i, { unitPrice: n });
+              }}
+              onBlur={() => setPrecoEmEdicao(null)}
               className="text-right"
             />
             <Button

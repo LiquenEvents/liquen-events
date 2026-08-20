@@ -10362,7 +10362,27 @@ function Thumb({
           type="button"
           onClick={onRemove}
           aria-label="Remover imagem"
-          className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white text-xs leading-none opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+          /**
+           * ── INVISÍVEL E TOCÁVEL AO MESMO TEMPO ────────────────────────
+           *
+           * Isto era `opacity-0 group-hover:opacity-100`. Num ecrã táctil não
+           * há hover nenhum, portanto o botão NUNCA se via — e `opacity: 0`
+           * não desliga o toque: um dedo no canto da miniatura apagava a
+           * fotografia sem que nada tivesse aparecido primeiro. É o único
+           * botão destrutivo do back office assim, e no telemóvel o engano nem
+           * se desfaz (o Cmd+Z do estúdio não existe lá).
+           *
+           * O par é o da casa (`globals.css:98`), e é o mesmo que o
+           * `ServicesEditor` e os `Fornecedores` já usam: à vista no dedo,
+           * escondido até ao hover só onde HÁ rato.
+           *
+           * 20 px é menos de metade do mínimo de toque, e o `alvo-toque` (44
+           * px) não serve aqui: a miniatura tem pouco mais de 100 px de largo
+           * e um alvo de 44 px no canto engolia um terço dela — num botão que
+           * APAGA, um alvo grande de mais é tão mau como um pequeno de mais.
+           * 32 px no dedo é o meio-termo, e é o que cabe.
+           */
+          className="absolute top-1 right-1 flex h-5 w-5 pointer-coarse:h-8 pointer-coarse:w-8 items-center justify-center rounded-full bg-black/55 text-white text-xs leading-none opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 transition-opacity"
         >
           ×
         </button>

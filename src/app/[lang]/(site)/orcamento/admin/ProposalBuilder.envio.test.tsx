@@ -157,3 +157,66 @@ describe("ProposalBuilder — quando o servidor nem chega a responder JSON", () 
     expect(await screen.findByText(/sessão expirou/i)).toBeTruthy();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PREÇO ZERAVA QUANDO ELA ESCREVIA A VÍRGULA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O campo era `type="number"` com `Number(e.target.value)`. Num
+ * `input type="number"` a norma manda apagar o valor sempre que o conteúdo não
+ * é um número de vírgula flutuante VÁLIDO — e válido, em HTML, quer dizer com
+ * PONTO. A tecla decimal do teclado português é a vírgula: ela escrevia
+ * `150,50`, o `.value` vinha vazio, `Number("")` é `0`, e o preço ficava a
+ * zero num orçamento que seguia para o cliente.
+ */
+describe("ProposalBuilder — o preço escreve-se à portuguesa", () => {
+  async function abrir() {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ProposalBuilder quote={quote} onSent={onSent} />
+      </ToastProvider>,
+    );
+    return user;
+  }
+
+  it("aceita a vírgula como separador decimal", async () => {
+    const user = await abrir();
+    const preco = screen.getByLabelText("Preço unitário da linha 1");
+    await user.clear(preco);
+    await user.type(preco, "150,50");
+    // O que ela escreveu continua no ecrã enquanto escreve.
+    expect((preco as HTMLInputElement).value).toBe("150,50");
+    // E o total já conta com ele: 150,50 × 1, com IVA a 23% → 185,12 €.
+    expect(await screen.findByText(/185,1/)).toBeTruthy();
+  });
+
+  it("um texto ainda por acabar não apaga o que lá estava", async () => {
+    const user = await abrir();
+    const preco = screen.getByLabelText("Preço unitário da linha 1");
+    await user.clear(preco);
+    await user.type(preco, "150");
+    await user.type(preco, ",");
+    // «150,» não é um número — mas o modelo tem de continuar com 150.
+    expect((preco as HTMLInputElement).value).toBe("150,");
+    expect(screen.queryByText(/^0,00\s*€$/)).toBeNull();
+  });
+
+  it("continua a aceitar o ponto, que é o que o teclado do computador dá", async () => {
+    const user = await abrir();
+    const preco = screen.getByLabelText("Preço unitário da linha 1");
+    await user.clear(preco);
+    await user.type(preco, "150.50");
+    expect(await screen.findByText(/185,1/)).toBeTruthy();
+  });
+
+  it("dá o teclado numérico no telemóvel", async () => {
+    await abrir();
+    const preco = screen.getByLabelText("Preço unitário da linha 1");
+    // `type="number"` sozinho dava teclado numérico e comia a vírgula; o par
+    // certo é `text` + `inputMode="decimal"`.
+    expect(preco.getAttribute("inputmode")).toBe("decimal");
+    expect(preco.getAttribute("type")).toBe("text");
+  });
+});
