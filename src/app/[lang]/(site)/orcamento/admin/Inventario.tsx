@@ -850,14 +850,14 @@ export default function Inventario() {
                         <div className="hidden com-rato:flex items-center justify-end gap-1">
                           <button
                             onClick={() => startEdit(i)}
-                            className="alvo-toque text-foreground/25 hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            className="alvo-toque text-foreground/25 sem-rato:text-foreground/55 hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                             aria-label="Editar"
                           >
                             {LapisIcon}
                           </button>
                           <button
                             onClick={() => remove(i.id)}
-                            className="alvo-toque text-foreground/25 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
+                            className="alvo-toque text-foreground/25 sem-rato:text-foreground/55 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                             aria-label="Remover"
                           >
                             {CruzIcon}
