@@ -84,9 +84,6 @@ describe("cobertura da reposição", () => {
     const at = (key: string) => RESTORE_TARGETS.findIndex((t) => t.key === key);
     // proposals.quote_id → quotes.id
     expect(at("quotes")).toBeLessThan(at("proposals"));
-    // message_links.quote_id → quotes.id, message_links.proposal_id → proposals.id
-    expect(at("quotes")).toBeLessThan(at("messageLinks"));
-    expect(at("proposals")).toBeLessThan(at("messageLinks"));
   });
 
   it("a reposição e a exportação falam a MESMA versão do formato", () => {

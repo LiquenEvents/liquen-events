@@ -17,7 +17,6 @@ import { listAllEventItems } from "@/lib/event-material-items-store";
 import { listAllLog } from "@/lib/event-material-log-store";
 import { listTemplatesWithDefaults } from "@/lib/email-templates-store";
 import { listThemes } from "@/lib/themes-store";
-import { listLinks } from "@/lib/message-links-store";
 import { listEtiquetas } from "@/lib/biblioteca-etiquetas-store";
 import { listFotos } from "@/lib/biblioteca-fotos-store";
 import { listFotoEtiquetas } from "@/lib/biblioteca-foto-etiquetas-store";
@@ -129,7 +128,6 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
   { key: "bibliotecaEtiquetas", table: "biblioteca_etiquetas", list: listEtiquetas },
   { key: "bibliotecaFotos", table: "biblioteca_fotos", list: listFotos },
   { key: "bibliotecaFotoEtiquetas", table: "biblioteca_foto_etiquetas", list: listFotoEtiquetas },
-  { key: "messageLinks", table: "message_links", list: listLinks },
   // A Visão Geral guarda os dois campos como duas LINHAS (`notas`, `meta`);
   // `readOverviewSettings` devolve-as indexadas por campo — aqui voltam a ser
   // linhas, que é a forma como o resto do ficheiro fala e como se repõem.
@@ -197,6 +195,8 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
  * `db/schema.sql` esteja aqui ou em `BACKUP_DATASETS`.
  */
 export const NOT_BACKED_UP: Readonly<Record<string, string>> = {
+  message_links:
+    "As anotações da caixa de entrada de email — a ligação de uma mensagem a um pedido, as etiquetas, o alfinete e o arquivo. A caixa de entrada foi APAGADA a pedido dela (ver o cabeçalho do RUNBOOK): nada no sistema volta a escrever ou a ler esta tabela, e as linhas que lá estão apontam para identificadores de mensagens de um ecrã que já não existe. A tabela NÃO foi deitada abaixo — as linhas continuam na base de dados, intactas, e podem ser lidas ou apagadas à mão por quem quiser. O que deixou de fazer sentido é levá-las numa cópia de segurança que existe para repor o que a casa usa.",
   push_subscriptions:
     "Subscrições Web Push, uma por browser/dispositivo: um endereço de entrega mais duas chaves SECRETAS. São credenciais de browser, caducam sozinhas e são recriadas quando a equipa volta a autorizar as notificações — repô-las não devolve nada e exportá-las era espalhar segredos por um ficheiro que anda de email em email.",
   passkeys:
@@ -223,7 +223,7 @@ export const NOT_BACKED_UP: Readonly<Record<string, string>> = {
  */
 export const PARTIALLY_BACKED_UP: Readonly<Record<string, string>> = {
   app_state:
-    "Desta tabela vão na cópia APENAS dois espaços de nomes: os rascunhos do Estúdio de Propostas (chaves `proposal-draft:…`, conjunto `proposalDrafts`), porque as propostas por acabar são trabalho de horas que não existe em mais lado nenhum; e as cópias dos emails de proposta enviados (chaves `envio-de-proposta:…`, conjunto `proposalEmails`), porque o que foi escrito ao casal também não existe em mais lado nenhum — o modelo guardado é o ponto de partida e pode ter sido reescrito para aquele casal. Fica DE FORA todo o resto, que são marcadores de funcionamento — até que email o robô da caixa de entrada já avisou, os fechos já enviados à Meta, e o contador de faturas de DESENVOLVIMENTO (em produção a numeração está em `invoice_counters`, essa sim na cópia, e é a que tem valor legal). Fica de fora também o tempo activo por proposta (chaves `tempo-activo:…`, ver `tempo-activo-servidor.ts`): é uma MEDIÇÃO de como a casa trabalha, não trabalho da casa — perdida, volta a acumular-se a partir do zero na proposta seguinte, e nenhuma proposta fica pior por causa disso. Copiá-la obrigaria a repor números de esforço ao lado de dados de negócio numa reposição em que a atenção tem de estar toda nos segundos. Não é esquecimento: repor marcadores de operação de há dois meses faz o robô voltar a avisar de emails já avisados e a Meta receber conversões repetidas — ruído numa reposição em que a atenção tem de estar toda nos dados. Perdidos, refazem-se sozinhos com um aviso repetido, no máximo.",
+    "Desta tabela vão na cópia APENAS dois espaços de nomes: os rascunhos do Estúdio de Propostas (chaves `proposal-draft:…`, conjunto `proposalDrafts`), porque as propostas por acabar são trabalho de horas que não existe em mais lado nenhum; e as cópias dos emails de proposta enviados (chaves `envio-de-proposta:…`, conjunto `proposalEmails`), porque o que foi escrito ao casal também não existe em mais lado nenhum — o modelo guardado é o ponto de partida e pode ter sido reescrito para aquele casal. Fica DE FORA todo o resto, que são marcadores de funcionamento — os fechos já enviados à Meta e o contador de faturas de DESENVOLVIMENTO (em produção a numeração está em `invoice_counters`, essa sim na cópia, e é a que tem valor legal). Fica de fora também o tempo activo por proposta (chaves `tempo-activo:…`, ver `tempo-activo-servidor.ts`): é uma MEDIÇÃO de como a casa trabalha, não trabalho da casa — perdida, volta a acumular-se a partir do zero na proposta seguinte, e nenhuma proposta fica pior por causa disso. Copiá-la obrigaria a repor números de esforço ao lado de dados de negócio numa reposição em que a atenção tem de estar toda nos segundos. Não é esquecimento: repor marcadores de operação de há dois meses faz a Meta receber conversões repetidas — ruído numa reposição em que a atenção tem de estar toda nos dados. Perdidos, refazem-se sozinhos com um aviso repetido, no máximo.",
 };
 
 /**
@@ -239,7 +239,7 @@ export const EXTERNAL_ASSETS: Readonly<Record<string, string>> = {
 
 const README = [
   "Cópia de segurança dos dados de negócio da Líquen Events.",
-  "Inclui pedidos, propostas, faturas (livro completo + contadores de numeração), contratos aceites, fornecedores, tarefas, agenda, inventário, modelos de email, temas, as anotações da caixa de entrada, as notas/meta da Visão Geral e os RASCUNHOS do Estúdio de Propostas (as propostas por acabar).",
+  "Inclui pedidos, propostas, faturas (livro completo + contadores de numeração), contratos aceites, fornecedores, tarefas, agenda, inventário, modelos de email, temas, as notas/meta da Visão Geral e os RASCUNHOS do Estúdio de Propostas (as propostas por acabar).",
   "Da tabela `app_state` vêm SÓ os rascunhos: os marcadores de funcionamento que lá vivem ao lado deles ficam de fora de propósito (ver `notIncluded`).",
   "NÃO inclui as fotos (vivem nos buckets listados em `notIncluded`) — sem elas, propostas e temas repõem-se com os caminhos das imagens mas sem as imagens.",
   "PARA REPOR: back office → Backup → Repor cópia (POST /api/backup/restore). Carregar o ficheiro mostra primeiro um ENSAIO — o que aconteceria, sem escrever nada — e a reposição real exige uma frase escrita à mão. Repor SUBSTITUI o conteúdo de cada conjunto e faz antes uma cópia do estado actual, que é entregue para o caso de a reposição ter sido um engano. Os campos aqui estão como a aplicação os usa (`quoteId`, `clientName`), não como as colunas se chamam na base de dados (`quote_id`, `client_name`) — a conversão é a do `mapper` de cada store em src/lib. Guarda este ficheiro fora do computador de trabalho.",

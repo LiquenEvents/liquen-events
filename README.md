@@ -2,8 +2,7 @@
 
 Marketing site **and** quote/event back-office for Líquen Events (Évora, PT).
 Public site in a dark, editorial "Pixel Matters" style; an authenticated admin
-at `/orcamento/admin` for quotes, tasks, calendar, suppliers, proposals and an
-email inbox.
+at `/orcamento/admin` for quotes, tasks, calendar, suppliers and proposals.
 
 ## Tech stack
 

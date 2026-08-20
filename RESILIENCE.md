@@ -33,7 +33,8 @@ rotas, 11 têm tecto — e são exactamente as que qualquer pessoa pode chamar:
 
 `orcamento` · `orcamento/[id]` · `admin/login` · `proposta` ·
 `proposta/[token]/pdf` · `portal/[token]/contrato-pdf` ·
-`portal/[token]/proposta-pdf` · `inbox/reply` · `health` · `vitals` ·
+`portal/[token]/proposta-pdf` · `proposta/[token]/escolha` · `health` ·
+`vitals` ·
 `security/csp-report`
 
 As restantes 44 estão **todas** atrás de `isAuthed`, com palavra-passe *bcrypt*
@@ -72,12 +73,10 @@ Cinco testes, três mutações verificadas.
 
 ## 2. Custo de cada pedido
 
-**IMAP.** `src/lib/inbox.ts` abre e fecha ligação por operação
-(`connect()` … `logout()`). É custo real por pedido e não há reutilização de
-ligação. Fica **levantado, não resolvido**: a rota está autenticada e com tecto,
-e a tarefa agendada corre uma vez por dia, portanto o volume é conhecido e
-pequeno. Passa a valer a pena se a frequência subir — o que acontece no dia em
-que a conta passar a Pro (ver abaixo).
+**IMAP.** Deixou de existir: a caixa de entrada de email foi apagada a pedido
+dela (agosto de 2026). O custo que aqui estava descrito — uma ligação IMAP
+aberta e fechada por operação — desapareceu com ela, e com ele duas
+dependências (`imapflow`, `mailparser`).
 
 **Geração de PDF.** Corre em runtime e é o trabalho mais pesado por pedido. As
 rotas públicas que o fazem têm tecto (12/min por endereço nos PDFs por token).
@@ -269,7 +268,10 @@ de 4 segundos e responde mesmo com ela em baixo.
 clientes nunca corria sozinha, e o repositório dizia o contrário em dois sítios.
 
 É a família de defeito que mais aparece neste projecto: não o código que falha
-alto, mas o que não chega a correr e não se queixa.
+alto, mas o que não chega a correr e não se queixa. O guarda que ficou —
+`agendamento.contrato.test.ts` — recusa uma rota de cron que ninguém agendou, e
+continua de pé. (A caixa de entrada foi apagada em agosto de 2026, a pedido
+dela; o guarda não era sobre ela.)
 
 Está agendada — mas **uma vez por dia, e isso é pouco**. Tentei de 15 em 15
 minutos e a Vercel RECUSOU o deploy: *"Hobby accounts are limited to daily cron
