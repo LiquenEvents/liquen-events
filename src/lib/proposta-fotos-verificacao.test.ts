@@ -20,6 +20,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  */
 
 const H = vi.hoisted(() => ({
+  /** caminho → medida, como a tabela das fotografias a conhece. */
+  formas: new Map<string, { largura: number; altura: number }>(),
   /** bucket::pasta → nomes de ficheiro, ou `null` para «a listagem falhou». */
   pastas: new Map<string, string[] | null>(),
   /** Quantas vezes o Storage foi consultado — o custo, medido. */
@@ -28,6 +30,10 @@ const H = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("./biblioteca-fotos-store", () => ({
+  formasDeCaminhos: async (paths: readonly string[]) =>
+    new Map([...H.formas].filter(([c]) => paths.includes(c))),
+}));
 vi.mock("./logger", () => ({
   log: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
@@ -55,6 +61,7 @@ vi.mock("./supabase", () => ({
 const { verificarFotosDaProposta, PORQUE_FALTA } = await import("./proposta-fotos-verificacao");
 
 beforeEach(() => {
+  H.formas.clear();
   H.pastas.clear();
   H.listagens.length = 0;
   H.temSupabase = true;
@@ -85,7 +92,7 @@ describe("o que está lá, está", () => {
 
   it("um documento sem fotos nenhumas responde sim, e sem ir ao Storage", async () => {
     const r = await verificarFotosDaProposta(doc());
-    expect(r).toEqual({ total: 0, emFalta: [], naoVerificaveis: 0, verificou: true });
+    expect(r).toEqual({ total: 0, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: true });
     expect(H.listagens).toEqual([]);
   });
 });
@@ -241,5 +248,93 @@ describe("cada motivo explica-se a quem o lê", () => {
       expect(frase.length, motivo).toBeGreaterThan(40);
       expect(frase, motivo).not.toMatch(/bucket.*\/|undefined|null/);
     }
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS QUE ESTÃO LÁ E NÃO DEVIAM IR ASSIM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma foto do Seating Plan levava a marca de utilizador do Pinterest gravada
+ * no canto, e outra das Lapelas tinha um ícone escuro por cima. Nenhuma delas
+ * FALTA — estão no armazenamento, resolvem, desenham-se.
+ *
+ * O que se prende aqui é o alcance honesto da resposta: **isto lê medidas, não
+ * lê pixéis**. Acusa o ficheiro que o Pinterest serve (que tem largura exacta)
+ * e a foto pequena demais para o sítio; não acusa, nem finge acusar, uma marca
+ * de água gravada numa fotografia grande.
+ */
+describe("as fotografias que vão sair pior do que deviam", () => {
+  const comFoto = (largura: number, altura: number) => {
+    naPastaDoPedido("LIQ-9", ["uma.jpg"]);
+    H.formas.set("LIQ-9/uma.jpg", { largura, altura });
+    return verificarFotosDaProposta(
+      doc({ moodBoards: [{ title: "Seating Plan", images: ["LIQ-9/uma.jpg"] }] }),
+    );
+  };
+
+  it("uma largura EXACTA do Pinterest é apanhada, mesmo com a foto alta", async () => {
+    // 736 é a largura com que o site serve. Uma foto reduzida à mão dava 735
+    // ou 740 tão facilmente — é a exactidão que faz a pista valer.
+    const r = await comFoto(736, 1104);
+    expect(r.suspeitas).toEqual([
+      {
+        id: "b0f0",
+        onde: "Mood board «Seating Plan» · foto 1",
+        motivo: "medida-de-partilha",
+        largura: 736,
+        altura: 1104,
+      },
+    ]);
+  });
+
+  it("uma foto pequena demais para o sítio onde é desenhada é apanhada", async () => {
+    const r = await comFoto(640, 480);
+    expect(r.suspeitas[0].motivo).toBe("pequena-demais");
+  });
+
+  it("uma fotografia grande passa sem uma palavra", async () => {
+    const r = await comFoto(2200, 1467);
+    expect(r.suspeitas).toEqual([]);
+  });
+
+  it("735 não é 736 — não se acusa por aproximação", async () => {
+    // Um «à volta de 736» transformava metade das fotografias reduzidas em
+    // acusações, e um aviso que se engana deixa de se ler ao terceiro engano.
+    const r = await comFoto(735, 1103);
+    expect(r.suspeitas[0]?.motivo).not.toBe("medida-de-partilha");
+  });
+
+  it("a medida de partilha ganha à de tamanho — é ela que diz o que fazer", async () => {
+    // Uma foto do Pinterest é quase sempre pequena também. Das duas frases, a
+    // que resolve é «troca esta foto», não «esta foto é pequena».
+    const r = await comFoto(236, 354);
+    expect(r.suspeitas[0].motivo).toBe("medida-de-partilha");
+  });
+
+  /**
+   * ── O QUE NÃO SE SABE NÃO SE DÁ POR SABIDO ────────────────────────────
+   */
+  it("uma foto sem medida conhecida NÃO é acusada", async () => {
+    // Não saber a medida é não saber. As propostas antigas, anteriores à
+    // tabela, são todas assim — e nenhuma delas é um defeito.
+    naPastaDoPedido("LIQ-9", ["uma.jpg"]);
+    const r = await verificarFotosDaProposta(
+      doc({ moodBoards: [{ title: "Mesa", images: ["LIQ-9/uma.jpg"] }] }),
+    );
+    expect(r.suspeitas).toEqual([]);
+    expect(r.verificou).toBe(true);
+  });
+
+  it("uma foto que FALTA não é também acusada de ser pequena", async () => {
+    // A mesma foto contada duas vezes, com dois nomes, em duas caixas.
+    naPastaDoPedido("LIQ-9", []);
+    H.formas.set("LIQ-9/sumida.jpg", { largura: 400, altura: 300 });
+    const r = await verificarFotosDaProposta(
+      doc({ moodBoards: [{ title: "Mesa", images: ["LIQ-9/sumida.jpg"] }] }),
+    );
+    expect(r.emFalta).toHaveLength(1);
+    expect(r.suspeitas).toEqual([]);
   });
 });
