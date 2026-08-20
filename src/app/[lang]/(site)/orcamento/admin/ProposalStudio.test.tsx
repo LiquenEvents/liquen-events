@@ -5191,3 +5191,71 @@ describe("as notas internas vivem no estúdio", () => {
     expect(JSON.parse(ultimo).doc.notasInternas).toContain("Decide a mãe");
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE FALTA PARA ENVIAR DEIXA DE SER INVISÍVEL
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A lista vivia numa coluna lateral `xl:block` — abaixo de 1280 px ela nunca a
+ * via — e o passo de envio tinha uma frase estática, sempre com as mesmas
+ * palavras e sem link nenhum: «Preenche clientes, referência e um total maior
+ * que 0».
+ *
+ * Passa a estar na Conferência, que é a lista que já se lê antes de carregar em
+ * enviar e que não depende da largura do ecrã. E cada linha leva ao campo.
+ */
+describe("o que falta para enviar, no passo de enviar", () => {
+  /** Um rascunho a que falta o nome dos clientes — o que TRAVA o envio. */
+  function seedSemNome() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [{ label: "Igreja" }] }],
+        moodBoards: [],
+        budgetItems: ["Decor"],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  it("a frase estática saiu — no lugar dela está o nome do que falta", async () => {
+    seedSemNome();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    expect(
+      screen.queryByText(/Preenche clientes, referência e um total maior que 0 \(no passo/),
+    ).toBeNull();
+    expect(await screen.findByText(/Uma coisa impede o envio/)).toBeTruthy();
+    expect(screen.getByText("Nome dos clientes")).toBeTruthy();
+  });
+
+  it("tocar na linha volta ao conteúdo e põe o cursor no campo", async () => {
+    seedSemNome();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Nome dos clientes/ }));
+
+    // De volta ao passo 1 — o campo vive lá.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^1\s*Conteúdo$/ })).toHaveAttribute(
+        "aria-current",
+        "step",
+      ),
+    );
+    const campo = document.querySelector<HTMLInputElement>('[data-campo="clientNames"]');
+    expect(campo).not.toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(campo));
+  });
+});

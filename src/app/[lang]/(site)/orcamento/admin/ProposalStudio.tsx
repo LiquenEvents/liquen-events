@@ -1495,6 +1495,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * o controlo ainda não existe no DOM. Guarda-se o alvo e o salto é dado por um
    * efeito, depois do desenho — que é a única altura em que ele existe.
    */
+  /** A falta que a Conferência mandou visitar — ver `irParaAFalta`. */
+  const [faltaAVisitar, setFaltaAVisitar] = useState<{
+    seccao?: string;
+    campo?: string;
+    /** Contador, para pedir DUAS vezes o mesmo sítio voltar a saltar. */
+    pedido: number;
+  } | null>(null);
   const [campoAVisitar, setCampoAVisitar] = useState<{
     campo: CampoDeTexto;
     /** Contador de pedidos. Carregar duas vezes na mesma palavra tem de saltar
@@ -3961,6 +3968,32 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }
   }, [campoAVisitar]);
 
+  /** O salto da Conferência, depois de a secção estar aberta e desenhada. */
+  useEffect(() => {
+    if (!faltaAVisitar) return;
+    const { seccao, campo } = faltaAVisitar;
+    const cartao = seccao ? document.getElementById(`seccao-${seccao}`) : null;
+    // `:scope > div >` e não um `querySelector` solto: dentro de uma secção há
+    // outros botões com `aria-expanded` (os mood boards têm as suas dobras), e
+    // o primeiro fechado que aparecesse era o que abria — que podia ser outro
+    // qualquer, algures no meio do cartão.
+    cartao
+      ?.querySelector<HTMLButtonElement>(':scope > div > button[aria-expanded="false"]')
+      ?.click();
+    // Num tique a seguir: o campo só está VISÍVEL depois de o clique acima ter
+    // sido processado, e focar um elemento escondido não faz nada.
+    const espera = setTimeout(() => {
+      const alvo =
+        (campo && document.querySelector<HTMLElement>(`[data-campo="${campo}"]`)) || cartao;
+      alvo?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement) {
+        alvo.focus({ preventScroll: true });
+        alvo.select();
+      }
+    }, 0);
+    return () => clearTimeout(espera);
+  }, [faltaAVisitar]);
+
   function alternarDobra(id: string) {
     escreverDobras({ ...dobrados, [id]: !dobrados[id] });
   }
@@ -4110,6 +4143,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     } finally {
       setATraduzir(false);
     }
+  }
+
+  /**
+   * ── IR AO SÍTIO ONDE A FALTA SE RESOLVE ─────────────────────────────────
+   *
+   * O irmão do `irParaCampo`, para a Conferência. A diferença é a matéria: ali
+   * é um campo de PROSA identificado por um `CampoDeTexto`; aqui é uma falta
+   * («Falta o valor»), que às vezes tem um controlo próprio e às vezes só tem
+   * uma secção — as capas e os mood boards não são um campo.
+   *
+   * Três coisas, e só a última é o salto: voltar ao conteúdo, ABRIR a secção se
+   * ela estiver dobrada (saltar para dentro de um cartão fechado deixava-a a
+   * olhar para um cartão que «não abriu», e os campos continuam lá dentro
+   * porque uma secção fechada esconde-os sem os desmontar), e só então levar a
+   * vista e o foco.
+   */
+  function irParaAFalta(seccao?: string, campo?: string) {
+    setStep("conteudo");
+    setFaltaAVisitar((antes) => ({ seccao, campo, pedido: (antes?.pedido ?? 0) + 1 }));
   }
 
   function irParaCampo(campo: CampoDeTexto, versao: "pt" | "en" = "pt") {
@@ -5169,6 +5221,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   patch({ clientNames: e.target.value });
                 }}
                 containerClassName={realce("clientNames")}
+                data-campo="clientNames"
                 placeholder="Maria & Zé"
               />
               <Field
@@ -5186,6 +5239,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   patch({ eventDate: e.target.value });
                 }}
                 containerClassName={realce("eventDate")}
+                data-campo="eventDate"
                 placeholder="12 de setembro de 2026"
               />
               <Field
@@ -5197,6 +5251,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   patch({ location: e.target.value });
                 }}
                 containerClassName={realce("location")}
+                data-campo="location"
                 placeholder="Monte da Oliveirinha"
               />
               <Field
@@ -5207,6 +5262,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   patch({ guests: e.target.value });
                 }}
                 containerClassName={realce("guests")}
+                data-campo="guests"
                 placeholder="150 pax"
               />
               {isDeco && (
@@ -6978,6 +7034,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   onTotalInput(e.target.value);
                 }}
                 placeholder="3000"
+                data-campo="totalAmount"
                 containerClassName={realce("totalAmount")}
                 hint={
                   desvio
@@ -7518,6 +7575,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 // pedido que veio em inglês e calava-se sobre a metade da
                 // proposta que ia sair em português.
                 idioma={idiomaDoPdf}
+                onIr={(v) => irParaAFalta(v.seccao, v.campo)}
               />
               {/* Os acentos que faltam nos campos que saem impressos. Aqui, ao
                   pé da Conferência, e não a meio de escrever: a palavra ainda
@@ -7579,15 +7637,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 idioma={idiomaDoPdf}
                 onInserirNaMensagem={inserirParagrafoDoQueMudou}
               />
-              {!canSend && fotosPorConfirmar === 0 && (
-                <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
-                  <span aria-hidden="true">⚠</span>
-                  <span>
-                    Preenche clientes, referência e um total maior que 0 (no passo «Conteúdo») antes
-                    de enviar.
-                  </span>
-                </p>
-              )}
+              {/* ── A FRASE ESTÁTICA SAIU DAQUI ──────────────────────────
+                  Dizia «Preenche clientes, referência e um total maior que 0
+                  (no passo «Conteúdo») antes de enviar» — sempre as mesmas
+                  palavras, mesmo quando só faltava uma das três, sem link para
+                  nenhuma e a repetir uma lista que já existia duas vezes (a
+                  Conferência aqui em cima e a coluna lateral, que só existe
+                  acima de 1280 px).
+
+                  Agora o que trava está na Conferência, em primeiro e a
+                  vermelho, com o nome do que falta e um link que põe o cursor
+                  dentro do campo. Uma lista, um vocabulário, e visível em
+                  qualquer largura — ver `conferencia.ts`. */}
             </>
           )}
         </Section>

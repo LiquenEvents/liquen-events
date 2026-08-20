@@ -109,8 +109,29 @@ export function estadoDasSeccoes(doc: ProposalDoc): EstadoSeccao[] {
 }
 
 export interface Impedimento {
+  /**
+   * Identidade estável do ASSUNTO, e não desta frase.
+   *
+   * A Conferência — que é a lista única do passo de envio — já tem palavras
+   * suas para metade destes assuntos, e melhores: sabe comparar com o pedido e
+   * diz «A proposta diz "X" e o pedido pedia Y». Sem uma identidade partilhada,
+   * juntar as duas listas produzia duas linhas sobre o nome dos clientes, uma
+   * delas mais pobre — que é a maneira de se aprender a não ler nenhuma.
+   *
+   * Com ela, quem já tem frase fica com a frase e ganha só a marca de TRAVA;
+   * quem não tem entra na lista tal como está escrito aqui.
+   */
+  id: string;
   /** A secção onde está o problema, para o link poder lá saltar. */
   seccao: string;
+  /**
+   * O `data-campo` do controlo, quando ele existe.
+   *
+   * É o que transforma «Falta o nome dos clientes» num link que põe o cursor
+   * dentro da caixa. Sem controlo próprio (as capas, os mood boards) fica por
+   * preencher e o salto cai na SECÇÃO — que é onde a resposta está.
+   */
+  campo?: string;
   texto: string;
   /** Um impedimento TRAVA o envio; um reparo é só um conselho. */
   trava: boolean;
@@ -128,33 +149,68 @@ export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Imped
   const deco = doc.template !== "organizacao";
 
   if (!temTexto(doc.clientNames)) {
-    faltas.push({ seccao: "evento", texto: "Falta o nome dos clientes", trava: true });
+    faltas.push({
+      id: "nome",
+      seccao: "evento",
+      campo: "clientNames",
+      texto: "Falta o nome dos clientes",
+      trava: true,
+    });
   }
   if (!temTexto(doc.ref)) {
     // Aparece no topo de todas as páginas do PDF. Gera-se sozinho a partir do
     // resto, por isso estar vazio quer dizer que o resto também está.
-    faltas.push({ seccao: "evento", texto: "Falta o título interno", trava: true });
+    faltas.push({
+      id: "titulo-interno",
+      seccao: "evento",
+      campo: "ref",
+      texto: "Falta o título interno",
+      trava: true,
+    });
   }
   if (totalBruto <= 0) {
     // Uma proposta a €0 seria enviada e poluiria os indicadores (total
     // enviado, taxa de aceitação) com um negócio vazio.
-    faltas.push({ seccao: "total", texto: "Falta o valor", trava: true });
+    faltas.push({
+      id: "valor",
+      seccao: "total",
+      campo: "totalAmount",
+      texto: "Falta o valor",
+      trava: true,
+    });
   }
 
   if (!temTexto(doc.eventDate)) {
-    faltas.push({ seccao: "evento", texto: "Sem data do evento", trava: false });
+    faltas.push({
+      id: "data",
+      seccao: "evento",
+      campo: "eventDate",
+      texto: "Sem data do evento",
+      trava: false,
+    });
   }
   if (!temTexto(doc.location)) {
-    faltas.push({ seccao: "evento", texto: "Sem local", trava: false });
+    faltas.push({
+      id: "local",
+      seccao: "evento",
+      campo: "location",
+      texto: "Sem local",
+      trava: false,
+    });
   }
   if ((doc.serviceGroups ?? []).every((g) => !temTexto(g.title))) {
-    faltas.push({ seccao: "servicos", texto: "Nenhum grupo de serviços", trava: false });
+    faltas.push({
+      id: "servicos",
+      seccao: "servicos",
+      texto: "Nenhum grupo de serviços",
+      trava: false,
+    });
   }
   if (deco && (doc.coverImages ?? []).every((c) => !temTexto(c))) {
-    faltas.push({ seccao: "capas", texto: "Sem imagens de capa", trava: false });
+    faltas.push({ id: "capas", seccao: "capas", texto: "Sem imagens de capa", trava: false });
   }
   if (deco && (doc.moodBoards ?? []).length === 0) {
-    faltas.push({ seccao: "moodboards", texto: "Sem mood boards", trava: false });
+    faltas.push({ id: "moodboards", seccao: "moodboards", texto: "Sem mood boards", trava: false });
   }
   // O aviso do orçamento vive na secção do total, que é onde ela o resolve.
   //
@@ -171,7 +227,13 @@ export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Imped
   // Agora é a mesma função, com a mesma base, nos dois sítios — que é a razão
   // pela qual este módulo existe.
   if (desalinhamento(doc, dinheiroDaProposta(doc).base) !== null) {
-    faltas.push({ seccao: "total", texto: "O total não bate com a soma das linhas", trava: false });
+    faltas.push({
+      id: "soma",
+      seccao: "total",
+      campo: "totalAmount",
+      texto: "O total não bate com a soma das linhas",
+      trava: false,
+    });
   }
 
   return faltas;
