@@ -305,7 +305,7 @@ export const pt = {
     ctaEyebrow: "Próximo evento",
     ctaTitleLine1: "Junte-se aos",
     ctaTitleLine2: "nossos clientes",
-    ctaText: "Conte-nos a sua ideia e dizemos-lhe o que é preciso para a pôr de pé.",
+    ctaText: "Conte-nos a sua ideia.",
     galleryAlt: [
       "Receção de evento corporativo num pátio",
       "Casamento com decoração floral numa herdade",

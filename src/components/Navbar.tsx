@@ -21,6 +21,32 @@ const MENU_EASE = EASE_OUT;
 // Ordem do menu — define a DIREÇÃO das transições de página: navegar para um
 // item mais à frente desliza para a esquerda (avançar), voltar atrás desliza
 // para a direita. Ver PageTransition + .vt-page-fwd/bwd em globals.css.
+/**
+ * A CAIXA DOS DOIS BOTÕES DA BARRA — E PORQUE É QUE VIVE NUMA CONSTANTE.
+ *
+ * «Contacto» e «Pedir orçamento» são o mesmo objecto com pesos diferentes: o
+ * mesmo tamanho de letra, o mesmo enchimento, o mesmo filete. Escritos em dois
+ * sítios, divergiram — e não por alguém lhes ter mexido, mas porque o segundo
+ * leva uma seta dentro de um `<span>` e o primeiro não.
+ *
+ * MEDIDO a 1440 px, antes: «Contacto» 120,9 × **34,5** e «Pedir orçamento →»
+ * 197,3 × **32**, com os topos desalinhados em 3,2 px. Dois píxeis e meio de
+ * diferença numa caixa de 34 é meio milímetro de desalinho no primeiro ecrã do
+ * sítio — pouco para se explicar, suficiente para se ver.
+ *
+ * A causa é a altura da LINHA DE TEXTO, não o enchimento: com a seta lá dentro,
+ * os dois pedaços de texto passam a ser itens de flex e a caixa passa a medir
+ * pelo item mais alto, que não é o mesmo nos dois botões. O `leading-none` mais
+ * o `items-center` tiram essa variável da conta: a altura passa a ser
+ * enchimento + filete + letra, igual nos dois, venha lá dentro uma seta ou não.
+ *
+ * As CORES não entram aqui de propósito: são o que distingue a acção principal
+ * da secundária, e essas continuam escritas em cada botão.
+ */
+const BOTAO_DA_BARRA =
+  "alvo-toque inline-flex items-center justify-center gap-1.5 leading-none " +
+  "border px-5 py-2.5 text-[11px] tracking-[0.2em] uppercase";
+
 const NAV_ORDER = ["/", "/sobre", "/servicos", "/galeria", "/clientes", "/contacto"];
 function orderIdx(path: string): number {
   if (path === "/") return 0;
@@ -567,7 +593,7 @@ export default function Navbar() {
             <Link
               href={localizeHref("/contacto", locale)}
               transitionTypes={navTypes("/contacto")}
-              className={`alvo-toque text-[11px] tracking-[0.2em] uppercase border px-5 py-2 transition-all duration-300 ${
+              className={`${BOTAO_DA_BARRA} transition-all duration-300 ${
                 light
                   ? "border-white/50 text-white/90 hover:border-white/80 hover:bg-white/10"
                   : "border-moss/60 text-moss hover:border-moss/80 hover:bg-moss/10"
@@ -585,7 +611,7 @@ export default function Navbar() {
               <Link
                 href={localizeHref("/orcamento", locale)}
                 onClick={() => track("CTAClick", { source: "nav" })}
-                className={`alvo-toque text-[11px] tracking-[0.2em] uppercase border px-5 py-2 transition-colors duration-300 ease-expo ${
+                className={`${BOTAO_DA_BARRA} transition-colors duration-300 ease-expo ${
                   light
                     ? "border-white/70 text-white hover:bg-white hover:text-[#0c0e0b] hover:border-white"
                     : "border-moss text-moss hover:bg-moss hover:text-white hover:border-moss"

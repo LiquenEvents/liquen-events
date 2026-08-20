@@ -138,30 +138,35 @@ export async function generateMetadata({
 }
 
 /**
- * O DINHEIRO DESTA PÁGINA FICA EM pt-PT NAS DUAS LÍNGUAS — NÃO É UM ESQUECIMENTO.
+ * O DINHEIRO SEGUE A LÍNGUA DA PROPOSTA.
  *
- * Aqui vivia uma cópia do `Intl` que recebia o `dateLocale` do dicionário, e
- * numa proposta em inglês o mesmo total saía «€24,600.00» enquanto o email que
- * trouxe o casal a esta página, e o PDF que ela transporta, diziam
- * «24.600,00 €». O `eurDocumento` é o formatador de tudo o que sai para o
- * cliente (ver `money.ts`), e é pt-PT por construção.
+ * Decisão dela, 20-08-2026: «se é em pt o dinheiro tem que estar em português,
+ * mas se é em eng o dinheiro tem que estar em inglês».
  *
- * Foi decidido de propósito, e não se muda para `en-GB` sem desfazer isto:
+ * ── O que aqui estava escrito, e a parte que era falsa ────────────────────
  *
- *   1. metade dos valores de uma proposta é TEXTO LIVRE escrito por ela, à
- *      portuguesa. Formatar os nossos à inglesa punha «€24,600.00» ao lado do
- *      «24.600,00 €» dela, na mesma folha — e nas duas formas a vírgula e o
- *      ponto TROCAM DE PAPEL: «24.600» lê-se, em inglês, como vinte e quatro
- *      euros e sessenta;
- *   2. a FACTURA que se segue é um documento fiscal português e sai em
- *      português. O casal inglês recebe os dois;
- *   3. o PDF da proposta já escreve assim em qualquer idioma. Localizar só esta
- *      página punha-a a discordar do documento que ela própria oferece a abrir.
+ * Vivia aqui a decisão contrária — pt-PT nas duas línguas — com três razões.
+ * Duas continuam de pé e valem: metade dos montantes de uma proposta é TEXTO
+ * LIVRE escrito por ela à portuguesa, e a factura que se segue é um documento
+ * fiscal português. A terceira dizia que «o PDF já escreve assim em qualquer
+ * idioma» — e **é falsa**: o gerador passa cada montante por
+ * `montanteNaLingua` (`proposal-doc-pdf.ts:858`). Uma proposta inglesa saía do
+ * PDF com «€24,600.00» e desta página com «24.600,00 €». Era a página a
+ * discordar do PDF, e não o contrário.
  *
- * As DATAS continuam localizadas — é o `t.dateLocale` que trata delas, e é para
- * isso que ele existe.
+ * ── Como se converte, e porque não é um `Intl` com outra localização ──────
+ *
+ * Pelo MESMO caminho do PDF: escreve-se à portuguesa com o `eurDocumento` e
+ * converte-se no fim com o `montanteNaLingua`. A diferença não é de estilo. Um
+ * formatador à parte punha os NOSSOS números em inglês e os DELA — o texto
+ * livre — em português na mesma folha, e entre as duas formas a vírgula e o
+ * ponto TROCAM DE PAPEL: «24.600» lido à inglesa são vinte e quatro euros e
+ * sessenta. A conversão partilhada trata os dois da mesma maneira, que é o que
+ * torna a folha coerente.
+ *
+ * As DATAS já eram localizadas pelo `t.dateLocale` e continuam.
  */
-import { eurDocumento as eur } from "@/lib/money";
+import { eurDocumento, montanteNaLingua } from "@/lib/money";
 
 function Shell({ children, lang }: { children: React.ReactNode; lang: string }) {
   return (
@@ -262,6 +267,9 @@ export default async function ProposalPage({
    */
   const locale = idiomaDaProposta(proposal);
   const t = getDictionary(locale).proposta;
+  /** O dinheiro na língua da proposta — ver o cabeçalho do ficheiro. */
+  const eur = (valor: number, moeda?: string) =>
+    montanteNaLingua(eurDocumento(valor, moeda), locale);
 
   /**
    * ── «OLÁ, .» ────────────────────────────────────────────────────────────
