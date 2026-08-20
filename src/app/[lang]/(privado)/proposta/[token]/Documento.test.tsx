@@ -189,3 +189,72 @@ describe("as fotografias", () => {
     expect(screen.queryByRole("link", { name: "Inspiração" })).toBeNull();
   });
 });
+
+describe("o modelo Organização", () => {
+  const ORG = {
+    template: "organizacao",
+    budgetItems: [],
+    budgetRows: [
+      { item: "Coordenação do dia", price: "2.500,00 €" },
+      { item: "Reuniões de preparação", price: "[Valor]" },
+      { item: "Cronograma e fornecedores", price: "" },
+    ],
+    cronograma: [{ title: "Fase 1 · Conceito", items: ["Reunião inicial", "Moodboard"] }],
+    totalAmount: 0,
+    // O documento base traz um total de Decoração: aqui não há nenhum que se
+    // consiga somar, que é o caso desta folha.
+    totalText: "",
+    // O modo tem de acompanhar o texto: «+ IVA» é «acresce». O documento base
+    // é «incluído», e herdá-lo aqui punha o quadro a discordar da frase.
+    totalVatMode: "acrescer",
+    totalEstimatedText: "12.500,00 € + IVA",
+    totalLabel: "Valor Total",
+  } as unknown as Partial<ProposalDoc>;
+
+  it("desenha o quadro estimado, com o preço que ela escreveu", () => {
+    desenhar(ORG);
+    expect(screen.getByText("Coordenação do dia")).toBeTruthy();
+    expect(screen.getByText("2.500,00 €")).toBeTruthy();
+  });
+
+  it("uma linha por orçamentar fica EM BRANCO — nunca «[Valor]», nunca um traço", () => {
+    desenhar(ORG);
+    const texto = document.body.textContent ?? "";
+    expect(texto).toContain("Reuniões de preparação");
+    expect(texto).not.toContain("[Valor]");
+    // CONTROLO POSITIVO da ausência: a linha existe mesmo, e a que tem preço
+    // continua a mostrá-lo. Sem esta metade, um quadro que não desenhasse nada
+    // passava as duas afirmações de cima.
+    const linha = screen.getByText("Reuniões de preparação").parentElement;
+    expect(linha?.textContent).toBe("Reuniões de preparação");
+  });
+
+  it("o cronograma entra", () => {
+    desenhar(ORG);
+    expect(screen.getByRole("heading", { name: "Cronograma de Organização" })).toBeTruthy();
+    expect(screen.getByText("Fase 1 · Conceito")).toBeTruthy();
+    expect(screen.getByText("Reunião inicial")).toBeTruthy();
+  });
+
+  it("um total estimado que se consegue ler vira escada, como no papel", () => {
+    // «12.500,00 € + IVA» é um número: `totaisDaProposta` lê-o, e o casal
+    // recebe a conta feita em vez de ter de fazer 23% de cabeça. É o mesmo que
+    // o gerador faz com o mesmo documento.
+    desenhar(ORG);
+    expect(screen.getByText("12.500,00 €")).toBeTruthy();
+    expect(screen.getByText("15.375,00 €")).toBeTruthy();
+    expect(screen.getByText("IVA (23%)")).toBeTruthy();
+  });
+
+  it("um total que NÃO é um número sai como ela o escreveu, com o «+ IVA» garantido", () => {
+    desenhar({ ...ORG, totalEstimatedText: "A definir após a visita" });
+    expect(screen.getByText(/A definir após a visita/)).toBeTruthy();
+    // Sem escada: não há euros nenhuns para somar, e não se inventa uma de zeros.
+    expect(screen.queryByText("IVA (23%)")).toBeNull();
+  });
+
+  it("um total vazio não imprime rótulo nenhum a apontar para nada", () => {
+    desenhar({ ...ORG, totalEstimatedText: "" });
+    expect(screen.queryByText("Valor Total")).toBeNull();
+  });
+});

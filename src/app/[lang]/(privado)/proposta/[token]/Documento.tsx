@@ -228,6 +228,25 @@ export default function Documento({
       extra: !!(doc.budgetOpcional ?? [])[indicesDasLinhas[i]],
     }))
     .filter((r) => r.item);
+  /**
+   * As LINHAS ESTIMADAS do modelo Organização — rubrica e preço escrito por ela.
+   *
+   * O modelo de Decoração lista rubricas sem preço (a coluna é interna e na
+   * maioria das propostas nem existe); o de Organização escreve um preço por
+   * linha. São dois quadros diferentes e o documento só tem um deles.
+   *
+   * `[Valor]` é o marcador que o estúdio semeia numa linha por orçamentar e
+   * NÃO pode chegar ao ecrã. Fica em branco, que é como uma linha sem preço
+   * sai há anos — e não um traço, que numa coluna de dinheiro tanto se lê como
+   * «zero» como «por definir». A regra é a mesma que o gerador aplica
+   * (`semMarcador`, em `proposal-doc-pdf.ts`); está aqui reescrita porque é
+   * uma linha e o gerador não a exporta, e mexer nele não é opção.
+   */
+  const semMarcador = (v: string) => (/^\[[^\]]*\]$/.test(v.trim()) ? "" : v.trim());
+  const linhasEstimadas = (doc.budgetRows ?? [])
+    .map((r) => ({ item: (r.item ?? "").trim(), preco: semMarcador(r.price ?? "") }))
+    .filter((r) => r.item);
+
   const extras = (doc.budgetExtras ?? []).filter(
     (e) => (e.label ?? "").trim() || (e.valueText ?? "").trim(),
   );
@@ -262,7 +281,7 @@ export default function Documento({
   const indice = [
     (doc.serviceGroups ?? []).length > 0 && { href: "#servicos", texto: t.tituloServicos },
     boards.length > 0 && { href: "#inspiracao", texto: p.inspiracao },
-    (rubricas.length > 0 || totais.aPagar > 0) && {
+    (rubricas.length > 0 || linhasEstimadas.length > 0 || totais.aPagar > 0) && {
       href: "#orcamento",
       texto: t.tituloOrcamento,
     },
@@ -427,6 +446,23 @@ export default function Documento({
             ))}
           </ul>
         )}
+        {/* ── O QUADRO ESTIMADO (modelo Organização) ──────────────────────
+            Rubrica à esquerda, o preço que ela escreveu à direita. Uma linha
+            ainda por orçamentar fica com a coluna em branco. */}
+        {linhasEstimadas.length > 0 && (
+          <ul className="mt-8">
+            {linhasEstimadas.map((r, i) => (
+              <li
+                key={i}
+                className="border-foreground/8 flex items-baseline justify-between gap-4 border-b py-3"
+              >
+                <span className="text-foreground/85 text-[15px]">{r.item}</span>
+                <span className="text-foreground/75 shrink-0 text-sm tabular-nums">{r.preco}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
         {quantosExtras > 0 && (
           <p className="text-foreground/60 mt-3 text-[13px] leading-relaxed">
             {quantosExtras === 1 ? t.umaLinhaExtra : t.variasLinhasExtra(quantosExtras)}
