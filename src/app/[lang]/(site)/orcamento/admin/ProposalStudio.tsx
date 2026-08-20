@@ -33,6 +33,7 @@ import {
   camposDoEventoNaLingua,
   dataDoEventoPorExtenso,
   ehIdiomaDaProposta,
+  isoDaDataPorExtenso,
   referenciaDoDocumento,
   type IdiomaDaProposta,
 } from "@/lib/proposal-doc-textos";
@@ -114,6 +115,7 @@ import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
 import NavEstudio from "./NavEstudio";
 import NotasInternas from "./NotasInternas";
+import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
 import { depositPercentOf } from "@/lib/proposal-doc";
 // A geometria do documento, para a pré-visualização mostrar a forma que cada
@@ -5045,6 +5047,46 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * não há nada por traduzir, e uma fila de contagens debaixo de cada secção
    * seria ruído no índice de quem nunca faz propostas inglesas.
    */
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A DATA QUE ELA ESCREVE AQUI TAMBÉM PODE CHOCAR
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O aviso de dia ocupado já existia, e disparava ao ESCOLHER o cliente — a
+   * partir do `quote.date`. Só que a data que sai impressa é a que está neste
+   * documento, e este campo é texto livre: o casal liga a mudar o dia, ela
+   * corrige aqui, e o aviso continuava a olhar para a data do formulário.
+   *
+   * ── CALA-SE QUANDO NÃO CONSEGUE LER A DATA ──────────────────────────────
+   * `isoDaDataPorExtenso` só reconhece a forma que o estúdio escreve («12 de
+   * setembro de 2026») e devolve `null` para tudo o resto: «a definir»,
+   * «18.09.2027», «Set.», ou uma data a meio de ser escrita. Um aviso ERRADO
+   * sobre uma data é pior do que nenhum — diz que há um casamento noutro dia,
+   * e o dia é inventado por uma leitura falhada.
+   *
+   * ── E CALA-SE QUANDO É A MESMA DATA DO PEDIDO ───────────────────────────
+   * Aí o aviso já está no ecrã, por cima do estúdio (ver `FazerProposta`). O
+   * mesmo cartão duas vezes na mesma página é a maneira de se aprender a
+   * saltar os dois.
+   */
+  const dataEscritaNoDoc = isoDaDataPorExtenso(doc.eventDate ?? "");
+  const pedidoComADataDoDoc = useMemo(
+    () =>
+      dataEscritaNoDoc && dataEscritaNoDoc !== quote.date
+        ? ({
+            ...quote,
+            date: dataEscritaNoDoc,
+            // O fim de um evento de vários dias é do PEDIDO e não desta data:
+            // arrastá-lo para aqui inventava um intervalo que ninguém escreveu.
+            endDate: "",
+            // E o local também é o do documento quando ele diz outro: a
+            // distância por estrada é metade da resposta.
+            location: doc.location || quote.location,
+          } as Quote)
+        : null,
+    [dataEscritaNoDoc, quote, doc.location],
+  );
+
   const traducoesPorSeccao = useMemo(
     () => (idiomaDoPdf === "en" ? porTraduzirPorSeccao(doc as ProposalDoc) : undefined),
     [idiomaDoPdf, doc],
@@ -5411,6 +5453,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </>
               )}
             </div>
+
+            {/* O que já está marcado à volta da data que ESTÁ ESCRITA AQUI —
+                ver `pedidoComADataDoDoc`. O mesmo cartão do ecrã de escolher o
+                cliente, com a mesma leitura de distância por estrada. */}
+            {pedidoComADataDoDoc && (
+              <div className="mt-4">
+                <AvisoDataOcupada
+                  quote={pedidoComADataDoDoc}
+                  quotes={quotes ?? []}
+                  motivo="Não impede nada — a decisão é tua. Esta é a data que escreveste na proposta, e não a do pedido."
+                />
+              </div>
+            )}
 
             {/* As sugestões. `datalist` e não um `select`: ela TEM de poder
                 escrever um espaço novo — a lista ajuda, não fecha a porta. */}

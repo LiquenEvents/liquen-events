@@ -15,6 +15,12 @@ import { choquesDeData, gravidade, type Choque } from "@/lib/orcamento/choque-de
  * NÃO BLOQUEIA NADA. Dois casamentos no mesmo dia a 20 km fazem-se; a 300 km
  * não se fazem. Quem sabe isso é ela, e o que lhe falta para decidir é o que
  * este cartão mostra: qual é o outro, onde é, e a que distância fica.
+ *
+ * ── E TAMBÉM AO ESCREVER A DATA NO ESTÚDIO ────────────────────────────────
+ * O segundo momento em que a data muda: `doc.eventDate` é texto livre e ela
+ * pode escrever ali um dia que o pedido não tem. A pergunta é a mesma e o
+ * cartão é o mesmo — muda só a frase do `motivo`, porque «antes de escrever a
+ * proposta» seria falso a quem já a está a escrever.
  */
 
 const PROXIMIDADE: Record<Choque["proximidade"], string> = {
@@ -44,9 +50,20 @@ interface Props {
   quotes: Quote[];
   /** Abrir o outro pedido, para ver o que lá está sem perder este. */
   onAbrir?: (id: string) => void;
+  /**
+   * A frase por baixo do título. Por omissão, a de quem ainda vai começar a
+   * proposta. No estúdio isso já não é verdade, e uma frase falsa num aviso
+   * gasta o aviso.
+   */
+  motivo?: string;
 }
 
-export default function AvisoDataOcupada({ quote, quotes, onAbrir }: Props) {
+export default function AvisoDataOcupada({
+  quote,
+  quotes,
+  onAbrir,
+  motivo = "Não impede nada — a decisão é tua. Fica aqui para a tomares antes de escrever a proposta.",
+}: Props) {
   const choques = useMemo(() => choquesDeData(quote, quotes), [quote, quotes]);
   if (choques.length === 0) return null;
 
@@ -81,10 +98,7 @@ export default function AvisoDataOcupada({ quote, quotes, onAbrir }: Props) {
               ? "Já há um evento nesta data"
               : `Já há ${choques.length} eventos à volta desta data`}
           </h3>
-          <p className="mt-1 text-xs leading-relaxed text-foreground/55">
-            Não impede nada — a decisão é tua. Fica aqui para a tomares antes de escrever a
-            proposta.
-          </p>
+          <p className="mt-1 text-xs leading-relaxed text-foreground/55">{motivo}</p>
 
           <ul className="mt-3 flex flex-col gap-2.5">
             {choques.map((c) => {

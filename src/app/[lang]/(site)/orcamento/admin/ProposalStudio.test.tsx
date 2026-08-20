@@ -5388,3 +5388,94 @@ describe("fotos repetidas dentro da mesma proposta", () => {
     expect(screen.queryByText(/nesta proposta$/)).toBeNull();
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O CHOQUE DE DATAS TAMBÉM AO ESCREVER A DATA AQUI
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O aviso disparava só ao ESCOLHER o cliente, a partir do `quote.date`. Mas a
+ * data que sai impressa é a deste documento, e este campo é texto livre: o
+ * casal liga a mudar o dia, ela corrige aqui, e o aviso continuava a olhar
+ * para a data do formulário.
+ */
+describe("o dia ocupado, a partir da data escrita na proposta", () => {
+  /** Um casamento já COTADO no dia 20, a 3 km — para o choque ter matéria. */
+  const jaMarcado = {
+    id: "LQ-outro",
+    name: "Sara e Nuno",
+    status: "cotado",
+    date: "2026-09-20",
+    location: "Évora",
+  } as unknown as Quote;
+
+  const renderCom = (q: Quote) =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={q} quotes={[q, jaMarcado]} />
+      </ToastProvider>,
+    );
+
+  function seedComData(data: string) {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: data,
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  const pedido = { ...quote, date: "2026-05-02", location: "Évora" } as unknown as Quote;
+
+  it("avisa quando a data escrita cai em cima de um evento já marcado", async () => {
+    seedComData("20 de setembro de 2026");
+    renderCom(pedido);
+    expect(await screen.findByText(/Já há um evento nesta data/)).toBeTruthy();
+    expect(screen.getByText("Sara e Nuno")).toBeTruthy();
+    // E diz que a data é a DESTE documento, não a do pedido.
+    expect(screen.getByText(/data que escreveste na proposta/)).toBeTruthy();
+  });
+
+  it("cala-se quando não consegue ler a data", async () => {
+    // «a definir» é uma resposta legítima deste campo. Um aviso sobre um dia
+    // inventado por uma leitura falhada é pior do que aviso nenhum.
+    seedComData("a definir");
+    renderCom(pedido);
+    await waitFor(() => expect(screen.getByLabelText("Data")).toHaveValue("a definir"));
+    expect(screen.queryByText(/Já há um evento nesta data/)).toBeNull();
+  });
+
+  it("cala-se numa data que não choca com nada", async () => {
+    // CONTROLO POSITIVO do teste de cima: o mecanismo está ligado e sabe ler
+    // esta data — o que falta é o choque.
+    seedComData("12 de setembro de 2026");
+    renderCom(pedido);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Data")).toHaveValue("12 de setembro de 2026"),
+    );
+    expect(screen.queryByText(/Já há um evento nesta data/)).toBeNull();
+  });
+
+  it("não repete o aviso quando a data escrita É a do pedido", async () => {
+    // Aí o cartão já está no ecrã, por cima do estúdio (`FazerProposta`). O
+    // mesmo cartão duas vezes na mesma página ensina a saltar os dois.
+    seedComData("20 de setembro de 2026");
+    renderCom({ ...pedido, date: "2026-09-20" } as unknown as Quote);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Data")).toHaveValue("20 de setembro de 2026"),
+    );
+    expect(screen.queryByText(/Já há um evento nesta data/)).toBeNull();
+  });
+});
