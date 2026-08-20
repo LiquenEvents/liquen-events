@@ -63,7 +63,10 @@ export default function NotaDaProposta({ quoteId }: { quoteId: string }) {
       {/* `whitespace-pre-wrap`: a nota escreve-se em linhas («abaixo dos 8.000
           €» numa, «decide a mãe» noutra) e juntá-las num parágrafo só é perder
           a única arrumação que ela tem. */}
-      <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-foreground/75">
+      {/* `break-words`: a nota é texto livre e pode trazer um link ou um IBAN
+          — uma cadeia sem espaços não parte sozinha, e a 390 px é a FICHA
+          inteira que passa a andar para o lado. */}
+      <p className="mt-1.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/75">
         {nota}
       </p>
     </div>

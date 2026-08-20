@@ -62,6 +62,23 @@ describe("a nota da proposta na ficha do pedido", () => {
     expect(screen.queryByText(/Nota da proposta/)).toBeNull();
   });
 
+  it("uma nota com um link não empurra a ficha para o lado", async () => {
+    // A 390 px, uma cadeia sem espaços que não parte é a FICHA inteira a andar
+    // para o lado — e a barra de acções, que está encostada ao fundo, vai com
+    // ela. A nota é texto livre e pode trazer um link ou um IBAN.
+    window.innerWidth = 390;
+    resposta = {
+      ok: true,
+      json: {
+        ok: true,
+        draft: { doc: { notasInternas: "Ver https://exemplo.pt/um-caminho-bastante-comprido" } },
+      },
+    };
+    render(<NotaDaProposta quoteId="LQ-1" />);
+    const texto = await screen.findByText(/exemplo\.pt/);
+    expect(texto.className).toMatch(/break-(words|all)/);
+  });
+
   it("pergunta pelo rascunho DESTE pedido", async () => {
     render(<NotaDaProposta quoteId="LQ 1/2" />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
