@@ -4392,7 +4392,17 @@ describe("traduzir para inglês", () => {
       if (!el || !el.value) throw new Error("ainda não");
       return el;
     });
-    expect(caixa.value).toBe("EN: Cerimónia");
+    /*
+     * «Ceremony», e não «EN: Cerimónia».
+     *
+     * «Cerimónia» é um dos termos do GLOSSÁRIO da casa (ver
+     * `proposal-traducao.ts`): tem uma tradução única e verificada, e por isso
+     * nem chega a ir ao motor. O que este teste continua a provar é o que diz
+     * provar — o botão preenche a caixa inglesa —, e passa a provar também que
+     * o glossário chega ao estúdio. O caminho do motor está coberto no teste do
+     * próprio tradutor, com textos que ninguém pôs no glossário.
+     */
+    expect(caixa.value).toBe("Ceremony");
     // O português não se mexe: a tradução vive nos campos `…En`, e é por isso
     // que ela pode corrigi-la sem perder o que escreveu.
     expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).moodBoards[0].title).toBe("Cerimónia");

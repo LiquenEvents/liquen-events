@@ -36,7 +36,7 @@
  */
 
 import type { ProposalDoc } from "./proposal-doc";
-import { camposPorTraduzir, escreverEn } from "./proposal-doc-bilingue";
+import { camposPorRever, escreverEn } from "./proposal-doc-bilingue";
 import { lerCampo, type CampoDeTexto } from "./proposal-ortografia";
 
 /**
@@ -267,6 +267,84 @@ const PALAVRA = /\p{L}{2,}/u;
 const REFERENCIA = /^\p{Lu}{2,}[-–—][\p{L}\p{N}\-–—/.]*\p{N}[\p{L}\p{N}\-–—/.]*$/u;
 
 /** Vale a pena mandar este texto ao serviço de tradução? */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O GLOSSÁRIO DA CASA — as palavras que têm uma tradução e uma só
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «termos fixos com tradução única e verificada: "Seating Plan",
+ * "Mood board", nomes de serviço recorrentes».
+ *
+ * ── PORQUE É QUE ISTO EXISTE E NÃO SE DEIXA AO MOTOR ────────────────────
+ *
+ * Porque um motor de tradução é bom a frases e é imprevisível a RÓTULOS. Estas
+ * são duas ou três palavras sem verbo, e a mesma entrada traduzida em duas
+ * propostas diferentes pode voltar diferente — «Decoração Cerimónia» tanto dá
+ * «Ceremony Decoration» como «Ceremony Decor», e a segunda proposta parece
+ * escrita por outra pessoa. Pior: «Seating Plan» já É inglês, e mandá-lo
+ * traduzir devolve-o traduzido.
+ *
+ * ── E É UMA IGUALDADE, NÃO UMA SUBSTITUIÇÃO DENTRO DA FRASE ─────────────
+ *
+ * O campo INTEIRO tem de ser o termo. Trocar palavras dentro de uma frase era
+ * fazer tradução automática à mão, com os erros que ela tem e sem nenhuma das
+ * defesas dela: «a decoração da cerimónia decorre no jardim» não se resolve
+ * palavra a palavra. Rótulos são campos inteiros — é assim que a Líquen os
+ * escreve —, e é esse o caso que isto cobre.
+ *
+ * ── E PORQUE É QUE ESTA LISTA É PARA ELA CORRIGIR ───────────────────────
+ *
+ * Porque a tradução «verificada» de um serviço é uma decisão do negócio e não
+ * do dicionário. Estão aqui as que se leem nas propostas da casa; se alguma
+ * não for a palavra que ela usa com os clientes ingleses, o sítio de a mudar é
+ * este, e muda em todas as propostas de uma vez.
+ */
+const GLOSSARIO: ReadonlyArray<readonly [pt: string, en: string]> = [
+  // Os que já são ingleses, e que o motor devolvia traduzidos.
+  ["seating plan", "Seating Plan"],
+  ["mood board", "Mood board"],
+  ["welcome drink", "Welcome Drink"],
+  ["save the date", "Save the Date"],
+  ["cocktail", "Cocktail"],
+  // As rubricas que se repetem proposta após proposta.
+  ["cerimónia", "Ceremony"],
+  ["jantar", "Dinner"],
+  ["corredor", "Aisle"],
+  ["plano de mesas", "Seating Plan"],
+  ["decoração cerimónia", "Ceremony Decoration"],
+  ["decoração jantar", "Dinner Decoration"],
+  ["decoração cocktail", "Cocktail Decoration"],
+  ["arco floral", "Floral Arch"],
+  ["ramo de noiva", "Bridal Bouquet"],
+  ["lapelas", "Boutonnières"],
+  ["complementos dos noivos", "Couple's Details"],
+  ["mesa dos noivos", "Couple's Table"],
+  ["mesa do bolo", "Cake Table"],
+  ["centros de mesa", "Centrepieces"],
+  ["montagem e desmontagem", "Set-up and Take-down"],
+];
+
+/** Sem acentos, sem maiúsculas, sem espaços a mais — a chave de comparação. */
+const chaveDoTermo = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const POR_TERMO: ReadonlyMap<string, string> = new Map(
+  GLOSSARIO.map(([pt, en]) => [chaveDoTermo(pt), en]),
+);
+
+/**
+ * A tradução da casa para este campo, quando ele é EXACTAMENTE um termo do
+ * glossário. Nada, quando não é — e aí segue o caminho normal.
+ */
+export function doGlossario(texto: string): string | undefined {
+  return POR_TERMO.get(chaveDoTermo(texto));
+}
+
 export function precisaDeTraducao(texto: string): boolean {
   const limpo = texto.trim();
   if (!limpo) return false;
@@ -414,7 +492,22 @@ export async function traduzirParaIngles(
   doc: ProposalDoc,
   motor: MotorDeTraducao,
 ): Promise<ResultadoDaTraducao> {
-  const campos = camposPorTraduzir(doc);
+  /**
+   * Os vazios E os que ficaram para trás.
+   *
+   * Palavras dela: «o botão de traduzir deve preencher apenas os campos vazios
+   * ou desatualizados, sem reescrever o que já foi revisto à mão». É
+   * exactamente o que isto faz — e o «sem reescrever o que já foi revisto» é
+   * uma consequência e não uma segunda regra: um campo que ela reviu deixa de
+   * estar desactualizado no instante em que carrega em «já está bem assim»
+   * (ver `confirmarTraducao`), e a partir daí não volta a esta lista.
+   *
+   * O que este ficheiro dizia antes — «o que NÃO vai ao motor são os campos que
+   * já têm inglês escrito» — passou a ser demasiado largo: um inglês escrito
+   * contra um português que ENTRETANTO MUDOU não é trabalho dela a proteger, é
+   * o defeito que ela apanhou («Reunião Inicial» com «Ceremony Decor»).
+   */
+  const campos = camposPorRever(doc);
   if (campos.length === 0) return { doc, escritos: 0, escritas: [], naoVieram: 0 };
 
   // Os que vão mesmo ao serviço. Os outros — números, valores, datas, horas,
@@ -422,7 +515,12 @@ export async function traduzirParaIngles(
   // aqui abaixo tal e qual. Um documento inteiro de rubricas numéricas não gasta
   // uma única ida à rede.
   const aPedir: number[] = [];
-  for (const [i, campo] of campos.entries()) if (precisaDeTraducao(campo.texto)) aPedir.push(i);
+  for (const [i, campo] of campos.entries()) {
+    // O glossário primeiro: o que ele sabe não vai ao serviço, e volta sempre
+    // igual. Ver `doGlossario` para a razão longa.
+    if (doGlossario(campo.texto)) continue;
+    if (precisaDeTraducao(campo.texto)) aPedir.push(i);
+  }
 
   let respostas: string[] = [];
   if (aPedir.length > 0) {
@@ -469,11 +567,18 @@ export async function traduzirParaIngles(
       proximo++;
       foiPedido = true;
     } else {
-      // Não foi pedido porque não há nada a traduzir. Escrever o português na
-      // caixa inglesa é exactamente o que o botão «Ficar em português» faz, e
-      // deixa o campo DECIDIDO em vez de por traduzir para sempre — um aviso
-      // sempre aceso é um aviso que se aprende a ignorar.
-      texto = campo.texto;
+      // O glossário sabe este, e o que ele diz vale mais do que o motor: é a
+      // tradução da casa, escrita à mão e igual em todas as propostas.
+      //
+      // Não foi pedido, e não foi por não haver nada a traduzir: foi por já se
+      // saber a resposta.
+      texto =
+        doGlossario(campo.texto) ??
+        // Não foi pedido porque não há nada a traduzir. Escrever o português na
+        // caixa inglesa é exactamente o que o botão «Ficar em português» faz, e
+        // deixa o campo DECIDIDO em vez de por traduzir para sempre — um aviso
+        // sempre aceso é um aviso que se aprende a ignorar.
+        campo.texto;
     }
     // Uma posição vazia fica por traduzir. Não é um buraco: no papel esse campo
     // cai para o português, e no ecrã continua a contar como falta — que é

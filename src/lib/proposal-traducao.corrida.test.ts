@@ -37,8 +37,8 @@ function proposta(over: Partial<ProposalDoc> = {}): ProposalDoc {
     coverImages: ["", ""],
     serviceGroups: [],
     moodBoards: [
-      { title: "Decoração Cerimónia", images: ["q1/a.jpg", "q1/b.jpg"] },
-      { title: "Complementos dos Noivos", images: ["q1/c.jpg"] },
+      { title: "Mesa de doces da avó", images: ["q1/a.jpg", "q1/b.jpg"] },
+      { title: "Cantinho dos miúdos", images: ["q1/c.jpg"] },
     ],
     budgetItems: [],
     budgetExtras: [],
@@ -53,6 +53,18 @@ function proposta(over: Partial<ProposalDoc> = {}): ProposalDoc {
 /** Um motor de mentira: devolve o que lhe mandarem, com uma marca à frente. */
 const motorFalso: MotorDeTraducao = async (textos) => textos.map((t) => `EN: ${t}`);
 
+/*
+ * ── PORQUE É QUE OS FIXTURES SÃO ESTES NOMES E NÃO OS DA CASA ─────────────
+ *
+ * Eram «Decoração Cerimónia» e «Complementos dos Noivos» — dois rótulos que a
+ * Líquen escreve em quase todas as propostas, e por isso entraram no GLOSSÁRIO
+ * (ver `proposal-traducao.ts`). Um termo do glossário nunca chega ao motor: a
+ * resposta é a da casa, escrita à mão.
+ *
+ * O que estes testes medem é a CORRIDA — escrever uma tradução num documento
+ * que entretanto andou —, e para isso o texto tem de passar pelo motor. Dois
+ * nomes que ninguém pôs no glossário mantêm o teste a medir o que diz medir.
+ */
 describe("aplicarTraducao — escrever num documento que entretanto andou", () => {
   it("O CASO DO RELATO: as fotos que entraram durante a tradução ficam lá", async () => {
     const aoPedir = proposta();
@@ -61,15 +73,15 @@ describe("aplicarTraducao — escrever num documento que entretanto andou", () =
     // teste fala. (O documento traduz mais campos: o rótulo do total, por
     // exemplo. Contá-los à mão era um teste a partir-se ao primeiro campo novo.)
     expect(escritas.map((e) => e.pt)).toEqual(
-      expect.arrayContaining(["Decoração Cerimónia", "Complementos dos Noivos"]),
+      expect.arrayContaining(["Mesa de doces da avó", "Cantinho dos miúdos"]),
     );
 
     // Entretanto ela carregou duas fotos para o primeiro board e tirou a única
     // do segundo. É este o documento que existe quando a resposta chega.
     const agora = proposta({
       moodBoards: [
-        { title: "Decoração Cerimónia", images: ["q1/a.jpg", "q1/b.jpg", "q1/nova.jpg"] },
-        { title: "Complementos dos Noivos", images: [] },
+        { title: "Mesa de doces da avó", images: ["q1/a.jpg", "q1/b.jpg", "q1/nova.jpg"] },
+        { title: "Cantinho dos miúdos", images: [] },
       ],
     });
 
@@ -78,8 +90,8 @@ describe("aplicarTraducao — escrever num documento que entretanto andou", () =
     // A tradução entrou INTEIRA — nenhum campo mudou debaixo dela.
     expect(r.escritos).toBe(escritos);
     expect(r.ignorados).toEqual([]);
-    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 0 })).toBe("EN: Decoração Cerimónia");
-    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 1 })).toBe("EN: Complementos dos Noivos");
+    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 0 })).toBe("EN: Mesa de doces da avó");
+    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 1 })).toBe("EN: Cantinho dos miúdos");
     // …e as fotos são as DE AGORA, não as de quando se carregou no botão.
     expect(r.doc.moodBoards.map((b) => b.images)).toEqual([
       ["q1/a.jpg", "q1/b.jpg", "q1/nova.jpg"],
@@ -89,22 +101,22 @@ describe("aplicarTraducao — escrever num documento que entretanto andou", () =
 
   it("um mood board ARRASTADO para outro sítio não recebe a tradução do que lá estava", async () => {
     // O perigo da chave posicional: `boardTitulo:0` já é outro board. Escrever
-    // ali «EN: Decoração Cerimónia» punha o título inglês da página errada num
+    // ali «EN: Mesa de doces da avó» punha o título inglês da página errada num
     // documento que ninguém volta a conferir em português.
     const aoPedir = proposta();
     const { escritas } = await traduzirParaIngles(aoPedir, motorFalso);
 
     const trocados = proposta({
       moodBoards: [
-        { title: "Complementos dos Noivos", images: ["q1/c.jpg"] },
-        { title: "Decoração Cerimónia", images: ["q1/a.jpg", "q1/b.jpg"] },
+        { title: "Cantinho dos miúdos", images: ["q1/c.jpg"] },
+        { title: "Mesa de doces da avó", images: ["q1/a.jpg", "q1/b.jpg"] },
       ],
     });
     const r = aplicarTraducao(trocados, escritas);
 
     // Nenhuma tradução foi escrita no board errado.
-    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 0 })).not.toBe("EN: Decoração Cerimónia");
-    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 1 })).not.toBe("EN: Complementos dos Noivos");
+    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 0 })).not.toBe("EN: Mesa de doces da avó");
+    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 1 })).not.toBe("EN: Cantinho dos miúdos");
     // Cada uma foi ignorada por não encontrar o português com que partiu — e a
     // que casou por acaso (o texto é o mesmo) está no sítio certo.
     expect(r.escritos + r.ignorados.length).toBe(escritas.length);
@@ -117,14 +129,14 @@ describe("aplicarTraducao — escrever num documento que entretanto andou", () =
     const reescrito = proposta({
       moodBoards: [
         { title: "Decoração da Capela", images: ["q1/a.jpg", "q1/b.jpg"] },
-        { title: "Complementos dos Noivos", images: ["q1/c.jpg"] },
+        { title: "Cantinho dos miúdos", images: ["q1/c.jpg"] },
       ],
     });
     const r = aplicarTraducao(reescrito, escritas);
 
     expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 0 })).toBeUndefined();
-    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 1 })).toBe("EN: Complementos dos Noivos");
-    expect(r.ignorados.map((i) => i.pt)).toEqual(["Decoração Cerimónia"]);
+    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 1 })).toBe("EN: Cantinho dos miúdos");
+    expect(r.ignorados.map((i) => i.pt)).toEqual(["Mesa de doces da avó"]);
     expect(r.escritos).toBe(escritas.length - 1);
   });
 
@@ -132,11 +144,11 @@ describe("aplicarTraducao — escrever num documento que entretanto andou", () =
     const aoPedir = proposta();
     const { escritas } = await traduzirParaIngles(aoPedir, motorFalso);
     const semOSegundo = proposta({
-      moodBoards: [{ title: "Decoração Cerimónia", images: ["q1/a.jpg", "q1/b.jpg"] }],
+      moodBoards: [{ title: "Mesa de doces da avó", images: ["q1/a.jpg", "q1/b.jpg"] }],
     });
     const r = aplicarTraducao(semOSegundo, escritas);
     expect(r.doc.moodBoards).toHaveLength(1);
-    expect(r.ignorados.map((i) => i.pt)).toEqual(["Complementos dos Noivos"]);
+    expect(r.ignorados.map((i) => i.pt)).toEqual(["Cantinho dos miúdos"]);
     expect(r.escritos).toBe(escritas.length - 1);
   });
 
