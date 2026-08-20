@@ -372,7 +372,10 @@ describe("POST /api/orcamento/[id]/proposta — assinatura", () => {
     expect(env.html).toContain(SITE.phoneDisplay);
     expect(env.text).toContain("Catarina Gaspar");
     expect(env.text).toContain(SITE.phoneDisplay);
-    expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
+    // A faixa da casa viaja COM a mensagem — nada de imagens remotas. (Era o
+    // logótipo; passou a ser a faixa quando a assinatura passou a ser a dela:
+    // sem marca por cima do nome, com a faixa a fechar. Ver `email-assinatura`.)
+    expect(env.attachments?.some((a) => a.cid === "liquen-banner")).toBe(true);
     expect(env.attachments?.some((a) => a.filename.endsWith(".pdf"))).toBe(true);
     expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
   });
@@ -682,7 +685,7 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     const email = enviado();
     expect(email.html).toContain("Catarina Gaspar");
     expect(email.html.match(/Catarina Gaspar/g)).toHaveLength(1);
-    expect(email.html).toContain("cid:liquen-logo");
+    expect(email.html).toContain("cid:liquen-banner");
   });
 
   it("um corpo vazio ou só com espaços é como não vir nenhum", async () => {

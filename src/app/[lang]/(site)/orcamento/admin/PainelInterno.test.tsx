@@ -338,6 +338,57 @@ describe("valor fora do habitual", () => {
     expect(screen.getByText(/em 10 eventos/)).toBeTruthy();
   });
 
+  /**
+   * ── O NÚMERO É O DA PROPOSTA, NÃO O DO PEDIDO ──────────────────────────
+   *
+   * O casal mudou de ideias entre o formulário e a proposta — o caso normal.
+   * Ela corrige os convidados aqui, e a comparação de preço continuava a usar o
+   * número velho: uma proposta de 200 pax cobrada a preço de 200 aparecia
+   * «acima do habitual» porque o intervalo era o de 120.
+   */
+  it("compara com os convidados escritos na PROPOSTA", async () => {
+    const grandes = Array.from(
+      { length: 10 },
+      (_, i) =>
+        ({
+          id: `G-${i}`,
+          status: "aceite",
+          guests: 200,
+          quotedPrice: 20_000,
+          location: "Palmela",
+        }) as Quote,
+    );
+    montar({
+      doc: doc({ guests: "200 pax" }),
+      quotes: [...historico, ...grandes],
+      totalBruto: 24_600,
+    });
+    await abrir();
+    // Cala-se: 24.600 € brutos são exactamente os 20.000 € do histórico de 200
+    // pax. Com o 120 do pedido, este total estava muito acima.
+    expect(screen.queryByText(/costuma ficar entre/)).toBeNull();
+  });
+
+  it("CONTROLO POSITIVO: sem convidados na proposta, volta a valer o pedido", async () => {
+    // O mesmo histórico e o mesmo total — só o documento é que deixa de dizer
+    // quantas pessoas são. Sem isto, o silêncio acima podia ser um silêncio que
+    // este histórico dá a qualquer preço.
+    const grandes = Array.from(
+      { length: 10 },
+      (_, i) =>
+        ({
+          id: `G-${i}`,
+          status: "aceite",
+          guests: 200,
+          quotedPrice: 20_000,
+          location: "Palmela",
+        }) as Quote,
+    );
+    montar({ doc: doc(), quotes: [...historico, ...grandes], totalBruto: 24_600 });
+    await abrir();
+    expect(screen.getByText(/120 pax costuma ficar entre/)).toBeTruthy();
+  });
+
   it("cala-se quando o valor é normal", async () => {
     // 12.300 € são os 10.000 € do histórico com IVA: o `totalBruto` que este
     // painel passa é BRUTO e o `quotedPrice` guardado é líquido. É o mesmo

@@ -5152,3 +5152,330 @@ describe("o email do passo 3 viaja com o envio", () => {
     expect(screen.queryByText(/Esta nota não aparece no texto do email/)).toBeNull();
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A NOTA INTERNA, MONTADA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O campo existia e não estava em lado nenhum: a única referência a
+ * `NotasInternas.tsx` em todo o `src/` era o seu próprio teste. Passa a viver
+ * na secção «Evento» do estúdio, e o que se escreve lá vai no rascunho — que é
+ * o que faz a nota sobreviver a fechar o separador.
+ *
+ * A garantia de que NÃO sai no PDF está onde tem de estar, no gerador:
+ * `src/lib/notas-internas-ficam-em-casa.test.ts`, com controlo positivo.
+ */
+describe("as notas internas vivem no estúdio", () => {
+  it("o campo está montado e diz que não sai na proposta", () => {
+    seedDraft(0);
+    renderStudio();
+    expect(screen.getByLabelText(/Notas internas/)).toBeTruthy();
+    expect(screen.getByText(/só para ti, nunca sai na proposta/)).toBeTruthy();
+  });
+
+  it("o que se escreve na nota entra no rascunho gravado", async () => {
+    seedDraft(0);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/Notas internas/), "Decide a mãe");
+
+    await waitFor(() => {
+      const gravados = corpos("proposta-rascunho");
+      expect(gravados.some((b) => b.includes("Decide a mãe"))).toBe(true);
+    });
+    // CONTROLO POSITIVO da leitura acima: o corpo gravado é MESMO o documento,
+    // e o campo tem MESMO o nome por que o PDF pergunta. Sem isto, um
+    // `includes` sobre um corpo qualquer passaria por acidente.
+    const ultimo = corpos("proposta-rascunho").at(-1) ?? "";
+    expect(JSON.parse(ultimo).doc.notasInternas).toContain("Decide a mãe");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE FALTA PARA ENVIAR DEIXA DE SER INVISÍVEL
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A lista vivia numa coluna lateral `xl:block` — abaixo de 1280 px ela nunca a
+ * via — e o passo de envio tinha uma frase estática, sempre com as mesmas
+ * palavras e sem link nenhum: «Preenche clientes, referência e um total maior
+ * que 0».
+ *
+ * Passa a estar na Conferência, que é a lista que já se lê antes de carregar em
+ * enviar e que não depende da largura do ecrã. E cada linha leva ao campo.
+ */
+describe("o que falta para enviar, no passo de enviar", () => {
+  /** Um rascunho a que falta o nome dos clientes — o que TRAVA o envio. */
+  function seedSemNome() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [{ label: "Igreja" }] }],
+        moodBoards: [],
+        budgetItems: ["Decor"],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  it("a frase estática saiu — no lugar dela está o nome do que falta", async () => {
+    seedSemNome();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    expect(
+      screen.queryByText(/Preenche clientes, referência e um total maior que 0 \(no passo/),
+    ).toBeNull();
+    expect(await screen.findByText(/Uma coisa impede o envio/)).toBeTruthy();
+    expect(screen.getByText("Nome dos clientes")).toBeTruthy();
+  });
+
+  it("tocar na linha volta ao conteúdo e põe o cursor no campo", async () => {
+    seedSemNome();
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Nome dos clientes/ }));
+
+    // De volta ao passo 1 — o campo vive lá.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^1\s*Conteúdo$/ })).toHaveAttribute(
+        "aria-current",
+        "step",
+      ),
+    );
+    const campo = document.querySelector<HTMLInputElement>('[data-campo="clientNames"]');
+    expect(campo).not.toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(campo));
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE VEIO DO PEDIDO FICA ASSINALADO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O pré-preenchimento já existia. O que não existia era dizê-lo: um campo
+ * semeado a partir do formulário do casal lia-se exactamente como um campo
+ * escrito por ela — e um campo escrito por ela não se relê.
+ *
+ * O anel laranja é o MESMO da cópia de outra proposta, e a confirmação é a
+ * mesma: tocar-lhe.
+ */
+describe("os campos semeados do pedido ficam marcados", () => {
+  const comTudo = {
+    ...quote,
+    date: "2026-09-12",
+    location: "Évora",
+    guests: 80,
+    ceremonyType: "civil",
+  } as unknown as Quote;
+
+  const renderCom = (q: Quote) =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={q} />
+      </ToastProvider>,
+    );
+
+  /** O invólucro do campo leva o anel — é lá que o `containerClassName` cai. */
+  const anelDe = (rotulo: string) =>
+    screen.getByLabelText(rotulo).closest("div")?.className.includes("ring-2") ?? false;
+
+  it("acende o anel nos campos que o pedido respondeu", async () => {
+    renderCom(comTudo);
+    await waitFor(() => expect(anelDe("Clientes")).toBe(true));
+    expect(anelDe("Data")).toBe(true);
+    expect(anelDe("Local")).toBe(true);
+    expect(anelDe("Convidados")).toBe(true);
+    // Os três que não tinham anel nenhum antes desta alteração.
+    expect(anelDe("Tipo de evento")).toBe(true);
+    expect(anelDe("Cerimónia")).toBe(true);
+  });
+
+  it("não acende num campo que o pedido não soube responder", async () => {
+    // CONTROLO POSITIVO do teste de cima: o mesmo ecrã, com o mesmo mecanismo
+    // ligado, deixa em paz o que está vazio. Um anel à volta de uma caixa em
+    // branco não pede confirmação nenhuma — pede que se ignore o anel.
+    renderCom(comTudo);
+    await waitFor(() => expect(anelDe("Clientes")).toBe(true));
+    expect(screen.getByLabelText("Hora")).toHaveValue("");
+    expect(anelDe("Hora")).toBe(false);
+  });
+
+  it("tocar no campo é a confirmação", async () => {
+    renderCom(comTudo);
+    const user = userEvent.setup();
+    await waitFor(() => expect(anelDe("Cerimónia")).toBe(true));
+    await user.type(screen.getByLabelText("Cerimónia"), " e religiosa");
+    expect(anelDe("Cerimónia")).toBe(false);
+    // E só nesse — confirmar um não confirma os outros.
+    expect(anelDe("Local")).toBe(true);
+  });
+
+  it("um rascunho já começado não pede confirmação nenhuma", async () => {
+    // O rascunho é trabalho DELA. Pedir-lhe que confirme o que ela própria
+    // escreveu é o caminho mais curto para o anel deixar de querer dizer algo.
+    seedDraft(0);
+    renderCom(comTudo);
+    await waitFor(() => expect(screen.getByLabelText("Clientes")).toHaveValue("Maria & Zé"));
+    expect(anelDe("Clientes")).toBe(false);
+    expect(anelDe("Local")).toBe(false);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A MESMA FOTOGRAFIA DUAS VEZES NA MESMA PROPOSTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * É o único caso em que o casal vê a mesma fotografia duas vezes no documento
+ * que recebe, e é quase sempre um engano — arrastou-se em vez de mover, ou
+ * duplicou-se um board e esqueceu-se de trocar uma foto.
+ *
+ * Assinalada NAS DUAS: assinalar só a segunda obrigava a procurar a primeira.
+ */
+describe("fotos repetidas dentro da mesma proposta", () => {
+  /** Dois boards, com a mesma foto no primeiro lugar de cada um. */
+  function seedComRepetida() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [
+          { title: "Cerimónia", images: ["board/a.jpg", "board/b.jpg"] },
+          { title: "Jantar", images: ["board/a.jpg", "board/c.jpg"] },
+        ],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  it("marca as DUAS células, e diz quantas vezes", async () => {
+    seedComRepetida();
+    renderStudio();
+    const marcas = await screen.findAllByText("2× nesta proposta");
+    expect(marcas).toHaveLength(2);
+  });
+
+  it("CONTROLO POSITIVO: sem repetição não marca nada", async () => {
+    // O mesmo ecrã, com o mesmo mecanismo ligado. Sem isto, «duas marcas»
+    // acima podia estar a passar por a grelha marcar sempre todas as fotos.
+    seedDraft(3);
+    renderStudio();
+    // A grelha está mesmo desenhada — três células, três fotos diferentes.
+    expect(await screen.findAllByLabelText(/Arrastar a fotografia/)).toHaveLength(3);
+    expect(screen.queryByText(/nesta proposta$/)).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O CHOQUE DE DATAS TAMBÉM AO ESCREVER A DATA AQUI
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O aviso disparava só ao ESCOLHER o cliente, a partir do `quote.date`. Mas a
+ * data que sai impressa é a deste documento, e este campo é texto livre: o
+ * casal liga a mudar o dia, ela corrige aqui, e o aviso continuava a olhar
+ * para a data do formulário.
+ */
+describe("o dia ocupado, a partir da data escrita na proposta", () => {
+  /** Um casamento já COTADO no dia 20, a 3 km — para o choque ter matéria. */
+  const jaMarcado = {
+    id: "LQ-outro",
+    name: "Sara e Nuno",
+    status: "cotado",
+    date: "2026-09-20",
+    location: "Évora",
+  } as unknown as Quote;
+
+  const renderCom = (q: Quote) =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={q} quotes={[q, jaMarcado]} />
+      </ToastProvider>,
+    );
+
+  function seedComData(data: string) {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: data,
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  const pedido = { ...quote, date: "2026-05-02", location: "Évora" } as unknown as Quote;
+
+  it("avisa quando a data escrita cai em cima de um evento já marcado", async () => {
+    seedComData("20 de setembro de 2026");
+    renderCom(pedido);
+    expect(await screen.findByText(/Já há um evento nesta data/)).toBeTruthy();
+    expect(screen.getByText("Sara e Nuno")).toBeTruthy();
+    // E diz que a data é a DESTE documento, não a do pedido.
+    expect(screen.getByText(/data que escreveste na proposta/)).toBeTruthy();
+  });
+
+  it("cala-se quando não consegue ler a data", async () => {
+    // «a definir» é uma resposta legítima deste campo. Um aviso sobre um dia
+    // inventado por uma leitura falhada é pior do que aviso nenhum.
+    seedComData("a definir");
+    renderCom(pedido);
+    await waitFor(() => expect(screen.getByLabelText("Data")).toHaveValue("a definir"));
+    expect(screen.queryByText(/Já há um evento nesta data/)).toBeNull();
+  });
+
+  it("cala-se numa data que não choca com nada", async () => {
+    // CONTROLO POSITIVO do teste de cima: o mecanismo está ligado e sabe ler
+    // esta data — o que falta é o choque.
+    seedComData("12 de setembro de 2026");
+    renderCom(pedido);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Data")).toHaveValue("12 de setembro de 2026"),
+    );
+    expect(screen.queryByText(/Já há um evento nesta data/)).toBeNull();
+  });
+
+  it("não repete o aviso quando a data escrita É a do pedido", async () => {
+    // Aí o cartão já está no ecrã, por cima do estúdio (`FazerProposta`). O
+    // mesmo cartão duas vezes na mesma página ensina a saltar os dois.
+    seedComData("20 de setembro de 2026");
+    renderCom({ ...pedido, date: "2026-09-20" } as unknown as Quote);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Data")).toHaveValue("20 de setembro de 2026"),
+    );
+    expect(screen.queryByText(/Já há um evento nesta data/)).toBeNull();
+  });
+});

@@ -1,4 +1,4 @@
-import { eurDocumento as eur } from "@/lib/money";
+import { eurDocumento, montanteNaLingua } from "@/lib/money";
 import {
   depositPercentOf,
   preencherMarcadores,
@@ -59,21 +59,29 @@ import { textosDaPagina } from "./textos-da-pagina";
  * pequenas». O que resolve a distância até elas é um índice no topo — que se
  * salta com um toque e não mexe no documento — e é isso que está feito.
  *
- * ── O DINHEIRO FICA EM pt-PT NAS DUAS LÍNGUAS ─────────────────────────────
+ * ── O DINHEIRO SEGUE A LÍNGUA DO DOCUMENTO ────────────────────────────────
  *
- * A decisão é a mesma da página que envolve isto, e a razão está escrita lá
- * por extenso: metade dos montantes de uma proposta é TEXTO LIVRE escrito por
- * ela, à portuguesa (`totalText`, `budgetExtras[].valueText`), e formatar os
- * NOSSOS à inglesa punha «€24,600.00» ao lado de «24.600,00 €» na mesma
- * secção — onde a vírgula e o ponto trocam de papel e «24.600» se lê como
- * vinte e quatro euros e sessenta. As DATAS continuam localizadas.
+ * Decisão dela, 20-08-2026, e é a que resolve um desacordo real: «se é em pt o
+ * dinheiro tem que estar em português, mas se é em eng o dinheiro tem que
+ * estar em inglês».
  *
- * FICA DITO, porque foi medido ao escrever isto e contradiz o que a `page.tsx`
- * afirma: o PDF **não** faz assim. O gerador passa cada montante por
- * `montanteNaLingua` (ver `proposal-doc-pdf.ts`), portanto uma proposta inglesa
- * sai do PDF com «€24,600.00» e desta página com «24.600,00 €». Uma das duas
- * está errada e a decisão é dela, não minha — não se muda nem um lado nem o
- * outro sem ela dizer qual.
+ * O desacordo era este, e foi medido: o gerador do PDF passa cada montante por
+ * `montanteNaLingua` (`proposal-doc-pdf.ts:858`), portanto uma proposta inglesa
+ * saía do PDF com «€24,600.00» e desta página com «24.600,00 €» — o mesmo
+ * número escrito de duas maneiras nos dois documentos que o casal recebe ao
+ * mesmo tempo. A `page.tsx` justificava-se dizendo que «o PDF já escreve assim
+ * em qualquer idioma»; não escreve, e era essa a raiz do engano.
+ *
+ * A conversão é feita PELO MESMO CAMINHO do PDF: escreve-se à portuguesa e
+ * converte-se no fim. Não é um `Intl` com outra localização, e a diferença não
+ * é de estilo — metade dos montantes é TEXTO LIVRE escrito por ela à
+ * portuguesa (`totalText`, `budgetExtras[].valueText`), e entre as duas formas
+ * a vírgula e o ponto TROCAM DE PAPEL: «24.600» lido à inglesa são vinte e
+ * quatro euros e sessenta. Um formatador à parte punha os nossos números em
+ * inglês e os dela em português na mesma folha; a conversão partilhada trata
+ * os dois da mesma maneira.
+ *
+ * As DATAS já eram localizadas e continuam.
  */
 
 /** Um bloco de texto corrido — as notas, as condições, as observações. */
@@ -153,6 +161,22 @@ export default function Documento({
    * sobre este documento e usar os índices para ir buscar as fotografias, que
    * são indexadas pela posição no documento ORIGINAL.
    */
+  /**
+   * O DINHEIRO SEGUE A LÍNGUA DO DOCUMENTO — decisão dela, 20-08-2026:
+   * «se é em pt o dinheiro tem que estar em português, mas se é em eng o
+   * dinheiro tem que estar em inglês».
+   *
+   * É o MESMO caminho que o PDF já usa (`proposal-doc-pdf.ts:858`): escreve-se
+   * primeiro à portuguesa e converte-se no fim com o `montanteNaLingua`. Não é
+   * um `Intl` com outra localização, e a diferença não é de estilo — metade
+   * dos valores de uma proposta é texto livre escrito por ela à portuguesa, e
+   * a vírgula e o ponto TROCAM DE PAPEL entre as duas formas: «24.600» lido à
+   * inglesa são vinte e quatro euros e sessenta. Passar tudo pela mesma
+   * conversão do PDF é o que garante que os dois documentos dizem o mesmo
+   * número — que era precisamente o que estava a falhar aqui.
+   */
+  const eur = (valor: number) => montanteNaLingua(eurDocumento(valor), idioma);
+
   const doc = docNaLingua(docOriginal, idioma);
   const t = textosDaProposta(idioma);
   const p = textosDaPagina(idioma);

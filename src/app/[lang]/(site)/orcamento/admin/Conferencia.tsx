@@ -3,7 +3,12 @@
 import { useMemo } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "@/lib/orcamento/types";
-import { conferir, temReparos, type Severidade } from "@/lib/orcamento/conferencia";
+import {
+  conferir,
+  temReparos,
+  type Severidade,
+  type Verificacao,
+} from "@/lib/orcamento/conferencia";
 import type { IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 
 /**
@@ -18,10 +23,22 @@ import type { IdiomaDaProposta } from "@/lib/proposal-doc-textos";
  * feitas, e é essa dúvida que faz voltar a conferir tudo à mão — que é o
  * trabalho que isto vem poupar. Os vistos verdes são metade da utilidade.
  *
- * ── NÃO TRAVA NADA ─────────────────────────────────────────────────────────
- * O que trava o envio continua em `proposal-progress.ts`. Uma data diferente da
- * do pedido pode ser a data certa: o casal mudou de ideias e disse-o ao
- * telefone. Quem decide é ela.
+ * ── QUASE NADA AQUI TRAVA, E O QUE TRAVA VEM DE FORA ───────────────────────
+ * A regra do que impede o envio continua a nascer em `proposal-progress.ts` —
+ * a mesma que acende o botão. O que mudou é que deixou de ter uma lista sua:
+ * havia esta (erro/aviso/conferido), a coluna lateral que só existe acima de
+ * 1280 px (trava/conselho) e uma frase estática por baixo do botão a repetir a
+ * terceira versão do mesmo. Três sítios a dizer coisas parecidas com palavras
+ * diferentes é como se ensina alguém a não ler nenhum.
+ *
+ * Fica UMA lista, com o que trava em cima e a vermelho. O resto continua a ser
+ * uma passagem de olhos: uma data diferente da do pedido pode ser a data certa
+ * — o casal mudou de ideias e disse-o ao telefone. Quem decide é ela.
+ *
+ * ── E CADA LINHA LEVA AO SÍTIO ─────────────────────────────────────────────
+ * Dizer «Falta o nome dos clientes» a cinco ecrãs de distância do campo é meio
+ * trabalho. A linha que sabe onde se resolve é um botão; a que não sabe (o
+ * texto de exemplo pode estar em qualquer campo) fica texto, que é honesto.
  */
 
 const MARCA: Record<Severidade, { simbolo: string; cor: string }> = {
@@ -42,22 +59,31 @@ interface Props {
    * dos campos que ainda não têm versão inglesa.
    */
   idioma?: IdiomaDaProposta;
+  /**
+   * Levar ao sítio onde se resolve. Sem isto a lista continua a ler-se — só
+   * não se toca — e é assim que ela aparece nos testes que só olham para o
+   * texto.
+   */
+  onIr?: (v: Verificacao) => void;
 }
 
-export default function Conferencia({ doc, quote, quotes = [], totalBruto, idioma }: Props) {
+export default function Conferencia({ doc, quote, quotes = [], totalBruto, idioma, onIr }: Props) {
   const verificacoes = useMemo(
     () => conferir({ doc, quote, historico: quotes, totalBruto, idioma }),
     [doc, quote, quotes, totalBruto, idioma],
   );
   const reparos = temReparos(verificacoes);
+  const travam = verificacoes.filter((x) => x.trava).length;
 
   return (
     <section
       aria-labelledby="conferencia-titulo"
       className={`mt-5 rounded-2xl border p-4 ${
-        reparos
-          ? "border-[#c08a3e]/40 bg-[#c08a3e]/[0.05]"
-          : "border-[#4d6350]/25 bg-[#4d6350]/[0.04]"
+        travam > 0
+          ? "border-[#b5654a]/45 bg-[#b5654a]/[0.06]"
+          : reparos
+            ? "border-[#c08a3e]/40 bg-[#c08a3e]/[0.05]"
+            : "border-[#4d6350]/25 bg-[#4d6350]/[0.04]"
       }`}
     >
       <h3
@@ -67,35 +93,67 @@ export default function Conferencia({ doc, quote, quotes = [], totalBruto, idiom
         Conferência
       </h3>
       <p className="mt-1 text-xs leading-relaxed text-foreground/55">
-        {reparos
-          ? "Há coisas a que vale a pena olhar. Nenhuma te impede de enviar."
-          : "Está tudo de acordo com o pedido original."}
+        {travam === 1
+          ? "Uma coisa impede o envio — está em primeiro, a vermelho. O resto é para olhar."
+          : travam > 1
+            ? `${travam} coisas impedem o envio — estão em primeiro, a vermelho. O resto é para olhar.`
+            : reparos
+              ? "Há coisas a que vale a pena olhar. Nenhuma te impede de enviar."
+              : "Está tudo de acordo com o pedido original."}
       </p>
 
       <ul className="mt-3 flex flex-col gap-1.5">
         {verificacoes.map((v) => {
           const m = MARCA[v.severidade];
+          /**
+           * A FRASE, num invólucro só.
+           *
+           * Título e detalhe são UMA frase — «Local — a proposta diz "Évora" e
+           * o pedido dizia "Sintra"» — e têm de correr como texto. Quando a
+           * linha é clicável leva `alvo-toque`, e essa classe põe
+           * `display: inline-flex` no toque: dentro de um contentor de flex
+           * cada `<span>` passa a ser uma coluna, e a frase parte-se em duas
+           * colunas lado a lado com o travessão a meio do nada. É a mesma
+           * armadilha que o `AvisoDataOcupada` documenta, medida a 375 px.
+           */
+          const frase = (
+            <span>
+              <span className={v.severidade === "ok" ? "text-foreground/45" : "text-foreground/75"}>
+                {v.titulo}
+              </span>
+              {v.detalhe && <span className="text-foreground/55"> — {v.detalhe}</span>}
+              {/* O leitor de ecrã ouve a gravidade, que a cor e o símbolo só
+                  dizem a quem vê. */}
+              <span className="sr-only">
+                {v.severidade === "ok"
+                  ? " (conferido)"
+                  : v.severidade === "erro"
+                    ? " (erro)"
+                    : " (a confirmar)"}
+              </span>
+            </span>
+          );
+          // Só é link quando há mesmo para onde ir, e nunca no que já está
+          // conferido: um visto verde clicável convida a um salto que não
+          // resolve nada.
+          const saltavel = !!onIr && !!v.seccao && v.severidade !== "ok";
           return (
             <li key={v.id} className="flex items-start gap-2 text-xs leading-relaxed">
               <span aria-hidden="true" className={`mt-px font-semibold ${m.cor}`}>
                 {m.simbolo}
               </span>
               <span className="min-w-0">
-                <span
-                  className={v.severidade === "ok" ? "text-foreground/45" : "text-foreground/75"}
-                >
-                  {v.titulo}
-                </span>
-                {v.detalhe && <span className="text-foreground/55"> — {v.detalhe}</span>}
-                {/* O leitor de ecrã ouve a gravidade, que a cor e o símbolo só
-                    dizem a quem vê. */}
-                <span className="sr-only">
-                  {v.severidade === "ok"
-                    ? " (conferido)"
-                    : v.severidade === "erro"
-                      ? " (erro)"
-                      : " (a confirmar)"}
-                </span>
+                {saltavel ? (
+                  <button
+                    type="button"
+                    onClick={() => onIr?.(v)}
+                    className="alvo-toque text-left underline decoration-foreground/25 underline-offset-2 hover:decoration-foreground/60"
+                  >
+                    {frase}
+                  </button>
+                ) : (
+                  frase
+                )}
               </span>
             </li>
           );

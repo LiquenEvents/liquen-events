@@ -8,7 +8,7 @@ import { normalizarValor } from "@/lib/proposal-budget";
 import { kmSugerido, sugerirDeslocacao } from "@/lib/orcamento/deslocacao";
 import { lerNumero } from "@/lib/numero-escrito";
 import { useDefinicoesDaProposta } from "./definicoes-da-proposta";
-import { foraDoPadrao, padraoPara } from "@/lib/orcamento/padrao-de-preco";
+import { foraDoPadrao, padraoPara, paxDaProposta } from "@/lib/orcamento/padrao-de-preco";
 import { chaveDoServico, type Historico, type Omissao } from "@/lib/orcamento/memoria-de-precos";
 import { Button } from "./ui";
 
@@ -239,13 +239,20 @@ export default function PainelInterno({
     [local, parametros, kmEscritos],
   );
 
+  /**
+   * ── OS CONVIDADOS VÊM DA PROPOSTA, NÃO DO PEDIDO ────────────────────────
+   *
+   * Mesma regra dos quilómetros aqui em cima: o que está escrito NESTA proposta
+   * manda, e o pedido é a rede. Se ela corrigiu os convidados aqui — porque o
+   * casal mudou de ideias entre o formulário e a proposta, que é o caso normal
+   * —, o intervalo habitual tem de ser o de 80 pax e não o de 120. Ver
+   * `paxDaProposta`.
+   */
+  const paxDaqui = paxDaProposta(doc, quote);
   const fora = useMemo(
     () =>
-      foraDoPadrao(
-        totalBruto,
-        padraoPara({ guests: quote.guests, location: quote.location }, quotes),
-      ),
-    [totalBruto, quote.guests, quote.location, quotes],
+      foraDoPadrao(totalBruto, padraoPara({ guests: paxDaqui, location: quote.location }, quotes)),
+    [totalBruto, paxDaqui, quote.location, quotes],
   );
 
   /** O histórico ao alcance do nome de cada linha. */
@@ -533,7 +540,7 @@ export default function PainelInterno({
           {/* ── O total está dentro do habitual? ─────────────────────── */}
           {fora && (
             <p className="mt-4 rounded-xl border border-[#c08a3e]/40 bg-[#c08a3e]/[0.06] p-3 text-[11px] leading-relaxed text-[#8a6420]">
-              {quote.guests} pax costuma ficar entre {eur(fora.padrao.min)} e {eur(fora.padrao.max)}
+              {paxDaqui} pax costuma ficar entre {eur(fora.padrao.min)} e {eur(fora.padrao.max)}
               {fora.padrao.regiao ? ` na zona de ${fora.padrao.regiao}` : " (média do país)"}, com
               mediana de {eur(fora.padrao.mediana)} em {fora.padrao.casos} eventos. Esta está{" "}
               {fora.lado === "abaixo" ? "abaixo" : "acima"} — confirma que não é um dígito trocado.

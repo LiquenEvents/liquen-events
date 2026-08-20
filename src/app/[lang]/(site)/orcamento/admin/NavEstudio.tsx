@@ -38,9 +38,18 @@ interface Props {
    * Opcional: quem só quer a coluna não passa nada e nada muda.
    */
   onSeccaoActual?: (id: string | null) => void;
+  /**
+   * Quantas traduções faltam em cada secção — a chave é o `id` da secção.
+   *
+   * Opcional, e ausente é o caso normal: numa proposta portuguesa não há nada
+   * por traduzir, e uma linha a dizer «0 traduções em falta» debaixo de cada
+   * secção seria uma fila de zeros no índice de toda a gente. Quem passa isto é
+   * o estúdio, e só com a proposta a sair em inglês.
+   */
+  porTraduzir?: Record<string, number>;
 }
 
-export default function NavEstudio({ seccoes, faltas, onSeccaoActual }: Props) {
+export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzir }: Props) {
   const [atual, setAtual] = useState<string | null>(null);
 
   // ── Onde estou ────────────────────────────────────────────────────────
@@ -122,6 +131,19 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual }: Props) {
                     {s.titulo}
                   </span>
                   <span className="block truncate text-[10px] text-foreground/40">{s.resumo}</span>
+                  {/* ── O QUE FALTA TRADUZIR, AQUI ─────────────────────────
+                      Linha própria e não colada ao resumo: a coluna tem 192 px
+                      e o resumo já é `truncate` — «2 grupos · 2 traduções em
+                      falta» sairia «2 grupos · 2 tradu…», que é a metade que
+                      não interessa. E cor própria, a mesma do que está por
+                      rever: é uma falta, não uma descrição. */}
+                  {(porTraduzir?.[s.id] ?? 0) > 0 && (
+                    <span className="block truncate text-[10px] text-[#8a6420]">
+                      {porTraduzir![s.id] === 1
+                        ? "1 tradução em falta"
+                        : `${porTraduzir![s.id]} traduções em falta`}
+                    </span>
+                  )}
                 </span>
               </button>
             </li>

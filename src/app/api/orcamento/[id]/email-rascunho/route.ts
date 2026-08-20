@@ -8,6 +8,7 @@ import { dinheiroDaProposta } from "@/lib/proposal-budget";
 import { resolveValidUntil, withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
 import { depositPercentOf } from "@/lib/proposal-doc";
 import { getQuote } from "@/lib/quotes-store";
+import { getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -105,6 +106,41 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // o que falta é um modelo escrito. O ecrã mostra a frase e continua a
       // oferecer os outros, em vez de ficar em branco.
       return NextResponse.json({ error: rascunho.erro, modeloEmFalta: chave }, { status: 409 });
+    }
+
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * ESTE PEDIDO JÁ TEM UMA PROPOSTA ACEITE
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Regra dela, na Fase 2: «se a proposta já foi aceite, o que foi aceite
+     * fica congelado e imutável — alterações posteriores geram uma nova
+     * versão, que tem de ser aceite de novo».
+     *
+     * O congelamento está feito (`proposta-do-link.ts`), e cria uma coisa que
+     * ela tem de saber ANTES de carregar em enviar: a revisão que está
+     * prestes a sair NÃO substitui o que o casal aceitou. Sem esta linha, ela
+     * envia a versão 3, o casal abre o link e vê a versão 1 — e ninguém
+     * percebe porquê.
+     *
+     * Vai nos avisos que o ecrã de envio já desenha, e é melhor esforço: uma
+     * leitura que falhe não pode travar o ecrã onde a proposta é enviada.
+     */
+    try {
+      const aceite = await getAcceptedContractByQuote(id);
+      if (aceite) {
+        const qual = aceite.propostaVersaoNumero
+          ? `a versão ${aceite.propostaVersaoNumero}`
+          : "uma versão anterior";
+        rascunho.rascunho.avisos = [
+          ...(rascunho.rascunho.avisos ?? []),
+          `Este pedido já tem uma proposta ACEITE (${qual}). O casal continua a ver ` +
+            `o que aceitou — enviar esta revisão não altera isso, e o novo aceite tem de ` +
+            `ser combinado convosco.`,
+        ];
+      }
+    } catch (e) {
+      log.warn("email-rascunho: não deu para saber se o pedido já tem aceite", { id, erro: e });
     }
 
     // A lista viaja com o rascunho para a troca de modelo ser instantânea: uma

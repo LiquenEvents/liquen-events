@@ -43,6 +43,13 @@ import {
   DRAFT_PREFIX,
 } from "./proposal-drafts";
 import {
+  mapper as enviosMapper,
+  listEnviosDeProposta,
+  replaceEnviosDeProposta,
+  ehChaveDeEnvios,
+  ENVIOS_PREFIX,
+} from "./envios-de-proposta";
+import {
   BACKUP_SCHEMA_MIN_VERSION,
   BACKUP_SCHEMA_VERSION,
   MAX_RESTORE_ROWS,
@@ -477,6 +484,25 @@ const proposalDraftSchema = z.looseObject({
   savedBy: text(200),
 });
 
+/**
+ * A cópia de um email enviado, no ficheiro.
+ *
+ * `looseObject` pela mesma razão do rascunho: o que aqui viaja é a lista de
+ * envios tal como o `envios-de-proposta.ts` a escreve, e copiá-la campo a
+ * campo faria uma cópia boa ser recusada a cada campo novo. Exige-se o que
+ * importa — a chave dentro do espaço de nomes (uma cópia adulterada não
+ * escreve fora dele) e uma lista de objectos.
+ */
+const envioDePropostaSchema = z.looseObject({
+  key: z
+    .string()
+    .max(300)
+    .refine(ehChaveDeEnvios, {
+      message: `chave fora do espaço de nomes dos envios (\`${ENVIOS_PREFIX}<pedido>\`)`,
+    }),
+  envios: z.array(z.looseObject({})).max(100),
+});
+
 const counterSchema = z.object({
   year: z.number().int().min(1900).max(9999),
   n: z.number().int().min(0).max(1_000_000),
@@ -619,6 +645,31 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     // é mais velha do que o trabalho que está lá agora.
     stamp: (d) => (typeof d.updatedAt === "string" ? d.updatedAt : ""),
     replace: replaceProposalDrafts,
+  }),
+  // As CÓPIAS dos emails de proposta que saíram. Ficam ao lado dos rascunhos
+  // porque são a mesma tabela partilhada e a mesma escrita à medida (ver
+  // `replace`): apagar o `app_state` inteiro para repor isto levava à frente os
+  // marcadores de operação que lá vivem.
+  //
+  // Porque é que passaram a ir na cópia: a cópia levava a PROPOSTA e não levava
+  // o email que a acompanhou. No dia da reposição, a pergunta que se faz ao
+  // telefone — «o que é que nós lhes escrevemos?» — voltava a não ter resposta,
+  // e esse é precisamente o dia em que ela se faz.
+  asTarget({
+    key: "proposalEmails",
+    label: "Cópias dos emails de proposta enviados",
+    table: enviosMapper.table,
+    mapper: enviosMapper,
+    schema: envioDePropostaSchema,
+    current: listEnviosDeProposta,
+    // O relógio é o do envio mais recente do pedido: é o que diz se a cópia de
+    // segurança é mais velha do que o que já saiu de casa.
+    stamp: (e) => {
+      const envios = Array.isArray(e.envios) ? e.envios : [];
+      const ultimo = envios[envios.length - 1] as { enviadoEm?: unknown } | undefined;
+      return typeof ultimo?.enviadoEm === "string" ? ultimo.enviadoEm : "";
+    },
+    replace: replaceEnviosDeProposta,
   }),
   asTarget({
     key: "contracts",

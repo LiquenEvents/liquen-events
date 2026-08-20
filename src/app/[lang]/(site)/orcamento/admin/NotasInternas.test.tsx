@@ -39,4 +39,63 @@ describe("NotasInternas", () => {
     render(<NotasInternas valor="" onChange={() => {}} titulo="Nota sobre o orçamento" />);
     expect(screen.getByLabelText(/Nota sobre o orçamento/)).toBeTruthy();
   });
+
+  /**
+   * ── O `id` DO SERVIDOR TEM DE SER O DO NAVEGADOR ─────────────────────────
+   *
+   * O campo nasceu com um id ALEATÓRIO (`notas-${idCurto()}`), sorteado uma vez
+   * a desenhar no servidor e outra vez a hidratar. O React desenhou
+   * `htmlFor="notas-53c900b712"` e hidratou com `notas-addc8e652c`, e disse-o:
+   * «A tree hydrated but some attributes … didn't match. This won't be patched
+   * up.» O `htmlFor` fica a apontar para um id que não existe — carregar no
+   * rótulo deixa de pôr o cursor na caixa.
+   *
+   * O defeito viveu escondido porque ninguém montava o componente; foi o E2E,
+   * depois de ele entrar no estúdio, que o apanhou.
+   *
+   * Aqui prende-se a propriedade directamente: desenhar no SERVIDOR e desenhar
+   * no CLIENTE têm de dar o mesmo id. O `useId` é determinístico pela posição
+   * na árvore, portanto dá; um sorteio não dá nunca.
+   */
+  it("hidrata sem queixa, e o id do servidor sobrevive", async () => {
+    const { renderToString } = await import("react-dom/server");
+    const { hydrateRoot } = await import("react-dom/client");
+    const { act } = await import("react");
+
+    const alvo = <NotasInternas valor="" onChange={() => {}} />;
+    const caixa = document.createElement("div");
+    caixa.innerHTML = renderToString(alvo);
+    document.body.appendChild(caixa);
+    const idDoServidor = caixa.querySelector("textarea")?.id;
+    const rotuloDoServidor = caixa.querySelector("label")?.getAttribute("for");
+
+    const queixas: unknown[][] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => void queixas.push(args);
+    try {
+      await act(async () => {
+        hydrateRoot(caixa, alvo);
+      });
+    } finally {
+      console.error = original;
+    }
+
+    // Controlo positivo: o HTML do servidor trouxe mesmo um id, e o rótulo
+    // apontava para ele. Sem isto o resto do teste podia passar a comparar
+    // `undefined` com `undefined`.
+    expect(idDoServidor).toBeTruthy();
+    expect(rotuloDoServidor).toBe(idDoServidor);
+
+    // O React diz «didn't match the client properties» quando o id foi
+    // sorteado outra vez. Com o `useId` não há queixa nenhuma.
+    const texto = queixas.map((q) => q.join(" ")).join("\n");
+    expect(texto).not.toMatch(/hydrat/i);
+
+    // E depois de hidratar, o rótulo continua a apontar para a caixa que está
+    // no ecrã — que é o que se perdia («this won't be patched up»).
+    const depois = caixa.querySelector("textarea");
+    expect(depois?.id).toBe(idDoServidor);
+    expect(caixa.querySelector("label")?.getAttribute("for")).toBe(idDoServidor);
+    caixa.remove();
+  });
 });

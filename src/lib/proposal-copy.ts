@@ -33,9 +33,17 @@ import type { Quote } from "./orcamento/types";
  * caminhos em `fotosParaRecopiar` e quem tem acesso ao Storage trata deles.
  */
 
-/** Campos que a interface tem de destacar depois de copiar. */
+/**
+ * Campos que a interface tem de destacar — depois de copiar, e também depois de
+ * SEMEAR a partir do pedido.
+ *
+ * São os mesmos nos dois casos porque a pergunta é a mesma: «isto veio de outro
+ * lado, confirma». O que muda é a origem (uma proposta antiga, ou o formulário
+ * que o casal preencheu), e nenhuma das duas é a palavra final.
+ */
 export type CampoAMudar =
   | "clientNames"
+  | "eventType"
   | "eventDate"
   | "location"
   | "guests"

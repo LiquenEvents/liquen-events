@@ -111,6 +111,52 @@ alter table public.proposals add column if not exists doc jsonb;
 -- A restrição é `not valid` como as outras desta tabela: aplica-se ao que se
 -- escrever de agora em diante e não obriga a varrer as linhas que já lá estão.
 alter table public.proposals add column if not exists idioma text;
+
+-- ── A VERSÃO DESTA PROPOSTA ────────────────────────────────────────────────
+-- Três colunas para uma pergunta só: «este documento é o mesmo que o casal viu
+-- da última vez?». É dela que dependem as duas metades da página do casal — a
+-- ligação viva (o que ela muda aparece lá sem reenviar nada) e o congelamento
+-- no aceite (o que foi aceite fica imutável; o que mudar depois é uma versão
+-- nova, que tem de ser aceite outra vez).
+--
+-- `versao_selo` é um sha256 do CONTEÚDO VISÍVEL — não dos bytes do PDF. O
+-- `pdf_sha256` aqui em cima não servia para isto e a razão foi medida: a
+-- pdf-lib carimba a data de criação dentro do ficheiro, portanto dois PDFs de
+-- conteúdo idêntico dão selos diferentes, e a página diria «esta proposta foi
+-- revista» de cada vez que ela carregasse em gravar. Ver `proposta-versao.ts`.
+--
+-- `versao_numero` é o que se diz em voz alta ao telefone («estou a olhar para
+-- a versão 2»). Sobe SÓ quando o selo muda: gravar cinco vezes sem mexer não
+-- leva à versão 6.
+--
+-- `versao_em` é quando o conteúdo mudou pela última vez — não quando a linha
+-- foi tocada. É o que a página mostra ao casal («atualizada a 20 de agosto»),
+-- e é sobre a proposta, nunca sobre quem a lê: nada aqui regista visitas.
+--
+-- Idempotentes e SEM `not null`: as propostas anteriores ficam a null, e o
+-- código lê isso como «ainda não tem versão» — a primeira gravação a seguir
+-- dá-lhes a versão 1.
+alter table public.proposals add column if not exists versao_selo text;
+alter table public.proposals add column if not exists versao_numero integer;
+alter table public.proposals add column if not exists versao_em timestamptz;
+
+-- ── QUE VERSÃO É QUE O CASAL ACEITOU ──────────────────────────────────────
+-- O par de cima, copiado para o contrato no momento do aceite. É o que
+-- distingue «o documento de agora é o que foi aceite» de «foi revisto depois
+-- do sim» — e sem isso não se pode dizer nem uma coisa nem a outra, só
+-- adivinhar.
+--
+-- NÃO se guarda aqui uma cópia do documento, e é uma decisão: uma revisão
+-- nesta casa é uma proposta NOVA (a rota do estúdio nunca reescreve uma
+-- proposta que já seguiu), portanto a linha aceite JÁ É o congelamento. Uma
+-- segunda cópia em jsonb custava 13 a 18 KB por contrato para garantir o que
+-- já está garantido pela forma como as propostas são gravadas.
+--
+-- O `proposta_pdf_sha256`, que já lá está, continua a ser outra coisa: é a
+-- impressão digital dos BYTES do ficheiro, e serve de prova. Este é a
+-- identidade do CONTEÚDO, e serve para comparar.
+alter table public.contracts add column if not exists proposta_versao_selo text;
+alter table public.contracts add column if not exists proposta_versao_numero integer;
 alter table public.proposals drop constraint if exists proposals_idioma_chk;
 alter table public.proposals add constraint proposals_idioma_chk
   check (idioma is null or idioma in ('pt','en')) not valid;

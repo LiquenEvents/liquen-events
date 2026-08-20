@@ -1,7 +1,8 @@
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "./types";
-import { foraDoPadrao, padraoPara } from "./padrao-de-preco";
+import { foraDoPadrao, padraoPara, paxDaProposta } from "./padrao-de-preco";
 import { camposComVersaoInglesa, camposPorTraduzir, lerEn } from "@/lib/proposal-doc-bilingue";
+import { oQueFaltaParaEnviar } from "@/lib/proposal-progress";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
 
 /**
@@ -35,6 +36,18 @@ export interface Verificacao {
   severidade: Severidade;
   /** O que dizer quando não está bem. Vazio quando está. */
   detalhe: string;
+  /** A secção do estúdio onde isto se resolve, para o link lá saltar. */
+  seccao?: string;
+  /** O `data-campo` do controlo, quando ele existe — o salto ao campo certo. */
+  campo?: string;
+  /**
+   * Isto TRAVA o envio?
+   *
+   * A regra continua a ser uma só, e continua em `proposal-progress.ts`: esta
+   * marca é copiada de lá, nunca decidida aqui. O que mudou é que a lista deixou
+   * de ser duas — ver o cabeçalho de {@link conferir}.
+   */
+  trava?: boolean;
 }
 
 const texto = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -192,6 +205,24 @@ export interface Contexto {
  * passaram — ver uma lista só com problemas não diz se as outras foram
  * sequer feitas, e é essa dúvida que faz voltar a conferir à mão.
  */
+/**
+ * Onde é que cada assunto desta lista se resolve, no estúdio.
+ *
+ * `seccao` é o alvo de recurso (o cartão da secção); `campo` é o `data-campo`
+ * do controlo, que é o que põe o cursor dentro da caixa certa. Sem controlo
+ * próprio — o texto de exemplo pode estar em qualquer campo — fica de fora e a
+ * linha não é um link, que é honesto: um link que salta para o sítio errado é
+ * pior do que nenhum.
+ */
+const ONDE_SE_RESOLVE: Readonly<Record<string, { seccao: string; campo?: string }>> = {
+  nome: { seccao: "evento", campo: "clientNames" },
+  data: { seccao: "evento", campo: "eventDate" },
+  local: { seccao: "evento", campo: "location" },
+  convidados: { seccao: "evento", campo: "guests" },
+  valor: { seccao: "total", campo: "totalAmount" },
+  idioma: { seccao: "evento" },
+};
+
 export function conferir({
   doc,
   quote,
@@ -335,18 +366,27 @@ export function conferir({
       detalhe: "A proposta não tem valor.",
     });
   } else {
+    // ── O NÚMERO DE CONVIDADOS VEM DA PROPOSTA, NÃO DO PEDIDO ────────────
+    // Ver `paxDaProposta`: se ela corrigiu os convidados aqui, é com esses que
+    // o preço se compara. A lista dizia, três linhas acima, que os dois
+    // divergem — e comparava o preço com o número velho na mesma.
+    const pax = paxDaProposta(doc, quote);
     const fora = foraDoPadrao(
       totalBruto,
-      padraoPara({ guests: quote.guests, location: quote.location }, historico),
+      padraoPara({ guests: pax, location: quote.location }, historico),
     );
     v.push({
       id: "valor",
       titulo: "Valor",
       severidade: fora ? "aviso" : "ok",
+      // ── E DIZ EM QUANTOS CASOS ASSENTA ─────────────────────────────────
+      // O Painel Interno já o dizia e esta lista não. Um intervalo sem o número
+      // de casos por trás não se sabe se é um padrão ou uma coincidência — e a
+      // decisão de acreditar nele é dela, não do programa.
       detalhe: fora
-        ? `${quote.guests} pax costuma ficar entre ${Math.round(fora.padrao.min)} € e ${Math.round(
+        ? `${pax} pax costuma ficar entre ${Math.round(fora.padrao.min)} € e ${Math.round(
             fora.padrao.max,
-          )} €${fora.padrao.regiao ? ` (${fora.padrao.regiao})` : ""}; esta está ${
+          )} €${fora.padrao.regiao ? ` (${fora.padrao.regiao})` : ""}, em ${fora.padrao.casos} propostas; esta está ${
             fora.lado === "abaixo" ? "abaixo" : "acima"
           }.`
         : "",
@@ -424,7 +464,59 @@ export function conferir({
     });
   }
 
-  return v;
+  // ════════════════════════════════════════════════════════════════════════
+  // E O QUE FALTA PARA PODER ENVIAR — NA MESMA LISTA, NÃO NUMA SEGUNDA
+  // ════════════════════════════════════════════════════════════════════════
+  //
+  // Havia duas listas a dizer coisas parecidas com dois vocabulários: esta
+  // (erro / aviso / conferido) e a de `proposal-progress` (trava / conselho),
+  // esta no passo de envio e aquela numa coluna que só existe acima de 1280 px.
+  // Mais uma frase estática por baixo do botão, sem links, a repetir a terceira
+  // versão do mesmo. Três sítios a dizer o mesmo é como se ensina alguém a não
+  // ler nenhum.
+  //
+  // Passa a haver UMA lista, e as regras continuam a nascer onde nasciam: quem
+  // decide o que trava é `oQueFaltaParaEnviar`, e o que se copia de lá é a
+  // MARCA (`trava`), nunca a decisão.
+  //
+  // ── PORQUE É QUE ISTO NÃO ACRESCENTA TUDO ────────────────────────────────
+  // Metade dos impedimentos são assuntos que esta lista já cobre, e cobre-os
+  // melhor: sabe comparar com o pedido. Para esses — o mesmo `id` — o que entra
+  // é só a marca de trava; a frase é a que já cá estava. Os outros (o título
+  // interno, os grupos, as capas, os boards, a soma) não tinham voz nenhuma
+  // aqui e entram tal como estão escritos.
+  const porId = new Map(v.map((x) => [x.id, x]));
+  for (const falta of oQueFaltaParaEnviar(doc, totalBruto)) {
+    const jaDito = porId.get(falta.id);
+    if (jaDito) {
+      if (falta.trava) jaDito.trava = true;
+      continue;
+    }
+    v.push({
+      id: falta.id,
+      titulo: falta.texto,
+      severidade: falta.trava ? "erro" : "aviso",
+      detalhe: "",
+      seccao: falta.seccao,
+      campo: falta.campo,
+      trava: falta.trava,
+    });
+  }
+
+  // Onde é que cada assunto se resolve. Uma tabela e não um campo repetido em
+  // catorze `push`: catorze sítios onde a mesma resposta podia divergir.
+  for (const x of v) {
+    const onde = ONDE_SE_RESOLVE[x.id];
+    if (onde && !x.seccao) {
+      x.seccao = onde.seccao;
+      x.campo = onde.campo;
+    }
+  }
+
+  // O que TRAVA primeiro. É uma lista para agir, e o que impede o envio é o
+  // que ela tem de fazer já — procurá-lo entre doze linhas era a razão de a
+  // frase estática existir.
+  return [...v.filter((x) => x.trava), ...v.filter((x) => !x.trava)];
 }
 
 /** Há alguma coisa a que valha a pena olhar antes de carregar em enviar? */

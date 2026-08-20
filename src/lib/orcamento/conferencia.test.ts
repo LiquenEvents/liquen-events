@@ -15,14 +15,29 @@ const pedido = (over: Partial<Quote> = {}): Quote =>
     ...over,
   }) as Quote;
 
+/**
+ * Uma proposta COMPLETA — a que se pode mesmo enviar.
+ *
+ * O fixture era um esqueleto (sem título interno, sem grupos, sem capas, sem
+ * mood boards) e passava por «documento certo» porque esta lista não olhava
+ * para nada disso: quem olhava era a coluna lateral, com palavras suas, num
+ * ecrã à parte. Agora é uma lista só (ver o fim de `conferir`), e um documento
+ * certo tem de ser um documento que segue.
+ */
 const documento = (over: Partial<ProposalDoc> = {}): ProposalDoc =>
   ({
+    ref: "Ana Silva · Decoração",
     clientNames: "Ana Silva",
     eventDate: "18 de Setembro de 2027",
     location: "Évora",
     guests: "120 pax",
     budgetItems: [],
-    serviceGroups: [],
+    // Um grupo COM título (é o que a lista exige) e mais nada traduzível: os
+    // testes do idioma contam campos, e um fixture cheio de prosa fazia-os
+    // contar a prosa do fixture.
+    serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [] }],
+    moodBoards: [{ images: ["board/1.jpg"] }],
+    coverImages: ["capa/1.jpg", "capa/2.jpg"],
     ...over,
   }) as ProposalDoc;
 
@@ -521,5 +536,146 @@ describe("a lista toda", () => {
       ...base,
     });
     expect(temReparos(vs)).toBe(false);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UMA LISTA, E NÃO TRÊS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Havia esta lista (erro/aviso/conferido), a coluna lateral do passo do
+ * conteúdo (trava/conselho, e só acima de 1280 px) e uma frase estática por
+ * baixo do botão a repetir uma terceira versão do mesmo, sem links. Passa a
+ * haver uma: os impedimentos entram AQUI, e a regra de o que trava continua a
+ * nascer em `proposal-progress`.
+ */
+describe("o que falta para enviar entra nesta lista", () => {
+  it("o que não tinha voz aqui passa a ter, marcado como trava", () => {
+    const vs = conferir({ doc: documento({ ref: "" }), quote: pedido(), ...base });
+    const titulo = achar(vs, "titulo-interno");
+    expect(titulo.severidade).toBe("erro");
+    expect(titulo.trava).toBe(true);
+    expect(titulo.seccao).toBe("evento");
+    expect(titulo.campo).toBe("ref");
+  });
+
+  it("o que já tinha voz NÃO é dito duas vezes — ganha só a marca", () => {
+    const vs = conferir({ doc: documento({ clientNames: "" }), quote: pedido(), ...base });
+    // Uma linha e uma só sobre o nome. Duas — uma delas mais pobre — é como se
+    // ensina alguém a deixar de ler a lista.
+    expect(vs.filter((v) => v.id === "nome")).toHaveLength(1);
+    const nome = achar(vs, "nome");
+    expect(nome.trava).toBe(true);
+    // E fica com a frase DESTA lista, que sabe comparar com o pedido.
+    expect(nome.detalhe).toBe("Está vazio na proposta.");
+  });
+
+  it("o que trava vem primeiro", () => {
+    const vs = conferir({
+      doc: documento({ clientNames: "", location: "" }),
+      quote: pedido(),
+      ...base,
+    });
+    // Sem esta linha o teste passava com ZERO travas — `lastIndexOf` devolve
+    // -1 e -1 é sempre menor do que 0. Era um verde por vacuidade.
+    expect(vs.filter((v) => v.trava)).toHaveLength(1);
+    const primeiroConselho = vs.findIndex((v) => !v.trava);
+    const ultimaTrava = vs.map((v) => !!v.trava).lastIndexOf(true);
+    expect(ultimaTrava).toBeLessThan(primeiroConselho);
+  });
+
+  it("cada linha sabe onde se resolve", () => {
+    const vs = conferir({ doc: documento(), quote: pedido(), ...base });
+    expect(achar(vs, "nome").campo).toBe("clientNames");
+    expect(achar(vs, "data").campo).toBe("eventDate");
+    expect(achar(vs, "local").campo).toBe("location");
+    expect(achar(vs, "convidados").campo).toBe("guests");
+    expect(achar(vs, "valor").campo).toBe("totalAmount");
+    // O texto de exemplo pode estar em QUALQUER campo: não inventa um link.
+    expect(achar(vs, "placeholders").seccao).toBeUndefined();
+  });
+
+  it("CONTROLO POSITIVO: uma proposta que pode seguir não tem nenhuma trava", () => {
+    // Sem isto, «tem trava» acima podia estar a passar por a lista trazer
+    // sempre travas, em qualquer documento.
+    const vs = conferir({
+      doc: documento({ totalText: "12.000,00 € + IVA" }),
+      ...{ quote: pedido() },
+      ...base,
+    });
+    expect(vs.some((v) => v.trava)).toBe(false);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O PREÇO COMPARA-SE COM OS CONVIDADOS DA PROPOSTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Comparava-se sempre com o `quote.guests`. Esta lista até já dizia, três
+ * linhas acima, que os dois números divergem — «A proposta é para "80 pax" e o
+ * pedido pedia 200» — e comparava o preço com o número velho na mesma.
+ */
+describe("o valor fora do habitual", () => {
+  const cotado = (guests: number, preco: number, i: number) =>
+    ({
+      id: `H-${i}`,
+      submittedAt: "2026-01-01T00:00:00.000Z",
+      status: "cotado",
+      name: `Casal ${i}`,
+      guests,
+      quotedPrice: preco,
+      location: "Évora",
+    }) as Quote;
+
+  // Dois grupos que não se tocam: 6 casamentos de 80 pax a 5.000 € e 6 de 200
+  // pax a 20.000 €. Com a tolerância de 35% nenhum entra no intervalo do outro.
+  const memoria = [
+    ...Array.from({ length: 6 }, (_, i) => cotado(80, 5_000, i)),
+    ...Array.from({ length: 6 }, (_, i) => cotado(200, 20_000, i + 10)),
+  ];
+
+  it("usa o número do DOCUMENTO quando ele existe", () => {
+    const vs = conferir({
+      doc: documento({ guests: "80 pax", totalText: "6.150,00 €" }),
+      quote: pedido({ guests: 200 }),
+      historico: memoria,
+      // O bruto de 5.000 € líquidos — dentro do habitual dos 80 pax, e muito
+      // abaixo do habitual dos 200.
+      totalBruto: 6_150,
+    });
+    const valor = achar(vs, "valor");
+    expect(valor.severidade).toBe("ok");
+  });
+
+  it("CONTROLO POSITIVO: com o número do PEDIDO, o mesmo preço estava fora", () => {
+    // O mesmo histórico, o mesmo total — só o documento é que deixa de dizer
+    // quantas pessoas são. Sem isto, o «ok» acima podia ser um «ok» que este
+    // histórico dá a qualquer preço.
+    const vs = conferir({
+      doc: documento({ guests: "", totalText: "6.150,00 €" }),
+      quote: pedido({ guests: 200 }),
+      historico: memoria,
+      totalBruto: 6_150,
+    });
+    const valor = achar(vs, "valor");
+    expect(valor.severidade).toBe("aviso");
+    expect(valor.detalhe).toContain("200 pax");
+  });
+
+  it("diz em quantas propostas a comparação assenta", () => {
+    // O Painel Interno já o dizia e esta lista não. Um intervalo sem o número
+    // de casos por trás não se sabe se é um padrão ou uma coincidência.
+    const vs = conferir({
+      doc: documento({ guests: "200 pax", totalText: "6.150,00 €" }),
+      quote: pedido({ guests: 200 }),
+      historico: memoria,
+      totalBruto: 6_150,
+    });
+    const valor = achar(vs, "valor");
+    expect(valor.severidade).toBe("aviso");
+    expect(valor.detalhe).toContain("em 6 propostas");
+    expect(valor.detalhe).toContain("200 pax");
   });
 });

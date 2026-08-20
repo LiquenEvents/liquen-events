@@ -47,6 +47,7 @@ import RestoreDialog from "./RestoreDialog";
 import PasskeysDialog from "./PasskeysDialog";
 import SessaoExpirada from "./SessaoExpirada";
 import NotificationBell from "./NotificationBell";
+import NotaDaProposta from "./NotaDaProposta";
 import {
   downloadCsv,
   quotesToCsvRows,
@@ -4847,6 +4848,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   placeholder="Notas internas sobre este pedido…"
                                   className="bo-input px-3 py-2 text-sm text-foreground/80 resize-none w-full"
                                 />
+                                {/* ── E A NOTA QUE FOI ESCRITA NO ESTÚDIO ────
+                                    A caixa acima é do PEDIDO. Esta é a nota da
+                                    PROPOSTA, e mostra-se aqui porque quem abre
+                                    a ficha três semanas depois não passa pelo
+                                    estúdio — era aí que a frase se perdia.
+                                    Só de leitura: ver `NotaDaProposta`. */}
+                                <NotaDaProposta key={selected.id} quoteId={selected.id} />
                               </div>
 
                               {/* Estimativa calculada — contexto para definir o preço. */}

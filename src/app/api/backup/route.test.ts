@@ -38,6 +38,9 @@ const stores = vi.hoisted(() => ({
   // do `app_state`), mas do ponto de vista da cópia são um conjunto como os
   // outros — e é assim que entram nas asserções que percorrem `BACKUP_DATASETS`.
   proposalDrafts: vi.fn(async () => [] as unknown[]),
+  // As cópias dos emails enviados vivem no mesmo espaço partilhado dos
+  // rascunhos, e entram na cópia pelo mesmo caminho.
+  proposalEmails: vi.fn(async () => [] as unknown[]),
 }));
 
 /** Estado do cliente Supabase falso que serve os contadores de numeração. */
@@ -114,6 +117,7 @@ vi.mock("@/lib/overview-settings-store", () => ({
   readOverviewSettings: stores.overviewSettings,
 }));
 vi.mock("@/lib/proposal-drafts", () => ({ listProposalDrafts: stores.proposalDrafts }));
+vi.mock("@/lib/envios-de-proposta", () => ({ listEnviosDeProposta: stores.proposalEmails }));
 vi.mock("@/lib/supabase", () => ({
   getSupabase: () =>
     sb.configured

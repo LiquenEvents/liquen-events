@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { idCurto } from "@/lib/id-unico";
+import { useEffect, useId, useRef } from "react";
 
 /**
  * O QUE SE SABE E NÃO SE ESCREVE AO CLIENTE.
@@ -39,7 +38,27 @@ export default function NotasInternas({
   // O textarea cresce com o texto: uma nota de três linhas dentro de uma caixa
   // de uma linha lê-se por uma frincha, e o que não se relê não serve.
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [id] = useState(() => `notas-${idCurto()}`);
+  /**
+   * ── O `id` TEM DE SER O MESMO NO SERVIDOR E NO NAVEGADOR ─────────────────
+   *
+   * Isto era `useState(() => \`notas-${idCurto()}\`)` — um id ALEATÓRIO,
+   * sorteado uma vez no servidor e outra vez no cliente. O React desenhou
+   * `htmlFor="notas-53c900b712"` no HTML e `notas-addc8e652c` na hidratação, e
+   * respondeu com o erro que apanhou o E2E:
+   *
+   *   «A tree hydrated but some attributes of the server rendered HTML didn't
+   *    match the client properties. This won't be patched up.»
+   *
+   * «This won't be patched up» é a parte que custa: o `htmlFor` fica a apontar
+   * para um `id` que já não existe, portanto carregar no rótulo deixa de pôr o
+   * cursor na caixa — e um leitor de ecrã deixa de saber como se chama o campo.
+   *
+   * O defeito estava escrito desde que o componente nasceu e nunca tinha
+   * disparado, porque NINGUÉM O MONTAVA (era código morto — foi este ramo que
+   * o pôs no estúdio). O `useId` é a resposta do React para exactamente isto:
+   * um identificador estável, igual nos dois lados, único por instância.
+   */
+  const id = useId();
 
   useEffect(() => {
     const el = ref.current;

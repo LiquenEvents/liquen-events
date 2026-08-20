@@ -33,6 +33,7 @@ import {
   camposDoEventoNaLingua,
   dataDoEventoPorExtenso,
   ehIdiomaDaProposta,
+  isoDaDataPorExtenso,
   referenciaDoDocumento,
   type IdiomaDaProposta,
 } from "@/lib/proposal-doc-textos";
@@ -113,6 +114,8 @@ import {
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
 import NavEstudio from "./NavEstudio";
+import NotasInternas from "./NotasInternas";
+import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
 import { depositPercentOf } from "@/lib/proposal-doc";
 // A geometria do documento, para a pré-visualização mostrar a forma que cada
@@ -167,7 +170,13 @@ import {
   traduzirParaIngles,
   type EstadoDaTraducao,
 } from "@/lib/proposal-traducao";
-import { camposPorTraduzir, docTemIngles, escreverEn, lerEn } from "@/lib/proposal-doc-bilingue";
+import {
+  camposPorTraduzir,
+  docTemIngles,
+  escreverEn,
+  lerEn,
+  porTraduzirPorSeccao,
+} from "@/lib/proposal-doc-bilingue";
 import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
 import { Ajuda, Button, Card, Field, FolhaOuDialogo, Segmented } from "./ui";
 
@@ -268,6 +277,48 @@ function initialDoc(quote: Quote): StudioDoc {
   };
   base.ref = buildRef(base);
   return base;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE VEIO DO PEDIDO, E AINDA NÃO FOI OLHADO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O pré-preenchimento já existia: a proposta abre com os nomes do casal, o
+ * tipo, a data por extenso, o local, os convidados e a cerimónia que o casal
+ * escolheu no formulário. Poupa-lhe cinco campos e uma ida ao pedido.
+ *
+ * O que faltava era DIZÊ-LO. Um campo semeado é uma resposta de terceiros
+ * dentro de um documento que sai com a assinatura dela: o casal escreveu
+ * «Évora» no formulário e a proposta pode ter de dizer «Herdade da Malhadinha,
+ * Albernoa». Sem marca nenhuma, um valor semeado lê-se como um valor escrito —
+ * e um valor escrito não se relê.
+ *
+ * O mecanismo já existia inteiro e é o da CÓPIA: anel laranja, e tocar-lhe é a
+ * confirmação (ver `realce`/`confirmado`). Estava só ligado a um dos dois
+ * caminhos por onde entra texto de outra pessoa.
+ *
+ * ── SÓ O QUE TEM MESMO ALGUMA COISA ESCRITA ──────────────────────────────
+ * Um campo que o pedido não sabia responder fica VAZIO (é a regra do
+ * `initialDoc`: nunca inventa). Um anel laranja à volta de uma caixa em branco
+ * não pede confirmação nenhuma — pede que se ignore o anel.
+ *
+ * ── E O VALOR NÃO ────────────────────────────────────────────────────────
+ * O total também é semeado do pedido, e de propósito NÃO entra aqui: não é um
+ * palpite a confirmar, é o mesmo número visto de dois sítios — escrever aqui
+ * altera-o lá. Marcá-lo pedia confirmação de uma coisa que ela própria escreveu.
+ */
+function camposVindosDoPedido(d: StudioDoc): CampoAMudar[] {
+  const escrito = (v: unknown) => typeof v === "string" && v.trim() !== "";
+  const marcar: CampoAMudar[] = [];
+  if (escrito(d.clientNames)) marcar.push("clientNames");
+  if (escrito(d.eventType)) marcar.push("eventType");
+  if (escrito(d.eventDate)) marcar.push("eventDate");
+  if (escrito(d.location)) marcar.push("location");
+  if (escrito(d.guests)) marcar.push("guests");
+  if (escrito(d.ceremony)) marcar.push("ceremony");
+  if (escrito(d.time)) marcar.push("time");
+  return marcar;
 }
 
 /** Passos do fluxo guiado do estúdio. */
@@ -1494,6 +1545,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * o controlo ainda não existe no DOM. Guarda-se o alvo e o salto é dado por um
    * efeito, depois do desenho — que é a única altura em que ele existe.
    */
+  /** A falta que a Conferência mandou visitar — ver `irParaAFalta`. */
+  const [faltaAVisitar, setFaltaAVisitar] = useState<{
+    seccao?: string;
+    campo?: string;
+    /** Contador, para pedir DUAS vezes o mesmo sítio voltar a saltar. */
+    pedido: number;
+  } | null>(null);
   const [campoAVisitar, setCampoAVisitar] = useState<{
     campo: CampoDeTexto;
     /** Contador de pedidos. Carregar duas vezes na mesma palavra tem de saltar
@@ -1647,6 +1705,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // existente (mesmo sem grupos) nunca é sobrescrito.
     if (!hadDraft) {
       setDoc((d) => seedDefaults(d, quote));
+      // E marca o que veio do pedido, pela mesma condição: um rascunho é
+      // trabalho DELA, e pedir-lhe que confirme o que ela própria escreveu é o
+      // caminho mais curto para o anel laranja deixar de querer dizer alguma
+      // coisa. Ver `camposVindosDoPedido`.
+      setPorConfirmar(new Set(camposVindosDoPedido(initialDoc(quote))));
     }
 
     // O VALOR é a excepção, e de propósito: vem SEMPRE do pedido, haja rascunho
@@ -1888,6 +1951,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         });
         return mandaOPedido ? aplicarBase(limpo, doPedido) : limpo;
       });
+      // O que estava marcado como «vindo do pedido» deixou de estar no ecrã: o
+      // que se vê agora é o rascunho dela, feito noutro dispositivo. Manter os
+      // anéis pedia confirmação de texto que ela já escreveu — e o anel só vale
+      // enquanto quiser dizer «isto não é teu».
+      setPorConfirmar(new Set());
       const base = mandaOPedido ? doPedido : baseDoDoc(doDoServidor);
       if (base != null) setTotalInput(textoDoTotal(base));
       // O documento do servidor pode trazer traduções que este computador nunca
@@ -2647,26 +2715,56 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     [repetidas],
   );
 
-  /** O que dizer sobre uma foto, ou nada. */
-  function historiaDaFoto(caminho: string): { texto: string; grave: boolean } | null {
+  /**
+   * ── A ÚNICA REPETIÇÃO QUE SE DESENHA NA GRELHA ──────────────────────────
+   *
+   * A mesma fotografia em duas páginas do MESMO documento. É quase sempre um
+   * engano, é o único caso em que o casal vê a mesma fotografia duas vezes na
+   * proposta que recebe, e é a única das três perguntas que se resolve sem
+   * sair desta página — está ali, na grelha ao lado.
+   *
+   * Marcada NAS DUAS: a contagem é sobre o documento inteiro, portanto as duas
+   * células acendem. Assinalar só a segunda obrigava a procurar a primeira.
+   *
+   * ── E PORQUE É QUE AS OUTRAS DUAS NÃO ACENDEM AQUI ──────────────────────
+   * «Já usada noutro casamento» e «já usada no mesmo espaço» são verdadeiras e
+   * úteis, mas esta página já pode acender sete avisos ao mesmo tempo (página
+   * cheia, fotos fora do PDF, fila desequilibrada, fotos cortadas, foto que
+   * destoa da paleta…). Cada aviso novo torna os outros menos lidos. As duas
+   * vivem onde a decisão se toma — no selector da biblioteca, que já as mostra
+   * — e aqui contam-se ao rato, em `passadoDaFoto`, sem acender nada.
+   */
+  function repeticaoNestaProposta(caminho: string): { texto: string; grave: boolean } | null {
     const vezesAqui = ondeEstaCadaFoto.get(caminho) ?? 0;
-    if (vezesAqui > 1) {
-      return {
-        texto: `Esta fotografia está ${vezesAqui} vezes nesta proposta.`,
-        grave: true,
-      };
-    }
+    if (vezesAqui <= 1) return null;
+    // CURTO porque a tira é `truncate` e a célula, a 390 px numa grelha de três
+    // colunas, tem ~110 px de largura: «Esta fotografia está 2 vezes nesta
+    // proposta.» a 8 px sai «Esta fotografia es…», que é uma frase que não diz
+    // nada. A frase inteira fica no texto do rato, onde há espaço.
+    return { texto: `${vezesAqui}× nesta proposta`, grave: true };
+  }
+
+  /**
+   * O que se conta ao passar o rato: de que foto da biblioteca veio esta, e para
+   * onde ela já foi. Não acende nada no ecrã — é a resposta à pergunta «esta
+   * foto já não a usei?», dada a quem a faz.
+   */
+  function passadoDaFoto(caminho: string): string | undefined {
     const origem = themeOrigins[caminho];
     const f = origem ? repetidasPorOrigem.get(origem) : undefined;
-    if (!f) return null;
+    if (!f) return origem;
     const mesmoEspaco = noMesmoEspaco(f, quote.location || undefined);
-    if (mesmoEspaco.length > 0) {
-      return {
-        texto: `Já foi para ${mesmoEspaco[0].cliente}, no mesmo espaço.`,
-        grave: true,
-      };
-    }
-    return { texto: `Já usada — ${comoSeDiz(f)}.`, grave: false };
+    // A repetição DENTRO desta proposta não vem aqui: a `CelulaDeFoto` já lhe
+    // cola o texto da tira ao fim do título. Repeti-la era dizer duas vezes a
+    // mesma coisa no mesmo balão.
+    return [
+      origem,
+      mesmoEspaco.length > 0
+        ? `Já foi para ${mesmoEspaco[0].cliente}, no mesmo espaço.`
+        : `Já usada — ${comoSeDiz(f)}.`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   /** Alguma das duas listas sai por ordem diferente da que está escrita? */
@@ -3179,6 +3277,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       /* sem rede: fica para a próxima limpeza; nada se perde por isso */
     });
     setDoc(seedDefaults(initialDoc(quote), quote));
+    // Limpar volta a pôr no ecrã o que o pedido diz — e o que o pedido diz
+    // volta a estar por confirmar.
+    setPorConfirmar(new Set(camposVindosDoPedido(initialDoc(quote))));
     setTotalInput(
       typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
         ? textoDoTotal(quote.quotedPrice)
@@ -3960,6 +4061,32 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     }
   }, [campoAVisitar]);
 
+  /** O salto da Conferência, depois de a secção estar aberta e desenhada. */
+  useEffect(() => {
+    if (!faltaAVisitar) return;
+    const { seccao, campo } = faltaAVisitar;
+    const cartao = seccao ? document.getElementById(`seccao-${seccao}`) : null;
+    // `:scope > div >` e não um `querySelector` solto: dentro de uma secção há
+    // outros botões com `aria-expanded` (os mood boards têm as suas dobras), e
+    // o primeiro fechado que aparecesse era o que abria — que podia ser outro
+    // qualquer, algures no meio do cartão.
+    cartao
+      ?.querySelector<HTMLButtonElement>(':scope > div > button[aria-expanded="false"]')
+      ?.click();
+    // Num tique a seguir: o campo só está VISÍVEL depois de o clique acima ter
+    // sido processado, e focar um elemento escondido não faz nada.
+    const espera = setTimeout(() => {
+      const alvo =
+        (campo && document.querySelector<HTMLElement>(`[data-campo="${campo}"]`)) || cartao;
+      alvo?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement) {
+        alvo.focus({ preventScroll: true });
+        alvo.select();
+      }
+    }, 0);
+    return () => clearTimeout(espera);
+  }, [faltaAVisitar]);
+
   function alternarDobra(id: string) {
     escreverDobras({ ...dobrados, [id]: !dobrados[id] });
   }
@@ -4109,6 +4236,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     } finally {
       setATraduzir(false);
     }
+  }
+
+  /**
+   * ── IR AO SÍTIO ONDE A FALTA SE RESOLVE ─────────────────────────────────
+   *
+   * O irmão do `irParaCampo`, para a Conferência. A diferença é a matéria: ali
+   * é um campo de PROSA identificado por um `CampoDeTexto`; aqui é uma falta
+   * («Falta o valor»), que às vezes tem um controlo próprio e às vezes só tem
+   * uma secção — as capas e os mood boards não são um campo.
+   *
+   * Três coisas, e só a última é o salto: voltar ao conteúdo, ABRIR a secção se
+   * ela estiver dobrada (saltar para dentro de um cartão fechado deixava-a a
+   * olhar para um cartão que «não abriu», e os campos continuam lá dentro
+   * porque uma secção fechada esconde-os sem os desmontar), e só então levar a
+   * vista e o foco.
+   */
+  function irParaAFalta(seccao?: string, campo?: string) {
+    setStep("conteudo");
+    setFaltaAVisitar((antes) => ({ seccao, campo, pedido: (antes?.pedido ?? 0) + 1 }));
   }
 
   function irParaCampo(campo: CampoDeTexto, versao: "pt" | "en" = "pt") {
@@ -4893,6 +5039,58 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // ainda vai a caminho só esta sessão a conhece. O email sai uma vez, e um
   // PDF sem a foto escolhida dura para sempre.
   const canSend = podeEnviar(doc as ProposalDoc, money.gross) && fotosPorConfirmar === 0;
+  /**
+   * Quantas traduções faltam em cada secção, para o índice.
+   *
+   * SÓ com a proposta a sair em inglês — é a mesma condição do painel «Por
+   * traduzir» do passo do envio, e pela mesma razão: numa proposta portuguesa
+   * não há nada por traduzir, e uma fila de contagens debaixo de cada secção
+   * seria ruído no índice de quem nunca faz propostas inglesas.
+   */
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A DATA QUE ELA ESCREVE AQUI TAMBÉM PODE CHOCAR
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O aviso de dia ocupado já existia, e disparava ao ESCOLHER o cliente — a
+   * partir do `quote.date`. Só que a data que sai impressa é a que está neste
+   * documento, e este campo é texto livre: o casal liga a mudar o dia, ela
+   * corrige aqui, e o aviso continuava a olhar para a data do formulário.
+   *
+   * ── CALA-SE QUANDO NÃO CONSEGUE LER A DATA ──────────────────────────────
+   * `isoDaDataPorExtenso` só reconhece a forma que o estúdio escreve («12 de
+   * setembro de 2026») e devolve `null` para tudo o resto: «a definir»,
+   * «18.09.2027», «Set.», ou uma data a meio de ser escrita. Um aviso ERRADO
+   * sobre uma data é pior do que nenhum — diz que há um casamento noutro dia,
+   * e o dia é inventado por uma leitura falhada.
+   *
+   * ── E CALA-SE QUANDO É A MESMA DATA DO PEDIDO ───────────────────────────
+   * Aí o aviso já está no ecrã, por cima do estúdio (ver `FazerProposta`). O
+   * mesmo cartão duas vezes na mesma página é a maneira de se aprender a
+   * saltar os dois.
+   */
+  const dataEscritaNoDoc = isoDaDataPorExtenso(doc.eventDate ?? "");
+  const pedidoComADataDoDoc = useMemo(
+    () =>
+      dataEscritaNoDoc && dataEscritaNoDoc !== quote.date
+        ? ({
+            ...quote,
+            date: dataEscritaNoDoc,
+            // O fim de um evento de vários dias é do PEDIDO e não desta data:
+            // arrastá-lo para aqui inventava um intervalo que ninguém escreveu.
+            endDate: "",
+            // E o local também é o do documento quando ele diz outro: a
+            // distância por estrada é metade da resposta.
+            location: doc.location || quote.location,
+          } as Quote)
+        : null,
+    [dataEscritaNoDoc, quote, doc.location],
+  );
+
+  const traducoesPorSeccao = useMemo(
+    () => (idiomaDoPdf === "en" ? porTraduzirPorSeccao(doc as ProposalDoc) : undefined),
+    [idiomaDoPdf, doc],
+  );
 
   return (
     <div className="border-t border-foreground/10 pt-5">
@@ -5054,7 +5252,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         className="flex gap-6"
         style={{ paddingBottom: folgaDaBarra }}
       >
-        <NavEstudio seccoes={seccoes} faltas={faltas} onSeccaoActual={anotarSeccao} />
+        <NavEstudio
+          seccoes={seccoes}
+          faltas={faltas}
+          onSeccaoActual={anotarSeccao}
+          porTraduzir={traducoesPorSeccao}
+        />
         <div className="min-w-0 flex-1">
           {/* Template selector */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -5168,12 +5371,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   patch({ clientNames: e.target.value });
                 }}
                 containerClassName={realce("clientNames")}
+                data-campo="clientNames"
                 placeholder="Maria & Zé"
               />
               <Field
                 label="Tipo de evento"
                 value={doc.eventType}
-                onChange={(e) => patch({ eventType: e.target.value })}
+                onChange={(e) => {
+                  confirmado("eventType");
+                  patch({ eventType: e.target.value });
+                }}
+                containerClassName={realce("eventType")}
                 data-campo="eventType"
                 placeholder="Casamento"
               />
@@ -5185,6 +5393,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   patch({ eventDate: e.target.value });
                 }}
                 containerClassName={realce("eventDate")}
+                data-campo="eventDate"
                 placeholder="12 de setembro de 2026"
               />
               <Field
@@ -5196,6 +5405,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   patch({ location: e.target.value });
                 }}
                 containerClassName={realce("location")}
+                data-campo="location"
                 placeholder="Monte da Oliveirinha"
               />
               <Field
@@ -5206,25 +5416,56 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   patch({ guests: e.target.value });
                 }}
                 containerClassName={realce("guests")}
+                data-campo="guests"
                 placeholder="150 pax"
               />
               {isDeco && (
                 <>
+                  {/* ── ESTES TRÊS NÃO TINHAM ANEL NENHUM ────────────────
+                      A cerimónia vem do que o casal escolheu no formulário e a
+                      hora vem, quando vem, de uma proposta copiada — texto de
+                      outra pessoa, exactamente como os quatro de cima. Eram os
+                      únicos campos do Evento onde a marca não acendia, e por
+                      isso os únicos onde um valor de terceiros se lia como um
+                      valor escrito. */}
                   <Field
                     label="Cerimónia"
                     value={doc.ceremony ?? ""}
-                    onChange={(e) => patch({ ceremony: e.target.value })}
+                    onChange={(e) => {
+                      confirmado("ceremony");
+                      patch({ ceremony: e.target.value });
+                    }}
+                    containerClassName={realce("ceremony")}
+                    data-campo="ceremony"
                     placeholder="Civil, simbólica"
                   />
                   <Field
                     label="Hora"
                     value={doc.time ?? ""}
-                    onChange={(e) => patch({ time: e.target.value })}
+                    onChange={(e) => {
+                      confirmado("time");
+                      patch({ time: e.target.value });
+                    }}
+                    containerClassName={realce("time")}
+                    data-campo="time"
                     placeholder="A definir"
                   />
                 </>
               )}
             </div>
+
+            {/* O que já está marcado à volta da data que ESTÁ ESCRITA AQUI —
+                ver `pedidoComADataDoDoc`. O mesmo cartão do ecrã de escolher o
+                cliente, com a mesma leitura de distância por estrada. */}
+            {pedidoComADataDoDoc && (
+              <div className="mt-4">
+                <AvisoDataOcupada
+                  quote={pedidoComADataDoDoc}
+                  quotes={quotes ?? []}
+                  motivo="Não impede nada — a decisão é tua. Esta é a data que escreveste na proposta, e não a do pedido."
+                />
+              </div>
+            )}
 
             {/* As sugestões. `datalist` e não um `select`: ela TEM de poder
                 escrever um espaço novo — a lista ajuda, não fecha a porta. */}
@@ -5261,6 +5502,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
               />
             </div>
+
+            {/* ── O QUE SE SABE E NÃO SE ESCREVE AO CLIENTE ────────────────
+                «Quer ficar por baixo dos 8.000 €.» «Quem decide é a mãe.»
+                Frases que hoje vivem na cabeça de quem escreveu a proposta e
+                que se perdem quando é outra pessoa a pegar nela — ou quando são
+                seis meses depois.
+
+                Vive na secção do EVENTO e não ao pé do dinheiro: é sobre o
+                negócio inteiro, e é a primeira secção — a nota tem de estar
+                onde se dá com ela sem a procurar.
+
+                O aspecto de papel amarelo é a garantia de que não se confunde
+                com um campo que sai na proposta; o teste
+                (`notas-internas-ficam-em-casa.test.ts`) garante que não sai
+                mesmo. */}
+            <NotasInternas
+              valor={doc.notasInternas ?? ""}
+              onChange={(v) => patch({ notasInternas: v })}
+            />
           </Section>
 
           {/* Cover images */}
@@ -5843,6 +6103,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           // Fechado, a foto vê-se mas não se mexe: é
                                           // isso que «terminado» quer dizer.
                                           bloqueada={fechado}
+                                          // A tira e o texto do rato — ver
+                                          // `repeticaoNestaProposta` logo por
+                                          // cima, e porque é que só uma das
+                                          // três perguntas acende.
+                                          historia={repeticaoNestaProposta(path)}
+                                          origem={passadoDaFoto(path)}
                                           accoes={
                                             fechado ? null : (
                                               <AccoesDaFoto
@@ -6958,6 +7224,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   onTotalInput(e.target.value);
                 }}
                 placeholder="3000"
+                data-campo="totalAmount"
                 containerClassName={realce("totalAmount")}
                 hint={
                   desvio
@@ -7498,6 +7765,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 // pedido que veio em inglês e calava-se sobre a metade da
                 // proposta que ia sair em português.
                 idioma={idiomaDoPdf}
+                onIr={(v) => irParaAFalta(v.seccao, v.campo)}
               />
               {/* Os acentos que faltam nos campos que saem impressos. Aqui, ao
                   pé da Conferência, e não a meio de escrever: a palavra ainda
@@ -7559,15 +7827,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 idioma={idiomaDoPdf}
                 onInserirNaMensagem={inserirParagrafoDoQueMudou}
               />
-              {!canSend && fotosPorConfirmar === 0 && (
-                <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-[#b5654a]">
-                  <span aria-hidden="true">⚠</span>
-                  <span>
-                    Preenche clientes, referência e um total maior que 0 (no passo «Conteúdo») antes
-                    de enviar.
-                  </span>
-                </p>
-              )}
+              {/* ── A FRASE ESTÁTICA SAIU DAQUI ──────────────────────────
+                  Dizia «Preenche clientes, referência e um total maior que 0
+                  (no passo «Conteúdo») antes de enviar» — sempre as mesmas
+                  palavras, mesmo quando só faltava uma das três, sem link para
+                  nenhuma e a repetir uma lista que já existia duas vezes (a
+                  Conferência aqui em cima e a coluna lateral, que só existe
+                  acima de 1280 px).
+
+                  Agora o que trava está na Conferência, em primeiro e a
+                  vermelho, com o nome do que falta e um link que põe o cursor
+                  dentro do campo. Uma lista, um vocabulário, e visível em
+                  qualquer largura — ver `conferencia.ts`. */}
             </>
           )}
         </Section>

@@ -24,7 +24,13 @@ vi.mock("@/lib/proposal-token", () => ({
 }));
 vi.mock("@/lib/proposals-store", () => ({
   getProposal: vi.fn(async (id: string) => db.proposals.get(id) ?? null),
+  // Ver a nota igual no teste da página: sem isto o resolvedor rebentava, a
+  // avaria era engolida e estes testes ficavam verdes pela razão errada.
+  listProposalsForQuote: vi.fn(async (quoteId: string) =>
+    [...db.proposals.values()].filter((p) => (p as { quoteId?: string }).quoteId === quoteId),
+  ),
 }));
+vi.mock("@/lib/contracts-store", () => ({ getAcceptedContractByQuote: async () => null }));
 vi.mock("@/lib/proposal-doc-render", () => ({
   renderStoredProposalDocPdf: vi.fn(async (doc: unknown) => {
     db.rendered.push(doc);

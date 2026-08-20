@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { readProposalToken } from "@/lib/proposal-token";
-import { getProposal } from "@/lib/proposals-store";
+import { propostaDoLink } from "@/lib/proposta-do-link";
 import { SITE } from "@/lib/site";
 import { getDictionary, htmlLang, normalizeLocale, type Locale } from "@/lib/i18n";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
@@ -75,8 +75,10 @@ export async function generateMetadata({
   // o título da página: cai-se no visitante, como sempre foi.
   let locale = normalizeLocale(lang);
   try {
-    const claim = readProposalToken(token);
-    const proposal = claim ? await getProposal(claim.proposalId) : null;
+    // A MESMA proposta que a página resolve (o link segue o pedido, não a
+    // linha — ver `proposta-do-link.ts`). Duas escadas diferentes davam um
+    // separador português por cima de uma revisão inglesa.
+    const proposal = (await propostaDoLink(token))?.proposta ?? null;
     if (proposal) locale = idiomaDaProposta(proposal);
   } catch {
     /* fica a língua do visitante */
@@ -138,30 +140,35 @@ export async function generateMetadata({
 }
 
 /**
- * O DINHEIRO DESTA PÁGINA FICA EM pt-PT NAS DUAS LÍNGUAS — NÃO É UM ESQUECIMENTO.
+ * O DINHEIRO SEGUE A LÍNGUA DA PROPOSTA.
  *
- * Aqui vivia uma cópia do `Intl` que recebia o `dateLocale` do dicionário, e
- * numa proposta em inglês o mesmo total saía «€24,600.00» enquanto o email que
- * trouxe o casal a esta página, e o PDF que ela transporta, diziam
- * «24.600,00 €». O `eurDocumento` é o formatador de tudo o que sai para o
- * cliente (ver `money.ts`), e é pt-PT por construção.
+ * Decisão dela, 20-08-2026: «se é em pt o dinheiro tem que estar em português,
+ * mas se é em eng o dinheiro tem que estar em inglês».
  *
- * Foi decidido de propósito, e não se muda para `en-GB` sem desfazer isto:
+ * ── O que aqui estava escrito, e a parte que era falsa ────────────────────
  *
- *   1. metade dos valores de uma proposta é TEXTO LIVRE escrito por ela, à
- *      portuguesa. Formatar os nossos à inglesa punha «€24,600.00» ao lado do
- *      «24.600,00 €» dela, na mesma folha — e nas duas formas a vírgula e o
- *      ponto TROCAM DE PAPEL: «24.600» lê-se, em inglês, como vinte e quatro
- *      euros e sessenta;
- *   2. a FACTURA que se segue é um documento fiscal português e sai em
- *      português. O casal inglês recebe os dois;
- *   3. o PDF da proposta já escreve assim em qualquer idioma. Localizar só esta
- *      página punha-a a discordar do documento que ela própria oferece a abrir.
+ * Vivia aqui a decisão contrária — pt-PT nas duas línguas — com três razões.
+ * Duas continuam de pé e valem: metade dos montantes de uma proposta é TEXTO
+ * LIVRE escrito por ela à portuguesa, e a factura que se segue é um documento
+ * fiscal português. A terceira dizia que «o PDF já escreve assim em qualquer
+ * idioma» — e **é falsa**: o gerador passa cada montante por
+ * `montanteNaLingua` (`proposal-doc-pdf.ts:858`). Uma proposta inglesa saía do
+ * PDF com «€24,600.00» e desta página com «24.600,00 €». Era a página a
+ * discordar do PDF, e não o contrário.
  *
- * As DATAS continuam localizadas — é o `t.dateLocale` que trata delas, e é para
- * isso que ele existe.
+ * ── Como se converte, e porque não é um `Intl` com outra localização ──────
+ *
+ * Pelo MESMO caminho do PDF: escreve-se à portuguesa com o `eurDocumento` e
+ * converte-se no fim com o `montanteNaLingua`. A diferença não é de estilo. Um
+ * formatador à parte punha os NOSSOS números em inglês e os DELA — o texto
+ * livre — em português na mesma folha, e entre as duas formas a vírgula e o
+ * ponto TROCAM DE PAPEL: «24.600» lido à inglesa são vinte e quatro euros e
+ * sessenta. A conversão partilhada trata os dois da mesma maneira, que é o que
+ * torna a folha coerente.
+ *
+ * As DATAS já eram localizadas pelo `t.dateLocale` e continuam.
  */
-import { eurDocumento as eur } from "@/lib/money";
+import { eurDocumento, montanteNaLingua } from "@/lib/money";
 
 function Shell({ children, lang }: { children: React.ReactNode; lang: string }) {
   return (
@@ -244,7 +251,18 @@ export default async function ProposalPage({
     );
   }
 
-  const proposal = await getProposal(claim.proposalId);
+  /**
+   * ── A VERSÃO ATUAL, PELO LINK QUE O CASAL JÁ TEM ─────────────────────────
+   *
+   * Palavras dela: «Se eu ajustar o preço ou os serviços, o casal vê a versão
+   * atual sem eu reenviar nada.» O token guarda o identificador de UMA
+   * proposta e uma revisão é uma proposta NOVA — portanto este link mostrava a
+   * versão 1 para sempre. Quem resolve isso (e as guardas que impedem o salto
+   * de virar um buraco) está em `proposta-do-link.ts`, num sítio só, porque o
+   * PDF e as fotografias têm de resolver exactamente a mesma.
+   */
+  const doLink = await propostaDoLink(token);
+  const proposal = doLink?.proposta;
   if (!proposal) {
     const t = getDictionary(doVisitante).proposta;
     return <Message title={t.notFoundTitle} body={t.notFoundBody} lang={htmlLang(doVisitante)} />;
@@ -262,6 +280,9 @@ export default async function ProposalPage({
    */
   const locale = idiomaDaProposta(proposal);
   const t = getDictionary(locale).proposta;
+  /** O dinheiro na língua da proposta — ver o cabeçalho do ficheiro. */
+  const eur = (valor: number, moeda?: string) =>
+    montanteNaLingua(eurDocumento(valor, moeda), locale);
 
   /**
    * ── «OLÁ, .» ────────────────────────────────────────────────────────────
@@ -315,6 +336,14 @@ export default async function ProposalPage({
         return !Number.isNaN(e) && e < Date.now();
       })()
     : false;
+  /** O dia em que o CONTEÚDO mudou pela última vez, na língua do documento. */
+  const atualizadaLabel = doLink?.versaoEm
+    ? new Date(doLink.versaoEm).toLocaleDateString(t.dateLocale, {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
   const validLabel = proposal.validUntil
     ? new Date(proposal.validUntil + "T12:00:00").toLocaleDateString(t.dateLocale, {
         day: "numeric",
@@ -474,6 +503,26 @@ export default async function ProposalPage({
         {validLabel && (
           <p className="text-foreground/68 text-xs mt-5 text-center">
             {t.validoAte} {validLabel}.
+          </p>
+        )}
+
+        {/* ── QUE VERSÃO É ESTA, E DE QUE DIA ──────────────────────────────
+            O link mostra sempre a versão ATUAL (ver `proposta-do-link.ts`), o
+            que resolve o problema de fundo e cria outro: o casal volta ao
+            link meses depois e não tem como saber se está a olhar para o
+            mesmo papel que leu. Esta linha responde a isso.
+
+            É sobre o DOCUMENTO e nunca sobre quem o lê. Não se regista que a
+            proposta foi aberta, nem quando, nem por quem — a regra dela, à
+            letra. O que aqui está é a data em que ELA mexeu, que já estava
+            gravada do lado do estúdio.
+
+            Só aparece a partir da versão 2: dizer «Versão 1» a quem abre uma
+            proposta pela primeira vez é ruído. */}
+        {!!doLink?.versao && doLink.versao > 1 && (
+          <p className="text-foreground/60 text-[11px] mt-2 text-center">
+            {t.versaoNumero} {doLink.versao}
+            {atualizadaLabel ? ` · ${t.atualizadaEm} ${atualizadaLabel}` : ""}
           </p>
         )}
 

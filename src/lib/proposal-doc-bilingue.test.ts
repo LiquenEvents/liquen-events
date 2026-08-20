@@ -8,6 +8,7 @@ import {
   docTemIngles,
   escreverEn,
   lerEn,
+  porTraduzirPorSeccao,
   temVersaoInglesa,
 } from "./proposal-doc-bilingue";
 
@@ -371,5 +372,55 @@ describe("camposComVersaoInglesa", () => {
     expect(tipos.has("eventType")).toBe(false);
     expect(tipos.has("grupoTitulo")).toBe(true);
     expect(tipos.has("linhaDeOrcamento")).toBe(true);
+  });
+});
+
+/**
+ * A CONTAGEM POR SECÇÃO — para o índice do estúdio.
+ *
+ * O painel «Por traduzir» lista tudo, mas vive no passo do envio. A meio de
+ * escrever a pergunta é outra: «desta secção, o que é que ainda falta?».
+ */
+describe("porTraduzirPorSeccao", () => {
+  it("conta cada campo na secção onde ele se resolve", () => {
+    const doc = proposta({
+      serviceGroups: [
+        { title: "Decoração Floral", items: [{ label: "Arco" }, { label: "Igreja" }] },
+      ],
+      budgetItems: ["Decor Cerimónia"],
+      moodBoards: [{ title: "Cerimónia", images: [] }],
+    });
+    // Serviços: o título do grupo + as duas rubricas. Orçamento: a linha.
+    // Mood boards: o título do board. Total: o rótulo do total e o adicional,
+    // que o fixture traz — e que caem na secção do total, como no estúdio.
+    expect(porTraduzirPorSeccao(doc)).toEqual({
+      servicos: 3,
+      orcamento: 1,
+      moodboards: 1,
+      total: 2,
+    });
+  });
+
+  it("o que já tem inglês não entra na conta", () => {
+    const doc = proposta({
+      serviceGroups: [{ title: "Decoração", titleEn: "Decoration", items: [] }],
+      budgetItems: [],
+      moodBoards: [],
+    });
+    expect(porTraduzirPorSeccao(doc).servicos ?? 0).toBe(0);
+    // CONTROLO POSITIVO: sem a caixa inglesa, o MESMO documento contava um.
+    const semEn = proposta({
+      serviceGroups: [{ title: "Decoração", items: [] }],
+      budgetItems: [],
+      moodBoards: [],
+    });
+    expect(porTraduzirPorSeccao(semEn).servicos).toBe(1);
+  });
+
+  it("uma secção sem faltas não aparece de todo", () => {
+    // Um `0` no índice ao lado de cinco secções é uma fila de zeros a dizer que
+    // não há nada a fazer.
+    const doc = proposta({ serviceGroups: [], budgetItems: [], moodBoards: [] });
+    expect(Object.keys(porTraduzirPorSeccao(doc))).not.toContain("servicos");
   });
 });

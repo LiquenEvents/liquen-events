@@ -1,7 +1,8 @@
 import "server-only";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { esc, MAIL_TO, type Attachment } from "./mail";
 import { SITE } from "./site";
-import { EMAIL_LOGO_CID, emailLogoAttachment } from "./email-logo";
 import { log } from "./logger";
 
 /**
@@ -47,25 +48,31 @@ import { log } from "./logger";
  * que é o caso de metade destes emails. Nenhum `<img>` daqui aponta para um
  * URL: os bytes viajam com a mensagem.
  *
- * ── AS REDES SÃO TEXTO, NÃO ÍCONES ────────────────────────────────────────
+ * ── AS REDES SÃO ÍCONES ──────────────────────────────────────────────────
  *
- * A assinatura de origem tem três ícones sociais pretos. Aqui saem como
- * palavras, e a escolha tem três razões:
+ * Decisão dela, 20-08-2026, com a assinatura dela à frente: «sempre com este
+ * banner e com este aspeto a dizer catarina manager, redes sociais».
  *
- *   1. PESO. Cada ícone seria mais um anexo `cid` em CADA email. O logótipo já
- *      são ~7KB de base64 por mensagem, e a proposta ainda leva um PDF atrás;
- *      três imagens de 16px por cima disso é peso que se paga em todos os
- *      envios para ganhar um enfeite.
- *   2. O OUTLOOK. Escala imagens minúsculas ao seu critério em ecrãs de alta
- *      densidade — um ícone de 16px sai borratado ou com um pixel de desalinho
- *      que não se consegue corrigir por CSS, porque metade do CSS moderno lá
- *      não existe. Uma palavra sai sempre bem.
- *   3. LEGIBILIDADE. Um ícone de 16px sem etiqueta é um enigma para quem lê com
- *      as imagens desligadas ou com um leitor de ecrã; «Instagram» não é.
+ * Aqui estavam as três redes escritas por extenso, e a razão estava escrita:
+ * peso (mais um anexo por rede, em CADA email), o Outlook a escalar imagens
+ * pequenas ao seu critério, e um ícone de 16 px sem etiqueta ser um enigma
+ * para quem lê com as imagens desligadas. As três continuam a ser verdade e
+ * nenhuma delas manda: a assinatura é o rosto da casa e o desenho é dela.
  *
- * Trocar para ícones `cid:` é uma mudança pequena e localizada (juntar os
- * anexos em {@link assinaturaDeEmail} e trocar as palavras por `<img>`), se
- * ela preferir o desenho ao peso.
+ * O que se fez para as pagar o mais barato possível:
+ *   · os ícones são PNG de 32 px (224, 537 e 317 bytes), desenhados em traço
+ *     cheio para o Outlook não ter nada que escalar mal, e apresentados a
+ *     18 px com `width`/`height` no atributo — que é a única forma que o
+ *     Outlook respeita;
+ *   · cada um leva `alt` («Facebook», «Instagram», «LinkedIn»), portanto quem
+ *     tem as imagens desligadas ou lê por leitor de ecrã continua a ler o nome
+ *     da rede, que era a terceira objecção;
+ *   · a versão em texto simples continua a levar os endereços por extenso.
+ *
+ * O LOGÓTIPO que estava no topo da assinatura SAIU. Não é corte por corte: a
+ * assinatura dela não o tem (a marca aparece na faixa, em baixo), e tê-lo nos
+ * dois sítios era o mesmo desenho duas vezes com dez linhas de intervalo.
+ * Poupa ~7 KB por email, que é quase o que a faixa custa.
  */
 
 /** Quem assina quando não há sessão com nome — e quem assina a protecção. */
@@ -142,26 +149,88 @@ export function assinanteDoEmail(quem: QuemAssina = {}): { nome: string; cargo: 
 }
 
 /**
- * ── O BANNER FOI-SE, E NÃO VOLTA POR SE LARGAR UM FICHEIRO ────────────────
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FAIXA DA CASA, NO FIM DE TODOS OS EMAILS
+ * ════════════════════════════════════════════════════════════════════════════
  *
- * Havia aqui um segundo bloco de imagem no fim da assinatura: bastava pôr um
- * `banner-liquen-email.png` em `public/email/` e ele passava a ir em todos os
- * emails, sem tocar em código. O ficheiro foi lá posto, e o que chegava à caixa
- * do cliente era um rectângulo verde de 560×140 (~200 px de altura no
- * telemóvel) com o logótipo outra vez — o mesmo logótipo que está três linhas
- * acima, no topo da assinatura. Metade da peça era verde vazio.
+ * Isto já cá esteve e foi tirado — «o rectângulo verde no fim dos emails
+ * vai-se» —, com o argumento de que era verde vazio com o logótipo repetido.
+ * O argumento estava certo sobre o que lá estava, e ERRADO sobre o que ela
+ * queria: a faixa dela não é um rectângulo vazio, tem a marca de água do
+ * líquen, e é assim que a casa assina há anos. Ela mandou a peça e a
+ * instrução: «sempre com este banner e com este aspeto».
  *
- * Tirou-se o FICHEIRO e tirou-se o MECANISMO, e a segunda metade é que é a
- * correcção: só apagar o PNG deixava a porta aberta para o próximo que largasse
- * um ficheiro com aquele nome — o banner voltava a todos os emails sem que
- * ninguém tivesse escrito uma linha, que foi exactamente como ele apareceu.
+ * Volta, e volta EXPLÍCITA. O que se tirou da outra vez, e não volta, foi o
+ * mecanismo silencioso: naquele desenho, largar um ficheiro com o nome certo
+ * numa pasta punha uma imagem em todo o correio da casa sem ninguém escrever
+ * uma linha — foi assim que a primeira apareceu. Agora a faixa está escrita
+ * aqui, à vista, e é obrigatória: se o ficheiro faltar, o email SAI À MESMA e
+ * sem imagem partida, e fica um erro no registo — porque uma faixa em falta é
+ * uma avaria de instalação, não o estado normal de nada.
  *
- * Se um dia houver uma peça gráfica que valha o peso (vai em TODOS os envios) e
- * que diga alguma coisa que a assinatura ainda não diz, escreve-se aqui, à
- * vista, com o `cid:` e o anexo ao lado — como o logótipo. Uma imagem que entra
- * no correio da casa é uma decisão, não um efeito secundário de copiar um
- * ficheiro para uma pasta.
+ * O ficheiro é `public/email/banner-liquen-email.png` e é a fonte de verdade:
+ * substituí-lo troca a faixa em todos os emails, sem regenerar constantes.
+ * Medidas: 1120×336 no ficheiro (para os ecrãs de alta densidade), apresentado
+ * a 560×168, que é a largura do corpo destes emails.
  */
+export const BANNER_EMAIL_CID = "liquen-banner";
+
+const BANNER_FICHEIRO = "banner-liquen-email.png";
+const BANNER_LARGURA = 560;
+const BANNER_ALTURA = 168;
+
+/** Acima disto a faixa pesa mais do que tudo o resto da mensagem. */
+const BANNER_TECTO_BYTES = 200_000;
+
+/**
+ * Os ícones das redes, no mesmo sítio e pela mesma razão: ficheiros, não
+ * constantes de base64, para se poderem trocar sem regenerar nada.
+ */
+const ICONES_SOCIAIS: Readonly<Record<string, string>> = {
+  Facebook: "social-facebook.png",
+  Instagram: "social-instagram.png",
+  LinkedIn: "social-linkedin.png",
+};
+
+/**
+ * Lidos do disco UMA vez e guardados — incluindo a ausência. Um `readFileSync`
+ * por email seria uma ida ao disco em cada envio; o ficheiro só muda com um
+ * deploy novo, que traz um processo novo.
+ */
+const cacheDeImagens = new Map<string, Buffer | null>();
+
+function imagemDoEmail(nome: string): Buffer | null {
+  const guardada = cacheDeImagens.get(nome);
+  if (guardada !== undefined) return guardada;
+  let lida: Buffer | null = null;
+  try {
+    lida = readFileSync(path.join(process.cwd(), "public", "email", nome));
+    if (lida.byteLength > BANNER_TECTO_BYTES) {
+      /**
+       * Vai na mesma — uma imagem que não aparece por causa de um limite que
+       * ninguém vê é pior do que um email pesado —, mas fica registado.
+       *
+       * O tamanho MEDIDO não entra aqui, e é de propósito: o `log.warn` acaba
+       * no webhook de alertas (`logger.ts`), que serializa o contexto para
+       * dentro de um `fetch`. Um valor lido do disco a viajar para fora é um
+       * rasto que o CodeQL segue e assinala — «file data in outbound network
+       * request». O nome e o tecto são constantes nossas e chegam para saber o
+       * que fazer. NÃO voltes a pôr aqui o `byteLength`.
+       */
+      log.warn("assinatura: uma imagem do email é grande demais", {
+        ficheiro: nome,
+        tecto: BANNER_TECTO_BYTES,
+      });
+    }
+  } catch {
+    // A faixa é obrigatória: a falta dela é uma avaria de instalação e tem de
+    // se ver. Os ícones seguem a mesma regra — sem eles a assinatura fica sem
+    // as redes, que é uma diferença que se nota.
+    log.error("assinatura: imagem do email em falta em public/email", null, { ficheiro: nome });
+  }
+  cacheDeImagens.set(nome, lida);
+  return lida;
+}
 
 type Rede = { nome: string; url: string };
 
@@ -172,9 +241,10 @@ type Rede = { nome: string; url: string };
  * do que não ter link nenhum. Assim que o endereço lá estiver, aparece sozinho.
  */
 function redesConfiguradas(): Rede[] {
+  // Pela ORDEM da assinatura dela: Facebook, Instagram, LinkedIn.
   const todas: Rede[] = [
-    { nome: "Instagram", url: SITE.instagram },
     { nome: "Facebook", url: SITE.facebook },
+    { nome: "Instagram", url: SITE.instagram },
     { nome: "LinkedIn", url: SITE.linkedin },
   ];
   return todas.filter((r) => r.url.trim() !== "");
@@ -218,31 +288,69 @@ export function assinaturaDeEmail(quem: QuemAssina = {}): {
     ? `<div class="em-muted" style="color:${CINZA};font-size:13px;font-style:italic;mso-line-height-rule:exactly;line-height:19px">${esc(assinante.cargo)}</div>`
     : "";
 
+  /**
+   * As redes, em ícones. Cada um é um anexo `cid:` (nunca um URL — ver o
+   * cabeçalho), com `width`/`height` no ATRIBUTO, que é a única forma que o
+   * Outlook respeita, e com `alt` para quem tem as imagens desligadas.
+   */
+  const anexosSociais: Attachment[] = [];
   const linhaRedes = redes.length
-    ? `<tr><td style="padding-top:12px">${redes
-        .map(
-          (r) =>
-            `<a class="em-strong" href="${esc(r.url)}" style="color:${TINTA};text-decoration:underline;font-size:12px">${esc(r.nome)}</a>`,
-        )
-        .join(
-          `<span class="em-muted" style="color:${CINZA};font-size:12px">&nbsp;·&nbsp;</span>`,
-        )}</td></tr>`
+    ? `<tr><td style="padding-top:8px">${redes
+        .map((r) => {
+          const ficheiro = ICONES_SOCIAIS[r.nome];
+          const bytes = ficheiro ? imagemDoEmail(ficheiro) : null;
+          if (!bytes) {
+            // Sem ícone, a rede sai em palavra em vez de desaparecer: uma rede
+            // a menos é pior do que uma rede escrita.
+            return `<a class="em-strong" href="${esc(r.url)}" style="color:${TINTA};text-decoration:underline;font-size:12px">${esc(r.nome)}</a>`;
+          }
+          const cid = `liquen-social-${r.nome.toLowerCase()}`;
+          anexosSociais.push({
+            filename: ficheiro,
+            content: Buffer.from(bytes),
+            contentType: "image/png",
+            cid,
+          });
+          return `<a href="${esc(r.url)}" style="text-decoration:none;display:inline-block"><img src="cid:${cid}" alt="${esc(r.nome)}" width="18" height="18" style="display:inline-block;width:18px;height:18px;border:0;vertical-align:middle"></a>`;
+        })
+        .join('<span style="display:inline-block;width:10px">&nbsp;</span>')}</td></tr>`
     : "";
 
-  const html = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-top:28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
-  <tr><td class="em-hair" style="border-top:1px solid ${RISCO};padding-top:18px">
-    <img src="cid:${EMAIL_LOGO_CID}" alt="Líquen Events" width="96" height="48" style="display:block;width:96px;height:48px;border:0">
-  </td></tr>
-  <tr><td style="padding-top:14px">
+  /**
+   * A FAIXA, no fim — e é ela que fecha a assinatura. Ver o cabeçalho do
+   * bloco: é uma decisão dela, e é obrigatória. Em falta, o email sai à mesma
+   * e sem imagem partida (não se escreve `<img>` nenhum), com o erro no
+   * registo.
+   */
+  const bytesDaFaixa = imagemDoEmail(BANNER_FICHEIRO);
+  const linhaFaixa = bytesDaFaixa
+    ? `<tr><td style="padding-top:16px">
+    <img src="cid:${BANNER_EMAIL_CID}" alt="${esc(SITE.name)}" width="${BANNER_LARGURA}" height="${BANNER_ALTURA}" style="display:block;width:100%;max-width:${BANNER_LARGURA}px;height:auto;border:0">
+  </td></tr>`
+    : "";
+
+  /**
+   * ── «NADA AFASTADO UMAS COISAS DAS OUTRAS» ──────────────────────────────
+   *
+   * Instrução dela, e é sobre isto: a assinatura tinha 28 px de margem por
+   * cima, 18 px depois do risco, 14 px antes do nome e 12 px antes de cada
+   * bloco — degraus que somavam quase um ecrã de telemóvel entre o fim do
+   * texto e o fim da assinatura. Passa a 16/10/8, e as linhas de contacto de
+   * 21 para 19 px de entrelinha. É a mesma informação, junta, como na
+   * assinatura dela.
+   */
+  const html = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;margin-top:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <tr><td class="em-hair" style="border-top:1px solid ${RISCO};padding-top:10px">
     <div class="em-strong" style="color:${TINTA};font-size:15px;font-weight:700;mso-line-height-rule:exactly;line-height:20px">${esc(assinante.nome)}</div>
     ${linhaCargo}
   </td></tr>
-  <tr><td style="padding-top:12px">
-    <div style="mso-line-height-rule:exactly;line-height:21px"><a class="em-strong" href="tel:${esc(SITE.phone)}" style="color:${TINTA};text-decoration:none;font-size:13px;white-space:nowrap">${esc(SITE.phoneDisplay)}</a></div>
-    <div style="mso-line-height-rule:exactly;line-height:21px;font-size:13px">${ligacao(`mailto:${MAIL_TO}`, MAIL_TO)}</div>
-    <div style="mso-line-height-rule:exactly;line-height:21px;font-size:13px">${ligacao(SITE.url, dominio)}</div>
+  <tr><td style="padding-top:8px">
+    <div style="mso-line-height-rule:exactly;line-height:19px"><a class="em-strong" href="tel:${esc(SITE.phone)}" style="color:${TINTA};text-decoration:none;font-size:13px;white-space:nowrap">${esc(SITE.phoneDisplay)}</a></div>
+    <div style="mso-line-height-rule:exactly;line-height:19px;font-size:13px">${ligacao(`mailto:${MAIL_TO}`, MAIL_TO)}</div>
+    <div style="mso-line-height-rule:exactly;line-height:19px;font-size:13px">${ligacao(SITE.url, dominio)}</div>
   </td></tr>
   ${linhaRedes}
+  ${linhaFaixa}
 </table>`;
 
   // Coerente com o HTML, e não uma versão pobre dele: quem lê em texto tem de
@@ -260,10 +368,29 @@ export function assinaturaDeEmail(quem: QuemAssina = {}): {
     ...(redes.length ? ["", ...redes.map((r) => `${r.nome}: ${r.url}`)] : []),
   ].join("\n");
 
-  // Só o logótipo. Buffer novo a cada chamada — o porquê está no
-  // `emailLogoAttachment`: o nodemailer consome o conteúdo, e um Buffer
-  // partilhado ia vazio no segundo envio.
-  const anexos: Attachment[] = [emailLogoAttachment()];
+  /**
+   * A faixa e os ícones das redes. O logótipo do topo saiu com o desenho novo
+   * (ver o cabeçalho) — e o `emailLogoAttachment` continua a existir e a ser
+   * usado pela confirmação do formulário público, que o desenha no cabeçalho.
+   *
+   * `Buffer.from(...)` a cada chamada, e não o buffer guardado: o nodemailer
+   * CONSOME o conteúdo de um anexo, portanto partilhar o buffer entre envios
+   * fazia o segundo email sair com a imagem vazia. É a mesma armadilha que o
+   * `emailLogoAttachment` documenta.
+   */
+  const anexos: Attachment[] = [
+    ...anexosSociais,
+    ...(bytesDaFaixa
+      ? [
+          {
+            filename: BANNER_FICHEIRO,
+            content: Buffer.from(bytesDaFaixa),
+            contentType: "image/png",
+            cid: BANNER_EMAIL_CID,
+          } satisfies Attachment,
+        ]
+      : []),
+  ];
 
   return { html, texto, anexos };
 }

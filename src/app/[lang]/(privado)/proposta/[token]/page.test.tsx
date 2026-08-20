@@ -24,7 +24,17 @@ vi.mock("@/lib/proposal-token", () => ({
 }));
 vi.mock("@/lib/proposals-store", () => ({
   getProposal: vi.fn(async () => db.proposal),
+  /**
+   * O link do casal passou a seguir o PEDIDO e não a linha (ver
+   * `proposta-do-link.ts`), portanto a resolução lista as irmãs. Sem este
+   * duplo, a chamada rebentava, o `try` do resolvedor engolia a avaria e estes
+   * testes passavam a exercitar o caminho de recurso — verdes pela razão
+   * errada. Uma lista vazia é o que este ficheiro quer: aqui só há uma
+   * proposta, e o que se testa é a página.
+   */
+  listProposalsForQuote: vi.fn(async () => (db.proposal ? [db.proposal] : [])),
 }));
+vi.mock("@/lib/contracts-store", () => ({ getAcceptedContractByQuote: async () => null }));
 vi.mock("next/image", () => ({ default: () => null }));
 // O bloco de resposta é um Client Component com estado próprio e testes seus;
 // aqui interessa a página, por isso entra como um marcador.
@@ -55,6 +65,8 @@ vi.mock("@/lib/i18n", () => ({
             iva: "VAT",
             total: "Total",
             validoAte: "Valid until",
+            versaoNumero: "Version",
+            atualizadaEm: "Updated on",
             verPdf: "View the full proposal (PDF)",
             footerNote: "…",
             respostaComo: "Let us know by email or by phone whether you would like to go ahead.",
@@ -76,6 +88,8 @@ vi.mock("@/lib/i18n", () => ({
             iva: "IVA",
             total: "Total",
             validoAte: "Válida até",
+            versaoNumero: "Versão",
+            atualizadaEm: "Atualizada a",
             verPdf: "Ver a proposta completa (PDF)",
             footerNote: "…",
             respostaComo: "Diga-nos por e-mail ou por telefone se quer avançar com esta proposta.",
@@ -358,5 +372,54 @@ describe("a proposta nunca leva imagem de partilha", () => {
     // O layout de raiz continua a dar imagem de partilha a quem não a recusa.
     expect(fonte).toMatch(/openGraph:[\s\S]{0,600}images:/);
     expect(fonte).toMatch(/twitter:[\s\S]{0,300}images:/);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUE VERSÃO É ESTA, E DE QUE DIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O link passou a mostrar sempre a versão ATUAL (ver `proposta-do-link.ts`).
+ * Isso resolve o problema de fundo — ela ajusta o preço e o casal vê o preço
+ * novo sem reenvio nenhum — e cria outro: o casal volta ao link meses depois e
+ * não tem como saber se está a olhar para o mesmo papel que leu.
+ *
+ * A linha responde a isso e a mais nada. É sobre o DOCUMENTO: a data em que
+ * ELA mexeu, que já estava gravada do lado do estúdio. Não se regista que a
+ * proposta foi aberta, nem quando, nem por quem.
+ */
+describe("página pública da proposta — a versão", () => {
+  it("não diz nada na versão 1: dizer «Versão 1» a quem abre pela primeira vez é ruído", async () => {
+    db.proposal = proposta({ versaoNumero: 1, versaoEm: "2026-03-01T09:00:00.000Z" });
+    await abrir();
+    expect(screen.queryByText(/Versão/)).toBeNull();
+  });
+
+  it("nada também quando a proposta é anterior às colunas de versão", async () => {
+    db.proposal = proposta();
+    await abrir();
+    expect(screen.queryByText(/Versão/)).toBeNull();
+  });
+
+  it("a partir da versão 2 diz o número e o dia em que o conteúdo mudou", async () => {
+    db.proposal = proposta({ versaoNumero: 2, versaoEm: "2026-03-15T09:00:00.000Z" });
+    await abrir();
+    expect(screen.getByText(/Versão 2/)).toBeTruthy();
+    expect(screen.getByText(/Atualizada a 15 de março de 2026/)).toBeTruthy();
+  });
+
+  it("na língua da proposta, e não na do visitante", async () => {
+    db.proposal = proposta({ idioma: "en", versaoNumero: 2, versaoEm: "2026-03-15T09:00:00.000Z" });
+    await abrir("bom", "pt");
+    expect(screen.getByText(/Version 2/)).toBeTruthy();
+    expect(screen.getByText(/Updated on 15 March 2026/)).toBeTruthy();
+  });
+
+  it("o número aparece mesmo sem data gravada", async () => {
+    db.proposal = proposta({ versaoNumero: 3 });
+    await abrir();
+    expect(screen.getByText(/Versão 3/)).toBeTruthy();
+    expect(screen.queryByText(/Atualizada a/)).toBeNull();
   });
 });

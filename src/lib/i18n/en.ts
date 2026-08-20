@@ -295,7 +295,7 @@ export const en: Dict = {
     ctaEyebrow: "Next event",
     ctaTitleLine1: "Join our",
     ctaTitleLine2: "clients",
-    ctaText: "Tell us your idea and we will tell you what it takes to put it together.",
+    ctaText: "Tell us your idea.",
     galleryAlt: [
       "Corporate event reception in a courtyard",
       "Wedding with floral decoration on a country estate",
@@ -703,6 +703,8 @@ export const en: Dict = {
     iva: "VAT",
     total: "Total",
     validoAte: "Valid until",
+    versaoNumero: "Version",
+    atualizadaEm: "Updated on",
     verPdf: "View the full proposal (PDF)",
     footerNote: "Any questions or changes? Reply to this email or contact us:",
     respostaComo:

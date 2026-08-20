@@ -46,6 +46,13 @@ export const mapper: Mapper<Proposal> = {
     // (/api/propostas) e todas as que são anteriores a este campo continuam a
     // gravar-se numa base onde o `alter table` ainda não correu.
     ...(p.idioma !== undefined ? { idioma: p.idioma } : {}),
+    // A versão do conteúdo, com o mesmo cuidado do `doc`: só entra na linha
+    // quando existe. Uma proposta de linhas (/api/propostas) nunca a tem, e
+    // numa base onde o `alter table` ainda não correu escrevê-la sempre partia
+    // até um simples "aceitar proposta".
+    ...(p.versaoSelo !== undefined ? { versao_selo: p.versaoSelo } : {}),
+    ...(p.versaoNumero !== undefined ? { versao_numero: p.versaoNumero } : {}),
+    ...(p.versaoEm !== undefined ? { versao_em: p.versaoEm } : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -83,6 +90,12 @@ export const mapper: Mapper<Proposal> = {
     // entrar aqui espalhava-se pelo email, pela página do aceite e pelo PDF.
     // O que não é língua vale o mesmo que a ausência, e a ausência é português.
     ...(ehIdiomaDaProposta(r.idioma) ? { idioma: r.idioma } : {}),
+    // Simétrico do `toRow`. Uma proposta anterior a estas colunas volta sem
+    // elas, que é o que o `proximaVersao` lê como «ainda não tem versão» — e a
+    // primeira gravação a seguir dá-lhe a 1.
+    ...(r.versao_selo ? { versaoSelo: String(r.versao_selo) } : {}),
+    ...(r.versao_numero != null ? { versaoNumero: Number(r.versao_numero) } : {}),
+    ...(r.versao_em ? { versaoEm: String(r.versao_em) } : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),

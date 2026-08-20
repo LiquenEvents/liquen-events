@@ -432,6 +432,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
                 ? { propostaPdfSha256: proposta.pdfSha256 }
                 : {}),
               ...(proposta.pdfBytes !== undefined ? { propostaPdfBytes: proposta.pdfBytes } : {}),
+              /**
+               * QUE VERSÃO É QUE FOI ACEITE. Sem isto não se pode dizer nem
+               * «o documento de agora é o que foi aceite» nem «foi revisto
+               * depois do sim» — só adivinhar, e um aviso adivinhado sobre
+               * dinheiro é pior do que nenhum. As propostas anteriores às
+               * colunas de versão não têm selo, e então não vai nada: ausente
+               * lê-se como «não se sabe», nunca como «foi revisto».
+               */
+              ...(proposta.versaoSelo !== undefined
+                ? { propostaVersaoSelo: proposta.versaoSelo }
+                : {}),
+              ...(proposta.versaoNumero !== undefined
+                ? { propostaVersaoNumero: proposta.versaoNumero }
+                : {}),
             });
           }
         }

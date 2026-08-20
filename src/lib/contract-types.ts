@@ -49,5 +49,22 @@ export interface Contract {
    * um selo inventado a posteriori não seria prova de nada.
    */
   propostaPdfSha256?: string;
+  /**
+   * ── QUE VERSÃO É QUE O CASAL ACEITOU ────────────────────────────────────
+   *
+   * O selo do CONTEÚDO (e o número que se diz em voz alta) da proposta no
+   * momento do sim. Não confundir com o {@link Contract.propostaPdfSha256},
+   * aqui em cima: aquele é a impressão digital dos BYTES do ficheiro e serve
+   * de PROVA; este é a identidade do conteúdo e serve para COMPARAR — é o que
+   * distingue «o documento de agora é o que foi aceite» de «foi revisto depois
+   * do sim». Os bytes não servem para isso: dois PDFs de conteúdo igual têm
+   * bytes diferentes (medido em `proposta-versao.ts`).
+   *
+   * AUSENTES nos contratos anteriores a estas colunas — e ausente lê-se como
+   * «não se sabe», nunca como «foi revisto». Um aviso inventado sobre um
+   * contrato antigo era pior do que não haver aviso nenhum.
+   */
+  propostaVersaoSelo?: string;
+  propostaVersaoNumero?: number;
   propostaPdfBytes?: number;
 }

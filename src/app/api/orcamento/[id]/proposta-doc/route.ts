@@ -26,6 +26,7 @@ import {
 } from "@/lib/proposal-doc-textos";
 import { textosDoEmailDaProposta } from "@/lib/email-proposta-textos";
 import { createProposalToken } from "@/lib/proposal-token";
+import { proximaVersao, seloDoConteudo } from "@/lib/proposta-versao";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
 import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
@@ -446,9 +447,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * que é exactamente o que a rota fazia antes.
      */
     let porEnviar: Proposal | null = null;
+    /** As outras propostas DESTE pedido: é delas que sai o número da versão. */
+    let irmas: Proposal[] = [];
     if (mode === "send") {
       try {
-        const irmas = await listProposalsForQuote(id);
+        irmas = await listProposalsForQuote(id);
         porEnviar =
           irmas
             .filter((p) => p.status === "rascunho")
@@ -537,6 +540,48 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       idioma,
     };
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * A VERSÃO — CONTA-SE POR PEDIDO, NÃO POR LINHA
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Uma revisão nesta casa é uma proposta NOVA (ver o comentário do
+     * `porEnviar`, aqui em cima: uma proposta que já seguiu nunca é
+     * reescrita). Logo, o número da versão não pode viver na linha — cada
+     * linha nasceria na versão 1 e o casal ouviria «versão 1» ao telefone
+     * três revisões depois. Conta-se sobre as IRMÃS: o maior número já
+     * atribuído neste pedido, mais um.
+     *
+     * E só sobe quando o CONTEÚDO muda. O selo é o de `proposta-versao.ts` —
+     * sobre o que o casal vê, não sobre os bytes do PDF, que mudam sozinhos a
+     * cada gravação (medido: a pdf-lib carimba a data lá dentro). Sem essa
+     * distinção, carregar duas vezes em enviar inventava uma versão nova.
+     *
+     * Melhor esforço declarado: se a leitura das irmãs falhou (o `try` acima
+     * escreve um aviso), `irmas` fica vazia e esta proposta entra na versão 1.
+     * É a única coisa que se pode dizer sem inventar, e não trava o envio.
+     */
+    const irmasAnteriores = irmas.filter((p) => p.id !== proposal.id);
+    const maisRecente =
+      irmasAnteriores.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0] ?? null;
+    const maiorNumero = irmasAnteriores.reduce(
+      (maior, p) =>
+        Number.isFinite(p.versaoNumero) ? Math.max(maior, Number(p.versaoNumero)) : maior,
+      0,
+    );
+    const versao = proximaVersao(
+      { versaoSelo: maisRecente?.versaoSelo, versaoNumero: maiorNumero },
+      seloDoConteudo(proposal),
+    );
+    proposal.versaoSelo = versao.versaoSelo;
+    proposal.versaoNumero = versao.versaoNumero;
+    // A data é a do CONTEÚDO, não a da gravação: uma proposta reenviada sem
+    // uma vírgula mudada continua a dizer ao casal que foi actualizada no dia
+    // em que mudou mesmo.
+    proposal.versaoEm = versao.mudou
+      ? new Date().toISOString()
+      : (maisRecente?.versaoEm ?? new Date().toISOString());
+
     // A proposta fica guardada COM o documento (`doc`): é a única cópia
     // DURÁVEL do que seguiu para o cliente (o rascunho do estúdio vive em
     // `app_state`, apaga-se e não vai na cópia de segurança), e é dela que sai
@@ -601,12 +646,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             // que volta a dar o documento em português — o comportamento de
             // antes desta funcionalidade, dito no `docError`.
             idioma: undefined,
+            // A versão do conteúdo sai com as outras, pela mesma razão: são as
+            // colunas mais recentes de todas, logo as mais prováveis de faltar
+            // numa base por actualizar. O que se perde é a página do casal não
+            // saber dizer «versão 2, atualizada a …» — não é o envio.
+            versaoSelo: undefined,
+            versaoNumero: undefined,
+            versaoEm: undefined,
           });
           docSaved = false;
           docError =
             "A proposta foi guardada e enviada, mas sem o documento nem o selo: falta correr o " +
             "db/schema.sql na base de dados (colunas `proposals.doc`, `pdf_sha256`, `pdf_bytes`, " +
-            "`idioma`). Sem o documento o cliente não vê o PDF no link, sem a língua uma proposta " +
+            "`idioma`, `versao_selo`, `versao_numero`, `versao_em`). Sem o documento o cliente não vê o PDF no link, sem a língua uma proposta " +
             "inglesa volta a descarregar-se em português, e do que foi enviado só fica o " +
             "rascunho do estúdio (que se apaga e não vai na cópia de segurança).";
         } catch (e2) {

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { readProposalToken } from "@/lib/proposal-token";
-import { getProposal } from "@/lib/proposals-store";
+import { propostaDoLink } from "@/lib/proposta-do-link";
 import { fotosDaProposta } from "@/lib/proposta-fotos";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { log } from "@/lib/logger";
@@ -64,11 +63,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
   const limited = await rateLimit(`proposta-fotos:${clientIp(request)}`, 20, 60_000);
   if (!limited.ok) return new NextResponse(null, { status: 429 });
 
-  const claim = readProposalToken(token);
-  if (!claim) return new NextResponse(null, { status: 404 });
-
+  /** Só para o registo do `catch`: de que proposta eram as fotografias. */
+  let idParaRegisto = "";
   try {
-    const proposal = await getProposal(claim.proposalId);
+    // A MESMA proposta que a página desenha — ver `proposta-do-link.ts`. As
+    // assinaturas destas fotografias valem 6 horas e são pedidas outra vez
+    // daqui; resolver de outra maneira dava fotografias de uma versão e texto
+    // de outra na mesma folha.
+    const proposal = (await propostaDoLink(token))?.proposta;
+    idParaRegisto = proposal?.id ?? "";
     // Sem documento não há fotografias nenhumas — é o caso das propostas
     // anteriores à coluna `proposals.doc` e das propostas de linhas do back
     // office. A página esconde a galeria nesse caso; isto fecha a mesma porta
@@ -91,7 +94,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       },
     );
   } catch (err) {
-    log.error("proposta fotos GET falhou", err, { proposalId: claim.proposalId });
+    log.error("proposta fotos GET falhou", err, { proposalId: idParaRegisto });
     return new NextResponse(null, { status: 500 });
   }
 }

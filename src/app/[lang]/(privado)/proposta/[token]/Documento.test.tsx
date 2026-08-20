@@ -128,13 +128,27 @@ describe("o dinheiro fica em pt-PT nas duas línguas", () => {
     expect(total().textContent).toContain("24.600,00");
   });
 
-  it("EM INGLÊS TAMBÉM — e é deliberado", () => {
+  /**
+   * A DECISÃO MUDOU, E ESTE TESTE MUDOU COM ELA.
+   *
+   * Aqui exigia-se o contrário — «24.600,00» também em inglês — com um
+   * controlo positivo a apanhar quem localizasse. Foi esse controlo que fez o
+   * trabalho: acendeu-se assim que o dinheiro passou a seguir a língua, que é
+   * exactamente para o que ele lá estava.
+   *
+   * A decisão nova é dela, 20-08-2026: «se é em pt o dinheiro tem que estar em
+   * português, mas se é em eng o dinheiro tem que estar em inglês». Resolve um
+   * desacordo a sério — o PDF já localizava (`proposal-doc-pdf.ts:858`), e o
+   * casal inglês recebia o mesmo número escrito de duas maneiras nos dois
+   * documentos que abre ao mesmo tempo.
+   */
+  it("e em inglês escreve-se à inglesa — como o PDF já fazia", () => {
     desenhar({}, "en");
     const texto = total().textContent ?? "";
-    expect(texto).toContain("24.600,00");
-    // CONTROLO POSITIVO da afirmação inversa: se alguém localizar isto para
-    // en-GB, o mesmo número passa a ler-se «24,600.00» e este teste apanha-o.
-    expect(texto).not.toContain("24,600.00");
+    expect(texto).toContain("24,600.00");
+    // Controlo positivo da afirmação inversa: se alguém voltar a fixar o
+    // português nas duas línguas, o número volta a «24.600,00» e isto apanha-o.
+    expect(texto).not.toContain("24.600,00");
   });
 
   it("a marca «extra» viaja com a linha que ela marcou", () => {
