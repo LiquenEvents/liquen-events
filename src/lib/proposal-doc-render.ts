@@ -92,6 +92,15 @@ const MAX_IMAGES_PER_DOC = 80;
 const FETCH_CONCURRENCY = 4;
 
 /**
+ * Quantos mood boards se resolvem ao mesmo tempo.
+ *
+ * O total de downloads em voo é este número vezes {@link FETCH_CONCURRENCY} —
+ * ver o bloco «OS MOOD BOARDS DEIXAM DE ESPERAR UNS PELOS OUTROS» para a conta
+ * de memória que o fixa em dois.
+ */
+const BOARDS_EM_PARALELO = 2;
+
+/**
  * ════════════════════════════════════════════════════════════════════════════
  * A CAIXA DE CADA FOTO DE UM MOOD BOARD, PELA ORDEM DO ARRAY
  * ════════════════════════════════════════════════════════════════════════════
@@ -214,6 +223,43 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
   }
 
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A MESMA FOTOGRAFIA NÃO SE DESCARREGA DUAS VEZES
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Um caminho pode aparecer mais do que uma vez no mesmo documento: a mesma
+   * foto em dois mood boards (que é um gesto de um clique no estúdio: duplicar
+   * um board), e a MESMA foto pedida duas vezes dentro do mesmo board — a 1.ª
+   * passagem aceita a miniatura, a 2.ª mede a caixa verdadeira, vê que ela ficou
+   * curta e vai buscar o original.
+   *
+   * Sem memória, cada uma dessas voltas são 2,6 MB descarregados outra vez para
+   * dar exactamente os mesmos bytes.
+   *
+   * ── PORQUE É QUE GUARDA A PROMESSA E NÃO OS BYTES ────────────────────────
+   *
+   * Porque com os boards a correr em paralelo dois pedidos da mesma foto podem
+   * partir ao mesmo tempo, e uma memória de RESULTADOS só os apanharia depois
+   * de ambos terem descarregado — que é precisamente o caso que se quer evitar.
+   * Guardando a promessa, o segundo espera pelo primeiro.
+   *
+   * ── E PORQUE É QUE NÃO GUARDA AS FALHAS ──────────────────────────────────
+   *
+   * Guarda. Uma foto que não está no armazenamento não vai passar a estar a
+   * meio desta geração, e voltar a pedi-la são três tentativas com esperas —
+   * até vinte e quatro segundos por foto, num pedido que tem vinte para tudo.
+   * É a diferença entre uma proposta lenta e uma proposta que não abre.
+   */
+  const jaPedidas = new Map<string, ReturnType<typeof fetchProposalImageBytes>>();
+  const bytesDoOriginal = (ref: string) => {
+    const emCurso = jaPedidas.get(ref);
+    if (emCurso) return emCurso;
+    const nova = fetchProposalImageBytes(ref);
+    jaPedidas.set(ref, nova);
+    return nova;
+  };
+
+  /**
    * Busca uma foto, preferindo a derivada que serve `caixa`.
    *
    * `caixa` a `null` é a CAPA, e tem um caminho próprio: as suas tiras correm de
@@ -229,7 +275,7 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
       const mini = await fetchProposalThumbBytes(ref);
       if (mini && (await cobre(mini, alvo))) return { ref, bytes: mini, original: false };
     }
-    const bytes = await fetchProposalImageBytes(ref);
+    const bytes = await bytesDoOriginal(ref);
     return bytes ? { ref, bytes, original: true } : null;
   };
 
@@ -270,7 +316,7 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
       // geometria seria uma foto ampliada na primeira página da proposta.
       if (pronta && (await cobre(pronta, alvo))) return { ref, bytes: pronta, original: true };
     }
-    const bytes = await fetchProposalImageBytes(ref);
+    const bytes = await bytesDoOriginal(ref);
     if (!bytes) return null;
     const derivada = await derivadaDaCapa(bytes);
     if (!derivada) return { ref, bytes, original: true };
@@ -304,10 +350,39 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
     )
   ).map((r) => (r ? r.bytes.toString("base64") : ""));
 
-  // Mood boards resolved one board at a time (inner concurrency bounded), so
-  // total in-flight fetches stay ≤ FETCH_CONCURRENCY across the whole doc.
-  const moodBoards: NonNullable<ProposalDoc["moodBoards"]> = [];
-  for (const mb of doc.moodBoards ?? []) {
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS MOOD BOARDS DEIXAM DE ESPERAR UNS PELOS OUTROS
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Estava escrito aqui, e era verdade: «um board de cada vez, para o total em
+   * voo não passar de FETCH_CONCURRENCY». O que a frase não dizia é o preço.
+   *
+   * MEDIDO na proposta de que ela se queixou: quarenta e seis fotografias
+   * espalhadas por seis boards, quatro downloads em voo. Entre um board e o
+   * seguinte a fila ESVAZIA-SE — as últimas três fotografias de um board
+   * correm sozinhas enquanto três lugares ficam parados à espera —, e isso
+   * acontece seis vezes. É tempo de parede pago para nada.
+   *
+   * Passam a correr DOIS boards ao mesmo tempo, com quatro downloads cada. O
+   * total em voo continua a ter tecto — passa a ser oito em vez de quatro — e
+   * a fila deixa de secar na fronteira de cada board.
+   *
+   * ── PORQUE É QUE SÃO DOIS, E NÃO SEIS ────────────────────────────────────
+   *
+   * Memória. Cada original anda pelos 2,6 MB e é descodificado para um bitmap
+   * de ~10 MB quando o `sharp` lhe toca. Oito em voo são ~21 MB de bytes
+   * crus, que uma função de servidor aguenta; trinta seriam ~78 MB mais os
+   * bitmaps, e uma geração que estoura de memória não é mais rápida — é uma
+   * proposta que não abre.
+   *
+   * ── E A ORDEM NÃO MUDA ───────────────────────────────────────────────────
+   *
+   * O `mapLimit` devolve pela ordem de entrada, não pela de chegada. O
+   * documento sai com os boards exactamente na ordem em que ela os arrumou —
+   * byte a byte o mesmo PDF, só que mais cedo.
+   */
+  const moodBoards = await mapLimit(doc.moodBoards ?? [], BOARDS_EM_PARALELO, async (mb) => {
     // TODAS são buscadas, mesmo as que passam da lotação do collage.
     //
     // Cortá-las aqui pouparia downloads, e foi a primeira coisa que escrevi —
@@ -393,13 +468,13 @@ async function resolveImages(doc: ProposalDoc): Promise<{ doc: ProposalDoc; miss
         // Ficou curta. Sobe-se ao original; se ELE falhar agora, fica-se com a
         // miniatura — uma foto mole é melhor do que uma foto que desaparece de
         // uma proposta.
-        return (await fetchProposalImageBytes(r.ref)) ?? r.bytes;
+        return (await bytesDoOriginal(r.ref)) ?? r.bytes;
       },
     );
 
     // A marca reindexada segue com o board: o gerador vai permutar por ela.
-    moodBoards.push({ ...mb, images: finais.map((b) => b.toString("base64")), principal });
-  }
+    return { ...mb, images: finais.map((b) => b.toString("base64")), principal };
+  });
 
   return { doc: { ...doc, coverImages: cover, moodBoards }, missing };
 }

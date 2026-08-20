@@ -227,3 +227,65 @@ describe("conteúdo cortado pelo desenho", () => {
     expect(recebido.moodBoards[0].images).toHaveLength(2); // só as que resolveram
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE SE DESCARREGA, E QUANTAS VEZES
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «demora imenso tempo a carregar a proposta em PDF».
+ *
+ * O que se prende aqui é o custo, e prende-se de duas maneiras: a mesma
+ * fotografia não se descarrega duas vezes, e a ORDEM dos mood boards não muda
+ * por eles passarem a correr em paralelo. A segunda é a que importa mais — uma
+ * geração mais rápida que trocasse a ordem das secções seria um documento
+ * diferente, e o documento é para ficar igual.
+ */
+describe("o custo de descarregar", () => {
+  const docComBoards = (boards: { title: string; images: string[] }[]) =>
+    ({
+      ref: "LIQ-TESTE",
+      clientNames: "Teste",
+      coverImages: [],
+      moodBoards: boards,
+    }) as unknown as Parameters<typeof renderStoredProposalDocPdfWithReport>[0];
+
+  it("a mesma fotografia em dois boards é descarregada UMA vez", () => {
+    // Duplicar um board é um clique no estúdio, e as fotos são caminhos: o
+    // mesmo ficheiro passa a estar em dois sítios do documento.
+    fetchMock.mockImplementation(async () => Buffer.from("bytes-de-uma-foto"));
+    return renderStoredProposalDocPdfWithReport(
+      docComBoards([
+        { title: "Cerimónia", images: ["p/uma.jpg"] },
+        { title: "Cerimónia (cópia)", images: ["p/uma.jpg"] },
+      ]),
+    ).then(() => {
+      const pedidas = fetchMock.mock.calls.map((c) => c[0]);
+      expect(pedidas.filter((r) => r === "p/uma.jpg")).toHaveLength(1);
+    });
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("com os boards em paralelo, saem pela ordem em que ela os arrumou", () => {
+    // O `mapLimit` devolve pela ordem de ENTRADA, não pela de chegada. Sem
+    // isso, o board cujas fotos chegassem primeiro subia no documento — e uma
+    // proposta mais rápida com as secções trocadas é uma proposta errada.
+    fetchMock.mockImplementation(async (ref: string) => {
+      // A primeira demora mais: é assim que uma corrida se vê num teste.
+      if (ref === "p/a.jpg") await new Promise((r) => setTimeout(r, 30));
+      return Buffer.from(ref);
+    });
+    return renderStoredProposalDocPdfWithReport(
+      docComBoards([
+        { title: "Primeiro", images: ["p/a.jpg"] },
+        { title: "Segundo", images: ["p/b.jpg"] },
+        { title: "Terceiro", images: ["p/c.jpg"] },
+      ]),
+    ).then(() => {
+      const recebido = pdfMock.docs[0] as { moodBoards: { title: string }[] };
+      expect(recebido.moodBoards.map((b) => b.title)).toEqual(["Primeiro", "Segundo", "Terceiro"]);
+    });
+  });
+});
