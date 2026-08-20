@@ -39,6 +39,15 @@ export interface TextosDaPagina {
   contagem: string;
   /** A célula que não conseguiu mostrar a fotografia. */
   fotoFalhou: string;
+  /**
+   * O botão que volta a tentar UMA fotografia — dentro da célula que falhou.
+   *
+   * Separado do {@link recarregarFotos} de propósito: são duas acções
+   * diferentes (uma volta a pedir esta imagem, a outra vai buscar assinaturas
+   * novas ao servidor) e enquanto tiveram o mesmo rótulo estavam os dois no
+   * ecrã a dizer a mesma coisa, um por cima do outro.
+   */
+  tentarDeNovo: string;
   /** O botão que volta a pedir as assinaturas ao servidor. */
   recarregarFotos: string;
   /** O índice no topo, para se chegar às fotografias sem rolar tudo. */
@@ -55,6 +64,7 @@ const PT: TextosDaPagina = {
   seguinte: "Fotografia seguinte",
   contagem: "Fotografia {i} de {n}",
   fotoFalhou: "Não foi possível mostrar esta fotografia.",
+  tentarDeNovo: "Tentar de novo",
   recarregarFotos: "Voltar a carregar as fotografias",
   nestaPagina: "Nesta página",
   inspiracao: "Inspiração",
@@ -68,6 +78,7 @@ const EN: TextosDaPagina = {
   seguinte: "Next photo",
   contagem: "Photo {i} of {n}",
   fotoFalhou: "This photo could not be shown.",
+  tentarDeNovo: "Try again",
   recarregarFotos: "Load the photos again",
   nestaPagina: "On this page",
   inspiracao: "Inspiration",

@@ -148,6 +148,18 @@ export default function Inspiracao({
    */
   const [aberta, setAberta] = useState<{ board: number; i: number } | null>(null);
   const [arecarregar, setARecarregar] = useState(false);
+  /**
+   * Alguma célula desistiu de mostrar a fotografia?
+   *
+   * É o que decide se o botão de voltar a pedir as assinaturas existe. Um botão
+   * «Voltar a carregar as fotografias» sempre à vista, numa proposta de vinte
+   * mil euros, diz ao casal que o estúdio conta com isto avariar. Quando
+   * avariar mesmo, aparece.
+   */
+  const [houveFalha, setHouveFalha] = useState(false);
+  // Identidade estável: a célula avisa dentro de um efeito, e um retorno novo a
+  // cada desenho punha esse efeito a correr em cada pintura.
+  const marcarFalha = useCallback(() => setHouveFalha(true), []);
   /** Quem abriu a lupa, para o foco voltar exactamente ao sítio de onde saiu. */
   const origemDoFoco = useRef<HTMLElement | null>(null);
 
@@ -232,6 +244,7 @@ export default function Inspiracao({
                 rotulo={contar(textos.contagem, destacada(board)! + 1, board.fotos.length)}
                 textos={textos}
                 aoAmpliar={(alvo) => abrir(b, destacada(board)!, alvo)}
+                aoDesistir={marcarFalha}
               />
             </div>
           )}
@@ -250,6 +263,7 @@ export default function Inspiracao({
                   rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
                   textos={textos}
                   aoAmpliar={(alvo) => abrir(b, i, alvo)}
+                  aoDesistir={marcarFalha}
                 />
               ),
             )}
@@ -263,18 +277,20 @@ export default function Inspiracao({
         </section>
       ))}
 
-      {/* O botão de reassinar vive no fim da secção, discreto: só faz falta
-          quando alguma coisa correu mal, e não é para ser lido quando não faz. */}
-      <p className="mt-10 text-center">
-        <button
-          type="button"
-          onClick={recarregar}
-          disabled={arecarregar}
-          className="alvo-toque text-foreground/60 hover:text-moss inline-flex items-center justify-center text-[11px] tracking-[0.14em] uppercase transition-colors disabled:opacity-50"
-        >
-          {textos.recarregarFotos}
-        </button>
-      </p>
+      {/* O botão de reassinar só existe quando alguma coisa correu mal. Ver
+          `houveFalha`. */}
+      {houveFalha && (
+        <p className="mt-10 text-center">
+          <button
+            type="button"
+            onClick={recarregar}
+            disabled={arecarregar}
+            className="alvo-toque text-foreground/60 hover:text-moss inline-flex items-center justify-center text-[11px] tracking-[0.14em] uppercase transition-colors disabled:opacity-50"
+          >
+            {textos.recarregarFotos}
+          </button>
+        </p>
+      )}
 
       {boardAberto && aberta && (
         <Lupa
@@ -304,12 +320,15 @@ function Celula({
   rotulo,
   textos,
   aoAmpliar,
+  aoDesistir,
 }: {
   foto?: FotoDaProposta;
   ansiosa: boolean;
   rotulo: string;
   textos: TextosDaPagina;
   aoAmpliar: (alvo: HTMLElement | null) => void;
+  /** Esta célula esgotou as tentativas. Ver `houveFalha`, acima. */
+  aoDesistir: () => void;
 }) {
   // A grelha pede a MINIATURA. O original é o plano B — e é plano B, não
   // primeira escolha: as fotografias anteriores ao bucket das miniaturas não
@@ -319,6 +338,13 @@ function Celula({
     foto?.original,
   );
   const proporcao = foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : undefined;
+
+  // Avisar o pai NUM EFEITO, e não durante o desenho: mudar estado do pai a
+  // meio do render de um filho é o aviso que o React dá («Cannot update a
+  // component while rendering a different component»).
+  useEffect(() => {
+    if (desistiu) aoDesistir();
+  }, [desistiu, aoDesistir]);
 
   return (
     <figure className="foto-inteira m-0">
@@ -368,7 +394,7 @@ function Celula({
           onClick={tentarDeNovo}
           className="alvo-toque text-moss mt-1 inline-flex w-full items-center justify-center text-[11px] hover:underline"
         >
-          {textos.recarregarFotos}
+          {textos.tentarDeNovo}
         </button>
       )}
     </figure>
@@ -548,7 +574,7 @@ function Lupa({
               onClick={tentarDeNovo}
               className="alvo-toque mt-4 inline-flex items-center justify-center rounded-md border border-white/30 px-5 py-2.5 text-xs tracking-[0.16em] text-white uppercase hover:bg-white/10"
             >
-              {textos.recarregarFotos}
+              {textos.tentarDeNovo}
             </button>
           </div>
         ) : (

@@ -138,6 +138,28 @@ describe("a lupa", () => {
 });
 
 describe("quando as assinaturas morrem", () => {
+  /**
+   * O botão de voltar a pedir as assinaturas SÓ existe depois de alguma coisa
+   * falhar. Sempre à vista, numa proposta de vinte mil euros, dizia ao casal
+   * que o estúdio conta com isto avariar.
+   */
+  it("o botão não existe enquanto está tudo bem", () => {
+    desenhar();
+    expect(screen.queryByRole("button", { name: T.recarregarFotos })).toBeNull();
+  });
+
+  it("aparece quando uma célula desiste", () => {
+    desenhar();
+    const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
+    // A miniatura falha, cai para o original, o original falha: desistiu.
+    fireEvent.error(img);
+    fireEvent.error(screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!);
+    expect(screen.getByRole("button", { name: T.recarregarFotos })).toBeTruthy();
+    // E a célula tem o SEU botão, com o seu próprio rótulo: são duas acções
+    // diferentes e não podem dizer a mesma coisa.
+    expect(screen.getByRole("button", { name: T.tentarDeNovo })).toBeTruthy();
+  });
+
   it("o botão volta a pedi-las — e nunca manda um caminho ao servidor", async () => {
     const fetchMock = vi.fn(async (_url: string) => ({
       ok: true,
@@ -147,6 +169,10 @@ describe("quando as assinaturas morrem", () => {
     }));
     vi.stubGlobal("fetch", fetchMock);
     desenhar();
+    // Provocar a falha, que é o que faz o botão existir.
+    const cel = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
+    fireEvent.error(cel());
+    fireEvent.error(cel());
     fireEvent.click(screen.getByRole("button", { name: T.recarregarFotos }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const url = String(fetchMock.mock.calls[0][0]);
