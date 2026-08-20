@@ -37,20 +37,58 @@ export default function EventChecklist({ quote, onChange }: Props) {
   const gravacoes = useRef(0);
   const gravado = useRef<ChecklistItem[]>(quote.checklist ?? []);
 
+  /**
+   * ── DE ONDE ESTA LISTA FOI COPIADA ───────────────────────────────────────
+   *
+   * A checklist é copiada UMA vez, ao montar, e ao gravar vai INTEIRA — logo a
+   * gravação é «substitui a checklist por esta», não «marca este item». Uma
+   * cópia de há duas horas apagava as tarefas que a colega acrescentou pelo
+   * meio, com as duas gravações a responder 200.
+   *
+   * `base` é a versão de que esta lista partiu; o servidor compara-a com a que
+   * tem e recusa com 409 se mudou. Avança ao ENVIAR (não ao confirmar): dois
+   * toques seguidos põem dois PATCH no ar e o segundo já leva o primeiro lá
+   * dentro — declarar a versão de antes do primeiro era inventar uma colisão
+   * dela consigo própria.
+   */
+  const base = useRef<ChecklistItem[]>(quote.checklist ?? []);
+
   function persist(next: ChecklistItem[]) {
     const minha = ++gravacoes.current;
     setItems(next);
     onChange(next);
+    const baseAnterior = base.current;
+    base.current = next;
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ checklist: next }),
+      body: JSON.stringify({ checklist: next, base: { checklist: baseAnterior } }),
     })
-      .then((res) => {
+      .then(async (res) => {
+        /**
+         * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir
+         * era escrever por cima do trabalho da outra pessoa. Adopta-se o que o
+         * servidor tem e diz-se-lhe.
+         */
+        if (res.status === 409) {
+          const corpo = (await res.json().catch(() => null)) as {
+            current?: { checklist?: ChecklistItem[] };
+          } | null;
+          const doServidor = corpo?.current?.checklist ?? gravado.current;
+          base.current = doServidor;
+          gravado.current = doServidor;
+          if (minha === gravacoes.current) {
+            setItems(doServidor);
+            onChange(doServidor);
+          }
+          toast("A checklist foi alterada noutro sítio. Está aqui a versão guardada.", "error");
+          return;
+        }
         if (!res.ok) throw new Error();
         if (minha === gravacoes.current) gravado.current = next;
       })
       .catch(() => {
+        base.current = baseAnterior;
         // Já foi substituída por uma gravação mais recente: o que essa levar
         // contém o que esta levava, portanto não há nada a desfazer nem nada a
         // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.

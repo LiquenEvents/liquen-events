@@ -875,3 +875,115 @@ describe("POST /api/orcamento/[id] — o painel de geração ao Ganho", () => {
     expect(res.status).toBe(500);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA LISTA COPIADA DE MANHÃ NÃO ESCREVE POR CIMA DO QUE ACONTECEU AO ALMOÇO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel de Pagamentos e a Checklist copiam a colecção INTEIRA quando abrem
+ * e mandam-na inteira de volta ao gravar. A gravação não é «marca este
+ * pagamento como recebido»: é «substitui a lista de pagamentos por esta».
+ *
+ * MEDIDO no produto, e sem corrida nenhuma: painel aberto de manhã no
+ * telemóvel, um pagamento dado por recebido no portátil ao meio-dia, um toque
+ * no telemóvel à tarde — o `paid: true` voltava a `false` e as linhas novas
+ * desapareciam, com as duas gravações a responder 200.
+ *
+ * O bloqueio optimista do `Repository` não apanha isto: ele relê e volta a
+ * tentar, e o que volta a aplicar é a MESMA substituição completa.
+ *
+ * A correcção é o ecrã dizer de onde copiou (`base`), e o servidor recusar
+ * quando essa base já não é a que está guardada.
+ */
+describe("PATCH /api/orcamento/[id] — a base de uma lista inteira", () => {
+  const GRAVADO = [{ id: "p1", kind: "sinal", amount: 3000, date: "2026-06-05", paid: true }];
+
+  it("aceita quando a base é exactamente o que está guardado", async () => {
+    authed.ok = true;
+    const res = await PATCH(
+      req("PATCH", {
+        payments: [
+          ...GRAVADO,
+          { id: "p2", kind: "saldo", amount: 7000, date: "2026-07-01", paid: false },
+        ],
+        base: { payments: GRAVADO },
+      }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    expect(store.update).toHaveBeenCalled();
+  });
+
+  it("recusa com 409 quando a lista mudou por baixo — e o sinal recebido fica", async () => {
+    authed.ok = true;
+    // O que o telemóvel copiou de manhã: o sinal ainda por receber.
+    const deManha = [{ id: "p1", kind: "sinal", amount: 3000, date: "2026-06-05", paid: false }];
+    const res = await PATCH(
+      req("PATCH", { payments: deManha, base: { payments: deManha } }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(409);
+    // Nada foi gravado: o `paid: true` do meio-dia continua de pé.
+    expect(store.update).not.toHaveBeenCalled();
+
+    const corpo = await res.json();
+    // As duas versões voltam, para o ecrã se pôr em dia sem perder o que escreveu.
+    expect(corpo.current.payments).toEqual(GRAVADO);
+    expect(corpo.submetido.payments).toEqual(deManha);
+    expect(corpo.error).toMatch(/alterado noutro sítio/i);
+  });
+
+  it("a ordem por que as chaves foram escritas não conta", async () => {
+    authed.ok = true;
+    // A mesma linha, com as chaves noutra ordem — é o que uma ida e volta pelo
+    // `jsonb` do Postgres pode devolver. Não pode dar colisão falsa.
+    const baralhado = [{ paid: true, date: "2026-06-05", amount: 3000, kind: "sinal", id: "p1" }];
+    const res = await PATCH(
+      req("PATCH", { payments: [], base: { payments: baralhado } }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("sem `base`, grava como sempre gravou", async () => {
+    authed.ok = true;
+    const res = await PATCH(req("PATCH", { payments: [] }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(store.update).toHaveBeenCalled();
+  });
+
+  it("a base não é gravada — não é campo do pedido", async () => {
+    authed.ok = true;
+    await PATCH(req("PATCH", { payments: GRAVADO, base: { payments: GRAVADO } }), ctx("LIQ-1"));
+    const patch = store.update.mock.calls[0][1] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("base");
+  });
+
+  it("vale para a checklist, não só para os pagamentos", async () => {
+    authed.ok = true;
+    store.override = { checklist: [{ id: "c1", label: "Confirmar flores", done: true }] };
+    const res = await PATCH(
+      req("PATCH", {
+        checklist: [{ id: "c1", label: "Confirmar flores", done: false }],
+        base: { checklist: [{ id: "c1", label: "Confirmar flores", done: false }] },
+      }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(409);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("uma lista ausente e uma lista vazia são a mesma base", async () => {
+    authed.ok = true;
+    store.override = { productionPlan: undefined };
+    const res = await PATCH(
+      req("PATCH", {
+        productionPlan: [{ id: "t1", label: "Montar arco", done: false }],
+        base: { productionPlan: [] },
+      }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+  });
+});

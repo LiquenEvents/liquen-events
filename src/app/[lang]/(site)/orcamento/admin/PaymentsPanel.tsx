@@ -226,6 +226,37 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
   }, [editingId]);
 
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * DE ONDE ESTA LISTA FOI COPIADA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Este painel copia `quote.payments` UMA vez, quando monta (`useState`, lá em
+   * cima), e está preso por `key` ao id do pedido — não volta a ler a
+   * propriedade quando ela mudar. Ao gravar manda a lista INTEIRA, portanto a
+   * gravação não é «marca este pagamento como recebido»: é «substitui a lista
+   * de pagamentos por esta».
+   *
+   * O que isso fazia, sem corrida nenhuma: painel aberto de manhã no telemóvel,
+   * um pagamento dado por recebido no portátil ao meio-dia, um toque no
+   * telemóvel à tarde — e o `paid: true` voltava a `false`, com as duas
+   * gravações a responder 200. É dinheiro a mudar de estado sozinho, e muda a
+   * coluna do Quadro e a margem do evento.
+   *
+   * `base` é a versão de que esta lista partiu. Vai no pedido, o servidor
+   * compara-a com a que tem guardada e recusa com 409 se alguém lhe mexeu no
+   * meio.
+   *
+   * ── PORQUE É QUE AVANÇA AO ENVIAR E NÃO AO CONFIRMAR ────────────────────
+   *
+   * Dois cliques seguidos dela põem dois PATCH no ar, e o segundo leva a lista
+   * inteira JÁ COM o primeiro lá dentro. Se a base só avançasse na confirmação,
+   * o segundo pedido declarava a versão de antes do primeiro e o servidor
+   * recusava-o — uma colisão inventada, dela consigo própria, no meio de um
+   * gesto normal. Avança ao enviar, e volta atrás se a gravação falhar.
+   */
+  const base = useRef<Payment[]>(quote.payments ?? []);
+
+  /**
    * Gravação otimista COM REVERSÃO: se o servidor recusar, o dinheiro não pode
    * ficar diferente no ecrã e na base de dados sem ninguém dar por isso. Além de
    * reverter, marca a linha em causa e guarda a tentativa para o botão "Repetir".
@@ -235,15 +266,40 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
     setPayments(next);
     onChange(next);
     setFailed((f) => (f && f.id === op.id ? null : f));
+    const baseAnterior = base.current;
+    base.current = next;
     fetch(`/api/orcamento/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ payments: next }),
+      body: JSON.stringify({ payments: next, base: { payments: baseAnterior } }),
     })
-      .then((res) => {
+      .then(async (res) => {
+        /**
+         * 409 NÃO é «tenta outra vez». É «isto mudou noutro sítio», e repetir
+         * seria escrever por cima do que a outra pessoa acabou de fazer — que é
+         * exactamente o que este guarda existe para impedir. Por isso NÃO se
+         * marca a linha para o botão «Repetir»: adopta-se o que o servidor tem,
+         * diz-se-lhe, e ela decide o que fazer já a olhar para a verdade.
+         */
+        if (res.status === 409) {
+          const corpo = (await res.json().catch(() => null)) as {
+            current?: { payments?: Payment[] };
+          } | null;
+          const doServidor = corpo?.current?.payments ?? snapshot;
+          setPayments(doServidor);
+          onChange(doServidor);
+          base.current = doServidor;
+          setFailed(null);
+          toast(
+            "Os pagamentos foram alterados noutro sítio. Está aqui a versão guardada.",
+            "error",
+          );
+          return;
+        }
         if (!res.ok) throw new Error();
       })
       .catch(() => {
+        base.current = baseAnterior;
         setPayments(snapshot);
         onChange(snapshot);
         setFailed({ id: op.id, next, ghost: op.ghost ?? null, label: op.label });
