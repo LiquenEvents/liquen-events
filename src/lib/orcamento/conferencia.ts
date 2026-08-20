@@ -1,6 +1,6 @@
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { Quote } from "./types";
-import { foraDoPadrao, padraoPara } from "./padrao-de-preco";
+import { foraDoPadrao, padraoPara, paxDaProposta } from "./padrao-de-preco";
 import { camposComVersaoInglesa, camposPorTraduzir, lerEn } from "@/lib/proposal-doc-bilingue";
 import { oQueFaltaParaEnviar } from "@/lib/proposal-progress";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
@@ -366,18 +366,27 @@ export function conferir({
       detalhe: "A proposta não tem valor.",
     });
   } else {
+    // ── O NÚMERO DE CONVIDADOS VEM DA PROPOSTA, NÃO DO PEDIDO ────────────
+    // Ver `paxDaProposta`: se ela corrigiu os convidados aqui, é com esses que
+    // o preço se compara. A lista dizia, três linhas acima, que os dois
+    // divergem — e comparava o preço com o número velho na mesma.
+    const pax = paxDaProposta(doc, quote);
     const fora = foraDoPadrao(
       totalBruto,
-      padraoPara({ guests: quote.guests, location: quote.location }, historico),
+      padraoPara({ guests: pax, location: quote.location }, historico),
     );
     v.push({
       id: "valor",
       titulo: "Valor",
       severidade: fora ? "aviso" : "ok",
+      // ── E DIZ EM QUANTOS CASOS ASSENTA ─────────────────────────────────
+      // O Painel Interno já o dizia e esta lista não. Um intervalo sem o número
+      // de casos por trás não se sabe se é um padrão ou uma coincidência — e a
+      // decisão de acreditar nele é dela, não do programa.
       detalhe: fora
-        ? `${quote.guests} pax costuma ficar entre ${Math.round(fora.padrao.min)} € e ${Math.round(
+        ? `${pax} pax costuma ficar entre ${Math.round(fora.padrao.min)} € e ${Math.round(
             fora.padrao.max,
-          )} €${fora.padrao.regiao ? ` (${fora.padrao.regiao})` : ""}; esta está ${
+          )} €${fora.padrao.regiao ? ` (${fora.padrao.regiao})` : ""}, em ${fora.padrao.casos} propostas; esta está ${
             fora.lado === "abaixo" ? "abaixo" : "acima"
           }.`
         : "",

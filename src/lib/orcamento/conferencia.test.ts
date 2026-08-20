@@ -607,3 +607,75 @@ describe("o que falta para enviar entra nesta lista", () => {
     expect(vs.some((v) => v.trava)).toBe(false);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O PREÇO COMPARA-SE COM OS CONVIDADOS DA PROPOSTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Comparava-se sempre com o `quote.guests`. Esta lista até já dizia, três
+ * linhas acima, que os dois números divergem — «A proposta é para "80 pax" e o
+ * pedido pedia 200» — e comparava o preço com o número velho na mesma.
+ */
+describe("o valor fora do habitual", () => {
+  const cotado = (guests: number, preco: number, i: number) =>
+    ({
+      id: `H-${i}`,
+      submittedAt: "2026-01-01T00:00:00.000Z",
+      status: "cotado",
+      name: `Casal ${i}`,
+      guests,
+      quotedPrice: preco,
+      location: "Évora",
+    }) as Quote;
+
+  // Dois grupos que não se tocam: 6 casamentos de 80 pax a 5.000 € e 6 de 200
+  // pax a 20.000 €. Com a tolerância de 35% nenhum entra no intervalo do outro.
+  const memoria = [
+    ...Array.from({ length: 6 }, (_, i) => cotado(80, 5_000, i)),
+    ...Array.from({ length: 6 }, (_, i) => cotado(200, 20_000, i + 10)),
+  ];
+
+  it("usa o número do DOCUMENTO quando ele existe", () => {
+    const vs = conferir({
+      doc: documento({ guests: "80 pax", totalText: "6.150,00 €" }),
+      quote: pedido({ guests: 200 }),
+      historico: memoria,
+      // O bruto de 5.000 € líquidos — dentro do habitual dos 80 pax, e muito
+      // abaixo do habitual dos 200.
+      totalBruto: 6_150,
+    });
+    const valor = achar(vs, "valor");
+    expect(valor.severidade).toBe("ok");
+  });
+
+  it("CONTROLO POSITIVO: com o número do PEDIDO, o mesmo preço estava fora", () => {
+    // O mesmo histórico, o mesmo total — só o documento é que deixa de dizer
+    // quantas pessoas são. Sem isto, o «ok» acima podia ser um «ok» que este
+    // histórico dá a qualquer preço.
+    const vs = conferir({
+      doc: documento({ guests: "", totalText: "6.150,00 €" }),
+      quote: pedido({ guests: 200 }),
+      historico: memoria,
+      totalBruto: 6_150,
+    });
+    const valor = achar(vs, "valor");
+    expect(valor.severidade).toBe("aviso");
+    expect(valor.detalhe).toContain("200 pax");
+  });
+
+  it("diz em quantas propostas a comparação assenta", () => {
+    // O Painel Interno já o dizia e esta lista não. Um intervalo sem o número
+    // de casos por trás não se sabe se é um padrão ou uma coincidência.
+    const vs = conferir({
+      doc: documento({ guests: "200 pax", totalText: "6.150,00 €" }),
+      quote: pedido({ guests: 200 }),
+      historico: memoria,
+      totalBruto: 6_150,
+    });
+    const valor = achar(vs, "valor");
+    expect(valor.severidade).toBe("aviso");
+    expect(valor.detalhe).toContain("em 6 propostas");
+    expect(valor.detalhe).toContain("200 pax");
+  });
+});

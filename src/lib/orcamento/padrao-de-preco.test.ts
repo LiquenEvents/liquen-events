@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { round2 } from "@/lib/money";
 import type { Quote, QuoteStatus } from "./types";
-import { MINIMO_PARA_COMPARAR, foraDoPadrao, padraoPara } from "./padrao-de-preco";
+import { MINIMO_PARA_COMPARAR, foraDoPadrao, padraoPara, paxDaProposta } from "./padrao-de-preco";
 
 /**
  * O padrão fala em BRUTO — é o total com IVA da proposta que lhe é dado a
@@ -148,5 +148,33 @@ describe("o aviso", () => {
 
   it("sem padrão não há aviso nenhum", () => {
     expect(foraDoPadrao(3_000, null)).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O NÚMERO QUE SE COMPARA É O DA PROPOSTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Os dois sítios que perguntam «este valor é normal para um casamento assim?»
+ * liam sempre o `quote.guests`. Se ela corrigir os convidados NA PROPOSTA — o
+ * casal mudou de ideias entre o formulário e a proposta —, a comparação de
+ * preço continuava a usar o número velho do pedido.
+ */
+describe("paxDaProposta", () => {
+  it("o documento manda quando lá está escrito um número", () => {
+    expect(paxDaProposta({ guests: "80 pax" }, { guests: 120 } as Quote)).toBe(80);
+  });
+
+  it("o pedido é a rede quando o documento não diz nada", () => {
+    expect(paxDaProposta({ guests: "" }, { guests: 120 } as Quote)).toBe(120);
+    expect(paxDaProposta({ guests: "cerca de uma centena" }, { guests: 120 } as Quote)).toBe(120);
+    expect(paxDaProposta(null, { guests: 120 } as Quote)).toBe(120);
+  });
+
+  it("sem número em lado nenhum, não há com que comparar", () => {
+    // `undefined` e não 0: o `padraoPara` cala-se, em vez de construir um
+    // intervalo para «zero pessoas».
+    expect(paxDaProposta({ guests: "" }, {} as Quote)).toBeUndefined();
   });
 });

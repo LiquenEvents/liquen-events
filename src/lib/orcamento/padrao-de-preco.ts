@@ -1,5 +1,7 @@
 import type { Quote } from "./types";
+import type { ProposalDoc } from "@/lib/proposal-doc";
 import { contractedAmounts } from "./dossier";
+import { convidadosDoDoc } from "./escala";
 import { localizar } from "@/lib/geo/portugal";
 
 /**
@@ -124,6 +126,44 @@ export function padraoPara(
     casos: valores.length,
     regiao: usar === daRegiao ? regiaoAlvo : null,
   };
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PARA QUANTAS PESSOAS É QUE ESTE PREÇO É
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O DOCUMENTO manda; o pedido é a rede.
+ *
+ * ── O defeito que isto corrige ─────────────────────────────────────────────
+ * Os dois sítios que perguntam «este valor é normal para um casamento assim?»
+ * — a Conferência e o Painel Interno — construíam o intervalo habitual com o
+ * `quote.guests`, sempre, e nunca olhavam para o `doc.guests`. Se ela corrigir
+ * os convidados NA PROPOSTA (porque o casal mudou de ideias, que é o caso
+ * normal entre o formulário e a proposta), o intervalo continuava a ser o de
+ * 120 pax enquanto a proposta era para 80: uma proposta de 80 pessoas cobrada
+ * a preço de 80 aparecia «abaixo do habitual», todas as vezes — e uma cobrada
+ * a preço de 120 passava sem uma palavra.
+ *
+ * A Conferência até já dizia que os dois números divergem («A proposta é para
+ * "80 pax" e o pedido pedia 120»); o que não acompanhava era o preço.
+ *
+ * ── E o texto que se lê ao lado tem de usar ESTE número ────────────────────
+ * Escrever «120 pax costuma ficar entre…» debaixo de uma proposta para 80 é
+ * pior do que não comparar: parece um erro do programa, e quem o lê deixa de
+ * acreditar no resto da lista.
+ *
+ * `convidadosDoDoc` é o MESMO leitor que a escala do orçamento usa para saber
+ * por quantas pessoas multiplica o catering — o número que se usa para pôr um
+ * preço é o mesmo que se usa para o julgar.
+ */
+export function paxDaProposta(
+  doc: Pick<ProposalDoc, "guests"> | null | undefined,
+  quote: Pick<Quote, "guests">,
+): number | undefined {
+  const noDoc = doc ? convidadosDoDoc(doc) : 0;
+  if (noDoc > 0) return noDoc;
+  return typeof quote.guests === "number" && quote.guests > 0 ? quote.guests : undefined;
 }
 
 export type ForaDoPadrao = { lado: "abaixo" | "acima"; padrao: Padrao } | null;
