@@ -5582,3 +5582,84 @@ describe("o rascunho do servidor não escreve por cima de quem está a escrever"
     await waitFor(() => expect(screen.getByLabelText("Tipo de evento")).toHaveValue("Casamento"));
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ABRIR UM PEDIDO SÓ PARA LER NÃO É TRABALHO POR GRAVAR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O estúdio abre, semeia o que vem do PEDIDO (os pontos de decoração que o
+ * casal marcou, o preço final, a regra dos adicionais) — e essa semeadura
+ * mexia no documento. O efeito que vigia o documento não distingue quem lhe
+ * mexeu: marcava «por gravar», gravava no `localStorage`, e mandava um PUT do
+ * rascunho ao servidor.
+ *
+ * Duas consequências, e a segunda é a que custa:
+ *
+ *   1. Uma linha de rascunho gravada em cada pedido que ela ABRE para ler.
+ *   2. O «Guardar tudo (1)» aceso por nada, várias vezes por hora — e um
+ *      alarme que mente é um alarme que se deixa de ver. É esse botão que ela
+ *      olha antes de fechar o portátil.
+ *
+ * A semeadura é DERIVADA do pedido: reabrir produz exactamente o mesmo
+ * documento. Não há nada para perder em não a gravar — e quando ela escrever
+ * a primeira letra, grava-se tudo, semeadura incluída.
+ */
+describe("abrir um pedido só para ler não é trabalho por gravar", () => {
+  /** O debounce da gravação é de 800 ms. Isto passa-o com folga. */
+  const passarODebounce = () => new Promise((r) => setTimeout(r, 1400));
+
+  it("não manda rascunho nenhum ao servidor", async () => {
+    renderStudio();
+    await screen.findByRole("heading", { name: "Mood boards" });
+    await passarODebounce();
+    expect(corpos("proposta-rascunho")).toEqual([]);
+  });
+
+  it("não deixa cópia local de um documento que ela não escreveu", async () => {
+    renderStudio();
+    await screen.findByRole("heading", { name: "Mood boards" });
+    await passarODebounce();
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+
+  it("e o indicador cala-se — não diz «guardado» ao que não foi feito", async () => {
+    renderStudio();
+    await screen.findByRole("heading", { name: "Mood boards" });
+    await passarODebounce();
+    expect(screen.queryByTitle(/a guardar/i)).toBeNull();
+    expect(screen.queryByTitle(/guardado às/i)).toBeNull();
+  });
+
+  it("mas com rascunho GUARDADO, abrir continua a gravar (controlo positivo)", async () => {
+    // A fronteira. Abrir um pedido virgem é semear o que veio do pedido — e
+    // isso re-deriva-se ao reabrir. Abrir um pedido COM rascunho é outra coisa:
+    // o restauro CORRIGE o que lá está (tira marcadores de fotos que nunca
+    // chegaram a existir, acerta o total pelo «Preço final» do pedido), e uma
+    // correcção que não fica gravada é uma correcção que se volta a fazer
+    // amanhã. Ver também «um marcador deixado num rascunho antigo» e «o preço
+    // do pedido sobrevive ao rascunho do servidor».
+    seedDraft(1);
+    renderStudio();
+    await screen.findByRole("heading", { name: "Mood boards" });
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+  });
+
+  it("à PRIMEIRA letra dela, grava tudo — semeadura incluída (controlo positivo)", async () => {
+    // Sem esta, a correcção podia ser «nunca gravar», que é muito pior do que
+    // o defeito.
+    const user = userEvent.setup();
+    renderStudio();
+    await user.type(await screen.findByLabelText("Local"), "Évora");
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    const gravado = JSON.parse(corpos("proposta-rascunho").at(-1) ?? "{}");
+    expect(gravado.doc.location).toBe("Évora");
+    // A semeadura vai lá dentro: é o grupo de serviços que o estúdio abre.
+    expect(gravado.doc.serviceGroups.length).toBeGreaterThan(0);
+    expect(localStorage.getItem(DRAFT_KEY)).toContain("Évora");
+  });
+});

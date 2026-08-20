@@ -1701,6 +1701,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       if (daProposta && daProposta > 0) persistirPreco(daProposta);
     }
     hydrated.current = true;
+    // SÓ quando não havia rascunho nenhum. Ver o bloco «A ABERTURA TAMBÉM NÃO
+    // É TRABALHO POR GRAVAR»: abrir um pedido virgem é semear o que veio do
+    // pedido, e isso não se grava; abrir um pedido COM rascunho é outra coisa
+    // — o restauro corrige o que lá está (tira marcadores provisórios de fotos
+    // que nunca chegaram a existir, acerta o total pelo «Preço final» do
+    // pedido) e essas correcções TÊM de ficar gravadas.
+    if (!hadDraft) aAbrir.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1924,6 +1931,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const semOsQueElaTocou = Object.fromEntries(
         Object.entries(doDoServidor).filter(([chave]) => !camposTocados.current.has(chave)),
       ) as Partial<StudioDoc>;
+      // A abertura ACABA AQUI quando há rascunho no servidor.
+      //
+      // Sem isto, o que este merge produz — o rascunho do servidor com o preço
+      // do pedido por cima, e sem os marcadores provisórios — ficava por
+      // gravar: era «a abertura», e a abertura não se grava. Mas isto não é
+      // uma abertura derivada do pedido, é trabalho vindo de outro dispositivo
+      // com uma correcção aplicada em cima. Ver o bloco «A ABERTURA TAMBÉM NÃO
+      // É TRABALHO POR GRAVAR».
+      aAbrir.current = false;
       setDoc((d) => {
         const merged = { ...d, ...semOsQueElaTocou };
         const limpo = stripPendingImages({
@@ -2113,24 +2129,105 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    *
    * Saltar a primeira passagem não adia nada do que interessa: o restauro (ou
    * o `seedDefaults`, quando não há rascunho) muda o documento e faz este
-   * efeito correr outra vez — aí sim, com a versão boa à mão. E quando o
-   * restauro não muda nada, não há mesmo nada por gravar: é o caso que o
-   * comentário de cima descreve, o de cada troca de separador pagar um PUT
-   * para reescrever o que já lá estava.
+   * efeito correr outra vez — aí sim, com a versão boa à mão. O que essa
+   * segunda passagem NÃO é está logo a seguir.
    */
   const montagem = useRef(true);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A ABERTURA TAMBÉM NÃO É TRABALHO POR GRAVAR
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A segunda passagem deste efeito é sempre a da ABERTURA: o restauro do
+   * rascunho, ou — quando não há rascunho — o `seedDefaults` com o que veio do
+   * PEDIDO (os pontos de decoração que o casal marcou, o preço final, a regra
+   * dos adicionais). Nenhuma dessas coisas foi escrita por ela, e marcá-las
+   * como trabalho por gravar custava duas coisas:
+   *
+   *   1. cada pedido ABERTO PARA LER deixava uma linha de rascunho gravada, e
+   *      cada troca de separador pagava um PUT para reescrever o que já lá
+   *      estava — que é o que o comentário de cima já descrevia;
+   *   2. o «Guardar tudo (1)» acendia por nada, várias vezes por hora. É esse
+   *      botão que ela olha antes de fechar o portátil, e um alarme que mente é
+   *      um alarme que se deixa de ver.
+   *
+   * Nada se perde: a semeadura é DERIVADA do pedido e reabrir volta a produzir
+   * o mesmo documento, e o restauro é a leitura do que já está gravado. Assim
+   * que ela escrever a primeira letra, grava-se tudo — semeadura incluída.
+   *
+   * ── PORQUE É QUE ISTO NÃO PODE ENGOLIR TRABALHO A SÉRIO ───────────────────
+   *
+   * O silêncio só vale enquanto o documento for IGUAL ao da abertura, e só até
+   * à primeira gravação. Depois de haver rascunho gravado, voltar ao estado de
+   * abertura é uma alteração como outra qualquer — e tem de ser gravada, senão
+   * o que fica no servidor é a versão do meio.
+   */
+  const aAbrir = useRef(false);
+  const marcaDaAbertura = useRef<string | null>(null);
+  const jaGravou = useRef(false);
+  /** O que se compara com a abertura: só o que é TRABALHO DELA. Os mapas de
+   *  apoio (`assetUrls`, `themeOrigins`) ficam de fora de propósito — são
+   *  memória de endereços que a hidratação vai buscar ao servidor, e mudam
+   *  sozinhos depois de o ecrã abrir. */
+  const marcaDoTrabalho = useCallback(
+    () => JSON.stringify([doc, refEdited, mensagemAoCliente, bilingue, idiomaDoPdf]),
+    [doc, refEdited, mensagemAoCliente, bilingue, idiomaDoPdf],
+  );
+  /** Não há nada por gravar: o que está no ecrã é a abertura, e ainda não se
+   *  gravou nada. Vale para o indicador E para a gravação — se só valesse para
+   *  o indicador, o alarme calava-se e o PUT continuava a sair, que é meia
+   *  correcção com o aspecto de uma inteira. */
+  const nadaPorGravar = useCallback(
+    // `null` (a marca ainda não foi tirada) NUNCA é igual a uma marca: quando
+    // há rascunho guardado a abertura não se marca de todo, e o estúdio grava
+    // como sempre gravou.
+    () => !jaGravou.current && marcaDaAbertura.current === marcaDoTrabalho(),
+    [marcaDoTrabalho],
+  );
+  /**
+   * E a abertura acaba no PRIMEIRO GESTO DELA — não num relógio.
+   *
+   * É o único sinal honesto: um relógio ou uma contagem de passagens fazia a
+   * fronteira depender da velocidade da rede desta manhã, e a partir daí
+   * haveria manhãs em que a primeira letra escrita não contava como trabalho.
+   * Daqui para a frente, tudo o que mexer no documento é dela até prova em
+   * contrário.
+   */
+  useEffect(() => {
+    const fechar = () => {
+      aAbrir.current = false;
+    };
+    const gestos = ["pointerdown", "keydown", "drop", "paste"] as const;
+    for (const g of gestos) window.addEventListener(g, fechar, true);
+    return () => {
+      for (const g of gestos) window.removeEventListener(g, fechar, true);
+    };
+  }, []);
+
   useEffect(() => {
     if (!hydrated.current) return;
     if (montagem.current) {
       montagem.current = false;
       return;
     }
+    if (aAbrir.current) {
+      // Enquanto durar a abertura, o que está no ecrã É a abertura. Não se
+      // fixa na primeira passagem porque a abertura não é uma: o restauro (ou
+      // a semeadura) é a primeira, e atrás dela vêm as derivadas — os
+      // identificadores estáveis dos grupos e das linhas, o merge do rascunho
+      // do servidor, as fotos que a hidratação vai buscar. Nenhuma delas é
+      // trabalho dela, e fixar a marca antes de todas fazia o alarme acender
+      // por causa de um `id` que o próprio estúdio acabou de escrever.
+      marcaDaAbertura.current = marcaDoTrabalho();
+      return;
+    }
+    if (nadaPorGravar()) return;
     porGravarRef.current = true;
     setPorGravar(true);
     // A mensagem do envio conta como trabalho por gravar: sem ela nesta lista, o
     // indicador dizia «guardado às 14:32» com o texto dela ainda por escrever no
     // rascunho — e é essa frase que faz uma pessoa fechar o portátil descansada.
-  }, [doc, assetUrls, themeOrigins, refEdited, mensagemAoCliente, bilingue]);
+  }, [doc, assetUrls, themeOrigins, refEdited, mensagemAoCliente, bilingue, nadaPorGravar]);
 
   useEffect(() => {
     if (!hydrated.current) return;
@@ -2220,6 +2317,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           }),
         );
         setGravadoEm(new Date());
+        // A partir daqui há rascunho gravado, e voltar ao estado de abertura
+        // deixa de ser «nada por gravar» — ver o bloco da abertura.
+        jaGravou.current = true;
         porGravarRef.current = false;
         setPorGravar(false);
       } catch {
@@ -2249,6 +2349,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       })();
     };
     flushDraft.current = save;
+    // A abertura não se grava. O `flushDraft` fica montado à mesma — o
+    // Ctrl/Cmd+Enter dos Serviços tem de continuar a poder gravar à ordem —,
+    // mas o relógio dos 800 ms não arranca por causa de um documento que
+    // ninguém escreveu. Ver o bloco «A ABERTURA TAMBÉM NÃO É TRABALHO POR
+    // GRAVAR».
+    if (nadaPorGravar()) return;
     const t = setTimeout(save, 800);
     return () => clearTimeout(t);
   }, [
@@ -2273,6 +2379,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     quote.id,
     toast,
     enviarParaServidor,
+    nadaPorGravar,
   ]);
 
   /**
