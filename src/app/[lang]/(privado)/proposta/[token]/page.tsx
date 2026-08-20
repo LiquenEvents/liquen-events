@@ -310,6 +310,19 @@ export default async function ProposalPage({
   const saudacao = primeiroNome ? `${t.greeting}, ${primeiroNome}.` : `${t.greeting}.`;
 
   /**
+   * A frase de intenção, na língua da proposta.
+   *
+   * A caixa inglesa vazia cai para o português, como tudo o resto neste
+   * documento (ver `proposal-doc-bilingue.ts`): uma proposta inglesa com a
+   * abertura em branco era um buraco no sítio mais visível da página.
+   */
+  const intencao = (
+    (locale === "en" ? proposal.doc?.intencaoEn?.trim() : "") ||
+    proposal.doc?.intencao?.trim() ||
+    ""
+  ).trim();
+
+  /**
    * AS FOTOGRAFIAS, ASSINADAS AQUI E NÃO POR UM PEDIDO DO NAVEGADOR.
    *
    * A página é `force-dynamic`, portanto isto corre a cada visita e o HTML sai
@@ -409,9 +422,32 @@ export default async function ProposalPage({
           >
             {saudacao}
           </h1>
-          <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
-            {t.intro}
-          </p>
+          {/*
+           * ══════════════════════════════════════════════════════════════
+           * A FRASE DE INTENÇÃO, OU A DA CASA — NUNCA AS DUAS
+           * ══════════════════════════════════════════════════════════════
+           *
+           * Quando ela escreveu uma frase para AQUELE casamento, é essa que se
+           * lê. A da casa («preparámos esta proposta com todo o cuidado…») é
+           * verdadeira e é de toda a gente; pô-las as duas seguidas fazia a
+           * primeira parecer o subtítulo da segunda, e a específica perdia
+           * exactamente o que a torna específica.
+           *
+           * Maior e na serifada do documento quando é dela: não é uma nota de
+           * boas-vindas, é a tese da proposta.
+           */}
+          {intencao ? (
+            <p
+              className="text-foreground/80 mx-auto mt-5 max-w-xl leading-relaxed text-balance"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(17px, 2.4vw, 21px)" }}
+            >
+              {intencao}
+            </p>
+          ) : (
+            <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
+              {t.intro}
+            </p>
+          )}
         </header>
 
         {/* ── O DOCUMENTO INTEIRO, QUANDO ELE EXISTE ──────────────────────

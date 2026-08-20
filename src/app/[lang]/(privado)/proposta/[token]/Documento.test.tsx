@@ -585,7 +585,7 @@ describe("o orçamento", () => {
   const COM_TOTAL = {
     budgetItems: ["Decor Cerimónia"],
     totalAmount: 10000,
-    totalVatMode: "acresce" as const,
+    totalVatMode: "acrescer" as const,
     vatRate: 0.23,
     faseamento: [...DEFAULT_FASEAMENTO],
   };
@@ -655,5 +655,61 @@ describe("o orçamento", () => {
     expect(screen.queryByText(/30% na adjudicação/i)).toBeNull();
     // E o faseamento dela continua lá, por extenso, na secção dele.
     expect(screen.getByText(/50% na assinatura/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A ÚLTIMA COISA QUE SE VÊ NÃO PODE SER O CANCELAMENTO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A proposta acabava na cláusula do Centro de Arbitragem de Conflitos de
+ * Consumo de Lisboa. É a frase certa e é o sítio errado para uma proposta de
+ * casamento acabar.
+ *
+ * A afirmação que vale por todas é a última: com uma capa só, NÃO há fecho.
+ * Repetir a fotografia de abertura no fim não é um fecho — é a mesma proposta
+ * a dizer duas vezes a mesma coisa, e nota-se.
+ */
+describe("o fecho", () => {
+  const DUAS_CAPAS: FotoDaProposta[] = [
+    { id: "c0", miniatura: "mini/capa0", original: "orig/capa0", largura: 1600, altura: 1067 },
+    { id: "c1", miniatura: "mini/capa1", original: "orig/capa1", largura: 1600, altura: 1067 },
+  ];
+
+  const comCapas = (fotos: FotoDaProposta[], coverImages: string[]) =>
+    render(
+      <Documento
+        doc={{ ...DOC, coverImages } as ProposalDoc}
+        idioma="pt"
+        fotos={fotos}
+        token="tk"
+      />,
+    );
+
+  it("fecha com a segunda capa, que a página ainda não tinha usado", () => {
+    comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
+    const imagens = Array.from(document.querySelectorAll("img"));
+    expect(imagens[0].getAttribute("src")).toBe("mini/capa0");
+    expect(imagens[imagens.length - 1].getAttribute("src")).toBe("mini/capa1");
+  });
+
+  it("a fotografia do fecho entra preguiçosa", () => {
+    // Está no fim de uma página com quarenta e seis fotografias; quem lá chega
+    // já esperou o que tinha a esperar.
+    comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
+    const imagens = Array.from(document.querySelectorAll("img"));
+    expect(imagens[imagens.length - 1].getAttribute("loading")).toBe("lazy");
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("com uma capa só, não se repete a de abertura no fim", () => {
+    comCapas([DUAS_CAPAS[0]], ["ped/capa0.jpg"]);
+    const capas = Array.from(document.querySelectorAll("img")).filter(
+      (i) => i.getAttribute("src") === "mini/capa0",
+    );
+    expect(capas).toHaveLength(1);
   });
 });

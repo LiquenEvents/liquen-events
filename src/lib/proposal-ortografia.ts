@@ -242,6 +242,7 @@ function comAsMaiusculasDe(escrita: string, grafia: string): string {
 export type CampoDeTexto =
   | { tipo: "ref" }
   | { tipo: "headerTitle" }
+  | { tipo: "intencao" }
   | { tipo: "servico" }
   | { tipo: "eventType" }
   | { tipo: "totalLabel" }
@@ -423,6 +424,8 @@ export function lerCampo(doc: Partial<ProposalDoc>, campo: CampoPublicado): stri
       return doc.ref;
     case "headerTitle":
       return doc.headerTitle;
+    case "intencao":
+      return doc.intencao;
     case "servico":
       return doc.servico;
     case "eventType":
@@ -480,6 +483,8 @@ export function escreverCampo<T extends Partial<ProposalDoc>>(
       return { ...doc, ref: texto };
     case "headerTitle":
       return { ...doc, headerTitle: texto };
+    case "intencao":
+      return { ...doc, intencao: texto };
     case "servico":
       return { ...doc, servico: texto };
     case "eventType":
@@ -673,6 +678,7 @@ export function camposDoDocumento(doc: Partial<ProposalDoc>): Array<{
   const campos: Array<{ campo: CampoDeTexto; rotulo: string }> = [
     { campo: { tipo: "ref" }, rotulo: "Referência" },
     { campo: { tipo: "headerTitle" }, rotulo: "Título do cabeçalho" },
+    { campo: { tipo: "intencao" }, rotulo: "Frase de intenção" },
     { campo: { tipo: "servico" }, rotulo: "Serviço" },
     { campo: { tipo: "eventType" }, rotulo: "Tipo de evento" },
     { campo: { tipo: "totalLabel" }, rotulo: "Rótulo do total" },

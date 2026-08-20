@@ -536,6 +536,32 @@ export default function Documento({
     ...boards.map((b) => b.titulo.trim()),
   ].filter((nome, i, todos) => !!nome && todos.indexOf(nome) === i);
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A ÚLTIMA COISA QUE SE VÊ NÃO PODE SER O CANCELAMENTO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A proposta acabava na cláusula do Centro de Arbitragem de Conflitos de
+   * Consumo de Lisboa. É a frase certa e é o sítio errado para uma proposta de
+   * casamento acabar: o que fica na cabeça de quem fecha o separador é a
+   * última coisa que leu.
+   *
+   * ── QUAL É A FOTOGRAFIA, E PORQUE É QUE NÃO É UMA REPETIÇÃO ────────────
+   *
+   * A capa tem duas posições e esta página só desenha UMA (a primeira que
+   * resolve). A segunda está lá, escolhida por ela, e não é vista em lado
+   * nenhum do ecrã — no papel imprime do outro lado do painel escuro. É essa
+   * que fecha.
+   *
+   * Se só uma resolveu, ela já está no topo, e não há fecho. Repetir a foto de
+   * abertura no fim não é um fecho: é a mesma proposta a dizer duas vezes a
+   * mesma coisa, e nota-se.
+   */
+  const fecho = (doc.coverImages ?? [])
+    .map((_, i) => porId.get(`c${i}`))
+    .filter((f) => f?.miniatura || f?.original)
+    .find((f) => f && f.id !== capa?.id);
+
   const sinalPct = depositPercentOf(doc);
   const faseamentoDaCasa = blocoEDaCasa(docOriginal, "faseamento");
 
@@ -1012,6 +1038,38 @@ export default function Documento({
         >
           <Lista itens={fixos.cancelamento} />
         </SeccaoDobrada>
+      )}
+
+      {/* ── O FECHO ────────────────────────────────────────────────────────
+          Ver `fecho`, acima, para qual é a fotografia e porque é que ela não é
+          uma repetição. Sem título, sem legenda e sem botão: é uma imagem, e o
+          que ela faz é acabar a proposta com o trabalho dela em vez de uma
+          cláusula de arbitragem. */}
+      {fecho && (
+        <div className="mt-20 overflow-hidden rounded-sm sm:mt-28">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fecho.miniatura ?? fecho.original}
+            {...(fecho.miniatura
+              ? {
+                  srcSet: `${fecho.miniatura} 400w, /api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(fecho.id)} 1200w`,
+                  sizes: "(min-width: 1024px) 1024px, 100vw",
+                }
+              : {})}
+            alt=""
+            /* Preguiçosa, ao contrário da capa: está no fim de uma página com
+               quarenta e seis fotografias, e quem lá chega já esperou o que
+               tinha a esperar. */
+            loading="lazy"
+            decoding="async"
+            className="w-full object-cover"
+            style={{
+              aspectRatio:
+                fecho.largura && fecho.altura ? `${fecho.largura} / ${fecho.altura}` : "3 / 2",
+              maxHeight: "min(62vh, 560px)",
+            }}
+          />
+        </div>
       )}
     </article>
   );

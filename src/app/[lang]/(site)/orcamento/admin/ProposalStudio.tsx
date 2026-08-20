@@ -26,6 +26,7 @@ import {
   DEFAULT_VALID_DAYS,
   DEFAULT_VAT_RATE,
   MOOD_BOARD_MAX_IMAGES,
+  MAX_INTENCAO,
   type MoodBoard,
   type VatMode,
 } from "@/lib/proposal-doc";
@@ -5672,6 +5673,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 }}
                 data-campo="ref"
                 hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
+              />
+            </div>
+
+            {/*
+             * ══════════════════════════════════════════════════════════════
+             * A FRASE DE INTENÇÃO
+             * ══════════════════════════════════════════════════════════════
+             *
+             * «Pensámos o vosso dia em branco e azul, com a serenidade do
+             * Redondo em setembro.» É a primeira coisa que o casal lê na
+             * página, e é a única coisa da proposta que não é um dado.
+             *
+             * ── SEM TEXTO POR OMISSÃO, E ISSO É A DECISÃO ────────────────
+             * Palavras dela: «uma frase genérica é pior do que nenhuma». Uma
+             * frase da casa aqui seria lida como escrita para aquele casal, e
+             * no dia em que dois casais a comparassem seria pior do que nunca
+             * ter existido. Por isso não há sugestão, não há exemplo
+             * pré-preenchido, e o campo vazio não acende aviso nenhum: uma
+             * proposta sem frase é uma proposta legítima.
+             *
+             * O exemplo está no `hint`, onde se lê e não se copia.
+             */}
+            <div className="mt-4">
+              <Field
+                as="textarea"
+                rows={3}
+                label="Frase de intenção (só na página do casal)"
+                value={doc.intencao ?? ""}
+                maxLength={MAX_INTENCAO}
+                onChange={(e) => patch({ intencao: e.target.value.slice(0, MAX_INTENCAO) })}
+                data-campo="intencao"
+                hint={`abre a página, por cima do nome deles. Três linhas sobre o que imaginou para este casamento, escritas de raiz para eles. Ex.: «Pensámos o vosso dia em branco e azul, com a serenidade do Redondo em setembro.» ${(doc.intencao ?? "").length}/${MAX_INTENCAO}`}
               />
             </div>
 

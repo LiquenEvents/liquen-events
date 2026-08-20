@@ -269,7 +269,7 @@ export default function Inspiracao({
 
               Ver `respiro`, acima, para qual das fotografias é. */}
             {oRespiro !== null && (
-              <div className="mb-9">
+              <div className="relative mb-9">
                 <Celula
                   token={token}
                   foto={fotos[board.fotos[oRespiro]]}
@@ -289,16 +289,74 @@ export default function Inspiracao({
                   aoAmpliar={(alvo) => abrir(b, oRespiro, alvo)}
                   aoDesistir={marcarFalha}
                 />
+                {/*
+                 * ── O NOME DO MOMENTO POR CIMA DA FOTOGRAFIA ──────────────
+                 *
+                 * Palavras dela: «as secções principais abrem com uma imagem a
+                 * toda a largura e o nome do momento por cima». O título
+                 * estava por baixo, e por baixo ele é uma legenda: lê-se
+                 * depois da fotografia, e o que ela quer é que se leia COM ela.
+                 *
+                 * `pointer-events-none` porque a fotografia por baixo é
+                 * clicável (amplia), e uma faixa de texto por cima roubava-lhe
+                 * metade da área de toque sem dizer que o fazia.
+                 *
+                 * O véu escuro não é decoração: sem ele, um título branco
+                 * sobre uma fotografia de mesa posta em luz alta desaparece.
+                 * Começa em transparente a meio da altura para não escurecer a
+                 * fotografia inteira — o que se quer é ler o texto, não pôr um
+                 * filtro na foto dela.
+                 */}
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b-sm bg-gradient-to-t from-black/60 via-black/25 to-transparent"
+                  style={{ height: "58%" }}
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-7">
+                  <h3
+                    className="text-balance text-white"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(22px, 3.4vw, 34px)",
+                      textShadow: "0 1px 12px rgba(0,0,0,0.35)",
+                    }}
+                  >
+                    {board.titulo}
+                  </h3>
+                  {board.subtitulo && (
+                    <p
+                      className="mt-1.5 text-sm leading-relaxed text-white/85"
+                      style={{ textShadow: "0 1px 10px rgba(0,0,0,0.35)" }}
+                    >
+                      {board.subtitulo}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
-            <h3
-              className="text-foreground/90 text-balance"
-              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3.4vw, 34px)" }}
-            >
-              {board.titulo}
-            </h3>
-            {board.subtitulo && (
-              <p className="text-foreground/72 mt-1.5 text-sm leading-relaxed">{board.subtitulo}</p>
+            {/*
+             * Sem respiro — a secção cujas fotografias nenhuma resolveu — o
+             * título volta ao sítio de sempre. Não há fotografia por cima de
+             * que ele possa estar, e um título branco sobre nada nenhum é o
+             * defeito que isto existe para não ter.
+             */}
+            {oRespiro === null && (
+              <>
+                <h3
+                  className="text-foreground/90 text-balance"
+                  style={{
+                    fontFamily: "var(--font-playfair)",
+                    fontSize: "clamp(22px, 3.4vw, 34px)",
+                  }}
+                >
+                  {board.titulo}
+                </h3>
+                {board.subtitulo && (
+                  <p className="text-foreground/72 mt-1.5 text-sm leading-relaxed">
+                    {board.subtitulo}
+                  </p>
+                )}
+              </>
             )}
 
             {/* ── A GRELHA ─────────────────────────────────────────────────────
