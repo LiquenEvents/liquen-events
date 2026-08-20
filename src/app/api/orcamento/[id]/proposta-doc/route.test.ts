@@ -1718,3 +1718,82 @@ describe("POST /api/orcamento/[id]/proposta-doc — o que vem do ecrã de envio"
     expect((await res.json()).emailed).toBe(true);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A VERSÃO CONTA-SE POR PEDIDO, E SÓ SOBE QUANDO O CONTEÚDO MUDA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Fase 2 da página do casal. Uma revisão nesta casa é uma proposta NOVA (uma
+ * proposta que já seguiu nunca é reescrita), portanto o número da versão não
+ * pode viver na linha: cada linha nasceria na versão 1 e o casal ouviria
+ * «versão 1» ao telefone três revisões depois. Conta-se sobre as irmãs.
+ *
+ * E só sobe quando o conteúdo muda. O selo é o de `proposta-versao.ts` — sobre
+ * o que o casal vê, não sobre os bytes do PDF, que mudam sozinhos a cada
+ * gravação. Sem essa distinção, carregar duas vezes em enviar inventava uma
+ * versão nova, e o aviso de «foi revista» aparecia sempre — que é o mesmo que
+ * não aparecer nunca.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — a versão da proposta", () => {
+  it("a primeira proposta de um pedido nasce na versão 1, selada e datada", async () => {
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    const p = created.last!;
+    expect(p.versaoNumero).toBe(1);
+    expect(p.versaoSelo).toMatch(/^[0-9a-f]{64}$/);
+    expect(Number.isNaN(Date.parse(p.versaoEm!))).toBe(false);
+  });
+
+  it("reenviar a MESMA proposta não inventa uma versão nova", async () => {
+    const doc = baseDoc({ totalAmount: 3000 });
+    await POST(sendReq(doc), { params });
+    const primeira = created.last!;
+    await POST(sendReq(doc), { params });
+    const segunda = created.last!;
+
+    // Controlo positivo: são mesmo duas linhas diferentes (uma revisão é uma
+    // proposta nova). Sem isto o teste passava por não ter acontecido nada.
+    expect(segunda.id).not.toBe(primeira.id);
+    expect(store.linhas.size).toBe(2);
+
+    expect(segunda.versaoNumero).toBe(1);
+    expect(segunda.versaoSelo).toBe(primeira.versaoSelo);
+    // A data é a do CONTEÚDO: não se mexeu, portanto não muda.
+    expect(segunda.versaoEm).toBe(primeira.versaoEm);
+  });
+
+  it("mexer no preço sobe para a versão 2", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const primeira = created.last!;
+    await POST(sendReq(baseDoc({ totalAmount: 3500 })), { params });
+    const segunda = created.last!;
+
+    expect(segunda.versaoNumero).toBe(2);
+    expect(segunda.versaoSelo).not.toBe(primeira.versaoSelo);
+  });
+
+  it("três revisões dão a versão 3 — e a repetição pelo meio não conta", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params }); // igual
+    await POST(sendReq(baseDoc({ totalAmount: 3500 })), { params });
+    await POST(sendReq(baseDoc({ totalAmount: 4000 })), { params });
+    expect(created.last!.versaoNumero).toBe(3);
+  });
+
+  it("uma nota interna não é uma versão nova — o casal não a vê", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const primeira = created.last!;
+    await POST(sendReq(baseDoc({ totalAmount: 3000, notasInternas: "margem apertada" })), {
+      params,
+    });
+    expect(created.last!.versaoNumero).toBe(1);
+    expect(created.last!.versaoSelo).toBe(primeira.versaoSelo);
+  });
+
+  it("mudar a LÍNGUA é outro documento, e é uma versão nova", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { idioma: "en" }), { params });
+    expect(created.last!.versaoNumero).toBe(2);
+  });
+});

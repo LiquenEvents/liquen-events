@@ -43,7 +43,9 @@ describe("o selo é estável", () => {
       subtotal: 20_000,
       total: 24_600,
       doc: {
-        serviceGroups: [{ items: [{ text: "Arco floral", id: "i1" }], title: "Cerimónia", id: "g1" }],
+        serviceGroups: [
+          { items: [{ text: "Arco floral", id: "i1" }], title: "Cerimónia", id: "g1" },
+        ],
         clientNames: "Maria & Zé",
         ref: "PO Decoração Casamento Maria & Zé",
       },
@@ -52,7 +54,8 @@ describe("o selo é estável", () => {
   });
 
   it("uma proposta sem língua gravada é portuguesa — e sela como tal", () => {
-    const { idioma: _fora, ...semLingua } = base;
+    const semLingua: ConteudoSelavel = { ...base };
+    delete semLingua.idioma;
     expect(seloDoConteudo(semLingua)).toBe(seloDoConteudo(base));
   });
 
@@ -153,10 +156,7 @@ describe("o selo ignora o que é só dela", () => {
  */
 describe("nada do que é escondido é desenhado na página do casal", () => {
   const documento = readFileSync(
-    path.join(
-      process.cwd(),
-      "src/app/[lang]/(privado)/proposta/[token]/Documento.tsx",
-    ),
+    path.join(process.cwd(), "src/app/[lang]/(privado)/proposta/[token]/Documento.tsx"),
     "utf8",
   );
 

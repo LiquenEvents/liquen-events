@@ -516,4 +516,26 @@ export interface Proposal {
    * em `@/lib/proposta-idioma`, que é o único sítio onde essa leitura se faz.
    */
   idioma?: import("@/lib/proposal-doc-textos").IdiomaDaProposta;
+  /**
+   * ── A VERSÃO DESTE DOCUMENTO ──────────────────────────────────────────────
+   *
+   * O selo do CONTEÚDO VISÍVEL (sha256), o número que se diz em voz alta e o
+   * momento em que o conteúdo mudou pela última vez.
+   *
+   * Não confundir com o {@link Proposal.pdfSha256}, que está aqui em cima e
+   * serve outra coisa: aquele é a impressão digital dos BYTES do PDF enviado, e
+   * é PROVA. Este é a identidade do conteúdo, e é o que responde a «isto mudou
+   * desde que o casal viu?» — a pergunta de que dependem a ligação viva da
+   * página e o congelamento no aceite. Os dois têm de existir, e são
+   * diferentes: dois PDFs de conteúdo igual têm bytes diferentes (a pdf-lib
+   * carimba a data lá dentro), medido em `proposta-versao.ts`.
+   *
+   * AUSENTES em todas as propostas anteriores a estes campos. Ausente lê-se
+   * como «ainda não tem versão», e a primeira gravação a seguir dá-lhe a 1 —
+   * ninguém escreve nada por cima das antigas.
+   */
+  versaoSelo?: string;
+  versaoNumero?: number;
+  /** ISO. Quando o CONTEÚDO mudou — não quando a linha foi tocada. */
+  versaoEm?: string;
 }
