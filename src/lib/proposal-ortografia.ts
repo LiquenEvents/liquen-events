@@ -256,6 +256,57 @@ export type CampoDeTexto =
   | { tipo: "extraRotulo"; i: number };
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PROSA QUE SAI PUBLICADA E NÃO ESTÁ NO INVENTÁRIO BILINGUE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, a olhar para uma proposta que já tinha seguido: «o corretor
+ * ortográfico existe no ecrã de envio, mas estes erros chegaram à página. O
+ * corretor tem de correr sobre TODO o conteúdo publicado.»
+ *
+ * MEDIDO, campo a campo, antes de mexer: as gralhas varriam catorze famílias de
+ * campo e deixavam de fora três que ela escreve à mão e que saem publicadas —
+ * o cronograma do modelo Organização, as linhas estimadas do mesmo modelo, e as
+ * alternativas que o casal escolhe. Escrever «decoracao» em qualquer uma delas
+ * passava sem uma palavra.
+ *
+ * ── E PORQUE É QUE NÃO ENTRAM NO `CampoDeTexto` ──────────────────────────
+ *
+ * Porque esse tipo tem um segundo dono. `proposal-doc-bilingue.ts` percorre-o
+ * com um `switch` sem `default` — de propósito, para que um campo novo não
+ * possa nascer mudo numa proposta inglesa. Meter estes lá dentro obrigava a
+ * responder «tem segunda versão?» a cada um, e as respostas honestas seriam:
+ *
+ *   cronograma, linhas estimadas  não têm par inglês NENHUM no tipo do
+ *                                 documento — é uma lacuna conhecida, escrita
+ *                                 no cabeçalho de `proposal-doc-bilingue.ts`,
+ *                                 e não é esta a alteração que a resolve;
+ *   alternativas                  TÊM par inglês (`tituloEn`, `rotuloEn`…) e
+ *                                 já são contadas — por `camposDeEscolhaPor-
+ *                                 Traduzir`, que é de quem elas são.
+ *
+ * Nos dois casos, entrar no inventário bilingue dava uma resposta errada: no
+ * primeiro escrevia-se `false` num campo de prosa dela (que é exactamente o
+ * modo de falha que aquele `switch` existe para impedir), no segundo passavam a
+ * ser contadas duas vezes, no painel das traduções e no das alternativas.
+ *
+ * Por isso as duas listas divergem, e divergem DITAS: `camposDoDocumento` é o
+ * inventário bilingue, `camposPublicados` é tudo o que sai publicado. Quem lê
+ * um campo para o corrigir usa a segunda.
+ */
+export type OutroCampoPublicado =
+  | { tipo: "cronogramaTitulo"; pi: number }
+  | { tipo: "cronogramaItem"; pi: number; ii: number }
+  | { tipo: "linhaEstimada"; i: number }
+  | { tipo: "escolhaTitulo"; ei: number }
+  | { tipo: "escolhaNota"; ei: number }
+  | { tipo: "escolhaRotulo"; ei: number; oi: number }
+  | { tipo: "escolhaDescricao"; ei: number; oi: number };
+
+/** Todo o texto livre que chega ao casal — o que o corretor tem de varrer. */
+export type CampoPublicado = CampoDeTexto | OutroCampoPublicado;
+
+/**
  * ── ONDE É QUE ESTE CAMPO ESTÁ NO ECRÃ ────────────────────────────────────
  *
  * O aviso dizia qual era a palavra e oferecia-se para a corrigir, e isso chega
@@ -269,7 +320,7 @@ export type CampoDeTexto =
  * campo, algumas com índices, e um `id` colide com o que quer que exista no
  * resto da página.
  */
-export function chaveDoCampo(c: CampoDeTexto): string {
+export function chaveDoCampo(c: CampoPublicado): string {
   switch (c.tipo) {
     case "grupoTitulo":
       return `grupoTitulo:${c.gi}`;
@@ -283,7 +334,30 @@ export function chaveDoCampo(c: CampoDeTexto): string {
       return `${c.tipo}:${c.bi}`;
     case "linhaDeOrcamento":
     case "extraRotulo":
+    case "linhaEstimada":
       return `${c.tipo}:${c.i}`;
+    case "cronogramaTitulo":
+      return `cronogramaTitulo:${c.pi}`;
+    case "cronogramaItem":
+      return `cronogramaItem:${c.pi}:${c.ii}`;
+    /**
+     * ── AS ALTERNATIVAS JÁ TINHAM MORADA, E É ESTA ─────────────────────────
+     *
+     * `escolhas:0:opcoes:1:rotulo` não é uma invenção daqui: é o `caminho` que
+     * o painel das traduções (`camposDeEscolhaPorTraduzir`) já usa e que o
+     * `EditorDeEscolhas` já escreve no `data-campo` de cada caixa. Inventar
+     * `escolhaRotulo:0:1` dava DUAS moradas para a mesma caixa — e no dia em
+     * que uma delas mudasse, um dos dois saltos deixava de encontrar o campo
+     * sem que nada acendesse. Uma caixa, um endereço.
+     */
+    case "escolhaTitulo":
+      return `escolhas:${c.ei}:titulo`;
+    case "escolhaNota":
+      return `escolhas:${c.ei}:nota`;
+    case "escolhaRotulo":
+      return `escolhas:${c.ei}:opcoes:${c.oi}:rotulo`;
+    case "escolhaDescricao":
+      return `escolhas:${c.ei}:opcoes:${c.oi}:descricao`;
     default:
       return c.tipo;
   }
@@ -297,7 +371,7 @@ export function chaveDoCampo(c: CampoDeTexto): string {
  * decoração do pedido, e o título do cabeçalho é composto. Para esses, o salto
  * leva à secção — que é onde a resposta está — em vez de não fazer nada.
  */
-export function seccaoDoCampo(c: CampoDeTexto): string {
+export function seccaoDoCampo(c: CampoPublicado): string {
   switch (c.tipo) {
     case "grupoTitulo":
     case "itemRotulo":
@@ -306,8 +380,19 @@ export function seccaoDoCampo(c: CampoDeTexto): string {
     case "boardTitulo":
     case "boardSubtitulo":
     case "boardNota":
+    // As alternativas vivem DENTRO da secção dos mood boards — não têm secção
+    // própria, e a razão está no cabeçalho do `EditorDeEscolhas`: são visuais,
+    // e as fotografias que as explicam já estão nestas páginas.
+    case "escolhaTitulo":
+    case "escolhaNota":
+    case "escolhaRotulo":
+    case "escolhaDescricao":
       return "moodboards";
+    case "cronogramaTitulo":
+    case "cronogramaItem":
+      return "cronograma";
     case "linhaDeOrcamento":
+    case "linhaEstimada":
     case "budgetNote":
       return "orcamento";
     case "extraRotulo":
@@ -320,7 +405,7 @@ export function seccaoDoCampo(c: CampoDeTexto): string {
 
 /** Uma gralha encontrada, pronta a ser mostrada e a ser corrigida. */
 export interface Gralha {
-  campo: CampoDeTexto;
+  campo: CampoPublicado;
   /** Como se chama este campo em pt-PT, para a frase do aviso. */
   rotulo: string;
   /** A palavra tal como está escrita. */
@@ -332,7 +417,7 @@ export interface Gralha {
 }
 
 /** O texto de um campo, ou `undefined` se o campo não existe neste documento. */
-export function lerCampo(doc: Partial<ProposalDoc>, campo: CampoDeTexto): string | undefined {
+export function lerCampo(doc: Partial<ProposalDoc>, campo: CampoPublicado): string | undefined {
   switch (campo.tipo) {
     case "ref":
       return doc.ref;
@@ -362,6 +447,20 @@ export function lerCampo(doc: Partial<ProposalDoc>, campo: CampoDeTexto): string
       return doc.budgetItems?.[campo.i];
     case "extraRotulo":
       return doc.budgetExtras?.[campo.i]?.label;
+    case "cronogramaTitulo":
+      return doc.cronograma?.[campo.pi]?.title;
+    case "cronogramaItem":
+      return doc.cronograma?.[campo.pi]?.items?.[campo.ii];
+    case "linhaEstimada":
+      return doc.budgetRows?.[campo.i]?.item;
+    case "escolhaTitulo":
+      return doc.escolhas?.[campo.ei]?.titulo;
+    case "escolhaNota":
+      return doc.escolhas?.[campo.ei]?.nota;
+    case "escolhaRotulo":
+      return doc.escolhas?.[campo.ei]?.opcoes?.[campo.oi]?.rotulo;
+    case "escolhaDescricao":
+      return doc.escolhas?.[campo.ei]?.opcoes?.[campo.oi]?.descricao;
   }
 }
 
@@ -373,7 +472,7 @@ export function lerCampo(doc: Partial<ProposalDoc>, campo: CampoDeTexto): string
  */
 export function escreverCampo<T extends Partial<ProposalDoc>>(
   doc: T,
-  campo: CampoDeTexto,
+  campo: CampoPublicado,
   texto: string,
 ): T {
   switch (campo.tipo) {
@@ -471,6 +570,78 @@ export function escreverCampo<T extends Partial<ProposalDoc>>(
           i === campo.i ? { ...e, label: texto } : e,
         ),
       };
+    case "cronogramaTitulo":
+      return {
+        ...doc,
+        cronograma: (doc.cronograma ?? []).map((f, i) =>
+          i === campo.pi ? { ...f, title: texto } : f,
+        ),
+      };
+    case "cronogramaItem":
+      return {
+        ...doc,
+        cronograma: (doc.cronograma ?? []).map((f, i) =>
+          i === campo.pi
+            ? { ...f, items: (f.items ?? []).map((it, j) => (j === campo.ii ? texto : it)) }
+            : f,
+        ),
+      };
+    case "linhaEstimada":
+      return {
+        ...doc,
+        budgetRows: (doc.budgetRows ?? []).map((l, i) =>
+          i === campo.i ? { ...l, item: texto } : l,
+        ),
+      };
+    /**
+     * ── AS ALTERNATIVAS ESCREVEM-SE SEM TOCAR NOS `id` ─────────────────────
+     *
+     * Cada opção tem um `id` estável, e é a ele que a resposta do casal aponta.
+     * Corrigir «Terracota e hortensias» reescreve o `rotulo` e mais nada: a
+     * escolha que eles já fizeram continua a apontar para a mesma opção. Se a
+     * identidade fosse o texto, corrigir uma gralha apagava a resposta — está
+     * escrito no tipo, em `proposta-escolhas.ts`, e é a razão de ele existir.
+     */
+    case "escolhaTitulo":
+      return {
+        ...doc,
+        escolhas: (doc.escolhas ?? []).map((e, i) =>
+          i === campo.ei ? { ...e, titulo: texto } : e,
+        ),
+      };
+    case "escolhaNota":
+      return {
+        ...doc,
+        escolhas: (doc.escolhas ?? []).map((e, i) => (i === campo.ei ? { ...e, nota: texto } : e)),
+      };
+    case "escolhaRotulo":
+      return {
+        ...doc,
+        escolhas: (doc.escolhas ?? []).map((e, i) =>
+          i === campo.ei
+            ? {
+                ...e,
+                opcoes: (e.opcoes ?? []).map((o, j) =>
+                  j === campo.oi ? { ...o, rotulo: texto } : o,
+                ),
+              }
+            : e,
+        ),
+      };
+    case "escolhaDescricao":
+      return {
+        ...doc,
+        escolhas: (doc.escolhas ?? []).map((e, i) =>
+          i === campo.ei
+            ? {
+                ...e,
+                opcoes: (e.opcoes ?? []).map((o, j) =>
+                  j === campo.oi ? { ...o, descricao: texto } : o,
+                ),
+              }
+            : e,
+        ),
+      };
   }
 }
 
@@ -483,11 +654,17 @@ export function escreverCampo<T extends Partial<ProposalDoc>>(
  * aviso sobre o nome da quinta seria exactamente o ruído que faz ignorar os
  * avisos verdadeiros.
  *
- * ── E É TAMBÉM O INVENTÁRIO DA SEGUNDA CAIXA ──────────────────────────────
+ * ── É O INVENTÁRIO DA SEGUNDA CAIXA, E É SÓ ISSO ──────────────────────────
  * Exportada porque `proposal-doc-bilingue.ts` precisa exactamente desta lista,
- * com estes rótulos: os campos de prosa que saem impressos são os mesmos que
- * precisam de par inglês. Duas listas divergiriam, e o sintoma seria um campo
- * traduzível que nenhuma contagem via.
+ * com estes rótulos: são estes os campos que têm par inglês no documento, e é
+ * por esta lista que se conta o que falta traduzir.
+ *
+ * NÃO é «tudo o que sai publicado» — foi durante um tempo, e deixou de ser no
+ * dia em que se mediu a diferença. O cronograma, as linhas estimadas e as
+ * alternativas saem publicados e NÃO estão aqui, cada um pela sua razão, e as
+ * razões estão escritas por cima do `OutroCampoPublicado`. Quem quer varrer
+ * texto publicado usa {@link camposPublicados}; quem quer contar traduções usa
+ * esta.
  */
 export function camposDoDocumento(doc: Partial<ProposalDoc>): Array<{
   campo: CampoDeTexto;
@@ -531,6 +708,64 @@ export function camposDoDocumento(doc: Partial<ProposalDoc>): Array<{
   return campos;
 }
 
+/**
+ * TUDO o que ela escreve à mão e o casal acaba por ler — a lista do corretor.
+ *
+ * «O corretor tem de correr sobre todo o conteúdo publicado.» É esta a lista
+ * que responde a essa frase, e é maior do que a de cima em três famílias.
+ *
+ * ── O QUE CONTINUA A FICAR DE FORA, E PORQUE NÃO É ESQUECIMENTO ──────────
+ *
+ * Os nomes próprios (o casal, o espaço, os wedding planners), pela razão de
+ * sempre: «Oliveirinha» não está em dicionário nenhum e um aviso sobre o nome
+ * da quinta é o ruído que faz ignorar os avisos verdadeiros.
+ *
+ * E os blocos fixos — notas importantes, incluído, não incluído, condições
+ * gerais, observações, faseamento, cancelamento. Esses NÃO se escrevem em lado
+ * nenhum do estúdio: vêm inteiros de `withProposalDefaults`, são texto da casa,
+ * e varrê-los seria varrer as nossas próprias constantes para não encontrar
+ * nada. Pior: a correcção de uma gralha reescrevia o bloco, ele deixava de ser
+ * igual ao da casa, e `blocosFixosNaLingua` — que decide a versão inglesa
+ * COMPARANDO com o bloco da casa — passava a mandar o português para uma
+ * proposta inglesa. Um corrector que estraga a tradução ao corrigir uma gralha
+ * que não existe é pior do que não haver corrector.
+ */
+export function camposPublicados(doc: Partial<ProposalDoc>): Array<{
+  campo: CampoPublicado;
+  rotulo: string;
+}> {
+  const campos: Array<{ campo: CampoPublicado; rotulo: string }> = [...camposDoDocumento(doc)];
+  (doc.cronograma ?? []).forEach((fase, pi) => {
+    campos.push({ campo: { tipo: "cronogramaTitulo", pi }, rotulo: `Cronograma · fase ${pi + 1}` });
+    (fase.items ?? []).forEach((_, ii) => {
+      campos.push({
+        campo: { tipo: "cronogramaItem", pi, ii },
+        rotulo: `Cronograma · fase ${pi + 1}, linha ${ii + 1}`,
+      });
+    });
+  });
+  (doc.budgetRows ?? []).forEach((_, i) => {
+    campos.push({ campo: { tipo: "linhaEstimada", i }, rotulo: `Orçamento · estimativa ${i + 1}` });
+  });
+  (doc.escolhas ?? []).forEach((e, ei) => {
+    // Pelo TÍTULO dela e não pelo número: «Escolha «Paleta»» é o que a leva lá.
+    const nome = e.titulo?.trim() ? `«${e.titulo.trim()}»` : `${ei + 1}`;
+    campos.push({ campo: { tipo: "escolhaTitulo", ei }, rotulo: `Alternativa ${nome} · título` });
+    campos.push({ campo: { tipo: "escolhaNota", ei }, rotulo: `Alternativa ${nome} · nota` });
+    (e.opcoes ?? []).forEach((_, oi) => {
+      campos.push({
+        campo: { tipo: "escolhaRotulo", ei, oi },
+        rotulo: `Alternativa ${nome} · opção ${oi + 1}`,
+      });
+      campos.push({
+        campo: { tipo: "escolhaDescricao", ei, oi },
+        rotulo: `Alternativa ${nome} · descrição da opção ${oi + 1}`,
+      });
+    });
+  });
+  return campos;
+}
+
 /** As palavras de um texto, com a pontuação de fora. Apóstrofos e hífenes
  *  ficam DENTRO da palavra: «copo d'água» e «pé-de-altar» são uma palavra
  *  cada, e parti-las inventava tokens que não existem. */
@@ -547,7 +782,7 @@ function palavrasDe(texto: string): string[] {
  */
 export function gralhasDoDocumento(doc: Partial<ProposalDoc>): Gralha[] {
   const achados: Gralha[] = [];
-  for (const { campo, rotulo } of camposDoDocumento(doc)) {
+  for (const { campo, rotulo } of camposPublicados(doc)) {
     const texto = lerCampo(doc, campo);
     if (!texto || !texto.trim()) continue;
     const jaVistas = new Set<string>();

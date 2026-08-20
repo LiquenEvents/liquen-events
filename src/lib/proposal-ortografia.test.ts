@@ -7,6 +7,8 @@ import {
   lerCampo,
   escreverCampo,
   seccaoDoCampo,
+  camposDoDocumento,
+  camposPublicados,
   type CampoDeTexto,
 } from "./proposal-ortografia";
 import type { ProposalDoc } from "./proposal-doc";
@@ -306,5 +308,220 @@ describe("o caminho até ao campo", () => {
     expect(seccaoDoCampo({ tipo: "boardTitulo", bi: 0 })).toBe("moodboards");
     expect(seccaoDoCampo({ tipo: "itemDesc", gi: 0, ii: 0 })).toBe("servicos");
     expect(seccaoDoCampo({ tipo: "linhaDeOrcamento", i: 0 })).toBe("orcamento");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «O CORRETOR TEM DE CORRER SOBRE TODO O CONTEÚDO PUBLICADO»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, a olhar para uma proposta que já tinha seguido. MEDIDO antes
+ * de mexer: das famílias de campo que ela escreve à mão e que saem publicadas,
+ * três não eram varridas — o cronograma do modelo Organização, as linhas
+ * estimadas do mesmo modelo, e as alternativas que o casal escolhe.
+ */
+describe("o que sai publicado é varrido — todo", () => {
+  const gralhas = (over: Partial<ProposalDoc>) =>
+    gralhasDoDocumento({ moodBoards: [], serviceGroups: [], budgetItems: [], ...over });
+
+  it("o cronograma de Organização — o título da fase e cada tarefa", () => {
+    const g = gralhas({
+      cronograma: [{ title: "12 meses antes da cerimonia", items: ["Conceito da decoracao"] }],
+    });
+    expect(g.map((x) => x.escrita)).toEqual(["cerimonia", "decoracao"]);
+    // E o rótulo leva-a ao sítio: fase 1, linha 1.
+    expect(g[0].rotulo).toBe("Cronograma · fase 1");
+    expect(g[1].rotulo).toBe("Cronograma · fase 1, linha 1");
+  });
+
+  it("as linhas estimadas do orçamento de Organização", () => {
+    const g = gralhas({ budgetRows: [{ item: "Coordenação da cerimonia", price: "1.500,00 €" }] });
+    expect(g.map((x) => x.escrita)).toEqual(["cerimonia"]);
+    expect(g[0].rotulo).toBe("Orçamento · estimativa 1");
+  });
+
+  it("as alternativas — o título, a nota, e o rótulo e a descrição de cada opção", () => {
+    const g = gralhas({
+      escolhas: [
+        {
+          id: "e1",
+          titulo: "Paleta da cerimonia",
+          nota: "Pode mudar até à montagem da decoracao",
+          opcoes: [
+            { id: "o1", rotulo: "Terracota e hortensias", descricao: "Com ceramica à mesa" },
+            { id: "o2", rotulo: "Verde-oliva" },
+          ],
+        },
+      ],
+    });
+    expect(g.map((x) => x.escrita)).toEqual(["cerimonia", "decoracao", "hortensias", "ceramica"]);
+    // Nomeadas pelo TÍTULO dela, que é o que a leva lá.
+    expect(g[0].rotulo).toBe("Alternativa «Paleta da cerimonia» · título");
+    expect(g[2].rotulo).toBe("Alternativa «Paleta da cerimonia» · opção 1");
+  });
+
+  /**
+   * ── E O QUE NÃO SE VARRE, NÃO SE VARRE DE PROPÓSITO ─────────────────────
+   *
+   * Os blocos fixos não se escrevem em lado nenhum do estúdio: vêm inteiros de
+   * `withProposalDefaults`. Varrê-los era varrer as nossas próprias constantes
+   * — e corrigir uma «gralha» lá dentro reescrevia o bloco, ele deixava de ser
+   * igual ao da casa, e `blocosFixosNaLingua` (que decide a versão inglesa
+   * COMPARANDO com o da casa) mandava o português para uma proposta inglesa.
+   */
+  it("os blocos fixos ficam de fora — corrigi-los estragava a versão inglesa", () => {
+    const g = gralhas({
+      incluido: ["Montagem e decoracao do salao"],
+      naoIncluido: ["Transporte dos adereços"],
+      notasImportantes: ["A decoracao é da responsabilidade da Liquen"],
+      observacoesGerais: ["A cerimonia começa às 16h"],
+      condicoesGerais: ["Esta proposta cobre a decoracao da cerimonia."],
+      faseamento: ["30% na adjudicacao"],
+      cancelamento: ["Em caso de cancelamento da cerimonia"],
+    });
+    expect(g).toEqual([]);
+  });
+});
+
+describe("as duas listas divergem, e divergem ditas", () => {
+  const comTudo: Partial<ProposalDoc> = {
+    moodBoards: [],
+    serviceGroups: [],
+    budgetItems: [],
+    cronograma: [{ title: "x", items: ["y"] }],
+    budgetRows: [{ item: "z", price: "" }],
+    escolhas: [{ id: "e1", titulo: "t", opcoes: [{ id: "o1", rotulo: "r" }] }],
+  };
+
+  it("o inventário bilingue NÃO cresceu com isto", () => {
+    // `camposDoDocumento` é percorrido por um `switch` sem `default` em
+    // `proposal-doc-bilingue.ts`. O cronograma não tem par inglês no tipo do
+    // documento, e as alternativas já são contadas por quem é delas.
+    const tipos = new Set(camposDoDocumento(comTudo).map((c) => c.campo.tipo));
+    for (const novo of [
+      "cronogramaTitulo",
+      "cronogramaItem",
+      "linhaEstimada",
+      "escolhaTitulo",
+      "escolhaRotulo",
+    ]) {
+      expect(tipos.has(novo as CampoDeTexto["tipo"]), novo).toBe(false);
+    }
+  });
+
+  it("e a lista do corretor é a de cima MAIS os que faltavam", () => {
+    const bilingue = camposDoDocumento(comTudo).map((c) => c.campo.tipo);
+    const publicados = camposPublicados(comTudo).map((c) => c.campo.tipo);
+    // Nada se perdeu pelo caminho.
+    for (const t of bilingue) expect(publicados).toContain(t);
+    expect(publicados.length).toBeGreaterThan(bilingue.length);
+  });
+});
+
+describe("corrigir uma alternativa não mexe na resposta do casal", () => {
+  /**
+   * A resposta do casal aponta para o `id` da opção. Se corrigir «hortensias»
+   * lhe tocasse, a escolha deles desaparecia em silêncio — e ninguém dava por
+   * isso até ao dia da montagem.
+   */
+  it("reescreve o rótulo e mais nada", () => {
+    const original: Partial<ProposalDoc> = {
+      moodBoards: [],
+      serviceGroups: [],
+      budgetItems: [],
+      escolhas: [
+        {
+          id: "e1",
+          titulo: "Paleta",
+          opcoes: [
+            { id: "o1", rotulo: "Terracota e hortensias", imagem: "LIQ-9/p.jpg" },
+            { id: "o2", rotulo: "Verde-oliva" },
+          ],
+        },
+      ],
+    };
+    const g = gralhasDoDocumento(original);
+    expect(g).toHaveLength(1);
+    const depois = corrigirGralha(original, g[0]);
+    const opcoes = depois.escolhas![0].opcoes;
+    expect(opcoes[0].rotulo).toBe("Terracota e hortênsias");
+    expect(opcoes[0].id).toBe("o1");
+    // A fotografia da opção e a opção ao lado ficam exactamente onde estavam.
+    expect(opcoes[0].imagem).toBe("LIQ-9/p.jpg");
+    expect(opcoes[1]).toBe(original.escolhas![0].opcoes[1]);
+    expect(depois.escolhas![0].id).toBe("e1");
+  });
+});
+
+describe("o salto encontra os campos novos", () => {
+  it("o cronograma e a estimativa levam a chave do controlo", () => {
+    expect(chaveDoCampo({ tipo: "cronogramaTitulo", pi: 2 })).toBe("cronogramaTitulo:2");
+    expect(chaveDoCampo({ tipo: "cronogramaItem", pi: 2, ii: 1 })).toBe("cronogramaItem:2:1");
+    expect(chaveDoCampo({ tipo: "linhaEstimada", i: 3 })).toBe("linhaEstimada:3");
+    expect(seccaoDoCampo({ tipo: "cronogramaTitulo", pi: 0 })).toBe("cronograma");
+    expect(seccaoDoCampo({ tipo: "linhaEstimada", i: 0 })).toBe("orcamento");
+  });
+
+  /**
+   * UMA CAIXA, UM ENDEREÇO. `escolhas:0:opcoes:1:rotulo` não é invenção do
+   * corrector: é o `caminho` que o painel das traduções já usava e que o
+   * `EditorDeEscolhas` já escreve no `data-campo` de cada caixa. Um segundo
+   * endereço para a mesma caixa era um dos dois saltos a partir-se em silêncio
+   * no dia em que um deles mudasse.
+   */
+  it("as alternativas usam o endereço que as caixas JÁ têm", () => {
+    expect(chaveDoCampo({ tipo: "escolhaTitulo", ei: 0 })).toBe("escolhas:0:titulo");
+    expect(chaveDoCampo({ tipo: "escolhaNota", ei: 1 })).toBe("escolhas:1:nota");
+    expect(chaveDoCampo({ tipo: "escolhaRotulo", ei: 0, oi: 1 })).toBe(
+      "escolhas:0:opcoes:1:rotulo",
+    );
+    expect(chaveDoCampo({ tipo: "escolhaDescricao", ei: 0, oi: 1 })).toBe(
+      "escolhas:0:opcoes:1:descricao",
+    );
+    // E vivem dentro da secção dos mood boards, que é onde o editor delas está.
+    expect(seccaoDoCampo({ tipo: "escolhaRotulo", ei: 0, oi: 0 })).toBe("moodboards");
+  });
+});
+
+describe("ler e escrever os campos novos", () => {
+  const base: Partial<ProposalDoc> = {
+    moodBoards: [],
+    serviceGroups: [],
+    budgetItems: [],
+    cronograma: [{ title: "Doze meses antes", items: ["Conceito", "Fornecedores"] }],
+    budgetRows: [{ item: "Coordenação", price: "1.500,00 €" }],
+    escolhas: [
+      { id: "e1", titulo: "Paleta", nota: "n", opcoes: [{ id: "o1", rotulo: "Terracota" }] },
+    ],
+  };
+
+  const casos: Array<[CampoDeTexto | Parameters<typeof lerCampo>[1], string]> = [
+    [{ tipo: "cronogramaTitulo", pi: 0 }, "Doze meses antes"],
+    [{ tipo: "cronogramaItem", pi: 0, ii: 1 }, "Fornecedores"],
+    [{ tipo: "linhaEstimada", i: 0 }, "Coordenação"],
+    [{ tipo: "escolhaTitulo", ei: 0 }, "Paleta"],
+    [{ tipo: "escolhaNota", ei: 0 }, "n"],
+    [{ tipo: "escolhaRotulo", ei: 0, oi: 0 }, "Terracota"],
+  ];
+
+  it.each(casos)("lê %o", (campo, esperado) => {
+    expect(lerCampo(base, campo as Parameters<typeof lerCampo>[1])).toBe(esperado);
+  });
+
+  it.each(casos)("escreve %o e volta a lê-lo", (campo) => {
+    const c = campo as Parameters<typeof lerCampo>[1];
+    const depois = escreverCampo(base, c, "escrito de novo");
+    expect(lerCampo(depois, c)).toBe("escrito de novo");
+    // O preço da linha estimada e os ids das alternativas não se movem.
+    expect(depois.budgetRows?.[0].price).toBe("1.500,00 €");
+    expect(depois.escolhas?.[0].id).toBe("e1");
+    expect(depois.escolhas?.[0].opcoes[0].id).toBe("o1");
+  });
+
+  it("uma posição que não existe lê-se como vazia, e não estoira", () => {
+    expect(lerCampo(base, { tipo: "cronogramaItem", pi: 9, ii: 9 })).toBeUndefined();
+    expect(lerCampo(base, { tipo: "escolhaRotulo", ei: 9, oi: 9 })).toBeUndefined();
+    expect(escreverCampo(base, { tipo: "linhaEstimada", i: 9 }, "x").budgetRows).toHaveLength(1);
   });
 });

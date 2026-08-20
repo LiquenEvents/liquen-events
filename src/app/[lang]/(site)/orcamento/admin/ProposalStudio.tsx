@@ -86,6 +86,7 @@ import {
   lerCampo,
   seccaoDoCampo,
   type CampoDeTexto,
+  type CampoPublicado,
 } from "@/lib/proposal-ortografia";
 import { fotosQueDestoam, ordemPorCor } from "@/lib/cor-dominante";
 import {
@@ -1526,7 +1527,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     pedido: number;
   } | null>(null);
   const [campoAVisitar, setCampoAVisitar] = useState<{
-    campo: CampoDeTexto;
+    campo: CampoPublicado;
     /** Contador de pedidos. Carregar duas vezes na mesma palavra tem de saltar
      *  as duas — e é ele que evita limpar o alvo DENTRO do efeito. */
     pedido: number;
@@ -4391,7 +4392,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setFaltaAVisitar((antes) => ({ seccao, campo, pedido: (antes?.pedido ?? 0) + 1 }));
   }
 
-  function irParaCampo(campo: CampoDeTexto, versao: "pt" | "en" = "pt") {
+  function irParaCampo(campo: CampoPublicado, versao: "pt" | "en" = "pt") {
     setStep("conteudo");
     // Saltar para uma caixa inglesa que não está desenhada deixava-a a olhar
     // para o campo português sem perceber porquê. O interruptor acende-se junto
@@ -6618,6 +6619,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         onChange={(e) => updatePhase(pi, { title: e.target.value })}
                         placeholder="6-12 meses antes do casamento"
                         aria-label="Título da fase"
+                        /* O salto das gralhas encontra o campo por aqui. Ver
+                           `chaveDoCampo` — o cronograma entrou na varredura
+                           depois de se medir que era texto dela a sair
+                           publicado sem passar por corrector nenhum. */
+                        data-campo={chaveDoCampo({ tipo: "cronogramaTitulo", pi })}
                       />
                       <MoveBtns
                         onUp={() => movePhase(pi, -1)}
@@ -6643,6 +6649,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                             onChange={(e) => updatePhaseItem(pi, ii, e.target.value)}
                             placeholder="Definição do conceito"
                             aria-label="Tarefa"
+                            data-campo={chaveDoCampo({ tipo: "cronogramaItem", pi, ii })}
                           />
                           <button
                             type="button"
@@ -7250,6 +7257,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
                         placeholder="Coordenação do dia"
                         aria-label="Item"
+                        data-campo={chaveDoCampo({ tipo: "linhaEstimada", i })}
                       />
                       <input
                         className="bo-input px-2.5 py-2 text-xs text-foreground/75 text-right"
