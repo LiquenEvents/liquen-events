@@ -147,32 +147,50 @@ describe("portal proposta-pdf — fotos em falta", () => {
     expect(renderStoredProposalDocPdfWithReport).toHaveBeenCalledTimes(2);
   });
 
-  it("503 quando à segunda continuam a faltar — e NADA é servido", async () => {
+  /**
+   * ── E DEPOIS DA SEGUNDA, SERVE-SE NA MESMA ─────────────────────────────
+   *
+   * Aqui estava um 503 sem corpo. Palavras dela, com o telemóvel na mão:
+   * «quero que este botão ver a proposta de PDF funcione porque não está a
+   * funcionar». Estava a responder 503 porque quatro fotografias tinham
+   * desaparecido do armazenamento — e o botão «VER A PROPOSTA COMPLETA (PDF)»
+   * não fazia nada. Nem abria, nem explicava.
+   *
+   * Entre não dar nada ao casal e dar-lhe o documento sem uma fotografia,
+   * dá-se o documento: este botão REDESENHA para ecrã uma coisa que eles já
+   * receberam por email. A recusa fica onde foi pedida — no ANEXO do email,
+   * que é o documento de registo e passa por outro caminho.
+   *
+   * E o aviso mudou de destinatário: passou para o estúdio, ANTES do envio,
+   * com o nome do mood board e a posição da foto.
+   */
+  it("com fotos a menos, SERVE na mesma — um botão que não faz nada é pior", async () => {
     db.newestByQuote.set("q-1", { id: "p", quoteId: "q-1", doc: { which: "x" } });
     db.emFalta = 1;
 
     const res = await call();
-    expect(res.status).toBe(503);
-    // 503 e não 500: isto tem conserto e é temporário.
-    expect(res.headers.get("Retry-After")).toBe("30");
-    expect(await res.text()).toBe("");
+    expect(res.status).toBe(200);
+    expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(0);
   });
 
   /**
-   * O ERRO QUE ISTO IMPEDE: guardar a falha em cache.
+   * O ERRO QUE ISTO IMPEDE: guardar o documento com buracos em cache.
    *
-   * A falha é passageira por definição. Guardá-la fixava-a até ao próximo
-   * arranque a frio — é o mesmo "gravar uma falha como se fosse um facto" que
-   * já apareceu na cache de fotografias e na célula do estúdio.
+   * A falta é passageira por definição. Guardá-la fixava-a até ao próximo
+   * arranque a frio — mesmo depois de ela repor a fotografia. É o mesmo
+   * "gravar uma falha como se fosse um facto" que já apareceu na cache de
+   * fotografias e na célula do estúdio.
    */
-  it("uma recusa não fica em cache: a chamada seguinte volta a desenhar", async () => {
+  it("o documento incompleto NÃO fica em cache: a chamada seguinte volta a desenhar", async () => {
     db.newestByQuote.set("q-1", { id: "p", quoteId: "q-1", doc: { which: "x" } });
     db.emFalta = 1;
-    expect((await call()).status).toBe(503);
+    expect((await call()).status).toBe(200);
+    const desenhosAteAgora = db.rendered.length;
 
     db.emFalta = 0;
-    const res = await call();
-    expect(res.status).toBe(200);
+    expect((await call()).status).toBe(200);
+    // Voltou a desenhar — não respondeu do que tinha guardado.
+    expect(db.rendered.length).toBeGreaterThan(desenhosAteAgora);
   });
 });
 

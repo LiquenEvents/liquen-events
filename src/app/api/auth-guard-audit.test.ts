@@ -493,6 +493,10 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./orcamento/[id]/proposta/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/email-rascunho/route", methods: ["POST"] },
   { path: "./orcamento/[id]/proposta-doc/route", methods: ["POST"] },
+  // A verificação das fotografias antes de o link seguir. Recebe o documento
+  // que está no ecrã dela — preços, notas, caminhos de ficheiro — e lista as
+  // pastas do Storage: ler isto de fora seria enumerar o armazenamento da casa.
+  { path: "./orcamento/[id]/fotos-em-falta/route", methods: ["POST"] },
   // O rascunho é trabalho comercial por publicar (preços, notas internas): ler
   // conta tanto como escrever.
   { path: "./orcamento/[id]/proposta-rascunho/route", methods: ["GET", "PUT", "DELETE"] },

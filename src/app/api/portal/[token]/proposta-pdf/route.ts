@@ -84,7 +84,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
      * recebeu. Sem língua gravada é português (`idiomaDaProposta`).
      */
     const idioma = idiomaDaProposta(proposal);
-    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma);
+    // `true`: este botão redesenha, para ecrã, um documento que o casal já
+    // recebeu por email. Uma fotografia em falta no armazenamento fazia isto
+    // responder 503 sem corpo — e o botão não fazia nada. Ver a nota em
+    // `proposal-pdf-cache.ts`; o anexo do email continua a recusar.
+    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true);
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
     // O nome é o mesmo do anexo que seguiu no email, para o ficheiro ser
     // reconhecível como o documento que o casal já tem.

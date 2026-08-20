@@ -333,7 +333,9 @@ function Celula({
   // A grelha pede a MINIATURA. O original é o plano B — e é plano B, não
   // primeira escolha: as fotografias anteriores ao bucket das miniaturas não
   // têm nenhuma, e essas pagam o ficheiro inteiro porque não há alternativa.
-  const { alvo, desistiu, aoFalhar, tentarDeNovo } = useFotoComPlanoB(
+  // Sem `tentarDeNovo`: a célula que desiste desaparece, e quem a faz voltar é
+  // o botão do pé da galeria (`recarregar`), que reassina o documento inteiro.
+  const { alvo, desistiu, aoFalhar } = useFotoComPlanoB(
     foto?.miniatura ?? foto?.original,
     foto?.original,
   );
@@ -345,6 +347,33 @@ function Celula({
   useEffect(() => {
     if (desistiu) aoDesistir();
   }, [desistiu, aoDesistir]);
+
+  /**
+   * ── UMA FOTO QUE NÃO ABRE DESAPARECE. NÃO SE EXPLICA. ────────────────────
+   *
+   * Palavras dela, a olhar para a página de uma proposta que já tinha seguido:
+   * «quatro barras cinzentas com ícone de imagem quebrada onde devia estar a
+   * primeira foto. Um cliente que veja isto conclui que a empresa é
+   * descuidada.»
+   *
+   * Aqui estava a nossa própria mensagem de falha — «Não foi possível mostrar
+   * esta fotografia» e um «Tentar de novo» — repetida célula a célula. Escrita
+   * para ajudar, e a fazer exactamente o contrário: quatro caixas cinzentas a
+   * meio de um mood board, numa proposta de vinte mil euros, dizem ao casal
+   * que o estúdio nem sabe o que tem no documento.
+   *
+   * O aviso não desaparece do produto — mudou de sítio. Sobe para o pé da
+   * galeria, UMA vez («Voltar a carregar as fotografias», ver `houveFalha`),
+   * que é onde ele serve para alguma coisa: o caso comum é um separador aberto
+   * há seis horas com as assinaturas caducadas, e aí um só botão resolve tudo.
+   * E o caso do ficheiro que não existe passou a ser apanhado ANTES do envio —
+   * ver `proposta-fotos-verificacao.ts`, que é o sítio certo para o descobrir:
+   * do lado de cá, com tempo de o corrigir.
+   *
+   * O `aoDesistir` acima é o que faz o botão do pé aparecer, e por isso corre
+   * antes deste regresso.
+   */
+  if (desistiu || !alvo) return null;
 
   return (
     <figure className="foto-inteira m-0">
@@ -367,11 +396,7 @@ function Celula({
             className="absolute inset-0 h-full w-full scale-105 object-cover blur-md"
           />
         )}
-        {desistiu || !alvo ? (
-          <span className="text-foreground/60 block px-4 py-8 text-center text-xs leading-relaxed">
-            {textos.fotoFalhou}
-          </span>
-        ) : (
+        {
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             key={alvo}
@@ -386,17 +411,8 @@ function Celula({
             onError={aoFalhar}
             className="relative block h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-[1.02]"
           />
-        )}
+        }
       </button>
-      {desistiu && (
-        <button
-          type="button"
-          onClick={tentarDeNovo}
-          className="alvo-toque text-moss mt-1 inline-flex w-full items-center justify-center text-[11px] hover:underline"
-        >
-          {textos.tentarDeNovo}
-        </button>
-      )}
     </figure>
   );
 }

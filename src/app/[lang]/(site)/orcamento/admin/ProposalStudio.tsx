@@ -165,6 +165,7 @@ import ThemePicker, { type ImportedImage, type ReservedImage } from "./ThemePick
 import ServicesEditor, { MoveBtns } from "./ServicesEditor";
 import CaixaInglesa from "./CaixaInglesa";
 import PorTraduzir from "./PorTraduzir";
+import FotosEmFalta from "./FotosEmFalta";
 import {
   aplicarTraducao,
   estadoDaTraducao,
@@ -7939,6 +7940,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 idioma={idiomaDoPdf}
                 onIr={(v) => irParaAFalta(v.seccao, v.campo)}
               />
+              {/* ── AS FOTOGRAFIAS ESTÃO MESMO LÁ? ─────────────────────────
+                  Primeiro de todos os avisos deste passo, e é de propósito: é
+                  o único que fala de uma coisa que já não se vê no ecrã. As
+                  gralhas e as traduções lêem-se no documento; um ficheiro que
+                  desapareceu do armazenamento só se descobre perguntando.
+
+                  Foi o defeito que a fez escrever: quatro fotos que não
+                  existiam seguiram numa proposta, e a primeira pessoa a dar por
+                  isso foi o casal. */}
+              <FotosEmFalta quoteId={quote.id} doc={doc as ProposalDoc} />
+
               {/* Os acentos que faltam nos campos que saem impressos. Aqui, ao
                   pé da Conferência, e não a meio de escrever: a palavra ainda
                   está a ser escrita quando o aviso apareceria. */}

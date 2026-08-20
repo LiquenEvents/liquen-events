@@ -155,9 +155,29 @@ describe("quando as assinaturas morrem", () => {
     fireEvent.error(img);
     fireEvent.error(screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!);
     expect(screen.getByRole("button", { name: T.recarregarFotos })).toBeTruthy();
-    // E a célula tem o SEU botão, com o seu próprio rótulo: são duas acções
-    // diferentes e não podem dizer a mesma coisa.
-    expect(screen.getByRole("button", { name: T.tentarDeNovo })).toBeTruthy();
+  });
+
+  /**
+   * ── E A CÉLULA DESAPARECE, EM SILÊNCIO ─────────────────────────────────
+   *
+   * Aqui havia um segundo botão, por célula, com o seu próprio rótulo. Palavras
+   * dela, a olhar para uma proposta que já tinha seguido: «quatro barras
+   * cinzentas com ícone de imagem quebrada onde devia estar a primeira foto. Um
+   * cliente que veja isto conclui que a empresa é descuidada.»
+   *
+   * O aviso não desapareceu do produto — subiu para o pé da galeria, UMA vez,
+   * que é onde serve: o caso comum é um separador aberto há seis horas com as
+   * assinaturas caducadas, e um só botão resolve as vinte células de uma vez.
+   */
+  it("e a célula que desistiu SOME — nada de caixas cinzentas no mood board", () => {
+    desenhar();
+    const antes = screen.getAllByRole("button", { name: /Ampliar/ }).length;
+    const cel = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
+    fireEvent.error(cel());
+    fireEvent.error(cel());
+    expect(screen.getAllByRole("button", { name: /Ampliar/ }).length).toBe(antes - 1);
+    expect(screen.queryByText(T.fotoFalhou)).toBeNull();
+    expect(screen.queryByRole("button", { name: T.tentarDeNovo })).toBeNull();
   });
 
   it("o botão volta a pedi-las — e nunca manda um caminho ao servidor", async () => {
