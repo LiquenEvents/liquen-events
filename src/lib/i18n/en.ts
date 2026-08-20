@@ -692,10 +692,9 @@ export const en: Dict = {
       "This proposal link is no longer valid. Get in touch and we'll gladly send you a new one.",
     notFoundTitle: "Proposal not found",
     notFoundBody: "We couldn't find this proposal. If you think this is a mistake, get in touch.",
-    eyebrow: "Proposal for your event",
     greeting: "Hello",
     intro:
-      "We've carefully prepared this proposal for your event. Review the details and respond right here, we'd be delighted to move forward with you.",
+      "We have prepared this proposal with great care for your day. Take your time: any adjustment is welcome, just reply to the email.",
     tableDescricao: "Description",
     tableQt: "Qty",
     tableValor: "Amount",

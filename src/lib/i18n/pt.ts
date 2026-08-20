@@ -764,10 +764,9 @@ export const pt = {
     notFoundTitle: "Proposta não encontrada",
     notFoundBody:
       "Não conseguimos encontrar esta proposta. Se acha que é um engano, fale connosco.",
-    eyebrow: "Proposta para o seu evento",
     greeting: "Olá",
     intro:
-      "Preparámos esta proposta com todo o cuidado para o seu evento. Reveja os detalhes e responda-nos aqui mesmo, será um prazer avançar consigo.",
+      "Preparámos esta proposta com todo o cuidado para o vosso dia. Vejam com calma: qualquer ajuste é bem-vindo, basta responderem ao email.",
     tableDescricao: "Descrição",
     tableQt: "Qt",
     tableValor: "Valor",

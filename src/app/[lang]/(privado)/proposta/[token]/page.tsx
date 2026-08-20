@@ -391,10 +391,18 @@ export default async function ProposalPage({
           a largura que lhe serve, em vez de uma só para as duas. Sem
           documento, a página fica exactamente como estava. */}
       <div className={`w-full ${proposal.doc ? "max-w-5xl" : "max-w-2xl"}`}>
+        {/*
+         * ── O QUE ESTAVA AQUI E SAIU ────────────────────────────────────
+         *
+         * «PROPOSTA PARA O SEU EVENTO», em maiúsculas espaçadas, por cima do
+         * nome do casal. Não acrescentava nada: eles abriram um link que lhes
+         * foi mandado a dizer que a proposta estava pronta, e a primeira coisa
+         * que liam era alguém a informá-los de que aquilo era uma proposta.
+         *
+         * O espaço fica para a frase de intenção estética, escrita à mão
+         * proposta a proposta.
+         */}
         <header className="text-center mb-10">
-          <p className="text-foreground/68 text-[10px] tracking-[0.45em] uppercase mb-3">
-            {t.eyebrow}
-          </p>
           <h1
             className="text-foreground/90 font-bold"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 5vw, 52px)" }}

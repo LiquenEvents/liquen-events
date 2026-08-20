@@ -162,12 +162,12 @@ export interface TextosDoEmailDaProposta {
 }
 
 const PT: TextosDoEmailDaProposta = {
-  assunto: "Proposta para o seu evento — Líquen Events",
-  titulo: "A sua proposta — Líquen Events",
+  assunto: "A vossa proposta — Líquen Events",
+  titulo: "A vossa proposta — Líquen Events",
   ola: "Olá",
   intro:
-    "Segue em anexo a proposta personalizada para o seu evento. Pode vê-la e responder online através do botão abaixo.",
-  introEmTexto: "Segue em anexo a proposta personalizada para o seu evento.",
+    "Segue em anexo a proposta que preparámos para o vosso dia. Podem vê-la e responder online no botão abaixo.",
+  introEmTexto: "Segue em anexo a proposta que preparámos para o vosso dia.",
   botao: "Ver a proposta →",
   verOnline: "Ver online:",
   nomeDoAnexo: (dados) => nomeDoFicheiroDaProposta(dados, "pt"),

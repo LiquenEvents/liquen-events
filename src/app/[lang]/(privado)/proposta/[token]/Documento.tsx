@@ -716,7 +716,7 @@ export default function Documento({
       {/* ── ORÇAMENTO ────────────────────────────────────────────────────── */}
       {temOrcamento && (
         <Seccao>
-          <Titulo id="orcamento" sobretitulo={t.sobretituloOrcamento} titulo={t.tituloOrcamento} />
+          <Titulo id="orcamento" sobretitulo={p.sobretituloOrcamento} titulo={t.tituloOrcamento} />
 
           {rubricas.length > 0 && (
             <ul className="mt-8">
@@ -878,7 +878,7 @@ export default function Documento({
       {(fixos.condicoesGerais ?? []).length > 0 && (
         <SeccaoDobrada
           id="condicoes"
-          sobretitulo={t.sobretituloCondicoes}
+          sobretitulo={p.sobretituloCondicoes}
           titulo={t.tituloCondicoes}
           resumo={resumoDe("condicoesGerais", fixos.condicoesGerais ?? [])}
         >

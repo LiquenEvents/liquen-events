@@ -96,6 +96,37 @@ export interface TextosDaPagina {
   pontos: string;
   /** O mesmo, no singular. Um molde com `{n}` dizia «1 pontos». */
   umPonto: string;
+
+  /* ── OS SOBRETÍTULOS QUE A PÁGINA DIZ DE OUTRA MANEIRA ─────────────────── */
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A PÁGINA MUDOU DE VOZ; O PDF FICA COMO ESTÁ
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Decisão dela, dita com todas as letras: as mudanças de linguagem são para
+   * a página web, e no PDF fica tudo igual. E o PDF e a página bebem do MESMO
+   * dicionário (`proposal-doc-textos.ts`) — mudar lá uma palavra mudava-a nos
+   * dois de uma vez, que é precisamente o que não se pode fazer.
+   *
+   * Por isso estes sobretítulos vivem aqui, no dicionário que só a página lê,
+   * e o `Documento` prefere-os aos do documento quando existem. Não é uma
+   * segunda verdade: é o mesmo sítio a ser dito de duas maneiras a dois
+   * públicos, e o único que o vê nas duas formas é ela, ao rever.
+   *
+   * ── O QUE MUDA, E PORQUÊ ─────────────────────────────────────────────
+   *
+   * «O investimento» é a palavra que as agências usam para não dizer preço, e
+   * destoa de um documento que em tudo o resto diz as coisas como elas são: a
+   * seguir a ela vem uma tabela com números, e quem a lê já sabe que vai pagar.
+   *
+   * «Para sua tranquilidade» trata uma pessoa. Quem lê são duas, e são duas
+   * que vão casar. As cláusulas lá dentro continuam a falar de «o cliente» e
+   * da «Líquen Events» — são contratuais, e uma cláusula que trate as partes
+   * por «vocês» deixa de dizer quem se obriga a quê. O que muda é a voz da
+   * casa à volta delas, não o texto que obriga.
+   */
+  sobretituloOrcamento: string;
+  sobretituloCondicoes: string;
 }
 
 /** As secções que a página dobra. Todas são texto de condições. */
@@ -136,6 +167,8 @@ const PT: TextosDaPagina = {
   },
   pontos: "{n} pontos",
   umPonto: "1 ponto",
+  sobretituloOrcamento: "O que custa",
+  sobretituloCondicoes: "Para vossa tranquilidade",
 };
 
 const EN: TextosDaPagina = {
@@ -167,6 +200,8 @@ const EN: TextosDaPagina = {
   },
   pontos: "{n} points",
   umPonto: "1 point",
+  sobretituloOrcamento: "What it costs",
+  sobretituloCondicoes: "For your peace of mind",
 };
 
 export function textosDaPagina(idioma: IdiomaDaProposta): TextosDaPagina {

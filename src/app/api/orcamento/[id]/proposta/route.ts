@@ -408,7 +408,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         // a linha que o cliente lê antes de abrir também tem de ser — dois
         // assuntos para o mesmo email era o ecrã dos modelos a mentir outra
         // vez, agora só a meio.
-        subject: doModelo?.assunto ?? "Proposta para o seu evento — Líquen Events",
+        subject: doModelo?.assunto ?? "A vossa proposta — Líquen Events",
         html: email.html,
         text: email.text,
         // O PDF JUNTA-SE aos anexos da assinatura, não os substitui:

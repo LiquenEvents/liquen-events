@@ -2,6 +2,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import Documento from "./Documento";
+import { textosDaProposta } from "@/lib/proposal-doc-textos";
 import {
   DEFAULT_CANCELAMENTO,
   DEFAULT_CONDICOES_GERAIS,
@@ -515,5 +516,51 @@ describe("as secções de condições", () => {
   it("uma secção vazia não deixa uma dobra vazia para trás", () => {
     desenhar({ ...COM_TUDO, cancelamento: [] });
     expect(screen.queryByRole("heading", { name: /Cancelamento/i })).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A PÁGINA MUDOU DE VOZ; O PDF FICA COMO ESTÁ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Decisão dela, dita com todas as letras: as mudanças de linguagem são para a
+ * página web, e no PDF fica tudo igual.
+ *
+ * O que isto prende é o mecanismo que o permite. O PDF e a página bebem do
+ * MESMO dicionário — mudar lá uma palavra mudava-a nos dois de uma vez. Por
+ * isso a página tem os seus sobretítulos num dicionário só dela, e o teste que
+ * interessa é o segundo: **o dicionário do documento continua a dizer o que
+ * dizia**. Sem ele, alguém «arruma» os dois num sítio só daqui a um mês e a
+ * mudança escorrega para o papel sem ninguém dar por isso.
+ */
+const COM_CONDICOES = {
+  condicoesGerais: ["Aos valores acresce o IVA à taxa legal em vigor como descrito."],
+};
+
+describe("a voz da página não escorrega para o documento", () => {
+  it("o orçamento deixou de ser «O investimento» — na página", () => {
+    desenhar();
+    expect(screen.getByText("O que custa")).toBeInTheDocument();
+    expect(screen.queryByText(/O investimento/i)).toBeNull();
+  });
+
+  it("as condições são «para vossa tranquilidade» — na página", () => {
+    desenhar(COM_CONDICOES);
+    expect(screen.getByText(/Para vossa tranquilidade/i)).toBeInTheDocument();
+  });
+
+  it("em inglês, a página também", () => {
+    desenhar({}, "en");
+    expect(screen.getByText("What it costs")).toBeInTheDocument();
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("e o dicionário DO DOCUMENTO continua intocado — é ele que o PDF lê", () => {
+    expect(textosDaProposta("pt").sobretituloOrcamento).toBe("O investimento");
+    expect(textosDaProposta("pt").sobretituloCondicoes).toBe("Para sua tranquilidade");
+    expect(textosDaProposta("en").sobretituloOrcamento).toBe("The investment");
   });
 });

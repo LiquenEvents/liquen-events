@@ -435,7 +435,7 @@ describe("POST /api/orcamento/[id]/proposta — assinatura", () => {
     const res = await POST(req("POST", validItems), ctx("LIQ-1"));
     const { id } = await res.json();
     const env = mail.send.mock.calls.at(-1)![0] as { subject: string };
-    expect(env.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(env.subject).toBe("A vossa proposta — Líquen Events");
     expect(env.subject).not.toContain(String(id).slice(0, 8));
     expect(env.subject).not.toMatch(/[0-9a-f]{8}/i);
   });
@@ -564,7 +564,7 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     authed.ok = true;
     await POST(req("POST", validItems), ctx("LIQ-1"));
     const email = enviado();
-    expect(email.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(email.subject).toBe("A vossa proposta — Líquen Events");
     expect(email.html).toContain("Segue em anexo a proposta personalizada");
   });
 
@@ -731,7 +731,7 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     );
     await POST(req("POST", validItems), ctx("LIQ-1"));
     const email = enviado();
-    expect(email.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(email.subject).toBe("A vossa proposta — Líquen Events");
     expect(email.subject).not.toContain("para a ");
     expect(email.html).not.toContain("da .");
   });

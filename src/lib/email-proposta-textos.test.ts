@@ -28,16 +28,36 @@ describe("textosDoEmailDaProposta", () => {
   const pt = textosDoEmailDaProposta("pt");
   const en = textosDoEmailDaProposta("en");
 
-  it("o português é EXACTAMENTE o que a rota mandava antes", () => {
-    expect(pt.assunto).toBe("Proposta para o seu evento — Líquen Events");
-    expect(pt.titulo).toBe("A sua proposta — Líquen Events");
+  /**
+   * ── ESTE TESTE MUDOU DE AFIRMAÇÃO, E DIZ PORQUÊ ────────────────────────
+   *
+   * Dizia «o português é EXACTAMENTE o que a rota mandava antes»: nasceu de um
+   * refactor, e o que prendia era que mover as frases da rota para aqui não
+   * lhes tocasse numa vírgula.
+   *
+   * Agora tocou-se, de propósito. Uma proposta de casamento é para DUAS
+   * pessoas, e o email dizia «o seu evento» a um casal. O que se prende passa
+   * a ser a voz: nenhuma frase do email da casa trata quem lê por uma pessoa
+   * só. Manter a afirmação antiga era prender a página ao que ela deixou de
+   * querer, e um teste que se corrige a cada mudança de texto não prende nada.
+   */
+  it("nenhuma frase da casa trata o casal por uma pessoa só", () => {
+    expect(pt.assunto).toBe("A vossa proposta — Líquen Events");
+    expect(pt.titulo).toBe("A vossa proposta — Líquen Events");
     expect(pt.ola).toBe("Olá");
     expect(pt.intro).toBe(
-      "Segue em anexo a proposta personalizada para o seu evento. Pode vê-la e responder online através do botão abaixo.",
+      "Segue em anexo a proposta que preparámos para o vosso dia. Podem vê-la e responder online no botão abaixo.",
     );
-    expect(pt.introEmTexto).toBe("Segue em anexo a proposta personalizada para o seu evento.");
+    expect(pt.introEmTexto).toBe("Segue em anexo a proposta que preparámos para o vosso dia.");
     expect(pt.botao).toBe("Ver a proposta →");
     expect(pt.verOnline).toBe("Ver online:");
+
+    // E o varrimento, que é o que apanha a frase que alguém acrescentar amanhã.
+    for (const [campo, frase] of Object.entries(pt)) {
+      if (typeof frase !== "string") continue;
+      expect(frase, campo).not.toMatch(/\b(o seu|a sua|do seu|da sua|ao seu|à sua)\b/i);
+    }
+
     // Sem nome de casal, o ficheiro continua a chamar-se pela referência —
     // exactamente como a rota sempre o chamou.
     expect(pt.nomeDoAnexo({ ref: "q1" })).toBe("Proposta-Liquen-q1.pdf");
