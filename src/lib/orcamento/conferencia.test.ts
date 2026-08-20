@@ -679,3 +679,146 @@ describe("o valor fora do habitual", () => {
     expect(valor.detalhe).toContain("200 pax");
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DUAS SECÇÕES SEGUIDAS COM O MESMO TÍTULO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Numa proposta que já seguiu, «Complementos dos Noivos» era o título de duas
+ * secções consecutivas: uma para o ramo da noiva, outra para as lapelas. Os
+ * subtítulos diziam qual era qual, e mesmo assim quem lê de cima para baixo vê
+ * o mesmo título duas vezes e conclui que ficou ali um bloco colado por engano.
+ */
+describe("títulos de secções seguidas", () => {
+  const comBoards = (boards: Partial<ProposalDoc["moodBoards"][number]>[]) =>
+    conferir({
+      doc: documento({ moodBoards: boards as ProposalDoc["moodBoards"] }),
+      quote: pedido(),
+      ...base,
+    });
+
+  it("apanha o caso real e nomeia as duas secções", () => {
+    const vs = comBoards([
+      { title: "Decoração Cerimónia", images: ["b/1.jpg"] },
+      { title: "Complementos dos Noivos", subtitulo: "Ramo de Noiva", images: ["b/2.jpg"] },
+      { title: "Complementos dos Noivos", subtitulo: "Lapelas", images: ["b/3.jpg"] },
+    ]);
+    const t = achar(vs, "titulos-seguidos");
+    expect(t.severidade).toBe("aviso");
+    expect(t.detalhe).toContain("«Complementos dos Noivos»");
+    // Contadas como ela as vê no estúdio: a segunda e a terceira.
+    expect(t.detalhe).toContain("secções 2 e 3");
+  });
+
+  it("leva ao título da SEGUNDA, que é a que se vai corrigir", () => {
+    const vs = comBoards([
+      { title: "Complementos dos Noivos", images: ["b/1.jpg"] },
+      { title: "Complementos dos Noivos", images: ["b/2.jpg"] },
+    ]);
+    const t = achar(vs, "titulos-seguidos");
+    expect(t.seccao).toBe("moodboards");
+    expect(t.campo).toBe("boardTitulo:1");
+  });
+
+  it("com subtítulos a distinguir, diz que eles não chegam", () => {
+    const vs = comBoards([
+      { title: "Complementos", subtitulo: "Ramo", images: ["b/1.jpg"] },
+      { title: "Complementos", subtitulo: "Lapelas", images: ["b/2.jpg"] },
+    ]);
+    expect(achar(vs, "titulos-seguidos").detalhe).toMatch(/subtítulo sobe para o título/i);
+  });
+
+  it("não trava o envio: repetir de propósito é uma resposta", () => {
+    const vs = comBoards([
+      { title: "Complementos", images: ["b/1.jpg"] },
+      { title: "Complementos", images: ["b/2.jpg"] },
+    ]);
+    expect(achar(vs, "titulos-seguidos").trava).toBeFalsy();
+  });
+
+  it("ignora acentos e maiúsculas, como o resto da lista", () => {
+    const vs = comBoards([
+      { title: "Decoração Cerimónia", images: ["b/1.jpg"] },
+      { title: "DECORACAO  CERIMONIA", images: ["b/2.jpg"] },
+    ]);
+    expect(achar(vs, "titulos-seguidos").severidade).toBe("aviso");
+  });
+
+  it("dois títulos iguais SEPARADOS não são este defeito", () => {
+    // Dois capítulos do mesmo assunto, com outro pelo meio, leem-se como uma
+    // escolha. É encostados um ao outro que parecem um duplicado.
+    const vs = comBoards([
+      { title: "Complementos", images: ["b/1.jpg"] },
+      { title: "Mesa", images: ["b/2.jpg"] },
+      { title: "Complementos", images: ["b/3.jpg"] },
+    ]);
+    expect(achar(vs, "titulos-seguidos").severidade).toBe("ok");
+  });
+
+  it("dois títulos VAZIOS seguidos não são acusados aqui", () => {
+    // «Falta o título» já é dito por `oQueFaltaParaEnviar`. A mesma falta com
+    // dois nomes ensina a não ler nenhum.
+    const vs = comBoards([{ images: ["b/1.jpg"] }, { images: ["b/2.jpg"] }]);
+    expect(achar(vs, "titulos-seguidos").severidade).toBe("ok");
+  });
+
+  it("diz que há mais casos quando há mais do que um", () => {
+    const vs = comBoards([
+      { title: "Complementos", images: ["b/1.jpg"] },
+      { title: "Complementos", images: ["b/2.jpg"] },
+      { title: "Mesa", images: ["b/3.jpg"] },
+      { title: "Mesa", images: ["b/4.jpg"] },
+    ]);
+    expect(achar(vs, "titulos-seguidos").detalhe).toMatch(/mais um caso/i);
+  });
+
+  it("com uma secção só, não há linha nenhuma a fingir que verificou", () => {
+    const vs = comBoards([{ title: "Complementos", images: ["b/1.jpg"] }]);
+    expect(vs.find((x) => x.id === "titulos-seguidos")).toBeUndefined();
+  });
+});
+
+/**
+ * ── E EM INGLÊS, COMPARA-SE O QUE VAI SAIR EM INGLÊS ──────────────────────
+ *
+ * Dois títulos diferentes em português podem ter sido traduzidos para o mesmo
+ * inglês. A repetição existe só na proposta inglesa, que é precisamente a que
+ * ela não relê.
+ */
+describe("títulos seguidos, na língua que vai sair", () => {
+  const comBoards = (boards: Partial<ProposalDoc["moodBoards"][number]>[]) =>
+    conferir({
+      doc: documento({ moodBoards: boards as ProposalDoc["moodBoards"] }),
+      quote: pedido(),
+      idioma: "en" as const,
+      ...base,
+    });
+
+  it("dois portugueses diferentes com o MESMO inglês são apanhados", () => {
+    const vs = comBoards([
+      { title: "Ramo de Noiva", titleEn: "Bridal Details", images: ["b/1.jpg"] },
+      { title: "Lapelas", titleEn: "Bridal Details", images: ["b/2.jpg"] },
+    ]);
+    const t = achar(vs, "titulos-seguidos");
+    expect(t.severidade).toBe("aviso");
+    expect(t.detalhe).toContain("«Bridal Details»");
+  });
+
+  it("dois portugueses iguais com inglês diferente NÃO são repetição", () => {
+    const vs = comBoards([
+      { title: "Complementos", titleEn: "Bridal Bouquet", images: ["b/1.jpg"] },
+      { title: "Complementos", titleEn: "Boutonnières", images: ["b/2.jpg"] },
+    ]);
+    expect(achar(vs, "titulos-seguidos").severidade).toBe("ok");
+  });
+
+  it("a caixa inglesa vazia cai para o português, e a repetição vê-se na mesma", () => {
+    // É a regra de toda a proposta inglesa: sem versão inglesa sai o português.
+    const vs = comBoards([
+      { title: "Complementos", images: ["b/1.jpg"] },
+      { title: "Complementos", images: ["b/2.jpg"] },
+    ]);
+    expect(achar(vs, "titulos-seguidos").severidade).toBe("aviso");
+  });
+});
