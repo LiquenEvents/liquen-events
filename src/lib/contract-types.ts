@@ -66,5 +66,30 @@ export interface Contract {
    */
   propostaVersaoSelo?: string;
   propostaVersaoNumero?: number;
+  /**
+   * ── QUANDO É A EQUIPA A REGISTAR UM ACEITE QUE ACONTECEU FORA DAQUI ──────
+   *
+   * Um contrato nasce `pendente` porque este sistema NÃO presenciou o sim: o
+   * botão de aceitar pelo link foi retirado — decisão dela, «um casamento não
+   * se fecha num botão» — e o que existe é uma conversa, um email, um papel
+   * assinado. Sem uma porta para registar isso, NENHUM contrato chegava alguma
+   * vez a `aceite`, e três coisas contavam com esse estado: o portal do casal
+   * nunca oferecia o contrato em PDF, o filtro «Aceite» ficava vazio para
+   * sempre, e o congelamento da proposta aceite era código que não podia
+   * correr.
+   *
+   * Estes campos são a diferença entre um aceite ELECTRÓNICO (o casal escreveu
+   * o nome, com hora e IP) e um aceite REGISTADO (alguém da casa diz que ele
+   * aconteceu, e diz como). O PDF do contrato imprime blocos diferentes para
+   * os dois — é isso que impede o documento de afirmar uma assinatura
+   * electrónica que ninguém deu.
+   *
+   * `registadoPor` é lido da SESSÃO, nunca do corpo do pedido, pela mesma
+   * razão que o nome de quem assina os emails: aceitá-lo de fora era deixar
+   * qualquer pessoa pôr o nome de outra debaixo de um registo.
+   */
+  registadoPor?: string;
+  /** Como é que a casa soube — «assinado em papel», «por email a 12/05». */
+  registadoComo?: string;
   propostaPdfBytes?: number;
 }

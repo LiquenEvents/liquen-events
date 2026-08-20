@@ -455,6 +455,7 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./calendario/route", methods: ["GET", "POST"] },
   { path: "./calendario/[id]/route", methods: ["DELETE"] },
   { path: "./contratos/route", methods: ["GET"] },
+  { path: "./contratos/[id]/route", methods: ["PATCH"] },
   { path: "./contratos/[id]/pdf/route", methods: ["GET"] },
   { path: "./email-templates/route", methods: ["GET", "POST", "PUT"] },
   // Os modelos nas duas línguas: o corpo é o texto que sai para clientes na

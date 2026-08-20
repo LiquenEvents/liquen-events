@@ -48,6 +48,11 @@ export const mapper: Mapper<Contract> = {
     ...(c.propostaVersaoNumero !== undefined
       ? { proposta_versao_numero: c.propostaVersaoNumero }
       : {}),
+    // O registo de um aceite acontecido fora do sistema. Mesmo cuidado dos
+    // outros: só entram na linha quando existem, para uma base onde o
+    // `alter table` ainda não correu continuar a aceitar um contrato.
+    ...(c.registadoPor !== undefined ? { registado_por: c.registadoPor } : {}),
+    ...(c.registadoComo !== undefined ? { registado_como: c.registadoComo } : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -68,6 +73,8 @@ export const mapper: Mapper<Contract> = {
     ...(r.proposta_versao_numero != null
       ? { propostaVersaoNumero: Number(r.proposta_versao_numero) }
       : {}),
+    ...(r.registado_por ? { registadoPor: String(r.registado_por) } : {}),
+    ...(r.registado_como ? { registadoComo: String(r.registado_como) } : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),

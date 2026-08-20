@@ -150,3 +150,59 @@ describe("as datas do contrato saem no dia de Portugal, não no do servidor", ()
     expect(texto).toContain("02 de julho de 2026 às 15:32");
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CONTRATO NÃO PODE AFIRMAR UMA ASSINATURA ELECTRÓNICA QUE NINGUÉM DEU
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Há duas maneiras de um contrato ser aceite nesta casa, e não se podem
+ * confundir:
+ *
+ *   ELECTRÓNICO — o casal escreveu o nome no link, e ficou a hora e o IP. É o
+ *   que o fluxo antigo produzia, e há contratos assim guardados.
+ *
+ *   REGISTADO — o sim aconteceu numa conversa, num email ou num papel, e
+ *   alguém da casa registou-o. É o único caminho que existe hoje, porque o
+ *   botão de aceitar foi retirado: «um casamento não se fecha num botão».
+ *
+ * Imprimir «Aceite eletronicamente por Maria Silva» num contrato do segundo
+ * tipo era o nosso software a escrever uma prova falsa. É a única coisa deste
+ * ficheiro que se pode estragar de vez.
+ */
+describe("um aceite registado pela casa não se disfarça de aceite electrónico", () => {
+  const registado = () =>
+    contrato({
+      acceptedName: undefined,
+      acceptedIp: undefined,
+      registadoPor: "Catarina Gaspar",
+      registadoComo: "Assinado em papel, entregue a 12/05",
+    });
+
+  it("não diz «electrónico» em lado nenhum da folha", async () => {
+    const texto = await textoDoPdf(await renderContractPdf(registado()));
+    expect(texto).not.toContain("ELETRÓNICO");
+    expect(texto).not.toContain("eletronicamente");
+  });
+
+  it("diz quem registou, quando, e COMO a casa soube", async () => {
+    const texto = await textoDoPdf(await renderContractPdf(registado()));
+    expect(texto).toContain("ACEITE REGISTADO");
+    expect(texto).toContain("Aceite confirmado por Catarina Gaspar em 02 de julho de 2026");
+    expect(texto).toContain("Como: Assinado em papel, entregue a 12/05");
+  });
+
+  it("não imprime IP nenhum — não houve navegador do outro lado", async () => {
+    const texto = await textoDoPdf(await renderContractPdf(registado()));
+    expect(texto).not.toContain("registo 203.0.113.7");
+  });
+
+  it("um aceite ELECTRÓNICO continua a dizer o que sempre disse (controlo positivo)", async () => {
+    // Sem isto, um desenhador que nunca imprimisse o bloco electrónico passava
+    // nos três testes acima — e apagava a prova dos contratos antigos.
+    const texto = await textoDoPdf(await renderContractPdf(contrato()));
+    expect(texto).toContain("ACEITE ELETRÓNICO");
+    expect(texto).toContain("Aceite eletronicamente por Maria Silva");
+    expect(texto).toContain("203.0.113.7");
+  });
+});

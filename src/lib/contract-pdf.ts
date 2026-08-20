@@ -310,7 +310,54 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
   y -= 22;
 
   const accepted = contract.status === "aceite";
-  if (accepted) {
+  /**
+   * ── DUAS MANEIRAS DE UM CONTRATO SER ACEITE, E NÃO SE PODEM CONFUNDIR ────
+   *
+   * ELECTRÓNICO: o casal escreveu o nome no link, e ficou a hora e o IP. É o
+   * que o fluxo antigo produzia, e há contratos assim guardados.
+   *
+   * REGISTADO: o sim aconteceu numa conversa, num email ou num papel, e
+   * alguém da casa registou-o (ver `registadoPor` em `contract-types.ts`). É o
+   * único caminho que existe hoje, porque o botão de aceitar foi retirado —
+   * «um casamento não se fecha num botão».
+   *
+   * Imprimir «Aceite eletronicamente por Maria Silva» num contrato do segundo
+   * tipo era o documento a afirmar uma assinatura electrónica que ninguém deu
+   * — uma prova falsa, escrita pelo nosso software. É a única coisa aqui que
+   * se pode estragar de vez, e por isso os dois blocos são diferentes: o do
+   * registo não diz «electrónico», não mostra IP, e diz quem registou e como.
+   */
+  const registado = !!contract.registadoPor || !!contract.registadoComo;
+  if (accepted && registado) {
+    text("ACEITE REGISTADO", MARGIN, y, { font: bold, size: 8, color: MOSS });
+    y -= 18;
+    text(contract.clientName || "—", MARGIN, y, { font: bold, size: 12 });
+    y -= 16;
+    text(
+      `Aceite confirmado por ${contract.registadoPor || SITE.name} em ${fmtDateTime(contract.acceptedAt)}.`,
+      MARGIN,
+      y,
+      { size: 9.5, color: INK },
+    );
+    y -= 14;
+    if (contract.registadoComo) {
+      text(`Como: ${contract.registadoComo}`, MARGIN, y, { size: 9, color: INK });
+      y -= 14;
+    }
+    text(`Versão dos termos v${contract.termsVersion}`, MARGIN, y, { size: 8.5, color: MUTED });
+    y -= 14;
+    if (contract.propostaPdfSha256) {
+      text(
+        `Documento aceite: ${contract.propostaPdfSha256.slice(0, 12)}` +
+          (contract.propostaPdfBytes ? `  ·  ${contract.propostaPdfBytes} bytes` : ""),
+        MARGIN,
+        y,
+        { size: 8.5, color: MUTED },
+      );
+      y -= 14;
+    }
+    y -= 2;
+  } else if (accepted) {
     text("ACEITE ELETRÓNICO", MARGIN, y, { font: bold, size: 8, color: MOSS });
     y -= 18;
     text(contract.acceptedName || contract.clientName || "—", MARGIN, y, { font: bold, size: 12 });
