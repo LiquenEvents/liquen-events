@@ -4854,9 +4854,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                     a ficha três semanas depois não passa pelo
                                     estúdio — era aí que a frase se perdia.
                                     Só de leitura: ver `NotaDaProposta`. */}
-                                <div className="mt-2">
-                                  <NotaDaProposta key={selected.id} quoteId={selected.id} />
-                                </div>
+                                <NotaDaProposta key={selected.id} quoteId={selected.id} />
                               </div>
 
                               {/* Estimativa calculada — contexto para definir o preço. */}

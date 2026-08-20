@@ -52,7 +52,7 @@ export default function NotaDaProposta({ quoteId }: { quoteId: string }) {
   if (!nota) return null;
 
   return (
-    <div className="rounded-xl border border-[#c9a227]/30 bg-[#f6efd8]/60 p-3">
+    <div className="mt-2 rounded-xl border border-[#c9a227]/30 bg-[#f6efd8]/60 p-3">
       <p className="flex flex-wrap items-center gap-x-1.5 text-[10px] font-medium tracking-[0.12em] uppercase text-[#7a6420]">
         <span aria-hidden="true">✎</span>
         Nota da proposta
