@@ -329,8 +329,36 @@ function corpos(parte: string, metodo = "PUT"): string[] {
     .map((p) => String(p.init?.body ?? ""));
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS SECÇÕES ABREM ABERTAS, NESTES TESTES
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O estúdio passou a abrir DOBRADAS as secções que já estavam feitas quando a
+ * proposta abriu (ver o efeito em `Section`), e a esmagadora maioria destes
+ * testes semeia uma proposta completa para ir mexer num campo lá dentro.
+ *
+ * Semear a preferência dela é a maneira honesta de os pôr a medir outra vez o
+ * que dizem medir: a escolha guardada GANHA ao automatismo — é essa a regra —,
+ * e por isso isto não desliga a funcionalidade nem finge que ela não existe.
+ * Escreve-se aqui a mesma coisa que um clique dela escreveria.
+ *
+ * Quem quiser medir o automatismo apaga esta chave primeiro. É o que o bloco
+ * «o que já está feito abre fechado» faz, ali em baixo.
+ */
+const SECCOES_ABERTAS = {
+  evento: false,
+  capas: false,
+  servicos: false,
+  moodboards: false,
+  cronograma: false,
+  orcamento: false,
+  total: false,
+};
+
 beforeEach(() => {
   localStorage.clear();
+  localStorage.setItem("liquen-estudio-secoes", JSON.stringify(SECCOES_ABERTAS));
   seletor.marcadores.length = 0;
   seletor.n = 0;
   pedidos = [];
@@ -5855,5 +5883,69 @@ describe("a configuração ao nível da proposta", () => {
     const resumo = (await screen.findAllByText(/^Disposição:/))[0].closest("summary");
     expect(resumo).toBeTruthy();
     expect(resumo!.closest("details")!.open).toBe(false);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE JÁ ESTÁ FEITO ABRE FECHADO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * «Secções concluídas recolhem-se automaticamente. Só a secção em que se está
+ * a trabalhar fica aberta.»
+ *
+ * A afirmação que vale por todas é a segunda: **uma secção nunca se fecha por
+ * baixo das mãos dela.** Se fechasse ao ficar completa, escrever o último campo
+ * de um grupo fazia o ecrã saltar e o cursor desaparecer.
+ */
+describe("o que já está feito abre fechado", () => {
+  const semPreferencias = () => localStorage.removeItem("liquen-estudio-secoes");
+
+  it("uma secção já preenchida nasce dobrada", async () => {
+    semPreferencias();
+    seedDraft(1);
+    renderStudio();
+    const evento = await waitFor(() => {
+      const el = document.getElementById("seccao-evento");
+      if (!el) throw new Error("ainda não");
+      return el;
+    });
+    await waitFor(() => expect(evento.querySelector('[aria-expanded="false"]')).not.toBeNull());
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("uma secção que fica completa ENQUANTO ela escreve não se fecha", async () => {
+    // A decisão é tomada uma vez, quando a proposta abre. Um editor que se
+    // mexe sozinho enquanto se escreve é pior do que um editor comprido.
+    semPreferencias();
+    seedDraft(1);
+    renderStudio();
+    const total = await waitFor(() => {
+      const el = document.getElementById("seccao-total");
+      if (!el) throw new Error("ainda não");
+      return el;
+    });
+    const comoAbriu = total.querySelector("[aria-expanded]")?.getAttribute("aria-expanded");
+    // Mexer no documento não pode mudar a dobra de nada.
+    const campo = document.querySelector<HTMLInputElement>('[data-campo="clientNames"]');
+    if (campo) fireEvent.change(campo, { target: { value: "Ana & Rui" } });
+    await waitFor(() =>
+      expect(total.querySelector("[aria-expanded]")?.getAttribute("aria-expanded")).toBe(comoAbriu),
+    );
+  });
+
+  it("a escolha dela ganha ao automatismo", async () => {
+    // Uma secção que ela deixou aberta continua aberta, mesmo estando feita.
+    localStorage.setItem("liquen-estudio-secoes", JSON.stringify({ evento: false }));
+    seedDraft(1);
+    renderStudio();
+    const evento = await waitFor(() => {
+      const el = document.getElementById("seccao-evento");
+      if (!el) throw new Error("ainda não");
+      return el;
+    });
+    await waitFor(() => expect(evento.querySelector('[aria-expanded="true"]')).not.toBeNull());
   });
 });

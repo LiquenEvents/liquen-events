@@ -5296,6 +5296,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const [boardActivo, setBoardActivo] = useState<number | null>(null);
 
+  /**
+   * O que já estava feito quando esta proposta ABRIU.
+   *
+   * Uma fotografia tirada uma vez, e não uma leitura contínua: é ela que decide
+   * que secções nascem dobradas, e uma leitura contínua fechava uma secção no
+   * instante em que ela acabasse de a preencher — com o cursor lá dentro.
+   *
+   * Só se tira depois de o documento chegar. Antes disso «está tudo por
+   * preencher» é uma resposta sobre um documento que ainda não existe, e
+   * dobrava zero secções em todas as propostas.
+   */
+  const [feitoAoAbrir, setFeitoAoAbrir] = useState<Record<string, boolean> | null>(null);
+  useEffect(() => {
+    if (feitoAoAbrir) return;
+    if (!seccoes.some((s) => s.preenchida)) return;
+    setFeitoAoAbrir(Object.fromEntries(seccoes.map((s) => [s.id, s.preenchida])));
+  }, [seccoes, feitoAoAbrir]);
+
   /** As páginas COM fotografias, pela ordem em que saem — a ordem do PDF. */
   const paginasParaOPainel = useMemo(
     () =>
@@ -5579,7 +5597,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Event fields */}
-          <Section title="Evento" id="evento">
+          <Section title="Evento" id="evento" fechadaPorOmissao={feitoAoAbrir?.evento}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field
                 label="Clientes"
@@ -5774,7 +5792,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Cover images */}
-          <Section title="Imagens de capa (2)" id="capas">
+          <Section title="Imagens de capa (2)" id="capas" fechadaPorOmissao={feitoAoAbrir?.capas}>
             <div className="grid grid-cols-2 gap-3">
               {[0, 1].map((idx) => {
                 const path = doc.coverImages?.[idx];
@@ -5887,7 +5905,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Service groups */}
-          <Section title="Serviços" id="servicos">
+          <Section title="Serviços" id="servicos" fechadaPorOmissao={feitoAoAbrir?.servicos}>
             {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
             <ServicesEditor
               groups={doc.serviceGroups}
@@ -5907,7 +5925,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Mood boards — decoracao only */}
           {isDeco && (
-            <Section title="Mood boards" id="moodboards" nota={contagemDosBoards}>
+            <Section
+              title="Mood boards"
+              id="moodboards"
+              nota={contagemDosBoards}
+              fechadaPorOmissao={feitoAoAbrir?.moodboards}
+            >
               <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
                 grupos de imagens de inspiração para o cliente
               </p>
@@ -6841,7 +6864,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Cronograma — organizacao only */}
           {!isDeco && (
-            <Section title="Cronograma de Organização" id="cronograma">
+            <Section
+              title="Cronograma de Organização"
+              id="cronograma"
+              fechadaPorOmissao={feitoAoAbrir?.cronograma}
+            >
               <div className="flex flex-col gap-3">
                 {(doc.cronograma ?? []).map((ph, pi) => (
                   <div
@@ -6911,7 +6938,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Budget */}
-          <Section title="Orçamento Proposto" id="orcamento">
+          <Section
+            title="Orçamento Proposto"
+            id="orcamento"
+            fechadaPorOmissao={feitoAoAbrir?.orcamento}
+          >
             {isDeco ? (
               <>
                 <AvisoDeOrdem
@@ -7630,7 +7661,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             }}
           />
 
-          <Section title="Total, IVA e validade" id="total">
+          <Section title="Total, IVA e validade" id="total" fechadaPorOmissao={feitoAoAbrir?.total}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
                 É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido
@@ -9402,6 +9433,7 @@ function Section({
   id,
   /** Marca à direita do título — "3 linhas", "por preencher". */
   nota,
+  fechadaPorOmissao,
   /** Um controlo à direita do título — o "Reordenar" dos Serviços, por
    *  exemplo. Fica FORA do botão que dobra a secção: um botão dentro de outro
    *  botão não é HTML válido, e clicar num fecharia o outro. */
@@ -9412,14 +9444,56 @@ function Section({
   id?: string;
   nota?: string;
   accao?: React.ReactNode;
+  /**
+   * Esta secção já estava feita quando a proposta abriu?
+   *
+   * `undefined` quer dizer «ainda não se sabe» e não «não estava» — ver o
+   * efeito lá dentro. Só vale onde ela nunca dobrou a secção à mão.
+   */
+  fechadaPorOmissao?: boolean;
 }) {
   const [fechada, setFechada] = useState(false);
-  // Ler no efeito e não no `useState` inicial: o servidor não tem
-  // `localStorage`, e uma diferença entre o que o servidor desenha e o que o
-  // browser desenha dá um erro de hidratação.
+  const jaDecidiu = useRef(false);
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O QUE JÁ ESTÁ FEITO ABRE FECHADO — MAS SÓ AO ABRIR
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * «Secções concluídas recolhem-se automaticamente. Só a secção em que se
+   * está a trabalhar fica aberta.»
+   *
+   * Com um limite que ela não pediu e que é o que torna isto usável: **uma
+   * secção nunca se fecha por baixo das mãos dela.** Se fechasse quando fica
+   * completa, escrever o último campo de um grupo fazia o ecrã saltar e o
+   * cursor desaparecer — um editor que se mexe sozinho enquanto se escreve é
+   * pior do que um editor comprido.
+   *
+   * Por isso a decisão é tomada UMA vez, quando a proposta abre, e o que
+   * decide é o que já estava feito nesse momento.
+   *
+   * ── E A ESCOLHA DELA GANHA SEMPRE ───────────────────────────────────────
+   *
+   * Uma secção que ela tenha aberto ou fechado à mão tem a resposta guardada,
+   * e essa manda. O automatismo só fala onde ninguém disse nada.
+   *
+   * Ler no efeito e não no `useState` inicial: o servidor não tem
+   * `localStorage`, e uma diferença entre o que o servidor desenha e o que o
+   * browser desenha dá um erro de hidratação.
+   */
   useEffect(() => {
-    if (id) setFechada(!!lerFechadas()[id]);
-  }, [id]);
+    if (!id || jaDecidiu.current) return;
+    const guardadas = lerFechadas();
+    if (id in guardadas) {
+      setFechada(!!guardadas[id]);
+      jaDecidiu.current = true;
+      return;
+    }
+    // Ainda não se sabe se esta secção estava feita — o documento pode não ter
+    // chegado. Espera-se, em vez de se decidir com uma resposta que é «não sei».
+    if (fechadaPorOmissao === undefined) return;
+    setFechada(fechadaPorOmissao);
+    jaDecidiu.current = true;
+  }, [id, fechadaPorOmissao]);
 
   function alternar() {
     if (!id) return;
