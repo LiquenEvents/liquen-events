@@ -81,7 +81,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
      * Uma proposta sem língua gravada é portuguesa — ver `idiomaDaProposta`.
      */
     const idioma = idiomaDaProposta(proposal);
-    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma);
+    // `true`: este botão redesenha, para ecrã, um documento que o casal já
+    // recebeu por email. Uma fotografia em falta no armazenamento fazia isto
+    // responder 503 sem corpo — e o botão não fazia nada. Ver a nota em
+    // `proposal-pdf-cache.ts`; o anexo do email continua a recusar.
+    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true);
     // O nome do ficheiro vai dentro de um cabeçalho: saneia-se a referência
     // (aspas, espaços, acentos) em vez de a confiar tal como está gravada.
     const ref = (proposal.quoteId || proposal.id).replace(/[^A-Za-z0-9_-]/g, "");

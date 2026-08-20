@@ -108,6 +108,15 @@ export async function pdfDaPropostaEmCache(
    * anteriores a essa coluna são — e o que esta função sempre desenhou.
    */
   idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+  /**
+   * Servir o documento mesmo que lhe falte uma fotografia?
+   *
+   * `true` nos botões que REDESENHAM para ecrã um documento que o casal já
+   * recebeu — dar-lhes o documento sem uma foto vale mais do que dar-lhes um
+   * botão que não faz nada. `false` (o que fica por omissão) em tudo o que
+   * seja o documento de registo. Ver a nota longa lá em baixo.
+   */
+  servirIncompleto = false,
 ): Promise<Buffer<ArrayBuffer>> {
   const chave = chaveDe(doc, idioma);
   const guardado = cache.get(chave);
@@ -154,6 +163,36 @@ export async function pdfDaPropostaEmCache(
     ultimo = await renderStoredProposalDocPdfWithReport(doc, idioma);
   }
   if (ultimo.missingImages > 0) {
+    /**
+     * ── E AQUI A REGRA MUDOU, POR UMA RAZÃO MEDIDA NO TELEMÓVEL DELA ──────
+     *
+     * «Quero que este botão ver a proposta de PDF funcione porque não está a
+     * funcionar.» Estava: uma proposta com quatro fotografias em falta no
+     * armazenamento fazia isto atirar, a rota respondia 503 sem corpo, e o
+     * botão «VER A PROPOSTA COMPLETA (PDF)» não fazia **nada**. Nem abria, nem
+     * explicava. Um botão que não faz nada é a pior das saídas: o casal
+     * conclui que o link está partido, e ninguém do lado de cá fica a saber.
+     *
+     * A recusa continua a ser a regra onde ela foi pedida — o ANEXO DO EMAIL,
+     * que é o documento de registo, e que passa por outro caminho
+     * (`api/orcamento/[id]/proposta-doc`). Aqui é outra coisa: este botão
+     * REDESENHA, para ecrã, um documento que o casal já recebeu. Entre não lhe
+     * dar nada e dar-lhe o documento sem uma fotografia, dá-se o documento.
+     *
+     * E o aviso não se perdeu: mudou de sítio e de destinatário. Passou para
+     * ANTES do envio, no estúdio, com o nome do mood board e a posição da foto
+     * (`proposta-fotos-verificacao.ts`) — que é onde ela o pode corrigir em
+     * trinta segundos, em vez de o casal tropeçar nele semanas depois.
+     */
+    if (servirIncompleto) {
+      log.error("proposta-pdf: servido INCOMPLETO — o link vale mais do que um 503", null, {
+        emFalta: ultimo.missingImages,
+      });
+      // NÃO se guarda em cache. Uma falta é passageira por definição, e fixá-la
+      // punha o documento com buracos a durar até ao próximo arranque a frio —
+      // mesmo depois de ela repor a fotografia.
+      return ultimo.pdf;
+    }
     log.error("proposta-pdf: RECUSADO — o documento sairia com fotos a menos", null, {
       emFalta: ultimo.missingImages,
     });
