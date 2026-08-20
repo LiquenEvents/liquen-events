@@ -195,7 +195,7 @@ describe("as caixas inglesas", () => {
  */
 describe("o destaque do «À escolha do casal»", () => {
   it("o nome é um título, e não um rótulo de campo", () => {
-    render(<EditorDeEscolhas escolhas={[]} fotos={[]} onChange={() => {}} />);
+    render(<EditorDeEscolhas escolhas={[]} fotos={[]} bilingue={false} onChange={() => {}} />);
     const titulo = screen.getByRole("heading", { name: /À escolha do casal/i });
     // Na serifada do documento — a mesma que dá nome às secções da proposta.
     expect(titulo.getAttribute("style")).toContain("--font-playfair");
@@ -205,7 +205,7 @@ describe("o destaque do «À escolha do casal»", () => {
   it("continua a dizer que é opcional", () => {
     // É opcional, e a maior parte das propostas não leva alternativas nenhumas.
     // Dar-lhe destaque não é transformá-lo num campo obrigatório.
-    render(<EditorDeEscolhas escolhas={[]} fotos={[]} onChange={() => {}} />);
+    render(<EditorDeEscolhas escolhas={[]} fotos={[]} bilingue={false} onChange={() => {}} />);
     expect(screen.getByText(/\(opcional\)/i)).toBeTruthy();
   });
 
@@ -215,7 +215,7 @@ describe("o destaque do «À escolha do casal»", () => {
   it("a explicação diz para que serve, e não só o que é", () => {
     // «Duas paletas para a cerimónia» descreve. O que faz alguém usar isto é
     // saber o que ganha: uma reunião a menos.
-    render(<EditorDeEscolhas escolhas={[]} fotos={[]} onChange={() => {}} />);
+    render(<EditorDeEscolhas escolhas={[]} fotos={[]} bilingue={false} onChange={() => {}} />);
     expect(screen.getByText(/sem ser preciso outra reunião/i)).toBeTruthy();
     // E continua a dizer as duas coisas que evitam uma surpresa: onde aparece,
     // e para onde volta a resposta.

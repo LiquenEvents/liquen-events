@@ -5774,3 +5774,76 @@ describe("abrir um pedido só para ler não é trabalho por gravar", () => {
     expect(localStorage.getItem(DRAFT_KEY)).toContain("Évora");
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A CONFIGURAÇÃO DAS PÁGINAS, DECIDIDA UMA VEZ PARA A PROPOSTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «"Manter a forma de cada fotografia" hoje está desligada no
+ * primeiro board e ligada no terceiro, sem razão». É o que acontece quando a
+ * escolha só existe por página: sete páginas, sete decisões, tomadas em sete
+ * momentos diferentes de uma tarde.
+ *
+ * A afirmação que vale por todas é a última: a página que discordar continua a
+ * ganhar. Há páginas que pedem mesmo outro tratamento, e uma preferência de
+ * proposta que passasse por cima delas era trocar sete decisões dispersas por
+ * uma decisão errada.
+ */
+describe("a configuração ao nível da proposta", () => {
+  const comBoards = (doc: Record<string, unknown>) => {
+    assetsServidor = [{ path: "b/1.jpg", url: "https://exemplo.pt/b/1.jpg" }];
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        serviceGroups: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+        ...doc,
+      }),
+    );
+    renderStudio();
+  };
+
+  const dobraDaDisposicao = async () =>
+    (await screen.findAllByText(/^Disposição:/)).map((s) => s.textContent ?? "");
+
+  it("a preferência da proposta vale nas páginas que não escolheram", async () => {
+    comBoards({
+      enquadramentoPorOmissao: "forma-da-foto",
+      moodBoards: [{ id: "b1", title: "Cerimónia", images: ["b/1.jpg"] }],
+    });
+    expect((await dobraDaDisposicao())[0]).toContain("sem recorte");
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("uma página que escolheu continua a ganhar à proposta", async () => {
+    comBoards({
+      enquadramentoPorOmissao: "forma-da-foto",
+      moodBoards: [
+        { id: "b1", title: "Cerimónia", images: ["b/1.jpg"], enquadramento: undefined },
+        { id: "b2", title: "Jantar", images: ["b/1.jpg"], enquadramento: "forma-da-foto" },
+      ],
+    });
+    const dobras = await dobraDaDisposicao();
+    // As duas leem «sem recorte» — a primeira pela proposta, a segunda por si.
+    expect(dobras).toHaveLength(2);
+    expect(dobras.every((d) => d.includes("sem recorte"))).toBe(true);
+  });
+
+  it("o bloco dos seis diagramas está DOBRADO, com a escolha à vista", async () => {
+    // «O bloco de seis layouts repete-se sete vezes, a ocupar altura.» O que se
+    // precisa de saber sem lá mexer é qual está escolhida, e é isso que fica.
+    comBoards({ moodBoards: [{ id: "b1", title: "Cerimónia", images: ["b/1.jpg"] }] });
+    const resumo = (await screen.findAllByText(/^Disposição:/))[0].closest("summary");
+    expect(resumo).toBeTruthy();
+    expect(resumo!.closest("details")!.open).toBe(false);
+  });
+});

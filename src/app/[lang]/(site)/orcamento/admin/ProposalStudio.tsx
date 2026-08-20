@@ -6003,8 +6003,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                          * Se uma delas ficasse para trás, ela escolhia por um
                          * desenho e recebia outro.
                          */
-                        const semRecorte = b.enquadramento === "forma-da-foto";
-                        const layoutDoBoard = b.layout ?? layoutSugerido(aspectos.length);
+                        /*
+                         * ── O QUE ESTA PÁGINA FAZ, OU O QUE A PROPOSTA FAZ ──
+                         *
+                         * A página primeiro, a proposta a seguir, e a sugestão
+                         * do número de fotografias em último. É esta ordem que
+                         * permite decidir uma vez para as sete páginas e ainda
+                         * assim uma delas discordar — ver `layoutPorOmissao`,
+                         * em `proposal-doc.ts`.
+                         */
+                        const semRecorte =
+                          (b.enquadramento ?? doc.enquadramentoPorOmissao) === "forma-da-foto";
+                        const layoutDoBoard =
+                          b.layout ?? doc.layoutPorOmissao ?? layoutSugerido(aspectos.length);
                         /**
                          * A ALTURA QUE A LEGENDA ROUBA ÀS FOTOS.
                          *
@@ -6473,41 +6484,76 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         das caixas; isto diz que fotografia
                                         fica em qual. */}
                                     {aspectos.length > 0 && (
-                                      <div className="mt-1 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
-                                        <div className="min-w-0">
-                                          <SelectorDeLayout
-                                            valor={b.layout}
-                                            aspectos={aspectos}
-                                            semRecorte={semRecorte}
-                                            // `undefined` APAGA o campo: um mood board sem
-                                            // layout gravado continua sem ele, e uma proposta
-                                            // já enviada não muda de aspecto por causa disto.
-                                            onEscolher={(layout) => updateBoard(bi, { layout })}
-                                          />
+                                      /*
+                                       * ── SEIS DIAGRAMAS VEZES SETE PÁGINAS ──
+                                       *
+                                       * Palavras dela: «o bloco de seis layouts
+                                       * repete-se sete vezes, a ocupar altura».
+                                       *
+                                       * Passa a estar dobrado, com a escolha
+                                       * ACTUAL escrita no fecho — que é a única
+                                       * coisa que se precisa de saber quando não
+                                       * se está a mexer nela. Abre-se com um
+                                       * clique e fica aberto enquanto ela lá
+                                       * estiver.
+                                       *
+                                       * `details` e não um estado nosso: sete
+                                       * dobras guardadas num objecto era mais
+                                       * uma coisa a manter, para o navegador
+                                       * fazer melhor de graça.
+                                       */
+                                      <details className="group mt-1">
+                                        <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-foreground/75 [&::-webkit-details-marker]:hidden">
+                                          <span
+                                            aria-hidden
+                                            className="text-[10px] text-foreground/35 motion-safe:transition-transform group-open:rotate-90"
+                                          >
+                                            ▸
+                                          </span>
+                                          Disposição:{" "}
+                                          <strong className="font-medium text-foreground/75">
+                                            {NOME_DO_LAYOUT[layoutDoBoard]}
+                                          </strong>
+                                          <span className="text-foreground/35">
+                                            · {semRecorte ? "sem recorte" : "recorta"}
+                                          </span>
+                                        </summary>
+                                        <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
+                                          <div className="min-w-0">
+                                            <SelectorDeLayout
+                                              valor={b.layout}
+                                              aspectos={aspectos}
+                                              semRecorte={semRecorte}
+                                              // `undefined` APAGA o campo: um mood board sem
+                                              // layout gravado continua sem ele, e uma proposta
+                                              // já enviada não muda de aspecto por causa disto.
+                                              onEscolher={(layout) => updateBoard(bi, { layout })}
+                                            />
+                                          </div>
+                                          <div className="lg:pt-6">
+                                            <PreviaDaPagina
+                                              layout={layoutDoBoard}
+                                              aspectos={aspectos}
+                                              // Pela ordem de DESENHO, com a principal à frente
+                                              // — a mesma que a página vai usar.
+                                              urls={ordemDeDesenho
+                                                .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                .map((i) => assetUrls[b.images[i]])}
+                                              // O plano B, o mesmo da grelha aqui
+                                              // ao lado: uma miniatura que não
+                                              // existe cai para o original em vez
+                                              // de dar o ícone de imagem partida.
+                                              originais={ordemDeDesenho
+                                                .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                .map((i) => assetOriginais[b.images[i]])}
+                                              semRecorte={semRecorte}
+                                              titulo={b.title}
+                                              subtitulo={b.subtitulo}
+                                              legenda={b.annotation}
+                                            />
+                                          </div>
                                         </div>
-                                        <div className="lg:pt-6">
-                                          <PreviaDaPagina
-                                            layout={layoutDoBoard}
-                                            aspectos={aspectos}
-                                            // Pela ordem de DESENHO, com a principal à frente
-                                            // — a mesma que a página vai usar.
-                                            urls={ordemDeDesenho
-                                              .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                              .map((i) => assetUrls[b.images[i]])}
-                                            // O plano B, o mesmo da grelha aqui
-                                            // ao lado: uma miniatura que não
-                                            // existe cai para o original em vez
-                                            // de dar o ícone de imagem partida.
-                                            originais={ordemDeDesenho
-                                              .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                              .map((i) => assetOriginais[b.images[i]])}
-                                            semRecorte={semRecorte}
-                                            titulo={b.title}
-                                            subtitulo={b.subtitulo}
-                                            legenda={b.annotation}
-                                          />
-                                        </div>
-                                      </div>
+                                      </details>
                                     )}
                                     {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
                           Está aqui, por baixo dos diagramas, porque é com eles
@@ -6668,6 +6714,66 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           Abrir todos
                         </button>
                       </>
+                    )}
+                    {/*
+                     * ── O QUE ESTA PROPOSTA FAZ, DECIDIDO UMA VEZ ──────────
+                     *
+                     * Palavras dela: «"Manter a forma de cada fotografia" hoje
+                     * está desligada no primeiro board e ligada no terceiro,
+                     * sem razão». É o que acontece quando a escolha só existe
+                     * por página: sete páginas, sete decisões, tomadas em sete
+                     * momentos diferentes de uma tarde. O resultado não é
+                     * variedade — é uma proposta que parece montada por duas
+                     * pessoas.
+                     *
+                     * Isto vale para as páginas que não disserem outra coisa. A
+                     * que discordar continua a ganhar, e é por isso que o botão
+                     * de aplicar a todas existe ao lado: é o gesto de quem quer
+                     * mesmo pôr as sete de acordo, e escreve a escolha em cada
+                     * uma em vez de a adivinhar.
+                     */}
+                    {doc.moodBoards.length > 1 && (
+                      <label className="flex items-center gap-2 text-xs text-foreground/65">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 shrink-0 accent-[#4d6350]"
+                          checked={doc.enquadramentoPorOmissao === "forma-da-foto"}
+                          onChange={(e) =>
+                            patch({
+                              // Ausente e não `false`: ausente quer dizer
+                              // «ninguém escolheu», e uma proposta já enviada
+                              // tem de continuar a sair como sempre saiu.
+                              enquadramentoPorOmissao: e.target.checked
+                                ? "forma-da-foto"
+                                : undefined,
+                            })
+                          }
+                        />
+                        <span>Manter a forma das fotografias em toda a proposta</span>
+                      </label>
+                    )}
+                    {doc.moodBoards.length > 1 && (
+                      <button
+                        type="button"
+                        className={ADD_BTN}
+                        onClick={() => {
+                          const enq = doc.enquadramentoPorOmissao;
+                          patch({
+                            moodBoards: doc.moodBoards.map((b) => ({
+                              ...b,
+                              ...(enq ? { enquadramento: enq } : { enquadramento: undefined }),
+                            })),
+                          });
+                          toast(
+                            enq
+                              ? "As páginas passam todas a manter a forma das fotografias."
+                              : "As páginas passam todas a recortar as fotografias.",
+                            "info",
+                          );
+                        }}
+                      >
+                        Aplicar a todas as páginas
+                      </button>
                     )}
                     <ModelosParciais
                       tipo="moodboard"

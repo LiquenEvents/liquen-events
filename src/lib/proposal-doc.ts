@@ -452,6 +452,34 @@ export interface ProposalDoc {
    */
   traducoesFeitas?: Record<string, number>;
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A CONFIGURAÇÃO DAS PÁGINAS, DECIDIDA UMA VEZ PARA A PROPOSTA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «"Manter a forma de cada fotografia" hoje está desligada no
+   * primeiro board e ligada no terceiro, sem razão».
+   *
+   * E é o que acontece quando a escolha só existe por página: sete páginas,
+   * sete decisões, tomadas em sete momentos diferentes de uma tarde. O
+   * resultado não é variedade — é uma proposta que parece montada por duas
+   * pessoas.
+   *
+   * Isto é o que a proposta INTEIRA faz, quando a página não disser outra
+   * coisa. Uma página continua a poder discordar: o campo dela ganha sempre,
+   * porque há páginas que pedem mesmo outro tratamento.
+   *
+   * ── E PORQUE É QUE AUSENTE NÃO É `false` ────────────────────────────────
+   *
+   * Pela mesma razão que já valia por página: ausente quer dizer «ninguém
+   * escolheu», e uma proposta já enviada tem de continuar a sair como sempre
+   * saiu. Um `false` gravado seria uma escolha, e mudaria o desenho de
+   * documentos antigos no dia em que a regra de omissão mudasse.
+   */
+  layoutPorOmissao?: LayoutDeMoodboard;
+  /** Como {@link ProposalDoc.layoutPorOmissao}, para o recorte. */
+  enquadramentoPorOmissao?: "forma-da-foto";
+
   // ── 1. Apresentação ──
   /** Couple / client, e.g. "Maria & Zé". */
   clientNames: string;
