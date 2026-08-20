@@ -60,6 +60,7 @@ import EmailDoEnvio from "./EmailDoEnvio";
 import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
 import PreviaDaPagina from "./PreviaDaPagina";
+import PainelDoEstudio from "./PainelDoEstudio";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import VistaDeConjunto from "./VistaDeConjunto";
 import LupaDeFotos from "./LupaDeFotos";
@@ -5286,6 +5287,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     [dataEscritaNoDoc, quote, doc.location],
   );
 
+  /**
+   * A página que ela está a editar — para o painel da direita mostrar ESSA.
+   *
+   * Marcada quando o foco entra no cartão de um board, e não quando o rato lá
+   * passa: o rato atravessa cartões a caminho de outro sítio, e um painel que
+   * mudasse de página ao atravessar era um painel a piscar.
+   */
+  const [boardActivo, setBoardActivo] = useState<number | null>(null);
+
+  /** As páginas COM fotografias, pela ordem em que saem — a ordem do PDF. */
+  const paginasParaOPainel = useMemo(
+    () =>
+      ordemDeSaida(doc as ProposalDoc, doc.moodBoards ?? [], (b) => b.title ?? "")
+        .map((bi) => ({ bi, board: (doc.moodBoards ?? [])[bi] }))
+        .filter((p) => p.board && (p.board.images ?? []).length > 0),
+    [doc],
+  );
+
   const traducoesPorSeccao = useMemo(
     () => (idiomaDoPdf === "en" ? porTraduzirPorSeccao(doc as ProposalDoc) : undefined),
     [idiomaDoPdf, doc],
@@ -6064,6 +6083,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           <CartaoDeBoard
                             key={bi}
                             bi={bi}
+                            // Qual é a página que ela está a editar — para o
+                            // painel da direita mostrar ESSA. No foco e não no
+                            // rato: o rato atravessa cartões a caminho de
+                            // outro sítio, e o painel piscava.
+                            onFocusCapture={() => setBoardActivo(bi)}
                             // O `id` é o alvo do índice lateral. Pelo ÍNDICE REAL:
                             // a ordem desenhada pode mudar debaixo do salto.
                             ancora={`mood-board-${bi}`}
@@ -6518,7 +6542,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             · {semRecorte ? "sem recorte" : "recorta"}
                                           </span>
                                         </summary>
-                                        <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
+                                        <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] 2xl:grid-cols-1">
                                           <div className="min-w-0">
                                             <SelectorDeLayout
                                               valor={b.layout}
@@ -6530,7 +6554,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                               onEscolher={(layout) => updateBoard(bi, { layout })}
                                             />
                                           </div>
-                                          <div className="lg:pt-6">
+                                          {/*
+                                           * ── A MINIATURA REPETIDA SETE VEZES
+                                           *
+                                           * «Minúscula e repetida sete vezes.»
+                                           * A partir de `2xl` deixa de existir:
+                                           * o painel da direita mostra a MESMA
+                                           * página, grande, e duas cópias da
+                                           * mesma coisa no mesmo ecrã são uma a
+                                           * mais.
+                                           *
+                                           * Abaixo disso fica, porque abaixo
+                                           * disso o painel não cabe — e tirá-la
+                                           * aí era tirar a pré-visualização a
+                                           * quem trabalha num portátil, para
+                                           * resolver um problema que só existe
+                                           * no ecrã grande.
+                                           */}
+                                          <div className="lg:pt-6 2xl:hidden">
                                             <PreviaDaPagina
                                               layout={layoutDoBoard}
                                               aspectos={aspectos}
@@ -7875,6 +7916,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             )}
           </Section>
         </div>
+        {/*
+         * ── A TERCEIRA ZONA ──────────────────────────────────────────────
+         *
+         * «Uma pré-visualização grande e fixa à direita, no espaço hoje
+         * vazio.» O índice diz onde estou, a coluna do meio é o que escrevo, e
+         * isto é o que vai sair. Ver `PainelDoEstudio` para o resto das razões
+         * — em particular por que é um painel só e por que só aparece muito
+         * largo.
+         */}
+        <PainelDoEstudio
+          paginas={paginasParaOPainel}
+          activa={boardActivo ?? undefined}
+          urls={assetUrls}
+          originais={assetOriginais}
+          aspetos={aspetosDasFotos}
+          layoutPorOmissao={doc.layoutPorOmissao}
+          enquadramentoPorOmissao={doc.enquadramentoPorOmissao}
+          onSaltar={(bi) => irParaAFalta("moodboards", `boardTitulo:${bi}`)}
+        />
       </div>
       {/* ══════════ /PASSO 1 ══════════ */}
 

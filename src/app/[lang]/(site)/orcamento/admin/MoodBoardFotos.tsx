@@ -352,12 +352,21 @@ export function CartaoDeBoard({
   children,
   className = "",
   ancora,
+  onFocusCapture,
 }: {
   bi: number;
   children: (pega: React.HTMLAttributes<HTMLElement>) => ReactNode;
   className?: string;
   /** `id` no DOM, para o índice lateral poder saltar para aqui. */
   ancora?: string;
+  /**
+   * O foco entrou nesta página.
+   *
+   * É o que diz ao painel da direita qual é a página a mostrar. `Capture`
+   * porque o foco aterra num campo lá dentro e não no cartão: sem a fase de
+   * captura, o cartão nunca o via.
+   */
+  onFocusCapture?: () => void;
 }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: idDoBoard(bi),
@@ -366,6 +375,7 @@ export function CartaoDeBoard({
     <div
       ref={setNodeRef}
       id={ancora}
+      onFocusCapture={onFocusCapture}
       // `scroll-mt`: o back office tem uma barra fixa no topo, e sem margem de
       // deslocamento o salto do índice deixa o cabeçalho do board por baixo dela.
       style={{ transform: CSS.Translate.toString(transform), transition }}
