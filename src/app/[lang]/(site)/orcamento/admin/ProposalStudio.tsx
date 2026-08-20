@@ -4389,6 +4389,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   function irParaAFalta(seccao?: string, campo?: string) {
     setStep("conteudo");
+    // Um campo de um mood board pode estar dentro de um cartão DOBRADO, e um
+    // campo que não está desenhado não se foca: o salto morria na secção e
+    // deixava-a a olhar para a lista de boards fechados. É a mesma abertura
+    // que o `irParaCampo` já fazia — ver lá.
+    const board = /^board[A-Za-z]*:(\d+)/.exec(campo ?? "");
+    if (board) {
+      const id = doc.moodBoards[Number(board[1])]?.id;
+      if (id && dobrados[id]) escreverDobras({ ...dobrados, [id]: false });
+    }
     setFaltaAVisitar((antes) => ({ seccao, campo, pedido: (antes?.pedido ?? 0) + 1 }));
   }
 

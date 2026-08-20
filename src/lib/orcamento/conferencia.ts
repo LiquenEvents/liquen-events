@@ -405,6 +405,73 @@ export function conferir({
         : "",
   });
 
+  // ── Duas secções seguidas com o mesmo título ────────────────────────────
+  //
+  // Numa proposta que já seguiu, «Complementos dos Noivos» era o título de
+  // DUAS secções consecutivas: uma para o ramo da noiva, outra para as
+  // lapelas. Os subtítulos diziam qual era qual, mas quem lê de cima para
+  // baixo vê o mesmo título duas vezes e conclui, antes de chegar ao
+  // subtítulo, que ficou ali um duplicado por engano.
+  //
+  // ── PORQUE É QUE COMPARA NA LÍNGUA QUE VAI SAIR ────────────────────────
+  // Porque é essa que o casal lê. Dois títulos diferentes em português podem
+  // ter sido traduzidos para o mesmo inglês — e nesse caso a repetição existe
+  // só na proposta inglesa, que é precisamente a que ela não relê.
+  //
+  // ── PORQUE É QUE SÓ OLHA PARA AS SEGUIDAS ──────────────────────────────
+  // Porque duas secções com o mesmo título separadas por outras leem-se como
+  // dois capítulos do mesmo assunto, e isso é uma escolha legítima. Encostadas
+  // uma à outra é que parecem o mesmo bloco colado duas vezes.
+  //
+  // ── E PORQUE É QUE AVISA EM VEZ DE CORRIGIR ────────────────────────────
+  // Porque as saídas boas são decisões dela e não se adivinham: juntar as
+  // fotografias numa secção só, ou dar a cada uma o seu título. Repetir de
+  // propósito também é uma resposta.
+  const boards = doc.moodBoards ?? [];
+  const tituloDaSeccao = (b: { title?: string; titleEn?: string }) =>
+    idioma === "en" ? texto(b.titleEn) || texto(b.title) : texto(b.title);
+
+  if (boards.length > 1) {
+    /** O índice do SEGUNDO de cada par repetido: é esse que se vai corrigir. */
+    const repetidos: number[] = [];
+    for (let i = 1; i < boards.length; i += 1) {
+      const este = tituloDaSeccao(boards[i]);
+      // Um título vazio repetido não é este defeito: é «falta o título», e
+      // quem o diz é `oQueFaltaParaEnviar`. Acusá-lo aqui seria a mesma falta
+      // contada duas vezes com dois nomes.
+      if (este && mesmoNome(este, tituloDaSeccao(boards[i - 1]))) repetidos.push(i);
+    }
+
+    const primeiro = repetidos[0];
+    const maisCasos = repetidos.length - 1;
+    v.push({
+      id: "titulos-seguidos",
+      titulo: "Títulos das secções",
+      severidade: repetidos.length > 0 ? "aviso" : "ok",
+      detalhe:
+        repetidos.length > 0
+          ? [
+              `«${tituloDaSeccao(boards[primeiro])}» é o título das secções ${primeiro} e ${
+                primeiro + 1
+              }, uma a seguir à outra.`,
+              texto(boards[primeiro].subtitulo) || texto(boards[primeiro - 1].subtitulo)
+                ? "Os subtítulos distinguem-nas, mas o título repetido lê-se como um engano: ou se juntam numa secção só, ou o subtítulo sobe para o título."
+                : "Ou se juntam numa secção só, ou cada uma leva o seu título.",
+              maisCasos > 0
+                ? maisCasos === 1
+                  ? "Há mais um caso destes."
+                  : `Há mais ${maisCasos} casos destes.`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : "",
+      ...(repetidos.length > 0
+        ? { seccao: "moodboards", campo: `boardTitulo:${primeiro}` }
+        : {}),
+    });
+  }
+
   // ── O idioma ────────────────────────────────────────────────────────────
   //
   // ════════════════════════════════════════════════════════════════════════

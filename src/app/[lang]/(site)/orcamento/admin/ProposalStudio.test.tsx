@@ -1167,7 +1167,19 @@ describe("fotos da biblioteca em estado provisório", () => {
     renderStudio();
     const user = userEvent.setup();
     await abrirBiblioteca(user);
-    const antes = pedidos.length;
+    /**
+     * Os pedidos de antes, DESCONTADA a gravação do rascunho.
+     *
+     * Este teste chegou a contar todos e a falhar de vez em quando na
+     * integração: a gravação do rascunho sai com oitocentos milissegundos de
+     * atraso e, com a máquina carregada, cabe dentro desta janela. É outra
+     * coisa — persistência, não a fotografia — e não se controla daqui.
+     * Contá-la fazia o teste ficar vermelho por uma razão que nada tem a ver
+     * com o que ele afirma, e um teste que falha por acaso deixa de se ler.
+     */
+    const semGravacoes = (ps: typeof pedidos) =>
+      ps.filter((p) => !p.url.includes("proposta-rascunho")).length;
+    const antes = semGravacoes(pedidos);
     await reservar(user);
 
     // Sem esperar por rede nenhuma: são duas células, a nova por assentar.
@@ -1175,7 +1187,7 @@ describe("fotos da biblioteca em estado provisório", () => {
     // Percetível por quem não vê o esbatido, e não só por opacidade.
     expect(screen.getByText("a entrar…")).toBeInTheDocument();
     // E ZERO pedidos novos: a miniatura é a que o seletor já tinha em memória.
-    expect(pedidos.length).toBe(antes);
+    expect(semGravacoes(pedidos)).toBe(antes);
   });
 
   it("ao confirmar, o marcador dá lugar ao caminho definitivo NA MESMA POSIÇÃO", async () => {
