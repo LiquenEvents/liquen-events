@@ -1,4 +1,4 @@
-import { eurDocumento, montanteNaLingua } from "@/lib/money";
+import { eurDocumento, milharesComPonto, montanteNaLingua } from "@/lib/money";
 import {
   depositPercentOf,
   preencherMarcadores,
@@ -176,6 +176,30 @@ export default function Documento({
    * número — que era precisamente o que estava a falhar aqui.
    */
   const eur = (valor: number) => montanteNaLingua(eurDocumento(valor), idioma);
+  /**
+   * ── O DINHEIRO QUE ELA ESCREVEU À MÃO ────────────────────────────────────
+   *
+   * O cabeçalho deste ficheiro já dizia que «metade dos montantes é TEXTO
+   * LIVRE escrito por ela à portuguesa» e que a conversão os trata da mesma
+   * maneira. Dizia — e não tratava: o `valueText` dos valores adicionais, o
+   * `preco` das linhas estimadas e o total escrito saíam CRUS.
+   *
+   * MEDIDO, mesma linha, mesmo documento:
+   *
+   *            PDF                 esta página
+   *   pt    + 1.550,00 €           1550,00 €
+   *   en    + €1,550.00            1550,00 € + IVA
+   *
+   * Na folha inglesa a coluna ficava «€10,950.00 · 1550,00 € + IVA ·
+   * €12,500.00» — e «1550,00» lido à inglesa é um euro e cinquenta e cinco.
+   * Factor mil, na linha que ela acrescentou para cobrar a deslocação.
+   *
+   * O caminho é o MESMO do PDF (`proposal-doc-pdf.ts:858`): agrupa-se à
+   * portuguesa e converte-se no fim. Um texto que já venha agrupado passa
+   * incólume — o `milharesComPonto` só acrescenta o separador a quem não o tem.
+   */
+  const dinheiroEscrito = (texto: string | undefined) =>
+    montanteNaLingua(milharesComPonto(texto ?? ""), idioma);
 
   const doc = docNaLingua(docOriginal, idioma);
   const t = textosDaProposta(idioma);
@@ -500,7 +524,7 @@ export default function Documento({
                 >
                   <span className="text-foreground/85 text-[15px]">{r.item}</span>
                   <span className="text-foreground/75 shrink-0 text-sm tabular-nums">
-                    {r.preco}
+                    {dinheiroEscrito(r.preco)}
                   </span>
                 </li>
               ))}
@@ -532,7 +556,9 @@ export default function Documento({
                   {extras.map((e, i) => (
                     <div key={i} className="flex items-baseline justify-between gap-4 py-1.5">
                       <span className="text-foreground/70 text-sm">{e.label}</span>
-                      <span className="text-foreground/70 text-sm tabular-nums">{e.valueText}</span>
+                      <span className="text-foreground/70 text-sm tabular-nums">
+                        {dinheiroEscrito(e.valueText)}
+                      </span>
                     </div>
                   ))}
                 </>
@@ -575,7 +601,7 @@ export default function Documento({
                   className="text-moss"
                   style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 3vw, 28px)" }}
                 >
-                  {comIvaDito(totalEscrito)}
+                  {comIvaDito(dinheiroEscrito(totalEscrito))}
                 </span>
               </div>
             )
