@@ -114,6 +114,7 @@ import {
 } from "@/lib/orcamento/escala";
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
+import EditorDeEscolhas, { type FotoDisponivel } from "./EditorDeEscolhas";
 import NavEstudio from "./NavEstudio";
 import NotasInternas from "./NotasInternas";
 import AvisoDataOcupada from "./AvisoDataOcupada";
@@ -5175,6 +5176,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // faltava o valor e o botão deixava enviar na mesma. A regra (e a razão de
   // cada exigência) está em `proposal-progress.ts`.
   const seccoes = estadoDasSeccoes(doc as ProposalDoc);
+
+  /**
+   * As fotografias que uma alternativa pode usar: as que JÁ estão nos mood
+   * boards desta proposta.
+   *
+   * Sem carregamento novo e sem marcadores provisórios — uma opção que
+   * apontasse para uma foto ainda por copiar ficava com um caminho que nunca
+   * vai existir, e o casal via um buraco onde devia estar a paleta.
+   */
+  const fotosParaEscolhas: FotoDisponivel[] = (doc.moodBoards ?? []).flatMap((b) =>
+    (b.images ?? [])
+      .filter((caminho) => !!caminho && !isPendingImage(caminho))
+      .map((caminho) => ({
+        caminho,
+        url: assetUrls[caminho],
+        onde: (b.title ?? "").trim() || "Mood board",
+      })),
+  );
   const faltas = oQueFaltaParaEnviar(doc as ProposalDoc, money.gross);
   // A regra das FOTOS POR CONFIRMAR fica aqui e não em `proposal-progress`:
   // esse olha para o DOCUMENTO, e isto é um estado desta aba — a cópia que
@@ -6568,6 +6587,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   </div>
                 </div>
               </div>
+
+              {/* ── AS ALTERNATIVAS QUE O CASAL ESCOLHE (Fase 3) ───────────
+                  Vive aqui dentro, e não numa secção própria: as alternativas
+                  são visuais e as fotografias que as explicam já estão nestas
+                  páginas. A razão longa está no cabeçalho do editor. */}
+              <EditorDeEscolhas
+                escolhas={doc.escolhas}
+                fotos={fotosParaEscolhas}
+                bilingue={bilingue}
+                onChange={(escolhas) => patch({ escolhas })}
+              />
             </Section>
           )}
 

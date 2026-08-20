@@ -17,7 +17,15 @@ import {
 import { totaisDaProposta } from "@/lib/proposal-budget";
 import { ordemDeSaida, aplicarOrdem } from "@/lib/proposal-ordem";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
+import {
+  descricaoNaLingua,
+  escolhasParaOCasal,
+  notaNaLingua,
+  rotuloNaLingua,
+  tituloNaLingua,
+} from "@/lib/proposta-escolhas";
 import Inspiracao, { type BoardParaEcra } from "./Inspiracao";
+import Escolhas from "./Escolhas";
 import { textosDaPagina } from "./textos-da-pagina";
 
 /**
@@ -146,12 +154,19 @@ export default function Documento({
   idioma,
   fotos,
   token,
+  escolhido = {},
 }: {
   doc: ProposalDoc;
   idioma: IdiomaDaProposta;
   /** As fotografias já assinadas no servidor — ver `proposta-fotos.ts`. */
   fotos: FotoDaProposta[];
   token: string;
+  /**
+   * O que o casal já escolheu, por escolha. Vem do PEDIDO e não da proposta —
+   * a razão está em `proposta-escolhas.ts`. Ausente por omissão: uma proposta
+   * sem alternativas nunca chega a olhar para isto.
+   */
+  escolhido?: Record<string, string>;
 }) {
   /**
    * A prosa dela na língua do documento, num sítio só.
@@ -264,6 +279,43 @@ export default function Documento({
       };
     })
     .filter((b) => b.fotos.length > 0);
+
+  // ── AS ALTERNATIVAS ───────────────────────────────────────────────────────
+  //
+  // A projecção de língua do documento (`docNaLingua`) não chega aqui: as
+  // caixas inglesas destas vivem DENTRO de duas listas encaixadas, e o
+  // `docNaLingua` só troca campos de topo. A tradução faz-se aqui, com os
+  // ajudantes do `proposta-escolhas`, e o componente do cliente recebe texto
+  // já resolvido — não a regra.
+  const escolhas = escolhasParaOCasal(doc.escolhas);
+  const escolhasEmLingua = {
+    titulo: Object.fromEntries(escolhas.map((e) => [e.id, tituloNaLingua(e, idioma)])),
+    nota: Object.fromEntries(escolhas.map((e) => [e.id, notaNaLingua(e, idioma)])),
+    rotulo: Object.fromEntries(
+      escolhas.flatMap((e) => e.opcoes.map((o) => [o.id, rotuloNaLingua(o, idioma)])),
+    ),
+    descricao: Object.fromEntries(
+      escolhas.flatMap((e) => e.opcoes.map((o) => [o.id, descricaoNaLingua(o, idioma)])),
+    ),
+  };
+  /**
+   * As fotografias das opções, pelo id opaco `e{i}o{j}`.
+   *
+   * Os índices são os do documento ORIGINAL (é assim que o inventário os
+   * escreve), e por isso constrói-se a partir de `doc.escolhas` e não da lista
+   * já filtrada — uma escolha por acabar no meio da lista deslocava todos os
+   * ids seguintes e cada opção ficava com a fotografia da vizinha.
+   */
+  const fotosDasEscolhas: Record<string, FotoDaProposta> = {};
+  (doc.escolhas ?? []).forEach((e, i) => {
+    const posicao = escolhas.findIndex((x) => x.id === e.id);
+    if (posicao < 0) return;
+    e.opcoes.forEach((o, j) => {
+      const foto = porId.get(`e${i}o${j}`);
+      const jVisivel = escolhas[posicao].opcoes.findIndex((x) => x.id === o.id);
+      if (foto && jVisivel >= 0) fotosDasEscolhas[`e${posicao}o${jVisivel}`] = foto;
+    });
+  });
 
   // ── O ORÇAMENTO ───────────────────────────────────────────────────────────
   const totais = totaisDaProposta(doc, depositPercentOf(doc));
@@ -487,6 +539,33 @@ export default function Documento({
               textos={p}
             />
           </div>
+        </Seccao>
+      )}
+
+      {/* ── À VOSSA ESCOLHA ───────────────────────────────────────────────
+          «Onde eu tiver dado alternativas ao casal (duas paletas para a
+          cerimónia, dois estilos de corredor), eles escolhem ali.»
+
+          A SEGUIR às fotografias e ANTES do dinheiro, e é de propósito: uma
+          alternativa entre duas paletas lê-se com os mood boards ainda na
+          cabeça, e pedir para escolher depois de mostrar o total transforma
+          uma preferência numa negociação.
+
+          Nada disto sai no PDF — ver `NUNCA_NO_PDF`. */}
+      {escolhas.length > 0 && (
+        <Seccao larga>
+          <Titulo id="escolhas" titulo={p.escolhas} />
+          <p className="mt-4 max-w-2xl text-foreground/70 text-sm leading-relaxed">
+            {p.escolhasIntro}
+          </p>
+          <Escolhas
+            escolhas={escolhas}
+            escolhido={escolhido}
+            fotos={fotosDasEscolhas}
+            token={token}
+            textos={p}
+            emLingua={escolhasEmLingua}
+          />
         </Seccao>
       )}
 

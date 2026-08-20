@@ -66,8 +66,24 @@ import { NUNCA_NO_PDF } from "./proposta-de-pdf/tipos";
  * entre linhas sem mudar o total não muda nada do que o casal leu; mudar o
  * total muda o selo.
  */
+/**
+ * Os campos que o gerador de PDF não desenha E A PÁGINA DESENHA.
+ *
+ * São a excepção que este ficheiro existe para não deixar cair: excluí-los do
+ * selo deixava mudar, por baixo de um aceite, coisa que o casal tinha à frente
+ * dos olhos. O teste que acompanha este ficheiro lê o `Documento.tsx` e recusa
+ * qualquer campo excluído que lá apareça — as duas listas não podem voltar a
+ * divergir em silêncio.
+ */
+const VISTO_NA_PAGINA = new Set([
+  "headerTitle",
+  // As alternativas do casal só existem na página, e é lá que se escolhe:
+  // trocar uma opção depois do aceite é mudar o que foi aceite.
+  "escolhas",
+]);
+
 export const NUNCA_VISTO_PELO_CASAL: readonly string[] = Object.freeze(
-  Object.keys(NUNCA_NO_PDF).filter((campo) => campo !== "headerTitle"),
+  Object.keys(NUNCA_NO_PDF).filter((campo) => !VISTO_NA_PAGINA.has(campo)),
 );
 
 /** O conteúdo de uma proposta que conta para a versão. */

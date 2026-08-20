@@ -194,7 +194,12 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
           {/* Coluna principal */}
           <div className="flex flex-col gap-6 min-w-0">
             <FinanceZone quote={quote} onQuoteChange={onQuoteChange} />
-            <ProductionZone quote={quote} userName={userName} onQuoteChange={onQuoteChange} />
+            <ProductionZone
+              quote={quote}
+              userName={userName}
+              onQuoteChange={onQuoteChange}
+              doc={data.proposal?.doc ?? null}
+            />
             <CommsZone
               quote={quote}
               userName={userName}

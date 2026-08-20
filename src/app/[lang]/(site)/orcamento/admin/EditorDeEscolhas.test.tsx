@@ -1,0 +1,187 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import EditorDeEscolhas, { type FotoDisponivel } from "./EditorDeEscolhas";
+import { escolhaPronta, type Escolha } from "@/lib/proposta-escolhas";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ESCREVER AS ALTERNATIVAS — O LADO DELA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O que aqui se prende é sobretudo uma coisa: que ela nunca fique convencida
+ * de ter dado uma alternativa que o casal não vê. Uma escolha com uma opção
+ * só não sai — e se o ecrã não o disser, a conversa que se segue é ela a jurar
+ * que escreveu e eles a jurar que não viram.
+ */
+
+const FOTOS: FotoDisponivel[] = [
+  { caminho: "ped/uma.jpg", url: "u1", onde: "Cerimónia" },
+  { caminho: "ped/duas.jpg", url: "u2", onde: "Cerimónia" },
+];
+
+const UMA: Escolha[] = [
+  {
+    id: "e1",
+    titulo: "Paleta da cerimónia",
+    opcoes: [
+      { id: "o1", rotulo: "Verde-oliva e branco" },
+      { id: "o2", rotulo: "Terracota e creme" },
+    ],
+  },
+];
+
+function desenhar(escolhas: Escolha[] | undefined = undefined, bilingue = false) {
+  const onChange = vi.fn();
+  render(
+    <EditorDeEscolhas
+      escolhas={escolhas}
+      fotos={FOTOS}
+      bilingue={bilingue}
+      onChange={onChange}
+    />,
+  );
+  return onChange;
+}
+
+afterEach(cleanup);
+
+describe("a secção só se acende quando ela quer", () => {
+  it("sem alternativas, é só o convite — nada de «por preencher»", () => {
+    // A maior parte das propostas não leva alternativas nenhumas, e um alarme
+    // aceso em todas para servir algumas é um alarme que se aprende a ignorar.
+    desenhar();
+    expect(screen.getByRole("button", { name: /\+ Alternativa/ })).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("a primeira alternativa nasce com DUAS opções", async () => {
+    // Uma só não é uma escolha. Nascer com uma poupava um clique e punha-a a
+    // descobrir a regra a meio.
+    const user = userEvent.setup();
+    const onChange = desenhar();
+    await user.click(screen.getByRole("button", { name: /\+ Alternativa/ }));
+    const nova: Escolha[] = onChange.mock.calls[0][0];
+    expect(nova).toHaveLength(1);
+    expect(nova[0].opcoes).toHaveLength(2);
+    // E com identificadores distintos, senão a resposta do casal era ambígua.
+    expect(nova[0].opcoes[0].id).not.toBe(nova[0].opcoes[1].id);
+    expect(nova[0].id).not.toBe(nova[0].opcoes[0].id);
+  });
+});
+
+describe("o aviso de que ainda não se vê", () => {
+  it("com uma opção por escrever, di-lo", () => {
+    desenhar([
+      {
+        id: "e1",
+        titulo: "Paleta",
+        opcoes: [
+          { id: "o1", rotulo: "Verde-oliva" },
+          { id: "o2", rotulo: "" },
+        ],
+      },
+    ]);
+    expect(screen.getByText(/Ainda não aparece ao casal/)).toBeTruthy();
+  });
+
+  it("sem título, di-lo também", () => {
+    desenhar([{ ...UMA[0], titulo: "" }]);
+    expect(screen.getByText(/Ainda não aparece ao casal/)).toBeTruthy();
+  });
+
+  it("completa, cala-se — e concorda com a regra que o casal vê", () => {
+    desenhar(UMA);
+    expect(screen.queryByText(/Ainda não aparece ao casal/)).toBeNull();
+    // O aviso e a página do casal lêem a MESMA função: se um dia divergirem,
+    // este teste não muda mas a promessa parte-se, por isso afirma-se aqui.
+    expect(escolhaPronta(UMA[0])).toBe(true);
+  });
+});
+
+describe("escrever", () => {
+  it("o título vai para a escolha certa", async () => {
+    const user = userEvent.setup();
+    const onChange = desenhar(UMA);
+    await user.type(screen.getByLabelText("Título da alternativa 1"), "!");
+    expect(onChange).toHaveBeenCalledWith([{ ...UMA[0], titulo: "Paleta da cerimónia!" }]);
+  });
+
+  it("acrescentar uma opção não mexe nas que lá estão", async () => {
+    const user = userEvent.setup();
+    const onChange = desenhar(UMA);
+    await user.click(screen.getByRole("button", { name: /\+ Opção/ }));
+    const nova: Escolha[] = onChange.mock.calls[0][0];
+    expect(nova[0].opcoes.map((o) => o.id).slice(0, 2)).toEqual(["o1", "o2"]);
+    expect(nova[0].opcoes).toHaveLength(3);
+  });
+
+  it("não deixa apagar abaixo do mínimo — com duas, não há botão de apagar opção", () => {
+    desenhar(UMA);
+    expect(screen.queryByRole("button", { name: /Apagar a opção/ })).toBeNull();
+  });
+
+  it("com três, já deixa", () => {
+    desenhar([{ ...UMA[0], opcoes: [...UMA[0].opcoes, { id: "o3", rotulo: "Azul" }] }]);
+    expect(screen.getAllByRole("button", { name: /Apagar a opção/ })).toHaveLength(3);
+  });
+
+  it("apagar a alternativa apaga a certa", async () => {
+    const user = userEvent.setup();
+    const duas = [UMA[0], { ...UMA[0], id: "e2", titulo: "Corredor" }];
+    const onChange = desenhar(duas);
+    await user.click(screen.getByRole("button", { name: /Apagar a alternativa 1/ }));
+    expect(onChange).toHaveBeenCalledWith([duas[1]]);
+  });
+});
+
+describe("a fotografia", () => {
+  it("escolhe-se entre as que já estão nos mood boards", async () => {
+    const user = userEvent.setup();
+    const onChange = desenhar(UMA);
+    await user.click(screen.getAllByRole("button", { name: /Pôr uma fotografia/ })[0]);
+    await user.click(screen.getByRole("button", { name: /Usar a fotografia 1 de Cerimónia/ }));
+    const nova: Escolha[] = onChange.mock.calls[0][0];
+    expect(nova[0].opcoes[0].imagem).toBe("ped/uma.jpg");
+  });
+
+  it("sem fotografias na proposta, diz porquê em vez de mostrar uma caixa vazia", async () => {
+    const user = userEvent.setup();
+    render(<EditorDeEscolhas escolhas={UMA} fotos={[]} bilingue={false} onChange={vi.fn()} />);
+    await user.click(screen.getAllByRole("button", { name: /Pôr uma fotografia/ })[0]);
+    expect(screen.getByText(/Ainda não há fotografias nos mood boards/)).toBeTruthy();
+  });
+
+  it("tira-se sem apagar a opção", async () => {
+    const user = userEvent.setup();
+    const comFoto = [
+      { ...UMA[0], opcoes: [{ ...UMA[0].opcoes[0], imagem: "ped/uma.jpg" }, UMA[0].opcoes[1]] },
+    ];
+    const onChange = desenhar(comFoto);
+    await user.click(screen.getByRole("button", { name: /^Tirar$/ }));
+    const nova: Escolha[] = onChange.mock.calls[0][0];
+    expect(nova[0].opcoes[0].imagem).toBeUndefined();
+    expect(nova[0].opcoes[0].rotulo).toBe("Verde-oliva e branco");
+  });
+});
+
+describe("as caixas inglesas", () => {
+  it("com o interruptor desligado, não existem no DOM", () => {
+    desenhar(UMA, false);
+    expect(screen.queryByLabelText(/\(inglês\)/)).toBeNull();
+  });
+
+  it("ligado, aparecem ao lado de cada campo de prosa", () => {
+    desenhar(UMA, true);
+    expect(screen.getByLabelText("Título da alternativa 1 (inglês)")).toBeTruthy();
+    expect(screen.getByLabelText("Opção 1 (inglês)")).toBeTruthy();
+  });
+
+  it("e escrevem no campo irmão, não por cima do português", async () => {
+    const user = userEvent.setup();
+    const onChange = desenhar(UMA, true);
+    await user.type(screen.getByLabelText("Título da alternativa 1 (inglês)"), "C");
+    expect(onChange).toHaveBeenCalledWith([{ ...UMA[0], tituloEn: "C" }]);
+  });
+});

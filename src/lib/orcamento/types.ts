@@ -1,3 +1,5 @@
+import type { RespostaDeEscolha } from "../proposta-escolhas";
+
 export type EventCategory = "empresas" | "particulares";
 
 export type EventType =
@@ -291,6 +293,23 @@ export interface Quote extends QuoteFormData {
   followUpAt?: string;
   /** RSVP / guest list for the event. */
   guestList?: Guest[];
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O QUE O CASAL ESCOLHEU NA PÁGINA DA PROPOSTA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * «A escolha volta ao back office e aparece na ficha do evento.»
+   *
+   * A PERGUNTA vive no documento da proposta (`ProposalDoc.escolhas`); a
+   * resposta vive aqui, no PEDIDO, e não na proposta. A razão é a mesma que
+   * faz o link do casal seguir o pedido e não a linha: uma revisão de preço
+   * cria uma proposta NOVA, e a paleta que o casal escolheu na semana passada
+   * não pode desaparecer porque ela mexeu no valor da deslocação.
+   *
+   * É a única coisa que o lado do CLIENTE escreve neste registo, e escreve-a
+   * por acção deliberada — ver `proposta-escolhas.ts` para o que não se grava.
+   */
+  escolhasDoCasal?: RespostaDeEscolha[];
   /** Chronological log of significant actions taken on this quote. */
   activityLog?: ActivityEntry[];
   /** Internal contract/invoice reference number (e.g. "2026-042"). */

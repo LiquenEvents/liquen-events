@@ -55,6 +55,28 @@ export interface TextosDaPagina {
   inspiracao: string;
   /** O aviso de que a galeria não abriu — sem fotografias não há nada a fazer. */
   semFotos: string;
+
+  /* ── AS ESCOLHAS DO CASAL (Fase 3) ─────────────────────────────────────── */
+  /** O título da secção onde ela deixou alternativas. */
+  escolhas: string;
+  /** A linha que explica o que ali se faz, e o que acontece a seguir. */
+  escolhasIntro: string;
+  /** O botão de cada alternativa, para quem lê o ecrã: «Escolher …». */
+  escolherEsta: string;
+  /** A marca da que ficou escolhida. */
+  escolhida: string;
+  /**
+   * O que se diz DEPOIS de a escolha seguir.
+   *
+   * Não é «guardado»: o que interessa ao casal não é o nosso registo, é saber
+   * que a mensagem chegou a alguém. E é o que permite mudar de ideias sem
+   * telefonar — a frase di-lo.
+   */
+  escolhaGuardada: string;
+  /** A escolha não chegou ao servidor. Diz-se, e não se finge. */
+  escolhaFalhou: string;
+  /** O botão que tenta outra vez a mesma escolha. */
+  escolhaRepetir: string;
 }
 
 const PT: TextosDaPagina = {
@@ -69,6 +91,14 @@ const PT: TextosDaPagina = {
   nestaPagina: "Nesta página",
   inspiracao: "Inspiração",
   semFotos: "As fotografias desta secção não estão disponíveis neste momento.",
+  escolhas: "À vossa escolha",
+  escolhasIntro:
+    "Deixámos aqui algumas alternativas. Escolham a que preferirem: podem mudar de ideias, e falamos sobre isso na mesma.",
+  escolherEsta: "Escolher",
+  escolhida: "A vossa escolha",
+  escolhaGuardada: "Ficámos a saber. Podem mudar de ideias quando quiserem.",
+  escolhaFalhou: "Não foi possível registar a escolha.",
+  escolhaRepetir: "Tentar outra vez",
 };
 
 const EN: TextosDaPagina = {
@@ -83,6 +113,14 @@ const EN: TextosDaPagina = {
   nestaPagina: "On this page",
   inspiracao: "Inspiration",
   semFotos: "The photos in this section are not available right now.",
+  escolhas: "Yours to choose",
+  escolhasIntro:
+    "We have left a few alternatives here. Pick the one you prefer: you can change your mind, and we will talk it through anyway.",
+  escolherEsta: "Choose",
+  escolhida: "Your choice",
+  escolhaGuardada: "We have got it. Change your mind whenever you like.",
+  escolhaFalhou: "We could not register your choice.",
+  escolhaRepetir: "Try again",
 };
 
 export function textosDaPagina(idioma: IdiomaDaProposta): TextosDaPagina {

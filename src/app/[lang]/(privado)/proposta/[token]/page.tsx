@@ -6,6 +6,8 @@ import { SITE } from "@/lib/site";
 import { getDictionary, htmlLang, normalizeLocale, type Locale } from "@/lib/i18n";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import { fotosDaProposta } from "@/lib/proposta-fotos";
+import { getQuote } from "@/lib/quotes-store";
+import { log } from "@/lib/logger";
 import Documento from "./Documento";
 
 /**
@@ -326,6 +328,30 @@ export default async function ProposalPage({
    */
   const fotos = proposal.doc ? await fotosDaProposta(proposal.doc) : [];
 
+  /**
+   * O QUE O CASAL JÁ ESCOLHEU — lido do PEDIDO, e não da proposta.
+   *
+   * A razão está em `proposta-escolhas.ts`: uma revisão de preço cria uma
+   * proposta NOVA, e a paleta que eles escolheram na semana passada não pode
+   * desaparecer por causa disso. É por isso que a resposta vive no pedido, e
+   * é por isso que se vai lá buscar.
+   *
+   * Melhor esforço declarado: uma leitura falhada (base em baixo) desenha as
+   * alternativas SEM marca nenhuma. É o pior caso honesto — as alternativas
+   * continuam a poder ser escolhidas e a escolha volta a seguir; o que não
+   * acontece é a página inventar que não escolheram.
+   */
+  let escolhido: Record<string, string> = {};
+  if ((proposal.doc?.escolhas ?? []).length > 0 && (proposal.quoteId ?? "").trim()) {
+    try {
+      const pedido = await getQuote(proposal.quoteId.trim());
+      for (const r of pedido?.escolhasDoCasal ?? []) escolhido[r.escolhaId] = r.opcaoId;
+    } catch (e) {
+      log.warn("proposta: não deu para ler as escolhas do casal", { erro: e });
+      escolhido = {};
+    }
+  }
+
   const cur = proposal.currency || "EUR";
   // Mirror the API's expiry rule (through the WHOLE of the last valid day, i.e.
   // 23:59:59) so the client sees an "expired" notice up front instead of only
@@ -394,7 +420,13 @@ export default async function ProposalPage({
             Sem documento — as propostas anteriores à coluna e as de linhas do
             back office — desenha-se o quadro de sempre, sem uma diferença. */}
         {proposal.doc ? (
-          <Documento doc={proposal.doc} idioma={locale} fotos={fotos} token={token} />
+          <Documento
+            doc={proposal.doc}
+            idioma={locale}
+            fotos={fotos}
+            token={token}
+            escolhido={escolhido}
+          />
         ) : (
           <>
             {/* Line items */}

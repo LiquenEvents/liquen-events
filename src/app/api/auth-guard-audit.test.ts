@@ -718,6 +718,12 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       // modelo de confiança do PDF ao lado — e ver menos do que ele, que já
       // leva os mesmos ficheiros embutidos.
       "./proposta/[token]/fotos/route",
+      // A escolha do casal entre as alternativas que ela escreveu. Mesmo
+      // modelo de confiança: o token É a autorização, e o corpo do pedido só
+      // pode nomear um par (escolha, opção) que EXISTE no documento que esse
+      // token abre. Não muda o estado do pedido, não gera contrato, não manda
+      // email — não é o aceite, e há um teste ao lado a prendê-lo.
+      "./proposta/[token]/escolha/route",
       "./proposta/route",
       "./cron/reminders/route",
       "./cron/inbox-check/route",
@@ -878,6 +884,16 @@ describe("TOKEN-guarded routes deny a bad token", () => {
     const res = await fn(req("GET"), ctx());
     expect(res.status).toBe(404);
     expect(calls).toEqual([]); // nunca chegou à proposta nem ao Storage
+  });
+
+  it("POST /api/proposta/[token]/escolha → 404 on a bad token, e não escreve nada", async () => {
+    // A ÚNICA escrita que o lado do cliente faz. Um token forjado não pode
+    // tocar num registo de ninguém — e o que se afirma não é só o 404: é que
+    // nada correu antes dele.
+    const fn = await handler("./proposta/[token]/escolha/route", "POST");
+    const res = await fn(req("POST", "/api/x", { escolhaId: "e1", opcaoId: "o1" }), ctx());
+    expect(res.status).toBe(404);
+    expect(calls).toEqual([]);
   });
 
   /**

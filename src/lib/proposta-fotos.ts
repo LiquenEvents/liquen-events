@@ -113,7 +113,9 @@ function enderecoDirecto(ref: string): string | null {
  * ficheiro ainda não foi escrito. Assinar um caminho no Storage NÃO garante
  * que o ficheiro lá esteja — devolve um URL bem formado para um 404.
  */
-export function inventarioDeFotos(doc: Pick<ProposalDoc, "coverImages" | "moodBoards">): Entrada[] {
+export function inventarioDeFotos(
+  doc: Pick<ProposalDoc, "coverImages" | "moodBoards" | "escolhas">,
+): Entrada[] {
   const out: Entrada[] = [];
   const juntar = (id: string, ref: unknown) => {
     if (typeof ref !== "string" || !ref) return;
@@ -123,6 +125,14 @@ export function inventarioDeFotos(doc: Pick<ProposalDoc, "coverImages" | "moodBo
   (doc.coverImages ?? []).forEach((ref, i) => juntar(`c${i}`, ref));
   (doc.moodBoards ?? []).forEach((board, b) =>
     (board?.images ?? []).forEach((ref, i) => juntar(`b${b}f${i}`, ref)),
+  );
+  // As fotografias das alternativas (Fase 3). Entram pelo MESMO caminho de
+  // tudo o resto — assinadas em lote, com miniatura, forma e placeholder —
+  // porque uma paleta explica-se com a fotografia e não com o nome dela. Uma
+  // segunda escada só para estas seria uma segunda maneira de as fotos
+  // falharem em silêncio.
+  (doc.escolhas ?? []).forEach((escolha, e) =>
+    (escolha?.opcoes ?? []).forEach((opcao, o) => juntar(`e${e}o${o}`, opcao?.imagem)),
   );
   return out;
 }
@@ -144,7 +154,7 @@ export function inventarioDeFotos(doc: Pick<ProposalDoc, "coverImages" | "moodBo
  * por fotografia.
  */
 export async function fotosDaProposta(
-  doc: Pick<ProposalDoc, "coverImages" | "moodBoards">,
+  doc: Pick<ProposalDoc, "coverImages" | "moodBoards" | "escolhas">,
 ): Promise<FotoDaProposta[]> {
   const inventario = inventarioDeFotos(doc);
   if (inventario.length === 0) return [];
