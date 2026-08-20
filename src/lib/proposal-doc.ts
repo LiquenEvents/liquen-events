@@ -9,6 +9,7 @@
  */
 
 import { SINAL_POR_OMISSAO } from "./money";
+import type { Escolha } from "./proposta-escolhas";
 import type { LayoutDeMoodboard } from "./proposal-geometria";
 
 import { round2 } from "@/lib/money";
@@ -581,6 +582,27 @@ export interface ProposalDoc {
    * A chave é o id da secção do estúdio: evento, servicos, orcamento, total…
    */
   notasPorSeccao?: Record<string, string>;
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * AS ESCOLHAS QUE O CASAL FAZ NA PÁGINA — E QUE O PDF NÃO IMPRIME
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * «Onde eu tiver dado alternativas ao casal (duas paletas para a cerimónia,
+   * dois estilos de corredor), eles escolhem ali.»
+   *
+   * Vivem no DOCUMENTO para viajarem com ele: uma revisão, uma cópia a partir
+   * de outra proposta e a cópia de segurança levam as perguntas consigo sem
+   * uma linha a mais em lado nenhum. A RESPOSTA do casal não está aqui — está
+   * no pedido, e a razão está escrita em `proposta-escolhas.ts`.
+   *
+   * NUNCA SÃO DESENHADAS NO PDF, e isso é uma decisão e não um esquecimento:
+   * uma folha A4 não tem como oferecer uma escolha, e imprimir «Opção A / B»
+   * no documento que o casal guarda e mostra à família só cria a dúvida de
+   * qual das duas é que ficou. Está declarado em `NUNCA_NO_PDF`.
+   */
+  escolhas?: Escolha[];
+
   totalLabel: string; // "Valor Total Decoração"
   /**
    * O {@link ProposalDoc.totalLabel} em inglês.
@@ -941,12 +963,16 @@ export function isPendingImage(path: string | null | undefined): boolean {
 /** As fotos deste documento que ainda são promessas — o número que decide se
  *  a proposta já pode seguir para o cliente. */
 export function countPendingImages(
-  doc: Partial<Pick<ProposalDoc, "coverImages" | "moodBoards">>,
+  doc: Partial<Pick<ProposalDoc, "coverImages" | "moodBoards" | "escolhas">>,
 ): number {
   let n = 0;
   for (const p of doc.coverImages ?? []) if (isPendingImage(p)) n += 1;
   for (const b of doc.moodBoards ?? [])
     for (const p of b.images ?? []) if (isPendingImage(p)) n += 1;
+  // As fotografias das alternativas contam como as outras: uma promessa por
+  // cumprir é uma promessa por cumprir, esteja num mood board ou numa opção.
+  for (const e of doc.escolhas ?? [])
+    for (const o of e.opcoes ?? []) if (isPendingImage(o.imagem)) n += 1;
   return n;
 }
 
@@ -962,7 +988,7 @@ export function countPendingImages(
  * não sujar as comparações por referência de quem grava o rascunho.
  */
 export function stripPendingImages<
-  T extends Partial<Pick<ProposalDoc, "coverImages" | "moodBoards">>,
+  T extends Partial<Pick<ProposalDoc, "coverImages" | "moodBoards" | "escolhas">>,
 >(doc: T): T {
   if (countPendingImages(doc) === 0) return doc;
   const out: T = { ...doc };
@@ -974,6 +1000,22 @@ export function stripPendingImages<
       (b.images ?? []).some(isPendingImage)
         ? { ...b, images: b.images.filter((p) => !isPendingImage(p)) }
         : b,
+    );
+  }
+  // Numa opção o marcador some e a OPÇÃO FICA: o que identifica a alternativa
+  // é o rótulo, e apagar a opção porque a fotografia não chegou trocava a
+  // escolha que o casal já pode ter feito. Fica sem fotografia, que é o que
+  // ela vê no estúdio e pode voltar a pôr.
+  if (doc.escolhas) {
+    out.escolhas = doc.escolhas.map((e) =>
+      (e.opcoes ?? []).some((o) => isPendingImage(o.imagem))
+        ? {
+            ...e,
+            opcoes: e.opcoes.map((o) =>
+              isPendingImage(o.imagem) ? { ...o, imagem: undefined } : o,
+            ),
+          }
+        : e,
     );
   }
   return out;

@@ -191,6 +191,8 @@ export const NUNCA_NO_PDF: Readonly<Record<string, string>> = {
   fotosDeBiblioteca: "a origem das fotos na biblioteca não é impressa.",
   vatRate: "a taxa de IVA não é impressa em lado nenhum; só o «+ IVA» que diz se acresce.",
   headerTitle: "o título de cabeçalho não chega a ser desenhado pelo gerador.",
+  escolhas:
+    "as alternativas que o casal escolhe são de ecrã: vivem na página da proposta e nunca são impressas — uma folha A4 não oferece escolhas, e imprimir «opção A / opção B» no documento que o casal guarda só cria a dúvida de qual das duas ficou.",
 };
 
 /**

@@ -60,7 +60,11 @@ describe("nada no ramo privado chama um medidor", () => {
   const ficheiros = [
     ...ficheirosDe(RAMO),
     "src/app/api/proposta/[token]/fotos/route.ts",
+    // A rota das escolhas: é a única escrita que o lado do cliente faz, e por
+    // isso é a que mais tentação tem de «aproveitar para registar».
+    "src/app/api/proposta/[token]/escolha/route.ts",
     "src/lib/proposta-fotos.ts",
+    "src/lib/proposta-escolhas.ts",
   ];
 
   it("CONTROLO POSITIVO: o varrimento encontra mesmo os ficheiros", () => {
