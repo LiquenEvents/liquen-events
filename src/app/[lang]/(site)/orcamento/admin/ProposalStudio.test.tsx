@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import ProposalStudio, {
@@ -5629,6 +5629,32 @@ describe("abrir um pedido só para ler não é trabalho por gravar", () => {
     await passarODebounce();
     expect(screen.queryByTitle(/a guardar/i)).toBeNull();
     expect(screen.queryByTitle(/guardado às/i)).toBeNull();
+  });
+
+  it("um clique que não muda nada continua a não gravar", async () => {
+    // O gesto FECHA a janela de abertura, mas não é o gesto que decide: o que
+    // decide é o documento ser igual ao que se abriu. Sem isto, tocar no ecrã
+    // para ler acendia o alarme na mesma — e era esse o defeito.
+    const user = userEvent.setup();
+    renderStudio();
+    await user.click(await screen.findByRole("heading", { name: "Mood boards" }));
+    await passarODebounce();
+    expect(corpos("proposta-rascunho")).toEqual([]);
+  });
+
+  it("escrita SEM teclas — preenchimento automático — também conta (controlo positivo)", async () => {
+    // Nem toda a escrita passa por uma tecla: o preenchimento automático do
+    // browser, um gestor de palavras-passe e a ditadura de voz põem o valor e
+    // disparam só `input`. Se a abertura só fechasse com `keydown`, esse texto
+    // ficava por gravar — e foi assim que o passeio automático das propostas
+    // apanhou este buraco.
+    renderStudio();
+    const local = (await screen.findByLabelText("Local")) as HTMLInputElement;
+    fireEvent.input(local, { target: { value: "Herdade do Automático" } });
+    await waitFor(() => expect(corpos("proposta-rascunho").length).toBeGreaterThan(0), {
+      timeout: 3000,
+    });
+    expect(corpos("proposta-rascunho").at(-1)).toContain("Herdade do Automático");
   });
 
   it("mas com rascunho GUARDADO, abrir continua a gravar (controlo positivo)", async () => {

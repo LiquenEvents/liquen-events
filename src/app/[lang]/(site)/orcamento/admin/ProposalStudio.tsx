@@ -2197,7 +2197,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const fechar = () => {
       aAbrir.current = false;
     };
-    const gestos = ["pointerdown", "keydown", "drop", "paste"] as const;
+    // `input` e `change` estão aqui por uma razão que não é teórica: nem toda a
+    // escrita passa por uma tecla. O preenchimento automático do browser, um
+    // gestor de palavras-passe, a ditadura de voz e os passeios automáticos
+    // escrevem o valor e disparam só `input` — sem `keydown`. Sem estes dois,
+    // esse texto ficava do lado da «abertura» e não era gravado.
+    const gestos = ["pointerdown", "keydown", "input", "change", "drop", "paste"] as const;
     for (const g of gestos) window.addEventListener(g, fechar, true);
     return () => {
       for (const g of gestos) window.removeEventListener(g, fechar, true);
