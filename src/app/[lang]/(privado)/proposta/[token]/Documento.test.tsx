@@ -2,7 +2,13 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import Documento from "./Documento";
-import type { ProposalDoc } from "@/lib/proposal-doc";
+import {
+  DEFAULT_CANCELAMENTO,
+  DEFAULT_CONDICOES_GERAIS,
+  DEFAULT_OBSERVACOES_GERAIS,
+  preencherMarcadores,
+  type ProposalDoc,
+} from "@/lib/proposal-doc";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
 
 /**
@@ -413,5 +419,101 @@ describe("o dinheiro escrito à mão", () => {
     } as unknown as Partial<ProposalDoc>);
     expect(screen.getByText("A combinar")).toBeTruthy();
     expect(screen.queryByText("0,00 €")).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AS CONDIÇÕES DOBRADAS: FECHADAS, MAS NÃO ESCONDIDAS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * As condições, as observações, o faseamento e o cancelamento somam mais de
+ * duas dezenas de cláusulas. Abertas, empurram para baixo tudo aquilo por que
+ * a proposta se vende.
+ *
+ * A afirmação que aqui se prende não é «estão fechadas» — é que **fechada não
+ * é escondida**: o título continua a ser um título, o texto continua no HTML
+ * (a procura da página encontra-o), e por baixo do título há uma linha que diz
+ * o que lá está dentro. Sem essa linha, dobrar é o mesmo que omitir.
+ */
+describe("as secções de condições", () => {
+  /**
+   * O texto DA CASA, preenchido como o documento o guarda.
+   *
+   * Tinha de ser este e não um de fantasia: o resumo por baixo do título só se
+   * mostra enquanto o bloco for, palavra por palavra, o da casa — é essa a
+   * regra que impede a página de resumir um texto que já lá não está.
+   */
+  const COM_TUDO = {
+    condicoesGerais: DEFAULT_CONDICOES_GERAIS.map((l) =>
+      preencherMarcadores(l, DOC as unknown as ProposalDoc),
+    ),
+    observacoesGerais: [...DEFAULT_OBSERVACOES_GERAIS],
+    faseamento: [...DEFAULT_CANCELAMENTO.slice(0, 1)],
+    cancelamento: [...DEFAULT_CANCELAMENTO],
+  };
+
+  const dobra = (nome: RegExp) =>
+    screen.getByRole("heading", { name: nome }).closest("details") as HTMLDetailsElement;
+
+  it("saem fechadas — é essa a razão de existirem", () => {
+    desenhar(COM_TUDO);
+    for (const nome of [/Condições Gerais/i, /Observações/i, /Faseamento/i, /Cancelamento/i]) {
+      expect(dobra(nome).open).toBe(false);
+    }
+  });
+
+  it("o título continua a ser um título, e não um parágrafo dentro de um botão", () => {
+    // O índice da página e o leitor de ecrã leem-se pelos cabeçalhos. Trocar o
+    // `h2` por um `span` dobrava a secção e apagava-a da estrutura.
+    desenhar(COM_TUDO);
+    const t = screen.getByRole("heading", { name: /Condições Gerais/i });
+    expect(t.tagName).toBe("H2");
+  });
+
+  it("o texto continua no HTML mesmo fechado — a procura da página encontra-o", () => {
+    desenhar(COM_TUDO);
+    expect(screen.getByText(/Aos valores acresce o IVA/i)).toBeInTheDocument();
+  });
+
+  it("diz numa linha o que está lá dentro", () => {
+    // Sem isto, «Condições Gerais» tanto pode ser uma cláusula como catorze, e
+    // quem não sabe o que está a abrir não abre.
+    desenhar(COM_TUDO);
+    expect(screen.getByText(/confirmação do número de convidados/i)).toBeInTheDocument();
+    expect(screen.getByText(/O que acontece se o evento for cancelado/i)).toBeInTheDocument();
+    expect(screen.getByText(/uso do material/i)).toBeInTheDocument();
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   *
+   * Os resumos foram escritos a olhar para o texto DA CASA. Sobre um texto que
+   * ela reescreveu, o mesmo resumo passa a ser uma frase falsa dita por cima
+   * de uma secção fechada — que é o pior sítio para a dizer, porque ninguém a
+   * vai lá dentro desmentir.
+   */
+  it("com o texto reescrito por ela, conta os pontos em vez de os resumir", () => {
+    desenhar({
+      ...COM_TUDO,
+      cancelamento: ["Uma cláusula dela.", "E outra.", "E outra ainda."],
+    });
+    expect(screen.getByText("3 pontos")).toBeInTheDocument();
+    expect(screen.queryByText(/O que acontece se o evento for cancelado/i)).toBeNull();
+  });
+
+  it("um só ponto não se lê «1 pontos»", () => {
+    desenhar({ ...COM_TUDO, cancelamento: ["Uma cláusula dela."] });
+    expect(screen.getAllByText("1 ponto").length).toBeGreaterThan(0);
+  });
+
+  it("em inglês, o resumo é inglês", () => {
+    desenhar(COM_TUDO, "en");
+    expect(screen.getByText(/confirming the final guest count/i)).toBeInTheDocument();
+  });
+
+  it("uma secção vazia não deixa uma dobra vazia para trás", () => {
+    desenhar({ ...COM_TUDO, cancelamento: [] });
+    expect(screen.queryByRole("heading", { name: /Cancelamento/i })).toBeNull();
   });
 });

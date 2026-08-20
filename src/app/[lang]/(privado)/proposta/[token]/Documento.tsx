@@ -7,6 +7,7 @@ import {
 } from "@/lib/proposal-doc";
 import { docNaLingua } from "@/lib/proposal-doc-bilingue";
 import {
+  blocoEDaCasa,
   blocosFixosNaLingua,
   camposDoEventoNaLingua,
   rotuloDoTotalNaLingua,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/proposta-escolhas";
 import Inspiracao, { type BoardParaEcra } from "./Inspiracao";
 import Escolhas from "./Escolhas";
-import { textosDaPagina } from "./textos-da-pagina";
+import { textosDaPagina, type SeccaoDobravel } from "./textos-da-pagina";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -149,6 +150,107 @@ function Seccao({ children, larga = false }: { children: React.ReactNode; larga?
   return <section className={`mt-16 sm:mt-24 ${larga ? "" : "max-w-2xl"}`}>{children}</section>;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA SECÇÃO DE CONDIÇÕES, DOBRADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As condições, as observações, o faseamento e o cancelamento somam mais de
+ * duas dezenas de cláusulas. Abertas, empurram para baixo tudo aquilo por que
+ * a proposta se vende: um casal que rola até ao fim atravessa páginas de letra
+ * miúda antes de chegar seja ao que for. Não é que não devam lá estar; é que
+ * não devem ser o corpo do documento.
+ *
+ * ── FECHADA NÃO É ESCONDIDA ───────────────────────────────────────────────
+ *
+ * O título continua à vista, e por baixo dele uma linha que diz o que lá está
+ * dentro. É essa linha que faz a diferença entre uma secção dobrada e uma
+ * secção omitida: sem ela, «Condições Gerais» tanto pode ser uma cláusula como
+ * catorze, e quem não sabe o que está a abrir não abre.
+ *
+ * E o PDF continua a trazer tudo, por extenso, sem dobra nenhuma. A folha é
+ * que é o documento; isto é o ecrã.
+ *
+ * ── PORQUE É QUE É UM `details` E NÃO UM BOTÃO NOSSO ─────────────────────
+ *
+ * Porque funciona sem uma linha de JavaScript, numa página que é desenhada no
+ * servidor; porque o leitor de ecrã já sabe anunciá-lo como «expansível, por
+ * abrir»; e porque a procura na página (o Cmd+F do casal) ABRE sozinha um
+ * `details` fechado onde encontre o que procura. Um botão nosso perdia as três
+ * e não ganhava nada.
+ *
+ * ── E NÃO SE REGISTA QUEM ABRIU O QUÊ ────────────────────────────────────
+ *
+ * Não há aqui pedido nenhum, nem ao abrir nem ao fechar. Saber que secções um
+ * casal abriu e quais deixou fechadas é exactamente o rasto de leitura que
+ * esta página não recolhe, por decisão dela.
+ */
+function SeccaoDobrada({
+  id,
+  sobretitulo,
+  titulo,
+  resumo,
+  children,
+}: {
+  id?: string;
+  sobretitulo?: string | null;
+  titulo: string;
+  resumo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mt-16 max-w-2xl sm:mt-24">
+      <details className="group">
+        {/*
+         * `list-none` e o marcador do WebKit escondido: o triângulo do
+         * navegador entra ANTES do sobretítulo e desalinha um cabeçalho que é
+         * desenhado com muito cuidado. A seta abaixo faz o mesmo trabalho no
+         * sítio certo.
+         *
+         * `min-h-11` só ao toque, e NÃO a classe `.alvo-toque`: ela força
+         * `inline-flex` com o conteúdo ao centro, e num `summary` isso centrava
+         * um cabeçalho alinhado à esquerda.
+         */}
+        <summary
+          className="marker:content-none pointer-coarse:min-h-11 relative cursor-pointer list-none scroll-mt-6 pl-6 [&::-webkit-details-marker]:hidden"
+          id={id}
+        >
+          {/* A seta fora do fluxo: o cabeçalho mantém o alinhamento que tem
+              nas secções que não dobram, e o `h2` continua a ser um `h2` —
+              filho directo do `summary`, e não embrulhado num `span`, que
+              seria HTML inválido e um nível a menos no índice da página. */}
+          <span
+            aria-hidden
+            className="text-moss/70 absolute top-[0.35em] left-0 text-[13px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+          >
+            ▸
+          </span>
+          {sobretitulo && (
+            <span className="text-foreground/60 mb-2 block text-[10px] tracking-[0.4em] uppercase">
+              {sobretitulo}
+            </span>
+          )}
+          <h2
+            className="text-foreground/90 text-balance"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3.4vw, 32px)" }}
+          >
+            {titulo}
+          </h2>
+          {/*
+           * O resumo desaparece com a secção aberta: com o texto todo à vista
+           * por baixo, uma linha a dizer do que ele trata passa a ser ruído
+           * entre o título e a primeira cláusula.
+           */}
+          <span className="text-foreground/55 mt-1 block text-[13px] leading-relaxed group-open:hidden">
+            {resumo}
+          </span>
+        </summary>
+        {children}
+      </details>
+    </section>
+  );
+}
+
 export default function Documento({
   doc: docOriginal,
   idioma,
@@ -222,6 +324,25 @@ export default function Documento({
   const org = doc.template === "organizacao";
   const evento = camposDoEventoNaLingua(doc, idioma);
   const fixos = blocosFixosNaLingua(doc, idioma);
+
+  /**
+   * A linha que se lê por baixo do título de uma secção dobrada.
+   *
+   * Os resumos foram escritos a olhar para o texto DA CASA, cláusula a
+   * cláusula. Onde ela o reescreveu, o resumo deixaria de descrever o que lá
+   * está — e uma frase errada por cima de uma secção fechada é a pior das
+   * mentiras, porque ninguém a vai lá dentro desmentir. Nesse caso conta-se o
+   * que há: menos útil, sempre verdade.
+   *
+   * A pergunta é feita ao `docOriginal`, que é o documento como ela o gravou.
+   * O `doc` já passou pela língua, e o texto da casa compara-se em português.
+   */
+  const resumoDe = (campo: SeccaoDobravel, linhas: readonly string[]) =>
+    blocoEDaCasa(docOriginal, campo)
+      ? p.resumos[campo]
+      : linhas.length === 1
+        ? p.umPonto
+        : p.pontos.replace("{n}", String(linhas.length));
   const porId = new Map(fotos.map((f) => [f.id, f]));
   /** A primeira fotografia de capa que resolveu — as posições vazias contam
    *  para o índice e não para o desenho (ver `normaliseCoverImages`). */
@@ -716,12 +837,23 @@ export default function Documento({
           )}
 
           {(fixos.notasImportantes ?? []).length > 0 && (
-            <div className="mt-10">
-              <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
-                {t.notasImportantes}
-              </h3>
+            <details className="group mt-10">
+              <summary className="marker:content-none pointer-coarse:min-h-11 relative cursor-pointer list-none pl-5 [&::-webkit-details-marker]:hidden">
+                <span
+                  aria-hidden
+                  className="text-moss/70 absolute top-[0.2em] left-0 text-[11px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+                >
+                  ▸
+                </span>
+                <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
+                  {t.notasImportantes}
+                </h3>
+                <span className="text-foreground/55 mt-1 block text-[13px] leading-relaxed group-open:hidden">
+                  {resumoDe("notasImportantes", fixos.notasImportantes ?? [])}
+                </span>
+              </summary>
               <Lista itens={fixos.notasImportantes} />
-            </div>
+            </details>
           )}
           {(fixos.incluido ?? []).length > 0 && (
             <div className="mt-8">
@@ -744,39 +876,49 @@ export default function Documento({
 
       {/* ── CONDIÇÕES GERAIS ─────────────────────────────────────────────── */}
       {(fixos.condicoesGerais ?? []).length > 0 && (
-        <Seccao>
-          <Titulo id="condicoes" sobretitulo={t.sobretituloCondicoes} titulo={t.tituloCondicoes} />
+        <SeccaoDobrada
+          id="condicoes"
+          sobretitulo={t.sobretituloCondicoes}
+          titulo={t.tituloCondicoes}
+          resumo={resumoDe("condicoesGerais", fixos.condicoesGerais ?? [])}
+        >
           {/* Os marcadores («a data do evento», «o número de convidados») são
               preenchidos com a MESMA função do gerador — senão o casal lia aqui
               um «{{data}}» que o PDF dele não tem. */}
           <Lista itens={(fixos.condicoesGerais ?? []).map((l) => preencherMarcadores(l, doc))} />
-        </Seccao>
+        </SeccaoDobrada>
       )}
 
       {(fixos.observacoesGerais ?? []).length > 0 && (
-        <Seccao>
-          <Titulo titulo={t.observacoesGerais} />
+        <SeccaoDobrada
+          titulo={t.observacoesGerais}
+          resumo={resumoDe("observacoesGerais", fixos.observacoesGerais ?? [])}
+        >
           <Lista itens={(fixos.observacoesGerais ?? []).map((l) => preencherMarcadores(l, doc))} />
-        </Seccao>
+        </SeccaoDobrada>
       )}
 
       {(fixos.faseamento ?? []).length > 0 && (
-        <Seccao>
-          <Titulo titulo={t.faseamentoDoPagamento} />
+        <SeccaoDobrada
+          titulo={t.faseamentoDoPagamento}
+          resumo={resumoDe("faseamento", fixos.faseamento ?? [])}
+        >
           <Lista itens={fixos.faseamento} />
           {totais.aPagar > 0 && (
             <p className="text-foreground/60 mt-4 text-[13px] leading-relaxed">
               {t.baseDoCalculo(eur(totais.aPagar))}
             </p>
           )}
-        </Seccao>
+        </SeccaoDobrada>
       )}
 
       {(fixos.cancelamento ?? []).length > 0 && (
-        <Seccao>
-          <Titulo titulo={t.cancelamento} />
+        <SeccaoDobrada
+          titulo={t.cancelamento}
+          resumo={resumoDe("cancelamento", fixos.cancelamento ?? [])}
+        >
           <Lista itens={fixos.cancelamento} />
-        </Seccao>
+        </SeccaoDobrada>
       )}
     </article>
   );

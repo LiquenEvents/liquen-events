@@ -77,7 +77,34 @@ export interface TextosDaPagina {
   escolhaFalhou: string;
   /** O botão que tenta outra vez a mesma escolha. */
   escolhaRepetir: string;
+
+  /* ── AS SECÇÕES DE CONDIÇÕES, DOBRADAS ─────────────────────────────────── */
+  /**
+   * O resumo de uma linha por baixo do título de cada secção dobrada.
+   *
+   * Uma secção fechada esconde o que lá está dentro, e um título sozinho não
+   * chega para se decidir se vale a pena abrir: «Condições Gerais» podia ser
+   * uma linha ou catorze. O resumo é o que substitui a leitura.
+   *
+   * Estão escritos a olhar para o TEXTO DA CASA, cláusula a cláusula, e por
+   * isso só se mostram enquanto o texto for esse — quem decide é o
+   * `blocoEDaCasa`. Onde ela reescreveu, a página conta os pontos
+   * ({@link pontos}): menos útil, sempre verdade.
+   */
+  resumos: Readonly<Record<SeccaoDobravel, string>>;
+  /** «9 pontos» — o molde com `{n}`, para quando não se pode resumir. */
+  pontos: string;
+  /** O mesmo, no singular. Um molde com `{n}` dizia «1 pontos». */
+  umPonto: string;
 }
+
+/** As secções que a página dobra. Todas são texto de condições. */
+export type SeccaoDobravel =
+  | "notasImportantes"
+  | "condicoesGerais"
+  | "observacoesGerais"
+  | "faseamento"
+  | "cancelamento";
 
 const PT: TextosDaPagina = {
   ampliar: "Ampliar",
@@ -99,6 +126,16 @@ const PT: TextosDaPagina = {
   escolhaGuardada: "Ficámos a saber. Podem mudar de ideias quando quiserem.",
   escolhaFalhou: "Não foi possível registar a escolha.",
   escolhaRepetir: "Tentar outra vez",
+  resumos: {
+    notasImportantes: "A montagem e a desmontagem, e o que fica do lado do espaço.",
+    condicoesGerais:
+      "IVA, pré-reserva, deslocações da equipa e a confirmação do número de convidados.",
+    observacoesGerais: "O uso do material, os direitos de imagem e a confidencialidade.",
+    faseamento: "Quando se paga cada parte, e sobre que valor.",
+    cancelamento: "O que acontece se o evento for cancelado, e em que prazos.",
+  },
+  pontos: "{n} pontos",
+  umPonto: "1 ponto",
 };
 
 const EN: TextosDaPagina = {
@@ -121,6 +158,15 @@ const EN: TextosDaPagina = {
   escolhaGuardada: "We have got it. Change your mind whenever you like.",
   escolhaFalhou: "We could not register your choice.",
   escolhaRepetir: "Try again",
+  resumos: {
+    notasImportantes: "Set-up and take-down, and what the venue is responsible for.",
+    condicoesGerais: "VAT, booking, the team's travel, and confirming the final guest count.",
+    observacoesGerais: "Use of the materials, image rights, and confidentiality.",
+    faseamento: "When each part is due, and on which amount.",
+    cancelamento: "What happens if the event is cancelled, and by when.",
+  },
+  pontos: "{n} points",
+  umPonto: "1 point",
 };
 
 export function textosDaPagina(idioma: IdiomaDaProposta): TextosDaPagina {
