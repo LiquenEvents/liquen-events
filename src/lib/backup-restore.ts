@@ -25,7 +25,6 @@ import { mapper as eventMaterialItemMapper, listAllEventItems } from "./event-ma
 import { mapper as eventMaterialLogMapper, listAllLog } from "./event-material-log-store";
 import { mapper as templatesMapper, listTemplates } from "./email-templates-store";
 import { mapper as themesMapper, listThemes } from "./themes-store";
-import { mapper as linksMapper, listLinks } from "./message-links-store";
 import { mapper as overviewMapper, type OverviewField } from "./overview-settings-store";
 import { mapper as definicoesMapper, listarDefinicoes } from "./proposta-definicoes-store";
 import { mapper as catalogoMapper, listarServicos } from "./servicos-catalogo-store";
@@ -405,16 +404,6 @@ const themeSchema = z.looseObject({
   updatedAt: z.string().max(64),
 });
 
-const messageLinkSchema = z.looseObject({
-  messageId: z.string().trim().min(1).max(1000),
-  quoteId: text(300),
-  proposalId: text(300),
-  labels: z.array(z.string().max(200)).max(200).default([]),
-  pinned: z.boolean().default(false),
-  archivedAt: stamp,
-  createdAt: z.string().max(64),
-});
-
 const overviewSchema = z.looseObject({
   id: z.enum(["notas", "meta"]),
   value: z.string().max(200_000).default(""),
@@ -589,10 +578,10 @@ const asTarget = <T>(t: RestoreTarget<T>): RestoreTarget<AnyRow> =>
 /**
  * TUDO o que se sabe repor, PELA ORDEM DE ESCRITA.
  *
- * A ordem não é decorativa: `proposals.quote_id` e `message_links.quote_id /
- * proposal_id` são chaves estrangeiras (db/schema.sql). Inserir uma proposta
- * antes do pedido dela rebenta com violação de integridade referencial. Os
- * conjuntos são apagados pela ordem INVERSA, pela mesma razão.
+ * A ordem não é decorativa: `proposals.quote_id` é uma chave estrangeira
+ * (db/schema.sql). Inserir uma proposta antes do pedido dela rebenta com
+ * violação de integridade referencial. Os conjuntos são apagados pela ordem
+ * INVERSA, pela mesma razão.
  */
 export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
   asTarget({
@@ -691,15 +680,6 @@ export const RESTORE_TARGETS: readonly RestoreTarget<AnyRow>[] = [
     schema: invoiceSchema,
     current: listInvoices,
     stamp: (i) => i.issuedAt,
-  }),
-  asTarget({
-    key: "messageLinks",
-    label: "Anotações da caixa de entrada",
-    table: linksMapper.table,
-    mapper: linksMapper,
-    schema: messageLinkSchema,
-    current: listLinks,
-    stamp: (l) => l.createdAt,
   }),
   asTarget({
     key: "suppliers",
@@ -1446,30 +1426,11 @@ function skipReason(key: string, file: ValidBackup, unreadable: boolean): string
 function danglingReferences(file: ValidBackup): string[] {
   const out: string[] = [];
   const quoteIds = new Set((file.rows.get("quotes") ?? []).map((q) => String(q.id)));
-  const proposalIds = new Set((file.rows.get("proposals") ?? []).map((p) => String(p.id)));
-
   if (file.rows.has("quotes") && file.rows.has("proposals")) {
     const n = (file.rows.get("proposals") ?? []).filter(
       (p) => p.quoteId && !quoteIds.has(String(p.quoteId)),
     ).length;
     if (n) out.push(`${n} proposta(s) apontam para pedidos que não estão na cópia`);
-  }
-  if (file.rows.has("messageLinks")) {
-    const links = file.rows.get("messageLinks") ?? [];
-    const q = file.rows.has("quotes")
-      ? links.filter((l) => l.quoteId && !quoteIds.has(String(l.quoteId))).length
-      : 0;
-    const p = file.rows.has("proposals")
-      ? links.filter((l) => l.proposalId && !proposalIds.has(String(l.proposalId))).length
-      : 0;
-    if (q)
-      out.push(
-        `${q} anotação(ões) da caixa de entrada apontam para pedidos que não estão na cópia`,
-      );
-    if (p)
-      out.push(
-        `${p} anotação(ões) da caixa de entrada apontam para propostas que não estão na cópia`,
-      );
   }
   return out;
 }

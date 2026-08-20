@@ -164,7 +164,6 @@ const MAPPERS = [
   "./material-lists-store",
   "./material-rules-store",
   "./material-store",
-  "./message-links-store",
   "./overview-settings-store",
   "./passkeys-store",
   "./proposal-drafts",

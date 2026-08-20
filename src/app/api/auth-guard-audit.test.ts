@@ -208,18 +208,6 @@ vi.mock("@/lib/email-templates-store", () =>
     "MODELOS_DE_ORIGEM",
   ]),
 );
-vi.mock("@/lib/message-links-store", () =>
-  H.build("message-links-store", [
-    "getLink",
-    "listLinks",
-    "listLinksForQuote",
-    "linkToQuote",
-    "setArchived",
-    "setPinned",
-    "toggleLabel",
-    "upsertLink",
-  ]),
-);
 vi.mock("@/lib/app-state", () => H.build("app-state", ["getState", "setState"]));
 vi.mock("@/lib/mail", () =>
   H.build("mail", ["sendMail"], { esc: (s: string) => s, MAIL_TO: "team@liquen.test" }),
@@ -229,9 +217,6 @@ vi.mock("@/lib/push", () =>
     pushConfigured: () => false,
     sendPushToAll: H.afn("push.sendPushToAll", async () => ({ sent: 0 })),
   }),
-);
-vi.mock("@/lib/inbox", () =>
-  H.build("inbox", ["listInbox", "getInboxMessage", "setFlags"], { imapConfigured: () => false }),
 );
 vi.mock("@/lib/proposal-storage", () =>
   H.build(
@@ -475,11 +460,6 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./email-templates/teste/route", methods: ["POST"] },
   { path: "./fornecedores/route", methods: ["GET", "POST"] },
   { path: "./fornecedores/[id]/route", methods: ["PATCH", "DELETE"] },
-  { path: "./inbox/route", methods: ["GET"] },
-  { path: "./inbox/[uid]/route", methods: ["GET"] },
-  { path: "./inbox/[uid]/flags/route", methods: ["POST"] },
-  { path: "./inbox/link/route", methods: ["GET", "POST"] },
-  { path: "./inbox/reply/route", methods: ["POST"] },
   { path: "./inventario/route", methods: ["GET", "POST"] },
   { path: "./inventario/[id]/route", methods: ["PATCH", "DELETE"] },
   { path: "./material/route", methods: ["GET", "POST"] },
@@ -726,7 +706,6 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       "./proposta/[token]/escolha/route",
       "./proposta/route",
       "./cron/reminders/route",
-      "./cron/inbox-check/route",
       // A cópia de segurança automática. Mesmo guarda das irmãs (Bearer com
       // CRON_SECRET, comparado em tempo constante, a falhar fechado em
       // produção) — e sai daqui um ficheiro com TODOS os dados de clientes,
@@ -922,7 +901,6 @@ describe("SECRET-guarded cron routes fail closed", () => {
 
   for (const path of [
     "./cron/reminders/route",
-    "./cron/inbox-check/route",
     "./cron/backup/route",
   ]) {
     it(`GET ${path} → 401 in production with no CRON_SECRET, and never scans`, async () => {

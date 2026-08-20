@@ -738,11 +738,20 @@ create index if not exists contracts_proposal_id_idx on public.contracts (propos
 create unique index if not exists contracts_proposal_id_uk on public.contracts (proposal_id);
 
 -- ── Sobreposição local do Inbox (ligações CRM, etiquetas, arquivo) ──
--- Camada de anotação PRÓPRIA sobre os emails, chaveada pelo Message-ID (chave
--- durável — o uid IMAP não é estável). NÃO toca na caixa de correio: o Gmail não
--- persiste keywords personalizadas de forma fiável, e "arquivar"/"apagar" aqui
--- significam ESCONDER (preencher `archived_at`), NUNCA um expunge no IMAP.
--- A coluna `id` guarda o Message-ID (o Repository endereça as linhas por `id`).
+--
+-- ⚠ TABELA ÓRFÃ, DE PROPÓSITO. A caixa de entrada de email foi APAGADA a
+-- pedido dela (agosto de 2026): não há rota, ecrã, store nem cópia de
+-- segurança que escreva ou leia isto. As linhas que cá estão apontam para
+-- Message-IDs de um ecrã que já não existe.
+--
+-- A tabela FICA — não se deita abaixo dados de ninguém por arrumação. Quem a
+-- quiser mesmo ver pelas costas do sistema pode; quem a quiser apagar de vez
+-- corre `drop table public.message_links;` à mão, e mais nada se parte.
+--
+-- O que era: camada de anotação PRÓPRIA sobre os emails, chaveada pelo
+-- Message-ID (chave durável — o uid IMAP não é estável). Não tocava na caixa
+-- de correio: "arquivar"/"apagar" aqui significavam ESCONDER (preencher
+-- `archived_at`), NUNCA um expunge no IMAP.
 create table if not exists public.message_links (
   id           text primary key,          -- Message-ID do email (chave durável)
   quote_id     text references public.quotes (id) on delete set null,

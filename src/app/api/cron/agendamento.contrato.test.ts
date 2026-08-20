@@ -25,6 +25,10 @@ import { join } from "node:path";
  * É a mesma família de defeito que já apareceu várias vezes neste projecto:
  * não o código que falha alto, mas o que não chega a correr e não se queixa.
  *
+ * (A caixa de entrada foi entretanto APAGADA, a pedido dela — não vale a pena
+ * procurar o ficheiro. A história fica porque é a razão de este teste existir,
+ * e o teste continua a valer para as rotas de cron que restam.)
+ *
  * O QUE ESTE FICHEIRO GARANTE: acrescentar uma rota de cron sem a agendar fica
  * vermelho, com o nome da rota na mensagem.
  */
@@ -95,9 +99,7 @@ describe("agendamento dos crons: o que existe tem de estar inscrito", () => {
     // dia, e é isso que o plano recusa.
     //
     // AO PASSAR A PRO: apaga este teste. Ele existe para proteger a publicação
-    // no plano actual, não porque correr mais vezes seja mau — o `inbox-check`
-    // BENEFICIA de correr de 15 em 15 minutos, e uma vez por dia significa que
-    // uma resposta de um cliente pode esperar 24 horas para ser vista.
+    // no plano actual, não porque correr mais vezes seja mau.
     for (const c of agendadas) {
       const [minuto, hora] = c.schedule.trim().split(/\s+/);
       for (const [campo, valor] of [

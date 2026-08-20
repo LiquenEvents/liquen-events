@@ -175,7 +175,6 @@ As tarefas estão em `vercel.json`:
 |---|---|---|
 | `/api/cron/backup` | 04:00 diário | Envia a cópia de segurança por email (dados + a lista das fotografias) |
 | `/api/cron/reminders` | 07:00 diário | Resumo diário e lembretes |
-| `/api/cron/inbox-check` | 08:00 diário | Lê as respostas dos clientes na caixa de correio |
 
 Se pararem, o suspeito nº 1 é o `CRON_SECRET` em falta: as rotas fecham-se em
 produção e param **sem dar erro nenhum**.

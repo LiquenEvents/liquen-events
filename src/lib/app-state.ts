@@ -6,8 +6,8 @@ import { isMissingTable } from "./repository";
 import { log } from "./logger";
 
 /**
- * Tiny persistent key-value state for operational markers (e.g. the inbox
- * high-water mark the cron uses for dedupe). Supabase-backed when configured —
+ * Tiny persistent key-value state for operational markers (e.g. the list of
+ * closed weddings already sent to Meta). Supabase-backed when configured —
  * a local file is EPHEMERAL on serverless, so markers stored there reset on
  * every deploy/instance swap. Falls back to data/app-state.json in dev.
  *
@@ -20,7 +20,7 @@ import { log } from "./logger";
  *
  * O `setState` apanhava o erro da escrita, registava-o, e fazia `return` — a
  * mesma coisa, vista de fora, que uma gravação bem sucedida. Enquanto isto
- * guardou apenas marcadores de operação (o UID do inbox, os fechos do Meta) o
+ * guardou apenas marcadores de operação (os fechos já enviados à Meta) o
  * pior que acontecia era uma notificação repetida, e o desenho estava certo.
  *
  * Deixou de estar no dia em que os RASCUNHOS do estúdio passaram a viver aqui.

@@ -60,11 +60,11 @@ const CHECKS: EnvCheck[] = [
   },
   // Without it the /api/cron/* routes fail closed in production (see their
   // authorized() checks) — so this isn't silent data loss, but it does mean
-  // the daily digest / inbox-check cron jobs silently stop firing.
+  // the daily digest / backup cron jobs silently stop firing.
   {
     name: "CRON_SECRET",
     critical: true,
-    enables: "authenticated /api/cron/* scheduled jobs (daily digest, inbox check)",
+    enables: "authenticated /api/cron/* scheduled jobs (daily digest, backup)",
   },
 ];
 

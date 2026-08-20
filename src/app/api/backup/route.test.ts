@@ -27,7 +27,6 @@ const stores = vi.hoisted(() => ({
   eventMaterialLog: vi.fn(async () => [] as unknown[]),
   emailTemplates: vi.fn(async () => [] as unknown[]),
   themes: vi.fn(async () => [] as unknown[]),
-  messageLinks: vi.fn(async () => [] as unknown[]),
   overviewSettings: vi.fn(async () => [] as unknown[]),
   propostaDefinicoes: vi.fn(async () => [] as unknown[]),
   servicosCatalogo: vi.fn(async () => [] as unknown[]),
@@ -98,7 +97,6 @@ vi.mock("@/lib/email-templates-store", () => ({
   listTemplatesWithDefaults: stores.emailTemplates,
 }));
 vi.mock("@/lib/themes-store", () => ({ listThemes: stores.themes }));
-vi.mock("@/lib/message-links-store", () => ({ listLinks: stores.messageLinks }));
 vi.mock("@/lib/biblioteca-etiquetas-store", () => ({ listEtiquetas: stores.bibliotecaEtiquetas }));
 vi.mock("@/lib/biblioteca-fotos-store", () => ({ listFotos: stores.bibliotecaFotos }));
 vi.mock("@/lib/biblioteca-foto-etiquetas-store", () => ({

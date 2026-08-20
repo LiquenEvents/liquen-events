@@ -52,14 +52,20 @@ const ADMIN = path.join(RAIZ, "app", "[lang]", "(site)", "orcamento", "admin");
  * A chave é o caminho a partir de `src/`. A razão tem de dizer o que falta
  * para o ecrã ser montado — não «é código morto», que não ajuda ninguém.
  */
-const POR_MONTAR: Readonly<Record<string, string>> = {
-  "app/[lang]/(site)/orcamento/admin/InboxList.tsx":
-    "a caixa de entrada perdeu o contentor (`Inbox.tsx`) quando a página autónoma «Mensagens» foi removida, em julho. Os três ficheiros e as cinco rotas `/api/inbox/*` ficaram. Decidir: voltar a montar dentro do painel do pedido, ou apagar os três e as rotas E tirar o `cron` de `/api/cron/inbox-check` do `vercel.json`, que continua a mandar «Novo email» para um sítio que não existe.",
-  "app/[lang]/(site)/orcamento/admin/InboxThread.tsx":
-    "o painel de leitura da caixa de entrada, órfão pela mesma razão do `InboxList` — ver a entrada acima. Não apagar um sem o outro.",
-  "app/[lang]/(site)/orcamento/admin/InboxShared.tsx":
-    "a linguagem visual partilhada pelos dois anteriores. Sai com eles ou volta com eles.",
-};
+/*
+ * A LISTA ESTÁ VAZIA — e é assim que ela deve ficar.
+ *
+ * Teve três entradas, as da caixa de entrada de email: `InboxList`,
+ * `InboxThread` e `InboxShared`, órfãos desde julho, com cinco rotas
+ * `/api/inbox/*` e um `cron` a mandar «Novo email» para um ecrã que não
+ * existia. A entrada dizia o que faltava decidir — voltar a montar ou apagar.
+ * Foi decidido: apagar. Ver o commit que os removeu.
+ *
+ * Uma lista vazia é o estado saudável deste teste. Se alguém acrescentar aqui
+ * um ficheiro, está a pedir uma decisão adiada — e a razão tem de dizer o que
+ * falta para o ecrã ser montado, não «é código morto», que não ajuda ninguém.
+ */
+const POR_MONTAR: Readonly<Record<string, string>> = {};
 
 function ficheiros(dir: string, acc: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {

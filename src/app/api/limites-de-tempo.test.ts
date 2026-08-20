@@ -106,7 +106,6 @@ const PESADAS: { rota: string; faz: string; minimo: number }[] = [
   },
   { rota: "cron/backup", faz: "a cópia de segurança diária", minimo: 60 },
   { rota: "cron/reminders", faz: "o resumo diário", minimo: 30 },
-  { rota: "cron/inbox-check", faz: "lê a caixa de correio", minimo: 30 },
 ];
 
 const fonte = (rota: string) =>
