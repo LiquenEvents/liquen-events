@@ -93,6 +93,7 @@ export default function PainelDoEstudio({
   layoutPorOmissao,
   enquadramentoPorOmissao,
   onSaltar,
+  onEscolherFotos,
 }: {
   /** As páginas com fotografias, pela ordem em que saem. */
   paginas: readonly PaginaParaOPainel[];
@@ -104,6 +105,22 @@ export default function PainelDoEstudio({
   layoutPorOmissao?: LayoutDeMoodboard;
   enquadramentoPorOmissao?: "forma-da-foto";
   onSaltar: (bi: number) => void;
+  /**
+   * Abrir a biblioteca de temas já apontada a esta página.
+   *
+   * ── O QUE ISTO É, E O QUE AINDA NÃO É ───────────────────────────────────
+   *
+   * Ela pediu a biblioteca ABERTA no painel, para arrastar fotografias direto
+   * para as páginas. Isto ainda não é isso: é o caminho mais curto para o
+   * seletor que já existe, a partir do sítio onde ela está a olhar para a
+   * página, sem ter de a ir procurar no meio do formulário.
+   *
+   * Está escrito para não se confundir com o que falta. O seletor de hoje é um
+   * ecrã inteiro — com pesquisa, filtros e a marca das fotos já usadas — e
+   * pô-lo dentro de uma coluna de vinte e uma polegadas é reescrevê-lo, não
+   * mudá-lo de sítio.
+   */
+  onEscolherFotos?: (bi: number) => void;
 }) {
   const [vista, setVista] = useState<"pagina" | "documento">("pagina");
   const cabe = useLarguraQueChega();
@@ -212,6 +229,15 @@ export default function PainelDoEstudio({
                   <p className="mt-2 text-center text-[11px] text-foreground/45">
                     Página {paginas.findIndex((p) => p.bi === aVer.bi) + 1} de {paginas.length}
                   </p>
+                  {onEscolherFotos && (
+                    <button
+                      type="button"
+                      onClick={() => onEscolherFotos(aVer.bi)}
+                      className="mt-3 w-full rounded-lg border border-foreground/[0.12] px-3 py-2 text-[12px] text-foreground/65 motion-safe:transition-colors hover:border-[#4d6350]/40 hover:text-foreground/85"
+                    >
+                      Escolher fotografias para esta página
+                    </button>
+                  )}
                 </>
               ) : (
                 /*

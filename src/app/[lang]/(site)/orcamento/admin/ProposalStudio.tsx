@@ -7965,6 +7965,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           layoutPorOmissao={doc.layoutPorOmissao}
           enquadramentoPorOmissao={doc.enquadramentoPorOmissao}
           onSaltar={(bi) => irParaAFalta("moodboards", `boardTitulo:${bi}`)}
+          onEscolherFotos={(bi) => setPicker({ kind: "board", bi })}
         />
       </div>
       {/* ══════════ /PASSO 1 ══════════ */}
