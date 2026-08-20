@@ -271,6 +271,48 @@ function initialDoc(quote: Quote): StudioDoc {
   return base;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE VEIO DO PEDIDO, E AINDA NÃO FOI OLHADO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O pré-preenchimento já existia: a proposta abre com os nomes do casal, o
+ * tipo, a data por extenso, o local, os convidados e a cerimónia que o casal
+ * escolheu no formulário. Poupa-lhe cinco campos e uma ida ao pedido.
+ *
+ * O que faltava era DIZÊ-LO. Um campo semeado é uma resposta de terceiros
+ * dentro de um documento que sai com a assinatura dela: o casal escreveu
+ * «Évora» no formulário e a proposta pode ter de dizer «Herdade da Malhadinha,
+ * Albernoa». Sem marca nenhuma, um valor semeado lê-se como um valor escrito —
+ * e um valor escrito não se relê.
+ *
+ * O mecanismo já existia inteiro e é o da CÓPIA: anel laranja, e tocar-lhe é a
+ * confirmação (ver `realce`/`confirmado`). Estava só ligado a um dos dois
+ * caminhos por onde entra texto de outra pessoa.
+ *
+ * ── SÓ O QUE TEM MESMO ALGUMA COISA ESCRITA ──────────────────────────────
+ * Um campo que o pedido não sabia responder fica VAZIO (é a regra do
+ * `initialDoc`: nunca inventa). Um anel laranja à volta de uma caixa em branco
+ * não pede confirmação nenhuma — pede que se ignore o anel.
+ *
+ * ── E O VALOR NÃO ────────────────────────────────────────────────────────
+ * O total também é semeado do pedido, e de propósito NÃO entra aqui: não é um
+ * palpite a confirmar, é o mesmo número visto de dois sítios — escrever aqui
+ * altera-o lá. Marcá-lo pedia confirmação de uma coisa que ela própria escreveu.
+ */
+function camposVindosDoPedido(d: StudioDoc): CampoAMudar[] {
+  const escrito = (v: unknown) => typeof v === "string" && v.trim() !== "";
+  const marcar: CampoAMudar[] = [];
+  if (escrito(d.clientNames)) marcar.push("clientNames");
+  if (escrito(d.eventType)) marcar.push("eventType");
+  if (escrito(d.eventDate)) marcar.push("eventDate");
+  if (escrito(d.location)) marcar.push("location");
+  if (escrito(d.guests)) marcar.push("guests");
+  if (escrito(d.ceremony)) marcar.push("ceremony");
+  if (escrito(d.time)) marcar.push("time");
+  return marcar;
+}
+
 /** Passos do fluxo guiado do estúdio. */
 type Step = "conteudo" | "prever" | "enviar";
 /**
@@ -1655,6 +1697,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // existente (mesmo sem grupos) nunca é sobrescrito.
     if (!hadDraft) {
       setDoc((d) => seedDefaults(d, quote));
+      // E marca o que veio do pedido, pela mesma condição: um rascunho é
+      // trabalho DELA, e pedir-lhe que confirme o que ela própria escreveu é o
+      // caminho mais curto para o anel laranja deixar de querer dizer alguma
+      // coisa. Ver `camposVindosDoPedido`.
+      setPorConfirmar(new Set(camposVindosDoPedido(initialDoc(quote))));
     }
 
     // O VALOR é a excepção, e de propósito: vem SEMPRE do pedido, haja rascunho
@@ -1896,6 +1943,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         });
         return mandaOPedido ? aplicarBase(limpo, doPedido) : limpo;
       });
+      // O que estava marcado como «vindo do pedido» deixou de estar no ecrã: o
+      // que se vê agora é o rascunho dela, feito noutro dispositivo. Manter os
+      // anéis pedia confirmação de texto que ela já escreveu — e o anel só vale
+      // enquanto quiser dizer «isto não é teu».
+      setPorConfirmar(new Set());
       const base = mandaOPedido ? doPedido : baseDoDoc(doDoServidor);
       if (base != null) setTotalInput(textoDoTotal(base));
       // O documento do servidor pode trazer traduções que este computador nunca
@@ -3187,6 +3239,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       /* sem rede: fica para a próxima limpeza; nada se perde por isso */
     });
     setDoc(seedDefaults(initialDoc(quote), quote));
+    // Limpar volta a pôr no ecrã o que o pedido diz — e o que o pedido diz
+    // volta a estar por confirmar.
+    setPorConfirmar(new Set(camposVindosDoPedido(initialDoc(quote))));
     setTotalInput(
       typeof quote.quotedPrice === "number" && quote.quotedPrice > 0
         ? textoDoTotal(quote.quotedPrice)
@@ -5227,7 +5282,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <Field
                 label="Tipo de evento"
                 value={doc.eventType}
-                onChange={(e) => patch({ eventType: e.target.value })}
+                onChange={(e) => {
+                  confirmado("eventType");
+                  patch({ eventType: e.target.value });
+                }}
+                containerClassName={realce("eventType")}
                 data-campo="eventType"
                 placeholder="Casamento"
               />
@@ -5267,16 +5326,33 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               />
               {isDeco && (
                 <>
+                  {/* ── ESTES TRÊS NÃO TINHAM ANEL NENHUM ────────────────
+                      A cerimónia vem do que o casal escolheu no formulário e a
+                      hora vem, quando vem, de uma proposta copiada — texto de
+                      outra pessoa, exactamente como os quatro de cima. Eram os
+                      únicos campos do Evento onde a marca não acendia, e por
+                      isso os únicos onde um valor de terceiros se lia como um
+                      valor escrito. */}
                   <Field
                     label="Cerimónia"
                     value={doc.ceremony ?? ""}
-                    onChange={(e) => patch({ ceremony: e.target.value })}
+                    onChange={(e) => {
+                      confirmado("ceremony");
+                      patch({ ceremony: e.target.value });
+                    }}
+                    containerClassName={realce("ceremony")}
+                    data-campo="ceremony"
                     placeholder="Civil, simbólica"
                   />
                   <Field
                     label="Hora"
                     value={doc.time ?? ""}
-                    onChange={(e) => patch({ time: e.target.value })}
+                    onChange={(e) => {
+                      confirmado("time");
+                      patch({ time: e.target.value });
+                    }}
+                    containerClassName={realce("time")}
+                    data-campo="time"
                     placeholder="A definir"
                   />
                 </>

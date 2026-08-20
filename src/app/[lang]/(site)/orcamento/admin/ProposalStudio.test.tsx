@@ -5259,3 +5259,77 @@ describe("o que falta para enviar, no passo de enviar", () => {
     await waitFor(() => expect(document.activeElement).toBe(campo));
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE VEIO DO PEDIDO FICA ASSINALADO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O pré-preenchimento já existia. O que não existia era dizê-lo: um campo
+ * semeado a partir do formulário do casal lia-se exactamente como um campo
+ * escrito por ela — e um campo escrito por ela não se relê.
+ *
+ * O anel laranja é o MESMO da cópia de outra proposta, e a confirmação é a
+ * mesma: tocar-lhe.
+ */
+describe("os campos semeados do pedido ficam marcados", () => {
+  const comTudo = {
+    ...quote,
+    date: "2026-09-12",
+    location: "Évora",
+    guests: 80,
+    ceremonyType: "civil",
+  } as unknown as Quote;
+
+  const renderCom = (q: Quote) =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={q} />
+      </ToastProvider>,
+    );
+
+  /** O invólucro do campo leva o anel — é lá que o `containerClassName` cai. */
+  const anelDe = (rotulo: string) =>
+    screen.getByLabelText(rotulo).closest("div")?.className.includes("ring-2") ?? false;
+
+  it("acende o anel nos campos que o pedido respondeu", async () => {
+    renderCom(comTudo);
+    await waitFor(() => expect(anelDe("Clientes")).toBe(true));
+    expect(anelDe("Data")).toBe(true);
+    expect(anelDe("Local")).toBe(true);
+    expect(anelDe("Convidados")).toBe(true);
+    // Os três que não tinham anel nenhum antes desta alteração.
+    expect(anelDe("Tipo de evento")).toBe(true);
+    expect(anelDe("Cerimónia")).toBe(true);
+  });
+
+  it("não acende num campo que o pedido não soube responder", async () => {
+    // CONTROLO POSITIVO do teste de cima: o mesmo ecrã, com o mesmo mecanismo
+    // ligado, deixa em paz o que está vazio. Um anel à volta de uma caixa em
+    // branco não pede confirmação nenhuma — pede que se ignore o anel.
+    renderCom(comTudo);
+    await waitFor(() => expect(anelDe("Clientes")).toBe(true));
+    expect(screen.getByLabelText("Hora")).toHaveValue("");
+    expect(anelDe("Hora")).toBe(false);
+  });
+
+  it("tocar no campo é a confirmação", async () => {
+    renderCom(comTudo);
+    const user = userEvent.setup();
+    await waitFor(() => expect(anelDe("Cerimónia")).toBe(true));
+    await user.type(screen.getByLabelText("Cerimónia"), " e religiosa");
+    expect(anelDe("Cerimónia")).toBe(false);
+    // E só nesse — confirmar um não confirma os outros.
+    expect(anelDe("Local")).toBe(true);
+  });
+
+  it("um rascunho já começado não pede confirmação nenhuma", async () => {
+    // O rascunho é trabalho DELA. Pedir-lhe que confirme o que ela própria
+    // escreveu é o caminho mais curto para o anel deixar de querer dizer algo.
+    seedDraft(0);
+    renderCom(comTudo);
+    await waitFor(() => expect(screen.getByLabelText("Clientes")).toHaveValue("Maria & Zé"));
+    expect(anelDe("Clientes")).toBe(false);
+    expect(anelDe("Local")).toBe(false);
+  });
+});
