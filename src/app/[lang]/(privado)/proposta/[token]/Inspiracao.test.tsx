@@ -172,8 +172,10 @@ describe("a grelha oferece dois tamanhos", () => {
 
   it("diz que largura a fotografia OCUPA — senão o navegador pede sempre a maior", () => {
     desenhar();
-    const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
-    expect(img.getAttribute("sizes")).toBeTruthy();
+    // A SEGUNDA célula: a primeira é o respiro, que ocupa a largura toda e
+    // por isso tem um `sizes` seu. Esta é uma célula da grelha.
+    const img = screen.getAllByRole("button", { name: /Ampliar/ })[1].querySelector("img")!;
+    expect(img.getAttribute("sizes")).toBe("(min-width: 640px) 46vw, 92vw");
   });
 
   it("depois de a primeira escolha falhar, o `srcset` SAI", () => {
@@ -258,5 +260,74 @@ describe("quando as assinaturas morrem", () => {
           ?.getAttribute("src"),
       ).toBe("mini/a-nova"),
     );
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS MOMENTOS DE RESPIRAÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «A capa (arco em azulejo) é a única imagem grande da página.
+ * Devia haver mais momentos assim, a separar secções: uma foto a toda a
+ * largura entre blocos.»
+ */
+describe("o respiro que abre cada secção", () => {
+  /** A célula do respiro é a primeira da secção — vem antes do título. */
+  const oRespiro = () => screen.getAllByRole("button", { name: /Ampliar/ })[0];
+
+  it("vem ANTES do título — é ele que separa o bloco anterior deste", () => {
+    desenhar();
+    const titulo = screen.getByRole("heading", { name: "Cerimónia" });
+    // `compareDocumentPosition`: o respiro está antes do título no documento.
+    expect(oRespiro().compareDocumentPosition(titulo)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("ocupa a largura toda e tem tecto de altura", () => {
+    // Uma foto ao alto a 1024 px de largura são 1500 px de altura: isso não é
+    // um respiro, é um ecrã inteiro sem uma palavra.
+    desenhar();
+    expect(oRespiro().style.maxHeight).toBe("min(64vh, 560px)");
+    expect(oRespiro().querySelector("img")?.getAttribute("sizes")).toBe(
+      "(min-width: 1024px) 1024px, 100vw",
+    );
+  });
+
+  it("a fotografia do respiro SAI da grelha — não se vê duas vezes", () => {
+    desenhar();
+    const fontes = screen
+      .getAllByRole("button", { name: /Ampliar/ })
+      .map((b) => b.querySelector("img")?.getAttribute("src"));
+    expect(fontes).toEqual(["mini/a", "mini/b", "mini/c"]);
+    // E o `mini/a` aparece UMA vez, não duas.
+    expect(fontes.filter((f) => f === "mini/a")).toHaveLength(1);
+  });
+
+  it("é a que ela marcou como principal, quando marcou alguma", () => {
+    desenhar({ ...BOARD, principal: 2 });
+    expect(oRespiro().querySelector("img")?.getAttribute("src")).toBe("mini/c");
+  });
+
+  /**
+   * Sem marca, o `destacada` devolve `null` — e essa decisão mantém-se para a
+   * GRELHA. O que ela pediu aqui não foi um destaque: foi ar entre secções, em
+   * TODAS. Sem marca, abre a primeira que resolve.
+   */
+  it("sem marca nenhuma, abre a primeira que resolve", () => {
+    desenhar({ ...BOARD, fotos: ["semNada", "b", "c"] });
+    // `semNada` não está no mapa: não resolve, e um respiro que desaparece
+    // deixava o título encostado ao bloco anterior.
+    expect(oRespiro().querySelector("img")?.getAttribute("src")).toBe("mini/b");
+  });
+
+  it("a lupa abre na fotografia certa a partir do respiro", () => {
+    desenhar({ ...BOARD, principal: 2 });
+    fireEvent.click(oRespiro());
+    expect(fotoDaLupa()?.getAttribute("src")).toBe("orig/c");
+  });
+
+  it("um board sem uma única foto resolvida não inventa respiro nenhum", () => {
+    desenhar({ ...BOARD, fotos: ["semNada"] });
+    expect(screen.queryAllByRole("button", { name: /Ampliar/ })).toHaveLength(0);
   });
 });
