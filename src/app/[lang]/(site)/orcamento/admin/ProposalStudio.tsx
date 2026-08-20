@@ -2707,26 +2707,56 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     [repetidas],
   );
 
-  /** O que dizer sobre uma foto, ou nada. */
-  function historiaDaFoto(caminho: string): { texto: string; grave: boolean } | null {
+  /**
+   * ── A ÚNICA REPETIÇÃO QUE SE DESENHA NA GRELHA ──────────────────────────
+   *
+   * A mesma fotografia em duas páginas do MESMO documento. É quase sempre um
+   * engano, é o único caso em que o casal vê a mesma fotografia duas vezes na
+   * proposta que recebe, e é a única das três perguntas que se resolve sem
+   * sair desta página — está ali, na grelha ao lado.
+   *
+   * Marcada NAS DUAS: a contagem é sobre o documento inteiro, portanto as duas
+   * células acendem. Assinalar só a segunda obrigava a procurar a primeira.
+   *
+   * ── E PORQUE É QUE AS OUTRAS DUAS NÃO ACENDEM AQUI ──────────────────────
+   * «Já usada noutro casamento» e «já usada no mesmo espaço» são verdadeiras e
+   * úteis, mas esta página já pode acender sete avisos ao mesmo tempo (página
+   * cheia, fotos fora do PDF, fila desequilibrada, fotos cortadas, foto que
+   * destoa da paleta…). Cada aviso novo torna os outros menos lidos. As duas
+   * vivem onde a decisão se toma — no selector da biblioteca, que já as mostra
+   * — e aqui contam-se ao rato, em `passadoDaFoto`, sem acender nada.
+   */
+  function repeticaoNestaProposta(caminho: string): { texto: string; grave: boolean } | null {
     const vezesAqui = ondeEstaCadaFoto.get(caminho) ?? 0;
-    if (vezesAqui > 1) {
-      return {
-        texto: `Esta fotografia está ${vezesAqui} vezes nesta proposta.`,
-        grave: true,
-      };
-    }
+    if (vezesAqui <= 1) return null;
+    // CURTO porque a tira é `truncate` e a célula, a 390 px numa grelha de três
+    // colunas, tem ~110 px de largura: «Esta fotografia está 2 vezes nesta
+    // proposta.» a 8 px sai «Esta fotografia es…», que é uma frase que não diz
+    // nada. A frase inteira fica no texto do rato, onde há espaço.
+    return { texto: `${vezesAqui}× nesta proposta`, grave: true };
+  }
+
+  /**
+   * O que se conta ao passar o rato: de que foto da biblioteca veio esta, e para
+   * onde ela já foi. Não acende nada no ecrã — é a resposta à pergunta «esta
+   * foto já não a usei?», dada a quem a faz.
+   */
+  function passadoDaFoto(caminho: string): string | undefined {
     const origem = themeOrigins[caminho];
     const f = origem ? repetidasPorOrigem.get(origem) : undefined;
-    if (!f) return null;
+    if (!f) return origem;
     const mesmoEspaco = noMesmoEspaco(f, quote.location || undefined);
-    if (mesmoEspaco.length > 0) {
-      return {
-        texto: `Já foi para ${mesmoEspaco[0].cliente}, no mesmo espaço.`,
-        grave: true,
-      };
-    }
-    return { texto: `Já usada — ${comoSeDiz(f)}.`, grave: false };
+    // A repetição DENTRO desta proposta não vem aqui: a `CelulaDeFoto` já lhe
+    // cola o texto da tira ao fim do título. Repeti-la era dizer duas vezes a
+    // mesma coisa no mesmo balão.
+    return [
+      origem,
+      mesmoEspaco.length > 0
+        ? `Já foi para ${mesmoEspaco[0].cliente}, no mesmo espaço.`
+        : `Já usada — ${comoSeDiz(f)}.`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   /** Alguma das duas listas sai por ordem diferente da que está escrita? */
@@ -5995,6 +6025,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           // Fechado, a foto vê-se mas não se mexe: é
                                           // isso que «terminado» quer dizer.
                                           bloqueada={fechado}
+                                          // A tira e o texto do rato — ver
+                                          // `repeticaoNestaProposta` logo por
+                                          // cima, e porque é que só uma das
+                                          // três perguntas acende.
+                                          historia={repeticaoNestaProposta(path)}
+                                          origem={passadoDaFoto(path)}
                                           accoes={
                                             fechado ? null : (
                                               <AccoesDaFoto

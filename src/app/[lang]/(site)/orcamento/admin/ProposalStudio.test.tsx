@@ -5333,3 +5333,58 @@ describe("os campos semeados do pedido ficam marcados", () => {
     expect(anelDe("Local")).toBe(false);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A MESMA FOTOGRAFIA DUAS VEZES NA MESMA PROPOSTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * É o único caso em que o casal vê a mesma fotografia duas vezes no documento
+ * que recebe, e é quase sempre um engano — arrastou-se em vez de mover, ou
+ * duplicou-se um board e esqueceu-se de trocar uma foto.
+ *
+ * Assinalada NAS DUAS: assinalar só a segunda obrigava a procurar a primeira.
+ */
+describe("fotos repetidas dentro da mesma proposta", () => {
+  /** Dois boards, com a mesma foto no primeiro lugar de cada um. */
+  function seedComRepetida() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [
+          { title: "Cerimónia", images: ["board/a.jpg", "board/b.jpg"] },
+          { title: "Jantar", images: ["board/a.jpg", "board/c.jpg"] },
+        ],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  it("marca as DUAS células, e diz quantas vezes", async () => {
+    seedComRepetida();
+    renderStudio();
+    const marcas = await screen.findAllByText("2× nesta proposta");
+    expect(marcas).toHaveLength(2);
+  });
+
+  it("CONTROLO POSITIVO: sem repetição não marca nada", async () => {
+    // O mesmo ecrã, com o mesmo mecanismo ligado. Sem isto, «duas marcas»
+    // acima podia estar a passar por a grelha marcar sempre todas as fotos.
+    seedDraft(3);
+    renderStudio();
+    // A grelha está mesmo desenhada — três células, três fotos diferentes.
+    expect(await screen.findAllByLabelText(/Arrastar a fotografia/)).toHaveLength(3);
+    expect(screen.queryByText(/nesta proposta$/)).toBeNull();
+  });
+});
