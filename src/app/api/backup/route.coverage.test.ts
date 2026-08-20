@@ -87,8 +87,28 @@ describe("cobertura do backup", () => {
     expect(new Set(keys).size, "chaves repetidas escondem conjuntos umas das outras").toBe(
       keys.length,
     );
+    /**
+     * As TABELAS são únicas — com uma excepção declarada, e não uma tolerância
+     * geral. `app_state` é uma tabela PARTILHADA e leva na cópia dois espaços
+     * de nomes distintos (`proposal-draft:…` e `envio-de-proposta:…`), cada um
+     * com a sua leitura, o seu tecto de varredura e a sua escrita à medida na
+     * reposição. Fundi-los num conjunto só era misturar o trabalho por acabar
+     * com as cópias do que já saiu, que se repõem por caminhos diferentes.
+     *
+     * A regra que continua a valer, e é a que interessa: duas tabelas iguais
+     * só se admitem quando a tabela é a `app_state`. Qualquer outra repetição
+     * é um conjunto a esconder outro, e cai aqui.
+     */
     const tables = BACKUP_DATASETS.map((d) => d.table);
-    expect(new Set(tables).size, "tabelas repetidas em BACKUP_DATASETS").toBe(tables.length);
+    const repetidas = tables.filter((t, i) => tables.indexOf(t) !== i);
+    expect(
+      [...new Set(repetidas)].filter((t) => t !== "app_state"),
+      "tabelas repetidas em BACKUP_DATASETS (só a `app_state` pode, por ser partilhada)",
+    ).toEqual([]);
+    // Controlo positivo: a excepção não é uma porta aberta — a `app_state`
+    // está mesmo lá duas vezes, e é por isso que a lista acima não é vazia por
+    // não haver repetições nenhumas.
+    expect(tables.filter((t) => t === "app_state").length).toBe(2);
   });
 
   describe("contra db/schema.sql", () => {

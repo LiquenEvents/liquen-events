@@ -25,6 +25,7 @@ import { readOverviewSettings } from "@/lib/overview-settings-store";
 import { listarDefinicoes } from "@/lib/proposta-definicoes-store";
 import { listarServicos } from "@/lib/servicos-catalogo-store";
 import { listProposalDrafts } from "@/lib/proposal-drafts";
+import { listEnviosDeProposta } from "@/lib/envios-de-proposta";
 import { registarCopiaEnviada } from "@/lib/copia-de-seguranca-marcador";
 import { getSupabase } from "@/lib/supabase";
 import { log } from "@/lib/logger";
@@ -175,6 +176,19 @@ export const BACKUP_DATASETS: readonly BackupDataset[] = [
     table: "app_state",
     list: listProposalDrafts,
   },
+  // As CÓPIAS dos emails de proposta que saíram (`envio-de-proposta:…`), pelo
+  // mesmo caminho e pela mesma razão: a cópia levava a PROPOSTA e não levava o
+  // email que a acompanhou. No dia da reposição, a pergunta que se faz ao
+  // telefone — «o que é que nós lhes escrevemos?» — voltava a não ter resposta.
+  //
+  // `listEnviosDeProposta` também LANÇA quando a varredura fica truncada: é
+  // isso que põe o conjunto em `incomplete` em vez de o deixar sair vazio com
+  // ar de «não se enviou nada».
+  {
+    key: "proposalEmails",
+    table: "app_state",
+    list: listEnviosDeProposta,
+  },
 ] as const;
 
 /**
@@ -209,7 +223,7 @@ export const NOT_BACKED_UP: Readonly<Record<string, string>> = {
  */
 export const PARTIALLY_BACKED_UP: Readonly<Record<string, string>> = {
   app_state:
-    "Desta tabela vai na cópia APENAS o espaço de nomes dos rascunhos do Estúdio de Propostas (chaves `proposal-draft:…`, conjunto `proposalDrafts`): as propostas por acabar são trabalho de horas que não existe em mais lado nenhum. Fica DE FORA todo o resto, que são marcadores de funcionamento — até que email o robô da caixa de entrada já avisou, os fechos já enviados à Meta, e o contador de faturas de DESENVOLVIMENTO (em produção a numeração está em `invoice_counters`, essa sim na cópia, e é a que tem valor legal). Fica de fora também o tempo activo por proposta (chaves `tempo-activo:…`, ver `tempo-activo-servidor.ts`): é uma MEDIÇÃO de como a casa trabalha, não trabalho da casa — perdida, volta a acumular-se a partir do zero na proposta seguinte, e nenhuma proposta fica pior por causa disso. Copiá-la obrigaria a repor números de esforço ao lado de dados de negócio numa reposição em que a atenção tem de estar toda nos segundos. Não é esquecimento: repor marcadores de operação de há dois meses faz o robô voltar a avisar de emails já avisados e a Meta receber conversões repetidas — ruído numa reposição em que a atenção tem de estar toda nos dados. Perdidos, refazem-se sozinhos com um aviso repetido, no máximo.",
+    "Desta tabela vão na cópia APENAS dois espaços de nomes: os rascunhos do Estúdio de Propostas (chaves `proposal-draft:…`, conjunto `proposalDrafts`), porque as propostas por acabar são trabalho de horas que não existe em mais lado nenhum; e as cópias dos emails de proposta enviados (chaves `envio-de-proposta:…`, conjunto `proposalEmails`), porque o que foi escrito ao casal também não existe em mais lado nenhum — o modelo guardado é o ponto de partida e pode ter sido reescrito para aquele casal. Fica DE FORA todo o resto, que são marcadores de funcionamento — até que email o robô da caixa de entrada já avisou, os fechos já enviados à Meta, e o contador de faturas de DESENVOLVIMENTO (em produção a numeração está em `invoice_counters`, essa sim na cópia, e é a que tem valor legal). Fica de fora também o tempo activo por proposta (chaves `tempo-activo:…`, ver `tempo-activo-servidor.ts`): é uma MEDIÇÃO de como a casa trabalha, não trabalho da casa — perdida, volta a acumular-se a partir do zero na proposta seguinte, e nenhuma proposta fica pior por causa disso. Copiá-la obrigaria a repor números de esforço ao lado de dados de negócio numa reposição em que a atenção tem de estar toda nos segundos. Não é esquecimento: repor marcadores de operação de há dois meses faz o robô voltar a avisar de emails já avisados e a Meta receber conversões repetidas — ruído numa reposição em que a atenção tem de estar toda nos dados. Perdidos, refazem-se sozinhos com um aviso repetido, no máximo.",
 };
 
 /**

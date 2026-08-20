@@ -276,6 +276,22 @@ const DOC_DO_ESTUDIO = {
 
 /** Um rascunho por acabar: a mesma proposta um passo antes de seguir, ainda só
  *  no estúdio. É o que se perdia por inteiro quando a cópia saltava a tabela. */
+/**
+ * A cópia de um email de proposta que saiu — o que se relê três semanas depois,
+ * ao telefone, quando a pergunta é «o que é que nós lhes escrevemos?».
+ */
+const EMAIL_ENVIADO = {
+  enviadoEm: ONTEM,
+  para: "ana@exemplo.pt",
+  porQuem: "Catarina",
+  modelo: "registo-formal",
+  idioma: "pt" as const,
+  assunto: "A nossa proposta para o vosso casamento",
+  texto: "Olá Ana, boa tarde,\n\nDe acordo com o solicitado, enviamos a nossa proposta.",
+  anexo: { nome: "Proposta-Liquen.pdf", bytes: 421_337 },
+  propostaId: "p-1",
+};
+
 const RASCUNHO_DO_ESTUDIO = {
   ...DOC_DO_ESTUDIO,
   totalText: "9.500,00 € + IVA (por confirmar)",
@@ -444,6 +460,14 @@ function seedBusiness(): void {
   rowsOf("app_state").push({
     key: "proposal-draft:LIQ-ZZZ-9",
     value: null,
+    updated_at: ONTEM,
+  });
+  // A CÓPIA do email que acompanhou a proposta. Vive no mesmo espaço partilhado
+  // e tem o mesmo problema: a cópia levava a proposta e não levava o que lhes
+  // foi escrito.
+  rowsOf("app_state").push({
+    key: "envio-de-proposta:LIQ-AAA-1",
+    value: { envios: [EMAIL_ENVIADO] },
     updated_at: ONTEM,
   });
   rowsOf("app_state").push({ key: "inbox-last-uid", value: 4211, updated_at: ONTEM });

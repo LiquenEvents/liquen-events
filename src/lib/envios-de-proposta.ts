@@ -1,5 +1,6 @@
 import "server-only";
-import { getState, setState, type ResultadoDeEscrita } from "./app-state";
+import { getState, listStateByPrefix, setState, type ResultadoDeEscrita } from "./app-state";
+import type { Mapper } from "./repository";
 import { log } from "./logger";
 
 /**
@@ -178,5 +179,167 @@ export async function registarEnvio(
   } catch (e) {
     log.error("envios de proposta: não foi possível guardar a cópia do email", e, { quoteId });
     return { gravado: false, duradouro: false, onde: "nenhures" };
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A CÓPIA DE SEGURANÇA
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Isto ficou escrito no cabeçalho como uma limitação conhecida — «a AUSÊNCIA
+   da cópia de segurança (`backup-restore.ts` exporta os rascunhos por conjunto
+   próprio; este espaço de nomes ainda não tem o seu)» — e é uma limitação com
+   um custo concreto: a cópia de segurança diária levava a proposta e não
+   levava o EMAIL que a acompanhou. No dia da reposição, a pergunta «o que é
+   que nós lhes escrevemos?» voltava a não ter resposta — e esse é precisamente
+   o dia em que ela se faz.
+
+   O caminho é o dos rascunhos do estúdio, passo por passo, porque o problema é
+   o mesmo: estas linhas vivem no `app_state`, que é uma tabela PARTILHADA.
+   Apagá-la para repor os envios levava à frente os marcadores de operação que
+   lá vivem ao lado (o UID até onde a caixa de entrada já avisou, os fechos do
+   Meta, o contador de facturas). Por isso só se toca neste espaço de nomes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Uma chave que a reposição sabe voltar a escrever — e que, por isso, é a
+ * mesma que a exportação aceita. Sem esta verificação, uma cópia adulterada
+ * escrevia onde quisesse dentro do `app_state`.
+ */
+export function ehChaveDeEnvios(key: unknown): key is string {
+  return (
+    typeof key === "string" &&
+    key.startsWith(ENVIOS_PREFIX) &&
+    key === chaveDosEnvios(key.slice(ENVIOS_PREFIX.length))
+  );
+}
+
+/**
+ * Os envios de um pedido, na forma em que viajam no ficheiro.
+ *
+ * `key` é a chave INTEIRA do `app_state`, e não só o id do pedido: é o que
+ * torna a reposição uma escrita literal, sem uma segunda regra a remontar
+ * chaves e a divergir do `chaveDosEnvios` com o tempo.
+ */
+export interface EnviosNaCopia {
+  key: string;
+  envios: EnvioDeProposta[];
+}
+
+/** A tradução entre a entrada do ficheiro e a linha do `app_state`. */
+export const mapper: Mapper<EnviosNaCopia> = {
+  table: "app_state",
+  fileName: "app-state.json",
+  getId: (e) => e.key,
+  /** `key text primary key` — ver a mesma linha em `proposal-drafts.ts`, e a
+   *  avaria que a sua ausência custou na `biblioteca_fotos`. */
+  idColumn: "key",
+  toRow: (e) => ({
+    key: e.key,
+    value: { envios: e.envios } satisfies EnviosDoPedido,
+  }),
+  fromRow: (row) => {
+    const guardado = (row.value ?? {}) as Partial<EnviosDoPedido>;
+    const crus = Array.isArray(guardado.envios) ? guardado.envios : [];
+    return {
+      key: String(row.key ?? ""),
+      // A MESMA limpeza da leitura normal: uma entrada estragada não pode
+      // deitar abaixo a lista de um pedido, nem numa cópia de segurança.
+      envios: crus.map(comoEnvio).filter((e): e is EnvioDeProposta => e !== null),
+    };
+  },
+};
+
+/**
+ * Quantas chaves se varrem de uma vez.
+ *
+ * Há uma chave por pedido a quem alguma vez foi enviada uma proposta, e ela
+ * não desaparece. O número a comparar é «quantas propostas se enviaram desde
+ * sempre», que só cresce — a mesma conta dos rascunhos, e o mesmo tecto, por
+ * isso: 10 000 afasta o problema para lá do horizonte de vida da instalação, e
+ * garante que a varredura não MENTE. Se um dia lá chegarem, a cópia declara-se
+ * incompleta em vez de deixar envios de fora sem ninguém saber.
+ */
+export const LIMITE_ENVIOS = 10_000;
+
+/** Quantas escritas em voo de cada vez, na reposição. */
+const LOTE_DE_ESCRITAS = 25;
+
+const ERRO_VARREDURA =
+  `não foi possível varrer as cópias dos emails enviados (chaves \`${ENVIOS_PREFIX}\` em app_state): ` +
+  `ou a leitura falhou — a tabela existe? ver db/schema.sql —, ou há mais de ${LIMITE_ENVIOS} ` +
+  `chaves e a varredura ficou truncada. Uma lista incompleta não pode passar por completa numa cópia de segurança.`;
+
+/**
+ * As cópias que existem, para a cópia de segurança.
+ *
+ * LANÇA quando a varredura não se conseguiu fazer INTEIRA — devolver `[]`
+ * calado dava um ficheiro com ar de completo e sem os emails lá dentro.
+ */
+export async function listEnviosDeProposta(): Promise<EnviosNaCopia[]> {
+  const { entradas, completa } = await listStateByPrefix<unknown>(ENVIOS_PREFIX, LIMITE_ENVIOS);
+  if (!completa) throw new Error(ERRO_VARREDURA);
+
+  const tudo: EnviosNaCopia[] = [];
+  for (const { key, value } of entradas) {
+    if (!ehChaveDeEnvios(key)) continue;
+    if (value == null || typeof value !== "object") continue;
+    const doPedido = mapper.fromRow({ key, value });
+    // Um pedido cuja lista ficou vazia não tem cópia nenhuma a salvar.
+    if (doPedido.envios.length === 0) continue;
+    tudo.push(doPedido);
+  }
+  // Por ordem de chave: duas exportações do mesmo estado têm de se ler igual.
+  return tudo.sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/**
+ * Escreve as cópias do ficheiro por cima das que existem — SUBSTITUINDO, como
+ * todos os outros conjuntos da reposição, e sem tocar no resto do `app_state`.
+ *
+ * LANÇA se alguma escrita não chegou ao servidor: uma cópia que não ficou
+ * gravada tem de sair pelo nome em `failed`, e não passar por reposta.
+ */
+export async function replaceEnviosDeProposta(tudo: readonly EnviosNaCopia[]): Promise<void> {
+  const { entradas, completa } = await listStateByPrefix<unknown>(ENVIOS_PREFIX, LIMITE_ENVIOS);
+  if (!completa) throw new Error(ERRO_VARREDURA);
+
+  const doFicheiro = new Map<string, EnviosNaCopia>();
+  for (const doPedido of tudo) {
+    if (!ehChaveDeEnvios(doPedido.key)) {
+      throw new Error(
+        `a cópia traz uma chave de envios fora do espaço de nomes ("${String(doPedido.key).slice(0, 60)}") — nada foi escrito neste conjunto.`,
+      );
+    }
+    doFicheiro.set(doPedido.key, doPedido);
+  }
+
+  const escritas: { key: string; value: unknown }[] = [
+    ...[...doFicheiro.values()].map((e) => ({
+      key: e.key,
+      value: (mapper.toRow(e) as { value: unknown }).value,
+    })),
+    // Substituir, não fundir: o que está na base e não está na cópia desaparece.
+    ...entradas
+      .filter(({ key, value }) => ehChaveDeEnvios(key) && value != null && !doFicheiro.has(key))
+      .map(({ key }) => ({ key, value: null })),
+  ];
+
+  const falhadas: string[] = [];
+  for (let i = 0; i < escritas.length; i += LOTE_DE_ESCRITAS) {
+    const lote = escritas.slice(i, i + LOTE_DE_ESCRITAS);
+    const resultados = await Promise.all(
+      lote.map(async (e) => ({ key: e.key, ...(await setState(e.key, e.value)) })),
+    );
+    for (const r of resultados) {
+      if (!r.gravado) falhadas.push(`${r.key} (${r.motivo ?? "sem motivo"})`);
+    }
+  }
+
+  if (falhadas.length) {
+    throw new Error(
+      `${falhadas.length} de ${escritas.length} cópias de email não ficaram gravadas: ${falhadas.slice(0, 5).join("; ")}` +
+        (falhadas.length > 5 ? ` e mais ${falhadas.length - 5}.` : "."),
+    );
   }
 }
