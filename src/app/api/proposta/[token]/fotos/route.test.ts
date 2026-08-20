@@ -17,7 +17,12 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/proposal-token", () => ({
   readProposalToken: (t: string) => (t === "bom" ? { proposalId: "p1" } : null),
 }));
-vi.mock("@/lib/proposals-store", () => ({ getProposal: async () => H.proposta }));
+vi.mock("@/lib/proposals-store", () => ({
+  getProposal: async () => H.proposta,
+  // Ver a nota igual no teste da página.
+  listProposalsForQuote: async () => (H.proposta ? [H.proposta] : []),
+}));
+vi.mock("@/lib/contracts-store", () => ({ getAcceptedContractByQuote: async () => null }));
 vi.mock("@/lib/rate-limit", () => ({
   clientIp: () => "1.2.3.4",
   rateLimit: async () => H.limite,

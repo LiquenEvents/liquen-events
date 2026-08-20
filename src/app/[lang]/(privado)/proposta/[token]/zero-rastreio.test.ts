@@ -112,7 +112,10 @@ vi.mock("@/lib/proposals-store", () => ({
     id: "p1",
     doc: { coverImages: [], moodBoards: [{ title: "x", images: ["ped/1.jpg"] }] },
   }),
+  // Ver a nota igual no teste da página.
+  listProposalsForQuote: async () => [],
 }));
+vi.mock("@/lib/contracts-store", () => ({ getAcceptedContractByQuote: async () => null }));
 vi.mock("@/lib/rate-limit", () => ({
   clientIp: () => "1.2.3.4",
   rateLimit: async () => ({ ok: true }),

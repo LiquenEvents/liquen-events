@@ -775,6 +775,17 @@ export const pt = {
     iva: "IVA",
     total: "Total",
     validoAte: "Válida até",
+    /**
+     * A versão que o casal está a ver, e quando é que ela mudou.
+     *
+     * É sobre o DOCUMENTO, nunca sobre quem o lê: não se regista quando a
+     * proposta foi aberta, nem por quem, nem quantas vezes — a regra dela, à
+     * letra. Isto diz só «este papel foi mexido neste dia», que é o que
+     * responde à pergunta que o casal faz ao voltar meses depois: «isto ainda
+     * é o mesmo que eu vi?».
+     */
+    versaoNumero: "Versão",
+    atualizadaEm: "Atualizada a",
     verPdf: "Ver a proposta completa (PDF)",
     footerNote: "Alguma questão ou ajuste? Responda a este e-mail ou contacte-nos:",
     respostaComo:

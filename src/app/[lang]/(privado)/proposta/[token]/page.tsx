@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { readProposalToken } from "@/lib/proposal-token";
-import { getProposal } from "@/lib/proposals-store";
+import { propostaDoLink } from "@/lib/proposta-do-link";
 import { SITE } from "@/lib/site";
 import { getDictionary, htmlLang, normalizeLocale, type Locale } from "@/lib/i18n";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
@@ -75,8 +75,10 @@ export async function generateMetadata({
   // o título da página: cai-se no visitante, como sempre foi.
   let locale = normalizeLocale(lang);
   try {
-    const claim = readProposalToken(token);
-    const proposal = claim ? await getProposal(claim.proposalId) : null;
+    // A MESMA proposta que a página resolve (o link segue o pedido, não a
+    // linha — ver `proposta-do-link.ts`). Duas escadas diferentes davam um
+    // separador português por cima de uma revisão inglesa.
+    const proposal = (await propostaDoLink(token))?.proposta ?? null;
     if (proposal) locale = idiomaDaProposta(proposal);
   } catch {
     /* fica a língua do visitante */
@@ -249,7 +251,18 @@ export default async function ProposalPage({
     );
   }
 
-  const proposal = await getProposal(claim.proposalId);
+  /**
+   * ── A VERSÃO ATUAL, PELO LINK QUE O CASAL JÁ TEM ─────────────────────────
+   *
+   * Palavras dela: «Se eu ajustar o preço ou os serviços, o casal vê a versão
+   * atual sem eu reenviar nada.» O token guarda o identificador de UMA
+   * proposta e uma revisão é uma proposta NOVA — portanto este link mostrava a
+   * versão 1 para sempre. Quem resolve isso (e as guardas que impedem o salto
+   * de virar um buraco) está em `proposta-do-link.ts`, num sítio só, porque o
+   * PDF e as fotografias têm de resolver exactamente a mesma.
+   */
+  const doLink = await propostaDoLink(token);
+  const proposal = doLink?.proposta;
   if (!proposal) {
     const t = getDictionary(doVisitante).proposta;
     return <Message title={t.notFoundTitle} body={t.notFoundBody} lang={htmlLang(doVisitante)} />;
@@ -323,6 +336,14 @@ export default async function ProposalPage({
         return !Number.isNaN(e) && e < Date.now();
       })()
     : false;
+  /** O dia em que o CONTEÚDO mudou pela última vez, na língua do documento. */
+  const atualizadaLabel = doLink?.versaoEm
+    ? new Date(doLink.versaoEm).toLocaleDateString(t.dateLocale, {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
   const validLabel = proposal.validUntil
     ? new Date(proposal.validUntil + "T12:00:00").toLocaleDateString(t.dateLocale, {
         day: "numeric",
@@ -482,6 +503,26 @@ export default async function ProposalPage({
         {validLabel && (
           <p className="text-foreground/68 text-xs mt-5 text-center">
             {t.validoAte} {validLabel}.
+          </p>
+        )}
+
+        {/* ── QUE VERSÃO É ESTA, E DE QUE DIA ──────────────────────────────
+            O link mostra sempre a versão ATUAL (ver `proposta-do-link.ts`), o
+            que resolve o problema de fundo e cria outro: o casal volta ao
+            link meses depois e não tem como saber se está a olhar para o
+            mesmo papel que leu. Esta linha responde a isso.
+
+            É sobre o DOCUMENTO e nunca sobre quem o lê. Não se regista que a
+            proposta foi aberta, nem quando, nem por quem — a regra dela, à
+            letra. O que aqui está é a data em que ELA mexeu, que já estava
+            gravada do lado do estúdio.
+
+            Só aparece a partir da versão 2: dizer «Versão 1» a quem abre uma
+            proposta pela primeira vez é ruído. */}
+        {!!doLink?.versao && doLink.versao > 1 && (
+          <p className="text-foreground/60 text-[11px] mt-2 text-center">
+            {t.versaoNumero} {doLink.versao}
+            {atualizadaLabel ? ` · ${t.atualizadaEm} ${atualizadaLabel}` : ""}
           </p>
         )}
 

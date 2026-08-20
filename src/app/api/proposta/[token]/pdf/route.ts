@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { readProposalToken } from "@/lib/proposal-token";
-import { getProposal } from "@/lib/proposals-store";
+import { propostaDoLink } from "@/lib/proposta-do-link";
 import { pdfDaPropostaEmCache, PropostaIncompleta } from "@/lib/proposal-pdf-cache";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
@@ -47,11 +46,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
   const limited = await rateLimit(`proposta-pdf:${clientIp(request)}`, 12, 60_000);
   if (!limited.ok) return new NextResponse(null, { status: 429 });
 
-  const claim = readProposalToken(token);
-  if (!claim) return new NextResponse(null, { status: 404 });
-
+  /** Só para o registo do `catch`: qual proposta é que estava a ser desenhada. */
+  let idParaRegisto = "";
   try {
-    const proposal = await getProposal(claim.proposalId);
+    /**
+     * A MESMA proposta que a página mostra — ver `proposta-do-link.ts`. O link
+     * segue o PEDIDO e não a linha, portanto uma revisão que ela envie chega
+     * ao casal pelo link que ele já tem. Resolver aqui de outra maneira dava a
+     * página na versão 2 com um botão que descarregava a 1.
+     */
+    const doLink = await propostaDoLink(token);
+    const proposal = doLink?.proposta;
+    idParaRegisto = proposal?.id ?? "";
     // Sem documento guardado não há PDF nenhum para servir: é o caso das
     // propostas anteriores à coluna `proposals.doc` e das propostas de linhas
     // criadas em /api/propostas. A página do cliente esconde o botão nesse
@@ -106,12 +112,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
      */
     if (err instanceof PropostaIncompleta) {
       log.error("proposta pdf: recusado, o documento sairia incompleto", null, {
-        proposalId: claim.proposalId,
+        proposalId: idParaRegisto,
         emFalta: err.emFalta,
       });
       return new NextResponse(null, { status: 503, headers: { "Retry-After": "30" } });
     }
-    log.error("proposta pdf GET falhou", err, { proposalId: claim.proposalId });
+    log.error("proposta pdf GET falhou", err, { proposalId: idParaRegisto });
     return new NextResponse(null, { status: 500 });
   }
 }
