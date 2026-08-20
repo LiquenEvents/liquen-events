@@ -421,6 +421,29 @@ export default function Documento({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={capa.miniatura ?? capa.original}
+            {...(capa.miniatura
+              ? {
+                  /**
+                   * ── A MAIOR IMAGEM DA PÁGINA NÃO PODE SER A DE 400 PX ────
+                   *
+                   * A capa desenha-se com a largura toda do documento — até
+                   * 1024 px numa janela larga, e num iPhone ~390 pontos com
+                   * três pixéis cada, ~1170. A miniatura tem 400. Era a mesma
+                   * conta da galeria, no sítio onde ela se vê mais: a primeira
+                   * coisa que o casal olha ao abrir a proposta.
+                   *
+                   * A derivada intermédia (1200 px) vem da mesma rota da
+                   * galeria — ver `api/proposta/[token]/foto/[id]`. O `src`
+                   * fica com a miniatura por ser o que um navegador sem
+                   * `srcset` usa.
+                   */
+                  srcSet: `${capa.miniatura} 400w, /api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)} 1200w`,
+                  /* A capa ocupa a largura da página, com o tecto de 1024 px
+                     do `max-w-5xl`. Sem isto o navegador assume `100vw` e num
+                     ecrã grande pede a maior sem precisar. */
+                  sizes: "(min-width: 1024px) 1024px, 100vw",
+                }
+              : {})}
             alt=""
             /* A capa é a primeira coisa à vista: entra ansiosa, com prioridade
                de busca, porque é ela o elemento de maior pintura da página. */
