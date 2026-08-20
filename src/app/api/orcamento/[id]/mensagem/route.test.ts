@@ -224,7 +224,8 @@ describe("POST /api/orcamento/[id]/mensagem — assinatura", () => {
     expect(env.text).toContain("Catarina Gaspar");
     expect(env.text).toContain("+351 919 259 820");
     // O logótipo viaja com a mensagem: nada de imagens remotas.
-    expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
+    // A faixa da casa viaja COM a mensagem — nada de imagens remotas.
+    expect(env.attachments?.some((a) => a.cid === "liquen-banner")).toBe(true);
     expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
   });
 

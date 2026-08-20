@@ -1052,7 +1052,8 @@ describe("POST /api/orcamento/[id]/proposta-doc — assinatura", () => {
     expect(env.html).toContain("+351 919 259 820");
     expect(env.text).toContain("Catarina Gaspar");
     expect(env.text).toContain("+351 919 259 820");
-    expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
+    // A faixa da casa viaja COM a mensagem — nada de imagens remotas.
+    expect(env.attachments?.some((a) => a.cid === "liquen-banner")).toBe(true);
     expect(env.attachments?.some((a) => a.filename.endsWith(".pdf"))).toBe(true);
     expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
     expect(env.html).not.toContain("Líquen Events · ");

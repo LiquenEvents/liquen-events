@@ -8,6 +8,7 @@ import {
   emailAoCliente,
   ASSINATURA_NOME,
   ASSINATURA_CARGO,
+  BANNER_EMAIL_CID,
 } from "./email-assinatura";
 import { log } from "./logger";
 import { SITE } from "./site";
@@ -53,42 +54,47 @@ describe("assinaturaDeEmail", () => {
     expect(texto).toContain(SITE.name);
   });
 
-  it("leva o logótipo por cid: e nenhuma imagem remota", () => {
+  /**
+   * ── A FAIXA E OS ÍCONES ─────────────────────────────────────────────────
+   *
+   * Aqui estavam três testes a prender a decisão CONTRÁRIA: «fecha na
+   * assinatura: uma só imagem, e nenhum banner». Era a decisão certa para o
+   * rectângulo verde vazio que aqui esteve, e deixou de ser a decisão desta
+   * casa: ela mandou a peça dela — faixa com a marca de água do líquen, redes
+   * em ícones — e a instrução, «sempre com este banner e com este aspeto».
+   *
+   * O que NÃO mudou, e continua preso: nenhuma imagem por URL.
+   */
+  it("leva a faixa da casa por cid:, e nenhuma imagem remota", () => {
     const { html, anexos } = assinaturaDeEmail();
-    expect(html).toContain(`cid:${EMAIL_LOGO_CID}`);
-    expect(anexos.some((a) => a.cid === EMAIL_LOGO_CID)).toBe(true);
-    // Nenhum <img> pode apontar para http(s): o Gmail/Outlook bloqueiam-nas de
-    // um remetente desconhecido e o ficheiro só existe depois do deploy.
+    expect(html).toContain(`cid:${BANNER_EMAIL_CID}`);
+    expect(anexos.some((a) => a.cid === BANNER_EMAIL_CID)).toBe(true);
+    // O Gmail/Outlook bloqueiam imagens remotas de um remetente desconhecido,
+    // e o ficheiro só existe depois do deploy: nenhum <img> aponta para http.
     expect(html).not.toMatch(/<img[^>]+src="https?:/);
   });
 
+  it("as redes saem em ícones, cada um com o nome no `alt`", () => {
+    const { html, anexos } = assinaturaDeEmail();
+    for (const rede of ["Facebook", "Instagram"]) {
+      expect(html).toContain(`cid:liquen-social-${rede.toLowerCase()}`);
+      expect(html).toContain(`alt="${rede}"`);
+      expect(anexos.some((a) => a.cid === `liquen-social-${rede.toLowerCase()}`)).toBe(true);
+    }
+    // O `width`/`height` no ATRIBUTO é a única forma que o Outlook respeita.
+    expect(html).toMatch(/<img src="cid:liquen-social-[a-z]+" alt="[^"]+" width="18" height="18"/);
+  });
+
+  it("já não repete o logótipo por cima do nome — a marca está na faixa", () => {
+    const { html } = assinaturaDeEmail();
+    expect(html).not.toContain(`cid:${EMAIL_LOGO_CID}`);
+  });
+
   it("dá um Buffer novo a cada chamada — o nodemailer consome o anterior", () => {
-    const a = assinaturaDeEmail().anexos[0];
-    const b = assinaturaDeEmail().anexos[0];
+    const a = assinaturaDeEmail().anexos.find((x) => x.cid === BANNER_EMAIL_CID)!;
+    const b = assinaturaDeEmail().anexos.find((x) => x.cid === BANNER_EMAIL_CID)!;
     expect(a.content).not.toBe(b.content);
     expect(Buffer.from(a.content).equals(Buffer.from(b.content))).toBe(true);
-  });
-
-  it("mostra as redes configuradas e cala o LinkedIn enquanto não tiver endereço", () => {
-    const { html } = assinaturaDeEmail();
-    expect(html).toContain(SITE.instagram);
-    expect(html).toContain(SITE.facebook);
-    expect(SITE.linkedin).toBe("");
-    expect(html).not.toContain("LinkedIn");
-  });
-
-  /**
-   * O banner era um rectângulo verde de 560×140 no fim de cada email, com o
-   * logótipo repetido — o mesmo que já está no topo da assinatura. Foi-se, e
-   * com ele o mecanismo que o trazia de volta a quem largasse um ficheiro em
-   * `public/email/`. Uma imagem por email, e é a do logótipo.
-   */
-  it("fecha na assinatura: uma só imagem, e nenhum banner", () => {
-    const { html, anexos } = assinaturaDeEmail();
-    expect(anexos).toHaveLength(1);
-    expect(anexos[0].cid).toBe(EMAIL_LOGO_CID);
-    expect(html).not.toContain("banner");
-    expect(html.match(/<img/g) ?? []).toHaveLength(1);
   });
 });
 
@@ -102,7 +108,7 @@ describe("emailAoCliente", () => {
     expect(html).toContain(ASSINATURA_NOME);
     expect(text).toContain("Segue a proposta.");
     expect(text).toContain(SITE.phoneDisplay);
-    expect(attachments.some((a) => a.cid === EMAIL_LOGO_CID)).toBe(true);
+    expect(attachments.some((a) => a.cid === BANNER_EMAIL_CID)).toBe(true);
   });
 
   /**
@@ -207,5 +213,87 @@ describe("quem assina", () => {
     });
     expect(html).toContain("Rui Belo");
     expect(text).toContain("Rui Belo");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * NENHUM `cid:` FICA SEM ANEXO — É ASSIM QUE SE MANDA UMA CRUZ VERMELHA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Apanhado ao vivo nesta mudança: a confirmação do formulário público desenha
+ * o logótipo no CABEÇALHO e ia buscar o anexo à assinatura. Quando a
+ * assinatura passou a ser a dela — sem logótipo em cima, com a faixa em baixo
+ * — o anexo deixou de vir, e o `<img>` do topo ficava a apontar para nada: uma
+ * cruz vermelha no primeiro email que um cliente novo recebe desta casa.
+ *
+ * Este teste não prende um caso: percorre TODOS os `cid:` do HTML e exige um
+ * anexo para cada um. Serve para o próximo que mexa nas imagens do correio.
+ */
+describe("os cid: e os anexos andam sempre juntos", () => {
+  const cidsDe = (html: string) => [...html.matchAll(/cid:([a-z0-9-]+)/gi)].map((m) => m[1]);
+
+  it("na assinatura", () => {
+    const { html, anexos } = assinaturaDeEmail();
+    const cids = cidsDe(html);
+    // Controlo positivo: há mesmo imagens embutidas para verificar.
+    expect(cids.length).toBeGreaterThan(1);
+    for (const cid of cids) {
+      expect(
+        anexos.some((a) => a.cid === cid),
+        `\`cid:${cid}\` sem anexo`,
+      ).toBe(true);
+    }
+  });
+
+  it("no email inteiro que sai para o cliente", () => {
+    const { html, attachments } = emailAoCliente({ html: "<p>Olá.</p>", texto: "Olá." });
+    for (const cid of cidsDe(html)) {
+      expect(
+        attachments.some((a) => a.cid === cid),
+        `\`cid:${cid}\` sem anexo`,
+      ).toBe(true);
+    }
+  });
+
+  it("na confirmação do formulário público, que desenha o logótipo no topo", async () => {
+    const { buildClientConfirmation } = await import("./client-confirmation");
+    const { html, attachments } = buildClientConfirmation({
+      name: "Ana Dias",
+      locale: "pt",
+    } as Parameters<typeof buildClientConfirmation>[0]);
+    const cids = cidsDe(html);
+    expect(cids).toContain(EMAIL_LOGO_CID);
+    for (const cid of cids) {
+      expect(
+        attachments.some((a) => a.cid === cid),
+        `\`cid:${cid}\` sem anexo`,
+      ).toBe(true);
+    }
+  });
+});
+
+/**
+ * As imagens do correio são FICHEIROS em `public/email/`, para se poderem
+ * trocar sem regenerar constantes. Um ficheiro que desapareça de lá tira a
+ * faixa (ou uma rede) de todos os emails da casa, em silêncio — este teste é o
+ * barulho.
+ */
+describe("as imagens do correio estão no sítio", () => {
+  it("a faixa e os três ícones existem em public/email", async () => {
+    const { existsSync } = await import("node:fs");
+    const path = await import("node:path");
+    for (const nome of [
+      "banner-liquen-email.png",
+      "social-facebook.png",
+      "social-instagram.png",
+      "social-linkedin.png",
+      "logo-liquen-email.png",
+    ]) {
+      expect(
+        existsSync(path.join(process.cwd(), "public", "email", nome)),
+        `falta public/email/${nome}`,
+      ).toBe(true);
+    }
   });
 });
