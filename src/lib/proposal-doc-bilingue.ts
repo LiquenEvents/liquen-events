@@ -70,6 +70,7 @@ import {
   camposDoDocumento,
   escreverCampo,
   lerCampo,
+  seccaoDoCampo,
   type CampoDeTexto,
 } from "./proposal-ortografia";
 
@@ -331,6 +332,31 @@ export function camposPorTraduzir(doc: Partial<ProposalDoc>): CampoBilingue[] {
  *
  * Uma função e não duas verdades.
  */
+/**
+ * Quantas traduções faltam em CADA secção do estúdio.
+ *
+ * ── Porquê por secção ────────────────────────────────────────────────────
+ * O painel «Por traduzir» já lista tudo — mas vive no passo do ENVIO, que é o
+ * último sítio onde se olha. A meio de escrever, a pergunta é outra: «desta
+ * secção, o que é que ainda falta?». Sem resposta, ou se percorre o documento
+ * inteiro à procura de caixas inglesas vazias, ou se vai ao fim e volta.
+ *
+ * As duas peças já existiam e é só o cruzamento delas: `camposPorTraduzir` diz
+ * QUAIS faltam e `seccaoDoCampo` diz ONDE vive cada um — a MESMA função que o
+ * salto do painel usa, para o número e o salto nunca poderem discordar.
+ *
+ * Só entram as secções com contagem: um `0` no índice ao lado de cinco secções
+ * seria uma fila de zeros a dizer que não há nada a fazer.
+ */
+export function porTraduzirPorSeccao(doc: Partial<ProposalDoc>): Record<string, number> {
+  const conta: Record<string, number> = {};
+  for (const c of camposPorTraduzir(doc)) {
+    const seccao = seccaoDoCampo(c.campo);
+    conta[seccao] = (conta[seccao] ?? 0) + 1;
+  }
+  return conta;
+}
+
 export function docTemIngles(doc: Partial<ProposalDoc>): boolean {
   return camposDoDocumento(doc).some(
     ({ campo }) => temVersaoInglesa(campo) && limpo(lerEn(doc, campo)) !== "",

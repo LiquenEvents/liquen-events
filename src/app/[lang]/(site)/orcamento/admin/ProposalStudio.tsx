@@ -168,7 +168,13 @@ import {
   traduzirParaIngles,
   type EstadoDaTraducao,
 } from "@/lib/proposal-traducao";
-import { camposPorTraduzir, docTemIngles, escreverEn, lerEn } from "@/lib/proposal-doc-bilingue";
+import {
+  camposPorTraduzir,
+  docTemIngles,
+  escreverEn,
+  lerEn,
+  porTraduzirPorSeccao,
+} from "@/lib/proposal-doc-bilingue";
 import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
 import { Ajuda, Button, Card, Field, FolhaOuDialogo, Segmented } from "./ui";
 
@@ -5031,6 +5037,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // ainda vai a caminho só esta sessão a conhece. O email sai uma vez, e um
   // PDF sem a foto escolhida dura para sempre.
   const canSend = podeEnviar(doc as ProposalDoc, money.gross) && fotosPorConfirmar === 0;
+  /**
+   * Quantas traduções faltam em cada secção, para o índice.
+   *
+   * SÓ com a proposta a sair em inglês — é a mesma condição do painel «Por
+   * traduzir» do passo do envio, e pela mesma razão: numa proposta portuguesa
+   * não há nada por traduzir, e uma fila de contagens debaixo de cada secção
+   * seria ruído no índice de quem nunca faz propostas inglesas.
+   */
+  const traducoesPorSeccao = useMemo(
+    () => (idiomaDoPdf === "en" ? porTraduzirPorSeccao(doc as ProposalDoc) : undefined),
+    [idiomaDoPdf, doc],
+  );
 
   return (
     <div className="border-t border-foreground/10 pt-5">
@@ -5192,7 +5210,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         className="flex gap-6"
         style={{ paddingBottom: folgaDaBarra }}
       >
-        <NavEstudio seccoes={seccoes} faltas={faltas} onSeccaoActual={anotarSeccao} />
+        <NavEstudio
+          seccoes={seccoes}
+          faltas={faltas}
+          onSeccaoActual={anotarSeccao}
+          porTraduzir={traducoesPorSeccao}
+        />
         <div className="min-w-0 flex-1">
           {/* Template selector */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
