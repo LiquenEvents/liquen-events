@@ -127,6 +127,30 @@ export interface TextosDaPagina {
    */
   sobretituloOrcamento: string;
   sobretituloCondicoes: string;
+
+  /* ── O ORÇAMENTO, COM O QUE SE PAGA AGORA À VISTA ─────────────────────── */
+  /**
+   * «30% na adjudicação» e «70% um mês antes», ao lado do total.
+   *
+   * O faseamento estava três secções abaixo do número, e a pergunta que um
+   * casal faz a seguir a ver um total é sempre a mesma: quanto é que pagamos
+   * agora. Ter de rolar mais três secções para a responder é a diferença entre
+   * uma proposta que se percebe e uma que se põe de lado para ver depois.
+   *
+   * Moldes com `{pct}` e `{valor}` e não funções: isto atravessa a fronteira
+   * servidor→cliente. Ver {@link contagem}.
+   */
+  agora: string;
+  depois: string;
+  /**
+   * A linha por cima do «Incluído na proposta»: os nomes das secções por que o
+   * casal acabou de passar.
+   *
+   * Sem ela a lista flutua — «serviço de decoração, material e flores conforme
+   * descrito» é abstracto a seguir a quarenta fotografias de coisas concretas,
+   * e o que o casal precisa é de ligar uma coisa à outra.
+   */
+  oQueViram: string;
 }
 
 /** As secções que a página dobra. Todas são texto de condições. */
@@ -169,6 +193,9 @@ const PT: TextosDaPagina = {
   umPonto: "1 ponto",
   sobretituloOrcamento: "O que custa",
   sobretituloCondicoes: "Para vossa tranquilidade",
+  agora: "{pct}% na adjudicação: {valor}",
+  depois: "os restantes {pct}% um mês antes",
+  oQueViram: "Tudo o que viram atrás:",
 };
 
 const EN: TextosDaPagina = {
@@ -202,6 +229,9 @@ const EN: TextosDaPagina = {
   umPonto: "1 point",
   sobretituloOrcamento: "What it costs",
   sobretituloCondicoes: "For your peace of mind",
+  agora: "{pct}% on booking: {valor}",
+  depois: "the remaining {pct}% one month before",
+  oQueViram: "Everything you have just seen:",
 };
 
 export function textosDaPagina(idioma: IdiomaDaProposta): TextosDaPagina {
@@ -211,4 +241,9 @@ export function textosDaPagina(idioma: IdiomaDaProposta): TextosDaPagina {
 /** O molde da contagem preenchido — a única forma de o ler, dos dois lados. */
 export function contar(molde: string, i: number, n: number): string {
   return molde.replace("{i}", String(i)).replace("{n}", String(n));
+}
+
+/** O molde do faseamento preenchido: a percentagem e, quando há, o valor. */
+export function fase(molde: string, pct: number, valor?: string): string {
+  return molde.replace("{pct}", String(pct)).replace("{valor}", valor ?? "");
 }

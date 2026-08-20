@@ -27,7 +27,7 @@ import {
 } from "@/lib/proposta-escolhas";
 import Inspiracao, { type BoardParaEcra } from "./Inspiracao";
 import Escolhas from "./Escolhas";
-import { textosDaPagina, type SeccaoDobravel } from "./textos-da-pagina";
+import { textosDaPagina, fase, type SeccaoDobravel } from "./textos-da-pagina";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -519,6 +519,26 @@ export default function Documento({
    * regra da casa —, cai-se para a palavra desta página, que é a mesma.
    */
   const tituloDaInspiracao = t.sobretituloInspiracao ?? p.inspiracao;
+  /**
+   * O faseamento é o da casa, e portanto a linha curta ao lado do total pode
+   * citar as percentagens dele? Ver o comentário no sítio onde ela é escrita.
+   */
+  /**
+   * Os momentos por que o casal passou, pela ordem em que os viu.
+   *
+   * Os grupos de serviços primeiro (são eles que dizem o que se faz), e os
+   * mood boards a seguir para os momentos que só existem em fotografia. Sem
+   * repetir: um board chamado «Cerimónia» ao lado de um grupo «Cerimónia» é a
+   * mesma palavra duas vezes numa linha de quatro.
+   */
+  const momentos = [
+    ...(doc.serviceGroups ?? []).map((g) => (g.title ?? "").trim()),
+    ...boards.map((b) => b.titulo.trim()),
+  ].filter((nome, i, todos) => !!nome && todos.indexOf(nome) === i);
+
+  const sinalPct = depositPercentOf(doc);
+  const faseamentoDaCasa = blocoEDaCasa(docOriginal, "faseamento");
+
   const indice = [
     (doc.serviceGroups ?? []).length > 0 && { href: "#servicos", texto: t.tituloServicos },
     boards.length > 0 && { href: "#inspiracao", texto: p.inspiracao },
@@ -797,17 +817,57 @@ export default function Documento({
                   <span className="text-foreground/70 text-sm">{t.iva(taxa)}</span>
                   <span className="text-foreground/70 text-sm tabular-nums">{eur(totais.iva)}</span>
                 </div>
-                <div className="border-foreground/15 mt-3 flex items-baseline justify-between gap-4 border-t pt-4">
-                  <span className="text-foreground/75 text-sm font-medium">{t.totalAPagar}</span>
-                  <span
-                    className="text-moss tabular-nums"
+                {/*
+                 * ════════════════════════════════════════════════════════
+                 * O NÚMERO MAIS IMPORTANTE DA PÁGINA, DESENHADO COMO TAL
+                 * ════════════════════════════════════════════════════════
+                 *
+                 * Estava na mesma escada dos subtotais, com o rótulo do mesmo
+                 * tamanho dos outros e o número quatro pontos acima: quem
+                 * percorre a coluna de números com o polegar não distingue o
+                 * que paga do que somou para lá chegar.
+                 *
+                 * Sai da escada e passa a ser um bloco. O rótulo em cima, o
+                 * número em baixo e grande — e não os dois na mesma linha,
+                 * porque num telemóvel um rótulo e um número de quarenta
+                 * pontos lado a lado ou encolhem o número ou partem a linha.
+                 */}
+                <div className="border-foreground/15 mt-5 border-t pt-5">
+                  <p className="text-foreground/60 text-[11px] tracking-[0.22em] uppercase">
+                    {t.totalAPagar}
+                  </p>
+                  <p
+                    className="text-moss mt-1.5 tabular-nums"
                     style={{
                       fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(22px, 3.2vw, 30px)",
+                      fontSize: "clamp(34px, 6vw, 52px)",
+                      lineHeight: 1.05,
                     }}
                   >
                     {eur(totais.aPagar)}
-                  </span>
+                  </p>
+                  {/*
+                   * ── E O QUE SE PAGA AGORA, AQUI E NÃO TRÊS SECÇÕES ABAIXO
+                   *
+                   * A pergunta que um casal faz a seguir a ver um total é
+                   * sempre a mesma. O faseamento continua lá em baixo por
+                   * extenso, com as suas condições; isto é a resposta curta no
+                   * sítio onde ela é feita.
+                   *
+                   * Só quando o faseamento é o DA CASA. Se ela o reescreveu,
+                   * os 30/70 desta linha podiam já não ser os de lá — e duas
+                   * percentagens diferentes na mesma proposta são a única
+                   * coisa pior do que a pergunta sem resposta.
+                   */}
+                  {faseamentoDaCasa && (
+                    <p className="text-foreground/70 mt-3 text-[13px] leading-relaxed">
+                      <span className="text-foreground/85 font-medium">
+                        {fase(p.agora, sinalPct, eur(totais.aPagar * (sinalPct / 100)))}
+                      </span>
+                      {" · "}
+                      {fase(p.depois, 100 - sinalPct)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -855,20 +915,53 @@ export default function Documento({
               <Lista itens={fixos.notasImportantes} />
             </details>
           )}
-          {(fixos.incluido ?? []).length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
-                {t.incluidoNaProposta}
-              </h3>
-              <Lista itens={fixos.incluido} />
-            </div>
-          )}
-          {(fixos.naoIncluido ?? []).length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
-                {t.naoIncluidoNoOrcamento}
-              </h3>
-              <Lista itens={fixos.naoIncluido} />
+          {/*
+           * ════════════════════════════════════════════════════════════════
+           * O INCLUÍDO DEIXA DE FLUTUAR
+           * ════════════════════════════════════════════════════════════════
+           *
+           * «Serviço de decoração, material e flores conforme descrito» é uma
+           * frase abstracta a seguir a quarenta fotografias de coisas
+           * concretas. O casal acabou de percorrer a Cerimónia, o Cocktail e o
+           * Jantar, e a lista não os nomeia: não se percebe que o «conforme
+           * descrito» é exactamente aquilo.
+           *
+           * Passa a abrir com os nomes das secções por que eles passaram,
+           * tirados do documento e não escritos à mão — se ela acrescentar um
+           * momento, ele aparece aqui sem ninguém se lembrar de o vir cá pôr.
+           *
+           * ── E AS DUAS LISTAS LADO A LADO ──────────────────────────────
+           * Uma debaixo da outra, «não incluído» lia-se como a continuação de
+           * «incluído»: a mesma marca, o mesmo tamanho, e um título pequeno a
+           * separá-las. Em duas colunas vê-se de relance que são duas contas
+           * diferentes. Numa coluna só (telemóvel) voltam a empilhar-se, e aí
+           * a distância entre elas é que faz o trabalho.
+           */}
+          {((fixos.incluido ?? []).length > 0 || (fixos.naoIncluido ?? []).length > 0) && (
+            <div className="mt-10">
+              {(fixos.incluido ?? []).length > 0 && momentos.length > 0 && (
+                <p className="text-foreground/65 mb-6 text-[14px] leading-relaxed">
+                  <span className="text-foreground/80">{p.oQueViram}</span> {momentos.join(" · ")}
+                </p>
+              )}
+              <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
+                {(fixos.incluido ?? []).length > 0 && (
+                  <div>
+                    <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
+                      {t.incluidoNaProposta}
+                    </h3>
+                    <Lista itens={fixos.incluido} />
+                  </div>
+                )}
+                {(fixos.naoIncluido ?? []).length > 0 && (
+                  <div>
+                    <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
+                      {t.naoIncluidoNoOrcamento}
+                    </h3>
+                    <Lista itens={fixos.naoIncluido} />
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </Seccao>

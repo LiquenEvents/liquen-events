@@ -5,6 +5,7 @@ import Documento from "./Documento";
 import { textosDaProposta } from "@/lib/proposal-doc-textos";
 import {
   DEFAULT_CANCELAMENTO,
+  DEFAULT_FASEAMENTO,
   DEFAULT_CONDICOES_GERAIS,
   DEFAULT_OBSERVACOES_GERAIS,
   preencherMarcadores,
@@ -562,5 +563,97 @@ describe("a voz da página não escorrega para o documento", () => {
     expect(textosDaProposta("pt").sobretituloOrcamento).toBe("O investimento");
     expect(textosDaProposta("pt").sobretituloCondicoes).toBe("Para sua tranquilidade");
     expect(textosDaProposta("en").sobretituloOrcamento).toBe("The investment");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O ORÇAMENTO: O NÚMERO QUE MAIS IMPORTA, E A PERGUNTA QUE VEM A SEGUIR
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * «Total a pagar» estava na mesma escada dos subtotais. E a pergunta que um
+ * casal faz a seguir a ver um total é sempre a mesma — quanto pagamos agora —
+ * com a resposta três secções abaixo.
+ *
+ * A afirmação que mais vale aqui é a última: a linha curta do faseamento SÓ
+ * aparece enquanto o faseamento for o da casa. Se ela o reescreveu, as
+ * percentagens desta linha podiam já não ser as de lá, e duas percentagens
+ * diferentes na mesma proposta são a única coisa pior do que a pergunta sem
+ * resposta.
+ */
+describe("o orçamento", () => {
+  const COM_TOTAL = {
+    budgetItems: ["Decor Cerimónia"],
+    totalAmount: 10000,
+    totalVatMode: "acresce" as const,
+    vatRate: 0.23,
+    faseamento: [...DEFAULT_FASEAMENTO],
+  };
+
+  /** O rótulo pequeno por cima do número, e não a frase do faseamento. */
+  const rotuloDoTotal = () =>
+    screen.getAllByText(/Total a pagar/i).find((e) => e.className.includes("uppercase"))!;
+
+  it("diz o que se paga agora, ao lado do total", () => {
+    desenhar(COM_TOTAL);
+    // Dois pontos e não ponto e vírgula: a linha curta escreve
+    // «30% na adjudicação: 3.075,00 €»; a cláusula lá em baixo escreve
+    // «30% na adjudicação;». É a pontuação que as distingue.
+    expect(screen.getByText(/30% na adjudicação:/i)).toBeInTheDocument();
+    expect(screen.getByText(/restantes 70% um mês antes/i)).toBeInTheDocument();
+  });
+
+  it("o total é o maior número do bloco", () => {
+    // A hierarquia é a mensagem: quem percorre a coluna com o polegar tem de
+    // distinguir o que paga do que somou para lá chegar.
+    desenhar(COM_TOTAL);
+    /*
+     * A medida exacta não se pode afirmar aqui: o jsdom não conhece `clamp()`
+     * e deita a declaração fora inteira, o que faria um teste sobre os «52px»
+     * passar por não ver nada — que é a pior espécie de teste verde.
+     *
+     * O que se afirma é a HIERARQUIA, que é a decisão: o total saiu da escada
+     * dos subtotais. Está noutra tipografia (a serifada do documento) e não
+     * partilha a classe de tamanho com que os subtotais são desenhados.
+     */
+    const numero = rotuloDoTotal().parentElement?.querySelectorAll("p")[1] as HTMLElement;
+    expect(numero.getAttribute("style")).toContain("--font-playfair");
+    expect(numero.className).not.toContain("text-sm");
+
+    // O controlo positivo: um subtotal É `text-sm` e não tem tipografia própria.
+    const subtotal = screen.getByText(/TOTAL \(sem IVA\)/i).parentElement
+      ?.lastElementChild as HTMLElement;
+    expect(subtotal.className).toContain("text-sm");
+    expect(subtotal.getAttribute("style")).toBeNull();
+  });
+
+  it("liga o incluído ao que o casal acabou de ver", () => {
+    desenhar({ ...COM_TOTAL, incluido: ["Serviço de decoração conforme descrito;"] });
+    const linha = screen.getByText(/Tudo o que viram atrás/i).parentElement as HTMLElement;
+    // Os nomes saem do documento, não de uma lista escrita à mão.
+    expect(linha.textContent).toContain("Decoração Cerimónia");
+  });
+
+  it("não repete o mesmo momento duas vezes", () => {
+    // Um board «Cerimónia» ao lado de um grupo «Cerimónia» é a mesma palavra
+    // duas vezes numa linha de quatro.
+    desenhar({
+      ...COM_TOTAL,
+      incluido: ["Serviço de decoração;"],
+      serviceGroups: [{ letter: "A", title: "Cerimónia", items: [] }],
+      moodBoards: [{ title: "Cerimónia", images: ["ped/0.jpg"] }],
+    } as unknown as Partial<ProposalDoc>);
+    const linha = screen.getByText(/Tudo o que viram atrás/i).parentElement as HTMLElement;
+    expect(linha.textContent?.match(/Cerimónia/g)).toHaveLength(1);
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("com o faseamento reescrito por ela, a linha curta CALA-SE", () => {
+    desenhar({ ...COM_TOTAL, faseamento: ["50% na assinatura;", "50% na véspera;"] });
+    expect(screen.queryByText(/30% na adjudicação/i)).toBeNull();
+    // E o faseamento dela continua lá, por extenso, na secção dele.
+    expect(screen.getByText(/50% na assinatura/i)).toBeInTheDocument();
   });
 });

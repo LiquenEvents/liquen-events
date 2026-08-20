@@ -68,7 +68,9 @@ function FotoDaOpcao({ foto, alt }: { foto?: FotoDaProposta; alt: string }) {
   return (
     <span
       className="block overflow-hidden rounded-md bg-foreground/[0.04]"
-      style={{ aspectRatio: foto.largura && foto.altura ? `${foto.largura}/${foto.altura}` : "4/3" }}
+      style={{
+        aspectRatio: foto.largura && foto.altura ? `${foto.largura}/${foto.altura}` : "4/3",
+      }}
     >
       {/* `<img>` e não `next/image`: estes URLs são assinados e de vida curta,
           e o optimizador do Next guardaria em cache uma assinatura que expira.
@@ -86,14 +88,7 @@ function FotoDaOpcao({ foto, alt }: { foto?: FotoDaProposta; alt: string }) {
   );
 }
 
-export default function Escolhas({
-  escolhas,
-  escolhido,
-  fotos,
-  token,
-  textos,
-  emLingua,
-}: Props) {
+export default function Escolhas({ escolhas, escolhido, fotos, token, textos, emLingua }: Props) {
   const [respostas, setRespostas] = useState<Record<string, string>>(escolhido);
   const [estados, setEstados] = useState<Record<string, Estado>>({});
   /**
@@ -200,9 +195,7 @@ export default function Escolhas({
             {/* O desfecho DESTA pergunta, por baixo dela. `aria-live` porque a
                 frase aparece sem que nada mude de sítio. */}
             <p className="mt-3 min-h-5 text-[13px]" aria-live="polite">
-              {estado === "seguiu" && (
-                <span className="text-moss">{textos.escolhaGuardada}</span>
-              )}
+              {estado === "seguiu" && <span className="text-moss">{textos.escolhaGuardada}</span>}
               {estado === "falhou" && (
                 <span className="text-[#a03123]">
                   {textos.escolhaFalhou}{" "}
