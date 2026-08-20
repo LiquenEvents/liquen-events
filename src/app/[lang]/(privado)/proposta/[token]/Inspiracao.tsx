@@ -112,6 +112,63 @@ export interface BoardParaEcra {
 const FOTOS_ANSIOSAS = 4;
 
 /**
+ * A forma de uma fotografia que ainda não se mediu.
+ *
+ * Três por dois deitada — a forma mais comum num mood board de decoração. Uma
+ * foto sem medida não pode ficar de fora do equilíbrio: seria uma coluna a
+ * crescer sem que a conta desse por isso.
+ */
+const ALTURA_POR_OMISSAO = 2 / 3;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS COLUNAS ACABAM À MESMA ALTURA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «há buracos visíveis onde uma coluna acaba antes da outra
+ * (notório na Decoração Jantar)».
+ *
+ * O `columns` do CSS enche uma coluna de cima a baixo antes de começar a
+ * seguinte e equilibra-as por conta própria — mas com `break-inside: avoid`
+ * (que é o que impede uma fotografia de ser partida ao meio) o equilíbrio é o
+ * melhor que ele consegue com blocos indivisíveis, e sobra sempre um degrau.
+ *
+ * Aqui as colunas são arrumadas ANTES de a página se desenhar, com as formas
+ * das fotografias já conhecidas: cada uma vai para a coluna que está mais
+ * curta nesse momento. É o empacotamento guloso de sempre, e dá o degrau
+ * mínimo que existe sem experimentar todas as combinações.
+ *
+ * ── O QUE ISTO CUSTA, E A DECISÃO DELA ───────────────────────────────────
+ *
+ * A ordem de leitura. Uma fotografia pode saltar de coluna para equilibrar, e
+ * por isso a ordem que ela arrumou no estúdio deixa de se ler exactamente da
+ * esquerda para a direita. Numa página desenhada no servidor, sem JavaScript a
+ * medir o ecrã, é uma coisa ou a outra — e a escolha foi dela, com a pergunta
+ * feita nestes termos: colunas equilibradas.
+ *
+ * ── E NO TELEMÓVEL NÃO SE PERDE NADA ─────────────────────────────────────
+ *
+ * Porque lá só há uma coluna, e uma coluna não tem nada para equilibrar. O
+ * desenho devolve-lhe a ordem dela — ver o `display: contents` e o `order` no
+ * sítio onde isto se desenha.
+ */
+function arrumarPorColunas<T>(
+  itens: readonly T[],
+  quantas: number,
+  alturaDe: (item: T) => number,
+): T[][] {
+  const colunas: T[][] = Array.from({ length: quantas }, () => []);
+  const alturas = new Array(quantas).fill(0);
+  for (const item of itens) {
+    let maisCurta = 0;
+    for (let c = 1; c < quantas; c += 1) if (alturas[c] < alturas[maisCurta]) maisCurta = c;
+    colunas[maisCurta].push(item);
+    alturas[maisCurta] += alturaDe(item);
+  }
+  return colunas;
+}
+
+/**
  * A posição da foto marcada como principal, ou `null` quando não há marca.
  *
  * `null` e não «a primeira»: no papel, ausente quer dizer «a primeira», porque
@@ -274,8 +331,12 @@ export default function Inspiracao({
          * a mesma proposta arrumada por outra ordem mudava de desenho sem que
          * nada no conteúdo tivesse mudado.
          */
-        const naGrelha = board.fotos.length - (oRespiro === null ? 0 : 1);
-        const colunas = naGrelha <= 3 ? "" : "sm:columns-2";
+        const naGrelha = board.fotos.map((id, i) => ({ id, i })).filter(({ i }) => i !== oRespiro);
+        const quantasColunas = naGrelha.length <= 3 ? 1 : 2;
+        const arrumadas = arrumarPorColunas(naGrelha, quantasColunas, ({ id }) => {
+          const f = fotos[id];
+          return f?.largura && f?.altura ? f.altura / f.largura : ALTURA_POR_OMISSAO;
+        });
         return (
           <section key={board.chave} className="mt-24 first:mt-6 sm:mt-36">
             {/* ── O MOMENTO DE RESPIRAÇÃO ──────────────────────────────────────
@@ -390,21 +451,42 @@ export default function Inspiracao({
               px davam o mesmo tamanho a que elas já saem na folha A4, e voltar
               a esse tamanho num ecrã era fazer o trabalho todo para não
               resolver nada. */}
-            <div className={`mt-3 columns-1 gap-4 [&>*]:mb-4 ${colunas}`}>
-              {board.fotos.map((id, i) =>
-                i === oRespiro ? null : (
-                  <Celula
-                    key={id}
-                    token={token}
-                    foto={fotos[id]}
-                    ansiosa={i < FOTOS_ANSIOSAS}
-                    rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
-                    textos={textos}
-                    aoAmpliar={(alvo) => abrir(b, i, alvo)}
-                    aoDesistir={marcarFalha}
-                  />
-                ),
-              )}
+            <div className="mt-3 flex flex-col gap-4 sm:flex-row">
+              {arrumadas.map((coluna, c) => (
+                /*
+                 * ── UMA COLUNA, E NO TELEMÓVEL NENHUMA ──────────────────
+                 *
+                 * `contents` faz este `div` desaparecer da disposição e deixa
+                 * as fotografias serem filhas directas do `flex` de cima. É o
+                 * que permite ter as duas coisas: acima de `sm` são duas
+                 * colunas equilibradas, e abaixo é uma coluna só onde o
+                 * `order` de cada fotografia lhe devolve a ordem que ELA
+                 * arrumou no estúdio.
+                 *
+                 * O `order` não faz mal nenhum do lado de cima: dentro de cada
+                 * coluna os índices já são crescentes (o empacotamento nunca
+                 * recua), portanto ordená-los por ele é deixá-los como estão.
+                 */
+                <div
+                  key={c}
+                  className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-4"
+                  style={{ minWidth: 0 }}
+                >
+                  {coluna.map(({ id, i }) => (
+                    <Celula
+                      key={id}
+                      token={token}
+                      foto={fotos[id]}
+                      ansiosa={i < FOTOS_ANSIOSAS}
+                      rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
+                      textos={textos}
+                      aoAmpliar={(alvo) => abrir(b, i, alvo)}
+                      aoDesistir={marcarFalha}
+                      ordem={i}
+                    />
+                  ))}
+                </div>
+              ))}
             </div>
 
             {/*
@@ -481,6 +563,7 @@ function Celula({
   larguraNoEcra,
   aoAmpliar,
   aoDesistir,
+  ordem,
 }: {
   foto?: FotoDaProposta;
   ansiosa: boolean;
@@ -488,6 +571,16 @@ function Celula({
   textos: TextosDaPagina;
   /** Para pedir a derivada intermédia desta fotografia — ver o `srcset`. */
   token: string;
+  /**
+   * A posição desta fotografia na ordem DELA.
+   *
+   * Só serve num sítio: no telemóvel, onde as colunas equilibradas deixam de
+   * existir (`display: contents`) e as fotografias passam a ser filhas do
+   * mesmo `flex`. Aí é este número que lhes devolve a ordem do estúdio. Acima
+   * de `sm` não faz diferença nenhuma — dentro de cada coluna os índices já
+   * são crescentes.
+   */
+  ordem?: number;
   /**
    * Um tecto de altura, para a célula que se desenha à largura toda.
    *
@@ -563,7 +656,10 @@ function Celula({
   if (desistiu || !alvo) return null;
 
   return (
-    <figure className="foto-inteira m-0">
+    /* O `order` só tem efeito quando as colunas desaparecem (telemóvel, com o
+       `display: contents`); acima de `sm` as fotografias já estão em ordem
+       crescente dentro da sua coluna. Ver `arrumarPorColunas`. */
+    <figure className="foto-inteira m-0" style={ordem === undefined ? undefined : { order: ordem }}>
       <button
         type="button"
         onClick={(e) => aoAmpliar(e.currentTarget)}

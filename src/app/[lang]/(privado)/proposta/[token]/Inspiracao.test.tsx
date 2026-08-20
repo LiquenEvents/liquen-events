@@ -64,10 +64,30 @@ describe("a grelha", () => {
   });
 
   it("só as primeiras entram ansiosas — 46 de uma vez é a conta que isto evita", () => {
+    /*
+     * Contadas pela POSIÇÃO DELA e não pela ordem no HTML.
+     *
+     * As colunas passaram a ser arrumadas para acabarem à mesma altura (ver
+     * `arrumarPorColunas`), e uma fotografia pode saltar de coluna — o que
+     * muda a ordem no documento sem mudar a posição dela na proposta. É a
+     * posição que decide quem entra ansiosa, e é essa que aqui se conta; ler o
+     * HTML por ordem media a arrumação, que é outra coisa.
+     */
     desenhar({ ...BOARD, fotos: ["a", "b", "c", "a", "b", "c"] });
-    const modos = [...document.querySelectorAll("img")].map((i) => i.getAttribute("loading"));
-    expect(modos.slice(0, 4)).toEqual(["eager", "eager", "eager", "eager"]);
-    expect(modos.slice(4)).toEqual(["lazy", "lazy"]);
+    const porPosicao = [...document.querySelectorAll("button[aria-label]")]
+      .map((b) => {
+        const n = /(\d+) de/.exec(b.getAttribute("aria-label") ?? "")?.[1];
+        return { n: Number(n), modo: b.querySelector("img:last-of-type")?.getAttribute("loading") };
+      })
+      .sort((x, y) => x.n - y.n);
+    expect(porPosicao.map((x) => x.modo)).toEqual([
+      "eager",
+      "eager",
+      "eager",
+      "eager",
+      "lazy",
+      "lazy",
+    ]);
   });
 });
 
@@ -329,5 +349,58 @@ describe("o respiro que abre cada secção", () => {
   it("um board sem uma única foto resolvida não inventa respiro nenhum", () => {
     desenhar({ ...BOARD, fotos: ["semNada"] });
     expect(screen.queryAllByRole("button", { name: /Ampliar/ })).toHaveLength(0);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS COLUNAS ACABAM À MESMA ALTURA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «há buracos visíveis onde uma coluna acaba antes da outra».
+ * E, posta a escolher entre a ordem de leitura e as colunas equilibradas —
+ * porque numa página desenhada no servidor, sem JavaScript a medir o ecrã, é
+ * uma coisa ou a outra: colunas equilibradas.
+ *
+ * A afirmação que vale por todas é a última: no telemóvel não se perde nada,
+ * porque lá só há uma coluna e o `order` devolve a ordem dela.
+ */
+describe("as colunas da grelha", () => {
+  /** As posições (1-based) de cada fotografia, pela ordem em que estão no HTML. */
+  const posicoesNoHtml = () =>
+    [...document.querySelectorAll("button[aria-label]")].map((b) =>
+      Number(/(\d+) de/.exec(b.getAttribute("aria-label") ?? "")?.[1]),
+    );
+
+  it("uma fotografia salta de coluna para equilibrar — e é isso que se pediu", () => {
+    // Duas altas seguidas iriam as duas para a mesma coluna se a arrumação
+    // fosse alternada; com o equilíbrio, a segunda vai para a que está curta.
+    desenhar({ ...BOARD, fotos: ["a", "b", "c", "a", "b", "c", "a", "b"] });
+    // A ordem no HTML deixa de ser 1,2,3,4… — é essa a troca aceite.
+    expect(posicoesNoHtml()).not.toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it("nenhuma fotografia se perde nem se repete na arrumação", () => {
+    // O modo de falha de um empacotamento é deixar uma de fora ou pô-la duas
+    // vezes, e as duas coisas passam despercebidas numa grelha de quarenta.
+    desenhar({ ...BOARD, fotos: ["a", "b", "c", "a", "b", "c", "a", "b"] });
+    expect([...posicoesNoHtml()].sort((x, y) => x - y)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("no telemóvel, o `order` devolve a ordem dela", () => {
+    // Abaixo de `sm` as colunas desaparecem (`display: contents`) e as
+    // fotografias passam a ser irmãs. Sem o `order`, o telemóvel mostrava-as
+    // pela ordem do empacotamento — que é uma perda paga sem nada em troca,
+    // porque numa coluna só não há nada para equilibrar.
+    desenhar({ ...BOARD, fotos: ["a", "b", "c", "a", "b", "c", "a", "b"] });
+    const ordens = [...document.querySelectorAll("figure")].map((f) =>
+      Number((f as HTMLElement).style.order),
+    );
+    // Cada fotografia leva a SUA posição, e não a da célula onde calhou.
+    expect([...ordens].sort((x, y) => x - y)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(ordens).toEqual(posicoesNoHtml().map((n) => n - 1));
   });
 });
