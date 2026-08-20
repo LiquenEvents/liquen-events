@@ -1914,8 +1914,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       const doPedido = quote.quotedPrice;
       const mandaOPedido = typeof doPedido === "number" && doPedido > 0;
       const doDoServidor = draft.doc as Partial<StudioDoc>;
+      /**
+       * ── E OS CAMPOS EM QUE ELA JÁ ESTÁ COM AS MÃOS FICAM DE FORA ────────
+       *
+       * Ver o bloco do `camposTocados`, mais abaixo. Sem isto, escrever no
+       * primeiro segundo depois de o ecrã abrir perdia o princípio da frase —
+       * medido, sete rondas em oito.
+       */
+      const semOsQueElaTocou = Object.fromEntries(
+        Object.entries(doDoServidor).filter(([chave]) => !camposTocados.current.has(chave)),
+      ) as Partial<StudioDoc>;
       setDoc((d) => {
-        const merged = { ...d, ...doDoServidor };
+        const merged = { ...d, ...semOsQueElaTocou };
         const limpo = stripPendingImages({
           ...merged,
           coverImages: normaliseCoverImages(merged.coverImages),
@@ -1928,7 +1938,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // enquanto quiser dizer «isto não é teu».
       setPorConfirmar(new Set());
       const base = mandaOPedido ? doPedido : baseDoDoc(doDoServidor);
-      if (base != null) setTotalInput(textoDoTotal(base));
+      if (base != null && !camposTocados.current.has("__total")) {
+        setTotalInput(textoDoTotal(base));
+      }
       // O documento do servidor pode trazer traduções que este computador nunca
       // viu — é o caso de abrir a proposta noutro portátil. As caixas inglesas
       // acendem-se, pela mesma razão do restauro local.
@@ -2392,7 +2404,37 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     },
   });
 
-  const patch = (p: Partial<StudioDoc>) => setDoc((d) => ({ ...d, ...p }));
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O QUE ELA JÁ ESCREVEU NÃO É SUBSTITUÍDO PELO RASCUNHO QUE VEM A CAMINHO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O estúdio vai buscar o rascunho ao servidor ao abrir, e o merge chega
+   * 100–300 ms depois. Até aqui esse merge era `{ ...d, ...doServidor }` —
+   * campo a campo, o servidor ganhava. Se ela começasse a escrever nesse
+   * primeiro segundo, o princípio do que escreveu era apagado.
+   *
+   * MEDIDO: escrever `ABCDEFGHIJKLMNOPQRST` meio segundo depois de o ecrã
+   * abrir, oito rondas — SETE perderam texto. Ficaram coisas como
+   * `HIJKLMNOPQRST`, `MNOPQRST`, `QRST`. Em quatro caixas diferentes, e uma
+   * delas (a «Cerimónia») ficou COMPLETAMENTE vazia. Não há erro nem aviso: a
+   * frase fica truncada pela frente e é assim que vai no PDF para o casal.
+   *
+   * Guarda-se aqui QUE CAMPOS ela tocou desde que o ecrã abriu. O merge
+   * continua a trazer tudo o resto do rascunho — as fotos, as condições, as
+   * traduções feitas noutro computador — e deixa em paz só aquilo em que ela
+   * está com as mãos.
+   *
+   * Só marcam os caminhos por onde a PESSOA escreve (`patch` e o editor de
+   * serviços). Os `setDoc` do sistema — semear os textos fixos, aplicar o
+   * preço do pedido, o próprio merge — não marcam nada, de propósito.
+   */
+  const camposTocados = useRef<Set<string>>(new Set());
+
+  const patch = (p: Partial<StudioDoc>) => {
+    for (const chave of Object.keys(p)) camposTocados.current.add(chave);
+    setDoc((d) => ({ ...d, ...p }));
+  };
 
   // ── Total estruturado + IVA ──
   // O modo efetivo: explícito no doc, senão detetado a partir do texto livre
@@ -2517,6 +2559,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   }
 
   function onTotalInput(raw: string) {
+    // O total não vive no `doc` (é um texto à parte), mas a regra é a mesma:
+    // ver `camposTocados`. Sem esta marca, o merge do rascunho reescrevia a
+    // caixa do total a meio de ela estar a escrever o valor.
+    camposTocados.current.add("__total");
     setTotalInput(raw);
     const base = raw.trim() === "" ? undefined : parseMoneyText(raw);
     writeTotal(base == null ? undefined : amountParaBase(base, vatMode), vatMode);
@@ -3577,6 +3623,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // Aqui fica só a ponte para o documento.
   const setServiceGroups = useCallback(
     (update: (prev: StudioDoc["serviceGroups"]) => StudioDoc["serviceGroups"]) => {
+      // Ver `camposTocados`: o editor de serviços é o outro caminho por onde a
+      // PESSOA escreve, e é onde o texto perdido foi medido primeiro.
+      camposTocados.current.add("serviceGroups");
       setDoc((d) => {
         const next = update(d.serviceGroups);
         return next === d.serviceGroups ? d : { ...d, serviceGroups: next };

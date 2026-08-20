@@ -208,6 +208,16 @@ let rascunhoDoEmail: Record<string, unknown> | null = {
 /** O rascunho que o SERVIDOR tem guardado (null = não tem nenhum). */
 let rascunhoServidor: { doc: unknown; updatedAt: string } | null = null;
 /**
+ * Um portão para segurar a LEITURA do rascunho.
+ *
+ * O merge do rascunho chega 100–300 ms depois de o ecrã abrir, e é nessa
+ * janela que ela começa a escrever. Sem uma forma de segurar a resposta, o
+ * duplo devolve-a antes de o teste conseguir carregar uma tecla — e o defeito
+ * que se quer prender fica por fora do alcance do teste.
+ */
+let portaoDoRascunho: Promise<void> | null = null;
+let abrirPortaoDoRascunho: (() => void) | null = null;
+/**
  * O que o servidor responde ao PUT do rascunho.
  *
  * Por omissão GUARDA — que é o caso normal, e era o que este duplo não fazia:
@@ -277,6 +287,7 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
     // resposta e é diferente de «não se conseguiu perguntar». É essa diferença
     // que decide se o estúdio pode reenviar o que tem preso no navegador.
     if (metodo === "GET") {
+      if (portaoDoRascunho) await portaoDoRascunho;
       return leituraDoRascunhoFalha
         ? reply({ ok: false })
         : reply({ json: { ok: true, draft: rascunhoServidor } });
@@ -325,6 +336,8 @@ beforeEach(() => {
   pedidos = [];
   propostaDoc = reply({ headers: {}, json: { ok: true, emailed: true } });
   rascunhoServidor = null;
+  portaoDoRascunho = null;
+  abrirPortaoDoRascunho = null;
   gravacaoDoRascunho = () =>
     reply({ json: { ok: true, guardado: true, updatedAt: new Date().toISOString() } });
   leituraDoRascunhoFalha = false;
@@ -5477,5 +5490,95 @@ describe("o dia ocupado, a partir da data escrita na proposta", () => {
       expect(screen.getByLabelText("Data")).toHaveValue("20 de setembro de 2026"),
     );
     expect(screen.queryByText(/Já há um evento nesta data/)).toBeNull();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE ELA ESCREVE NO PRIMEIRO SEGUNDO NÃO É APAGADO PELO RASCUNHO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O estúdio vai buscar o rascunho ao servidor ao abrir, e o merge chega
+ * 100–300 ms depois. Era `{ ...d, ...doServidor }` — campo a campo, o servidor
+ * ganhava. Se ela começasse a escrever nessa janela, o PRINCÍPIO do que
+ * escreveu era apagado.
+ *
+ * MEDIDO no produto, oito rondas a escrever `ABCDEFGHIJKLMNOPQRST` meio
+ * segundo depois de o ecrã abrir: SETE perderam texto. Ficaram coisas como
+ * `HIJKLMNOPQRST`, `MNOPQRST`, `QRST`. Em quatro caixas diferentes — e a
+ * «Cerimónia» chegou a ficar COMPLETAMENTE vazia. Sem erro e sem aviso: a
+ * frase fica truncada pela frente, e é assim que vai no PDF para o casal.
+ */
+describe("o rascunho do servidor não escreve por cima de quem está a escrever", () => {
+  function rascunhoComTudoPreenchido() {
+    rascunhoServidor = {
+      updatedAt: new Date().toISOString(),
+      doc: {
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Herdade do Servidor",
+        guests: "80 pax",
+        serviceGroups: [],
+        moodBoards: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalLabel: "Valor Total Decoração",
+      },
+    };
+  }
+
+  /** Segura a leitura do rascunho até o teste a soltar. */
+  function segurarORascunho() {
+    portaoDoRascunho = new Promise<void>((resolver) => {
+      abrirPortaoDoRascunho = resolver;
+    });
+  }
+
+  it("o que ela escreveu no Local fica — e o resto do rascunho entra à mesma", async () => {
+    rascunhoComTudoPreenchido();
+    segurarORascunho();
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={quote} />
+      </ToastProvider>,
+    );
+
+    const local = await screen.findByLabelText("Local");
+    await user.clear(local);
+    await user.type(local, "Monte da Oliveirinha");
+
+    // Agora o rascunho chega — a corrida, encenada.
+    abrirPortaoDoRascunho?.();
+
+    // Prova que o merge CORREU MESMO: um campo em que ela não tocou passa a
+    // ter o valor do servidor. Sem isto, o teste passava por não ter havido
+    // corrida nenhuma — que é a forma mais fácil de ele deixar de servir.
+    await waitFor(() => expect(screen.getByLabelText("Convidados")).toHaveValue("80 pax"));
+
+    // E o que ela escreveu continua inteiro.
+    expect(local).toHaveValue("Monte da Oliveirinha");
+  });
+
+  it("num campo em que ela NÃO tocou, o rascunho manda (controlo positivo)", async () => {
+    rascunhoComTudoPreenchido();
+    segurarORascunho();
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={quote} />
+      </ToastProvider>,
+    );
+
+    const local = await screen.findByLabelText("Local");
+    await user.clear(local);
+    await user.type(local, "Monte da Oliveirinha");
+    abrirPortaoDoRascunho?.();
+
+    // O «Tipo de evento» não foi tocado: o rascunho tem de o preencher.
+    await waitFor(() => expect(screen.getByLabelText("Tipo de evento")).toHaveValue("Casamento"));
   });
 });
