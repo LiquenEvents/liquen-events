@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Metadata } from "next";
 
-import { generateMetadata as metaProposta } from "./proposta/[token]/page";
+import { generateMetadata as metaProposta } from "../(privado)/proposta/[token]/page";
 import { generateMetadata as metaPortal } from "./portal/[token]/page";
 import { LOCALES } from "@/lib/i18n";
 

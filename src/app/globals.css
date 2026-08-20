@@ -2337,6 +2337,23 @@ body:has(.barra-consentimento) footer {
   .celula-saltavel {
     content-visibility: auto;
   }
+
+  /*
+   * UMA FOTOGRAFIA NÃO SE PARTE AO MEIO.
+   *
+   * A galeria da proposta usa `columns` (masonry) para cada foto entrar com a
+   * forma que tem, sem recorte. Sem `break-inside: avoid`, o navegador é livre
+   * de cortar uma fotografia no fim de uma coluna e continuá-la no topo da
+   * seguinte — metade do portão numa coluna, metade na outra. As três formas
+   * estão escritas porque as três ainda são precisas: `page-break-inside` para
+   * o WebKit mais antigo, `-webkit-column-break-inside` para o Safari, e a
+   * moderna para tudo o resto.
+   */
+  .foto-inteira {
+    page-break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    break-inside: avoid;
+  }
 }
 
 /* ── Print / PDF ── */

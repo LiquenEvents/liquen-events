@@ -62,13 +62,13 @@ describe("nada no que sai para o cliente lhe pede para aceitar com um clique", (
   });
 
   it("a página do casal não tem formulário de aceitar nem de recusar", () => {
-    const pagina = ler("src/app/[lang]/(site)/proposta/[token]/page.tsx");
+    const pagina = ler("src/app/[lang]/(privado)/proposta/[token]/page.tsx");
     for (const marca of ["ProposalResponse", "Aceitar proposta", "Recusar proposta"]) {
       expect(pagina, `«${marca}» voltou à página do cliente`).not.toContain(marca);
     }
     // E o ficheiro do formulário não voltou a nascer ao lado dela.
     expect(
-      existsSync(join(RAIZ, "src/app/[lang]/(site)/proposta/[token]/ProposalResponse.tsx")),
+      existsSync(join(RAIZ, "src/app/[lang]/(privado)/proposta/[token]/ProposalResponse.tsx")),
       "o formulário de resposta voltou",
     ).toBe(false);
   });

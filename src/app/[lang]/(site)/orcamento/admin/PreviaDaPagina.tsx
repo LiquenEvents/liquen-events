@@ -10,7 +10,7 @@ import {
   linhasDaLegendaAprox,
   type LayoutDeMoodboard,
 } from "@/lib/proposal-geometria";
-import { useFotoComPlanoB } from "./useFotoComPlanoB";
+import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

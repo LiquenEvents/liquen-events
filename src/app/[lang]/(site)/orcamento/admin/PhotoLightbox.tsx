@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ThemeImage } from "@/lib/theme-types";
 import { Button } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
-import { useFotoComPlanoB } from "./useFotoComPlanoB";
+import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 
 /**
  * VER UMA FOTO EM GRANDE, dentro da biblioteca de temas.

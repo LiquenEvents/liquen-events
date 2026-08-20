@@ -57,7 +57,7 @@ import EmailDoEnvio from "./EmailDoEnvio";
 import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
 import PreviaDaPagina from "./PreviaDaPagina";
-import { useFotoComPlanoB } from "./useFotoComPlanoB";
+import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import VistaDeConjunto from "./VistaDeConjunto";
 import LupaDeFotos from "./LupaDeFotos";
 import {
