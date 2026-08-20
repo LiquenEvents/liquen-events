@@ -5152,3 +5152,42 @@ describe("o email do passo 3 viaja com o envio", () => {
     expect(screen.queryByText(/Esta nota não aparece no texto do email/)).toBeNull();
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A NOTA INTERNA, MONTADA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O campo existia e não estava em lado nenhum: a única referência a
+ * `NotasInternas.tsx` em todo o `src/` era o seu próprio teste. Passa a viver
+ * na secção «Evento» do estúdio, e o que se escreve lá vai no rascunho — que é
+ * o que faz a nota sobreviver a fechar o separador.
+ *
+ * A garantia de que NÃO sai no PDF está onde tem de estar, no gerador:
+ * `src/lib/notas-internas-ficam-em-casa.test.ts`, com controlo positivo.
+ */
+describe("as notas internas vivem no estúdio", () => {
+  it("o campo está montado e diz que não sai na proposta", () => {
+    seedDraft(0);
+    renderStudio();
+    expect(screen.getByLabelText(/Notas internas/)).toBeTruthy();
+    expect(screen.getByText(/só para ti, nunca sai na proposta/)).toBeTruthy();
+  });
+
+  it("o que se escreve na nota entra no rascunho gravado", async () => {
+    seedDraft(0);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/Notas internas/), "Decide a mãe");
+
+    await waitFor(() => {
+      const gravados = corpos("proposta-rascunho");
+      expect(gravados.some((b) => b.includes("Decide a mãe"))).toBe(true);
+    });
+    // CONTROLO POSITIVO da leitura acima: o corpo gravado é MESMO o documento,
+    // e o campo tem MESMO o nome por que o PDF pergunta. Sem isto, um
+    // `includes` sobre um corpo qualquer passaria por acidente.
+    const ultimo = corpos("proposta-rascunho").at(-1) ?? "";
+    expect(JSON.parse(ultimo).doc.notasInternas).toContain("Decide a mãe");
+  });
+});

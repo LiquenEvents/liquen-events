@@ -291,9 +291,12 @@ describe("AdminClient shell", () => {
   it("reabrir o mesmo pedido não volta a pedi-lo ao servidor", async () => {
     renderAdmin([makeQuote({ id: "LQ-777", name: "Sara Lopes" })]);
     navTo(/Pedidos/);
+    // O PEDIDO e mais nada. O painel também vai buscar a nota da proposta a
+    // `/api/orcamento/<id>/proposta-rascunho`, e um `startsWith` contava-a —
+    // o que este teste prende é o pedido inteiro não ser lido duas vezes, não
+    // que o painel não fale com o servidor.
     const idas = () =>
-      vi.mocked(fetch).mock.calls.filter(([url]) => String(url).startsWith("/api/orcamento/"))
-        .length;
+      vi.mocked(fetch).mock.calls.filter(([url]) => String(url) === "/api/orcamento/LQ-777").length;
 
     fireEvent.click(screen.getByText("Sara Lopes"));
     fireEvent.click(await screen.findByRole("button", { name: "Fechar" }));

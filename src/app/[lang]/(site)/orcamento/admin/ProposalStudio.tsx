@@ -113,6 +113,7 @@ import {
 import CriarAPartirDe, { type Escolha } from "./CriarAPartirDe";
 import ModelosParciais from "./ModelosParciais";
 import NavEstudio from "./NavEstudio";
+import NotasInternas from "./NotasInternas";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
 import { depositPercentOf } from "@/lib/proposal-doc";
 // A geometria do documento, para a pré-visualização mostrar a forma que cada
@@ -5261,6 +5262,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 hint="sobretudo para uso interno; aparece apenas em letra pequena no topo de cada página da proposta."
               />
             </div>
+
+            {/* ── O QUE SE SABE E NÃO SE ESCREVE AO CLIENTE ────────────────
+                «Quer ficar por baixo dos 8.000 €.» «Quem decide é a mãe.»
+                Frases que hoje vivem na cabeça de quem escreveu a proposta e
+                que se perdem quando é outra pessoa a pegar nela — ou quando são
+                seis meses depois.
+
+                Vive na secção do EVENTO e não ao pé do dinheiro: é sobre o
+                negócio inteiro, e é a primeira secção — a nota tem de estar
+                onde se dá com ela sem a procurar.
+
+                O aspecto de papel amarelo é a garantia de que não se confunde
+                com um campo que sai na proposta; o teste
+                (`notas-internas-ficam-em-casa.test.ts`) garante que não sai
+                mesmo. */}
+            <NotasInternas
+              valor={doc.notasInternas ?? ""}
+              onChange={(v) => patch({ notasInternas: v })}
+            />
           </Section>
 
           {/* Cover images */}
