@@ -2670,7 +2670,12 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
    * 0,467:1 e nenhuma fotografia normal tem essa forma. O que se pode fazer é
    * DIZER o número, para escolher uma vertical deixar de ser sorte.
    */
-  it("na capa, diz quanto é que aquela fotografia perde", async () => {
+  const comCapas = (capas: string[]) => {
+    // O servidor CONHECE estas fotos: sem endereço assinado o `Thumb` não
+    // desenha imagem nenhuma, e sem imagem não há nada para medir.
+    assetsServidor = capas
+      .filter(Boolean)
+      .map((path) => ({ path, url: `https://exemplo.pt/${path}` }));
     localStorage.setItem(
       DRAFT_KEY,
       JSON.stringify({
@@ -2680,15 +2685,83 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
         serviceGroups: [],
         moodBoards: [],
         budgetItems: [],
-        coverImages: ["capas/uma.jpg", ""],
+        coverImages: capas,
         totalAmount: 3000,
         totalVatMode: "acrescer",
       }),
     );
     renderStudio();
-    expect(
-      await screen.findByText(/perde \d+% da área/i, undefined, { timeout: 3000 }),
-    ).toBeTruthy();
+  };
+
+  /**
+   * A miniatura mede-se sozinha no `onLoad`, e num teste as imagens não
+   * carregam. Isto é o que o navegador faz por ela: dá à imagem uma forma e
+   * dispara o `load`.
+   */
+  async function medirCapas(formas: { w: number; h: number }[]) {
+    // Pelo DOM e não por papel: um `<img alt="">` é decorativo e não tem
+    // papel nenhum de acessibilidade — `getAllByRole("img")` não o encontra.
+    const capas = await waitFor(() => {
+      const encontradas = [...document.querySelectorAll("img")].filter((i) =>
+        (i.getAttribute("src") ?? "").includes("capas/"),
+      );
+      if (encontradas.length === 0) throw new Error("as capas ainda não estão desenhadas");
+      return encontradas;
+    });
+    capas.forEach((img, i) => {
+      const forma = formas[i];
+      if (!forma) return;
+      Object.defineProperty(img, "naturalWidth", { value: forma.w, configurable: true });
+      Object.defineProperty(img, "naturalHeight", { value: forma.h, configurable: true });
+      Object.defineProperty(img, "complete", { value: true, configurable: true });
+      fireEvent.load(img);
+    });
+  }
+
+  it("na capa, diz quanto é que AQUELA fotografia perde", async () => {
+    comCapas(["capas/uma.jpg", ""]);
+    // Deitada 3:2 — a tira da capa é quase 1:2, e o corte é grande.
+    await medirCapas([{ w: 1500, h: 1000 }]);
+    expect(await screen.findByText(/perde \d+% da área/i)).toBeTruthy();
+  });
+
+  /**
+   * ── O AVISO ERA O MESMO PARA AS DUAS, E NÃO PODIA SER ──────────────────
+   *
+   * Palavras dela: «o mesmo texto aparece por baixo das duas imagens de capa,
+   * embora uma seja vertical e a outra horizontal — logo, perdem áreas
+   * diferentes».
+   */
+  it("duas fotografias de formas diferentes dão números diferentes", async () => {
+    comCapas(["capas/deitada.jpg", "capas/ao-alto.jpg"]);
+    await medirCapas([
+      { w: 1500, h: 1000 },
+      { w: 1000, h: 1500 },
+    ]);
+    const numeros = (await screen.findAllByText(/perde \d+% da área/i)).map(
+      (p) => /(\d+)%/.exec(p.textContent ?? "")?.[1],
+    );
+    // Pode haver só um aviso (a vertical perde pouco e não chega ao limiar) —
+    // o que NÃO pode haver é dois avisos com o mesmo número.
+    expect(new Set(numeros).size).toBe(numeros.length);
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("sem a forma medida, NÃO se inventa um número", async () => {
+    // Era esta a causa: por medir, a conta caía na forma por omissão — a mesma
+    // para as duas — e a frase dizia «ESTA fotografia perde» sobre um número
+    // que não era dela. Não saber é não saber.
+    comCapas(["capas/uma.jpg", "capas/outra.jpg"]);
+    await waitFor(() =>
+      expect(
+        [...document.querySelectorAll("img")].some((i) =>
+          (i.getAttribute("src") ?? "").includes("capas/"),
+        ),
+      ).toBe(true),
+    );
+    expect(screen.queryByText(/perde \d+% da área/i)).toBeNull();
   });
 });
 

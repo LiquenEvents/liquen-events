@@ -205,8 +205,12 @@ describe("POST /api/orcamento/[id]/proposta", () => {
     authed.ok = true;
     await POST(req("POST", { ...validItems, validUntil: "2026-12-31" }), ctx("LIQ-1"));
     const env = mail.send.mock.calls.at(-1)![0] as { html: string; text: string };
-    expect(env.html).toContain("Válida até 31/12/2026.");
-    expect(env.text).toContain("Válida até 31/12/2026.");
+    // POR EXTENSO, que é o que o nome deste teste sempre disse e o código não
+    // fazia: o `toLocaleDateString` sem opções dá o formato curto, e o curto em
+    // Portugal é com barras. Uma data com barras é a data de um recibo, e este
+    // é o email que acompanha uma proposta de casamento.
+    expect(env.html).toContain("Válida até 31 de dezembro de 2026.");
+    expect(env.text).toContain("Válida até 31 de dezembro de 2026.");
     expect(env.html).not.toContain("Invalid Date");
     expect(env.text).not.toContain("Invalid Date");
   });
@@ -565,7 +569,7 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     await POST(req("POST", validItems), ctx("LIQ-1"));
     const email = enviado();
     expect(email.subject).toBe("A vossa proposta — Líquen Events");
-    expect(email.html).toContain("Segue em anexo a proposta personalizada");
+    expect(email.html).toContain("Segue em anexo a proposta que preparámos");
   });
 
   it("com modelo guardado é o texto DELA que vai, assunto incluído", async () => {
@@ -580,7 +584,7 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     const email = enviado();
     expect(email.subject).toBe("A sua proposta | Líquen Events");
     expect(email.html).toContain("Olá Ana, a proposta está pronta.");
-    expect(email.html).not.toContain("Segue em anexo a proposta personalizada");
+    expect(email.html).not.toContain("Segue em anexo a proposta que preparámos");
     // A versão em texto simples é derivada do modelo, não mandada em branco
     // nem cheia de etiquetas — é ela que passa pelos filtros de spam.
     expect(email.text).toContain("Olá Ana, a proposta está pronta.");
@@ -693,7 +697,7 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
   it("um corpo vazio ou só com espaços é como não vir nenhum", async () => {
     authed.ok = true;
     await POST(req("POST", { ...validItems, corpo: "   \n\n " }), ctx("LIQ-1"));
-    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+    expect(enviado().html).toContain("Segue em anexo a proposta que preparámos");
   });
 
   /**
@@ -713,7 +717,7 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     authed.ok = true;
     modelo.get.mockResolvedValue(modeloGuardado("A sua proposta", `<div>\n  <p>   </p>\n</div>`));
     await POST(req("POST", validItems), ctx("LIQ-1"));
-    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+    expect(enviado().html).toContain("Segue em anexo a proposta que preparámos");
   });
 
   /**
@@ -788,7 +792,7 @@ describe("POST /api/orcamento/[id]/proposta — o modelo «proposta-enviada»", 
     modelo.get.mockRejectedValue(new Error('relation "email_templates" does not exist'));
     const res = await POST(req("POST", validItems), ctx("LIQ-1"));
     expect(res.status).toBe(200);
-    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+    expect(enviado().html).toContain("Segue em anexo a proposta que preparámos");
   });
 });
 

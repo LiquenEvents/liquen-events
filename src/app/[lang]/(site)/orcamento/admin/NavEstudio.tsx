@@ -155,8 +155,20 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
           aviso, e o verde da marca está reservado à acção principal. */}
       {faltas.length > 0 && (
         <div className="mt-4 border-t border-foreground/10 pt-3">
+          {/*
+           * ── «TALVEZ QUEIRA» NÃO QUERIA DIZER NADA ──────────────────────
+           *
+           * Era o que se lia por cima da lista quando nada travava o envio, e
+           * a frase debaixo dela era «Nenhum grupo de serviços». Juntas:
+           * «Talvez queira: Nenhum grupo de serviços» — uma sugestão escrita
+           * como se fosse um desejo dela, e a dizer o contrário do que ela quer.
+           *
+           * O rótulo passa a dizer o que a lista É: coisas por fazer que não
+           * impedem o envio. E a lista deixou de mentir sobre os grupos — ver
+           * `oQueTemODocumento`, em `proposal-progress.ts`.
+           */}
           <p className="mb-1.5 text-[10px] tracking-[0.1em] uppercase text-foreground/40">
-            {travam.length > 0 ? "Falta para enviar" : "Talvez queira"}
+            {travam.length > 0 ? "Falta para enviar" : "Ainda por fazer"}
           </p>
           <ul className="flex flex-col gap-1">
             {[...travam, ...conselhos].map((f, i) => (

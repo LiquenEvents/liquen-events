@@ -5746,9 +5746,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                  * escolher uma vertical para a capa deixa de ser sorte — e ela
                  * deixa de descobrir o corte com o PDF já feito.
                  */
-                const perdaDaCapa = path
-                  ? perdaNaCapa(aspetosDasFotos[path] ?? ASPETO_POR_OMISSAO)
-                  : 0;
+                /*
+                 * ── O NÚMERO É DESTA FOTOGRAFIA, OU NÃO HÁ NÚMERO ───────────
+                 *
+                 * Palavras dela: «o mesmo texto aparece por baixo das duas
+                 * imagens de capa, embora uma seja vertical e a outra
+                 * horizontal — logo, perdem áreas diferentes».
+                 *
+                 * A conta já era por fotografia. O que não era é o DADO: a
+                 * forma só se sabe depois de a miniatura carregar e o `Thumb`
+                 * a medir, e até lá caía-se na forma por omissão — a mesma
+                 * para as duas. Duas fotografias diferentes, uma forma
+                 * inventada, o mesmo 69% debaixo de ambas, e a frase a dizer
+                 * «ESTA fotografia perde» sobre um número que não é dela.
+                 *
+                 * Sem medida não há aviso. É a regra da casa em todo o lado
+                 * onde isto aparece: não saber é não saber, e um número errado
+                 * dito com confiança é pior do que nenhum — sobretudo este,
+                 * que existe para ela ESCOLHER a fotografia.
+                 */
+                const aspetoDestaCapa = path ? aspetosDasFotos[path] : undefined;
+                const perdaDaCapa = aspetoDestaCapa ? perdaNaCapa(aspetoDestaCapa) : 0;
                 return (
                   <div key={idx}>
                     {path ? (
@@ -5777,9 +5795,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         />
                         {perdaDaCapa > PERDA_QUE_SE_AVISA && (
                           <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
-                            A tira da capa é muito mais alta do que larga: esta fotografia perde{" "}
-                            {Math.round(perdaDaCapa * 100)}% da área. Uma fotografia ao alto perde
-                            menos.
+                            A tira da capa é quase duas vezes mais alta do que larga:{" "}
+                            <strong className="font-medium">
+                              esta fotografia perde {Math.round(perdaDaCapa * 100)}% da área
+                            </strong>
+                            . Uma fotografia ao alto perde menos.
                           </p>
                         )}
                       </>

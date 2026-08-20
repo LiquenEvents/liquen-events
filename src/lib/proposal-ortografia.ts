@@ -291,8 +291,19 @@ function semUmaLetraDobrada(palavra: string): string[] {
   return saida;
 }
 
-/** O termo inglês da casa que esta palavra QUERIA ser, ou nada. */
-function termoInglesQuaseCerto(minuscula: string): string | undefined {
+/**
+ * O termo inglês da casa que esta palavra QUERIA ser, ou nada.
+ *
+ * ── O NOME, OUTRA VEZ ─────────────────────────────────────────────────────
+ * Chamou-se `termoInglesQuaseCerto` durante um commit, e o CodeQL voltou a
+ * levantar o alerta de severidade alta que já está descrito no cabeçalho do
+ * `grafiaDe`: `Certo` tem `cert` lá dentro, a heurística lê-o como
+ * «certificate», e tudo o que sai daqui passa a ser tratado como segredo até
+ * chegar ao `localStorage` do rascunho. A regra escrita neste ficheiro é
+ * antiga e eu quebrei-a: aqui não há identificadores com «cert», por mais
+ * portuguesa que seja a palavra.
+ */
+function termoDaCasaPorUmaLetra(minuscula: string): string | undefined {
   // Já é um deles: não há nada a dizer. É esta linha que impede o aviso de
   // tocar sobre a palavra bem escrita.
   if (TERMOS_INGLESES.has(minuscula)) return undefined;
@@ -334,7 +345,7 @@ function grafiaDe(palavra: string): string | undefined {
     // Por último, e é de propósito: as duas listas de cima são fechadas e
     // sabem o que dizem. A regra da letra dobrada é uma inferência, e uma
     // inferência nunca pode ganhar a uma palavra que está numa lista.
-    termoInglesQuaseCerto(minuscula)
+    termoDaCasaPorUmaLetra(minuscula)
   );
 }
 

@@ -29,21 +29,52 @@ export interface EstadoSeccao {
 
 const temTexto = (v: unknown) => typeof v === "string" && v.trim() !== "";
 
-export function estadoDasSeccoes(doc: ProposalDoc): EstadoSeccao[] {
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE CADA SECÇÃO TEM — contado UMA vez, para as duas listas
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Este ficheiro tinha duas contagens da mesma coisa, e elas discordavam.
+ *
+ * O índice lateral contava um grupo de serviços se ele tivesse título OU um
+ * item com nome — que é a regra certa, porque um grupo com três serviços
+ * escritos e o título ainda por pôr é um grupo com trabalho lá dentro. A lista
+ * do que falta contava só o TÍTULO. Resultado, no ecrã dela: «Talvez queira:
+ * Nenhum grupo de serviços» por cima de um grupo de serviços visível.
+ *
+ * ── E O ORÇAMENTO ESTAVA A SER MEDIDO NO SÍTIO ERRADO ────────────────────
+ *
+ * As linhas do orçamento vivem em `budgetItems` no modelo Decoração e em
+ * `budgetRows` (as linhas estimadas) no modelo Organização. A contagem olhava
+ * só para o primeiro: numa proposta de Organização de 3.862,20 € o índice
+ * dizia «Orçamento · por preencher», com o orçamento preenchido no ecrã.
+ *
+ * Um índice que mente sobre o que está feito é pior do que não haver índice:
+ * ensina a não confiar nele, e a partir daí ele deixa de poupar o scroll que
+ * existe para poupar.
+ */
+function oQueTemODocumento(doc: ProposalDoc) {
   const deco = doc.template !== "organizacao";
+  return {
+    deco,
+    /** Um grupo conta com título OU com um item com nome. */
+    grupos: (doc.serviceGroups ?? []).filter(
+      (g) => temTexto(g.title) || (g.items ?? []).some((i) => temTexto(i.label)),
+    ),
+    boards: (doc.moodBoards ?? []).filter((b) => temTexto(b.title) || (b.images ?? []).length > 0),
+    /** As linhas do orçamento, no campo que ESTE modelo usa. */
+    linhas: deco
+      ? (doc.budgetItems ?? []).filter(temTexto)
+      : (doc.budgetRows ?? []).filter((r) => temTexto(r?.item)),
+    capas: (doc.coverImages ?? []).filter(temTexto),
+    fases: (doc.cronograma ?? []).filter(
+      (f) => temTexto(f.title) || (f.items ?? []).some(temTexto),
+    ),
+  };
+}
 
-  // Um grupo só conta se tiver título OU pelo menos um item com nome.
-  const grupos = (doc.serviceGroups ?? []).filter(
-    (g) => temTexto(g.title) || (g.items ?? []).some((i) => temTexto(i.label)),
-  );
-  const boards = (doc.moodBoards ?? []).filter(
-    (b) => temTexto(b.title) || (b.images ?? []).length > 0,
-  );
-  const linhas = (doc.budgetItems ?? []).filter(temTexto);
-  const capas = (doc.coverImages ?? []).filter(temTexto);
-  const fases = (doc.cronograma ?? []).filter(
-    (f) => temTexto(f.title) || (f.items ?? []).some(temTexto),
-  );
+export function estadoDasSeccoes(doc: ProposalDoc): EstadoSeccao[] {
+  const { deco, grupos, boards, linhas, capas, fases } = oQueTemODocumento(doc);
 
   const plural = (n: number, um: string, muitos: string) => `${n} ${n === 1 ? um : muitos}`;
 
@@ -146,7 +177,9 @@ export interface Impedimento {
  */
 export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Impedimento[] {
   const faltas: Impedimento[] = [];
-  const deco = doc.template !== "organizacao";
+  // A MESMA contagem do índice lateral. Ver `oQueTemODocumento`: eram duas, e
+  // discordavam sobre o mesmo documento.
+  const { deco, grupos, boards, capas } = oQueTemODocumento(doc);
 
   if (!temTexto(doc.clientNames)) {
     faltas.push({
@@ -198,7 +231,7 @@ export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Imped
       trava: false,
     });
   }
-  if ((doc.serviceGroups ?? []).every((g) => !temTexto(g.title))) {
+  if (grupos.length === 0) {
     faltas.push({
       id: "servicos",
       seccao: "servicos",
@@ -206,10 +239,10 @@ export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Imped
       trava: false,
     });
   }
-  if (deco && (doc.coverImages ?? []).every((c) => !temTexto(c))) {
+  if (deco && capas.length === 0) {
     faltas.push({ id: "capas", seccao: "capas", texto: "Sem imagens de capa", trava: false });
   }
-  if (deco && (doc.moodBoards ?? []).length === 0) {
+  if (deco && boards.length === 0) {
     faltas.push({ id: "moodboards", seccao: "moodboards", texto: "Sem mood boards", trava: false });
   }
   // O aviso do orçamento vive na secção do total, que é onde ela o resolve.
