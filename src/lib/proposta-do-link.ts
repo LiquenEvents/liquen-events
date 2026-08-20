@@ -68,6 +68,12 @@ export interface PropostaDoLink {
   versao?: number;
   /** ISO — quando o conteúdo mudou pela última vez. */
   versaoEm?: string;
+  /**
+   * O número da versão VIVA do pedido, que só difere da mostrada quando há um
+   * aceite e o documento foi revisto depois dele. É o que permite dizer «o
+   * casal aceitou a 2, e há uma 3 por aceitar» sem inventar nada.
+   */
+  versaoVivaNumero?: number;
 }
 
 /** Dois emails são do mesmo cliente quando existem os dois e são iguais. */
@@ -101,37 +107,42 @@ export async function propostaDoLink(
    * criar) NÃO pode deitar abaixo a página da proposta. Fica-se na linha do
    * token — o comportamento de sempre — e escreve-se o aviso.
    */
+  /** A mais recente JÁ OFERECIDA do mesmo pedido — o documento vivo. */
+  let maisRecente: Proposal | null = null;
+  let seloAceite: string | undefined;
+
   try {
     const quoteId = (doToken.quoteId ?? "").trim();
     if (quoteId) {
-      const aceite = await getAcceptedContractByQuote(quoteId);
-      if (aceite?.proposalId && aceite.proposalId !== doToken.id) {
-        const aceitada = await getProposal(aceite.proposalId);
-        if (
-          aceitada &&
-          (aceitada.quoteId ?? "").trim() === quoteId &&
-          mesmoCliente(aceitada.clientEmail, doToken.clientEmail)
-        ) {
-          proposta = aceitada;
-          seguiu = true;
-        }
-      } else if (!aceite) {
-        const irmas = await listProposalsForQuote(quoteId);
-        const candidata = irmas
+      /** Só entram irmãs que passem as três guardas do cabeçalho. */
+      const podeMostrar = (p: Proposal) =>
+        (p.quoteId ?? "").trim() === quoteId &&
+        mesmoCliente(p.clientEmail, doToken.clientEmail) &&
+        p.status !== "rascunho";
+
+      const irmas = (await listProposalsForQuote(quoteId)).filter(podeMostrar);
+      maisRecente =
+        [doToken, ...irmas.filter((p) => p.id !== doToken.id)]
           .filter(
-            (p) =>
-              p.id !== doToken.id &&
-              (p.quoteId ?? "").trim() === quoteId &&
-              mesmoCliente(p.clientEmail, doToken.clientEmail) &&
-              p.status !== "rascunho" &&
-              +new Date(p.createdAt) > +new Date(doToken.createdAt),
+            (p) => p.id === doToken.id || +new Date(p.createdAt) > +new Date(doToken.createdAt),
           )
-          .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
-        if (candidata) {
-          proposta = candidata;
-          seguiu = true;
+          .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0] ?? null;
+
+      const aceite = await getAcceptedContractByQuote(quoteId);
+      if (aceite?.proposalId) {
+        // «O que foi aceite fica congelado.» A proposta aceite manda, mesmo
+        // que haja uma revisão mais recente por aí.
+        const aceitada =
+          irmas.find((p) => p.id === aceite.proposalId) ??
+          (aceite.proposalId === doToken.id ? doToken : await getProposal(aceite.proposalId));
+        if (aceitada && podeMostrar(aceitada)) {
+          proposta = aceitada;
+          seloAceite = aceite.propostaVersaoSelo || aceitada.versaoSelo || seloDoConteudo(aceitada);
         }
+      } else if (maisRecente && maisRecente.id !== doToken.id) {
+        proposta = maisRecente;
       }
+      seguiu = proposta.id !== doToken.id;
     }
   } catch (e) {
     log.warn("proposta-do-link: não deu para procurar a versão atual", {
@@ -141,17 +152,31 @@ export async function propostaDoLink(
   }
 
   const selo = proposta.versaoSelo || seloDoConteudo(proposta);
+  /**
+   * O documento VIVO com que se compara o aceite. Sem aceite não há comparação
+   * nenhuma a fazer — o que está no ecrã já É o vivo.
+   */
+  const seloVivo = maisRecente ? maisRecente.versaoSelo || seloDoConteudo(maisRecente) : selo;
+
   return {
     proposta,
     doToken,
     seguiu,
     selo,
-    // O selo do que foi aceite ainda não é gravado — é a peça seguinte da Fase
-    // 2. Enquanto não for, uma proposta com aceite lê-se como «em vigor», que
-    // é o que a aplicação já dizia; nunca como «revista», que seria inventar
-    // um aviso sem prova nenhuma por baixo.
-    estado: estadoDaVersao(selo, undefined),
+    /**
+     * `revista` quando o documento vivo tem outro selo que não o aceite.
+     *
+     * O selo aceite vem do contrato; e quando o contrato é anterior a essa
+     * coluna, vem da PRÓPRIA proposta aceite. Isso não é adivinhar: uma
+     * revisão nesta casa é uma proposta nova, portanto a linha aceite nunca é
+     * reescrita e o selo que ela traz é, por construção, o que foi aceite.
+     * (O `theme-materializar` troca caminhos de fotografias dentro do `doc`,
+     * mas não recalcula o selo — a mesma fotografia noutro caminho não é uma
+     * versão nova, e não passa a sê-lo.)
+     */
+    estado: estadoDaVersao(seloVivo, seloAceite),
     versao: proposta.versaoNumero,
     versaoEm: proposta.versaoEm,
+    versaoVivaNumero: maisRecente?.versaoNumero,
   };
 }

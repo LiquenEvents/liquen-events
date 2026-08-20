@@ -249,3 +249,93 @@ describe("a versão que vem no resultado", () => {
     expect(r?.selo).toMatch(/^[0-9a-f]{64}$/);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «O QUE FOI ACEITE FICA CONGELADO. O QUE MUDAR DEPOIS É UMA VERSÃO NOVA.»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A comparação faz-se entre o selo ACEITE — o do contrato, ou, num contrato
+ * anterior a essa coluna, o da própria linha aceite, que nunca é reescrita — e
+ * o selo do documento VIVO. Nada disto é adivinhado, e é essa a exigência: um
+ * aviso adivinhado sobre dinheiro é pior do que aviso nenhum.
+ */
+describe("o estado da versão em relação ao aceite", () => {
+  const aceiteCom = (proposalId: string, selo?: string, numero?: number): Contract =>
+    ({
+      id: "c1",
+      quoteId: "q1",
+      proposalId,
+      status: "aceite",
+      ...(selo ? { propostaVersaoSelo: selo } : {}),
+      ...(numero ? { propostaVersaoNumero: numero } : {}),
+    }) as Contract;
+
+  const SELO_1 = "1".repeat(64);
+  const SELO_2 = "2".repeat(64);
+
+  it("sem aceite nenhum, está «por-aceitar»", async () => {
+    por(proposta({ id: "p1", versaoSelo: SELO_1, versaoNumero: 1 }));
+    expect((await propostaDoLink("bom"))?.estado).toBe("por-aceitar");
+  });
+
+  it("com aceite e nada mexido desde então, está «em-vigor»", async () => {
+    por(proposta({ id: "p1", versaoSelo: SELO_1, versaoNumero: 1 }));
+    dados.contrato = aceiteCom("p1", SELO_1, 1);
+    expect((await propostaDoLink("bom"))?.estado).toBe("em-vigor");
+  });
+
+  it("revista depois do sim: mostra-se o ACEITE e diz-se «revista»", async () => {
+    por(
+      proposta({ id: "p1", total: 1230, versaoSelo: SELO_1, versaoNumero: 1 }),
+      proposta({
+        id: "p2",
+        total: 9999,
+        versaoSelo: SELO_2,
+        versaoNumero: 2,
+        createdAt: "2026-02-01T10:00:00.000Z",
+      }),
+    );
+    dados.contrato = aceiteCom("p1", SELO_1, 1);
+    const r = await propostaDoLink("bom");
+    // O casal continua a ver o que aceitou — o congelamento.
+    expect(r?.proposta.id).toBe("p1");
+    expect(r?.proposta.total).toBe(1230);
+    expect(r?.versao).toBe(1);
+    // …e sabe-se que existe uma 2 por aceitar.
+    expect(r?.estado).toBe("revista");
+    expect(r?.versaoVivaNumero).toBe(2);
+  });
+
+  it("num contrato anterior à coluna, o selo vem da própria proposta aceite", async () => {
+    por(
+      proposta({ id: "p1", versaoSelo: SELO_1 }),
+      proposta({ id: "p2", versaoSelo: SELO_2, createdAt: "2026-02-01T10:00:00.000Z" }),
+    );
+    // Sem `propostaVersaoSelo`: o contrato é anterior a esta coluna. O selo
+    // cai para o da PRÓPRIA proposta aceite — e isso não é adivinhar: uma
+    // revisão é uma proposta nova, logo a linha aceite nunca é reescrita e o
+    // selo que ela traz é, por construção, o que foi aceite.
+    dados.contrato = aceiteCom("p1");
+    const r = await propostaDoLink("bom");
+    expect(r?.proposta.id).toBe("p1");
+    expect(r?.estado).toBe("revista");
+  });
+
+  it("um RASCUNHO de revisão não faz a proposta aceite parecer revista", async () => {
+    por(
+      proposta({ id: "p1", versaoSelo: SELO_1, versaoNumero: 1 }),
+      proposta({
+        id: "p2",
+        status: "rascunho",
+        versaoSelo: SELO_2,
+        versaoNumero: 2,
+        createdAt: "2026-02-01T10:00:00.000Z",
+      }),
+    );
+    dados.contrato = aceiteCom("p1", SELO_1, 1);
+    const r = await propostaDoLink("bom");
+    expect(r?.estado).toBe("em-vigor");
+    expect(r?.versaoVivaNumero).toBe(1);
+  });
+});

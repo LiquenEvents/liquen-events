@@ -139,6 +139,24 @@ alter table public.proposals add column if not exists idioma text;
 alter table public.proposals add column if not exists versao_selo text;
 alter table public.proposals add column if not exists versao_numero integer;
 alter table public.proposals add column if not exists versao_em timestamptz;
+
+-- ── QUE VERSÃO É QUE O CASAL ACEITOU ──────────────────────────────────────
+-- O par de cima, copiado para o contrato no momento do aceite. É o que
+-- distingue «o documento de agora é o que foi aceite» de «foi revisto depois
+-- do sim» — e sem isso não se pode dizer nem uma coisa nem a outra, só
+-- adivinhar.
+--
+-- NÃO se guarda aqui uma cópia do documento, e é uma decisão: uma revisão
+-- nesta casa é uma proposta NOVA (a rota do estúdio nunca reescreve uma
+-- proposta que já seguiu), portanto a linha aceite JÁ É o congelamento. Uma
+-- segunda cópia em jsonb custava 13 a 18 KB por contrato para garantir o que
+-- já está garantido pela forma como as propostas são gravadas.
+--
+-- O `proposta_pdf_sha256`, que já lá está, continua a ser outra coisa: é a
+-- impressão digital dos BYTES do ficheiro, e serve de prova. Este é a
+-- identidade do CONTEÚDO, e serve para comparar.
+alter table public.contracts add column if not exists proposta_versao_selo text;
+alter table public.contracts add column if not exists proposta_versao_numero integer;
 alter table public.proposals drop constraint if exists proposals_idioma_chk;
 alter table public.proposals add constraint proposals_idioma_chk
   check (idioma is null or idioma in ('pt','en')) not valid;

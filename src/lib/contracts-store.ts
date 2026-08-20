@@ -42,6 +42,12 @@ export const mapper: Mapper<Contract> = {
     // perdido. O selo é importante; não é mais importante do que o contrato.
     ...(c.propostaPdfSha256 !== undefined ? { proposta_pdf_sha256: c.propostaPdfSha256 } : {}),
     ...(c.propostaPdfBytes !== undefined ? { proposta_pdf_bytes: c.propostaPdfBytes } : {}),
+    // Mesmo cuidado: só entram na linha quando existem, para uma base onde o
+    // `alter table` ainda não correu continuar a aceitar um aceite.
+    ...(c.propostaVersaoSelo !== undefined ? { proposta_versao_selo: c.propostaVersaoSelo } : {}),
+    ...(c.propostaVersaoNumero !== undefined
+      ? { proposta_versao_numero: c.propostaVersaoNumero }
+      : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -58,6 +64,10 @@ export const mapper: Mapper<Contract> = {
     acceptedIp: (r.accepted_ip as string) ?? undefined,
     ...(r.proposta_pdf_sha256 ? { propostaPdfSha256: String(r.proposta_pdf_sha256) } : {}),
     ...(r.proposta_pdf_bytes != null ? { propostaPdfBytes: Number(r.proposta_pdf_bytes) } : {}),
+    ...(r.proposta_versao_selo ? { propostaVersaoSelo: String(r.proposta_versao_selo) } : {}),
+    ...(r.proposta_versao_numero != null
+      ? { propostaVersaoNumero: Number(r.proposta_versao_numero) }
+      : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
