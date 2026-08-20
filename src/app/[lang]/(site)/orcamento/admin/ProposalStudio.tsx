@@ -176,9 +176,12 @@ import {
   type EstadoDaTraducao,
 } from "@/lib/proposal-traducao";
 import {
+  camposPorRever,
   camposPorTraduzir,
   docTemIngles,
+  confirmarTraducao,
   escreverEn,
+  estadoDoIngles,
   lerEn,
   porTraduzirPorSeccao,
 } from "@/lib/proposal-doc-bilingue";
@@ -4276,8 +4279,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     } = {},
   ) {
     if (!bilingue) return null;
-    const pt = (lerCampo(doc as ProposalDoc, campo) ?? "").trim();
     const en = lerEn(doc as ProposalDoc, campo) ?? "";
+    /**
+     * Vazia, para trás, ou em dia — e as três leem-se diferentes.
+     *
+     * Era `pt !== "" && en === ""`, que só sabia responder «vazia». Um inglês
+     * escrito contra um português que entretanto mudou passava por bom, e é
+     * esse o defeito que ela apanhou: «Reunião Inicial» com «Ceremony Decor».
+     */
+    const estado = estadoDoIngles(doc as ProposalDoc, campo);
     // `empilhada` é desta função e não da caixa: separa-se antes de passar o
     // resto, para não escorregar para o DOM como um atributo inventado.
     const { empilhada, ...daCaixa } = opts;
@@ -4287,7 +4297,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         rotulo={rotulo}
         valor={en}
         onChange={(texto) => setDoc((d) => escreverEn(d, campo, texto))}
-        porTraduzir={pt !== "" && en.trim() === ""}
+        porTraduzir={estado === "por-traduzir"}
+        desactualizada={estado === "desactualizado"}
+        aoConfirmar={() => setDoc((d) => confirmarTraducao(d, campo))}
         aoLado={!empilhada}
         {...daCaixa}
       />
@@ -8390,19 +8402,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   `aria-live` porque o número muda com o selector ao lado. */}
               {idiomaDoPdf === "en" &&
                 (() => {
+                  /*
+                   * As duas contas, e as duas frases.
+                   *
+                   * «Vai sair em português» é verdade sobre um campo VAZIO e é
+                   * falso sobre um desactualizado — esse tem inglês e vai sair
+                   * em inglês, só que no inglês errado. Duas coisas com dois
+                   * remédios: uma traduz-se, a outra relê-se.
+                   */
                   const faltam = camposPorTraduzir(doc as ProposalDoc);
-                  if (faltam.length === 0) return null;
+                  const velhas = camposPorRever(doc as ProposalDoc).filter(
+                    (c) => c.estado === "desactualizado",
+                  );
+                  if (faltam.length === 0 && velhas.length === 0) return null;
+                  const primeiro = faltam[0] ?? velhas[0];
                   return (
                     <p
                       aria-live="polite"
                       className="w-full text-right text-[11px] leading-snug text-[#8a6420]"
                     >
-                      {faltam.length === 1
-                        ? "1 campo ainda não tem versão inglesa — vai sair em português."
-                        : `${faltam.length} campos ainda não têm versão inglesa — vão sair em português.`}{" "}
+                      {faltam.length > 0 &&
+                        (faltam.length === 1
+                          ? "1 campo ainda não tem versão inglesa — vai sair em português."
+                          : `${faltam.length} campos ainda não têm versão inglesa — vão sair em português.`)}{" "}
+                      {velhas.length > 0 &&
+                        (velhas.length === 1
+                          ? "1 tradução ficou para trás do português."
+                          : `${velhas.length} traduções ficaram para trás do português.`)}{" "}
                       <button
                         type="button"
-                        onClick={() => irParaCampo(faltam[0].campo, "en")}
+                        onClick={() => irParaCampo(primeiro.campo, "en")}
                         className="font-medium underline underline-offset-2"
                       >
                         Ver quais

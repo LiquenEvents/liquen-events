@@ -64,6 +64,8 @@ export default function CaixaInglesa({
   cresce = false,
   readOnly,
   porTraduzir,
+  desactualizada,
+  aoConfirmar,
   placeholder,
   aoLado = false,
 }: {
@@ -100,6 +102,29 @@ export default function CaixaInglesa({
    * que não são o seu par.
    */
   aoLado?: boolean;
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O INGLÊS QUE FICOU PARA TRÁS
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * «Reunião Inicial» com «Ceremony Decor» por tradução: alguém traduziu, mudou
+   * depois o português, e o inglês ficou errado. Uma caixa cheia passa em todas
+   * as verificações que perguntam se ela está vazia.
+   *
+   * Marcada, lê-se DIFERENTE de por traduzir — são dois problemas com dois
+   * remédios: um traduz-se, o outro relê-se. A tracejada laranja diz «falta»; a
+   * moldura cheia e o aviso dizem «isto está aqui e pode estar errado».
+   */
+  desactualizada?: boolean;
+  /**
+   * «Já está bem assim.»
+   *
+   * Não muda o inglês — muda o que ele promete: passa a valer para o português
+   * que lá está agora. Sem este botão, o único jeito de calar o aviso era
+   * reescrever a tradução, e uma tradução certa que obriga a ser reescrita para
+   * o ecrã se calar ensina a ignorar o ecrã.
+   */
+  aoConfirmar?: () => void;
   as?: "input" | "textarea";
   rows?: number;
   /**
@@ -135,8 +160,12 @@ export default function CaixaInglesa({
     // nome a meio centímetro uma da outra.
     "aria-label": `${rotulo} (inglês)`,
     className: `${className ?? ""} ${
-      porTraduzir ? "border-dashed border-[#c08a3e]/60" : ""
-    } bg-[#4d6350]/[0.04]`.trim(),
+      desactualizada
+        ? "border-[#c0392b]/50 bg-[#c0392b]/[0.05]"
+        : porTraduzir
+          ? "border-dashed border-[#c08a3e]/60 bg-[#4d6350]/[0.04]"
+          : "bg-[#4d6350]/[0.04]"
+    }`.trim(),
   };
 
   return (
@@ -151,15 +180,31 @@ export default function CaixaInglesa({
       >
         EN
       </span>
-      {as === "textarea" ? (
-        cresce ? (
-          <TextareaQueCresce {...comuns} />
+      <div className="min-w-0 flex-1">
+        {as === "textarea" ? (
+          cresce ? (
+            <TextareaQueCresce {...comuns} />
+          ) : (
+            <textarea {...comuns} rows={rows ?? 2} />
+          )
         ) : (
-          <textarea {...comuns} rows={rows ?? 2} />
-        )
-      ) : (
-        <input {...comuns} type="text" />
-      )}
+          <input {...comuns} type="text" />
+        )}
+        {desactualizada && (
+          <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[11px] leading-snug text-[#a03123]">
+            <span>O português mudou depois desta tradução.</span>
+            {aoConfirmar && (
+              <button
+                type="button"
+                onClick={aoConfirmar}
+                className="underline underline-offset-2 hover:no-underline"
+              >
+                Já está bem assim
+              </button>
+            )}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

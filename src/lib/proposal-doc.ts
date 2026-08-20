@@ -430,6 +430,28 @@ export interface ProposalDoc {
   /** A {@link ProposalDoc.intencao} em inglês. */
   intencaoEn?: string;
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * CONTRA QUE PORTUGUÊS É QUE CADA TRADUÇÃO FOI ESCRITA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A chave é a do campo (`itemRotulo:0:2`), o valor é uma impressão digital do
+   * texto português no momento em que o inglês foi escrito ou dado por revisto.
+   *
+   * Existe para uma coisa só, e é o defeito mais grave do estúdio: «Reunião
+   * Inicial» com «Ceremony Decor» por tradução. Alguém traduziu, mudou depois o
+   * português, e o inglês ficou errado — a passar em todas as verificações,
+   * porque nenhuma delas pergunta se o inglês ainda corresponde: perguntam se
+   * ele está lá.
+   *
+   * Ver `estadoDoIngles`, em `proposal-doc-bilingue.ts`, para as regras — e em
+   * particular para o que acontece às propostas ANTERIORES a este registo, que
+   * não têm marca nenhuma e não podem por isso ser acusadas.
+   *
+   * Nunca é impresso: é do estúdio, e está no `NUNCA_NO_PDF`.
+   */
+  traducoesFeitas?: Record<string, number>;
+
   // ── 1. Apresentação ──
   /** Couple / client, e.g. "Maria & Zé". */
   clientNames: string;
