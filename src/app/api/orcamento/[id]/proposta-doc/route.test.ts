@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NextRequest } from "next/server";
 import type { Proposal } from "@/lib/orcamento/types";
 import { splitThirtySeventy } from "@/lib/money";
+import { resolveValidUntil } from "@/lib/proposal-doc";
 
 // ── Mock the auth + data layer + heavy PDF/mail side effects; keep the money
 //    math (proposal-doc) and the route logic real ──
@@ -1876,5 +1877,51 @@ describe("POST /api/orcamento/[id]/proposta-doc — envio repetido", () => {
     const corpo = await res.json();
     expect(vi.mocked(sendMail).mock.calls.length).toBe(emails + 1);
     expect(corpo.repetido).toBeUndefined();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A VALIDADE NÃO PODE ANDAR COM O CALENDÁRIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O estúdio escreve o PRAZO («válida por 60 dias»), não a data — e a data era
+ * calculada em dois sítios: aqui, para a coluna `valid_until`, e outra vez
+ * DENTRO do desenhador, que corre a cada descarga do PDF pelo link do casal.
+ *
+ * MEDIDO antes desta correcção: proposta enviada a 20-06-2026 gravava
+ * `valid_until = 2026-08-19`; o mesmo PDF, descarregado pelo link a
+ * 20-08-2026, imprimia «válida até 19 de outubro de 2026». Mais 61 dias — e
+ * mais um por cada dia que passasse.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — a validade fica congelada", () => {
+  it("a data entra no DOCUMENTO guardado, e é a mesma da coluna", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const p = created.last!;
+    expect(p.doc?.validUntil).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // As duas datas deixam de poder divergir: a coluna lê-se do documento.
+    expect(p.doc?.validUntil).toBe(p.validUntil);
+  });
+
+  it("redesenhar o documento daqui a um ano dá exactamente a mesma data", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const guardado = created.last!.doc!;
+    const daquiAUmAno = new Date(Date.now() + 365 * 24 * 60 * 60_000);
+    // É o que o desenhador do PDF faz a cada descarga (`proposal-doc-pdf.ts`).
+    expect(resolveValidUntil(guardado, daquiAUmAno)).toBe(guardado.validUntil);
+  });
+
+  it("uma data escrita à mão continua a mandar", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000, validUntil: "2027-01-31" })), { params });
+    expect(created.last!.doc?.validUntil).toBe("2027-01-31");
+    expect(created.last!.validUntil).toBe("2027-01-31");
+  });
+
+  it("o prazo escrito no estúdio é respeitado (controlo positivo)", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000, validUntilDays: 15 })), { params });
+    const guardado = created.last!.doc!;
+    // 15 dias, não os 60 por omissão — senão o teste acima passava por acaso.
+    expect(guardado.validUntil).toBe(resolveValidUntil({ validUntilDays: 15 }));
+    expect(guardado.validUntil).not.toBe(resolveValidUntil({ validUntilDays: 60 }));
   });
 });

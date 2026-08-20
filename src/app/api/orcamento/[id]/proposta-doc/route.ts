@@ -269,6 +269,36 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // cancelamento) + event-token substitution so the UI only sends what varies.
     const doc = withProposalDefaults(raw);
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * A VALIDADE CONGELA-SE AQUI, DENTRO DO DOCUMENTO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * O estúdio escreve o PRAZO («válida por 60 dias»), não a data. A data era
+     * calculada em dois sítios separados — aqui, para a coluna
+     * `proposals.valid_until`, e outra vez DENTRO do desenhador
+     * (`resolveValidUntil(doc)`, em `proposal-doc-pdf.ts`) — e o desenhador
+     * corre outra vez a CADA descarga do PDF pelo link do casal.
+     *
+     * MEDIDO: proposta enviada a 20-06-2026 grava `valid_until = 2026-08-19`;
+     * o mesmo PDF, descarregado pelo link a 20-08-2026, imprime «válida até 19
+     * de outubro de 2026». **Mais 61 dias, e mais um por cada dia que passa.**
+     * O casal ficava com dois PDF do mesmo documento a dizer coisas
+     * diferentes — o anexo do email e o do link —, e a página a marcar
+     * «expirada» com um botão ao lado a entregar um PDF que dizia o contrário.
+     *
+     * A correcção é a mesma que o `kmDeslocacao` já usa e explica: o que é um
+     * FACTO deste documento escreve-se DENTRO dele, e a partir daí mudar o
+     * relógio deixa de lhe tocar. `resolveValidUntil` honra uma data explícita
+     * no `doc`, portanto isto é idempotente: quem redesenhar amanhã, ou daqui
+     * a um ano, obtém exactamente a mesma folha.
+     *
+     * É escrito ANTES de o PDF ser desenhado, de propósito: assim o anexo que
+     * segue no email e o documento que fica guardado são o mesmo, por
+     * construção, e não por coincidência de terem sido feitos no mesmo minuto.
+     */
+    doc.validUntil = resolveValidUntil(doc);
+
     // O documento passou a ser GUARDADO (coluna `proposals.doc`), por isso o
     // tamanho deixou de ser um detalhe do pedido e passou a ser uma linha na
     // base de dados e uma linha na cópia de segurança. Medido: 4,3 KB de texto
