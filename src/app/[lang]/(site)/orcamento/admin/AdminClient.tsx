@@ -90,6 +90,7 @@ import {
   Tarefas,
   Fornecedores,
   StatsDashboard,
+  FechosMeta,
   ProposalBuilder,
   ProposalStudio,
   FazerProposta,
@@ -3596,6 +3597,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {view === "estatisticas" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <StatsDashboard quotes={activeQuotes} />
+              {/* Os casamentos fechados que têm de voltar à Meta. Vive aqui e
+                  não nas Definições porque é uma leitura de desempenho, e
+                  porque é neste ecrã que ela olha para o que a publicidade
+                  trouxe — ver o cabeçalho de `FechosMeta`. */}
+              <div className="mt-6">
+                <FechosMeta />
+              </div>
             </div>
           )}
 

@@ -145,5 +145,6 @@ pagar sem aprender nada.
 taxa: com este volume, dois pedidos contra um não distinguem nada.
 
 E o número que decide tudo — quanto vale um casamento fechado — só chega à Meta
-pela rota `/api/meta/fechos`, que tem de correr **pelo menos uma vez por
-semana**. A Meta recusa eventos de fecho com mais de sete dias, em silêncio.
+pelo painel «Casamentos fechados · Meta», no fim das **Estatísticas** do back
+office, que tem de ser usado **pelo menos uma vez por semana**. A Meta recusa
+eventos de fecho com mais de sete dias, em silêncio.

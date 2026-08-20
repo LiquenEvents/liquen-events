@@ -134,6 +134,7 @@ const servicos = splitView(() => import("./Servicos"));
 const tarefas = splitView(() => import("./Tarefas"));
 const fornecedores = splitView(() => import("./Fornecedores"));
 const estatisticas = splitView(() => import("./StatsDashboard"));
+const fechosMeta = splitView(() => import("./FechosMeta"));
 const modelosEmail = splitView(() => import("./EmailTemplates"));
 const contratos = splitView(() => import("./Contratos"));
 const inventario = splitView(() => import("./Inventario"));
@@ -151,6 +152,7 @@ export const Servicos = servicos.View;
 export const Tarefas = tarefas.View;
 export const Fornecedores = fornecedores.View;
 export const StatsDashboard = estatisticas.View;
+export const FechosMeta = fechosMeta.View;
 export const EmailTemplates = modelosEmail.View;
 export const Contratos = contratos.View;
 export const Inventario = inventario.View;
@@ -221,7 +223,13 @@ const VIEW_WARMERS: Partial<Record<View, () => Promise<void>>> = {
   inventario: inventario.warm,
   material: material.warm,
   temas: temas.warm,
-  estatisticas: estatisticas.warm,
+  // Dois módulos para uma vista só: as Estatísticas desenham o painel dos
+  // fechos da Meta por baixo dos gráficos, e aquecer só metade deixava o
+  // clique a ir buscar a outra metade à rede — que é justamente o que este
+  // aquecimento existe para evitar.
+  estatisticas: async () => {
+    await Promise.all([estatisticas.warm(), fechosMeta.warm()]);
+  },
   contratos: contratos.warm,
   "modelos-email": modelosEmail.warm,
 };
