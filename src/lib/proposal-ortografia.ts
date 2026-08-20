@@ -188,6 +188,121 @@ const POR_ERRO: ReadonlyMap<string, string> = new Map(
 );
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS TERMOS INGLESES DA CASA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma proposta da Líquen é escrita em português e leva meia dúzia de palavras
+ * inglesas que são o nome das coisas: um «seating plan» não é um «plano de
+ * lugares» e um «welcome drink» não é um «copo de boas-vindas» — é assim que
+ * elas se chamam no ofício, e é assim que os casais as procuram.
+ *
+ * Ora um corrector português não tem opinião nenhuma sobre uma palavra
+ * inglesa: para ele, «seatting» é tão estrangeira como «seating». Foi por aí
+ * que «Decoração Seatting Plan» chegou a um cliente.
+ *
+ * ── PORQUE É QUE ISTO NÃO É UMA LISTA DE ERROS ───────────────────────────
+ *
+ * Porque a lista de erros já existe (a {@link GRAFIAS_DA_CASA}, ali em cima) e
+ * tem um tecto: só apanha os enganos que alguém já viu acontecer e se lembrou
+ * de escrever. Acrescentar «wellcome», «cocktaill» e «brunchh» à mão era
+ * adivinhar de que maneira é que ela vai escrever mal uma palavra que ainda
+ * não escreveu mal.
+ *
+ * Esta lista é dos termos CERTOS, e a regra que os defende é uma só: uma
+ * palavra que não se conhece, mas que passa a ser um destes termos quando se
+ * DESDOBRA uma letra repetida, é uma gralha. «seatting» → «seating»,
+ * «plann» → «plan», «wellcome» → «welcome», «cocktaill» → «cocktail».
+ *
+ * É exactamente o engano que estas palavras provocam em quem escreve
+ * português: a consoante dobrada inglesa que a mão portuguesa dobra onde não
+ * deve, ou dobra a mais.
+ *
+ * ── E PORQUE É QUE NÃO DISPARA EM PALAVRAS BOAS ─────────────────────────
+ *
+ * Porque só se olha para o que já não foi reconhecido, e porque a forma
+ * desdobrada tem de ser um destes termos EXACTAMENTE. Uma palavra portuguesa
+ * com consoante dobrada — «carro», «pessoa», «terra» — desdobra para «caro»,
+ * «pesoa», «tera», e nenhuma delas está nesta lista nem pode estar: só entram
+ * palavras inglesas do ofício.
+ */
+const TERMOS_INGLESES_DA_CASA: readonly string[] = [
+  "seating",
+  "seatings",
+  "plan",
+  "plans",
+  "cocktail",
+  "cocktails",
+  "welcome",
+  "drink",
+  "drinks",
+  "save",
+  "date",
+  "brunch",
+  "lounge",
+  "catering",
+  "buffet",
+  "coffee",
+  "break",
+  "after",
+  "party",
+  "finger",
+  "food",
+  "photo",
+  "booth",
+  "dress",
+  "code",
+  "mood",
+  "board",
+  "boards",
+  "boho",
+  "candy",
+  "bar",
+  "kids",
+  "corner",
+  "chill",
+  "out",
+  "open",
+  "table",
+  "wedding",
+  "planner",
+  "styling",
+  "backdrop",
+  "arch",
+  "greenery",
+];
+
+const TERMOS_INGLESES = new Set(TERMOS_INGLESES_DA_CASA);
+
+/**
+ * A mesma palavra com UMA letra repetida desdobrada, em todas as posições onde
+ * ela se repete.
+ *
+ * «seatting» dá «seating»; «plann» dá «plan»; «bookkeeping» daria
+ * «bokkeeping», «bookeeping» e «bookkeping» — três candidatos, e é por isso
+ * que se devolvem todos: a palavra pode ter mais do que um par dobrado e não
+ * se sabe qual é o errado sem experimentar.
+ */
+function semUmaLetraDobrada(palavra: string): string[] {
+  const saida: string[] = [];
+  for (let i = 1; i < palavra.length; i += 1) {
+    if (palavra[i] === palavra[i - 1]) saida.push(palavra.slice(0, i) + palavra.slice(i + 1));
+  }
+  return saida;
+}
+
+/** O termo inglês da casa que esta palavra QUERIA ser, ou nada. */
+function termoInglesQuaseCerto(minuscula: string): string | undefined {
+  // Já é um deles: não há nada a dizer. É esta linha que impede o aviso de
+  // tocar sobre a palavra bem escrita.
+  if (TERMOS_INGLESES.has(minuscula)) return undefined;
+  for (const candidato of semUmaLetraDobrada(minuscula)) {
+    if (TERMOS_INGLESES.has(candidato)) return candidato;
+  }
+  return undefined;
+}
+
+/**
  * A grafia boa de uma palavra escrita, venha ela do acento ou da lista da casa.
  *
  * ── O NOME NÃO É INOCENTE ─────────────────────────────────────────────────
@@ -212,7 +327,15 @@ const POR_ERRO: ReadonlyMap<string, string> = new Map(
  * identificadores começados por «cert», por mais portuguesa que seja a palavra.
  */
 function grafiaDe(palavra: string): string | undefined {
-  return POR_CHAVE.get(semAcentos(palavra)) ?? POR_ERRO.get(palavra.toLowerCase());
+  const minuscula = palavra.toLowerCase();
+  return (
+    POR_CHAVE.get(semAcentos(palavra)) ??
+    POR_ERRO.get(minuscula) ??
+    // Por último, e é de propósito: as duas listas de cima são fechadas e
+    // sabem o que dizem. A regra da letra dobrada é uma inferência, e uma
+    // inferência nunca pode ganhar a uma palavra que está numa lista.
+    termoInglesQuaseCerto(minuscula)
+  );
 }
 
 /**
