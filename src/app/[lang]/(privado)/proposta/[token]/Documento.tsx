@@ -266,6 +266,26 @@ export default function Documento({
   const comIvaDito = (texto: string) =>
     totais.modo === "acrescer" && !/\+\s*(iva|vat)/i.test(texto) ? `${texto} ${t.maisIva}` : texto;
 
+  /**
+   * ── UM CABEÇALHO DE ORÇAMENTO COM NADA POR BAIXO ─────────────────────────
+   *
+   * É o mesmo defeito que a página já tinha corrigido no quadro de linhas, e
+   * que o comentário de lá descreve: «o noivo que abre a página para decidir
+   * gastar milhares de euros via o cabeçalho, NADA por baixo». Um documento a
+   * meio — uma proposta antiga guardada sem orçamento nenhum — desenhava aqui
+   * «O investimento / Orçamento Proposto» e ar. A secção só existe quando tem
+   * mesmo alguma coisa para dizer.
+   */
+  const temOrcamento =
+    rubricas.length > 0 ||
+    linhasEstimadas.length > 0 ||
+    totais.aPagar > 0 ||
+    totalEscrito !== "" ||
+    (doc.budgetNote ?? "").trim() !== "" ||
+    (fixos.notasImportantes ?? []).length > 0 ||
+    (fixos.incluido ?? []).length > 0 ||
+    (fixos.naoIncluido ?? []).length > 0;
+
   // ── O ÍNDICE ──────────────────────────────────────────────────────────────
   // Não é navegação: são saltos DENTRO desta página. É o que responde ao «as
   // fotografias ficam em terceiro lugar» sem reordenar o documento dela.
@@ -281,10 +301,7 @@ export default function Documento({
   const indice = [
     (doc.serviceGroups ?? []).length > 0 && { href: "#servicos", texto: t.tituloServicos },
     boards.length > 0 && { href: "#inspiracao", texto: p.inspiracao },
-    (rubricas.length > 0 || linhasEstimadas.length > 0 || totais.aPagar > 0) && {
-      href: "#orcamento",
-      texto: t.tituloOrcamento,
-    },
+    temOrcamento && { href: "#orcamento", texto: t.tituloOrcamento },
     (fixos.condicoesGerais ?? []).length > 0 && {
       href: "#condicoes",
       texto: t.tituloCondicoes,
@@ -426,146 +443,152 @@ export default function Documento({
       )}
 
       {/* ── ORÇAMENTO ────────────────────────────────────────────────────── */}
-      <Seccao>
-        <Titulo id="orcamento" sobretitulo={t.sobretituloOrcamento} titulo={t.tituloOrcamento} />
+      {temOrcamento && (
+        <Seccao>
+          <Titulo id="orcamento" sobretitulo={t.sobretituloOrcamento} titulo={t.tituloOrcamento} />
 
-        {rubricas.length > 0 && (
-          <ul className="mt-8">
-            {rubricas.map((r, i) => (
-              <li
-                key={i}
-                className="border-foreground/8 flex items-baseline justify-between gap-4 border-b py-3"
-              >
-                <span className="text-foreground/85 text-[15px]">{r.item}</span>
-                {r.extra && (
-                  <span className="text-foreground/55 shrink-0 text-[11px] tracking-[0.14em] uppercase">
-                    {t.marcaExtra}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {/* ── O QUADRO ESTIMADO (modelo Organização) ──────────────────────
+          {rubricas.length > 0 && (
+            <ul className="mt-8">
+              {rubricas.map((r, i) => (
+                <li
+                  key={i}
+                  className="border-foreground/8 flex items-baseline justify-between gap-4 border-b py-3"
+                >
+                  <span className="text-foreground/85 text-[15px]">{r.item}</span>
+                  {r.extra && (
+                    <span className="text-foreground/55 shrink-0 text-[11px] tracking-[0.14em] uppercase">
+                      {t.marcaExtra}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {/* ── O QUADRO ESTIMADO (modelo Organização) ──────────────────────
             Rubrica à esquerda, o preço que ela escreveu à direita. Uma linha
             ainda por orçamentar fica com a coluna em branco. */}
-        {linhasEstimadas.length > 0 && (
-          <ul className="mt-8">
-            {linhasEstimadas.map((r, i) => (
-              <li
-                key={i}
-                className="border-foreground/8 flex items-baseline justify-between gap-4 border-b py-3"
-              >
-                <span className="text-foreground/85 text-[15px]">{r.item}</span>
-                <span className="text-foreground/75 shrink-0 text-sm tabular-nums">{r.preco}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+          {linhasEstimadas.length > 0 && (
+            <ul className="mt-8">
+              {linhasEstimadas.map((r, i) => (
+                <li
+                  key={i}
+                  className="border-foreground/8 flex items-baseline justify-between gap-4 border-b py-3"
+                >
+                  <span className="text-foreground/85 text-[15px]">{r.item}</span>
+                  <span className="text-foreground/75 shrink-0 text-sm tabular-nums">
+                    {r.preco}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
 
-        {quantosExtras > 0 && (
-          <p className="text-foreground/60 mt-3 text-[13px] leading-relaxed">
-            {quantosExtras === 1 ? t.umaLinhaExtra : t.variasLinhasExtra(quantosExtras)}
-          </p>
-        )}
+          {quantosExtras > 0 && (
+            <p className="text-foreground/60 mt-3 text-[13px] leading-relaxed">
+              {quantosExtras === 1 ? t.umaLinhaExtra : t.variasLinhasExtra(quantosExtras)}
+            </p>
+          )}
 
-        {/* ── A ESCADA DOS TOTAIS ───────────────────────────────────────────
+          {/* ── A ESCADA DOS TOTAIS ───────────────────────────────────────────
             Os seis números saem de `totaisDaProposta`, de uma vez: aqui não se
             faz uma única conta. Foi assim que o gerador deixou de poder
             imprimir parcelas em unidades diferentes, e é a mesma razão. */}
-        {totais.aPagar > 0 ? (
-          <div className="mt-8">
-            {extras.length > 0 && (
-              <>
-                <div className="flex items-baseline justify-between gap-4 py-1.5">
-                  <span className="text-foreground/80 text-sm font-medium">
-                    {org ? t.subtotalServicosEstimado : t.subtotalServicos}
-                  </span>
+          {totais.aPagar > 0 ? (
+            <div className="mt-8">
+              {extras.length > 0 && (
+                <>
+                  <div className="flex items-baseline justify-between gap-4 py-1.5">
+                    <span className="text-foreground/80 text-sm font-medium">
+                      {org ? t.subtotalServicosEstimado : t.subtotalServicos}
+                    </span>
+                    <span className="text-foreground/80 text-sm tabular-nums">
+                      {eur(totais.servicos)}
+                    </span>
+                  </div>
+                  {extras.map((e, i) => (
+                    <div key={i} className="flex items-baseline justify-between gap-4 py-1.5">
+                      <span className="text-foreground/70 text-sm">{e.label}</span>
+                      <span className="text-foreground/70 text-sm tabular-nums">{e.valueText}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              <div className="border-foreground/15 mt-3 border-t pt-3">
+                <div className="flex items-baseline justify-between gap-4 py-1">
+                  <span className="text-foreground/80 text-sm font-medium">{t.totalSemIva}</span>
                   <span className="text-foreground/80 text-sm tabular-nums">
-                    {eur(totais.servicos)}
+                    {eur(totais.total)}
                   </span>
                 </div>
-                {extras.map((e, i) => (
-                  <div key={i} className="flex items-baseline justify-between gap-4 py-1.5">
-                    <span className="text-foreground/70 text-sm">{e.label}</span>
-                    <span className="text-foreground/70 text-sm tabular-nums">{e.valueText}</span>
-                  </div>
-                ))}
-              </>
-            )}
-            <div className="border-foreground/15 mt-3 border-t pt-3">
-              <div className="flex items-baseline justify-between gap-4 py-1">
-                <span className="text-foreground/80 text-sm font-medium">{t.totalSemIva}</span>
-                <span className="text-foreground/80 text-sm tabular-nums">{eur(totais.total)}</span>
-              </div>
-              <div className="flex items-baseline justify-between gap-4 py-1">
-                <span className="text-foreground/70 text-sm">{t.iva(taxa)}</span>
-                <span className="text-foreground/70 text-sm tabular-nums">{eur(totais.iva)}</span>
-              </div>
-              <div className="border-foreground/15 mt-3 flex items-baseline justify-between gap-4 border-t pt-4">
-                <span className="text-foreground/75 text-sm font-medium">{t.totalAPagar}</span>
-                <span
-                  className="text-moss tabular-nums"
-                  style={{
-                    fontFamily: "var(--font-playfair)",
-                    fontSize: "clamp(22px, 3.2vw, 30px)",
-                  }}
-                >
-                  {eur(totais.aPagar)}
-                </span>
+                <div className="flex items-baseline justify-between gap-4 py-1">
+                  <span className="text-foreground/70 text-sm">{t.iva(taxa)}</span>
+                  <span className="text-foreground/70 text-sm tabular-nums">{eur(totais.iva)}</span>
+                </div>
+                <div className="border-foreground/15 mt-3 flex items-baseline justify-between gap-4 border-t pt-4">
+                  <span className="text-foreground/75 text-sm font-medium">{t.totalAPagar}</span>
+                  <span
+                    className="text-moss tabular-nums"
+                    style={{
+                      fontFamily: "var(--font-playfair)",
+                      fontSize: "clamp(22px, 3.2vw, 30px)",
+                    }}
+                  >
+                    {eur(totais.aPagar)}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          /* Sem euros que se consigam somar — uma proposta a meio, ou um total
+          ) : (
+            /* Sem euros que se consigam somar — uma proposta a meio, ou um total
              escrito «a definir» — imprime-se o que o estúdio escreveu, com o
              «+ IVA» garantido. Não se inventa uma escada de zeros. */
-          totalEscrito && (
-            <div className="border-foreground/15 mt-8 flex items-baseline justify-between gap-4 border-t pt-4">
-              <span className="text-foreground/75 text-sm font-medium">
-                {rotuloDoTotalNaLingua(doc, idioma)}
-              </span>
-              <span
-                className="text-moss"
-                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 3vw, 28px)" }}
-              >
-                {comIvaDito(totalEscrito)}
-              </span>
+            totalEscrito && (
+              <div className="border-foreground/15 mt-8 flex items-baseline justify-between gap-4 border-t pt-4">
+                <span className="text-foreground/75 text-sm font-medium">
+                  {rotuloDoTotalNaLingua(doc, idioma)}
+                </span>
+                <span
+                  className="text-moss"
+                  style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(20px, 3vw, 28px)" }}
+                >
+                  {comIvaDito(totalEscrito)}
+                </span>
+              </div>
+            )
+          )}
+
+          {doc.budgetNote?.trim() && (
+            <p className="text-foreground/65 mt-6 text-[13px] leading-relaxed">
+              {t.nota(doc.budgetNote.trim())}
+            </p>
+          )}
+
+          {(fixos.notasImportantes ?? []).length > 0 && (
+            <div className="mt-10">
+              <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
+                {t.notasImportantes}
+              </h3>
+              <Lista itens={fixos.notasImportantes} />
             </div>
-          )
-        )}
-
-        {doc.budgetNote?.trim() && (
-          <p className="text-foreground/65 mt-6 text-[13px] leading-relaxed">
-            {t.nota(doc.budgetNote.trim())}
-          </p>
-        )}
-
-        {(fixos.notasImportantes ?? []).length > 0 && (
-          <div className="mt-10">
-            <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
-              {t.notasImportantes}
-            </h3>
-            <Lista itens={fixos.notasImportantes} />
-          </div>
-        )}
-        {(fixos.incluido ?? []).length > 0 && (
-          <div className="mt-8">
-            <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
-              {t.incluidoNaProposta}
-            </h3>
-            <Lista itens={fixos.incluido} />
-          </div>
-        )}
-        {(fixos.naoIncluido ?? []).length > 0 && (
-          <div className="mt-8">
-            <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
-              {t.naoIncluidoNoOrcamento}
-            </h3>
-            <Lista itens={fixos.naoIncluido} />
-          </div>
-        )}
-      </Seccao>
+          )}
+          {(fixos.incluido ?? []).length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
+                {t.incluidoNaProposta}
+              </h3>
+              <Lista itens={fixos.incluido} />
+            </div>
+          )}
+          {(fixos.naoIncluido ?? []).length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
+                {t.naoIncluidoNoOrcamento}
+              </h3>
+              <Lista itens={fixos.naoIncluido} />
+            </div>
+          )}
+        </Seccao>
+      )}
 
       {/* ── CONDIÇÕES GERAIS ─────────────────────────────────────────────── */}
       {(fixos.condicoesGerais ?? []).length > 0 && (

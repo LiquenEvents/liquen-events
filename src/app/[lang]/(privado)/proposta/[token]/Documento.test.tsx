@@ -258,3 +258,51 @@ describe("o modelo Organização", () => {
     expect(screen.queryByText("Valor Total")).toBeNull();
   });
 });
+
+describe("um documento a meio não desenha cabeçalhos vazios", () => {
+  /**
+   * As propostas antigas guardadas com pouco mais do que a referência. É o
+   * mesmo defeito que o quadro de linhas desta página já tinha corrigido: um
+   * cabeçalho «Orçamento Proposto» com ar por baixo, na página mais cara do
+   * produto.
+   */
+  const MAGRO = {
+    ref: "PO Decoração",
+    clientNames: "Ana & Rui",
+    serviceGroups: [],
+    moodBoards: [],
+    budgetItems: [],
+    coverImages: [],
+    totalAmount: 0,
+    totalText: "",
+    notasImportantes: [],
+    incluido: [],
+    naoIncluido: [],
+    condicoesGerais: [],
+    observacoesGerais: [],
+    faseamento: [],
+    cancelamento: [],
+  } as unknown as ProposalDoc;
+
+  it("sem orçamento nenhum, a secção não existe", () => {
+    render(<Documento doc={MAGRO} idioma="pt" fotos={[]} token="tk" />);
+    expect(screen.queryByRole("heading", { name: "Orçamento Proposto" })).toBeNull();
+    // CONTROLO POSITIVO: com uma rubrica, a mesma secção aparece. Sem isto, um
+    // renderizador que nunca desenhasse orçamento nenhum passava por correcto.
+    cleanup();
+    render(
+      <Documento
+        doc={{ ...MAGRO, budgetItems: ["Decor Cerimónia"] } as ProposalDoc}
+        idioma="pt"
+        fotos={[]}
+        token="tk"
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Orçamento Proposto" })).toBeTruthy();
+  });
+
+  it("e o casal continua a ler a apresentação, sem a página partir", () => {
+    render(<Documento doc={MAGRO} idioma="pt" fotos={[]} token="tk" />);
+    expect(screen.getByText("Ana & Rui")).toBeTruthy();
+  });
+});
