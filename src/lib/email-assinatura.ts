@@ -235,10 +235,12 @@ function imagemDoEmail(nome: string): Buffer | null {
 type Rede = { nome: string; url: string };
 
 /**
- * As redes que ESTÃO configuradas. O LinkedIn ainda não tem endereço
- * (`SITE.linkedin` está vazio de propósito, com a nota lá): fica de fora
- * enquanto assim for, porque um link social que não vai a lado nenhum é pior
- * do que não ter link nenhum. Assim que o endereço lá estiver, aparece sozinho.
+ * As redes que ESTÃO configuradas.
+ *
+ * A lista é filtrada e não fixa: uma rede sem endereço fica de fora, porque um
+ * ícone social a apontar para lado nenhum é pior do que não haver ícone. O
+ * LinkedIn esteve vazio até ela dar o endereço do perfil; entrou sozinho
+ * quando o `SITE.linkedin` deixou de estar vazio, sem se tocar aqui.
  */
 function redesConfiguradas(): Rede[] {
   // Pela ORDEM da assinatura dela: Facebook, Instagram, LinkedIn.

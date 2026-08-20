@@ -299,6 +299,9 @@ const contractSchema = z.looseObject({
   acceptedAt: stamp,
   acceptedName: text(300),
   acceptedIp: text(120),
+  // A língua do contrato. Ausente nos contratos anteriores a este campo, e
+  // ausente lê-se como português — ver `contract-types.ts`.
+  idioma: z.enum(["pt", "en"]).optional(),
 });
 
 const inventorySchema = z.looseObject({

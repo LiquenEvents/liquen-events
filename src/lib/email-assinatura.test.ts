@@ -76,13 +76,38 @@ describe("assinaturaDeEmail", () => {
 
   it("as redes saem em ícones, cada um com o nome no `alt`", () => {
     const { html, anexos } = assinaturaDeEmail();
-    for (const rede of ["Facebook", "Instagram"]) {
+    for (const rede of ["Facebook", "Instagram", "LinkedIn"]) {
       expect(html).toContain(`cid:liquen-social-${rede.toLowerCase()}`);
       expect(html).toContain(`alt="${rede}"`);
       expect(anexos.some((a) => a.cid === `liquen-social-${rede.toLowerCase()}`)).toBe(true);
     }
     // O `width`/`height` no ATRIBUTO é a única forma que o Outlook respeita.
     expect(html).toMatch(/<img src="cid:liquen-social-[a-z]+" alt="[^"]+" width="18" height="18"/);
+  });
+
+  /**
+   * ── O «í» DO LINKEDIN ──────────────────────────────────────────────────
+   *
+   * O perfil dela é `pt.linkedin.com/company/líquen-events`, com acento. Um
+   * `href` com uma letra acentuada crua é um endereço que cada cliente de
+   * correio resolve à sua maneira, e os que não o convertem cortam o link no
+   * «í» — o ícone ficava a apontar para `…/company/l`.
+   */
+  it("o endereço do LinkedIn vai percent-encoded, para atravessar o correio", () => {
+    const { html } = assinaturaDeEmail();
+    expect(html).toContain("https://pt.linkedin.com/company/l%C3%ADquen-events");
+    expect(html).not.toContain("company/líquen-events");
+  });
+
+  it("uma rede sem endereço não desenha ícone nenhum", () => {
+    // O filtro é o que permitiu o LinkedIn entrar sozinho no dia em que ela
+    // deu o endereço, sem se mexer no desenho. Sem este teste, a lista podia
+    // voltar a ser fixa e um ícone a apontar para lado nenhum passava.
+    const html = assinaturaDeEmail().html;
+    for (const rede of ["Facebook", "Instagram", "LinkedIn"]) {
+      expect(html).toContain(`alt="${rede}"`);
+    }
+    expect(html).not.toMatch(/href=""/);
   });
 
   it("já não repete o logótipo por cima do nome — a marca está na faixa", () => {

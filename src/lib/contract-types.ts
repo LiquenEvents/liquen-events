@@ -21,6 +21,20 @@ export interface Contract {
   clientEmail: string;
   /** Version of the terms the client agreed to (e.g. "2026-01"). */
   termsVersion: string;
+  /**
+   * ── A LÍNGUA DESTE CONTRATO ─────────────────────────────────────────────
+   *
+   * A da PROPOSTA que lhe deu origem, copiada no momento em que o contrato
+   * nasce. Decide o texto dos termos congelado em `termsSnapshot` e a língua
+   * em que o PDF é desenhado.
+   *
+   * AUSENTE em todos os contratos anteriores a este campo, e lê-se como
+   * português — que é o que eles são, e o que sempre foi impresso.
+   *
+   * A versão portuguesa dos termos PREVALECE numa divergência, e é o próprio
+   * texto inglês que o diz (ponto 9). Ver o cabeçalho do `DEFAULT_TERMS_EN`.
+   */
+  idioma?: "pt" | "en";
   /** Full plain-text snapshot of the terms AS SHOWN, frozen at acceptance so a
    *  later edit to DEFAULT_TERMS can never rewrite what was agreed. */
   termsSnapshot: string;

@@ -10,6 +10,7 @@ import {
 } from "@/lib/semear-producao";
 import { getProposalByQuote, updateProposal } from "@/lib/proposals-store";
 import { createContractIfAbsent, newContractId } from "@/lib/contracts-store";
+import { idiomaDaProposta } from "@/lib/proposta-idioma";
 import { TERMS_VERSION, termosPara, termsToPlainText } from "@/lib/contract-terms";
 import { depositPercentOf, type ProposalDoc } from "@/lib/proposal-doc";
 import { isAuthed } from "@/lib/admin-auth";
@@ -502,8 +503,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               clientName: proposta.clientName,
               clientEmail: proposta.clientEmail,
               termsVersion: TERMS_VERSION,
+              /**
+               * ── E NA LÍNGUA DA PROPOSTA ─────────────────────────────────
+               *
+               * Os termos existem nas duas línguas desde que ela o pediu («o
+               * contrato quer que exista também em inglês»), e a língua não é
+               * uma escolha nova: é a que a proposta levou. Um casal que
+               * recebeu a proposta em inglês aceita o contrato em inglês.
+               *
+               * O snapshot congela o texto NA LÍNGUA QUE ELES VIRAM — é essa a
+               * função dele, ser a cópia do que foi aceite. A versão portuguesa
+               * prevalece numa divergência, e é o próprio texto inglês que o
+               * diz (ponto 9); ver o cabeçalho do `DEFAULT_TERMS_EN`.
+               */
+              idioma: idiomaDaProposta(proposta),
               termsSnapshot: termsToPlainText(
-                termosPara(depositPercentOf(proposta.doc as ProposalDoc | undefined)),
+                termosPara(
+                  depositPercentOf(proposta.doc as ProposalDoc | undefined),
+                  idiomaDaProposta(proposta),
+                ),
               ),
               status: "pendente",
               createdAt: new Date().toISOString(),

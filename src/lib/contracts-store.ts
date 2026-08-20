@@ -53,6 +53,10 @@ export const mapper: Mapper<Contract> = {
     // `alter table` ainda não correu continuar a aceitar um contrato.
     ...(c.registadoPor !== undefined ? { registado_por: c.registadoPor } : {}),
     ...(c.registadoComo !== undefined ? { registado_como: c.registadoComo } : {}),
+    // A língua do contrato. Mesmo cuidado dos outros campos novos: só entra na
+    // linha quando existe, para uma base onde o `alter table` ainda não correu
+    // continuar a aceitar um contrato. Ausente lê-se como português.
+    ...(c.idioma !== undefined ? { idioma: c.idioma } : {}),
   }),
   fromRow: (r) => ({
     id: String(r.id),
@@ -75,6 +79,7 @@ export const mapper: Mapper<Contract> = {
       : {}),
     ...(r.registado_por ? { registadoPor: String(r.registado_por) } : {}),
     ...(r.registado_como ? { registadoComo: String(r.registado_como) } : {}),
+    ...(r.idioma === "en" ? { idioma: "en" as const } : {}),
   }),
   order: { column: "created_at", ascending: false },
   fileCompare: (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt),
