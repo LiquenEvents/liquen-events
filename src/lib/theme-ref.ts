@@ -49,6 +49,17 @@
 /** Bucket das fotos da Biblioteca de Temas, em tamanho de arquivo (2200 px). */
 export const THEME_BUCKET = "theme-assets";
 
+/**
+ * A derivada INTERMÉDIA (1200 px) das fotos da Biblioteca.
+ *
+ * A razão está escrita ao lado da irmã das propostas
+ * (`PROPOSAL_MID_BUCKET`, em `proposal-storage.ts`): a grelha da página do
+ * casal esticava uma miniatura de 400 px para os ~1030 que um telemóvel
+ * moderno pede, e via-se. Uma foto referida da Biblioteca dentro de um mood
+ * board tem exactamente o mesmo problema, e por isso tem a mesma solução.
+ */
+export const THEME_MID_BUCKET = "theme-medias";
+
 /** Miniaturas (400 px) — a mesma chave do original, noutro bucket. */
 export const THEME_THUMB_BUCKET = "theme-thumbs";
 

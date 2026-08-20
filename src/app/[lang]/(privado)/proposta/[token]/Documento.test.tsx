@@ -170,6 +170,41 @@ describe("as condições gerais", () => {
 });
 
 describe("as fotografias", () => {
+  /**
+   * ── A CAPA É A MAIOR IMAGEM DA PÁGINA ───────────────────────────────────
+   *
+   * Desenha-se com a largura toda do documento — até 1024 px numa janela
+   * larga, ~1170 pixéis num iPhone. Se pedir só a miniatura de 400, é a mesma
+   * imagem esticada da galeria, na primeira coisa que o casal vê ao abrir.
+   */
+  const capa = () => {
+    const img = document.querySelector("img");
+    if (!img) throw new Error("a capa não se desenhou");
+    return img;
+  };
+
+  it("a capa oferece a derivada intermédia, e não só a miniatura", () => {
+    desenhar();
+    const srcset = capa().getAttribute("srcset") ?? "";
+    expect(srcset).toContain("mini/capa 400w");
+    expect(srcset).toContain("/api/proposta/tk/foto/c0 1200w");
+  });
+
+  it("e diz que largura ocupa — senão pede sempre a maior", () => {
+    desenhar();
+    expect(capa().getAttribute("sizes")).toBe("(min-width: 1024px) 1024px, 100vw");
+  });
+
+  it("uma capa sem miniatura fica com o original e sem `srcset` a mentir", () => {
+    // Sem miniatura não há candidato de 400 px: um `srcset` com uma medida só
+    // dizia ao navegador que o original tem 1200, e ele tem 2200.
+    render(
+      <Documento doc={DOC} idioma="pt" fotos={[{ id: "c0", original: "orig/capa" }]} token="tk" />,
+    );
+    expect(capa().getAttribute("src")).toBe("orig/capa");
+    expect(capa().getAttribute("srcset")).toBeNull();
+  });
+
   it("a grelha pede a MINIATURA, nunca o original", () => {
     desenhar();
     const fontes = [...document.querySelectorAll("img")].map((i) => i.getAttribute("src"));

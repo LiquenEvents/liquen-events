@@ -708,6 +708,12 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       // token abre. Não muda o estado do pedido, não gera contrato, não manda
       // email — não é o aceite, e há um teste ao lado a prendê-lo.
       "./proposta/[token]/escolha/route",
+      // A fotografia no tamanho que o ecrã pede. Mesmo modelo de confiança do
+      // `/fotos` ao lado, e a MESMA regra que o torna seguro: o parâmetro é o
+      // id OPACO da foto dentro daquele documento, e o caminho real sai do
+      // `doc` que o token abre. Uma rota que aceitasse caminhos serviria, com
+      // o token de um casal, qualquer ficheiro da Biblioteca de Temas.
+      "./proposta/[token]/foto/[id]/route",
       "./proposta/route",
       "./cron/reminders/route",
       // A cópia de segurança automática. Mesmo guarda das irmãs (Bearer com
@@ -867,6 +873,14 @@ describe("TOKEN-guarded routes deny a bad token", () => {
     const res = await fn(req("GET"), ctx());
     expect(res.status).toBe(404);
     expect(calls).toEqual([]); // nunca chegou à proposta nem ao Storage
+  });
+
+  it("GET /api/proposta/[token]/foto/[id] → 404 on a bad token, e não toca no Storage", async () => {
+    // Um token forjado não pode fabricar nem servir uma derivada de nada.
+    const fn = await handler("./proposta/[token]/foto/[id]/route", "GET");
+    const res = await fn(req("GET"), ctx());
+    expect(res.status).toBe(404);
+    expect(calls).toEqual([]);
   });
 
   it("POST /api/proposta/[token]/escolha → 404 on a bad token, e não escreve nada", async () => {

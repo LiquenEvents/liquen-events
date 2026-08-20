@@ -3,11 +3,14 @@ import sharp from "sharp";
 import { getSupabase } from "@/lib/supabase";
 import {
   PROPOSAL_BUCKET,
+  PROPOSAL_MID_BUCKET,
   PROPOSAL_THUMB_BUCKET,
+  uploadProposalMid,
   uploadProposalThumb,
 } from "@/lib/proposal-storage";
 import {
   THEME_BUCKET,
+  THEME_MID_BUCKET,
   THEME_THUMB_BUCKET,
   THEME_MICRO_BUCKET,
   ehRefDeTema,
@@ -78,6 +81,20 @@ export const LOTE = 25;
  * por onde foi fabricada.
  */
 const MINIATURA = { lado: 400, qualidade: 78 } as const;
+
+/**
+ * A DERIVADA INTERMÉDIA, e a conta que a justifica.
+ *
+ * 1200 px porque é o que cobre os dois casos que interessam sem servir o
+ * original: um telemóvel de 390 pontos com três pixéis por ponto pede ~1030, e
+ * um computador com ecrã de retina em três colunas pede ~680. O original
+ * (2200 px, ~2,6 MB) fica para a lupa, que é o único sítio onde os pixéis
+ * todos valem os bytes.
+ *
+ * Qualidade 80 e não 78: esta é a que o casal vê em grande no telemóvel, e os
+ * dois pontos custam ~15 KB numa imagem que já pesa 200.
+ */
+const MEDIA = { lado: 1200, qualidade: 80 } as const;
 
 const FAMILIAS = [
   {
@@ -400,5 +417,88 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
     const dito = e instanceof Error ? e.message : String(e);
     log.warn("derivadas: miniatura a pedido falhou", { caminho: chave, erro: dito });
     return { bytes: null, motivo: "sharp-falhou", detalhe: dito.slice(0, 300) };
+  }
+}
+
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DERIVADA INTERMÉDIA, A PEDIDO — a que a página do casal mostra
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Irmã do {@link miniaturaAPedidoComMotivo}, com o mesmo desenho e um tamanho
+ * diferente: procura no bucket das intermédias, e só fabrica se não estiver lá.
+ *
+ * ── PORQUE É QUE ISTO É UMA FUNÇÃO E NÃO UM PARÂMETRO DA OUTRA ───────────
+ *
+ * Porque as duas têm regras diferentes onde importa. A miniatura é a imagem da
+ * GRELHA DO ESTÚDIO e do seletor, e existe em lote (`gerarLoteDeDerivadas`)
+ * para a biblioteca abrir depressa. Esta existe só para a PÁGINA DO CASAL, é
+ * fabricada à primeira visita e mais nada — não entra no contador de derivadas
+ * em falta, e não se gera em lote para milhares de fotos da Biblioteca que
+ * nunca vão parar a uma proposta.
+ *
+ * NUNCA LANÇA. Um `null` daqui quer dizer «serve o que tinhas»: quem chama cai
+ * para a miniatura ou para o original, que é o comportamento de sempre.
+ */
+export async function derivadaMediaAPedido(
+  caminho: string,
+): Promise<{ bytes: Buffer | null; motivo: MotivoDaMiniatura }> {
+  const sb = getSupabase();
+  if (!sb || !caminho) return { bytes: null, motivo: "sem-storage" };
+  const daBiblioteca = ehRefDeTema(caminho);
+  const origem = daBiblioteca ? THEME_BUCKET : PROPOSAL_BUCKET;
+  const destino = daBiblioteca ? THEME_MID_BUCKET : PROPOSAL_MID_BUCKET;
+  const chave = daBiblioteca ? caminhoDoRefDeTema(caminho) : caminho;
+  if (!chave || chave.includes("..")) return { bytes: null, motivo: "caminho-invalido" };
+
+  // Já lá está? É o caso normal a partir da segunda visita, e custa um download
+  // em vez de um download + um `sharp` + um upload.
+  try {
+    const { data } = await sb.storage.from(destino).download(chave);
+    if (data) return { bytes: Buffer.from(await data.arrayBuffer()), motivo: "ok" };
+  } catch {
+    /* segue para gerar */
+  }
+
+  try {
+    const { data, error } = await sb.storage.from(origem).download(chave);
+    if (error || !data) {
+      const dito = error?.message ?? "sem dados";
+      const semResposta = /fetch failed|network|timeout|ENOTFOUND|ECONNREFUSED/i.test(dito);
+      return { bytes: null, motivo: semResposta ? "storage-sem-resposta" : "original-em-falta" };
+    }
+    const bytes = Buffer.from(await data.arrayBuffer());
+    const derivada = await sharp(bytes)
+      .rotate()
+      // `withoutEnlargement`: uma fotografia que já seja mais pequena do que
+      // 1200 sai como está. Esticá-la aqui seria fabricar pixéis que não
+      // existem e cobrar os bytes deles ao telemóvel do casal.
+      .resize(MEDIA.lado, MEDIA.lado, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: MEDIA.qualidade, mozjpeg: true })
+      .toBuffer();
+    // Guardar é melhor esforço, como na miniatura: falhar só quer dizer que a
+    // visita seguinte volta a pagar o `sharp`.
+    if (daBiblioteca) {
+      const { error: erroSubida } = await sb.storage
+        .from(destino)
+        .upload(chave, derivada, { contentType: "image/jpeg", upsert: false });
+      if (erroSubida && !/exist/i.test(erroSubida.message)) {
+        log.warn("derivadas: intermédia a pedido não ficou guardada", {
+          destino,
+          erro: erroSubida.message,
+        });
+      }
+    } else {
+      // Pelo `uploadProposalMid` e não por um `upload` cru: é ele que GARANTE
+      // o bucket. Sem isso, numa instalação onde ele ainda não existe, cada
+      // visita voltava a pagar o `sharp` de cada fotografia, para sempre.
+      await uploadProposalMid(chave, derivada);
+    }
+    return { bytes: derivada, motivo: "ok" };
+  } catch (e) {
+    const dito = e instanceof Error ? e.message : String(e);
+    log.warn("derivadas: intermédia a pedido falhou", { caminho: chave, erro: dito });
+    return { bytes: null, motivo: "sharp-falhou" };
   }
 }

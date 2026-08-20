@@ -126,6 +126,44 @@ function destacada(board: BoardParaEcra): number | null {
   return p;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O MOMENTO DE RESPIRAÇÃO — A FOTOGRAFIA QUE ABRE CADA SECÇÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «A capa (arco em azulejo) é a única imagem grande da página.
+ * Devia haver mais momentos assim, a separar secções: uma foto a toda a
+ * largura entre blocos.»
+ *
+ * É a posição da fotografia que sobe da grelha para cima do título e se
+ * desenha com a largura toda do documento, como a capa. Não é uma cópia: a
+ * foto SAI da grelha, e por isso não se vê duas vezes.
+ *
+ * ── PORQUE É QUE HÁ UMA SEGUNDA ESCOLHA ──────────────────────────────────
+ *
+ * O `destacada` devolve `null` quando ela não marcou nada, e essa decisão
+ * mantém-se para a GRELHA: sem marca, as fotografias são todas iguais e não se
+ * inventa um destaque. Mas o que ela pediu aqui não foi um destaque — foi ar
+ * entre secções, em TODAS. Sem marca, abre a primeira que resolve, que é a
+ * ordem que ela própria arrumou no estúdio.
+ *
+ * ── E PORQUE É QUE TEM DE RESOLVER ───────────────────────────────────────
+ *
+ * Porque uma célula que não abre a fotografia desaparece em silêncio (é a
+ * regra desta página), e um respiro que desaparece deixa o título encostado ao
+ * bloco anterior — o buraco exactamente onde se queria o ar.
+ */
+function respiro(board: BoardParaEcra, fotos: Record<string, FotoDaProposta>): number | null {
+  const resolve = (i: number) => {
+    const f = fotos[board.fotos[i]];
+    return !!(f?.miniatura || f?.original);
+  };
+  const marcada = destacada(board);
+  if (marcada !== null && resolve(marcada)) return marcada;
+  const primeira = board.fotos.findIndex((_, i) => resolve(i));
+  return primeira === -1 ? null : primeira;
+}
+
 export default function Inspiracao({
   boards,
   fotosIniciais,
@@ -218,64 +256,89 @@ export default function Inspiracao({
 
   return (
     <>
-      {boards.map((board, b) => (
-        <section key={board.chave} className="mt-14 first:mt-0">
-          <h3
-            className="text-foreground/90 text-balance"
-            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3.4vw, 34px)" }}
-          >
-            {board.titulo}
-          </h3>
-          {board.subtitulo && (
-            <p className="text-foreground/72 mt-1.5 text-sm leading-relaxed">{board.subtitulo}</p>
-          )}
+      {boards.map((board, b) => {
+        const oRespiro = respiro(board, fotos);
+        return (
+          <section key={board.chave} className="mt-20 first:mt-6">
+            {/* ── O MOMENTO DE RESPIRAÇÃO ──────────────────────────────────────
+              «Devia haver mais momentos assim, a separar secções: uma foto a
+              toda a largura entre blocos.» Vem ANTES do título de propósito:
+              é o que separa o bloco que acabou do que começa, e é a primeira
+              coisa que se vê da secção nova. A largura é a mesma da capa
+              (a do documento), porque foi a capa que ela deu como exemplo.
 
-          {/* ── A FOTO QUE MANDA ─────────────────────────────────────────────
-              Sozinha em cima, com a largura toda. No papel são o «destaque» e
-              o «mosaico» que lhe dão a caixa maior; aqui não há caixas, há
-              largura — a mesma intenção dela, sem uma linha da geometria do
-              PDF. Quando não está marcada, não há destaque nenhum e as fotos
-              entram todas na grelha, como sempre. */}
-          {destacada(board) !== null && (
-            <div className="mt-5">
-              <Celula
-                foto={fotos[board.fotos[destacada(board)!]]}
-                ansiosa
-                rotulo={contar(textos.contagem, destacada(board)! + 1, board.fotos.length)}
-                textos={textos}
-                aoAmpliar={(alvo) => abrir(b, destacada(board)!, alvo)}
-                aoDesistir={marcarFalha}
-              />
-            </div>
-          )}
+              Ver `respiro`, acima, para qual das fotografias é. */}
+            {oRespiro !== null && (
+              <div className="mb-9">
+                <Celula
+                  token={token}
+                  foto={fotos[board.fotos[oRespiro]]}
+                  /* Só o do PRIMEIRO board entra ansioso. Os outros estão a
+                     milhares de pixéis de distância, e três fotografias
+                     grandes a carregar de uma vez são meio megabyte gasto
+                     antes de a primeira secção acabar de se desenhar. */
+                  ansiosa={b === 0}
+                  /* Mais alta do que a capa (que ainda tem a página toda por
+                   baixo dela) e com tecto: uma foto ao alto a 1024 px de
+                   largura são 1500 px de altura, e isso não é um respiro, é um
+                   ecrã inteiro sem uma palavra. */
+                  tecto="min(64vh, 560px)"
+                  larguraNoEcra="(min-width: 1024px) 1024px, 100vw"
+                  rotulo={contar(textos.contagem, oRespiro + 1, board.fotos.length)}
+                  textos={textos}
+                  aoAmpliar={(alvo) => abrir(b, oRespiro, alvo)}
+                  aoDesistir={marcarFalha}
+                />
+              </div>
+            )}
+            <h3
+              className="text-foreground/90 text-balance"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3.4vw, 34px)" }}
+            >
+              {board.titulo}
+            </h3>
+            {board.subtitulo && (
+              <p className="text-foreground/72 mt-1.5 text-sm leading-relaxed">{board.subtitulo}</p>
+            )}
 
-          {/* ── A GRELHA ─────────────────────────────────────────────────────
+            {/* ── A GRELHA ─────────────────────────────────────────────────────
               `columns` e não `grid`: a fotografia entra com a forma que tem.
               O `break-inside: avoid` (a classe `.foto-inteira`, em globals.css)
               é o que impede uma foto de ser partida ao meio entre colunas. */}
-          <div className="mt-3 columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3">
-            {board.fotos.map((id, i) =>
-              i === destacada(board) ? null : (
-                <Celula
-                  key={id}
-                  foto={fotos[id]}
-                  ansiosa={i < FOTOS_ANSIOSAS}
-                  rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
-                  textos={textos}
-                  aoAmpliar={(alvo) => abrir(b, i, alvo)}
-                  aoDesistir={marcarFalha}
-                />
-              ),
-            )}
-          </div>
+            {/* ── MENOS COLUNAS, FOTOGRAFIAS MAIORES ─────────────────────
+              Eram três a partir de `lg`, e as palavras dela sobre o resultado
+              não deixam dúvidas: «uma foto de decoração a 200px de largura não
+              vende nada». Duas colunas num ecrã de 1440 dão ~430 px por
+              fotografia em vez de ~280 — mais de metade da área. No telemóvel
+              continua uma, pela razão que já estava escrita aqui: duas a 390
+              px davam o mesmo tamanho a que elas já saem na folha A4, e voltar
+              a esse tamanho num ecrã era fazer o trabalho todo para não
+              resolver nada. */}
+            <div className="mt-3 columns-1 gap-4 sm:columns-2 [&>*]:mb-4">
+              {board.fotos.map((id, i) =>
+                i === oRespiro ? null : (
+                  <Celula
+                    key={id}
+                    token={token}
+                    foto={fotos[id]}
+                    ansiosa={i < FOTOS_ANSIOSAS}
+                    rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
+                    textos={textos}
+                    aoAmpliar={(alvo) => abrir(b, i, alvo)}
+                    aoDesistir={marcarFalha}
+                  />
+                ),
+              )}
+            </div>
 
-          {board.nota && (
-            <p className="text-foreground/72 border-moss/40 mt-5 border-l-2 pl-5 text-sm leading-relaxed">
-              {board.nota}
-            </p>
-          )}
-        </section>
-      ))}
+            {board.nota && (
+              <p className="text-foreground/72 border-moss/40 mt-5 border-l-2 pl-5 text-sm leading-relaxed">
+                {board.nota}
+              </p>
+            )}
+          </section>
+        );
+      })}
 
       {/* O botão de reassinar só existe quando alguma coisa correu mal. Ver
           `houveFalha`. */}
@@ -319,6 +382,9 @@ function Celula({
   ansiosa,
   rotulo,
   textos,
+  token,
+  tecto,
+  larguraNoEcra,
   aoAmpliar,
   aoDesistir,
 }: {
@@ -326,6 +392,20 @@ function Celula({
   ansiosa: boolean;
   rotulo: string;
   textos: TextosDaPagina;
+  /** Para pedir a derivada intermédia desta fotografia — ver o `srcset`. */
+  token: string;
+  /**
+   * Um tecto de altura, para a célula que se desenha à largura toda.
+   *
+   * Sem ele, uma fotografia ao alto a 1024 px de largura dá 1500 px de altura
+   * e come o ecrã inteiro antes de se chegar a uma palavra. Com ele, a caixa
+   * pára na altura escrita e o `object-cover` recorta — a mesma decisão que a
+   * capa já tomava. Nas células da grelha não existe: é lá que a regra dela
+   * manda («cada fotografia com a forma que tem»).
+   */
+  tecto?: string;
+  /** O que dizer ao `sizes` quando esta célula não é uma célula da grelha. */
+  larguraNoEcra?: string;
   aoAmpliar: (alvo: HTMLElement | null) => void;
   /** Esta célula esgotou as tentativas. Ver `houveFalha`, acima. */
   aoDesistir: () => void;
@@ -340,6 +420,19 @@ function Celula({
     foto?.original,
   );
   const proporcao = foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : undefined;
+  /** A derivada intermédia desta fotografia, pelo id OPACO — nunca por um
+   *  caminho. Ver a rota `api/proposta/[token]/foto/[id]`. */
+  const media = foto
+    ? `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`
+    : "";
+  /**
+   * O `srcset` só vale enquanto a primeira escolha está de pé.
+   *
+   * Depois de a cascata cair para o plano B, o que interessa é servir ALGUMA
+   * COISA — e um `srcset` deixaria o navegador voltar a escolher o candidato
+   * que acabou de falhar.
+   */
+  const temSrcset = !!foto?.miniatura && alvo === foto.miniatura;
 
   // Avisar o pai NUM EFEITO, e não durante o desenho: mudar estado do pai a
   // meio do render de um filho é o aviso que o React dá («Cannot update a
@@ -383,7 +476,14 @@ function Celula({
         disabled={!alvo || desistiu}
         aria-label={`${textos.ampliar}: ${rotulo}`}
         className="group focus-visible:outline-moss relative block w-full cursor-zoom-in overflow-hidden rounded-sm bg-[color-mix(in_srgb,var(--color-moss)_12%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-default"
-        style={proporcao ? { aspectRatio: proporcao } : undefined}
+        style={
+          proporcao || tecto
+            ? {
+                ...(proporcao ? { aspectRatio: proporcao } : {}),
+                ...(tecto ? { maxHeight: tecto } : {}),
+              }
+            : undefined
+        }
       >
         {/* O `lqip` é um `data:` de poucos bytes que já vem no HTML: a célula
             nunca é um rectângulo vazio, nem sequer no primeiro fotograma. */}
@@ -401,6 +501,33 @@ function Celula({
           <img
             key={alvo}
             src={alvo}
+            {...(temSrcset
+              ? {
+                  /**
+                   * ── DOIS TAMANHOS, E O NAVEGADOR ESCOLHE ─────────────────
+                   *
+                   * MEDIDO, e é a razão disto existir: a grelha pedia SEMPRE a
+                   * miniatura de 400 px. Num iPhone a fotografia ocupa ~343
+                   * pontos e o ecrã tem três pixéis por ponto — pede ~1030. Era
+                   * uma imagem de 400 esticada duas vezes e meia, e via-se:
+                   * «essas imagens parecem estar desfocadas».
+                   *
+                   * O original resolvia a nitidez e punha 120 MB numa página de
+                   * 46 fotografias. A terceira medida (1200 px, ~200 KB) é a
+                   * que serve as duas coisas — e quem escolhe é o navegador,
+                   * que sabe a largura e a densidade do ecrã e nós não.
+                   *
+                   * O `src` fica: é o que um navegador sem `srcset` usa, e é
+                   * para onde a cascata de falhas volta (aí o `srcset` sai).
+                   */
+                  srcSet: `${foto?.miniatura} 400w, ${media} 1200w`,
+                  /* A largura que a fotografia OCUPA, por ecrã — a grelha é de
+                     uma coluna no telemóvel e de duas a partir de `sm`. Sem
+                     isto o navegador assume a largura toda da página e pede
+                     sempre a maior. */
+                  sizes: larguraNoEcra ?? "(min-width: 640px) 46vw, 92vw",
+                }
+              : {})}
             alt=""
             /* `loading="lazy"` em tudo menos nas primeiras: com 46 fotografias,
                carregá-las todas de uma vez é a conta que esta página existe
