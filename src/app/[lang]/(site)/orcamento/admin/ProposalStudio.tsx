@@ -4819,6 +4819,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         // uma proposta em aberto, por isso isto não pode passar em silêncio —
         // reenviar acerta o estado e reaproveita a MESMA proposta.
         toast(data.estadoError, "error");
+      } else if (typeof data?.repetidoAviso === "string") {
+        /**
+         * O servidor reconheceu isto como uma REPETIÇÃO e não enviou nada
+         * (mesmo documento, há menos de três minutos). Acontece quando a rede
+         * tosse a meio, o ecrã diz que falhou, e ela carrega outra vez — o
+         * primeiro pedido acabou por seguir. Dizer «Proposta enviada» aqui era
+         * verdade só por acidente; dizer o que aconteceu é o que a impede de
+         * ficar à espera de perceber porque é que há duas linhas no quadro.
+         */
+        toast(data.repetidoAviso, "success");
       } else if (saiu) {
         toast("Proposta enviada ao cliente", "success");
       } else {

@@ -582,6 +582,66 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ? new Date().toISOString()
       : (maisRecente?.versaoEm ?? new Date().toISOString());
 
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O MESMO ENVIO DUAS VEZES NÃO SÃO DOIS EMAILS AO CASAL
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * MEDIDO: dois envios em voo do mesmo documento davam 2 propostas gravadas
+     * e 2 emails ao casal — com DOIS links de aceitação diferentes, e duas
+     * linhas «versão 1» para o mesmo casamento no quadro.
+     *
+     * E o caminho provável nem são dois separadores. É este: o `fetch` do
+     * envio não tem tecto de tempo próprio, a rede tosse, o ecrã diz «Erro ao
+     * enviar a proposta» e repõe o botão — e ela carrega outra vez, enquanto o
+     * primeiro pedido continua a correr do lado de cá e acaba por enviar.
+     *
+     * A trava que existia era o `busy` do estúdio: estado de React, vale só
+     * naquele separador, e o `catch` de rede rearma-o. Não chega.
+     *
+     * A trava daqui é sobre o CONTEÚDO, e é por isso que só agora se pode
+     * fazer: o selo de versão diz se este documento é o mesmo que já seguiu.
+     * Se já seguiu, com o mesmo selo, há menos de {@link JANELA_DE_REPETICAO_MS},
+     * isto é uma repetição — devolve-se o que aconteceu da primeira vez, com o
+     * link que o casal recebeu, e NÃO se envia nada.
+     *
+     * A janela é curta de propósito. Reenviar a mesma proposta é uma coisa
+     * legítima e acontece («perdi o email, podes reenviar?»), e três minutos
+     * depois volta a ser possível sem nada no caminho. O que a janela apanha é
+     * o dedo duas vezes no mesmo botão, que é outra coisa.
+     */
+    const JANELA_DE_REPETICAO_MS = 3 * 60_000;
+    const jaSeguiu = irmasAnteriores.find(
+      (p) =>
+        p.status === "enviada" &&
+        !!p.versaoSelo &&
+        p.versaoSelo === proposal.versaoSelo &&
+        !!p.sentAt &&
+        Date.now() - Date.parse(p.sentAt) < JANELA_DE_REPETICAO_MS,
+    );
+    if (jaSeguiu) {
+      log.warn("proposta-doc: envio repetido do mesmo documento — não se enviou outra vez", {
+        id,
+        proposta: jaSeguiu.id,
+      });
+      return NextResponse.json({
+        ok: true,
+        id: jaSeguiu.id,
+        emailed: true,
+        estado: "enviada",
+        /** O link que o casal RECEBEU — não um segundo, que ninguém tem. */
+        acceptUrl: `${SITE.url}/proposta/${createProposalToken(jaSeguiu.id)}`,
+        missingImages,
+        truncations,
+        pdfBytes: pdfBuffer.byteLength,
+        /** Para o ecrã poder dizer o que aconteceu em vez de fingir um envio. */
+        repetido: true,
+        repetidoAviso:
+          "Esta proposta já tinha seguido para o cliente há instantes, com este mesmo " +
+          "documento. Não foi enviada outra vez — o link é o mesmo que ele recebeu.",
+      });
+    }
+
     // A proposta fica guardada COM o documento (`doc`): é a única cópia
     // DURÁVEL do que seguiu para o cliente (o rascunho do estúdio vive em
     // `app_state`, apaga-se e não vai na cópia de segurança), e é dela que sai
