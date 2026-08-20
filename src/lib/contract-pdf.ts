@@ -92,11 +92,19 @@ const FUSO = "Europe/Lisbon";
  * E há o outro lado, mais insidioso: sem fuso fixo, o mesmo contrato descarregado
  * do portal e regerado noutra máquina traz datas diferentes.
  */
-function fmtDateTime(iso?: string): string {
+function fmtDateTime(iso?: string, idioma: "pt" | "en" = "pt"): string {
   if (!iso) return "—";
   const dt = new Date(iso);
   if (Number.isNaN(dt.getTime())) return iso;
-  return dt.toLocaleString("pt-PT", {
+  /**
+   * A LOCALIZAÇÃO muda com a língua; o FUSO nunca.
+   *
+   * O fuso é o de Lisboa nas duas, e não é decoração: o momento do aceite é a
+   * data em que o contrato passa a vincular, e o alojamento corre em UTC. Um
+   * aceite às 23:32 de 2 de julho saía impresso no dia errado — está medido no
+   * `contract-pdf.datas.test.ts`, e é a razão de este parâmetro existir.
+   */
+  return dt.toLocaleString(idioma === "en" ? "en-GB" : "pt-PT", {
     timeZone: FUSO,
     day: "2-digit",
     month: "long",
@@ -105,6 +113,105 @@ function fmtDateTime(iso?: string): string {
     minute: "2-digit",
   });
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS PALAVRAS DA FOLHA — as que não são dos termos
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «CONTRATO», «ENTRE», «ACEITE REGISTADO». Nada disto está no
+ * `termsSnapshot`: o snapshot é o texto que o casal aceitou, e estas são a
+ * moldura em que ele é impresso. Traduzi-las era o que faltava para um casal
+ * estrangeiro receber um contrato inglês inteiro, em vez de termos ingleses
+ * dentro de uma folha portuguesa.
+ *
+ * A língua vem do CONTRATO (`Contract.idioma`), que a copiou da proposta.
+ * Ausente lê-se como português — é o que todos os contratos anteriores são.
+ */
+interface PalavrasDoContrato {
+  contrato: string;
+  ref: string;
+  titulo: string;
+  entre: string;
+  e: string;
+  doravante: string;
+  referencia: string;
+  pedido: string;
+  proposta: string;
+  termos: string;
+  versao: (v: string) => string;
+  semSnapshot: string;
+  aceiteRegistado: string;
+  confirmadoPor: (quem: string, quando: string) => string;
+  como: (texto: string) => string;
+  versaoDosTermos: (v: string) => string;
+  documentoAceite: string;
+  bytes: string;
+  aceiteElectronico: string;
+  aceiteElectronicoPor: (quem: string, quando: string) => string;
+  registoIp: (v: string, ip: string) => string;
+  valorProbatorio: string;
+  pendente: string;
+  minuta: string;
+}
+
+const PALAVRAS_PT: PalavrasDoContrato = {
+  contrato: "CONTRATO",
+  ref: "Ref.",
+  titulo: "Contrato de Prestação de Serviços de Decoração de Eventos",
+  entre: "ENTRE",
+  e: "E",
+  doravante: "doravante designados, respetivamente, por «Estúdio» e «Cliente».",
+  referencia: "REFERÊNCIA",
+  pedido: "Pedido",
+  proposta: "Proposta",
+  termos: "TERMOS E CONDIÇÕES",
+  versao: (v) => `Versão v${v}`,
+  semSnapshot: "Sem snapshot de termos guardado.",
+  aceiteRegistado: "ACEITE REGISTADO",
+  confirmadoPor: (quem, quando) => `Aceite confirmado por ${quem} em ${quando}.`,
+  como: (t) => `Como: ${t}`,
+  versaoDosTermos: (v) => `Versão dos termos v${v}`,
+  documentoAceite: "Documento aceite:",
+  bytes: "bytes",
+  aceiteElectronico: "ACEITE ELETRÓNICO",
+  aceiteElectronicoPor: (quem, quando) => `Aceite eletronicamente por ${quem} em ${quando}.`,
+  registoIp: (v, ip) => `Versão dos termos v${v}  ·  registo ${ip}`,
+  valorProbatorio:
+    "Aceitação registada por via eletrónica, com valor probatório equivalente a assinatura.",
+  pendente: "ACEITAÇÃO PENDENTE",
+  minuta:
+    "Este contrato ainda não foi aceite pelo Cliente. Torna-se vinculativo no momento em que o Cliente aceita as condições através do link enviado por e-mail; até lá, serve apenas de minuta.",
+};
+
+const PALAVRAS_EN: PalavrasDoContrato = {
+  contrato: "CONTRACT",
+  ref: "Ref.",
+  titulo: "Event Decoration Services Agreement",
+  entre: "BETWEEN",
+  e: "AND",
+  doravante: "hereinafter referred to, respectively, as the “Studio” and the “Client”.",
+  referencia: "REFERENCE",
+  pedido: "Request",
+  proposta: "Proposal",
+  termos: "TERMS AND CONDITIONS",
+  versao: (v) => `Version v${v}`,
+  semSnapshot: "No terms snapshot stored.",
+  aceiteRegistado: "ACCEPTANCE ON RECORD",
+  confirmadoPor: (quem, quando) => `Acceptance confirmed by ${quem} on ${quando}.`,
+  como: (t) => `How: ${t}`,
+  versaoDosTermos: (v) => `Terms version v${v}`,
+  documentoAceite: "Document accepted:",
+  bytes: "bytes",
+  aceiteElectronico: "ELECTRONIC ACCEPTANCE",
+  aceiteElectronicoPor: (quem, quando) => `Accepted electronically by ${quem} on ${quando}.`,
+  registoIp: (v, ip) => `Terms version v${v}  ·  record ${ip}`,
+  valorProbatorio:
+    "Acceptance recorded electronically, with evidential value equivalent to a signature.",
+  pendente: "ACCEPTANCE PENDING",
+  minuta:
+    "This contract has not yet been accepted by the Client. It becomes binding at the moment the Client accepts the conditions through the link sent by email; until then, it serves only as a draft.",
+};
 
 /**
  * Divide o snapshot de texto plano em secções { heading, body }. O formato
@@ -126,6 +233,11 @@ function parseSnapshot(snapshot: string): { heading: string; body: string }[] {
 
 /** Renderiza o contrato em PDF e devolve os bytes. */
 export async function renderContractPdf(contract: Contract): Promise<Buffer> {
+  // A língua do CONTRATO, copiada da proposta quando ele nasceu. Ausente nos
+  // contratos anteriores a esse campo, e ausente é português — que é o que
+  // eles são e o que sempre lhes foi impresso.
+  const idioma = contract.idioma === "en" ? "en" : "pt";
+  const w = idioma === "en" ? PALAVRAS_EN : PALAVRAS_PT;
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -215,20 +327,15 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
   const lw = 116;
   const lh = (logo.height / logo.width) * lw;
   page.drawImage(logo, { x: MARGIN, y: y - lh + 8, width: lw, height: lh });
-  tr("CONTRATO", right, y, { font: bold, size: 12, color: MUTED });
-  tr(`Ref. ${contract.quoteId || contract.id}`, right, y - 14, { size: 9, color: MUTED });
-  tr(fmtDateTime(contract.createdAt), right, y - 27, { size: 8, color: MUTED });
+  tr(w.contrato, right, y, { font: bold, size: 12, color: MUTED });
+  tr(`${w.ref} ${contract.quoteId || contract.id}`, right, y - 14, { size: 9, color: MUTED });
+  tr(fmtDateTime(contract.createdAt, idioma), right, y - 27, { size: 8, color: MUTED });
   y -= lh + 18;
   hr(y);
   y -= 28;
 
   // ── Título ──
-  const titleLines = wrap(
-    bold,
-    "Contrato de Prestação de Serviços de Decoração de Eventos",
-    15,
-    maxW,
-  );
+  const titleLines = wrap(bold, w.titulo, 15, maxW);
   for (const ln of titleLines) {
     text(ln, MARGIN, y, { font: bold, size: 15, color: INK });
     y -= 20;
@@ -236,7 +343,7 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
   y -= 10;
 
   // ── Partes ──
-  text("ENTRE", MARGIN, y, { font: bold, size: 8, color: MUTED });
+  text(w.entre, MARGIN, y, { font: bold, size: 8, color: MUTED });
   y -= 16;
   text(SITE.legalName, MARGIN, y, { font: bold, size: 11 });
   y -= 13;
@@ -248,7 +355,7 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
   });
   y -= 24;
 
-  text("E", MARGIN, y, { font: bold, size: 8, color: MUTED });
+  text(w.e, MARGIN, y, { font: bold, size: 8, color: MUTED });
   y -= 16;
   text(contract.clientName || "—", MARGIN, y, { font: bold, size: 11 });
   y -= 13;
@@ -257,30 +364,27 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
     y -= 12;
   }
   y -= 6;
-  text("doravante designados, respetivamente, por «Estúdio» e «Cliente».", MARGIN, y, {
-    size: 9,
-    color: MUTED,
-  });
+  text(w.doravante, MARGIN, y, { size: 9, color: MUTED });
   y -= 22;
 
   // Referência (pedido / proposta).
   hr(y);
   y -= 16;
-  text("REFERÊNCIA", MARGIN, y, { font: bold, size: 8, color: MUTED });
-  text(`Pedido ${contract.quoteId || "—"}`, MARGIN + 90, y, { size: 9 });
-  tr(`Proposta ${contract.proposalId || "—"}`, right, y, { size: 9, color: MUTED });
+  text(w.referencia, MARGIN, y, { font: bold, size: 8, color: MUTED });
+  text(`${w.pedido} ${contract.quoteId || "—"}`, MARGIN + 90, y, { size: 9 });
+  tr(`${w.proposta} ${contract.proposalId || "—"}`, right, y, { size: 9, color: MUTED });
   y -= 14;
   hr(y);
   y -= 26;
 
   // ── Termos (snapshot congelado) ──
-  text("TERMOS E CONDIÇÕES", MARGIN, y, { font: bold, size: 8, color: MUTED });
-  tr(`Versão v${contract.termsVersion}`, right, y, { size: 8, color: MUTED });
+  text(w.termos, MARGIN, y, { font: bold, size: 8, color: MUTED });
+  tr(w.versao(contract.termsVersion), right, y, { size: 8, color: MUTED });
   y -= 20;
 
   const sections = parseSnapshot(contract.termsSnapshot || "");
   if (sections.length === 0) {
-    text("Sem snapshot de termos guardado.", MARGIN, y, { size: 9.5, color: MUTED });
+    text(w.semSnapshot, MARGIN, y, { size: 9.5, color: MUTED });
     y -= 16;
   }
   for (const s of sections) {
@@ -329,27 +433,30 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
    */
   const registado = !!contract.registadoPor || !!contract.registadoComo;
   if (accepted && registado) {
-    text("ACEITE REGISTADO", MARGIN, y, { font: bold, size: 8, color: MOSS });
+    text(w.aceiteRegistado, MARGIN, y, { font: bold, size: 8, color: MOSS });
     y -= 18;
     text(contract.clientName || "—", MARGIN, y, { font: bold, size: 12 });
     y -= 16;
     text(
-      `Aceite confirmado por ${contract.registadoPor || SITE.name} em ${fmtDateTime(contract.acceptedAt)}.`,
+      w.confirmadoPor(
+        contract.registadoPor || SITE.name,
+        fmtDateTime(contract.acceptedAt, idioma),
+      ),
       MARGIN,
       y,
       { size: 9.5, color: INK },
     );
     y -= 14;
     if (contract.registadoComo) {
-      text(`Como: ${contract.registadoComo}`, MARGIN, y, { size: 9, color: INK });
+      text(w.como(contract.registadoComo), MARGIN, y, { size: 9, color: INK });
       y -= 14;
     }
-    text(`Versão dos termos v${contract.termsVersion}`, MARGIN, y, { size: 8.5, color: MUTED });
+    text(w.versaoDosTermos(contract.termsVersion), MARGIN, y, { size: 8.5, color: MUTED });
     y -= 14;
     if (contract.propostaPdfSha256) {
       text(
-        `Documento aceite: ${contract.propostaPdfSha256.slice(0, 12)}` +
-          (contract.propostaPdfBytes ? `  ·  ${contract.propostaPdfBytes} bytes` : ""),
+        `${w.documentoAceite} ${contract.propostaPdfSha256.slice(0, 12)}` +
+          (contract.propostaPdfBytes ? `  ·  ${contract.propostaPdfBytes} ${w.bytes}` : ""),
         MARGIN,
         y,
         { size: 8.5, color: MUTED },
@@ -358,24 +465,25 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
     }
     y -= 2;
   } else if (accepted) {
-    text("ACEITE ELETRÓNICO", MARGIN, y, { font: bold, size: 8, color: MOSS });
+    text(w.aceiteElectronico, MARGIN, y, { font: bold, size: 8, color: MOSS });
     y -= 18;
     text(contract.acceptedName || contract.clientName || "—", MARGIN, y, { font: bold, size: 12 });
     y -= 16;
     // Linha-prova legível: quem, quando, versão, registo.
     text(
-      `Aceite eletronicamente por ${contract.acceptedName || contract.clientName || "—"} em ${fmtDateTime(contract.acceptedAt)}.`,
+      w.aceiteElectronicoPor(
+        contract.acceptedName || contract.clientName || "—",
+        fmtDateTime(contract.acceptedAt, idioma),
+      ),
       MARGIN,
       y,
       { size: 9.5, color: INK },
     );
     y -= 14;
-    text(
-      `Versão dos termos v${contract.termsVersion}  ·  registo ${contract.acceptedIp || "—"}`,
-      MARGIN,
-      y,
-      { size: 8.5, color: MUTED },
-    );
+    text(w.registoIp(contract.termsVersion, contract.acceptedIp || "—"), MARGIN, y, {
+      size: 8.5,
+      color: MUTED,
+    });
     y -= 14;
     /**
      * ── O SELO DO DOCUMENTO ACEITE ─────────────────────────────────────────
@@ -395,8 +503,8 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
      */
     if (contract.propostaPdfSha256) {
       text(
-        `Documento aceite: ${contract.propostaPdfSha256.slice(0, 12)}` +
-          (contract.propostaPdfBytes ? `  ·  ${contract.propostaPdfBytes} bytes` : ""),
+        `${w.documentoAceite} ${contract.propostaPdfSha256.slice(0, 12)}` +
+          (contract.propostaPdfBytes ? `  ·  ${contract.propostaPdfBytes} ${w.bytes}` : ""),
         MARGIN,
         y,
         { size: 8.5, color: MUTED },
@@ -404,22 +512,12 @@ export async function renderContractPdf(contract: Contract): Promise<Buffer> {
       y -= 14;
     }
     y -= 2;
-    text(
-      "Aceitação registada por via eletrónica, com valor probatório equivalente a assinatura.",
-      MARGIN,
-      y,
-      { size: 8, color: MUTED },
-    );
+    text(w.valorProbatorio, MARGIN, y, { size: 8, color: MUTED });
   } else {
     // Pendente: sem assinatura ainda — anota o estado com clareza.
-    text("ACEITAÇÃO PENDENTE", MARGIN, y, { font: bold, size: 8, color: GOLD });
+    text(w.pendente, MARGIN, y, { font: bold, size: 8, color: GOLD });
     y -= 18;
-    for (const ln of wrap(
-      font,
-      "Este contrato ainda não foi aceite pelo Cliente. Torna-se vinculativo no momento em que o Cliente aceita as condições através do link enviado por e-mail; até lá, serve apenas de minuta.",
-      9.5,
-      maxW,
-    )) {
+    for (const ln of wrap(font, w.minuta, 9.5, maxW)) {
       text(ln, MARGIN, y, { size: 9.5, color: INK });
       y -= 14;
     }

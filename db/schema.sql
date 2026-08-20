@@ -176,6 +176,19 @@ alter table public.contracts add column if not exists proposta_versao_numero int
 -- houve aceite pelo botão antigo, têm `accepted_ip` e nome escrito pelo casal.
 alter table public.contracts add column if not exists registado_por text;
 alter table public.contracts add column if not exists registado_como text;
+
+-- A LÍNGUA DO CONTRATO — a da proposta que lhe deu origem, copiada quando o
+-- contrato nasce. Decide o texto dos termos congelado em `terms_snapshot` e a
+-- língua em que o PDF é desenhado.
+--
+-- Idempotente e sem `not null`: os contratos anteriores ficam a null, que se
+-- lê como português — que é o que eles são e o que sempre foi impresso. A
+-- versão portuguesa dos termos prevalece numa divergência, e é o próprio texto
+-- inglês que o diz (ponto 9).
+alter table public.contracts add column if not exists idioma text;
+alter table public.contracts drop constraint if exists contracts_idioma_chk;
+alter table public.contracts add constraint contracts_idioma_chk
+  check (idioma is null or idioma in ('pt','en')) not valid;
 alter table public.proposals drop constraint if exists proposals_idioma_chk;
 alter table public.proposals add constraint proposals_idioma_chk
   check (idioma is null or idioma in ('pt','en')) not valid;

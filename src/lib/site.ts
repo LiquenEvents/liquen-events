@@ -39,12 +39,19 @@ export const SITE = {
   reviews: { rating: 5, count: 56 },
   instagram: "https://www.instagram.com/liquen.events",
   facebook: "https://www.facebook.com/liquen.events",
-  // Ainda não há perfil. Fica VAZIO em vez de não existir: a assinatura dos
-  // emails (`email-assinatura.ts`) percorre as redes e salta as que estão sem
-  // endereço, portanto o dia em que este campo tiver um URL é o dia em que o
-  // LinkedIn aparece nos emails — sem tocar em mais nada. Um ícone social a
-  // apontar para lado nenhum é pior do que não haver ícone.
-  linkedin: "",
+  /**
+   * O perfil da empresa, dado por ela: `pt.linkedin.com/company/líquen-events`.
+   *
+   * ── PORQUE É QUE O «í» ESTÁ ESCRITO `%C3%AD` ─────────────────────────────
+   *
+   * Porque este endereço vai dentro de um EMAIL. Um `href` com uma letra
+   * acentuada crua é um endereço que cada cliente de correio resolve à sua
+   * maneira — e os que não o convertem cortam o link no «í», deixando o ícone
+   * do LinkedIn a apontar para `…/company/l`. A forma percent-encoded é o
+   * mesmo endereço escrito de maneira a atravessar qualquer cliente; o
+   * LinkedIn devolve o mesmo perfil.
+   */
+  linkedin: "https://pt.linkedin.com/company/l%C3%ADquen-events",
   // Google Business Profile (share link) — powers local pack/Maps ranking and
   // lets Google reconcile the site with the profile (sameAs + hasMap).
   googleBusiness: "https://share.google/4Qcuop16TDkYaowsU",
