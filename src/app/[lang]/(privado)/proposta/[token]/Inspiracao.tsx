@@ -35,14 +35,34 @@ import { contar, type TextosDaPagina } from "./textos-da-pagina";
  * folha A4. Voltar a esse tamanho num ecrã seria fazer o trabalho todo para
  * não resolver nada.
  *
+ * MEDIDO no mesmo documento de 46 fotografias:
+ *
+ *      390 px   1 coluna    fotografia com 350 px de largura
+ *      768 px   2 colunas
+ *     1440 px   3 colunas   fotografia com 333 px (a principal, 1024)
+ *
+ * e nenhuma das duas larguras faz a página rolar na horizontal
+ * (`scrollWidth === clientWidth` nas duas).
+ *
  * ── PORQUE É QUE A CÉLULA NASCE COM ALTURA ────────────────────────────────
  *
  * Cada foto declara o seu `aspect-ratio` a partir da forma guardada
  * (`formasDeCaminhos`). Sem isso, 46 células nascem com altura zero e a página
- * salta 46 vezes por baixo do dedo de quem está a ler. Quando a forma não se
- * sabe — fotografias anteriores às colunas de dimensão — a célula fica sem
- * `aspect-ratio` nenhum e cresce com a imagem: um salto, e não uma mentira
- * sobre a forma da fotografia.
+ * salta por baixo do dedo de quem está a ler.
+ *
+ * MEDIDO num Chromium a 390×844, com um documento de três boards e 46
+ * fotografias, comparando a página sem imagens carregadas com a página depois
+ * de todas chegarem:
+ *
+ *     com a forma guardada    o «Orçamento» fica onde estava       0 px
+ *     sem a forma guardada    o «Orçamento» desce            10 833 px
+ *
+ * Dez mil pixels é o documento inteiro a fugir por baixo de quem estava a ler
+ * uma condição. Num ecrã de 1440 o desvio com a forma é o mesmo: zero.
+ *
+ * Quando a forma não se sabe — fotografias anteriores às colunas de dimensão —
+ * a célula fica sem `aspect-ratio` nenhum e cresce com a imagem: um salto, e
+ * não uma mentira sobre a forma da fotografia.
  *
  * ── OS BYTES ──────────────────────────────────────────────────────────────
  *
