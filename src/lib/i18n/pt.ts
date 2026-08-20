@@ -783,6 +783,7 @@ export const pt = {
      * responde à pergunta que o casal faz ao voltar meses depois: «isto ainda
      * é o mesmo que eu vi?».
      */
+    emitidaEm: "Emitida a",
     versaoNumero: "Versão",
     atualizadaEm: "Atualizada a",
     verPdf: "Ver a proposta completa (PDF)",

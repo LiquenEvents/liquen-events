@@ -383,6 +383,32 @@ export default async function ProposalPage({
         year: "numeric",
       })
     : null;
+  /**
+   * O dia em que a proposta foi EMITIDA — discreto, e diferente do de cima.
+   *
+   * «Atualizada a» responde «isto ainda é o que eu vi?»; esta responde «de
+   * quando é esta proposta?», que é a pergunta de quem a reencontra num email
+   * de há três meses. Numa proposta que nunca foi revista são o mesmo dia, e
+   * por isso só se escrevem as duas quando são mesmo duas (ver o ecrã).
+   *
+   * A data de ENVIO quando existe, e a de criação quando não: é o dia em que a
+   * proposta passou a existir para o casal, não o dia em que ela a começou a
+   * escrever.
+   */
+  const emitidaLabel = (() => {
+    const iso = proposal.sentAt || proposal.createdAt;
+    if (!iso) return null;
+    const d = new Date(iso);
+    return Number.isNaN(+d)
+      ? null
+      : d.toLocaleDateString(t.dateLocale, {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "Europe/Lisbon",
+        });
+  })();
+
   const validLabel = proposal.validUntil
     ? new Date(proposal.validUntil + "T12:00:00").toLocaleDateString(t.dateLocale, {
         day: "numeric",
@@ -595,10 +621,25 @@ export default async function ProposalPage({
 
             Só aparece a partir da versão 2: dizer «Versão 1» a quem abre uma
             proposta pela primeira vez é ruído. */}
-        {!!doLink?.versao && doLink.versao > 1 && (
+        {(emitidaLabel || (!!doLink?.versao && doLink.versao > 1)) && (
           <p className="text-foreground/60 text-[11px] mt-2 text-center">
-            {t.versaoNumero} {doLink.versao}
-            {atualizadaLabel ? ` · ${t.atualizadaEm} ${atualizadaLabel}` : ""}
+            {[
+              emitidaLabel ? `${t.emitidaEm} ${emitidaLabel}` : "",
+              /* Só a partir da versão 2: dizer «Versão 1» a quem abre uma
+                 proposta pela primeira vez é ruído. */
+              !!doLink?.versao && doLink.versao > 1 ? `${t.versaoNumero} ${doLink.versao}` : "",
+              /* E a data da revisão só quando é OUTRO dia: numa proposta
+                 revista no próprio dia em que saiu, «emitida a 3 · atualizada
+                 a 3» é a mesma data escrita duas vezes. */
+              !!doLink?.versao &&
+              doLink.versao > 1 &&
+              atualizadaLabel &&
+              atualizadaLabel !== emitidaLabel
+                ? `${t.atualizadaEm} ${atualizadaLabel}`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         )}
 

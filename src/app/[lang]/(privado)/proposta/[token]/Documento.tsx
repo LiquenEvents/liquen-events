@@ -562,16 +562,62 @@ export default function Documento({
     .filter((f) => f?.miniatura || f?.original)
     .find((f) => f && f.id !== capa?.id);
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * AS SECÇÕES NUMERADAS — PARA SE PODER DIZER «NA PARTE 3»
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «numeração de secções, para o casal poder dizer ao telefone
+   * na parte 3».
+   *
+   * ── E POR ISSO A NUMERAÇÃO TEM DE SER A MESMA DO PDF ───────────────────
+   *
+   * O casal ao telefone tem uma das duas formas à frente, e ela tem a outra.
+   * Uma página que numerasse à sua maneira transformava a numeração no oposto
+   * do que ela serve para: duas pessoas a falar de partes diferentes com o
+   * mesmo número.
+   *
+   * Por isso isto ESPELHA o `numerada` do gerador, secção a secção e pela
+   * mesma ordem — incluindo a Inspiração, que o PDF não numera e que aqui
+   * também não leva número. O gerador não é tocado (o PDF fica como está):
+   * o que se faz é copiar a regra dele, e é por isso que ela está escrita aqui
+   * com todas as letras em vez de ser um contador solto.
+   */
+  const numeroDe = new Map<string, number>();
+  [
+    "apresentacao",
+    (doc.serviceGroups ?? []).length > 0 && "servicos",
+    (doc.cronograma ?? []).length > 0 && "cronograma",
+    temOrcamento && "orcamento",
+    (fixos.condicoesGerais ?? []).length > 0 && "condicoes",
+  ]
+    .filter((x): x is string => !!x)
+    .forEach((chave, i) => numeroDe.set(chave, i + 1));
+
+  /**
+   * Uma TABELA e não um contador que se incrementa a desenhar: o índice «Nesta
+   * página» é montado antes de o documento se desenhar, e um contador daria-lhe
+   * os números todos a zero. Duas numerações na mesma página — uma no índice,
+   * outra nos títulos — eram o defeito que a numeração vem resolver.
+   */
+  const numerada = (chave: string, titulo: string) => {
+    const n = numeroDe.get(chave);
+    return n ? `${n}. ${titulo}` : titulo;
+  };
+
   const sinalPct = depositPercentOf(doc);
   const faseamentoDaCasa = blocoEDaCasa(docOriginal, "faseamento");
 
   const indice = [
-    (doc.serviceGroups ?? []).length > 0 && { href: "#servicos", texto: t.tituloServicos },
+    (doc.serviceGroups ?? []).length > 0 && {
+      href: "#servicos",
+      texto: numerada("servicos", t.tituloServicos),
+    },
     boards.length > 0 && { href: "#inspiracao", texto: p.inspiracao },
-    temOrcamento && { href: "#orcamento", texto: t.tituloOrcamento },
+    temOrcamento && { href: "#orcamento", texto: numerada("orcamento", t.tituloOrcamento) },
     (fixos.condicoesGerais ?? []).length > 0 && {
       href: "#condicoes",
-      texto: t.tituloCondicoes,
+      texto: numerada("condicoes", t.tituloCondicoes),
     },
   ].filter((x): x is { href: string; texto: string } => !!x);
 
@@ -633,7 +679,7 @@ export default function Documento({
       <div className="max-w-2xl">
         <Titulo
           sobretitulo={t.sobretituloApresentacao}
-          titulo={doc.headerTitle || t.tituloApresentacao}
+          titulo={numerada("apresentacao", doc.headerTitle || t.tituloApresentacao)}
         />
         {apresentacao.length > 0 && (
           <dl className="mt-7 grid grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2">
@@ -672,7 +718,11 @@ export default function Documento({
       {/* ── SERVIÇOS ─────────────────────────────────────────────────────── */}
       {(doc.serviceGroups ?? []).length > 0 && (
         <Seccao>
-          <Titulo id="servicos" sobretitulo={t.sobretituloServicos} titulo={t.tituloServicos} />
+          <Titulo
+            id="servicos"
+            sobretitulo={t.sobretituloServicos}
+            titulo={numerada("servicos", t.tituloServicos)}
+          />
           <div className="mt-8 space-y-9">
             {(doc.serviceGroups ?? []).map((g, i) => (
               <div key={g.id ?? i}>
@@ -705,7 +755,10 @@ export default function Documento({
       {/* ── CRONOGRAMA (modelo Organização) ──────────────────────────────── */}
       {(doc.cronograma ?? []).length > 0 && (
         <Seccao>
-          <Titulo sobretitulo={t.sobretituloCronograma} titulo={t.tituloCronograma} />
+          <Titulo
+            sobretitulo={t.sobretituloCronograma}
+            titulo={numerada("cronograma", t.tituloCronograma)}
+          />
           <div className="mt-8 space-y-8">
             {(doc.cronograma ?? []).map((fase, i) => (
               <div key={i}>
@@ -762,7 +815,11 @@ export default function Documento({
       {/* ── ORÇAMENTO ────────────────────────────────────────────────────── */}
       {temOrcamento && (
         <Seccao>
-          <Titulo id="orcamento" sobretitulo={p.sobretituloOrcamento} titulo={t.tituloOrcamento} />
+          <Titulo
+            id="orcamento"
+            sobretitulo={p.sobretituloOrcamento}
+            titulo={numerada("orcamento", t.tituloOrcamento)}
+          />
 
           {rubricas.length > 0 && (
             <ul className="mt-8">
@@ -998,7 +1055,7 @@ export default function Documento({
         <SeccaoDobrada
           id="condicoes"
           sobretitulo={p.sobretituloCondicoes}
-          titulo={t.tituloCondicoes}
+          titulo={numerada("condicoes", t.tituloCondicoes)}
           resumo={resumoDe("condicoesGerais", fixos.condicoesGerais ?? [])}
         >
           {/* Os marcadores («a data do evento», «o número de convidados») são

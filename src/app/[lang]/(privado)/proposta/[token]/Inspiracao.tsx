@@ -258,8 +258,26 @@ export default function Inspiracao({
     <>
       {boards.map((board, b) => {
         const oRespiro = respiro(board, fotos);
+        /**
+         * ── QUANTAS COLUNAS TEM ESTA SECÇÃO ────────────────────────────────
+         *
+         * «A proposta está densa e monótona: quase tudo a três colunas, sem
+         * pausas. Variar o número de colunas entre secções.»
+         *
+         * A variação nasce do CONTEÚDO e não de um contador. Um board com duas
+         * ou três fotografias em duas colunas fica com uma coluna a metade e a
+         * outra vazia — é a secção que parece por acabar. Sozinhas e à largura
+         * toda, essas mesmas fotografias são o destaque que ela quer. A partir
+         * de quatro, duas colunas dão o ritmo de grelha sem encolher nada.
+         *
+         * Um índice (`b % 2`) daria variação também, e daria a secção errada:
+         * a mesma proposta arrumada por outra ordem mudava de desenho sem que
+         * nada no conteúdo tivesse mudado.
+         */
+        const naGrelha = board.fotos.length - (oRespiro === null ? 0 : 1);
+        const colunas = naGrelha <= 3 ? "" : "sm:columns-2";
         return (
-          <section key={board.chave} className="mt-20 first:mt-6">
+          <section key={board.chave} className="mt-24 first:mt-6 sm:mt-36">
             {/* ── O MOMENTO DE RESPIRAÇÃO ──────────────────────────────────────
               «Devia haver mais momentos assim, a separar secções: uma foto a
               toda a largura entre blocos.» Vem ANTES do título de propósito:
@@ -372,7 +390,7 @@ export default function Inspiracao({
               px davam o mesmo tamanho a que elas já saem na folha A4, e voltar
               a esse tamanho num ecrã era fazer o trabalho todo para não
               resolver nada. */}
-            <div className="mt-3 columns-1 gap-4 sm:columns-2 [&>*]:mb-4">
+            <div className={`mt-3 columns-1 gap-4 [&>*]:mb-4 ${colunas}`}>
               {board.fotos.map((id, i) =>
                 i === oRespiro ? null : (
                   <Celula
@@ -389,8 +407,26 @@ export default function Inspiracao({
               )}
             </div>
 
+            {/*
+             * ── A PAUSA DE LEITURA ────────────────────────────────────────
+             *
+             * «Uma frase curta ou citação entre blocos, como pausa de leitura.»
+             *
+             * A frase já existia e já era escrita por ela — a anotação do mood
+             * board —, desenhada como uma nota de rodapé encostada à esquerda
+             * com uma barra verde. Lia-se como um aviso técnico.
+             *
+             * É a mesma frase, no mesmo sítio, com o desenho do que ela é:
+             * centrada, na serifada do documento, com ar dos dois lados. Não se
+             * inventou conteúdo nenhum para isto — uma pausa escrita pelo
+             * programa seria uma frase de embrulho entre duas secções de
+             * trabalho verdadeiro.
+             */}
             {board.nota && (
-              <p className="text-foreground/72 border-moss/40 mt-5 border-l-2 pl-5 text-sm leading-relaxed">
+              <p
+                className="text-foreground/70 mx-auto mt-10 max-w-xl text-center leading-relaxed text-balance sm:mt-14"
+                style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(16px, 2vw, 19px)" }}
+              >
                 {board.nota}
               </p>
             )}

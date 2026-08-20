@@ -79,12 +79,14 @@ describe("as secções e a ordem", () => {
   it("sai pela ordem do documento — apresentação, serviços, inspiração, orçamento, condições", () => {
     desenhar();
     const titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent?.trim());
+    // Numeradas, e a Inspiração NÃO — é a numeração do PDF, espelhada, para
+    // que «na parte 3» queira dizer o mesmo nas duas formas.
     expect(titulos).toEqual([
-      "Apresentação",
-      "Serviços",
+      "1. Apresentação",
+      "2. Serviços",
       "Inspiração",
-      "Orçamento Proposto",
-      "Condições Gerais",
+      "3. Orçamento Proposto",
+      "4. Condições Gerais",
     ]);
   });
 
@@ -115,7 +117,7 @@ describe("a língua é a do DOCUMENTO", () => {
   it("em inglês, a moldura e a prosa dela saem as duas em inglês", () => {
     desenhar({}, "en");
     const titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(titulos).toContain("Services");
+    expect(titulos).toContain("2. Services");
     // A prosa dela vem do `titleEn` que ELA escreveu — não de uma tradução.
     expect(screen.getByText("Ceremony Decoration")).toBeTruthy();
     expect(screen.getByText("Floral arch")).toBeTruthy();
@@ -288,7 +290,7 @@ describe("o modelo Organização", () => {
 
   it("o cronograma entra", () => {
     desenhar(ORG);
-    expect(screen.getByRole("heading", { name: "Cronograma de Organização" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Cronograma de Organização/ })).toBeTruthy();
     expect(screen.getByText("Fase 1 · Conceito")).toBeTruthy();
     expect(screen.getByText("Reunião inicial")).toBeTruthy();
   });
@@ -343,7 +345,7 @@ describe("um documento a meio não desenha cabeçalhos vazios", () => {
 
   it("sem orçamento nenhum, a secção não existe", () => {
     render(<Documento doc={MAGRO} idioma="pt" fotos={[]} token="tk" />);
-    expect(screen.queryByRole("heading", { name: "Orçamento Proposto" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /Orçamento Proposto/ })).toBeNull();
     // CONTROLO POSITIVO: com uma rubrica, a mesma secção aparece. Sem isto, um
     // renderizador que nunca desenhasse orçamento nenhum passava por correcto.
     cleanup();
@@ -355,7 +357,7 @@ describe("um documento a meio não desenha cabeçalhos vazios", () => {
         token="tk"
       />,
     );
-    expect(screen.getByRole("heading", { name: "Orçamento Proposto" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Orçamento Proposto/ })).toBeTruthy();
   });
 
   it("e o casal continua a ler a apresentação, sem a página partir", () => {
@@ -711,5 +713,45 @@ describe("o fecho", () => {
       (i) => i.getAttribute("src") === "mini/capa0",
     );
     expect(capas).toHaveLength(1);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A NUMERAÇÃO TEM DE SER A MESMA DO PDF
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * «Numeração de secções, para o casal poder dizer ao telefone na parte 3.»
+ *
+ * O casal ao telefone tem uma das duas formas à frente e ela tem a outra. Uma
+ * página que numerasse à sua maneira transformava a numeração no oposto do que
+ * ela serve para: duas pessoas a falar de partes diferentes com o mesmo número.
+ */
+describe("a numeração das secções", () => {
+  it("o índice leva os MESMOS números dos títulos", () => {
+    // Duas numerações na mesma página — uma no índice, outra nos títulos — era
+    // o defeito que a numeração vem resolver.
+    desenhar();
+    const indice = screen.getByRole("navigation");
+    expect(within(indice).getByText("2. Serviços")).toBeTruthy();
+    expect(within(indice).getByText("3. Orçamento Proposto")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "2. Serviços" })).toBeTruthy();
+  });
+
+  it("a Inspiração não leva número, porque o PDF também não lhe dá", () => {
+    desenhar();
+    const indice = screen.getByRole("navigation");
+    expect(within(indice).getByText("Inspiração")).toBeTruthy();
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("uma secção que não existe não gasta um número", () => {
+    // Sem serviços, o Orçamento é a 2 — e no PDF também, porque a folha dos
+    // serviços também lá não é desenhada. Um número saltado seria «a parte 3»
+    // a não existir em lado nenhum.
+    desenhar({ serviceGroups: [] });
+    expect(screen.getByRole("heading", { name: "2. Orçamento Proposto" })).toBeTruthy();
   });
 });

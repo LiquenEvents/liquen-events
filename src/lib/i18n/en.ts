@@ -702,6 +702,7 @@ export const en: Dict = {
     iva: "VAT",
     total: "Total",
     validoAte: "Valid until",
+    emitidaEm: "Issued on",
     versaoNumero: "Version",
     atualizadaEm: "Updated on",
     verPdf: "View the full proposal (PDF)",
