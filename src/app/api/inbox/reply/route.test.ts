@@ -225,7 +225,10 @@ describe("POST /api/inbox/reply — assinatura", () => {
     // A mensagem que ela escreveu continua lá — a assinatura acrescenta-se, não
     // substitui nada.
     expect(env.text).toContain("Olá, com todo o gosto.");
-    expect(env.attachments?.some((a) => a.cid === "liquen-logo")).toBe(true);
+    // A faixa da casa viaja COM a mensagem — nada de imagens remotas. (Era o
+    // logótipo; passou a ser a faixa quando a assinatura passou a ser a dela:
+    // sem marca por cima do nome, com a faixa a fechar. Ver `email-assinatura`.)
+    expect(env.attachments?.some((a) => a.cid === "liquen-banner")).toBe(true);
     expect(env.html).not.toMatch(/<img[^>]+src="https?:/);
   });
 
