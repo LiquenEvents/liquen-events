@@ -764,10 +764,9 @@ export const pt = {
     notFoundTitle: "Proposta não encontrada",
     notFoundBody:
       "Não conseguimos encontrar esta proposta. Se acha que é um engano, fale connosco.",
-    eyebrow: "Proposta para o seu evento",
     greeting: "Olá",
     intro:
-      "Preparámos esta proposta com todo o cuidado para o seu evento. Reveja os detalhes e responda-nos aqui mesmo, será um prazer avançar consigo.",
+      "Preparámos esta proposta com todo o cuidado para o vosso dia. Vejam com calma: qualquer ajuste é bem-vindo, basta responderem ao email.",
     tableDescricao: "Descrição",
     tableQt: "Qt",
     tableValor: "Valor",
@@ -784,6 +783,7 @@ export const pt = {
      * responde à pergunta que o casal faz ao voltar meses depois: «isto ainda
      * é o mesmo que eu vi?».
      */
+    emitidaEm: "Emitida a",
     versaoNumero: "Versão",
     atualizadaEm: "Atualizada a",
     verPdf: "Ver a proposta completa (PDF)",

@@ -2,7 +2,15 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import Documento from "./Documento";
-import type { ProposalDoc } from "@/lib/proposal-doc";
+import { textosDaProposta } from "@/lib/proposal-doc-textos";
+import {
+  DEFAULT_CANCELAMENTO,
+  DEFAULT_FASEAMENTO,
+  DEFAULT_CONDICOES_GERAIS,
+  DEFAULT_OBSERVACOES_GERAIS,
+  preencherMarcadores,
+  type ProposalDoc,
+} from "@/lib/proposal-doc";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
 
 /**
@@ -71,12 +79,14 @@ describe("as secções e a ordem", () => {
   it("sai pela ordem do documento — apresentação, serviços, inspiração, orçamento, condições", () => {
     desenhar();
     const titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent?.trim());
+    // Numeradas, e a Inspiração NÃO — é a numeração do PDF, espelhada, para
+    // que «na parte 3» queira dizer o mesmo nas duas formas.
     expect(titulos).toEqual([
-      "Apresentação",
-      "Serviços",
+      "1. Apresentação",
+      "2. Serviços",
       "Inspiração",
-      "Orçamento Proposto",
-      "Condições Gerais",
+      "3. Orçamento Proposto",
+      "4. Condições Gerais",
     ]);
   });
 
@@ -107,7 +117,7 @@ describe("a língua é a do DOCUMENTO", () => {
   it("em inglês, a moldura e a prosa dela saem as duas em inglês", () => {
     desenhar({}, "en");
     const titulos = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(titulos).toContain("Services");
+    expect(titulos).toContain("2. Services");
     // A prosa dela vem do `titleEn` que ELA escreveu — não de uma tradução.
     expect(screen.getByText("Ceremony Decoration")).toBeTruthy();
     expect(screen.getByText("Floral arch")).toBeTruthy();
@@ -280,7 +290,7 @@ describe("o modelo Organização", () => {
 
   it("o cronograma entra", () => {
     desenhar(ORG);
-    expect(screen.getByRole("heading", { name: "Cronograma de Organização" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Cronograma de Organização/ })).toBeTruthy();
     expect(screen.getByText("Fase 1 · Conceito")).toBeTruthy();
     expect(screen.getByText("Reunião inicial")).toBeTruthy();
   });
@@ -335,7 +345,7 @@ describe("um documento a meio não desenha cabeçalhos vazios", () => {
 
   it("sem orçamento nenhum, a secção não existe", () => {
     render(<Documento doc={MAGRO} idioma="pt" fotos={[]} token="tk" />);
-    expect(screen.queryByRole("heading", { name: "Orçamento Proposto" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /Orçamento Proposto/ })).toBeNull();
     // CONTROLO POSITIVO: com uma rubrica, a mesma secção aparece. Sem isto, um
     // renderizador que nunca desenhasse orçamento nenhum passava por correcto.
     cleanup();
@@ -347,7 +357,7 @@ describe("um documento a meio não desenha cabeçalhos vazios", () => {
         token="tk"
       />,
     );
-    expect(screen.getByRole("heading", { name: "Orçamento Proposto" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Orçamento Proposto/ })).toBeTruthy();
   });
 
   it("e o casal continua a ler a apresentação, sem a página partir", () => {
@@ -413,5 +423,335 @@ describe("o dinheiro escrito à mão", () => {
     } as unknown as Partial<ProposalDoc>);
     expect(screen.getByText("A combinar")).toBeTruthy();
     expect(screen.queryByText("0,00 €")).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AS CONDIÇÕES DOBRADAS: FECHADAS, MAS NÃO ESCONDIDAS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * As condições, as observações, o faseamento e o cancelamento somam mais de
+ * duas dezenas de cláusulas. Abertas, empurram para baixo tudo aquilo por que
+ * a proposta se vende.
+ *
+ * A afirmação que aqui se prende não é «estão fechadas» — é que **fechada não
+ * é escondida**: o título continua a ser um título, o texto continua no HTML
+ * (a procura da página encontra-o), e por baixo do título há uma linha que diz
+ * o que lá está dentro. Sem essa linha, dobrar é o mesmo que omitir.
+ */
+describe("as secções de condições", () => {
+  /**
+   * O texto DA CASA, preenchido como o documento o guarda.
+   *
+   * Tinha de ser este e não um de fantasia: o resumo por baixo do título só se
+   * mostra enquanto o bloco for, palavra por palavra, o da casa — é essa a
+   * regra que impede a página de resumir um texto que já lá não está.
+   */
+  const COM_TUDO = {
+    condicoesGerais: DEFAULT_CONDICOES_GERAIS.map((l) =>
+      preencherMarcadores(l, DOC as unknown as ProposalDoc),
+    ),
+    observacoesGerais: [...DEFAULT_OBSERVACOES_GERAIS],
+    faseamento: [...DEFAULT_CANCELAMENTO.slice(0, 1)],
+    cancelamento: [...DEFAULT_CANCELAMENTO],
+  };
+
+  const dobra = (nome: RegExp) =>
+    screen.getByRole("heading", { name: nome }).closest("details") as HTMLDetailsElement;
+
+  it("saem fechadas — é essa a razão de existirem", () => {
+    desenhar(COM_TUDO);
+    for (const nome of [/Condições Gerais/i, /Observações/i, /Faseamento/i, /Cancelamento/i]) {
+      expect(dobra(nome).open).toBe(false);
+    }
+  });
+
+  it("o título continua a ser um título, e não um parágrafo dentro de um botão", () => {
+    // O índice da página e o leitor de ecrã leem-se pelos cabeçalhos. Trocar o
+    // `h2` por um `span` dobrava a secção e apagava-a da estrutura.
+    desenhar(COM_TUDO);
+    const t = screen.getByRole("heading", { name: /Condições Gerais/i });
+    expect(t.tagName).toBe("H2");
+  });
+
+  it("o texto continua no HTML mesmo fechado — a procura da página encontra-o", () => {
+    desenhar(COM_TUDO);
+    expect(screen.getByText(/Aos valores acresce o IVA/i)).toBeInTheDocument();
+  });
+
+  it("diz numa linha o que está lá dentro", () => {
+    // Sem isto, «Condições Gerais» tanto pode ser uma cláusula como catorze, e
+    // quem não sabe o que está a abrir não abre.
+    desenhar(COM_TUDO);
+    expect(screen.getByText(/confirmação do número de convidados/i)).toBeInTheDocument();
+    expect(screen.getByText(/O que acontece se o evento for cancelado/i)).toBeInTheDocument();
+    expect(screen.getByText(/uso do material/i)).toBeInTheDocument();
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   *
+   * Os resumos foram escritos a olhar para o texto DA CASA. Sobre um texto que
+   * ela reescreveu, o mesmo resumo passa a ser uma frase falsa dita por cima
+   * de uma secção fechada — que é o pior sítio para a dizer, porque ninguém a
+   * vai lá dentro desmentir.
+   */
+  it("com o texto reescrito por ela, conta os pontos em vez de os resumir", () => {
+    desenhar({
+      ...COM_TUDO,
+      cancelamento: ["Uma cláusula dela.", "E outra.", "E outra ainda."],
+    });
+    expect(screen.getByText("3 pontos")).toBeInTheDocument();
+    expect(screen.queryByText(/O que acontece se o evento for cancelado/i)).toBeNull();
+  });
+
+  it("um só ponto não se lê «1 pontos»", () => {
+    desenhar({ ...COM_TUDO, cancelamento: ["Uma cláusula dela."] });
+    expect(screen.getAllByText("1 ponto").length).toBeGreaterThan(0);
+  });
+
+  it("em inglês, o resumo é inglês", () => {
+    desenhar(COM_TUDO, "en");
+    expect(screen.getByText(/confirming the final guest count/i)).toBeInTheDocument();
+  });
+
+  it("uma secção vazia não deixa uma dobra vazia para trás", () => {
+    desenhar({ ...COM_TUDO, cancelamento: [] });
+    expect(screen.queryByRole("heading", { name: /Cancelamento/i })).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A PÁGINA MUDOU DE VOZ; O PDF FICA COMO ESTÁ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Decisão dela, dita com todas as letras: as mudanças de linguagem são para a
+ * página web, e no PDF fica tudo igual.
+ *
+ * O que isto prende é o mecanismo que o permite. O PDF e a página bebem do
+ * MESMO dicionário — mudar lá uma palavra mudava-a nos dois de uma vez. Por
+ * isso a página tem os seus sobretítulos num dicionário só dela, e o teste que
+ * interessa é o segundo: **o dicionário do documento continua a dizer o que
+ * dizia**. Sem ele, alguém «arruma» os dois num sítio só daqui a um mês e a
+ * mudança escorrega para o papel sem ninguém dar por isso.
+ */
+const COM_CONDICOES = {
+  condicoesGerais: ["Aos valores acresce o IVA à taxa legal em vigor como descrito."],
+};
+
+describe("a voz da página não escorrega para o documento", () => {
+  it("o orçamento deixou de ser «O investimento» — na página", () => {
+    desenhar();
+    expect(screen.getByText("O que custa")).toBeInTheDocument();
+    expect(screen.queryByText(/O investimento/i)).toBeNull();
+  });
+
+  it("as condições são «para vossa tranquilidade» — na página", () => {
+    desenhar(COM_CONDICOES);
+    expect(screen.getByText(/Para vossa tranquilidade/i)).toBeInTheDocument();
+  });
+
+  it("em inglês, a página também", () => {
+    desenhar({}, "en");
+    expect(screen.getByText("What it costs")).toBeInTheDocument();
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("e o dicionário DO DOCUMENTO continua intocado — é ele que o PDF lê", () => {
+    expect(textosDaProposta("pt").sobretituloOrcamento).toBe("O investimento");
+    expect(textosDaProposta("pt").sobretituloCondicoes).toBe("Para sua tranquilidade");
+    expect(textosDaProposta("en").sobretituloOrcamento).toBe("The investment");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O ORÇAMENTO: O NÚMERO QUE MAIS IMPORTA, E A PERGUNTA QUE VEM A SEGUIR
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * «Total a pagar» estava na mesma escada dos subtotais. E a pergunta que um
+ * casal faz a seguir a ver um total é sempre a mesma — quanto pagamos agora —
+ * com a resposta três secções abaixo.
+ *
+ * A afirmação que mais vale aqui é a última: a linha curta do faseamento SÓ
+ * aparece enquanto o faseamento for o da casa. Se ela o reescreveu, as
+ * percentagens desta linha podiam já não ser as de lá, e duas percentagens
+ * diferentes na mesma proposta são a única coisa pior do que a pergunta sem
+ * resposta.
+ */
+describe("o orçamento", () => {
+  const COM_TOTAL = {
+    budgetItems: ["Decor Cerimónia"],
+    totalAmount: 10000,
+    totalVatMode: "acrescer" as const,
+    vatRate: 0.23,
+    faseamento: [...DEFAULT_FASEAMENTO],
+  };
+
+  /** O rótulo pequeno por cima do número, e não a frase do faseamento. */
+  const rotuloDoTotal = () =>
+    screen.getAllByText(/Total a pagar/i).find((e) => e.className.includes("uppercase"))!;
+
+  it("diz o que se paga agora, ao lado do total", () => {
+    desenhar(COM_TOTAL);
+    // Dois pontos e não ponto e vírgula: a linha curta escreve
+    // «30% na adjudicação: 3.075,00 €»; a cláusula lá em baixo escreve
+    // «30% na adjudicação;». É a pontuação que as distingue.
+    expect(screen.getByText(/30% na adjudicação:/i)).toBeInTheDocument();
+    expect(screen.getByText(/restantes 70% um mês antes/i)).toBeInTheDocument();
+  });
+
+  it("o total é o maior número do bloco", () => {
+    // A hierarquia é a mensagem: quem percorre a coluna com o polegar tem de
+    // distinguir o que paga do que somou para lá chegar.
+    desenhar(COM_TOTAL);
+    /*
+     * A medida exacta não se pode afirmar aqui: o jsdom não conhece `clamp()`
+     * e deita a declaração fora inteira, o que faria um teste sobre os «52px»
+     * passar por não ver nada — que é a pior espécie de teste verde.
+     *
+     * O que se afirma é a HIERARQUIA, que é a decisão: o total saiu da escada
+     * dos subtotais. Está noutra tipografia (a serifada do documento) e não
+     * partilha a classe de tamanho com que os subtotais são desenhados.
+     */
+    const numero = rotuloDoTotal().parentElement?.querySelectorAll("p")[1] as HTMLElement;
+    expect(numero.getAttribute("style")).toContain("--font-playfair");
+    expect(numero.className).not.toContain("text-sm");
+
+    // O controlo positivo: um subtotal É `text-sm` e não tem tipografia própria.
+    const subtotal = screen.getByText(/TOTAL \(sem IVA\)/i).parentElement
+      ?.lastElementChild as HTMLElement;
+    expect(subtotal.className).toContain("text-sm");
+    expect(subtotal.getAttribute("style")).toBeNull();
+  });
+
+  it("liga o incluído ao que o casal acabou de ver", () => {
+    desenhar({ ...COM_TOTAL, incluido: ["Serviço de decoração conforme descrito;"] });
+    const linha = screen.getByText(/Tudo o que viram atrás/i).parentElement as HTMLElement;
+    // Os nomes saem do documento, não de uma lista escrita à mão.
+    expect(linha.textContent).toContain("Decoração Cerimónia");
+  });
+
+  it("não repete o mesmo momento duas vezes", () => {
+    // Um board «Cerimónia» ao lado de um grupo «Cerimónia» é a mesma palavra
+    // duas vezes numa linha de quatro.
+    desenhar({
+      ...COM_TOTAL,
+      incluido: ["Serviço de decoração;"],
+      serviceGroups: [{ letter: "A", title: "Cerimónia", items: [] }],
+      moodBoards: [{ title: "Cerimónia", images: ["ped/0.jpg"] }],
+    } as unknown as Partial<ProposalDoc>);
+    const linha = screen.getByText(/Tudo o que viram atrás/i).parentElement as HTMLElement;
+    expect(linha.textContent?.match(/Cerimónia/g)).toHaveLength(1);
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("com o faseamento reescrito por ela, a linha curta CALA-SE", () => {
+    desenhar({ ...COM_TOTAL, faseamento: ["50% na assinatura;", "50% na véspera;"] });
+    expect(screen.queryByText(/30% na adjudicação/i)).toBeNull();
+    // E o faseamento dela continua lá, por extenso, na secção dele.
+    expect(screen.getByText(/50% na assinatura/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A ÚLTIMA COISA QUE SE VÊ NÃO PODE SER O CANCELAMENTO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A proposta acabava na cláusula do Centro de Arbitragem de Conflitos de
+ * Consumo de Lisboa. É a frase certa e é o sítio errado para uma proposta de
+ * casamento acabar.
+ *
+ * A afirmação que vale por todas é a última: com uma capa só, NÃO há fecho.
+ * Repetir a fotografia de abertura no fim não é um fecho — é a mesma proposta
+ * a dizer duas vezes a mesma coisa, e nota-se.
+ */
+describe("o fecho", () => {
+  const DUAS_CAPAS: FotoDaProposta[] = [
+    { id: "c0", miniatura: "mini/capa0", original: "orig/capa0", largura: 1600, altura: 1067 },
+    { id: "c1", miniatura: "mini/capa1", original: "orig/capa1", largura: 1600, altura: 1067 },
+  ];
+
+  const comCapas = (fotos: FotoDaProposta[], coverImages: string[]) =>
+    render(
+      <Documento
+        doc={{ ...DOC, coverImages } as ProposalDoc}
+        idioma="pt"
+        fotos={fotos}
+        token="tk"
+      />,
+    );
+
+  it("fecha com a segunda capa, que a página ainda não tinha usado", () => {
+    comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
+    const imagens = Array.from(document.querySelectorAll("img"));
+    expect(imagens[0].getAttribute("src")).toBe("mini/capa0");
+    expect(imagens[imagens.length - 1].getAttribute("src")).toBe("mini/capa1");
+  });
+
+  it("a fotografia do fecho entra preguiçosa", () => {
+    // Está no fim de uma página com quarenta e seis fotografias; quem lá chega
+    // já esperou o que tinha a esperar.
+    comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
+    const imagens = Array.from(document.querySelectorAll("img"));
+    expect(imagens[imagens.length - 1].getAttribute("loading")).toBe("lazy");
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("com uma capa só, não se repete a de abertura no fim", () => {
+    comCapas([DUAS_CAPAS[0]], ["ped/capa0.jpg"]);
+    const capas = Array.from(document.querySelectorAll("img")).filter(
+      (i) => i.getAttribute("src") === "mini/capa0",
+    );
+    expect(capas).toHaveLength(1);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A NUMERAÇÃO TEM DE SER A MESMA DO PDF
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * «Numeração de secções, para o casal poder dizer ao telefone na parte 3.»
+ *
+ * O casal ao telefone tem uma das duas formas à frente e ela tem a outra. Uma
+ * página que numerasse à sua maneira transformava a numeração no oposto do que
+ * ela serve para: duas pessoas a falar de partes diferentes com o mesmo número.
+ */
+describe("a numeração das secções", () => {
+  it("o índice leva os MESMOS números dos títulos", () => {
+    // Duas numerações na mesma página — uma no índice, outra nos títulos — era
+    // o defeito que a numeração vem resolver.
+    desenhar();
+    const indice = screen.getByRole("navigation");
+    expect(within(indice).getByText("2. Serviços")).toBeTruthy();
+    expect(within(indice).getByText("3. Orçamento Proposto")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "2. Serviços" })).toBeTruthy();
+  });
+
+  it("a Inspiração não leva número, porque o PDF também não lhe dá", () => {
+    desenhar();
+    const indice = screen.getByRole("navigation");
+    expect(within(indice).getByText("Inspiração")).toBeTruthy();
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("uma secção que não existe não gasta um número", () => {
+    // Sem serviços, o Orçamento é a 2 — e no PDF também, porque a folha dos
+    // serviços também lá não é desenhada. Um número saltado seria «a parte 3»
+    // a não existir em lado nenhum.
+    desenhar({ serviceGroups: [] });
+    expect(screen.getByRole("heading", { name: "2. Orçamento Proposto" })).toBeTruthy();
   });
 });

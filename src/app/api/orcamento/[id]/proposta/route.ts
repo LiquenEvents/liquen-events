@@ -306,38 +306,52 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const corpoDoModelo =
       doModelo && arrumarLigacao(doModelo.html, { url: acceptUrl, rotulo: ROTULO_DA_PROPOSTA });
 
+    /**
+     * «17 de outubro de 2026», nunca «17/10/2026».
+     *
+     * O `toLocaleDateString` sem opções dá o formato CURTO, e o curto em
+     * Portugal é com barras. Uma data com barras é a data de um recibo, e este
+     * é o email que acompanha uma proposta de casamento. (O PDF não é tocado —
+     * decisão dela; isto é o email.)
+     */
+    const porExtenso = (iso: string) =>
+      new Date(`${iso}T12:00:00`).toLocaleDateString("pt-PT", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "Europe/Lisbon",
+      });
+
     const email = escrito
       ? emailAoCliente({ html: escrito.html, texto: escrito.texto, quem })
       : corpoDoModelo
         ? emailAoCliente({ html: corpoDoModelo, texto: textoDoCorpo(corpoDoModelo), quem })
         : emailAoCliente({
             quem,
-            html: `<h2 style="font-size:18px;margin:0 0 12px">A sua proposta — Líquen Events</h2>
+            html: `<h2 style="font-size:18px;margin:0 0 12px">A vossa proposta — Líquen Events</h2>
       <p style="font-size:14px;line-height:1.6;color:#333">Olá ${esc(primeiroNome)},</p>
       <p style="font-size:14px;line-height:1.6;color:#333">
-        Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento,
+        Obrigado pelo vosso interesse. Segue em anexo a proposta que preparámos para o vosso dia,
         no valor total de <strong style="color:#7c854b">${eurDocumento(total)}</strong> (IVA incluído).
       </p>
-      ${proposal.validUntil ? `<p style="font-size:13px;color:#777">Válida até ${esc(new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT"))}.</p>` : ""}
+      ${proposal.validUntil ? `<p style="font-size:13px;color:#777">Válida até ${esc(porExtenso(proposal.validUntil))}.</p>` : ""}
       <p style="margin:24px 0">
         <a href="${acceptUrl}" style="display:inline-block;background:#7c854b;color:#f5f3ee;text-decoration:none;padding:13px 28px;border-radius:4px;font-size:13px;letter-spacing:0.06em">Ver e responder à proposta online →</a>
       </p>
       <p style="font-size:14px;line-height:1.6;color:#333">
-        Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.
+        Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento convosco.
       </p>`,
             texto: [
-              "A sua proposta — Líquen Events",
+              "A vossa proposta — Líquen Events",
               "",
               `Olá ${primeiroNome},`,
               "",
-              `Obrigado pelo seu interesse. Segue em anexo a proposta personalizada para o seu evento, no valor total de ${eurDocumento(total)} (IVA incluído).`,
-              proposal.validUntil
-                ? `Válida até ${new Date(proposal.validUntil + "T12:00:00").toLocaleDateString("pt-PT")}.`
-                : "",
+              `Obrigado pelo vosso interesse. Segue em anexo a proposta que preparámos para o vosso dia, no valor total de ${eurDocumento(total)} (IVA incluído).`,
+              proposal.validUntil ? `Válida até ${porExtenso(proposal.validUntil)}.` : "",
               "",
               `Ver e responder à proposta online: ${acceptUrl}`,
               "",
-              "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento consigo.",
+              "Ficamos ao dispor para qualquer questão ou ajuste. Será um prazer criar este momento convosco.",
             ]
               .filter((line) => line !== "")
               .join("\n"),
@@ -408,7 +422,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         // a linha que o cliente lê antes de abrir também tem de ser — dois
         // assuntos para o mesmo email era o ecrã dos modelos a mentir outra
         // vez, agora só a meio.
-        subject: doModelo?.assunto ?? "Proposta para o seu evento — Líquen Events",
+        subject: doModelo?.assunto ?? "A vossa proposta — Líquen Events",
         html: email.html,
         text: email.text,
         // O PDF JUNTA-SE aos anexos da assinatura, não os substitui:

@@ -3,6 +3,8 @@ import { getSupabase } from "./supabase";
 import { PROPOSAL_BUCKET } from "./proposal-storage";
 import { THEME_BUCKET, ehRefDeTema, caminhoDoRefDeTema } from "./theme-ref";
 import { isPendingImage, type ProposalDoc } from "./proposal-doc";
+import { formasDeCaminhos } from "./biblioteca-fotos-store";
+import { LARGURAS_DE_PARTILHA, type FotoSuspeita } from "./proposta-fotos-verificacao-tipos";
 import { log } from "./logger";
 import type {
   FotoEmFalta,
@@ -14,7 +16,21 @@ export type {
   FotoEmFalta,
   VerificacaoDeFotos,
 } from "./proposta-fotos-verificacao-tipos";
-export { PORQUE_FALTA } from "./proposta-fotos-verificacao-tipos";
+export { PORQUE_FALTA, PORQUE_SUSPEITA } from "./proposta-fotos-verificacao-tipos";
+
+/**
+ * Abaixo desta largura (ou altura), uma fotografia é esticada onde é desenhada.
+ *
+ * A grelha da página pede fotografias de 1200 píxeis (ver a derivada `MEDIA` e
+ * o `srcset` da `Inspiracao`), e a célula em destaque do PDF pede ~713. Mil é a
+ * linha abaixo da qual a foto é esticada mais de vinte por cento na página —
+ * que é onde a moleza começa a ver-se — e já não sobra nada para o papel.
+ *
+ * Um número redondo e não uma conta de geometria de propósito: a conta exacta
+ * mudaria com a disposição de cada board e obrigava este módulo a importar o
+ * motor de desenho para responder «esta foto é pequena».
+ */
+const MINIMO_UTIL = 1000;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -149,6 +165,7 @@ export async function verificarFotosDaProposta(
   const vazio: VerificacaoDeFotos = {
     total: entradas.length,
     emFalta: [],
+    suspeitas: [],
     naoVerificaveis: 0,
     verificou: false,
   };
@@ -218,7 +235,38 @@ export async function verificarFotosDaProposta(
       }
     }
 
-    return { total: entradas.length, emFalta, naoVerificaveis, verificou: true };
+    /**
+     * ── E AGORA AS QUE ESTÃO LÁ, MAS NÃO DEVIAM IR ASSIM ────────────────
+     *
+     * As medidas vêm da tabela das fotografias, não dos ficheiros: uma
+     * consulta por pasta contra descarregar quarenta e seis imagens para lhes
+     * medir a largura. Uma foto sem linha na tabela não entra — não saber a
+     * medida é não saber, e daí não sai acusação nenhuma.
+     */
+    const jaEmFalta = new Set(emFalta.map((f) => f.id));
+    const paraMedir = porResolver.filter((e) => !jaEmFalta.has(e.id));
+    const caminhoDe = (ref: string) => (ehRefDeTema(ref) ? caminhoDoRefDeTema(ref) : ref);
+    const formas = await formasDeCaminhos(
+      paraMedir.map((e) => caminhoDe(e.ref)).filter((c): c is string => !!c),
+    );
+
+    const suspeitas: FotoSuspeita[] = [];
+    for (const e of paraMedir) {
+      const caminho = caminhoDe(e.ref);
+      const forma = caminho ? formas.get(caminho) : undefined;
+      if (!forma) continue;
+      const { largura, altura } = forma;
+      // A medida de partilha vem PRIMEIRO: uma foto do Pinterest é quase
+      // sempre pequena também, e das duas frases é esta que diz o que fazer.
+      const motivo = LARGURAS_DE_PARTILHA.includes(largura)
+        ? "medida-de-partilha"
+        : Math.max(largura, altura) < MINIMO_UTIL
+          ? "pequena-demais"
+          : null;
+      if (motivo) suspeitas.push({ id: e.id, onde: e.onde, motivo, largura, altura });
+    }
+
+    return { total: entradas.length, emFalta, suspeitas, naoVerificaveis, verificou: true };
   } catch (err) {
     log.error("verificação de fotos falhou", err);
     return vazio;

@@ -18,6 +18,16 @@ import { round2 } from "@/lib/money";
  *  with or without a `data:` prefix — the renderer sniffs the format). */
 export type ImageData = string;
 
+/**
+ * O tecto da frase de intenção, em caracteres.
+ *
+ * Três linhas numa medida de leitura, e o limite existe para que sejam TRÊS:
+ * o sítio dela é uma abertura, não um parágrafo de apresentação, e uma frase
+ * que passe daqui deixa de se ler de uma vez e passa a empurrar a fotografia
+ * de capa para fora do ecrã, que é exactamente o contrário do que se quer.
+ */
+export const MAX_INTENCAO = 200;
+
 /** Taxa de IVA por omissão (23% — taxa normal em Portugal continental). */
 export const DEFAULT_VAT_RATE = 0.23;
 
@@ -388,6 +398,87 @@ export interface ProposalDoc {
   headerTitle?: string;
   /** O {@link ProposalDoc.headerTitle} em inglês. */
   headerTitleEn?: string;
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A FRASE DE INTENÇÃO — a única coisa desta proposta que não é um dado
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * «Pensámos o vosso dia em branco e azul, com a serenidade do Redondo em
+   * setembro.» Três linhas, escritas à mão, proposta a proposta, sobre o que
+   * ela viu quando pensou naquele casamento.
+   *
+   * É a primeira coisa que o casal lê na página, e substitui um sobretítulo em
+   * maiúsculas que dizia «PROPOSTA PARA O SEU EVENTO» — quer dizer, que dizia
+   * a quem abriu um link de uma proposta que aquilo era uma proposta.
+   *
+   * ── NÃO TEM TEXTO POR OMISSÃO, E ISSO É A DECISÃO ────────────────────────
+   *
+   * Palavras dela: «uma frase genérica é pior do que nenhuma». Uma frase da
+   * casa aqui seria lida como escrita para aquele casal, e no dia em que dois
+   * casais a comparassem seria pior do que nunca ter existido. Vazio quer
+   * dizer vazio: a página não desenha nada e a abertura fica com o nome deles.
+   *
+   * ── SÓ NA PÁGINA ─────────────────────────────────────────────────────────
+   *
+   * Decisão dela: o PDF fica exactamente como está. Por isso este campo entra
+   * no `NUNCA_NO_PDF` — e, por ser visto pela página, no `VISTO_NA_PAGINA` do
+   * selo de versão, ao lado do `headerTitle`. Mudá-la por baixo de um casal
+   * que já leu a proposta é mudar o que ele leu.
+   */
+  intencao?: string;
+  /** A {@link ProposalDoc.intencao} em inglês. */
+  intencaoEn?: string;
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * CONTRA QUE PORTUGUÊS É QUE CADA TRADUÇÃO FOI ESCRITA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A chave é a do campo (`itemRotulo:0:2`), o valor é uma impressão digital do
+   * texto português no momento em que o inglês foi escrito ou dado por revisto.
+   *
+   * Existe para uma coisa só, e é o defeito mais grave do estúdio: «Reunião
+   * Inicial» com «Ceremony Decor» por tradução. Alguém traduziu, mudou depois o
+   * português, e o inglês ficou errado — a passar em todas as verificações,
+   * porque nenhuma delas pergunta se o inglês ainda corresponde: perguntam se
+   * ele está lá.
+   *
+   * Ver `estadoDoIngles`, em `proposal-doc-bilingue.ts`, para as regras — e em
+   * particular para o que acontece às propostas ANTERIORES a este registo, que
+   * não têm marca nenhuma e não podem por isso ser acusadas.
+   *
+   * Nunca é impresso: é do estúdio, e está no `NUNCA_NO_PDF`.
+   */
+  traducoesFeitas?: Record<string, number>;
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A CONFIGURAÇÃO DAS PÁGINAS, DECIDIDA UMA VEZ PARA A PROPOSTA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «"Manter a forma de cada fotografia" hoje está desligada no
+   * primeiro board e ligada no terceiro, sem razão».
+   *
+   * E é o que acontece quando a escolha só existe por página: sete páginas,
+   * sete decisões, tomadas em sete momentos diferentes de uma tarde. O
+   * resultado não é variedade — é uma proposta que parece montada por duas
+   * pessoas.
+   *
+   * Isto é o que a proposta INTEIRA faz, quando a página não disser outra
+   * coisa. Uma página continua a poder discordar: o campo dela ganha sempre,
+   * porque há páginas que pedem mesmo outro tratamento.
+   *
+   * ── E PORQUE É QUE AUSENTE NÃO É `false` ────────────────────────────────
+   *
+   * Pela mesma razão que já valia por página: ausente quer dizer «ninguém
+   * escolheu», e uma proposta já enviada tem de continuar a sair como sempre
+   * saiu. Um `false` gravado seria uma escolha, e mudaria o desenho de
+   * documentos antigos no dia em que a regra de omissão mudasse.
+   */
+  layoutPorOmissao?: LayoutDeMoodboard;
+  /** Como {@link ProposalDoc.layoutPorOmissao}, para o recorte. */
+  enquadramentoPorOmissao?: "forma-da-foto";
 
   // ── 1. Apresentação ──
   /** Couple / client, e.g. "Maria & Zé". */

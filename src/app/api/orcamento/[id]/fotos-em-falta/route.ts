@@ -60,6 +60,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * diferente de «está tudo bem» e diferente de «erro». Um 5xx aqui deixava
      * o painel sem nada para escrever, e o silêncio lê-se como a primeira.
      */
-    return NextResponse.json({ total: 0, emFalta: [], naoVerificaveis: 0, verificou: false });
+    return NextResponse.json({
+      total: 0,
+      emFalta: [],
+      suspeitas: [],
+      naoVerificaveis: 0,
+      verificou: false,
+    });
   }
 }

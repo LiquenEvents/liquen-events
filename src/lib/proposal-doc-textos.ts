@@ -934,49 +934,85 @@ function saoIguais(a: readonly string[] | undefined, b: readonly string[]): bool
  * da casa (ver o bloco de comentário acima). O que ela reescreveu fica como
  * está.
  */
-export function blocosFixosNaLingua(
+/**
+ * O texto DA CASA de cada bloco fixo, em português e no seu par inglês.
+ *
+ * Uma tabela e não dois sítios: há agora DUAS perguntas a fazer sobre a mesma
+ * comparação — «qual é a versão inglesa deste bloco?» ({@link
+ * blocosFixosNaLingua}) e «isto ainda é o texto da casa?» ({@link
+ * blocoEDaCasa}) —, e as duas dependem de o par estar escrito uma vez só.
+ * Escritas em dois sítios, divergiam no dia em que uma cláusula mudasse: uma
+ * proposta inglesa continuaria a traduzir um texto que a outra pergunta já
+ * dava por reescrito à mão.
+ *
+ * As redacções alternativas vão na LÍNGUA das linhas que se estão a preencher
+ * — sem data, a condição inglesa tem de ser reescrita em inglês.
+ *
+ * E os DADOS também: a cláusula inglesa que cita o dia do evento recebe o dia
+ * escrito em inglês (ver «OS CAMPOS QUE O NOSSO CÓDIGO ESCREVEU»). A
+ * portuguesa recebe o que está no documento — tem de receber, porque é com ela
+ * que se compara para saber se o bloco continua a ser o da casa: preencher a
+ * versão de COMPARAÇÃO com a data inglesa fazia todas as condições parecerem
+ * reescritas à mão, e o bloco inteiro saía em português.
+ */
+function textosDaCasa(
   doc: ProposalDoc,
-  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
-): BlocosFixos {
-  if (idioma !== "en") return doc;
-  // As redacções alternativas vão na LÍNGUA das linhas que se estão a preencher
-  // — sem data, a condição inglesa tem de ser reescrita em inglês.
-  //
-  // E os DADOS também: a cláusula inglesa que cita o dia do evento recebe o dia
-  // escrito em inglês (ver «OS CAMPOS QUE O NOSSO CÓDIGO ESCREVEU»). A
-  // portuguesa recebe o que está no documento — tem de receber, porque é com ela
-  // que se compara para saber se o bloco continua a ser o da casa: preencher a
-  // versão de COMPARAÇÃO com a data inglesa fazia todas as condições parecerem
-  // reescritas à mão, e o bloco inteiro saía em português.
+): Record<keyof BlocosFixos, { pt: readonly string[]; en: readonly string[] }> {
   const campos = camposDoEventoNaLingua(doc, "en");
   const preencher = (
     linhas: readonly string[],
     semDado?: RedaccoesSemDado,
     dados: CamposDoEventoEscritos = doc,
   ) => linhas.map((l) => preencherMarcadores(l, dados, semDado));
-  /** O bloco em inglês, se o que está no documento for o da casa. */
-  const naLingua = (atual: string[], pt: readonly string[], en: readonly string[]) =>
-    saoIguais(atual, pt) ? [...en] : atual;
   const pct = depositPercentOf(doc);
   return {
-    notasImportantes: naLingua(
-      doc.notasImportantes,
-      DEFAULT_NOTAS_IMPORTANTES,
-      EN_NOTAS_IMPORTANTES,
-    ),
-    incluido: naLingua(doc.incluido, DEFAULT_INCLUIDO, EN_INCLUIDO),
-    naoIncluido: naLingua(doc.naoIncluido, DEFAULT_NAO_INCLUIDO, EN_NAO_INCLUIDO),
-    condicoesGerais: naLingua(
-      doc.condicoesGerais,
-      preencher(DEFAULT_CONDICOES_GERAIS),
-      preencher(EN_CONDICOES_GERAIS, EN_CONDICOES_SEM_DADO, campos),
-    ),
-    observacoesGerais: naLingua(
-      doc.observacoesGerais,
-      DEFAULT_OBSERVACOES_GERAIS,
-      EN_OBSERVACOES_GERAIS,
-    ),
-    faseamento: naLingua(doc.faseamento, faseamentoPorOmissao(pct), faseamentoEn(pct)),
-    cancelamento: naLingua(doc.cancelamento, DEFAULT_CANCELAMENTO, EN_CANCELAMENTO),
+    notasImportantes: { pt: DEFAULT_NOTAS_IMPORTANTES, en: EN_NOTAS_IMPORTANTES },
+    incluido: { pt: DEFAULT_INCLUIDO, en: EN_INCLUIDO },
+    naoIncluido: { pt: DEFAULT_NAO_INCLUIDO, en: EN_NAO_INCLUIDO },
+    condicoesGerais: {
+      pt: preencher(DEFAULT_CONDICOES_GERAIS),
+      en: preencher(EN_CONDICOES_GERAIS, EN_CONDICOES_SEM_DADO, campos),
+    },
+    observacoesGerais: { pt: DEFAULT_OBSERVACOES_GERAIS, en: EN_OBSERVACOES_GERAIS },
+    faseamento: { pt: faseamentoPorOmissao(pct), en: faseamentoEn(pct) },
+    cancelamento: { pt: DEFAULT_CANCELAMENTO, en: EN_CANCELAMENTO },
   };
+}
+
+export function blocosFixosNaLingua(
+  doc: ProposalDoc,
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): BlocosFixos {
+  if (idioma !== "en") return doc;
+  const casa = textosDaCasa(doc);
+  /** O bloco em inglês, se o que está no documento for o da casa. */
+  const naLingua = (atual: string[], campo: keyof BlocosFixos) =>
+    saoIguais(atual, casa[campo].pt) ? [...casa[campo].en] : atual;
+  return {
+    notasImportantes: naLingua(doc.notasImportantes, "notasImportantes"),
+    incluido: naLingua(doc.incluido, "incluido"),
+    naoIncluido: naLingua(doc.naoIncluido, "naoIncluido"),
+    condicoesGerais: naLingua(doc.condicoesGerais, "condicoesGerais"),
+    observacoesGerais: naLingua(doc.observacoesGerais, "observacoesGerais"),
+    faseamento: naLingua(doc.faseamento, "faseamento"),
+    cancelamento: naLingua(doc.cancelamento, "cancelamento"),
+  };
+}
+
+/**
+ * Este bloco continua a ser, palavra por palavra, o texto da casa?
+ *
+ * Existe para uma coisa só: a página do casal dobra as secções de condições e
+ * escreve por baixo do título um resumo de uma linha do que lá está dentro.
+ * Esse resumo foi escrito a olhar para o TEXTO DA CASA — «IVA, pré-reserva,
+ * deslocações da equipa» —, e um resumo escrito sobre um texto que já não está
+ * lá é uma mentira dita a um casal por cima de uma secção dobrada, que é o
+ * pior sítio para a dizer. Onde ela reescreveu, a página conta os pontos em
+ * vez de os resumir: menos útil, sempre verdade.
+ *
+ * A comparação é a MESMA que decide se a versão inglesa se aplica — ver
+ * {@link textosDaCasa}.
+ */
+export function blocoEDaCasa(doc: ProposalDoc, campo: keyof BlocosFixos): boolean {
+  return saoIguais(doc[campo], textosDaCasa(doc)[campo].pt);
 }

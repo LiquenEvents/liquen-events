@@ -686,13 +686,39 @@ export default function ServicesEditor({
           fazem o que o Alt+↑/↓ faz, e o «Desfazer» do cabeçalho do estúdio faz
           o que o Ctrl+Z faz. É por isso que isto se pode esconder em vez de ter
           de ser substituído. */}
-      <p className="max-md:hidden -mt-2 mb-3 text-xs leading-relaxed text-foreground/50">
-        <strong className="font-semibold text-foreground/70">Enter</strong> abre a linha seguinte ·{" "}
-        <strong className="font-semibold text-foreground/70">Enter numa linha vazia</strong> abre um
-        grupo novo · <strong className="font-semibold text-foreground/70">Alt+↑/↓</strong> move ·{" "}
-        <strong className="font-semibold text-foreground/70">Ctrl+Z</strong> anula. Colar várias
-        linhas cria uma linha por cada.
-      </p>
+      {/*
+       * ── OS ATALHOS PASSAM PARA TRÁS DE UM «?» ──────────────────────────
+       *
+       * Palavras dela: «são úteis em desktop, mas não precisam de uma linha
+       * permanente». E é verdade das duas maneiras — quem os sabe não precisa
+       * de os ler todos os dias, e quem não os sabe lê-os uma vez.
+       *
+       * `<details>` e não um painel nosso: abre sem JavaScript, o leitor de
+       * ecrã já sabe anunciá-lo, e o estado fica onde o navegador o guarda em
+       * vez de num estado nosso que ninguém grava.
+       *
+       * Continua escondido no telemóvel, pela razão que já cá estava: sessenta
+       * píxeis no topo da secção mais escrita da casa, gastos a explicar gestos
+       * que ali não existem.
+       */}
+      <details className="max-md:hidden group -mt-2 mb-3">
+        <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/45 hover:text-foreground/70 [&::-webkit-details-marker]:hidden">
+          <span
+            aria-hidden
+            className="grid h-4 w-4 place-items-center rounded-full border border-foreground/20 text-[10px] leading-none"
+          >
+            ?
+          </span>
+          Atalhos de teclado
+        </summary>
+        <p className="mt-2 text-xs leading-relaxed text-foreground/50">
+          <strong className="font-semibold text-foreground/70">Enter</strong> abre a linha seguinte
+          · <strong className="font-semibold text-foreground/70">Enter numa linha vazia</strong>{" "}
+          abre um grupo novo · <strong className="font-semibold text-foreground/70">Alt+↑/↓</strong>{" "}
+          move · <strong className="font-semibold text-foreground/70">Ctrl+Z</strong> anula. Colar
+          várias linhas cria uma linha por cada.
+        </p>
+      </details>
 
       <DndContext
         sensors={sensors}
@@ -743,12 +769,14 @@ export default function ServicesEditor({
                           placeholder="Decoração Floral de Casamento"
                           aria-label={`Título do grupo ${gi + 1}`}
                         />
-                        {/* A caixa inglesa, por baixo: o `w-full` dela quebra a
-                            linha deste `flex-wrap`. Escreve-se em `titleEn`,
+                        {/* A caixa inglesa AO LADO em ecrã largo, por baixo
+                            abaixo de `xl` — ver `aoLado`, em `CaixaInglesa`.
+                            Escreve-se em `titleEn`,
                             que viaja colado ao grupo — incluindo quando o grupo
                             é guardado como MODELO, isolado do documento. */}
                         {bilingue && (
                           <CaixaInglesa
+                            aoLado
                             campo={{ tipo: "grupoTitulo", gi }}
                             rotulo={`Título do grupo ${gi + 1}`}
                             valor={g.titleEn ?? ""}
@@ -862,6 +890,7 @@ export default function ServicesEditor({
                                       />
                                       {bilingue && (
                                         <CaixaInglesa
+                                          aoLado
                                           campo={{ tipo: "itemRotulo", gi, ii }}
                                           rotulo={`Linha ${ii + 1} do grupo ${gi + 1}`}
                                           valor={it.labelEn ?? ""}
@@ -918,6 +947,7 @@ export default function ServicesEditor({
                                       )}
                                       {showDesc && bilingue && (
                                         <CaixaInglesa
+                                          aoLado
                                           campo={{ tipo: "itemDesc", gi, ii }}
                                           rotulo={`Descrição da linha ${ii + 1} do grupo ${gi + 1}`}
                                           valor={it.descEn ?? ""}

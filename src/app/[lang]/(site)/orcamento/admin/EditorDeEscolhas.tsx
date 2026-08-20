@@ -97,18 +97,41 @@ export default function EditorDeEscolhas({
     ]);
 
   return (
-    <div className="mt-8 border-t border-[var(--bo-hairline)] pt-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <h4 className="text-foreground/70 text-[11px] uppercase tracking-[0.18em]">
-          À escolha do casal <span className="text-foreground/35 normal-case">(opcional)</span>
+    /*
+     * ── ISTO NÃO É UM RODAPÉ ────────────────────────────────────────────
+     *
+     * Palavras dela: «"À escolha do casal" é a funcionalidade mais interessante
+     * do ecrã e está no fim, em cinzento, quase invisível».
+     *
+     * Estava desenhado como uma nota de pé de secção: um título de onze píxeis
+     * em maiúsculas cinzentas, do tamanho e da cor de um rótulo de campo, atrás
+     * de uma linha fina. Um leitor que percorra a secção com o polegar passa-lhe
+     * ao lado — e o que ali está é a única coisa desta proposta que faz o casal
+     * responder.
+     *
+     * Ganha um cartão seu, com a cor da casa e o nome escrito na serifada do
+     * documento. Continua a dizer «opcional», porque é, e continua a viver
+     * dentro dos mood boards, pela razão escrita no cabeçalho: é lá que estão
+     * as fotografias que explicam as alternativas.
+     */
+    <div className="mt-8 rounded-xl border border-[var(--color-moss)]/25 bg-[color-mix(in_srgb,var(--color-moss)_5%,transparent)] p-4 sm:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h4
+          className="text-foreground/85 text-[17px]"
+          style={{ fontFamily: "var(--font-playfair)" }}
+        >
+          À escolha do casal <span className="text-foreground/40 text-[12px]">(opcional)</span>
         </h4>
         <button type="button" className={BOTAO_MAGRO} onClick={acrescentarEscolha}>
           + Alternativa
         </button>
       </div>
-      <p className="mt-1.5 text-[12px] leading-relaxed text-foreground/45">
-        Duas paletas para a cerimónia, dois estilos de corredor. Aparecem na página do casal — não
-        no PDF — e a resposta deles volta para a ficha do evento.
+      <p className="mt-2 text-[13px] leading-relaxed text-foreground/60">
+        Duas paletas para a cerimónia, dois estilos de corredor:{" "}
+        <strong className="font-medium text-foreground/75">
+          deixa o casal decidir sem ser preciso outra reunião
+        </strong>
+        . Aparecem na página deles — não no PDF — e a resposta volta para a ficha do evento.
       </p>
 
       {lista.length === 0 ? null : (
@@ -238,7 +261,9 @@ export default function EditorDeEscolhas({
                             <button
                               type="button"
                               className={BOTAO_MAGRO}
-                              onClick={() => setAEscolherFoto(aEscolherFoto === chave ? null : chave)}
+                              onClick={() =>
+                                setAEscolherFoto(aEscolherFoto === chave ? null : chave)
+                              }
                             >
                               {opcao.imagem ? "Trocar a fotografia" : "Pôr uma fotografia"}
                             </button>

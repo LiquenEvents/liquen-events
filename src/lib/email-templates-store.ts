@@ -86,15 +86,32 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
   {
     key: "proposta-enviada",
     name: "Proposta enviada",
-    subject: "A sua proposta | Líquen Events",
+    subject: "A vossa proposta | Líquen Events",
     updatedAt: "1970-01-01T00:00:00.000Z",
     body: [
       `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">`,
-      `  <h2 style="font-size:18px;margin:0 0 16px;color:#1b2119">A sua proposta está pronta</h2>`,
+      `  <h2 style="font-size:18px;margin:0 0 16px;color:#1b2119">A vossa proposta está pronta</h2>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 12px">Olá {nome},</p>`,
-      `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Foi um gosto conhecer a sua visão. Preparámos uma proposta à medida do seu evento, com todo o cuidado que ele merece.</p>`,
-      `  <p style="font-size:14px;line-height:1.6;margin:0 0 20px">Pode consultá-la aqui: <a href="{link}" style="color:#7c854b">{link}</a></p>`,
-      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Ficamos a aguardar o seu feedback e qualquer ajuste é bem-vindo. Basta responder a este email.</p>`,
+      `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Foi um gosto conhecer a vossa visão. Preparámos uma proposta à medida do vosso dia, com todo o cuidado que ele merece.</p>`,
+      // ────────────────────────────────────────────────────────────────────
+      // O ENDEREÇO NÃO SE ESCREVE, CARREGA-SE.
+      //
+      // Esta linha era `Pode consultá-la aqui: {link}` — com o `{link}` a
+      // aparecer DUAS vezes, uma como destino e outra como texto visível. E o
+      // endereço de uma proposta leva o token do casal, que são duzentos e tal
+      // caracteres: no email dela ocupava quatro linhas de letras sem sentido,
+      // e era a primeira coisa que se via a seguir ao cumprimento.
+      //
+      // Passa a ser um botão com três palavras. O endereço continua lá, no
+      // `href`, exactamente igual — o que desapareceu foi vê-lo.
+      //
+      // ── PORQUÊ UMA TABELA PARA UM BOTÃO ─────────────────────────────────
+      // Porque é um email. O Outlook desenha `<div>` com `padding` à maneira
+      // dele e um botão feito com `div` sai encolhido ou torto; uma célula de
+      // tabela com a cor no `td` é a única forma que se comporta igual do
+      // Gmail ao Outlook antigo. Só estilos em linha, pela mesma razão.
+      `  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px"><tr><td style="background:#5F7C66;border-radius:2px"><a href="{link}" style="display:inline-block;padding:15px 30px;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#ffffff;text-decoration:none">Ver a proposta</a></td></tr></table>`,
+      `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Ficamos a aguardar o que acharem, e qualquer ajuste é bem-vindo. Basta responderem a este email.</p>`,
       `  <hr style="border:none;border-top:1px solid #eee;margin:0 0 12px">`,
       `  <p style="font-size:12px;color:#999;margin:0">Líquen Events · Portugal</p>`,
       `</div>`,
@@ -109,7 +126,7 @@ export const DEFAULT_TEMPLATES: EmailTemplate[] = [
       `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">`,
       `  <h2 style="font-size:18px;margin:0 0 16px;color:#1b2119">Está tudo tratado</h2>`,
       `  <p style="font-size:14px;line-height:1.6;margin:0 0 12px">Olá {nome},</p>`,
-      `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Confirmamos a receção do sinal de <strong style="color:#7c854b">{valor}</strong>. A sua data está oficialmente reservada e podemos avançar com a preparação.</p>`,
+      `  <p style="font-size:14px;line-height:1.6;margin:0 0 16px">Confirmamos a receção do sinal de <strong style="color:#7c854b">{valor}</strong>. A vossa data está oficialmente reservada e podemos avançar com a preparação.</p>`,
       `  <p style="font-size:13px;margin:0 0 16px;color:#555">Data do evento: <strong>{data_evento}</strong></p>`,
       `  <p style="font-size:13px;line-height:1.6;margin:0 0 20px;color:#555">Nas próximas semanas iremos afinar cada detalhe consigo. Para já, pode descansar, o mais importante já está garantido.</p>`,
       `  <hr style="border:none;border-top:1px solid #eee;margin:0 0 12px">`,

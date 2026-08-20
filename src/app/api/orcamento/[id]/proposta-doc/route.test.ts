@@ -938,10 +938,15 @@ describe("POST /api/orcamento/[id]/proposta-doc — o email sai na língua da pr
       params,
     });
     const email = enviado();
-    expect(email.subject).toBe("Proposta para o seu evento — Líquen Events");
-    expect(email.html).toContain("A sua proposta — Líquen Events");
+    expect(email.subject).toBe("A vossa proposta — Líquen Events");
+    // «A VOSSA», e não «a sua»: uma proposta de casamento é para duas pessoas.
+    // O nome deste teste — «o email de sempre, palavra por palavra» — nasceu de
+    // um refactor que não podia mexer no texto; o texto mudou de propósito
+    // desde então, e a afirmação que fica é que o português e o inglês não se
+    // misturam, não que as palavras nunca mudam.
+    expect(email.html).toContain("A vossa proposta — Líquen Events");
     expect(email.html).toContain("Olá Maria &amp; Zé,");
-    expect(email.html).toContain("Segue em anexo a proposta personalizada para o seu evento.");
+    expect(email.html).toContain("Segue em anexo a proposta que preparámos para o vosso dia.");
     expect(email.html).toContain("Ver a proposta");
     expect(enviado().attachments?.find((a) => a.filename.endsWith(".pdf"))?.filename).toBe(
       "Proposta-Liquen-Events-Maria-e-Ze-03-07-2027.pdf",
@@ -950,8 +955,8 @@ describe("POST /api/orcamento/[id]/proposta-doc — o email sai na língua da pr
 
   it("sem língua no pedido (o caminho de sempre) o email continua português", async () => {
     await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
-    expect(enviado().subject).toBe("Proposta para o seu evento — Líquen Events");
-    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+    expect(enviado().subject).toBe("A vossa proposta — Líquen Events");
+    expect(enviado().html).toContain("Segue em anexo a proposta que preparámos");
   });
 
   /**
@@ -1069,7 +1074,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — assinatura", () => {
   it("não põe o identificador interno da proposta no assunto", async () => {
     await POST(sendReq(baseDoc({ totalAmount: 3000, totalVatMode: "acrescer" })), { params });
     const env = vi.mocked(sendMail).mock.calls.at(-1)![0];
-    expect(env.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(env.subject).toBe("A vossa proposta — Líquen Events");
     expect(env.subject).not.toMatch(/[0-9a-f]{8}/i);
   });
 });
@@ -1195,7 +1200,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — o modelo «proposta-enviada�
 
   it("sem modelo guardado sai o texto da casa — o de sempre", async () => {
     await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
-    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+    expect(enviado().html).toContain("Segue em anexo a proposta que preparámos");
   });
 
   it("com modelo guardado é o texto dela que vai, e o assunto dela também", async () => {
@@ -1259,7 +1264,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — o modelo «proposta-enviada�
       params,
     });
     expect(enviado().html).toContain("Uma nota pessoal.");
-    expect(enviado().html).toContain("Segue em anexo a proposta personalizada");
+    expect(enviado().html).toContain("Segue em anexo a proposta que preparámos");
   });
 
   /**
@@ -1287,7 +1292,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — o modelo «proposta-enviada�
     );
     const email = enviado();
     expect(email.html).toContain("Foi um gosto conhecer-vos na quinta.");
-    expect(email.html).toContain("Segue em anexo a proposta personalizada");
+    expect(email.html).toContain("Segue em anexo a proposta que preparámos para o vosso dia");
     expect(email.html).not.toContain("está pronta.");
   });
 
@@ -1298,7 +1303,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — o modelo «proposta-enviada�
     );
     await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
     const email = enviado();
-    expect(email.subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(email.subject).toBe("A vossa proposta — Líquen Events");
     expect(email.html).not.toContain("da .");
   });
 
@@ -1645,7 +1650,7 @@ describe("POST /api/orcamento/[id]/proposta-doc — o que vem do ecrã de envio"
     await POST(sendReq(baseDoc({ totalAmount: 3000 }), { assunto: "Um assunto qualquer" }), {
       params,
     });
-    expect(enviado().subject).toBe("Proposta para o seu evento — Líquen Events");
+    expect(enviado().subject).toBe("A vossa proposta — Líquen Events");
   });
 
   it("um assunto com uma quebra de linha não abre um cabeçalho novo", async () => {

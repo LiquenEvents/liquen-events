@@ -77,7 +77,89 @@ export interface TextosDaPagina {
   escolhaFalhou: string;
   /** O botão que tenta outra vez a mesma escolha. */
   escolhaRepetir: string;
+
+  /* ── AS SECÇÕES DE CONDIÇÕES, DOBRADAS ─────────────────────────────────── */
+  /**
+   * O resumo de uma linha por baixo do título de cada secção dobrada.
+   *
+   * Uma secção fechada esconde o que lá está dentro, e um título sozinho não
+   * chega para se decidir se vale a pena abrir: «Condições Gerais» podia ser
+   * uma linha ou catorze. O resumo é o que substitui a leitura.
+   *
+   * Estão escritos a olhar para o TEXTO DA CASA, cláusula a cláusula, e por
+   * isso só se mostram enquanto o texto for esse — quem decide é o
+   * `blocoEDaCasa`. Onde ela reescreveu, a página conta os pontos
+   * ({@link pontos}): menos útil, sempre verdade.
+   */
+  resumos: Readonly<Record<SeccaoDobravel, string>>;
+  /** «9 pontos» — o molde com `{n}`, para quando não se pode resumir. */
+  pontos: string;
+  /** O mesmo, no singular. Um molde com `{n}` dizia «1 pontos». */
+  umPonto: string;
+
+  /* ── OS SOBRETÍTULOS QUE A PÁGINA DIZ DE OUTRA MANEIRA ─────────────────── */
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A PÁGINA MUDOU DE VOZ; O PDF FICA COMO ESTÁ
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Decisão dela, dita com todas as letras: as mudanças de linguagem são para
+   * a página web, e no PDF fica tudo igual. E o PDF e a página bebem do MESMO
+   * dicionário (`proposal-doc-textos.ts`) — mudar lá uma palavra mudava-a nos
+   * dois de uma vez, que é precisamente o que não se pode fazer.
+   *
+   * Por isso estes sobretítulos vivem aqui, no dicionário que só a página lê,
+   * e o `Documento` prefere-os aos do documento quando existem. Não é uma
+   * segunda verdade: é o mesmo sítio a ser dito de duas maneiras a dois
+   * públicos, e o único que o vê nas duas formas é ela, ao rever.
+   *
+   * ── O QUE MUDA, E PORQUÊ ─────────────────────────────────────────────
+   *
+   * «O investimento» é a palavra que as agências usam para não dizer preço, e
+   * destoa de um documento que em tudo o resto diz as coisas como elas são: a
+   * seguir a ela vem uma tabela com números, e quem a lê já sabe que vai pagar.
+   *
+   * «Para sua tranquilidade» trata uma pessoa. Quem lê são duas, e são duas
+   * que vão casar. As cláusulas lá dentro continuam a falar de «o cliente» e
+   * da «Líquen Events» — são contratuais, e uma cláusula que trate as partes
+   * por «vocês» deixa de dizer quem se obriga a quê. O que muda é a voz da
+   * casa à volta delas, não o texto que obriga.
+   */
+  sobretituloOrcamento: string;
+  sobretituloCondicoes: string;
+
+  /* ── O ORÇAMENTO, COM O QUE SE PAGA AGORA À VISTA ─────────────────────── */
+  /**
+   * «30% na adjudicação» e «70% um mês antes», ao lado do total.
+   *
+   * O faseamento estava três secções abaixo do número, e a pergunta que um
+   * casal faz a seguir a ver um total é sempre a mesma: quanto é que pagamos
+   * agora. Ter de rolar mais três secções para a responder é a diferença entre
+   * uma proposta que se percebe e uma que se põe de lado para ver depois.
+   *
+   * Moldes com `{pct}` e `{valor}` e não funções: isto atravessa a fronteira
+   * servidor→cliente. Ver {@link contagem}.
+   */
+  agora: string;
+  depois: string;
+  /**
+   * A linha por cima do «Incluído na proposta»: os nomes das secções por que o
+   * casal acabou de passar.
+   *
+   * Sem ela a lista flutua — «serviço de decoração, material e flores conforme
+   * descrito» é abstracto a seguir a quarenta fotografias de coisas concretas,
+   * e o que o casal precisa é de ligar uma coisa à outra.
+   */
+  oQueViram: string;
 }
+
+/** As secções que a página dobra. Todas são texto de condições. */
+export type SeccaoDobravel =
+  | "notasImportantes"
+  | "condicoesGerais"
+  | "observacoesGerais"
+  | "faseamento"
+  | "cancelamento";
 
 const PT: TextosDaPagina = {
   ampliar: "Ampliar",
@@ -99,6 +181,21 @@ const PT: TextosDaPagina = {
   escolhaGuardada: "Ficámos a saber. Podem mudar de ideias quando quiserem.",
   escolhaFalhou: "Não foi possível registar a escolha.",
   escolhaRepetir: "Tentar outra vez",
+  resumos: {
+    notasImportantes: "A montagem e a desmontagem, e o que fica do lado do espaço.",
+    condicoesGerais:
+      "IVA, pré-reserva, deslocações da equipa e a confirmação do número de convidados.",
+    observacoesGerais: "O uso do material, os direitos de imagem e a confidencialidade.",
+    faseamento: "Quando se paga cada parte, e sobre que valor.",
+    cancelamento: "O que acontece se o evento for cancelado, e em que prazos.",
+  },
+  pontos: "{n} pontos",
+  umPonto: "1 ponto",
+  sobretituloOrcamento: "O que custa",
+  sobretituloCondicoes: "Para vossa tranquilidade",
+  agora: "{pct}% na adjudicação: {valor}",
+  depois: "os restantes {pct}% um mês antes",
+  oQueViram: "Tudo o que viram atrás:",
 };
 
 const EN: TextosDaPagina = {
@@ -121,6 +218,20 @@ const EN: TextosDaPagina = {
   escolhaGuardada: "We have got it. Change your mind whenever you like.",
   escolhaFalhou: "We could not register your choice.",
   escolhaRepetir: "Try again",
+  resumos: {
+    notasImportantes: "Set-up and take-down, and what the venue is responsible for.",
+    condicoesGerais: "VAT, booking, the team's travel, and confirming the final guest count.",
+    observacoesGerais: "Use of the materials, image rights, and confidentiality.",
+    faseamento: "When each part is due, and on which amount.",
+    cancelamento: "What happens if the event is cancelled, and by when.",
+  },
+  pontos: "{n} points",
+  umPonto: "1 point",
+  sobretituloOrcamento: "What it costs",
+  sobretituloCondicoes: "For your peace of mind",
+  agora: "{pct}% on booking: {valor}",
+  depois: "the remaining {pct}% one month before",
+  oQueViram: "Everything you have just seen:",
 };
 
 export function textosDaPagina(idioma: IdiomaDaProposta): TextosDaPagina {
@@ -130,4 +241,9 @@ export function textosDaPagina(idioma: IdiomaDaProposta): TextosDaPagina {
 /** O molde da contagem preenchido — a única forma de o ler, dos dois lados. */
 export function contar(molde: string, i: number, n: number): string {
   return molde.replace("{i}", String(i)).replace("{n}", String(n));
+}
+
+/** O molde do faseamento preenchido: a percentagem e, quando há, o valor. */
+export function fase(molde: string, pct: number, valor?: string): string {
+  return molde.replace("{pct}", String(pct)).replace("{valor}", valor ?? "");
 }

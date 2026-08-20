@@ -6,7 +6,9 @@ import type { ProposalDoc } from "@/lib/proposal-doc";
 // `proposta-fotos-verificacao.ts` importa `server-only`. Ver o cabeçalho de lá.
 import {
   PORQUE_FALTA,
+  PORQUE_SUSPEITA,
   type MotivoDeFalta,
+  type MotivoSuspeito,
   type VerificacaoDeFotos,
 } from "@/lib/proposta-fotos-verificacao-tipos";
 
@@ -89,13 +91,62 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
     );
   }
 
+  /**
+   * As que estão lá e não deviam ir assim.
+   *
+   * Numa caixa PRÓPRIA e a amarelo, não misturada com as que faltam: são dois
+   * problemas com duas resoluções — uma foto que falta volta ao armazenamento,
+   * uma foto com marca do Pinterest troca-se por outra. Juntas na mesma lista
+   * vermelha, a segunda lia-se como um erro a impedir o envio, que não é.
+   */
+  const suspeitas = r.suspeitas ?? [];
+  const porSuspeita = new Map<MotivoSuspeito, typeof suspeitas>();
+  for (const f of suspeitas) porSuspeita.set(f.motivo, [...(porSuspeita.get(f.motivo) ?? []), f]);
+
+  const aviso = suspeitas.length > 0 && (
+    <div className={`${CAIXA} bg-[#8a6420]/10 text-[#7a5a1c]`}>
+      <p className="font-semibold">
+        {suspeitas.length === 1
+          ? "1 fotografia vai sair pior do que devia."
+          : `${suspeitas.length} fotografias vão sair pior do que deviam.`}
+      </p>
+      {[...porSuspeita.entries()].map(([motivo, fotos]) => (
+        <div key={motivo} className="mt-2">
+          <p className="text-[11px]">{PORQUE_SUSPEITA[motivo]}</p>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {fotos.map((f) => (
+              <li key={f.id} className="text-foreground/70 text-[12px]">
+                {f.onde}{" "}
+                <span className="text-foreground/45">
+                  ({f.largura}×{f.altura})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      {/*
+       * A frase que fecha, e que é a mais importante desta caixa: o que aqui
+       * se conta são MEDIDAS. Uma marca de água gravada nos pixéis de uma foto
+       * grande não é vista por conta nenhuma — só por ela.
+       */}
+      <p className="mt-2 text-[11px] italic">
+        Isto são medidas, não é o que está dentro da imagem. Uma marca de água ou um ícone por cima
+        só se veem a olhar.
+      </p>
+    </div>
+  );
+
   if (r.emFalta.length === 0) {
     return (
-      <p className="mt-3 text-[12px] text-[#3c5140]">
-        As {r.total} fotografias estão todas no sítio.
-        {r.naoVerificaveis > 0 &&
-          ` (${r.naoVerificaveis} ${r.naoVerificaveis === 1 ? "vem de um endereço de fora e não dá para confirmar daqui" : "vêm de endereços de fora e não dão para confirmar daqui"}.)`}
-      </p>
+      <>
+        <p className="mt-3 text-[12px] text-[#3c5140]">
+          As {r.total} fotografias estão todas no sítio.
+          {r.naoVerificaveis > 0 &&
+            ` (${r.naoVerificaveis} ${r.naoVerificaveis === 1 ? "vem de um endereço de fora e não dá para confirmar daqui" : "vêm de endereços de fora e não dão para confirmar daqui"}.)`}
+        </p>
+        {aviso}
+      </>
     );
   }
 
@@ -105,35 +156,38 @@ export default function FotosEmFalta({ quoteId, doc }: { quoteId: string; doc: P
   for (const f of r.emFalta) porMotivo.set(f.motivo, [...(porMotivo.get(f.motivo) ?? []), f]);
 
   return (
-    <div className={`${CAIXA} bg-[#c0392b]/10 text-[#a03123]`} role="alert">
-      <p className="font-semibold">
-        {r.emFalta.length === 1
-          ? "1 fotografia não vai aparecer ao casal."
-          : `${r.emFalta.length} fotografias não vão aparecer ao casal.`}{" "}
-        <span className="font-normal">de {r.total}</span>
-      </p>
-      {[...porMotivo.entries()].map(([motivo, fotos]) => (
-        <div key={motivo} className="mt-2">
-          <p className="text-[11px]">{PORQUE_FALTA[motivo]}</p>
-          <ul className="mt-1 flex flex-col gap-0.5">
-            {fotos.map((f) => (
-              <li key={f.id} className="text-[12px] text-foreground/70">
-                {f.onde}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={() => {
-          setEstado("a-ver");
-          void verificar();
-        }}
-        className="alvo-toque mt-2.5 underline"
-      >
-        Já corrigi — voltar a confirmar
-      </button>
-    </div>
+    <>
+      <div className={`${CAIXA} bg-[#c0392b]/10 text-[#a03123]`} role="alert">
+        <p className="font-semibold">
+          {r.emFalta.length === 1
+            ? "1 fotografia não vai aparecer ao casal."
+            : `${r.emFalta.length} fotografias não vão aparecer ao casal.`}{" "}
+          <span className="font-normal">de {r.total}</span>
+        </p>
+        {[...porMotivo.entries()].map(([motivo, fotos]) => (
+          <div key={motivo} className="mt-2">
+            <p className="text-[11px]">{PORQUE_FALTA[motivo]}</p>
+            <ul className="mt-1 flex flex-col gap-0.5">
+              {fotos.map((f) => (
+                <li key={f.id} className="text-[12px] text-foreground/70">
+                  {f.onde}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => {
+            setEstado("a-ver");
+            void verificar();
+          }}
+          className="alvo-toque mt-2.5 underline"
+        >
+          Já corrigi — voltar a confirmar
+        </button>
+      </div>
+      {aviso}
+    </>
   );
 }

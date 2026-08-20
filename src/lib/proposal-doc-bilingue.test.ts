@@ -3,7 +3,10 @@ import { withProposalDefaults, type ProposalDoc } from "./proposal-doc";
 import type { CampoDeTexto } from "./proposal-ortografia";
 import {
   camposComVersaoInglesa,
+  camposPorRever,
   camposPorTraduzir,
+  confirmarTraducao,
+  estadoDoIngles,
   docNaLingua,
   docTemIngles,
   escreverEn,
@@ -422,5 +425,102 @@ describe("porTraduzirPorSeccao", () => {
     // não há nada a fazer.
     const doc = proposta({ serviceGroups: [], budgetItems: [], moodBoards: [] });
     expect(Object.keys(porTraduzirPorSeccao(doc))).not.toContain("servicos");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O INGLÊS QUE FICOU PARA TRÁS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «o serviço "Reunião Inicial" tem como tradução "Ceremony
+ * Decor". Alguém traduziu, mudou depois o texto em português, e o inglês ficou
+ * desatualizado sem nada avisar».
+ *
+ * É o defeito mais grave do estúdio porque produz uma proposta ERRADA que passa
+ * em todas as verificações: o campo inglês não está vazio — está errado, e uma
+ * contagem de caixas vazias não tem como o ver.
+ *
+ * Este ficheiro já dizia, no cabeçalho, que o defeito existia e o que era
+ * preciso para o apanhar. Isto é esse registo.
+ */
+describe("o inglês que ficou para trás", () => {
+  const campo = { tipo: "grupoTitulo", gi: 0 } as const;
+  const comGrupo = (title: string) => ({ serviceGroups: [{ letter: "A", title, items: [] }] });
+
+  it("escrever o inglês regista o português contra o qual ele foi escrito", () => {
+    const d = escreverEn(comGrupo("Reunião Inicial"), campo, "Initial Meeting");
+    expect(estadoDoIngles(d, campo)).toBe("em-dia");
+  });
+
+  /**
+   * ── O CASO DELA, DO PRINCÍPIO AO FIM ──────────────────────────────────
+   */
+  it("mudar o português por baixo de uma tradução marca-a como desactualizada", () => {
+    let d = escreverEn(comGrupo("Decoração Cerimónia"), campo, "Ceremony Decor");
+    expect(estadoDoIngles(d, campo)).toBe("em-dia");
+    // Ela reescreve o português e não toca no inglês.
+    d = { ...d, serviceGroups: [{ ...d.serviceGroups![0], title: "Reunião Inicial" }] };
+    expect(estadoDoIngles(d, campo)).toBe("desactualizado");
+  });
+
+  it("e entra na conta do que há para rever, com o estado", () => {
+    let d = escreverEn(comGrupo("Decoração Cerimónia"), campo, "Ceremony Decor");
+    d = { ...d, serviceGroups: [{ ...d.serviceGroups![0], title: "Reunião Inicial" }] };
+    const rever = camposPorRever(d);
+    expect(rever).toHaveLength(1);
+    expect(rever[0].estado).toBe("desactualizado");
+    // Mas NÃO entra na dos que vão sair em português: essa frase seria falsa —
+    // este campo tem inglês e vai sair em inglês, só que no inglês errado.
+    expect(camposPorTraduzir(d)).toEqual([]);
+  });
+
+  it("«já está bem assim» cala o aviso sem reescrever a tradução", () => {
+    let d = escreverEn(comGrupo("Decoração Cerimónia"), campo, "Ceremony Decor");
+    d = { ...d, serviceGroups: [{ ...d.serviceGroups![0], title: "Decoração da Cerimónia" }] };
+    expect(estadoDoIngles(d, campo)).toBe("desactualizado");
+    d = confirmarTraducao(d, campo);
+    expect(estadoDoIngles(d, campo)).toBe("em-dia");
+    // E o inglês é o mesmo: o que mudou foi o que ele promete.
+    expect(lerEn(d, campo)).toBe("Ceremony Decor");
+  });
+
+  it("voltar a pôr o português de antes desmarca-a", () => {
+    let d = escreverEn(comGrupo("Decoração Cerimónia"), campo, "Ceremony Decor");
+    d = { ...d, serviceGroups: [{ ...d.serviceGroups![0], title: "Outra coisa" }] };
+    expect(estadoDoIngles(d, campo)).toBe("desactualizado");
+    d = { ...d, serviceGroups: [{ ...d.serviceGroups![0], title: "Decoração Cerimónia" }] };
+    expect(estadoDoIngles(d, campo)).toBe("em-dia");
+  });
+
+  it("espaços a mais não são uma alteração", () => {
+    let d = escreverEn(comGrupo("Decoração Cerimónia"), campo, "Ceremony Decor");
+    d = { ...d, serviceGroups: [{ ...d.serviceGroups![0], title: "  Decoração Cerimónia  " }] };
+    expect(estadoDoIngles(d, campo)).toBe("em-dia");
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("uma proposta ANTIGA, sem registo nenhum, não é acusada", () => {
+    // Elas têm inglês escrito e nenhuma marca do português contra o qual ele
+    // foi escrito. Acusá-las todas era acender um aviso em cada campo de cada
+    // proposta antiga — e um aviso que toca sempre deixa de se ler, incluindo
+    // no dia em que está certo.
+    const antiga = {
+      serviceGroups: [
+        { letter: "A", title: "Decoração Cerimónia", titleEn: "Ceremony Decor", items: [] },
+      ],
+    };
+    expect(estadoDoIngles(antiga, campo)).toBe("em-dia");
+    expect(camposPorRever(antiga)).toEqual([]);
+  });
+
+  it("um campo com português e sem inglês continua a ser «por traduzir»", () => {
+    expect(estadoDoIngles(comGrupo("Reunião Inicial"), campo)).toBe("por-traduzir");
+  });
+
+  it("um campo sem português nenhum não tem estado de tradução", () => {
+    expect(estadoDoIngles(comGrupo("  "), campo)).toBe("sem-portugues");
   });
 });

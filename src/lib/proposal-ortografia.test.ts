@@ -525,3 +525,63 @@ describe("ler e escrever os campos novos", () => {
     expect(escreverCampo(base, { tipo: "linhaEstimada", i: 9 }, "x").budgetRows).toHaveLength(1);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS TERMOS INGLESES DA CASA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Uma proposta da Líquen leva meia dúzia de palavras inglesas que são o nome
+ * das coisas. Um corrector português não tem opinião nenhuma sobre elas: para
+ * ele, «seatting» é tão estrangeira como «seating».
+ *
+ * A lista de erros já existia e tinha um tecto — só apanha os enganos que
+ * alguém já viu e se lembrou de escrever. O que se prende aqui é a regra que
+ * dispensa essa memória: uma palavra desconhecida que passa a ser um termo da
+ * casa quando se DESDOBRA uma letra repetida é uma gralha.
+ *
+ * A afirmação que vale por todas é a última: a regra tem de estar CALADA sobre
+ * as palavras portuguesas de consoante dobrada, que são muitas e são as mais
+ * comuns da língua.
+ */
+describe("os termos ingleses da casa", () => {
+  const gralhas = (texto: string) => gralhasDoDocumento({ budgetItems: [texto] });
+
+  it("apanha um engano que nunca foi escrito numa lista", () => {
+    // «wellcome» não está em lista nenhuma: é a regra da letra dobrada a
+    // trabalhar, e é isso que a torna diferente de uma lista de erros.
+    const a = gralhas("Wellcome drink no jardim");
+    expect(a.map((g) => [g.escrita, g.sugerida])).toEqual([["Wellcome", "Welcome"]]);
+  });
+
+  it("a palavra bem escrita não faz tocar nada", () => {
+    expect(gralhas("Welcome drink e seating plan")).toEqual([]);
+  });
+
+  it("guarda as maiúsculas de quem escreveu", () => {
+    expect(gralhas("COCKTAILL DE BOAS-VINDAS")[0]?.sugerida).toBe("COCKTAIL");
+  });
+
+  it("corrigir escreve a palavra certa no campo certo", () => {
+    const doc = { budgetItems: ["Decoração Seatting Plann"] };
+    expect(corrigirTudo(doc).budgetItems).toEqual(["Decoração Seating Plan"]);
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("cala-se sobre as palavras portuguesas de consoante dobrada", () => {
+    // «carro» desdobra para «caro», «pessoa» para «pesoa», «terra» para
+    // «tera» — e nenhuma delas é um termo inglês da casa nem pode ser. Se um
+    // dia alguém puser uma palavra portuguesa naquela lista, é aqui que se vê.
+    const portuguesas =
+      "O carro da noiva passa pela terra da avó, com a pessoa que a acompanha e o arranjo bem posto";
+    expect(gralhas(portuguesas)).toEqual([]);
+  });
+
+  it("e sobre uma palavra inglesa que não é da casa", () => {
+    // A lista é do OFÍCIO, não do dicionário inglês. «Summer» desdobrado dá
+    // «sumer», que lá não está — e portanto não há nada a sugerir.
+    expect(gralhas("Summer vibes")).toEqual([]);
+  });
+});

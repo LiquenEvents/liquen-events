@@ -329,8 +329,36 @@ function corpos(parte: string, metodo = "PUT"): string[] {
     .map((p) => String(p.init?.body ?? ""));
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS SECÇÕES ABREM ABERTAS, NESTES TESTES
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O estúdio passou a abrir DOBRADAS as secções que já estavam feitas quando a
+ * proposta abriu (ver o efeito em `Section`), e a esmagadora maioria destes
+ * testes semeia uma proposta completa para ir mexer num campo lá dentro.
+ *
+ * Semear a preferência dela é a maneira honesta de os pôr a medir outra vez o
+ * que dizem medir: a escolha guardada GANHA ao automatismo — é essa a regra —,
+ * e por isso isto não desliga a funcionalidade nem finge que ela não existe.
+ * Escreve-se aqui a mesma coisa que um clique dela escreveria.
+ *
+ * Quem quiser medir o automatismo apaga esta chave primeiro. É o que o bloco
+ * «o que já está feito abre fechado» faz, ali em baixo.
+ */
+const SECCOES_ABERTAS = {
+  evento: false,
+  capas: false,
+  servicos: false,
+  moodboards: false,
+  cronograma: false,
+  orcamento: false,
+  total: false,
+};
+
 beforeEach(() => {
   localStorage.clear();
+  localStorage.setItem("liquen-estudio-secoes", JSON.stringify(SECCOES_ABERTAS));
   seletor.marcadores.length = 0;
   seletor.n = 0;
   pedidos = [];
@@ -2670,7 +2698,12 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
    * 0,467:1 e nenhuma fotografia normal tem essa forma. O que se pode fazer é
    * DIZER o número, para escolher uma vertical deixar de ser sorte.
    */
-  it("na capa, diz quanto é que aquela fotografia perde", async () => {
+  const comCapas = (capas: string[]) => {
+    // O servidor CONHECE estas fotos: sem endereço assinado o `Thumb` não
+    // desenha imagem nenhuma, e sem imagem não há nada para medir.
+    assetsServidor = capas
+      .filter(Boolean)
+      .map((path) => ({ path, url: `https://exemplo.pt/${path}` }));
     localStorage.setItem(
       DRAFT_KEY,
       JSON.stringify({
@@ -2680,15 +2713,83 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
         serviceGroups: [],
         moodBoards: [],
         budgetItems: [],
-        coverImages: ["capas/uma.jpg", ""],
+        coverImages: capas,
         totalAmount: 3000,
         totalVatMode: "acrescer",
       }),
     );
     renderStudio();
-    expect(
-      await screen.findByText(/perde \d+% da área/i, undefined, { timeout: 3000 }),
-    ).toBeTruthy();
+  };
+
+  /**
+   * A miniatura mede-se sozinha no `onLoad`, e num teste as imagens não
+   * carregam. Isto é o que o navegador faz por ela: dá à imagem uma forma e
+   * dispara o `load`.
+   */
+  async function medirCapas(formas: { w: number; h: number }[]) {
+    // Pelo DOM e não por papel: um `<img alt="">` é decorativo e não tem
+    // papel nenhum de acessibilidade — `getAllByRole("img")` não o encontra.
+    const capas = await waitFor(() => {
+      const encontradas = [...document.querySelectorAll("img")].filter((i) =>
+        (i.getAttribute("src") ?? "").includes("capas/"),
+      );
+      if (encontradas.length === 0) throw new Error("as capas ainda não estão desenhadas");
+      return encontradas;
+    });
+    capas.forEach((img, i) => {
+      const forma = formas[i];
+      if (!forma) return;
+      Object.defineProperty(img, "naturalWidth", { value: forma.w, configurable: true });
+      Object.defineProperty(img, "naturalHeight", { value: forma.h, configurable: true });
+      Object.defineProperty(img, "complete", { value: true, configurable: true });
+      fireEvent.load(img);
+    });
+  }
+
+  it("na capa, diz quanto é que AQUELA fotografia perde", async () => {
+    comCapas(["capas/uma.jpg", ""]);
+    // Deitada 3:2 — a tira da capa é quase 1:2, e o corte é grande.
+    await medirCapas([{ w: 1500, h: 1000 }]);
+    expect(await screen.findByText(/perde \d+% da área/i)).toBeTruthy();
+  });
+
+  /**
+   * ── O AVISO ERA O MESMO PARA AS DUAS, E NÃO PODIA SER ──────────────────
+   *
+   * Palavras dela: «o mesmo texto aparece por baixo das duas imagens de capa,
+   * embora uma seja vertical e a outra horizontal — logo, perdem áreas
+   * diferentes».
+   */
+  it("duas fotografias de formas diferentes dão números diferentes", async () => {
+    comCapas(["capas/deitada.jpg", "capas/ao-alto.jpg"]);
+    await medirCapas([
+      { w: 1500, h: 1000 },
+      { w: 1000, h: 1500 },
+    ]);
+    const numeros = (await screen.findAllByText(/perde \d+% da área/i)).map(
+      (p) => /(\d+)%/.exec(p.textContent ?? "")?.[1],
+    );
+    // Pode haver só um aviso (a vertical perde pouco e não chega ao limiar) —
+    // o que NÃO pode haver é dois avisos com o mesmo número.
+    expect(new Set(numeros).size).toBe(numeros.length);
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("sem a forma medida, NÃO se inventa um número", async () => {
+    // Era esta a causa: por medir, a conta caía na forma por omissão — a mesma
+    // para as duas — e a frase dizia «ESTA fotografia perde» sobre um número
+    // que não era dela. Não saber é não saber.
+    comCapas(["capas/uma.jpg", "capas/outra.jpg"]);
+    await waitFor(() =>
+      expect(
+        [...document.querySelectorAll("img")].some((i) =>
+          (i.getAttribute("src") ?? "").includes("capas/"),
+        ),
+      ).toBe(true),
+    );
+    expect(screen.queryByText(/perde \d+% da área/i)).toBeNull();
   });
 });
 
@@ -4319,7 +4420,17 @@ describe("traduzir para inglês", () => {
       if (!el || !el.value) throw new Error("ainda não");
       return el;
     });
-    expect(caixa.value).toBe("EN: Cerimónia");
+    /*
+     * «Ceremony», e não «EN: Cerimónia».
+     *
+     * «Cerimónia» é um dos termos do GLOSSÁRIO da casa (ver
+     * `proposal-traducao.ts`): tem uma tradução única e verificada, e por isso
+     * nem chega a ir ao motor. O que este teste continua a provar é o que diz
+     * provar — o botão preenche a caixa inglesa —, e passa a provar também que
+     * o glossário chega ao estúdio. O caminho do motor está coberto no teste do
+     * próprio tradutor, com textos que ninguém pôs no glossário.
+     */
+    expect(caixa.value).toBe("Ceremony");
     // O português não se mexe: a tradução vive nos campos `…En`, e é por isso
     // que ela pode corrigi-la sem perder o que escreveu.
     expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).moodBoards[0].title).toBe("Cerimónia");
@@ -5699,5 +5810,142 @@ describe("abrir um pedido só para ler não é trabalho por gravar", () => {
     // A semeadura vai lá dentro: é o grupo de serviços que o estúdio abre.
     expect(gravado.doc.serviceGroups.length).toBeGreaterThan(0);
     expect(localStorage.getItem(DRAFT_KEY)).toContain("Évora");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A CONFIGURAÇÃO DAS PÁGINAS, DECIDIDA UMA VEZ PARA A PROPOSTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «"Manter a forma de cada fotografia" hoje está desligada no
+ * primeiro board e ligada no terceiro, sem razão». É o que acontece quando a
+ * escolha só existe por página: sete páginas, sete decisões, tomadas em sete
+ * momentos diferentes de uma tarde.
+ *
+ * A afirmação que vale por todas é a última: a página que discordar continua a
+ * ganhar. Há páginas que pedem mesmo outro tratamento, e uma preferência de
+ * proposta que passasse por cima delas era trocar sete decisões dispersas por
+ * uma decisão errada.
+ */
+describe("a configuração ao nível da proposta", () => {
+  const comBoards = (doc: Record<string, unknown>) => {
+    assetsServidor = [{ path: "b/1.jpg", url: "https://exemplo.pt/b/1.jpg" }];
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        serviceGroups: [],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+        ...doc,
+      }),
+    );
+    renderStudio();
+  };
+
+  const dobraDaDisposicao = async () =>
+    (await screen.findAllByText(/^Disposição:/)).map((s) => s.textContent ?? "");
+
+  it("a preferência da proposta vale nas páginas que não escolheram", async () => {
+    comBoards({
+      enquadramentoPorOmissao: "forma-da-foto",
+      moodBoards: [{ id: "b1", title: "Cerimónia", images: ["b/1.jpg"] }],
+    });
+    expect((await dobraDaDisposicao())[0]).toContain("sem recorte");
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("uma página que escolheu continua a ganhar à proposta", async () => {
+    comBoards({
+      enquadramentoPorOmissao: "forma-da-foto",
+      moodBoards: [
+        { id: "b1", title: "Cerimónia", images: ["b/1.jpg"], enquadramento: undefined },
+        { id: "b2", title: "Jantar", images: ["b/1.jpg"], enquadramento: "forma-da-foto" },
+      ],
+    });
+    const dobras = await dobraDaDisposicao();
+    // As duas leem «sem recorte» — a primeira pela proposta, a segunda por si.
+    expect(dobras).toHaveLength(2);
+    expect(dobras.every((d) => d.includes("sem recorte"))).toBe(true);
+  });
+
+  it("o bloco dos seis diagramas está DOBRADO, com a escolha à vista", async () => {
+    // «O bloco de seis layouts repete-se sete vezes, a ocupar altura.» O que se
+    // precisa de saber sem lá mexer é qual está escolhida, e é isso que fica.
+    comBoards({ moodBoards: [{ id: "b1", title: "Cerimónia", images: ["b/1.jpg"] }] });
+    const resumo = (await screen.findAllByText(/^Disposição:/))[0].closest("summary");
+    expect(resumo).toBeTruthy();
+    expect(resumo!.closest("details")!.open).toBe(false);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE JÁ ESTÁ FEITO ABRE FECHADO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * «Secções concluídas recolhem-se automaticamente. Só a secção em que se está
+ * a trabalhar fica aberta.»
+ *
+ * A afirmação que vale por todas é a segunda: **uma secção nunca se fecha por
+ * baixo das mãos dela.** Se fechasse ao ficar completa, escrever o último campo
+ * de um grupo fazia o ecrã saltar e o cursor desaparecer.
+ */
+describe("o que já está feito abre fechado", () => {
+  const semPreferencias = () => localStorage.removeItem("liquen-estudio-secoes");
+
+  it("uma secção já preenchida nasce dobrada", async () => {
+    semPreferencias();
+    seedDraft(1);
+    renderStudio();
+    const evento = await waitFor(() => {
+      const el = document.getElementById("seccao-evento");
+      if (!el) throw new Error("ainda não");
+      return el;
+    });
+    await waitFor(() => expect(evento.querySelector('[aria-expanded="false"]')).not.toBeNull());
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("uma secção que fica completa ENQUANTO ela escreve não se fecha", async () => {
+    // A decisão é tomada uma vez, quando a proposta abre. Um editor que se
+    // mexe sozinho enquanto se escreve é pior do que um editor comprido.
+    semPreferencias();
+    seedDraft(1);
+    renderStudio();
+    const total = await waitFor(() => {
+      const el = document.getElementById("seccao-total");
+      if (!el) throw new Error("ainda não");
+      return el;
+    });
+    const comoAbriu = total.querySelector("[aria-expanded]")?.getAttribute("aria-expanded");
+    // Mexer no documento não pode mudar a dobra de nada.
+    const campo = document.querySelector<HTMLInputElement>('[data-campo="clientNames"]');
+    if (campo) fireEvent.change(campo, { target: { value: "Ana & Rui" } });
+    await waitFor(() =>
+      expect(total.querySelector("[aria-expanded]")?.getAttribute("aria-expanded")).toBe(comoAbriu),
+    );
+  });
+
+  it("a escolha dela ganha ao automatismo", async () => {
+    // Uma secção que ela deixou aberta continua aberta, mesmo estando feita.
+    localStorage.setItem("liquen-estudio-secoes", JSON.stringify({ evento: false }));
+    seedDraft(1);
+    renderStudio();
+    const evento = await waitFor(() => {
+      const el = document.getElementById("seccao-evento");
+      if (!el) throw new Error("ainda não");
+      return el;
+    });
+    await waitFor(() => expect(evento.querySelector('[aria-expanded="true"]')).not.toBeNull());
   });
 });

@@ -28,7 +28,7 @@ const ok = (corpo: unknown) =>
   ({ ok: true, json: async () => corpo }) as unknown as Response;
 
 beforeEach(() => {
-  responde = () => ok({ total: 3, emFalta: [], naoVerificaveis: 0, verificou: true });
+  responde = () => ok({ total: 3, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: true });
   fetchMock.mockClear();
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -45,7 +45,7 @@ describe("quando está tudo no sítio", () => {
   });
 
   it("as fotos de fora contam-se à parte", async () => {
-    responde = () => ok({ total: 3, emFalta: [], naoVerificaveis: 1, verificou: true });
+    responde = () => ok({ total: 3, emFalta: [], suspeitas: [], naoVerificaveis: 1, verificou: true });
     render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
     expect(await screen.findByText(/endereço de fora/i)).toBeTruthy();
   });
@@ -55,6 +55,7 @@ describe("quando falta alguma", () => {
   const comFalta = () =>
     ok({
       total: 5,
+      suspeitas: [],
       naoVerificaveis: 0,
       verificou: true,
       emFalta: [
@@ -97,7 +98,7 @@ describe("quando falta alguma", () => {
     const user = userEvent.setup();
     render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
     await screen.findByText(/2 fotografias não vão aparecer/i);
-    responde = () => ok({ total: 5, emFalta: [], naoVerificaveis: 0, verificou: true });
+    responde = () => ok({ total: 5, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: true });
     await user.click(screen.getByRole("button", { name: /Já corrigi/i }));
     expect(await screen.findByText(/estão todas no sítio/i)).toBeTruthy();
   });
@@ -108,7 +109,7 @@ describe("quando falta alguma", () => {
  */
 describe("«não consegui verificar» nunca se lê como «está tudo bem»", () => {
   it("com a verificação por correr, di-lo com todas as letras", async () => {
-    responde = () => ok({ total: 3, emFalta: [], naoVerificaveis: 0, verificou: false });
+    responde = () => ok({ total: 3, emFalta: [], suspeitas: [], naoVerificaveis: 0, verificou: false });
     render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
     expect(await screen.findByText(/Não foi possível confirmar/i)).toBeTruthy();
     expect(screen.getByText(/não quer dizer que estejam bem/i)).toBeTruthy();
@@ -135,5 +136,92 @@ describe("«não consegui verificar» nunca se lê como «está tudo bem»", () 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/orcamento/LIQ-9/fotos-em-falta");
     expect(JSON.parse(String(init.body)).doc.ref).toBe("PO Decoração");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AS QUE ESTÃO LÁ E NÃO DEVIAM IR ASSIM
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Uma foto do Seating Plan levava a marca de utilizador do Pinterest gravada
+ * no canto. Não «faltava»: estava no armazenamento, resolvia, desenhava-se.
+ *
+ * O que este painel pode dizer é a MEDIDA. O que ele NÃO pode dizer é o que
+ * está dentro dos pixéis — e a última afirmação daqui é que ele o admite em
+ * vez de deixar ficar a impressão de que olhou.
+ */
+describe("as fotografias que vão sair pior do que deviam", () => {
+  const comSuspeitas = () =>
+    ok({
+      total: 4,
+      emFalta: [],
+      naoVerificaveis: 0,
+      verificou: true,
+      suspeitas: [
+        {
+          id: "b0f1",
+          onde: "Mood board «Seating Plan» · foto 2",
+          motivo: "medida-de-partilha",
+          largura: 736,
+          altura: 1104,
+        },
+        {
+          id: "b1f0",
+          onde: "Mood board «Lapelas» · foto 1",
+          motivo: "pequena-demais",
+          largura: 640,
+          altura: 480,
+        },
+      ],
+    });
+
+  it("nomeia cada uma e diz a medida que a denuncia", async () => {
+    responde = comSuspeitas;
+    render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
+    expect(await screen.findByText(/2 fotografias vão sair pior/i)).toBeTruthy();
+    expect(screen.getByText("Mood board «Seating Plan» · foto 2")).toBeTruthy();
+    expect(screen.getByText("(736×1104)")).toBeTruthy();
+  });
+
+  it("explica a causa em português, não com o nome do motivo", async () => {
+    responde = comSuspeitas;
+    render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
+    expect(await screen.findByText(/largura com que o Pinterest serve/i)).toBeTruthy();
+    expect(screen.queryByText(/medida-de-partilha/)).toBeNull();
+  });
+
+  it("aparece mesmo quando não falta nenhuma — são dois problemas diferentes", async () => {
+    // Uma foto que falta volta ao armazenamento; uma foto com marca do
+    // Pinterest troca-se por outra. «Está tudo no sítio» não responde à segunda.
+    responde = comSuspeitas;
+    render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
+    expect(await screen.findByText(/estão todas no sítio/i)).toBeTruthy();
+    expect(screen.getByText(/2 fotografias vão sair pior/i)).toBeTruthy();
+  });
+
+  it("não trava nada — não há aqui botão a impedir o envio", async () => {
+    responde = comSuspeitas;
+    render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
+    await screen.findByText(/2 fotografias vão sair pior/i);
+    expect(screen.queryByRole("button", { name: /impedir|bloquear|cancelar/i })).toBeNull();
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("admite que não viu dentro da imagem", async () => {
+    // Sem esta frase, uma lista de medidas lê-se como «olhei para as
+    // fotografias e estão bem» — e a marca de água que passou é exactamente a
+    // coisa que nenhuma conta viu.
+    responde = comSuspeitas;
+    render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
+    expect(await screen.findByText(/só se veem a olhar/i)).toBeTruthy();
+  });
+
+  it("sem suspeitas nenhumas, não inventa uma caixa vazia", async () => {
+    render(<FotosEmFalta quoteId="LIQ-9" doc={DOC} />);
+    await screen.findByText(/estão todas no sítio/i);
+    expect(screen.queryByText(/vão sair pior/i)).toBeNull();
   });
 });

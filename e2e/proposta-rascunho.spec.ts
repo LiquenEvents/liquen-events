@@ -29,6 +29,25 @@ async function openStudio(page: Page, quoteId: string): Promise<void> {
   await page.waitForTimeout(1500);
 }
 
+/**
+ * Abrir a secção, se ela abriu dobrada.
+ *
+ * O estúdio passou a abrir DOBRADAS as secções que já estavam feitas quando a
+ * proposta abriu — e uma proposta nova nasce com o «Evento» preenchido a partir
+ * do pedido (nome, data e local vêm de lá), portanto nasce fechado.
+ *
+ * Não é um remendo ao teste: é o teste a fazer o gesto que ela faz. O que se
+ * mede aqui é o rascunho a seguir para outro dispositivo, e para isso é preciso
+ * escrever num campo — que é o que ela faria depois de abrir a secção.
+ */
+async function abrirSeccao(page: Page, id: string) {
+  const cartao = page.locator(`#seccao-${id}`);
+  await expect(cartao).toBeVisible({ timeout: 20000 });
+  const dobra = cartao.locator("[aria-expanded]").first();
+  if ((await dobra.getAttribute("aria-expanded")) === "false") await dobra.click();
+  await expect(dobra).toHaveAttribute("aria-expanded", "true");
+}
+
 test.describe("Rascunho da proposta", () => {
   test("segue o trabalho para outro dispositivo", async ({ page, browser }) => {
     test.setTimeout(90_000);
@@ -41,6 +60,7 @@ test.describe("Rascunho da proposta", () => {
     try {
       // ── Dispositivo 1: escrever ──
       await openStudio(page, quoteId);
+      await abrirSeccao(page, "evento");
       await page
         .getByLabel(/^Clientes$/i)
         .first()
@@ -64,6 +84,7 @@ test.describe("Rascunho da proposta", () => {
         const loggedIn2 = await entrarNoBackOffice(page2);
         expect(loggedIn2, "o segundo dispositivo também entra").toBe(true);
         await openStudio(page2, quoteId);
+        await abrirSeccao(page2, "evento");
         await expect(page2.getByLabel(/^Clientes$/i).first()).toHaveValue(marca, {
           timeout: 20_000,
         });

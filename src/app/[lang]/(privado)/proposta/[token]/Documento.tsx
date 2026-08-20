@@ -7,6 +7,7 @@ import {
 } from "@/lib/proposal-doc";
 import { docNaLingua } from "@/lib/proposal-doc-bilingue";
 import {
+  blocoEDaCasa,
   blocosFixosNaLingua,
   camposDoEventoNaLingua,
   rotuloDoTotalNaLingua,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/proposta-escolhas";
 import Inspiracao, { type BoardParaEcra } from "./Inspiracao";
 import Escolhas from "./Escolhas";
-import { textosDaPagina } from "./textos-da-pagina";
+import { textosDaPagina, fase, type SeccaoDobravel } from "./textos-da-pagina";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -149,6 +150,107 @@ function Seccao({ children, larga = false }: { children: React.ReactNode; larga?
   return <section className={`mt-16 sm:mt-24 ${larga ? "" : "max-w-2xl"}`}>{children}</section>;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA SECÇÃO DE CONDIÇÕES, DOBRADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As condições, as observações, o faseamento e o cancelamento somam mais de
+ * duas dezenas de cláusulas. Abertas, empurram para baixo tudo aquilo por que
+ * a proposta se vende: um casal que rola até ao fim atravessa páginas de letra
+ * miúda antes de chegar seja ao que for. Não é que não devam lá estar; é que
+ * não devem ser o corpo do documento.
+ *
+ * ── FECHADA NÃO É ESCONDIDA ───────────────────────────────────────────────
+ *
+ * O título continua à vista, e por baixo dele uma linha que diz o que lá está
+ * dentro. É essa linha que faz a diferença entre uma secção dobrada e uma
+ * secção omitida: sem ela, «Condições Gerais» tanto pode ser uma cláusula como
+ * catorze, e quem não sabe o que está a abrir não abre.
+ *
+ * E o PDF continua a trazer tudo, por extenso, sem dobra nenhuma. A folha é
+ * que é o documento; isto é o ecrã.
+ *
+ * ── PORQUE É QUE É UM `details` E NÃO UM BOTÃO NOSSO ─────────────────────
+ *
+ * Porque funciona sem uma linha de JavaScript, numa página que é desenhada no
+ * servidor; porque o leitor de ecrã já sabe anunciá-lo como «expansível, por
+ * abrir»; e porque a procura na página (o Cmd+F do casal) ABRE sozinha um
+ * `details` fechado onde encontre o que procura. Um botão nosso perdia as três
+ * e não ganhava nada.
+ *
+ * ── E NÃO SE REGISTA QUEM ABRIU O QUÊ ────────────────────────────────────
+ *
+ * Não há aqui pedido nenhum, nem ao abrir nem ao fechar. Saber que secções um
+ * casal abriu e quais deixou fechadas é exactamente o rasto de leitura que
+ * esta página não recolhe, por decisão dela.
+ */
+function SeccaoDobrada({
+  id,
+  sobretitulo,
+  titulo,
+  resumo,
+  children,
+}: {
+  id?: string;
+  sobretitulo?: string | null;
+  titulo: string;
+  resumo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mt-16 max-w-2xl sm:mt-24">
+      <details className="group">
+        {/*
+         * `list-none` e o marcador do WebKit escondido: o triângulo do
+         * navegador entra ANTES do sobretítulo e desalinha um cabeçalho que é
+         * desenhado com muito cuidado. A seta abaixo faz o mesmo trabalho no
+         * sítio certo.
+         *
+         * `min-h-11` só ao toque, e NÃO a classe `.alvo-toque`: ela força
+         * `inline-flex` com o conteúdo ao centro, e num `summary` isso centrava
+         * um cabeçalho alinhado à esquerda.
+         */}
+        <summary
+          className="marker:content-none pointer-coarse:min-h-11 relative cursor-pointer list-none scroll-mt-6 pl-6 [&::-webkit-details-marker]:hidden"
+          id={id}
+        >
+          {/* A seta fora do fluxo: o cabeçalho mantém o alinhamento que tem
+              nas secções que não dobram, e o `h2` continua a ser um `h2` —
+              filho directo do `summary`, e não embrulhado num `span`, que
+              seria HTML inválido e um nível a menos no índice da página. */}
+          <span
+            aria-hidden
+            className="text-moss/70 absolute top-[0.35em] left-0 text-[13px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+          >
+            ▸
+          </span>
+          {sobretitulo && (
+            <span className="text-foreground/60 mb-2 block text-[10px] tracking-[0.4em] uppercase">
+              {sobretitulo}
+            </span>
+          )}
+          <h2
+            className="text-foreground/90 text-balance"
+            style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(22px, 3.4vw, 32px)" }}
+          >
+            {titulo}
+          </h2>
+          {/*
+           * O resumo desaparece com a secção aberta: com o texto todo à vista
+           * por baixo, uma linha a dizer do que ele trata passa a ser ruído
+           * entre o título e a primeira cláusula.
+           */}
+          <span className="text-foreground/55 mt-1 block text-[13px] leading-relaxed group-open:hidden">
+            {resumo}
+          </span>
+        </summary>
+        {children}
+      </details>
+    </section>
+  );
+}
+
 export default function Documento({
   doc: docOriginal,
   idioma,
@@ -222,6 +324,25 @@ export default function Documento({
   const org = doc.template === "organizacao";
   const evento = camposDoEventoNaLingua(doc, idioma);
   const fixos = blocosFixosNaLingua(doc, idioma);
+
+  /**
+   * A linha que se lê por baixo do título de uma secção dobrada.
+   *
+   * Os resumos foram escritos a olhar para o texto DA CASA, cláusula a
+   * cláusula. Onde ela o reescreveu, o resumo deixaria de descrever o que lá
+   * está — e uma frase errada por cima de uma secção fechada é a pior das
+   * mentiras, porque ninguém a vai lá dentro desmentir. Nesse caso conta-se o
+   * que há: menos útil, sempre verdade.
+   *
+   * A pergunta é feita ao `docOriginal`, que é o documento como ela o gravou.
+   * O `doc` já passou pela língua, e o texto da casa compara-se em português.
+   */
+  const resumoDe = (campo: SeccaoDobravel, linhas: readonly string[]) =>
+    blocoEDaCasa(docOriginal, campo)
+      ? p.resumos[campo]
+      : linhas.length === 1
+        ? p.umPonto
+        : p.pontos.replace("{n}", String(linhas.length));
   const porId = new Map(fotos.map((f) => [f.id, f]));
   /** A primeira fotografia de capa que resolveu — as posições vazias contam
    *  para o índice e não para o desenho (ver `normaliseCoverImages`). */
@@ -398,13 +519,105 @@ export default function Documento({
    * regra da casa —, cai-se para a palavra desta página, que é a mesma.
    */
   const tituloDaInspiracao = t.sobretituloInspiracao ?? p.inspiracao;
+  /**
+   * O faseamento é o da casa, e portanto a linha curta ao lado do total pode
+   * citar as percentagens dele? Ver o comentário no sítio onde ela é escrita.
+   */
+  /**
+   * Os momentos por que o casal passou, pela ordem em que os viu.
+   *
+   * Os grupos de serviços primeiro (são eles que dizem o que se faz), e os
+   * mood boards a seguir para os momentos que só existem em fotografia. Sem
+   * repetir: um board chamado «Cerimónia» ao lado de um grupo «Cerimónia» é a
+   * mesma palavra duas vezes numa linha de quatro.
+   */
+  const momentos = [
+    ...(doc.serviceGroups ?? []).map((g) => (g.title ?? "").trim()),
+    ...boards.map((b) => b.titulo.trim()),
+  ].filter((nome, i, todos) => !!nome && todos.indexOf(nome) === i);
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A ÚLTIMA COISA QUE SE VÊ NÃO PODE SER O CANCELAMENTO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * A proposta acabava na cláusula do Centro de Arbitragem de Conflitos de
+   * Consumo de Lisboa. É a frase certa e é o sítio errado para uma proposta de
+   * casamento acabar: o que fica na cabeça de quem fecha o separador é a
+   * última coisa que leu.
+   *
+   * ── QUAL É A FOTOGRAFIA, E PORQUE É QUE NÃO É UMA REPETIÇÃO ────────────
+   *
+   * A capa tem duas posições e esta página só desenha UMA (a primeira que
+   * resolve). A segunda está lá, escolhida por ela, e não é vista em lado
+   * nenhum do ecrã — no papel imprime do outro lado do painel escuro. É essa
+   * que fecha.
+   *
+   * Se só uma resolveu, ela já está no topo, e não há fecho. Repetir a foto de
+   * abertura no fim não é um fecho: é a mesma proposta a dizer duas vezes a
+   * mesma coisa, e nota-se.
+   */
+  const fecho = (doc.coverImages ?? [])
+    .map((_, i) => porId.get(`c${i}`))
+    .filter((f) => f?.miniatura || f?.original)
+    .find((f) => f && f.id !== capa?.id);
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * AS SECÇÕES NUMERADAS — PARA SE PODER DIZER «NA PARTE 3»
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «numeração de secções, para o casal poder dizer ao telefone
+   * na parte 3».
+   *
+   * ── E POR ISSO A NUMERAÇÃO TEM DE SER A MESMA DO PDF ───────────────────
+   *
+   * O casal ao telefone tem uma das duas formas à frente, e ela tem a outra.
+   * Uma página que numerasse à sua maneira transformava a numeração no oposto
+   * do que ela serve para: duas pessoas a falar de partes diferentes com o
+   * mesmo número.
+   *
+   * Por isso isto ESPELHA o `numerada` do gerador, secção a secção e pela
+   * mesma ordem — incluindo a Inspiração, que o PDF não numera e que aqui
+   * também não leva número. O gerador não é tocado (o PDF fica como está):
+   * o que se faz é copiar a regra dele, e é por isso que ela está escrita aqui
+   * com todas as letras em vez de ser um contador solto.
+   */
+  const numeroDe = new Map<string, number>();
+  [
+    "apresentacao",
+    (doc.serviceGroups ?? []).length > 0 && "servicos",
+    (doc.cronograma ?? []).length > 0 && "cronograma",
+    temOrcamento && "orcamento",
+    (fixos.condicoesGerais ?? []).length > 0 && "condicoes",
+  ]
+    .filter((x): x is string => !!x)
+    .forEach((chave, i) => numeroDe.set(chave, i + 1));
+
+  /**
+   * Uma TABELA e não um contador que se incrementa a desenhar: o índice «Nesta
+   * página» é montado antes de o documento se desenhar, e um contador daria-lhe
+   * os números todos a zero. Duas numerações na mesma página — uma no índice,
+   * outra nos títulos — eram o defeito que a numeração vem resolver.
+   */
+  const numerada = (chave: string, titulo: string) => {
+    const n = numeroDe.get(chave);
+    return n ? `${n}. ${titulo}` : titulo;
+  };
+
+  const sinalPct = depositPercentOf(doc);
+  const faseamentoDaCasa = blocoEDaCasa(docOriginal, "faseamento");
+
   const indice = [
-    (doc.serviceGroups ?? []).length > 0 && { href: "#servicos", texto: t.tituloServicos },
+    (doc.serviceGroups ?? []).length > 0 && {
+      href: "#servicos",
+      texto: numerada("servicos", t.tituloServicos),
+    },
     boards.length > 0 && { href: "#inspiracao", texto: p.inspiracao },
-    temOrcamento && { href: "#orcamento", texto: t.tituloOrcamento },
+    temOrcamento && { href: "#orcamento", texto: numerada("orcamento", t.tituloOrcamento) },
     (fixos.condicoesGerais ?? []).length > 0 && {
       href: "#condicoes",
-      texto: t.tituloCondicoes,
+      texto: numerada("condicoes", t.tituloCondicoes),
     },
   ].filter((x): x is { href: string; texto: string } => !!x);
 
@@ -466,7 +679,7 @@ export default function Documento({
       <div className="max-w-2xl">
         <Titulo
           sobretitulo={t.sobretituloApresentacao}
-          titulo={doc.headerTitle || t.tituloApresentacao}
+          titulo={numerada("apresentacao", doc.headerTitle || t.tituloApresentacao)}
         />
         {apresentacao.length > 0 && (
           <dl className="mt-7 grid grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2">
@@ -505,7 +718,11 @@ export default function Documento({
       {/* ── SERVIÇOS ─────────────────────────────────────────────────────── */}
       {(doc.serviceGroups ?? []).length > 0 && (
         <Seccao>
-          <Titulo id="servicos" sobretitulo={t.sobretituloServicos} titulo={t.tituloServicos} />
+          <Titulo
+            id="servicos"
+            sobretitulo={t.sobretituloServicos}
+            titulo={numerada("servicos", t.tituloServicos)}
+          />
           <div className="mt-8 space-y-9">
             {(doc.serviceGroups ?? []).map((g, i) => (
               <div key={g.id ?? i}>
@@ -538,7 +755,10 @@ export default function Documento({
       {/* ── CRONOGRAMA (modelo Organização) ──────────────────────────────── */}
       {(doc.cronograma ?? []).length > 0 && (
         <Seccao>
-          <Titulo sobretitulo={t.sobretituloCronograma} titulo={t.tituloCronograma} />
+          <Titulo
+            sobretitulo={t.sobretituloCronograma}
+            titulo={numerada("cronograma", t.tituloCronograma)}
+          />
           <div className="mt-8 space-y-8">
             {(doc.cronograma ?? []).map((fase, i) => (
               <div key={i}>
@@ -595,7 +815,11 @@ export default function Documento({
       {/* ── ORÇAMENTO ────────────────────────────────────────────────────── */}
       {temOrcamento && (
         <Seccao>
-          <Titulo id="orcamento" sobretitulo={t.sobretituloOrcamento} titulo={t.tituloOrcamento} />
+          <Titulo
+            id="orcamento"
+            sobretitulo={p.sobretituloOrcamento}
+            titulo={numerada("orcamento", t.tituloOrcamento)}
+          />
 
           {rubricas.length > 0 && (
             <ul className="mt-8">
@@ -676,17 +900,57 @@ export default function Documento({
                   <span className="text-foreground/70 text-sm">{t.iva(taxa)}</span>
                   <span className="text-foreground/70 text-sm tabular-nums">{eur(totais.iva)}</span>
                 </div>
-                <div className="border-foreground/15 mt-3 flex items-baseline justify-between gap-4 border-t pt-4">
-                  <span className="text-foreground/75 text-sm font-medium">{t.totalAPagar}</span>
-                  <span
-                    className="text-moss tabular-nums"
+                {/*
+                 * ════════════════════════════════════════════════════════
+                 * O NÚMERO MAIS IMPORTANTE DA PÁGINA, DESENHADO COMO TAL
+                 * ════════════════════════════════════════════════════════
+                 *
+                 * Estava na mesma escada dos subtotais, com o rótulo do mesmo
+                 * tamanho dos outros e o número quatro pontos acima: quem
+                 * percorre a coluna de números com o polegar não distingue o
+                 * que paga do que somou para lá chegar.
+                 *
+                 * Sai da escada e passa a ser um bloco. O rótulo em cima, o
+                 * número em baixo e grande — e não os dois na mesma linha,
+                 * porque num telemóvel um rótulo e um número de quarenta
+                 * pontos lado a lado ou encolhem o número ou partem a linha.
+                 */}
+                <div className="border-foreground/15 mt-5 border-t pt-5">
+                  <p className="text-foreground/60 text-[11px] tracking-[0.22em] uppercase">
+                    {t.totalAPagar}
+                  </p>
+                  <p
+                    className="text-moss mt-1.5 tabular-nums"
                     style={{
                       fontFamily: "var(--font-playfair)",
-                      fontSize: "clamp(22px, 3.2vw, 30px)",
+                      fontSize: "clamp(34px, 6vw, 52px)",
+                      lineHeight: 1.05,
                     }}
                   >
                     {eur(totais.aPagar)}
-                  </span>
+                  </p>
+                  {/*
+                   * ── E O QUE SE PAGA AGORA, AQUI E NÃO TRÊS SECÇÕES ABAIXO
+                   *
+                   * A pergunta que um casal faz a seguir a ver um total é
+                   * sempre a mesma. O faseamento continua lá em baixo por
+                   * extenso, com as suas condições; isto é a resposta curta no
+                   * sítio onde ela é feita.
+                   *
+                   * Só quando o faseamento é o DA CASA. Se ela o reescreveu,
+                   * os 30/70 desta linha podiam já não ser os de lá — e duas
+                   * percentagens diferentes na mesma proposta são a única
+                   * coisa pior do que a pergunta sem resposta.
+                   */}
+                  {faseamentoDaCasa && (
+                    <p className="text-foreground/70 mt-3 text-[13px] leading-relaxed">
+                      <span className="text-foreground/85 font-medium">
+                        {fase(p.agora, sinalPct, eur(totais.aPagar * (sinalPct / 100)))}
+                      </span>
+                      {" · "}
+                      {fase(p.depois, 100 - sinalPct)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -716,27 +980,71 @@ export default function Documento({
           )}
 
           {(fixos.notasImportantes ?? []).length > 0 && (
-            <div className="mt-10">
-              <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
-                {t.notasImportantes}
-              </h3>
+            <details className="group mt-10">
+              <summary className="marker:content-none pointer-coarse:min-h-11 relative cursor-pointer list-none pl-5 [&::-webkit-details-marker]:hidden">
+                <span
+                  aria-hidden
+                  className="text-moss/70 absolute top-[0.2em] left-0 text-[11px] transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+                >
+                  ▸
+                </span>
+                <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
+                  {t.notasImportantes}
+                </h3>
+                <span className="text-foreground/55 mt-1 block text-[13px] leading-relaxed group-open:hidden">
+                  {resumoDe("notasImportantes", fixos.notasImportantes ?? [])}
+                </span>
+              </summary>
               <Lista itens={fixos.notasImportantes} />
-            </div>
+            </details>
           )}
-          {(fixos.incluido ?? []).length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
-                {t.incluidoNaProposta}
-              </h3>
-              <Lista itens={fixos.incluido} />
-            </div>
-          )}
-          {(fixos.naoIncluido ?? []).length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
-                {t.naoIncluidoNoOrcamento}
-              </h3>
-              <Lista itens={fixos.naoIncluido} />
+          {/*
+           * ════════════════════════════════════════════════════════════════
+           * O INCLUÍDO DEIXA DE FLUTUAR
+           * ════════════════════════════════════════════════════════════════
+           *
+           * «Serviço de decoração, material e flores conforme descrito» é uma
+           * frase abstracta a seguir a quarenta fotografias de coisas
+           * concretas. O casal acabou de percorrer a Cerimónia, o Cocktail e o
+           * Jantar, e a lista não os nomeia: não se percebe que o «conforme
+           * descrito» é exactamente aquilo.
+           *
+           * Passa a abrir com os nomes das secções por que eles passaram,
+           * tirados do documento e não escritos à mão — se ela acrescentar um
+           * momento, ele aparece aqui sem ninguém se lembrar de o vir cá pôr.
+           *
+           * ── E AS DUAS LISTAS LADO A LADO ──────────────────────────────
+           * Uma debaixo da outra, «não incluído» lia-se como a continuação de
+           * «incluído»: a mesma marca, o mesmo tamanho, e um título pequeno a
+           * separá-las. Em duas colunas vê-se de relance que são duas contas
+           * diferentes. Numa coluna só (telemóvel) voltam a empilhar-se, e aí
+           * a distância entre elas é que faz o trabalho.
+           */}
+          {((fixos.incluido ?? []).length > 0 || (fixos.naoIncluido ?? []).length > 0) && (
+            <div className="mt-10">
+              {(fixos.incluido ?? []).length > 0 && momentos.length > 0 && (
+                <p className="text-foreground/65 mb-6 text-[14px] leading-relaxed">
+                  <span className="text-foreground/80">{p.oQueViram}</span> {momentos.join(" · ")}
+                </p>
+              )}
+              <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
+                {(fixos.incluido ?? []).length > 0 && (
+                  <div>
+                    <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
+                      {t.incluidoNaProposta}
+                    </h3>
+                    <Lista itens={fixos.incluido} />
+                  </div>
+                )}
+                {(fixos.naoIncluido ?? []).length > 0 && (
+                  <div>
+                    <h3 className="text-foreground/80 text-[13px] tracking-[0.16em] uppercase">
+                      {t.naoIncluidoNoOrcamento}
+                    </h3>
+                    <Lista itens={fixos.naoIncluido} />
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </Seccao>
@@ -744,39 +1052,81 @@ export default function Documento({
 
       {/* ── CONDIÇÕES GERAIS ─────────────────────────────────────────────── */}
       {(fixos.condicoesGerais ?? []).length > 0 && (
-        <Seccao>
-          <Titulo id="condicoes" sobretitulo={t.sobretituloCondicoes} titulo={t.tituloCondicoes} />
+        <SeccaoDobrada
+          id="condicoes"
+          sobretitulo={p.sobretituloCondicoes}
+          titulo={numerada("condicoes", t.tituloCondicoes)}
+          resumo={resumoDe("condicoesGerais", fixos.condicoesGerais ?? [])}
+        >
           {/* Os marcadores («a data do evento», «o número de convidados») são
               preenchidos com a MESMA função do gerador — senão o casal lia aqui
               um «{{data}}» que o PDF dele não tem. */}
           <Lista itens={(fixos.condicoesGerais ?? []).map((l) => preencherMarcadores(l, doc))} />
-        </Seccao>
+        </SeccaoDobrada>
       )}
 
       {(fixos.observacoesGerais ?? []).length > 0 && (
-        <Seccao>
-          <Titulo titulo={t.observacoesGerais} />
+        <SeccaoDobrada
+          titulo={t.observacoesGerais}
+          resumo={resumoDe("observacoesGerais", fixos.observacoesGerais ?? [])}
+        >
           <Lista itens={(fixos.observacoesGerais ?? []).map((l) => preencherMarcadores(l, doc))} />
-        </Seccao>
+        </SeccaoDobrada>
       )}
 
       {(fixos.faseamento ?? []).length > 0 && (
-        <Seccao>
-          <Titulo titulo={t.faseamentoDoPagamento} />
+        <SeccaoDobrada
+          titulo={t.faseamentoDoPagamento}
+          resumo={resumoDe("faseamento", fixos.faseamento ?? [])}
+        >
           <Lista itens={fixos.faseamento} />
           {totais.aPagar > 0 && (
             <p className="text-foreground/60 mt-4 text-[13px] leading-relaxed">
               {t.baseDoCalculo(eur(totais.aPagar))}
             </p>
           )}
-        </Seccao>
+        </SeccaoDobrada>
       )}
 
       {(fixos.cancelamento ?? []).length > 0 && (
-        <Seccao>
-          <Titulo titulo={t.cancelamento} />
+        <SeccaoDobrada
+          titulo={t.cancelamento}
+          resumo={resumoDe("cancelamento", fixos.cancelamento ?? [])}
+        >
           <Lista itens={fixos.cancelamento} />
-        </Seccao>
+        </SeccaoDobrada>
+      )}
+
+      {/* ── O FECHO ────────────────────────────────────────────────────────
+          Ver `fecho`, acima, para qual é a fotografia e porque é que ela não é
+          uma repetição. Sem título, sem legenda e sem botão: é uma imagem, e o
+          que ela faz é acabar a proposta com o trabalho dela em vez de uma
+          cláusula de arbitragem. */}
+      {fecho && (
+        <div className="mt-20 overflow-hidden rounded-sm sm:mt-28">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={fecho.miniatura ?? fecho.original}
+            {...(fecho.miniatura
+              ? {
+                  srcSet: `${fecho.miniatura} 400w, /api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(fecho.id)} 1200w`,
+                  sizes: "(min-width: 1024px) 1024px, 100vw",
+                }
+              : {})}
+            alt=""
+            /* Preguiçosa, ao contrário da capa: está no fim de uma página com
+               quarenta e seis fotografias, e quem lá chega já esperou o que
+               tinha a esperar. */
+            loading="lazy"
+            decoding="async"
+            className="w-full object-cover"
+            style={{
+              aspectRatio:
+                fecho.largura && fecho.altura ? `${fecho.largura} / ${fecho.altura}` : "3 / 2",
+              maxHeight: "min(62vh, 560px)",
+            }}
+          />
+        </div>
       )}
     </article>
   );

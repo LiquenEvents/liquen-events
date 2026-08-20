@@ -68,6 +68,7 @@ import type { IdiomaDaProposta } from "./proposal-doc-textos";
 import type { ProposalDoc } from "./proposal-doc";
 import {
   camposDoDocumento,
+  chaveDoCampo,
   escreverCampo,
   lerCampo,
   seccaoDoCampo,
@@ -97,6 +98,7 @@ export function temVersaoInglesa(c: CampoDeTexto): boolean {
       return false;
     // ── A prosa dela ──────────────────────────────────────────────────────
     case "headerTitle":
+    case "intencao":
     case "servico":
     case "totalLabel":
     case "budgetNote":
@@ -127,6 +129,8 @@ export function lerEn(doc: Partial<ProposalDoc>, campo: CampoDeTexto): string | 
       return undefined;
     case "headerTitle":
       return doc.headerTitleEn;
+    case "intencao":
+      return doc.intencaoEn;
     case "servico":
       return doc.servicoEn;
     case "totalLabel":
@@ -181,12 +185,26 @@ export function escreverEn<T extends Partial<ProposalDoc>>(
   campo: CampoDeTexto,
   texto: string,
 ): T {
+  // A cada escrita do inglês fica registado o português contra o qual ele foi
+  // escrito. É o que permite, mais tarde, saber que o português mudou por baixo
+  // dele — ver `estadoDoIngles`.
+  const comMarca = limpo(texto) ? confirmarTraducao(doc, campo) : doc;
+  return escreverInglesNoCampo(comMarca, campo, texto);
+}
+
+function escreverInglesNoCampo<T extends Partial<ProposalDoc>>(
+  doc: T,
+  campo: CampoDeTexto,
+  texto: string,
+): T {
   switch (campo.tipo) {
     case "ref":
     case "eventType":
       return doc;
     case "headerTitle":
       return { ...doc, headerTitleEn: texto };
+    case "intencao":
+      return { ...doc, intencaoEn: texto };
     case "servico":
       return { ...doc, servicoEn: texto };
     case "totalLabel":
@@ -299,6 +317,87 @@ export function camposComVersaoInglesa(doc: Partial<ProposalDoc>): CampoBilingue
 const limpo = (s: string | undefined) => (typeof s === "string" ? s.trim() : "");
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O INGLÊS QUE FICOU PARA TRÁS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, a olhar para o estúdio: «o serviço "Reunião Inicial" tem como
+ * tradução "Ceremony Decor". Alguém traduziu, mudou depois o texto em
+ * português, e o inglês ficou desatualizado sem nada avisar».
+ *
+ * É o defeito mais grave deste ecrã porque produz uma proposta ERRADA que passa
+ * em todas as verificações: o campo inglês não está vazio — está errado, e uma
+ * contagem de caixas vazias não tem como o ver.
+ *
+ * E estava escrito, no cabeçalho deste ficheiro, que ele existia: «traduzir,
+ * voltar atrás e reescrever o português deixa o inglês desactualizado e
+ * continua a não contar, porque está preenchido. Apanhá-lo obrigava a guardar,
+ * por campo, o português contra o qual a tradução foi escrita». É exactamente
+ * isso que passa a acontecer.
+ *
+ * ── UMA IMPRESSÃO DIGITAL, E NÃO O TEXTO ────────────────────────────────
+ *
+ * Guarda-se um número por campo, e não uma segunda cópia do português. O
+ * documento viaja inteiro em cada gravação do rascunho — para o `localStorage`
+ * e para o servidor, a cada oitocentos milissegundos — e duplicar a prosa toda
+ * era duplicar o que se grava, para responder a uma pergunta de sim ou não.
+ *
+ * Não é uma função de segurança e não precisa de ser: o que se pergunta é «é o
+ * mesmo texto?». Duas frases diferentes com o mesmo número dariam um campo dado
+ * por fresco estando velho — uma hipótese em quatro mil milhões, contra a
+ * certeza de que hoje NENHUM é apanhado.
+ */
+function marcaDoTexto(s: string): number {
+  // FNV-1a de 32 bits. Escolhida por ser curta, determinista e igual nos dois
+  // lados da fronteira: isto corre no browser a cada tecla e no servidor a
+  // contar o que falta, e as duas contas têm de dar o mesmo número.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i += 1) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/** A chave por que o português de um campo é registado. */
+const chaveDaMarca = (campo: CampoDeTexto) => chaveDoCampo(campo);
+
+/**
+ * O estado da versão inglesa de um campo.
+ *
+ * `nao-se-sabe` é o caso das propostas ANTERIORES a este registo, e é uma
+ * resposta a sério: elas têm inglês escrito e nenhuma marca do português contra
+ * o qual ele foi escrito. Acusá-las todas de desactualizadas era acender um
+ * aviso em cada campo de cada proposta antiga — e um aviso que toca sempre
+ * deixa de se ler, incluindo no dia em que está certo.
+ */
+export type EstadoDoIngles = "sem-portugues" | "por-traduzir" | "desactualizado" | "em-dia";
+
+export function estadoDoIngles(doc: Partial<ProposalDoc>, campo: CampoDeTexto): EstadoDoIngles {
+  const pt = limpo(lerCampo(doc, campo));
+  if (!pt) return "sem-portugues";
+  if (!limpo(lerEn(doc, campo))) return "por-traduzir";
+  const registada = doc.traducoesFeitas?.[chaveDaMarca(campo)];
+  if (registada === undefined) return "em-dia";
+  return registada === marcaDoTexto(pt) ? "em-dia" : "desactualizado";
+}
+
+/**
+ * O documento com a tradução deste campo DADA POR REVISTA.
+ *
+ * É o que o botão «já está bem assim» escreve: não muda o inglês, muda o que
+ * ele promete — passa a valer para o português que lá está agora.
+ */
+export function confirmarTraducao<T extends Partial<ProposalDoc>>(doc: T, campo: CampoDeTexto): T {
+  const pt = limpo(lerCampo(doc, campo));
+  if (!pt) return doc;
+  return {
+    ...doc,
+    traducoesFeitas: { ...(doc.traducoesFeitas ?? {}), [chaveDaMarca(campo)]: marcaDoTexto(pt) },
+  };
+}
+
+/**
  * Os campos com português escrito e sem inglês — é esta a lista dos avisos, e é
  * a mesma nos três sítios onde o aviso aparece.
  *
@@ -316,6 +415,42 @@ export function camposPorTraduzir(doc: Partial<ProposalDoc>): CampoBilingue[] {
     if (!pt) continue;
     if (limpo(lerEn(doc, campo))) continue;
     out.push({ campo, rotulo, texto: pt });
+  }
+  return out;
+}
+
+/**
+ * Os campos cuja versão inglesa PRECISA de atenção: os vazios e os que ficaram
+ * para trás.
+ *
+ * ── PORQUE É QUE NÃO SUBSTITUI O `camposPorTraduzir` ────────────────────
+ *
+ * Porque as duas listas dizem coisas diferentes a quem as lê, e a diferença
+ * importa no sítio onde cada uma aparece.
+ *
+ * A Conferência escreve «N campos não têm versão inglesa e vão sair em
+ * português» — e isso é verdade sobre um campo vazio e é FALSO sobre um campo
+ * desactualizado, que tem inglês e vai sair em inglês. É outra frase, com outro
+ * remédio: o primeiro traduz-se, o segundo relê-se.
+ *
+ * Quem quer os dois — o botão de traduzir, que preenche vazios e refaz
+ * desactualizados, e o contador do índice — pede esta.
+ */
+export function camposPorRever(
+  doc: Partial<ProposalDoc>,
+): Array<CampoBilingue & { estado: EstadoDoIngles }> {
+  const out: Array<CampoBilingue & { estado: EstadoDoIngles }> = [];
+  for (const { campo, rotulo } of camposDoDocumento(doc)) {
+    if (!temVersaoInglesa(campo)) continue;
+    const estado = estadoDoIngles(doc, campo);
+    if (estado !== "por-traduzir" && estado !== "desactualizado") continue;
+    out.push({
+      campo,
+      rotulo,
+      texto: limpo(lerCampo(doc, campo)),
+      ...(estado === "desactualizado" ? { ingles: lerEn(doc, campo) } : {}),
+      estado,
+    });
   }
   return out;
 }
@@ -350,7 +485,10 @@ export function camposPorTraduzir(doc: Partial<ProposalDoc>): CampoBilingue[] {
  */
 export function porTraduzirPorSeccao(doc: Partial<ProposalDoc>): Record<string, number> {
   const conta: Record<string, number> = {};
-  for (const c of camposPorTraduzir(doc)) {
+  // O `camposPorRever` e não o `camposPorTraduzir`: o contador do índice conta o
+  // que ela tem para FAZER na tradução, e um inglês que ficou para trás dá-lhe
+  // tanto trabalho como um que falta — mais, até, porque o primeiro não se vê.
+  for (const c of camposPorRever(doc)) {
     const seccao = seccaoDoCampo(c.campo);
     conta[seccao] = (conta[seccao] ?? 0) + 1;
   }

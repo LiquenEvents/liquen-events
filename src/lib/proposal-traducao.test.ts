@@ -4,6 +4,7 @@ import { camposPorTraduzir, lerEn } from "./proposal-doc-bilingue";
 import {
   MAX_CARACTERES_POR_TRADUCAO,
   MAX_TEXTOS_POR_TRADUCAO,
+  doGlossario,
   estadoDaTraducao,
   motorPelaRota,
   precisaDeTraducao,
@@ -526,5 +527,66 @@ describe("traduzirParaIngles", () => {
     expect(traduzido.serviceGroups[0].items).toHaveLength(doc.serviceGroups[0].items.length);
     expect(traduzido.budgetItems).toEqual(doc.budgetItems);
     expect(traduzido.budgetItemsEn).toHaveLength(doc.budgetItems.length);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O GLOSSÁRIO DA CASA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «termos fixos com tradução única e verificada: "Seating Plan",
+ * "Mood board", nomes de serviço recorrentes».
+ *
+ * Um motor de tradução é bom a frases e imprevisível a RÓTULOS: «Decoração
+ * Cerimónia» tanto dá «Ceremony Decoration» como «Ceremony Decor», e a segunda
+ * proposta parece escrita por outra pessoa.
+ *
+ * A afirmação que vale por todas é a última: o glossário é uma IGUALDADE, não
+ * uma substituição dentro da frase.
+ */
+describe("o glossário da casa", () => {
+  it("um rótulo da casa nem chega a ir ao motor", async () => {
+    const pedidos: string[][] = [];
+    const motor = async (textos: string[]) => {
+      pedidos.push(textos);
+      return textos.map((t) => `MOTOR: ${t}`);
+    };
+    const doc = {
+      moodBoards: [{ title: "Decoração Cerimónia", images: [] }],
+    } as unknown as ProposalDoc;
+    const r = await traduzirParaIngles(doc, motor);
+    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 0 })).toBe("Ceremony Decoration");
+    // Zero idas à rede: o documento inteiro era um termo conhecido.
+    expect(pedidos).toEqual([]);
+  });
+
+  it("«Seating Plan» já é inglês e volta igual", async () => {
+    // Mandá-lo traduzir devolvia-o traduzido.
+    expect(doGlossario("Seating Plan")).toBe("Seating Plan");
+    expect(doGlossario("seating plan")).toBe("Seating Plan");
+  });
+
+  it("ignora acentos, maiúsculas e espaços a mais", async () => {
+    expect(doGlossario("  DECORACAO   CERIMONIA ")).toBe("Ceremony Decoration");
+  });
+
+  /**
+   * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   */
+  it("é o campo INTEIRO, e não palavras dentro de uma frase", async () => {
+    // Trocar palavras dentro de uma frase era fazer tradução automática à mão,
+    // com os erros dela e sem nenhuma das defesas dela: «a decoração da
+    // cerimónia decorre no jardim» não se resolve palavra a palavra.
+    expect(doGlossario("A decoração da cerimónia decorre no jardim")).toBeUndefined();
+  });
+
+  it("o que o glossário não sabe segue o caminho de sempre", async () => {
+    const motor = async (textos: string[]) => textos.map((t) => `MOTOR: ${t}`);
+    const doc = {
+      moodBoards: [{ title: "Mesa de doces da avó", images: [] }],
+    } as unknown as ProposalDoc;
+    const r = await traduzirParaIngles(doc, motor);
+    expect(lerEn(r.doc, { tipo: "boardTitulo", bi: 0 })).toBe("MOTOR: Mesa de doces da avó");
   });
 });

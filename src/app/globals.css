@@ -2369,4 +2369,27 @@ body:has(.barra-consentimento) footer {
     background: #fff !important;
     color: #111 !important;
   }
+
+  /*
+   * AS SECÇÕES DOBRADAS ABREM-SE NO PAPEL.
+   *
+   * As condições, o faseamento e o cancelamento estão dobrados no ecrã para
+   * não empurrarem a proposta para baixo. Numa folha não há gesto nenhum para
+   * as abrir: imprimir com elas fechadas era imprimir uma proposta sem
+   * condições. A seta também sai — não há nada para rodar no papel.
+   *
+   * ── O LIMITE, DITO COM TODAS AS LETRAS ─────────────────────────────────
+   * Isto resolve nos navegadores que escondem o conteúdo com
+   * `content-visibility` no `::details-content` (Chrome/Edge recentes). Os
+   * outros nem sequer desenham a fenda, e daí não há CSS da página que os
+   * alcance. O documento formal continua a ser o PDF, que traz tudo por
+   * extenso e nunca dobrou nada.
+   */
+  details::details-content {
+    content-visibility: visible !important;
+    block-size: auto !important;
+  }
+  details > summary span[aria-hidden] {
+    display: none !important;
+  }
 }

@@ -26,6 +26,7 @@ import {
   DEFAULT_VALID_DAYS,
   DEFAULT_VAT_RATE,
   MOOD_BOARD_MAX_IMAGES,
+  MAX_INTENCAO,
   type MoodBoard,
   type VatMode,
 } from "@/lib/proposal-doc";
@@ -59,6 +60,7 @@ import EmailDoEnvio from "./EmailDoEnvio";
 import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
 import PreviaDaPagina from "./PreviaDaPagina";
+import PainelDoEstudio from "./PainelDoEstudio";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
 import VistaDeConjunto from "./VistaDeConjunto";
 import LupaDeFotos from "./LupaDeFotos";
@@ -175,9 +177,12 @@ import {
   type EstadoDaTraducao,
 } from "@/lib/proposal-traducao";
 import {
+  camposPorRever,
   camposPorTraduzir,
   docTemIngles,
+  confirmarTraducao,
   escreverEn,
+  estadoDoIngles,
   lerEn,
   porTraduzirPorSeccao,
 } from "@/lib/proposal-doc-bilingue";
@@ -4262,19 +4267,42 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       cresce?: boolean;
       readOnly?: boolean;
       placeholder?: string;
+      /**
+       * Este par NÃO fica lado a lado.
+       *
+       * A marca é ao contrário — todas ficam, e diz-se quais não — porque o
+       * desenho normal passa a ser o par numa linha só, e uma excepção que se
+       * esquece de se declarar é uma caixa empilhada no meio de doze ao lado,
+       * que se vê. Uma que se esquecesse ao contrário era uma caixa ao lado de
+       * uma coisa que não é o seu par, que também se vê.
+       */
+      empilhada?: boolean;
     } = {},
   ) {
     if (!bilingue) return null;
-    const pt = (lerCampo(doc as ProposalDoc, campo) ?? "").trim();
     const en = lerEn(doc as ProposalDoc, campo) ?? "";
+    /**
+     * Vazia, para trás, ou em dia — e as três leem-se diferentes.
+     *
+     * Era `pt !== "" && en === ""`, que só sabia responder «vazia». Um inglês
+     * escrito contra um português que entretanto mudou passava por bom, e é
+     * esse o defeito que ela apanhou: «Reunião Inicial» com «Ceremony Decor».
+     */
+    const estado = estadoDoIngles(doc as ProposalDoc, campo);
+    // `empilhada` é desta função e não da caixa: separa-se antes de passar o
+    // resto, para não escorregar para o DOM como um atributo inventado.
+    const { empilhada, ...daCaixa } = opts;
     return (
       <CaixaInglesa
         campo={campo}
         rotulo={rotulo}
         valor={en}
         onChange={(texto) => setDoc((d) => escreverEn(d, campo, texto))}
-        porTraduzir={pt !== "" && en.trim() === ""}
-        {...opts}
+        porTraduzir={estado === "por-traduzir"}
+        desactualizada={estado === "desactualizado"}
+        aoConfirmar={() => setDoc((d) => confirmarTraducao(d, campo))}
+        aoLado={!empilhada}
+        {...daCaixa}
       />
     );
   }
@@ -5259,6 +5287,42 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     [dataEscritaNoDoc, quote, doc.location],
   );
 
+  /**
+   * A página que ela está a editar — para o painel da direita mostrar ESSA.
+   *
+   * Marcada quando o foco entra no cartão de um board, e não quando o rato lá
+   * passa: o rato atravessa cartões a caminho de outro sítio, e um painel que
+   * mudasse de página ao atravessar era um painel a piscar.
+   */
+  const [boardActivo, setBoardActivo] = useState<number | null>(null);
+
+  /**
+   * O que já estava feito quando esta proposta ABRIU.
+   *
+   * Uma fotografia tirada uma vez, e não uma leitura contínua: é ela que decide
+   * que secções nascem dobradas, e uma leitura contínua fechava uma secção no
+   * instante em que ela acabasse de a preencher — com o cursor lá dentro.
+   *
+   * Só se tira depois de o documento chegar. Antes disso «está tudo por
+   * preencher» é uma resposta sobre um documento que ainda não existe, e
+   * dobrava zero secções em todas as propostas.
+   */
+  const [feitoAoAbrir, setFeitoAoAbrir] = useState<Record<string, boolean> | null>(null);
+  useEffect(() => {
+    if (feitoAoAbrir) return;
+    if (!seccoes.some((s) => s.preenchida)) return;
+    setFeitoAoAbrir(Object.fromEntries(seccoes.map((s) => [s.id, s.preenchida])));
+  }, [seccoes, feitoAoAbrir]);
+
+  /** As páginas COM fotografias, pela ordem em que saem — a ordem do PDF. */
+  const paginasParaOPainel = useMemo(
+    () =>
+      ordemDeSaida(doc as ProposalDoc, doc.moodBoards ?? [], (b) => b.title ?? "")
+        .map((bi) => ({ bi, board: (doc.moodBoards ?? [])[bi] }))
+        .filter((p) => p.board && (p.board.images ?? []).length > 0),
+    [doc],
+  );
+
   const traducoesPorSeccao = useMemo(
     () => (idiomaDoPdf === "en" ? porTraduzirPorSeccao(doc as ProposalDoc) : undefined),
     [idiomaDoPdf, doc],
@@ -5533,7 +5597,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Event fields */}
-          <Section title="Evento" id="evento">
+          <Section title="Evento" id="evento" fechadaPorOmissao={feitoAoAbrir?.evento}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field
                 label="Clientes"
@@ -5675,6 +5739,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               />
             </div>
 
+            {/*
+             * ══════════════════════════════════════════════════════════════
+             * A FRASE DE INTENÇÃO
+             * ══════════════════════════════════════════════════════════════
+             *
+             * «Pensámos o vosso dia em branco e azul, com a serenidade do
+             * Redondo em setembro.» É a primeira coisa que o casal lê na
+             * página, e é a única coisa da proposta que não é um dado.
+             *
+             * ── SEM TEXTO POR OMISSÃO, E ISSO É A DECISÃO ────────────────
+             * Palavras dela: «uma frase genérica é pior do que nenhuma». Uma
+             * frase da casa aqui seria lida como escrita para aquele casal, e
+             * no dia em que dois casais a comparassem seria pior do que nunca
+             * ter existido. Por isso não há sugestão, não há exemplo
+             * pré-preenchido, e o campo vazio não acende aviso nenhum: uma
+             * proposta sem frase é uma proposta legítima.
+             *
+             * O exemplo está no `hint`, onde se lê e não se copia.
+             */}
+            <div className="mt-4">
+              <Field
+                as="textarea"
+                rows={3}
+                label="Frase de intenção (só na página do casal)"
+                value={doc.intencao ?? ""}
+                maxLength={MAX_INTENCAO}
+                onChange={(e) => patch({ intencao: e.target.value.slice(0, MAX_INTENCAO) })}
+                data-campo="intencao"
+                hint={`abre a página, por cima do nome deles. Três linhas sobre o que imaginou para este casamento, escritas de raiz para eles. Ex.: «Pensámos o vosso dia em branco e azul, com a serenidade do Redondo em setembro.» ${(doc.intencao ?? "").length}/${MAX_INTENCAO}`}
+              />
+            </div>
+
             {/* ── O QUE SE SABE E NÃO SE ESCREVE AO CLIENTE ────────────────
                 «Quer ficar por baixo dos 8.000 €.» «Quem decide é a mãe.»
                 Frases que hoje vivem na cabeça de quem escreveu a proposta e
@@ -5696,7 +5792,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Cover images */}
-          <Section title="Imagens de capa (2)" id="capas">
+          <Section title="Imagens de capa (2)" id="capas" fechadaPorOmissao={feitoAoAbrir?.capas}>
             <div className="grid grid-cols-2 gap-3">
               {[0, 1].map((idx) => {
                 const path = doc.coverImages?.[idx];
@@ -5713,9 +5809,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                  * escolher uma vertical para a capa deixa de ser sorte — e ela
                  * deixa de descobrir o corte com o PDF já feito.
                  */
-                const perdaDaCapa = path
-                  ? perdaNaCapa(aspetosDasFotos[path] ?? ASPETO_POR_OMISSAO)
-                  : 0;
+                /*
+                 * ── O NÚMERO É DESTA FOTOGRAFIA, OU NÃO HÁ NÚMERO ───────────
+                 *
+                 * Palavras dela: «o mesmo texto aparece por baixo das duas
+                 * imagens de capa, embora uma seja vertical e a outra
+                 * horizontal — logo, perdem áreas diferentes».
+                 *
+                 * A conta já era por fotografia. O que não era é o DADO: a
+                 * forma só se sabe depois de a miniatura carregar e o `Thumb`
+                 * a medir, e até lá caía-se na forma por omissão — a mesma
+                 * para as duas. Duas fotografias diferentes, uma forma
+                 * inventada, o mesmo 69% debaixo de ambas, e a frase a dizer
+                 * «ESTA fotografia perde» sobre um número que não é dela.
+                 *
+                 * Sem medida não há aviso. É a regra da casa em todo o lado
+                 * onde isto aparece: não saber é não saber, e um número errado
+                 * dito com confiança é pior do que nenhum — sobretudo este,
+                 * que existe para ela ESCOLHER a fotografia.
+                 */
+                const aspetoDestaCapa = path ? aspetosDasFotos[path] : undefined;
+                const perdaDaCapa = aspetoDestaCapa ? perdaNaCapa(aspetoDestaCapa) : 0;
                 return (
                   <div key={idx}>
                     {path ? (
@@ -5744,9 +5858,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         />
                         {perdaDaCapa > PERDA_QUE_SE_AVISA && (
                           <p className="mt-1.5 text-xs leading-relaxed text-[#8a2a22]">
-                            A tira da capa é muito mais alta do que larga: esta fotografia perde{" "}
-                            {Math.round(perdaDaCapa * 100)}% da área. Uma fotografia ao alto perde
-                            menos.
+                            A tira da capa é quase duas vezes mais alta do que larga:{" "}
+                            <strong className="font-medium">
+                              esta fotografia perde {Math.round(perdaDaCapa * 100)}% da área
+                            </strong>
+                            . Uma fotografia ao alto perde menos.
                           </p>
                         )}
                       </>
@@ -5789,7 +5905,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Service groups */}
-          <Section title="Serviços" id="servicos">
+          <Section title="Serviços" id="servicos" fechadaPorOmissao={feitoAoAbrir?.servicos}>
             {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
             <ServicesEditor
               groups={doc.serviceGroups}
@@ -5809,7 +5925,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Mood boards — decoracao only */}
           {isDeco && (
-            <Section title="Mood boards" id="moodboards" nota={contagemDosBoards}>
+            <Section
+              title="Mood boards"
+              id="moodboards"
+              nota={contagemDosBoards}
+              fechadaPorOmissao={feitoAoAbrir?.moodboards}
+            >
               <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
                 grupos de imagens de inspiração para o cliente
               </p>
@@ -5924,8 +6045,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                          * Se uma delas ficasse para trás, ela escolhia por um
                          * desenho e recebia outro.
                          */
-                        const semRecorte = b.enquadramento === "forma-da-foto";
-                        const layoutDoBoard = b.layout ?? layoutSugerido(aspectos.length);
+                        /*
+                         * ── O QUE ESTA PÁGINA FAZ, OU O QUE A PROPOSTA FAZ ──
+                         *
+                         * A página primeiro, a proposta a seguir, e a sugestão
+                         * do número de fotografias em último. É esta ordem que
+                         * permite decidir uma vez para as sete páginas e ainda
+                         * assim uma delas discordar — ver `layoutPorOmissao`,
+                         * em `proposal-doc.ts`.
+                         */
+                        const semRecorte =
+                          (b.enquadramento ?? doc.enquadramentoPorOmissao) === "forma-da-foto";
+                        const layoutDoBoard =
+                          b.layout ?? doc.layoutPorOmissao ?? layoutSugerido(aspectos.length);
                         /**
                          * A ALTURA QUE A LEGENDA ROUBA ÀS FOTOS.
                          *
@@ -5974,6 +6106,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           <CartaoDeBoard
                             key={bi}
                             bi={bi}
+                            // Qual é a página que ela está a editar — para o
+                            // painel da direita mostrar ESSA. No foco e não no
+                            // rato: o rato atravessa cartões a caminho de
+                            // outro sítio, e o painel piscava.
+                            onFocusCapture={() => setBoardActivo(bi)}
                             // O `id` é o alvo do índice lateral. Pelo ÍNDICE REAL:
                             // a ordem desenhada pode mudar debaixo do salto.
                             ancora={`mood-board-${bi}`}
@@ -6027,11 +6164,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     aria-label="Título do mood board"
                                     readOnly={fechado}
                                   />
-                                  {/* A segunda caixa fica POR BAIXO — o `w-full`
-                                      da `CaixaInglesa` quebra a linha deste
-                                      `flex-wrap`. Só de leitura quando a página
-                                      está fechada, como a portuguesa: um board
-                                      terminado é terminado nas duas línguas. */}
+                                  {/* A segunda caixa fica AO LADO em ecrã largo
+                                      e por baixo abaixo de `xl` — ver `aoLado`,
+                                      em `CaixaInglesa`. Só de leitura quando a
+                                      página está fechada, como a portuguesa: um
+                                      board terminado é terminado nas duas
+                                      línguas. */}
                                   {caixaDeIngles(
                                     { tipo: "boardTitulo", bi },
                                     "Título do mood board",
@@ -6393,41 +6531,93 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         das caixas; isto diz que fotografia
                                         fica em qual. */}
                                     {aspectos.length > 0 && (
-                                      <div className="mt-1 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
-                                        <div className="min-w-0">
-                                          <SelectorDeLayout
-                                            valor={b.layout}
-                                            aspectos={aspectos}
-                                            semRecorte={semRecorte}
-                                            // `undefined` APAGA o campo: um mood board sem
-                                            // layout gravado continua sem ele, e uma proposta
-                                            // já enviada não muda de aspecto por causa disto.
-                                            onEscolher={(layout) => updateBoard(bi, { layout })}
-                                          />
+                                      /*
+                                       * ── SEIS DIAGRAMAS VEZES SETE PÁGINAS ──
+                                       *
+                                       * Palavras dela: «o bloco de seis layouts
+                                       * repete-se sete vezes, a ocupar altura».
+                                       *
+                                       * Passa a estar dobrado, com a escolha
+                                       * ACTUAL escrita no fecho — que é a única
+                                       * coisa que se precisa de saber quando não
+                                       * se está a mexer nela. Abre-se com um
+                                       * clique e fica aberto enquanto ela lá
+                                       * estiver.
+                                       *
+                                       * `details` e não um estado nosso: sete
+                                       * dobras guardadas num objecto era mais
+                                       * uma coisa a manter, para o navegador
+                                       * fazer melhor de graça.
+                                       */
+                                      <details className="group mt-1">
+                                        <summary className="marker:content-none inline-flex cursor-pointer list-none items-center gap-1.5 text-xs text-foreground/50 hover:text-foreground/75 [&::-webkit-details-marker]:hidden">
+                                          <span
+                                            aria-hidden
+                                            className="text-[10px] text-foreground/35 motion-safe:transition-transform group-open:rotate-90"
+                                          >
+                                            ▸
+                                          </span>
+                                          Disposição:{" "}
+                                          <strong className="font-medium text-foreground/75">
+                                            {NOME_DO_LAYOUT[layoutDoBoard]}
+                                          </strong>
+                                          <span className="text-foreground/35">
+                                            · {semRecorte ? "sem recorte" : "recorta"}
+                                          </span>
+                                        </summary>
+                                        <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] 2xl:grid-cols-1">
+                                          <div className="min-w-0">
+                                            <SelectorDeLayout
+                                              valor={b.layout}
+                                              aspectos={aspectos}
+                                              semRecorte={semRecorte}
+                                              // `undefined` APAGA o campo: um mood board sem
+                                              // layout gravado continua sem ele, e uma proposta
+                                              // já enviada não muda de aspecto por causa disto.
+                                              onEscolher={(layout) => updateBoard(bi, { layout })}
+                                            />
+                                          </div>
+                                          {/*
+                                           * ── A MINIATURA REPETIDA SETE VEZES
+                                           *
+                                           * «Minúscula e repetida sete vezes.»
+                                           * A partir de `2xl` deixa de existir:
+                                           * o painel da direita mostra a MESMA
+                                           * página, grande, e duas cópias da
+                                           * mesma coisa no mesmo ecrã são uma a
+                                           * mais.
+                                           *
+                                           * Abaixo disso fica, porque abaixo
+                                           * disso o painel não cabe — e tirá-la
+                                           * aí era tirar a pré-visualização a
+                                           * quem trabalha num portátil, para
+                                           * resolver um problema que só existe
+                                           * no ecrã grande.
+                                           */}
+                                          <div className="lg:pt-6 2xl:hidden">
+                                            <PreviaDaPagina
+                                              layout={layoutDoBoard}
+                                              aspectos={aspectos}
+                                              // Pela ordem de DESENHO, com a principal à frente
+                                              // — a mesma que a página vai usar.
+                                              urls={ordemDeDesenho
+                                                .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                .map((i) => assetUrls[b.images[i]])}
+                                              // O plano B, o mesmo da grelha aqui
+                                              // ao lado: uma miniatura que não
+                                              // existe cai para o original em vez
+                                              // de dar o ícone de imagem partida.
+                                              originais={ordemDeDesenho
+                                                .slice(0, MOOD_BOARD_MAX_IMAGES)
+                                                .map((i) => assetOriginais[b.images[i]])}
+                                              semRecorte={semRecorte}
+                                              titulo={b.title}
+                                              subtitulo={b.subtitulo}
+                                              legenda={b.annotation}
+                                            />
+                                          </div>
                                         </div>
-                                        <div className="lg:pt-6">
-                                          <PreviaDaPagina
-                                            layout={layoutDoBoard}
-                                            aspectos={aspectos}
-                                            // Pela ordem de DESENHO, com a principal à frente
-                                            // — a mesma que a página vai usar.
-                                            urls={ordemDeDesenho
-                                              .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                              .map((i) => assetUrls[b.images[i]])}
-                                            // O plano B, o mesmo da grelha aqui
-                                            // ao lado: uma miniatura que não
-                                            // existe cai para o original em vez
-                                            // de dar o ícone de imagem partida.
-                                            originais={ordemDeDesenho
-                                              .slice(0, MOOD_BOARD_MAX_IMAGES)
-                                              .map((i) => assetOriginais[b.images[i]])}
-                                            semRecorte={semRecorte}
-                                            titulo={b.title}
-                                            subtitulo={b.subtitulo}
-                                            legenda={b.annotation}
-                                          />
-                                        </div>
-                                      </div>
+                                      </details>
                                     )}
                                     {/* ── O INTERRUPTOR DO RECORTE ─────────────────────────
                           Está aqui, por baixo dos diagramas, porque é com eles
@@ -6589,6 +6779,66 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         </button>
                       </>
                     )}
+                    {/*
+                     * ── O QUE ESTA PROPOSTA FAZ, DECIDIDO UMA VEZ ──────────
+                     *
+                     * Palavras dela: «"Manter a forma de cada fotografia" hoje
+                     * está desligada no primeiro board e ligada no terceiro,
+                     * sem razão». É o que acontece quando a escolha só existe
+                     * por página: sete páginas, sete decisões, tomadas em sete
+                     * momentos diferentes de uma tarde. O resultado não é
+                     * variedade — é uma proposta que parece montada por duas
+                     * pessoas.
+                     *
+                     * Isto vale para as páginas que não disserem outra coisa. A
+                     * que discordar continua a ganhar, e é por isso que o botão
+                     * de aplicar a todas existe ao lado: é o gesto de quem quer
+                     * mesmo pôr as sete de acordo, e escreve a escolha em cada
+                     * uma em vez de a adivinhar.
+                     */}
+                    {doc.moodBoards.length > 1 && (
+                      <label className="flex items-center gap-2 text-xs text-foreground/65">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 shrink-0 accent-[#4d6350]"
+                          checked={doc.enquadramentoPorOmissao === "forma-da-foto"}
+                          onChange={(e) =>
+                            patch({
+                              // Ausente e não `false`: ausente quer dizer
+                              // «ninguém escolheu», e uma proposta já enviada
+                              // tem de continuar a sair como sempre saiu.
+                              enquadramentoPorOmissao: e.target.checked
+                                ? "forma-da-foto"
+                                : undefined,
+                            })
+                          }
+                        />
+                        <span>Manter a forma das fotografias em toda a proposta</span>
+                      </label>
+                    )}
+                    {doc.moodBoards.length > 1 && (
+                      <button
+                        type="button"
+                        className={ADD_BTN}
+                        onClick={() => {
+                          const enq = doc.enquadramentoPorOmissao;
+                          patch({
+                            moodBoards: doc.moodBoards.map((b) => ({
+                              ...b,
+                              ...(enq ? { enquadramento: enq } : { enquadramento: undefined }),
+                            })),
+                          });
+                          toast(
+                            enq
+                              ? "As páginas passam todas a manter a forma das fotografias."
+                              : "As páginas passam todas a recortar as fotografias.",
+                            "info",
+                          );
+                        }}
+                      >
+                        Aplicar a todas as páginas
+                      </button>
+                    )}
                     <ModelosParciais
                       tipo="moodboard"
                       mostrar="inserir"
@@ -6614,7 +6864,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Cronograma — organizacao only */}
           {!isDeco && (
-            <Section title="Cronograma de Organização" id="cronograma">
+            <Section
+              title="Cronograma de Organização"
+              id="cronograma"
+              fechadaPorOmissao={feitoAoAbrir?.cronograma}
+            >
               <div className="flex flex-col gap-3">
                 {(doc.cronograma ?? []).map((ph, pi) => (
                   <div
@@ -6684,7 +6938,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Budget */}
-          <Section title="Orçamento Proposto" id="orcamento">
+          <Section
+            title="Orçamento Proposto"
+            id="orcamento"
+            fechadaPorOmissao={feitoAoAbrir?.orcamento}
+          >
             {isDeco ? (
               <>
                 <AvisoDeOrdem
@@ -7014,7 +7272,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   })()}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                  <div className="xl:grid xl:grid-cols-2 xl:items-end xl:gap-x-3">
                     <Field
                       label="Rótulo do total"
                       value={doc.totalLabel}
@@ -7174,6 +7432,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               {
                                 className: "bo-input px-2.5 py-2 text-xs text-foreground/75",
                                 placeholder: "Líquen team travel",
+                                // EMPILHADA: esta já vive numa célula estreita
+                                // de uma grelha de dois (o rótulo à esquerda, o
+                                // valor à direita). Parti-la outra vez ao meio
+                                // dava duas caixas onde não cabe «Deslocação».
+                                empilhada: true,
                               },
                             )}
                           </div>
@@ -7289,7 +7552,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     + Adicionar linha
                   </button>
                 </div>
-                <div className="flex flex-col gap-3">
+                {/* O par PT/EN numa linha só em ecrã largo — ver `aoLado`,
+                    em `CaixaInglesa`. Abaixo de `xl` volta a empilhar. */}
+                <div className="flex flex-col gap-3 xl:grid xl:grid-cols-2 xl:items-end xl:gap-x-3">
                   <Field
                     as="textarea"
                     label="Nota do orçamento"
@@ -7396,7 +7661,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             }}
           />
 
-          <Section title="Total, IVA e validade" id="total">
+          <Section title="Total, IVA e validade" id="total" fechadaPorOmissao={feitoAoAbrir?.total}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
                 É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido
@@ -7682,6 +7947,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             )}
           </Section>
         </div>
+        {/*
+         * ── A TERCEIRA ZONA ──────────────────────────────────────────────
+         *
+         * «Uma pré-visualização grande e fixa à direita, no espaço hoje
+         * vazio.» O índice diz onde estou, a coluna do meio é o que escrevo, e
+         * isto é o que vai sair. Ver `PainelDoEstudio` para o resto das razões
+         * — em particular por que é um painel só e por que só aparece muito
+         * largo.
+         */}
+        <PainelDoEstudio
+          paginas={paginasParaOPainel}
+          activa={boardActivo ?? undefined}
+          urls={assetUrls}
+          originais={assetOriginais}
+          aspetos={aspetosDasFotos}
+          layoutPorOmissao={doc.layoutPorOmissao}
+          enquadramentoPorOmissao={doc.enquadramentoPorOmissao}
+          onSaltar={(bi) => irParaAFalta("moodboards", `boardTitulo:${bi}`)}
+          onEscolherFotos={(bi) => setPicker({ kind: "board", bi })}
+        />
       </div>
       {/* ══════════ /PASSO 1 ══════════ */}
 
@@ -8315,19 +8600,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   `aria-live` porque o número muda com o selector ao lado. */}
               {idiomaDoPdf === "en" &&
                 (() => {
+                  /*
+                   * As duas contas, e as duas frases.
+                   *
+                   * «Vai sair em português» é verdade sobre um campo VAZIO e é
+                   * falso sobre um desactualizado — esse tem inglês e vai sair
+                   * em inglês, só que no inglês errado. Duas coisas com dois
+                   * remédios: uma traduz-se, a outra relê-se.
+                   */
                   const faltam = camposPorTraduzir(doc as ProposalDoc);
-                  if (faltam.length === 0) return null;
+                  const velhas = camposPorRever(doc as ProposalDoc).filter(
+                    (c) => c.estado === "desactualizado",
+                  );
+                  if (faltam.length === 0 && velhas.length === 0) return null;
+                  const primeiro = faltam[0] ?? velhas[0];
                   return (
                     <p
                       aria-live="polite"
                       className="w-full text-right text-[11px] leading-snug text-[#8a6420]"
                     >
-                      {faltam.length === 1
-                        ? "1 campo ainda não tem versão inglesa — vai sair em português."
-                        : `${faltam.length} campos ainda não têm versão inglesa — vão sair em português.`}{" "}
+                      {faltam.length > 0 &&
+                        (faltam.length === 1
+                          ? "1 campo ainda não tem versão inglesa — vai sair em português."
+                          : `${faltam.length} campos ainda não têm versão inglesa — vão sair em português.`)}{" "}
+                      {velhas.length > 0 &&
+                        (velhas.length === 1
+                          ? "1 tradução ficou para trás do português."
+                          : `${velhas.length} traduções ficaram para trás do português.`)}{" "}
                       <button
                         type="button"
-                        onClick={() => irParaCampo(faltam[0].campo, "en")}
+                        onClick={() => irParaCampo(primeiro.campo, "en")}
                         className="font-medium underline underline-offset-2"
                       >
                         Ver quais
@@ -9132,6 +9434,7 @@ function Section({
   id,
   /** Marca à direita do título — "3 linhas", "por preencher". */
   nota,
+  fechadaPorOmissao,
   /** Um controlo à direita do título — o "Reordenar" dos Serviços, por
    *  exemplo. Fica FORA do botão que dobra a secção: um botão dentro de outro
    *  botão não é HTML válido, e clicar num fecharia o outro. */
@@ -9142,14 +9445,56 @@ function Section({
   id?: string;
   nota?: string;
   accao?: React.ReactNode;
+  /**
+   * Esta secção já estava feita quando a proposta abriu?
+   *
+   * `undefined` quer dizer «ainda não se sabe» e não «não estava» — ver o
+   * efeito lá dentro. Só vale onde ela nunca dobrou a secção à mão.
+   */
+  fechadaPorOmissao?: boolean;
 }) {
   const [fechada, setFechada] = useState(false);
-  // Ler no efeito e não no `useState` inicial: o servidor não tem
-  // `localStorage`, e uma diferença entre o que o servidor desenha e o que o
-  // browser desenha dá um erro de hidratação.
+  const jaDecidiu = useRef(false);
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O QUE JÁ ESTÁ FEITO ABRE FECHADO — MAS SÓ AO ABRIR
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * «Secções concluídas recolhem-se automaticamente. Só a secção em que se
+   * está a trabalhar fica aberta.»
+   *
+   * Com um limite que ela não pediu e que é o que torna isto usável: **uma
+   * secção nunca se fecha por baixo das mãos dela.** Se fechasse quando fica
+   * completa, escrever o último campo de um grupo fazia o ecrã saltar e o
+   * cursor desaparecer — um editor que se mexe sozinho enquanto se escreve é
+   * pior do que um editor comprido.
+   *
+   * Por isso a decisão é tomada UMA vez, quando a proposta abre, e o que
+   * decide é o que já estava feito nesse momento.
+   *
+   * ── E A ESCOLHA DELA GANHA SEMPRE ───────────────────────────────────────
+   *
+   * Uma secção que ela tenha aberto ou fechado à mão tem a resposta guardada,
+   * e essa manda. O automatismo só fala onde ninguém disse nada.
+   *
+   * Ler no efeito e não no `useState` inicial: o servidor não tem
+   * `localStorage`, e uma diferença entre o que o servidor desenha e o que o
+   * browser desenha dá um erro de hidratação.
+   */
   useEffect(() => {
-    if (id) setFechada(!!lerFechadas()[id]);
-  }, [id]);
+    if (!id || jaDecidiu.current) return;
+    const guardadas = lerFechadas();
+    if (id in guardadas) {
+      setFechada(!!guardadas[id]);
+      jaDecidiu.current = true;
+      return;
+    }
+    // Ainda não se sabe se esta secção estava feita — o documento pode não ter
+    // chegado. Espera-se, em vez de se decidir com uma resposta que é «não sei».
+    if (fechadaPorOmissao === undefined) return;
+    setFechada(fechadaPorOmissao);
+    jaDecidiu.current = true;
+  }, [id, fechadaPorOmissao]);
 
   function alternar() {
     if (!id) return;

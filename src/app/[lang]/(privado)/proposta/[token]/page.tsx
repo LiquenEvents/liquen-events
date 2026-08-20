@@ -310,6 +310,19 @@ export default async function ProposalPage({
   const saudacao = primeiroNome ? `${t.greeting}, ${primeiroNome}.` : `${t.greeting}.`;
 
   /**
+   * A frase de intenção, na língua da proposta.
+   *
+   * A caixa inglesa vazia cai para o português, como tudo o resto neste
+   * documento (ver `proposal-doc-bilingue.ts`): uma proposta inglesa com a
+   * abertura em branco era um buraco no sítio mais visível da página.
+   */
+  const intencao = (
+    (locale === "en" ? proposal.doc?.intencaoEn?.trim() : "") ||
+    proposal.doc?.intencao?.trim() ||
+    ""
+  ).trim();
+
+  /**
    * AS FOTOGRAFIAS, ASSINADAS AQUI E NÃO POR UM PEDIDO DO NAVEGADOR.
    *
    * A página é `force-dynamic`, portanto isto corre a cada visita e o HTML sai
@@ -370,6 +383,32 @@ export default async function ProposalPage({
         year: "numeric",
       })
     : null;
+  /**
+   * O dia em que a proposta foi EMITIDA — discreto, e diferente do de cima.
+   *
+   * «Atualizada a» responde «isto ainda é o que eu vi?»; esta responde «de
+   * quando é esta proposta?», que é a pergunta de quem a reencontra num email
+   * de há três meses. Numa proposta que nunca foi revista são o mesmo dia, e
+   * por isso só se escrevem as duas quando são mesmo duas (ver o ecrã).
+   *
+   * A data de ENVIO quando existe, e a de criação quando não: é o dia em que a
+   * proposta passou a existir para o casal, não o dia em que ela a começou a
+   * escrever.
+   */
+  const emitidaLabel = (() => {
+    const iso = proposal.sentAt || proposal.createdAt;
+    if (!iso) return null;
+    const d = new Date(iso);
+    return Number.isNaN(+d)
+      ? null
+      : d.toLocaleDateString(t.dateLocale, {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "Europe/Lisbon",
+        });
+  })();
+
   const validLabel = proposal.validUntil
     ? new Date(proposal.validUntil + "T12:00:00").toLocaleDateString(t.dateLocale, {
         day: "numeric",
@@ -391,19 +430,50 @@ export default async function ProposalPage({
           a largura que lhe serve, em vez de uma só para as duas. Sem
           documento, a página fica exactamente como estava. */}
       <div className={`w-full ${proposal.doc ? "max-w-5xl" : "max-w-2xl"}`}>
+        {/*
+         * ── O QUE ESTAVA AQUI E SAIU ────────────────────────────────────
+         *
+         * «PROPOSTA PARA O SEU EVENTO», em maiúsculas espaçadas, por cima do
+         * nome do casal. Não acrescentava nada: eles abriram um link que lhes
+         * foi mandado a dizer que a proposta estava pronta, e a primeira coisa
+         * que liam era alguém a informá-los de que aquilo era uma proposta.
+         *
+         * O espaço fica para a frase de intenção estética, escrita à mão
+         * proposta a proposta.
+         */}
         <header className="text-center mb-10">
-          <p className="text-foreground/68 text-[10px] tracking-[0.45em] uppercase mb-3">
-            {t.eyebrow}
-          </p>
           <h1
             className="text-foreground/90 font-bold"
             style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(30px, 5vw, 52px)" }}
           >
             {saudacao}
           </h1>
-          <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
-            {t.intro}
-          </p>
+          {/*
+           * ══════════════════════════════════════════════════════════════
+           * A FRASE DE INTENÇÃO, OU A DA CASA — NUNCA AS DUAS
+           * ══════════════════════════════════════════════════════════════
+           *
+           * Quando ela escreveu uma frase para AQUELE casamento, é essa que se
+           * lê. A da casa («preparámos esta proposta com todo o cuidado…») é
+           * verdadeira e é de toda a gente; pô-las as duas seguidas fazia a
+           * primeira parecer o subtítulo da segunda, e a específica perdia
+           * exactamente o que a torna específica.
+           *
+           * Maior e na serifada do documento quando é dela: não é uma nota de
+           * boas-vindas, é a tese da proposta.
+           */}
+          {intencao ? (
+            <p
+              className="text-foreground/80 mx-auto mt-5 max-w-xl leading-relaxed text-balance"
+              style={{ fontFamily: "var(--font-playfair)", fontSize: "clamp(17px, 2.4vw, 21px)" }}
+            >
+              {intencao}
+            </p>
+          ) : (
+            <p className="text-foreground/72 text-sm mt-3 max-w-md mx-auto leading-relaxed">
+              {t.intro}
+            </p>
+          )}
         </header>
 
         {/* ── O DOCUMENTO INTEIRO, QUANDO ELE EXISTE ──────────────────────
@@ -551,10 +621,25 @@ export default async function ProposalPage({
 
             Só aparece a partir da versão 2: dizer «Versão 1» a quem abre uma
             proposta pela primeira vez é ruído. */}
-        {!!doLink?.versao && doLink.versao > 1 && (
+        {(emitidaLabel || (!!doLink?.versao && doLink.versao > 1)) && (
           <p className="text-foreground/60 text-[11px] mt-2 text-center">
-            {t.versaoNumero} {doLink.versao}
-            {atualizadaLabel ? ` · ${t.atualizadaEm} ${atualizadaLabel}` : ""}
+            {[
+              emitidaLabel ? `${t.emitidaEm} ${emitidaLabel}` : "",
+              /* Só a partir da versão 2: dizer «Versão 1» a quem abre uma
+                 proposta pela primeira vez é ruído. */
+              !!doLink?.versao && doLink.versao > 1 ? `${t.versaoNumero} ${doLink.versao}` : "",
+              /* E a data da revisão só quando é OUTRO dia: numa proposta
+                 revista no próprio dia em que saiu, «emitida a 3 · atualizada
+                 a 3» é a mesma data escrita duas vezes. */
+              !!doLink?.versao &&
+              doLink.versao > 1 &&
+              atualizadaLabel &&
+              atualizadaLabel !== emitidaLabel
+                ? `${t.atualizadaEm} ${atualizadaLabel}`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         )}
 
