@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
 import { Card, Field, Button, EmptyState } from "@/app/[lang]/(site)/orcamento/admin/ui";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -241,9 +242,13 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
   const [notes, setNotes] = useState(inicial.notes);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ total: number; emailed: boolean; pdfUrl: string } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{
+    total: number;
+    emailed: boolean;
+    pdfUrl: string;
+    /** A frase do SERVIDOR sobre porque é que o email não saiu. */
+    emailError?: string;
+  } | null>(null);
   const [hasLastItems, setHasLastItems] = useState(false);
 
   useEffect(() => {
@@ -518,8 +523,27 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           notes: notes || undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erro");
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * LER O CORPO SEM PARTIR, E DIZER O QUE O ESTADO SIGNIFICA
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * O `res.json()` corria ANTES de se olhar ao `res.ok`. Um 504 devolve uma
+       * PÁGINA HTML, o interpretador atirava, e o que ficava no ecrã era a
+       * mensagem crua da excepção:
+       *
+       *   ⚠ Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+       *
+       * Uma frase em inglês, de programador, que não diz o que aconteceu nem o
+       * que fazer — e que esconde o que interessa: um 504 acontece DEPOIS de a
+       * rota ter falado com o SMTP, portanto o email pode ter saído. Ela vê um
+       * erro, carrega outra vez, e o casal recebe duas propostas.
+       *
+       * O `porqueFalhouOEnvio` já existia e já dizia a frase certa para cada
+       * estado — só o Estúdio é que o usava. É a mesma rota e a mesma avaria.
+       */
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || porqueFalhouOEnvio(res.status));
       saveLastItems(items);
       setHasLastItems(true);
       // A proposta seguiu: o rascunho já não é trabalho por acabar, e deixá-lo
@@ -537,8 +561,27 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
       void fetch(rotaDoRascunho(quote.id), { method: "DELETE" }).catch(() => {});
       setEstado(null);
       const pdfUrl = `data:application/pdf;base64,${data.pdfBase64}`;
-      setResult({ total: data.total, emailed: data.emailed, pdfUrl });
-      onSent?.(data.total);
+      setResult({
+        total: data.total,
+        emailed: data.emailed,
+        pdfUrl,
+        ...(typeof data.emailError === "string" ? { emailError: data.emailError } : {}),
+      });
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * «PROPOSTA ENVIADA» SÓ QUANDO FOI MESMO ENVIADA
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * O `onSent` escreve no histórico PERMANENTE do pedido «Proposta enviada
+       * — 3.690,00 €», e era chamado mesmo com `emailed:false`. Daqui a três
+       * semanas, a pergunta «mandámos ou não mandámos?» tem uma resposta
+       * escrita — e era a errada.
+       *
+       * É a mesma regra que o Estúdio já segue, com a nota a explicá-la: o
+       * email não ter saído é um ERRO, não uma informação. A proposta fica
+       * gravada na mesma; o que não fica é a afirmação de que seguiu.
+       */
+      if (data.emailed) onSent?.(data.total);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao enviar a proposta.");
     } finally {
@@ -564,10 +607,20 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
             </svg>
           }
           title={`Proposta criada — ${eur(result.total)}`}
+          /**
+           * A frase do SERVIDOR, quando ele a manda. Ele distingue três
+           * avarias com três resoluções diferentes — «acrescenta o email e
+           * reenvia», «reenvia daqui a pouco», «o SMTP não está configurado» —
+           * e o ecrã deitava-as fora e mostrava sempre a terceira, que é a
+           * única que manda enviar À MÃO. Nas outras duas, ela enviava à mão um
+           * email que devia ter seguido sozinho.
+           */
           description={
             result.emailed
               ? `Enviada por e-mail para ${quote.email}.`
-              : "Gerada (e-mail não configurado — descarrega e envia manualmente)."
+              : result.emailError ||
+                "A proposta foi gerada mas o E-MAIL NÃO SAIU — o cliente não recebeu nada. " +
+                  "Descarrega o PDF e envia-o à mão."
           }
           action={{
             label: "Descarregar PDF",
