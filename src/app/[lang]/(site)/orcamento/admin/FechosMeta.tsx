@@ -300,7 +300,24 @@ export default function FechosMeta() {
           )}
 
           <details className="mt-4">
-            <summary className="cursor-pointer text-[11px] text-foreground/40">
+            {/* ── O ALVO DESTA LINHA TINHA 35 px ────────────────────────
+                Medido pelo passeio `admin-mobile` a 390 px: 293x38, abaixo do
+                mínimo de 44. É um `<summary>` — abre e fecha ao toque, portanto
+                é um alvo como qualquer botão.
+
+                NÃO leva `.alvo-toque`, que era o reflexo: essa classe, em ecrã
+                de toque, passa o elemento a `inline-flex` centrado. Aqui isso
+                custava duas coisas — a linha é texto corrido alinhado à
+                esquerda, e o `display` tira o triângulo do `<summary>`, que é
+                a única coisa no ecrã a dizer que isto abre.
+
+                `min-h-11` E acolchoado: o `min-height` é que GARANTE os 44 px
+                (o texto tem 11 px e a linha dá 19; um acolchoado sozinho seria
+                uma conta que se parte no dia em que a letra mudar), e o `py-3`
+                é o que põe o texto a meio dessa caixa em vez de encostado ao
+                topo. Só em ecrãs de toque: no computador esta linha fica como
+                estava. */}
+            <summary className="cursor-pointer text-[11px] text-foreground/40 pointer-coarse:min-h-11 pointer-coarse:py-3">
               {relatorio.examinados}{" "}
               {relatorio.examinados === 1 ? "fecho examinado" : "fechos examinados"} — ver o que
               ficou de fora
