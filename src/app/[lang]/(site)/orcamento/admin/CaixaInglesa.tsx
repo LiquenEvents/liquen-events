@@ -65,6 +65,7 @@ export default function CaixaInglesa({
   readOnly,
   porTraduzir,
   placeholder,
+  aoLado = false,
 }: {
   /** O campo que esta caixa traduz — dá a pega do salto e a chave. */
   campo: CampoDeTexto;
@@ -75,6 +76,30 @@ export default function CaixaInglesa({
   /** A classe da caixa portuguesa — a inglesa herda-a, para as duas serem a
    *  mesma caixa e não duas maquetizações. */
   className?: string;
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * A CAIXA INGLESA AO LADO DA PORTUGUESA, E NÃO POR BAIXO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «hoje cada campo PT tem o seu EN empilhado por baixo,
+   * duplicando a altura de tudo». Medido no formulário dela: cerca de dez mil
+   * píxeis de altura, e a proposta bilingue paga o dobro em cada campo.
+   *
+   * Com isto, em ecrã largo o par fica numa linha só. Abaixo de `xl` volta ao
+   * empilhado, e é de propósito: duas caixas de texto lado a lado num portátil
+   * de treze polegadas são duas caixas onde não cabe uma frase.
+   *
+   * ── PORQUE É QUE É UMA MARCA E NÃO UM AUTOMATISMO ───────────────────────
+   *
+   * Porque os pares vivem em dois desenhos diferentes: uns numa fila que
+   * quebra (o cabeçalho de um mood board, onde o campo português divide a
+   * linha com o botão da dobra) e outros dentro de um `div` seu. As classes
+   * daqui servem os dois — `flex-1` na fila, `w-full` na grelha —, mas quem
+   * sabe que o par existe é o sítio onde ele é escrito, e é lá que a grelha se
+   * abre. Uma caixa que se pusesse ao lado sozinha ia parar ao lado de coisas
+   * que não são o seu par.
+   */
+  aoLado?: boolean;
   as?: "input" | "textarea";
   rows?: number;
   /**
@@ -115,7 +140,11 @@ export default function CaixaInglesa({
   };
 
   return (
-    <div className="mt-1 flex w-full basis-full items-start gap-1.5">
+    <div
+      className={`mt-1 flex w-full basis-full items-start gap-1.5 ${
+        aoLado ? "xl:mt-0 xl:min-w-[12rem] xl:flex-1 xl:basis-0" : ""
+      }`}
+    >
       <span
         aria-hidden="true"
         className="mt-1.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold tracking-[0.14em] text-[#4d6350]/80 uppercase"

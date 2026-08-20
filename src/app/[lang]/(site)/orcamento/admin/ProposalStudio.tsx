@@ -4263,11 +4263,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       cresce?: boolean;
       readOnly?: boolean;
       placeholder?: string;
+      /**
+       * Este par NÃO fica lado a lado.
+       *
+       * A marca é ao contrário — todas ficam, e diz-se quais não — porque o
+       * desenho normal passa a ser o par numa linha só, e uma excepção que se
+       * esquece de se declarar é uma caixa empilhada no meio de doze ao lado,
+       * que se vê. Uma que se esquecesse ao contrário era uma caixa ao lado de
+       * uma coisa que não é o seu par, que também se vê.
+       */
+      empilhada?: boolean;
     } = {},
   ) {
     if (!bilingue) return null;
     const pt = (lerCampo(doc as ProposalDoc, campo) ?? "").trim();
     const en = lerEn(doc as ProposalDoc, campo) ?? "";
+    // `empilhada` é desta função e não da caixa: separa-se antes de passar o
+    // resto, para não escorregar para o DOM como um atributo inventado.
+    const { empilhada, ...daCaixa } = opts;
     return (
       <CaixaInglesa
         campo={campo}
@@ -4275,7 +4288,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         valor={en}
         onChange={(texto) => setDoc((d) => escreverEn(d, campo, texto))}
         porTraduzir={pt !== "" && en.trim() === ""}
-        {...opts}
+        aoLado={!empilhada}
+        {...daCaixa}
       />
     );
   }
@@ -6080,11 +6094,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     aria-label="Título do mood board"
                                     readOnly={fechado}
                                   />
-                                  {/* A segunda caixa fica POR BAIXO — o `w-full`
-                                      da `CaixaInglesa` quebra a linha deste
-                                      `flex-wrap`. Só de leitura quando a página
-                                      está fechada, como a portuguesa: um board
-                                      terminado é terminado nas duas línguas. */}
+                                  {/* A segunda caixa fica AO LADO em ecrã largo
+                                      e por baixo abaixo de `xl` — ver `aoLado`,
+                                      em `CaixaInglesa`. Só de leitura quando a
+                                      página está fechada, como a portuguesa: um
+                                      board terminado é terminado nas duas
+                                      línguas. */}
                                   {caixaDeIngles(
                                     { tipo: "boardTitulo", bi },
                                     "Título do mood board",
@@ -7067,7 +7082,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   })()}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                  <div className="xl:grid xl:grid-cols-2 xl:items-end xl:gap-x-3">
                     <Field
                       label="Rótulo do total"
                       value={doc.totalLabel}
@@ -7227,6 +7242,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                               {
                                 className: "bo-input px-2.5 py-2 text-xs text-foreground/75",
                                 placeholder: "Líquen team travel",
+                                // EMPILHADA: esta já vive numa célula estreita
+                                // de uma grelha de dois (o rótulo à esquerda, o
+                                // valor à direita). Parti-la outra vez ao meio
+                                // dava duas caixas onde não cabe «Deslocação».
+                                empilhada: true,
                               },
                             )}
                           </div>
@@ -7342,7 +7362,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     + Adicionar linha
                   </button>
                 </div>
-                <div className="flex flex-col gap-3">
+                {/* O par PT/EN numa linha só em ecrã largo — ver `aoLado`,
+                    em `CaixaInglesa`. Abaixo de `xl` volta a empilhar. */}
+                <div className="flex flex-col gap-3 xl:grid xl:grid-cols-2 xl:items-end xl:gap-x-3">
                   <Field
                     as="textarea"
                     label="Nota do orçamento"

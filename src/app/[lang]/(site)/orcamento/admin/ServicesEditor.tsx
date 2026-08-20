@@ -743,12 +743,14 @@ export default function ServicesEditor({
                           placeholder="Decoração Floral de Casamento"
                           aria-label={`Título do grupo ${gi + 1}`}
                         />
-                        {/* A caixa inglesa, por baixo: o `w-full` dela quebra a
-                            linha deste `flex-wrap`. Escreve-se em `titleEn`,
+                        {/* A caixa inglesa AO LADO em ecrã largo, por baixo
+                            abaixo de `xl` — ver `aoLado`, em `CaixaInglesa`.
+                            Escreve-se em `titleEn`,
                             que viaja colado ao grupo — incluindo quando o grupo
                             é guardado como MODELO, isolado do documento. */}
                         {bilingue && (
                           <CaixaInglesa
+                            aoLado
                             campo={{ tipo: "grupoTitulo", gi }}
                             rotulo={`Título do grupo ${gi + 1}`}
                             valor={g.titleEn ?? ""}
@@ -862,6 +864,7 @@ export default function ServicesEditor({
                                       />
                                       {bilingue && (
                                         <CaixaInglesa
+                                          aoLado
                                           campo={{ tipo: "itemRotulo", gi, ii }}
                                           rotulo={`Linha ${ii + 1} do grupo ${gi + 1}`}
                                           valor={it.labelEn ?? ""}
@@ -918,6 +921,7 @@ export default function ServicesEditor({
                                       )}
                                       {showDesc && bilingue && (
                                         <CaixaInglesa
+                                          aoLado
                                           campo={{ tipo: "itemDesc", gi, ii }}
                                           rotulo={`Descrição da linha ${ii + 1} do grupo ${gi + 1}`}
                                           valor={it.descEn ?? ""}
