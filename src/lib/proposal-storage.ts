@@ -811,6 +811,80 @@ async function ensureThumbBucket(): Promise<boolean> {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A DERIVADA INTERMÉDIA — a que faz falta ao telemóvel do casal
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO, e é a razão de este bucket existir: a grelha da página do casal pede
+ * a miniatura de 400 px. Num iPhone, uma fotografia ocupa ~343 pontos e o ecrã
+ * tem TRÊS pixéis por ponto — precisa de ~1030. Estava a esticar 400 para
+ * 1030, duas vezes e meia acima do que a imagem tem, e vê-se: as palavras dela
+ * foram «essas imagens parecem estar desfocadas, ou com pouca qualidade».
+ *
+ * Servir o ORIGINAL resolvia a nitidez e partia a página: 2,6 MB por
+ * fotografia, 46 fotografias, 120 MB num telemóvel em 4G. É precisamente a
+ * conta que esta página existe para não fazer.
+ *
+ * Daí uma TERCEIRA medida, entre as duas: 1200 px, ~200 KB. O navegador
+ * escolhe (`srcset`): 400 no computador, 1200 no telemóvel, o original só
+ * quando ampliam. Nítida em todo o lado e leve.
+ *
+ * Bucket próprio, e não uma pasta dentro do das miniaturas: o contador de
+ * derivadas em falta LISTA as pastas de cada bucket para saber o que gerar, e
+ * uma família escondida dentro da outra apareceria como um pedido chamado «m».
+ */
+export const PROPOSAL_MID_BUCKET = "proposal-medias";
+
+let midBucketReady = false;
+
+/** Garante o bucket das derivadas intermédias. Mesma regra do das miniaturas:
+ *  só quem ESCREVE o chama, para uma instalação antiga não pagar uma chamada
+ *  por leitura. */
+async function ensureMidBucket(): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  if (midBucketReady) return true;
+  const { data } = await sb.storage.getBucket(PROPOSAL_MID_BUCKET);
+  if (!data) {
+    const { error } = await sb.storage.createBucket(PROPOSAL_MID_BUCKET, {
+      public: false,
+      fileSizeLimit: BUCKET_FILE_SIZE_LIMIT,
+      allowedMimeTypes: UPLOAD_MIME_TYPES,
+    });
+    if (error && !/exist/i.test(error.message)) {
+      log.warn("proposal-storage: createBucket das intermédias falhou", { erro: error.message });
+      return false;
+    }
+  }
+  midBucketReady = true;
+  return true;
+}
+
+/**
+ * Guarda a derivada intermédia, na MESMA chave do original.
+ *
+ * Melhor esforço, como a miniatura: falhar aqui só quer dizer que a abertura
+ * seguinte volta a pagar o `sharp`. Nunca impede a imagem de ser servida.
+ */
+export async function uploadProposalMid(path: string, bytes: Buffer): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb || !path) return false;
+  try {
+    if (!(await ensureMidBucket())) return false;
+    const { error } = await sb.storage
+      .from(PROPOSAL_MID_BUCKET)
+      .upload(path, bytes, { contentType: "image/jpeg", upsert: true });
+    if (error && !/exist/i.test(error.message)) {
+      log.warn("proposal-storage: intermédia não guardada", { path, erro: error.message });
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Guarda a miniatura de uma foto, na MESMA chave do original mas no bucket das
  * miniaturas.
  *

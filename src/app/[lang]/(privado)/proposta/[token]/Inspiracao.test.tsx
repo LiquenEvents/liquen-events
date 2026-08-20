@@ -137,6 +137,56 @@ describe("a lupa", () => {
   });
 });
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A NITIDEZ — dois tamanhos, e o navegador escolhe
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO: a grelha pedia SEMPRE a miniatura de 400 px. Num iPhone a fotografia
+ * ocupa ~343 pontos e o ecrã tem três pixéis por ponto — pede ~1030. Era uma
+ * imagem de 400 esticada duas vezes e meia, e ela viu-o: «essas imagens
+ * parecem estar desfocadas, ou com pouca qualidade».
+ *
+ * Servir o original resolvia a nitidez e punha 120 MB numa página de 46
+ * fotografias. A saída é uma terceira medida e um `srcset`.
+ */
+describe("a grelha oferece dois tamanhos", () => {
+  it("o `srcset` traz a miniatura E a derivada intermédia, com as larguras", () => {
+    desenhar();
+    const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
+    expect(img.getAttribute("srcset")).toMatch(/400w/);
+    expect(img.getAttribute("srcset")).toMatch(/1200w/);
+  });
+
+  it("a intermédia pede-se pelo id OPACO da foto, nunca por um caminho", () => {
+    // A regra de sempre: uma rota que aceitasse caminhos serviria, com o token
+    // de um casal, qualquer ficheiro da Biblioteca de Temas. O endereço que
+    // ESTA página constrói leva o id do documento e mais nada — o caminho real
+    // é resolvido do lado do servidor, a partir do token.
+    desenhar();
+    const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
+    const candidatos = (img.getAttribute("srcset") ?? "").split(",").map((c) => c.trim());
+    const daRota = candidatos.find((c) => c.startsWith("/api/"));
+    expect(daRota).toBe("/api/proposta/tk/foto/a 1200w");
+  });
+
+  it("diz que largura a fotografia OCUPA — senão o navegador pede sempre a maior", () => {
+    desenhar();
+    const img = screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
+    expect(img.getAttribute("sizes")).toBeTruthy();
+  });
+
+  it("depois de a primeira escolha falhar, o `srcset` SAI", () => {
+    // Senão o navegador voltava a escolher o candidato que acabou de falhar.
+    desenhar();
+    const img = () => screen.getAllByRole("button", { name: /Ampliar/ })[0].querySelector("img")!;
+    fireEvent.error(img());
+    expect(img().getAttribute("srcset")).toBeNull();
+    // E o `src` é o plano B, que é o que continua a mostrar alguma coisa.
+    expect(img().getAttribute("src")).toBe("orig/a");
+  });
+});
+
 describe("quando as assinaturas morrem", () => {
   /**
    * O botão de voltar a pedir as assinaturas SÓ existe depois de alguma coisa

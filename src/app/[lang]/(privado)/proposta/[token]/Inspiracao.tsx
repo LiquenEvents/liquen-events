@@ -239,6 +239,7 @@ export default function Inspiracao({
           {destacada(board) !== null && (
             <div className="mt-5">
               <Celula
+                token={token}
                 foto={fotos[board.fotos[destacada(board)!]]}
                 ansiosa
                 rotulo={contar(textos.contagem, destacada(board)! + 1, board.fotos.length)}
@@ -253,11 +254,21 @@ export default function Inspiracao({
               `columns` e não `grid`: a fotografia entra com a forma que tem.
               O `break-inside: avoid` (a classe `.foto-inteira`, em globals.css)
               é o que impede uma foto de ser partida ao meio entre colunas. */}
-          <div className="mt-3 columns-1 gap-3 sm:columns-2 lg:columns-3 [&>*]:mb-3">
+          {/* ── MENOS COLUNAS, FOTOGRAFIAS MAIORES ─────────────────────
+              Eram três a partir de `lg`, e as palavras dela sobre o resultado
+              não deixam dúvidas: «uma foto de decoração a 200px de largura não
+              vende nada». Duas colunas num ecrã de 1440 dão ~430 px por
+              fotografia em vez de ~280 — mais de metade da área. No telemóvel
+              continua uma, pela razão que já estava escrita aqui: duas a 390
+              px davam o mesmo tamanho a que elas já saem na folha A4, e voltar
+              a esse tamanho num ecrã era fazer o trabalho todo para não
+              resolver nada. */}
+          <div className="mt-3 columns-1 gap-4 sm:columns-2 [&>*]:mb-4">
             {board.fotos.map((id, i) =>
               i === destacada(board) ? null : (
                 <Celula
                   key={id}
+                  token={token}
                   foto={fotos[id]}
                   ansiosa={i < FOTOS_ANSIOSAS}
                   rotulo={contar(textos.contagem, i + 1, board.fotos.length)}
@@ -319,6 +330,7 @@ function Celula({
   ansiosa,
   rotulo,
   textos,
+  token,
   aoAmpliar,
   aoDesistir,
 }: {
@@ -326,6 +338,8 @@ function Celula({
   ansiosa: boolean;
   rotulo: string;
   textos: TextosDaPagina;
+  /** Para pedir a derivada intermédia desta fotografia — ver o `srcset`. */
+  token: string;
   aoAmpliar: (alvo: HTMLElement | null) => void;
   /** Esta célula esgotou as tentativas. Ver `houveFalha`, acima. */
   aoDesistir: () => void;
@@ -340,6 +354,19 @@ function Celula({
     foto?.original,
   );
   const proporcao = foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : undefined;
+  /** A derivada intermédia desta fotografia, pelo id OPACO — nunca por um
+   *  caminho. Ver a rota `api/proposta/[token]/foto/[id]`. */
+  const media = foto
+    ? `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`
+    : "";
+  /**
+   * O `srcset` só vale enquanto a primeira escolha está de pé.
+   *
+   * Depois de a cascata cair para o plano B, o que interessa é servir ALGUMA
+   * COISA — e um `srcset` deixaria o navegador voltar a escolher o candidato
+   * que acabou de falhar.
+   */
+  const temSrcset = !!foto?.miniatura && alvo === foto.miniatura;
 
   // Avisar o pai NUM EFEITO, e não durante o desenho: mudar estado do pai a
   // meio do render de um filho é o aviso que o React dá («Cannot update a
@@ -401,6 +428,33 @@ function Celula({
           <img
             key={alvo}
             src={alvo}
+            {...(temSrcset
+              ? {
+                  /**
+                   * ── DOIS TAMANHOS, E O NAVEGADOR ESCOLHE ─────────────────
+                   *
+                   * MEDIDO, e é a razão disto existir: a grelha pedia SEMPRE a
+                   * miniatura de 400 px. Num iPhone a fotografia ocupa ~343
+                   * pontos e o ecrã tem três pixéis por ponto — pede ~1030. Era
+                   * uma imagem de 400 esticada duas vezes e meia, e via-se:
+                   * «essas imagens parecem estar desfocadas».
+                   *
+                   * O original resolvia a nitidez e punha 120 MB numa página de
+                   * 46 fotografias. A terceira medida (1200 px, ~200 KB) é a
+                   * que serve as duas coisas — e quem escolhe é o navegador,
+                   * que sabe a largura e a densidade do ecrã e nós não.
+                   *
+                   * O `src` fica: é o que um navegador sem `srcset` usa, e é
+                   * para onde a cascata de falhas volta (aí o `srcset` sai).
+                   */
+                  srcSet: `${foto?.miniatura} 400w, ${media} 1200w`,
+                  /* A largura que a fotografia OCUPA, por ecrã — a grelha é de
+                     uma coluna no telemóvel e de duas a partir de `sm`. Sem
+                     isto o navegador assume a largura toda da página e pede
+                     sempre a maior. */
+                  sizes: "(min-width: 640px) 46vw, 92vw",
+                }
+              : {})}
             alt=""
             /* `loading="lazy"` em tudo menos nas primeiras: com 46 fotografias,
                carregá-las todas de uma vez é a conta que esta página existe
