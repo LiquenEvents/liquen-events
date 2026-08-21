@@ -125,6 +125,9 @@ const cabecalhos = (mapa: Record<string, string>) => ({ get: (k: string) => mapa
 let gravacoes: { id: string; corpo: Record<string, unknown> }[] = [];
 /** O que o PATCH seguinte responde. `null` = responde bem. */
 let recusarCom: number | null = null;
+/** Quantas das próximas gravações caem por REDE — não por recusa do servidor.
+ *  É o caso da quinta com 4G: a ligação aceita e nunca responde. */
+let falharPorRede = 0;
 
 function montar(quote: Quote, comRegisto = false) {
   const servidor = new Map<string, Quote>([[quote.id, quote]]);
@@ -138,6 +141,10 @@ function montar(quote: Quote, comRegisto = false) {
       if (init?.method === "PATCH" && pedido) {
         const corpo = JSON.parse(String(init.body)) as Record<string, unknown>;
         gravacoes.push({ id: pedido.id, corpo });
+        if (falharPorRede > 0) {
+          falharPorRede -= 1;
+          return Promise.reject(new TypeError("Failed to fetch"));
+        }
         if (recusarCom) {
           return Promise.resolve({
             ok: false,
@@ -209,9 +216,36 @@ async function passar(ms: number) {
 
 const notas = () => screen.getByLabelText("Notas internas");
 
+/** Põe no telemóvel um rascunho deste pedido, com os campos que se quiser
+ *  diferentes do que o servidor tem. */
+function semearRascunho(q: Quote, mudancas: Record<string, string>) {
+  localStorage.setItem(
+    `liquen-pedido-${q.id}`,
+    JSON.stringify({
+      id: q.id,
+      em: new Date(Date.now() - 12 * 60000).toISOString(),
+      campos: {
+        preco: q.quotedPrice ? String(q.quotedPrice) : "",
+        notas: q.adminNotes ?? "",
+        estado: q.status,
+        responsavel: q.assignedTo ?? "",
+        motivoDePerda: q.lostReason ?? "",
+        data: q.date ?? "",
+        convidados: String(q.guests ?? ""),
+        local: q.location ?? "",
+        nome: q.name ?? "",
+        email: q.email ?? "",
+        telefone: q.phone ?? "",
+        ...mudancas,
+      },
+    }),
+  );
+}
+
 beforeEach(() => {
   gravacoes = [];
   recusarCom = null;
+  falharPorRede = 0;
   localStorage.clear();
   vi.useFakeTimers();
 });
@@ -444,5 +478,121 @@ describe("Painel do pedido — fechar o separador", () => {
     await passar(ATRASO_DA_GRAVACAO + 50);
 
     expect(fecharSeparador()).toBe(false);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE NÃO GRAVA SOZINHO NÃO PODE PERDER-SE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As notas gravam sozinhas. O preço, a data, os convidados, o local e os
+ * contactos não — só saem do telemóvel quando ela carrega em «Guardar». E o
+ * travão que havia, um `beforeunload`, é quase decorativo num iPhone: o Safari
+ * descarta separadores em segundo plano sem o correr. Atender o telefone chega
+ * para perder a tarde.
+ *
+ * Duas metades, e as duas são precisas: o botão passa a insistir quando a rede
+ * falha, e o que está escrito fica no telemóvel até chegar mesmo ao servidor.
+ */
+describe("Painel do pedido — o que se perdia", () => {
+  const preco = () => screen.getByPlaceholderText("Ex.: 12500");
+  const guardar = () => screen.getByRole("button", { name: /^Guardar alterações$/ });
+
+  it("uma falha de rede no «Guardar» não desiste à primeira", async () => {
+    // O caso da quinta: a ligação aceita e não responde. Antes disto, o botão
+    // fazia um `fetch` cru — uma falha e acabou, com o trabalho só no ecrã.
+    montar(makeQuote());
+    await abrirPedido();
+    falharPorRede = 2;
+
+    fireEvent.change(preco(), { target: { value: "4321" } });
+    fireEvent.click(guardar());
+    // A repetição espera entre tentativas (400ms, depois 800ms).
+    await passar(3000);
+
+    expect(gravacoes.length, "tentou uma vez só").toBeGreaterThanOrEqual(3);
+    expect(gravacoes[gravacoes.length - 1].corpo.quotedPrice).toBe(4321);
+  });
+
+  it("o que se escreve fica no telemóvel antes de chegar ao servidor", async () => {
+    const q = makeQuote();
+    montar(q);
+    await abrirPedido();
+
+    fireEvent.change(preco(), { target: { value: "4321" } });
+    await passar(1000);
+
+    const guardado = JSON.parse(localStorage.getItem(`liquen-pedido-${q.id}`) ?? "null");
+    expect(guardado?.campos?.preco).toBe("4321");
+    expect(gravacoes, "nada foi para o servidor — é esse o ponto").toHaveLength(0);
+  });
+
+  it("e deixa de ficar quando chega mesmo", async () => {
+    const q = makeQuote();
+    montar(q);
+    await abrirPedido();
+
+    fireEvent.change(preco(), { target: { value: "4321" } });
+    await passar(1000);
+    expect(localStorage.getItem(`liquen-pedido-${q.id}`)).not.toBeNull();
+
+    fireEvent.click(guardar());
+    await passar(1000);
+
+    // Uma rede de segurança que sobrevive ao perigo é um aviso falso na
+    // abertura seguinte.
+    expect(localStorage.getItem(`liquen-pedido-${q.id}`)).toBeNull();
+  });
+
+  it("ao reabrir, diz o que ficou por gravar — e diz QUAL campo", async () => {
+    const q = makeQuote();
+    semearRascunho(q, { preco: "9999" });
+    montar(q);
+    await abrirPedido();
+
+    expect(screen.getByText(/Ficou por gravar o preço deste pedido/)).toBeInTheDocument();
+  });
+
+  /**
+   * SE O SERVIDOR JÁ TEM O MESMO, NÃO SE PERGUNTA NADA.
+   *
+   * Ela pode ter gravado noutro sítio entretanto. Uma barra a perguntar por
+   * uma diferença que não existe é ruído — e ruído numa barra destas ensina a
+   * carregar em «Descartar» sem ler, que é como se perde a próxima a sério.
+   */
+  it("um rascunho igual ao que o servidor tem não incomoda ninguém", async () => {
+    const q = makeQuote();
+    semearRascunho(q, {});
+    montar(q);
+    await abrirPedido();
+
+    expect(screen.queryByText(/Ficou por gravar/)).toBeNull();
+  });
+
+  it("«Recuperar» põe no ecrã e NÃO grava — a decisão continua a ser dela", async () => {
+    const q = makeQuote();
+    semearRascunho(q, { preco: "9999" });
+    montar(q);
+    await abrirPedido();
+
+    fireEvent.click(screen.getByRole("button", { name: "Recuperar" }));
+
+    expect(preco()).toHaveValue("9999");
+    expect(gravacoes, "recuperar não é gravar").toHaveLength(0);
+    expect(screen.queryByText(/Ficou por gravar/)).toBeNull();
+  });
+
+  it("«Descartar» esquece de vez", async () => {
+    const q = makeQuote();
+    semearRascunho(q, { preco: "9999" });
+    montar(q);
+    await abrirPedido();
+
+    fireEvent.click(screen.getByRole("button", { name: "Descartar" }));
+    await passar(1000);
+
+    expect(screen.queryByText(/Ficou por gravar/)).toBeNull();
+    expect(localStorage.getItem(`liquen-pedido-${q.id}`)).toBeNull();
   });
 });
