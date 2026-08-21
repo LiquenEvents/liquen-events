@@ -103,7 +103,11 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
   return (
     <nav
       aria-label="Secções da proposta"
-      className="sticky top-4 hidden w-48 shrink-0 self-start xl:block"
+      /* TECTO: é `sticky`, portanto uma lista mais alta do que o ecrã ficava
+         com o fim inalcançável — não se rola até ele, porque a coluna não
+         acompanha o rolo da página. Só age quando há secções e faltas que
+         cheguem; até lá não se nota. */
+      className="sticky top-4 hidden max-h-[calc(100vh-2rem)] w-48 shrink-0 self-start overflow-y-auto xl:block"
     >
       <ul className="flex flex-col gap-0.5">
         {seccoes.map((s) => {
