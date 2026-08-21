@@ -1,7 +1,7 @@
 import "server-only";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { esc, MAIL_TO, type Attachment } from "./mail";
+import { esc, type Attachment } from "./mail";
 import { SITE } from "./site";
 import { log } from "./logger";
 
@@ -32,7 +32,7 @@ import { log } from "./logger";
  * um campo `cargo` (`ADMIN_USERS`, no `admin-auth.ts`) é o dia em que isto
  * deixa de ser preciso.
  *
- * Os CONTACTOS não estão escritos aqui: vêm do `SITE`/`MAIL_TO`. É de
+ * Os CONTACTOS não estão escritos aqui: vêm todos do `SITE`. É de
  * propósito e não é zelo — a assinatura que ela usa hoje no telemóvel tem
  * «líquen.alentejo@gmail.com» e «líquen-events.com» COM ACENTO no i. Um
  * endereço com acento não existe e uma ligação para `líquen-events.com` não
@@ -294,6 +294,19 @@ export function assinaturaDeEmail(quem: QuemAssina = {}): {
   texto: string;
   anexos: Attachment[];
 } {
+  /**
+   * ── O ENDEREÇO DA ASSINATURA É O PÚBLICO, NÃO O DAS NOTIFICAÇÕES ─────────
+   *
+   * Isto usava o `MAIL_TO`, e são coisas diferentes que por acaso têm hoje o
+   * mesmo valor. O `MAIL_TO` é a caixa para onde a casa manda os AVISOS
+   * INTERNOS (um pedido novo, uma cópia de segurança) e é uma variável de
+   * ambiente; o `SITE.email` é o endereço de contacto que a empresa publica.
+   *
+   * Enquanto forem iguais, ninguém dá por isso. No dia em que ela mandar as
+   * notificações para outra caixa — a coisa mais natural do mundo — a
+   * assinatura de todos os emails ao cliente passava a mostrar o endereço
+   * interno, sem ninguém escrever uma linha para isso acontecer.
+   */
   const assinante = assinanteDoEmail(quem);
   const redes = redesConfiguradas();
   const dominio = SITE.url.replace(/^https?:\/\//, "");
@@ -366,7 +379,7 @@ export function assinaturaDeEmail(quem: QuemAssina = {}): {
   </td></tr>
   <tr><td style="padding-top:8px">
     <div style="mso-line-height-rule:exactly;line-height:19px"><a class="em-strong" href="tel:${esc(SITE.phone)}" style="color:${TINTA};text-decoration:none;font-size:13px;white-space:nowrap">${esc(SITE.phoneDisplay)}</a></div>
-    <div style="mso-line-height-rule:exactly;line-height:19px;font-size:13px">${ligacao(`mailto:${MAIL_TO}`, MAIL_TO)}</div>
+    <div style="mso-line-height-rule:exactly;line-height:19px;font-size:13px">${ligacao(`mailto:${SITE.email}`, SITE.email)}</div>
     <div style="mso-line-height-rule:exactly;line-height:19px;font-size:13px">${ligacao(SITE.url, dominio)}</div>
   </td></tr>
   ${linhaRedes}
@@ -383,7 +396,7 @@ export function assinaturaDeEmail(quem: QuemAssina = {}): {
     SITE.name,
     "",
     SITE.phoneDisplay,
-    MAIL_TO,
+    SITE.email,
     SITE.url,
     ...(redes.length ? ["", ...redes.map((r) => `${r.nome}: ${r.url}`)] : []),
   ].join("\n");

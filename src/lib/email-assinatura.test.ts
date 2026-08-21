@@ -322,3 +322,75 @@ describe("as imagens do correio estão no sítio", () => {
     }
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TODOS OS LINKS DA ASSINATURA, UM A UM
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Pedido dela depois de o ícone do LinkedIn não abrir o perfil da empresa:
+ * «verificar TODOS os links — Facebook, Instagram, LinkedIn, site, email,
+ * telefone. URLs em configuração e não fixos no código. Se algum perfil não
+ * existir, remover o ícone em vez de o deixar apontar para lado nenhum.»
+ *
+ * O que um teste PODE afirmar é o que está aqui: que cada link sai da
+ * configuração, que tem a forma certa, e que uma rede sem endereço desaparece.
+ * O que ele NÃO pode afirmar é que um perfil existe do outro lado — isso é uma
+ * ida à internet, e um teste que a fizesse falhava sempre que o LinkedIn
+ * estivesse em baixo, que é a definição de teste instável.
+ */
+describe("os links da assinatura", () => {
+  const html = () => assinaturaDeEmail({ nome: "Catarina Gaspar" }).html;
+  const texto = () => assinaturaDeEmail({ nome: "Catarina Gaspar" }).texto;
+
+  it("o telefone é dialável no href e legível no ecrã", () => {
+    // `tel:` não leva espaços; o que se lê leva.
+    expect(html()).toContain(`href="tel:${SITE.phone}"`);
+    expect(html()).toContain(SITE.phoneDisplay);
+    expect(SITE.phone).toMatch(/^\+\d{6,}$/);
+    expect(texto()).toContain(SITE.phoneDisplay);
+  });
+
+  /**
+   * O endereço da assinatura é o PÚBLICO (`SITE.email`), não a caixa das
+   * notificações internas (`MAIL_TO`, que é uma variável de ambiente). Hoje
+   * têm o mesmo valor; no dia em que ela mandar os avisos para outra caixa, a
+   * assinatura de todos os emails ao cliente passaria a mostrar o endereço
+   * interno sem ninguém escrever uma linha para isso acontecer.
+   */
+  it("o email é o de contacto da empresa, e não o das notificações", () => {
+    expect(html()).toContain(`href="mailto:${SITE.email}"`);
+    expect(texto()).toContain(SITE.email);
+  });
+
+  it("o site aparece sem o esquema, e o href leva-o", () => {
+    expect(html()).toContain(`href="${SITE.url}"`);
+    expect(html()).toContain(SITE.url.replace(/^https?:\/\//, ""));
+  });
+
+  it("as três redes saem da configuração, com o endereço tal e qual", () => {
+    const h = html();
+    for (const url of [SITE.facebook, SITE.instagram, SITE.linkedin]) {
+      expect(url.trim()).not.toBe("");
+      expect(h).toContain(`href="${url}"`);
+    }
+  });
+
+  it("cada rede tem a forma de um endereço do seu sítio", () => {
+    expect(SITE.facebook).toMatch(/^https:\/\/(www\.)?facebook\.com\//);
+    expect(SITE.instagram).toMatch(/^https:\/\/(www\.)?instagram\.com\//);
+    // Um perfil de EMPRESA, e não um perfil pessoal (`/in/`): o ícone da
+    // assinatura da casa aponta para a Líquen Events.
+    expect(SITE.linkedin).toMatch(/^https:\/\/([a-z]{2}\.)?linkedin\.com\/company\/[^/\s]+$/);
+  });
+
+  it("nenhum href fica vazio ou a apontar para lado nenhum", () => {
+    const hrefs = [...html().matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+    expect(hrefs.length).toBeGreaterThan(4);
+    for (const h of hrefs) {
+      expect(h.trim()).not.toBe("");
+      expect(h).not.toBe("#");
+      expect(h).toMatch(/^(https?:|mailto:|tel:)/);
+    }
+  });
+});

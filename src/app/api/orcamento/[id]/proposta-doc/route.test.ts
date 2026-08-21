@@ -2083,3 +2083,47 @@ describe("POST proposta-doc — o que acontece depois de o email sair", () => {
     vi.mocked(updateProposal).mockImplementation(original);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O ENDEREÇO NÃO SE ESCREVE POR EXTENSO NA CARA DO CLIENTE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO num email real: o link da proposta saiu com o token inteiro, a ocupar
+ * cinco linhas de caracteres aleatórios. É o desenho de uma mensagem de
+ * phishing, e um dos padrões que os filtros de spam penalizam.
+ *
+ * A arrumação já existia. O que não existia era a chamada NESTE ramo — o corpo
+ * escrito no ecrã de envio, que é o caminho de todos os dias. O do modelo já
+ * passava por ela, e é por isso que o defeito não aparecia em teste nenhum.
+ */
+describe("POST proposta-doc — o link no corpo do email", () => {
+  const enviado = () => vi.mocked(sendMail).mock.calls.at(-1)![0] as { html: string };
+  const CORPO = "A proposta segue em anexo e pode também ser consultada aqui: {{link_proposta}}";
+
+  it("o corpo escrito no ecrã sai com o endereço só no href", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { corpo: CORPO }), { params });
+    const html = enviado().html;
+    // O que se LÊ é uma frase.
+    expect(html).toContain("Ver a proposta online");
+    // E o endereço está no href — não no texto.
+    expect(html).toMatch(/<a[^>]+href="[^"]*\/proposta\/[^"]+"/);
+    // Controlo positivo: o token não aparece como TEXTO em lado nenhum. Sem
+    // isto, um `arrumarLigacao` que não fizesse nada passava neste teste.
+    const semEtiquetas = html.replace(/<[^>]*>/g, " ");
+    expect(semEtiquetas).not.toMatch(/\/proposta\/[A-Za-z0-9._-]{20,}/);
+  });
+
+  it("o texto simples LEVA o endereço — é o que um email de texto tem", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { corpo: CORPO }), { params });
+    const env = vi.mocked(sendMail).mock.calls.at(-1)![0] as { text?: string };
+    expect(String(env.text ?? "")).toContain("/proposta/");
+  });
+
+  it("um corpo SEM link não ganha nenhum", async () => {
+    await POST(sendReq(baseDoc({ totalAmount: 3000 }), { corpo: "Segue a proposta em anexo." }), {
+      params,
+    });
+    expect(enviado().html).not.toContain("Ver a proposta online");
+  });
+});

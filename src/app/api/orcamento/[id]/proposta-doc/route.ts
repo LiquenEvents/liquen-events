@@ -1082,7 +1082,37 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
 
     const email = escrito
-      ? emailAoCliente({ html: escrito.html, texto: escrito.texto, quem })
+      ? emailAoCliente({
+          /**
+           * ════════════════════════════════════════════════════════════════
+           * O CORPO ESCRITO NO ECRÃ TAMBÉM PASSA PELA ARRUMAÇÃO DO LINK
+           * ════════════════════════════════════════════════════════════════
+           *
+           * MEDIDO num email real: o endereço da proposta saiu por extenso, com
+           * o token inteiro, a ocupar cinco linhas de caracteres aleatórios. É
+           * o desenho de uma mensagem de phishing e um dos padrões que os
+           * filtros de spam penalizam.
+           *
+           * A arrumação existia e funcionava — mas só neste ramo é que não era
+           * chamada. Dos três caminhos deste envio, o do MODELO passava pelo
+           * `arrumarLigacao` (uma linha abaixo) e o de recurso desenha um botão
+           * a sério; o corpo escrito no ECRÃ DE ENVIO, que é o que ela usa
+           * todos os dias, ia tal e qual.
+           *
+           * O `resolverLigacaoDaProposta`, que corre antes, troca o marcador
+           * pelo endereço verdadeiro — e é por isso que o endereço aqui está nu:
+           * o trabalho dele acaba onde o desta função começa.
+           */
+          html: arrumarLigacao(escrito.html, { url: acceptUrl, rotulo: ROTULO_DA_PROPOSTA }),
+          /**
+           * O TEXTO SIMPLES fica com o endereço — não há `href` onde o esconder,
+           * e um email de texto sem o link é um email sem a proposta. O que o
+           * torna legível é o endereço ser CURTO; é outro trabalho, e é o do
+           * identificador curto.
+           */
+          texto: escrito.texto,
+          quem,
+        })
       : corpoDoModelo
         ? emailAoCliente({ html: corpoDoModelo, texto: textoDoCorpo(corpoDoModelo), quem })
         : emailAoCliente({
