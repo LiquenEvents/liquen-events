@@ -84,7 +84,7 @@ describe("estadoDasSeccoes", () => {
 });
 
 describe("oQueFaltaParaEnviar", () => {
-  it("numa proposta vazia, o que trava é o nome, o título e o valor", () => {
+  it("numa proposta vazia, trava o nome, o título, o valor e os serviços", () => {
     const travam = oQueFaltaParaEnviar(RECEM_ABERTO, 0)
       .filter((f) => f.trava)
       .map((f) => f.texto);
@@ -92,7 +92,33 @@ describe("oQueFaltaParaEnviar", () => {
       "Falta o nome dos clientes",
       "Falta o título interno",
       "Falta o valor",
+      "A secção Serviços está vazia",
     ]);
+  });
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * A LINHA QUE DEIXOU SAIR UMA PROPOSTA VAZIA
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * Foi enviada uma proposta com a secção de Serviços em branco. O índice
+   * lateral dizia «Serviços · por preencher» — estava certo, e era a única
+   * coisa no ecrã a dizer a verdade —, e o botão verde ao lado deixou passar,
+   * porque isto estava escrito como conselho.
+   *
+   * O critério dela: se o cliente receber algo que parece um erro, bloqueia.
+   */
+  it("uma proposta sem serviços não sai, por muito completa que esteja o resto", () => {
+    const semServicos = { ...COMPLETO, serviceGroups: [] } as unknown as ProposalDoc;
+    expect(podeEnviar(semServicos, 3997.5)).toBe(false);
+  });
+
+  it("nem com os grupos montados e vazios, que é como o estúdio abre", () => {
+    const soAEstrutura = {
+      ...COMPLETO,
+      serviceGroups: [{ title: "", items: [{ label: "" }] }],
+    } as unknown as ProposalDoc;
+    expect(podeEnviar(soAEstrutura, 3997.5)).toBe(false);
   });
 
   it("numa proposta completa não trava nada", () => {
@@ -183,5 +209,102 @@ describe("oQueFaltaParaEnviar", () => {
       const travam = oQueFaltaParaEnviar(doc, total).some((f) => f.trava);
       expect(podeEnviar(doc, total)).toBe(!travam);
     }
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE NÃO PODE CHEGAR A UM CLIENTE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O critério dela, e é o único: se o cliente receber algo que parece um erro,
+ * bloqueia. Cada um destes saiu de uma coisa que aconteceu ou que estava a um
+ * passo de acontecer — e o que se prende é a REGRA, não a frase.
+ */
+describe("os bloqueios que impedem um erro de sair", () => {
+  it("uma página de inspiração com título e sem fotos não sai", () => {
+    // Diferente de «sem mood boards», que é uma escolha legítima: esta ocupa
+    // uma folha do PDF e sai em branco.
+    const comBoardVazio = {
+      ...COMPLETO,
+      moodBoards: [{ title: "Bouquets", images: [] }],
+    } as unknown as ProposalDoc;
+    const f = oQueFaltaParaEnviar(comBoardVazio, 3997.5).find((x) => x.id === "moodboard-vazio");
+    expect(f?.trava).toBe(true);
+    expect(f?.texto, "diz QUAL página, senão não se sabe onde ir").toContain("Bouquets");
+  });
+
+  it("mas uma página sem título e sem fotos é só uma página por começar", () => {
+    const porComecar = {
+      ...COMPLETO,
+      moodBoards: [{ title: "", images: [] }],
+    } as unknown as ProposalDoc;
+    expect(oQueFaltaParaEnviar(porComecar, 3997.5).some((x) => x.id === "moodboard-vazio")).toBe(
+      false,
+    );
+  });
+
+  /**
+   * A REDE DAS CHAVETAS.
+   *
+   * O email já tem três camadas a impedir um `{{marcador}}` de sair (ver
+   * `frase-que-nao-parte.test.ts`). O PDF não tem nenhuma: o que ela escrever
+   * à mão num campo vai para lá tal e qual.
+   */
+  it("um marcador por resolver escrito à mão num campo não sai", () => {
+    const comMarcador = { ...COMPLETO, ref: "Proposta {{nome}}" } as unknown as ProposalDoc;
+    const f = oQueFaltaParaEnviar(comMarcador, 3997.5).find((x) => x.id === "chavetas");
+    expect(f?.trava).toBe(true);
+  });
+
+  it("e o texto normal com chavetas simples passa — não é um marcador", () => {
+    const normal = { ...COMPLETO, ref: "Proposta {2026}" } as unknown as ProposalDoc;
+    expect(oQueFaltaParaEnviar(normal, 3997.5).some((x) => x.id === "chavetas")).toBe(false);
+  });
+
+  it("uma fotografia que não carrega não sai — o PDF ficaria com um buraco", () => {
+    const f = oQueFaltaParaEnviar(COMPLETO, 3997.5, {
+      imagensQueFaltam: ["tema/foto.jpg"],
+    }).find((x) => x.id === "imagens");
+    expect(f?.trava).toBe(true);
+  });
+
+  it("sem fotos em falta, não há nada a dizer", () => {
+    expect(
+      oQueFaltaParaEnviar(COMPLETO, 3997.5, { imagensQueFaltam: [] }).some(
+        (x) => x.id === "imagens",
+      ),
+    ).toBe(false);
+  });
+
+  /**
+   * O INGLÊS NÃO É UM AVISO — É UMA PROPOSTA QUE O CASAL NÃO PERCEBE.
+   *
+   * A regra de o que conta como traduzido não se escreve aqui: vive no
+   * `proposal-doc-bilingue`, que sabe distinguir «por traduzir» de «traduzido
+   * e depois o português mudou».
+   */
+  it("proposta em inglês com campos por traduzir não sai", () => {
+    const semIngles = {
+      ...COMPLETO,
+      intencao: "Uma frase escrita em português",
+      intencaoEn: "",
+    } as unknown as ProposalDoc;
+    expect(podeEnviar(semIngles, 3997.5, { idioma: "en" })).toBe(false);
+  });
+
+  it("e a mesma proposta em português sai sem problema nenhum", () => {
+    const semIngles = {
+      ...COMPLETO,
+      intencao: "Uma frase escrita em português",
+      intencaoEn: "",
+    } as unknown as ProposalDoc;
+    expect(podeEnviar(semIngles, 3997.5, { idioma: "pt" })).toBe(true);
+  });
+
+  it("sem contexto nenhum, o gate comporta-se como se comportava", () => {
+    // Quem chamar com dois argumentos — e há chamadas assim — não passa a ver
+    // bloqueios que não pode resolver.
+    expect(podeEnviar(COMPLETO, 3997.5)).toBe(true);
   });
 });
