@@ -1,5 +1,7 @@
 import { type ProposalDoc } from "./proposal-doc";
 import { desalinhamento, dinheiroDaProposta } from "./proposal-budget";
+import { camposPorTraduzir } from "./proposal-doc-bilingue";
+import { camposDoDocumento, lerCampo } from "./proposal-ortografia";
 
 /**
  * ONDE ESTOU, O QUE JÁ ESTÁ FEITO, E O QUE FALTA PARA PODER ENVIAR.
@@ -175,7 +177,39 @@ export interface Impedimento {
  * divergirem, é aqui que se corrige, e num sítio só. Os outros são conselhos:
  * uma proposta sem mood boards pode ser enviada, mas provavelmente não devia.
  */
-export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Impedimento[] {
+/**
+ * O que o DOCUMENTO não sabe de si próprio, e sem o qual metade dos bloqueios
+ * não se pode decidir.
+ *
+ * A separação já existia neste ficheiro e mantém-se: aqui olha-se para o
+ * documento, e o que é estado da sessão — as fotos que ainda vão a caminho —
+ * fica no estúdio. Estas três são do meio: nascem fora do documento mas
+ * decidem se ele pode sair, portanto entram como argumento em vez de duplicarem
+ * a lista do lado de lá.
+ */
+export interface ContextoDoEnvio {
+  /** A língua em que a proposta vai sair. */
+  idioma?: "pt" | "en";
+  /**
+   * Caminhos de imagem do documento que NÃO resolvem para um endereço.
+   *
+   * Quem sabe isto é o estúdio, que tem o mapa dos `assetUrls`. Uma foto que
+   * não resolve não é uma foto em falta no documento — está lá escrita, e é
+   * por isso que ninguém dá por ela até o PDF sair com um buraco.
+   */
+  imagensQueFaltam?: readonly string[];
+  /** O email do cliente. Sem ele gera-se, mas não se envia. */
+  emailDoCliente?: string;
+}
+
+/** Um `{{marcador}}` que sobreviveu até ao texto final. */
+const TEM_CHAVETAS = /\{\{/;
+
+export function oQueFaltaParaEnviar(
+  doc: ProposalDoc,
+  totalBruto: number,
+  ctx: ContextoDoEnvio = {},
+): Impedimento[] {
   const faltas: Impedimento[] = [];
   // A MESMA contagem do índice lateral. Ver `oQueTemODocumento`: eram duas, e
   // discordavam sobre o mesmo documento.
@@ -232,11 +266,112 @@ export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Imped
     });
   }
   if (grupos.length === 0) {
+    /**
+     * ── A LINHA QUE DEIXOU SAIR UMA PROPOSTA VAZIA ────────────────────────
+     *
+     * Isto esteve escrito como conselho (`trava: false`) e uma proposta foi
+     * enviada com a secção de Serviços em branco. O índice lateral dizia
+     * «Serviços · por preencher» — estava certo, e era a única coisa no ecrã a
+     * dizer a verdade —, e o botão verde ao lado deixou passar na mesma.
+     *
+     * O critério dela é o que manda aqui: se o cliente receber algo que parece
+     * um erro, bloqueia. Uma proposta de decoração sem nenhum serviço listado é
+     * exactamente isso.
+     */
     faltas.push({
       id: "servicos",
       seccao: "servicos",
-      texto: "Nenhum grupo de serviços",
-      trava: false,
+      texto: "A secção Serviços está vazia",
+      trava: true,
+    });
+  }
+
+  /**
+   * Uma PÁGINA de inspiração sem fotografias.
+   *
+   * Diferente de «sem mood boards», que é uma escolha legítima: isto é uma
+   * página com título, que conta para a contagem, que ocupa uma folha do PDF —
+   * e que sai em branco. Quem a criou queria lá pôr fotos.
+   */
+  const boardsVazios = (doc.moodBoards ?? []).filter(
+    (b) => temTexto(b.title) && (b.images ?? []).length === 0,
+  );
+  if (boardsVazios.length > 0) {
+    const quais = boardsVazios
+      .map((b) => `«${b.title.trim()}»`)
+      .slice(0, 2)
+      .join(" e ");
+    faltas.push({
+      id: "moodboard-vazio",
+      seccao: "moodboards",
+      texto:
+        boardsVazios.length === 1
+          ? `A página ${quais} não tem fotografias`
+          : `${boardsVazios.length} páginas de inspiração sem fotografias (${quais}…)`,
+      trava: true,
+    });
+  }
+
+  /**
+   * Um `{{marcador}}` que chegou ao texto final.
+   *
+   * É rede e não caça: o email já tem três camadas a impedir isto (ver
+   * `frase-que-nao-parte.test.ts`, que gera o email com cada variável vazia).
+   * O que esta linha guarda é o outro lado — o que ela escreve À MÃO nos campos
+   * do documento. Um `{{nome}}` copiado de um modelo para dentro de um título
+   * vai para o PDF tal e qual, e o PDF não tem camada nenhuma.
+   */
+  const comChavetas = camposDoDocumento(doc)
+    .filter(({ campo }) => TEM_CHAVETAS.test(lerCampo(doc, campo) ?? ""))
+    .map(({ rotulo }) => rotulo);
+  if (comChavetas.length > 0) {
+    faltas.push({
+      id: "chavetas",
+      seccao: comChavetas.length === 1 ? "evento" : "evento",
+      texto:
+        comChavetas.length === 1
+          ? `${comChavetas[0]} tem um marcador por resolver`
+          : `${comChavetas.length} campos com marcadores por resolver`,
+      trava: true,
+    });
+  }
+
+  /**
+   * Inglês escolhido, e traduções em falta.
+   *
+   * A regra de o que conta como traduzido não é escrita aqui — vive no
+   * `proposal-doc-bilingue`, que também sabe distinguir «por traduzir» de
+   * «traduzido e depois o português mudou». Uma segunda contagem discordaria
+   * dela ao primeiro caso difícil.
+   */
+  if (ctx.idioma === "en") {
+    const porTraduzir = camposPorTraduzir(doc);
+    if (porTraduzir.length > 0) {
+      faltas.push({
+        id: "ingles",
+        seccao: "envio",
+        texto:
+          porTraduzir.length === 1
+            ? `${porTraduzir[0].rotulo} está por traduzir`
+            : `${porTraduzir.length} campos por traduzir`,
+        trava: true,
+      });
+    }
+  }
+
+  /**
+   * Fotografias escritas no documento que não resolvem para um endereço.
+   *
+   * Sai um PDF com um buraco onde devia estar uma foto — e é a falha que menos
+   * se nota a montar, porque no ecrã a página parece ter as fotos todas.
+   */
+  if (ctx.imagensQueFaltam && ctx.imagensQueFaltam.length > 0) {
+    const n = ctx.imagensQueFaltam.length;
+    faltas.push({
+      id: "imagens",
+      seccao: "moodboards",
+      texto: n === 1 ? "Uma fotografia não carrega" : `${n} fotografias não carregam`,
+      trava: true,
     });
   }
   if (deco && capas.length === 0) {
@@ -273,6 +408,10 @@ export function oQueFaltaParaEnviar(doc: ProposalDoc, totalBruto: number): Imped
 }
 
 /** Pode enviar? A MESMA fonte que a lista acima, para não poderem discordar. */
-export function podeEnviar(doc: ProposalDoc, totalBruto: number): boolean {
-  return !oQueFaltaParaEnviar(doc, totalBruto).some((f) => f.trava);
+export function podeEnviar(
+  doc: ProposalDoc,
+  totalBruto: number,
+  ctx: ContextoDoEnvio = {},
+): boolean {
+  return !oQueFaltaParaEnviar(doc, totalBruto, ctx).some((f) => f.trava);
 }

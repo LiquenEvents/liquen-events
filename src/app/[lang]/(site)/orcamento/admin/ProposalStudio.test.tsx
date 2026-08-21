@@ -135,6 +135,51 @@ const DRAFT_KEY = `liquen-proposal-studio-${quote.id}`;
  *  `extra` acrescenta campos ao mood board — é como se semeia um rascunho que já
  *  traz uma disposição escolhida à mão (`{ layout: "mosaico" }`), que é o caso
  *  que distingue «apagar a escolha» de «nunca ter havido escolha». */
+/**
+ * A mesma proposta, com o inglês feito.
+ *
+ * Uma proposta em EN só sai traduzida (ver `oQueFaltaParaEnviar`) — e é bem
+ * que seja: metade em inglês e metade em português é um documento que o casal
+ * não percebe. Os testes que escolhem «Inglês» e esperam que o envio siga
+ * precisam, portanto, de uma proposta que na vida real pudesse sair.
+ *
+ * Vive à parte do `seedDraft` de propósito: pôr as traduções na semente comum
+ * liga o modo bilingue por omissão, e há quatro testes que medem justamente o
+ * ecrã SEM ele.
+ */
+function seedDraftEmIngles(n: number, extra: Record<string, unknown> = {}) {
+  seedDraft(n, extra);
+  const doc = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>;
+  localStorage.setItem(
+    DRAFT_KEY,
+    JSON.stringify({
+      ...doc,
+      serviceGroups: [
+        {
+          letter: "a)",
+          title: "Decoração",
+          titleEn: "Decoration",
+          items: [{ label: "Cerimónia", labelEn: "Ceremony" }],
+        },
+      ],
+      moodBoards: [
+        {
+          title: "Cerimónia",
+          titleEn: "Ceremony",
+          annotation: "",
+          images: Array.from({ length: n }, (_, i) => `board/foto-${i}.jpg`),
+          ...extra,
+        },
+      ],
+      // O rótulo do total também é prosa que o casal lê. Sem inglês, uma
+      // proposta em EN imprimia «Valor Total Decoração» no meio do documento —
+      // e é por isso que o envio a trava.
+      totalLabel: "Valor Total Decoração",
+      totalLabelEn: "Total Decoration Value",
+    }),
+  );
+}
+
 function seedDraft(n: number, extra: Record<string, unknown> = {}) {
   localStorage.setItem(
     DRAFT_KEY,
@@ -146,7 +191,7 @@ function seedDraft(n: number, extra: Record<string, unknown> = {}) {
       eventDate: "12 de setembro de 2026",
       location: "Évora",
       guests: "80 pax",
-      serviceGroups: [],
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
       moodBoards: [
         {
           title: "Cerimónia",
@@ -497,7 +542,7 @@ describe("total desalinhado da soma das linhas", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: ["Decor Cerimónia", "Decor Jantar"],
         budgetAmounts: [900, 2350],
@@ -537,7 +582,7 @@ describe("total desalinhado da soma das linhas", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: ["Decor Cerimónia", "Decor Jantar"],
         budgetAmounts: [900, null],
@@ -574,7 +619,7 @@ describe("total desalinhado da soma das linhas", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: ["Decor Cerimónia", "Decor Jantar"],
         budgetAmounts: [null, null],
@@ -767,7 +812,7 @@ describe("as linhas de Organização que não somam o total", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: [],
         budgetRows: [
@@ -1354,7 +1399,7 @@ describe("fotos da biblioteca em estado provisório", () => {
         template: "decoracao",
         ref: "PO Decoração",
         clientNames: "Maria & Zé",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [
           { title: "Cerimónia", annotation: "", images: ["board/foto-0.jpg", "pending:antigo"] },
         ],
@@ -1855,6 +1900,10 @@ describe("o envio não se dá por feito quando o email não saiu", () => {
         truncations: [],
       },
     });
+    // Uma proposta que PODE sair: o que este teste mede é o que acontece
+    // quando o servidor diz que o email não foi entregue, e para lá chegar é
+    // preciso passar primeiro pelo que impede uma proposta incompleta de sair.
+    seedDraft(1);
     desenhar(comPreco(3000));
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
@@ -1925,7 +1974,7 @@ describe("o preço do pedido sobrevive ao rascunho do servidor", () => {
         // Marca para se saber que o rascunho do servidor JÁ chegou.
         location: "Herdade do Servidor",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: [],
         coverImages: ["", ""],
@@ -2015,7 +2064,7 @@ describe("repor e copiar gravam o preço no pedido", () => {
       eventDate: "12 de setembro de 2026",
       location: "Évora",
       guests: "80 pax",
-      serviceGroups: [],
+      serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
       moodBoards: [],
       budgetItems: [],
       coverImages: ["", ""],
@@ -2149,7 +2198,7 @@ describe("modelos parciais de mood board", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [
           { title: "Cerimónia", annotation: "", images: [] },
           { title: "Cocktail", annotation: "", images: [] },
@@ -2381,7 +2430,7 @@ describe("o rascunho preso neste navegador é reenviado ao abrir", () => {
         template: "decoracao",
         ref: "PO Decoração",
         clientNames: marca,
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: [],
         coverImages: ["", ""],
@@ -2710,7 +2759,7 @@ describe("as fotografias do mood board deixam de ser cortadas", () => {
         template: "decoracao",
         ref: "PO Decoração",
         clientNames: "Maria & Zé",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: [],
         coverImages: capas,
@@ -3048,7 +3097,7 @@ describe("a margem no bloco dos totais", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: precos.map((_, i) => `Linha ${i + 1}`),
         budgetAmounts: precos,
@@ -3119,7 +3168,7 @@ describe("apagar uma linha do meio do orçamento", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: ["Alfa", "Beta", "Gama"],
         budgetAmounts: [100, 200, 300],
@@ -3270,7 +3319,7 @@ describe("a grelha das fotos conta com a legenda", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [
           {
             title: "Cerimónia",
@@ -3375,7 +3424,7 @@ describe("ver as páginas lado a lado", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [
           { title: "Cerimónia", annotation: "", images: ["board/a.jpg"] },
           { title: "Jantar", annotation: "", images: ["board/b.jpg"] },
@@ -3459,7 +3508,7 @@ describe("gerar a proposta em inglês", () => {
   }
 
   it("por omissão é português — e a barra diz que língua vai sair", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await irParaPrever(user);
@@ -3476,7 +3525,7 @@ describe("gerar a proposta em inglês", () => {
   });
 
   it("o caminho por omissão fica intacto: «pt», e o ficheiro chama-se proposta-…", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     const nomes = espiarDescarregamentos();
     renderStudio();
     const user = userEvent.setup();
@@ -3500,7 +3549,7 @@ describe("gerar a proposta em inglês", () => {
   });
 
   it("escolher inglês manda «en» e o ficheiro sai com outro nome", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     const nomes = espiarDescarregamentos();
     renderStudio();
     const user = userEvent.setup();
@@ -3518,7 +3567,7 @@ describe("gerar a proposta em inglês", () => {
   });
 
   it("a escolha alcança-se pelo teclado, com as setas", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await irParaPrever(user);
@@ -3546,7 +3595,7 @@ describe("gerar a proposta em inglês", () => {
    * supor que as datas eram nossas e vinham traduzidas.
    */
   it("diz, antes do clique, que só a moldura muda de língua", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await irParaPrever(user);
@@ -3559,7 +3608,7 @@ describe("gerar a proposta em inglês", () => {
   });
 
   it("e diz o mesmo a quem ouve o controlo em vez de o ver", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await irParaPrever(user);
@@ -3572,7 +3621,7 @@ describe("gerar a proposta em inglês", () => {
   });
 
   it("«A gerar…» diz em que língua está a desenhar", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     // A resposta da rota fica PENDURADA: o estado que se quer ver é o do meio,
     // e sem isto o botão volta a «Descarregar PDF» antes de se poder olhar.
     let libertar: (r: Response) => void = () => {};
@@ -3612,7 +3661,7 @@ describe("gerar a proposta em inglês", () => {
    * surpresa maior das duas.
    */
   it("o envio ao cliente leva a língua escolhida", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await irParaPrever(user);
@@ -3629,7 +3678,7 @@ describe("gerar a proposta em inglês", () => {
   });
 
   it("e no caminho de sempre manda «pt», dito e não subentendido", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
@@ -3652,7 +3701,7 @@ describe("gerar a proposta em inglês", () => {
    * passo 2 tem de poder escolher — e de VER o que está escolhido.
    */
   it("o passo 3 deixa escolher a língua, e diz o que ela decide", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
@@ -3680,7 +3729,7 @@ describe("gerar a proposta em inglês", () => {
    *  ao contrário. Duas caixas com estados diferentes eram a maneira certa de
    *  enviar em inglês um documento que ela pré-visualizou em português. */
   it("a escolha do passo 3 e a do passo 2 são a mesma", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
@@ -3716,7 +3765,7 @@ describe("gerar a proposta em inglês", () => {
    * como ela está a trabalhar nesta.
    */
   it("a língua escolhida volta com o rascunho", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     renderStudio();
     const user = userEvent.setup();
     await irParaPrever(user);
@@ -3742,7 +3791,7 @@ describe("gerar a proposta em inglês", () => {
   /** E o envio que se segue a essa reabertura leva «en» — que é o que o casal
    *  recebe. Sem isto, o teste de cima provava um pixel e não o desfecho. */
   it("e o envio depois de reabrir leva a língua que ela tinha escolhido", async () => {
-    seedDraft(1);
+    seedDraftEmIngles(1);
     localStorage.setItem(`${DRAFT_KEY}:meta`, JSON.stringify({ idioma: "en" }));
     renderStudio();
     const user = userEvent.setup();
@@ -4114,7 +4163,7 @@ describe("proposta bilingue", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [{ title: "Cerimónia", titleEn: "Ceremony", images: ["board/f.jpg"] }],
         budgetItems: [],
         coverImages: ["", ""],
@@ -4146,7 +4195,7 @@ describe("proposta bilingue", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [{ title: "Cerimónia", images: ["board/f.jpg"] }],
         budgetItems: [],
         coverImages: ["", ""],
@@ -4776,7 +4825,7 @@ describe("a lista das fotos e o que sobrevive a um deployment", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [
           { title: "Cerimónia", images: ["q1/a.jpg", "q1/b.jpg", "q1/c.jpg"] },
           { title: "Copo de água", images: ["q1/d.jpg"] },
@@ -5507,7 +5556,7 @@ describe("fotos repetidas dentro da mesma proposta", () => {
         eventDate: "12 de setembro de 2026",
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [
           { title: "Cerimónia", images: ["board/a.jpg", "board/b.jpg"] },
           { title: "Jantar", images: ["board/a.jpg", "board/c.jpg"] },
@@ -5576,7 +5625,7 @@ describe("o dia ocupado, a partir da data escrita na proposta", () => {
         eventDate: data,
         location: "Évora",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: [],
         coverImages: ["", ""],
@@ -5657,7 +5706,7 @@ describe("o rascunho do servidor não escreve por cima de quem está a escrever"
         eventDate: "12 de setembro de 2026",
         location: "Herdade do Servidor",
         guests: "80 pax",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         moodBoards: [],
         budgetItems: [],
         coverImages: ["", ""],
@@ -5850,7 +5899,7 @@ describe("a configuração ao nível da proposta", () => {
         template: "decoracao",
         ref: "PO Decoração",
         clientNames: "Maria & Zé",
-        serviceGroups: [],
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
         budgetItems: [],
         coverImages: ["", ""],
         totalAmount: 3000,

@@ -5297,12 +5297,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         onde: (b.title ?? "").trim() || "Mood board",
       })),
   );
-  const faltas = oQueFaltaParaEnviar(doc as ProposalDoc, money.gross);
+  /**
+   * ── O QUE O DOCUMENTO NÃO SABE DE SI PRÓPRIO ──────────────────────────────
+   *
+   * Por agora, só a LÍNGUA.
+   *
+   * O `oQueFaltaParaEnviar` também sabe travar por fotografias que não
+   * resolvem, e essa peça está escrita e testada — mas não é alimentada
+   * daqui, de propósito, e a razão é uma corrida:
+   *
+   * o `assetUrls` chega DEPOIS do documento. Entre abrir o estúdio e o mapa
+   * carregar, um `!assetUrls[caminho]` é verdadeiro para TODAS as fotografias
+   * da proposta — e o botão de enviar ficaria travado durante esse intervalo, a
+   * dizer que catorze fotografias não carregam quando o que se passa é que
+   * ainda não foram pedidas.
+   *
+   * Um bloqueio que dispara por uma corrida é pior do que não existir: ensina a
+   * ignorar a lista, e a lista é o que impede a próxima proposta errada de
+   * sair. Fica para um bloco próprio, alimentado por falhas REAIS de
+   * carregamento (o `ImagemComPlanoB` já as conhece) e não por uma ausência no
+   * mapa.
+   */
+  const contextoDoEnvio = useMemo(() => ({ idioma: idiomaDoPdf }), [idiomaDoPdf]);
+
+  const faltas = oQueFaltaParaEnviar(doc as ProposalDoc, money.gross, contextoDoEnvio);
   // A regra das FOTOS POR CONFIRMAR fica aqui e não em `proposal-progress`:
   // esse olha para o DOCUMENTO, e isto é um estado desta aba — a cópia que
   // ainda vai a caminho só esta sessão a conhece. O email sai uma vez, e um
   // PDF sem a foto escolhida dura para sempre.
-  const canSend = podeEnviar(doc as ProposalDoc, money.gross) && fotosPorConfirmar === 0;
+  const canSend =
+    podeEnviar(doc as ProposalDoc, money.gross, contextoDoEnvio) && fotosPorConfirmar === 0;
   /**
    * Quantas traduções faltam em cada secção, para o índice.
    *
@@ -8787,12 +8811,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 variant="primary"
                 onClick={() => setConfirmSend(true)}
                 disabled={busy !== null || !canSend}
+                /**
+                 * ── O BOTÃO DIZ O QUE FALTA, E NÃO UMA LISTA DECORADA ──────
+                 *
+                 * Isto dizia «Preenche clientes, referência e um total maior
+                 * que 0» — os três bloqueios que existiam quando foi escrito.
+                 * Passaram a ser oito, e uma frase fixa que nomeia três deles
+                 * é pior do que uma genérica: manda procurar no sítio errado.
+                 *
+                 * Agora sai do MESMO sítio que trava o botão, portanto não
+                 * pode discordar dele.
+                 */
                 title={
                   canSend
                     ? undefined
                     : fotosPorConfirmar > 0
                       ? "Há fotos ainda a entrar na proposta. Falta pouco."
-                      : "Preenche clientes, referência e um total maior que 0 antes de enviar."
+                      : faltas
+                          .filter((f) => f.trava)
+                          .map((f) => f.texto)
+                          .join(" · ") || "Falta preencher a proposta antes de enviar."
                 }
                 iconRight={<span aria-hidden="true">→</span>}
                 className="ml-auto"
