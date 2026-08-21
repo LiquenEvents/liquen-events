@@ -949,6 +949,31 @@ describe("mood board com mais fotos do que a página desenha", () => {
     );
   });
 
+  /**
+   * ── UM AVISO CORTADO NÃO É UM AVISO ─────────────────────────────────────
+   *
+   * Palavras dela: «"9 fotos numa página: cada uma fica peque…" — cortado à
+   * direita».
+   *
+   * `white-space` e `text-overflow` HERDAM-SE: um `truncate` em qualquer
+   * antepassado deste parágrafo desce até ele, e o `overflow: hidden` desse
+   * antepassado faz o resto. Não é preciso o parágrafo ter classe nenhuma para
+   * sair com «…» — basta estar debaixo de alguém que a tenha.
+   *
+   * Por isso a defesa é declarada no próprio parágrafo, e é isso que se prende
+   * aqui: seja o que for que lhe esteja por cima, este aviso quebra.
+   */
+  it("o aviso quebra a linha, aconteça o que acontecer por cima dele", async () => {
+    seedDraft(12);
+    renderStudio();
+    for (const aviso of [
+      screen.getByText(/A página deste mood board mostra 10 fotos/i),
+      ...screen.queryAllByText(/fotos numa página: cada uma fica pequena/i),
+    ]) {
+      expect(aviso.className, aviso.textContent ?? "").toContain("whitespace-normal");
+    }
+  });
+
   it("avisa NO INSTANTE em que a foto a mais entra no mood board", async () => {
     // Não depois de gerar o PDF, não depois de enviar: agora, com a mão ainda
     // na foto que acabou de escolher.

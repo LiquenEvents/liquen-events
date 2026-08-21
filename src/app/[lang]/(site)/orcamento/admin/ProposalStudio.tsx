@@ -215,6 +215,42 @@ const ADD_BTN =
 const REMOVE_BTN =
   "alvo-toque text-foreground/30 hover:text-[#8a2a22] transition-colors text-base leading-none shrink-0";
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM AVISO QUE NÃO PODE SER CORTADO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «"9 fotos numa página: cada uma fica peque…" — cortado à
+ * direita, no editor de mood boards, por cima da grelha de fotos dessa página».
+ *
+ * ── Porque é que um parágrafo que quebra saía cortado ─────────────────────
+ *
+ * Porque `white-space` e `text-overflow` HERDAM-SE. Um `truncate` em qualquer
+ * antepassado deste parágrafo — e o cartão de um board tem cabeçalhos, tiras e
+ * linhas de resumo que o usam — desce até aqui como `white-space: nowrap` mais
+ * `text-overflow: ellipsis`, e o `overflow: hidden` desse antepassado faz o
+ * resto. O parágrafo não precisa de ter classe nenhuma para sair com «…»: basta
+ * estar debaixo de alguém que a tenha.
+ *
+ * Por isso a defesa é aqui e é explícita: este parágrafo declara que quebra,
+ * seja o que for que lhe esteja por cima. `whitespace-normal` corta a herança
+ * do `nowrap`, e o `overflow-wrap: anywhere` garante que uma palavra comprida
+ * também não empurra a linha para fora.
+ *
+ * ── E porque é que é uma constante ────────────────────────────────────────
+ *
+ * Porque são dois avisos irmãos — «a página está a ficar cheia» e «estas não
+ * são impressas» — e o segundo é o mais grave dos dois. Corrigir um e deixar o
+ * outro à mercê do mesmo antepassado era resolver metade do problema no sítio
+ * onde ele importa menos.
+ */
+const AVISO_DO_BOARD =
+  // Sem cor: os dois avisos têm cores diferentes, e duas classes `text-*` na
+  // mesma string não se resolvem pela ordem em que estão escritas — quem ganha
+  // é a que aparece depois na FOLHA DE ESTILO. O aviso vermelho podia sair
+  // cinzento sem ninguém perceber porquê.
+  "mb-2 text-xs leading-relaxed whitespace-normal [overflow-wrap:anywhere]";
+
 /* ── Os campos que o estúdio semeia a partir do pedido ─────────────────────
  *
  * O tipo, a data e a referência nascem escritos por NÓS, em português — e é
@@ -6442,7 +6478,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         ser impressa. */}
                                     {b.images.length >= FOTOS_QUE_ENCHEM_A_PAGINA &&
                                       b.images.length <= MOOD_BOARD_MAX_IMAGES && (
-                                        <p className="mb-2 text-xs leading-relaxed text-foreground/45">
+                                        <p className={`${AVISO_DO_BOARD} text-foreground/45`}>
                                           {b.images.length} fotos numa página: cada uma fica
                                           pequena. Duas páginas com metade lêem-se melhor do que uma
                                           cheia.
@@ -6453,7 +6489,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           extenso a seguir — em vez de desaparecerem caladas no
                           PDF. */}
                                     {b.images.length > MOOD_BOARD_MAX_IMAGES && (
-                                      <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
+                                      <p className={`${AVISO_DO_BOARD} text-[#8a2a22]`}>
                                         A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES}{" "}
                                         fotos:{" "}
                                         {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
