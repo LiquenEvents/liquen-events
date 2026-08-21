@@ -30,7 +30,7 @@ import { log } from "@/lib/logger";
  * no painel — mudá-la aqui deixava-a a discordar das linhas que as rotas irmãs
  * escrevem para o mesmo pedido.
  */
-import { eur, eurDocumento } from "@/lib/money";
+import { eur, eurDocumento, round2 } from "@/lib/money";
 
 export const runtime = "nodejs";
 /** O POST desenha o PDF da proposta e ainda fala com o SMTP com o anexo
@@ -106,9 +106,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const vatRate = parsed.data.vatRate ?? 0.23;
-    const subtotal = lineItems.reduce((s, it) => s + it.qty * it.unitPrice, 0);
-    const vat = subtotal * vatRate;
-    const total = subtotal + vat;
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * AS TRÊS LINHAS DE UMA FOLHA DE DINHEIRO TÊM DE FECHAR
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Isto era `subtotal * vatRate` e `subtotal + vat`, sem arredondar nenhum
+     * dos três. Cada parcela era arredondada só na altura de a DESENHAR, e a
+     * conta nunca. Uma linha de 36,50 € imprimia, no PDF que segue em anexo
+     * (`proposal-pdf.ts` desenha as três a partir destes campos):
+     *
+     *     Subtotal   36,50 €      IVA (23%)   8,40 €      TOTAL   44,89 €
+     *
+     * 36,50 + 8,40 = 44,90. O IVA real é 8,395 (arredonda para cima ao mostrar)
+     * e o total real 44,895, que em vírgula flutuante é 44,89499999… e arredonda
+     * para BAIXO. Falham assim todos os subtotais terminados em ,50 com dezena
+     * ímpar de euros, e mais casos — 36,50 · 85,50 · 158,50 · 183,50 · 279,50…
+     * O corpo do email imprime só o total, e por isso saía sozinho e errado.
+     * Estes três campos são também os que ficam GRAVADOS na proposta.
+     *
+     * A regra da casa está escrita em `pricing.ts` desde que este mesmo erro foi
+     * corrigido lá: «o IVA é 23% DAQUELE número, o que lá está escrito, e não de
+     * um número intermédio que ninguém vê». Esta rota tinha ficado de fora.
+     */
+    const subtotal = round2(lineItems.reduce((s, it) => s + it.qty * it.unitPrice, 0));
+    const vat = round2(subtotal * vatRate);
+    const total = round2(subtotal + vat);
 
     /**
      * ══════════════════════════════════════════════════════════════════════

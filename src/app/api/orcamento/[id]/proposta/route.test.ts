@@ -480,23 +480,43 @@ describe("POST /api/orcamento/[id]/proposta — o dinheiro no email", () => {
     return [env.html, env.text ?? ""];
   }
 
-  /** Uma linha com o preço unitário que dá o total pedido, IVA a 23% incluído. */
-  const porTotal = (total: number) => ({
-    lineItems: [{ description: "Decoração", qty: 1, unitPrice: total / 1.23 }],
+  /**
+   * Uma linha com um preço unitário realista — DUAS casas, como o campo do
+   * estúdio. O que a seguir se verifica é o TOTAL que a rota calcula a partir
+   * dele, que é o único número que este email imprime.
+   *
+   * ── PORQUE É QUE ISTO DEIXOU DE SER `total / 1.23` ────────────────────────
+   * A fixture antiga fabricava um preço unitário com treze casas decimais
+   * (7890 / 1,23 = 6414,634146341464) para aterrar num total redondo. Desde que
+   * a rota arredonda ao cêntimo antes de somar — a correcção do A1-001, que é o
+   * que faz as três parcelas do PDF fecharem — esse total deixou de ser
+   * alcançável: um subtotal de 6.414,63 € dá 7.889,99 €, e 7.890,00 exactos não
+   * saem de subtotal nenhum em cêntimos.
+   *
+   * Estes quatro testes são sobre o FORMATO — o ponto dos milhares e o espaço
+   * inquebrável antes do € —, não sobre um valor em concreto. Os subtotais
+   * abaixo foram escolhidos para dar totais com o mesmo NÚMERO DE DÍGITOS que
+   * os de antes, que é a única coisa que o formato vê.
+   */
+  const porTotal = (valor: number) => ({
+    lineItems: [{ description: "Decoração", qty: 1, unitPrice: valor }],
   });
 
   it("escreve os milhares com PONTO, mesmo com quatro dígitos", async () => {
     authed.ok = true;
-    await POST(req("POST", porTotal(7890)), ctx("LIQ-1"));
+    await POST(req("POST", porTotal(6000)), ctx("LIQ-1"));
+    // 6.000,00 + 23% = 7.380,00 — quatro dígitos, ponto nos milhares.
     for (const corpo of corpos()) {
-      expect(corpo).toContain(`7.890,00${EURO}`);
-      expect(corpo).not.toContain(`7890,00${EURO}`);
+      expect(corpo).toContain(`7.380,00${EURO}`);
+      expect(corpo).not.toContain(`7380,00${EURO}`);
     }
   });
 
   it("24 600 € sai igual ao PDF — e não com o espaço do Intl", async () => {
     authed.ok = true;
-    await POST(req("POST", porTotal(24600)), ctx("LIQ-1"));
+    await POST(req("POST", porTotal(20000)), ctx("LIQ-1"));
+    // 20.000,00 + 23% = 24.600,00 — o mesmo número de sempre, agora derivado
+    // de um preço que uma pessoa consegue escrever.
     for (const corpo of corpos()) {
       expect(corpo).toContain(`24.600,00${EURO}`);
       expect(corpo).not.toContain(`24\u00A0600,00${EURO}`);
@@ -505,18 +525,20 @@ describe("POST /api/orcamento/[id]/proposta — o dinheiro no email", () => {
 
   it("999 € não leva separador nenhum", async () => {
     authed.ok = true;
-    await POST(req("POST", porTotal(999)), ctx("LIQ-1"));
+    await POST(req("POST", porTotal(800)), ctx("LIQ-1"));
+    // 800,00 + 23% = 984,00 — três dígitos, sem separador nenhum.
     for (const corpo of corpos()) {
-      expect(corpo).toContain(`999,00${EURO}`);
-      expect(corpo).not.toContain(`.999,00${EURO}`);
+      expect(corpo).toContain(`984,00${EURO}`);
+      expect(corpo).not.toContain(`.984,00${EURO}`);
     }
   });
 
   it("um milhão leva os dois pontos", async () => {
     authed.ok = true;
-    await POST(req("POST", porTotal(1234567)), ctx("LIQ-1"));
+    await POST(req("POST", porTotal(1000000)), ctx("LIQ-1"));
+    // 1.000.000,00 + 23% = 1.230.000,00 — sete dígitos, os dois pontos.
     for (const corpo of corpos()) {
-      expect(corpo).toContain(`1.234.567,00${EURO}`);
+      expect(corpo).toContain(`1.230.000,00${EURO}`);
     }
   });
 
@@ -532,12 +554,65 @@ describe("POST /api/orcamento/[id]/proposta — o dinheiro no email", () => {
    * O que TEM de ser verdade é que o número do CLIENTE já saiu certo no
    * mesmo pedido: é isso que se verifica a seguir, lado a lado.
    */
+  /**
+   * ── AS TRÊS LINHAS DA FOLHA TÊM DE FECHAR ────────────────────────────────
+   *
+   * Da caça a bugs, A1-001. Uma linha de 36,50 € produzia, no PDF que segue em
+   * anexo (`proposal-pdf.ts` desenha as três a partir destes campos):
+   *
+   *     Subtotal 36,50 €   ·   IVA (23%) 8,40 €   ·   TOTAL 44,89 €
+   *
+   * 36,50 + 8,40 = 44,90. O IVA real era 8,395 (arredonda para cima ao mostrar)
+   * e o total real 44,895, que em vírgula flutuante é 44,89499999… e arredonda
+   * para baixo. Cada parcela era arredondada só ao DESENHAR, e a conta nunca.
+   *
+   * O que se prende é a REGRA — as três parcelas que o casal vê na mesma folha
+   * somam — e prende-se nos CAMPOS GRAVADOS, que são de onde o desenho os lê.
+   * Um teste sobre o texto do email não servia: o email imprime só o total.
+   */
+  /** Os três números como ficam na proposta gravada — a fonte do PDF. */
+  const gravados = () => {
+    const p = (proposals.create.mock.calls.at(-1)?.[0] ?? {}) as Record<string, number>;
+    return { subtotal: p.subtotal, vat: p.vat, total: p.total };
+  };
+
+  it.each([36.5, 85.5, 158.5, 183.5, 279.5, 304.5, 329.5, 354.5])(
+    "subtotal %s: o TOTAL é exactamente subtotal + IVA, aos cêntimos",
+    async (unit) => {
+      authed.ok = true;
+      await POST(
+        req("POST", { lineItems: [{ description: "Decoração", qty: 1, unitPrice: unit }] }),
+        ctx("LIQ-1"),
+      );
+      const { subtotal, vat, total } = gravados();
+      // Cada um é um número de cêntimos — nenhum traz casas escondidas.
+      // (`n * 100` não serve para o verificar: 19,67 × 100 dá
+      //  1967,0000000000002 em vírgula flutuante, e o defeito seria do teste.)
+      for (const n of [subtotal, vat, total]) expect(Number(n.toFixed(2))).toBe(n);
+      // E a soma fecha. Antes desta correcção, 36,50 dava 36,50 + 8,40 = 44,89.
+      expect(total).toBe(Math.round((subtotal + vat) * 100) / 100);
+      expect(subtotal).toBe(unit);
+    },
+  );
+
+  it("o caso que originou a queixa: 36,50 € dá 44,90 €, e não 44,89 €", async () => {
+    authed.ok = true;
+    await POST(
+      req("POST", { lineItems: [{ description: "Decoração", qty: 1, unitPrice: 36.5 }] }),
+      ctx("LIQ-1"),
+    );
+    expect(gravados()).toEqual({ subtotal: 36.5, vat: 8.4, total: 44.9 });
+    // E é esse o número que o casal lê no email.
+    for (const corpo of corpos()) expect(corpo).toContain(`44,90${EURO}`);
+  });
+
   it("o histórico fica com o formato do painel; o email é que muda", async () => {
     authed.ok = true;
-    await POST(req("POST", porTotal(4600)), ctx("LIQ-1"));
+    await POST(req("POST", porTotal(4000)), ctx("LIQ-1"));
+    // 4.000,00 + 23% = 4.920,00.
     const log = JSON.stringify(quotes.gravado?.activityLog ?? []);
-    expect(log).toContain(`4600,00${EURO}`);
-    for (const corpo of corpos()) expect(corpo).toContain(`4.600,00${EURO}`);
+    expect(log).toContain(`4920,00${EURO}`);
+    for (const corpo of corpos()) expect(corpo).toContain(`4.920,00${EURO}`);
   });
 });
 
