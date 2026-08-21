@@ -175,11 +175,25 @@ function cells() {
 }
 
 /** O botão que fecha o diálogo a adicionar (mostra sempre quantas vão). */
+/**
+ * O botão que escolhe tudo o que já desceu.
+ *
+ * Chamava-se «Selecionar todas as visíveis» e era ambíguo — palavras dela:
+ * «seleciona as visíveis no ecrã ou todas as do tema?». O rótulo passa a dizer
+ * o número e de onde ele vem, e muda com o estado; por isso aqui procura-se
+ * pela FORMA e não pelo texto exacto.
+ */
+function escolherTodasAsMostradas() {
+  return screen.getByRole("button", { name: /^Escolher as \d+ (deste tema|já mostradas)$/ });
+}
+
 function addAndClose(n: number) {
-  return screen.getByRole("button", { name: `Adicionar ${n} e fechar` });
+  // «Adicionar 4 fotos»: o que se confirma é uma quantidade, e vê-la no botão é
+  // a última hipótese de dar por um engano antes de as fotos entrarem.
+  return screen.getByRole("button", { name: `Adicionar ${n} ${n === 1 ? "foto" : "fotos"}` });
 }
 function addAndStay(n: number) {
-  return screen.getByRole("button", { name: `Adicionar ${n} e continuar` });
+  return screen.getByRole("button", { name: `Adicionar ${n} e escolher mais` });
 }
 
 function importCalls() {
@@ -269,14 +283,14 @@ describe("ThemePicker", () => {
     // A meio do caminho o rodapé passa a contar para o teto.
     for (let n = 1; n <= MAX_IMPORT_BATCH / 2; n++) fireEvent.click(photo(n));
     expect(
-      screen.getByText(`${MAX_IMPORT_BATCH / 2} de ${MAX_IMPORT_BATCH} selecionadas`),
+      screen.getByText(`${MAX_IMPORT_BATCH / 2} de ${MAX_IMPORT_BATCH} fotos selecionadas`),
     ).toBeInTheDocument();
 
     // Tocar nas 41 → ficam 40; a 41.ª nem sequer entra.
     for (let n = MAX_IMPORT_BATCH / 2 + 1; n <= TOTAL; n++) fireEvent.click(photo(n));
 
     expect(
-      screen.getByText(`${MAX_IMPORT_BATCH} de ${MAX_IMPORT_BATCH} selecionadas`),
+      screen.getByText(`${MAX_IMPORT_BATCH} de ${MAX_IMPORT_BATCH} fotos selecionadas`),
     ).toBeInTheDocument();
     expect(
       screen.getByText(`Podes adicionar até ${MAX_IMPORT_BATCH} fotos de cada vez.`),
@@ -306,7 +320,7 @@ describe("ThemePicker", () => {
 
     expect(photo(1)).toHaveAttribute("aria-pressed", "false");
     expect(photo(2)).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("1 selecionada")).toBeInTheDocument();
+    expect(screen.getByText("1 foto selecionada")).toBeInTheDocument();
     // O botão diz sempre quantas vão — e só está desligado sem seleção.
     expect(addAndClose(1)).toBeEnabled();
   });
@@ -386,8 +400,8 @@ describe("ThemePicker", () => {
     expect(photo(1, " (a adicionar)")).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(photo(1, " (a adicionar)"));
     expect(photo(1, " (a adicionar)")).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(screen.getByRole("button", { name: "Selecionar todas as visíveis" }));
-    expect(screen.getByText("8 selecionadas")).toBeInTheDocument();
+    fireEvent.click(escolherTodasAsMostradas());
+    expect(screen.getByText("8 fotos selecionadas")).toBeInTheDocument();
     fireEvent.click(addAndStay(8));
 
     release();
@@ -424,7 +438,7 @@ describe("ThemePicker", () => {
     );
     const falhada = await screen.findByRole("button", { name: "Foto 1 de 6 (não entrou)" });
     expect(falhada).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("1 selecionada")).toBeInTheDocument();
+    expect(screen.getByText("1 foto selecionada")).toBeInTheDocument();
   });
 
   // ── O lugar guardado no instante do clique ───────────────────────────────
@@ -530,7 +544,7 @@ describe("ThemePicker", () => {
     });
 
     await openPicker(true);
-    fireEvent.click(screen.getByRole("button", { name: "Selecionar todas as visíveis" }));
+    fireEvent.click(escolherTodasAsMostradas());
     fireEvent.click(addAndClose(20));
     const lugares = reservados();
     expect(lugares).toHaveLength(20);
@@ -567,7 +581,7 @@ describe("ThemePicker", () => {
     });
 
     await openPicker(true);
-    fireEvent.click(screen.getByRole("button", { name: "Selecionar todas as visíveis" }));
+    fireEvent.click(escolherTodasAsMostradas());
     fireEvent.click(addAndClose(5));
     expect(reservados()).toHaveLength(5);
 
@@ -593,7 +607,7 @@ describe("ThemePicker", () => {
     });
 
     await openPicker(true);
-    fireEvent.click(screen.getByRole("button", { name: "Selecionar todas as visíveis" }));
+    fireEvent.click(escolherTodasAsMostradas());
     fireEvent.click(addAndClose(30));
 
     // O diálogo saiu; a barra ficou na proposta, fora dele.
@@ -778,10 +792,10 @@ describe("ThemePicker", () => {
     photos = folder(150);
     await openPicker(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Selecionar todas as visíveis" }));
+    fireEvent.click(escolherTodasAsMostradas());
 
     expect(
-      screen.getByText(`${MAX_IMPORT_BATCH} de ${MAX_IMPORT_BATCH} selecionadas`),
+      screen.getByText(`${MAX_IMPORT_BATCH} de ${MAX_IMPORT_BATCH} fotos selecionadas`),
     ).toBeInTheDocument();
     expect(
       await screen.findByText(
@@ -796,7 +810,7 @@ describe("ThemePicker", () => {
     fireEvent.click(photo(1));
     fireEvent.click(photo(55), { shiftKey: true });
     expect(
-      screen.getByText(`${MAX_IMPORT_BATCH} de ${MAX_IMPORT_BATCH} selecionadas`),
+      screen.getByText(`${MAX_IMPORT_BATCH} de ${MAX_IMPORT_BATCH} fotos selecionadas`),
     ).toBeInTheDocument();
     expect(photo(MAX_IMPORT_BATCH)).toHaveAttribute("aria-pressed", "true");
     expect(photo(55)).toHaveAttribute("aria-pressed", "false");
@@ -828,15 +842,15 @@ describe("ThemePicker", () => {
 
     fireEvent.click(photo(1));
     fireEvent.click(photo(2));
-    expect(screen.getByText("2 selecionadas")).toBeInTheDocument();
+    expect(screen.getByText("2 fotos selecionadas")).toBeInTheDocument();
 
     // Muda de tema: a grelha é outra, a seleção é a mesma.
     fireEvent.click(screen.getByRole("button", { name: /Itália/ }));
     await screen.findByRole("button", { name: "Foto 1 de 3" });
-    expect(screen.getByText("2 selecionadas")).toBeInTheDocument();
+    expect(screen.getByText("2 fotos selecionadas")).toBeInTheDocument();
     expect(screen.getByText("2 são de outros temas.")).toBeInTheDocument();
     fireEvent.click(photo(1, "", 3));
-    expect(screen.getByText("3 selecionadas")).toBeInTheDocument();
+    expect(screen.getByText("3 fotos selecionadas")).toBeInTheDocument();
 
     // E de volta: as duas primeiras continuam marcadas, sem pedido novo.
     const antes = calls.length;
@@ -893,7 +907,7 @@ describe("ThemePicker", () => {
     expect(preview.querySelector("img")).toHaveAttribute("src", "https://cdn.test/t1-foto-2.jpg");
 
     fireEvent.click(screen.getByRole("button", { name: "Escolher esta foto" }));
-    expect(screen.getByText("1 selecionada")).toBeInTheDocument();
+    expect(screen.getByText("1 foto selecionada")).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("group", { name: /em grande/ })).not.toBeInTheDocument();
@@ -1054,6 +1068,79 @@ describe("a lista de temas não engole o ecrã", () => {
     // escolher decoração.
     expect(grelha.className).toMatch(/(^|\s)grid-cols-2(\s|$)/);
     expect(grelha.className).toContain("sm:grid-cols-5");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE SE ESCOLHE, DITO PELO NÚMERO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Este painel serve para escolher fotos, e três das frases que o diziam não
+ * diziam nada:
+ *
+ *  · «Selecionar todas as visíveis» — palavras dela: «está solto e é ambíguo:
+ *    seleciona as visíveis no ecrã ou todas as do tema?». Nenhuma das duas:
+ *    escolhe as que já foram CARREGADAS;
+ *  · «Adicionar e fechar» — o que se confirma é uma quantidade, e ela não
+ *    estava no botão;
+ *  · e no telemóvel não havia dica nenhuma sobre as duas acções que uma célula
+ *    tem, escolher e ver em grande.
+ */
+describe("o que se escolhe, dito pelo número", () => {
+  it("o botão de escolher tudo diz quantas são e de onde vêm", async () => {
+    photos = folder(8);
+    await openPicker(true);
+    // Sem mais nada por descer, são as do tema — e o número é exacto.
+    expect(screen.getByRole("button", { name: "Escolher as 8 deste tema" })).toBeInTheDocument();
+  });
+
+  it("e diz outra coisa quando o tema ainda tem mais por descer", async () => {
+    // Com paginação, «deste tema» seria mentira: o botão só alcança o que já
+    // desceu.
+    photos = folder(THEME_PAGE_SIZE + 10);
+    await openPicker(true);
+    expect(
+      screen.getByRole("button", { name: `Escolher as ${THEME_PAGE_SIZE} já mostradas` }),
+    ).toBeInTheDocument();
+  });
+
+  it("o botão de confirmar traz o número das fotos", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    // Sem nada escolhido não há número para dizer.
+    expect(screen.getByRole("button", { name: "Adicionar fotos" })).toBeDisabled();
+    fireEvent.click(photo(1));
+    expect(screen.getByRole("button", { name: "Adicionar 1 foto" })).toBeEnabled();
+    fireEvent.click(photo(2));
+    expect(screen.getByRole("button", { name: "Adicionar 2 fotos" })).toBeEnabled();
+  });
+
+  it("e o contador diz «fotos», não só o número", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    fireEvent.click(photo(1));
+    expect(screen.getByText("1 foto selecionada")).toBeInTheDocument();
+    fireEvent.click(photo(2));
+    expect(screen.getByText("2 fotos selecionadas")).toBeInTheDocument();
+  });
+
+  it("o segundo botão diz que NÃO fecha", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    fireEvent.click(photo(1));
+    // «e continuar» não dizia continuar o quê.
+    expect(screen.getByRole("button", { name: "Adicionar 1 e escolher mais" })).toBeInTheDocument();
+  });
+
+  it("no telemóvel diz o que o dedo faz e o que a lupa faz", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    // A dica de teclado é do computador (`hidden sm:inline`); esta é a do dedo,
+    // e não existia.
+    const dica = screen.getByText(/Toca para escolher/);
+    expect(dica.className).toContain("sm:hidden");
+    expect(dica.textContent).toContain("lupa");
   });
 });
 

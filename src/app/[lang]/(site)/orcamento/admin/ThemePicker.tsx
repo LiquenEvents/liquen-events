@@ -1822,17 +1822,40 @@ export default function ThemePicker({
           )}
         </div>
 
-        {/* Barra de seleção — só faz sentido com várias fotos a escolher */}
+        {/* ── Barra de seleção ──────────────────────────────────────────────
+            Só faz sentido com várias fotos a escolher.
+
+            ── «SELECIONAR TODAS AS VISÍVEIS» NÃO DIZIA O QUE FAZIA ──────────
+            Palavras dela: «está solto e é ambíguo: seleciona as visíveis no
+            ecrã ou todas as do tema?». Nenhuma das duas — escolhe as que já
+            foram CARREGADAS, que com um tema pequeno são todas e com um tema
+            grande são as primeiras quarenta.
+
+            O rótulo passa a dizer o número e de onde ele vem, e muda com o
+            estado: «as 18 deste tema» quando não falta nenhuma, «as 40 já
+            mostradas» quando o tema tem mais e ainda não desceram. Um botão
+            que diz um número é também um botão que se pode recusar antes de
+            carregar nele. */}
         {multiple && images.length > 0 && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-foreground/[0.06] px-5 py-2.5">
             <Button size="sm" variant="ghost" onClick={selectAllVisible} disabled={atLimit}>
-              Selecionar todas as visíveis
+              {hasMore
+                ? `Escolher as ${images.length} já mostradas`
+                : `Escolher as ${images.length} deste tema`}
             </Button>
             {selected.length > 0 && (
               <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
                 Limpar seleção
               </Button>
             )}
+            {/* ── O QUE O DEDO FAZ, E O QUE A LUPA FAZ ────────────────────
+                A dica de teclado é do computador e continua lá. No telemóvel
+                não havia dica nenhuma, e as duas acções que uma célula tem —
+                escolher e ver em grande — só se descobriam por tentativa.
+                Palavras dela: «a distinção tem de ser óbvia». */}
+            <span className="bo-text-muted ml-auto text-xs sm:hidden">
+              Toca para escolher · a lupa mostra em grande
+            </span>
             <span className="bo-text-muted ml-auto hidden text-xs sm:inline">
               Shift + clique escolhe tudo o que está pelo meio · <strong>V</strong> mostra a foto em
               grande
@@ -2091,8 +2114,10 @@ export default function ThemePicker({
                   ? "Toca nas fotos que queres usar."
                   : "Escolhe uma foto."
                 : multiple && selected.length >= COUNTDOWN_FROM
-                  ? `${selected.length} de ${MAX_IMPORT_BATCH} selecionadas`
-                  : `${selected.length} ${selected.length === 1 ? "selecionada" : "selecionadas"}`}
+                  ? `${selected.length} de ${MAX_IMPORT_BATCH} fotos selecionadas`
+                  : `${selected.length} ${
+                      selected.length === 1 ? "foto selecionada" : "fotos selecionadas"
+                    }`}
             </p>
             {elsewhere > 0 && (
               <p className="bo-text-muted mt-0.5 text-xs">
@@ -2125,8 +2150,8 @@ export default function ThemePicker({
                 disabled={selected.length === 0}
               >
                 {selected.length > 0
-                  ? `Adicionar ${selected.length} e continuar`
-                  : "Adicionar e continuar"}
+                  ? `Adicionar ${selected.length} e escolher mais`
+                  : "Adicionar e escolher mais"}
               </Button>
             )}
             {/* `primary`, a cor cheia da marca: sem variante, aqui ao lado do
@@ -2138,7 +2163,16 @@ export default function ThemePicker({
               onClick={() => submit(true)}
               disabled={selected.length === 0}
             >
-              {selected.length > 0 ? `Adicionar ${selected.length} e fechar` : "Adicionar e fechar"}
+              {/* ── O NÚMERO NO BOTÃO ────────────────────────────────────
+                  «Adicionar 4 fotos» e não «Adicionar e fechar»: o que se
+                  confirma é uma quantidade, e vê-la no botão é a última
+                  hipótese de dar por um engano antes de as fotos entrarem na
+                  proposta. Que o painel fecha a seguir é o que se espera de um
+                  botão de confirmar — quem quiser continuar tem o de ao lado, e
+                  esse di-lo pelo nome. */}
+              {selected.length > 0
+                ? `Adicionar ${selected.length} ${selected.length === 1 ? "foto" : "fotos"}`
+                : "Adicionar fotos"}
             </Button>
           </div>
         </div>
