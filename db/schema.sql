@@ -140,6 +140,33 @@ alter table public.proposals add column if not exists versao_selo text;
 alter table public.proposals add column if not exists versao_numero integer;
 alter table public.proposals add column if not exists versao_em timestamptz;
 
+-- ── Contratos / aceitação de Termos & Condições ─────────────────
+-- Registo, por proposta, da aceitação das condições pelo cliente ao confirmar
+-- a proposta no link público: quem aceitou, quando, de que IP, a versão dos
+-- termos e um snapshot imutável do texto acordado (prova/auditoria).
+--
+-- ── PORQUE É QUE A TABELA ESTÁ AQUI, E NÃO LÁ MAIS ABAIXO ─────────────────
+-- Porque as colunas que vêm a seguir são DESTA tabela, e um `alter table` só
+-- corre depois de a tabela existir. Estava criada 550 linhas mais abaixo: numa
+-- base que já tinha tudo ninguém dava por isso, mas numa instalação de raiz o
+-- ficheiro parava aqui — e parava calado a meio, com metade do esquema criado.
+-- O `src/lib/ordem-do-esquema.test.ts` passa a impedir que a ordem se volte a
+-- trocar, em qualquer tabela.
+create table if not exists public.contracts (
+  id             text primary key,
+  quote_id       text,
+  proposal_id    text,
+  client_name    text,
+  client_email   text,
+  terms_version  text,
+  terms_snapshot text,
+  status         text not null default 'pendente',  -- pendente | aceite
+  created_at     timestamptz not null default now(),
+  accepted_at    timestamptz,
+  accepted_name  text,
+  accepted_ip    text
+);
+
 -- ── QUE VERSÃO É QUE O CASAL ACEITOU ──────────────────────────────────────
 -- O par de cima, copiado para o contrato no momento do aceite. É o que
 -- distingue «o documento de agora é o que foi aceite» de «foi revisto depois
@@ -702,24 +729,9 @@ exception when others then
   raise warning 'proposal_themes_name_uk não criado (%). Há temas com o mesmo nome: renomeie-os e volte a correr este ficheiro. O resto do schema continuou.', sqlerrm;
 end $$;
 
--- ── Contratos / aceitação de Termos & Condições ─────────────────
--- Registo, por proposta, da aceitação das condições pelo cliente ao confirmar
--- a proposta no link público: quem aceitou, quando, de que IP, a versão dos
--- termos e um snapshot imutável do texto acordado (prova/auditoria).
-create table if not exists public.contracts (
-  id             text primary key,
-  quote_id       text,
-  proposal_id    text,
-  client_name    text,
-  client_email   text,
-  terms_version  text,
-  terms_snapshot text,
-  status         text not null default 'pendente',  -- pendente | aceite
-  created_at     timestamptz not null default now(),
-  accepted_at    timestamptz,
-  accepted_name  text,
-  accepted_ip    text
-);
+-- ── Contratos, continuação ──────────────────────────────────────
+-- A tabela é criada mais acima, junto às colunas do selo da versão (a razão
+-- está lá escrita). O que fica aqui é o resto do que ela ganhou desde então.
 
 -- O selo do documento aceite: a impressão digital do PDF que o casal viu,
 -- copiada da proposta no momento do aceite. Ver a nota nas colunas homónimas
