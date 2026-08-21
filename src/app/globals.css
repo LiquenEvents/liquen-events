@@ -701,6 +701,42 @@ body {
     }
   }
 }
+/* ── Alvo de toque que NÃO cresce no ecrã ─────────────────────────────────
+   O irmão do `.alvo-toque`, para quando o desenho tem de ficar do tamanho que
+   tem.
+
+   MEDIDO na biblioteca de temas, a 390 px: a lupa de cada foto é um disco de
+   24 px no canto da miniatura, e levava `.alvo-toque`. Sob `(pointer: coarse)`
+   isso força 44×44 — e o disco preto passou a tapar o canto superior esquerdo
+   de todas as fotografias, encostado à margem na primeira coluna. Palavras
+   dela: «os ícones circulares de lupa aparecem cortados pela borda esquerda e
+   sobrepostos às imagens». O alvo estava certo; o que não podia crescer era o
+   desenho.
+
+   Aqui o elemento fica do tamanho que tem e é um `::after` transparente que
+   estende a área tocável para fora dele, centrado. Vinte e dois pixéis de
+   raio a partir do centro de um alvo de 24 px dão os 44 exigidos, sem um pixel
+   pintado a mais.
+
+   Exige `position: relative` (ou `absolute`) no elemento — o `::after` é
+   posicionado contra ele. Todos os alvos onde isto faz sentido já o têm.
+
+   Porquê não em `@layer`: pela mesma razão do `.alvo-toque` — o tamanho mínimo
+   é a razão de a classe existir e não pode ser desligado por distracção. */
+@media (pointer: coarse) {
+  .alvo-invisivel::after {
+    content: "";
+    position: absolute;
+    /* Metade da diferença entre os 44 exigidos e os 24 desenhados, para cada
+       lado. Um alvo maior do que 24 px encolhe esta margem sozinho — o
+       `max()` nunca deixa a área tocável ficar abaixo do desenho. */
+    inset: -10px;
+    /* Não pinta, não intercepta o cursor do rato (que não precisa disto) e não
+       entra na árvore de acessibilidade. Só apanha o dedo. */
+    border-radius: inherit;
+  }
+}
+
 /* Subtle scrim behind white text that sits over the near-transparent MIDDLE of
    a hero veil (vertically-centered statements/CTAs). It lifts contrast to AA on
    bright photo regions without darkening the photo itself — imperceptible over

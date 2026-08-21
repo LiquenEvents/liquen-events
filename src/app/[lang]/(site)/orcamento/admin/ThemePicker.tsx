@@ -1759,7 +1759,17 @@ export default function ThemePicker({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-6"
+      /* ── O FUNDO ──────────────────────────────────────────────────────────
+         Era `bg-black/35` e mais nada: o título «Fazer proposta» lia-se por
+         trás do sheet, nítido e cortado a meio pela aresta de cima. Um fundo
+         que deixa ler o que está por baixo não separa nada — parece um erro de
+         desenho, não uma camada.
+
+         Metade escuro e uma desfocagem curta: o que está por trás continua a
+         dar contexto (vê-se que a página lá está) e deixa de competir com o
+         que está à frente. `supports` porque o `backdrop-filter` não existe em
+         toda a parte — onde não existir, fica só o escuro, que já chega. */
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 supports-[backdrop-filter]:backdrop-blur-[3px] sm:items-center sm:p-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) dismiss();
       }}
@@ -2086,14 +2096,23 @@ export default function ThemePicker({
                         tabIndex={i === focusIndex ? 0 : -1}
                         aria-label={`Ver a foto ${i + 1} em grande`}
                         onClick={() => setPreviewIndex(i)}
-                        // 24×24 medidos a 375 px, num ecrã onde a lupa está
-                        // SEMPRE visível (não há passar o rato) e é a única
-                        // forma de ver a foto antes de a escolher. `.alvo-toque`
-                        // leva-a aos 44 px só sob `(pointer: coarse)` — a
-                        // célula tem 106 px, e o resto continua a ser o alvo da
-                        // escolha. Mesmo remendo que os botões da grelha de
-                        // Temas.
-                        className="alvo-toque absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-0 motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                        /* ── O ALVO CRESCE, O DISCO NÃO ──────────────────
+                           Isto levava `.alvo-toque`, que sob `(pointer:
+                           coarse)` força 44×44 — e num telemóvel, com células
+                           de 111 px, o disco preto passou a tapar o canto
+                           superior esquerdo de TODAS as fotografias, encostado
+                           à margem na primeira coluna. Palavras dela: «os
+                           ícones de lupa aparecem cortados pela borda esquerda
+                           e sobrepostos às imagens».
+
+                           O alvo de 44 px estava certo e continua lá — o que
+                           mudou é quem cresce: o `.alvo-invisivel` estende a
+                           área tocável com um `::after` transparente e deixa o
+                           desenho nos 24 px. Ver `globals.css`.
+
+                           Fica também mais discreto: um disco a 45% em vez de
+                           55%, e mais pequeno, porque a foto é que interessa. */
+                        className="alvo-invisivel absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-[2px] motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                       >
                         <svg
                           width="13"
@@ -2158,13 +2177,28 @@ export default function ThemePicker({
           </div>
         )}
 
-        {/* Ações */}
-        <div className="flex items-center justify-between gap-3 border-t border-foreground/[0.08] px-5 py-4">
+        {/* ── Ações ────────────────────────────────────────────────────────
+            MEDIDO a 390 px: esta linha era `flex ... justify-between` com o
+            texto à esquerda e TRÊS botões à direita («Cancelar», «Adicionar N
+            e continuar», «Adicionar N e fechar»). Os botões não quebram, o
+            texto tem `min-w-0`, e o resultado era o rodapé a dizer «Toca» —
+            uma palavra, cortada a meio de «Toca nas fotos que queres usar.».
+
+            `flex-wrap` com o texto a ocupar a linha toda abaixo de `sm`: no
+            telemóvel a contagem fica numa linha só para ela, inteira, e os
+            botões na seguinte; no computador nada muda, porque lá cabe tudo.
+
+            E o `pb` com a `safe-area-inset-bottom`: num iPhone a barra de
+            gestos comia a fila de botões. */}
+        <div
+          className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-foreground/[0.08] px-5 py-4"
+          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+        >
           {/* Uma só região viva: a contagem muda a cada escolha, e a linha do
               teto entra e sai com ela — ou seja, é anunciada na TRANSIÇÃO para
               o limite e não outra vez a cada toque bloqueado (esses não mudam
               nada, logo não anunciam nada). */}
-          <div className="min-w-0" aria-live="polite">
+          <div className="min-w-0 basis-full sm:basis-auto" aria-live="polite">
             <p className="bo-text-muted text-xs">
               {selected.length === 0
                 ? multiple
@@ -2190,7 +2224,7 @@ export default function ThemePicker({
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
             <Button variant="ghost" size="sm" onClick={dismiss}>
               Cancelar
             </Button>

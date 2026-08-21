@@ -1124,3 +1124,77 @@ describe("a lista de temas não engole o ecrã", () => {
     }
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O QUE SE VIA MAL A 390 PX
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Três defeitos medidos no telemóvel dela, num Chromium a 390×844:
+ *
+ *  · a LUPA de cada foto levava `.alvo-toque`, que sob `(pointer: coarse)`
+ *    força 44×44 — e numa célula de 111 px o disco preto tapava o canto
+ *    superior esquerdo de todas as fotografias, encostado à margem na primeira
+ *    coluna. Palavras dela: «cortados pela borda esquerda e sobrepostos às
+ *    imagens». O alvo estava certo; o que não podia crescer era o desenho;
+ *
+ *  · o RODAPÉ dizia «Toca» — uma palavra, cortada a meio de «Toca nas fotos
+ *    que queres usar.». A linha era `justify-between` com o texto à esquerda e
+ *    três botões à direita, que não quebram;
+ *
+ *  · o FUNDO era `bg-black/35` e mais nada: o título «Fazer proposta» lia-se
+ *    por trás do sheet, nítido e cortado ao meio pela aresta.
+ *
+ * O jsdom não mede pixéis. O que se prende aqui é a decisão em cada um — que é
+ * o que um refactor apaga sem dar por isso; a medida é do browser e está no
+ * `geometria-dos-alvos.spec.ts`.
+ */
+describe("o painel a 390 px", () => {
+  it("a lupa cresce em ÁREA e não em desenho", async () => {
+    await openPicker(true);
+    const lupa = screen.getByRole("button", { name: "Ver a foto 1 em grande" });
+    // `.alvo-invisivel` estende a área tocável com um `::after`; o
+    // `.alvo-toque` esticava o próprio botão.
+    expect(lupa.className).toContain("alvo-invisivel");
+    expect(
+      lupa.className,
+      "o `.alvo-toque` força 44×44 no próprio disco — é o defeito",
+    ).not.toContain("alvo-toque");
+    // E o desenho continua nos 24 px.
+    expect(lupa.className).toMatch(/\bh-6\b/);
+    expect(lupa.className).toMatch(/\bw-6\b/);
+  });
+
+  it("o rodapé quebra em vez de espremer a contagem", async () => {
+    await openPicker(true);
+    const contagem = screen.getByText(/Toca nas fotos que queres usar/);
+    const linha = contagem.closest("div")?.parentElement;
+    expect(linha?.className, "sem `flex-wrap` os botões comem o texto").toContain("flex-wrap");
+    // O texto ocupa a linha toda no telemóvel e volta ao lado dos botões
+    // quando há espaço.
+    expect(contagem.closest("div")?.className).toContain("basis-full");
+  });
+
+  it("e a frase inteira está lá — não «Toca»", async () => {
+    await openPicker(true);
+    // O controlo positivo do de cima: a frase que era cortada.
+    expect(screen.getByText("Toca nas fotos que queres usar.")).toBeInTheDocument();
+  });
+
+  it("o fundo separa o painel da página, em vez de a deixar ler", async () => {
+    await openPicker(true);
+    const dialogo = screen.getByRole("dialog", { name: /biblioteca de temas/i });
+    const fundo = dialogo.parentElement!;
+    expect(fundo.className, "`black/35` deixava o cabeçalho legível por trás").toContain(
+      "bg-black/50",
+    );
+    expect(fundo.className).toContain("backdrop-blur");
+  });
+
+  it("e o rodapé não fica debaixo da barra de gestos do iPhone", async () => {
+    await openPicker(true);
+    const contagem = screen.getByText(/Toca nas fotos que queres usar/);
+    const linha = contagem.closest("div")?.parentElement as HTMLElement;
+    expect(linha.style.paddingBottom).toContain("safe-area-inset-bottom");
+  });
+});
