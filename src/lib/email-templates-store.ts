@@ -393,7 +393,7 @@ export const MODELOS_DE_ORIGEM: ModeloDeOrigem[] = [
         "Olá {{cliente_nome}}, boa tarde,",
         "",
         "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento" +
-          "{{#se evento_local}} para o {{evento_tipo}} no {{evento_local}}{{/se}}" +
+          "{{#se evento_no_local}} {{evento_no_local}}{{/se}}" +
           "{{#se evento_data}}, a {{evento_data}}{{/se}}.",
         "",
         // A LINHA EM BRANCO VAI DENTRO DO BLOCO, e é por isso que ela está
@@ -416,7 +416,7 @@ export const MODELOS_DE_ORIGEM: ModeloDeOrigem[] = [
         "Dear {{cliente_nome}}, good afternoon,",
         "",
         "As requested, we are sending our decoration proposal and respective quote" +
-          "{{#se evento_local}} for the {{evento_tipo}} at {{evento_local}}{{/se}}" +
+          "{{#se evento_no_local}} {{evento_no_local}}{{/se}}" +
           "{{#se evento_data}}, on {{evento_data}}{{/se}}.",
         "",
         "{{#se_nao evento_data}}We are still awaiting the date; we can add it to the proposal " +
@@ -443,7 +443,7 @@ export const MODELOS_DE_ORIGEM: ModeloDeOrigem[] = [
         "Olá {{cliente_nome}}, boa tarde,",
         "",
         "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento" +
-          "{{#se evento_local}} para o {{evento_tipo}} no {{evento_local}}{{/se}}" +
+          "{{#se evento_no_local}} {{evento_no_local}}{{/se}}" +
           "{{#se evento_data}}, a {{evento_data}}{{/se}}.",
         "",
         "{{#se_nao evento_data}}Ainda aguardamos a informação relativamente à data, mas podemos " +
@@ -471,7 +471,7 @@ export const MODELOS_DE_ORIGEM: ModeloDeOrigem[] = [
         "Dear {{cliente_nome}}, good afternoon,",
         "",
         "As requested, we are sending our decoration proposal and respective quote" +
-          "{{#se evento_local}} for the {{evento_tipo}} at {{evento_local}}{{/se}}" +
+          "{{#se evento_no_local}} {{evento_no_local}}{{/se}}" +
           "{{#se evento_data}}, on {{evento_data}}{{/se}}.",
         "",
         "{{#se_nao evento_data}}We are still awaiting the date; we can add it to the proposal " +

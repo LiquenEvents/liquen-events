@@ -42,7 +42,12 @@ describe("o aviso do «Olá ,»", () => {
     expect(r.porPreencher.map((v) => v.chave)).toEqual(["cliente_nome"]);
     // E dá-lhe o nome que ela lê no menu de variáveis, não a chave crua.
     expect(r.porPreencher[0].rotulo).toBe("Primeiro nome");
-    expect(r.rascunho.texto).toBe("Olá ,");
+    // «Olá ,» — com o espaço órfão — era o que o desenho produzia antes de o
+    // `arrumarEspacos` existir. O que ESTE teste guarda é que a limpeza não
+    // esconde o problema: o aviso continua a nomear a variável, porque olha
+    // para o MODELO e não para o texto desenhado. Se um dia passar a olhar
+    // para o texto, este par de asserções acende.
+    expect(r.rascunho.texto).toBe("Olá,");
   });
 
   /**

@@ -1,4 +1,5 @@
 import { eurDocumento, montanteNaLingua } from "./money";
+import { atVenue, noLugar } from "./lugares";
 import { eventTypeName } from "./orcamento/data";
 import { dataIso } from "./validation";
 
@@ -94,6 +95,16 @@ export const VARIAVEIS: VariavelDoModelo[] = [
     grupo: "evento",
     dica: "o espaço do evento, se já estiver escolhido",
     exemplo: "Herdade da Malhadinha",
+  },
+  {
+    chave: "evento_no_local",
+    rotulo: "Evento e local, por extenso",
+    grupo: "evento",
+    // A dica diz o que a variável FAZ, porque é isso que a distingue das duas
+    // de cima: ela traz as palavras de ligação e o artigo certo, e desaparece
+    // por inteiro quando não há nada para dizer.
+    dica: "«para o Casamento na Torre de Palma» — com o artigo certo, e vazio quando falta",
+    exemplo: "para o Casamento na Herdade da Malhadinha",
   },
   {
     chave: "valor_total",
@@ -246,6 +257,37 @@ function dataPorExtenso(iso: string | undefined, idioma: "pt" | "en"): string {
  * escreve o modelo tem o `{{#se}}` para dizer o que fazer nesse caso, e quem
  * envia tem o `variaveisPorPreencher` para recusar quando nem isso há.
  */
+/**
+ * «para o Casamento na Torre de Palma» — ou o pedaço que houver, ou nada.
+ *
+ * O artigo antes do tipo de evento é o masculino porque os tipos do catálogo o
+ * são («Casamento», «Batizado», «Jantar»); a excepção é «Conferência», e por
+ * isso ele também se lê da tabela em vez de estar escrito à mão — foi assim que
+ * saiu «para o Conferência» numa proposta.
+ */
+export function fraseDoLocal(tipo: string, local: unknown, idioma: "pt" | "en"): string {
+  const tipoLimpo = String(tipo ?? "").trim();
+  const lugar = idioma === "en" ? atVenue(local) : noLugar(local);
+  if (idioma === "en") {
+    const parte = tipoLimpo ? `for the ${tipoLimpo}` : "";
+    return [parte, lugar].filter(Boolean).join(" ");
+  }
+  const parte = tipoLimpo ? `para ${artigoDoTipo(tipoLimpo)} ${tipoLimpo}` : "";
+  return [parte, lugar].filter(Boolean).join(" ");
+}
+
+/** «a Conferência», «o Casamento». A única palavra feminina do catálogo é a
+ *  conferência, e escrevê-la aqui é mais honesto do que uma regra de sufixos
+ *  que acerta por acaso. */
+function artigoDoTipo(tipo: string): string {
+  const chave = tipo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+  return chave.startsWith("conferencia") ? "a" : "o";
+}
+
 export function construirValores(entrada: EntradaDosValores): Record<string, string> {
   const idioma = entrada.idioma === "en" ? "en" : "pt";
   const { destinatario, evento, proposta, remetente } = entrada;
@@ -262,6 +304,40 @@ export function construirValores(entrada: EntradaDosValores): Record<string, str
     evento_tipo: eventTypeName(evento?.tipo, idioma),
     evento_data: dataPorExtenso(evento?.dataIso, idioma),
     evento_local: String(evento?.local ?? "").trim(),
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * A FRASE INTEIRA, COMPOSTA AQUI — E POR ISSO IMPOSSÍVEL DE PARTIR
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * MEDIDO num email real enviado a uma cliente:
+     *
+     *     «…proposta de decoração e respetivo orçamento para o ␣no Torre de
+     *      Palma, a 27 de setembro de 2027.»
+     *
+     * Duas coisas erradas, e a mesma causa: o modelo escrevia à mão as palavras
+     * que ligam as variáveis — «para o {{evento_tipo}} no {{evento_local}}» —
+     * e essas palavras não sabem nada sobre o que vai no lugar delas.
+     *
+     *  · o bloco condicional guardava a frase pelo LOCAL, não pelo tipo. Sem
+     *    tipo de evento, o «para o » ficava pendurado com um buraco a seguir —
+     *    e o `marcadoresDoPedido` devolve `evento_tipo: ""` SEMPRE, portanto
+     *    pelas rotas antigas isto saía em todos os envios;
+     *  · o «no» estava colado a um nome cujo género ninguém conhecia. Dos seis
+     *    espaços que a casa usa, acertava em um (ver `lugares.ts`).
+     *
+     * A frase passa a ser composta AQUI, onde os valores existem e se sabe o
+     * que falta. Cada pedaço só aparece se tiver conteúdo, e as palavras de
+     * ligação vêm com ele:
+     *
+     *     tipo + local  →  «para o Casamento na Torre de Palma»
+     *     só o local    →  «na Torre de Palma»
+     *     só o tipo     →  «para o Casamento»
+     *     nenhum        →  «»  (e o modelo não escreve nada)
+     *
+     * Um modelo que use `{{evento_no_local}}` não consegue produzir a frase
+     * partida — não há palavra fixa nenhuma para ficar órfã.
+     */
+    evento_no_local: fraseDoLocal(eventTypeName(evento?.tipo, idioma), evento?.local, idioma),
     // ── Proposta ──
     valor_total:
       typeof total === "number" && Number.isFinite(total)

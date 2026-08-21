@@ -17,7 +17,11 @@ describe("variáveis {{...}}", () => {
 
   it("uma variável desconhecida sai VAZIA e nunca como texto literal", () => {
     const saida = renderizarCorpo("Olá {{nao_existe}}.", {});
-    expect(saida).toBe("Olá .");
+    // «Olá .» — com o espaço órfão — era o que saía antes de o
+    // `arrumarEspacos` existir. A regra 1 continua a ser a mesma (nada de
+    // chavetas para o cliente); o que mudou é que a pontuação já não fica
+    // pendurada a seguir a um buraco.
+    expect(saida).toBe("Olá.");
     expect(saida).not.toContain("{{");
   });
 
