@@ -60,6 +60,7 @@ function Estudio() {
     <EmailDoEnvio
       quoteId="q1"
       doc={doc}
+      onNomeDoFicheiro={() => {}}
       idioma="pt"
       mensagem=""
       activo

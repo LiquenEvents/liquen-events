@@ -315,3 +315,82 @@ describe("o nome do ficheiro da proposta", () => {
     );
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O NOME ESCRITO POR ELA MANDA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Pedido dela: «gostava de poder editar o nome do pdf que vai ser gerado».
+ *
+ * A composição automática acerta na maioria dos casos e não acerta em todos —
+ * duas propostas para o mesmo casal, uma versão para os pais e outra para eles.
+ * Escrito, o nome dela manda; e manda em todos os sítios, porque é esta função
+ * que nomeia o anexo do email, a descarga do link do casal, o portal e o botão
+ * do estúdio.
+ */
+describe("o nome escrito à mão", () => {
+  const casal = { clientNames: "Maria & Zé", eventDate: "12 de setembro de 2026", ref: "q1" };
+
+  it("substitui a composição inteira — sem casa, sem casal, sem data", () => {
+    expect(nomeDoFicheiroDaProposta({ ...casal, escolhido: "Proposta Torre de Palma" }, "pt")).toBe(
+      "Proposta-Torre-de-Palma.pdf",
+    );
+  });
+
+  it("e manda também em inglês: quem escreve o nome escreve-o para os dois", () => {
+    expect(nomeDoFicheiroDaProposta({ ...casal, escolhido: "Wedding proposal" }, "en")).toBe(
+      "Wedding-proposal.pdf",
+    );
+  });
+
+  it("um «.pdf» escrito no fim não sai a dobrar", () => {
+    // Metade das pessoas escreve a extensão. «Proposta.pdf.pdf» é o género de
+    // detalhe que faz uma funcionalidade nova parecer partida à primeira vez.
+    expect(nomeDoFicheiroDaProposta({ ...casal, escolhido: "Proposta.pdf" }, "pt")).toBe(
+      "Proposta.pdf",
+    );
+    expect(nomeDoFicheiroDaProposta({ ...casal, escolhido: "Proposta.PDF" }, "pt")).toBe(
+      "Proposta.pdf",
+    );
+  });
+
+  it("passa pela mesma limpeza: acentos, «&» e sinais fora", () => {
+    // A razão é a mesma da composição — um acento num anexo ainda hoje chega
+    // partido a alguns clientes de correio, e o mesmo nome viaja num
+    // `Content-Disposition`.
+    expect(
+      nomeDoFicheiroDaProposta({ ...casal, escolhido: "Proposta Ana & José / 2027" }, "pt"),
+    ).toBe("Proposta-Ana-e-Jose-2027.pdf");
+  });
+
+  it("um nome que não sobrevive à limpeza vale o mesmo que nada", () => {
+    // `-.pdf` era pior do que qualquer nome composto.
+    for (const escrito of ["   ", "///", "!!!", ".pdf"]) {
+      expect(nomeDoFicheiroDaProposta({ ...casal, escolhido: escrito }, "pt")).toBe(
+        "Proposta-Liquen-Events-Maria-e-Ze-12-09-2026.pdf",
+      );
+    }
+  });
+
+  it("e ausente, tudo continua exactamente como estava", () => {
+    // Controlo positivo: sem isto, os testes acima passariam com a composição
+    // desligada — e a maioria das propostas não leva nome escrito nenhum.
+    expect(nomeDoFicheiroDaProposta(casal, "pt")).toBe(
+      "Proposta-Liquen-Events-Maria-e-Ze-12-09-2026.pdf",
+    );
+  });
+
+  it("um nome muito comprido é cortado, e nunca acaba num hífen", () => {
+    const nome = nomeDoFicheiroDaProposta(
+      {
+        ...casal,
+        escolhido:
+          "Proposta de decoracao e organizacao para o casamento de Maria Madalena e Jose Alberto na Herdade da Malhadinha Nova",
+      },
+      "pt",
+    );
+    expect(nome.length).toBeLessThanOrEqual(85);
+    expect(nome).not.toMatch(/-\.pdf$/);
+  });
+});

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import EmailDoEnvio from "./EmailDoEnvio";
@@ -65,11 +65,15 @@ function Estudio({ mensagem = "", bytes = 2_400_000 }: { mensagem?: string; byte
   const [corpo, setCorpo] = useState("");
   const [assunto, setAssunto] = useState("");
   const [modelo, setModelo] = useState("");
+  /** O nome do ficheiro vive no DOCUMENTO, e o estúdio é quem o guarda — como
+   *  no produto. Sem este ciclo completo, o teste do campo provava só que o
+   *  `onChange` dispara, e não que o que se escreve chega ao anexo. */
+  const [nome, setNome] = useState<string | undefined>(undefined);
   return (
     <>
       <EmailDoEnvio
         quoteId="q1"
-        doc={doc}
+        doc={{ ...doc, nomeDoFicheiro: nome }}
         idioma="pt"
         mensagem={mensagem}
         activo
@@ -80,6 +84,7 @@ function Estudio({ mensagem = "", bytes = 2_400_000 }: { mensagem?: string; byte
         onModelo={setModelo}
         bytesDoAnexo={bytes}
         bytesMedidos={false}
+        onNomeDoFicheiro={(n) => setNome(n.trim() ? n : undefined)}
       />
       {/* O que o estúdio tem na mão para enviar, à vista do teste. */}
       <output data-testid="modelo-do-envio">{modelo}</output>
@@ -234,5 +239,64 @@ describe("EmailDoEnvio", () => {
     expect(pedidos.every((p) => p.url.includes("/email-rascunho"))).toBe(true);
     expect(pedidos.some((p) => p.url.includes("/proposta-doc"))).toBe(false);
     expect(pedidos.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O NOME DO FICHEIRO, ESCRITO POR ELA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Pedido dela: «gostava de poder editar o nome do pdf que vai ser gerado».
+ *
+ * O campo fica um dedo abaixo da linha que MOSTRA o nome, e o que se escreve
+ * aparece ali enquanto se escreve — a limpeza (letras, números e hífenes) nunca
+ * pode ser uma surpresa descoberta na caixa de correio do cliente.
+ */
+describe("o nome do anexo", () => {
+  const campo = () => screen.getByLabelText("Nome do ficheiro") as HTMLInputElement;
+  const linhaDoAnexo = () => screen.getByText(/\.pdf/).textContent ?? "";
+
+  it("por omissão, é o composto — a casa, o casal e a data", async () => {
+    render(<Estudio />);
+    await screen.findByLabelText("Texto do email");
+    expect(linhaDoAnexo()).toContain("Proposta-Liquen-Events-Maria-e-Ze-03-07-2027.pdf");
+    // E a caixa está vazia, com o composto como sugestão: quem não quer mexer
+    // não vê um campo já preenchido a pedir-lhe uma decisão.
+    expect(campo().value).toBe("");
+    expect(campo().placeholder).toContain("Proposta-Liquen-Events");
+  });
+
+  it("o que se escreve passa a ser o nome do anexo", async () => {
+    render(<Estudio />);
+    await screen.findByLabelText("Texto do email");
+    fireEvent.change(campo(), { target: { value: "Proposta Torre de Palma" } });
+    expect(linhaDoAnexo()).toContain("Proposta-Torre-de-Palma.pdf");
+  });
+
+  it("e a limpeza vê-se acontecer, em vez de aparecer na caixa de correio", async () => {
+    render(<Estudio />);
+    await screen.findByLabelText("Texto do email");
+    fireEvent.change(campo(), { target: { value: "Proposta Ana & José" } });
+    expect(linhaDoAnexo()).toContain("Proposta-Ana-e-Jose.pdf");
+    // O que ela escreveu fica como ela o escreveu — é o nome DELA; o que muda
+    // é o ficheiro que sai.
+    expect(campo().value).toBe("Proposta Ana & José");
+  });
+
+  it("«Automático» devolve o nome composto", async () => {
+    render(<Estudio />);
+    await screen.findByLabelText("Texto do email");
+    fireEvent.change(campo(), { target: { value: "Outro nome" } });
+    expect(linhaDoAnexo()).toContain("Outro-nome.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /Automático/ }));
+    expect(campo().value).toBe("");
+    expect(linhaDoAnexo()).toContain("Proposta-Liquen-Events-Maria-e-Ze-03-07-2027.pdf");
+  });
+
+  it("e o botão só aparece quando há alguma coisa para desfazer", async () => {
+    render(<Estudio />);
+    await screen.findByLabelText("Texto do email");
+    expect(screen.queryByRole("button", { name: /Automático/ })).toBeNull();
   });
 });

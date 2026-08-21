@@ -1147,6 +1147,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * duas discordarem, e a cópia passava a falar de um ficheiro que não seguiu.
      */
     const nomeDoAnexo = t.nomeDoAnexo({
+      // O nome que ela escreveu, quando escreveu — manda sobre a composição.
+      escolhido: doc.nomeDoFicheiro,
       clientNames: doc.clientNames,
       eventDate: doc.eventDate,
       ref: id,

@@ -400,6 +400,26 @@ export interface ProposalDoc {
   headerTitleEn?: string;
 
   /**
+   * ── O NOME DO FICHEIRO PDF, QUANDO ELA O ESCREVE ────────────────────────
+   *
+   * Pedido dela: «gostava de poder editar o nome do pdf que vai ser gerado».
+   *
+   * Sem isto, o nome é composto — casa, casal e data — e acerta na maioria dos
+   * casos. Não acerta em todos: duas propostas para o mesmo casal, uma versão
+   * para os pais e outra para eles, ou simplesmente outra maneira de arrumar a
+   * pasta.
+   *
+   * Vive no DOCUMENTO e não nas definições da casa porque é uma decisão DESTA
+   * proposta — como o título interno, ao lado do qual nasceu. E porque é isso
+   * que o congela: o nome com que uma proposta seguiu para um casal não muda
+   * porque a regra da casa mudou seis meses depois.
+   *
+   * Ausente quer dizer «compõe-o tu», que é o que a casa fazia e continua a
+   * fazer. Ver `nomeDoFicheiroDaProposta`.
+   */
+  nomeDoFicheiro?: string;
+
+  /**
    * ════════════════════════════════════════════════════════════════════════
    * A FRASE DE INTENÇÃO — a única coisa desta proposta que não é um dado
    * ════════════════════════════════════════════════════════════════════════
