@@ -1258,6 +1258,61 @@ describe("fechar sem ser pelo ×", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
+ * A CURADORIA E A GRELHA SÃO A MESMA SELECÇÃO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Pedido dela: «alternar entre grelha e curadoria a qualquer momento, sem
+ * perder as escolhas». Não há duas listas a sincronizar — há uma, e é a do
+ * painel. Este teste é o que garante que continua a ser assim.
+ */
+describe("uma de cada vez", () => {
+  it("a porta só aparece quando a grelha já não cabe no ecrã", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    // Com seis, a grelha mostra-as todas e uma de cada vez seria mais lento.
+    expect(screen.queryByRole("button", { name: "Uma de cada vez" })).toBeNull();
+  });
+
+  it("o que se escolhe na curadoria aparece escolhido na grelha", async () => {
+    photos = folder(12);
+    await openPicker(true);
+    fireEvent.click(screen.getByRole("button", { name: "Uma de cada vez" }));
+
+    // A grelha sai do ecrã e fica uma foto só.
+    expect(screen.queryByRole("button", { name: "Foto 1 de 12" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Incluir/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Incluir/ }));
+    expect(screen.getByText("2 fotos selecionadas")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ver em grelha" }));
+    expect(photo(1)).toHaveAttribute("aria-pressed", "true");
+    expect(photo(2)).toHaveAttribute("aria-pressed", "true");
+    expect(photo(3)).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("e o que já estava escolhido na grelha sobrevive à ida e volta", async () => {
+    photos = folder(12);
+    await openPicker(true);
+    fireEvent.click(photo(5));
+    fireEvent.click(screen.getByRole("button", { name: "Uma de cada vez" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver em grelha" }));
+    expect(photo(5)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("o rodapé continua a contar o mesmo, e o botão a dizer o número", async () => {
+    photos = folder(12);
+    await openPicker(true);
+    fireEvent.click(screen.getByRole("button", { name: "Uma de cada vez" }));
+    fireEvent.click(screen.getByRole("button", { name: /Incluir/ }));
+    // O cabeçalho, a fila dos temas e o rodapé não saem do sítio: a curadoria
+    // substitui a grelha e mais nada.
+    expect(screen.getByRole("button", { name: "Adicionar 1 foto" })).toBeEnabled();
+    expect(screen.getByRole("group", { name: "Temas" })).toBeInTheDocument();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
  * O QUE SE VIA MAL A 390 PX
  * ═══════════════════════════════════════════════════════════════════════════
  *
