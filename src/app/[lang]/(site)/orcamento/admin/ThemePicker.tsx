@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { idUnico } from "@/lib/id-unico";
 import { PENDING_IMAGE_PREFIX } from "@/lib/proposal-doc";
@@ -100,58 +92,6 @@ import {
 
 /** Último tema usado, para abrir já no sítio certo na proposta seguinte. */
 const LAST_THEME_KEY = "liquen-tema-recente";
-
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * A LISTA DE TEMAS ABRE-SE E FECHA-SE — E LEMBRA-SE DE COMO A DEIXARAM
- * ════════════════════════════════════════════════════════════════════════════
- *
- * MEDIDO no telemóvel dela: quarenta temas em `flex-wrap` enchem o ecrã e a
- * grelha de fotografias — que é a razão de o diálogo existir — fica abaixo da
- * dobra. Palavras dela: «não consigo abrir os temas e escolher, só dá se
- * pesquisar». Pesquisar funcionava porque encurtava a lista.
- *
- * O tecto de altura resolve o caso agudo. O que ele NÃO resolve é o caso
- * normal: mesmo com tecto, um terço do ecrã fica ocupado por uma lista que só
- * se lê uma vez por sessão, sempre que o diálogo abre. Por isso a lista passa a
- * fechar-se, e o estado fica guardado.
- *
- * ── PORQUE É QUE A PROCURA FICA SEMPRE À VISTA ───────────────────────────
- *
- * Porque é o caminho que ela já usa. Esconder a caixa dentro do painel fechado
- * era tirar do ecrã a única coisa que hoje funciona, e obrigar a duas acções
- * (abrir, escrever) onde havia uma.
- *
- * ── E PORQUE É QUE ESCREVER NA PROCURA ABRE A LISTA ──────────────────────
- *
- * Porque uma procura cujos resultados estão escondidos não é uma procura. A
- * abertura é temporária e não se guarda: apagar o que se escreveu devolve a
- * lista ao estado que ela escolheu.
- */
-
-/** Aberta (`"1"`) ou fechada (`"0"`), entre visitas. Ausente = nunca escolheu. */
-const THEME_LIST_OPEN_KEY = "liquen-temas-abertos";
-
-/**
- * A partir de quantos temas é que a lista se fecha sozinha da primeira vez.
- *
- * Com seis ou menos, a lista ocupa uma ou duas linhas e fechá-la não devolve
- * ecrã nenhum — só acrescenta um toque para chegar ao que já estava à vista.
- * Acima disso, é a lista que empurra a grelha para baixo, e é aí que fechar
- * vale a pena. O número não trava nada: é só o palpite inicial, e a primeira
- * vez que ela abre ou fecha a lista passa a ser a preferência dela.
- */
-const TEMAS_QUE_CABEM_SEM_ROLAR = 6;
-
-/** A preferência guardada, ou `null` quando ainda não há nenhuma. */
-function listaDeTemasGuardada(): boolean | null {
-  try {
-    const v = localStorage.getItem(THEME_LIST_OPEN_KEY);
-    return v === "1" ? true : v === "0" ? false : null;
-  } catch {
-    return null; // sem `localStorage` vale o palpite; não é motivo para falhar
-  }
-}
 
 /** Quem pediu ao sistema para não haver animações. */
 function movimentoReduzido(): boolean {
@@ -1095,15 +1035,6 @@ export default function ThemePicker({
    * na nota dá o mesmo resultado com o que já existe.
    */
   const [procuraTema, setProcuraTema] = useState("");
-  /**
-   * A lista de temas está aberta? `null` = ainda ninguém decidiu, e vale o
-   * palpite (ver {@link TEMAS_QUE_CABEM_SEM_ROLAR}).
-   *
-   * Ler o `localStorage` no desenho inicial é seguro aqui pela mesma razão que
-   * já vale para o tema recente: este diálogo só existe depois de um clique, ou
-   * seja, nunca é desenhado no servidor nem na hidratação.
-   */
-  const [listaAberta, setListaAberta] = useState<boolean | null>(() => listaDeTemasGuardada());
   /** Qual a célula que responde ao Tab (roving tabindex). */
   const [focusIndex, setFocusIndex] = useState(0);
   /** Foto aberta em grande, por índice na grelha. */
@@ -1486,28 +1417,8 @@ export default function ThemePicker({
     return themes.filter((t) => limpo(t.name).includes(q) || limpo(t.notes ?? "").includes(q));
   })();
 
-  /** O painel dos temas está à vista? A procura abre-o por cima da preferência
-   *  — resultados escondidos não são resultados —, e sem se guardar. */
-  const procurando = procuraTema.trim() !== "";
-  const mostraLista = (listaAberta ?? themes.length <= TEMAS_QUE_CABEM_SEM_ROLAR) || procurando;
-
-  /** Onde vive a lista, para lhe pôr o tema activo à vista ao abrir. */
+  /** Onde vive a fila dos temas, para lhe pôr o activo à vista. */
   const listaRef = useRef<HTMLDivElement | null>(null);
-  const idDaLista = useId();
-
-  function alternarLista() {
-    const proxima = !mostraLista;
-    setListaAberta(proxima);
-    // Fechar a lista fecha também a procura que a tinha aberto: deixar um
-    // filtro activo por trás de um painel fechado é esconder a razão por que a
-    // próxima abertura mostra três temas em vez de quarenta.
-    if (!proxima) setProcuraTema("");
-    try {
-      localStorage.setItem(THEME_LIST_OPEN_KEY, proxima ? "1" : "0");
-    } catch {
-      /* não essencial — a sessão continua a funcionar sem memória */
-    }
-  }
 
   /**
    * AO ABRIR, O TEMA ACTIVO TEM DE ESTAR À VISTA.
@@ -1518,7 +1429,6 @@ export default function ThemePicker({
    * abrir. `block: "nearest"` não mexe em nada quando já está visível.
    */
   useEffect(() => {
-    if (!mostraLista) return;
     const activo = listaRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
     if (!activo || typeof activo.scrollIntoView !== "function") return;
     activo.scrollIntoView({
@@ -1526,7 +1436,7 @@ export default function ThemePicker({
       inline: "nearest",
       behavior: movimentoReduzido() ? "auto" : "smooth",
     });
-  }, [mostraLista, themeId, temasVisiveis.length]);
+  }, [themeId, temasVisiveis.length]);
 
   function pickTheme(id: string) {
     if (id === themeId) return;
@@ -1829,117 +1739,84 @@ export default function ThemePicker({
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              {/* ── A FILA QUE ESTÁ SEMPRE LÁ ──────────────────────────────
-                  O botão que abre e fecha, e a procura. Nenhum dos dois
-                  desaparece com a lista: é por aqui que se chega aos temas
-                  quando o painel está fechado, e a procura é o caminho que ela
-                  já usava quando a lista não cabia no ecrã. */}
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={alternarLista}
-                  aria-expanded={mostraLista}
-                  aria-controls={idDaLista}
-                  className="alvo-toque -ml-1 flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm text-foreground/80 hover:bg-foreground/[0.06]"
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                    className={`transition-transform duration-200 motion-reduce:transition-none ${
-                      mostraLista ? "rotate-90" : ""
-                    }`}
-                  >
-                    <path d="m9 6 6 6-6 6" />
-                  </svg>
-                  <span>
-                    Temas <span className="bo-text-muted tabular-nums">({themes.length})</span>
-                  </span>
-                </button>
-                {/* Só aparece quando há temas que cheguem para valer a pena
-                    filtrar. Com três, a caixa era mais uma coisa a ler. */}
-                {themes.length > 3 && (
-                  <input
-                    value={procuraTema}
-                    onChange={(e) => setProcuraTema(e.target.value)}
-                    placeholder="Procurar tema por nome ou etiqueta…"
-                    aria-label="Procurar tema"
-                    className="bo-input w-full min-w-0 flex-1 px-3 py-1.5 text-xs sm:max-w-xs"
-                  />
-                )}
-              </div>
-              {/* ── A LISTA TEM DE TER TECTO ────────────────────────────
-                  MEDIDO no telemóvel dela, com 40 temas: esta lista não tinha
-                  altura máxima nenhuma, e uma lista de 40 nomes em `flex-wrap`
-                  ocupa o ecrã inteiro. A grelha de fotografias existe, está
-                  desenhada e está logo a seguir — mas fica tão abaixo que não se
-                  chega lá. Palavras dela: «não consigo abrir os temas e
-                  escolher, só dá se pesquisar» — pesquisar funcionava porque
-                  encurtava a lista o suficiente para as fotos caberem.
+              {/* ── A PROCURA, SEMPRE À VISTA ─────────────────────────────
+                  Não desaparece com nada: é o caminho que ela já usava quando
+                  a lista não cabia no ecrã, e escrever aqui filtra os chips
+                  abaixo sem tirar nada do sítio.
 
-                  O tecto é em `vh` e não em `rem` porque o que está em causa é
-                  quanto SOBRA do ecrã: num telemóvel ao alto, 34% da altura
-                  deixa a lista utilizável e garante que a grelha começa acima da
-                  dobra. Quem tiver poucos temas não vê diferença nenhuma — o
-                  `max-h` só age quando há mais lista do que espaço. */}
+                  Só aparece quando há temas que cheguem para valer a pena
+                  filtrar. Com três, a caixa era mais uma coisa a ler. */}
+              {themes.length > 3 && (
+                <input
+                  value={procuraTema}
+                  onChange={(e) => setProcuraTema(e.target.value)}
+                  placeholder="Procurar tema por nome ou etiqueta…"
+                  aria-label="Procurar tema"
+                  className="bo-input w-full px-3 py-1.5 text-xs sm:max-w-xs"
+                />
+              )}
+
+              {/* ── OS TEMAS, NUMA LINHA SÓ ───────────────────────────────
+                  MEDIDO no telemóvel dela, a 390 px: a lista empilhava-se em
+                  seis linhas e as fotografias — que são a razão de abrir este
+                  painel — ficavam espremidas num terço, cortadas a meio.
+                  Palavras dela: «está ao contrário do que devia ser».
+
+                  Uma linha de chips que rola de lado devolve essa altura toda
+                  à grelha. Cada chip traz o nome e a contagem juntos, porque
+                  são a mesma informação: qual é o tema e quanto tem lá dentro.
+
+                  ── E NO COMPUTADOR NÃO ────────────────────────────────────
+                  A partir de `sm` a fila volta a QUEBRAR e a ocupar as linhas
+                  que precisar, com o tecto de altura de sempre. Rolar de lado
+                  com um rato é mau, e num ecrã largo vêem-se os quarenta temas
+                  de uma vez — que é melhor do que qualquer scroll. É a mesma
+                  marcação com duas formas, e não dois blocos: um segundo bloco
+                  duplicava os botões no DOM e punha o teclado a passar duas
+                  vezes por cada tema.
+
+                  O `-mx-5 px-5` é para a fila sangrar até às arestas do painel:
+                  um chip cortado a meio na margem é o que diz que há mais para
+                  o lado. Com a fila a acabar dentro do `px-5`, parecia que
+                  acabava ali. */}
               <div
-                id={idDaLista}
-                /* A ALTURA ANIMA-SE COM `grid-template-rows`, e não com um
-                   `max-height` a fingir: `0fr → 1fr` anima a altura REAL do
-                   conteúdo, portanto não é preciso adivinhar um valor grande o
-                   suficiente (que salta) nem um pequeno de mais (que corta). O
-                   filho precisa de `min-h-0` para poder encolher. */
-                className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${
-                  mostraLista ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                }`}
+                ref={listaRef}
+                className="-mx-5 flex snap-x gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] sm:mx-0 sm:max-h-[34vh] sm:snap-none sm:flex-wrap sm:overflow-x-visible sm:overflow-y-auto sm:px-0 [&::-webkit-scrollbar]:hidden"
+                role="group"
+                aria-label="Temas"
               >
-                <div className="min-h-0">
-                  <div
-                    ref={listaRef}
-                    className="flex max-h-[34vh] flex-wrap gap-2 overflow-y-auto"
-                    role="group"
-                    aria-label="Temas"
-                    /* Fechada, a lista sai do caminho do Tab e do leitor de
-                       ecrã. Sem isto, o painel estava escondido aos olhos e
-                       continuava a ter quarenta paragens de teclado lá dentro. */
-                    inert={!mostraLista || undefined}
-                  >
-                    {temasVisiveis.map((t) => (
-                      <Button
-                        key={t.id}
-                        size="sm"
-                        variant={t.id === themeId ? "subtle" : "ghost"}
-                        aria-pressed={t.id === themeId}
-                        aria-label={themeButtonLabel(t)}
-                        onClick={() => pickTheme(t.id)}
-                        /* PRÉ-CARREGAR AO APROXIMAR, não ao carregar. Entre o rato
-                         chegar ao separador e o clique passam ~150–300 ms — que é
-                         praticamente o que a rota demora. Buscar aí faz o tema
-                         estar pronto no instante do clique, em vez de começar nele.
+                {temasVisiveis.map((t) => (
+                  <Button
+                    key={t.id}
+                    size="sm"
+                    variant={t.id === themeId ? "subtle" : "ghost"}
+                    aria-pressed={t.id === themeId}
+                    aria-label={themeButtonLabel(t)}
+                    onClick={() => pickTheme(t.id)}
+                    /* `shrink-0` e `snap-start`: numa fila que rola, um chip
+                       que encolhe deixa de se ler, e sem o encaixe o dedo larga
+                       a fila a meio de um nome. */
+                    className="shrink-0 snap-start"
+                    /* PRÉ-CARREGAR AO APROXIMAR, não ao carregar. Entre o rato
+                       chegar ao separador e o clique passam ~150–300 ms — que é
+                       praticamente o que a rota demora. Buscar aí faz o tema
+                       estar pronto no instante do clique, em vez de começar nele.
 
-                         `focus` para quem navega por teclado; `touchstart` para o
-                         telemóvel, onde não há hover nenhum — é o instante entre
-                         pousar o dedo e o levantar, e sem ele o telemóvel era o
-                         único sítio que não ganhava nada com isto. */
-                        onPointerEnter={() => prefetchTheme(t.id)}
-                        onFocus={() => prefetchTheme(t.id)}
-                        onTouchStart={() => prefetchTheme(t.id)}
-                      >
-                        {t.name}
-                        <span className="bo-text-muted">{themeCountLabel(t)}</span>
-                      </Button>
-                    ))}
-                    {temasVisiveis.length === 0 && (
-                      <p className="bo-text-muted text-xs">Nenhum tema com esse nome.</p>
-                    )}
-                  </div>
-                </div>
+                       `focus` para quem navega por teclado; `touchstart` para o
+                       telemóvel, onde não há hover nenhum — é o instante entre
+                       pousar o dedo e o levantar, e sem ele o telemóvel era o
+                       único sítio que não ganhava nada com isto. */
+                    onPointerEnter={() => prefetchTheme(t.id)}
+                    onFocus={() => prefetchTheme(t.id)}
+                    onTouchStart={() => prefetchTheme(t.id)}
+                  >
+                    {t.name}
+                    <span className="bo-text-muted">{themeCountLabel(t)}</span>
+                  </Button>
+                ))}
+                {temasVisiveis.length === 0 && (
+                  <p className="bo-text-muted text-xs">Nenhum tema com esse nome.</p>
+                )}
               </div>
             </div>
           )}
@@ -1997,7 +1874,16 @@ export default function ThemePicker({
               <div
                 ref={gridRef}
                 onKeyDown={onGridKeyDown}
-                className="grid select-none grid-cols-3 gap-2 sm:grid-cols-5"
+                /* ── DUAS COLUNAS NO TELEMÓVEL ───────────────────────────
+                   Três colunas a 390 px dão miniaturas de 111 px — pequenas de
+                   mais para escolher decoração, que é o que aqui se faz. A duas
+                   colunas cada foto tem 171 px e vê-se o que lá está.
+
+                   A escada até ao computador fica igual: aos 480 px voltam as
+                   três (a foto ainda tem 148), e a partir de `sm` as cinco de
+                   sempre — num diálogo de 768 px isso são 140 px por foto, que
+                   com o rato e o passar por cima chegam. */
+                className="grid select-none grid-cols-2 gap-2 min-[480px]:grid-cols-3 sm:grid-cols-5"
               >
                 {images.map((im, i) => {
                   const on = selectedSet.has(im.path);

@@ -942,24 +942,25 @@ describe("fotos que já foram para outro casamento", () => {
  * COM MUITOS TEMAS, A GRELHA DE FOTOS TEM DE CONTINUAR ALCANÇÁVEL
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * MEDIDO no telemóvel dela, com 40 temas: a lista de temas não tinha altura
- * máxima nenhuma. Quarenta nomes em `flex-wrap` ocupam o ecrã inteiro, e a
- * grelha de fotografias — que existe, está desenhada e vem logo a seguir —
- * ficava tão abaixo que não se lá chegava.
+ * MEDIDO no telemóvel dela, com 40 temas: a lista empilhava-se em seis linhas e
+ * a grelha de fotografias — que é a razão de abrir este painel — ficava
+ * espremida num terço, cortada a meio. Palavras dela: «está ao contrário do que
+ * devia ser».
  *
- * Palavras dela: «não consigo abrir os temas e escolher, só dá se pesquisar».
- * Pesquisar funcionava porque encurtava a lista até as fotos caberem — ou seja,
- * o sintoma era a própria pista.
+ * Passaram-se por aqui duas soluções, e a segunda substituiu a primeira:
  *
- * São DUAS regras, e cada uma trava um defeito diferente:
+ *  1. a lista fechava-se, com um botão «Temas (40)» e o estado guardado. Tirava
+ *     a lista do caminho, mas ao preço de um toque para chegar aos temas — e de
+ *     um painel que abria a esconder metade do que serve para escolher;
+ *  2. os CHIPS: uma linha só, que rola de lado. A lista deixa de precisar de se
+ *     fechar porque nunca chega a ocupar mais do que uma linha, e os temas
+ *     estão sempre à mão. É o que está.
  *
- *  · a lista COMEÇA FECHADA quando é grande, e a grelha fica com o ecrã;
- *  · aberta, tem TECTO e rola por dentro — sem isto, o defeito volta na mesma
- *    no dia em que houver sessenta temas.
+ * No computador a fila volta a quebrar, com o tecto de altura de sempre: rolar
+ * de lado com um rato é mau, e num ecrã largo vêem-se os quarenta de uma vez.
  *
- * O que estes testes podem afirmar em jsdom é a decisão, não os pixéis: a
- * altura real é do browser e mede-se no `biblioteca-temas.spec.ts`, a 390 px.
- * Aqui prende-se o que um refactor apaga sem dar por isso.
+ * O que se prende aqui é a decisão. A altura em pixéis é do browser e mede-se
+ * no `geometria-dos-alvos.spec.ts`.
  */
 describe("a lista de temas não engole o ecrã", () => {
   /** Quarenta temas, como os dela. */
@@ -970,140 +971,64 @@ describe("a lista de temas não engole o ecrã", () => {
     imageCount: 10 + i,
   }));
 
-  /**
-   * A lista NÃO se procura por `getByRole`: fechada, ela leva `inert`, e o que
-   * este teste quer verificar é precisamente o estado fechado. Uma consulta que
-   * a ignore quando está escondida não serve para provar que está escondida.
-   */
-  function lista(): HTMLElement {
-    const el = document.querySelector<HTMLElement>('[role="group"][aria-label="Temas"]');
-    if (!el) throw new Error("a lista de temas não está na árvore");
-    return el;
-  }
+  const lista = () => screen.getByRole("group", { name: "Temas" });
 
-  /** O botão que abre e fecha — «Temas (40)». */
-  const botao = () => screen.getByRole("button", { name: /^Temas \(\d+\)$/ });
-
-  const procura = () => screen.getByLabelText("Procurar tema");
-
-  /** Abre o seletor com os quarenta temas. */
   async function comMuitos() {
     route("GET /api/temas", () => ok(muitos));
     return openPicker(true);
   }
 
-  it("com quarenta temas, a lista começa FECHADA — a grelha fica com o ecrã", async () => {
+  it("os temas estão numa linha que rola de lado, não empilhados", async () => {
     await comMuitos();
-    expect(botao()).toHaveAttribute("aria-expanded", "false");
-    // A razão de tudo isto: chegar às fotos.
-    expect(screen.getByRole("button", { name: `Foto 1 de ${visible()}` })).toBeInTheDocument();
-  });
-
-  it("o botão diz quantos temas há, para não ser preciso abrir para saber", async () => {
-    await comMuitos();
-    expect(screen.getByRole("button", { name: "Temas (40)" })).toBeInTheDocument();
-  });
-
-  it("fechada, os quarenta temas saem do caminho do teclado", async () => {
-    await comMuitos();
-    // Sem `inert`, o painel estava escondido aos olhos e continuava a ter
-    // quarenta paragens de Tab lá dentro — que é uma armadilha pior do que a
-    // lista comprida, porque não se vê.
-    expect(lista()).toHaveAttribute("inert");
-  });
-
-  it("aberta, tem tecto de altura e rola por dentro", async () => {
-    await comMuitos();
-    fireEvent.click(botao());
-    expect(botao()).toHaveAttribute("aria-expanded", "true");
-
     const classes = lista().className;
-    // Um tecto — e um tecto que deixa a lista utilizável, não um que a esmague.
-    expect(classes).toMatch(/max-h-\[\d+vh\]/);
-    // E rola por dentro: sem isto, o tecto cortava os temas de baixo em vez de
-    // os tornar alcançáveis, que seria trocar um defeito por outro.
-    expect(classes).toContain("overflow-y-auto");
-    expect(lista()).not.toHaveAttribute("inert");
+    // Uma linha: sem `flex-wrap` no telemóvel, e a rolar na horizontal.
+    expect(classes).toContain("overflow-x-auto");
+    expect(classes, "com `flex-wrap` no telemóvel volta a empilhar").not.toMatch(/(^|\s)flex-wrap/);
   });
 
-  it("os quarenta temas continuam todos lá — o tecto não esconde nenhum", async () => {
+  it("e no computador voltam a quebrar, com tecto — rolar de lado com rato é mau", async () => {
     await comMuitos();
-    fireEvent.click(botao());
-    // Controlo positivo: se o tecto tivesse sido implementado a cortar a lista
-    // (um `slice`, um «ver mais»), este número descia e o teste acendia.
+    const classes = lista().className;
+    expect(classes).toContain("sm:flex-wrap");
+    expect(classes).toMatch(/sm:max-h-\[\d+vh\]/);
+    expect(classes).toContain("sm:overflow-y-auto");
+  });
+
+  it("os quarenta continuam todos lá — a fila não corta nenhum", async () => {
+    await comMuitos();
+    // Controlo positivo: um «ver mais» ou um `slice` fazia este número descer.
     expect(lista().querySelectorAll("button").length).toBe(muitos.length);
   });
 
-  it("com poucos temas, abre por omissão — fechá-la não devolvia ecrã nenhum", async () => {
-    // A rota por omissão traz UM tema. Fechar uma lista de uma linha só
-    // acrescentava um toque para chegar ao que já estava à vista.
-    await openPicker(true);
-    expect(botao()).toHaveAttribute("aria-expanded", "true");
-  });
-
-  it("a escolha fica guardada, e a abertura seguinte respeita-a", async () => {
-    const montado = await comMuitos();
-    fireEvent.click(botao());
-    expect(localStorage.getItem("liquen-temas-abertos")).toBe("1");
-
-    montado.unmount();
+  it("cada chip traz o nome E a contagem — são a mesma pergunta", async () => {
     await comMuitos();
-    expect(botao()).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Tema 2, 11 fotos" })).toBeInTheDocument();
   });
 
-  it("e o contrário também: uma lista pequena fechada à mão continua fechada", async () => {
-    const montado = await openPicker(true);
-    fireEvent.click(botao());
-    expect(localStorage.getItem("liquen-temas-abertos")).toBe("0");
-
-    montado.unmount();
-    await openPicker(true);
-    expect(botao()).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("escrever na procura ABRE a lista — resultados escondidos não são resultados", async () => {
+  it("o tema activo distingue-se dos outros", async () => {
     await comMuitos();
-    fireEvent.change(procura(), { target: { value: "Tema 3" } });
-    expect(botao()).toHaveAttribute("aria-expanded", "true");
-    expect(lista()).not.toHaveAttribute("inert");
-    // Mas é uma abertura de circunstância: a preferência dela não se toca.
-    expect(localStorage.getItem("liquen-temas-abertos")).toBe(null);
+    const activos = [...lista().querySelectorAll('button[aria-pressed="true"]')];
+    expect(activos).toHaveLength(1);
+    expect(activos[0].textContent).toContain("Tema 1");
   });
 
-  it("e apagar o que se escreveu devolve a lista ao estado dela", async () => {
+  it("a procura continua a filtrar a fila", async () => {
     await comMuitos();
-    fireEvent.change(procura(), { target: { value: "Tema 3" } });
-    fireEvent.change(procura(), { target: { value: "" } });
-    expect(botao()).toHaveAttribute("aria-expanded", "false");
+    fireEvent.change(screen.getByLabelText("Procurar tema"), { target: { value: "Tema 3" } });
+    // «Tema 3», «Tema 30»…«Tema 39» — onze.
+    expect(lista().querySelectorAll("button").length).toBe(11);
   });
 
-  it("fechar a lista limpa a procura que a tinha aberto", async () => {
+  it("e diz quando não há nada com esse nome", async () => {
     await comMuitos();
-    fireEvent.change(procura(), { target: { value: "Tema 3" } });
-    fireEvent.click(botao());
-    // Sem isto ficava um filtro activo por trás de um painel fechado — e a
-    // abertura seguinte mostrava três temas sem se perceber porquê.
-    expect((procura() as HTMLInputElement).value).toBe("");
-    expect(botao()).toHaveAttribute("aria-expanded", "false");
+    fireEvent.change(screen.getByLabelText("Procurar tema"), { target: { value: "zzz" } });
+    expect(screen.getByText("Nenhum tema com esse nome.")).toBeInTheDocument();
   });
 
-  /**
-   * ESCOLHER UM TEMA NÃO FECHA A LISTA.
-   *
-   * A decisão foi tomada a pensar no uso repetido: montar um mood board raramente
-   * acaba no primeiro tema, e uma lista que se fecha a cada escolha cobra um
-   * toque a mais por cada tema visto a seguir. Pior: o estado é GUARDADO, e
-   * fechar sozinha ao escolher trocava a preferência dela a cada clique.
-   */
-  it("escolher um tema não fecha a lista", async () => {
-    route("GET /api/temas/t2/imagens", () =>
-      ok({ ok: true, images: folder(3), total: 3, truncated: false }),
-    );
+  it("a grelha das fotos continua a desenhar-se, com os quarenta temas lá", async () => {
     await comMuitos();
-    fireEvent.click(botao());
-    fireEvent.click(screen.getByRole("button", { name: "Tema 2, 11 fotos" }));
-    await screen.findByRole("button", { name: "Foto 1 de 3" });
-    expect(botao()).toHaveAttribute("aria-expanded", "true");
+    // A razão de tudo isto: chegar às fotos.
+    expect(screen.getByRole("button", { name: `Foto 1 de ${visible()}` })).toBeInTheDocument();
   });
 
   it("ao abrir, o tema activo é posto à vista", async () => {
@@ -1113,15 +1038,22 @@ describe("a lista de temas não engole o ecrã", () => {
     (Element.prototype as unknown as { scrollIntoView: unknown }).scrollIntoView = espia;
     try {
       await comMuitos();
-      espia.mockClear();
-      fireEvent.click(botao());
       expect(espia).toHaveBeenCalled();
-      // E é o ACTIVO, não um qualquer: com tecto e quarenta temas, o escolhido
-      // pode estar a três écrans de rolo de distância.
+      // E é o ACTIVO, não um qualquer: numa fila de quarenta chips o escolhido
+      // pode estar a três écrans de distância, para o lado.
       expect((espia.mock.instances[0] as HTMLElement).getAttribute("aria-pressed")).toBe("true");
     } finally {
       delete (Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView;
     }
+  });
+
+  it("as fotos abrem a DUAS colunas no telemóvel, e a cinco no computador", async () => {
+    await comMuitos();
+    const grelha = screen.getByRole("button", { name: /^Foto 1 de/ }).closest(".grid")!;
+    // Três colunas a 390 px dão 111 px por foto — pequeno de mais para
+    // escolher decoração.
+    expect(grelha.className).toMatch(/(^|\s)grid-cols-2(\s|$)/);
+    expect(grelha.className).toContain("sm:grid-cols-5");
   });
 });
 

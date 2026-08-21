@@ -56,7 +56,10 @@ describe("os nomes por arrumar", () => {
   });
 
   it("corrigir renomeia mesmo, com o nome arrumado", async () => {
-    const renomear = vi.fn(async () => true);
+    // Tipado com os argumentos: sem eles o `vi.fn` infere um tuplo vazio e o
+    // `calls[0][1]` — que é o que este teste existe para verificar — nem
+    // compila.
+    const renomear = vi.fn(async (_tema: ThemeSummary, _nome: string) => true);
     render(
       <NomesPorArrumar
         themes={[tema({ id: "t2", name: "Seatings Plans" })]}
