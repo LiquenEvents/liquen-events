@@ -158,13 +158,83 @@ function desenhar(nos: No[], valores: Record<string, string>, escapar: boolean):
 }
 
 /** O CORPO: markup dela, valores escapados. */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A REDE DE SEGURANÇA: NENHUM BURACO CHEGA AO CLIENTE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO num email real enviado a uma cliente:
+ *
+ *     «…enviamos a nossa proposta de decoração e respetivo orçamento para o
+ *      ␣no Torre de Palma, a 27 de setembro de 2027.»
+ *
+ * O tipo de evento estava vazio, o bloco condicional guardava a frase pelo
+ * LOCAL, e o «para o » ficou pendurado com dois espaços a seguir.
+ *
+ * A correcção de fundo é escrever a frase de maneira a não poder partir-se —
+ * está feita na variável composta `evento_no_local` (`email-template-vars.ts`).
+ * Isto é a rede por baixo, e existe por uma razão que a de fundo não cobre:
+ * **os modelos que ela já tem guardados** continuam a usar a forma antiga, e
+ * um modelo que ela reescreva amanhã pode voltar a deixar um artigo pendurado.
+ *
+ * O que se limpa, e só isto:
+ *  · espaços repetidos, incluindo os não separáveis que vêm de colar;
+ *  · espaço antes de `,` `.` `;` `:` `!` `?` — a pontuação órfã;
+ *  · vírgulas seguidas e vírgula colada a um ponto final.
+ *
+ * O que NÃO se faz: adivinhar palavras. Um «para o» seguido de nada continua a
+ * ser «para o» — isso é uma frase partida, e quem a tem de apanhar é o
+ * `variaveisPorPreencher`, que já a nomeia antes de o botão ser carregado.
+ * Uma limpeza que inventasse texto era pior do que o buraco.
+ *
+ * Corre por LINHA, para não colar parágrafos: o `\n` é significativo neste
+ * corpo, e um `\s+` cego juntava duas linhas numa.
+ */
+export function arrumarEspacos(texto: string): string {
+  return String(texto ?? "")
+    .split("\n")
+    .map((linha) =>
+      linha
+        // Espaços repetidos (normais e não separáveis) → um só.
+        .replace(/[ \t\u00a0]{2,}/g, " ")
+        // Espaço antes de pontuação.
+        .replace(/[ \t\u00a0]+([,.;:!?])/g, "$1")
+        // Vírgulas seguidas, e vírgula colada ao ponto final.
+        .replace(/,\s*,+/g, ",")
+        .replace(/,\s*\./g, ".")
+        // ── E O FIM DA LINHA CORTA-SE COM A MESMA LISTA, NÃO COM `trimEnd` ──
+        //
+        // O `trimEnd()` apaga TODO o espaço em branco do Unicode, e isso partiu
+        // uma coisa que não tem nada que ver com esta limpeza: o aviso «Ficou
+        // por preencher».
+        //
+        // Esse aviso (`email-rascunho-do-envio.ts`) descobre uma variável vazia
+        // à vista desenhando o rascunho DUAS vezes — uma como está, outra com
+        // um espaço fino (U+2009) no lugar de cada vazio — e comparando os dois
+        // desenhos. A sentinela tem de ser espaço em branco, senão abriria os
+        // `{{#se}}` que estão fechados; e tem de SOBREVIVER ao desenho, senão
+        // as duas passagens saem iguais e o aviso cala-se.
+        //
+        // Com o `trimEnd()`, «Proposta para ␠» ficava «Proposta para» — igual à
+        // primeira passagem — e a variável deixava de ser acusada. Ou seja: uma
+        // limpeza cosmética desligava, em silêncio, exactamente o aviso que
+        // apanha a frase partida que ela veio corrigir.
+        //
+        // Cortam-se só os caracteres que esta função declara limpar. O espaço
+        // fino não está na lista, e é por isso que aqui está escrito por
+        // extenso em vez de um `\s`.
+        .replace(/[ \t\u00a0]+$/, ""),
+    )
+    .join("\n");
+}
+
 export function renderizarCorpo(fonte: string, valores: Record<string, string>): string {
-  return desenhar(analisar(String(fonte ?? "")).raiz, valores, true);
+  return arrumarEspacos(desenhar(analisar(String(fonte ?? "")).raiz, valores, true));
 }
 
 /** O ASSUNTO: cabeçalho de email, valores por escapar (ver o cabeçalho). */
 export function renderizarAssunto(fonte: string, valores: Record<string, string>): string {
-  return desenhar(analisar(String(fonte ?? "")).raiz, valores, false);
+  return arrumarEspacos(desenhar(analisar(String(fonte ?? "")).raiz, valores, false));
 }
 
 /**

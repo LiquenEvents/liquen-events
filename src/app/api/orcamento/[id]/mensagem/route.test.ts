@@ -26,11 +26,20 @@ const store = vi.hoisted(() => ({
 }));
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_opts?: unknown) => ({ sent: true })) }));
 /** Quem tem a sessão iniciada, tal como o token assinado a traria. */
-const sessao = vi.hoisted(() => ({ nome: "" as string }));
+const sessao = vi.hoisted(() => ({
+  nome: "" as string,
+  /** O que o perfil da conta diz — vazio quando não há `ADMIN_USERS`. */
+  perfil: {} as { nome?: string; cargo?: string },
+}));
 vi.mock("@/lib/admin-auth", () => ({
   isAuthed: () => authed.ok,
   ADMIN_COOKIE: "liquen_admin",
   readSession: (token: string | undefined) => (token ? { name: sessao.nome } : null),
+  /** A assinatura ESCRITA no perfil da conta (`assina` no `ADMIN_USERS`).
+   *  Vazio = assina a casa, que é o comportamento certo sem contas
+   *  configuradas — e o que impede um nome adivinhado a partir de um endereço
+   *  de email de ir parar ao fundo de uma proposta. */
+  assinaturaConfigurada: () => sessao.perfil,
 }));
 vi.mock("@/lib/quotes-store", () => ({ getQuote: store.get, updateQuote: store.update }));
 vi.mock("@/lib/mail", () => ({
@@ -464,13 +473,39 @@ describe("POST /api/orcamento/[id]/mensagem — quem assina", () => {
 
   const enviado = () => mail.send.mock.calls[0][0] as { html: string; text: string };
 
-  it("assina com o nome de quem tem a sessão iniciada", async () => {
+  /**
+   * ── A REGRA MUDOU, E A RAZÃO ESTÁ NUM EMAIL REAL ────────────────────────
+   *
+   * Isto exigia que o nome DA SESSÃO assinasse o email. Parecia certo e
+   * produziu, numa proposta enviada a uma cliente, a assinatura
+   * **«Liquen Alentejo»** — que ninguém escreveu em lado nenhum: foi derivada
+   * do endereço de entrada (`liquen.alentejo@gmail.com` → `nomeVisivel` troca
+   * os pontos por espaços e capitaliza) e seguiu para o `sub` da sessão.
+   *
+   * A regra passa a ser: **só assina o que estiver escrito no perfil da
+   * conta.** Um nome adivinhado a partir de um endereço nunca assina nada.
+   */
+  it("assina com o nome ESCRITO no perfil da conta", async () => {
     authed.ok = true;
-    sessao.nome = "Rui Belo";
+    sessao.nome = "rui.belo@liquen.pt";
+    sessao.perfil = { nome: "Rui Belo", cargo: "Produção" };
     await POST(pedidoComSessao("Olá!"), ctx("LIQ-1"));
     expect(enviado().html).toContain("Rui Belo");
     expect(enviado().text).toContain("Rui Belo");
+    expect(enviado().html).toContain("Produção");
     expect(enviado().html).not.toContain("Catarina Gaspar");
+  });
+
+  it("sem perfil, assina a CASA — e nunca o nome tirado do endereço", async () => {
+    authed.ok = true;
+    // Exactamente o caso real: entrada com a palavra-passe partilhada, e o
+    // nome da sessão derivado do endereço da conta de Gmail.
+    sessao.nome = "Liquen Alentejo";
+    sessao.perfil = {};
+    await POST(pedidoComSessao("Olá!"), ctx("LIQ-1"));
+    expect(enviado().html).toContain("Catarina Gaspar");
+    expect(enviado().html).not.toContain("Liquen Alentejo");
+    expect(enviado().text).not.toContain("Liquen Alentejo");
   });
 
   /**
@@ -480,7 +515,8 @@ describe("POST /api/orcamento/[id]/mensagem — quem assina", () => {
   it("com o nome igual ao do cliente, assina a casa", async () => {
     authed.ok = true;
     store.nome = "Ana Silva";
-    sessao.nome = "ana  silva";
+    sessao.nome = "ana.silva@liquen.pt";
+    sessao.perfil = { nome: "ana  silva" };
     await POST(pedidoComSessao("Olá!"), ctx("LIQ-1"));
     expect(enviado().html).toContain("Catarina Gaspar");
     expect(enviado().html).not.toMatch(/>ana {2}silva</i);

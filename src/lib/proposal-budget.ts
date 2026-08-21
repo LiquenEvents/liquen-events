@@ -128,18 +128,61 @@ export interface LinhaOrcamento {
 }
 
 /**
+ * Os pedaços de texto que se parecem com um número: "1.500", "75,00", "-500",
+ * "1 500" (com espaço normal ou não separável, que é o que vem de colar de uma
+ * folha de cálculo). As pontas são sempre dígitos, para não apanhar o ponto
+ * final de uma frase nem a vírgula que a segue.
+ *
+ * É a MESMA forma que o `parseMoneyText` do `proposal-doc.ts` usa, e é de
+ * propósito: dois leitores do mesmo texto que discordam do número são um
+ * defeito, não uma escolha.
+ */
+const CORRIDA_NUMERICA = /-?\d(?:[\d.,\s\u00a0]*\d)?/g;
+
+/**
  * "1.500", "1500", "1 500 €", "1.500,50" → 1500 / 1500 / 1500 / 1500.5
  *
  * Ela escreve os valores de maneiras diferentes conforme a pressa, e a
  * missão pede que isto se normalize sozinho. As regras seguem o português:
  * a vírgula é o decimal, o ponto separa milhares.
+ *
+ * ── PORQUE É QUE UM TEXTO COM DOIS NÚMEROS NÃO SE LÊ ──────────────────────
+ *
+ * Isto começava por deitar fora tudo o que não fosse dígito, vírgula, ponto ou
+ * sinal. Parece inofensivo e não é: deitar fora as LETRAS COLA os dígitos que
+ * estavam à volta delas. Medido, num documento de base 10.000 €:
+ *
+ *     "de 800 a 1.200 €"          →  8.001.200,00 €   (oito milhões)
+ *     "1.500 € + 23% IVA"         →          1,50 €   (perde 1.498,50 €)
+ *     "2 x 450,00 €"              →      2.450,00 €
+ *     "75,00 € (Évora, 120 km)"   →           null    (duas vírgulas ⇒ NaN)
+ *
+ * Os três primeiros são a pior avaria que este ficheiro pode ter: um número
+ * inventado, sem aviso nenhum, a viajar para o PDF, para a página do casal,
+ * para o corpo do email, para o sinal e para a factura.
+ *
+ * A regra passa a ser simples e recusa-se a adivinhar: **uma corrida numérica
+ * lê-se; duas ou mais não se lêem.** Um valor com um número só («896,00 €»,
+ * «1 500 €», «-500,00 €») continua exactamente como estava. Um valor com dois
+ * («de 800 a 1.200 €», «2 x 450,00 €») é um intervalo, uma multiplicação ou
+ * uma ressalva — coisas que ninguém consegue somar sem adivinhar qual dos
+ * números conta.
+ *
+ * E não se cala: o {@link textoTemNumeroQueNaoSeLe} diz que aquilo TINHA um
+ * número, e o {@link totaisDaProposta} usa-o para escrever, no aviso, qual é a
+ * linha que não entra na soma. É a diferença entre um valor deliberadamente «a
+ * definir» e um valor que ela escreveu a contar que fosse somado.
  */
 export function normalizarValor(texto: unknown): number | null {
   if (typeof texto === "number") return Number.isFinite(texto) ? texto : null;
   if (typeof texto !== "string") return null;
-  // Fora tudo o que não é dígito, vírgula, ponto ou sinal: o «€», os espaços,
-  // os espaços não separáveis que vêm de copiar e colar de uma folha de cálculo.
-  const limpo = texto.replace(/[^\d,.\-]/g, "").trim();
+
+  const corridas = texto.match(CORRIDA_NUMERICA);
+  // Nenhum número («a definir», «sob consulta») ou mais do que um: não se lê.
+  if (!corridas || corridas.length !== 1) return null;
+
+  // Fora os espaços (normais e não separáveis) de dentro do próprio número.
+  const limpo = corridas[0].replace(/[\s ]/g, "");
   if (!limpo) return null;
 
   let normalizado: string;
@@ -157,6 +200,20 @@ export function normalizarValor(texto: unknown): number | null {
   }
   const n = Number(normalizado);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * «Isto tinha um número lá dentro e mesmo assim não se conseguiu ler.»
+ *
+ * Serve para distinguir as duas ausências que hoje se parecem uma com a outra
+ * na coluna do dinheiro: «a definir» (deliberado, e está tudo bem) de «de 800
+ * a 1.200 €» (ela escreveu um valor a contar que contasse, e não conta).
+ * Só a segunda merece um aviso.
+ */
+export function textoTemNumeroQueNaoSeLe(texto: unknown): boolean {
+  if (typeof texto !== "string") return false;
+  if (normalizarValor(texto) !== null) return false;
+  return /\d/.test(texto);
 }
 
 /** Os preços, sempre com o mesmo comprimento que as linhas. */
@@ -281,6 +338,93 @@ export function somaDosExtrasSemIva(
     return acc + (modo === "incluido" ? valor / (1 + taxa) : valor);
   }, 0);
   return round2(total);
+}
+
+/**
+ * A RESSALVA que ela escreveu num valor — o que lá está além do número e além
+ * do IVA.
+ *
+ *   «12.500,00 € + IVA (a confirmar consoante a distância final)»
+ *       → «a confirmar consoante a distância final»
+ *   «950,50 € + IVA»  → «»   (não há ressalva; não se imprime nada)
+ *   «12.500,00 €»     → «»
+ *
+ * Três coisas caem, por esta ordem, e cada uma por uma razão diferente:
+ *
+ *  1. O NÚMERO — com os separadores e a moeda que venha agarrada. Vai para a
+ *     coluna da direita, na unidade do bloco, e não se repete no nome.
+ *  2. O «+ IVA». Não se perde nada: a escada por baixo diz «TOTAL (sem IVA)»,
+ *     «IVA (23%)» e «Total a pagar», que é a mesma informação dita pelas nossas
+ *     contas e não por um pedaço de texto livre. E há uma razão dura para o
+ *     tirar: numa proposta INGLESA, o «+ IVA» dela chegava ao papel em português
+ *     por cima de uma folha que diz «VAT».
+ *  3. Os parênteses à volta do que sobra, se ela já lá os tiver posto — senão
+ *     saía «(( a confirmar ))».
+ *
+ * O que fica é a CONDIÇÃO, que é a única parte que só ela sabe e que o documento
+ * não diz por si. Não se interpreta: só se separa.
+ *
+ * Vivia dentro do `proposal-doc-pdf.ts`, como fecho local. Mudou-se para aqui
+ * sem uma vírgula de diferença porque a PÁGINA passou a precisar exactamente da
+ * mesma regra — ver {@link valorAdicionalParaOEcra}.
+ */
+export function ressalvaDoValor(texto: string | undefined): string {
+  const semNumero = (texto ?? "")
+    .trim()
+    .replace(/^[^\d+-]*[-+]?\d[\d\s.,\u00a0]*\s*(€|eur(?:os?)?)?\s*/i, "")
+    .trim();
+  const semIva = semNumero.replace(/^[+\s]*(iva|vat)\b\s*/i, "").trim();
+  const sobra = semIva.replace(/^[\s,;:·—–-]+/u, "").trim();
+  return /^\([\s\S]*\)$/.test(sobra) ? sobra.slice(1, -1).trim() : sobra;
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM VALOR ADICIONAL, PRONTO A DESENHAR — NA UNIDADE DA ESCADA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O PDF já fazia isto bem e tinha a razão escrita ao lado: o que vai na coluna
+ * do dinheiro é a BASE (`somaDosExtrasSemIva`), nunca o número cru que ela
+ * escreveu. «75,00 €» numa proposta que se lê COM IVA vale 60,98 € de base, e
+ * imprimir 75,00 ao lado de um subtotal de 2.399,02 € era pôr uma parcela que
+ * não soma com as outras.
+ *
+ * A página do casal não fazia. Imprimia o texto cru, e a coluna ficava assim:
+ *
+ *     Subtotal dos serviços        2.399,02 €
+ *     Deslocação da Equipa Líquen     75,00 €
+ *     TOTAL (sem IVA)              2.460,00 €
+ *
+ * 2.399,02 + 75,00 = 2.474,02, e a folha diz 2.460,00. Catorze euros que a
+ * página não explica — na página onde o casal decide dizer que sim. O PDF do
+ * mesmo documento estava certo, o que é pior: as duas folhas discordavam.
+ *
+ * Devolve as duas metades da decisão, para o desenho não a repetir:
+ *  · `montante` — o que soma, em base. `null` quando o valor não se lê
+ *    (ver {@link normalizarValor}), e aí a coluna imprime «—».
+ *  · `aoLado` — o que ela escreveu que NÃO é o número: a ressalva quando o
+ *    número cru bate certo com a base, e o texto inteiro quando não bate (é a
+ *    forma de a folha dizer os dois números em vez de esconder um deles).
+ */
+export function valorAdicionalParaOEcra(
+  extra: { label?: string; valueText?: string },
+  contexto?: { mode?: "acrescer" | "incluido"; vatRate?: number },
+): { montante: number | null; mostraTudo: boolean; escrito: string; ressalva: string } {
+  const cru = normalizarValor(extra.valueText);
+  const base = somaDosExtrasSemIva(
+    [{ label: extra.label ?? "", valueText: extra.valueText ?? "" }],
+    contexto,
+  );
+  const escrito = (extra.valueText ?? "").trim();
+  // `mostraTudo` e não `aoLado` já formatado: o PDF passa o texto dela por um
+  // conversor de língua antes de o desenhar e a página não. A DECISÃO é que tem
+  // de ser a mesma nos dois sítios; a formatação é de cada folha.
+  return {
+    montante: cru === null ? null : base,
+    mostraTudo: cru === null || round2(cru) !== base,
+    escrito,
+    ressalva: ressalvaDoValor(escrito),
+  };
 }
 
 /**
@@ -663,6 +807,46 @@ export function totaisDaProposta(
   if (servicos < 0) {
     porQueNaoFecha.push(
       `os valores adicionais (${adicionais}) valem mais do que o total (${money.base}), e o subtotal dos serviços sai negativo`,
+    );
+  }
+  /**
+   * ── O TOTAL A PAGAR NÃO PODE SER NEGATIVO ────────────────────────────────
+   *
+   * Um desconto escrito como valor adicional («−12.000,00 €» sobre uma base de
+   * 10.000 €) fazia o PDF desenhar a escada inteira com o número grande a dizer
+   * «Total a pagar −2.460,00 €», enquanto a página do casal escondia o quadro
+   * todo (a condição dela é `aPagar > 0`). Duas folhas do mesmo documento, uma
+   * com seis números negativos e a outra sem números nenhuns.
+   *
+   * O aviso já disparava, mas pela via errada — queixava-se do sinal e do saldo
+   * («0 + 0 ≠ −2460»), que é o SINTOMA. Isto nomeia a causa, e é o que o desenho
+   * passa a ler para decidir não imprimir a escada.
+   */
+  if (money.gross < 0) {
+    porQueNaoFecha.push(
+      `o total a pagar é negativo (${money.gross}) — um desconto maior do que o valor dos serviços não é um preço`,
+    );
+  }
+  /**
+   * ── OS VALORES ADICIONAIS QUE TÊM UM NÚMERO E NÃO SE SOMAM ──────────────
+   *
+   * «de 800 a 1.200 €», «2 x 450,00 €», «75,00 € (Évora, 120 km)». Ver
+   * {@link normalizarValor}: um texto com dois números não se lê, de propósito,
+   * porque a alternativa era adivinhar — e adivinhar dava oito milhões de euros.
+   *
+   * O que não pode acontecer é ficar calado. Sem isto, um valor que ela escreveu
+   * a contar que contasse é indistinguível de um «a definir» deliberado: os dois
+   * imprimem «—» na coluna do dinheiro e nenhum aparece em lado nenhum. Com
+   * isto, o rótulo da linha vai no aviso e ela sabe qual é que tem de reescrever.
+   */
+  const ilegiveis = (doc.budgetExtras ?? [])
+    .filter((e) => textoTemNumeroQueNaoSeLe(e.valueText))
+    .map((e) => e.label?.trim() || "(sem nome)");
+  if (ilegiveis.length > 0) {
+    porQueNaoFecha.push(
+      ilegiveis.length === 1
+        ? `o valor adicional «${ilegiveis[0]}» tem um número escrito que não se consegue somar — escreve um valor só (por exemplo «800,00 €») e põe o resto ao lado do nome`
+        : `${ilegiveis.length} valores adicionais têm números que não se conseguem somar (${ilegiveis.map((n) => `«${n}»`).join(", ")}) — cada um precisa de um valor só`,
     );
   }
   /**

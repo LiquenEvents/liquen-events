@@ -3,6 +3,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import Documento from "./Documento";
 import { textosDaProposta } from "@/lib/proposal-doc-textos";
+import { totaisDaProposta } from "@/lib/proposal-budget";
 import {
   DEFAULT_CANCELAMENTO,
   DEFAULT_FASEAMENTO,
@@ -392,18 +393,21 @@ describe("o dinheiro escrito à mão", () => {
 
   it("agrupa os milhares como o PDF, em português", () => {
     desenhar(COM_EXTRAS);
-    expect(screen.getByText("1.550,00 €")).toBeTruthy();
+    // O que ela escreveu vai ao lado do nome, agrupado — ver a secção
+    // «a coluna dos adicionais soma» abaixo para saber porque é que é ao lado
+    // do nome e não na coluna do dinheiro.
+    expect(screen.getByText(/Deslocação equipa \(1\.550,00 €\)/)).toBeTruthy();
     expect(screen.getByText("2.400,00 €")).toBeTruthy();
     // Controlo positivo: a forma antiga, sem separador, deixou de aparecer.
-    expect(screen.queryByText("1550,00 €")).toBeNull();
+    expect(screen.queryByText(/1550,00 €/)).toBeNull();
   });
 
   it("na folha inglesa passa a inglês, como tudo o resto", () => {
     desenhar(COM_EXTRAS, "en");
-    expect(screen.getByText("€1,550.00")).toBeTruthy();
+    expect(screen.getByText(/Deslocação equipa \(€1,550\.00\)/)).toBeTruthy();
     expect(screen.getByText("€2,400.00")).toBeTruthy();
     // O que estava lá antes — português no meio de números ingleses.
-    expect(screen.queryByText("1550,00 €")).toBeNull();
+    expect(screen.queryByText(/1550,00 €/)).toBeNull();
   });
 
   it("um texto que já vem agrupado passa incólume", () => {
@@ -413,7 +417,7 @@ describe("o dinheiro escrito à mão", () => {
       totalText: "",
       budgetExtras: [{ label: "Extra", valueText: "9.876,00 €" }],
     } as unknown as Partial<ProposalDoc>);
-    expect(screen.getByText("9.876,00 €")).toBeTruthy();
+    expect(screen.getByText(/9\.876,00 €/)).toBeTruthy();
   });
 
   it("uma linha sem preço continua sem preço — não vira «0,00 €»", () => {
@@ -753,5 +757,88 @@ describe("a numeração das secções", () => {
     // a não existir em lado nenhum.
     desenhar({ serviceGroups: [] });
     expect(screen.getByRole("heading", { name: "2. Orçamento Proposto" })).toBeTruthy();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A PÁGINA NÃO FAZ CONTAS — LÊ AS QUE JÁ ESTÃO FEITAS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Da caça a bugs: A3-003 e A3-004. Esta página era a ÚNICA das quatro
+ * superfícies (PDF, estúdio, portal, página) que ainda recalculava dinheiro por
+ * sua conta — e divergia das outras três de duas maneiras diferentes.
+ *
+ * O comentário da escada, no componente, promete que «aqui não se faz uma única
+ * conta». Estes dois testes são o que torna a promessa verificável.
+ */
+describe("a página do casal e a folha dizem o mesmo número", () => {
+  /**
+   * A3-003 — O SINAL, ARREDONDADO PARA O MESMO LADO.
+   *
+   * A pagar 12.000,15 € a 30%: o `totais.sinal` empurra o meio-cêntimo para
+   * cima e dá 3.600,05 €, que é o número do PDF e o número sobre que a factura
+   * é emitida. A conta que aqui se fazia (`aPagar * pct / 100`) entregava
+   * 3.600,045 ao `Intl`, que arredonda para baixo: 3.600,04 €.
+   *
+   * Acontecia em 2,5% de todos os totais entre mil e cinco mil euros, e SÓ à
+   * percentagem da casa — a 40% e a 50% nunca acontece. Um cêntimo é pouco;
+   * duas folhas do mesmo documento a discordar não é.
+   */
+  it("o sinal é o do PDF, ao cêntimo — não um recalculado à parte", () => {
+    desenhar({
+      totalAmount: 12000.15,
+      totalVatMode: "incluido",
+      vatRate: 0,
+      depositPercent: 30,
+      faseamento: DEFAULT_FASEAMENTO,
+    } as unknown as Partial<ProposalDoc>);
+    const totais = totaisDaProposta(
+      { ...DOC, totalAmount: 12000.15, totalVatMode: "incluido", vatRate: 0 } as ProposalDoc,
+      30,
+    );
+    expect(totais.aPagar).toBe(12000.15);
+    expect(totais.sinal).toBe(3600.05);
+    expect(screen.getByText(/3\.600,05 €/)).toBeTruthy();
+    // Controlo positivo: o número da conta antiga deixou de estar na página.
+    expect(screen.queryByText(/3\.600,04 €/)).toBeNull();
+  });
+
+  /**
+   * A3-004 — A COLUNA SOMA COM O SUBTOTAL QUE TEM POR CIMA.
+   *
+   * O caso da proposta real: bruto 3.025,80 lido COM IVA e uma deslocação de
+   * «75,00 €» calada. Imprimir 75,00 ao lado de um subtotal de 2.399,02 € dava
+   * 2.474,02 contra os 2.460,00 escritos à frente — catorze euros que a folha
+   * não explica, na página onde o casal decide dizer que sim.
+   */
+  it("a coluna dos adicionais fecha o total, e o texto dela vai ao lado do nome", () => {
+    desenhar({
+      totalAmount: 3025.8,
+      totalVatMode: "incluido",
+      vatRate: 0.23,
+      budgetExtrasSomam: true,
+      budgetExtras: [{ label: "Deslocação da Equipa Líquen", valueText: "75,00 €" }],
+    } as unknown as Partial<ProposalDoc>);
+    // O que a coluna imprime é a BASE, com o «+» à frente.
+    expect(screen.getByText("+ 60,98 €")).toBeTruthy();
+    // O que ela escreveu não se perde: fica ao lado do nome.
+    expect(screen.getByText(/Deslocação da Equipa Líquen \(75,00 €\)/)).toBeTruthy();
+    // Controlo positivo: a parcela que não somava com as outras saiu da coluna.
+    expect(screen.queryByText("75,00 €")).toBeNull();
+  });
+
+  it("um valor que não se consegue ler fica com o texto dela, nunca com um número inventado", () => {
+    desenhar({
+      totalAmount: 10000,
+      totalVatMode: "acrescer",
+      budgetExtrasSomam: true,
+      budgetExtras: [{ label: "Transporte", valueText: "de 800 a 1.200 €" }],
+    } as unknown as Partial<ProposalDoc>);
+    // Fica o que ela escreveu: um intervalo lê-se como intervalo, e ninguém o
+    // confunde com uma parcela que soma.
+    expect(screen.getByText(/de 800 a 1\.200 €/)).toBeTruthy();
+    // Controlo positivo: os oito milhões que a leitura antiga inventava.
+    expect(screen.queryByText(/8\.001\.200/)).toBeNull();
   });
 });

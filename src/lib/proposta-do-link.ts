@@ -3,6 +3,7 @@ import type { Proposal } from "@/lib/orcamento/types";
 import { getProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { readProposalToken } from "@/lib/proposal-token";
+import { lerLigacaoCurta, pareceCodigoCurto } from "@/lib/proposta-link-curto";
 import { estadoDaVersao, seloDoConteudo, type EstadoDaVersao } from "@/lib/proposta-versao";
 import { log } from "@/lib/logger";
 
@@ -93,10 +94,21 @@ function mesmoCliente(a: string | undefined, b: string | undefined): boolean {
 export async function propostaDoLink(
   token: string | undefined | null,
 ): Promise<PropostaDoLink | null> {
-  const claim = readProposalToken(token);
-  if (!claim) return null;
+  /**
+   * DUAS PORTAS PARA A MESMA SALA.
+   *
+   * O que vem no endereço é o token assinado (os links já enviados, que têm de
+   * continuar a abrir) ou o código curto de 16 caracteres. Distinguem-se pela
+   * forma, sem ambiguidade possível: um token tem pontos e duzentos caracteres.
+   *
+   * O código curto é tentado primeiro porque é uma comparação de forma, barata,
+   * e falha de imediato para tudo o que seja um token.
+   */
+  const codigo = pareceCodigoCurto(token) ? await lerLigacaoCurta(String(token)) : null;
+  const propostaId = codigo?.propostaId ?? readProposalToken(token)?.proposalId;
+  if (!propostaId) return null;
 
-  const doToken = await getProposal(claim.proposalId);
+  const doToken = await getProposal(propostaId);
   if (!doToken) return null;
 
   let proposta = doToken;
@@ -140,7 +152,43 @@ export async function propostaDoLink(
           seloAceite = aceite.propostaVersaoSelo || aceitada.versaoSelo || seloDoConteudo(aceitada);
         }
       } else if (maisRecente && maisRecente.id !== doToken.id) {
-        proposta = maisRecente;
+        /**
+         * ══════════════════════════════════════════════════════════════════
+         * SALTAR PARA A VERSÃO NOVA NUNCA PODE PERDER O DOCUMENTO
+         * ══════════════════════════════════════════════════════════════════
+         *
+         * MEDIDO num email real: o casal recebeu uma proposta de 15 páginas em
+         * anexo, com mood boards, e o link ao lado abriu uma página com a
+         * saudação, o subtotal, o IVA, o total e os contactos. Sem Apresentação,
+         * sem Serviços, sem Inspiração, sem Condições — e sem o botão «Ver a
+         * proposta completa (PDF)».
+         *
+         * A causa não é a página nem o conteúdo da proposta: é ESTE salto. A
+         * página desenha o documento inteiro quando `proposal.doc` existe e cai
+         * no quadro de preço quando não existe (`page.tsx`, «O DOCUMENTO
+         * INTEIRO, QUANDO ELE EXISTE»), e o botão do PDF está na mesma
+         * condição. Este ramo escolhia a irmã mais RECENTE por data — e uma
+         * proposta criada pelo construtor de linhas do back office não tem
+         * documento nenhum (`api/orcamento/[id]/proposta` grava `lineItems`,
+         * nunca um `doc`). Basta ela existir depois, para o mesmo pedido, para
+         * o link do casal deixar de mostrar a proposta que lhe foi enviada.
+         *
+         * A regra passa a ser: só se salta para a versão nova se ela souber
+         * mostrar-se. Uma irmã mais recente SEM documento não desloca uma que o
+         * tenha — o casal continua a ver a proposta inteira, que é o que o email
+         * lhe prometeu. Quando nenhuma das duas tem documento, salta-se na
+         * mesma: aí as duas desenham-se da mesma maneira e a mais recente é a
+         * verdadeira.
+         */
+        const perderiaODocumento = Boolean(doToken.doc) && !maisRecente.doc;
+        if (perderiaODocumento) {
+          log.warn("proposta-do-link: a versão mais recente não tem documento — fica a do link", {
+            proposta: doToken.id,
+            maisRecente: maisRecente.id,
+          });
+        } else {
+          proposta = maisRecente;
+        }
       }
       seguiu = proposta.id !== doToken.id;
     }

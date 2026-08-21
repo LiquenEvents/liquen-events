@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { rascunhoDoEnvio, valoresDoEnvio } from "@/lib/email-rascunho-do-envio";
 import { MODELO_POR_OMISSAO } from "@/lib/email-modelos-rascunho";
-import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
+import { assinaturaDeQuemEnvia } from "@/lib/email-quem-assina";
+import { assinanteDoEmail } from "@/lib/email-assinatura";
 import { listarModelos, type IdiomaDoModelo } from "@/lib/email-templates-store";
 import { dinheiroDaProposta } from "@/lib/proposal-budget";
 import { resolveValidUntil, withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       validadeIso: doc ? resolveValidUntil(doc) : undefined,
       sinalPercentagem: doc ? depositPercentOf(doc) : undefined,
       mensagemPessoal: mensagem,
-      remetente: nomeDeQuemEnvia(request),
+      remetente: assinanteDoEmail({ ...assinaturaDeQuemEnvia(request) }).nome,
       idioma,
     });
 
@@ -151,9 +152,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({
       ...rascunho,
       porOmissao: MODELO_POR_OMISSAO,
-      /** Quem assina, para o ecrã o poder MOSTRAR — é o mesmo nome que vai
-       *  parar debaixo do email, e vê-lo antes de enviar é metade do pedido. */
-      remetente: nomeDeQuemEnvia(request),
+      /**
+       * Quem assina, para o ecrã o poder MOSTRAR — é o mesmo nome que vai
+       * parar debaixo do email, e vê-lo antes de enviar é metade do pedido.
+       *
+       * Passa pelo `assinanteDoEmail` e não pelo nome cru da sessão: é ELE que
+       * decide o que vai ser impresso, incluindo a queda para a assinatura da
+       * casa. Sem isto, o ecrã mostrava um nome e o email levava outro — e foi
+       * assim que «Liquen Alentejo» chegou a uma cliente sem ninguém o ver
+       * antes.
+       */
+      remetente: assinanteDoEmail({ ...assinaturaDeQuemEnvia(request) }).nome,
       destinatario: { nome: clientNames, email: String(quote.email ?? "").trim() },
       modelos: modelos.map((m) => ({
         chave: m.chave,

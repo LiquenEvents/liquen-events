@@ -7,12 +7,11 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
-import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
+import { assinaturaDeQuemEnvia } from "@/lib/email-quem-assina";
 import { marcadoresDoPedido, modeloParaEnvioAutomatico, textoDoCorpo } from "@/lib/email-modelos";
 import { arrumarLigacao, ROTULO_DA_PROPOSTA } from "@/lib/email-ligacoes";
 import { corpoEscritoAMao, excedeOTecto, MAXIMO_CORPO_ESCRITO } from "@/lib/email-corpo-escrito";
-import { SITE } from "@/lib/site";
-import { createProposalToken } from "@/lib/proposal-token";
+import { enderecoDaProposta } from "@/lib/proposta-link-curto";
 import { isAuthed } from "@/lib/admin-auth";
 import { proposalCreateSchema, firstError, dataIso } from "@/lib/validation";
 import { log } from "@/lib/logger";
@@ -30,7 +29,7 @@ import { log } from "@/lib/logger";
  * no painel — mudá-la aqui deixava-a a discordar das linhas que as rotas irmãs
  * escrevem para o mesmo pedido.
  */
-import { eur, eurDocumento } from "@/lib/money";
+import { eur, eurDocumento, round2 } from "@/lib/money";
 
 export const runtime = "nodejs";
 /** O POST desenha o PDF da proposta e ainda fala com o SMTP com o anexo
@@ -106,9 +105,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const vatRate = parsed.data.vatRate ?? 0.23;
-    const subtotal = lineItems.reduce((s, it) => s + it.qty * it.unitPrice, 0);
-    const vat = subtotal * vatRate;
-    const total = subtotal + vat;
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * AS TRÊS LINHAS DE UMA FOLHA DE DINHEIRO TÊM DE FECHAR
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Isto era `subtotal * vatRate` e `subtotal + vat`, sem arredondar nenhum
+     * dos três. Cada parcela era arredondada só na altura de a DESENHAR, e a
+     * conta nunca. Uma linha de 36,50 € imprimia, no PDF que segue em anexo
+     * (`proposal-pdf.ts` desenha as três a partir destes campos):
+     *
+     *     Subtotal   36,50 €      IVA (23%)   8,40 €      TOTAL   44,89 €
+     *
+     * 36,50 + 8,40 = 44,90. O IVA real é 8,395 (arredonda para cima ao mostrar)
+     * e o total real 44,895, que em vírgula flutuante é 44,89499999… e arredonda
+     * para BAIXO. Falham assim todos os subtotais terminados em ,50 com dezena
+     * ímpar de euros, e mais casos — 36,50 · 85,50 · 158,50 · 183,50 · 279,50…
+     * O corpo do email imprime só o total, e por isso saía sozinho e errado.
+     * Estes três campos são também os que ficam GRAVADOS na proposta.
+     *
+     * A regra da casa está escrita em `pricing.ts` desde que este mesmo erro foi
+     * corrigido lá: «o IVA é 23% DAQUELE número, o que lá está escrito, e não de
+     * um número intermédio que ninguém vê». Esta rota tinha ficado de fora.
+     */
+    const subtotal = round2(lineItems.reduce((s, it) => s + it.qty * it.unitPrice, 0));
+    const vat = round2(subtotal * vatRate);
+    const total = round2(subtotal + vat);
 
     /**
      * ══════════════════════════════════════════════════════════════════════
@@ -208,8 +230,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
     const pdfBuffer = Buffer.from(pdfBytes);
 
-    // Signed link so the client can accept/decline the proposal online.
-    const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
+    // O endereço por onde o casal aceita ou recusa. Curto quando o
+    // armazenamento responde, token assinado quando não responde — as duas
+    // portas abrem a mesma sala e expiram no mesmo instante.
+    const acceptUrl = await enderecoDaProposta(proposal.id, id);
 
     // Email the client with the PDF attached. Só o corpo se escreve aqui — a
     // moldura, a assinatura e os anexos da marca vêm do `email-assinatura`,
@@ -265,7 +289,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * do casal vai junto só para a protecção: nenhum email pode sair assinado
      * com o nome de quem o vai ler (ver `email-assinatura.ts`).
      */
-    const quem = { nome: nomeDeQuemEnvia(request), destinatario: quote.name };
+    const quem = { ...assinaturaDeQuemEnvia(request), destinatario: quote.name };
 
     /**
      * O corpo dela, com o endereço arrumado: o token gigante fica no `href` e o

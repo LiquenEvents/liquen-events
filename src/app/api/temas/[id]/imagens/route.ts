@@ -11,7 +11,7 @@ import {
   type ThemeThumbInput,
 } from "@/lib/theme-storage";
 import { isFingerprint } from "@/lib/theme-fingerprint";
-import { garantirFormatoImprimivel, motivoDaRecusa } from "@/lib/proposal-image";
+import { dimensoesReais, garantirFormatoImprimivel, motivoDaRecusa } from "@/lib/proposal-image";
 import { recusaDeImagem } from "@/lib/recusa-de-imagem";
 import {
   THEME_PAGE_SIZE,
@@ -356,13 +356,37 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // motivo para devolver erro de um carregamento que correu bem.
     const lqip = lqips[i];
     const cor = cores[i];
-    if (lqip || cor) {
+    /**
+     * A FORMA DA FOTOGRAFIA, GUARDADA — e não só usada e deitada fora.
+     *
+     * As colunas `largura`/`altura` existiam na tabela, eram lidas por três
+     * consumidores, e ninguém as escrevia: o `formasDeCaminhos` devolvia sempre
+     * um mapa vazio. A página do casal desenhava as células sem `aspect-ratio`
+     * (o salto de 10 833 px documentado no `Inspiracao.tsx`), o empacotamento
+     * das colunas nunca equilibrava, e as suspeitas da verificação pré-envio
+     * saltavam todas com um `if (!forma) continue`.
+     *
+     * Lê-se dos bytes que já estão em memória, pelo `dimensoesReais` e não pela
+     * `metadata()` crua: uma foto de telemóvel ao alto tem largura e altura
+     * trocadas no cabeçalho, e gravá-las assim trocava o problema por outro.
+     *
+     * Sobre `pronto` e não sobre `recebidos`: é `pronto` que fica no bucket.
+     */
+    const forma = await dimensoesReais(pronto.bytes);
+    const dados = {
+      ...(lqip ? { lqip } : {}),
+      ...(cor ? { cor } : {}),
+      ...(forma ? { largura: forma.w, altura: forma.h } : {}),
+    };
+    if (Object.keys(dados).length > 0) {
       try {
-        const dados = { ...(lqip ? { lqip } : {}), ...(cor ? { cor } : {}) };
         await garantirFoto(res.image.path, dados);
         await updateFoto(res.image.path, dados);
       } catch (e) {
-        log.warn("temas: LQIP/cor não guardados", { path: res.image.path, erro: String(e) });
+        log.warn("temas: LQIP/cor/forma não guardados", {
+          path: res.image.path,
+          erro: String(e),
+        });
       }
     }
     // ── A ETIQUETA DE PALETA, DE GRAÇA ────────────────────────────────────

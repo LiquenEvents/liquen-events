@@ -15,7 +15,7 @@ import {
   type CampoDoEvento,
   type IdiomaDaProposta,
 } from "@/lib/proposal-doc-textos";
-import { totaisDaProposta } from "@/lib/proposal-budget";
+import { totaisDaProposta, valorAdicionalParaOEcra } from "@/lib/proposal-budget";
 import { ordemDeSaida, aplicarOrdem } from "@/lib/proposal-ordem";
 import type { FotoDaProposta } from "@/lib/proposta-fotos";
 import {
@@ -879,14 +879,47 @@ export default function Documento({
                       {eur(totais.servicos)}
                     </span>
                   </div>
-                  {extras.map((e, i) => (
-                    <div key={i} className="flex items-baseline justify-between gap-4 py-1.5">
-                      <span className="text-foreground/70 text-sm">{e.label}</span>
-                      <span className="text-foreground/70 text-sm tabular-nums">
-                        {dinheiroEscrito(e.valueText)}
-                      </span>
-                    </div>
-                  ))}
+                  {/* ── A COLUNA TEM DE SOMAR COM A DE CIMA ──────────────────
+                    Aqui imprimia-se o texto CRU dela. Numa proposta que se lê
+                    com IVA, «75,00 €» vale 60,98 € de base, e a coluna ficava:
+
+                        Subtotal dos serviços      2.399,02 €
+                        Deslocação da Equipa         75,00 €
+                        TOTAL (sem IVA)            2.460,00 €
+
+                    Catorze euros que a folha não explica, na página onde o
+                    casal decide dizer que sim — e o PDF do MESMO documento
+                    dizia o número certo. Agora é a mesma decisão nos dois
+                    (`valorAdicionalParaOEcra`), e o que ela escreveu vai ao
+                    lado do nome, entre parênteses, que é onde pertence. */}
+                  {extras.map((e, i) => {
+                    const v = valorAdicionalParaOEcra(e, {
+                      mode: totais.modo,
+                      vatRate: totais.taxa,
+                    });
+                    /* Quando o valor NÃO se lê («de 800 a 1.200 €», «a
+                       definir»), a coluna fica com o que ela escreveu — como
+                       ficava antes, e sem problema nenhum: não há ali um número
+                       a fingir que soma com o subtotal de cima. O defeito era
+                       só com os valores que se LÊEM, e esses passam a sair na
+                       unidade da escada, com o «+» à frente. */
+                    const somavel = v.montante !== null;
+                    const aoLado = somavel
+                      ? v.mostraTudo
+                        ? dinheiroEscrito(v.escrito)
+                        : v.ressalva
+                      : "";
+                    return (
+                      <div key={i} className="flex items-baseline justify-between gap-4 py-1.5">
+                        <span className="text-foreground/70 text-sm">
+                          {aoLado ? `${e.label} (${aoLado})` : e.label}
+                        </span>
+                        <span className="text-foreground/70 text-sm tabular-nums">
+                          {somavel ? `+ ${eur(v.montante as number)}` : dinheiroEscrito(v.escrito)}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </>
               )}
               <div className="border-foreground/15 mt-3 border-t pt-3">
@@ -941,11 +974,23 @@ export default function Documento({
                    * os 30/70 desta linha podiam já não ser os de lá — e duas
                    * percentagens diferentes na mesma proposta são a única
                    * coisa pior do que a pergunta sem resposta.
+                   *
+                   * ── E O NÚMERO É LIDO, NÃO CALCULADO ────────────────────
+                   * Foi `totais.aPagar * (sinalPct / 100)`, feito aqui. Divergia
+                   * do PDF e da factura em 2,5% de todos os totais entre mil e
+                   * cinco mil euros, à percentagem da casa: o `totais.sinal`
+                   * empurra o meio-cêntimo para cima e o `Intl` deste sítio
+                   * arredondava-o para baixo. A pagar 12.000,15 € dava «Sinal
+                   * 30% 3.600,05 €» na folha e «30% na adjudicação: 3.600,04 €»
+                   * aqui — e é sobre o primeiro que a factura é emitida.
+                   *
+                   * O comentário da escada, dez linhas acima, promete que nesta
+                   * secção não se faz uma única conta. Passou a ser verdade.
                    */}
                   {faseamentoDaCasa && (
                     <p className="text-foreground/70 mt-3 text-[13px] leading-relaxed">
                       <span className="text-foreground/85 font-medium">
-                        {fase(p.agora, sinalPct, eur(totais.aPagar * (sinalPct / 100)))}
+                        {fase(p.agora, sinalPct, eur(totais.sinal))}
                       </span>
                       {" · "}
                       {fase(p.depois, 100 - sinalPct)}

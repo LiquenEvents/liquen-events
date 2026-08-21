@@ -7,13 +7,11 @@ import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
 import { Card, Field, Button, EmptyState } from "@/app/[lang]/(site)/orcamento/admin/ui";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import { useTravaoDeSaida } from "./useGravacaoAutomatica";
+import { eur, round2 } from "@/lib/money";
 
-const eur = (n: number) =>
-  new Intl.NumberFormat("pt-PT", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2,
-  }).format(n || 0);
+/* O `eur` e o `round2` da casa. Havia aqui uma quinta cópia local do
+   `Intl.NumberFormat`, que é o género de coisa que diverge sem ninguém dar
+   por isso — e este ficheiro é justamente onde o dinheiro divergiu. */
 
 const LS_KEY = "liquen-last-proposal-items";
 
@@ -496,12 +494,16 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
    *  `porGravar` anda em estado a par do `ref` (ver a declaração). */
   useTravaoDeSaida(!oRegistoFalaPorMim && (porGravar || estado === "so-neste-computador"));
 
-  const subtotal = items.reduce(
-    (s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0),
-    0,
+  /* Os mesmos três `round2` da rota, e pela mesma razão: o ecrã tem de dizer o
+     que a folha vai dizer. Sem eles, este painel mostrava «Subtotal 36,50 € ·
+     IVA 8,40 € · TOTAL 44,89 €» — e a proposta que saía dizia o mesmo, errado
+     da mesma maneira. Ver o comentário longo em
+     `api/orcamento/[id]/proposta/route.ts`. */
+  const subtotal = round2(
+    items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.unitPrice) || 0), 0),
   );
-  const vat = subtotal * vatRate;
-  const total = subtotal + vat;
+  const vat = round2(subtotal * vatRate);
+  const total = round2(subtotal + vat);
 
   function update(i: number, patch: Partial<ProposalLineItem>) {
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));

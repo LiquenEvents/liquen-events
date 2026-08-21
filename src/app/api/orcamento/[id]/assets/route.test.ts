@@ -7,6 +7,10 @@ import type { NextRequest } from "next/server";
 // (415), oversized (413), storage failure (502). We mock the storage layer so
 // no Supabase is touched and assert it is only called for accepted files.
 const st = vi.hoisted(() => ({
+  garantirFoto: vi.fn(async (_p: string, _d: unknown) => {}),
+  updateFoto: vi.fn(async (_p: string, _d: unknown) => {}),
+  /** O que o `dimensoesReais` devolve. `null` = o sharp não leu os bytes. */
+  forma: vi.fn(async () => ({ w: 1200, h: 800 }) as { w: number; h: number } | null),
   authed: false,
   dbConfigured: true,
   /** O documento gravado da proposta (null = não há). */
@@ -52,6 +56,15 @@ vi.mock("@/lib/proposal-drafts", () => ({ getProposalDraft: vi.fn(async () => nu
 vi.mock("@/lib/proposal-image", async (importOriginal) => ({
   garantirFormatoImprimivel: st.converter,
   motivoDaRecusa: (await importOriginal<typeof import("@/lib/proposal-image")>()).motivoDaRecusa,
+  // A FORMA da fotografia, que a rota passou a GRAVAR (`biblioteca_fotos`).
+  // Devolve-se um valor fixo: os bytes das fixtures são zeros, e o que aqui se
+  // verifica é que a rota a lê e a manda gravar — não o que o sharp sabe ler.
+  dimensoesReais: st.forma,
+}));
+vi.mock("@/lib/biblioteca-fotos-store", () => ({
+  coresDeCaminhos: vi.fn(async () => new Map<string, string>()),
+  garantirFoto: st.garantirFoto,
+  updateFoto: st.updateFoto,
 }));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 // The route reads image dimensions via sharp to reject decompression bombs.
@@ -303,5 +316,83 @@ describe("GET /api/orcamento/[id]/assets", () => {
     const res = await GET(req, ctx);
     expect(res.status).toBe(500);
     expect(log.error).toHaveBeenCalled();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A FORMA DA FOTOGRAFIA FICA GRAVADA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Da caça a bugs: A5-004 = A6-002 = A8-015, encontrado por três agentes
+ * independentes a partir de três ângulos diferentes. As colunas
+ * `largura`/`altura` existiam, eram lidas por três consumidores, e ninguém as
+ * escrevia — o `formasDeCaminhos` devolvia SEMPRE um mapa vazio.
+ *
+ * O que isso custava, tudo em silêncio: a página do casal desenhava as células
+ * sem `aspect-ratio` (o salto de 10 833 px), o empacotamento das colunas nunca
+ * equilibrava, e as «suspeitas» da verificação pré-envio eram código morto.
+ */
+describe("o carregamento grava a forma da fotografia", () => {
+  const gravado = () => (st.updateFoto.mock.calls.at(-1)?.[1] ?? {}) as Record<string, unknown>;
+
+  it("manda a largura e a altura, e não só a cor", async () => {
+    st.authed = true;
+    st.forma.mockResolvedValueOnce({ w: 1600, h: 1067 });
+    await POST(...uploadReq([file("a.jpg", "image/jpeg")]));
+    expect(gravado()).toMatchObject({ largura: 1600, altura: 1067 });
+  });
+
+  it("uma foto ao alto fica ao alto — a orientação EXIF já vem aplicada", async () => {
+    // O `dimensoesReais` troca os eixos quando a etiqueta de orientação diz que
+    // a foto está deitada no ficheiro. Gravar os números crus do cabeçalho
+    // punha a página a reservar uma caixa deitada para uma foto ao alto.
+    st.authed = true;
+    st.forma.mockResolvedValueOnce({ w: 1067, h: 1600 });
+    await POST(...uploadReq([file("b.jpg", "image/jpeg")]));
+    const d = gravado();
+    expect(Number(d.altura)).toBeGreaterThan(Number(d.largura));
+  });
+
+  it("quando o sharp não lê os bytes, grava-se o resto e não se inventa forma", async () => {
+    st.authed = true;
+    st.forma.mockResolvedValueOnce(null);
+    await POST(...uploadReq([file("c.jpg", "image/jpeg")]));
+    const d = gravado();
+    expect(d).not.toHaveProperty("largura");
+    expect(d).not.toHaveProperty("altura");
+  });
+
+  /**
+   * A6-003. O LQIP é a mancha de cor que ocupa a célula enquanto a fotografia
+   * não chega. O caminho da Biblioteca de Temas gravava-o e este não — e por
+   * isso a MESMA página do casal tinha metade das células a abrir com
+   * placeholder e a outra metade a abrir vazias.
+   */
+  it("aceita o LQIP que o estúdio calcula, como a Biblioteca já aceitava", async () => {
+    st.authed = true;
+    const fd = new FormData();
+    fd.append("files", file("d.jpg", "image/jpeg"));
+    fd.append("lqips", `data:image/webp;base64,${"A".repeat(60)}==`);
+    const req = new Request("https://liquen.test/api/orcamento/q-1/assets", {
+      method: "POST",
+      body: fd,
+    }) as unknown as NextRequest;
+    await POST(req, { params: Promise.resolve({ id: "q-1" }) });
+    expect(gravado()).toHaveProperty("lqip");
+  });
+
+  it("um LQIP que não passa na verificação não é gravado", async () => {
+    st.authed = true;
+    const fd = new FormData();
+    fd.append("files", file("e.jpg", "image/jpeg"));
+    // Um SVG com script dentro — o `lqipAceitavel` recusa-o, e bem.
+    fd.append("lqips", "data:image/svg+xml;base64,PHN2Zz48c2NyaXB0Pg==");
+    const req = new Request("https://liquen.test/api/orcamento/q-1/assets", {
+      method: "POST",
+      body: fd,
+    }) as unknown as NextRequest;
+    await POST(req, { params: Promise.resolve({ id: "q-1" }) });
+    expect(gravado()).not.toHaveProperty("lqip");
   });
 });

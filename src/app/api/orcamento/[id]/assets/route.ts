@@ -11,7 +11,8 @@ import {
 import { getProposalByQuote } from "@/lib/proposals-store";
 import { getProposalDraft } from "@/lib/proposal-drafts";
 import { refsDeTemaNoDoc } from "@/lib/theme-materializar";
-import { garantirFormatoImprimivel, motivoDaRecusa } from "@/lib/proposal-image";
+import { dimensoesReais, garantirFormatoImprimivel, motivoDaRecusa } from "@/lib/proposal-image";
+import { lqipAceitavel } from "@/lib/lqip";
 import { recusaDeImagem } from "@/lib/recusa-de-imagem";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { corNormalizada } from "@/lib/cor";
@@ -263,6 +264,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
   }
 
+  /**
+   * Os LQIP, emparelhados pela ordem — a mesma regra das cores, e pela mesma
+   * razão: comprimentos diferentes significam que os dois lados discordam sobre
+   * o que está a ser enviado, e um placeholder na foto errada é uma mancha de
+   * cor que não tem nada que ver com a fotografia que vai aparecer.
+   *
+   * Este caminho não os recebia. O da Biblioteca de Temas recebia — e por isso a
+   * mesma página do casal tinha metade das células a abrir com placeholder e a
+   * outra metade a abrir vazias, conforme a foto tivesse vindo de um sítio ou do
+   * outro.
+   */
+  const lqipsCrus = form.getAll("lqips").filter((v): v is string => typeof v === "string");
+  const lqips: (string | null)[] =
+    lqipsCrus.length === files.length
+      ? lqipsCrus.map((v) => (lqipAceitavel(v) ? v : null))
+      : files.map(() => null);
+  if (lqipsCrus.length > 0 && lqipsCrus.length !== files.length) {
+    log.warn("assets: LQIP ignorados (não correspondem aos ficheiros)", {
+      files: files.length,
+      lqips: lqipsCrus.length,
+    });
+  }
+
   const uploaded: { path: string; url: string; thumbUrl?: string; cor?: string }[] = [];
   for (const [indice, file] of files.entries()) {
     if (!OK_TYPES.test(file.type)) {
@@ -281,6 +305,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Reject decompression bombs by pixel count before the image is ever stored
     // or later decoded by the PDF renderer. sharp reads dimensions from the
     // header without fully decoding, so this is cheap.
+    /**
+     * A FORMA DA FOTOGRAFIA, GUARDADA — e não só contada.
+     *
+     * As colunas `largura`/`altura` da `biblioteca_fotos` existiam, eram lidas
+     * por três consumidores, e NINGUÉM as escrevia. O `formasDeCaminhos`
+     * devolvia sempre um mapa vazio, e com ele:
+     *
+     *  · a página do casal desenhava as 46 células sem `aspect-ratio` — o salto
+     *    de 10 833 px que o cabeçalho do `Inspiracao.tsx` documenta como sendo
+     *    «o comportamento sem a forma guardada». Não era o caso degradado: era
+     *    o único caso que existia;
+     *  · o empacotamento das colunas usava a altura de reserva para todas, e
+     *    por isso nunca equilibrava — a queixa dos buracos na grelha;
+     *  · e as «suspeitas» da verificação pré-envio («esta foto vai sair mole»)
+     *    faziam `if (!forma) continue` sobre todas: código morto a responder
+     *    «não há nada a apontar».
+     *
+     * O sharp já corria aqui, para o tecto de píxeis. Aproveita-se a mesma
+     * leitura — mas pelo `dimensoesReais`, que troca os eixos quando a
+     * orientação EXIF diz que a foto está deitada no ficheiro.
+     */
+    let forma: { w: number; h: number } | null = null;
     try {
       const meta = await sharp(bytes).metadata();
       const pixels = (meta.width ?? 0) * (meta.height ?? 0);
@@ -290,6 +336,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           { status: 413 },
         );
       }
+      forma = await dimensoesReais(bytes);
     } catch {
       return NextResponse.json(
         { error: `Não foi possível processar a imagem: ${file.name}.` },
@@ -331,12 +378,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // como estão todas as anteriores a isto existir. Nunca é motivo para
     // devolver erro de um carregamento que correu bem.
     const cor = cores[indice];
-    if (cor) {
+    const lqip = lqips[indice];
+    const dados = {
+      ...(cor ? { cor } : {}),
+      ...(lqip ? { lqip } : {}),
+      ...(forma ? { largura: forma.w, altura: forma.h } : {}),
+    };
+    if (Object.keys(dados).length > 0) {
       try {
-        await garantirFoto(res.path, { cor });
-        await updateFoto(res.path, { cor });
+        await garantirFoto(res.path, dados);
+        await updateFoto(res.path, dados);
       } catch (e) {
-        log.warn("assets: cor não guardada", { path: res.path, erro: String(e) });
+        log.warn("assets: cor/LQIP/forma não guardados", { path: res.path, erro: String(e) });
       }
     }
     uploaded.push({ ...res, ...(thumbUrl ? { thumbUrl } : {}), ...(cor ? { cor } : {}) });

@@ -109,3 +109,41 @@ describe("quando corre mal", () => {
     await waitFor(() => expect(screen.getByText(/Escreve os serviços à mão/)).toBeTruthy());
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A GAVETA NÃO PODE EMPURRAR O EDITOR PARA FORA DO ECRÃ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * É o mesmo defeito que a lista de temas tinha, noutro sítio: uma lista que
+ * cresce com os dados, sem altura máxima, por cima do que a pessoa está a
+ * fazer. Aqui a gaveta abre POR BAIXO do botão, dentro do editor de serviços, e
+ * a biblioteca «cresce sozinha» por desenho — com sessenta serviços, o grupo em
+ * que ela estava a trabalhar fica fora do ecrã.
+ *
+ * O jsdom não mede alturas; o que se prende é a decisão, que é o que um
+ * refactor apaga sem dar por isso.
+ */
+describe("a lista tem tecto", () => {
+  it("a lista rola por dentro em vez de crescer sem fim", async () => {
+    const muitos = Array.from({ length: 60 }, (_, i) =>
+      servico({ id: `s${i}`, nome: `Serviço ${i}`, categoria: `Categoria ${i % 4}` }),
+    );
+    montar(muitos);
+    await waitFor(() => expect(screen.getByText("Serviço 0")).toBeTruthy());
+
+    const rolo = screen.getByText("Serviço 0").closest(".overflow-y-auto");
+    expect(rolo, "a lista da biblioteca não tem contentor que role").toBeTruthy();
+    expect(rolo?.className).toMatch(/max-h-\[\d+vh\]/);
+  });
+
+  it("e os sessenta continuam lá — o tecto não corta a biblioteca", async () => {
+    const muitos = Array.from({ length: 60 }, (_, i) =>
+      servico({ id: `s${i}`, nome: `Serviço ${i}` }),
+    );
+    montar(muitos);
+    // Controlo positivo: um tecto feito com um `slice` ou um «ver mais» fazia
+    // este número descer.
+    await waitFor(() => expect(screen.getByText("Serviço 59")).toBeTruthy());
+  });
+});

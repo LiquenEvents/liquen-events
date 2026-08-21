@@ -124,7 +124,11 @@ export default function MoodBoardIndice({
   return (
     <nav
       aria-label="Índice das páginas de inspiração"
-      className="mb-3 lg:mb-0 lg:sticky lg:top-24 lg:self-start"
+      /* No telemóvel é uma fila que rola de lado (o `<ul>` abaixo), e aí não há
+         altura para limitar. No ecrã grande é uma coluna `sticky`: sem tecto,
+         uma proposta com muitas páginas tem o fim do índice fora do ecrã e sem
+         maneira de lá chegar, porque uma coluna presa não acompanha o rolo. */
+      className="mb-3 lg:mb-0 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto"
     >
       <p className="bo-eyebrow mb-1.5">Páginas</p>
       {/* ── QUANTAS FALTAM, EM VEZ DE QUANTAS HÁ ────────────────────────────

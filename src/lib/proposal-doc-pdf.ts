@@ -34,7 +34,12 @@ import {
 import { ordemDeSaida, eAOrdemEscrita } from "@/lib/proposal-ordem";
 import { ordemDasFotos } from "@/lib/proposal-moodboard";
 import { eurDocumento, milharesComPonto, montanteNaLingua, round2 } from "@/lib/money";
-import { normalizarValor, somaDosExtrasSemIva, totaisDaProposta } from "@/lib/proposal-budget";
+import {
+  normalizarValor,
+  ressalvaDoValor,
+  somaDosExtrasSemIva,
+  totaisDaProposta,
+} from "@/lib/proposal-budget";
 import { LOGO_DARK_PNG_B64, LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
 import {
   CARLITO_REGULAR_TTF_B64,
@@ -1245,10 +1250,7 @@ export async function renderProposalDocPdfWithReport(
     const names = textoParaFonte(f.serif, doc.clientNames || "");
     const maxNameW = (hasImgs ? W * 0.34 : W * 0.72) - 16;
     let nameSize = 52;
-    while (
-      nameSize > COVER_NAME_MIN &&
-      f.serif.widthOfTextAtSize(names, nameSize) > maxNameW
-    )
+    while (nameSize > COVER_NAME_MIN && f.serif.widthOfTextAtSize(names, nameSize) > maxNameW)
       nameSize -= 2;
     if (f.serif.widthOfTextAtSize(names, nameSize) > maxNameW) {
       const inteiro = wrap(f.serif, names, nameSize, maxNameW);
@@ -1320,7 +1322,12 @@ export async function renderProposalDocPdfWithReport(
       // comia o «   ·   » largo que separa o tipo da data em todas as capas.
       // Encolher e quebrar é o caminho de excepção, não o de todos os dias.
       if (cabe(texto, size)) {
-        textCenter(p, texto, cx, base, { font: o.font, size, color: o.color, tracking: o.tracking });
+        textCenter(p, texto, cx, base, {
+          font: o.font,
+          size,
+          color: o.color,
+          tracking: o.tracking,
+        });
         return base;
       }
       while (size > COVER_LINE_MIN && !cabe(texto, size)) size -= 0.5;
@@ -1907,8 +1914,7 @@ export async function renderProposalDocPdfWithReport(
     const baseHistorica = temSub ? TXT.subtitulo.base : TXT.titulo.base;
 
     /** Quantas linhas dá este texto neste corpo. */
-    const linhasEm = (texto: string, size: number) =>
-      wrap(f.serifIt, texto, size, LARGURA).length;
+    const linhasEm = (texto: string, size: number) => wrap(f.serifIt, texto, size, LARGURA).length;
 
     // O subtítulo encolhe pelo seu lado: é o texto secundário da página, e a
     // altura que ele ocupa é o que sobra para o título.
@@ -2048,39 +2054,11 @@ export async function renderProposalDocPdfWithReport(
      * lá dentro continua a sair como o escreveu.
      */
     const semMarcador = (v: string) => (/^\[[^\]]*\]$/.test(v.trim()) ? "" : v);
-    /**
-     * A RESSALVA que ela escreveu num valor — o que lá está além do número e
-     * além do IVA.
-     *
-     *   «12.500,00 € + IVA (a confirmar consoante a distância final)»
-     *       → «a confirmar consoante a distância final»
-     *   «950,50 € + IVA»  → «»   (não há ressalva; não se imprime nada)
-     *   «12.500,00 €»     → «»
-     *
-     * Três coisas caem, por esta ordem, e cada uma por uma razão diferente:
-     *
-     *  1. O NÚMERO — com os separadores e a moeda que venha agarrada. Vai para
-     *     a coluna da direita, na unidade do bloco, e não se repete no nome.
-     *  2. O «+ IVA». Não se perde nada: a escada por baixo diz «TOTAL (sem
-     *     IVA)», «IVA (23%)» e «Total a pagar», que é a mesma informação dita
-     *     pelas nossas contas e não por um pedaço de texto livre. E há uma
-     *     razão dura para o tirar: numa proposta INGLESA, o «+ IVA» dela
-     *     chegava ao papel em português por cima de uma folha que diz «VAT».
-     *  3. Os parênteses à volta do que sobra, se ela já lá os tiver posto —
-     *     senão saía «(( a confirmar ))».
-     *
-     * O que fica é a CONDIÇÃO, que é a única parte que só ela sabe e que o
-     * documento não diz por si. Não se interpreta: só se separa.
-     */
-    const ressalvaDoValor = (texto: string): string => {
-      const semNumero = (texto ?? "")
-        .trim()
-        .replace(/^[^\d+-]*[-+]?\d[\d\s.,\u00a0]*\s*(€|eur(?:os?)?)?\s*/i, "")
-        .trim();
-      const semIva = semNumero.replace(/^[+\s]*(iva|vat)\b\s*/i, "").trim();
-      const sobra = semIva.replace(/^[\s,;:·—–-]+/u, "").trim();
-      return /^\([\s\S]*\)$/.test(sobra) ? sobra.slice(1, -1).trim() : sobra;
-    };
+    /* A ressalva que ela escreve num valor («… (a confirmar consoante a
+       distância final)») vive agora em `proposal-budget.ts`, partilhada com a
+       PÁGINA do casal — que passou a precisar exactamente da mesma regra. Duas
+       folhas do mesmo documento a decidir isto de maneiras diferentes foi o
+       defeito; a função é a mesma, sem uma vírgula de diferença. */
     const totalStr = semMarcador(orgT ? (doc.totalEstimatedText ?? "") : doc.totalText);
     /* O rótulo do total de Decoração é um campo do estúdio, e nasce preenchido
        («Valor Total Decoração»): traduz-se enquanto for o que lá nasceu, e sai

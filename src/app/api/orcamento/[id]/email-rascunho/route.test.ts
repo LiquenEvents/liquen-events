@@ -22,7 +22,12 @@ const dados = vi.hoisted(() => ({
   rebenta: false,
 }));
 
-vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
+vi.mock("@/lib/admin-auth", () => ({
+  isAuthed: () => true,
+  /** A assinatura ESCRITA no perfil da conta. Vazio = assina a casa, que é
+   *  o comportamento certo sem `ADMIN_USERS` configurado. */
+  assinaturaConfigurada: () => ({}),
+}));
 vi.mock("@/lib/quotes-store", () => ({
   getQuote: async (id: string) => ({ id, name: "Maria", email: "maria@example.com" }),
 }));
@@ -32,7 +37,12 @@ vi.mock("@/lib/contracts-store", () => ({
     return dados.contrato;
   },
 }));
-vi.mock("@/lib/email-quem-assina", () => ({ nomeDeQuemEnvia: () => "Catarina" }));
+vi.mock("@/lib/email-quem-assina", () => ({
+  nomeDeQuemEnvia: () => "Catarina",
+  /** O que o PERFIL da conta diz. O ecrã mostra o nome que vai ser impresso, e
+   *  quem o decide é o `assinanteDoEmail` — não o nome cru da sessão. */
+  assinaturaDeQuemEnvia: () => ({ nome: "Catarina", cargo: "" }),
+}));
 vi.mock("@/lib/email-templates-store", () => ({ listarModelos: async () => [] }));
 vi.mock("@/lib/email-rascunho-do-envio", () => ({
   valoresDoEnvio: () => ({ cliente_nome: "Maria" }),

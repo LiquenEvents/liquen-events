@@ -52,7 +52,19 @@ const DIAS_DE_GRACA = 30;
  * continua a poder sobreviver ao seu próprio link; para essa fechar, o prazo
  * teria de ser decidido no momento de a enviar, onde a validade é conhecida.
  */
-const TTL_MS = 1000 * 60 * 60 * 24 * (DEFAULT_VALID_DAYS + DIAS_DE_GRACA);
+export const TTL_MS = 1000 * 60 * 60 * 24 * (DEFAULT_VALID_DAYS + DIAS_DE_GRACA);
+
+/**
+ * Até quando vale um link de proposta emitido AGORA.
+ *
+ * Exportado para o endereço curto poder expirar no mesmo instante que o token
+ * assinado. São duas portas para a mesma sala: se uma fechasse antes da outra,
+ * o casal via «expirou» num link e a proposta no outro, e ninguém saberia
+ * explicar porquê.
+ */
+export function validadeDeUmLinkNovo(agora: Date = new Date()): Date {
+  return new Date(agora.getTime() + TTL_MS);
+}
 
 let randomFallbackSecret: string | null = null;
 

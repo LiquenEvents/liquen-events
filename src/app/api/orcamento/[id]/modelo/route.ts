@@ -3,7 +3,7 @@ import type { QuoteMessage } from "@/lib/orcamento/types";
 import { getQuote, updateQuote } from "@/lib/quotes-store";
 import { sendMail, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
-import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
+import { assinaturaDeQuemEnvia } from "@/lib/email-quem-assina";
 import {
   ehModeloAPedido,
   marcadoresDoPedido,
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const email = emailAoCliente({
       html: corpo,
       texto: textoDoCorpo(corpo),
-      quem: { nome: nomeDeQuemEnvia(request), destinatario: quote.name },
+      quem: { ...assinaturaDeQuemEnvia(request), destinatario: quote.name },
     });
 
     /**

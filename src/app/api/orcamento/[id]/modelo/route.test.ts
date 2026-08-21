@@ -27,7 +27,12 @@ const quotes = vi.hoisted(() => ({
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_opts?: unknown) => ({ sent: true })) }));
 const modelo = vi.hoisted(() => ({ get: vi.fn(async (_chave: string) => null as unknown) }));
 
-vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
+vi.mock("@/lib/admin-auth", () => ({
+  isAuthed: () => authed.ok,
+  /** A assinatura ESCRITA no perfil da conta. Vazio = assina a casa, que é
+   *  o comportamento certo sem `ADMIN_USERS` configurado. */
+  assinaturaConfigurada: () => ({}),
+}));
 vi.mock("@/lib/quotes-store", () => ({ getQuote: quotes.get, updateQuote: quotes.update }));
 vi.mock("@/lib/mail", () => ({
   sendMail: mail.send,

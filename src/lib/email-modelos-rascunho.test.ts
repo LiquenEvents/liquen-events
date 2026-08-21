@@ -36,7 +36,7 @@ beforeEach(() => get.mockClear());
 const COM_DATA = [
   "Olá Marta e João, boa tarde,",
   "",
-  "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento para o Casamento no Herdade da Malhadinha, a 12 de setembro de 2026.",
+  "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento para o Casamento na Herdade da Malhadinha, a 12 de setembro de 2026.",
   "",
   `A proposta segue em anexo e pode também ser consultada aqui: ${LINK}`,
   "",
@@ -48,7 +48,7 @@ const COM_DATA = [
 const SEM_DATA = [
   "Olá Marta e João, boa tarde,",
   "",
-  "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento para o Casamento no Herdade da Malhadinha.",
+  "De acordo com o solicitado, enviamos a nossa proposta de decoração e respetivo orçamento para o Casamento na Herdade da Malhadinha.",
   "",
   "Ainda aguardamos a informação relativamente à data, mas podemos depois acrescentá-la à proposta.",
   "",
@@ -59,6 +59,17 @@ const SEM_DATA = [
   "Obrigada, agradecemos a atenção e aguardamos o Vosso feedback.",
 ].join("\n");
 
+/**
+ * ── PORQUE É QUE ESTAS FIXTURES DIZIAM «no Herdade da Malhadinha» ─────────
+ *
+ * Porque era o que saía. A contracção estava escrita à mão dentro do modelo
+ * («no {{evento_local}}»), colada a um nome cujo género ninguém conhecia — e
+ * dos seis espaços que a casa usa, acertava em um. Uma cliente recebeu «no
+ * Torre de Palma» num email a sério.
+ *
+ * A frase passou a ser composta em `email-template-vars.ts`, com o artigo lido
+ * de `lugares.ts`. Estas expectativas mudaram porque o português mudou.
+ */
 describe("o rascunho que abre no envio", () => {
   it("por omissão é o «Registo formal»", async () => {
     expect(MODELO_POR_OMISSAO).toBe("registo-formal");

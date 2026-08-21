@@ -114,40 +114,51 @@ export default function BibliotecaServicos({ onEscolher, onFechar }: Props) {
         </p>
       )}
 
-      {porCategoria.map(([categoria, itens]) => (
-        <div key={categoria} className="mt-3">
-          <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/30">{categoria}</p>
-          <ul className="mt-1 flex flex-col gap-1">
-            {itens.map((s) => (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onEscolher(s);
-                    toast(`"${s.nome}" acrescentado`, "success");
-                  }}
-                  className="alvo-toque !justify-start w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-foreground/[0.12] hover:bg-foreground/[0.02]"
-                >
-                  <span className="block text-xs font-medium text-foreground/80">{s.nome}</span>
-                  {s.descricao && (
-                    <span className="mt-0.5 block truncate text-[11px] text-foreground/45">
-                      {s.descricao}
-                    </span>
-                  )}
-                  {/* Sem inglês, di-lo aqui: é onde ela pode decidir escrevê-lo,
-                      e uma proposta em inglês com metade dos serviços em
-                      português lê-se como descuido. */}
-                  {!s.nomeEn && (
-                    <span className="mt-0.5 block text-[10px] text-[#8a6420]">
-                      sem versão inglesa
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {/* ── O MESMO TECTO QUE FALTAVA À LISTA DE TEMAS ──────────────────────
+          Esta gaveta abre POR BAIXO do botão, dentro do editor, e cresce com a
+          biblioteca — que, por desenho, «cresce sozinha». Sem tecto, com
+          sessenta serviços, ela empurra o grupo em que a Catarina está a
+          trabalhar para fora do ecrã: é o mesmo defeito que a lista de temas
+          tinha, noutro sítio.
+
+          45vh e não 34: aqui não há uma grelha a competir pelo espaço a
+          seguir, e cada linha tem duas alturas de texto. */}
+      <div className="max-h-[45vh] overflow-y-auto">
+        {porCategoria.map(([categoria, itens]) => (
+          <div key={categoria} className="mt-3">
+            <p className="text-[9px] tracking-[0.2em] uppercase text-foreground/30">{categoria}</p>
+            <ul className="mt-1 flex flex-col gap-1">
+              {itens.map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onEscolher(s);
+                      toast(`"${s.nome}" acrescentado`, "success");
+                    }}
+                    className="alvo-toque !justify-start w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-foreground/[0.12] hover:bg-foreground/[0.02]"
+                  >
+                    <span className="block text-xs font-medium text-foreground/80">{s.nome}</span>
+                    {s.descricao && (
+                      <span className="mt-0.5 block truncate text-[11px] text-foreground/45">
+                        {s.descricao}
+                      </span>
+                    )}
+                    {/* Sem inglês, di-lo aqui: é onde ela pode decidir escrevê-lo,
+                        e uma proposta em inglês com metade dos serviços em
+                        português lê-se como descuido. */}
+                    {!s.nomeEn && (
+                      <span className="mt-0.5 block text-[10px] text-[#8a6420]">
+                        sem versão inglesa
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

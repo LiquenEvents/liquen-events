@@ -1,6 +1,6 @@
 import "server-only";
 import type { NextRequest } from "next/server";
-import { ADMIN_COOKIE, readSession } from "./admin-auth";
+import { ADMIN_COOKIE, assinaturaConfigurada, readSession } from "./admin-auth";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -43,4 +43,33 @@ export function nomeDeQuemEnvia(request: NextRequest): string {
   } catch {
     return "";
   }
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUEM ASSINA O EMAIL — E PORQUE É QUE NÃO É O `nomeDeQuemEnvia`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Medido num email real enviado a uma cliente: a proposta saiu assinada
+ * **«Liquen Alentejo»**. Ninguém escreveu esse nome em lado nenhum — foi
+ * DERIVADO do endereço da conta de entrada (`liquen.alentejo@gmail.com` →
+ * `nomeVisivel` troca os pontos por espaços e capitaliza), passou a `sub` da
+ * sessão, e daí foi parar ao fundo de um email que um casal leu.
+ *
+ * O `nomeDeQuemEnvia` continua a existir e continua certo para o que faz — a
+ * saudação do back office, o dono de uma tarefa, o registo de quem carregou no
+ * botão. O que ele não pode ser é a assinatura de um documento comercial: um
+ * nome adivinhado a partir de um endereço não é o nome de uma pessoa.
+ *
+ * Isto devolve só o que estiver ESCRITO no perfil da conta (`assina` no
+ * `ADMIN_USERS`). Quando não há — palavra-passe partilhada, conta sem perfil —
+ * devolve vazio, e vazio quer dizer «assina a casa»: «Catarina Gaspar ·
+ * Manager», que nunca está errado.
+ */
+export function assinaturaDeQuemEnvia(request: NextRequest): {
+  nome: string;
+  cargo: string;
+} {
+  const conta = assinaturaConfigurada(nomeDeQuemEnvia(request));
+  return { nome: conta.nome ?? "", cargo: conta.cargo ?? "" };
 }

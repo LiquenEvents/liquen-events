@@ -11,7 +11,13 @@ import {
   type IdiomaDoModelo,
 } from "./email-templates-store";
 import { renderizarAssunto, renderizarCorpo, variaveisPorPreencher } from "./email-template-engine";
-import { primeiroNome, REMETENTE_POR_OMISSAO, VARIAVEIS } from "./email-template-vars";
+import {
+  fraseDoLocal,
+  primeiroNome,
+  REMETENTE_POR_OMISSAO,
+  VARIAVEIS,
+} from "./email-template-vars";
+import { eventTypeName } from "./orcamento/data";
 import { dataIso } from "./validation";
 import { log } from "./logger";
 
@@ -536,6 +542,10 @@ type PedidoParaMarcadores = {
   date?: string;
   location?: string;
   company?: string;
+  /** O tipo de evento do catálogo. Existia no pedido e nunca chegou aqui: era
+   *  por isso que o `evento_tipo` saía sempre vazio, e com ele a frase partida
+   *  «para o ␣no Torre de Palma» em todos os envios por este caminho. */
+  eventType?: string | null;
 };
 
 /**
@@ -601,9 +611,24 @@ export function marcadoresDoPedido(
   const novas: Record<string, string> = {
     cliente_nome: primeiroNome(completo),
     cliente_nome_completo: completo,
-    evento_tipo: "",
+    /**
+     * O TIPO DE EVENTO, que este caminho antigo nunca soube.
+     *
+     * Ficava sempre vazio — e era isso que, com o modelo antigo, produzia «para
+     * o ␣no Torre de Palma» em TODOS os envios que passassem por aqui. O
+     * `pedido.eventType` existe e é o que o catálogo traduz; a única razão para
+     * isto estar vazio era ninguém o ter ligado.
+     */
+    evento_tipo: eventTypeName(pedido.eventType, "pt"),
     evento_data: base.data_evento ?? "",
     evento_local: base.local ?? "",
+    /**
+     * A frase composta, com o artigo certo e sem palavras de ligação soltas —
+     * a mesma que o ecrã de envio novo produz (`construirValores`). Sem isto,
+     * um modelo actualizado desenhado por esta rota antiga ficava com o bloco
+     * vazio e a frase sem o local.
+     */
+    evento_no_local: fraseDoLocal(eventTypeName(pedido.eventType, "pt"), base.local ?? "", "pt"),
     valor_total: base.valor ?? "",
     validade_data: "",
     sinal_percentagem: "",

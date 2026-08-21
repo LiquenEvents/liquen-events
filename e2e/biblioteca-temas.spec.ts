@@ -175,3 +175,127 @@ test.describe("Biblioteca de temas — abrir", () => {
     ).toBeLessThanOrEqual(2);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A 390 PX, COM QUARENTA TEMAS, AS FOTOS TÊM DE ESTAR NO ECRÃ
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Isto é o que ela viu, medido no tamanho em que o viu. Palavras dela: «não
+ * consigo abrir os temas e escolher, só dá se pesquisar» — a lista de temas não
+ * tinha altura máxima nenhuma e empurrava a grelha de fotografias para baixo da
+ * dobra; pesquisar funcionava porque encurtava a lista.
+ *
+ * O teste unitário prende as DECISÕES (começa fechada, tem tecto, rola por
+ * dentro). Só um browser a sério mede a consequência delas, que é a única coisa
+ * que interessa: a primeira foto tem de caber, inteira, num ecrã de 390×844.
+ *
+ * ── PORQUE É QUE O PASSEIO NÃO É TODO A 390 PX ───────────────────────────
+ *
+ * Foi, à primeira tentativa, e esteve 120 s à espera de um botão: a 390 px o
+ * menu lateral do back office é `fixed` e vive FORA do ecrã até alguém abrir a
+ * gaveta — os destinos do dia estão na barra de baixo. Dava para abrir a gaveta
+ * (é o que o `geometria-dos-alvos.spec.ts` faz), mas isso põe metade do passeio
+ * a exercitar navegação que não é o que aqui se mede, e cada degrau a mais é um
+ * degrau que pode partir por razões que não têm nada a ver com a lista de temas.
+ *
+ * Em vez disso: o caminho até ao seletor faz-se no tamanho em que os outros dois
+ * passeios deste ficheiro já o fazem, e o ecrã encolhe para 390×844 com o
+ * diálogo JÁ ABERTO. O que se mede fica exactamente igual — o diálogo é
+ * `fixed inset-0` e a lista tem o tecto em `vh`, portanto ambos se refazem no
+ * tamanho novo —, e o `hasTouch` continua ligado para os alvos terem a altura
+ * que têm no dedo, que é a que enche a lista.
+ */
+test.describe("Biblioteca de temas — a 390 px", () => {
+  // Sem `viewport` aqui de propósito: ver acima. O toque fica, porque é ele que
+  // dá aos separadores dos temas a altura que têm no telemóvel.
+  test.use({ hasTouch: true });
+
+  /** O ecrã dela. */
+  const ECRA = { width: 390, height: 844 };
+
+  /** Quarenta temas, como os dela. */
+  const MUITOS = Array.from({ length: 40 }, (_, i) => ({
+    id: `tema-${i + 1}`,
+    name: `Tema ${i + 1}`,
+    notes: "",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    imageCount: 12,
+  }));
+
+  /** Um pixel transparente: a grelha desenha-se na mesma e não se vai à rede. */
+  const PIXEL = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  const FOTOS = Array.from({ length: 12 }, (_, i) => ({
+    path: `tema-1/foto-${i + 1}.jpg`,
+    url: PIXEL,
+    thumbUrl: PIXEL,
+  }));
+
+  test("a primeira foto cabe no ecrã, com a lista de temas cheia", async ({ page, context }) => {
+    await context.route("**/api/temas", (route) => route.fulfill({ json: MUITOS }));
+    await context.route("**/api/temas/*/imagens**", (route) =>
+      route.fulfill({ json: { ok: true, images: FOTOS, total: FOTOS.length, truncated: false } }),
+    );
+    await context.addInitScript(() => {
+      try {
+        localStorage.setItem("liquen-tema-recente", "tema-1");
+        // De propósito SEM `liquen-temas-abertos`: o que se mede é o que ela
+        // encontra da primeira vez, antes de ter escolhido o que quer que seja.
+        localStorage.removeItem("liquen-temas-abertos");
+      } catch {
+        /* ver acima */
+      }
+    });
+
+    const entrou = await entrarNoBackOffice(page);
+    exigirLogin(entrou);
+    await garantirPedido(page);
+
+    const nav = page.getByRole("navigation", { name: /Navegação do back office/i });
+    await nav
+      .getByRole("button", { name: /^Fazer proposta$/ })
+      .first()
+      .click();
+    const clientes = page.locator("li button");
+    // 30 s e não 15: contra o servidor de desenvolvimento, a primeira visita a
+    // «Fazer proposta» paga a compilação da rota.
+    await expect(clientes.first()).toBeVisible({ timeout: 30000 });
+    await clientes.first().click();
+
+    const abrir = page.getByRole("button", { name: /biblioteca de temas/i }).first();
+    await expect(abrir).toBeVisible({ timeout: 20000 });
+    await abrir.click();
+
+    // A partir daqui, o ecrã dela.
+    const dialogo = page.getByRole("dialog", { name: /biblioteca de temas/i });
+    await expect(dialogo).toBeVisible({ timeout: 20000 });
+    await page.setViewportSize(ECRA);
+
+    // A lista dos quarenta começa fechada, e diz quantos são sem se abrir.
+    const listaDeTemas = page.getByRole("button", { name: "Temas (40)" });
+    await expect(listaDeTemas).toBeVisible();
+    await expect(listaDeTemas).toHaveAttribute("aria-expanded", "false");
+
+    // E a razão de tudo isto: a primeira foto, INTEIRA, dentro do ecrã.
+    const primeira = page.getByRole("button", { name: "Foto 1 de 12" });
+    await expect(primeira).toBeVisible();
+    const caixa = await primeira.boundingBox();
+    expect(caixa, "a primeira foto não tem sítio nenhum no ecrã").not.toBeNull();
+    expect(
+      caixa!.y + caixa!.height,
+      `A primeira foto acaba a ${Math.round(caixa!.y + caixa!.height)}px num ecrã de ` +
+        `${ECRA.height} — a lista de temas voltou a empurrar a grelha para fora do ecrã.`,
+    ).toBeLessThanOrEqual(ECRA.height);
+
+    // Aberta, continua a caber: é o tecto de altura a fazer o seu trabalho.
+    await listaDeTemas.click();
+    await expect(listaDeTemas).toHaveAttribute("aria-expanded", "true");
+    const comALista = await primeira.boundingBox();
+    expect(
+      comALista!.y,
+      `Com a lista aberta a primeira foto começa a ${Math.round(comALista!.y)}px de ` +
+        `${ECRA.height} — sem tecto, quarenta temas voltam a ocupar o ecrã todo.`,
+    ).toBeLessThan(ECRA.height);
+  });
+});
