@@ -227,8 +227,15 @@ function ehJpegBaseline(bytes: Buffer): boolean {
  * essas que o recorte trabalha (porque `resizeToBox` faz `.rotate()` primeiro).
  * Devolve `null` quando nem o sharp lê os bytes — quem chama segue sem limite,
  * que é o comportamento de sempre.
+ *
+ * PÚBLICA desde que as duas rotas de carregamento passaram a GRAVAR a forma de
+ * cada fotografia (`biblioteca_fotos.largura`/`altura`). É esta função que elas
+ * têm de usar, e não a `metadata()` crua: uma foto de telemóvel ao alto tem as
+ * dimensões trocadas no cabeçalho, e gravá-las assim punha a página do casal a
+ * reservar uma caixa deitada para uma fotografia ao alto — o mesmo salto de
+ * layout, com mais um passo pelo meio.
  */
-async function dimensoesReais(bytes: Buffer): Promise<{ w: number; h: number } | null> {
+export async function dimensoesReais(bytes: Buffer): Promise<{ w: number; h: number } | null> {
   try {
     const m = await sharp(bytes, { failOn: "none" }).metadata();
     if (!m.width || !m.height) return null;

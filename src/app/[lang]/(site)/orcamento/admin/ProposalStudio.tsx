@@ -3453,10 +3453,18 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     file: File,
     thumb: File | null,
     cor?: string | null,
+    lqip?: string | null,
   ): Promise<{ path: string; url: string; thumbUrl?: string; cor?: string }> {
     const post = () => {
       const form = new FormData();
       form.append("files", file);
+      // O LQIP — a mancha de cor que ocupa a célula enquanto a fotografia não
+      // chega. Sai da MESMA descodificação que já calculou a cor e a miniatura
+      // (`image-prep`), portanto não custa nada, e sem ele a página do casal
+      // abre com rectângulos vazios: o caminho da Biblioteca de Temas gravava-o
+      // e este não, e por isso a mesma página tinha metade das células com
+      // placeholder e a outra metade sem.
+      if (lqip) form.append("lqips", lqip);
       // A cor dominante, calculada na mesma descodificação que encolheu a foto
       // (ver `image-prep`). É aqui que ela pode ser calculada — do lado do
       // estúdio as fotos já vêm de outro domínio e o `canvas` fica manchado.
@@ -3518,7 +3526,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         const f = files[i];
         try {
           const prepared = await prepareImageWithThumb(f, kind);
-          const im = await uploadOne(prepared.file, prepared.thumb, prepared.cor);
+          const im = await uploadOne(prepared.file, prepared.thumb, prepared.cor, prepared.lqip);
           // Guardado pelo ÍNDICE: as vias acabam fora de ordem e a ordem das
           // fotos escolhidas é a que a Catarina vê no documento.
           results[i] = { path: im.path };
