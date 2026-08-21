@@ -41,7 +41,7 @@ Safari, não o Dynamic Type nem o zoom, portanto está no sítio certo.
 
 [A6-001] [Agente 6] [Todos os ecrãs — barra inferior] [Grave] Os cinco destinos que ela carrega o dia inteiro estão pintados com o token que o próprio CSS proíbe usar como única informação
      Largura onde falha: 390 / 430 / 768 (a barra é `lg:hidden`, some a partir de 1024)
-     Onde: src/app/[lang]/(site)/orcamento/admin/AdminClient.tsx:3186-3187 e 3220-3224
+     Onde: src/app/[lang]/(site)/orcamento/admin/AdminClient.tsx:3186-3187 e 3220-3224 (rótulos em :3209 e :3240)
        (token em src/app/globals.css:172)
      Observado: os rótulos e os ícones das seis células — Visão geral, Pedidos, …, «Mais» —
        usam `text-[var(--bo-text-faint)]` quando não estão activos. `--bo-text-faint` é
@@ -65,7 +65,7 @@ Safari, não o Dynamic Type nem o zoom, portanto está no sítio certo.
        · ProposalStudio.tsx:6409, 7362, 7424, 7881 — prosa de ajuda em
          `text-xs text-foreground/45` → 12 px a **3,11:1**.
        · PaymentsPanel.tsx:601 «Registar pagamento» em `/45` → **3,11:1**;
-         PaymentsPanel.tsx:704 e 712 em `/35` → **2,32:1**.
+         PaymentsPanel.tsx:483, 555, 702, 713, 745, 769 em `/35` → **2,32:1**.
        · Overview.tsx:488 «Guardado no servidor» em `/22` → **1,64:1**;
          Overview.tsx:1857, 1901 em `/30` → **2,02:1**.
        · ActivityLog.tsx:295 e 299 em `/22` e `/28` → **1,64:1** e **1,91:1** (o registo de
@@ -86,7 +86,7 @@ Safari, não o Dynamic Type nem o zoom, portanto está no sítio certo.
 [A6-003] [Agente 6] [Todos os ecrãs] [Grave] A cor dos avisos falha AA — `#b5654a` dá 4,26:1, e é ela que pinta os `role="alert"`
      Largura onde falha: todas
      Onde: 55 chamadas de `text-[#b5654a]`. As que doem:
-       src/app/[lang]/(site)/orcamento/admin/PaymentsPanel.tsx:700-704 (`role="alert"` do erro de
+       src/app/[lang]/(site)/orcamento/admin/PaymentsPanel.tsx:699-706 (`role="alert"` do erro de
        registo de pagamento); Overview.tsx:465 (`role="alert"`, `text-[10px]`);
        PerguntaDeDesfecho.tsx:355 (`role="alert"`, `text-[11px]`); AvisoDataOcupada.tsx:85-90;
        LifecycleStepper.tsx:99.
@@ -347,7 +347,7 @@ Safari, não o Dynamic Type nem o zoom, portanto está no sítio certo.
 [A6-016] [Agente 6] [Formulário público de orçamento] [Menor] O rótulo de cada campo é 10,5 px fixos, e as dicas estão a 3,08:1
      Largura onde falha: todas (o chão de 12 px é `body.admin-mode` e não chega aqui)
      Onde: src/app/[lang]/(site)/orcamento/OrcamentoForm.tsx:160, 202, 1058, 1178, 1324, 1366;
-       `.eyebrow` em src/app/globals.css:1670-1676
+       `.eyebrow` em src/app/globals.css:1670-1677
      Observado: o rótulo de campo é `text-[10.5px] … text-foreground/60` → **4,11:1** a 10,5 px, e
        é o único texto que diz o que se está a preencher. As dicas por baixo são
        `text-[12px] text-foreground/50` → **3,08:1** e `text-[11px] text-foreground/55` →
@@ -355,7 +355,7 @@ Safari, não o Dynamic Type nem o zoom, portanto está no sítio certo.
        3,55:1, contra `text-foreground/85` da escolhida — a diferença entre escolhido e não
        escolhido está a ser feita com contraste que já não passa AA no lado não escolhido.
        Ao lado, `.eyebrow` está em `font-size: 10px` **em `px`** (globals.css:1672) e a sua
-       variante sobre a fotografia do painel, `rgba(222,218,212,0.55)` (globals.css:1681-1683),
+       variante sobre a fotografia do painel, `rgba(222,218,212,0.55)` (globals.css:1680-1682),
        dá **1,86:1** sobre uma zona média da foto e **1,29:1** sobre uma zona clara — só passa se
        a fotografia por baixo for escura, e nenhuma regra garante que seja.
      Proposta: rótulos a `/72` (**6,00:1**) e 12 px; dicas a `/68` (5,27:1); a opção não escolhida
@@ -377,7 +377,7 @@ não-textuais (bordas, ícones que carregam sentido).
 | ficheiro:linha | cor | fundo | rácio | AA? |
 |---|---|---|---|---|
 | `admin/recuperar/DefinirPalavraPasse.tsx:153` | `text-white/25` → `#ffffff` | gradiente `#ffffff`→`#f4f5f3` | **1,00:1** | ✗ (nem 3:1) |
-| `globals.css:1682` (`.eyebrow` sobre foto) | `rgba(222,218,212,.55)` | foto clara `#b0b0b0` | **1,29:1** | ✗ |
+| `globals.css:1681` (`.eyebrow` sobre foto) | `rgba(222,218,212,.55)` | foto clara `#b0b0b0` | **1,29:1** | ✗ |
 | `admin/Calendario.tsx:588` | `text-foreground/[0.15]` → `#dbdbdb` | `#ffffff` | **1,39:1** | ✗ |
 | `admin/PaymentsPanel.tsx:740` | `text-foreground/15` | `#ffffff` | **1,39:1** | ✗ |
 | `admin/Overview.tsx:488`, `ActivityLog.tsx:295` | `text-foreground/22` → `#c6c6c6` | `#ffffff` | **1,64:1** | ✗ |
@@ -388,7 +388,7 @@ não-textuais (bordas, ícones que carregam sentido).
 | `admin/PaymentsPanel.tsx:609` (cab. de colunas) | `text-foreground/30` → `#b4b4b4` | `#ffffff` | **2,02:1** | ✗ |
 | `admin/ui/Field.tsx:81` (placeholder) | `text-foreground/30` | `#ffffff` | **2,02:1** | ✗ |
 | `admin/Overview.tsx:1321,1383,1857,1901`, `ShortcutsModal.tsx:103`, `AjudaGlossario.tsx:83,109` | `text-foreground/30` | `#ffffff` | **2,02:1** | ✗ |
-| `admin/PaymentsPanel.tsx:704,712` | `text-foreground/35` → `#a8a8a8` | `#ffffff` | **2,32:1** | ✗ |
+| `admin/PaymentsPanel.tsx:483,555,702,713,745,769` | `text-foreground/35` → `#a8a8a8` | `#ffffff` | **2,32:1** | ✗ |
 | `admin/ProposalStudio.tsx:6197,6316,6620,7560,8509` | `text-foreground/35` | `#ffffff` | **2,32:1** | ✗ |
 | `admin/Overview.tsx:104` (▲ a subir) | `#8aad85` | `#ffffff` | **2,50:1** | ✗ |
 | `admin/Clientes.tsx:338` (selo VIP) | `#b88f28` | `#d6ab3a`/15 → `#fbf3e0` | **2,70:1** | ✗ |
@@ -401,7 +401,7 @@ não-textuais (bordas, ícones que carregam sentido).
 | `OrcamentoForm.tsx:202,1058` (dicas) | `text-foreground/50` (`#2a2620`) | `#ffffff` | **3,08:1** | ✗ |
 | `admin/Overview.tsx:104` (▼ a descer) | `#c08457` | `#ffffff` | **3,14:1** | ✗ (passa só ≥24 px) |
 | `Inspiracao.tsx:396` (título, ≈black/45) | `#ffffff` | `#ebebeb` + `black/45` | **3,29:1** | ✗ |
-| `AdminClient.tsx:3187,3224` (rótulos da barra inferior) | `--bo-text-faint` `rgba(13,13,13,.48)` → `#8b8b8b` | `#ffffff` | **3,41:1** | ✗ (é o degrau ≥3:1) |
+| `AdminClient.tsx:3187,3223` (rótulos da barra inferior) | `--bo-text-faint` `rgba(13,13,13,.48)` → `#8b8b8b` | `#ffffff` | **3,41:1** | ✗ (é o degrau ≥3:1) |
 | `admin/Propostas.tsx:152` (chip de estado) | `#a9781f` | `#b5894a`/12 → `#f9f2e9` | **3,46:1** | ✗ |
 | `admin/EmailTemplates.tsx:828`, `EmailTemplatesBilingue.tsx:709` | `text-foreground/30`, `text-sm` | `#ffffff` | **2,02:1** | ✗ |
 | `admin/LifecycleStepper.tsx:99` (chip de aviso) | `#b5654a` | `#b5654a`/12 → `#f8efec` | **3,69:1** | ✗ |
@@ -409,16 +409,16 @@ não-textuais (bordas, ícones que carregam sentido).
 | `page.tsx:637` (emitida/versão, 11 px) | `text-foreground/60` (`#2a2620`) | `#ffffff` | **4,11:1** | ✗ |
 | `Escolhas.tsx:144` (nota da escolha, `text-sm`) | `text-foreground/60` | `#ffffff` | **4,11:1** | ✗ |
 | `OrcamentoForm.tsx:160` (rótulo de campo, 10,5 px) | `text-foreground/60` | `#ffffff` | **4,11:1** | ✗ |
-| `admin/PaymentsPanel.tsx:701` (`role="alert"`) | `#b5654a` | `#ffffff` | **4,26:1** | ✗ |
+| `admin/PaymentsPanel.tsx:699-706` (`role="alert"`) | `#b5654a` | `#ffffff` | **4,26:1** | ✗ |
 | `admin/PerguntaDeDesfecho.tsx:355`, `Overview.tsx:465` (`role="alert"`) | `#b5654a` | `#ffffff` | **4,26:1** | ✗ |
 | `admin/ui/Button.tsx:71` (`ghost`) | `text-foreground/55` → `#7b7b7b` | `#ffffff` | **4,30:1** | ✗ (por 0,2) |
 | `admin/ui/PageHeader.tsx:60` (subtítulo) | `text-foreground/55` | `#ffffff` | **4,30:1** | ✗ |
 | `globals.css:191` (`--bo-control-border`) | `rgba(13,13,13,.55)` | `#ffffff` | **4,30:1** | ✓ (≥3:1 p/ borda) |
 | `Inspiracao.tsx:407` (subtítulo, rente ao fundo) | `text-white/85` | `#ebebeb` + `black/60` | **5,24:1** | ✓ (à justa) |
 | `page.tsx:527,618,701` | `text-foreground/68` (`#2a2620`) | `#ffffff` | **5,27:1** | ✓ |
-| `globals.css:1674` (`.eyebrow` público) | `rgba(42,38,32,.66)` | `#f7f4ee` | **4,75:1** | ✓ |
+| `globals.css:1676` (`.eyebrow` público) | `rgba(42,38,32,.66)` | `#f7f4ee` | **4,75:1** | ✓ |
 | `globals.css:171` (`--bo-text-muted`) | `rgba(13,13,13,.64)` → `#646464` | `#ffffff` | **5,91:1** | ✓ |
-| `globals.css:1631` (`.bo-eyebrow`) | `rgba(13,13,13,.64)` | `#ffffff` | **5,91:1** | ✓ |
+| `globals.css:1630-1637` (`.bo-eyebrow`) | `rgba(13,13,13,.64)` | `#ffffff` | **5,91:1** | ✓ |
 | `admin/ui/Button.tsx:69` (`subtle`) | `#4d6350` | `#4d6350`/10 → `#edf0ee` | **5,67:1** | ✓ |
 | `admin/ui/Button.tsx:67` (`primary`, branco s/ moss) | `#ffffff` | `#4d6350` | **6,53:1** | ✓ |
 | `admin/AvisoDeFalha.tsx:46` | `#a03a1a` | `#f6e6df`/50 → `#fbf3ef` | **6,13:1** | ✓ |
