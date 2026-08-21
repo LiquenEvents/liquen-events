@@ -123,6 +123,7 @@ import NavEstudio from "./NavEstudio";
 import NotasInternas from "./NotasInternas";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
+import { folhasAproximadas } from "@/lib/proposal-paginas";
 import { depositPercentOf } from "@/lib/proposal-doc";
 // A geometria do documento, para a pré-visualização mostrar a forma que cada
 // foto vai MESMO ter. Módulo próprio, sem `server-only`, exactamente para poder
@@ -2820,7 +2821,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const contagemDosBoards =
     `${paginasDeInspiracao} ${paginasDeInspiracao === 1 ? "página" : "páginas"} · ` +
     `${totalDeFotos} ${totalDeFotos === 1 ? "foto" : "fotos"} · ` +
-    `PDF com cerca de ${PAGINAS_FIXAS_DO_PDF + paginasDeInspiracao}${tempoDaProposta}`;
+    // O número sai da MESMA lista que a vista de conjunto desenha. Eram duas
+    // contas sobre o mesmo documento — «7 páginas» na vista e «cerca de 14» na
+    // frase — e discordavam porque contavam coisas diferentes.
+    `PDF com cerca de ${folhasAproximadas(doc as ProposalDoc)}${tempoDaProposta}`;
 
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -8947,7 +8951,6 @@ const SECOES_KEY = "liquen-estudio-secoes";
  * enorme) pode empurrar uma secção para a folha seguinte. Daí o «cerca de» na
  * frase que mostra este número: é um piso honesto, não uma promessa.
  */
-const PAGINAS_FIXAS_DO_PDF = 7;
 
 /**
  * As medições das gerações de PDF, partilhadas por TODAS as propostas.
