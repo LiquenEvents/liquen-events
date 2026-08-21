@@ -10,7 +10,8 @@ import {
 } from "@/lib/proposal-doc";
 import { dinheiroDaProposta } from "@/lib/proposal-budget";
 import { isAuthed } from "@/lib/admin-auth";
-import { isMissingTable } from "@/lib/repository";
+import { isMissingTable, nomeDaColunaEmFalta } from "@/lib/repository";
+import { avisoDeColunasPerdidas } from "@/lib/estado-das-colunas";
 import { transicaoDoPedido } from "@/lib/orcamento/estado-do-pedido";
 import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 /** `eur` é o formato do PAINEL (a linha do histórico); `eurDocumento` é o de
@@ -785,75 +786,144 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
       await createProposal(p);
     };
+    /**
+     * ════════════════════════════════════════════════════════════════════════
+     * UMA COLUNA QUE FALTA NÃO PODE LEVAR AS OUTRAS À FRENTE
+     * ════════════════════════════════════════════════════════════════════════
+     *
+     * O `db/schema.sql` é corrido À MÃO no editor de SQL do Supabase. Numa base
+     * onde a versão nova ainda não foi aplicada, as colunas novas não existem e
+     * a gravação rebenta. A resposta certa nunca foi recusar o envio — «uma
+     * proposta que não sai é um negócio parado» — mas era demasiado bruta:
+     * tirava-se TUDO o que fosse recente de uma vez.
+     *
+     * ── O QUE ISSO CUSTOU, MEDIDO ─────────────────────────────────────────
+     *
+     * A coluna `proposals.doc` existe naquela base desde 30 de julho. As do
+     * selo da versão (`versao_selo`, `versao_numero`, `versao_em`) nasceram a
+     * 20 de agosto. No primeiro envio depois disso, a base recusou o
+     * `versao_selo` — e o resgate, para salvar três colunas que não existiam,
+     * deitou fora a única que existia e a única que o casal vê.
+     *
+     * O casal recebeu a proposta em anexo, com quinze páginas e mood boards, e
+     * o link ao lado abriu uma página com a saudação, o subtotal, o IVA e o
+     * total. Nada disto deu erro: a proposta gerou-se, o email saiu, o quadro
+     * disse «enviada». A única coisa que dizia o que se tinha perdido era um
+     * aviso vermelho no fim do envio, entre outros quatro.
+     *
+     * ── A REGRA NOVA ──────────────────────────────────────────────────────
+     *
+     * Tira-se O QUE FALTA, e só isso. O erro nomeia a coluna
+     * (`nomeDaColunaEmFalta`); tira-se essa, tenta-se outra vez, e assim por
+     * diante até a base aceitar. Uma base a três colunas de distância paga três
+     * tentativas — e fica com o documento, que é o que interessa.
+     *
+     * O tecto de tentativas não é defensivo por hábito: é o que impede um erro
+     * que nomeia sempre a mesma coluna (ou uma que não sabemos desmontar) de
+     * dar uma volta infinita. Chegando lá, cai-se no resgate largo de antes,
+     * que é o comportamento que esta casa já tinha.
+     */
+    /** Coluna da base → campo do `Proposal` que a escreve. */
+    const CAMPO_DA_COLUNA: Readonly<Record<string, keyof Proposal>> = {
+      doc: "doc",
+      pdf_sha256: "pdfSha256",
+      pdf_bytes: "pdfBytes",
+      idioma: "idioma",
+      versao_selo: "versaoSelo",
+      versao_numero: "versaoNumero",
+      versao_em: "versaoEm",
+    };
+    /** Tudo o que se pode tirar, quando não se sabe o que tirar. */
+    const TUDO_O_QUE_E_RECENTE: readonly (keyof Proposal)[] = [
+      "doc",
+      "pdfSha256",
+      "pdfBytes",
+      "idioma",
+      "versaoSelo",
+      "versaoNumero",
+      "versaoEm",
+    ];
+    /** As colunas que a base não aceitou — é o que o aviso vai nomear. */
+    const colunasPerdidas: string[] = [];
+
     try {
-      await guardar(proposal);
+      let candidata = proposal;
+      let guardada = false;
+      /** O último erro de coluna em falta, para o poder atirar tal e qual se as
+       *  tentativas acabarem — o resgate largo precisa de o reconhecer. */
+      let ultimoErro: unknown = null;
+      // Sete colunas removíveis: oito voltas chegam para as tirar todas uma a
+      // uma e ainda sobra a última tentativa.
+      for (let tentativa = 0; tentativa < 8 && !guardada; tentativa += 1) {
+        try {
+          await guardar(candidata);
+          guardada = true;
+        } catch (e) {
+          if (!isMissingTable(e)) throw e;
+          const coluna = nomeDaColunaEmFalta(e);
+          const campo = coluna ? CAMPO_DA_COLUNA[coluna] : undefined;
+          if (!coluna || !campo) throw e;
+          /**
+           * PROGRESSO OU NADA FEITO.
+           *
+           * O erro pode nomear uma coluna que já se tirou — acontece quando o
+           * que a base recusa não é a coluna que o erro nomeia (mensagens de
+           * driver, erros em cadeia). Sem esta guarda, tirava-se a mesma coluna
+           * oito vezes seguidas, sempre com o mesmo resultado, e o envio pagava
+           * oito idas à base para acabar no mesmo sítio.
+           *
+           * Não havendo progresso possível, atira-se o erro ORIGINAL — que é um
+           * erro de coluna em falta — para o resgate largo lá fora fazer o que
+           * sabe: tirar tudo, gravar o que a base aceitar, e dizer o que se
+           * perdeu.
+           */
+          if (candidata[campo] === undefined) throw e;
+          log.warn("proposta-doc: coluna em falta — tira-se só essa e tenta-se de novo", {
+            id,
+            coluna,
+          });
+          colunasPerdidas.push(coluna);
+          candidata = { ...candidata, [campo]: undefined };
+          ultimoErro = e;
+        }
+      }
+      if (!guardada) {
+        // O tecto foi ao fundo sem a base aceitar. Não se declara guardada uma
+        // coisa que não foi: atira-se o último erro DE COLUNA, para o resgate
+        // largo lá fora o reconhecer como tal — um `Error` genérico aqui dava
+        // um 503 «tenta outra vez» sobre um problema que tentar não resolve.
+        throw ultimoErro ?? new Error("proposta-doc: a base recusou todas as tentativas");
+      }
+      if (colunasPerdidas.length > 0) {
+        log.error(
+          "proposta-doc: colunas em falta na tabela `proposals` — proposta guardada sem elas; corra db/schema.sql",
+          null,
+          { id, colunas: colunasPerdidas },
+        );
+        docSaved = !colunasPerdidas.includes("doc");
+        docError = avisoDeColunasPerdidas(colunasPerdidas);
+      }
     } catch (e) {
-      // Coluna `proposals.doc` em falta = instalação onde o db/schema.sql desta
-      // versão ainda não foi corrido. NÃO se deita fora o envio por causa
-      // disso: grava-se a proposta sem o documento (exatamente o que a
-      // aplicação fazia antes desta coluna existir) e diz-se o que se perdeu.
-      // Uma proposta por enviar é um negócio parado; uma proposta sem `doc` é
-      // só um botão a menos no link do cliente, e um `psql` de um minuto.
       if (isMissingTable(e)) {
         /**
-         * ══════════════════════════════════════════════════════════════════
-         * UMA COLUNA QUE FALTA NÃO PODE PARAR O NEGÓCIO
-         * ══════════════════════════════════════════════════════════════════
+         * O RESGATE LARGO, para o caso em que o erro não nomeia a coluna.
          *
-         * O `db/schema.sql` é corrido À MÃO no editor de SQL. Numa base onde
-         * a versão nova ainda não foi aplicada, as colunas novas não existem
-         * — e a gravação rebenta.
-         *
-         * Este resgate existia e tirava só o `doc`. Não chegava: o envio
-         * passou a escrever TAMBÉM o selo do documento (`pdf_sha256`,
-         * `pdf_bytes`, acrescentados na mesma altura), portanto a segunda
-         * tentativa levava-os na mesma, rebentava exactamente pela mesma
-         * razão, e a resposta era 503 — «Não foi possível guardar a proposta.
-         * Tente novamente.» Tentar outra vez nunca resolvia.
-         *
-         * E a avaria era invisível de uma maneira cruel: a PRÉ-VISUALIZAÇÃO
-         * continuava perfeita, porque devolve o PDF antes de chegar aqui. O
-         * documento via-se, o envio é que nunca ia — que é ao pé da letra
-         * «não dá para mandar a proposta para o cliente».
-         *
-         * Agora tira-se TUDO o que possa não existir numa base antiga, de uma
-         * vez. A proposta é gravada com o que a base aceita, o email segue, e
-         * o que se perdeu é DITO — em vez de se perder o negócio para guardar
-         * um campo acessório.
+         * Acontece com uma tabela inteira em falta e com mensagens que não
+         * sabemos desmontar. Aqui não há como escolher o que tirar, portanto
+         * tira-se tudo o que possa não existir — a proposta é gravada com o
+         * que a base aceitar, o email segue, e o que se perdeu é DITO.
          */
         log.error(
-          "proposta-doc: coluna em falta na tabela `proposals` — proposta guardada sem os campos novos; corra db/schema.sql",
+          "proposta-doc: a base recusou os campos novos sem dizer qual — proposta guardada sem eles; corra db/schema.sql",
           e,
           { id },
         );
         try {
-          await guardar({
-            ...proposal,
-            doc: undefined,
-            pdfSha256: undefined,
-            pdfBytes: undefined,
-            // A língua é a coluna mais recente das quatro, portanto é a mais
-            // provável de faltar numa base por actualizar. Sai com as outras: o
-            // EMAIL desta proposta segue na língua certa de qualquer maneira (é
-            // decidido aqui, em memória) e o que se perde é a segunda descarga,
-            // que volta a dar o documento em português — o comportamento de
-            // antes desta funcionalidade, dito no `docError`.
-            idioma: undefined,
-            // A versão do conteúdo sai com as outras, pela mesma razão: são as
-            // colunas mais recentes de todas, logo as mais prováveis de faltar
-            // numa base por actualizar. O que se perde é a página do casal não
-            // saber dizer «versão 2, atualizada a …» — não é o envio.
-            versaoSelo: undefined,
-            versaoNumero: undefined,
-            versaoEm: undefined,
-          });
+          const semNada = { ...proposal };
+          for (const campo of TUDO_O_QUE_E_RECENTE) semNada[campo] = undefined as never;
+          await guardar(semNada);
           docSaved = false;
-          docError =
-            "A proposta foi guardada e enviada, mas sem o documento nem o selo: falta correr o " +
-            "db/schema.sql na base de dados (colunas `proposals.doc`, `pdf_sha256`, `pdf_bytes`, " +
-            "`idioma`, `versao_selo`, `versao_numero`, `versao_em`). Sem o documento o cliente não vê o PDF no link, sem a língua uma proposta " +
-            "inglesa volta a descarregar-se em português, e do que foi enviado só fica o " +
-            "rascunho do estúdio (que se apaga e não vai na cópia de segurança).";
+          docError = avisoDeColunasPerdidas(Object.keys(CAMPO_DA_COLUNA));
         } catch (e2) {
           log.error("proposta-doc: guardar falhou mesmo sem os campos novos", e2, { id });
           return NextResponse.json(

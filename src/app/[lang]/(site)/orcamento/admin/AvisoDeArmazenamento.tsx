@@ -55,6 +55,10 @@ export interface EstadoDoArmazenamentoLido {
   avisar: boolean;
   titulo: string;
   oQueFazer: string;
+  /** As colunas que a base não tem — `proposals.doc` e companhia. */
+  colunasEmFalta?: string[];
+  colunasTitulo?: string;
+  colunasOQueFazer?: string;
   fotos: string;
   fotosOQueFazer?: string;
   detalhe?: string;
@@ -211,9 +215,27 @@ export function AvisoDeArmazenamento() {
           )}
         </>
       )}
-      {estado.copia?.avisar && (
+      {/* ── AS COLUNAS QUE FALTAM ────────────────────────────────────────
+          Vem ANTES da cópia de segurança de propósito: destas duas, é esta que
+          está a custar dinheiro agora. Uma coluna em falta na `proposals` não
+          impede nada — a proposta gera-se, o email sai, o quadro diz «enviada»
+          — e o casal abre o link e encontra um quadro de preço no lugar da
+          proposta. É a avaria mais cara que esta casa teve, e a mais calada. */}
+      {(estado.colunasEmFalta?.length ?? 0) > 0 && (
         <>
           <p className={`font-medium text-[#a03a1a] ${falarDoArmazenamento ? "mt-3" : ""}`}>
+            {estado.colunasTitulo}
+          </p>
+          <p className="bo-text-muted mt-1">{estado.colunasOQueFazer}</p>
+        </>
+      )}
+      {estado.copia?.avisar && (
+        <>
+          <p
+            className={`font-medium text-[#a03a1a] ${
+              falarDoArmazenamento || (estado.colunasEmFalta?.length ?? 0) > 0 ? "mt-3" : ""
+            }`}
+          >
             {estado.copia.titulo}
           </p>
           <p className="bo-text-muted mt-1">{estado.copia.oQueFazer}</p>

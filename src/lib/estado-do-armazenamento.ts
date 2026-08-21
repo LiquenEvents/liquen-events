@@ -6,6 +6,7 @@ import { PROPOSAL_BUCKET } from "./proposal-storage";
 import { THEME_BUCKET } from "./theme-ref";
 import { estadoDaCopia, type EstadoDaCopia } from "./copia-de-seguranca-marcador";
 import { log } from "./logger";
+import { colunasEmFalta, oQueFazerComAsColunas, tituloDasColunas } from "./estado-das-colunas";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -107,6 +108,20 @@ export interface DiagnosticoDoArmazenamento {
    * avaria a resolver é a outra.
    */
   copia?: EstadoDaCopia;
+  /**
+   * ── AS COLUNAS QUE FALTAM, QUANDO FALTAM ────────────────────────────────
+   *
+   * A pergunta irmã das outras duas, e a que custou uma proposta a sério: a
+   * base responde, grava e relê — e não tem a coluna onde o DOCUMENTO da
+   * proposta é guardado. Tudo funciona; só o casal é que não vê a proposta.
+   *
+   * Ausente quando está tudo lá e ausente também sem base de dados nenhuma
+   * (ver `estado-das-colunas`). Nomes com a tabela à frente: `proposals.doc`.
+   */
+  colunasEmFalta?: string[];
+  /** O que fazer quanto a elas. Nomeia o ficheiro a correr. */
+  colunasTitulo?: string;
+  colunasOQueFazer?: string;
   /** O que o servidor disse, para os registos. Não é para substituir o
    *  `oQueFazer` — é para quem for investigar. */
   detalhe?: string;
@@ -285,15 +300,33 @@ async function apurar(): Promise<DiagnosticoDoArmazenamento> {
    */
   const copia = estado === "ok" ? await estadoDaCopia() : undefined;
 
+  /**
+   * ── E AS COLUNAS, ESTÃO LÁ? ──────────────────────────────────────────────
+   *
+   * Só com o estado `ok`, e pela mesma razão que a cópia: sem base de dados não
+   * há esquema para lhe faltar coluna nenhuma (o ficheiro de desenvolvimento
+   * aceita qualquer campo), e com a base em baixo a pergunta não tem resposta —
+   * dizer duas coisas vermelhas pela mesma causa divide a atenção.
+   */
+  const colunas = estado === "ok" ? await colunasEmFalta() : [];
+
   const diagnostico: DiagnosticoDoArmazenamento = {
     estado,
     duradouro: saudavel ? escrita.duradouro : false,
     // Só se interrompe alguém quando há mesmo alguma coisa para essa pessoa
     // fazer. Ver o cabeçalho: um aviso que aparece sempre deixa de ser lido.
-    avisar: !saudavel || fotos.estado === "sem-resposta" || copia?.avisar === true,
+    avisar:
+      !saudavel || fotos.estado === "sem-resposta" || copia?.avisar === true || colunas.length > 0,
     ...FRASES[estado],
     fotos: fotos.estado,
     ...(copia ? { copia } : {}),
+    ...(colunas.length
+      ? {
+          colunasEmFalta: colunas,
+          colunasTitulo: tituloDasColunas(colunas),
+          colunasOQueFazer: oQueFazerComAsColunas(colunas),
+        }
+      : {}),
     ...(FOTOS_O_QUE_FAZER[fotos.estado] ? { fotosOQueFazer: FOTOS_O_QUE_FAZER[fotos.estado] } : {}),
     ...(detalhe || fotos.detalhe
       ? { detalhe: [detalhe, fotos.detalhe].filter(Boolean).join(" · ") }
@@ -305,6 +338,7 @@ async function apurar(): Promise<DiagnosticoDoArmazenamento> {
     log.warn("armazenamento: verificação com aviso", {
       estado,
       fotos: fotos.estado,
+      colunas,
       detalhe: diagnostico.detalhe,
     });
   }
