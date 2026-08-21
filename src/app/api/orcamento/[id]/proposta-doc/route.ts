@@ -25,7 +25,7 @@ import {
   type IdiomaDaProposta,
 } from "@/lib/proposal-doc-textos";
 import { textosDoEmailDaProposta } from "@/lib/email-proposta-textos";
-import { createProposalToken } from "@/lib/proposal-token";
+import { enderecoDaProposta } from "@/lib/proposta-link-curto";
 import { proximaVersao, seloDoConteudo } from "@/lib/proposta-versao";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
@@ -41,7 +41,6 @@ import {
 } from "@/lib/email-corpo-escrito";
 import { resolverLigacaoDaProposta } from "@/lib/email-ligacao-reservada";
 import { listarEnvios, registarEnvio } from "@/lib/envios-de-proposta";
-import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -82,7 +81,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const ultima = enviadas[0];
     return NextResponse.json({
       ok: true,
-      acceptUrl: ultima ? `${SITE.url}/proposta/${createProposalToken(ultima.id)}` : null,
+      acceptUrl: ultima ? await enderecoDaProposta(ultima.id, id) : null,
     });
   } catch (err) {
     log.error("proposta-doc GET falhou", err, { id });
@@ -702,7 +701,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         id: proposal.id,
         emailed: true,
         estado: "enviada",
-        acceptUrl: `${SITE.url}/proposta/${createProposalToken(proposal.id)}`,
+        acceptUrl: await enderecoDaProposta(proposal.id, id),
         missingImages,
         truncations,
         pdfBytes: pdfBuffer.byteLength,
@@ -723,8 +722,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         id: jaSeguiu.id,
         emailed: true,
         estado: "enviada",
-        /** O link que o casal RECEBEU — não um segundo, que ninguém tem. */
-        acceptUrl: `${SITE.url}/proposta/${createProposalToken(jaSeguiu.id)}`,
+        /** O link que o casal RECEBEU — não um segundo, que ninguém tem. É
+         *  literalmente o mesmo: o código curto de uma proposta é cunhado uma
+         *  vez e reaproveitado daí em diante. */
+        acceptUrl: await enderecoDaProposta(jaSeguiu.id, id),
         missingImages,
         truncations,
         pdfBytes: pdfBuffer.byteLength,
@@ -873,7 +874,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
+    const acceptUrl = await enderecoDaProposta(proposal.id, id);
 
     /**
      * ══════════════════════════════════════════════════════════════════════

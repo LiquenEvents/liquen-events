@@ -16,6 +16,8 @@ const dados = vi.hoisted(() => ({
   porId: new Map<string, Proposal>(),
   contrato: null as Contract | null,
   rebentaAoListar: false,
+  /** Código curto → proposta, a gaveta do lado do servidor. */
+  curtas: new Map<string, string>(),
 }));
 
 vi.mock("@/lib/proposal-token", () => ({
@@ -31,6 +33,21 @@ vi.mock("@/lib/proposals-store", () => ({
 vi.mock("@/lib/contracts-store", () => ({
   getAcceptedContractByQuote: async () => dados.contrato,
 }));
+/**
+ * A gaveta dos endereços curtos. O `pareceCodigoCurto` é o VERDADEIRO de
+ * propósito: é ele que separa as duas portas, e um duplo aqui deixava passar o
+ * defeito em que um token era confundido com um código (ou o contrário).
+ */
+vi.mock("@/lib/proposta-link-curto", async (original) => {
+  const real = await original<typeof import("@/lib/proposta-link-curto")>();
+  return {
+    ...real,
+    lerLigacaoCurta: async (codigo: string) => {
+      const propostaId = dados.curtas.get(codigo);
+      return propostaId ? { propostaId } : null;
+    },
+  };
+});
 
 const { propostaDoLink } = await import("./proposta-do-link");
 
@@ -394,5 +411,56 @@ describe("o salto para a versão nova não pode perder o documento", () => {
     );
     const r = await propostaDoLink("bom");
     expect(r?.proposta.id).toBe("p2");
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * DUAS PORTAS PARA A MESMA SALA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Os links novos levam um código de 16 caracteres; os que já foram enviados
+ * levam o token assinado, e estão em caixas de correio de gente a sério. Os
+ * dois têm de abrir — e é a FORMA que os distingue, sem ambiguidade possível.
+ */
+describe("o endereço curto abre a mesma proposta que o token", () => {
+  /** Um código com a forma certa: 16 símbolos do alfabeto de Crockford. */
+  const CODIGO = "k3m7p9q2rstv4wxy";
+
+  beforeEach(() => dados.curtas.clear());
+
+  it("um código curto conhecido abre a proposta", async () => {
+    por(proposta({ id: "p1" }));
+    dados.curtas.set(CODIGO, "p1");
+    expect((await propostaDoLink(CODIGO))?.proposta.id).toBe("p1");
+  });
+
+  it("e segue as MESMAS regras — salta para a revisão mais recente", async () => {
+    por(
+      proposta({ id: "p1" }),
+      proposta({ id: "p2", createdAt: "2026-02-01T10:00:00.000Z", doc: {} as never }),
+    );
+    dados.curtas.set(CODIGO, "p1");
+    // Nada de um caminho paralelo com regras próprias: a porta muda, a sala é
+    // a mesma.
+    expect((await propostaDoLink(CODIGO))?.proposta.id).toBe("p2");
+  });
+
+  it("um código que ninguém emitiu não abre nada", async () => {
+    por(proposta({ id: "p1" }));
+    expect(await propostaDoLink(CODIGO)).toBe(null);
+  });
+
+  it("o token dos links JÁ ENVIADOS continua a abrir", async () => {
+    por(proposta({ id: "p1" }));
+    // Controlo positivo do que não pode partir: há emails lá fora com isto.
+    expect((await propostaDoLink("bom"))?.proposta.id).toBe("p1");
+  });
+
+  it("um endereço que não é nem uma coisa nem outra não abre", async () => {
+    por(proposta({ id: "p1" }));
+    expect(await propostaDoLink("mau")).toBe(null);
+    expect(await propostaDoLink("")).toBe(null);
+    expect(await propostaDoLink(undefined)).toBe(null);
   });
 });

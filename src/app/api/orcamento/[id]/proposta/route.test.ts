@@ -78,6 +78,20 @@ vi.mock("@/lib/mail", () => ({
   MAIL_TO: "team@example.com",
 }));
 vi.mock("@/lib/proposal-token", () => ({ createProposalToken: token.create }));
+/**
+ * O endereço que vai no email é composto no `proposta-link-curto` — curto
+ * quando o armazenamento de estado responde, token assinado quando não
+ * responde. Aqui interessa a OUTRA coisa: que leve o identificador da proposta
+ * acabada de criar, e não o do pedido. O duplo passa pelo `token.create` para
+ * essa asserção continuar a ser possível.
+ *
+ * O anfitrião está escrito à mão porque um `vi.hoisted` corre antes dos
+ * `import`, e tem de ser igual ao `SITE.url` com que os testes comparam.
+ */
+vi.mock("@/lib/proposta-link-curto", () => ({
+  enderecoDaProposta: async (propostaId: string) =>
+    `https://liquen-events.com/proposta/${token.create(propostaId)}`,
+}));
 // Só o `getTemplate` é duplo: o `renderTemplate`, os campos de fusão e as
 // sementes são os verdadeiros, para o que se mede aqui ser mesmo o caminho que
 // leva o texto dela até ao email.

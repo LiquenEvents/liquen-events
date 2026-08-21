@@ -3,6 +3,7 @@ import type { Proposal } from "@/lib/orcamento/types";
 import { getProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { getAcceptedContractByQuote } from "@/lib/contracts-store";
 import { readProposalToken } from "@/lib/proposal-token";
+import { lerLigacaoCurta, pareceCodigoCurto } from "@/lib/proposta-link-curto";
 import { estadoDaVersao, seloDoConteudo, type EstadoDaVersao } from "@/lib/proposta-versao";
 import { log } from "@/lib/logger";
 
@@ -93,10 +94,21 @@ function mesmoCliente(a: string | undefined, b: string | undefined): boolean {
 export async function propostaDoLink(
   token: string | undefined | null,
 ): Promise<PropostaDoLink | null> {
-  const claim = readProposalToken(token);
-  if (!claim) return null;
+  /**
+   * DUAS PORTAS PARA A MESMA SALA.
+   *
+   * O que vem no endereço é o token assinado (os links já enviados, que têm de
+   * continuar a abrir) ou o código curto de 16 caracteres. Distinguem-se pela
+   * forma, sem ambiguidade possível: um token tem pontos e duzentos caracteres.
+   *
+   * O código curto é tentado primeiro porque é uma comparação de forma, barata,
+   * e falha de imediato para tudo o que seja um token.
+   */
+  const codigo = pareceCodigoCurto(token) ? await lerLigacaoCurta(String(token)) : null;
+  const propostaId = codigo?.propostaId ?? readProposalToken(token)?.proposalId;
+  if (!propostaId) return null;
 
-  const doToken = await getProposal(claim.proposalId);
+  const doToken = await getProposal(propostaId);
   if (!doToken) return null;
 
   let proposta = doToken;

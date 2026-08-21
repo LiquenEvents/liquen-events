@@ -117,6 +117,12 @@ vi.mock("@/lib/email-templates-store", async (original) => {
   return { ...real, getTemplate: modelo.get };
 });
 vi.mock("@/lib/proposal-token", () => ({ createProposalToken: vi.fn(() => "tok") }));
+/** O endereço do casal, sempre o mesmo, para as asserções poderem ser exactas.
+ *  O que ele é POR DENTRO — código curto ou token — mede-se no
+ *  `proposta-link-curto.test.ts`. */
+vi.mock("@/lib/proposta-link-curto", () => ({
+  enderecoDaProposta: async () => "https://liquen-events.com/proposta/tok",
+}));
 vi.mock("@/lib/mail", () => ({
   sendMail: vi.fn(async () => ({ sent: true })),
   // O `esc` do duplo escapa MESMO, como o verdadeiro (`src/lib/mail.ts`). Era

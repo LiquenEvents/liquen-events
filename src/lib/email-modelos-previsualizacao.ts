@@ -3,9 +3,8 @@ import { ASSINATURA_NOME } from "./email-assinatura";
 import { construirValores, type EntradaDosValores } from "./email-template-vars";
 import { SINAL_POR_OMISSAO } from "./money";
 import { getProposalByQuote } from "./proposals-store";
-import { createProposalToken } from "./proposal-token";
+import { enderecoDaProposta } from "./proposta-link-curto";
 import { getQuote, listQuotes } from "./quotes-store";
-import { SITE } from "./site";
 import type { IdiomaDoModelo } from "./email-templates-store";
 
 /**
@@ -90,7 +89,11 @@ export async function valoresDoPedidoReal(
       moeda: proposta?.currency || "EUR",
       validadeIso: proposta?.validUntil ?? "",
       sinalPercentagem: SINAL_POR_OMISSAO,
-      link: proposta ? `${SITE.url}/proposta/${createProposalToken(proposta.id)}` : "",
+      // O MESMO endereço que sairia no email a sério — curto. Mostrar aqui um
+      // token de duzentos caracteres e enviar outra coisa fazia da
+      // pré-visualização uma mentira precisamente sobre a linha que ela veio
+      // ver.
+      link: proposta ? await enderecoDaProposta(proposta.id, quoteId) : "",
       // A mensagem pessoal é escrita no momento do envio, não vive no pedido.
       // Na pré-visualização fica vazia de propósito: é assim que ela vê o que
       // o modelo faz quando não há mensagem nenhuma.

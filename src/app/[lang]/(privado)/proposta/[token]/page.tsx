@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { readProposalToken } from "@/lib/proposal-token";
 import { propostaDoLink } from "@/lib/proposta-do-link";
+import { pareceCodigoCurto } from "@/lib/proposta-link-curto";
 import { SITE } from "@/lib/site";
 import { getDictionary, htmlLang, normalizeLocale, type Locale } from "@/lib/i18n";
 import { idiomaDaProposta } from "@/lib/proposta-idioma";
@@ -245,13 +246,6 @@ export default async function ProposalPage({
    * olhar.
    */
   const doVisitante = normalizeLocale(lang);
-  const claim = readProposalToken(token);
-  if (!claim) {
-    const t = getDictionary(doVisitante).proposta;
-    return (
-      <Message title={t.linkInvalidTitle} body={t.linkInvalidBody} lang={htmlLang(doVisitante)} />
-    );
-  }
 
   /**
    * ── A VERSÃO ATUAL, PELO LINK QUE O CASAL JÁ TEM ─────────────────────────
@@ -266,8 +260,26 @@ export default async function ProposalPage({
   const doLink = await propostaDoLink(token);
   const proposal = doLink?.proposta;
   if (!proposal) {
+    /**
+     * ── DUAS MANEIRAS DE NÃO HAVER PROPOSTA, E DUAS FRASES ─────────────────
+     *
+     * O endereço que chega aqui é uma de duas coisas: o token assinado dos
+     * links já enviados, ou o código curto dos novos. A verificação estava
+     * feita ANTES, e só sabia ler tokens — um código curto legítimo apanhava
+     * «link inválido» sem sequer se ir ver se a proposta existia.
+     *
+     * Agora quem resolve as duas portas é o `propostaDoLink`, e o que sobra
+     * aqui é só escolher a frase: um endereço com forma reconhecível que não
+     * abre nada é uma proposta que já não está lá; um endereço sem forma
+     * nenhuma é um link partido pelo caminho.
+     */
     const t = getDictionary(doVisitante).proposta;
-    return <Message title={t.notFoundTitle} body={t.notFoundBody} lang={htmlLang(doVisitante)} />;
+    const formaConhecida = pareceCodigoCurto(token) || readProposalToken(token) !== null;
+    return formaConhecida ? (
+      <Message title={t.notFoundTitle} body={t.notFoundBody} lang={htmlLang(doVisitante)} />
+    ) : (
+      <Message title={t.linkInvalidTitle} body={t.linkInvalidBody} lang={htmlLang(doVisitante)} />
+    );
   }
 
   /**

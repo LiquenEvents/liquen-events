@@ -11,8 +11,7 @@ import { assinaturaDeQuemEnvia } from "@/lib/email-quem-assina";
 import { marcadoresDoPedido, modeloParaEnvioAutomatico, textoDoCorpo } from "@/lib/email-modelos";
 import { arrumarLigacao, ROTULO_DA_PROPOSTA } from "@/lib/email-ligacoes";
 import { corpoEscritoAMao, excedeOTecto, MAXIMO_CORPO_ESCRITO } from "@/lib/email-corpo-escrito";
-import { SITE } from "@/lib/site";
-import { createProposalToken } from "@/lib/proposal-token";
+import { enderecoDaProposta } from "@/lib/proposta-link-curto";
 import { isAuthed } from "@/lib/admin-auth";
 import { proposalCreateSchema, firstError, dataIso } from "@/lib/validation";
 import { log } from "@/lib/logger";
@@ -231,8 +230,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
     const pdfBuffer = Buffer.from(pdfBytes);
 
-    // Signed link so the client can accept/decline the proposal online.
-    const acceptUrl = `${SITE.url}/proposta/${createProposalToken(proposal.id)}`;
+    // O endereço por onde o casal aceita ou recusa. Curto quando o
+    // armazenamento responde, token assinado quando não responde — as duas
+    // portas abrem a mesma sala e expiram no mesmo instante.
+    const acceptUrl = await enderecoDaProposta(proposal.id, id);
 
     // Email the client with the PDF attached. Só o corpo se escreve aqui — a
     // moldura, a assinatura e os anexos da marca vêm do `email-assinatura`,
