@@ -935,6 +935,56 @@ describe("pontos de decoração escolhidos no pedido", () => {
   });
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DUAS PÁGINAS COM O MESMO NOME, UMA A SEGUIR À OUTRA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «páginas 6 e 7 dos mood boards: "Complementos Dos Noivos" e
+ * "Complementos Noivos". Uma é bouquet, outra lapelas — mas na proposta
+ * aparecem dois títulos praticamente idênticos seguidos».
+ *
+ * As regras de o que é «parecido» estão presas em `proposal-titulos-parecidos`.
+ * O que se prende AQUI é que o aviso chegue ao ecrã onde ela escreve o título —
+ * é o único sítio onde o problema se resolve.
+ */
+describe("títulos de páginas quase iguais", () => {
+  /** Um rascunho com os títulos que interessam, e uma foto em cada página. */
+  function seedComTitulos(...titulos: string[]) {
+    seedDraft(1);
+    const doc = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>;
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        ...doc,
+        moodBoards: titulos.map((title, i) => ({
+          title,
+          annotation: "",
+          images: [`board/foto-${i}.jpg`],
+        })),
+      }),
+    );
+  }
+
+  it("avisa no cartão do board, e cita o outro título", async () => {
+    seedComTitulos("Complementos Dos Noivos", "Complementos Noivos");
+    renderStudio();
+    const avisos = await screen.findAllByText(/lê-se como esta página/i);
+    expect(avisos).toHaveLength(2);
+    expect(avisos[0].textContent).toContain("«Complementos Noivos»");
+    expect(avisos[1].textContent).toContain("«Complementos Dos Noivos»");
+  });
+
+  it("«Mesa 1» e «Mesa 2» não levam aviso nenhum", async () => {
+    // Um aviso que trava uma escolha legítima ensina-se a ignorar, e o próximo
+    // — o que interessa — ignora-se com ele.
+    seedComTitulos("Mesa 1", "Mesa 2");
+    renderStudio();
+    await screen.findByDisplayValue("Mesa 1");
+    expect(screen.queryByText(/lê-se como esta página/i)).toBeNull();
+  });
+});
+
 describe("mood board com mais fotos do que a página desenha", () => {
   it("marca AO MONTAR as fotos que não vão ser impressas", async () => {
     // A lotação subiu de 6 para 10 quando os layouts passaram a ser cinco (a

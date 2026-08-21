@@ -126,6 +126,7 @@ import NotasInternas from "./NotasInternas";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
 import { folhasAproximadas } from "@/lib/proposal-paginas";
+import { avisoDeTituloParecido, titulosParecidos } from "@/lib/proposal-titulos-parecidos";
 import { depositPercentOf } from "@/lib/proposal-doc";
 // A geometria do documento, para a pré-visualização mostrar a forma que cada
 // foto vai MESMO ter. Módulo próprio, sem `server-only`, exactamente para poder
@@ -2863,6 +2864,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // contas sobre o mesmo documento — «7 páginas» na vista e «cerca de 14» na
     // frase — e discordavam porque contavam coisas diferentes.
     `PDF com cerca de ${folhasAproximadas(doc as ProposalDoc)}${tempoDaProposta}`;
+
+  /**
+   * ── OS TÍTULOS QUE SE LÊEM COMO O MESMO NOME ────────────────────────────
+   *
+   * Um por board, e `undefined` na esmagadora maioria. Calculado uma vez para
+   * a lista toda e não board a board: a pergunta é sobre PARES, e fazê-la
+   * dentro do cartão dava um varrimento de todos os títulos por cada cartão
+   * desenhado — oito páginas, sessenta e quatro comparações, a cada tecla
+   * escrita num título.
+   */
+  const avisosDeTitulo = useMemo(() => {
+    const por: Record<number, string> = {};
+    for (const grupo of titulosParecidos(doc as ProposalDoc)) {
+      for (const bi of grupo.bis) {
+        const aviso = avisoDeTituloParecido(doc as ProposalDoc, bi);
+        if (aviso) por[bi] = aviso;
+      }
+    }
+    return por;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.moodBoards, doc.serviceGroups, doc.ordemExplicita]);
 
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -6469,6 +6491,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         // ser. A `CaixaInglesa` já sabia fazê-lo.
                                         cresce: true,
                                       },
+                                    )}
+                                    {/* ── DUAS PÁGINAS COM O MESMO NOME ───────
+                                        «"Complementos Dos Noivos" e
+                                        "Complementos Noivos". Uma é bouquet,
+                                        outra lapelas — mas na proposta aparecem
+                                        dois títulos praticamente idênticos
+                                        seguidos.»
+
+                                        Não é vermelho e não trava nada: «Mesa
+                                        1» e «Mesa 2» é uma decisão, não um
+                                        descuido, e um aviso que trava uma
+                                        escolha legítima ensina-se a ignorar. Diz
+                                        o que viu, cita o outro título, e deixa-a
+                                        decidir. */}
+                                    {avisosDeTitulo[bi] && (
+                                      <p className={`${AVISO_DO_BOARD} text-[#8a6420]`}>
+                                        {avisosDeTitulo[bi]}
+                                      </p>
                                     )}
                                     {/* ── A PÁGINA ESTÁ A FICAR CHEIA ─────────
                                         Discreto, e antes do limite: às oito
