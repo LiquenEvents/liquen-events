@@ -1026,17 +1026,30 @@ describe("a lista de temas não engole o ecrã", () => {
     expect(activos[0].textContent).toContain("Tema 1");
   });
 
+  /** Abre a procura e escreve. A caixa vive atrás de uma lupa no telemóvel —
+   *  ver «a procura vive atrás de uma lupa», mais abaixo. */
+  async function procurar(texto: string) {
+    const lupa = screen.queryByRole("button", { name: "Procurar tema" });
+    if (lupa) fireEvent.click(lupa);
+    fireEvent.change(screen.getByRole("textbox", { name: "Procurar tema" }), {
+      target: { value: texto },
+    });
+  }
+
   it("a procura continua a filtrar a fila", async () => {
     await comMuitos();
-    fireEvent.change(screen.getByLabelText("Procurar tema"), { target: { value: "Tema 3" } });
+    await procurar("Tema 3");
     // «Tema 3», «Tema 30»…«Tema 39» — onze.
     expect(lista().querySelectorAll("button").length).toBe(11);
   });
 
-  it("e diz quando não há nada com esse nome", async () => {
+  it("e o vazio diz o que se procurou, com o caminho de volta", async () => {
     await comMuitos();
-    fireEvent.change(screen.getByLabelText("Procurar tema"), { target: { value: "zzz" } });
-    expect(screen.getByText("Nenhum tema com esse nome.")).toBeInTheDocument();
+    await procurar("zzz");
+    // Era «Nenhum tema com esse nome.» — uma legenda cinzenta sem saída.
+    expect(screen.getByText("Nenhum tema com «zzz».")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ver os 40 temas" }));
+    expect(lista().querySelectorAll("button").length).toBe(40);
   });
 
   it("a grelha das fotos continua a desenhar-se, com os quarenta temas lá", async () => {
@@ -1141,6 +1154,105 @@ describe("o que se escolhe, dito pelo número", () => {
     const dica = screen.getByText(/Toca para escolher/);
     expect(dica.className).toContain("sm:hidden");
     expect(dica.textContent).toContain("lupa");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * OS DETALHES QUE ROUBAVAM ESPAÇO OU LEGIBILIDADE
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+describe("a procura vive atrás de uma lupa", () => {
+  const muitos = Array.from({ length: 12 }, (_, i) => ({
+    ...THEME,
+    id: `t${i + 1}`,
+    name: `Tema ${i + 1}`,
+  }));
+
+  it("por omissão não há caixa nenhuma a ocupar uma linha", async () => {
+    route("GET /api/temas", () => ok(muitos));
+    await openPicker(true);
+    // 55 px que a grelha não tinha.
+    expect(screen.queryByRole("textbox", { name: "Procurar tema" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Procurar tema" })).toBeInTheDocument();
+  });
+
+  it("a lupa abre a caixa, e fechá-la limpa o que estava escrito", async () => {
+    route("GET /api/temas", () => ok(muitos));
+    await openPicker(true);
+    fireEvent.click(screen.getByRole("button", { name: "Procurar tema" }));
+    const campo = screen.getByRole("textbox", { name: "Procurar tema" });
+    fireEvent.change(campo, { target: { value: "Tema 1" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Fechar a procura" }));
+    // Um filtro activo por trás de uma caixa fechada é a razão escondida por
+    // que a fila mostra dois temas em vez de doze.
+    expect(screen.queryByRole("textbox", { name: "Procurar tema" })).toBeNull();
+    const lista = screen.getByRole("group", { name: "Temas" });
+    expect(lista.querySelectorAll("button").length).toBe(12);
+  });
+
+  it("com texto escrito, a caixa não se fecha sozinha", async () => {
+    route("GET /api/temas", () => ok(muitos));
+    await openPicker(true);
+    fireEvent.click(screen.getByRole("button", { name: "Procurar tema" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Procurar tema" }), {
+      target: { value: "Tema 4" },
+    });
+    // O botão passa a ser o de fechar — e a caixa continua lá, com o texto.
+    expect((screen.getByRole("textbox", { name: "Procurar tema" }) as HTMLInputElement).value).toBe(
+      "Tema 4",
+    );
+  });
+
+  it("com três temas não há lupa nenhuma — não há o que filtrar", async () => {
+    route("GET /api/temas", () => ok(muitos.slice(0, 3)));
+    await openPicker(true);
+    expect(screen.queryByRole("button", { name: "Procurar tema" })).toBeNull();
+  });
+});
+
+describe("os chips lêem-se", () => {
+  it("o tom é escrito, e não o 55% do botão fantasma", async () => {
+    await openPicker(true);
+    const chip = screen.getByRole("button", { name: /^Terracotta,/ });
+    // 55% dá ~4,5:1 — em cima da linha da AA para letra pequena, e estes chips
+    // são a navegação deste painel.
+    expect(chip.className).toContain("text-foreground/75");
+  });
+});
+
+describe("fechar sem ser pelo ×", () => {
+  it("há uma pega para arrastar, e só no telemóvel", async () => {
+    const { container } = await openPicker(true);
+    const pega = container.querySelector(".cursor-grab");
+    expect(pega, "a única saída era o × no canto mais longe do polegar").toBeTruthy();
+    expect(pega!.className).toContain("sm:hidden");
+    // `touch-none` para o browser não tratar o arrasto como rolagem.
+    expect(pega!.className).toContain("touch-none");
+  });
+
+  it("arrastar para baixo o suficiente fecha o painel", async () => {
+    const { container } = await openPicker(true);
+    const pega = container.querySelector(".cursor-grab") as HTMLElement;
+    // O jsdom não implementa a captura do ponteiro.
+    pega.setPointerCapture = () => {};
+    fireEvent.pointerDown(pega, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(pega, { clientY: 260, pointerId: 1 });
+    fireEvent.pointerUp(pega, { pointerId: 1 });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("e um arrasto curto devolve o painel ao sítio", async () => {
+    const { container } = await openPicker(true);
+    const pega = container.querySelector(".cursor-grab") as HTMLElement;
+    pega.setPointerCapture = () => {};
+    fireEvent.pointerDown(pega, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(pega, { clientY: 130, pointerId: 1 });
+    fireEvent.pointerUp(pega, { pointerId: 1 });
+    // Trinta pixéis é um toque trémulo, não um gesto.
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: /biblioteca de temas/i })).toBeInTheDocument();
   });
 });
 

@@ -1419,6 +1419,71 @@ export default function ThemePicker({
 
   /** Onde vive a fila dos temas, para lhe pôr o activo à vista. */
   const listaRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * ── FECHAR ARRASTANDO PARA BAIXO ────────────────────────────────────────
+   *
+   * A única saída era o × no topo direito — o canto mais longe do polegar num
+   * telemóvel. Palavras dela: «acrescentar gesto de arrastar para baixo».
+   *
+   * O gesto vive na PEGA, e não no painel inteiro, de propósito: o painel tem
+   * uma fila que rola de lado e uma grelha que rola para baixo, e um arrasto
+   * que apanhasse tudo roubaria toques a essas duas. A pega é uma barra no topo
+   * que não faz mais nada — é o sítio onde um arrasto só pode querer dizer uma
+   * coisa.
+   *
+   * `puxado` é a distância já arrastada: o painel segue o dedo (é isso que faz
+   * o gesto parecer que existe) e volta ao sítio se for largado a meio.
+   */
+  const [puxado, setPuxado] = useState(0);
+  /** Onde o dedo pousou. `null` quando não há arrasto nenhum a decorrer. */
+  const arrasto = useRef<number | null>(null);
+
+  /** A partir de onde largar fecha em vez de voltar ao sítio. */
+  const FECHA_AOS = 90;
+
+  function pegarNaPega(e: React.PointerEvent<HTMLDivElement>) {
+    arrasto.current = e.clientY;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function moverAPega(e: React.PointerEvent<HTMLDivElement>) {
+    if (arrasto.current === null) return;
+    // Só para BAIXO: puxar para cima não faz nada (é o P1.2, e não é isto).
+    setPuxado(Math.max(0, e.clientY - arrasto.current));
+  }
+
+  function largarAPega() {
+    if (arrasto.current === null) return;
+    const fechar = puxado >= FECHA_AOS;
+    arrasto.current = null;
+    setPuxado(0);
+    if (fechar) dismiss();
+  }
+
+  /**
+   * A caixa de procurar está aberta?
+   *
+   * Com texto escrito está sempre — fechá-la deixando o filtro por baixo
+   * escondia a razão por que a fila mostra três temas em vez de quarenta.
+   */
+  const [procuraAberta, setProcuraAberta] = useState(false);
+  const campoDaProcura = useRef<HTMLInputElement | null>(null);
+
+  const procuraVisivel = procuraAberta || procuraTema !== "";
+
+  function abrirOuFecharProcura() {
+    if (procuraVisivel) {
+      // Fechar limpa: um filtro activo por trás de uma caixa fechada é a razão
+      // escondida por que a fila mostra três temas em vez de quarenta.
+      setProcuraTema("");
+      setProcuraAberta(false);
+      return;
+    }
+    setProcuraAberta(true);
+    // O foco tem de esperar pela caixa existir. Sem isto, abrir a procura era
+    // abrir uma caixa e ter de lhe tocar a seguir.
+    requestAnimationFrame(() => campoDaProcura.current?.focus());
+  }
 
   /**
    * AO ABRIR, O TEMA ACTIVO TEM DE ESTAR À VISTA.
@@ -1690,7 +1755,28 @@ export default function ThemePicker({
         aria-modal="true"
         aria-label="Escolher fotos da biblioteca de temas"
         className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
+        /* O painel segue o dedo enquanto se arrasta a pega. Sem transição
+           durante o arrasto (seria um atraso entre o dedo e o painel) e com ela
+           ao largar, que é o que faz o painel voltar ao sítio em vez de
+           saltar. */
+        style={puxado > 0 ? { transform: `translateY(${puxado}px)` } : undefined}
       >
+        {/* ── A PEGA ────────────────────────────────────────────────────────
+            Só no telemóvel: no computador o painel é um diálogo ao centro e
+            arrastá-lo para baixo não quer dizer nada. Não leva rótulo nem
+            entra na ordem do teclado — quem navega por teclado fecha com o Esc,
+            que já funciona, e tem o × logo a seguir. */}
+        <div
+          onPointerDown={pegarNaPega}
+          onPointerMove={moverAPega}
+          onPointerUp={largarAPega}
+          onPointerCancel={largarAPega}
+          aria-hidden
+          className="flex shrink-0 cursor-grab touch-none justify-center py-2 active:cursor-grabbing sm:hidden"
+        >
+          <span className="h-1 w-9 rounded-full bg-foreground/20" />
+        </div>
+
         {/* Cabeçalho */}
         <div className="flex items-start justify-between gap-4 border-b border-foreground/[0.08] px-5 py-4">
           <div>
@@ -1739,85 +1825,174 @@ export default function ThemePicker({
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              {/* ── A PROCURA, SEMPRE À VISTA ─────────────────────────────
-                  Não desaparece com nada: é o caminho que ela já usava quando
-                  a lista não cabia no ecrã, e escrever aqui filtra os chips
-                  abaixo sem tirar nada do sítio.
+              {/* ── A PROCURA E OS TEMAS, NA MESMA LINHA ──────────────────
+                  Duas correcções na mesma fila.
 
-                  Só aparece quando há temas que cheguem para valer a pena
-                  filtrar. Com três, a caixa era mais uma coisa a ler. */}
-              {themes.length > 3 && (
-                <input
-                  value={procuraTema}
-                  onChange={(e) => setProcuraTema(e.target.value)}
-                  placeholder="Procurar tema por nome ou etiqueta…"
-                  aria-label="Procurar tema"
-                  className="bo-input w-full px-3 py-1.5 text-xs sm:max-w-xs"
-                />
-              )}
+                  A PROCURA ocupava uma linha inteira e permanente por cima dos
+                  chips — 55 px que a grelha não tinha. Palavras dela:
+                  «considerar torná-la acionável por ícone, libertando espaço».
+                  Passa a estar atrás de uma lupa à cabeça da fila, e quando
+                  abre toma o lugar da lupa em vez de nascer numa linha nova: os
+                  chips continuam ao lado, a rolar, e a altura não muda.
 
-              {/* ── OS TEMAS, NUMA LINHA SÓ ───────────────────────────────
-                  MEDIDO no telemóvel dela, a 390 px: a lista empilhava-se em
-                  seis linhas e as fotografias — que são a razão de abrir este
-                  painel — ficavam espremidas num terço, cortadas a meio.
-                  Palavras dela: «está ao contrário do que devia ser».
+                  Fica aberta enquanto houver texto escrito — fechá-la com um
+                  filtro activo por baixo era esconder a razão por que a fila
+                  mostra três temas em vez de quarenta.
 
-                  Uma linha de chips que rola de lado devolve essa altura toda
-                  à grelha. Cada chip traz o nome e a contagem juntos, porque
-                  são a mesma informação: qual é o tema e quanto tem lá dentro.
+                  OS TEMAS empilhavam-se em seis linhas e as fotografias — que
+                  são a razão de abrir este painel — ficavam espremidas num
+                  terço. Palavras dela: «está ao contrário do que devia ser».
+                  Uma linha que rola de lado devolve essa altura à grelha, com o
+                  nome e a contagem no mesmo chip.
 
-                  ── E NO COMPUTADOR NÃO ────────────────────────────────────
-                  A partir de `sm` a fila volta a QUEBRAR e a ocupar as linhas
-                  que precisar, com o tecto de altura de sempre. Rolar de lado
-                  com um rato é mau, e num ecrã largo vêem-se os quarenta temas
-                  de uma vez — que é melhor do que qualquer scroll. É a mesma
-                  marcação com duas formas, e não dois blocos: um segundo bloco
-                  duplicava os botões no DOM e punha o teclado a passar duas
-                  vezes por cada tema.
+                  ── E NO COMPUTADOR ────────────────────────────────────────
+                  A partir de `sm` a fila desdobra-se: a caixa de procurar volta
+                  a ficar sempre à vista por cima (lá a linha não custa nada e
+                  escrever é mais rápido do que dois cliques) e os chips voltam
+                  a QUEBRAR, com o tecto de altura de sempre. Rolar de lado com
+                  um rato é mau, e num ecrã largo vêem-se os quarenta de uma vez.
 
                   O `-mx-5 px-5` é para a fila sangrar até às arestas do painel:
                   um chip cortado a meio na margem é o que diz que há mais para
-                  o lado. Com a fila a acabar dentro do `px-5`, parecia que
-                  acabava ali. */}
-              <div
-                ref={listaRef}
-                className="-mx-5 flex snap-x gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] sm:mx-0 sm:max-h-[34vh] sm:snap-none sm:flex-wrap sm:overflow-x-visible sm:overflow-y-auto sm:px-0 [&::-webkit-scrollbar]:hidden"
-                role="group"
-                aria-label="Temas"
-              >
-                {temasVisiveis.map((t) => (
-                  <Button
-                    key={t.id}
-                    size="sm"
-                    variant={t.id === themeId ? "subtle" : "ghost"}
-                    aria-pressed={t.id === themeId}
-                    aria-label={themeButtonLabel(t)}
-                    onClick={() => pickTheme(t.id)}
-                    /* `shrink-0` e `snap-start`: numa fila que rola, um chip
-                       que encolhe deixa de se ler, e sem o encaixe o dedo larga
-                       a fila a meio de um nome. */
-                    className="shrink-0 snap-start"
-                    /* PRÉ-CARREGAR AO APROXIMAR, não ao carregar. Entre o rato
-                       chegar ao separador e o clique passam ~150–300 ms — que é
-                       praticamente o que a rota demora. Buscar aí faz o tema
-                       estar pronto no instante do clique, em vez de começar nele.
-
-                       `focus` para quem navega por teclado; `touchstart` para o
-                       telemóvel, onde não há hover nenhum — é o instante entre
-                       pousar o dedo e o levantar, e sem ele o telemóvel era o
-                       único sítio que não ganhava nada com isto. */
-                    onPointerEnter={() => prefetchTheme(t.id)}
-                    onFocus={() => prefetchTheme(t.id)}
-                    onTouchStart={() => prefetchTheme(t.id)}
-                  >
-                    {t.name}
-                    <span className="bo-text-muted">{themeCountLabel(t)}</span>
-                  </Button>
-                ))}
-                {temasVisiveis.length === 0 && (
-                  <p className="bo-text-muted text-xs">Nenhum tema com esse nome.</p>
+                  o lado. */}
+              <div className="-mx-5 flex items-center gap-2 px-5 sm:mx-0 sm:flex-col sm:items-start sm:gap-2 sm:px-0">
+                {procuraVisivel ? (
+                  <div className="flex shrink-0 items-center gap-1 sm:w-full sm:max-w-xs">
+                    <input
+                      ref={campoDaProcura}
+                      value={procuraTema}
+                      onChange={(e) => setProcuraTema(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Escape") return;
+                        // Esc limpa e fecha — e NÃO fecha o diálogo, que é o que
+                        // faria se a tecla subisse até ao ouvinte de cima.
+                        e.stopPropagation();
+                        setProcuraTema("");
+                        setProcuraAberta(false);
+                      }}
+                      placeholder="Procurar tema…"
+                      aria-label="Procurar tema"
+                      className="bo-input w-36 shrink-0 px-3 py-1.5 text-xs sm:w-full sm:max-w-none"
+                    />
+                    {/* A saída da procura. Sem ela, uma caixa aberta num
+                      telemóvel só se fechava com uma tecla Esc que muitos
+                      teclados não têm — e limpar o texto não bastava, porque a
+                      caixa fica aberta de propósito enquanto se escreve. */}
+                    <button
+                      type="button"
+                      onClick={abrirOuFecharProcura}
+                      aria-expanded
+                      aria-label="Fechar a procura"
+                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
+                    >
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M18 6 6 18M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  themes.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={abrirOuFecharProcura}
+                      aria-expanded={false}
+                      aria-label="Procurar tema"
+                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        aria-hidden="true"
+                      >
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="m20 20-3.5-3.5" />
+                      </svg>
+                    </button>
+                  )
                 )}
+                <div
+                  ref={listaRef}
+                  className="flex min-w-0 flex-1 snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] sm:max-h-[34vh] sm:w-full sm:flex-none sm:snap-none sm:flex-wrap sm:overflow-x-visible sm:overflow-y-auto [&::-webkit-scrollbar]:hidden"
+                  role="group"
+                  aria-label="Temas"
+                >
+                  {temasVisiveis.map((t) => (
+                    <Button
+                      key={t.id}
+                      size="sm"
+                      variant={t.id === themeId ? "subtle" : "ghost"}
+                      aria-pressed={t.id === themeId}
+                      aria-label={themeButtonLabel(t)}
+                      onClick={() => pickTheme(t.id)}
+                      /* `shrink-0` e `snap-start`: numa fila que rola, um chip
+                         que encolhe deixa de se ler, e sem o encaixe o dedo
+                         larga a fila a meio de um nome.
+
+                         O TOM é escrito aqui e não herdado do `ghost` (55%,
+                         ~4,5:1 — em cima da linha da AA para letra pequena).
+                         Palavras dela: «contadores em cinzento demasiado claro,
+                         quase ilegíveis». Estes chips são a navegação deste
+                         painel, não uma acção secundária. */
+                      className="shrink-0 snap-start text-foreground/75"
+                      /* PRÉ-CARREGAR AO APROXIMAR, não ao carregar. Entre o
+                         rato chegar ao separador e o clique passam ~150–300 ms
+                         — que é praticamente o que a rota demora. Buscar aí faz
+                         o tema estar pronto no instante do clique.
+
+                         `focus` para quem navega por teclado; `touchstart` para
+                         o telemóvel, onde não há hover nenhum. */
+                      onPointerEnter={() => prefetchTheme(t.id)}
+                      onFocus={() => prefetchTheme(t.id)}
+                      onTouchStart={() => prefetchTheme(t.id)}
+                    >
+                      {t.name}
+                      <span className="tabular-nums text-foreground/55">{themeCountLabel(t)}</span>
+                    </Button>
+                  ))}
+                </div>
               </div>
+
+              {/* ── QUANDO A PROCURA NÃO DEVOLVE NADA ─────────────────────
+                  Era uma linha cinzenta dentro da própria fila — «Nenhum tema
+                  com esse nome.» — do tamanho de uma legenda, no sítio onde
+                  deviam estar os temas. Um vazio sem saída não é um estado, é
+                  um beco: passa a dizer o que se procurou e a ter o caminho de
+                  volta no mesmo sítio onde se lê o problema. */}
+              {temasVisiveis.length === 0 && (
+                <div className="rounded-xl border border-dashed border-foreground/15 px-4 py-3 text-center">
+                  <p className="text-sm text-foreground/75">
+                    Nenhum tema com «{procuraTema.trim()}».
+                  </p>
+                  <p className="bo-text-muted mt-0.5 text-xs">
+                    A procura olha para o nome e para a nota do tema.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="mt-1.5"
+                    onClick={() => {
+                      setProcuraTema("");
+                      setProcuraAberta(false);
+                    }}
+                  >
+                    Ver os {themes.length} temas
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
