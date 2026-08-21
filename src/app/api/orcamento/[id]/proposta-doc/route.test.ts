@@ -22,6 +22,9 @@ const renderMock = vi.hoisted(() => ({
 const updated = vi.hoisted(() => ({
   last: null as Record<string, unknown> | null,
   estado: "pendente" as string,
+  /** Faz a actualização do PEDIDO rebentar — a terceira escrita depois do
+   *  correio, que falhava com um `log.error` e mais nada. */
+  falhar: false,
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => true }));
@@ -39,6 +42,7 @@ vi.mock("@/lib/quotes-store", () => ({
    */
   updateQuoteWith: vi.fn(
     async (id: string, mutar: (q: Record<string, unknown>) => Record<string, unknown>) => {
+      if (updated.falhar) throw new Error("a base recusou o pedido");
       updated.last = mutar({ id, email: "cliente@example.com", status: updated.estado });
       return updated.last;
     },
@@ -130,13 +134,21 @@ vi.mock("@/lib/mail", () => ({
  * dados). O que interessa aqui é o QUE se guarda — e que se guarda só depois de
  * o correio ter sido aceite.
  */
-const copia = vi.hoisted(() => ({ registar: vi.fn(async () => ({ gravado: true })) }));
-vi.mock("@/lib/envios-de-proposta", () => ({ registarEnvio: copia.registar }));
+const copia = vi.hoisted(() => ({
+  registar: vi.fn(async () => ({ gravado: true })),
+  /** O REGISTO de envios do pedido — a trava de repetição passou a lê-lo, para
+   *  reconhecer um envio que aconteceu mesmo quando o `status` não gravou. */
+  lista: [] as Array<{ enviadoEm: string; propostaId?: string }>,
+}));
+vi.mock("@/lib/envios-de-proposta", () => ({
+  registarEnvio: copia.registar,
+  listarEnvios: vi.fn(async () => copia.lista),
+}));
 
 import { GET, POST } from "./route";
 import { sendMail } from "@/lib/mail";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
-import { createProposal } from "@/lib/proposals-store";
+import { createProposal, updateProposal } from "@/lib/proposals-store";
 
 /** Minimal studio doc — only `ref` + `clientNames` are validated by the route;
  *  the money fields under test are added per-case. */
@@ -197,6 +209,9 @@ beforeEach(() => {
   store.failFirstWith = null;
   store.attempts = 0;
   store.linhas.clear();
+  copia.lista = [];
+  copia.registar.mockResolvedValue({ gravado: true });
+  updated.falhar = false;
   vi.clearAllMocks();
   modelo.get.mockResolvedValue(null);
 });
@@ -1928,5 +1943,138 @@ describe("POST /api/orcamento/[id]/proposta-doc — a validade fica congelada", 
     // 15 dias, não os 60 por omissão — senão o teste acima passava por acaso.
     expect(guardado.validUntil).toBe(resolveValidUntil({ validUntilDays: 15 }));
     expect(guardado.validUntil).not.toBe(resolveValidUntil({ validUntilDays: 60 }));
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O ENVIO QUE MENTE — bloco 3 da caça a bugs
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Três escritas acontecem DEPOIS do `sendMail`: a cópia do envio, a marcação
+ * da proposta como enviada, e a actualização do pedido. Nenhuma delas se pode
+ * desfazer, porque o email já saiu. O que estava errado era o que se fazia a
+ * seguir: duas falhavam em silêncio, e a terceira pedia por escrito um reenvio
+ * que mandava um segundo email ao casal.
+ */
+describe("POST proposta-doc — o que acontece depois de o email sair", () => {
+  const corpo = async (res: Response) => (await res.json()) as Record<string, unknown>;
+
+  /**
+   * A10-001. A trava de repetição reconhecia um envio pelo `status` da
+   * proposta — que é precisamente a escrita que falhou. Reenviar não era
+   * reconhecido, o `sendMail` corria outra vez, e o casal recebia dois emails.
+   */
+  it("um reenvio depois de o estado não ter gravado NÃO manda um segundo email", async () => {
+    const primeira = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(primeira.status).toBe(200);
+    const p = created.last!;
+    // O email saiu e ficou registado; a marcação do estado é que não pegou.
+    copia.lista = [{ enviadoEm: new Date().toISOString(), propostaId: p.id }];
+    store.linhas.set(p.id, { ...p, status: "rascunho" });
+    vi.mocked(sendMail).mockClear();
+
+    const segunda = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(segunda.status).toBe(200);
+    // O que interessa: NENHUM email novo.
+    expect(vi.mocked(sendMail)).not.toHaveBeenCalled();
+    const c = await corpo(segunda);
+    expect(c.repetido).toBe(true);
+    expect(String(c.repetidoAviso)).toContain("JÁ recebeu");
+  });
+
+  it("passados os três minutos da janela, o reenvio volta a ser possível", async () => {
+    const primeira = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const p = created.last!;
+    // Quatro minutos atrás: fora da janela.
+    copia.lista = [
+      { enviadoEm: new Date(Date.now() - 4 * 60_000).toISOString(), propostaId: p.id },
+    ];
+    store.linhas.set(p.id, { ...p, status: "rascunho" });
+    vi.mocked(sendMail).mockClear();
+    expect(primeira.status).toBe(200);
+
+    await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(vi.mocked(sendMail)).toHaveBeenCalled();
+  });
+
+  /**
+   * A10-002. `updateProposal` devolve `null` sem lançar quando a linha
+   * desapareceu. O retorno era ignorado, e o email seguia com um link assinado
+   * sobre um id que já não existia.
+   */
+  it("a proposta por enviar que desapareceu a meio é criada de novo, e o link serve", async () => {
+    // Uma proposta em rascunho, que a rota vai querer reaproveitar…
+    const fantasma: Proposal = {
+      id: "p-fantasma",
+      quoteId: "q1",
+      status: "rascunho",
+      createdAt: new Date().toISOString(),
+    } as unknown as Proposal;
+    store.linhas.set(fantasma.id, fantasma);
+    // …e que desaparece entre a leitura e a gravação.
+    const original = vi.mocked(updateProposal).getMockImplementation()!;
+    vi.mocked(updateProposal).mockImplementationOnce(async () => null);
+
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    expect(res.status).toBe(200);
+    const c = await corpo(res);
+    // Não se perdeu o envio, e a linha existe — o link do casal aponta para
+    // alguma coisa. Era este o defeito: um email com um link morto.
+    expect(c.emailed).toBe(true);
+    expect(store.linhas.get(String(c.id))).toBeTruthy();
+    vi.mocked(updateProposal).mockImplementation(original);
+  });
+
+  /**
+   * A10-003. As duas escritas «melhor esforço» que falhavam com um `log.error`
+   * e mais nada — a resposta saía `{ok:true, emailed:true}` e o toast dizia
+   * «Proposta enviada ao cliente».
+   */
+  it("a CÓPIA do envio que não grava sai pelo nome na resposta", async () => {
+    copia.registar.mockRejectedValueOnce(new Error("app_state recusou"));
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const c = await corpo(res);
+    expect(c.emailed).toBe(true);
+    expect(String(c.copiaError)).toContain("CÓPIA");
+  });
+
+  it("o PEDIDO que não actualiza sai pelo nome na resposta", async () => {
+    updated.falhar = true;
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const c = await corpo(res);
+    expect(c.emailed).toBe(true);
+    expect(String(c.pedidoError)).toContain("PEDIDO");
+    updated.falhar = false;
+  });
+
+  it("num envio que corre bem, nenhum dos três campos de erro viaja", async () => {
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const c = await corpo(res);
+    expect(c).not.toHaveProperty("copiaError");
+    expect(c).not.toHaveProperty("pedidoError");
+    expect(c).not.toHaveProperty("estadoError");
+  });
+
+  /**
+   * A frase que provocava o defeito. Mandava reenviar — e reenviar mandava um
+   * segundo email ao casal.
+   */
+  it("a frase do estado por marcar já não manda reenviar", async () => {
+    const original = vi.mocked(updateProposal).getMockImplementation()!;
+    // A primeira gravação passa (a proposta nasce); a MARCAÇÃO é que falha.
+    vi.mocked(updateProposal).mockImplementation(async (id, patch) => {
+      if ((patch as Partial<Proposal>).status === "enviada") return null;
+      return original(id, patch);
+    });
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params });
+    const c = await corpo(res);
+    const frase = String(c.estadoError ?? "");
+    expect(frase).toContain("JÁ a recebeu");
+    // A instrução que provocava o defeito era «Reenvia-a para acertar o
+    // estado». Agora diz-se o contrário, por extenso.
+    expect(frase.toLowerCase()).not.toContain("reenvia-a");
+    expect(frase).toContain("Não é preciso reenviar");
+    vi.mocked(updateProposal).mockImplementation(original);
   });
 });

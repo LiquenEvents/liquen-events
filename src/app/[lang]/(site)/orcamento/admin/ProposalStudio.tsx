@@ -4991,14 +4991,35 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
        * contacto e enviar a sério.
        */
       const saiu = Boolean(data?.emailed);
-      if (aviso) {
-        toast(`No PDF que seguiu, ${aviso}. Verifica a proposta e reenvia.`, "error");
-      } else if (saiu && typeof data?.estadoError === "string") {
-        // Caso raro e feio: o email saiu, mas a proposta ficou marcada como por
-        // enviar (a base recusou a segunda escrita). O link do cliente só aceita
-        // uma proposta em aberto, por isso isto não pode passar em silêncio —
-        // reenviar acerta o estado e reaproveita a MESMA proposta.
-        toast(data.estadoError, "error");
+      /**
+       * ══════════════════════════════════════════════════════════════════════
+       * PRIMEIRO O QUE ACONTECEU, DEPOIS O QUE ESTAVA LÁ DENTRO
+       * ══════════════════════════════════════════════════════════════════════
+       *
+       * Esta cadeia começava pelo `aviso` do conteúdo, e ele ganhava a tudo.
+       * A prioridade fazia sentido quando havia três desfechos («o documento
+       * incompleto é o mais importante dos três»); com cinco, produzia frases
+       * que afirmam o contrário do que aconteceu:
+       *
+       *  · com uma foto em falta E o SMTP em baixo, lia-se «No PDF que seguiu,
+       *    falta 1 foto. Verifica a proposta e reenvia» — e não seguiu PDF
+       *    nenhum, o casal não recebeu nada;
+       *  · com uma foto em falta E a marcação do estado a falhar, o
+       *    `estadoError` nunca chegava a ser mostrado.
+       *
+       * A ordem passa a ser: decide-se primeiro por SAIU ou não saiu — que é o
+       * facto — e só depois pelo conteúdo. E quando saiu, os avisos JUNTAM-SE
+       * em vez de se substituírem: não há razão para escolher entre dizer que
+       * faltou uma foto e dizer que o pedido não ficou actualizado.
+       */
+      if (!saiu) {
+        // O email NÃO saiu. Nada do que o documento tenha lá dentro interessa
+        // mais do que isto, e sobretudo nada pode dizer «que seguiu».
+        toast(
+          data?.emailError ||
+            "A proposta foi gravada mas o EMAIL NÃO SAIU — o cliente não recebeu nada.",
+          "error",
+        );
       } else if (typeof data?.repetidoAviso === "string") {
         /**
          * O servidor reconheceu isto como uma REPETIÇÃO e não enviou nada
@@ -5009,14 +5030,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
          * ficar à espera de perceber porque é que há duas linhas no quadro.
          */
         toast(data.repetidoAviso, "success");
-      } else if (saiu) {
-        toast("Proposta enviada ao cliente", "success");
       } else {
-        toast(
-          data?.emailError ||
-            "A proposta foi gravada mas o EMAIL NÃO SAIU — o cliente não recebeu nada.",
-          "error",
-        );
+        /**
+         * O email saiu. Junta-se tudo o que correu mal DEPOIS disso, por ordem
+         * de gravidade, numa frase só — cada um destes campos só vem na
+         * resposta quando falhou mesmo.
+         *
+         * O `docError` (A9-003) nunca era lido: `grep docError` no cliente dava
+         * zero. É o pior dos quatro — sem documento gravado, o link que o casal
+         * acabou de receber não tem PDF nenhum para lhe mostrar.
+         */
+        const problemas = [
+          typeof data?.docError === "string" && data?.docSaved === false ? data.docError : "",
+          typeof data?.estadoError === "string" ? data.estadoError : "",
+          typeof data?.pedidoError === "string" ? data.pedidoError : "",
+          typeof data?.copiaError === "string" ? data.copiaError : "",
+          aviso ? `No PDF que seguiu, ${aviso}.` : "",
+        ].filter(Boolean);
+        if (problemas.length > 0) {
+          toast(problemas.join(" "), "error");
+        } else {
+          toast("Proposta enviada ao cliente", "success");
+        }
       }
       // Trava contra reenvio acidental: o passo Enviar passa a mostrar a
       // confirmação "Proposta enviada ✓" em vez do botão pronto a disparar.

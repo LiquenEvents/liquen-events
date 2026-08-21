@@ -40,7 +40,7 @@ import {
   paragrafosDeTexto,
 } from "@/lib/email-corpo-escrito";
 import { resolverLigacaoDaProposta } from "@/lib/email-ligacao-reservada";
-import { registarEnvio } from "@/lib/envios-de-proposta";
+import { listarEnvios, registarEnvio } from "@/lib/envios-de-proposta";
 import { SITE } from "@/lib/site";
 import { log } from "@/lib/logger";
 
@@ -649,6 +649,70 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         !!p.sentAt &&
         Date.now() - Date.parse(p.sentAt) < JANELA_DE_REPETICAO_MS,
     );
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * A TRAVA TEM DE OLHAR PARA O FACTO DO ENVIO, E NÃO PARA O ESTADO
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * A trava de cima reconhece uma repetição pelo ESTADO da proposta
+     * (`status === "enviada"`) — e o estado é a SEGUNDA escrita depois do
+     * `sendMail`. Quando essa segunda escrita falha, o desfecho é este:
+     *
+     *   1. o email SAI e o casal recebe-o;
+     *   2. a proposta fica marcada como «por enviar»;
+     *   3. o ecrã diz-lhe, textualmente: «Reenvia-a para acertar o estado (é a
+     *      mesma proposta, não se cria outra)»;
+     *   4. ela reenvia — e a trava não reconhece nada, porque procura um
+     *      `status` que nunca chegou a ser gravado. O `sendMail` corre outra
+     *      vez, e o casal recebe DOIS emails com a mesma proposta.
+     *
+     * Ou seja: a frase que ela lê era a que provocava o defeito.
+     *
+     * O facto do envio, esse, EXISTE e está gravado uma linha antes da que
+     * falhou — o `registarEnvio` escreve `enviadoEm` + `propostaId` em
+     * `app_state` ANTES do `updateProposal`. A trava passa a consultá-lo.
+     *
+     * Melhor esforço declarado: se a leitura dos envios falhar, segue-se sem
+     * ela — que é exactamente o que a rota fazia antes. Uma consulta que não
+     * responde não pode travar um envio.
+     */
+    let jaSeguiuPeloRegisto: { enviadoEm: string; propostaId?: string } | undefined;
+    if (!jaSeguiu) {
+      try {
+        jaSeguiuPeloRegisto = (await listarEnvios(id)).find(
+          (e) =>
+            e.propostaId === proposal.id &&
+            !!e.enviadoEm &&
+            Date.now() - Date.parse(e.enviadoEm) < JANELA_DE_REPETICAO_MS,
+        );
+      } catch (e) {
+        log.warn("proposta-doc: não deu para ler os envios registados", { id, erro: String(e) });
+      }
+    }
+    if (!jaSeguiu && jaSeguiuPeloRegisto) {
+      log.warn(
+        "proposta-doc: o email já tinha saído (registo de envios) — não se enviou outra vez",
+        {
+          id,
+          proposta: proposal.id,
+        },
+      );
+      return NextResponse.json({
+        ok: true,
+        id: proposal.id,
+        emailed: true,
+        estado: "enviada",
+        acceptUrl: `${SITE.url}/proposta/${createProposalToken(proposal.id)}`,
+        missingImages,
+        truncations,
+        pdfBytes: pdfBuffer.byteLength,
+        repetido: true,
+        repetidoAviso:
+          "O cliente JÁ recebeu esta proposta há instantes — o email saiu, e o que tinha " +
+          "falhado foi só a marcação do estado deste lado. Não se enviou outra vez, e o " +
+          "link é o mesmo que ele tem.",
+      });
+    }
     if (jaSeguiu) {
       log.warn("proposta-doc: envio repetido do mesmo documento — não se enviou outra vez", {
         id,
@@ -679,9 +743,47 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // isso aconteceu mesmo.
     let docSaved = true;
     let docError: string | undefined;
-    /** Gravar ESTA proposta: uma linha nova, ou a que ficou por enviar (acima). */
-    const guardar = (p: Proposal): Promise<unknown> =>
-      porEnviar ? updateProposal(p.id, p) : createProposal(p);
+    /**
+     * Gravar ESTA proposta: uma linha nova, ou a que ficou por enviar (acima).
+     *
+     * ── UMA GRAVAÇÃO QUE NÃO ACONTECEU NÃO PODE PASSAR POR UMA QUE ACONTECEU ─
+     *
+     * O `updateProposal` devolve `null` — SEM lançar — quando a linha que se ia
+     * actualizar já não existe (`repository.updateWith`: «const current = await
+     * backend.get(id); if (!current) return null»). O valor de retorno era
+     * ignorado, e o desfecho era o pior que esta rota tem:
+     *
+     *   1. um envio anterior falhou o email e deixou uma proposta em rascunho;
+     *   2. essa linha é apagada noutro separador (o quadro «Propostas» deixa,
+     *      e não pergunta nada);
+     *   3. este pedido, que a leu no princípio, passa 15 a 40 segundos a
+     *      desenhar o PDF e só depois tenta gravar;
+     *   4. a gravação não faz nada, `docSaved` fica `true`, e o email SEGUE com
+     *      um link assinado sobre um id que não existe. O casal abre-o e lê
+     *      «proposta não encontrada».
+     *
+     * A rota irmã tem escrito, em comentário, que isto nunca pode acontecer —
+     * «A persistence failure here is fatal — we do not send an un-acceptable
+     * proposal» — e a de baixo, 440 linhas à frente, já verifica o retorno.
+     * Faltava aqui.
+     *
+     * E a resposta certa não é recusar o envio: a linha antiga já não existe,
+     * portanto não há duplicado nenhum a criar. Cria-se uma. É a correcção que
+     * mantém a regra da casa — uma proposta que não sai é um negócio parado.
+     */
+    const guardar = async (p: Proposal): Promise<void> => {
+      if (!porEnviar) {
+        await createProposal(p);
+        return;
+      }
+      const gravado = await updateProposal(p.id, p);
+      if (gravado) return;
+      log.warn("proposta-doc: a proposta por enviar desapareceu a meio — cria-se de novo", {
+        id,
+        proposta: p.id,
+      });
+      await createProposal(p);
+    };
     try {
       await guardar(proposal);
     } catch (e) {
@@ -1075,6 +1177,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * o casal recebe o mesmo documento).
      */
     let estadoError: string | undefined;
+    /** As duas escritas «melhor esforço» que acontecem DEPOIS do correio. Só
+     *  viajam na resposta quando falham — o mesmo desenho do `estadoError`. */
+    let copiaError: string | undefined;
+    let pedidoError: string | undefined;
     /** O estado com que a proposta FICOU — é este que a resposta conta. (Uma
      *  variável e não `proposal.status`: o objecto já foi entregue à camada de
      *  gravação, e mudá-lo por baixo dela seria mentir a quem o guardou.) */
@@ -1122,6 +1228,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         });
       } catch (e) {
         log.error("proposta-doc: o email saiu mas a cópia não ficou guardada", e, { id });
+        /**
+         * MELHOR ESFORÇO QUE FALHA TEM DE SER DITO.
+         *
+         * Isto era só um `log.error`, e a resposta saía
+         * `{ok:true, emailed:true, estado:"enviada"}` — o toast dizia «Proposta
+         * enviada ao cliente» e mais nada. O que se perde não é ruído: é a
+         * resposta à pergunta «o que é que nós lhes escrevemos?», que não existe
+         * em mais lado nenhum (o modelo é só o ponto de partida, e o rascunho é
+         * o documento, não o email). Está escrito em `envios-de-proposta.ts`.
+         *
+         * Não pode deitar abaixo um envio que já aconteceu — por isso continua a
+         * ser melhor esforço. O que muda é sair pelo nome, como o `docError` e o
+         * `estadoError` já saem.
+         */
+        copiaError =
+          "O email seguiu para o cliente, mas a CÓPIA do que lhe escrevemos não ficou " +
+          "guardada. O envio está feito; o que se perde é poder reler o texto mais tarde.";
       }
 
       try {
@@ -1133,10 +1256,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           id,
           proposta: proposal.id,
         });
+        /**
+         * A FRASE DEIXOU DE MANDAR REENVIAR.
+         *
+         * Dizia: «Reenvia-a para acertar o estado (é a mesma proposta, não se
+         * cria outra)». Não era verdade — a trava de repetição reconhecia uma
+         * repetição pelo `status`, que é precisamente o que acabou de não ser
+         * gravado, e o reenvio mandava um SEGUNDO email ao casal. A frase que
+         * ela lia era a que provocava o defeito.
+         *
+         * A trava passou a consultar também o registo de envios, portanto
+         * reenviar já não duplica nada. Mesmo assim a frase não o pede: o que
+         * ela precisa de saber é que o cliente JÁ recebeu, e que o que falta é
+         * uma correcção deste lado.
+         */
         estadoError =
-          "O email seguiu para o cliente, mas a proposta ficou marcada como «por enviar» — " +
-          "a base de dados recusou a actualização. Reenvia-a para acertar o estado (é a mesma " +
-          "proposta, não se cria outra).";
+          "O email seguiu para o cliente — ele JÁ a recebeu. O que falhou foi a marcação " +
+          "deste lado: a proposta ficou como «por enviar» e o Quadro pode não a mostrar na " +
+          "coluna certa. Não é preciso reenviar nada.";
       }
     }
 
@@ -1209,6 +1346,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
     } catch (e) {
       log.error("proposta-doc: actualizar pedido falhou", e);
+      /**
+       * A MESMA REGRA, E AQUI CUSTA MAIS.
+       *
+       * Sem esta escrita, duas coisas ficam erradas do lado de cá e nenhuma
+       * dava sinal: o pedido não avança para «Proposta enviada» no Quadro (sai
+       * da coluna onde ela ia dar por ele) e o `quotedPrice` não grava — e é
+       * dele que vivem a margem do evento e a proposta seguinte.
+       *
+       * Melhor esforço, como a cópia: o email já saiu e não se desfaz. Mas dito.
+       */
+      pedidoError =
+        "O email seguiu para o cliente, mas o PEDIDO não ficou actualizado: pode continuar " +
+        "na coluna anterior do Quadro, e o preço final pode não ter sido gravado. " +
+        "Confirma-os antes de fechar.";
     }
 
     // `missingImages` VAI TAMBÉM NO ENVIO, não só na pré-visualização.
@@ -1237,6 +1388,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        */
       estado,
       ...(estadoError ? { estadoError } : {}),
+      ...(copiaError ? { copiaError } : {}),
+      ...(pedidoError ? { pedidoError } : {}),
       /**
        * O link de aceitação, só quando o email saiu mesmo (`estado ===
        * "enviada"`) — para o botão «Copiar resumo» poder usá-lo já, sem um
