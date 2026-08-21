@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Locale } from "@/lib/i18n";
+import { prefersReducedMotion } from "@/lib/motion/useReducedMotion";
 import type { Quote, ActivityEntry } from "@/lib/orcamento/types";
 import {
   deriveStage,
@@ -139,8 +140,14 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
   const scrollTo = useCallback((id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    // A peça partilhada, e não um `matchMedia` à mão: era a ÚNICA leitura da
+    // preferência de movimento em todo o back office, e estava escrita de novo
+    // aqui. Treze componentes do sítio público já liam pela mesma função — a
+    // que guarda a `MediaQueryList` em vez de a criar a cada chamada.
+    el.scrollIntoView({
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+      block: "start",
+    });
   }, []);
 
   return (

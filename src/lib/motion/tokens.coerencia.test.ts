@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   EASE_OUT,
+  EASE_IN,
+  DUR_MICRO_MS,
+  DUR_ELEMENTO_MS,
+  DUR_VISTA_MS,
   REVEAL_MS,
   REVEAL_S,
   STAGGER_S,
@@ -67,6 +71,49 @@ describe("ficha de movimento ↔ globals.css", () => {
     expect(x1).toBeLessThan(0.35); // arranca depressa
     expect(x2).toBeLessThan(0.5); // e já está quase parada bem antes do fim
     expect(y2).toBe(1);
+  });
+
+  it("EASE_IN é, caracter a caracter, a mesma curva que `--ease-in` no CSS", () => {
+    const m = /--ease-in:\s*([^;]+);/.exec(css);
+    expect(m, "o `--ease-in` desapareceu do :root do globals.css").not.toBeNull();
+    expect(norm(m![1])).toBe(norm(EASE_IN));
+  });
+
+  it("a curva de saída é mesmo uma ACELERAÇÃO — o contrário da de entrada", () => {
+    // O erro fácil aqui é copiar a de entrada e trocar-lhe o nome: as duas
+    // ficam a chamar-se coisas diferentes e a fazer a mesma coisa, e a saída
+    // passa a ler-se como se a coisa ainda pudesse voltar atrás.
+    const n = /cubic-bezier\(([^)]+)\)/.exec(EASE_IN);
+    expect(n).not.toBeNull();
+    const [x1, y1, , y2] = n![1].split(",").map((v) => parseFloat(v));
+    expect(y1).toBe(0); // hesita no arranque
+    expect(x1).toBeGreaterThan(0.2); // e hesita mesmo, não só um instante
+    expect(y2).toBe(1); // e sai a acelerar até ao fim
+  });
+
+  it("a escala dos tempos é a mesma no CSS e na ficha", () => {
+    // Os `--duration-*` vivem no `@theme` (é lá que o Tailwind os lê e faz
+    // `duration-elemento`); a ficha serve quem escreve `style.transition` à
+    // mão. Dois sítios, um valor — como já acontece com a curva.
+    const pares: [string, number][] = [
+      ["micro", DUR_MICRO_MS],
+      ["elemento", DUR_ELEMENTO_MS],
+      ["vista", DUR_VISTA_MS],
+    ];
+    for (const [nome, ms] of pares) {
+      const m = new RegExp(`--duration-${nome}:\\s*([0-9]+)ms;`).exec(css);
+      expect(m, `o \`--duration-${nome}\` desapareceu do @theme do globals.css`).not.toBeNull();
+      expect(Number(m![1]), `--duration-${nome}`).toBe(ms);
+    }
+  });
+
+  it("os três degraus estão por ordem, e nenhum passa dos 400ms", () => {
+    // O tecto é dela: «nada acima de 400ms». A excepção — a entrada de uma
+    // fotografia ao scroll — não é um degrau desta escala, é a escala própria
+    // das fotografias (`PHOTO_REVEAL_*`), e por isso não é medida aqui.
+    expect(DUR_MICRO_MS).toBeLessThan(DUR_ELEMENTO_MS);
+    expect(DUR_ELEMENTO_MS).toBeLessThan(DUR_VISTA_MS);
+    expect(DUR_VISTA_MS).toBeLessThanOrEqual(400);
   });
 });
 

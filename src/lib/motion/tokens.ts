@@ -25,6 +25,81 @@
 export const EASE_OUT = "cubic-bezier(0.16, 1, 0.3, 1)";
 
 /**
+ * A curva de SAÍDA. Espelha `--ease-in` do globals.css (mesmo valor, verificado
+ * por teste).
+ *
+ * A irmã da de cima, e a que faltava. Quem sai não precisa de ser acompanhado
+ * até ao fim: hesita no arranque — para se perceber o que é que está a sair — e
+ * acelera a partir daí. Uma saída que trava à chegada lê-se como indecisão, e
+ * uma saída na curva de ENTRADA lê-se como se a coisa ainda pudesse voltar
+ * atrás.
+ */
+export const EASE_IN = "cubic-bezier(0.4, 0, 1, 1)";
+
+/**
+ * ── A ESCALA DOS TEMPOS ─────────────────────────────────────────────────────
+ *
+ * Três degraus, e a razão de serem três: o que responde ao dedo, o que move uma
+ * coisa, e o que troca um ecrã. Antes disto havia seis números em uso (300,
+ * 200, 500, 700, 150, 400) sem regra escrita em lado nenhum — ou seja, cada
+ * componente novo escolhia à sorte, e a olho lia-se como deriva.
+ *
+ * Espelham os `--duration-*` do `@theme` do globals.css, com teste a ligar as
+ * pontas. Lá dão utilitários do Tailwind (`duration-elemento`); aqui servem
+ * quem escreve `element.style.transition` à mão.
+ *
+ * O QUARTO tempo — a entrada de uma fotografia ao scroll — NÃO é um degrau
+ * desta escala. É uma escala própria, que acompanha o tamanho da fotografia
+ * (ver `PHOTO_REVEAL_*` no fim deste ficheiro), e existia antes disto.
+ */
+/** Responde ao dedo: toque, foco, passar o rato. */
+export const DUR_MICRO_MS = 120;
+/** Move uma coisa: abrir uma secção, entrar uma foto, fechar um aviso. */
+export const DUR_ELEMENTO_MS = 250;
+/** Troca um ecrã: mudar de passo, mudar de vista. */
+export const DUR_VISTA_MS = 350;
+
+/**
+ * ── A MOLA ──────────────────────────────────────────────────────────────────
+ *
+ * Para o que se ARRASTA — e só para isso. Uma curva descreve um percurso com
+ * princípio e fim conhecidos; uma coisa largada a meio de um gesto não tem
+ * nenhum dos dois, e é por isso que uma `transition` a seguir um dedo se lê
+ * sempre como atraso.
+ *
+ * Amortecimento alto, quase crítico: assenta e fica. A oscilação é o erro
+ * clássico da mola em interfaces — parece brincadeira, e num painel onde se
+ * arrastam quarenta fotografias parece que o programa não está seguro do que
+ * fez.
+ *
+ * Sem biblioteca: ver `mola.ts`, cerca de quarenta linhas sobre
+ * `requestAnimationFrame`. O `@dnd-kit` que a casa já usa trata do arrastar; o
+ * que lhe falta é a assentada.
+ *
+ * ── Os números são MEDIDOS, e não herdados ────────────────────────────────
+ *
+ * A primeira proposta foi 170/26 — que é, literalmente, o preset «gentle» de
+ * uma biblioteca de molas conhecida. Herdar o valor por omissão de outra pessoa
+ * é exactamente o que se lê como «não foi escolhido»: medido aqui, assentava um
+ * arrasto de 200 px em 717 ms, o que num painel de fotografias é uma espera.
+ *
+ * 400/38 assenta o mesmo arrasto em 450 ms, 40 px em 350 ms e um empurrão de
+ * 8 px em 233 ms — ou seja, o tempo acompanha a distância sozinho, que é a
+ * razão de se usar uma mola e não uma duração fixa.
+ *
+ * O amortecimento fica a 95% do crítico (o crítico, para esta rigidez, é 40):
+ * o recuo depois de chegar é de centésimos de píxel — invisível — mas continua
+ * a ser uma mola e não um travão. Um teste guarda as duas pontas.
+ */
+export const MOLA = {
+  /** A força com que puxa para o sítio. */
+  rigidez: 400,
+  /** O travão — é isto que impede a oscilação. */
+  amortecimento: 38,
+  massa: 1,
+} as const;
+
+/**
  * Duração de UMA entrada ao scroll. Vale para todas as revelações do mesmo
  * gesto — `Reveal`, `AnimateIn` e a `.cl-reveal` da parede de logótipos já
  * partilhavam este número, cada uma escrita à parte; agora partilham a ficha.

@@ -54,6 +54,22 @@
      `var(--ease-out)` aqui não resolveria. `tokens.coerencia.test.ts` guarda a
      outra ponta (o `--ease-out` ↔ a ficha de JS). */
   --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── A ESCALA DOS TEMPOS ──────────────────────────────────────────────────
+     Três degraus, e a razão de serem três: o que responde ao dedo, o que
+     move uma coisa, e o que troca um ecrã. Antes disto havia seis números em
+     uso (300, 200, 500, 700, 150, 400) sem regra escrita em lado nenhum, o
+     que quer dizer que cada componente novo escolhia à sorte.
+
+     Alimentam os utilitários do Tailwind (`duration-micro`, `duration-elemento`,
+     `duration-vista`) e a ficha de JS espelha-os, com teste a ligar as pontas.
+
+     O QUARTO tempo — a entrada de uma fotografia ao scroll — não está aqui
+     porque não é um degrau desta escala: é uma escala própria, que acompanha o
+     TAMANHO da fotografia, e vive em `lib/motion/tokens.ts` desde antes disto. */
+  --duration-micro: 120ms;
+  --duration-elemento: 250ms;
+  --duration-vista: 350ms;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -139,6 +155,17 @@
      (the old .ease-expo and Reveal's curve) onto it makes adjacent motion read
      as one coherent system rather than three slightly different decelerations. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* ── A curva de SAÍDA ─────────────────────────────────────────────────────
+     A irmã da de cima, e a que faltava. Quem SAI não precisa de ser
+     acompanhado até ao fim: hesita no arranque — para se perceber o que é que
+     está a sair — e acelera a partir daí. Uma saída que trava à chegada lê-se
+     como indecisão, e uma saída na curva de ENTRADA lê-se como se a coisa
+     ainda pudesse voltar atrás.
+
+     Não é a omissão de nada, de propósito: a esmagadora maioria das
+     transições da casa são de estado (cor, contorno, sombra) e não têm entrada
+     nem saída. Esta pede-se onde há mesmo uma coisa a desaparecer. */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* Pedido de orçamento — clean white surface, matching the rest of the site.
