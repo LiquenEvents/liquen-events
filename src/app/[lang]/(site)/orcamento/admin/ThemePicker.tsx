@@ -1691,7 +1691,25 @@ export default function ThemePicker({
                   className="bo-input w-full max-w-xs px-3 py-1.5 text-xs"
                 />
               )}
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Temas">
+              {/* ── A LISTA TEM DE TER TECTO ────────────────────────────
+                  MEDIDO no telemóvel dela, com 40 temas: esta lista não tinha
+                  altura máxima nenhuma, e uma lista de 40 nomes em `flex-wrap`
+                  ocupa o ecrã inteiro. A grelha de fotografias existe, está
+                  desenhada e está logo a seguir — mas fica tão abaixo que não se
+                  chega lá. Palavras dela: «não consigo abrir os temas e
+                  escolher, só dá se pesquisar» — pesquisar funcionava porque
+                  encurtava a lista o suficiente para as fotos caberem.
+
+                  O tecto é em `vh` e não em `rem` porque o que está em causa é
+                  quanto SOBRA do ecrã: num telemóvel ao alto, 34% da altura
+                  deixa a lista utilizável e garante que a grelha começa acima da
+                  dobra. Quem tiver poucos temas não vê diferença nenhuma — o
+                  `max-h` só age quando há mais lista do que espaço. */}
+              <div
+                className="flex max-h-[34vh] flex-wrap gap-2 overflow-y-auto"
+                role="group"
+                aria-label="Temas"
+              >
                 {temasVisiveis.map((t) => (
                   <Button
                     key={t.id}

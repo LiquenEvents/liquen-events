@@ -936,3 +936,62 @@ describe("fotos que já foram para outro casamento", () => {
     expect(screen.queryByTitle("Já usada em Ana e Rui")).toBeNull();
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * COM MUITOS TEMAS, A GRELHA DE FOTOS TEM DE CONTINUAR ALCANÇÁVEL
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO no telemóvel dela, com 40 temas: a lista de temas não tinha altura
+ * máxima nenhuma. Quarenta nomes em `flex-wrap` ocupam o ecrã inteiro, e a
+ * grelha de fotografias — que existe, está desenhada e vem logo a seguir —
+ * ficava tão abaixo que não se lá chegava.
+ *
+ * Palavras dela: «não consigo abrir os temas e escolher, só dá se pesquisar».
+ * Pesquisar funcionava porque encurtava a lista até as fotos caberem — ou seja,
+ * o sintoma era a própria pista.
+ *
+ * O que este teste pode afirmar em jsdom é a REGRA: o contentor dos temas tem
+ * um tecto de altura e rola por dentro. A altura em pixéis é do browser e é o
+ * `geometria-dos-alvos.spec.ts` que a mede; aqui prende-se a decisão, que é o
+ * que um refactor apaga sem dar por isso.
+ */
+describe("a lista de temas não engole o ecrã", () => {
+  /** Quarenta temas, como os dela. */
+  const muitos = Array.from({ length: 40 }, (_, i) => ({
+    ...THEME,
+    id: `t${i + 1}`,
+    name: `Tema ${i + 1}`,
+    imageCount: 10 + i,
+  }));
+
+  it("o contentor dos temas tem tecto de altura e rola por dentro", async () => {
+    route("GET /api/temas", () => ok(muitos));
+    await openPicker(true);
+
+    const lista = screen.getByRole("group", { name: "Temas" });
+    const classes = lista.className;
+    // Um tecto — e um tecto que deixa a lista utilizável, não um que a esmague.
+    expect(classes).toMatch(/max-h-\[\d+vh\]/);
+    // E rola por dentro: sem isto, o tecto cortava os temas de baixo em vez de
+    // os tornar alcançáveis, que seria trocar um defeito por outro.
+    expect(classes).toContain("overflow-y-auto");
+  });
+
+  it("os quarenta temas continuam todos lá — o tecto não esconde nenhum", async () => {
+    route("GET /api/temas", () => ok(muitos));
+    await openPicker(true);
+
+    const lista = screen.getByRole("group", { name: "Temas" });
+    // Controlo positivo: se o tecto tivesse sido implementado a cortar a lista
+    // (um `slice`, um «ver mais»), este número descia e o teste acendia.
+    expect(lista.querySelectorAll("button").length).toBe(muitos.length);
+  });
+
+  it("e a grelha das fotos continua a desenhar-se, com a lista cheia", async () => {
+    route("GET /api/temas", () => ok(muitos));
+    await openPicker(true);
+    // A razão de tudo isto: chegar às fotos.
+    expect(screen.getByRole("button", { name: `Foto 1 de ${visible()}` })).toBeInTheDocument();
+  });
+});
