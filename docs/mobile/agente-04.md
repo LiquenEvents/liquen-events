@@ -156,9 +156,9 @@ tecla Escape. O `onBlur` grava o que lá estiver.
      Observado: é o campo «Valor» das `budgetRows` — o quadro de valores estimados que sai no
        PDF. `placeholder="1.500,00 €"`, `aria-label="Valor"`, e **nenhum `inputMode`**. Abre o
        teclado de letras para escrever um preço. Todos os outros campos de dinheiro do mesmo
-       ficheiro têm `inputMode="decimal"` — o preço da linha (:7161), o unitário (:7224), o
-       valor adicional (:7532), o preço do serviço (:7212), o total (:7739). Este ficou de
-       fora, e é o único do lote que não tem. Uma proposta escrita com o teclado errado é
+       ficheiro têm `inputMode="decimal"` — o preço da linha (:7161), o preço por mesa/convidado
+       (:7224), o valor da linha adicional (:7532) e o total (:7739). Este ficou de fora, e é o
+       único campo de dinheiro do estúdio que não tem. Uma proposta escrita com o teclado errado é
        exactamente a frase do briefing.
      Proposta: `inputMode="decimal"`. Uma palavra.
      Equivalente em desktop: existe / não se nota
@@ -592,7 +592,7 @@ Legenda de abreviaturas: `aC` = `autoComplete`, `cap` = `autoCapitalize`, `cor` 
 | `admin/ActivityLog.tsx:211` | registar chamada / nota | textarea | — | — | — |
 | `admin/ClientMessenger.tsx:171` | mensagem ao cliente | textarea | — | — | + `enterKeyHint:send` |
 | `admin/PainelInterno.tsx:118` | quilómetros até ao local | `text` | `numeric` | — | — está certo (é o modelo) |
-| `admin/PainelInterno.tsx:387` | (campo do painel interno) | — | — | — | [por confirmar no ecrã] |
+| `admin/PainelInterno.tsx:387` | custo da linha (margem) | `text` | `decimal` | — | — está certo |
 
 ### Estúdio de propostas
 
@@ -643,7 +643,7 @@ Legenda de abreviaturas: `aC` = `autoComplete`, `cap` = `autoCapitalize`, `cor` 
 | `admin/EditorDeEscolhas.tsx:221/230` | opção PT / EN | — | — | — | — |
 | `admin/EditorDeEscolhas.tsx:239/248` | descrição da opção PT / EN | — | — | — | — |
 | `admin/CaixaInglesa.tsx:188/191` | tradução (textarea / input) | — | — | — | — |
-| `admin/NotaDaProposta.tsx` / `NotasInternas.tsx:86` | nota | textarea | — | — | — |
+| `admin/NotasInternas.tsx:86` | nota interna | textarea | — | — | — |
 | `admin/DefinicoesProposta.tsx:124` | valor por omissão (€/km) | `text` | `decimal` | — | — está certo (é o modelo de leitura) |
 | `admin/DefinicoesProposta.tsx:200` | terra de partida | `text` | — | — | + `cap:words` `cor:off` |
 | `admin/ModelosParciais.tsx:254` | nome do modelo parcial | — | — | — | — |
