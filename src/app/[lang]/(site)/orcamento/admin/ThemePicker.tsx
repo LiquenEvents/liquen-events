@@ -15,6 +15,7 @@ import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { Button } from "./ui";
 import { CuradoriaDeFotos } from "./CuradoriaDeFotos";
+import { PaginaEmConstrucao, type FotoDaPagina } from "./PaginaEmConstrucao";
 import {
   type PaginaTema,
   buscarPrimeiraPagina,
@@ -319,6 +320,27 @@ const failedByQuote = new Map<string, string[]>();
 /** As fotos da biblioteca que JÁ foram copiadas para cada proposta nesta
  *  sessão — a marca "já nesta proposta" aparece sem esperar pelo estúdio. */
 const importedByQuote = new Map<string, Set<string>>();
+
+/**
+ * A miniatura de cada foto já vista, por caminho.
+ *
+ * A seleção atravessa temas (é uma lista de caminhos, não de índices), mas a
+ * grelha só tem em mãos as imagens do tema ABERTO. Sem esta memória, a página
+ * em construção desenhava um quadrado cinzento para tudo o que tivesse sido
+ * escolhido noutro separador — que é precisamente o caso em que ver o conjunto
+ * interessa mais.
+ *
+ * Só guarda o `thumbUrl` (ou o `url` quando não há miniatura): são endereços,
+ * não bytes, e o browser já tem as imagens em cache de ter desenhado a grelha.
+ */
+const miniaturaDe = new Map<string, string>();
+
+function guardarMiniaturas(images: readonly ThemeImage[]): void {
+  for (const im of images) {
+    const u = im.thumbUrl || im.url;
+    if (u) miniaturaDe.set(im.path, u);
+  }
+}
 
 /**
  * Deita fora o que está guardado da biblioteca.
@@ -946,6 +968,24 @@ interface Props {
   onReserve?: (reservas: ReservedImage[]) => void;
   /** Estes lugares ficaram sem foto — a pastilha já avisa porquê. */
   onDropped?: (marcadores: string[]) => void;
+  /**
+   * A PÁGINA para onde isto vai — quando vai para uma.
+   *
+   * Palavras dela: «deixa de se escolher às cegas e passa a compor-se». O que
+   * se escolhe aqui não cai numa lista: cai numa página do PDF, que tem um
+   * número de fotos que cabe. Sem isto, "quantas é que já tenho?" só se
+   * respondia depois de fechar o diálogo — muitas vezes só no PDF.
+   *
+   * Opcional de propósito: nas capas é uma foto por espaço e não há conjunto
+   * nenhum a compor, portanto o canto não aparece.
+   */
+  paginaEmConstrucao?: {
+    titulo?: string;
+    /** As que a página JÁ tem, na ordem em que lá estão. */
+    fotos: readonly FotoDaPagina[];
+    /** Quantas a página do PDF imprime. */
+    maximo: number;
+  };
 }
 
 export default function ThemePicker({
@@ -957,6 +997,7 @@ export default function ThemePicker({
   onPicked,
   onReserve,
   onDropped,
+  paginaEmConstrucao,
 }: Props) {
   const { toast } = useToast();
   const trapRef = useFocusTrap<HTMLDivElement>(true);
@@ -1101,6 +1142,18 @@ export default function ThemePicker({
   const failedPaths = useMemo(() => failedFor(quoteId), [quoteId, tick]);
   /** O que a grelha está a mostrar, para a seleção poder falar de outros temas. */
   const visiblePaths = useMemo(() => new Set(images.map((i) => i.path)), [images]);
+
+  // As miniaturas do tema aberto ficam guardadas por caminho: é o que permite
+  // à página em construção desenhar o que foi escolhido noutro separador.
+  useEffect(() => {
+    guardarMiniaturas(images);
+  }, [images]);
+
+  /** O que está escolhido, pela ordem por que vai entrar na página. */
+  const aEntrar = useMemo<FotoDaPagina[]>(
+    () => selected.map((path) => ({ path, url: miniaturaDe.get(path) })),
+    [selected],
+  );
 
   // O que ficou por entrar volta a ficar selecionado — inclusive quando falha
   // com o diálogo ainda aberto ("Adicionar e continuar"). A seleção nunca se
@@ -2087,226 +2140,246 @@ export default function ThemePicker({
             desenha. A curadoria substitui a grelha e mais nada: o cabeçalho, a
             fila dos temas e o rodapé continuam onde estavam, e o botão de
             confirmar conta o mesmo que contava. */}
-        {curadoria && multiple ? (
-          <CuradoriaDeFotos
-            images={images}
-            escolhidas={selectedSet}
-            usadas={usedSet}
-            podeEscolherMais={!atLimit}
-            aoDecidir={decidirNaCuradoria}
-            aoVerGrande={(i) => setPreviewIndex(i)}
-            aoSair={() => setCuradoria(false)}
-          />
-        ) : (
-          <>
-            {/* Fotos */}
-            <div
-              ref={scrollRef}
-              onScroll={(e) => {
-                if (themeId) themeScroll.set(themeId, e.currentTarget.scrollTop);
-              }}
-              className="min-h-[10rem] flex-1 overflow-y-auto px-5 py-4"
-            >
-              {loadingImages ? (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <div key={i} className="bo-skeleton aspect-square rounded-lg" aria-hidden />
-                  ))}
-                </div>
-              ) : !themeId ? null : unreadable ? (
-                // Falha de leitura NÃO é "tema sem fotos" — dizer-lhe que o tema
-                // está vazio seria mentira, e mandava-a carregar tudo outra vez.
-                <div className="py-8 text-center">
-                  <p className="text-sm text-foreground/75">
-                    Não foi possível ler a pasta deste tema agora.
-                  </p>
-                  <p className="bo-text-muted mt-1 text-xs">
-                    É uma falha temporária — as fotos não desapareceram. Tenta daqui a pouco.
-                  </p>
-                </div>
-              ) : images.length === 0 ? (
-                <p className="bo-text-muted py-8 text-center text-sm">
-                  Este tema ainda não tem fotos. Adiciona-as em <strong>Temas</strong>.
-                </p>
-              ) : (
-                <>
-                  <div
-                    ref={gridRef}
-                    onKeyDown={onGridKeyDown}
-                    /* ── DUAS COLUNAS NO TELEMÓVEL ───────────────────────────
-                   Três colunas a 390 px dão miniaturas de 111 px — pequenas de
-                   mais para escolher decoração, que é o que aqui se faz. A duas
-                   colunas cada foto tem 171 px e vê-se o que lá está.
-
-                   A escada até ao computador fica igual: aos 480 px voltam as
-                   três (a foto ainda tem 148), e a partir de `sm` as cinco de
-                   sempre — num diálogo de 768 px isso são 140 px por foto, que
-                   com o rato e o passar por cima chegam. */
-                    className="grid select-none grid-cols-2 gap-2 min-[480px]:grid-cols-3 sm:grid-cols-5"
-                  >
-                    {images.map((im, i) => {
-                      const on = selectedSet.has(im.path);
-                      const going = pendingSet.has(im.path);
-                      const used = !going && usedSet.has(im.path);
-                      // "Já noutra proposta" só aparece quando NÃO está nesta: as
-                      // duas marcas no mesmo sítio tapavam-se uma à outra, e a que
-                      // interessa primeiro é a desta proposta.
-                      const noutra = !going && !used ? usadasNoutras?.[im.path] : undefined;
-                      const failed = failedPaths.includes(im.path);
-                      // No teto, as fotos por escolher ficam apagadas e anunciadas
-                      // como indisponíveis (aria-disabled, não `disabled`: o botão
-                      // continua alcançável pelo teclado). O mesmo para as que já
-                      // vão a caminho.
-                      const blocked = (atLimit && !on) || going;
-                      return (
-                        // `aspect-square` PASSOU PARA AQUI, do botão para o
-                        // invólucro. É o que torna a altura da célula independente
-                        // do que está lá dentro — e sem isso `content-visibility`
-                        // não podia saltar o conteúdo sem a célula encolher.
-                        <div key={im.path} className="celula-saltavel group relative aspect-square">
-                          <button
-                            type="button"
-                            data-cell={i}
-                            tabIndex={i === focusIndex ? 0 : -1}
-                            aria-pressed={on}
-                            aria-disabled={blocked || undefined}
-                            // Nome ESTÁVEL: quem diz se está escolhida é o
-                            // aria-pressed. O "já nesta proposta" entra no nome
-                            // porque é a única forma de a marca visual chegar a
-                            // quem não vê a grelha.
-                            aria-label={`Foto ${i + 1} de ${images.length}${
-                              going
-                                ? " (a adicionar)"
-                                : used
-                                  ? " (já nesta proposta)"
-                                  : noutra
-                                    ? ` (já usada em ${noutra})`
-                                    : ""
-                            }${failed ? " (não entrou)" : ""}`}
-                            onClick={(e) => toggleAt(i, e.shiftKey)}
-                            onFocus={() => setFocusIndex(i)}
-                            /* `h-full w-full` e não `aspect-square`: quem é
-                           quadrado agora é o INVÓLUCRO (ver `celula-saltavel`
-                           em globals.css) — é isso que deixa o browser saltar
-                           a célula sem ela colapsar. */
-                            className={`relative block h-full w-full overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-all ${
-                              failed
-                                ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
-                                : on
-                                  ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
-                                  : "border-foreground/[0.1] hover:border-[#4d6350]/45"
-                            } ${blocked ? "opacity-50" : ""}`}
-                          >
-                            <Photo image={im} priority={i < ABOVE_FOLD} />
-                            {on && (
-                              <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-white">
-                                <svg
-                                  width="12"
-                                  height="12"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="3"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  aria-hidden="true"
-                                >
-                                  <path d="m5 13 4 4L19 7" />
-                                </svg>
-                              </span>
-                            )}
-                            {(used || going) && (
-                              <span
-                                aria-hidden
-                                className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-black/65 px-1.5 py-0.5 text-center text-[10px] uppercase tracking-[0.06em] text-white"
-                              >
-                                {going ? "A adicionar…" : "Já nesta proposta"}
-                              </span>
-                            )}
-                            {noutra && (
-                              <span
-                                aria-hidden
-                                title={`Já usada em ${noutra}`}
-                                className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-[#8a6420]/85 px-1.5 py-0.5 text-center text-[10px] tracking-[0.04em] text-white"
-                              >
-                                {noutra}
-                              </span>
-                            )}
-                          </button>
-                          {/* A lupa é o caminho do rato/toque para a foto em
-                          grande; pelo teclado é a tecla V. Só é focável na
-                          célula ativa, para o Tab não passar por 60 lupas. */}
-                          <button
-                            type="button"
-                            tabIndex={i === focusIndex ? 0 : -1}
-                            aria-label={`Ver a foto ${i + 1} em grande`}
-                            onClick={() => setPreviewIndex(i)}
-                            /* ── O ALVO CRESCE, O DISCO NÃO ──────────────────
-                           Isto levava `.alvo-toque`, que sob `(pointer:
-                           coarse)` força 44×44 — e num telemóvel, com células
-                           de 111 px, o disco preto passou a tapar o canto
-                           superior esquerdo de TODAS as fotografias, encostado
-                           à margem na primeira coluna. Palavras dela: «os
-                           ícones de lupa aparecem cortados pela borda esquerda
-                           e sobrepostos às imagens».
-
-                           O alvo de 44 px estava certo e continua lá — o que
-                           mudou é quem cresce: o `.alvo-invisivel` estende a
-                           área tocável com um `::after` transparente e deixa o
-                           desenho nos 24 px. Ver `globals.css`.
-
-                           Fica também mais discreto: um disco a 45% em vez de
-                           55%, e mais pequeno, porque a foto é que interessa. */
-                            className="alvo-invisivel absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-[2px] motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
-                          >
-                            <svg
-                              width="13"
-                              height="13"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.2"
-                              strokeLinecap="round"
-                              aria-hidden="true"
-                            >
-                              <circle cx="11" cy="11" r="7" />
-                              <path d="m20 20-3.5-3.5" />
-                            </svg>
-                          </button>
-                        </div>
-                      );
-                    })}
+        {/* ── O CANTO ONDE A PÁGINA SE VÊ A COMPOR ────────────────────────
+            `relative` para o canto flutuar POR CIMA das fotos em vez de lhes
+            tirar uma linha — palavras dela: «não pode roubar espaço às fotos.
+            Pequena, num canto, e dispensável». O invólucro não muda nada do que
+            está cá dentro: era este `flex-1` que a grelha ocupava, e continua a
+            ser. */}
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          {curadoria && multiple ? (
+            <CuradoriaDeFotos
+              images={images}
+              escolhidas={selectedSet}
+              usadas={usedSet}
+              podeEscolherMais={!atLimit}
+              aoDecidir={decidirNaCuradoria}
+              aoVerGrande={(i) => setPreviewIndex(i)}
+              aoSair={() => setCuradoria(false)}
+            />
+          ) : (
+            <>
+              {/* Fotos */}
+              <div
+                ref={scrollRef}
+                onScroll={(e) => {
+                  if (themeId) themeScroll.set(themeId, e.currentTarget.scrollTop);
+                }}
+                className="min-h-[10rem] flex-1 overflow-y-auto px-5 py-4"
+              >
+                {loadingImages ? (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div key={i} className="bo-skeleton aspect-square rounded-lg" aria-hidden />
+                    ))}
                   </div>
+                ) : !themeId ? null : unreadable ? (
+                  // Falha de leitura NÃO é "tema sem fotos" — dizer-lhe que o tema
+                  // está vazio seria mentira, e mandava-a carregar tudo outra vez.
+                  <div className="py-8 text-center">
+                    <p className="text-sm text-foreground/75">
+                      Não foi possível ler a pasta deste tema agora.
+                    </p>
+                    <p className="bo-text-muted mt-1 text-xs">
+                      É uma falha temporária — as fotos não desapareceram. Tenta daqui a pouco.
+                    </p>
+                  </div>
+                ) : images.length === 0 ? (
+                  <p className="bo-text-muted py-8 text-center text-sm">
+                    Este tema ainda não tem fotos. Adiciona-as em <strong>Temas</strong>.
+                  </p>
+                ) : (
+                  <>
+                    <div
+                      ref={gridRef}
+                      onKeyDown={onGridKeyDown}
+                      /* ── DUAS COLUNAS NO TELEMÓVEL ───────────────────────────
+                     Três colunas a 390 px dão miniaturas de 111 px — pequenas de
+                     mais para escolher decoração, que é o que aqui se faz. A duas
+                     colunas cada foto tem 171 px e vê-se o que lá está.
 
-                  {hasMore ? (
-                    <div className="mt-4 flex flex-col items-center gap-1">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        loading={loadingMore}
-                        onClick={loadMore}
-                      >
-                        {remaining && remaining > 0
-                          ? `Mostrar mais (faltam ${remaining}${truncated ? "+" : ""})`
-                          : "Mostrar mais"}
-                      </Button>
-                      <p className="bo-text-muted text-xs">
-                        As mais recentes aparecem primeiro. A grelha mostra {THEME_PAGE_SIZE} de
-                        cada vez para o tema abrir depressa.
-                      </p>
+                     A escada até ao computador fica igual: aos 480 px voltam as
+                     três (a foto ainda tem 148), e a partir de `sm` as cinco de
+                     sempre — num diálogo de 768 px isso são 140 px por foto, que
+                     com o rato e o passar por cima chegam. */
+                      className="grid select-none grid-cols-2 gap-2 min-[480px]:grid-cols-3 sm:grid-cols-5"
+                    >
+                      {images.map((im, i) => {
+                        const on = selectedSet.has(im.path);
+                        const going = pendingSet.has(im.path);
+                        const used = !going && usedSet.has(im.path);
+                        // "Já noutra proposta" só aparece quando NÃO está nesta: as
+                        // duas marcas no mesmo sítio tapavam-se uma à outra, e a que
+                        // interessa primeiro é a desta proposta.
+                        const noutra = !going && !used ? usadasNoutras?.[im.path] : undefined;
+                        const failed = failedPaths.includes(im.path);
+                        // No teto, as fotos por escolher ficam apagadas e anunciadas
+                        // como indisponíveis (aria-disabled, não `disabled`: o botão
+                        // continua alcançável pelo teclado). O mesmo para as que já
+                        // vão a caminho.
+                        const blocked = (atLimit && !on) || going;
+                        return (
+                          // `aspect-square` PASSOU PARA AQUI, do botão para o
+                          // invólucro. É o que torna a altura da célula independente
+                          // do que está lá dentro — e sem isso `content-visibility`
+                          // não podia saltar o conteúdo sem a célula encolher.
+                          <div
+                            key={im.path}
+                            className="celula-saltavel group relative aspect-square"
+                          >
+                            <button
+                              type="button"
+                              data-cell={i}
+                              tabIndex={i === focusIndex ? 0 : -1}
+                              aria-pressed={on}
+                              aria-disabled={blocked || undefined}
+                              // Nome ESTÁVEL: quem diz se está escolhida é o
+                              // aria-pressed. O "já nesta proposta" entra no nome
+                              // porque é a única forma de a marca visual chegar a
+                              // quem não vê a grelha.
+                              aria-label={`Foto ${i + 1} de ${images.length}${
+                                going
+                                  ? " (a adicionar)"
+                                  : used
+                                    ? " (já nesta proposta)"
+                                    : noutra
+                                      ? ` (já usada em ${noutra})`
+                                      : ""
+                              }${failed ? " (não entrou)" : ""}`}
+                              onClick={(e) => toggleAt(i, e.shiftKey)}
+                              onFocus={() => setFocusIndex(i)}
+                              /* `h-full w-full` e não `aspect-square`: quem é
+                             quadrado agora é o INVÓLUCRO (ver `celula-saltavel`
+                             em globals.css) — é isso que deixa o browser saltar
+                             a célula sem ela colapsar. */
+                              className={`relative block h-full w-full overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-all ${
+                                failed
+                                  ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
+                                  : on
+                                    ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
+                                    : "border-foreground/[0.1] hover:border-[#4d6350]/45"
+                              } ${blocked ? "opacity-50" : ""}`}
+                            >
+                              <Photo image={im} priority={i < ABOVE_FOLD} />
+                              {on && (
+                                <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-white">
+                                  <svg
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="m5 13 4 4L19 7" />
+                                  </svg>
+                                </span>
+                              )}
+                              {(used || going) && (
+                                <span
+                                  aria-hidden
+                                  className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-black/65 px-1.5 py-0.5 text-center text-[10px] uppercase tracking-[0.06em] text-white"
+                                >
+                                  {going ? "A adicionar…" : "Já nesta proposta"}
+                                </span>
+                              )}
+                              {noutra && (
+                                <span
+                                  aria-hidden
+                                  title={`Já usada em ${noutra}`}
+                                  className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-[#8a6420]/85 px-1.5 py-0.5 text-center text-[10px] tracking-[0.04em] text-white"
+                                >
+                                  {noutra}
+                                </span>
+                              )}
+                            </button>
+                            {/* A lupa é o caminho do rato/toque para a foto em
+                            grande; pelo teclado é a tecla V. Só é focável na
+                            célula ativa, para o Tab não passar por 60 lupas. */}
+                            <button
+                              type="button"
+                              tabIndex={i === focusIndex ? 0 : -1}
+                              aria-label={`Ver a foto ${i + 1} em grande`}
+                              onClick={() => setPreviewIndex(i)}
+                              /* ── O ALVO CRESCE, O DISCO NÃO ──────────────────
+                             Isto levava `.alvo-toque`, que sob `(pointer:
+                             coarse)` força 44×44 — e num telemóvel, com células
+                             de 111 px, o disco preto passou a tapar o canto
+                             superior esquerdo de TODAS as fotografias, encostado
+                             à margem na primeira coluna. Palavras dela: «os
+                             ícones de lupa aparecem cortados pela borda esquerda
+                             e sobrepostos às imagens».
+
+                             O alvo de 44 px estava certo e continua lá — o que
+                             mudou é quem cresce: o `.alvo-invisivel` estende a
+                             área tocável com um `::after` transparente e deixa o
+                             desenho nos 24 px. Ver `globals.css`.
+
+                             Fica também mais discreto: um disco a 45% em vez de
+                             55%, e mais pequeno, porque a foto é que interessa. */
+                              className="alvo-invisivel absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-[2px] motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                            >
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.2"
+                                strokeLinecap="round"
+                                aria-hidden="true"
+                              >
+                                <circle cx="11" cy="11" r="7" />
+                                <path d="m20 20-3.5-3.5" />
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ) : (
-                    images.length > THEME_PAGE_SIZE && (
-                      <p className="bo-text-muted mt-4 text-center text-xs">
-                        Fim do tema — {plural(images.length, "foto", "fotos")}.
-                      </p>
-                    )
-                  )}
-                </>
-              )}
-            </div>
-          </>
-        )}
+
+                    {hasMore ? (
+                      <div className="mt-4 flex flex-col items-center gap-1">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          loading={loadingMore}
+                          onClick={loadMore}
+                        >
+                          {remaining && remaining > 0
+                            ? `Mostrar mais (faltam ${remaining}${truncated ? "+" : ""})`
+                            : "Mostrar mais"}
+                        </Button>
+                        <p className="bo-text-muted text-xs">
+                          As mais recentes aparecem primeiro. A grelha mostra {THEME_PAGE_SIZE} de
+                          cada vez para o tema abrir depressa.
+                        </p>
+                      </div>
+                    ) : (
+                      images.length > THEME_PAGE_SIZE && (
+                        <p className="bo-text-muted mt-4 text-center text-xs">
+                          Fim do tema — {plural(images.length, "foto", "fotos")}.
+                        </p>
+                      )
+                    )}
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+          {paginaEmConstrucao && multiple && (
+            <PaginaEmConstrucao
+              titulo={paginaEmConstrucao.titulo}
+              jaLa={paginaEmConstrucao.fotos}
+              aEntrar={aEntrar}
+              maximo={paginaEmConstrucao.maximo}
+            />
+          )}
+        </div>
 
         {/* O que não entrou da última vez — os caminhos ficam guardados e
             voltam selecionados, não se volta a escolher */}
@@ -2641,6 +2714,7 @@ export function __resetThemePickerState(): void {
   lastThemeId = null;
   failedByQuote.clear();
   importedByQuote.clear();
+  miniaturaDe.clear();
   jobs.length = 0;
   inFlight.clear();
   if (overlayTeardown) {

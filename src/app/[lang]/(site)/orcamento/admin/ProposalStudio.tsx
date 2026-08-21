@@ -8848,6 +8848,26 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           onPicked={onPickedFromLibrary}
           onReserve={onReservedFromLibrary}
           onDropped={onDroppedFromLibrary}
+          /* ── A PÁGINA QUE SE ESTÁ A COMPOR ─────────────────────────────
+             Só para os mood boards: um mood board É uma página do PDF, com
+             `MOOD_BOARD_MAX_IMAGES` fotos impressas e as restantes de fora. As
+             capas são uma foto por espaço — não há conjunto nenhum a compor, e
+             o canto não teria o que dizer.
+
+             Fora também quando se está a TROCAR uma foto no lugar: aí a página
+             não cresce, e um contador a somar mais uma seria mentira. */
+          paginaEmConstrucao={
+            picker.kind === "board" && picker.substituir === undefined
+              ? {
+                  titulo: doc.moodBoards[picker.bi]?.title,
+                  fotos: (doc.moodBoards[picker.bi]?.images ?? []).map((path) => ({
+                    path,
+                    url: assetUrls[path],
+                  })),
+                  maximo: MOOD_BOARD_MAX_IMAGES,
+                }
+              : undefined
+          }
         />
       )}
     </div>

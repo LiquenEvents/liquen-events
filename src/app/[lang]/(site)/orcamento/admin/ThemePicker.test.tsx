@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MAX_IMPORT_BATCH, THEME_PAGE_SIZE, type ThemeSummary } from "@/lib/theme-types";
@@ -119,10 +119,12 @@ function Host({
   multiple,
   usedThemePaths,
   usadasNoutras,
+  paginaEmConstrucao,
 }: {
   multiple: boolean;
   usedThemePaths?: string[];
   usadasNoutras?: Record<string, string>;
+  paginaEmConstrucao?: ComponentProps<typeof ThemePicker>["paginaEmConstrucao"];
 }) {
   const [open, setOpen] = useState(true);
   if (!open) return null;
@@ -132,6 +134,7 @@ function Host({
       multiple={multiple}
       usedThemePaths={usedThemePaths}
       usadasNoutras={usadasNoutras}
+      paginaEmConstrucao={paginaEmConstrucao}
       onClose={() => {
         onClose();
         setOpen(false);
@@ -148,10 +151,16 @@ async function openPicker(
   multiple: boolean,
   usedThemePaths?: string[],
   usadasNoutras?: Record<string, string>,
+  paginaEmConstrucao?: ComponentProps<typeof ThemePicker>["paginaEmConstrucao"],
 ) {
   const montado = render(
     <ToastProvider>
-      <Host multiple={multiple} usedThemePaths={usedThemePaths} usadasNoutras={usadasNoutras} />
+      <Host
+        multiple={multiple}
+        usedThemePaths={usedThemePaths}
+        usadasNoutras={usadasNoutras}
+        paginaEmConstrucao={paginaEmConstrucao}
+      />
     </ToastProvider>,
   );
   await screen.findByRole("button", { name: `Foto 1 de ${visible()}` });
@@ -1382,5 +1391,53 @@ describe("o painel a 390 px", () => {
     const contagem = screen.getByText(/Toca nas fotos que queres usar/);
     const linha = contagem.closest("div")?.parentElement as HTMLElement;
     expect(linha.style.paddingBottom).toContain("safe-area-inset-bottom");
+  });
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * A PÁGINA A GANHAR FORMA
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «deixa de se escolher às cegas e passa a compor-se». O que
+   * se prende aqui não é o desenho do canto (isso é do próprio componente) mas
+   * a LIGAÇÃO: o que já lá está vem do estúdio, o que vai entrar vem da
+   * seleção, e as duas contas somam.
+   */
+  it("o canto soma o que a página já tem com o que está escolhido", async () => {
+    await openPicker(true, undefined, undefined, {
+      titulo: "Jardim ao entardecer",
+      fotos: [{ path: "b/uma.jpg" }, { path: "b/outra.jpg" }],
+      maximo: 10,
+    });
+    expect(screen.getByText("Jardim ao entardecer")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `Foto 1 de ${visible()}` }));
+    expect(screen.getByText("3"), "a escolhida conta antes de entrar").toBeInTheDocument();
+  });
+
+  it("e avisa quando a escolha passa do que a página imprime", async () => {
+    await openPicker(true, undefined, undefined, {
+      fotos: [{ path: "b/uma.jpg" }, { path: "b/outra.jpg" }],
+      maximo: 2,
+    });
+    expect(screen.queryByText(/não entra/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: `Foto 1 de ${visible()}` }));
+    expect(screen.getByText("1 não entra na página")).toBeInTheDocument();
+  });
+
+  it("sem página nenhuma para compor, o canto não existe", async () => {
+    // É o caso das capas: uma foto por espaço, nenhum conjunto a compor.
+    await openPicker(false);
+    expect(screen.queryByLabelText("A página em construção")).toBeNull();
+  });
+
+  /** Flutuar e não empurrar: o canto não pode roubar altura às fotografias. */
+  it("o canto flutua por cima da grelha", async () => {
+    await openPicker(true, undefined, undefined, { fotos: [{ path: "b/uma.jpg" }], maximo: 10 });
+    const canto = screen.getByLabelText("A página em construção");
+    expect(canto.className).toContain("absolute");
+    expect(canto.parentElement?.className, "sem `relative` o canto sai do painel").toContain(
+      "relative",
+    );
   });
 });
