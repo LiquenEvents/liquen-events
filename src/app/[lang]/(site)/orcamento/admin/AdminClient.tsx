@@ -4911,15 +4911,40 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   ))}
                               </div>
 
-                              {/* Campos editáveis — tudo em grelha, à mão. */}
+                              {/* ── CAMPOS EDITÁVEIS ────────────────────────────
+                                  Tudo em grelha, à mão — e cada rótulo LIGADO ao
+                                  seu campo (`htmlFor` ↔ `id`). Eram dez rótulos
+                                  soltos: por cima de um campo, a dizer o que ele
+                                  é, e sem nada que o dissesse ao browser.
+
+                                  Duas consequências, e a segunda é a que se nota
+                                  todos os dias. Quem usa leitor de ecrã ouvia
+                                  «edit text» sem saber de quê. E tocar no rótulo
+                                  não fazia nada — quando um rótulo ligado põe o
+                                  cursor no campo, o que num telemóvel duplica o
+                                  alvo de cada um destes onze campos sem mexer no
+                                  desenho.
+
+                                  Havia dois remendos com `aria-label`, e saíram:
+                                  um `aria-label` SUBSTITUI o rótulo visível, o
+                                  que deixa os dois livres para dizerem coisas
+                                  diferentes sem ninguém dar por isso — era o
+                                  caso, «Estado» no ecrã e «Estado do pedido» no
+                                  leitor.
+
+                                  O campo dos convidados já estava certo, e é o
+                                  modelo: é o único que também liga o erro ao
+                                  campo (`aria-invalid` + `aria-describedby`). */}
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Estado</label>
+                                  <label
+                                    htmlFor="pedido-estado"
+                                    className="bo-eyebrow block mb-1.5"
+                                  >
+                                    Estado
+                                  </label>
                                   <select
-                                    // O rótulo ao lado não está ligado ao campo
-                                    // (é um `label` sem `for`), e sem isto quem
-                                    // usa leitor de ecrã ouve só «combobox».
-                                    aria-label="Estado do pedido"
+                                    id="pedido-estado"
                                     value={editStatus}
                                     onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
                                     className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
@@ -4932,10 +4957,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">
+                                  <label htmlFor="pedido-preco" className="bo-eyebrow block mb-1.5">
                                     Preço final (sem IVA) €
                                   </label>
                                   <input
+                                    id="pedido-preco"
                                     type="text"
                                     inputMode="decimal"
                                     value={editPrice}
@@ -4986,8 +5012,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   })()}
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Data do evento</label>
+                                  <label htmlFor="pedido-data" className="bo-eyebrow block mb-1.5">
+                                    Data do evento
+                                  </label>
                                   <input
+                                    id="pedido-data"
                                     type="date"
                                     value={editDate}
                                     onChange={(e) => setEditDate(e.target.value)}
@@ -5040,8 +5069,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   )}
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Responsável</label>
+                                  <label
+                                    htmlFor="pedido-responsavel"
+                                    className="bo-eyebrow block mb-1.5"
+                                  >
+                                    Responsável
+                                  </label>
                                   <input
+                                    id="pedido-responsavel"
                                     type="text"
                                     value={editAssigned}
                                     onChange={(e) => setEditAssigned(e.target.value)}
@@ -5050,8 +5085,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   />
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Local</label>
+                                  <label htmlFor="pedido-local" className="bo-eyebrow block mb-1.5">
+                                    Local
+                                  </label>
                                   <input
+                                    id="pedido-local"
                                     value={editLocation}
                                     onChange={(e) => setEditLocation(e.target.value)}
                                     placeholder="Local do evento…"
@@ -5078,8 +5116,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 dados de QUEM, e o que está em cima é o QUÊ. */}
                               <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-3">
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Nome do cliente</label>
+                                  <label htmlFor="pedido-nome" className="bo-eyebrow block mb-1.5">
+                                    Nome do cliente
+                                  </label>
                                   <input
+                                    id="pedido-nome"
                                     value={editNome}
                                     onChange={(e) => setEditNome(e.target.value)}
                                     placeholder="Quem pediu…"
@@ -5087,8 +5128,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   />
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Email</label>
+                                  <label htmlFor="pedido-email" className="bo-eyebrow block mb-1.5">
+                                    Email
+                                  </label>
                                   <input
+                                    id="pedido-email"
                                     type="email"
                                     inputMode="email"
                                     autoComplete="off"
@@ -5109,8 +5153,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   )}
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Telefone</label>
+                                  <label
+                                    htmlFor="pedido-telefone"
+                                    className="bo-eyebrow block mb-1.5"
+                                  >
+                                    Telefone
+                                  </label>
                                   <input
+                                    id="pedido-telefone"
                                     type="tel"
                                     inputMode="tel"
                                     autoComplete="off"
@@ -5151,8 +5201,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                               {editStatus === "rejeitado" && (
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Motivo de perda</label>
+                                  <label
+                                    htmlFor="pedido-motivo"
+                                    className="bo-eyebrow block mb-1.5"
+                                  >
+                                    Motivo de perda
+                                  </label>
                                   <textarea
+                                    id="pedido-motivo"
                                     rows={2}
                                     value={editLostReason}
                                     onChange={(e) => setEditLostReason(e.target.value)}
@@ -5175,10 +5231,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 )}
 
                               <div>
-                                <label className="bo-eyebrow block mb-1.5">Notas internas</label>
+                                <label htmlFor="pedido-notas" className="bo-eyebrow block mb-1.5">
+                                  Notas internas
+                                </label>
                                 <textarea
+                                  id="pedido-notas"
                                   rows={3}
-                                  aria-label="Notas internas"
                                   // O que se escreve aqui grava-se sozinho — ver a
                                   // gravação automática lá em cima. A barra de
                                   // baixo diz em que pé está.

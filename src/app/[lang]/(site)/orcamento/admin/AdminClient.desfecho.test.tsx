@@ -268,7 +268,7 @@ describe("o painel do pedido", () => {
     fireEvent.click(screen.getByText("Voltaram Atrás"));
     await screen.findByRole("button", { name: "Fechar" });
 
-    await user.selectOptions(screen.getByLabelText("Estado do pedido"), "aceite");
+    await user.selectOptions(screen.getByLabelText("Estado"), "aceite");
     await user.click(await screen.findByRole("button", { name: /guardar alterações/i }));
 
     await waitFor(() => expect(patches).toHaveLength(1));
@@ -283,6 +283,6 @@ describe("o painel do pedido", () => {
 
     expect(screen.queryByRole("button", { name: /^ganho$/i })).toBeNull();
     // O selector de estado continua lá, que é por onde se corrige.
-    expect(screen.getByLabelText("Estado do pedido")).toBeInTheDocument();
+    expect(screen.getByLabelText("Estado")).toBeInTheDocument();
   });
 });

@@ -330,7 +330,7 @@ describe("Painel do pedido — o que se escreve grava-se sozinho", () => {
     montar(makeQuote());
     await abrirPedido();
 
-    fireEvent.change(screen.getByLabelText("Estado do pedido"), {
+    fireEvent.change(screen.getByLabelText("Estado"), {
       target: { value: "cotado" },
     });
     await passar(ATRASO_DA_GRAVACAO * 4);
@@ -422,7 +422,7 @@ describe("Painel do pedido — inscrito no «Guardar tudo»", () => {
     await abrirPedido();
 
     await act(async () => {
-      fireEvent.change(screen.getByLabelText("Estado do pedido"), { target: { value: "cotado" } });
+      fireEvent.change(screen.getByLabelText("Estado"), { target: { value: "cotado" } });
     });
     expect(guardarTudo()).toHaveAccessibleName(/guardar tudo \(1\)/i);
 
@@ -465,7 +465,7 @@ describe("Painel do pedido — fechar o separador", () => {
     await abrirPedido();
 
     await act(async () => {
-      fireEvent.change(screen.getByLabelText("Estado do pedido"), { target: { value: "cotado" } });
+      fireEvent.change(screen.getByLabelText("Estado"), { target: { value: "cotado" } });
     });
     expect(fecharSeparador()).toBe(true);
   });
@@ -594,5 +594,49 @@ describe("Painel do pedido — o que se perdia", () => {
 
     expect(screen.queryByText(/Ficou por gravar/)).toBeNull();
     expect(localStorage.getItem(`liquen-pedido-${q.id}`)).toBeNull();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * CADA RÓTULO LIGADO AO SEU CAMPO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Eram dez rótulos soltos: por cima de um campo, a dizer o que ele é, e sem
+ * nada que o dissesse ao browser. Duas consequências, e a segunda nota-se
+ * todos os dias — quem usa leitor de ecrã ouvia «edit text» sem saber de quê,
+ * e tocar no rótulo não fazia nada, quando um rótulo ligado põe o cursor no
+ * campo. Num telemóvel isso duplica o alvo de cada campo sem mexer no desenho.
+ *
+ * Este teste consulta os campos como uma pessoa os vê: pelo que está escrito
+ * por cima deles. Se alguém acrescentar um campo com o rótulo solto — ou puser
+ * um `aria-label` a dizer outra coisa que o texto visível — fica vermelho aqui.
+ */
+describe("Painel do pedido — os rótulos", () => {
+  it.each([
+    "Estado",
+    "Preço final (sem IVA) €",
+    "Data do evento",
+    "Convidados",
+    "Responsável",
+    "Local",
+    "Nome do cliente",
+    "Email",
+    "Telefone",
+    "Notas internas",
+  ])("«%s» encontra o seu campo", async (rotulo) => {
+    montar(makeQuote());
+    await abrirPedido();
+    expect(screen.getByLabelText(rotulo)).toBeInTheDocument();
+  });
+
+  it("e o que o leitor de ecrã diz é o que está escrito no ecrã", async () => {
+    // Um `aria-label` SUBSTITUI o rótulo visível — e deixa os dois livres para
+    // divergirem sem ninguém dar por isso. Era o caso: «Estado» no ecrã e
+    // «Estado do pedido» no leitor.
+    montar(makeQuote());
+    await abrirPedido();
+    const estado = screen.getByLabelText("Estado");
+    expect(estado.getAttribute("aria-label")).toBeNull();
   });
 });
