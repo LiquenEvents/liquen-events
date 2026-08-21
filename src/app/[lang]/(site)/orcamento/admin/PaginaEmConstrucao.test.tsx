@@ -16,13 +16,21 @@ import { PaginaEmConstrucao, type FotoDaPagina } from "./PaginaEmConstrucao";
  * é que a página do PDF não vai imprimir.
  */
 
+/** O ecrã dela. Por omissão o jsdom é largo, que é o caso do computador. */
+function estreitar(px: number) {
+  Object.defineProperty(window, "innerWidth", { value: px, configurable: true });
+}
+
 const fotos = (n: number, prefixo: string): FotoDaPagina[] =>
   Array.from({ length: n }, (_, i) => ({
     path: `${prefixo}/foto-${i + 1}.jpg`,
     url: `https://cdn.test/${prefixo}-${i + 1}.jpg`,
   }));
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  estreitar(1024);
+});
 afterEach(cleanup);
 
 describe("a página em construção", () => {
@@ -127,5 +135,63 @@ describe("a página em construção", () => {
     render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={10} />);
     expect(screen.queryByText(/de 10/)).toBeNull();
     expect(screen.getByRole("button").textContent).toContain("2 fotos");
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * NO TELEMÓVEL COMEÇA FECHADA
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * MEDIDO no ecrã dela: a 390 px a grelha tem duas colunas de 171 px, e um
+   * cartão de 120 px pousado no canto tapa uma fotografia inteira. Tapar uma
+   * foto é pior do que roubar-lhe espaço — a foto ainda lá está e não se vê.
+   */
+  it("num ecrã estreito começa fechada, e continua a dizer a conta", () => {
+    estreitar(390);
+    render(<PaginaEmConstrucao jaLa={fotos(7, "a")} aEntrar={fotos(4, "b")} maximo={10} />);
+    expect(screen.queryByLabelText("A página em construção")).toBeNull();
+    const pastilha = screen.getByRole("button");
+    expect(pastilha.textContent).toContain("11 fotos");
+    expect(pastilha.textContent).toContain("1 a mais");
+  });
+
+  it("e no computador, onde não tapa nada, começa aberta", () => {
+    estreitar(1024);
+    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={10} />);
+    expect(screen.getByLabelText("A página em construção")).toBeTruthy();
+  });
+
+  it("mas uma escolha dela manda em qualquer largura", () => {
+    estreitar(390);
+    localStorage.setItem("liquen-pagina-em-construcao", "1");
+    render(<PaginaEmConstrucao jaLa={fotos(2, "a")} aEntrar={[]} maximo={10} />);
+    expect(screen.getByLabelText("A página em construção")).toBeTruthy();
+  });
+
+  /**
+   * UMA MINIATURA QUE NÃO EXISTE NÃO PODE DAR UM ÍCONE PARTIDO.
+   *
+   * Assinar um caminho no Supabase devolve um URL bem formado para um ficheiro
+   * que pode não estar lá — quem descobre é o browser, com um 404. Sem plano B,
+   * o canto mostrava nove ícones de imagem partida em vez de nove fotografias.
+   */
+  it("uma miniatura que falha cai para o original", () => {
+    const { container } = render(
+      <PaginaEmConstrucao
+        jaLa={[
+          {
+            path: "a/1.jpg",
+            url: "https://cdn.test/mini.jpg",
+            planoB: "https://cdn.test/original.jpg",
+          },
+        ]}
+        aEntrar={[]}
+        maximo={10}
+      />,
+    );
+    const img = container.querySelector("img")!;
+    expect(img.getAttribute("src")).toBe("https://cdn.test/mini.jpg");
+    fireEvent.error(img);
+    expect(img.getAttribute("src")).toBe("https://cdn.test/original.jpg");
   });
 });

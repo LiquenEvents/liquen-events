@@ -8863,6 +8863,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   fotos: (doc.moodBoards[picker.bi]?.images ?? []).map((path) => ({
                     path,
                     url: assetUrls[path],
+                    // O plano B, como na grelha aqui ao lado: uma miniatura que
+                    // não existe cai para o original em vez de dar o ícone de
+                    // imagem partida.
+                    planoB: assetOriginais[path],
                   })),
                   maximo: MOOD_BOARD_MAX_IMAGES,
                 }

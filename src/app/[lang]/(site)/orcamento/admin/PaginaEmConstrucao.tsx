@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ImagemComPlanoB from "./ImagemComPlanoB";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -35,17 +36,39 @@ import { useState } from "react";
 /** Onde fica a preferência de a ver ou não. */
 const CHAVE = "liquen-pagina-em-construcao";
 
+/**
+ * Abaixo disto o canto começa fechado. MEDIDO no telemóvel dela: a 390 px a
+ * grelha tem DUAS colunas de 171 px, e um cartão de 120 px pousado no canto
+ * tapa uma fotografia inteira. Palavras dela: «não pode roubar espaço às
+ * fotos» — e tapar uma foto é pior do que lhe roubar espaço, porque a foto
+ * ainda lá está e não se vê.
+ *
+ * Fechado é uma pastilha com a contagem e o aviso, que é o que se quer saber
+ * de relance; abre-se com um toque quando se quer ver o conjunto, e o toque
+ * seguinte fecha-a outra vez. No computador, onde a grelha tem cinco colunas e
+ * o canto não tapa nada, continua aberto.
+ */
+const LARGURA_PARA_ABRIR = 640;
+
 function guardada(): boolean {
   try {
-    return localStorage.getItem(CHAVE) !== "0";
+    const escolha = localStorage.getItem(CHAVE);
+    // Uma escolha dela manda sempre, em qualquer largura.
+    if (escolha !== null) return escolha !== "0";
   } catch {
-    return true;
+    /* sem localStorage decide-se pela largura, como abaixo */
   }
+  if (typeof window === "undefined") return true;
+  return window.innerWidth >= LARGURA_PARA_ABRIR;
 }
 
 export interface FotoDaPagina {
   path: string;
   url?: string;
+  /** O ORIGINAL, para quando a miniatura não existir. Ver `assetOriginais` no
+   *  estúdio — nem todas as fotos têm derivadas, e assinar um caminho no
+   *  Supabase não verifica que o ficheiro lá está. */
+  planoB?: string;
 }
 
 export function PaginaEmConstrucao({
@@ -104,7 +127,10 @@ export function PaginaEmConstrucao({
       aria-label="A página em construção"
     >
       <div className="flex items-start justify-between gap-1">
-        <p className="min-w-0 truncate text-[10px] uppercase tracking-[0.1em] text-foreground/45">
+        {/* Duas linhas e não uma: com 90 px de largura, «Complementos de mesa»
+            cortado ao fim da primeira sílaba não diz de que página se trata —
+            que é a única coisa que este título tem para dizer. */}
+        <p className="line-clamp-2 min-w-0 text-[10px] uppercase leading-tight tracking-[0.1em] text-foreground/45">
           {titulo?.trim() || "Esta página"}
         </p>
         <button
@@ -144,7 +170,15 @@ export function PaginaEmConstrucao({
               } ${excedente ? "opacity-40" : ""}`}
             >
               {f.url && (
-                <img src={f.url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                /* `ImagemComPlanoB` e não um `img`: uma miniatura que não
+                   existe devolve um URL bem formado e um 404, e o que se via
+                   eram nove ícones de imagem partida. O plano B é o original,
+                   o único que veio da listagem da pasta. */
+                <ImagemComPlanoB
+                  src={f.url}
+                  planoB={f.planoB}
+                  className="h-full w-full object-cover"
+                />
               )}
             </span>
           );
