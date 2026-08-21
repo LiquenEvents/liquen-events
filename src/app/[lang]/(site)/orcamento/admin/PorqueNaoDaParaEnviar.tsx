@@ -1,5 +1,6 @@
 "use client";
 
+import { destinatarioDoEnvio } from "@/lib/destinatario-do-envio";
 import type { Impedimento } from "@/lib/proposal-progress";
 
 /**
@@ -34,15 +35,65 @@ import type { Impedimento } from "@/lib/proposal-progress";
 export default function PorqueNaoDaParaEnviar({
   faltas,
   fotosPorConfirmar,
+  emailDoCliente,
   onIr,
 }: {
   /** Tudo o que `oQueFaltaParaEnviar` devolveu — os conselhos ficam de fora. */
   faltas: readonly Impedimento[];
   /** Fotografias ainda a entrar na proposta. Não é uma falta: é uma espera. */
   fotosPorConfirmar: number;
+  /** O email do pedido — para onde isto vai. */
+  emailDoCliente?: string;
   onIr: (falta: Impedimento) => void;
 }) {
   const travam = faltas.filter((f) => f.trava);
+  const destino = destinatarioDoEnvio(emailDoCliente);
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      {/* ── PARA ONDE É QUE ISTO VAI ────────────────────────────────────────
+          «A proposta para "Melanie e Sebastien" ia para
+          franciscomariagaspar6@gmail.com. Nada avisa que o destinatário não é o
+          cliente.»
+
+          O ecrã nunca mostrava o endereço: ele só aparecia DEPOIS de carregar
+          em «Gerar e enviar», na frase de confirmação — um clique depois de a
+          decisão já estar tomada. Pô-lo à vista ao lado do botão faz o caso
+          dela deixar de existir, sem julgar endereço nenhum: ela teria visto o
+          gmail e parado.
+
+          O aviso a sério fica para o que se sabe com certeza (ver
+          `destinatarioDoEnvio`). Um aviso que dispara em endereços legítimos —
+          e a maioria dos endereços de casamento não tem o nome de ninguém lá
+          dentro — ensina-se a ignorar. */}
+      <p
+        className={`max-w-lg text-right text-[11px] leading-relaxed ${
+          destino.aviso ? "text-[#8a6420]" : "text-foreground/45"
+        }`}
+      >
+        {destino.endereco ? (
+          <>
+            Vai para <span className="font-medium">{destino.endereco}</span>
+            {destino.aviso ? <> — {destino.aviso}</> : null}
+          </>
+        ) : (
+          destino.aviso
+        )}
+      </p>
+      <PorqueTrava travam={travam} fotosPorConfirmar={fotosPorConfirmar} onIr={onIr} />
+    </div>
+  );
+}
+
+function PorqueTrava({
+  travam,
+  fotosPorConfirmar,
+  onIr,
+}: {
+  travam: readonly Impedimento[];
+  fotosPorConfirmar: number;
+  onIr: (falta: Impedimento) => void;
+}) {
   if (travam.length === 0 && fotosPorConfirmar === 0) return null;
 
   return (

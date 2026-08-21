@@ -8926,6 +8926,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <PorqueNaoDaParaEnviar
                   faltas={faltas}
                   fotosPorConfirmar={fotosPorConfirmar}
+                  emailDoCliente={quote.email}
                   onIr={(f) => irParaAFalta(f.seccao, f.campo)}
                 />
                 <Button
