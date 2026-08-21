@@ -658,6 +658,70 @@ describe("POST /api/orcamento/[id]/proposta-doc — uma base sem as colunas nova
     expect(body.emailed).toBe(true);
   });
 
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * A COLUNA QUE FALTA NÃO PODE LEVAR O DOCUMENTO À FRENTE
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * ISTO ACONTECEU, e é o defeito mais caro que esta casa teve.
+   *
+   * A coluna `proposals.doc` existe naquela base desde 30 de julho. As do selo
+   * da versão (`versao_selo`, `versao_numero`, `versao_em`) nasceram a 20 de
+   * agosto. No primeiro envio depois disso, a base recusou o `versao_selo` — e
+   * o resgate, para salvar três colunas que não existiam, deitou fora a única
+   * que existia e a única que o casal vê.
+   *
+   * O casal recebeu a proposta em anexo, com quinze páginas e mood boards, e o
+   * link ao lado abriu uma página com a saudação, o subtotal, o IVA e o total.
+   * Nada disto deu erro.
+   *
+   * A base deste teste é a base dela: tem `doc`, não tem o selo.
+   */
+  it("uma base COM `doc` e sem o selo guarda o documento à mesma", async () => {
+    const real = vi.mocked(createProposal);
+    real.mockImplementation(async (p: Proposal) => {
+      // Exactamente a base dela: o selo da versão não existe, o resto existe.
+      if (p.versaoSelo !== undefined) throw semColuna("versao_selo");
+      if (p.versaoNumero !== undefined) throw semColuna("versao_numero");
+      if (p.versaoEm !== undefined) throw semColuna("versao_em");
+      created.last = p;
+    });
+
+    const body = await (await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params })).json();
+    expect(body.ok).toBe(true);
+    expect(body.emailed).toBe(true);
+
+    // O QUE ESTE TESTE EXISTE PARA PRENDER: o documento ficou lá.
+    expect(created.last).toBeTruthy();
+    expect(
+      created.last!.doc,
+      "o documento foi deitado fora para salvar colunas que não existem",
+    ).toBeTruthy();
+    // E o que a base não tem, não foi.
+    expect(created.last!.versaoSelo).toBeUndefined();
+
+    // Com o documento guardado, não se grita «o casal não vê a proposta» — o
+    // aviso existe, mas é o outro, e não interrompe da mesma maneira.
+    // `docSaved` só vem na resposta quando é FALSO (ver o fim da rota): a sua
+    // ausência é a afirmação de que correu bem.
+    expect(body.docSaved, "não pode dizer que o documento se perdeu").not.toBe(false);
+    expect(body.docError ?? "", "a frase não pode dizer que o casal ficou sem nada").not.toMatch(
+      /quadro com o preço/i,
+    );
+  });
+
+  it("e o `pdf_sha256` em falta também não leva o documento à frente", async () => {
+    const real = vi.mocked(createProposal);
+    real.mockImplementation(async (p: Proposal) => {
+      if (p.pdfSha256 !== undefined) throw semColuna("pdf_sha256");
+      created.last = p;
+    });
+    const body = await (await POST(sendReq(baseDoc({ totalAmount: 3000 })), { params })).json();
+    expect(created.last!.doc, "só se tira o que falta").toBeTruthy();
+    expect(created.last!.pdfSha256).toBeUndefined();
+    expect(body.docSaved).not.toBe(false);
+  });
+
   it("e diz o que se perdeu, com o nome do que é preciso correr", async () => {
     const real = vi.mocked(createProposal);
     real.mockImplementation(async (p: Proposal) => {

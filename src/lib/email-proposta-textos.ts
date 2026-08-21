@@ -85,7 +85,55 @@ export interface DadosDoNomeDoFicheiro {
   eventDate?: string;
   /** A referência interna — o que fica no nome quando não há casal nenhum. */
   ref: string;
+  /**
+   * ── O NOME ESCRITO POR ELA, QUANDO O ESCREVE ────────────────────────────
+   *
+   * Pedido dela: «gostava de poder editar o nome do pdf que vai ser gerado».
+   *
+   * A composição automática acerta na maioria dos casos e não acerta em todos:
+   * duas propostas para o mesmo casal, uma versão para os pais e outra para
+   * eles, um nome que ela quer arrumado de outra maneira na pasta. Escrito
+   * aqui, manda — e manda em TODOS os sítios, porque é este o único sítio onde
+   * o nome se decide (o anexo do email, a descarga do link do casal, o portal e
+   * o botão do estúdio).
+   *
+   * Passa pela MESMA limpeza da composição automática (letras, números e
+   * hífenes): o que ela escreve é o nome que quer, e o que sai é um nome que
+   * chega inteiro a qualquer cliente de correio. O ecrã mostra-lhe o resultado
+   * enquanto escreve, para a limpeza nunca ser uma surpresa.
+   *
+   * Vazio, ou só com sinais que não sobrevivem à limpeza, vale o mesmo que não
+   * ter escrito nada: volta a composição automática. Um ficheiro chamado
+   * `-.pdf` era pior do que qualquer nome que se componha.
+   */
+  escolhido?: string;
 }
+
+/**
+ * O nome escrito à mão, limpo e sem a extensão. Vazio quando não sobra nada.
+ *
+ * Tira um `.pdf` escrito no fim — quem escreve o nome de um PDF escreve-lhe a
+ * extensão metade das vezes, e `Proposta.pdf.pdf` é o género de detalhe que faz
+ * uma funcionalidade nova parecer partida à primeira utilização.
+ *
+ * O tecto é o mesmo do nome do casal, pela mesma razão: um nome que não cabe na
+ * coluna do gestor de ficheiros não serve para arrumar nada.
+ */
+export function nomeEscolhidoParaFicheiro(escrito: unknown): string {
+  const texto = String(escrito ?? "")
+    .trim()
+    .replace(/\.pdf$/i, "");
+  return paraNomeDeFicheiro(texto).slice(0, MAX_NOME_ESCOLHIDO).replace(/-+$/, "");
+}
+
+/**
+ * Quanto do nome escrito à mão cabe.
+ *
+ * Mais folgado do que o do casal (44) porque aqui não há casa nem data à volta
+ * — o que ela escreve é o nome todo. Oitenta caracteres é o que ainda se lê de
+ * uma vez num cartão de anexo de telemóvel.
+ */
+const MAX_NOME_ESCOLHIDO = 80;
 
 /** Letras, números e hífenes, e mais nada — ver o porquê acima. */
 function paraNomeDeFicheiro(texto: string): string {
@@ -128,6 +176,12 @@ export function nomeDoFicheiroDaProposta(
   dados: DadosDoNomeDoFicheiro,
   idioma: IdiomaDaProposta,
 ): string {
+  // O nome dela primeiro. Não leva prefixo, nem casa, nem data: quem escreve o
+  // nome de um ficheiro escreve-o inteiro, e acrescentar-lhe coisas seria
+  // desfazer a escolha que este campo existe para permitir.
+  const dela = nomeEscolhidoParaFicheiro(dados.escolhido);
+  if (dela) return `${dela}.pdf`;
+
   const prefixo = ehIdiomaDaProposta(idioma) && idioma === "en" ? "Proposal" : "Proposta";
   const nomes = paraNomeDeFicheiro(dados.clientNames ?? "");
   if (!nomes) return `${prefixo}-Liquen-${dados.ref}.pdf`;

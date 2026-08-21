@@ -56,6 +56,7 @@ import { relatarFalhaDeImagem } from "./relatar-falha";
 import { pedirVezDeImagemPesada, ESPERA_MAXIMA_MS } from "./fila-de-imagens";
 import PainelInterno from "./PainelInterno";
 import Conferencia from "./Conferencia";
+import { nomeDoFicheiroDaProposta } from "@/lib/email-proposta-textos";
 import EmailDoEnvio from "./EmailDoEnvio";
 import Gralhas from "./Gralhas";
 import MoodBoardIndice from "./MoodBoardIndice";
@@ -4822,7 +4823,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // acontece — ela manda a portuguesa aos pais e a inglesa ao casal — e com
       // o mesmo nome a segunda ficava «proposta-Ana (1).pdf» na pasta de
       // transferências, sem forma de saber qual é qual sem abrir as duas.
-      a.download = `${idiomaDoPdf === "en" ? "proposal" : "proposta"}-${quote.name || quote.id}.pdf`;
+      /**
+       * O MESMO NOME QUE O CASAL VAI VER.
+       *
+       * Isto compunha um nome só seu — `proposta-Ana.pdf` — e era o quarto nome
+       * diferente para o mesmo documento: um no botão daqui, um no anexo do
+       * email, um na descarga do link do casal e um no portal. Ela confere o
+       * PDF na pasta de transferências e envia-o a seguir; se o que confere não
+       * se chama como o que segue, a conferência não prova nada.
+       *
+       * Passa a sair da mesma função que o servidor usa — incluindo o nome que
+       * ela escreveu, quando escreveu.
+       */
+      a.download = nomeDoFicheiroDaProposta(
+        {
+          escolhido: doc.nomeDoFicheiro,
+          clientNames: doc.clientNames,
+          eventDate: doc.eventDate,
+          ref: quote.id,
+        },
+        idiomaDoPdf,
+      );
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -8253,6 +8274,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 // e o ecrã diz qual dos dois é.
                 bytesDoAnexo={bytesDoPdf ?? tamanhoEstimado(totalDeFotos, amostras)}
                 bytesMedidos={bytesDoPdf !== null}
+                // Vazio quer dizer «compõe-o tu», e por isso o campo sai do
+                // documento em vez de lá ficar como cadeia vazia: um `""`
+                // gravado era indistinguível de uma escolha, e o dia em que a
+                // composição mudasse não chegava às propostas que passaram por
+                // aqui.
+                onNomeDoFicheiro={(nome) =>
+                  patch({ nomeDoFicheiro: nome.trim() ? nome : undefined })
+                }
               />
               {/* As fotos a caminho têm a sua própria linha, e não a genérica
                   dos campos por preencher: aqui não há nada a fazer senão

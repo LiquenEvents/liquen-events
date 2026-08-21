@@ -94,6 +94,8 @@ export interface EmailDoEnvioProps {
   /** O tamanho do PDF em bytes e se foi MEDIDO (pré-visualização) ou estimado. */
   bytesDoAnexo: number;
   bytesMedidos: boolean;
+  /** O nome do anexo, escrito por ela. Vazio = composto automaticamente. */
+  onNomeDoFicheiro: (nome: string) => void;
 }
 
 /** Quanto tempo se espera antes de ir buscar o rascunho outra vez. Escrever a
@@ -114,6 +116,7 @@ export default function EmailDoEnvio({
   onModelo,
   bytesDoAnexo,
   bytesMedidos,
+  onNomeDoFicheiro,
 }: EmailDoEnvioProps) {
   const [modelo, setModelo] = useState("");
   const [modelos, setModelos] = useState<ModeloDaLista[]>([]);
@@ -249,9 +252,21 @@ export default function EmailDoEnvio({
   }
 
   const nomeDoAnexo = nomeDoFicheiroDaProposta(
+    {
+      escolhido: doc.nomeDoFicheiro,
+      clientNames: doc.clientNames,
+      eventDate: doc.eventDate,
+      ref: quoteId,
+    },
+    idioma,
+  );
+  /** O nome que a composição daria — é o que o botão «Automático» repõe, e o
+   *  que a caixa mostra como sugestão quando está vazia. */
+  const nomeComposto = nomeDoFicheiroDaProposta(
     { clientNames: doc.clientNames, eventDate: doc.eventDate, ref: quoteId },
     idioma,
   );
+  const nomeEscrito = (doc.nomeDoFicheiro ?? "").trim();
   const semLigacao = corpo.trim().length > 0 && !temLigacaoDaProposta(corpo);
   const passaDoTecto = corpo.length > MAXIMO_CORPO_ESCRITO;
 
@@ -438,6 +453,39 @@ export default function EmailDoEnvio({
           </span>
         </dd>
       </dl>
+
+      {/* ── O NOME DO FICHEIRO, ESCRITO POR ELA ─────────────────────────────
+          Pedido dela: «gostava de poder editar o nome do pdf que vai ser
+          gerado». Fica AQUI, um dedo abaixo da linha que mostra o nome, porque
+          é aqui que ela o lê — um campo com o mesmo assunto noutro ecrã era
+          obrigar a procurar o sítio onde se muda o que se está a ver.
+
+          O resultado aparece na linha «Anexo» acima enquanto se escreve: a
+          limpeza (letras, números e hífenes — um acento num anexo ainda hoje
+          chega partido a alguns clientes de correio) nunca é uma surpresa,
+          porque se vê a acontecer. */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <label htmlFor="nome-do-anexo" className="shrink-0 text-xs text-foreground/50">
+          Nome do ficheiro
+        </label>
+        <input
+          id="nome-do-anexo"
+          value={nomeEscrito}
+          onChange={(e) => onNomeDoFicheiro(e.target.value)}
+          placeholder={nomeComposto.replace(/\.pdf$/i, "")}
+          className="bo-input min-w-0 flex-1 px-2.5 py-1.5 text-xs sm:max-w-sm"
+        />
+        {nomeEscrito !== "" && (
+          <Button size="sm" variant="ghost" onClick={() => onNomeDoFicheiro("")}>
+            ↺ Automático
+          </Button>
+        )}
+        <p className="w-full text-[11px] leading-snug text-foreground/50">
+          Em branco, o nome é composto sozinho — a casa, o casal e a data do evento. O que
+          escreveres aqui vale para o anexo do email, para a descarga do link do casal e para o
+          botão do estúdio: é o mesmo ficheiro nos três sítios, e o casal tem de o reconhecer.
+        </p>
+      </div>
 
       {/* ── COMO O CLIENTE O RECEBE ──────────────────────────────────────────
           O texto acima já está resolvido, portanto isto não é «ver as variáveis

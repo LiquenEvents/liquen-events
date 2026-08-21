@@ -203,6 +203,45 @@ export function isMissingTable(err: unknown): boolean {
 }
 
 /**
+ * O NOME da coluna que falta, quando o erro o diz — `versao_selo`.
+ *
+ * ── Porque é que isto vale um extractor ───────────────────────────────────
+ *
+ * O `isMissingTable` responde «falta alguma coisa», e quem o usa para se
+ * salvar tem de decidir o que deitar fora sem saber o quê. A rota do envio da
+ * proposta fazia a única coisa que podia: deitava fora TUDO o que fosse
+ * recente — `doc`, `pdf_sha256`, `idioma`, o selo da versão — e gravava o
+ * resto.
+ *
+ * Custou uma proposta a sério. A coluna `proposals.doc` existe naquela base
+ * desde julho; as do selo da versão nasceram a 20 de agosto. Uma base sem o
+ * `db/schema.sql` novo rejeitava o `versao_selo` — e o resgate, para salvar
+ * três colunas que não existiam, deitava fora a única que existia e a única
+ * que o cliente vê. O casal recebeu quinze páginas em anexo e um link que
+ * abria um quadro de preços.
+ *
+ * Com o nome, quem se salva pode tirar só o que falta e ficar com o resto.
+ *
+ * `null` quando o erro não nomeia coluna nenhuma (tabela inteira em falta, ou
+ * uma mensagem que não se reconhece) — e aí quem chama volta ao que fazia.
+ */
+export function nomeDaColunaEmFalta(err: unknown): string | null {
+  if (!err || typeof err !== "object") return null;
+  const msg = (err as { message?: unknown }).message;
+  if (typeof msg !== "string") return null;
+  const achado =
+    // PostgREST: Could not find the 'versao_selo' column of 'proposals' in the schema cache
+    /could not find the ['"`]?([A-Za-z0-9_]+)['"`]? column/i.exec(msg) ??
+    // Postgres: column "versao_selo" of relation "proposals" does not exist
+    // Postgres: column proposals.versao_selo does not exist
+    /column ['"`]?([A-Za-z0-9_.]+)['"`]?(?: of relation [^ ]+)? does not exist/i.exec(msg);
+  if (!achado) return null;
+  // «proposals.versao_selo» → «versao_selo». O nome da tabela já se sabe.
+  const nome = achado[1].split(".").pop() ?? "";
+  return nome || null;
+}
+
+/**
  * A escrita foi RECUSADA por não haver base de dados ligada em produção (ver
  * `assertWritableInProd`): gravar num ficheiro efémero seria perder os dados no
  * deploy seguinte e dizer à equipa que ficaram guardados.

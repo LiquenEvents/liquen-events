@@ -3484,7 +3484,19 @@ describe("gerar a proposta em inglês", () => {
 
     await waitFor(() => expect(corpos("proposta-doc", "POST")).toHaveLength(1));
     expect(idiomaEnviado()).toBe("pt");
-    expect(nomes).toEqual(["proposta-Maria & Zé.pdf"]);
+    /**
+     * O MESMO NOME QUE O CASAL VAI VER.
+     *
+     * Isto dizia `proposta-Maria & Zé.pdf` — um nome só deste botão, e o quarto
+     * nome diferente para o mesmo documento (o anexo do email, a descarga do
+     * link do casal e o portal tinham cada um o seu). Ela confere o PDF na
+     * pasta de transferências e envia-o a seguir; se o que confere não se chama
+     * como o que segue, a conferência não prova nada.
+     *
+     * Agora sai da mesma função que o servidor usa — casa, casal e data — e o
+     * «&» e o acento saem, porque o mesmo nome viaja num cabeçalho e num anexo.
+     */
+    expect(nomes).toEqual(["Proposta-Liquen-Events-Maria-e-Ze-12-09-2026.pdf"]);
   });
 
   it("escolher inglês manda «en» e o ficheiro sai com outro nome", async () => {
@@ -3500,8 +3512,9 @@ describe("gerar a proposta em inglês", () => {
     await waitFor(() => expect(corpos("proposta-doc", "POST")).toHaveLength(1));
     expect(idiomaEnviado()).toBe("en");
     // Duas versões da mesma proposta na pasta de transferências têm de se
-    // distinguir sem as abrir.
-    expect(nomes).toEqual(["proposal-Maria & Zé.pdf"]);
+    // distinguir sem as abrir — e é o «Proposal» que as distingue, como no
+    // anexo que o casal recebe.
+    expect(nomes).toEqual(["Proposal-Liquen-Events-Maria-e-Ze-12-09-2026.pdf"]);
   });
 
   it("a escolha alcança-se pelo teclado, com as setas", async () => {

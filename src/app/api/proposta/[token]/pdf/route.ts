@@ -95,6 +95,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     return respostaPdf(request, pdf, {
       nome: nomeDoFicheiroDaProposta(
         {
+          escolhido: proposal.doc?.nomeDoFicheiro,
           clientNames: proposal.doc?.clientNames,
           eventDate: proposal.doc?.eventDate,
           ref,
