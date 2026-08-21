@@ -169,15 +169,21 @@ export default function PainelDoEstudio({
         <div className="mb-3 flex items-baseline justify-between gap-3">
           <p className="bo-eyebrow">O que vai sair</p>
           {/*
-           * A conta de páginas, ao vivo.
+           * A conta de páginas, ao vivo — E COM O NOME DO QUE CONTA.
            *
-           * São as páginas de mood board — as que mudam com o que ela faz aqui.
+           * São as páginas de mood board: as que mudam com o que ela faz aqui.
            * As folhas fixas do documento (capa, apresentação, serviços,
            * orçamento, condições) não mudam com um clique nesta secção, e
            * contá-las aqui dava um número que nunca se mexia.
+           *
+           * O que mudou foi a PALAVRA. Dizia «7 páginas», e a vista de conjunto
+           * ao lado diz «Página 4 de 13» sobre o mesmo documento — dois números
+           * com o mesmo nome a falar de coisas diferentes, que é literalmente a
+           * queixa dela: «a contagem tem de bater certo». Contam coisas
+           * diferentes de propósito; o que não podiam era chamar-lhes o mesmo.
            */}
           <p className="text-[11px] text-foreground/45 tabular-nums">
-            {paginas.length === 1 ? "1 página" : `${paginas.length} páginas`}
+            {paginas.length === 1 ? "1 inspiração" : `${paginas.length} inspirações`}
           </p>
         </div>
 
@@ -227,7 +233,7 @@ export default function PainelDoEstudio({
                     legenda={aVer.board.annotation}
                   />
                   <p className="mt-2 text-center text-[11px] text-foreground/45">
-                    Página {paginas.findIndex((p) => p.bi === aVer.bi) + 1} de {paginas.length}
+                    Inspiração {paginas.findIndex((p) => p.bi === aVer.bi) + 1} de {paginas.length}
                   </p>
                   {onEscolherFotos && (
                     <button

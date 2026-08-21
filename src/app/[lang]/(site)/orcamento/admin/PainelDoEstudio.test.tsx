@@ -80,10 +80,22 @@ describe("o painel só existe onde cabe", () => {
 });
 
 describe("o que o painel mostra", () => {
-  it("a página que está a ser editada, e diz qual é de quantas", () => {
+  /**
+   * ── DOIS NÚMEROS COM O MESMO NOME ────────────────────────────────────────
+   *
+   * Palavras dela: «a contagem tem de bater certo».
+   *
+   * Este painel conta as páginas de INSPIRAÇÃO — as que mudam com o que ela faz
+   * nesta secção —, e a vista de conjunto ao lado conta as folhas do DOCUMENTO.
+   * Contarem coisas diferentes é de propósito; chamarem-lhes as duas «páginas»
+   * é que punha dois números a discordar sobre a mesma proposta.
+   */
+  it("a inspiração que está a ser editada, e diz qual é de quantas", () => {
     largura(true);
     desenhar({ activa: 1 });
-    expect(screen.getByText(/Página 2 de 2/)).toBeTruthy();
+    expect(screen.getByText(/Inspiração 2 de 2/)).toBeTruthy();
+    // E não se chama «página», que é o que a vista de conjunto conta.
+    expect(screen.queryByText(/Página 2 de 2/)).toBeNull();
   });
 
   it("sem página activa, mostra a primeira em vez de nada", () => {
@@ -91,13 +103,13 @@ describe("o que o painel mostra", () => {
     // que parece avariado.
     largura(true);
     desenhar();
-    expect(screen.getByText(/Página 1 de 2/)).toBeTruthy();
+    expect(screen.getByText(/Inspiração 1 de 2/)).toBeTruthy();
   });
 
-  it("conta as páginas ao vivo", () => {
+  it("conta as inspirações ao vivo, e diz que é isso que conta", () => {
     largura(true);
     desenhar();
-    expect(screen.getByText("2 páginas")).toBeTruthy();
+    expect(screen.getByText("2 inspirações")).toBeTruthy();
   });
 
   it("em «Todas», cada página leva ao sítio dela no editor", async () => {
