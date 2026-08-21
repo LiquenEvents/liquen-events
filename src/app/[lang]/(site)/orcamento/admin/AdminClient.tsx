@@ -24,6 +24,15 @@ import { round2 } from "@/lib/money";
 import { lerNumero } from "@/lib/numero-escrito";
 import { porqueRecusou } from "@/lib/erro-do-servidor";
 import {
+  esquecerRascunho,
+  fraseDoQueMudou,
+  guardarRascunho,
+  haQuantoTempo,
+  lerRascunho,
+  oQueMudou,
+  type CamposDoPedido,
+} from "./rascunho-do-pedido";
+import {
   contextoDeLocal,
   diasDeEspera,
   esperaEmPalavras,
@@ -62,6 +71,7 @@ import {
   useGravacaoAutomatica,
   useTravaoDeSaida,
   fetchComTecto,
+  enviarComRepeticao,
   respostaDeHttp,
   type RespostaDoEnvio,
 } from "./useGravacaoAutomatica";
@@ -1380,6 +1390,131 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     [userName, absorverDoServidor],
   );
 
+  /**
+   * ── A REDE DE SEGURANÇA DO PAINEL ─────────────────────────────────────────
+   *
+   * Só duas coisas gravam sozinhas aqui: as notas e o motivo de perda. O preço,
+   * a data, os convidados, o local e os contactos só saem deste telemóvel
+   * quando ela carrega em «Guardar» — e o travão que existia, um
+   * `beforeunload`, é quase decorativo num iPhone: o Safari descarta
+   * separadores em segundo plano e não o corre quando o faz.
+   *
+   * Ver `rascunho-do-pedido.ts` para o porquê de ser cópia LOCAL e não no
+   * servidor, e de nunca repor sozinha.
+   */
+  const camposNoEcra = useMemo<CamposDoPedido>(
+    () => ({
+      preco: editPrice,
+      notas: editNotes,
+      estado: editStatus,
+      responsavel: editAssigned,
+      motivoDePerda: editLostReason,
+      data: editDate,
+      convidados: editGuests,
+      local: editLocation,
+      nome: editNome,
+      email: editEmail,
+      telefone: editTelefone,
+    }),
+    [
+      editPrice,
+      editNotes,
+      editStatus,
+      editAssigned,
+      editLostReason,
+      editDate,
+      editGuests,
+      editLocation,
+      editNome,
+      editEmail,
+      editTelefone,
+    ],
+  );
+
+  /** O mesmo pedido, como o servidor o tem — para se poder comparar. */
+  const camposDoPedido = useCallback(
+    (q: Quote): CamposDoPedido => ({
+      preco: textoDoPreco(q),
+      notas: q.adminNotes ?? "",
+      estado: q.status,
+      responsavel: q.assignedTo ?? "",
+      motivoDePerda: q.lostReason ?? "",
+      data: q.date ?? "",
+      convidados: String(q.guests ?? ""),
+      local: q.location ?? "",
+      nome: q.name ?? "",
+      email: q.email ?? "",
+      telefone: q.phone ?? "",
+    }),
+    [],
+  );
+
+  /** O rascunho encontrado ao abrir, à espera de uma decisão dela. */
+  const [rascunhoPorRepor, setRascunhoPorRepor] = useState<{
+    campos: CamposDoPedido;
+    /** Já escrito — «há 12 minutos». Calculado ao ABRIR e não a cada desenho:
+     *  no desenho, `new Date()` faz a frase mudar sozinha quando o painel
+     *  redesenha por outra razão qualquer, e uma frase que se mexe sem motivo
+     *  chama a atenção para o sítio errado. */
+    quando: string;
+    mudou: (keyof CamposDoPedido)[];
+  } | null>(null);
+
+  /**
+   * Guarda o que está escrito, com um atraso curto.
+   *
+   * O atraso não é para poupar escritas — é para não guardar o meio de uma
+   * palavra como se fosse uma decisão. E quando o que está no ecrã volta a ser
+   * igual ao servidor (gravou, ou ela desfez), a cópia é deitada fora: uma rede
+   * de segurança que sobrevive ao perigo passa a ser um aviso falso da próxima
+   * vez que se abre o pedido.
+   */
+  useEffect(() => {
+    const q = selected;
+    if (!q) return;
+    if (oQueMudou(camposNoEcra, camposDoPedido(q)).length === 0) {
+      esquecerRascunho(q.id);
+      return;
+    }
+    const t = setTimeout(() => guardarRascunho(q.id, camposNoEcra, new Date().toISOString()), 800);
+    return () => clearTimeout(t);
+  }, [selected, camposNoEcra, camposDoPedido]);
+
+  /**
+   * Repõe o que ficou por gravar — nos campos, e NÃO no servidor.
+   *
+   * A distinção é o ponto todo: repor escreve no ecrã e deixa-o por gravar, com
+   * o botão «Guardar» a acender como acenderia se ela tivesse escrito aquilo
+   * agora. Gravar por ela seria decidir por ela, e o rascunho pode ter dias.
+   */
+  function reporRascunho() {
+    const r = rascunhoPorRepor;
+    if (!r) return;
+    setEditPrice(r.campos.preco);
+    setEditNotes(r.campos.notas);
+    // O estado é o único campo que não é texto livre. Um valor que já não
+    // existe (um separador removido entretanto) fica de fora em silêncio, em
+    // vez de pôr o pedido num estado que a aplicação não sabe desenhar.
+    if (STATUS_OPTIONS.some((o) => o.id === r.campos.estado)) {
+      setEditStatus(r.campos.estado as QuoteStatus);
+    }
+    setEditAssigned(r.campos.responsavel);
+    setEditLostReason(r.campos.motivoDePerda);
+    setEditDate(r.campos.data);
+    setEditGuests(r.campos.convidados);
+    setEditLocation(r.campos.local);
+    setEditNome(r.campos.nome);
+    setEditEmail(r.campos.email);
+    setEditTelefone(r.campos.telefone);
+    setRascunhoPorRepor(null);
+    toast("Reposto no ecrã. Ainda não está guardado — confirma e carrega em Guardar.", "success");
+  }
+
+  function descartarRascunho() {
+    if (selected) esquecerRascunho(selected.id);
+    setRascunhoPorRepor(null);
+  }
+
   const escritoNoEcra = useMemo<NotasAutomaticas>(
     () => ({
       id: selected?.id ?? "",
@@ -1902,6 +2037,26 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     setEditNome(q.name ?? "");
     setEditEmail(q.email ?? "");
     setEditTelefone(q.phone ?? "");
+
+    /**
+     * O que ficou por gravar da última vez que este pedido esteve aberto.
+     *
+     * Só se oferece quando é MESMO diferente do que o servidor tem agora: se
+     * ela gravou entretanto noutro sítio, ou se os valores calharam iguais,
+     * uma barra a perguntar seria ruído — e ruído numa barra destas ensina a
+     * carregar em «Descartar» sem ler.
+     */
+    const ficou = lerRascunho(q.id);
+    const diferencas = ficou ? oQueMudou(ficou.campos, camposDoPedido(q)) : [];
+    setRascunhoPorRepor(
+      ficou && diferencas.length > 0
+        ? {
+            campos: ficou.campos,
+            quando: haQuantoTempo(ficou.em, new Date()),
+            mudou: diferencas,
+          }
+        : null,
+    );
     // Open on the tools tab that matches where this pedido is in its lifecycle.
     // Pedido NOVO: os separadores visitados do anterior não valem para este.
     const target = detailNextAction(q).tab;
@@ -2273,27 +2428,74 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
         return { ok: true };
       }
 
-      const res = await fetch(`/api/orcamento/${selected.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      /**
+       * ── O MESMO CUIDADO QUE A GRAVAÇÃO AUTOMÁTICA AO LADO ────────────────
+       *
+       * Este era o caminho MENOS resistente dos dois que vivem neste ficheiro.
+       * A gravação automática das notas já usava `fetchComTecto` (tecto de
+       * tempo) e `enviarComRepeticao` (três tentativas); o botão «Guardar» —
+       * por onde sai o preço, a data, os convidados e os contactos — fazia um
+       * `fetch` cru, sem `signal`, sem tecto e sem repetição.
+       *
+       * Numa quinta com 4G fraco isso não é um pormenor: uma rede que aceita a
+       * ligação e nunca responde deixa esse `fetch` pendurado até o Safari
+       * desistir sozinho, com o botão eternamente em «a guardar…», e uma única
+       * falha de rede devolvia «não foi possível» sem sequer tentar outra vez.
+       *
+       * A resposta do servidor tem de sair daqui de dentro: o
+       * `enviarComRepeticao` devolve se ficou guardado, não o corpo. Daí a
+       * variável apanhada no fecho.
+       */
+      let guardado: Quote | null = null;
+      const resultado = await enviarComRepeticao(async () => {
+        const res = await fetchComTecto(`/api/orcamento/${selected.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          /**
+           * O servidor já diz o que está mal — e era essa a frase que se
+           * deitava fora, para pôr no lugar «Não foi possível guardar as
+           * alterações», que não nomeia o campo nem diz o que fazer. Passa a
+           * ser a dele, em português (ver `erro-do-servidor`). Sem corpo
+           * aproveitável fica a frase genérica, que pelo menos não inventa uma
+           * razão.
+           *
+           * O `respostaDeHttp` decide também se vale a pena repetir: um 4xx é
+           * o pedido que está errado e repeti-lo dá exactamente o mesmo.
+           */
+          return respostaDeHttp(res.status, {
+            porque: (await porqueRecusou(res)) ?? undefined,
+          });
+        }
+        guardado = (await res.json()) as Quote;
+        return { estado: "guardado" } satisfies RespostaDoEnvio;
       });
-      if (!res.ok) {
-        /**
-         * O servidor já diz o que está mal — e era essa a frase que se deitava
-         * fora, para pôr no lugar «Não foi possível guardar as alterações»,
-         * que não nomeia o campo nem diz o que fazer. Passa a ser a dele, em
-         * português (ver `erro-do-servidor`). Sem corpo aproveitável fica a
-         * frase genérica, que pelo menos não inventa uma razão.
-         */
-        const doServidor = await porqueRecusou(res);
-        const porque = doServidor
-          ? `Não foi guardado. ${doServidor}`
-          : "Não foi possível guardar as alterações";
+      if (resultado.estado !== "guardado") {
+        const porque = resultado.porque
+          ? `Não foi guardado. ${resultado.porque}`
+          : "Não foi possível guardar. Fica no telemóvel — volta a tentar quando houver rede.";
         dizer(porque, "error");
         return { ok: false, porque };
       }
-      const updated = await res.json();
+      // O TypeScript não vê a atribuição que acontece dentro do fecho acima, e
+      // por isso continua a achar que isto é `null`. A leitura tem de ser
+      // explícita — e a verificação que se segue não é cerimónia: se o servidor
+      // respondesse 200 com um corpo ilegível, seguir em frente escrevia
+      // `undefined` por cima do pedido que está no ecrã.
+      // Chegou ao servidor: a cópia local deixa de ter razão de existir. O
+      // efeito acima também a apagaria assim que os campos re-sincronizassem,
+      // mas entre uma coisa e outra há uma janela — e uma rede de segurança que
+      // sobra é um aviso falso na abertura seguinte.
+      esquecerRascunho(selected.id);
+      setRascunhoPorRepor(null);
+      const updated = guardado as Quote | null;
+      if (updated === null) {
+        const porque = "Não foi guardado: o servidor respondeu sem o pedido.";
+        dizer(porque, "error");
+        return { ok: false, porque };
+      }
       setQuotes((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
       setSelected(updated);
       // Re-sync EVERY edit field to what the server persisted, so the form can
@@ -4467,6 +4669,43 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                         </div>
                       </div>
 
+                      {/* ── O QUE FICOU POR GRAVAR ─────────────────────────────
+                          Primeira coisa do conteúdo, e não presa ao cabeçalho:
+                          aparece exactamente onde o olho já está ao abrir o
+                          pedido, e rolar para lá dela é uma forma legítima de a
+                          ignorar. Presa, roubava altura a um cabeçalho que a
+                          390 px já está apertado — e a decisão não é urgente,
+                          é só importante.
+
+                          Diz o QUE está diferente, por nome, e há quanto tempo.
+                          Sem isso, «há alterações por gravar» obriga a aceitar
+                          às cegas — e uma barra que se aceita às cegas mais vale
+                          não existir. */}
+                      {rascunhoPorRepor && (
+                        <div
+                          role="status"
+                          className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#8a6420]/25 bg-[#8a6420]/[0.07] px-3.5 py-2.5"
+                        >
+                          <p className="min-w-0 flex-1 text-xs leading-snug text-foreground/75">
+                            Ficou por gravar {fraseDoQueMudou(rascunhoPorRepor.mudou)} deste pedido
+                            {rascunhoPorRepor.quando ? `, ${rascunhoPorRepor.quando}` : ""}.
+                          </p>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {/* «Recuperar» e não «Repor»: o produto já tem um
+                                «Repor», que repõe uma CÓPIA DE SEGURANÇA e
+                                apaga o que está lá. Duas palavras iguais para
+                                duas coisas diferentes — uma delas destrutiva —
+                                é como se carrega na errada. */}
+                            <Button size="sm" variant="secondary" onClick={reporRascunho}>
+                              Recuperar
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={descartarRascunho}>
+                              Descartar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Tudo à vista: ciclo de vida, próxima ação, o formulário de
                         gestão sempre presente e as ferramentas em separadores logo
                         abaixo — nada fica escondido atrás de revelações. */}
@@ -4672,15 +4911,40 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   ))}
                               </div>
 
-                              {/* Campos editáveis — tudo em grelha, à mão. */}
+                              {/* ── CAMPOS EDITÁVEIS ────────────────────────────
+                                  Tudo em grelha, à mão — e cada rótulo LIGADO ao
+                                  seu campo (`htmlFor` ↔ `id`). Eram dez rótulos
+                                  soltos: por cima de um campo, a dizer o que ele
+                                  é, e sem nada que o dissesse ao browser.
+
+                                  Duas consequências, e a segunda é a que se nota
+                                  todos os dias. Quem usa leitor de ecrã ouvia
+                                  «edit text» sem saber de quê. E tocar no rótulo
+                                  não fazia nada — quando um rótulo ligado põe o
+                                  cursor no campo, o que num telemóvel duplica o
+                                  alvo de cada um destes onze campos sem mexer no
+                                  desenho.
+
+                                  Havia dois remendos com `aria-label`, e saíram:
+                                  um `aria-label` SUBSTITUI o rótulo visível, o
+                                  que deixa os dois livres para dizerem coisas
+                                  diferentes sem ninguém dar por isso — era o
+                                  caso, «Estado» no ecrã e «Estado do pedido» no
+                                  leitor.
+
+                                  O campo dos convidados já estava certo, e é o
+                                  modelo: é o único que também liga o erro ao
+                                  campo (`aria-invalid` + `aria-describedby`). */}
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Estado</label>
+                                  <label
+                                    htmlFor="pedido-estado"
+                                    className="bo-eyebrow block mb-1.5"
+                                  >
+                                    Estado
+                                  </label>
                                   <select
-                                    // O rótulo ao lado não está ligado ao campo
-                                    // (é um `label` sem `for`), e sem isto quem
-                                    // usa leitor de ecrã ouve só «combobox».
-                                    aria-label="Estado do pedido"
+                                    id="pedido-estado"
                                     value={editStatus}
                                     onChange={(e) => setEditStatus(e.target.value as QuoteStatus)}
                                     className="bo-input px-3 py-2 text-sm text-foreground/80 w-full"
@@ -4693,10 +4957,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">
+                                  <label htmlFor="pedido-preco" className="bo-eyebrow block mb-1.5">
                                     Preço final (sem IVA) €
                                   </label>
                                   <input
+                                    id="pedido-preco"
                                     type="text"
                                     inputMode="decimal"
                                     value={editPrice}
@@ -4747,8 +5012,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   })()}
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Data do evento</label>
+                                  <label htmlFor="pedido-data" className="bo-eyebrow block mb-1.5">
+                                    Data do evento
+                                  </label>
                                   <input
+                                    id="pedido-data"
                                     type="date"
                                     value={editDate}
                                     onChange={(e) => setEditDate(e.target.value)}
@@ -4801,8 +5069,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   )}
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Responsável</label>
+                                  <label
+                                    htmlFor="pedido-responsavel"
+                                    className="bo-eyebrow block mb-1.5"
+                                  >
+                                    Responsável
+                                  </label>
                                   <input
+                                    id="pedido-responsavel"
                                     type="text"
                                     value={editAssigned}
                                     onChange={(e) => setEditAssigned(e.target.value)}
@@ -4811,8 +5085,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   />
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Local</label>
+                                  <label htmlFor="pedido-local" className="bo-eyebrow block mb-1.5">
+                                    Local
+                                  </label>
                                   <input
+                                    id="pedido-local"
                                     value={editLocation}
                                     onChange={(e) => setEditLocation(e.target.value)}
                                     placeholder="Local do evento…"
@@ -4839,8 +5116,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 dados de QUEM, e o que está em cima é o QUÊ. */}
                               <div className="grid grid-cols-1 gap-4 border-t border-foreground/[0.06] pt-4 sm:grid-cols-3">
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Nome do cliente</label>
+                                  <label htmlFor="pedido-nome" className="bo-eyebrow block mb-1.5">
+                                    Nome do cliente
+                                  </label>
                                   <input
+                                    id="pedido-nome"
                                     value={editNome}
                                     onChange={(e) => setEditNome(e.target.value)}
                                     placeholder="Quem pediu…"
@@ -4848,8 +5128,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   />
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Email</label>
+                                  <label htmlFor="pedido-email" className="bo-eyebrow block mb-1.5">
+                                    Email
+                                  </label>
                                   <input
+                                    id="pedido-email"
                                     type="email"
                                     inputMode="email"
                                     autoComplete="off"
@@ -4870,8 +5153,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                   )}
                                 </div>
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Telefone</label>
+                                  <label
+                                    htmlFor="pedido-telefone"
+                                    className="bo-eyebrow block mb-1.5"
+                                  >
+                                    Telefone
+                                  </label>
                                   <input
+                                    id="pedido-telefone"
                                     type="tel"
                                     inputMode="tel"
                                     autoComplete="off"
@@ -4912,8 +5201,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
 
                               {editStatus === "rejeitado" && (
                                 <div>
-                                  <label className="bo-eyebrow block mb-1.5">Motivo de perda</label>
+                                  <label
+                                    htmlFor="pedido-motivo"
+                                    className="bo-eyebrow block mb-1.5"
+                                  >
+                                    Motivo de perda
+                                  </label>
                                   <textarea
+                                    id="pedido-motivo"
                                     rows={2}
                                     value={editLostReason}
                                     onChange={(e) => setEditLostReason(e.target.value)}
@@ -4936,10 +5231,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 )}
 
                               <div>
-                                <label className="bo-eyebrow block mb-1.5">Notas internas</label>
+                                <label htmlFor="pedido-notas" className="bo-eyebrow block mb-1.5">
+                                  Notas internas
+                                </label>
                                 <textarea
+                                  id="pedido-notas"
                                   rows={3}
-                                  aria-label="Notas internas"
                                   // O que se escreve aqui grava-se sozinho — ver a
                                   // gravação automática lá em cima. A barra de
                                   // baixo diz em que pé está.
