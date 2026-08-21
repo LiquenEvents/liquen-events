@@ -35,7 +35,7 @@ px, e não 390**.
 
 Duas notas de honestidade. Não tenho browser nem servidor: tudo isto é lido em código, e o
 que precisa de olho está marcado `[por confirmar no ecrã]`. E há uma rede que muda o sintoma
-de tudo o que passa da margem — `body { overflow-x: clip }` em `src/app/globals.css:747` —
+de tudo o que passa da margem — `body { overflow-x: clip }` em `src/app/globals.css:750` —
 por isso um transbordo horizontal aqui **não** se lê como uma barra de scroll: lê-se como
 conteúdo cortado e desaparecido, que é bastante pior de diagnosticar em cima de uma quinta.
 
@@ -160,7 +160,7 @@ conteúdo cortado e desaparecido, que é bastante pior de diagnosticar em cima d
      Largura onde falha: 390 / 430 / 768 — em toda a largura onde a gaveta é sobreposição
      Onde:
        src/app/[lang]/(site)/orcamento/admin/AdminClient.tsx:5571 (o pé: `shrink-0 border-t … bg-white`)
-       src/app/[lang]/(site)/orcamento/admin/AdminClient.tsx:5574 (`px-5 py-3 sm:px-7` — e nada mais)
+       src/app/[lang]/(site)/orcamento/admin/AdminClient.tsx:5575 (`px-5 py-3 sm:px-7` — e nada mais)
        src/app/[lang]/(site)/orcamento/admin/AdminClient.tsx:4165 (a gaveta: `fixed inset-y-0 right-0 … max-h-[100dvh]`)
      Observado:
        A gaveta é `inset-y-0` com `max-h-[100dvh]`: a aresta de baixo do pé é a aresta de
@@ -175,7 +175,7 @@ conteúdo cortado e desaparecido, que é bastante pior de diagnosticar em cima d
        (`ui/FolhaOuDialogo.tsx:180`).
      Proposta:
        No pé, `pb-[max(0.75rem,env(safe-area-inset-bottom))]`, copiado do `FolhaOuDialogo`.
-       De caminho, dar `min-w-0` ao `<p>` do estado da gravação (`AdminClient.tsx:5575`): a
+       De caminho, dar `min-w-0` ao `<p>` do estado da gravação (`AdminClient.tsx:5576`): a
        fila é `justify-between` sem quebra, e uma mensagem longa de falha empurra a linha
        para quatro filas em vez de partir onde deve.
      Equivalente em desktop: existe (a partir de `xl` a gaveta é um painel na grelha, sem
@@ -199,7 +199,8 @@ conteúdo cortado e desaparecido, que é bastante pior de diagnosticar em cima d
        tapados exactamente no momento em que ela está a verificar o que falta.
        É a mesma armadilha que o estúdio já tinha e resolveu medindo a barra com um
        `ResizeObserver` («um número que se mede não pode ficar desactualizado por alguém
-       acrescentar um botão» — `ProposalStudio.tsx:5535`).
+       acrescentar um botão» — `ProposalStudio.tsx:5546`, com o `ResizeObserver` em
+       `:3163-3172` e a folga aplicada em `:5553`).
        O cabeçalho `sticky top-0` sem `pt-safe` só se nota fora do Safari com barras à vista
        (ecrã cheio, ou instalado no ecrã principal) — `[por confirmar no ecrã]`.
      Proposta:
@@ -415,7 +416,7 @@ tem as duas curas escritas** e usa-as em oito sítios: o tecto com scroll
 (`Reminders.tsx:241` → `max-h-[340px] overflow-y-auto`, `CommandPalette.tsx:226`,
 `Agenda.tsx:179`, `ClientMessenger.tsx:134`, `Contratos.tsx:552`, `BibliotecaServicos.tsx:126`,
 `ModelosParciais.tsx:219`, `Kanban.tsx:483`) e a paginação com «Mostrar mais»
-(`AdminClient.tsx:4125` com `LIST_PAGE_SIZE`, `Temas.tsx:3428`). O que falta é aplicá-las às
+(`AdminClient.tsx:4125` com `LIST_PAGE_SIZE`, `Temas.tsx:3437`). O que falta é aplicá-las às
 outras.
 
 A conta é sempre a mesma: **~595 px de trabalho a 390×844**, e a altura de cada linha já com
@@ -475,7 +476,7 @@ A2-001; `EmailTemplates` depois, que é uma linha de CSS; e o resto por tecto si
 7. Larguras: nada transborda para o lado de forma visível, mas isso é a rede
    `body { overflow-x: clip }` a fazer o seu trabalho — o preço é que o transbordo aparece
    como conteúdo cortado em vez de scroll, e num iPhone anterior ao iOS 16 nem essa rede
-   existe (a nota está em `globals.css:750`).
+   existe (a nota está em `globals.css:753`).
 8. As tabelas estão todas resolvidas (`TabelaOuCartoes`, `hidden md:block` + cartões) e o
    calendário troca as etiquetas por pontos abaixo de `sm`. Não há nada a dizer aí.
 9. O que **não** consegui verificar sem ecrã está marcado `[por confirmar no ecrã]`: o
