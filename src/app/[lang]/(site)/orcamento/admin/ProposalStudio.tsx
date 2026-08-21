@@ -63,6 +63,8 @@ import MoodBoardIndice from "./MoodBoardIndice";
 import PreviaDaPagina from "./PreviaDaPagina";
 import PainelDoEstudio from "./PainelDoEstudio";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
+import AEnviarAProposta from "./AEnviarAProposta";
+import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
 import VistaDeConjunto from "./VistaDeConjunto";
 import LupaDeFotos from "./LupaDeFotos";
 import {
@@ -8762,16 +8764,37 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
         {step === "enviar" && !sent && (
           <>
-            <Button variant="ghost" onClick={() => setStep("prever")}>
+            <Button
+              variant="ghost"
+              onClick={() => setStep("prever")}
+              // A meio de um envio, voltar atrás não cancela nada — o pedido já
+              // está a correr no servidor — e só serve para ela deixar de ver o
+              // que está a acontecer.
+              disabled={busy === "send"}
+            >
               ← Pré-visualizar
             </Button>
-            {/* ── O QUE FICA DE FORA, PERGUNTADO ANTES DE SEGUIR ──────────
-                O servidor desenhou o documento, viu o que a composição cortou
-                e parou. O email ainda não saiu e a proposta ainda não foi
-                gravada — é o último instante em que voltar atrás não custa
-                nada. A frase de cada corte é a mesma que o aviso da
-                pré-visualização usa; o que muda é a altura em que aparece. */}
-            {cortesPorConfirmar ? (
+            {/* ── ENQUANTO ESTÁ A IR ──────────────────────────────────────
+                «Ao enviar a proposta quero que haja uma animação que eu perceba
+                que está a ser enviado.» Não havia nenhuma: o `send()` fechava a
+                confirmação e o ecrã voltava ao botão apagado, durante os
+                dezenas de segundos que o desenho do PDF e o email demoram numa
+                quinta com 4G fraco. */}
+            {busy === "send" ? (
+              <div className="ml-auto flex justify-end">
+                <AEnviarAProposta
+                  fotos={totalDeFotos}
+                  amostras={amostras}
+                  para={quote.email || undefined}
+                />
+              </div>
+            ) : /* ── O QUE FICA DE FORA, PERGUNTADO ANTES DE SEGUIR ────────
+                O servidor desenhou o documento, viu o que a composição cortou e
+                parou. O email ainda não saiu e a proposta ainda não foi gravada
+                — é o último instante em que voltar atrás não custa nada. A
+                frase de cada corte é a mesma que o aviso da pré-visualização
+                usa; o que muda é a altura em que aparece. */
+            cortesPorConfirmar ? (
               <div className="ml-auto flex flex-col items-end gap-2">
                 <div className="max-w-lg rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/75">
                   <p className="font-medium">O documento sai com conteúdo cortado:</p>
@@ -8790,9 +8813,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     variant="primary"
                     onClick={() => void send(true)}
                     disabled={busy !== null}
-                    loading={busy === "send"}
                   >
-                    {busy === "send" ? "A enviar…" : "Enviar assim mesmo"}
+                    Enviar assim mesmo
                   </Button>
                   <Button
                     variant="ghost"
@@ -8810,49 +8832,56 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <span className="text-sm text-foreground/60">
                   Enviar para {quote.email || "o cliente"}?
                 </span>
-                <Button
-                  variant="primary"
-                  onClick={() => void send()}
-                  disabled={busy !== null}
-                  loading={busy === "send"}
-                >
-                  {busy === "send" ? "A enviar…" : "Confirmar"}
+                <Button variant="primary" onClick={() => void send()} disabled={busy !== null}>
+                  Confirmar
                 </Button>
                 <Button variant="ghost" onClick={() => setConfirmSend(false)}>
                   Cancelar
                 </Button>
               </div>
             ) : (
-              <Button
-                variant="primary"
-                onClick={() => setConfirmSend(true)}
-                disabled={busy !== null || !canSend}
-                /**
-                 * ── O BOTÃO DIZ O QUE FALTA, E NÃO UMA LISTA DECORADA ──────
-                 *
-                 * Isto dizia «Preenche clientes, referência e um total maior
-                 * que 0» — os três bloqueios que existiam quando foi escrito.
-                 * Passaram a ser oito, e uma frase fixa que nomeia três deles
-                 * é pior do que uma genérica: manda procurar no sítio errado.
-                 *
-                 * Agora sai do MESMO sítio que trava o botão, portanto não
-                 * pode discordar dele.
-                 */
-                title={
-                  canSend
-                    ? undefined
-                    : fotosPorConfirmar > 0
-                      ? "Há fotos ainda a entrar na proposta. Falta pouco."
-                      : faltas
-                          .filter((f) => f.trava)
-                          .map((f) => f.texto)
-                          .join(" · ") || "Falta preencher a proposta antes de enviar."
-                }
-                iconRight={<span aria-hidden="true">→</span>}
-                className="ml-auto"
-              >
-                Gerar e enviar ao cliente
-              </Button>
+              /* ── O BOTÃO, E POR CIMA DELE A RAZÃO ────────────────────────
+                 «Quando falta alguma coisa na proposta, quero que apareça um
+                 aviso a dizer que não dá para enviar porque não preenchi tal
+                 coisa.» A razão já existia — vivia no `title`, que num iPhone
+                 não aparece. Passa a estar escrita ao lado do botão, com cada
+                 falta a saltar para onde se resolve. */
+              <div className="ml-auto flex flex-col items-end gap-2">
+                <PorqueNaoDaParaEnviar
+                  faltas={faltas}
+                  fotosPorConfirmar={fotosPorConfirmar}
+                  onIr={(f) => irParaAFalta(f.seccao, f.campo)}
+                />
+                <Button
+                  variant="primary"
+                  onClick={() => setConfirmSend(true)}
+                  disabled={busy !== null || !canSend}
+                  /**
+                   * ── O BOTÃO DIZ O QUE FALTA, E NÃO UMA LISTA DECORADA ──────
+                   *
+                   * Isto dizia «Preenche clientes, referência e um total maior
+                   * que 0» — os três bloqueios que existiam quando foi escrito.
+                   * Passaram a ser oito, e uma frase fixa que nomeia três deles
+                   * é pior do que uma genérica: manda procurar no sítio errado.
+                   *
+                   * Agora sai do MESMO sítio que trava o botão, portanto não
+                   * pode discordar dele.
+                   */
+                  title={
+                    canSend
+                      ? undefined
+                      : fotosPorConfirmar > 0
+                        ? "Há fotos ainda a entrar na proposta. Falta pouco."
+                        : faltas
+                            .filter((f) => f.trava)
+                            .map((f) => f.texto)
+                            .join(" · ") || "Falta preencher a proposta antes de enviar."
+                  }
+                  iconRight={<span aria-hidden="true">→</span>}
+                >
+                  Gerar e enviar ao cliente
+                </Button>
+              </div>
             )}
           </>
         )}
