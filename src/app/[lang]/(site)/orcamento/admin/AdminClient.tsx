@@ -2866,64 +2866,99 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             As duas condições são precisas: a partir de `lg` a barra é uma
             coluna sempre visível, e marcá-la inerte ali desligava a navegação
             no portátil. */}
-        <aside
-          inert={navEhGaveta && !navOpen}
-          className={`fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-xl lg:shadow-none motion-safe:transition-transform duration-300 ${
-            navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-          }`}
-        >
-          {/* Mobile close */}
-          <button
-            className="lg:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
-            onClick={() => setNavOpen(false)}
-            aria-label="Fechar menu"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
-            </svg>
-          </button>
+        {/* ── O INVÓLUCRO QUE IMPEDE A PÁGINA DE SE ARRASTAR PARA O LADO ─────
+            ESTE É O DEFEITO QUE ELA VIU DUAS VEZES, e que nunca se reproduziu
+            aqui. Medido no ecrã dela: a página desliza 261 px para a direita e
+            do outro lado fica uma folha branca. A gaveta fechada tem 256 px.
 
-          {/* Marca — o logótipo sozinho, em maior. A legenda "Back Office" saiu:
+            A gaveta é `position: fixed` e, fechada, vive em `x = -256`. Duas
+            consequências que se juntam:
+
+            · A rede de segurança do `globals.css` (`body { overflow-x: clip }`)
+              NÃO a alcança. Um elemento `fixed` tem como bloco contentor o
+              viewport, e nenhum antepassado o corta — a não ser que esse
+              antepassado seja ele próprio o bloco contentor dos fixos, o que
+              só acontece com `transform`, `filter` ou `contain`. O `clip` do
+              `body` corta tudo menos exactamente isto.
+
+            · O Safari do iPhone conta os elementos `fixed` para a área que se
+              pode arrastar. O Chromium não — e é por isso que aqui a página
+              mede 390 px em 390 px de ecrã, com zero elementos a passar a
+              margem direita, e no telemóvel dela se arrasta 256.
+
+            O invólucro resolve as duas de uma vez: `translateZ(0)` faz dele o
+            bloco contentor da gaveta, e aí o `overflow-hidden` já a corta. Fica
+            do tamanho exacto do ecrã, portanto não transborda nada.
+
+            `lg:contents` desmonta-o a partir dos 1024 px: sem caixa não há
+            transform, não há corte, e a gaveta volta a ser a coluna `sticky` em
+            fluxo que era. `pointer-events-none` no invólucro (e `auto` na
+            gaveta) porque ele cobre o ecrã todo e não pode comer os toques da
+            página por baixo.
+
+            Porque não `hidden` quando fechada, que era mais simples: matava as
+            duas animações — a gaveta passava a aparecer e desaparecer de um
+            fotograma para o outro. Isto corrige o arrasto e não mexe no que
+            já estava bem. */}
+        <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden [transform:translateZ(0)] lg:contents">
+          <aside
+            inert={navEhGaveta && !navOpen}
+            className={`pointer-events-auto fixed lg:sticky top-0 z-40 h-screen w-64 shrink-0 bg-[var(--bo-surface-sunken)] flex flex-col border-r border-[var(--bo-hairline)] shadow-xl lg:shadow-none motion-safe:transition-transform duration-300 ${
+              navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+            }`}
+          >
+            {/* Mobile close */}
+            <button
+              className="lg:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-[var(--bo-text-faint)] hover:text-[var(--bo-text)] rounded-lg hover:bg-[var(--bo-surface-hover)] transition-colors"
+              onClick={() => setNavOpen(false)}
+              aria-label="Fechar menu"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            {/* Marca — o logótipo sozinho, em maior. A legenda "Back Office" saiu:
               quem está aqui dentro já sabe onde está, e o rótulo só roubava
               espaço ao único elemento que identifica a casa. O nome continua a
               ser anunciado por leitores de ecrã através do `alt` da imagem. */}
-          <div className="w-full px-3 pt-5 pb-6 flex justify-center">
-            <Image
-              src="/logo-liquen.png"
-              alt="Líquen Events"
-              width={300}
-              height={179}
-              priority
-              /* Centrado e a ocupar a largura toda da barra.
-               *
-               * Antes limitava-se a altura (`h-28`), e com isso o logótipo
-               * parava nos ~188 px de largura numa barra de 256: sobrava
-               * margem dos dois lados e ele ficava pequeno no meio do vazio.
-               * Amarrando à LARGURA (`w-full`) e deixando a altura seguir o
-               * rácio, passa a encher a barra de margem a margem — é a marca
-               * que abre o dia de trabalho, não um ícone. */
-              className="w-full h-auto object-contain"
-            />
-          </div>
+            <div className="w-full px-3 pt-5 pb-6 flex justify-center">
+              <Image
+                src="/logo-liquen.png"
+                alt="Líquen Events"
+                width={300}
+                height={179}
+                priority
+                /* Centrado e a ocupar a largura toda da barra.
+                 *
+                 * Antes limitava-se a altura (`h-28`), e com isso o logótipo
+                 * parava nos ~188 px de largura numa barra de 256: sobrava
+                 * margem dos dois lados e ele ficava pequeno no meio do vazio.
+                 * Amarrando à LARGURA (`w-full`) e deixando a altura seguir o
+                 * rácio, passa a encher a barra de margem a margem — é a marca
+                 * que abre o dia de trabalho, não um ícone. */
+                className="w-full h-auto object-contain"
+              />
+            </div>
 
-          {/* Nav — quiet, ChatGPT-like rail: a short core list always visible,
+            {/* Nav — quiet, ChatGPT-like rail: a short core list always visible,
               everything else tucked into a collapsed "Mais" group so a newcomer
               sees few things at once. The group auto-opens when a "Mais" view is
               active, so the current item (and its aria-current) is never hidden. */}
-          <nav
-            aria-label="Navegação do back office"
-            className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
-          >
-            {CORE_NAV.map((id) => renderNavItem(id))}
+            <nav
+              aria-label="Navegação do back office"
+              className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto"
+            >
+              {CORE_NAV.map((id) => renderNavItem(id))}
 
-            {/* "Mais" — secondary destinations, collapsed by default.
+              {/* "Mais" — secondary destinations, collapsed by default.
                 NO TELEMÓVEL NÃO SE DOBRA. Ali esta gaveta já É "o resto" (os
                 quatro do dia estão na barra de baixo), portanto uma dobra
                 chamada "Mais" dentro de um menu que se abriu para ver mais era
@@ -2931,212 +2966,216 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 gaveta com dois destinos à vista num ecrã inteiro.
                 Na coluna do computador a lista está completa e a dobra continua
                 a fazer o seu trabalho: manter a vista curta. */}
-            {(() => {
-              const activeInMore = MORE_NAV.includes(view);
-              const expanded = moreNavOpen || activeInMore;
-              return (
-                <div className="mt-3 pt-3 border-t border-[var(--bo-hairline)] flex flex-col gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setMoreNavOpen((o) => !o)}
-                    aria-expanded={expanded}
-                    className="alvo-toque !justify-start group hidden lg:flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
-                  >
-                    <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
+              {(() => {
+                const activeInMore = MORE_NAV.includes(view);
+                const expanded = moreNavOpen || activeInMore;
+                return (
+                  <div className="mt-3 pt-3 border-t border-[var(--bo-hairline)] flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setMoreNavOpen((o) => !o)}
+                      aria-expanded={expanded}
+                      className="alvo-toque !justify-start group hidden lg:flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-normal text-[var(--bo-text-muted)] hover:bg-[var(--bo-surface-hover)] hover:text-[var(--bo-text)] motion-safe:transition-colors duration-150"
+                    >
+                      <span className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]">
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                        >
+                          <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                          <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                          <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                        </svg>
+                      </span>
+                      <span className="truncate">Mais</span>
                       <svg
-                        width="16"
-                        height="16"
+                        className={`ml-auto shrink-0 text-[var(--bo-text-faint)] motion-safe:transition-transform duration-200 ${
+                          expanded ? "rotate-180" : ""
+                        }`}
+                        width="14"
+                        height="14"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="1.6"
+                        strokeWidth="1.8"
                       >
-                        <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                        <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-                        <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                        <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
-                    </span>
-                    <span className="truncate">Mais</span>
-                    <svg
-                      className={`ml-auto shrink-0 text-[var(--bo-text-faint)] motion-safe:transition-transform duration-200 ${
-                        expanded ? "rotate-180" : ""
-                      }`}
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                    >
-                      <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                  {/* Sempre no DOM, e sempre visível no telemóvel; no
+                    </button>
+                    {/* Sempre no DOM, e sempre visível no telemóvel; no
                       computador é a dobra que decide. */}
-                  <div className={`flex flex-col gap-1 ${expanded ? "" : "lg:hidden"}`}>
-                    {MORE_NAV.map(renderNavItem)}
+                    <div className={`flex flex-col gap-1 ${expanded ? "" : "lg:hidden"}`}>
+                      {MORE_NAV.map(renderNavItem)}
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
-          </nav>
+                );
+              })()}
+            </nav>
 
-          {/* User */}
-          <div className="px-2.5 pb-5 pt-3 border-t border-[var(--bo-hairline)]">
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bo-surface-hover)] mb-2">
-              <div className="w-8 h-8 rounded-full bg-[var(--bo-accent)] flex items-center justify-center text-white text-xs font-bold shrink-0">
-                {userName.slice(0, 1).toUpperCase()}
+            {/* User */}
+            <div className="px-2.5 pb-5 pt-3 border-t border-[var(--bo-hairline)]">
+              <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bo-surface-hover)] mb-2">
+                <div className="w-8 h-8 rounded-full bg-[var(--bo-accent)] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  {userName.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[var(--bo-text)] text-xs font-medium truncate">{userName}</p>
+                  <p className="text-[var(--bo-text-faint)] text-[10px] truncate">Administração</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[var(--bo-text)] text-xs font-medium truncate">{userName}</p>
-                <p className="text-[var(--bo-text-faint)] text-[10px] truncate">Administração</p>
-              </div>
-            </div>
-            {/* Linha própria, e não um quinto botão na fila de baixo: com cinco
+              {/* Linha própria, e não um quinto botão na fila de baixo: com cinco
                 não cabia o rótulo de nenhum. É também o sítio onde se procura —
                 logo debaixo de quem está com a sessão aberta. */}
-            <button
-              onClick={() => setPasskeysOpen(true)}
-              className="alvo-toque w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
-              title="Entrar sem palavra-passe neste aparelho"
-            >
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
+              <button
+                onClick={() => setPasskeysOpen(true)}
+                className="alvo-toque w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                title="Entrar sem palavra-passe neste aparelho"
               >
-                <rect x="5" y="11" width="14" height="10" rx="2" />
-                <path d="M8 11V7a4 4 0 0 1 8 0v4" strokeLinecap="round" />
-              </svg>
-              Os meus dispositivos
-            </button>
-            {/* A AJUDA MUDA-SE PARA AQUI NO TELEMÓVEL.
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4" strokeLinecap="round" />
+                </svg>
+                Os meus dispositivos
+              </button>
+              {/* A AJUDA MUDA-SE PARA AQUI NO TELEMÓVEL.
                 Estava na barra de topo, e um botão de 40 px mais o seu espaço
                 custavam 50 dos ~110 px que sobravam para o título — que por
                 isso saía "Visão…". Aqui é o sítio dela: é uma coisa que se lê
                 uma vez, ao lado do backup e da sessão, e não uma acção da
                 vista. No computador continua no topo, onde há espaço. */}
-            <button
-              onClick={() => setAjudaOpen(true)}
-              className="alvo-toque lg:hidden w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
-            >
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
+              <button
+                onClick={() => setAjudaOpen(true)}
+                className="alvo-toque lg:hidden w-full flex items-center justify-center gap-1.5 py-2 mb-1 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
               >
-                <circle cx="12" cy="12" r="9" />
-                <path
-                  d="M9.4 9a2.6 2.6 0 1 1 3.4 2.5c-.7.3-1.3.9-1.3 1.7v.3"
-                  strokeLinecap="round"
-                />
-                <path d="M12 17h.01" strokeLinecap="round" />
-              </svg>
-              Ajuda e glossário
-            </button>
-            <div className="flex gap-1 pointer-coarse:gap-2">
-              {/* A LISTA DE ATALHOS DE TECLADO NÃO APARECE NUM ECRÃ DE TOQUE.
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path
+                    d="M9.4 9a2.6 2.6 0 1 1 3.4 2.5c-.7.3-1.3.9-1.3 1.7v.3"
+                    strokeLinecap="round"
+                  />
+                  <path d="M12 17h.01" strokeLinecap="round" />
+                </svg>
+                Ajuda e glossário
+              </button>
+              <div className="flex gap-1 pointer-coarse:gap-2">
+                {/* A LISTA DE ATALHOS DE TECLADO NÃO APARECE NUM ECRÃ DE TOQUE.
                   É uma folha inteira a ensinar teclas — ⌘K, ?, G depois P — a
                   quem não tem teclado. Ocupava metade da gaveta de navegação
                   no telemóvel para não oferecer nada que ali se possa fazer.
                   Continua a abrir com "?" em quem tem teclado, e o botão
                   continua lá no computador. */}
-              <button
-                onClick={() => setShortcutsOpen(true)}
-                className="alvo-toque pointer-coarse:hidden flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
-                title="Atalhos de teclado"
-              >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
+                <button
+                  onClick={() => setShortcutsOpen(true)}
+                  className="alvo-toque pointer-coarse:hidden flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                  title="Atalhos de teclado"
                 >
-                  <rect x="2" y="6" width="20" height="12" rx="2" />
-                  <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12" strokeLinecap="round" />
-                </svg>
-                Atalhos
-              </button>
-              {/* Plain <a> on purpose: this hits an API route that streams a
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <rect x="2" y="6" width="20" height="12" rx="2" />
+                    <path
+                      d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  Atalhos
+                </button>
+                {/* Plain <a> on purpose: this hits an API route that streams a
                   file download, not a page — next/link would be wrong here. */}
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-              <a
-                href="/api/backup"
-                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
-                title="Exportar backup"
-              >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
+                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+                <a
+                  href="/api/backup"
+                  className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                  title="Exportar backup"
                 >
-                  <path
-                    d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Backup
-              </a>
-              {/* A outra metade do botão ao lado. Fica AQUI, encostado ao
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path
+                      d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Backup
+                </a>
+                {/* A outra metade do botão ao lado. Fica AQUI, encostado ao
                   Backup, porque é aqui que se procura num dia mau — e porque
                   uma cópia sem forma de a repor nunca foi uma cópia. */}
-              <button
-                onClick={() => setRestoreOpen(true)}
-                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
-                title="Repor cópia de segurança"
-              >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
+                <button
+                  onClick={() => setRestoreOpen(true)}
+                  className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                  title="Repor cópia de segurança"
                 >
-                  <path
-                    d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Repor
-              </button>
-              <button
-                onClick={logout}
-                className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
-                title="Terminar sessão"
-              >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path
+                      d="M12 21V9m0 0l-4 4m4-4l4 4M5 3h14"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Repor
+                </button>
+                <button
+                  onClick={logout}
+                  className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
+                  title="Terminar sessão"
                 >
-                  <path
-                    d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                Sair
-              </button>
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  >
+                    <path
+                      d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Sair
+                </button>
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        </div>
 
         {/* Backdrop (mobile nav drawer) */}
         {navOpen && (

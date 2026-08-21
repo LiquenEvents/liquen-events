@@ -903,4 +903,87 @@ test.describe("Back office — mobile", () => {
         "o mesmo sítio, em cantos opostos.",
     ).toBe(1);
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * A PÁGINA NÃO SE ARRASTA PARA O LADO
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Ela viu isto duas vezes, com um mês de intervalo: a página desliza para a
+   * direita e do outro lado fica uma folha branca. Da segunda vez mediu-se nas
+   * fotografias — 261 px de deslocamento — e mediu-se aqui: o ÚNICO elemento em
+   * todo o ecrã que sai da margem é a gaveta de navegação fechada, `fixed`, com
+   * 256 px, parqueada em `x = -256`.
+   *
+   * ── Porque é que nada disto apareceu antes ────────────────────────────────
+   *
+   * Duas razões que se juntam, e que é preciso ter as duas em conta para o
+   * teste valer alguma coisa:
+   *
+   * · A rede de segurança do `globals.css` (`body { overflow-x: clip }`) não
+   *   alcança um elemento `fixed`. O bloco contentor de um fixo é o viewport, e
+   *   nenhum antepassado o corta — a não ser que esse antepassado seja ele
+   *   próprio o bloco contentor dos fixos (`transform`, `filter`, `contain`).
+   *
+   * · O Safari do iPhone conta os `fixed` para a área que se pode arrastar. O
+   *   Chromium não conta — e é por isso que a asserção clássica
+   *   (`scrollWidth > clientWidth`) dá verde aqui e o telemóvel dela arrasta.
+   *
+   * Ou seja: este teste NÃO pode ser «nada passa a margem», porque no Chromium
+   * nada passa e no telemóvel passa. O que se prende é a ESTRUTURA que faz a
+   * diferença — a gaveta tem de viver dentro de um antepassado que a corte.
+   */
+  test("@movel phone: a gaveta fechada não deixa a página arrastar-se para o lado", async ({
+    page,
+  }) => {
+    const loggedIn = await login(page);
+    if (process.env.CI) {
+      expect(loggedIn, "não entrou no back office — ADMIN_PASSWORD_HASH em falta no CI?").toBe(
+        true,
+      );
+    } else {
+      test.skip(!loggedIn, "Sem login de admin aqui (build de produção sem ADMIN_PASSWORD_HASH).");
+    }
+
+    const m = await page.evaluate(() => {
+      const aside = document.querySelector("aside");
+      if (!aside) throw new Error("Sem <aside> — a barra lateral montou?");
+      const r = aside.getBoundingClientRect();
+      // `offsetParent` de um elemento `fixed` só é diferente de `null` quando
+      // algum antepassado é mesmo o bloco contentor dele. É esta a prova.
+      const contentor = (aside as HTMLElement).offsetParent as HTMLElement | null;
+      const cs = contentor ? getComputedStyle(contentor) : null;
+      const cr = contentor?.getBoundingClientRect() ?? null;
+      return {
+        gavetaX: Math.round(r.left),
+        gavetaLargura: Math.round(r.width),
+        ecra: document.documentElement.clientWidth,
+        temContentor: !!contentor,
+        corta: cs ? cs.overflowX === "hidden" || cs.overflowX === "clip" : false,
+        contentorCabe: cr ? cr.left >= -1 && cr.right <= innerWidth + 1 : false,
+      };
+    });
+
+    // A gaveta fechada CONTINUA fora do ecrã — é assim que ela desliza para
+    // dentro. O que não pode é estar fora e por cortar.
+    expect(m.gavetaX, "a gaveta fechada devia estar parqueada à esquerda").toBeLessThan(0);
+
+    expect(
+      m.temContentor,
+      `A gaveta fechada vive em x=${m.gavetaX} (${m.gavetaLargura} px de largura) num ecrã de ` +
+        `${m.ecra} px, e NÃO tem antepassado que a corte. No Safari do iPhone isso deixa a ` +
+        `página arrastar-se ${Math.abs(m.gavetaX)} px para o lado, com uma folha branca do outro. ` +
+        `O invólucro está em AdminClient.tsx — ver o comentário lá.`,
+    ).toBe(true);
+
+    expect(
+      m.corta,
+      "O antepassado da gaveta deixou de a cortar (`overflow` já não é hidden/clip).",
+    ).toBe(true);
+
+    expect(
+      m.contentorCabe,
+      "O invólucro da gaveta passou a ser maior do que o ecrã — corta a gaveta e transborda ele.",
+    ).toBe(true);
+  });
 });
