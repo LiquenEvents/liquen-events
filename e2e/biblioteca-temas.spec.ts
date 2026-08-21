@@ -272,10 +272,29 @@ test.describe("Biblioteca de temas — a 390 px", () => {
     await expect(dialogo).toBeVisible({ timeout: 20000 });
     await page.setViewportSize(ECRA);
 
-    // A lista dos quarenta começa fechada, e diz quantos são sem se abrir.
-    const listaDeTemas = page.getByRole("button", { name: "Temas (40)" });
-    await expect(listaDeTemas).toBeVisible();
-    await expect(listaDeTemas).toHaveAttribute("aria-expanded", "false");
+    /**
+     * ── OS QUARENTA TEMAS NUMA LINHA SÓ ──────────────────────────────────
+     *
+     * Este passeio verificava um botão «Temas (40)» que abria e fechava a
+     * lista. Foi substituído: a lista passou a ser uma fila de chips que rola
+     * de lado e nunca ocupa mais do que uma linha, portanto não há nada para
+     * fechar. O que se mede continua a ser o mesmo — quanto do ecrã sobra para
+     * as fotografias.
+     */
+    const fila = page.getByRole("group", { name: "Temas" });
+    await expect(fila).toBeVisible();
+    const caixaDaFila = await fila.boundingBox();
+    expect(
+      caixaDaFila!.height,
+      `A fila dos temas mede ${Math.round(caixaDaFila!.height)}px de altura. ` +
+        `Numa linha só não passa de ~50 — acima disso voltou a empilhar-se, e ` +
+        `é a grelha que paga.`,
+    ).toBeLessThan(64);
+
+    // E rola de lado: os quarenta estão lá, não foram cortados.
+    const rolaDeLado = await fila.evaluate((el) => el.scrollWidth > el.clientWidth + 2);
+    expect(rolaDeLado, "com quarenta chips, a fila tem de ter para onde rolar").toBe(true);
+    expect(await fila.getByRole("button").count()).toBe(MUITOS.length);
 
     // E a razão de tudo isto: a primeira foto, INTEIRA, dentro do ecrã.
     const primeira = page.getByRole("button", { name: "Foto 1 de 12" });
@@ -288,14 +307,18 @@ test.describe("Biblioteca de temas — a 390 px", () => {
         `${ECRA.height} — a lista de temas voltou a empurrar a grelha para fora do ecrã.`,
     ).toBeLessThanOrEqual(ECRA.height);
 
-    // Aberta, continua a caber: é o tecto de altura a fazer o seu trabalho.
-    await listaDeTemas.click();
-    await expect(listaDeTemas).toHaveAttribute("aria-expanded", "true");
-    const comALista = await primeira.boundingBox();
+    /**
+     * ── E A DUAS COLUNAS ─────────────────────────────────────────────────
+     *
+     * Três colunas a 390 px davam miniaturas de 111 px, pequenas de mais para
+     * escolher decoração. A duas, cada foto tem ~171. É a segunda metade da
+     * mesma correcção, e mede-se aqui pela mesma razão: só um browser a sério
+     * sabe quanto é que uma coluna mede.
+     */
     expect(
-      comALista!.y,
-      `Com a lista aberta a primeira foto começa a ${Math.round(comALista!.y)}px de ` +
-        `${ECRA.height} — sem tecto, quarenta temas voltam a ocupar o ecrã todo.`,
-    ).toBeLessThan(ECRA.height);
+      caixa!.width,
+      `Cada foto mede ${Math.round(caixa!.width)}px de largura. A duas colunas ` +
+        `são ~171; a três eram 111, que é o que estava e era pequeno de mais.`,
+    ).toBeGreaterThan(140);
   });
 });

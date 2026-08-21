@@ -24,6 +24,7 @@ import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import ImagemComPlanoB from "./ImagemComPlanoB";
 import { SugestaoDeNome } from "./SugestaoDeNome";
+import { NomesPorArrumar } from "./NomesPorArrumar";
 
 /**
  * Biblioteca de Temas — o sítio onde o estúdio guarda, uma vez, as fotos de
@@ -629,6 +630,47 @@ export default function Temas() {
   );
 
   /**
+   * Renomear um tema a partir da LISTA.
+   *
+   * O renomear que já existia vive dentro da pasta de um tema, e é lá que ele
+   * pertence. Isto é a outra porta: a revisão em lote dos nomes por arrumar,
+   * que precisa de mudar um nome sem entrar em cada pasta.
+   *
+   * Ao contrário do `alternarMarca`, aqui NÃO se grava primeiro no ecrã: um
+   * nome é o índice por onde ela procura, e mostrar um nome que o servidor
+   * recusou é pior do que esperar meio segundo por ele.
+   */
+  const renomearDaLista = useCallback(
+    async (t: ThemeSummary, nome: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/temas/${t.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: nome }),
+        });
+        if (!res.ok) {
+          // 409 é o nome já existir noutro tema — e aí a frase tem de o dizer,
+          // porque «não foi possível» mandava-a tentar outra vez para sempre.
+          toast(
+            res.status === 409
+              ? `Já há um tema chamado "${nome}".`
+              : "Não foi possível mudar o nome. Verifica a ligação.",
+            "error",
+          );
+          return false;
+        }
+        setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, name: nome } : x)));
+        toast(`"${t.name}" passou a "${nome}"`, "success");
+        return true;
+      } catch {
+        toast("Não foi possível mudar o nome. Verifica a ligação.", "error");
+        return false;
+      }
+    },
+    [toast],
+  );
+
+  /**
    * As acções de um cartão de tema, como DADOS — a forma é de quem as desenha.
    *
    * Estão aqui para que os dois ícones do computador e os dois itens do menu
@@ -1045,6 +1087,16 @@ export default function Temas() {
           </>
         }
       />
+
+      {/* ── OS NOMES POR ARRUMAR ──────────────────────────────────────────
+          A `SugestaoDeNome` abaixo só aparece enquanto se ESCREVE um nome — e
+          um tema baptizado há seis meses nunca mais passa por esse campo. Era
+          por isso que o «Seatings Plans» continuava lá com o corrector a saber,
+          desde sempre, que devia ser «Seating Plans».
+
+          Aparece só quando há alguma coisa a arrumar; com a biblioteca em ordem
+          não se vê nada. */}
+      <NomesPorArrumar themes={themes} onRenomear={renomearDaLista} />
 
       {adding && (
         <Card padding="sm" className="mb-6">
