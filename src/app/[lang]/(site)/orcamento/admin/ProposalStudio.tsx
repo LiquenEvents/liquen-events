@@ -6053,8 +6053,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   comparam. */}
               {vistaDeConjunto && (
                 <VistaDeConjunto
-                  boards={doc.moodBoards}
+                  doc={doc as ProposalDoc}
                   ordem={ordemDosBoards}
+                  idioma={idiomaDoPdf}
                   urls={assetUrls}
                   originais={assetOriginais}
                   aspetos={aspetosDasFotos}
@@ -6066,6 +6067,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       .getElementById(`mood-board-${bi}`)
                       ?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }}
+                  // O salto de uma folha de texto usa o MESMO caminho da
+                  // Conferência: abre a secção se estiver dobrada e só então
+                  // leva a vista. Uma segunda maneira de saltar era uma segunda
+                  // maneira de falhar a abertura da dobra.
+                  onIrParaSeccao={(seccao) => irParaAFalta(seccao)}
                   onFechar={() => setVistaDeConjunto(false)}
                 />
               )}
@@ -6706,6 +6712,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                               titulo={b.title}
                                               subtitulo={b.subtitulo}
                                               legenda={b.annotation}
+                                              // Aqui o rótulo ainda diz alguma
+                                              // coisa: é a única miniatura do
+                                              // cartão, e sem ele lê-se como
+                                              // mais uma fotografia. Ver
+                                              // `comRotulo`.
+                                              comRotulo
                                             />
                                           </div>
                                         </div>

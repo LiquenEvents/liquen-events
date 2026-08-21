@@ -46,9 +46,16 @@ import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
  */
 
 /** Um valor em pontos de PDF, em percentagem do eixo. */
-const pct = (n: number, total: number) => `${(n / total) * 100}%`;
-/** Um tamanho em pontos de PDF, em unidades de contentor — escala com a folha. */
-const cq = (pontos: number) => `${(pontos / PAGINA_W) * 100}cqw`;
+export const pct = (n: number, total: number) => `${(n / total) * 100}%`;
+/**
+ * Um tamanho em pontos de PDF, em unidades de contentor — escala com a folha.
+ *
+ * Exportado com o `pct` porque a folha de TEXTO (`FolhaDaProposta`) se desenha
+ * exactamente com as mesmas duas conversões. Escritas duas vezes, divergiam — e
+ * a divergência apareceria como duas miniaturas do mesmo documento com a
+ * tipografia a escalas diferentes, lado a lado na mesma grelha.
+ */
+export const cq = (pontos: number) => `${(pontos / PAGINA_W) * 100}cqw`;
 /**
  * A descida de uma linha de texto: o PDF ancora a LINHA DE BASE e o CSS ancora
  * a caixa. Um quinto do corpo é a descida típica de uma serifa — o suficiente
@@ -91,6 +98,7 @@ export default function PreviaDaPagina({
   titulo,
   subtitulo,
   legenda,
+  comRotulo = false,
 }: {
   layout: LayoutDeMoodboard;
   /** A forma de cada foto, pela ordem em que a página as desenha. */
@@ -109,6 +117,22 @@ export default function PreviaDaPagina({
   titulo: string;
   subtitulo?: string;
   legenda?: string;
+  /**
+   * ── «A PÁGINA, COMO VAI SAIR» — SÓ ONDE AINDA DIZ ALGUMA COISA ──────────
+   *
+   * Palavras dela: «remover "A página, como vai sair" repetido sob cada
+   * miniatura».
+   *
+   * O rótulo nasceu quando esta era a única miniatura do estúdio, ao lado do
+   * selector de disposição, e aí faz o seu trabalho: diz que aquele desenho não
+   * é uma fotografia, é a folha. Onde já há um número e um nome por baixo — a
+   * vista de conjunto, o painel da direita — repete-se em cada célula da grelha
+   * e não acrescenta nada: uma linha de ruído multiplicada por catorze.
+   *
+   * Por isso passa a pedir-se. Ausente é o caso comum, e o caso comum é o da
+   * grelha.
+   */
+  comRotulo?: boolean;
 }) {
   // A legenda reserva altura à página real, e reserva MAIS quanto mais linhas
   // tiver. Assumir uma linha mostrava as fotos maiores do que vão sair sempre
@@ -218,9 +242,11 @@ export default function PreviaDaPagina({
           </p>
         )}
       </div>
-      <figcaption className="mt-1 text-[10px] text-foreground/40">
-        A página, como vai sair
-      </figcaption>
+      {comRotulo && (
+        <figcaption className="mt-1 text-[10px] text-foreground/40">
+          A página, como vai sair
+        </figcaption>
+      )}
     </figure>
   );
 }
@@ -238,7 +264,7 @@ export default function PreviaDaPagina({
  * mostra a página; uma caixa cinzenta lê-se como «não há foto», que é a
  * verdade, em vez do ícone partido do navegador, que se lê como «isto avariou».
  */
-function FotoDaPrevia({
+export function FotoDaPrevia({
   url,
   original,
   semRecorte,
