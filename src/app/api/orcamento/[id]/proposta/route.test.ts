@@ -60,7 +60,12 @@ const token = vi.hoisted(() => ({ create: vi.fn((proposalId: string) => `tok:${p
  */
 const modelo = vi.hoisted(() => ({ get: vi.fn(async (_chave: string) => null as unknown) }));
 
-vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
+vi.mock("@/lib/admin-auth", () => ({
+  isAuthed: () => authed.ok,
+  /** A assinatura ESCRITA no perfil da conta. Vazio = assina a casa, que é
+   *  o comportamento certo sem `ADMIN_USERS` configurado. */
+  assinaturaConfigurada: () => ({}),
+}));
 vi.mock("@/lib/quotes-store", () => ({ getQuote: quotes.get, updateQuoteWith: quotes.update }));
 vi.mock("@/lib/proposals-store", () => ({
   createProposal: proposals.create,

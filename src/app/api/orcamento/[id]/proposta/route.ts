@@ -7,7 +7,7 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
-import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
+import { assinaturaDeQuemEnvia } from "@/lib/email-quem-assina";
 import { marcadoresDoPedido, modeloParaEnvioAutomatico, textoDoCorpo } from "@/lib/email-modelos";
 import { arrumarLigacao, ROTULO_DA_PROPOSTA } from "@/lib/email-ligacoes";
 import { corpoEscritoAMao, excedeOTecto, MAXIMO_CORPO_ESCRITO } from "@/lib/email-corpo-escrito";
@@ -288,7 +288,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * do casal vai junto só para a protecção: nenhum email pode sair assinado
      * com o nome de quem o vai ler (ver `email-assinatura.ts`).
      */
-    const quem = { nome: nomeDeQuemEnvia(request), destinatario: quote.name };
+    const quem = { ...assinaturaDeQuemEnvia(request), destinatario: quote.name };
 
     /**
      * O corpo dela, com o endereço arrumado: o token gigante fica no `href` e o

@@ -153,6 +153,28 @@ interface AdminUser {
   email?: string;
   passwordHash: string;
   totpSecret?: string;
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * COMO ESTA PESSOA ASSINA UM EMAIL AO CLIENTE
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Separado do `name` de propósito, e a razão é um defeito medido num email
+   * real enviado a uma cliente: a proposta saiu assinada **«Liquen Alentejo»**.
+   *
+   * Ninguém escreveu esse nome em lado nenhum. Ele foi DERIVADO do endereço da
+   * conta — `liquen.alentejo@gmail.com` → `nomeVisivel` troca os pontos por
+   * espaços e capitaliza → «Liquen Alentejo» — e daí seguiu para o `sub` da
+   * sessão e para o fundo de um email que um casal leu.
+   *
+   * A regra que isto instala: **um nome adivinhado a partir de um endereço de
+   * email nunca assina nada.** Só assina o que estiver escrito aqui, à mão, por
+   * quem configurou a conta. Sem `assina`, o email leva a assinatura da CASA,
+   * que nunca está errada (`ASSINATURA_NOME` em `email-assinatura.ts`).
+   *
+   *   { "name": "catarina", "email": "…", "passwordHash": "…",
+   *     "assina": { "nome": "Catarina Gaspar", "cargo": "Manager" } }
+   */
+  assina?: { nome?: string; cargo?: string };
 }
 
 /** O que a entrada devolve: quem entrou, e por que endereço (quando o tem). */
@@ -208,7 +230,16 @@ function configuredUsers(): AdminUser[] | null {
           // `email` é opcional durante a transição, mas se vier tem de ser
           // texto: um `email: 123` calado transformava-se em «esta conta não
           // tem endereço» e a recuperação dela desaparecia sem aviso.
-          (u.email === undefined || typeof u.email === "string"),
+          (u.email === undefined || typeof u.email === "string") &&
+          // O mesmo cuidado para a assinatura: um `assina` malformado tem de
+          // ser recusado à entrada, e não silenciosamente lido como «esta
+          // pessoa não tem assinatura» — que é o caminho que leva à da casa e
+          // esconderia um erro de configuração.
+          (u.assina === undefined ||
+            (typeof u.assina === "object" &&
+              u.assina !== null &&
+              (u.assina.nome === undefined || typeof u.assina.nome === "string") &&
+              (u.assina.cargo === undefined || typeof u.assina.cargo === "string"))),
       )
     ) {
       return parsed;
@@ -324,6 +355,46 @@ export function nomeVisivel(identificador: string): string {
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
     .join(" ")
     .slice(0, 40);
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A ASSINATURA CONFIGURADA DE QUEM ESTÁ COM A SESSÃO ABERTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Devolve `{}` — que quer dizer «assina a casa» — em todos os casos em que não
+ * há um nome ESCRITO por uma pessoa para aquela conta:
+ *
+ *  · sem `ADMIN_USERS` (palavra-passe partilhada), porque aí o nome da sessão é
+ *    derivado do endereço de entrada, e é exactamente daí que veio o
+ *    «Liquen Alentejo» que uma cliente leu;
+ *  · com `ADMIN_USERS` mas sem `assina` na conta, porque o `name` é um
+ *    identificador de entrada e pode ser «catarina» ou um endereço;
+ *  · conta que já não existe na lista.
+ *
+ * Nunca atira: uma assinatura não pode ser a razão pela qual uma proposta não
+ * chega ao cliente.
+ */
+export function assinaturaConfigurada(nomeDaSessao: string): {
+  nome?: string;
+  cargo?: string;
+} {
+  try {
+    const users = configuredUsers();
+    if (!users) return {};
+    const alvo = normalizarIdentificador(nomeDaSessao);
+    if (!alvo) return {};
+    const u = users.find(
+      (c) =>
+        normalizarIdentificador(c.name) === alvo ||
+        (c.email ? normalizarIdentificador(c.email) === alvo : false),
+    );
+    const nome = u?.assina?.nome?.trim();
+    if (!nome) return {};
+    return { nome, cargo: u?.assina?.cargo?.trim() || "" };
+  } catch {
+    return {};
+  }
 }
 
 // ── Two-factor (TOTP) ──────────────────────────────────────────────────────

@@ -339,3 +339,60 @@ describe("o estado da versão em relação ao aceite", () => {
     expect(r?.versaoVivaNumero).toBe(1);
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O LINK MOSTRA SEMPRE A PROPOSTA — NÃO UM RESUMO DE PREÇO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO num email real enviado a uma cliente: o anexo era a proposta de 15
+ * páginas, com mood boards, e o link ao lado abria uma página com a saudação, o
+ * subtotal, o IVA, o total e os contactos. Sem Apresentação, sem Serviços, sem
+ * Inspiração, sem Condições, e sem o botão «Ver a proposta completa (PDF)».
+ *
+ * A página não tem defeito nenhum: desenha o documento inteiro quando
+ * `proposal.doc` existe, e o botão do PDF está na mesma condição. O que estava
+ * errado era ESTA escolha — saltava para a irmã mais recente por data, e uma
+ * proposta do construtor de linhas do back office não tem documento nenhum.
+ */
+describe("o salto para a versão nova não pode perder o documento", () => {
+  const comDoc = { ref: "PO", clientNames: "Maria & João" } as unknown as Proposal["doc"];
+
+  it("uma revisão mais recente SEM documento não desloca a que o tem", () => {
+    por(
+      proposta({ id: "p1", doc: comDoc }),
+      // Uma proposta de linhas, criada depois para o mesmo pedido.
+      proposta({ id: "p2", createdAt: "2026-02-01T10:00:00.000Z" }),
+    );
+    return propostaDoLink("bom").then((r) => {
+      expect(r?.proposta.id).toBe("p1");
+      expect(r?.proposta.doc).toBeTruthy();
+      expect(r?.seguiu).toBe(false);
+    });
+  });
+
+  it("mas uma revisão mais recente COM documento desloca, como sempre", async () => {
+    por(
+      proposta({ id: "p1", doc: comDoc }),
+      proposta({ id: "p2", doc: comDoc, createdAt: "2026-02-01T10:00:00.000Z" }),
+    );
+    const r = await propostaDoLink("bom");
+    expect(r?.proposta.id).toBe("p2");
+    expect(r?.seguiu).toBe(true);
+  });
+
+  it("quando NENHUMA tem documento, a mais recente manda — as duas desenham-se igual", async () => {
+    por(proposta({ id: "p1" }), proposta({ id: "p2", createdAt: "2026-02-01T10:00:00.000Z" }));
+    const r = await propostaDoLink("bom");
+    expect(r?.proposta.id).toBe("p2");
+  });
+
+  it("a do token sem documento salta para uma mais recente que o tenha", async () => {
+    por(
+      proposta({ id: "p1" }),
+      proposta({ id: "p2", doc: comDoc, createdAt: "2026-02-01T10:00:00.000Z" }),
+    );
+    const r = await propostaDoLink("bom");
+    expect(r?.proposta.id).toBe("p2");
+  });
+});

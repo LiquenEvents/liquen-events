@@ -29,7 +29,7 @@ import { createProposalToken } from "@/lib/proposal-token";
 import { proximaVersao, seloDoConteudo } from "@/lib/proposta-versao";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
-import { nomeDeQuemEnvia } from "@/lib/email-quem-assina";
+import { assinaturaDeQuemEnvia } from "@/lib/email-quem-assina";
 import { marcadoresDoPedido, modeloParaEnvioAutomatico, textoDoCorpo } from "@/lib/email-modelos";
 import { arrumarLigacao, ROTULO_DA_PROPOSTA } from "@/lib/email-ligacoes";
 import {
@@ -1052,7 +1052,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      * o `quote.name`, que pode ser a mãe da noiva. Ver `email-assinatura.ts`.
      */
     const quem = {
-      nome: nomeDeQuemEnvia(request),
+      ...assinaturaDeQuemEnvia(request),
       destinatario: String(doc.clientNames ?? "").trim() || quote.name,
     };
 

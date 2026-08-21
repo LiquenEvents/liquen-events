@@ -83,8 +83,18 @@ export const ASSINATURA_CARGO = "Manager";
 const MAXIMO_NOME = 60;
 
 export interface QuemAssina {
-  /** O nome de quem tem a sessão iniciada. Vazio → assina a casa. */
+  /**
+   * O nome de quem assina, LIDO DO PERFIL da conta. Vazio → assina a casa.
+   *
+   * Nunca um nome derivado de um endereço de email. Um email real a uma cliente
+   * saiu assinado «Liquen Alentejo» — o `nomeVisivel` fabricou-o a partir de
+   * `liquen.alentejo@gmail.com`, e daí seguiu para o `sub` da sessão e para o
+   * fundo do email. Quem resolve isto é o `assinaturaDeQuemEnvia`
+   * (`email-quem-assina.ts`), que só devolve o que estiver escrito no perfil.
+   */
   nome?: string;
+  /** O cargo, também do perfil. Só acompanha um `nome` que venha de lá. */
+  cargo?: string;
   /**
    * O nome de quem RECEBE. Não aparece em lado nenhum do email: existe só para
    * a protecção abaixo poder comparar os dois.
@@ -140,8 +150,16 @@ export function assinanteDoEmail(quem: QuemAssina = {}): { nome: string; cargo: 
     return daCasa;
   }
 
-  // O cargo é dela e só acompanha o nome dela — incluindo quando a conta se
-  // chama só «Catarina» e a assinatura da casa é «Catarina Gaspar».
+  // O CARGO ESCRITO NO PERFIL manda. É a razão de ser do perfil: uma pessoa
+  // que não seja a dona assina com o cargo dela, e não sem cargo nenhum.
+  const cargoDoPerfil = String(quem.cargo ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAXIMO_NOME);
+  if (cargoDoPerfil) return { nome: candidato, cargo: cargoDoPerfil };
+
+  // Sem cargo escrito: o da casa só acompanha o nome dela — incluindo quando a
+  // conta se chama só «Catarina» e a assinatura da casa é «Catarina Gaspar».
   const nome = normalizarNome(candidato);
   const casa = normalizarNome(ASSINATURA_NOME);
   const ehDaCasa = nome === casa || casa.startsWith(`${nome} `);
