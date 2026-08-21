@@ -57,10 +57,29 @@ describe("a grelha", () => {
     desenhar();
     const comForma = screen.getAllByRole("button", { name: /Ampliar/ })[0];
     expect(comForma.style.aspectRatio).toBe("1200 / 800");
-    // CONTROLO POSITIVO: a que NÃO tem forma guardada não inventa nenhuma. Sem
-    // esta metade, um `aspectRatio` fixo escrito à mão passava o teste de cima.
+  });
+
+  /**
+   * ── AS DUAS METADES TÊM DE USAR O MESMO NÚMERO ──────────────────────────
+   *
+   * Palavras dela: «Seating Plan e Corredor Nupcial, colunas que acabam antes
+   * das outras».
+   *
+   * A conta que reparte as fotografias pelas colunas assume três por dois para
+   * as que não têm medida guardada. A célula dessas mesmas fotografias não
+   * reservava forma nenhuma e ficava com a altura natural do ficheiro — uma
+   * coluna com duas fotos de retrato sem medida crescia o dobro do que a conta
+   * julgava, e a outra acabava muito antes.
+   *
+   * Não era um defeito da repartição: eram as duas metades a usarem números
+   * diferentes para a mesma fotografia.
+   */
+  it("uma foto sem medida guardada reserva a forma que a repartição lhe assumiu", () => {
+    desenhar();
     const semForma = screen.getAllByRole("button", { name: /Ampliar/ })[1];
-    expect(semForma.style.aspectRatio).toBe("");
+    // Três por dois deitada — o mesmo `ALTURA_POR_OMISSAO` que equilibra as
+    // colunas. Deixá-la em branco era o que punha uma coluna a acabar antes.
+    expect(semForma.style.aspectRatio).toBe("3 / 2");
   });
 
   it("só as primeiras entram ansiosas — 46 de uma vez é a conta que isto evita", () => {
