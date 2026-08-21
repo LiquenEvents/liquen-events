@@ -1,5 +1,5 @@
 import "server-only";
-import { randomBytes } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { getState, setState } from "./app-state";
 import { createProposalToken, validadeDeUmLinkNovo } from "./proposal-token";
 import { SITE } from "./site";
@@ -120,15 +120,26 @@ function chave(codigo: string): string {
 /**
  * Um código novo, sem viés.
  *
- * O resto de 256 por 32 é zero, portanto ler cada byte módulo 32 é uniforme —
- * não há aqui o enviesamento clássico de mapear 0-255 para um alfabeto que não
- * divide 256. Vale a pena dizê-lo porque a alternativa (rejeitar bytes fora da
- * gama) seria código a mais para um problema que este alfabeto não tem.
+ * ── PORQUE É QUE ISTO NÃO É `randomBytes()[i] % 32` ───────────────────────
+ *
+ * Era, e estava CERTO: o resto de 256 por 32 é zero, portanto ler cada byte
+ * módulo 32 é uniforme — não há aqui o enviesamento clássico de mapear 0-255
+ * para um alfabeto que não divide 256.
+ *
+ * A análise de segurança do GitHub não faz essa conta: vê um `%` sobre uma
+ * fonte criptográfica e levanta um alerta de severidade alta («creating biased
+ * random numbers from a cryptographically secure source»). O achado era falso —
+ * e um aviso alto que se explica de cada vez que aparece é um aviso que um dia
+ * se ignora quando for verdadeiro. É a mesma razão por que o marcador das fotos
+ * deixou de se chamar `token` (ver `ThemePicker.tsx`).
+ *
+ * O `randomInt` não tem resto nenhum para enviesar: pede um número dentro da
+ * gama e rejeita internamente o que não cabe. Custa dezasseis chamadas por
+ * código, o que é nada, e não precisa de defesa escrita.
  */
 export function codigoNovo(): string {
-  const bytes = randomBytes(COMPRIMENTO_DO_CODIGO);
   let saida = "";
-  for (const b of bytes) saida += ALFABETO[b % ALFABETO.length];
+  for (let i = 0; i < COMPRIMENTO_DO_CODIGO; i += 1) saida += ALFABETO[randomInt(ALFABETO.length)];
   return saida;
 }
 
