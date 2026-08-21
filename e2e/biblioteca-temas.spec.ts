@@ -190,11 +190,29 @@ test.describe("Biblioteca de temas — abrir", () => {
  * dentro). Só um browser a sério mede a consequência delas, que é a única coisa
  * que interessa: a primeira foto tem de caber, inteira, num ecrã de 390×844.
  *
- * Tudo o que este passeio precisa vem de rotas nossas — quarenta temas e doze
- * fotos —, portanto não depende do que houver na biblioteca da casa.
+ * ── PORQUE É QUE O PASSEIO NÃO É TODO A 390 PX ───────────────────────────
+ *
+ * Foi, à primeira tentativa, e esteve 120 s à espera de um botão: a 390 px o
+ * menu lateral do back office é `fixed` e vive FORA do ecrã até alguém abrir a
+ * gaveta — os destinos do dia estão na barra de baixo. Dava para abrir a gaveta
+ * (é o que o `geometria-dos-alvos.spec.ts` faz), mas isso põe metade do passeio
+ * a exercitar navegação que não é o que aqui se mede, e cada degrau a mais é um
+ * degrau que pode partir por razões que não têm nada a ver com a lista de temas.
+ *
+ * Em vez disso: o caminho até ao seletor faz-se no tamanho em que os outros dois
+ * passeios deste ficheiro já o fazem, e o ecrã encolhe para 390×844 com o
+ * diálogo JÁ ABERTO. O que se mede fica exactamente igual — o diálogo é
+ * `fixed inset-0` e a lista tem o tecto em `vh`, portanto ambos se refazem no
+ * tamanho novo —, e o `hasTouch` continua ligado para os alvos terem a altura
+ * que têm no dedo, que é a que enche a lista.
  */
 test.describe("Biblioteca de temas — a 390 px", () => {
-  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  // Sem `viewport` aqui de propósito: ver acima. O toque fica, porque é ele que
+  // dá aos separadores dos temas a altura que têm no telemóvel.
+  test.use({ hasTouch: true });
+
+  /** O ecrã dela. */
+  const ECRA = { width: 390, height: 844 };
 
   /** Quarenta temas, como os dela. */
   const MUITOS = Array.from({ length: 40 }, (_, i) => ({
@@ -240,12 +258,19 @@ test.describe("Biblioteca de temas — a 390 px", () => {
       .first()
       .click();
     const clientes = page.locator("li button");
+    // 30 s e não 15: contra o servidor de desenvolvimento, a primeira visita a
+    // «Fazer proposta» paga a compilação da rota.
     await expect(clientes.first()).toBeVisible({ timeout: 30000 });
     await clientes.first().click();
 
     const abrir = page.getByRole("button", { name: /biblioteca de temas/i }).first();
     await expect(abrir).toBeVisible({ timeout: 20000 });
     await abrir.click();
+
+    // A partir daqui, o ecrã dela.
+    const dialogo = page.getByRole("dialog", { name: /biblioteca de temas/i });
+    await expect(dialogo).toBeVisible({ timeout: 20000 });
+    await page.setViewportSize(ECRA);
 
     // A lista dos quarenta começa fechada, e diz quantos são sem se abrir.
     const listaDeTemas = page.getByRole("button", { name: "Temas (40)" });
@@ -259,9 +284,9 @@ test.describe("Biblioteca de temas — a 390 px", () => {
     expect(caixa, "a primeira foto não tem sítio nenhum no ecrã").not.toBeNull();
     expect(
       caixa!.y + caixa!.height,
-      `A primeira foto acaba a ${Math.round(caixa!.y + caixa!.height)}px num ecrã de 844 — ` +
-        `a lista de temas voltou a empurrar a grelha para fora do ecrã.`,
-    ).toBeLessThanOrEqual(844);
+      `A primeira foto acaba a ${Math.round(caixa!.y + caixa!.height)}px num ecrã de ` +
+        `${ECRA.height} — a lista de temas voltou a empurrar a grelha para fora do ecrã.`,
+    ).toBeLessThanOrEqual(ECRA.height);
 
     // Aberta, continua a caber: é o tecto de altura a fazer o seu trabalho.
     await listaDeTemas.click();
@@ -269,8 +294,8 @@ test.describe("Biblioteca de temas — a 390 px", () => {
     const comALista = await primeira.boundingBox();
     expect(
       comALista!.y,
-      `Com a lista aberta a primeira foto começa a ${Math.round(comALista!.y)}px de 844 — ` +
-        `sem tecto, quarenta temas voltam a ocupar o ecrã todo.`,
-    ).toBeLessThan(844);
+      `Com a lista aberta a primeira foto começa a ${Math.round(comALista!.y)}px de ` +
+        `${ECRA.height} — sem tecto, quarenta temas voltam a ocupar o ecrã todo.`,
+    ).toBeLessThan(ECRA.height);
   });
 });
