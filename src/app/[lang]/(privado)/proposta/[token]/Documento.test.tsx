@@ -189,7 +189,9 @@ describe("as fotografias", () => {
    * imagem esticada da galeria, na primeira coisa que o casal vê ao abrir.
    */
   const capa = () => {
-    const img = document.querySelector("img");
+    // A primeira que NÃO é o borrão: o `lqip` desenha-se por baixo, e é uma
+    // imagem também. Ver «A CAPA NÃO NASCE EM BRANCO».
+    const img = [...document.querySelectorAll("img")].find((i) => !i.hasAttribute("aria-hidden"));
     if (!img) throw new Error("a capa não se desenhou");
     return img;
   };
@@ -199,6 +201,60 @@ describe("as fotografias", () => {
     const srcset = capa().getAttribute("srcset") ?? "";
     expect(srcset).toContain("mini/capa 400w");
     expect(srcset).toContain("/api/proposta/tk/foto/c0 1200w");
+  });
+
+  /**
+   * ── E VEM DIRECTA DO STORAGE QUANDO JÁ EXISTE ─────────────────────────────
+   *
+   * Palavras dela: «esta foto demora imenso tempo a carregar, e eu quero que
+   * seja super rápida e fluida a aparecer».
+   *
+   * A derivada de 1200 px era servida SEMPRE pela nossa rota — que abre o
+   * token, descarrega os bytes para dentro da função e só então os reencaminha.
+   * Os mesmos bytes a atravessar-nos a caminho de um sítio onde já estavam.
+   */
+  it("com a derivada assinada, a capa não passa pela nossa rota", () => {
+    render(
+      <Documento
+        doc={DOC}
+        idioma="pt"
+        fotos={[{ id: "c0", miniatura: "mini/capa", media: "https://cdn/media-capa" }]}
+        token="tk"
+      />,
+    );
+    const srcset = capa().getAttribute("srcset") ?? "";
+    expect(srcset).toContain("https://cdn/media-capa 1200w");
+    expect(srcset).not.toContain("/api/proposta/");
+  });
+
+  /**
+   * A CAPA NÃO NASCE EM BRANCO.
+   *
+   * O `lqip` são poucas centenas de bytes que vêm no HTML: está pintado no
+   * primeiro fotograma, antes de qualquer ida à rede.
+   */
+  it("com placeholder, há um borrão por baixo desde o primeiro fotograma", () => {
+    render(
+      <Documento
+        doc={DOC}
+        idioma="pt"
+        fotos={[{ id: "c0", miniatura: "mini/capa", lqip: "data:image/jpeg;base64,AAAA" }]}
+        token="tk"
+      />,
+    );
+    const borrao = document.querySelector('img[aria-hidden="true"]');
+    expect(borrao?.getAttribute("src")).toBe("data:image/jpeg;base64,AAAA");
+    // E é decorativo: quem ouve a página não pode encontrar a mesma fotografia
+    // duas vezes.
+    expect(borrao?.getAttribute("alt")).toBe("");
+  });
+
+  it("a forma reserva-se na caixa, e não na imagem", () => {
+    // Sem isto, o texto por baixo salta quando a fotografia chega — e um salto
+    // lê-se como lentidão mesmo quando não é.
+    desenhar();
+    const caixa = capa().parentElement;
+    expect(caixa?.getAttribute("style")).toContain("aspect-ratio");
   });
 
   it("e diz que largura ocupa — senão pede sempre a maior", () => {

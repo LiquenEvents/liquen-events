@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { getSupabase } from "./supabase";
 import {
   THEME_BUCKET,
+  THEME_MID_BUCKET,
   THEME_SIGNED_TTL,
   THEME_THUMB_BUCKET,
   caminhoDoRefDeTema,
@@ -1136,6 +1137,41 @@ export async function signProposalPaths(paths: string[]): Promise<Map<string, st
 
 export async function signProposalThumbs(paths: string[]): Promise<Map<string, string>> {
   return assinarRefs(paths, PROPOSAL_THUMB_BUCKET, THEME_THUMB_BUCKET, true);
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS DERIVADAS DE 1200 PX, DIRECTAS DO STORAGE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre a capa da proposta: «esta foto demora imenso tempo a
+ * carregar, e eu quero que seja super rápida e fluida a aparecer».
+ *
+ * ── O caminho longo ───────────────────────────────────────────────────────
+ *
+ * A derivada intermédia era servida SEMPRE pela rota `/api/proposta/…/foto/…`,
+ * e essa rota é um desvio: abre o token na base de dados, descarrega os bytes
+ * do Storage para dentro da função, e só então os manda para o telemóvel. Os
+ * mesmos bytes atravessam a nossa função a caminho de um sítio onde já estavam.
+ * Com o arranque a frio de uma função é o dobro ou o triplo do tempo — e a capa
+ * é a primeira coisa que o casal vê ao abrir o link.
+ *
+ * Assinada, a fotografia vem do CDN do Storage directamente ao telemóvel. É o
+ * mesmo caminho que as miniaturas de 400 px já fazem, e é por isso que elas
+ * apareciam depressa e a grande não aparecia.
+ *
+ * ── E porque é que a rota continua a existir ──────────────────────────────
+ *
+ * Porque uma derivada pode não existir ainda: o Supabase só assina o que lá
+ * está, e um caminho em falta simplesmente não vem no mapa. Onde não vier, quem
+ * desenha usa a rota — que a fabrica, guarda e serve. A rota deixa de ser o
+ * caminho de todos os dias e passa a ser o de arranque, que é o seu lugar.
+ *
+ * `silencioso` como nas miniaturas: uma derivada por fabricar é o caso normal
+ * de uma proposta acabada de enviar, e não um erro para escrever no registo.
+ */
+export async function signProposalMids(paths: string[]): Promise<Map<string, string>> {
+  return assinarRefs(paths, PROPOSAL_MID_BUCKET, THEME_MID_BUCKET, true);
 }
 
 /**

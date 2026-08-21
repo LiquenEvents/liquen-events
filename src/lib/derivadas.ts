@@ -420,7 +420,6 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
   }
 }
 
-
 /**
  * ════════════════════════════════════════════════════════════════════════════
  * A DERIVADA INTERMÉDIA, A PEDIDO — a que a página do casal mostra
@@ -500,5 +499,58 @@ export async function derivadaMediaAPedido(
     const dito = e instanceof Error ? e.message : String(e);
     log.warn("derivadas: intermédia a pedido falhou", { caminho: chave, erro: dito });
     return { bytes: null, motivo: "sharp-falhou" };
+  }
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A CAPA JÁ FABRICADA QUANDO O CASAL ABRE O LINK
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «esta foto demora imenso tempo a carregar, e eu quero que seja
+ * super rápida e fluida a aparecer».
+ *
+ * A derivada de 1200 px passou a vir assinada, directa do CDN — mas só depois de
+ * existir, e quem a fabrica é a PRIMEIRA visita. Numa proposta acabada de
+ * enviar, essa primeira visita é a do casal a abrir o email: um `sharp` sobre
+ * uma fotografia de 2200 px, mais um download e um upload, a acontecer enquanto
+ * eles olham para um rectângulo. O ganho todo ia para a segunda visita, que é a
+ * que não interessa.
+ *
+ * Isto fabrica-a no envio, e só a da CAPA: são uma ou duas fotografias, é a
+ * primeira coisa que se vê, e é a única que não pode esperar. As dos mood boards
+ * ficam para a visita — estão mais abaixo na página, entram preguiçosas, e
+ * fabricar quarenta e seis aqui era pôr o envio a demorar o que ela acabou de
+ * pedir que não demorasse.
+ *
+ * ── MELHOR ESFORÇO, E COM RELÓGIO ────────────────────────────────────────
+ *
+ * Nunca lança e nunca demora mais do que o tecto: uma derivada por fabricar não
+ * pode atrasar — nem muito menos travar — o envio de uma proposta. O que falhar
+ * aqui volta a ser tentado pela rota, na visita, exactamente como era antes.
+ */
+export async function aquecerDerivadasDaCapa(
+  capas: readonly string[],
+  tectoMs = 6000,
+): Promise<number> {
+  const refs = [...new Set(capas.filter((r) => typeof r === "string" && r.trim() !== ""))]
+    // Uma foto embutida ou de fora não tem derivada para fabricar.
+    .filter((r) => !r.startsWith("data:") && !/^https?:\/\//i.test(r))
+    .slice(0, 2);
+  if (refs.length === 0) return 0;
+
+  const relogio = new Promise<null>((resolve) => setTimeout(() => resolve(null), tectoMs));
+  try {
+    const feitas = await Promise.race([
+      Promise.all(refs.map((r) => derivadaMediaAPedido(r).catch(() => ({ motivo: "" })))),
+      relogio,
+    ]);
+    if (!feitas) {
+      log.warn("derivadas: aquecimento da capa passou do tecto", { n: refs.length, tectoMs });
+      return 0;
+    }
+    return feitas.filter((f) => f.motivo === "ok").length;
+  } catch {
+    return 0;
   }
 }

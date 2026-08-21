@@ -36,6 +36,10 @@ vi.mock("@/lib/proposal-storage", () => ({
     H.assinados.push(...paths);
     return new Map(paths.map((p) => [p, `https://storage.example/m/${encodeURIComponent(p)}`]));
   },
+  signProposalMids: async (paths: string[]) => {
+    H.assinados.push(...paths);
+    return new Map(paths.map((p) => [p, `https://storage.example/d/${encodeURIComponent(p)}`]));
+  },
 }));
 vi.mock("@/lib/biblioteca-fotos-store", () => ({
   formasDeCaminhos: async () => new Map(),
@@ -68,7 +72,12 @@ describe("o que a rota devolve", () => {
     // escreve. O que não pode aparecer é um caminho FORA de um URL: nos ids,
     // ou num campo qualquer que a rota tenha resolvido acrescentar.
     const semUrls = JSON.stringify(
-      corpo.fotos.map((f: Record<string, unknown>) => ({ ...f, miniatura: "", original: "" })),
+      corpo.fotos.map((f: Record<string, unknown>) => ({
+        ...f,
+        miniatura: "",
+        original: "",
+        media: "",
+      })),
     );
     expect(semUrls).not.toContain("ped-7");
     expect(semUrls).not.toContain("outono");

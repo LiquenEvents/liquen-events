@@ -607,10 +607,18 @@ function Celula({
     foto?.original,
   );
   const proporcao = foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : undefined;
-  /** A derivada intermédia desta fotografia, pelo id OPACO — nunca por um
-   *  caminho. Ver a rota `api/proposta/[token]/foto/[id]`. */
+  /**
+   * A derivada intermédia desta fotografia.
+   *
+   * Assinada, quando já foi fabricada: vem do CDN do Storage directamente ao
+   * telemóvel, sem passar pela nossa função. Enquanto não existir, é a rota que
+   * a fabrica, guarda e serve — pelo id OPACO, nunca por um caminho (ver
+   * `api/proposta/[token]/foto/[id]`). Ver `signProposalMids` para o porquê de
+   * a rota ter deixado de ser o caminho de todos os dias.
+   */
   const media = foto
-    ? `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`
+    ? (foto.media ??
+      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`)
     : "";
   /**
    * O `srcset` só vale enquanto a primeira escolha está de pé.

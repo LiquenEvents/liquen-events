@@ -1,6 +1,6 @@
 import "server-only";
 import { isPendingImage, type ProposalDoc } from "./proposal-doc";
-import { signProposalPaths, signProposalThumbs } from "./proposal-storage";
+import { signProposalMids, signProposalPaths, signProposalThumbs } from "./proposal-storage";
 import { ehRefDeTema, caminhoDoRefDeTema } from "./theme-ref";
 import { formasDeCaminhos, lqipsDeCaminhos } from "./biblioteca-fotos-store";
 
@@ -67,6 +67,15 @@ export interface FotoDaProposta {
   id: string;
   /** O URL da derivada de 400 px. Ausente quando não há miniatura guardada. */
   miniatura?: string;
+  /**
+   * O URL da derivada de 1200 px, assinado DIRECTO do Storage.
+   *
+   * Ausente quando a derivada ainda não foi fabricada — e é essa ausência que
+   * manda quem desenha usar a rota `/api/proposta/…/foto/…`, que a fabrica.
+   * Ver `signProposalMids`: a rota deixa de ser o caminho de todos os dias e
+   * passa a ser o de arranque.
+   */
+  media?: string;
   /** O URL do ficheiro grande. É o que a lupa abre, e SÓ isso. */
   original?: string;
   /** Largura do ficheiro em pixels, quando se sabe (ver `formasDeCaminhos`). */
@@ -147,9 +156,9 @@ export function inventarioDeFotos(
  * com menos fotos do que o casal tem no PDF que recebeu por email.
  *
  * ── O CUSTO, CONTADO ──────────────────────────────────────────────────────
- * Quatro idas ao Storage no total, sejam 4 fotografias ou 46: dois lotes de
- * assinatura (originais e miniaturas), cada um deles já dividido por bucket lá
- * dentro (`assinarRefs`), em paralelo. Mais duas consultas à base de dados,
+ * Cinco idas ao Storage no total, sejam 4 fotografias ou 46: três lotes de
+ * assinatura (originais, miniaturas e as derivadas de 1200 px), cada um deles
+ * já dividido por bucket lá dentro (`assinarRefs`), em paralelo. Mais duas consultas à base de dados,
  * por PASTA e não por foto, para as formas e os placeholders. Nunca uma ida
  * por fotografia.
  */
@@ -171,9 +180,12 @@ export async function fotosDaProposta(
   const caminhoReal = (ref: string) => (ehRefDeTema(ref) ? caminhoDoRefDeTema(ref) : ref);
   const caminhos = porAssinar.map(caminhoReal);
 
-  const [originais, miniaturas, formas, lqips] = await Promise.all([
+  const [originais, miniaturas, medias, formas, lqips] = await Promise.all([
     signProposalPaths(porAssinar),
     signProposalThumbs(porAssinar),
+    // A de 1200 px assinada, quando já existe: é ela que a capa e a galeria
+    // pedem num telemóvel, e era a única que fazia o desvio pela nossa função.
+    signProposalMids(porAssinar),
     formasDeCaminhos(caminhos),
     lqipsDeCaminhos(caminhos),
   ]);
@@ -187,6 +199,7 @@ export async function fotosDaProposta(
     return {
       id,
       ...(miniaturas.get(ref) ? { miniatura: miniaturas.get(ref) } : {}),
+      ...(medias.get(ref) ? { media: medias.get(ref) } : {}),
       ...(originais.get(ref) ? { original: originais.get(ref) } : {}),
       ...(forma ? { largura: forma.largura, altura: forma.altura } : {}),
       ...(lqip ? { lqip } : {}),
