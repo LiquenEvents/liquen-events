@@ -1552,3 +1552,83 @@ describe("o seletor a partir de 1024 px", () => {
     expect(primeiro.className).toContain("lg:!justify-start");
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O SELETOR ABRE A SABER EM QUE PROPOSTA ESTÁ — FASE 6
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «o seletor abre sem saber em que proposta estou».
+ *
+ * Abria no tema em que se tocou por último — que, ao fim de um dia de
+ * trabalho, é muitas vezes de OUTRO casamento. Encher o quarto mood board de
+ * um casamento cujos três primeiros vieram todos de «Itália» e ver o diálogo
+ * abrir em «Terracotta» é abrir no sítio errado com toda a informação para
+ * acertar.
+ *
+ * A ordem de escolha é o que aqui se prende: o que ela fez NESTA sessão ganha
+ * sempre (é o acto mais recente e mais explícito), e o contexto do pedido só
+ * entra quando não há nada dessa sessão — mas ganha à memória do dia anterior.
+ */
+describe("por que tema é que o diálogo abre", () => {
+  const varios = Array.from({ length: 4 }, (_, i) => ({
+    ...THEME,
+    id: `t${i + 1}`,
+    name: `Tema ${i + 1}`,
+  }));
+  /** O nome do tema que está aberto — o chip com `aria-pressed`. */
+  function temaActivo(): string {
+    const lista = screen.getByRole("group", { name: "Temas" });
+    const activos = [...lista.querySelectorAll('button[aria-pressed="true"]')];
+    expect(activos, "esperava UM tema activo").toHaveLength(1);
+    // Pelo nome ACESSÍVEL e não pelo texto: o chip escreve o nome e a
+    // contagem lado a lado, e o `textContent` cola-os («Tema 341»).
+    return (activos[0].getAttribute("aria-label") ?? "").split(",")[0].trim();
+  }
+
+  beforeEach(() => {
+    route("GET /api/temas", () => ok(varios));
+    // A pasta responde por qualquer um dos quatro: o que se está a testar é
+    // por QUAL deles o diálogo abre, e todos têm de poder abrir.
+    for (const t of varios) {
+      route(`GET /api/temas/${t.id}/imagens`, (url) => {
+        const q = new URL(url, "http://test").searchParams;
+        const offset = Number(q.get("offset") ?? 0);
+        const limit = Number(q.get("limit") ?? THEME_PAGE_SIZE);
+        return ok({
+          ok: true,
+          images: photos.slice(offset, offset + limit),
+          total: photos.length,
+          truncated: false,
+        });
+      });
+    }
+    // A memória da sessão passada aponta para o «Tema 3» — outro dia, muitas
+    // vezes outro casamento. É o palpite que o contexto tem de bater.
+    localStorage.setItem("liquen-tema-recente", "t3");
+  });
+
+  it("abre no tema de que esta proposta já está a beber", async () => {
+    // Nomes que NÃO existem na pasta de mentira: o que se está a testar é por
+    // que tema o diálogo abre, e uma foto que também esteja na grelha ganhava
+    // o sufixo «(já nesta proposta)» e mudava o nome acessível da célula.
+    await openPicker(true, ["t1/usada-a.jpg", "t1/usada-b.jpg", "t2/usada-c.jpg"]);
+    expect(temaActivo()).toBe("Tema 1");
+  });
+
+  it("uma foto solta de outro tema não muda o rumo", async () => {
+    await openPicker(true, ["t2/a.jpg", "t2/b.jpg", "t2/c.jpg", "t4/z.jpg"]);
+    expect(temaActivo()).toBe("Tema 2");
+  });
+
+  it("sem contexto nenhum, fica a memória da sessão passada", async () => {
+    await openPicker(true, []);
+    expect(temaActivo()).toBe("Tema 3");
+  });
+
+  /** Um caminho que não tem a forma `<tema>/<ficheiro>` não inventa um tema. */
+  it("caminhos mal formados são ignorados", async () => {
+    await openPicker(true, ["", "/solto.jpg", "sem-barra.jpg"]);
+    expect(temaActivo()).toBe("Tema 3");
+  });
+});

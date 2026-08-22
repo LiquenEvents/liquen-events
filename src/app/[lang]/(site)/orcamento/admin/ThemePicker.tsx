@@ -386,10 +386,42 @@ function warmThumbs(images: readonly ThemeImage[]): void {
   }
 }
 
-/** Qual o tema por que o diálogo abre: o desta sessão, o da sessão passada, ou
- *  o primeiro da lista. */
-function preferredThemeId(list: readonly ThemeSummary[]): string | null {
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * POR QUE TEMA É QUE O DIÁLOGO ABRE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Quatro respostas, por esta ordem — e a ordem é a decisão toda:
+ *
+ * 1. O tema que ela escolheu NESTA sessão. É o acto mais recente e mais
+ *    explícito que existe: escolheu «Boho» há dois minutos, fechou, reabriu.
+ *    Mandá-la de volta para outro sítio seria desfazer-lhe a escolha.
+ *
+ * 2. O tema de que ESTA PROPOSTA já está a beber. Palavras dela: «o seletor
+ *    abre sem saber em que proposta estou». Quando se está a encher o quarto
+ *    mood board de um casamento cujos três primeiros vieram todos de «Itália»,
+ *    abrir em «Terracotta» — porque foi nisso que se tocou ONTEM, noutro
+ *    casamento — é abrir no sítio errado com toda a informação para acertar.
+ *
+ *    Vem do que já foi importado para este pedido (`usadas`), e é o tema mais
+ *    representado entre elas: uma foto solta de outro tema não muda o rumo.
+ *
+ * 3. O da sessão passada (`localStorage`). Continua a ser melhor do que nada,
+ *    mas é o palpite mais fraco dos três — é memória de outro dia e, muitas
+ *    vezes, de outro casamento. Por isso perde para o contexto.
+ *
+ * 4. O primeiro da lista.
+ */
+function preferredThemeId(
+  list: readonly ThemeSummary[],
+  /** Caminhos da biblioteca já usados nesta proposta (`<tema>/<ficheiro>`). */
+  usadas?: readonly string[],
+): string | null {
   if (lastThemeId && list.some((t) => t.id === lastThemeId)) return lastThemeId;
+
+  const doPedido = temaMaisUsado(usadas);
+  if (doPedido && list.some((t) => t.id === doPedido)) return doPedido;
+
   let saved: string | null = null;
   try {
     saved = localStorage.getItem(LAST_THEME_KEY);
@@ -398,6 +430,32 @@ function preferredThemeId(list: readonly ThemeSummary[]): string | null {
   }
   if (saved && list.some((t) => t.id === saved)) return saved;
   return list[0]?.id ?? null;
+}
+
+/**
+ * O tema mais representado numa lista de caminhos da biblioteca, ou `null`.
+ *
+ * Empate resolve-se pelo primeiro a chegar ao topo, e não interessa qual: um
+ * empate quer dizer que a proposta bebe dos dois na mesma medida, e nesse caso
+ * qualquer um deles é uma abertura defensável.
+ */
+function temaMaisUsado(caminhos?: readonly string[]): string | null {
+  if (!caminhos || caminhos.length === 0) return null;
+  const conta = new Map<string, number>();
+  let melhor: string | null = null;
+  let maximo = 0;
+  for (const c of caminhos) {
+    const corte = c.indexOf("/");
+    if (corte <= 0) continue;
+    const tema = c.slice(0, corte);
+    const n = (conta.get(tema) ?? 0) + 1;
+    conta.set(tema, n);
+    if (n > maximo) {
+      maximo = n;
+      melhor = tema;
+    }
+  }
+  return melhor;
 }
 
 /** Adivinha um tema: metadados + miniaturas, sem nada no ecrã ainda. */
@@ -1047,8 +1105,15 @@ export default function ThemePicker({
    */
   const [themeId, setThemeId] = useState<string | null>(() => {
     const list = temasEmCache();
-    if (list) return preferredThemeId(list);
+    if (list) return preferredThemeId(list, usedThemePaths);
+    // Sem lista para validar contra, o palpite segue a MESMA ordem do
+    // `preferredThemeId` — e tem de a seguir, senão o contexto do pedido nunca
+    // chegava a ser usado: este palpite acerta quase sempre, e o efeito da
+    // lista, lá em baixo, só o corrige quando aponta para um tema que já não
+    // existe. Um palpite com outra ordem era outra ordem, disfarçada.
     if (lastThemeId) return lastThemeId;
+    const doPedido = temaMaisUsado(usedThemePaths);
+    if (doPedido) return doPedido;
     try {
       return localStorage.getItem(LAST_THEME_KEY);
     } catch {
@@ -1142,6 +1207,22 @@ export default function ThemePicker({
   /** As que estão a ser copiadas AGORA: escolher outra vez seria importar a
    *  dobrar, por isso o toque é ignorado em silêncio. */
   const pendingSet = useMemo(() => pendingSources(quoteId), [quoteId, tick]);
+  /**
+   * O contexto do pedido, num sítio de onde o efeito da lista o possa ler sem
+   * o pôr nas dependências.
+   *
+   * Pô-lo nas dependências fazia a lista de temas ser pedida OUTRA VEZ a cada
+   * foto que entrasse na proposta — e essa lista é de montagem, não de estado.
+   * O que o efeito precisa é do valor mais recente no instante em que a
+   * resposta chega, e é isso que uma referência dá.
+   */
+  const usadasRef = useRef(usedThemePaths);
+  // Num efeito e não no desenho: escrever numa referência durante o desenho é
+  // um efeito colateral, e o React tem razão em o recusar.
+  useEffect(() => {
+    usadasRef.current = usedThemePaths;
+  }, [usedThemePaths]);
+
   const usedSet = useMemo(() => {
     const set = new Set<string>(usedThemePaths ?? []);
     for (const p of importedSources(quoteId)) set.add(p);
@@ -1222,7 +1303,7 @@ export default function ThemePicker({
         // pedir as mesmas imagens e perder o rolo.
         setThemeId((atual) => {
           if (atual && list.some((t) => t.id === atual)) return atual;
-          return preferredThemeId(list);
+          return preferredThemeId(list, usadasRef.current);
         });
       } catch {
         if (active) toast("Não foi possível carregar os temas.", "error");
