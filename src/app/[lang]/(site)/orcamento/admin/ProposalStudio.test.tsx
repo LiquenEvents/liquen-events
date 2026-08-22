@@ -6473,3 +6473,362 @@ describe("o orçamento a 390 px", () => {
     expect(item.parentElement?.className).toContain("sm:grid-cols-[minmax(0,1fr)_10rem_auto]");
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE APAGA E NÃO VOLTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Um inventário do estúdio contou vinte e uma acções irreversíveis, e várias
+ * não tinham nada: nem pergunta, nem anular, nem sequer um aviso depois. O
+ * item desaparecia e mais nada — uma página de inspiração com oito fotografias
+ * curadas uma a uma, uma fase do cronograma com seis tarefas escritas à mão,
+ * uma linha do orçamento.
+ *
+ * A regra está escrita por extenso em `aRemover` (`ProposalStudio.tsx`) e é
+ * uma só: PERGUNTA-SE o que é raro e caro, OFERECE-SE ANULAR o que é frequente
+ * e barato de refazer. Uma coisa ou a outra, nunca as duas.
+ *
+ * O que estes testes prendem é o que separa uma pergunta útil de um «Tens a
+ * certeza?»: que a frase NOMEIA a coisa, que DIZ O NÚMERO do que vai com ela e
+ * a consequência, e que responder «não» (ou «Anular») devolve exactamente o
+ * que lá estava sem escrever nada.
+ */
+describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
+  /** Um rascunho de decoração com duas páginas de inspiração e o orçamento
+   *  escrito — que é como uma proposta está quando estes «×» fazem estrago. */
+  function seedDuasPaginas() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [
+          // Os títulos não repetem nenhum rótulo de serviço de propósito: um
+          // `getByDisplayValue("Cerimónia")` apanharia os dois campos.
+          {
+            title: "Altar e corredor",
+            annotation: "",
+            images: ["board/a.jpg", "board/b.jpg", "board/c.jpg"],
+          },
+          { title: "Mesa do jantar", annotation: "", images: ["board/d.jpg", "board/e.jpg"] },
+        ],
+        budgetItems: ["Decoração de cerimónia", "Centros de mesa"],
+        budgetAmounts: [1200, 800],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  /** Um rascunho de organização, que é o modelo que tem cronograma. */
+  function seedComCronograma() {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "organizacao",
+        ref: "PO Organização",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [
+          { letter: "a)", title: "Coordenação", items: [{ label: "Dia do evento" }] },
+        ],
+        moodBoards: [],
+        budgetItems: [],
+        budgetRows: [
+          { item: "Coordenação e planeamento integral", price: "6.500,00 €" },
+          { item: "Coordenação no dia do evento", price: "1.850,00 €" },
+        ],
+        cronograma: [
+          {
+            title: "6-12 meses antes do casamento",
+            items: ["Definição do conceito", "Escolha do espaço", "Reunião com fornecedores"],
+          },
+          { title: "1 mês antes", items: ["Confirmação de convidados"] },
+        ],
+        coverImages: ["", ""],
+        totalAmount: 8350,
+        totalVatMode: "acrescer",
+      }),
+    );
+  }
+
+  /** Os mood boards tal como estão gravados no rascunho, agora. */
+  const boardsGravados = () =>
+    (JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}").moodBoards ?? []) as {
+      title: string;
+      images: string[];
+    }[];
+
+  // ── A página de inspiração: PERGUNTA ────────────────────────────────────
+  // A acção mais cara do estúdio — leva as fotografias todas daquela página e a
+  // folha que elas ocupam no PDF. Rara e cara, portanto pergunta.
+
+  it("remover uma página pergunta, e a pergunta nomeia, conta e diz onde ela saía", async () => {
+    seedDuasPaginas();
+    renderStudio();
+    const user = userEvent.setup();
+    await screen.findAllByLabelText("Título do mood board");
+    await user.click(screen.getAllByRole("button", { name: "Remover mood board" })[0]);
+
+    const pergunta = (await screen.findByRole("alertdialog")).textContent ?? "";
+    // O NOME que ela deu à página, e não «esta página».
+    expect(pergunta).toMatch(/Altar e corredor/);
+    // O NÚMERO de fotografias que vão com ela.
+    expect(pergunta).toMatch(/3 fotografias/);
+    // E ONDE ela estava a sair — a parte que decide a resposta e a única que
+    // não se vê a olhar para o cartão.
+    expect(pergunta).toMatch(/1\.ª das 2 páginas de inspiração do PDF/);
+    // Nunca a frase que não acrescenta nada nenhuma.
+    expect(pergunta).not.toMatch(/certeza/i);
+  });
+
+  it("cancelar a remoção da página não perde nada nem escreve nada", async () => {
+    seedDuasPaginas();
+    renderStudio();
+    const user = userEvent.setup();
+    await screen.findAllByLabelText("Título do mood board");
+    // O que está gravado ANTES — é com isto que se compara no fim.
+    await waitFor(() => expect(boardsGravados()).toHaveLength(2));
+    const antes = JSON.stringify(boardsGravados());
+
+    await user.click(screen.getAllByRole("button", { name: "Remover mood board" })[0]);
+    await user.click(await screen.findByRole("button", { name: /^Cancelar$/ }));
+
+    // A pergunta sai do ecrã, as duas páginas continuam lá…
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByDisplayValue("Altar e corredor")).toBeTruthy();
+    expect(screen.getByDisplayValue("Mesa do jantar")).toBeTruthy();
+    // …e o rascunho gravado é exactamente o mesmo: cancelar não escreve nada.
+    expect(JSON.stringify(boardsGravados())).toBe(antes);
+    // E não fica uma barra de «Anular» a oferecer o resgate de nada.
+    expect(screen.queryByText(/Pode anular durante/)).toBeNull();
+  });
+
+  it("e confirmar remove mesmo — o caminho feliz não mudou", async () => {
+    seedDuasPaginas();
+    renderStudio();
+    const user = userEvent.setup();
+    await screen.findAllByLabelText("Título do mood board");
+    await user.click(screen.getAllByRole("button", { name: "Remover mood board" })[0]);
+    await user.click(await screen.findByRole("button", { name: /^Remover a página$/ }));
+    await waitFor(() => expect(screen.queryByDisplayValue("Altar e corredor")).toBeNull());
+    expect(screen.getByDisplayValue("Mesa do jantar")).toBeTruthy();
+  });
+
+  // ── A fase do cronograma: PERGUNTA ──────────────────────────────────────
+  // Leva as tarefas todas que lhe estão dentro, e o «×» que a apaga fica dois
+  // centímetros acima dos «×» das tarefas, do mesmo tamanho.
+
+  it("remover uma fase pergunta, nomeando-a e contando as tarefas", async () => {
+    seedComCronograma();
+    renderStudio();
+    const user = userEvent.setup();
+    await screen.findAllByLabelText("Título da fase");
+    await user.click(screen.getAllByRole("button", { name: "Remover fase" })[0]);
+
+    const pergunta = (await screen.findByRole("alertdialog")).textContent ?? "";
+    expect(pergunta).toMatch(/6-12 meses antes do casamento/);
+    expect(pergunta).toMatch(/3 tarefas/);
+    expect(pergunta).not.toMatch(/certeza/i);
+  });
+
+  it("cancelar a remoção da fase não perde nada nem escreve nada", async () => {
+    seedComCronograma();
+    renderStudio();
+    const user = userEvent.setup();
+    await screen.findAllByLabelText("Título da fase");
+    await user.click(screen.getAllByRole("button", { name: "Remover fase" })[0]);
+    await user.click(await screen.findByRole("button", { name: /^Cancelar$/ }));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    // A fase e as três tarefas continuam inteiras.
+    expect(screen.getByDisplayValue("6-12 meses antes do casamento")).toBeTruthy();
+    expect(screen.getByDisplayValue("Definição do conceito")).toBeTruthy();
+    expect(screen.getByDisplayValue("Escolha do espaço")).toBeTruthy();
+    expect(screen.getByDisplayValue("Reunião com fornecedores")).toBeTruthy();
+    expect(screen.queryByText(/Pode anular durante/)).toBeNull();
+  });
+
+  it("a fase que é a última com tarefas diz que o cronograma perde a página", async () => {
+    // A consequência que não se vê a olhar para o cartão: sem nenhuma fase com
+    // tarefas, o cronograma deixa de ter folha no PDF.
+    seedComCronograma();
+    renderStudio();
+    const user = userEvent.setup();
+    await screen.findAllByLabelText("Título da fase");
+    // Tira-se a segunda (uma tarefa só) e volta-se à primeira, que fica
+    // sozinha a segurar a página.
+    await user.click(screen.getAllByRole("button", { name: "Remover fase" })[1]);
+    await user.click(await screen.findByRole("button", { name: /^Remover a fase$/ }));
+    await waitFor(() => expect(screen.queryByDisplayValue("1 mês antes")).toBeNull());
+
+    await user.click(screen.getAllByRole("button", { name: "Remover fase" })[0]);
+    const pergunta = (await screen.findByRole("alertdialog")).textContent ?? "";
+    expect(pergunta).toMatch(/3 tarefas/);
+    expect(pergunta).toMatch(/cronograma deixa de ter página no PDF/);
+  });
+
+  // ── A tarefa: ANULAR ────────────────────────────────────────────────────
+  // Gesto frequente: escreve-se a lista às apalpadelas. Uma caixa por cada «×»
+  // seria cinco caixas para compor uma fase.
+
+  it("remover uma tarefa faz-se já, e a barra diz qual saiu e quantas ficam", async () => {
+    seedComCronograma();
+    renderStudio();
+    const user = userEvent.setup();
+    const tarefa = await screen.findByDisplayValue("Escolha do espaço");
+    await user.click(within(tarefa.parentElement!).getByLabelText("Remover tarefa"));
+
+    // Sem pergunta pelo meio.
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByDisplayValue("Escolha do espaço")).toBeNull();
+
+    const barra = (await screen.findByText(/Pode anular durante/)).textContent ?? "";
+    expect(barra).toMatch(/Escolha do espaço/);
+    expect(barra).toMatch(/6-12 meses antes do casamento/);
+    expect(barra).toMatch(/fica com 2/);
+  });
+
+  it("anular devolve a tarefa ao sítio de onde saiu", async () => {
+    seedComCronograma();
+    renderStudio();
+    const user = userEvent.setup();
+    const tarefa = await screen.findByDisplayValue("Escolha do espaço");
+    await user.click(within(tarefa.parentElement!).getByLabelText("Remover tarefa"));
+    await user.click(await screen.findByRole("button", { name: /^Anular$/ }));
+
+    expect(await screen.findByDisplayValue("Escolha do espaço")).toBeTruthy();
+    // As outras duas não se mexeram — anular repõe, não duplica.
+    expect(screen.getByDisplayValue("Definição do conceito")).toBeTruthy();
+    expect(screen.getByDisplayValue("Reunião com fornecedores")).toBeTruthy();
+    // E a oferta desaparece: anulada uma vez, não fica a pedir de novo.
+    expect(screen.queryByText(/Pode anular durante/)).toBeNull();
+  });
+
+  // ── A linha do orçamento: ANULAR ────────────────────────────────────────
+  // O gesto mais repetido do estúdio — compõe-se linha a linha com o cliente ao
+  // telefone. Uma pergunta a cada uma é um editor que ninguém usa.
+
+  it("remover uma linha do orçamento faz-se já, e a barra diz qual era e quanto valia", async () => {
+    seedDuasPaginas();
+    renderStudio();
+    const user = userEvent.setup();
+    const campo = await screen.findByDisplayValue("Decoração de cerimónia");
+    await user.click(within(campo.parentElement!).getByLabelText("Remover item"));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    const barra = (await screen.findByText(/Pode anular durante/)).textContent ?? "";
+    expect(barra).toMatch(/Decoração de cerimónia/);
+    expect(barra).toContain(eur(1200));
+  });
+
+  it("anular devolve a linha do orçamento com o preço que tinha", async () => {
+    seedDuasPaginas();
+    renderStudio();
+    const user = userEvent.setup();
+    const campo = await screen.findByDisplayValue("Decoração de cerimónia");
+    await user.click(within(campo.parentElement!).getByLabelText("Remover item"));
+    await user.click(await screen.findByRole("button", { name: /^Anular$/ }));
+
+    expect(await screen.findByDisplayValue("Decoração de cerimónia")).toBeTruthy();
+    // O preço volta com ela — uma linha sem preço não é a linha que lá estava.
+    expect(await screen.findByLabelText("Preço de Decoração de cerimónia")).toHaveValue("1200");
+    expect(screen.getByDisplayValue("Centros de mesa")).toBeTruthy();
+    expect(screen.queryByText(/Pode anular durante/)).toBeNull();
+  });
+
+  it("a linha de Organização leva o mesmo — anular, com o valor tal como está escrito", async () => {
+    seedComCronograma();
+    renderStudio();
+    const user = userEvent.setup();
+    const campo = await screen.findByDisplayValue("Coordenação no dia do evento");
+    await user.click(within(campo.parentElement!).getByLabelText("Remover linha"));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    const barra = (await screen.findByText(/Pode anular durante/)).textContent ?? "";
+    expect(barra).toMatch(/Coordenação no dia do evento/);
+    // Aqui o valor é TEXTO, e a barra di-lo à letra em vez de o tentar somar.
+    expect(barra).toMatch(/1\.850,00 €/);
+
+    await user.click(await screen.findByRole("button", { name: /^Anular$/ }));
+    expect(await screen.findByDisplayValue("Coordenação no dia do evento")).toBeTruthy();
+    expect(screen.getByDisplayValue("1.850,00 €")).toBeTruthy();
+  });
+
+  // ── O «Limpar rascunho» ─────────────────────────────────────────────────
+  // Continua sem pergunta, de propósito (ver `clearDraft`): já tem a sua
+  // protecção, e as duas seriam duas respostas ao mesmo gesto. O que faltava
+  // era o NÚMERO — quem não sabe o que perdeu não sabe se vale a pena anular.
+
+  it("«Limpar rascunho» diz o que levou, com os números, enquanto dá para anular", async () => {
+    seedDuasPaginas();
+    renderStudio();
+    const user = userEvent.setup();
+    await screen.findAllByLabelText("Título do mood board");
+    await user.click(await screen.findByRole("button", { name: /Limpar rascunho/ }));
+
+    const barra = (await screen.findByText(/Pode anular durante/)).textContent ?? "";
+    // Duas páginas de inspiração, cinco fotografias, um serviço, duas linhas.
+    expect(barra).toMatch(/2 páginas de inspiração/);
+    expect(barra).toMatch(/5 fotografias/);
+    expect(barra).toMatch(/2 linhas de orçamento/);
+    // E continua sem pergunta nenhuma antes — é a decisão escrita em `limpo`.
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  // ── O envio ─────────────────────────────────────────────────────────────
+  // A acção mais irreversível da casa. A pergunta confirmava só a MORADA.
+
+  it("a confirmação do envio diz para quem vai, quantas páginas, que total e em que língua", async () => {
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+
+    const resumo = (await screen.findByText(/Enviar para/)).textContent ?? "";
+    // PARA QUEM.
+    expect(resumo).toContain("maria@example.pt");
+    // QUANTAS PÁGINAS — com o «cerca de» que a contagem promete, e não um
+    // número exacto que o desenho do PDF pode desmentir.
+    expect(resumo).toMatch(/cerca de \d+ páginas/);
+    // EM QUE LÍNGUA — tira-se uma prova em inglês no passo anterior e o
+    // selector fica lá.
+    expect(resumo).toMatch(/em português/);
+    // QUE TOTAL — o mesmo bloco de totais que o gerador do PDF usa.
+    expect(resumo).toContain(eur(3690));
+  });
+
+  it("cancelar o envio não envia nada — e o passo não fica dado por feito", async () => {
+    seedDraft(2);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ }));
+    await user.click(await screen.findByRole("button", { name: /^Cancelar$/ }));
+
+    // Nada seguiu para o servidor: nem um POST à rota da proposta.
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url, init]) =>
+          String(url).includes("/proposta-doc") &&
+          ((init as RequestInit | undefined)?.method ?? "GET") === "POST",
+      ),
+    ).toHaveLength(0);
+    // Nem o cartão de êxito («Enviar de novo / nova revisão» só existe lá).
+    expect(screen.queryByRole("button", { name: /Enviar de novo/ })).toBeNull();
+    // E o botão volta ao sítio, para se poder responder outra vez.
+    expect(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ })).toBeTruthy();
+  });
+});

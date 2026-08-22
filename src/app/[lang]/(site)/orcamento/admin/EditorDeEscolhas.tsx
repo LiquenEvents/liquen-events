@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   MINIMO_DE_OPCOES,
   escolhaPronta,
@@ -42,6 +42,36 @@ import {
  * casal jura não a ter visto.
  */
 
+/**
+ * ── AS DUAS COISAS QUE APAGAM AQUI, E PORQUE É QUE LEVAM TRATAMENTO DIFERENTE ─
+ *
+ * A regra da casa é uma só: pergunta-se o que é RARO E CARO, oferece-se anular
+ * o que é FREQUENTE E BARATO de refazer. As duas acções deste ecrã caem cada
+ * uma de seu lado da linha, e por isso não levam o mesmo.
+ *
+ *  · APAGAR A ALTERNATIVA leva PERGUNTA. A maior parte das propostas não tem
+ *    alternativa nenhuma (é o que diz o cabeçalho, e é por isso que a secção é
+ *    opcional): quem apaga uma está a apagar a única coisa deste documento que
+ *    faz o casal responder, com o título, a nota, as duas ou mais opções e as
+ *    fotografias que as explicam — tudo escolhido à mão de entre os mood
+ *    boards. É um gesto de uma vez por proposta, e refazê-lo é voltar a
+ *    escolher fotografias uma a uma. A pergunta NOMEIA a alternativa, CONTA as
+ *    opções e as que já têm fotografia, e diz o que o casal perde.
+ *
+ *  · APAGAR A OPÇÃO leva ANULAR. Acrescentar e tirar opções é o gesto normal de
+ *    escrever uma alternativa — carrega-se em «+ Opção», escreve-se, tira-se a
+ *    que sobrou. Uma pergunta a cada uma seria uma caixa a interromper o acto
+ *    de escrever, e uma caixa que se responde vinte vezes é uma caixa que se
+ *    despacha sem ler. Faz-se, e fica um «Anular» ao lado durante dez segundos.
+ *
+ * E nenhuma das duas atrasa o que não é destrutivo: uma alternativa ainda em
+ * branco (nem título, nem nota, nem opção escrita, nem fotografia) sai sem
+ * pergunta nenhuma. Perguntar por nada é ensinar a responder sem ler.
+ */
+
+/** Quantos segundos o «Anular» fica de pé — os mesmos do estúdio. */
+const SEGUNDOS_PARA_ANULAR = 10;
+
 /** Uma fotografia já usada nesta proposta, para se poder escolher. */
 export interface FotoDisponivel {
   /** O caminho, tal como está gravado no documento. */
@@ -73,12 +103,106 @@ export default function EditorDeEscolhas({
   const lista = escolhas ?? [];
   /** Que opção está com o selector de fotografia aberto (`e.id:o.id`). */
   const [aEscolherFoto, setAEscolherFoto] = useState<string | null>(null);
+  /**
+   * A alternativa que está à espera de resposta — só o `id`, e não a frase.
+   *
+   * Pelo `id` e não pelo índice porque a lista pode encolher por baixo da
+   * pergunta (o pai é que manda nela), e uma pergunta presa a uma posição
+   * apagava a alternativa errada.
+   *
+   * E só o `id` porque a FRASE se compõe no desenho (`perguntaSobre`): guardada
+   * aqui, ficava congelada no instante do clique, e bastava escrever no título
+   * por baixo dela para a pergunta passar a falar de uma alternativa que já não
+   * existe com aquele nome. Uma pergunta que conta tem de contar o que está lá.
+   */
+  const [aApagar, setAApagar] = useState<string | null>(null);
+  /** A lista tal como estava antes de se apagar uma opção, à espera do «Anular». */
+  const [anulavel, setAnulavel] = useState<{
+    escolhas: Escolha[];
+    frase: string;
+    segundos: number;
+  } | null>(null);
+
+  // A contagem decrescente do «Anular». Um `setTimeout` por segundo, como no
+  // estúdio: um intervalo a correr para sempre por causa de uma oferta que já
+  // caducou é trabalho que ninguém pediu.
+  useEffect(() => {
+    if (!anulavel) return;
+    if (anulavel.segundos <= 0) {
+      setAnulavel(null);
+      return;
+    }
+    const t = setTimeout(
+      () => setAnulavel((a) => (a ? { ...a, segundos: a.segundos - 1 } : null)),
+      1000,
+    );
+    return () => clearTimeout(t);
+  }, [anulavel]);
 
   const mudarEscolha = (i: number, p: Partial<Escolha>) =>
     onChange(lista.map((e, k) => (k === i ? { ...e, ...p } : e)));
 
   const mudarOpcao = (i: number, j: number, p: Partial<OpcaoDeEscolha>) =>
     mudarEscolha(i, { opcoes: lista[i].opcoes.map((o, k) => (k === j ? { ...o, ...p } : o)) });
+
+  /** Como se lhe chama numa frase — o que ela escreveu, ou a posição. */
+  const nomeDaEscolha = (e: Escolha, i: number) => e.titulo.trim() || `alternativa ${i + 1}`;
+  const nomeDaOpcao = (o: OpcaoDeEscolha, j: number) => o.rotulo.trim() || `opção ${j + 1}`;
+
+  /** Há aqui trabalho a perder? Em branco não há, e então não se pergunta. */
+  const temTrabalho = (e: Escolha) =>
+    e.titulo.trim() !== "" ||
+    (e.tituloEn ?? "").trim() !== "" ||
+    (e.nota ?? "").trim() !== "" ||
+    (e.notaEn ?? "").trim() !== "" ||
+    e.opcoes.some((o) => o.rotulo.trim() !== "" || (o.descricao ?? "").trim() !== "" || !!o.imagem);
+
+  /**
+   * A pergunta que nomeia e conta o que se perde.
+   *
+   * Nada de «Tens a certeza?» — isso não acrescenta informação nenhuma e
+   * responde-se sem ler. O que aqui está é o nome que ela deu, quantas opções
+   * vão com ele, quantas dessas já têm fotografia escolhida à mão, e o que o
+   * casal deixa de ver.
+   */
+  const perguntaSobre = (e: Escolha, i: number) => {
+    const comFoto = e.opcoes.filter((o) => !!o.imagem).length;
+    const opcoes = `${e.opcoes.length} ${e.opcoes.length === 1 ? "opção" : "opções"}`;
+    const fotos = comFoto > 0 ? `, ${comFoto} com fotografia` : "";
+    return `Apagar «${nomeDaEscolha(e, i)}»? Leva com ela ${opcoes}${fotos}, e o casal fica sem esta escolha para responder.`;
+  };
+
+  /** Apagar a alternativa: levanta a pergunta — ou sai já, se não houver nada. */
+  function pedirParaApagarEscolha(i: number) {
+    const e = lista[i];
+    if (!e) return;
+    if (!temTrabalho(e)) {
+      // Em branco não é uma perda: sai já, sem atrasar nada.
+      onChange(lista.filter((_, k) => k !== i));
+      return;
+    }
+    setAApagar(e.id);
+  }
+
+  /**
+   * Apagar a opção: faz-se, e fica o «Anular».
+   *
+   * A fotografia da lista INTEIRA é o que se guarda, e não a opção sozinha:
+   * repor uma opção por índice, numa lista que o pai pode ter mexido entretanto,
+   * é repô-la no sítio errado. Voltar ao que estava é sempre exacto.
+   */
+  function apagarOpcao(i: number, j: number) {
+    const e = lista[i];
+    const o = e?.opcoes[j];
+    if (!e || !o) return;
+    const ficam = e.opcoes.length - 1;
+    setAnulavel({
+      escolhas: lista,
+      frase: `Opção «${nomeDaOpcao(o, j)}» apagada de «${nomeDaEscolha(e, i)}» — ficam ${ficam}.`,
+      segundos: SEGUNDOS_PARA_ANULAR,
+    });
+    mudarEscolha(i, { opcoes: e.opcoes.filter((_, k) => k !== j) });
+  }
 
   const acrescentarEscolha = () =>
     onChange([
@@ -133,6 +257,35 @@ export default function EditorDeEscolhas({
         </strong>
         . Aparecem na página deles — não no PDF — e a resposta volta para a ficha do evento.
       </p>
+
+      {/* ── O «ANULAR» DE UMA OPÇÃO APAGADA ────────────────────────────────
+          Aqui em cima, e não ao lado do botão que a apagou: a linha de onde ela
+          saiu deixou de existir, e uma oferta pendurada num sítio que já mudou
+          de forma é uma oferta que salta de posição enquanto se procura. Este é
+          o mesmo canto para todas as alternativas desta secção.
+
+          SEM `aria-live`, como a barra irmã do estúdio (ver `limpo`, em
+          `ProposalStudio.tsx`): a contagem muda de segundo a segundo, e uma
+          região viva com um número lá dentro põe o leitor de ecrã a repetir a
+          mesma frase dez vezes seguidas. Isso não é anunciar — é tapar o que
+          quer que ela estivesse a ouvir a seguir. */}
+      {anulavel && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+          <span className="min-w-0 flex-1 text-[12px] leading-relaxed text-foreground/70">
+            {anulavel.frase} Pode anular durante {anulavel.segundos}s.
+          </span>
+          <button
+            type="button"
+            className="alvo-toque shrink-0 text-[12px] font-medium text-[#4d6350] underline-offset-2 hover:underline"
+            onClick={() => {
+              onChange(anulavel.escolhas);
+              setAnulavel(null);
+            }}
+          >
+            Anular
+          </button>
+        </div>
+      )}
 
       {lista.length === 0 ? null : (
         <ul className="mt-5 flex flex-col gap-5">
@@ -190,11 +343,48 @@ export default function EditorDeEscolhas({
                     // das fotos: um botão que apaga não pode ser invisível e
                     // continuar a apanhar o dedo.
                     className="alvo-toque shrink-0 rounded-md px-2 py-1.5 text-[13px] text-foreground/55 transition-colors hover:bg-[#c0392b]/10 hover:text-[#a03123] pointer-coarse:h-8 pointer-coarse:w-8"
-                    onClick={() => onChange(lista.filter((_, k) => k !== i))}
+                    onClick={() => pedirParaApagarEscolha(i)}
                   >
                     ×
                   </button>
                 </div>
+
+                {/* ── A PERGUNTA, NO SÍTIO ONDE O DEDO CARREGOU ─────────────
+                    Dentro do cartão da alternativa e não no topo da secção: com
+                    quatro alternativas escritas, uma pergunta que aparecesse lá
+                    em cima aparecia fora do ecrã — e um «×» que não faz nada
+                    visível carrega-se outra vez.
+
+                    `alertdialog` + `assertive` porque INTERROMPE mesmo: está à
+                    espera de resposta, e ficar calada era deixar quem ouve o
+                    ecrã convencido de que o botão não fez nada. */}
+                {aApagar === escolha.id && (
+                  <div
+                    role="alertdialog"
+                    aria-live="assertive"
+                    aria-label="Confirmar apagar a alternativa"
+                    className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+                  >
+                    <span className="min-w-[12rem] flex-1 text-[12px] leading-relaxed text-foreground/80">
+                      {perguntaSobre(escolha, i)}
+                    </span>
+                    {/* Cancelar é o primeiro e não escreve NADA: nem apaga, nem
+                        toca no documento. Fecha a pergunta e mais nada. */}
+                    <button type="button" className={BOTAO_MAGRO} onClick={() => setAApagar(null)}>
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className={`${BOTAO_MAGRO} border-[#c0392b]/35 text-[#a03123] hover:bg-[#c0392b]/10`}
+                      onClick={() => {
+                        onChange(lista.filter((e) => e.id !== escolha.id));
+                        setAApagar(null);
+                      }}
+                    >
+                      Apagar a alternativa
+                    </button>
+                  </div>
+                )}
 
                 <ul className="mt-3 flex flex-col gap-2.5">
                   {escolha.opcoes.map((opcao, j) => {
@@ -280,11 +470,9 @@ export default function EditorDeEscolhas({
                               <button
                                 type="button"
                                 className={BOTAO_MAGRO}
-                                onClick={() =>
-                                  mudarEscolha(i, {
-                                    opcoes: escolha.opcoes.filter((_, k) => k !== j),
-                                  })
-                                }
+                                // Sem pergunta, de propósito: ver o cabeçalho.
+                                // Apaga já e deixa o «Anular» lá em cima.
+                                onClick={() => apagarOpcao(i, j)}
                               >
                                 Apagar a opção
                               </button>
