@@ -322,9 +322,23 @@ export function guardarDensidade(d: Densidade): void {
  * "Compacto" chega a seis colunas porque é exactamente o número de temas de
  * hoje — o pedido era vê-los todos de uma vez, sem scroll.
  */
+/**
+ * ── AS COLUNAS, E PORQUE É QUE A FOLGA NÃO É QUADRADA ─────────────────────
+ *
+ * Pedido dela, na Fase 3: «mais folga entre os cartões».
+ *
+ * A folga VERTICAL é maior do que a horizontal, e não por gosto: desde que um
+ * cartão pode ter uma linha pendurada por baixo dele — «Lê-se como "italia" ·
+ * Juntar» —, uma folga igual nos dois sentidos punha essa linha à mesma
+ * distância do cartão a que pertence e do cartão de baixo. Lia-se como sendo
+ * do outro.
+ *
+ * Horizontalmente muda pouco: a 390 px são duas colunas, e cada píxel de folga
+ * sai da fotografia. É o lado onde a folga custa e o lado onde não fazia falta.
+ */
 export const COLUNAS: Record<Densidade, string> = {
-  confortavel: "grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4",
-  compacto: "grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6",
+  confortavel: "grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4",
+  compacto: "grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4 lg:grid-cols-6",
 };
 
 /**
@@ -1146,15 +1160,28 @@ export default function Temas() {
         className="mb-6"
         start={
           searchable ? (
-            <div className="relative w-full max-w-md sm:w-72">
-              {SearchIcon}
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Procurar tema…"
-                aria-label="Procurar tema por nome ou nota"
-                className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
-              />
+            /* ── O RESUMO DEIXA DE SER FILHO DO CAMPO ────────────────────
+               Pedido dela, na Fase 3: «"395 fotos em 25 temas" está órfão».
+
+               Estava dentro da caixa `relative` do campo de procura — uma caixa
+               que só existe para ancorar o ícone da lupa. Herdava a largura do
+               campo, encostava-se a ele, e lia-se como se descrevesse o que
+               estava escrito na procura. Não descreve: descreve a BIBLIOTECA, e
+               continua verdadeiro com o campo vazio.
+
+               Passa a irmão do campo, na mesma coluna. O que muda é a quem ele
+               parece pertencer. */
+            <div className="w-full max-w-md sm:w-72">
+              <div className="relative">
+                {SearchIcon}
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Procurar tema…"
+                  aria-label="Procurar tema por nome ou nota"
+                  className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
+                />
+              </div>
               {/* O TAMANHO DA BIBLIOTECA, dito por ela própria. Era preciso
                   somar os cartões à mão para responder a «quantas fotos
                   temos?» — e este é o activo mais valioso do back office. */}
@@ -1178,37 +1205,89 @@ export default function Temas() {
              ficava-se sem navegação nenhuma. Tirar a caixa devolve a fila ao
              contentor que sabe quebrá-la; medido, o documento volta aos
              390 px. Ver `e2e/geometria-dos-alvos.spec.ts` (D4). */
-          <>
+          /* ══════════════════════════════════════════════════════════
+             OS CONTROLOS AGRUPADOS PELO QUE FAZEM
+             ══════════════════════════════════════════════════════════
+
+             Pedido dela, na Fase 3: «os controlos estão todos alinhados sem
+             agrupamento».
+
+             Estavam: cinco controlos em fila, todos com a mesma folga entre
+             si — a ordenação, «Rever etiquetas», «Arquivados», o tamanho dos
+             cartões e «Novo tema». Espaçamento igual quer dizer «isto é uma
+             lista de cinco coisas sem relação», e não era verdade: três deles
+             mudam COMO a lista se vê, um muda O QUE ela contém, e dois FAZEM
+             alguma coisa.
+
+             O agrupamento é feito com folga e não com linhas divisórias, de
+             propósito: uma linha vertical entre grupos parte-se assim que a
+             fila quebra no telemóvel — e ela quebra sempre. A folga quebra
+             bem. Dentro de um grupo `gap-1.5`; entre grupos, `gap-x-5`. A
+             razão entre as duas é o que se lê.
+
+             (A fila não leva caixa própria: o `Toolbar` já dá uma ao `end`, e
+             uma segunda por dentro custou-lhe uma vez a navegação inteira no
+             telemóvel — ver a nota acima e o `geometria-dos-alvos.spec.ts`.) */
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {/* ── VER: como a lista se mostra ─────────────────────────── */}
             {themes.length > 2 && (
-              <label className="flex items-center gap-1.5">
-                <span className="sr-only">Ordenar os temas</span>
-                <select
-                  value={ordem}
-                  onChange={(e) => {
-                    const o = e.target.value as Ordem;
-                    setOrdem(o);
-                    guardarOrdem(o);
-                  }}
-                  className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-foreground/70"
+              <div className="flex flex-wrap items-center gap-1.5">
+                <label className="flex items-center">
+                  <span className="sr-only">Ordenar os temas</span>
+                  <select
+                    value={ordem}
+                    onChange={(e) => {
+                      const o = e.target.value as Ordem;
+                      setOrdem(o);
+                      guardarOrdem(o);
+                    }}
+                    className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-foreground/70"
+                  >
+                    {ORDENS.map((o) => (
+                      <option key={o.valor} value={o.valor}>
+                        {o.rotulo}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div
+                  role="group"
+                  aria-label="Tamanho dos cartões"
+                  className="flex overflow-hidden rounded-lg border border-foreground/[0.1]"
                 >
-                  {ORDENS.map((o) => (
-                    <option key={o.valor} value={o.valor}>
-                      {o.rotulo}
-                    </option>
+                  {(
+                    [
+                      ["compacto", "Compacto"],
+                      ["confortavel", "Confortável"],
+                    ] as const
+                  ).map(([valor, rotulo]) => (
+                    <button
+                      key={valor}
+                      type="button"
+                      aria-pressed={densidade === valor}
+                      onClick={() => {
+                        setDensidade(valor);
+                        guardarDensidade(valor);
+                      }}
+                      className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                        densidade === valor
+                          ? "bg-foreground/[0.06] text-foreground/70"
+                          : "text-foreground/40 hover:text-foreground/60"
+                      }`}
+                    >
+                      {rotulo}
+                    </button>
                   ))}
-                </select>
-              </label>
+                </div>
+              </div>
             )}
-            {/* MANUTENÇÃO, não acção principal. Estava em `secondary`, ao lado
-                do «Novo tema» em verde cheio, e os dois competiam no topo — um
-                é o que se faz todos os dias, o outro é o que se faz de vez em
-                quando. Passa a `ghost`: continua à mão de quem o procura, sem
-                disputar o olhar com a acção que traz alguém a este ecrã. */}
-            <Button variant="ghost" size="sm" onClick={() => setRevendo(true)}>
-              Rever etiquetas
-            </Button>
-            {/* Só aparece quando há mesmo alguma coisa arquivada — senão seria
-                um interruptor a explicar uma funcionalidade que ninguém usou. */}
+
+            {/* ── O QUE A LISTA CONTÉM ────────────────────────────────────
+                Sozinho no seu grupo porque é a única coisa aqui que troca o
+                CONJUNTO que se está a ver — o arquivo é uma vista, não um
+                filtro que se soma. Só aparece quando há mesmo alguma coisa
+                arquivada: senão seria um interruptor a explicar uma
+                funcionalidade que ninguém usou. */}
             {arquivados > 0 && (
               <button
                 type="button"
@@ -1223,46 +1302,27 @@ export default function Temas() {
                 Arquivados ({arquivados})
               </button>
             )}
-            {themes.length > 2 && (
-              <div
-                role="group"
-                aria-label="Tamanho dos cartões"
-                className="flex overflow-hidden rounded-lg border border-foreground/[0.1]"
+
+            {/* ── FAZER ───────────────────────────────────────────────────
+                «Rever etiquetas» é MANUTENÇÃO e fica em `ghost`: um faz-se
+                todos os dias, o outro de vez em quando, e em `secondary` os
+                dois competiam no topo. Ficam no mesmo grupo porque são as duas
+                acções do ecrã — é o grupo que o olho procura quando veio aqui
+                para fazer alguma coisa, e não para olhar. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button variant="ghost" size="sm" onClick={() => setRevendo(true)}>
+                Rever etiquetas
+              </Button>
+              <Button
+                variant={adding ? "secondary" : "primary"}
+                size="sm"
+                iconLeft={adding ? undefined : PlusIcon}
+                onClick={() => setAdding(!adding)}
               >
-                {(
-                  [
-                    ["compacto", "Compacto"],
-                    ["confortavel", "Confortável"],
-                  ] as const
-                ).map(([valor, rotulo]) => (
-                  <button
-                    key={valor}
-                    type="button"
-                    aria-pressed={densidade === valor}
-                    onClick={() => {
-                      setDensidade(valor);
-                      guardarDensidade(valor);
-                    }}
-                    className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                      densidade === valor
-                        ? "bg-foreground/[0.06] text-foreground/70"
-                        : "text-foreground/40 hover:text-foreground/60"
-                    }`}
-                  >
-                    {rotulo}
-                  </button>
-                ))}
-              </div>
-            )}
-            <Button
-              variant={adding ? "secondary" : "primary"}
-              size="sm"
-              iconLeft={adding ? undefined : PlusIcon}
-              onClick={() => setAdding(!adding)}
-            >
-              {adding ? "Cancelar" : "Novo tema"}
-            </Button>
-          </>
+                {adding ? "Cancelar" : "Novo tema"}
+              </Button>
+            </div>
+          </div>
         }
       />
 

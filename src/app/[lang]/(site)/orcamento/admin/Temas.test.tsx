@@ -10,6 +10,7 @@ import {
 } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
 import Temas, {
+  COLUNAS,
   GRELHA_DE_FOTOS,
   contarFotosDaBiblioteca,
   desdeQuando,
@@ -1061,6 +1062,84 @@ describe("Biblioteca de Temas — o cartão", () => {
     renderTemas();
     expect(await screen.findByText("limões")).toBeTruthy();
     expect(screen.queryByText(/Ainda com poucas fotos/)).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A BARRA DE CONTROLOS — FASE 3
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «os controlos estão todos alinhados sem agrupamento», «"395
+ * fotos em 25 temas" está órfão» e «mais folga entre os cartões».
+ */
+describe("Biblioteca de Temas — a barra de controlos", () => {
+  const cinco = () =>
+    route("GET /api/temas", () =>
+      ok(
+        ["Terracotta", "Itália", "Boho", "Praia", "Verde"].map((name, i) => ({
+          ...THEME,
+          id: `t${i + 1}`,
+          name,
+          imageCount: 9,
+        })),
+      ),
+    );
+
+  /**
+   * O resumo descreve a BIBLIOTECA, e continua verdadeiro com a procura
+   * vazia. Vivia dentro da caixa que ancora o ícone da lupa — herdava a
+   * largura do campo e lia-se como se descrevesse o que lá estava escrito.
+   */
+  it("o resumo da biblioteca não é filho do campo de procura", async () => {
+    cinco();
+    renderTemas();
+    const resumo = await screen.findByText(/fotos em 5 temas/);
+    expect(
+      resumo.closest(".relative"),
+      "a caixa `relative` existe só para pôr a lupa em cima do campo",
+    ).toBeNull();
+    // E o campo continua lá, ao lado.
+    expect(screen.getByLabelText(/Procurar tema/)).toBeTruthy();
+  });
+
+  /**
+   * Espaçamento igual quer dizer «cinco coisas sem relação», e não era
+   * verdade: umas mudam como a lista se vê, outra o que ela contém, duas
+   * fazem alguma coisa.
+   */
+  it("as duas acções ficam juntas, e separadas do resto", async () => {
+    cinco();
+    renderTemas();
+    const novo = await screen.findByRole("button", { name: /Novo tema/ });
+    const grupo = novo.parentElement!;
+    expect(grupo.textContent).toMatch(/Rever etiquetas/);
+    // O que muda a VISTA não está no mesmo grupo do que FAZ.
+    expect(grupo.textContent).not.toMatch(/Compacto/);
+    expect(grupo.querySelector("select")).toBeNull();
+  });
+
+  it("a ordenação e o tamanho dos cartões ficam no mesmo grupo", async () => {
+    cinco();
+    renderTemas();
+    await screen.findByRole("button", { name: /Novo tema/ });
+    const tamanhos = screen.getByRole("group", { name: /Tamanho dos cartões/ });
+    expect(tamanhos.parentElement!.querySelector("select")).not.toBeNull();
+  });
+
+  /**
+   * A FOLGA NÃO É QUADRADA, E ISSO É A CORRECÇÃO.
+   *
+   * Desde que um cartão pode ter uma linha pendurada por baixo («Lê-se
+   * como…»), uma folga igual nos dois sentidos punha essa linha à mesma
+   * distância do cartão a que pertence e do cartão de baixo.
+   */
+  it("a folga vertical é maior do que a horizontal", () => {
+    for (const classes of Object.values(COLUNAS)) {
+      const x = Number(/gap-x-(\d+)/.exec(classes)![1]);
+      const y = Number(/gap-y-(\d+)/.exec(classes)![1]);
+      expect(y, `folga vertical curta em "${classes}"`).toBeGreaterThan(x);
+    }
   });
 });
 
