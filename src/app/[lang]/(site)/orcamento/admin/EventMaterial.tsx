@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import type { EventMaterial, EventMaterialItem } from "@/lib/event-material-types";
 import { progresso } from "@/lib/event-material-types";
 import { useToast } from "./Toast";
-import { Button, SectionCard } from "./ui";
+import { Button, PerguntaDestrutiva, SectionCard } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
@@ -24,6 +24,54 @@ interface Resposta {
   itens: EventMaterialItem[];
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * «VOLTAR A GERAR» É O PIOR BOTÃO DESTE MÓDULO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A geração preserva o que está CARREGADO, as notas e o veículo. NÃO preserva
+ * as marcações de DEVOLVIDO nem as de EM FALTA — e essas são as que se fazem no
+ * regresso, com a carrinha à porta, uma a uma, a conferir o que voltou.
+ *
+ * O botão dizia «Voltar a gerar» e mais nada, e o convite estava por todo o
+ * lado: o texto do painel a explicar que gerar junta os essenciais às regras, o
+ * aviso de leitura falhada a oferecê-lo, e a própria mensagem de sucesso a
+ * contar as marcações mantidas — que é o mesmo que dizer «podes carregar outra
+ * vez, não custa nada».
+ *
+ * Custa. Por isso leva PERGUNTA — não é raro por acaso, é raro porque só se
+ * volta a gerar quando a proposta mudou —, e a pergunta CONTA as marcações que
+ * se vão embora, uma a uma. Um número em vez de «esta ação não pode ser
+ * anulada»: quem lê «12 devoluções e 3 faltas voltam a zero» sabe o que está a
+ * decidir.
+ *
+ * GERAR PELA PRIMEIRA VEZ não pergunta nada. Não há checklist, não há
+ * marcações, não há nada a perder — e uma pergunta ali seria atrito numa tarefa
+ * que não é destrutiva.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Voltar a gerar», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
+}
+
+/** O que a geração NÃO preserva, contado a partir do que está no ecrã. */
+function oQueAGeracaoDeita(itens: EventMaterialItem[]) {
+  return {
+    devolvidos: itens.filter((i) => i.returnedAt).length,
+    emFalta: itens.filter((i) => i.missing).length,
+    gastos: itens.filter((i) => typeof i.usedQty === "number").length,
+  };
+}
+
 export default function EventMaterialPanel({ quote }: { quote: Quote }) {
   const { toast } = useToast();
   const [dados, setDados] = useState<Resposta>({ evento: null, itens: [] });
@@ -36,6 +84,8 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
    * desenho, mais abaixo.
    */
   const [falha, setFalha] = useState<string | null>(null);
+  /** A pergunta em curso — ver o comentário no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
 
   const buscar = useCallback(async () => {
     try {
@@ -100,6 +150,40 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
    * A frase nomeia o EVENTO porque este painel vive dentro da gaveta de um
    * pedido, e quem tem seis gavetas abertas não sabe de qual é o aviso.
    */
+  /**
+   * A PERGUNTA DE VOLTAR A GERAR, com as marcações contadas.
+   *
+   * Só se pergunta quando JÁ HÁ checklist: sem ela não há nada a deitar fora, e
+   * a caixa era atrito puro. Ver o comentário no topo do ficheiro.
+   */
+  function gerarOuPerguntar() {
+    if (!dados.evento) {
+      void gerar();
+      return;
+    }
+    const { devolvidos, emFalta, gastos } = oQueAGeracaoDeita(itens);
+    const perdas = [
+      devolvidos > 0 &&
+        `${devolvidos} ${devolvidos === 1 ? "devolução marcada" : "devoluções marcadas"} no regresso`,
+      emFalta > 0 && `${emFalta} ${emFalta === 1 ? "item marcado" : "itens marcados"} em falta`,
+      gastos > 0 && `${gastos} ${gastos === 1 ? "consumo apontado" : "consumos apontados"}`,
+    ].filter((x): x is string => typeof x === "string");
+
+    setAPerguntar({
+      titulo: `Voltar a gerar a checklist de «${quote.name}»?`,
+      oQueSePerde: perdas,
+      aviso:
+        (perdas.length > 0
+          ? "A geração não preserva estas marcações — voltam a zero. "
+          : "Ainda não há devoluções nem faltas marcadas, por isso não se perde nenhuma. ") +
+        `Os ${itens.length} ${itens.length === 1 ? "item é refeito" : "itens são refeitos"} a ` +
+        `partir dos essenciais de carrinha e das regras; o que já está carregado, as notas e o ` +
+        `veículo mantêm-se.`,
+      rotulo: "Voltar a gerar",
+      fazer: () => gerar(),
+    });
+  }
+
   async function gerar() {
     const oQue = `gerar a checklist de material de «${quote.name}»`;
     setGerando(true);
@@ -185,7 +269,7 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
       description="O que tem de ir na carrinha para esta montagem"
     >
       <div className="flex flex-wrap items-center gap-3">
-        <Button size="sm" onClick={gerar} disabled={gerando}>
+        <Button size="sm" onClick={gerarOuPerguntar} disabled={gerando}>
           {dados.evento ? "Voltar a gerar" : "Gerar checklist"}
         </Button>
         {dados.evento && itens.length > 0 && (
@@ -264,6 +348,30 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
           ))}
         </div>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </SectionCard>
   );
 }

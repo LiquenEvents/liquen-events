@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Quote, Task, TaskPriority } from "@/lib/orcamento/types";
 import { todayKey } from "./util";
 import { useToast } from "./Toast";
-import { Button, Field, EmptyState } from "./ui";
+import { Button, Field, EmptyState, PerguntaDestrutiva } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useCachedList } from "./useCachedList";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
@@ -23,6 +23,45 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
 
 // Para ordenar as tarefas por fazer: mais urgente primeiro.
 const PRIORITY_RANK: Record<TaskPriority, number> = { alta: 0, normal: 1, baixa: 2 };
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ELIMINAR UMA TAREFA — porque é que deixou de ser um `window.confirm`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O que estava aqui era `window.confirm('Eliminar a tarefa "X"?')`. Nomeava a
+ * tarefa, que já é mais do que a maioria fazia — mas ficava-se por aí, e tinha
+ * os defeitos da caixa do browser: não cabe em 375 px sem cortar a frase, não se
+ * traduz, não tem o desenho da casa e bloqueia o fio principal do browser
+ * enquanto está aberta.
+ *
+ * A pergunta que fica diz também o que se perde ALÉM do título — a prioridade,
+ * a data limite, quem estava encarregado — porque é isso que não se reescreve
+ * de cabeça, e porque a tarefa desaparece também da vista global de Tarefas, da
+ * Agenda e dos Lembretes, que leem esta mesma lista.
+ *
+ * PERGUNTA e não janela para anular: apagar uma tarefa é raro (ao contrário de
+ * a riscar, que é o gesto do dia) e é caro — repô-la seria criar OUTRA, com
+ * outro id, e tudo o que apontasse para a primeira ficava a apontar para o
+ * nada. Um «Anular» que não devolve a mesma coisa é pior do que não haver
+ * nenhum.
+ *
+ * CONCLUIR e REABRIR continuam sem pergunta nenhuma: é o mesmo botão nos dois
+ * sentidos, e desfaz-se com o mesmo dedo.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Eliminar a tarefa», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
+}
 
 interface Props {
   quote: Quote;
@@ -67,6 +106,8 @@ export default function EventTasks({ quote, userName }: Props) {
   const [newPriority, setNewPriority] = useState<TaskPriority>("normal");
   const [newDue, setNewDue] = useState("");
   const [busy, setBusy] = useState(false);
+  /** A pergunta em curso — ver o comentário no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
 
   /**
    * ══════════════════════════════════════════════════════════════════════
@@ -161,9 +202,39 @@ export default function EventTasks({ quote, userName }: Props) {
     setAdding(false);
   }
 
+  /** A pergunta de eliminar — ver o comentário no topo do ficheiro. */
+  function perguntarSeElimina(task: Task) {
+    const ficam = tasks.length - 1;
+    const perde: string[] = [
+      `${task.done ? "está concluída" : "está por fazer"}, prioridade ${PRIORITY_LABEL[
+        task.priority
+      ].toLowerCase()}`,
+    ];
+    if (task.dueDate) {
+      perde.push(
+        `a data limite de ${new Date(task.dueDate + "T12:00:00").toLocaleDateString("pt-PT", {
+          day: "numeric",
+          month: "long",
+        })}`,
+      );
+    }
+    if (task.assignee) perde.push(`o nome de quem ficou com ela (${task.assignee})`);
+    perde.push(
+      `sai também da lista global de tarefas — ficam ${ficam} ${
+        ficam === 1 ? "tarefa" : "tarefas"
+      } em «${quote.name}»`,
+    );
+    setAPerguntar({
+      titulo: `Eliminar a tarefa «${task.title}»?`,
+      oQueSePerde: perde,
+      aviso: "Não pode ser anulado.",
+      rotulo: "Eliminar a tarefa",
+      fazer: () => removeTask(task.id),
+    });
+  }
+
   async function removeTask(id: string) {
     const task = tasks.find((t) => t.id === id);
-    if (task && !window.confirm(`Eliminar a tarefa "${task.title}"?`)) return;
     setAllTasks((prev) => (prev ?? []).filter((t) => t.id !== id));
     const { ok } = await gravar(
       `eliminar a tarefa «${task?.title ?? "sem título"}»`,
@@ -411,7 +482,7 @@ export default function EventTasks({ quote, userName }: Props) {
                   como aparecia. E `alvo-toque` porque, quando finalmente
                   aparecia, media 13×13 px contra os 44 da casa. */}
               <button
-                onClick={() => removeTask(task.id)}
+                onClick={() => perguntarSeElimina(task)}
                 className="alvo-toque mt-0.5 shrink-0 text-foreground/25 sem-rato:text-foreground/55 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                 aria-label="Remover tarefa"
               >
@@ -431,6 +502,30 @@ export default function EventTasks({ quote, userName }: Props) {
           ))}
         </div>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </div>
   );
 }

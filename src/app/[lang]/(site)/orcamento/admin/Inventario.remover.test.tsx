@@ -20,9 +20,10 @@ import Inventario from "./Inventario";
  *     else { setItems(snapshot); }   // ← e agora, depois do `await`
  *
  * Esse `snapshot` foi lido antes do pedido, e é a lista de um instante que já
- * passou. A confirmação do `confirm()` é imediata: dois «Remover» seguidos põem
- * dois DELETE no ar, e o que falha repõe o mundo anterior aos DOIS — traz de
- * volta o adereço que o servidor já apagou.
+ * passou. A pergunta fecha assim que se responde e não espera pelo servidor:
+ * dois «Remover» confirmados de seguida põem dois DELETE no ar, e o que falha
+ * repõe o mundo anterior aos DOIS — traz de volta o adereço que o servidor já
+ * apagou.
  *
  * O inventário fica a afirmar que existe um adereço que já não existe, e como o
  * `setData` do `useCachedList` escreve através para a cache, o fantasma
@@ -52,10 +53,20 @@ const CASTICAIS = { ...base, id: "a2", name: "Castiçais de latão", quantity: 1
 const removerDe = (nome: string) =>
   within(screen.getAllByText(nome)[0].closest("li")!).getByRole("button", { name: "Remover" });
 
+/**
+ * O inventário pergunta antes de remover, e a pergunta é a da casa
+ * (`ui/PerguntaDestrutiva`) — não o `confirm()` do browser, que era o que
+ * estava aqui. Ver `Inventario.perguntas.test.tsx` para o que ela diz; aqui
+ * responde-se que sim e segue-se.
+ */
+async function confirmarRemocao(user: ReturnType<typeof userEvent.setup>) {
+  const caixa = await screen.findByRole("dialog");
+  await user.click(within(caixa).getByRole("button", { name: /^Remover do inventário$/i }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+}
+
 beforeEach(() => {
   __resetListCache();
-  // O inventário pergunta antes de apagar; aqui responde-se sempre que sim.
-  vi.stubGlobal("confirm", () => true);
 });
 
 afterEach(() => {
@@ -91,7 +102,9 @@ describe("Inventário — duas remoções ao mesmo tempo", () => {
     await waitFor(() => expect(screen.getAllByText("Arco de cerimónia").length).toBeGreaterThan(0));
 
     await user.click(removerDe("Arco de cerimónia"));
+    await confirmarRemocao(user);
     await user.click(removerDe("Castiçais de latão"));
+    await confirmarRemocao(user);
     await waitFor(() => expect(screen.queryByText("Castiçais de latão")).toBeNull());
 
     // Só agora o servidor recusa o primeiro apagamento.
@@ -123,6 +136,7 @@ describe("Inventário — duas remoções ao mesmo tempo", () => {
     await waitFor(() => expect(screen.getAllByText("Arco de cerimónia").length).toBeGreaterThan(0));
 
     await user.click(removerDe("Arco de cerimónia"));
+    await confirmarRemocao(user);
 
     // Nomeia a coisa, diz o que se passou e o que fazer — «Não foi possível
     // remover o item.» mandava tentar outra vez uma remoção que falha sempre.

@@ -1,13 +1,71 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
 import type { Quote, ChecklistItem } from "@/lib/orcamento/types";
 import { checklistTemplate } from "@/lib/checklist-templates";
-import { Button, Field, EmptyState } from "./ui";
+import { Button, Field, EmptyState, PerguntaDestrutiva } from "./ui";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE PERGUNTA E O QUE SE ANULA, NESTA CHECKLIST
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Esta lista é lida e corrigida de pé, numa quinta, com o telemóvel numa mão.
+ * A conta é sempre a mesma: pergunta-se o que é raro e caro; oferece-se anular
+ * o que é frequente e barato de refazer.
+ *
+ *   RISCAR, DESRISCAR, REMOVER UM ITEM e MARCAR TODAS são os gestos do dia.
+ *   Riscar e desriscar desfazem-se no mesmo sítio, com o mesmo dedo, e não
+ *   precisam de nada. Os outros dois deitam alguma coisa fora — o texto de uma
+ *   linha, o estado de todas as que estavam por fazer — e por isso ficam com um
+ *   «Anular» ao lado durante uns segundos. NÃO levam pergunta: uma caixa a
+ *   perguntar em cada item removido é o atrito que faz ignorar a caixa.
+ *
+ *   LIMPAR AS CONCLUÍDAS leva PERGUNTA. Sai um punhado de linhas de uma vez, e
+ *   o que se perde é o TEXTO delas — refazer é reescrever à mão o que já
+ *   estava escrito. A pergunta diz quantas são e nomeia-as.
+ *
+ * GERAR A CHECKLIST não pergunta nada, e é de propósito: o botão só existe no
+ * ecrã vazio (`items.length === 0`), portanto ali não há nada para deitar fora.
+ * Uma pergunta sobre uma lista vazia é atrito numa tarefa que não é destrutiva.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Remover as 3», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
+}
+
+/** Uma alteração feita sem perguntar, reversível durante uns segundos. */
+interface Anulavel {
+  /** O que aconteceu, para a tira o poder dizer: ««Escadote» saiu da lista.» */
+  texto: string;
+  repor: () => void;
+}
+
+/** Quanto tempo fica o «Anular» no ecrã, em milissegundos. Oito segundos dá
+ *  para ver o que desapareceu, perceber que foi engano e carregar — sem ficar
+ *  lá pendurado a dizer que há alguma coisa por decidir. */
+const MS_PARA_ANULAR = 8000;
+
+/** Nomeia até três linhas e conta o resto. Uma lista de vinte nomes dentro de
+ *  uma pergunta não se lê; três chegam para reconhecer o lote errado. */
+function ateTres(labels: string[]): string[] {
+  const primeiros = labels.slice(0, 3).map((l) => `«${l}»`);
+  const resto = labels.length - primeiros.length;
+  return resto > 0 ? [...primeiros, `e mais ${resto}`] : primeiros;
+}
 
 interface Props {
   quote: Quote;
@@ -21,8 +79,10 @@ export default function EventChecklist({ quote, onChange }: Props) {
   // Edição inline do texto de um item: commit em blur/Enter, Escape cancela.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  // Confirmação inline (dois cliques) antes de limpar itens concluídos.
-  const [confirmClear, setConfirmClear] = useState(false);
+  /** A pergunta em curso — ver o comentário no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
+  /** O último gesto que se pode anular, enquanto a janela estiver aberta. */
+  const [anular, setAnular] = useState<Anulavel | null>(null);
 
   /**
    * Otimista com reversão — mas a reversão é para o último estado que o SERVIDOR
@@ -131,6 +191,15 @@ export default function EventChecklist({ quote, onChange }: Props) {
     })();
   }
 
+  // O «Anular» some-se sozinho. A dependência é o objecto inteiro de propósito:
+  // cada gesto põe lá um objecto NOVO, portanto o segundo reinicia a contagem em
+  // vez de herdar os segundos que sobravam do primeiro.
+  useEffect(() => {
+    if (!anular) return;
+    const relogio = setTimeout(() => setAnular(null), MS_PARA_ANULAR);
+    return () => clearTimeout(relogio);
+  }, [anular]);
+
   function seed() {
     const next = checklistTemplate(quote.category).map((label) => ({
       id: randomId(),
@@ -146,12 +215,31 @@ export default function EventChecklist({ quote, onChange }: Props) {
       items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)),
     );
   }
+  /**
+   * REMOVER UM ITEM NÃO PERGUNTA — repõe-se com um toque.
+   *
+   * É o gesto de arrumar a lista, e faz-se em série. Uma caixa por cada item
+   * removido custava um toque a mais em cada arrumação e, ao fim de uma semana,
+   * ninguém lê o que lá está escrito — que é como uma pergunta deixa de
+   * proteger seja o que for.
+   *
+   * O que se guarda para o «Anular» é a lista INTEIRA de antes, e não o item
+   * solto: assim a linha volta ao sítio onde estava, e não ao fim.
+   */
   function remove(id: string) {
     const item = items.find((i) => i.id === id);
+    const antes = items;
     persist(
       `remover «${item?.label ?? "o item"}» da checklist`,
       items.filter((i) => i.id !== id),
     );
+    setAnular({
+      texto: `«${item?.label ?? "O item"}» saiu da checklist.`,
+      repor: () => {
+        setAnular(null);
+        persist(`repor «${item?.label ?? "o item"}» na checklist`, antes);
+      },
+    });
   }
   function add() {
     const l = newItem.trim();
@@ -163,24 +251,65 @@ export default function EventChecklist({ quote, onChange }: Props) {
     setNewItem("");
   }
 
+  /**
+   * «MARCAR TODAS» NÃO PERGUNTA — ANULA-SE.
+   *
+   * É um toque que risca de uma vez tudo o que estava por fazer. Nada
+   * desaparece (o texto fica todo lá), mas desfazer À MÃO seria voltar a
+   * carregar em cada caixa uma por uma — e é por isso que não basta dizer «é
+   * reversível». A janela de anular repõe a lista exactamente como estava, de
+   * uma vez.
+   *
+   * Uma pergunta aqui seria atrito num gesto rápido e frequente, no fim de uma
+   * montagem, com o telemóvel na mão.
+   */
   function markAll() {
+    const antes = items;
+    const quantas = items.filter((i) => !i.done).length;
     persist(
       "marcar toda a checklist como feita",
       items.map((i) => (i.done ? i : { ...i, done: true })),
     );
+    setAnular({
+      texto: `${quantas} ${quantas === 1 ? "item riscado" : "itens riscados"} de uma vez.`,
+      repor: () => {
+        setAnular(null);
+        persist("desmarcar o que a marcação em bloco riscou", antes);
+      },
+    });
   }
+
+  /**
+   * LIMPAR AS CONCLUÍDAS PERGUNTA, E A PERGUNTA DIZ QUAIS.
+   *
+   * O que estava aqui era uma confirmação de dois cliques: o botão trocava para
+   * «Remover 3 concluídas?» e o segundo clique executava. Tinha o número — o que
+   * já era melhor do que a maioria — mas não dizia QUAIS, e desarmava-se no
+   * `blur`: num telemóvel, rolar a lista chega para o botão voltar atrás sem
+   * ninguém perceber porquê.
+   *
+   * Passa a nomear as linhas que saem. O que se perde é o texto delas, escrito
+   * à mão uma a uma, e três nomes chegam para reconhecer o lote errado antes de
+   * ele desaparecer.
+   */
   function clearCompleted() {
-    // Primeiro clique arma a confirmação; o segundo executa. Blur desarma.
-    if (!confirmClear) {
-      setConfirmClear(true);
-      return;
-    }
-    setConfirmClear(false);
-    const quantas = items.filter((i) => i.done).length;
-    persist(
-      `remover ${quantas} ${quantas === 1 ? "concluída" : "concluídas"} da checklist`,
-      items.filter((i) => !i.done),
-    );
+    const concluidas = items.filter((i) => i.done);
+    const quantas = concluidas.length;
+    if (quantas === 0) return;
+    const ficam = items.length - quantas;
+    setAPerguntar({
+      titulo: `Remover ${quantas} ${quantas === 1 ? "concluída" : "concluídas"} da checklist?`,
+      oQueSePerde: ateTres(concluidas.map((i) => i.label)),
+      aviso: `O texto delas não fica guardado em lado nenhum. Ficam ${ficam} ${
+        ficam === 1 ? "linha" : "linhas"
+      } na checklist.`,
+      rotulo: quantas === 1 ? "Remover a concluída" : `Remover as ${quantas}`,
+      fazer: () =>
+        persist(
+          `remover ${quantas} ${quantas === 1 ? "concluída" : "concluídas"} da checklist`,
+          items.filter((i) => !i.done),
+        ),
+    });
   }
 
   function startEdit(item: ChecklistItem) {
@@ -287,16 +416,9 @@ export default function EventChecklist({ quote, onChange }: Props) {
                 <button
                   type="button"
                   onClick={clearCompleted}
-                  onBlur={() => setConfirmClear(false)}
-                  className={`alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] motion-safe:transition-colors ${
-                    confirmClear
-                      ? "bg-[#b5654a]/10 text-[#b5654a] hover:bg-[#b5654a]/[0.16]"
-                      : "text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75"
-                  }`}
+                  className="alvo-toque rounded-lg px-2 py-1 text-[11px] tracking-[0.02em] text-foreground/45 hover:bg-foreground/[0.05] hover:text-foreground/75 motion-safe:transition-colors"
                 >
-                  {confirmClear
-                    ? `Remover ${doneCount} ${doneCount === 1 ? "concluída" : "concluídas"}?`
-                    : "Limpar concluídas"}
+                  Limpar concluídas
                 </button>
               )}
             </div>
@@ -310,6 +432,22 @@ export default function EventChecklist({ quote, onChange }: Props) {
               </button>
             )}
           </div>
+          {/* ── A JANELA PARA ANULAR ──────────────────────────────────────
+              Por cima da lista, onde os olhos já estão quando a linha
+              desaparece — e não num aviso no canto do ecrã, que num telemóvel
+              fica atrás do teclado. `role="status"` para quem não vê o ecrã
+              ouvir o que aconteceu e que ainda dá para voltar atrás. */}
+          {anular && (
+            <div
+              role="status"
+              className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-foreground/[0.04] px-3 py-2 text-xs text-foreground/70"
+            >
+              <span>{anular.texto}</span>
+              <Button size="sm" variant="ghost" onClick={anular.repor}>
+                Anular
+              </Button>
+            </div>
+          )}
           <ul className="mb-5 flex flex-col gap-0.5">
             {items.map((i) => (
               <li
@@ -441,6 +579,30 @@ export default function EventChecklist({ quote, onChange }: Props) {
           </div>
         </>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </section>
   );
 }

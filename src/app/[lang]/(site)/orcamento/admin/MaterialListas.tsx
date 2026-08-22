@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { MaterialItem } from "@/lib/material-types";
 import type { MaterialList, MaterialListItem } from "@/lib/material-list-types";
 import { quantidadePara, porCadaQuantos } from "@/lib/material-list-types";
 import { useToast } from "./Toast";
-import { Button, EmptyState, Field } from "./ui";
+import { Button, EmptyState, Field, PerguntaDestrutiva } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
@@ -29,6 +29,55 @@ interface Resposta {
 /** Quantos convidados usar na pré-visualização das quantidades que escalam. */
 const PAX_EXEMPLO = 120;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * PERGUNTAR OU DEIXAR ANULAR — a decisão, escrita
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Neste ficheiro há duas coisas que deitam trabalho fora, e não levam o mesmo
+ * tratamento:
+ *
+ *   APAGAR UMA LISTA é raro e caro. Uma lista base leva meses a afinar — as
+ *   linhas, as quantidades, o que é crítico — e não há nada que a traga de
+ *   volta. Leva PERGUNTA, e a pergunta diz quantas linhas se vão embora, que é
+ *   o tamanho do que se perde.
+ *
+ *   REMOVER UMA LINHA é o gesto de todos os dias: abre-se a lista e vai-se
+ *   afinando. Uma pergunta por cada linha era um clique a mais em cada gesto de
+ *   arrumação, e ninguém a lê à décima vez. Leva ANULAR: faz-se, e fica um
+ *   «Anular» ao lado durante uns segundos.
+ *
+ * A regra, para quem vier a seguir: pergunta-se o que é raro e caro; oferece-se
+ * anular o que é frequente e barato de refazer.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Apagar a lista», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
+}
+
+/** O que se acabou de remover sem perguntar, e ainda dá para repor. */
+interface Anulavel {
+  /** O que aconteceu, para a tira o poder dizer: ««Escadote» saiu da lista.» */
+  texto: string;
+  repor: () => void;
+}
+
+/** Quanto tempo fica o «Anular» no ecrã, em milissegundos.
+ *
+ *  Oito segundos: dá para reparar que a linha desapareceu, ler qual era e
+ *  decidir. Mais do que isto e deixa de ser uma janela para passar a ser um
+ *  botão do ecrã, que fica lá a dizer que ainda há alguma coisa por decidir. */
+const MS_PARA_ANULAR = 8000;
+
 /** Gravou-se, mas o ecrã ficou a mostrar a versão anterior. Calar isto é o que
  *  faz alguém repetir a alteração — ou dar uma lista por vazia. */
 const AVISO_RELEITURA = "Gravado, mas não foi possível reler as listas. Atualiza a página.";
@@ -45,6 +94,10 @@ export default function MaterialListas() {
   const linhas = data?.linhas ?? [];
 
   const [abertaId, setAbertaId] = useState<string | null>(null);
+  /** A pergunta em curso — ver o comentário grande no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
+  /** A remoção mais recente, enquanto ainda dá para a anular. */
+  const [anular, setAnular] = useState<Anulavel | null>(null);
   const [novoNome, setNovoNome] = useState("");
   const [ocupado, setOcupado] = useState(false);
   /** O item escolhido no seletor de "acrescentar linha", por lista. */
@@ -55,6 +108,15 @@ export default function MaterialListas() {
     linhas.filter((l) => l.listId === listId).sort((a, b) => a.position - b.position);
 
   const temEssenciais = listas.some((l) => l.isDefault);
+
+  // O «Anular» some-se sozinho. A dependência é o objecto inteiro de propósito:
+  // cada remoção põe lá um objecto NOVO, portanto a segunda reinicia a contagem em
+  // vez de herdar os dois segundos que sobravam da primeira.
+  useEffect(() => {
+    if (!anular) return;
+    const relogio = setTimeout(() => setAnular(null), MS_PARA_ANULAR);
+    return () => clearTimeout(relogio);
+  }, [anular]);
 
   /**
    * Relê listas e linhas. `false` quando a leitura falhou — e aí não escreve
@@ -175,6 +237,33 @@ export default function MaterialListas() {
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
+  /**
+   * A PERGUNTA DE APAGAR UMA LISTA, com o tamanho do que se perde lá dentro.
+   *
+   * «Tens a certeza?» não é uma pergunta: é um degrau. Quem tem seis listas
+   * parecidas precisa de ver O NOME da que vai desaparecer e QUANTAS linhas
+   * leva com ela — é isso que apanha o clique na lista errada, e nenhum aviso
+   * genérico apanha.
+   *
+   * A segunda frase existe porque a dúvida a seguir é sempre a mesma: «e os
+   * eventos que já preparei?». Não mudam — a checklist é uma cópia, não uma
+   * referência (ver o cabeçalho deste ficheiro). Dizê-lo aqui evita o gesto de
+   * ir confirmar a outro sítio.
+   */
+  function perguntarSeApaga(lista: MaterialList) {
+    const quantas = linhasDe(lista.id).length;
+    setAPerguntar({
+      titulo: `Apagar a lista «${lista.name}»?`,
+      oQueSePerde: [
+        `${quantas} ${quantas === 1 ? "linha" : "linhas"} de material — com as quantidades e o que está marcado como crítico`,
+        "as regras que apontem para ela passam a dizer «(lista apagada)»",
+      ],
+      aviso: "As checklists já geradas a partir dela não mudam — são cópias. Não pode ser anulado.",
+      rotulo: "Apagar a lista",
+      fazer: () => apagar(lista),
+    });
+  }
+
   async function apagar(lista: MaterialList) {
     setOcupado(true);
     const { ok } = await gravar(
@@ -228,12 +317,59 @@ export default function MaterialListas() {
     return true;
   }
 
-  async function removerLinha(oQue: string, listId: string, linhaId: string) {
-    const { ok } = await gravar(oQue, `/api/material/listas/${listId}`, {
+  /**
+   * REMOVER UMA LINHA NÃO PERGUNTA NADA — e é de propósito.
+   *
+   * É o gesto de afinar uma lista, e faz-se em série: abre-se a lista, tiram-se
+   * três linhas que já não fazem sentido, acrescentam-se duas. Uma caixa a
+   * perguntar em cada uma delas seria três cliques a mais por arrumação, e ao
+   * fim de uma semana ninguém lê o que lá está escrito — que é a maneira de uma
+   * pergunta deixar de proteger o que quer que seja.
+   *
+   * Em troca, a linha volta com um toque. O que se repõe é o que a linha tinha
+   * — o item, a quantidade, o «por cada N pax» e o crítico —, e não só o nome.
+   *
+   * O QUE NÃO VOLTA é a POSIÇÃO: a rota só sabe acrescentar ao fim (ver
+   * `/api/material/listas/[id]`), portanto a linha reposta aparece em baixo.
+   * Fica escrito aqui em vez de se fingir que não: repor a ordem exacta pedia
+   * uma rota nova, e a ordem de uma lista base é o que menos custa a arrastar
+   * de volta ao pé do que se perdia a perguntar em cada remoção.
+   */
+  async function removerLinha(lista: MaterialList, linha: MaterialListItem, nome: string) {
+    const { ok } = await gravar(`remover «${nome}» da lista`, `/api/material/listas/${lista.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ remover: linhaId }),
+      body: JSON.stringify({ remover: linha.id }),
     });
+    if (!ok) return;
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
+    setAnular({
+      texto: `«${nome}» saiu de «${lista.name}».`,
+      repor: () => void reporLinha(lista, linha, nome),
+    });
+  }
+
+  /** O outro lado do «Anular»: mete a linha de volta, com o que ela tinha. */
+  async function reporLinha(lista: MaterialList, linha: MaterialListItem, nome: string) {
+    // Sai do ecrã primeiro: sem isto, dois toques seguidos no «Anular» mandavam
+    // duas linhas iguais para a lista.
+    setAnular(null);
+    const { ok } = await gravar(
+      `repor «${nome}» em «${lista.name}»`,
+      `/api/material/listas/${lista.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          linha: {
+            itemId: linha.itemId,
+            qty: linha.qty,
+            qtyPerPax: linha.qtyPerPax,
+            critical: linha.critical,
+          },
+        }),
+      },
+    );
     if (!ok) return;
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
@@ -330,7 +466,7 @@ export default function MaterialListas() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => apagar(lista)}
+                        onClick={() => perguntarSeApaga(lista)}
                         disabled={ocupado}
                       >
                         Apagar
@@ -455,13 +591,7 @@ export default function MaterialListas() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() =>
-                                  removerLinha(
-                                    `remover «${item?.name ?? "item"}» da lista`,
-                                    lista.id,
-                                    l.id,
-                                  )
-                                }
+                                onClick={() => void removerLinha(lista, l, item?.name ?? "item")}
                               >
                                 Remover
                               </Button>
@@ -469,6 +599,23 @@ export default function MaterialListas() {
                           );
                         })}
                       </ul>
+                    )}
+
+                    {/* ── A JANELA PARA ANULAR ────────────────────────────
+                        Encostada à lista de onde a linha saiu, e não num aviso
+                        no canto do ecrã: é aqui que os olhos estão quando a
+                        linha desaparece. `role="status"` para quem não vê o
+                        ecrã ouvir que saiu, e o quê. */}
+                    {anular && (
+                      <div
+                        role="status"
+                        className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-foreground/[0.04] px-3 py-2 text-xs text-foreground/70"
+                      >
+                        <span>{anular.texto}</span>
+                        <Button size="sm" variant="ghost" onClick={anular.repor}>
+                          Anular
+                        </Button>
+                      </div>
                     )}
 
                     <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -500,6 +647,30 @@ export default function MaterialListas() {
           })}
         </ul>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </div>
   );
 }

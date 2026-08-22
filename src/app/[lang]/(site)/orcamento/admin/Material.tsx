@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useDeferredValue, useRef } from "react";
+import { useMemo, useState, useDeferredValue, useRef, type ReactNode } from "react";
 import type { MaterialItem, MaterialKind } from "@/lib/material-types";
 import {
   MATERIAL_CATEGORIES,
@@ -11,7 +11,16 @@ import {
 import type { PlanoCsv } from "@/lib/material-csv";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
-import { Button, Card, EmCurso, EmptyState, Field, Segmented, Toolbar } from "./ui";
+import {
+  Button,
+  Card,
+  EmCurso,
+  EmptyState,
+  Field,
+  PerguntaDestrutiva,
+  Segmented,
+  Toolbar,
+} from "./ui";
 import MaterialListas from "./MaterialListas";
 import MaterialRegras from "./MaterialRegras";
 import { useCachedList } from "./useCachedList";
@@ -52,6 +61,45 @@ const PlusIcon = (
     <path d="M12 5v14M5 12h14" strokeLinecap="round" />
   </svg>
 );
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE LEVA PERGUNTA NESTE ECRÃ, E O QUE NÃO LEVA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Duas coisas daqui deitam trabalho fora, e as duas são RARAS e CARAS — por
+ * isso as duas levam pergunta, e nenhuma leva janela para anular:
+ *
+ *   REMOVER DO CATÁLOGO tira o item de vez. As listas base que o usem ficam com
+ *   a linha a dizer «(item removido do catálogo)» — o defeito não aparece aqui,
+ *   aparece na véspera de um evento, na lista de quem carrega a carrinha.
+ *
+ *   CANCELAR UMA IMPORTAÇÃO JÁ LIDA deita fora um ensaio de centenas de linhas
+ *   que o servidor já correu, e o botão está encostado ao «Gravar». Para voltar
+ *   ao mesmo sítio é preciso ir buscar o ficheiro outra vez.
+ *
+ * E o que NÃO leva pergunta, para não se andar a acrescentar depois:
+ *   · GRAVAR A IMPORTAÇÃO já tem a sua — é o painel «Antes de gravar», com os
+ *     números lá dentro. Uma segunda caixa por cima dessa era perguntar duas
+ *     vezes a mesma coisa.
+ *   · O «Cancelar» dos formulários de adicionar e editar é a declaração de que
+ *     não se quer aquilo. Perguntar a quem já disse que não é atrito puro.
+ *   · ESCOLHER UM SEGUNDO CSV com um ensaio aberto substitui o ensaio — mas
+ *     quem está no selector de ficheiros está exactamente a pedir isso.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Remover do catálogo», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
+}
 
 interface FormState {
   name: string;
@@ -182,6 +230,9 @@ function Catalogo() {
    */
   const [aGravar, setAGravar] = useState<number | null>(null);
 
+  /** A pergunta em curso — ver o comentário grande no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
+
   const emFalta = useMemo(() => items.filter(abaixoDoMinimo), [items]);
 
   const visiveis = useMemo(() => {
@@ -298,6 +349,34 @@ function Catalogo() {
     toast("Guardado.", "success");
   }
 
+  /**
+   * A PERGUNTA DE REMOVER, com o tamanho do que se perde lá dentro.
+   *
+   * O que estava aqui era nada: um botão «Remover» que apagava à primeira.
+   * Numa lista de dezenas de linhas todas com o mesmo botão no mesmo sítio,
+   * é o clique ao lado que apaga o material errado — e sem o nome à frente dos
+   * olhos ninguém dá por isso até faltar o escadote.
+   *
+   * O número é o stock: é a medida do que estava registado e deixa de estar. A
+   * segunda frase é a consequência que não se vê deste ecrã — a linha
+   * «(item removido do catálogo)» que fica nas listas base.
+   */
+  function perguntarSeRemove(i: MaterialItem) {
+    const unidade = i.unit?.trim() || "un.";
+    setAPerguntar({
+      titulo: `Remover «${i.name}» do catálogo?`,
+      oQueSePerde: [
+        `${i.stock} ${unidade} em stock${
+          typeof i.minStock === "number" ? `, e o mínimo de ${i.minStock} por que se vigia` : ""
+        }`,
+        "nas listas base, a linha dele passa a dizer «(item removido do catálogo)»",
+      ],
+      aviso: "As checklists já geradas não mudam — foram copiadas. Não pode ser anulado.",
+      rotulo: "Remover do catálogo",
+      fazer: () => remove(i.id),
+    });
+  }
+
   async function remove(id: string) {
     const removido = items.find((i) => i.id === id);
     if (!removido) return;
@@ -321,6 +400,35 @@ function Catalogo() {
           : [...prev, removido].sort((a, b) => a.name.localeCompare(b.name)),
       );
     }
+  }
+
+  /**
+   * A PERGUNTA DE DEITAR FORA UM ENSAIO JÁ LIDO.
+   *
+   * O «Cancelar» está a dois centímetros do «Gravar», e o que ele deita fora
+   * não é um formulário meio escrito: é um ficheiro já lido e um ensaio que o
+   * servidor já correu por cima do catálogo inteiro. A pergunta diz QUAL
+   * ficheiro e QUANTAS linhas estavam à espera — e diz também que nada foi
+   * gravado, que é a dúvida imediata de quem carregou por engano.
+   */
+  function perguntarSeDeitaForaOEnsaio() {
+    const novos = plano?.novos ?? 0;
+    const atualizados = plano?.atualizados ?? 0;
+    setAPerguntar({
+      titulo: `Deitar fora a importação de «${nomeCsv || "o ficheiro"}»?`,
+      oQueSePerde: [
+        `${novos} ${novos === 1 ? "linha nova" : "linhas novas"} e ${atualizados} a atualizar — ${
+          novos + atualizados
+        } ao todo, já lidas e conferidas pelo servidor`,
+      ],
+      aviso: "Nada foi gravado. Para voltar aqui tens de escolher o ficheiro outra vez.",
+      rotulo: "Deitar fora",
+      fazer: () => {
+        setPlano(null);
+        setCsv(null);
+        setNomeCsv("");
+      },
+    });
   }
 
   function pedirFicheiro() {
@@ -671,15 +779,7 @@ function Catalogo() {
             >
               {importando ? "A gravar…" : "Gravar"}
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setPlano(null);
-                setCsv(null);
-                setNomeCsv("");
-              }}
-            >
+            <Button size="sm" variant="ghost" onClick={perguntarSeDeitaForaOEnsaio}>
               Cancelar
             </Button>
           </div>
@@ -777,7 +877,7 @@ function Catalogo() {
                   >
                     Editar
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => remove(i.id)}>
+                  <Button size="sm" variant="ghost" onClick={() => perguntarSeRemove(i)}>
                     Remover
                   </Button>
                 </span>
@@ -786,6 +886,30 @@ function Catalogo() {
           )}
         </ul>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </>
   );
 }

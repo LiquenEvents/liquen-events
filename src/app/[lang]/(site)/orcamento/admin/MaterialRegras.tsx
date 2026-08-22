@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { MaterialItem } from "@/lib/material-types";
-import type { MaterialList } from "@/lib/material-list-types";
+import type { MaterialList, MaterialListItem } from "@/lib/material-list-types";
 import type { MaterialRule, MatchKind } from "@/lib/material-rules";
 import { useToast } from "./Toast";
-import { Button, EmptyState, Field } from "./ui";
+import { Button, EmptyState, Field, PerguntaDestrutiva } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
@@ -27,6 +27,39 @@ const TIPO_LABEL: Record<MatchKind, string> = {
 
 interface Listas {
   listas: MaterialList[];
+  /** As linhas de TODAS as listas. Vêm na mesma resposta, e são elas que dão o
+   *  número à pergunta de apagar uma regra: «a lista X (7 linhas)». */
+  linhas: MaterialListItem[];
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * APAGAR UMA REGRA PERGUNTA; DESLIGAR NÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Apagar uma regra é raro e é caro: o que se perde é a condição escrita à mão
+ * («quando a proposta disser arco floral»), e não há nada neste ecrã que a
+ * traga de volta. Por isso leva PERGUNTA, e a pergunta diz o que a regra
+ * deixa de acrescentar — com o número, porque «a lista Estrutura e fixação» e
+ * «a lista Estrutura e fixação (7 linhas)» não pesam o mesmo a quem decide.
+ *
+ * DESLIGAR continua a não perguntar nada, e é de propósito: é o gesto barato,
+ * reversível no mesmo botão, e é a alternativa que a própria pergunta oferece.
+ * Pôr uma caixa à frente dele era empurrar quem está a experimentar regras para
+ * o botão que apaga.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Apagar a regra», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
 }
 
 /** Gravou-se, mas o ecrã ficou a mostrar a versão anterior. Dizer as duas
@@ -45,6 +78,7 @@ export default function MaterialRegras() {
   const { data: dados } = useCachedList<Listas>("material-listas", "/api/material/listas");
   const { data: catalogo = [] } = useCachedList<MaterialItem[]>("material", "/api/material");
   const listas = dados?.listas ?? [];
+  const linhas = dados?.linhas ?? [];
 
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<MatchKind>("servico");
@@ -54,6 +88,8 @@ export default function MaterialRegras() {
   const [itemId, setItemId] = useState("");
   const [qty, setQty] = useState("1");
   const [ocupado, setOcupado] = useState(false);
+  /** A pergunta em curso — ver o comentário no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
 
   /**
    * Relê as regras. `false` quando a leitura falhou — e aí não escreve nada.
@@ -150,6 +186,45 @@ export default function MaterialRegras() {
     );
     if (!ok) return;
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
+  }
+
+  /**
+   * O QUE ESTA REGRA DEIXA DE FAZER, em palavras e com o número.
+   *
+   * Uma regra não «apaga dados»: apaga um automatismo. O que se perde só se
+   * percebe pelo que ela acrescentava, e é isso que esta frase diz — a lista
+   * (com quantas linhas tem) ou o item (com quantos).
+   */
+  function oQueEstaRegraAcrescenta(r: MaterialRule): string {
+    if (r.action === "add_list") {
+      const lista = listas.find((l) => l.id === r.listId);
+      if (!lista) return "a lista que ela acrescentava já não existe";
+      const quantas = linhas.filter((l) => l.listId === lista.id).length;
+      return `a lista «${lista.name}» (${quantas} ${
+        quantas === 1 ? "linha" : "linhas"
+      }) deixa de entrar nas checklists novas`;
+    }
+    const item = catalogo.find((i) => i.id === r.itemId);
+    if (!item) return "o item que ela acrescentava já não existe no catálogo";
+    return `${r.qty ?? 1} × «${item.name}» deixa de entrar nas checklists novas`;
+  }
+
+  /** A pergunta de apagar uma regra — e a saída barata, escrita na própria frase. */
+  function perguntarSeApaga(regra: MaterialRule) {
+    setAPerguntar({
+      titulo: `Apagar a regra «${regra.name}»?`,
+      oQueSePerde: [
+        oQueEstaRegraAcrescenta(regra),
+        `a condição escrita à mão: ${TIPO_LABEL[regra.matchKind].toLowerCase()}${
+          regra.matchValue ? ` “${regra.matchValue}”` : ""
+        }`,
+      ],
+      aviso:
+        "As checklists já geradas não mudam. Se for só para a experimentar sem ela, «Desligar» " +
+        "guarda a regra e pode voltar atrás.",
+      rotulo: "Apagar a regra",
+      fazer: () => apagar(regra),
+    });
   }
 
   async function apagar(regra: MaterialRule) {
@@ -292,7 +367,7 @@ export default function MaterialRegras() {
                 <Button size="sm" variant="ghost" onClick={() => alternar(r)}>
                   {r.enabled ? "Desligar" : "Ligar"}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => apagar(r)}>
+                <Button size="sm" variant="ghost" onClick={() => perguntarSeApaga(r)}>
                   Apagar
                 </Button>
               </span>
@@ -300,6 +375,30 @@ export default function MaterialRegras() {
           ))}
         </ul>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </div>
   );
 }

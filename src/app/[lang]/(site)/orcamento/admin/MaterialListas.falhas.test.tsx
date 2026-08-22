@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MaterialListas from "./MaterialListas";
 
@@ -201,7 +201,10 @@ describe("MaterialListas — uma gravação recusada", () => {
 
     render(<MaterialListas />);
     await screen.findByText("Cerimónia ao ar livre");
-    await userEvent.click(screen.getByRole("button", { name: /apagar/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^apagar$/i }));
+    // Apagar uma lista pergunta primeiro — ver `MaterialListas.perguntas.test.tsx`.
+    const caixa = await screen.findByRole("dialog");
+    await userEvent.click(within(caixa).getByRole("button", { name: /^Apagar a lista$/i }));
 
     await waitFor(() => expect(avisos.ditos.join(" ")).toMatch(/já não existe/i));
     expect(avisos.ditos.join(" ")).toContain("Cerimónia ao ar livre");

@@ -1,11 +1,20 @@
 "use client";
 
-import { useMemo, useState, useDeferredValue } from "react";
+import { useMemo, useState, useDeferredValue, type ReactNode } from "react";
 import type { PropItem } from "@/lib/inventory-types";
 import { PROP_CATEGORIES } from "@/lib/inventory-types";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
-import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  MenuDeAccoes,
+  PerguntaDestrutiva,
+  Toolbar,
+  type AccaoDeItem,
+} from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import ModoDeCarga from "./ModoDeCarga";
@@ -44,6 +53,42 @@ const CruzIcon = (
     <path d="M18 6 6 18M6 6l12 12" />
   </svg>
 );
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PERGUNTA DE REMOVER — porque é que deixou de ser um `confirm()`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O que estava aqui era `confirm('Remover o item "X"? Esta ação não pode ser
+ * anulada.')`, e tinha três defeitos, por esta ordem de gravidade:
+ *
+ *   1. «Esta ação não pode ser anulada» não diz o que se perde. Diz que é
+ *      grave, que é a única coisa que quem carregou no botão já sabia.
+ *   2. A caixa do browser não cabe num telemóvel de 375 px sem cortar a frase,
+ *      não se traduz e não tem nada do desenho da casa — e este inventário
+ *      usa-se no armazém, no telemóvel.
+ *   3. `confirm()` bloqueia o fio principal do browser. Numa aba com gravações
+ *      automáticas a decorrer, é a pior altura para congelar tudo.
+ *
+ * Fica uma pergunta que NOMEIA o adereço e diz o tamanho do que sai do
+ * inventário — a quantidade e onde estava. Remover um adereço é raro e é caro
+ * (o registo não volta, e nem sequer é o adereço que desaparece: é o
+ * conhecimento de que ele existe e de onde está), portanto leva pergunta e não
+ * janela para anular.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Remover do inventário», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
+}
 
 type Condition = PropItem["condition"];
 
@@ -160,6 +205,8 @@ export default function Inventario() {
   // gere-se (editar, corrigir, exportar), no modo de carga percorre-se e
   // risca-se. Ver ModoDeCarga.
   const [aCarregar, setACarregar] = useState(false);
+  /** A pergunta em curso — ver o comentário no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
 
   /**
    * ══════════════════════════════════════════════════════════════════════
@@ -289,10 +336,24 @@ export default function Inventario() {
     toast("Alterações guardadas.", "success");
   }
 
+  /** A pergunta, com a quantidade e o sítio lá dentro. Ver o topo do ficheiro. */
+  function perguntarSeRemove(i: PropItem) {
+    const unidade = i.unit?.trim() || "un.";
+    setAPerguntar({
+      titulo: `Remover «${i.name}» do inventário?`,
+      oQueSePerde: [
+        `${i.quantity} ${unidade} registadas${i.location ? ` em ${i.location}` : ""}`,
+        "a linha sai da lista, do modo de carga e das exportações",
+      ],
+      aviso: "Não pode ser anulado.",
+      rotulo: "Remover do inventário",
+      fazer: () => remove(i.id),
+    });
+  }
+
   async function remove(id: string) {
     const it = items.find((x) => x.id === id);
-    if (!confirm(`Remover o item${it ? ` "${it.name}"` : ""}? Esta ação não pode ser anulada.`))
-      return;
+    if (!it) return;
     setItems((prev) => prev.filter((x) => x.id !== id));
     const { ok } = await gravar(
       `remover «${it?.name ?? "o item"}» do inventário`,
@@ -302,17 +363,15 @@ export default function Inventario() {
     if (!ok) {
       // Repõe-se SÓ esta linha, e só se ela não estiver já na lista. Guardar a
       // lista inteira antes do pedido — como se fazia — era guardar um instante
-      // que já passou: a confirmação é imediata, dois «Remover» seguidos põem
-      // duas chamadas no ar, e a que falhasse ressuscitava no ecrã a que o
-      // servidor tinha mesmo apagado. E o `setItems` escreve através para a
-      // cache, portanto a linha fantasma ficava lá até alguém recarregar.
-      if (it) {
-        setItems((prev) =>
-          prev.some((x) => x.id === id)
-            ? prev
-            : [...prev, it].sort((a, b) => a.name.localeCompare(b.name)),
-        );
-      }
+      // que já passou: dois «Remover» confirmados de seguida põem duas chamadas
+      // no ar, e a que falhasse ressuscitava no ecrã a que o servidor tinha
+      // mesmo apagado. E o `setItems` escreve através para a cache, portanto a
+      // linha fantasma ficava lá até alguém recarregar.
+      setItems((prev) =>
+        prev.some((x) => x.id === id)
+          ? prev
+          : [...prev, it].sort((a, b) => a.name.localeCompare(b.name)),
+      );
       return;
     }
     toast("Item removido.", "success");
@@ -337,7 +396,7 @@ export default function Inventario() {
       rotulo: "Remover",
       icone: CruzIcon,
       destrutiva: true,
-      onAccao: () => remove(i.id),
+      onAccao: () => perguntarSeRemove(i),
     },
   ];
 
@@ -756,7 +815,7 @@ export default function Inventario() {
                       <Button size="sm" variant="ghost" onClick={() => startEdit(i)}>
                         Editar
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => remove(i.id)}>
+                      <Button size="sm" variant="ghost" onClick={() => perguntarSeRemove(i)}>
                         Remover
                       </Button>
                     </div>
@@ -917,7 +976,7 @@ export default function Inventario() {
                             {LapisIcon}
                           </button>
                           <button
-                            onClick={() => remove(i.id)}
+                            onClick={() => perguntarSeRemove(i)}
                             className="alvo-toque text-foreground/25 sem-rato:text-foreground/55 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                             aria-label="Remover"
                           >
@@ -938,6 +997,30 @@ export default function Inventario() {
           </Card>
         </>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </div>
   );
 }
