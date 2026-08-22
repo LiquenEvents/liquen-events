@@ -1507,36 +1507,40 @@ export default function Temas() {
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
                   proporções diferentes umas das outras. */}
-                <div className="flex aspect-[4/3] w-full gap-px overflow-hidden bg-foreground/[0.04]">
+                {/* ══════════════════════════════════════════════════════
+                    UMA FOTOGRAFIA, INTEIRA
+                    ══════════════════════════════════════════════════════
+
+                    Decisão dela na Fase 2: uma imagem por cartão.
+
+                    Aqui havia a capa e, encostada à direita, uma tira com mais
+                    três fotos do tema — «uma capa só diz o que é a foto de
+                    capa; três fotos dizem o que é o TEMA». A ideia estava
+                    certa; o desenho é que não chegava lá: na grelha compacta a
+                    tira tinha 41 px de largura e cada foto ~41 × 33. Pequena de
+                    mais para se ler como uma fotografia — o que se via era
+                    textura no canto do cartão, e a capa ficava com três quartos
+                    do espaço.
+
+                    O conjunto continua dito, noutro sítio e melhor: «9 fotos»
+                    no rasto de números, que custa uma linha de texto em vez de
+                    um quarto da imagem, e a grelha inteira ao abrir o tema, que
+                    é onde se escolhe.
+
+                    A moldura é 4:3 SEMPRE: é ela que mantém a primeira linha
+                    alinhada quando as fotos têm proporções diferentes. */}
+                <div className="aspect-[4/3] w-full overflow-hidden bg-foreground/[0.04]">
                   {t.coverUrl ? (
                     <ImagemComPlanoB
                       src={t.coverUrl}
                       avif={t.coverAvif}
                       planoB={t.coverFallbackUrl}
                       lqip={t.coverLqip}
-                      className="h-full min-w-0 flex-1 object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
+                      className="h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-elemento group-hover:scale-[1.02]"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-foreground/40">
                       {FolderIcon}
-                    </div>
-                  )}
-                  {/* Uma capa só diz o que é a foto de capa; três fotos dizem o que
-                    é o TEMA. Só aparecem quando existem mesmo — um tema com uma
-                    foto continua a ser uma imagem inteira, e não uma tira com
-                    dois buracos. */}
-                  {t.coverUrl && t.previewUrls && t.previewUrls.length > 0 && (
-                    <div className="flex w-1/4 shrink-0 flex-col gap-px">
-                      {t.previewUrls.slice(0, 3).map((u, k) => (
-                        <ImagemComPlanoB
-                          key={u}
-                          src={u}
-                          avif={t.previewAvifs?.[k]}
-                          planoB={t.previewFallbackUrls?.[k]}
-                          lqip={t.previewLqips?.[k]}
-                          className="min-h-0 w-full flex-1 object-cover"
-                        />
-                      ))}
                     </div>
                   )}
                 </div>

@@ -122,30 +122,33 @@ describe("GET /api/temas", () => {
    * imagem só), e isso muda o número de CAMINHOS — não o número de idas ao
    * Storage, que continua a ser um pedido para a página inteira.
    */
-  it("assina num único pedido para todos os temas, capas e pré-visualizações", async () => {
+  it("assina num único pedido para todos os temas", async () => {
     st.authed = true;
     st.themes = [theme("t-1", "Terracotta"), theme("t-2", "Itália")];
     st.files = { "t-1": folder(["a.jpg", "b.jpg", "c.jpg"]), "t-2": folder(["d.jpg"]) };
     await GET(req("GET"));
     expect(st.sign).toHaveBeenCalledTimes(1);
-    expect(st.sign).toHaveBeenCalledWith(["t-1/a.jpg", "t-2/d.jpg", "t-1/b.jpg", "t-1/c.jpg"]);
+    expect(st.sign).toHaveBeenCalledWith(["t-1/a.jpg", "t-2/d.jpg"]);
   });
 
-  it("a capa não se repete na pilha de pré-visualizações do cartão", async () => {
+  /**
+   * ── UMA FOTOGRAFIA POR CARTÃO ─────────────────────────────────────────
+   *
+   * Decisão dela na Fase 2. Aqui assinavam-se mais TRÊS fotos por tema para
+   * uma tira ao lado da capa — 41 px de largura na grelha compacta, pequena
+   * de mais para se ler como fotografia. Numa biblioteca de 25 temas são 75
+   * pedidos de imagem e 75 assinaturas que deixam de existir.
+   *
+   * Este teste é o guarda dessa poupança: só a capa é assinada, mesmo com a
+   * pasta cheia.
+   */
+  it("as fotos que não são capa não se assinam", async () => {
     st.authed = true;
     st.themes = [theme("t-1", "Terracotta")];
-    st.files = { "t-1": folder(["a.jpg", "b.jpg", "c.jpg"]) };
+    st.files = { "t-1": folder(["a.jpg", "b.jpg", "c.jpg", "d.jpg"]) };
     const body = await (await GET(req("GET"))).json();
     expect(body[0].coverUrl).toBe("https://signed/t-1/a.jpg");
-    expect(body[0].previewUrls).toEqual(["https://signed/t-1/b.jpg", "https://signed/t-1/c.jpg"]);
-  });
-
-  it("um tema com uma foto só não traz pré-visualizações nenhumas", async () => {
-    st.authed = true;
-    st.themes = [theme("t-1", "Terracotta")];
-    st.files = { "t-1": folder(["a.jpg"]) };
-    const body = await (await GET(req("GET"))).json();
-    expect(body[0].coverUrl).toBe("https://signed/t-1/a.jpg");
+    expect(st.sign).toHaveBeenCalledWith(["t-1/a.jpg"]);
     expect(body[0].previewUrls).toBeUndefined();
   });
 
@@ -173,13 +176,10 @@ describe("GET /api/temas", () => {
     st.files = { "t-1": folder(["recente.jpg", "antiga.jpg"]) };
     const body = await (await GET(req("GET"))).json();
     expect(body[0].coverUrl).toBe("https://signed/t-1/escolhida.jpg");
-    // As duas hipóteses — e as pré-visualizações — vão na MESMA assinatura.
+    // As duas hipóteses de capa — a escolhida e a mais recente, para o caso de
+    // a escolhida já não existir — vão na MESMA assinatura.
     expect(st.sign).toHaveBeenCalledTimes(1);
-    expect(st.sign).toHaveBeenCalledWith([
-      "t-1/escolhida.jpg",
-      "t-1/recente.jpg",
-      "t-1/antiga.jpg",
-    ]);
+    expect(st.sign).toHaveBeenCalledWith(["t-1/escolhida.jpg", "t-1/recente.jpg"]);
   });
 
   it("volta à foto mais recente quando a capa escolhida já não existe", async () => {

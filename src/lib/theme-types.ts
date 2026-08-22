@@ -141,24 +141,14 @@ export interface ThemeSummary extends ProposalTheme {
    *  escolha — ou se a escolhida já não existir —, a foto mais recente. */
   coverUrl?: string;
   /**
-   * Mais duas ou três fotos do tema, para o cartão dar uma ideia do CONJUNTO em
-   * vez de uma imagem só. A capa vem sempre à frente; estas são as seguintes.
-   *
-   * Não custam uma ida a mais ao Storage: os nomes já vinham na listagem que a
-   * rota faz por tema, e a assinatura de todos os temas continua a ser um único
-   * pedido — só com mais caminhos lá dentro. Podem faltar (tema com uma foto
-   * só, ou assinatura falhada), e nesse caso o cartão mostra o que tiver.
-   */
-  previewUrls?: string[];
-  /**
    * ═══════════════════════════════════════════════════════════════════════
    * O PLANO B, QUE TEM DE VIAJAR ATÉ AO NAVEGADOR
    * ═══════════════════════════════════════════════════════════════════════
    *
-   * `coverUrl` e `previewUrls` trazem a DERIVADA mais adequada — 96 px para
-   * uma tira, 400 px para a capa. Essas derivadas podem não existir: nascem
-   * no carregamento, e as fotos anteriores a elas (ou migradas em massa) não
-   * as têm.
+   * `coverUrl` traz a DERIVADA mais adequada — a miniatura de 400 px para uma
+   * capa desenhada com ~128. Essa derivada pode não existir: nasce no
+   * carregamento, e as fotos anteriores a ela (ou migradas em massa) não a
+   * têm.
    *
    * E aqui está a armadilha que partiu a página: **assinar um caminho não
    * verifica que o ficheiro existe.** O `createSignedUrls` devolve um URL
@@ -171,10 +161,8 @@ export interface ThemeSummary extends ProposalTheme {
    * tem de ir com ele: o URL do ORIGINAL, que é o único que veio da LISTAGEM
    * da pasta e portanto o único que existe de certeza.
    *
-   * Alinhados por índice com `previewUrls`.
    */
   coverFallbackUrl?: string;
-  previewFallbackUrls?: string[];
   /**
    * ═══════════════════════════════════════════════════════════════════════
    * O BORRÃO QUE FAZ O CARTÃO NÃO NASCER CINZENTO
@@ -193,10 +181,8 @@ export interface ThemeSummary extends ProposalTheme {
    * já sabe de que pastas precisa. Podem faltar (fotos anteriores à migração),
    * e aí o cartão fica como estava.
    *
-   * `previewLqips` está alinhado por índice com `previewUrls`.
    */
   coverLqip?: string;
-  previewLqips?: string[];
   /**
    * ═══════════════════════════════════════════════════════════════════════
    * A OFERTA EM AVIF
@@ -214,10 +200,8 @@ export interface ThemeSummary extends ProposalTheme {
    * suposição: o Supabase só assina o que está lá. Isso importa porque um
    * `<source>` que dá 404 NÃO faz o navegador recuar para o `<img>`.
    *
-   * `previewAvifs` está alinhado por índice com `previewUrls`.
    */
   coverAvif?: string;
-  previewAvifs?: string[];
 }
 
 /** Limites de escrita partilhados entre o formulário e as rotas de API. */

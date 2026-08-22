@@ -6,9 +6,7 @@ import {
   listThemeFiles,
   signThemePaths,
   signThemeThumbs,
-  signThemeMicros,
   signThemeAvif,
-  signThemeAvifMicros,
   themeFolder,
   isThemePath,
 } from "@/lib/theme-storage";
@@ -49,7 +47,6 @@ export const maxDuration = 30;
 
 /** Quantas fotos, além da capa, o cartão de um tema mostra empilhadas. Três
  *  chegam para dar uma ideia do conjunto sem transformar o cartão numa grelha. */
-const PREVIEWS_POR_CARTAO = 3;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -343,13 +340,26 @@ export async function GET(request: NextRequest) {
     const newest = listings.map(({ names }, i) =>
       names[0] ? `${themeFolder(themes[i].id)}/${names[0]}` : "",
     );
-    // Mais algumas fotos por tema, para o cartão poder mostrar o CONJUNTO.
-    // Continua a ser UMA assinatura em bloco para todos os temas — só com mais
-    // caminhos lá dentro —, e os nomes já vinham na listagem que se fez acima:
-    // não há aqui nem mais uma ida ao Storage.
-    const extras = listings.map(({ names }, i) =>
-      names.slice(0, PREVIEWS_POR_CARTAO + 1).map((n) => `${themeFolder(themes[i].id)}/${n}`),
-    );
+    /**
+     * ════════════════════════════════════════════════════════════════════
+     * UMA FOTOGRAFIA POR CARTÃO — e o que isso poupa
+     * ════════════════════════════════════════════════════════════════════
+     *
+     * Aqui assinavam-se mais TRÊS fotos por tema, para o cartão desenhar uma
+     * tira do conjunto ao lado da capa. A ideia era boa e o desenho não: numa
+     * grelha compacta a tira tinha 41 px de largura e cada foto ~41 × 33 —
+     * pequena de mais para se ler como uma fotografia, e o que se via era
+     * textura no canto do cartão. Falhava no seu próprio objectivo.
+     *
+     * Decisão dela na Fase 2: uma imagem por cartão. O conjunto passa a ser
+     * dito pelo número («9 fotos»), que ocupa uma linha de texto em vez de um
+     * quarto da fotografia, e visto ao abrir o tema, que é onde se escolhe.
+     *
+     * MEDIDO, numa biblioteca de 25 temas: 75 pedidos de imagem a menos e
+     * ~520 KB que deixam de atravessar a rede dela (micro AVIF a ~6,9 KB), sem
+     * contar as 75 assinaturas e os 75 borrões que deixam de ir na resposta.
+     * A tira era a metade mais cara do cartão e a que menos dizia.
+     */
     /**
      * ════════════════════════════════════════════════════════════════════
      * O CARTÃO NÃO PODE SERVIR ORIGINAIS. Servia.
@@ -372,7 +382,7 @@ export async function GET(request: NextRequest) {
      * as fotos anteriores às derivadas não têm miniatura nenhuma, e um cartão
      * vazio seria pior do que um cartão pesado. É plano B, não caminho.
      */
-    const todos = [...new Set([...chosen, ...newest, ...extras.flat()].filter(Boolean))];
+    const todos = [...new Set([...chosen, ...newest].filter(Boolean))];
     const vazio = () => new Map<string, string>();
     /* ── E OS BORRÕES, NO MESMO FÔLEGO ────────────────────────────────────
        «Placeholder blur por foto — acaba o ecrã de cartões cinzentos.»
@@ -386,24 +396,20 @@ export async function GET(request: NextRequest) {
        Os `lqip` lêem-se por PASTA e a chave é o caminho REAL, sem o prefixo
        `tema:` que só existe dentro de um documento. Aqui os caminhos já são os
        reais — vêm da listagem da pasta. */
-    const [urls, thumbs, micros, avifs, avifMicros, lqips] = await comOrcamento(
+    const [urls, thumbs, avifs, lqips] = await comOrcamento(
       Promise.all([
         signThemePaths(todos),
         signThemeThumbs(todos),
-        signThemeMicros(todos),
         // A oferta em AVIF, quando existe. O Supabase só assina o que lá está,
         // e é isso que a torna segura: um `<source>` que dá 404 não faz o
         // navegador recuar para o `<img>`. Ver `signThemeAvif`.
         signThemeAvif(todos),
-        signThemeAvifMicros(todos),
         lqipsDeCaminhos(todos),
       ]),
       limite - Date.now(),
-      [vazio(), vazio(), vazio(), vazio(), vazio(), vazio()],
+      [vazio(), vazio(), vazio(), vazio()],
       "assinatura das capas",
     );
-    /** O melhor que existe para uma tira de 43 px. */
-    const paraTira = (p: string) => micros.get(p) ?? thumbs.get(p) ?? urls.get(p);
     /** O melhor que existe para a capa do cartão (~128 px). */
     const paraCapa = (p: string) => thumbs.get(p) ?? urls.get(p);
 
@@ -413,35 +419,12 @@ export async function GET(request: NextRequest) {
       // para poder mandar também o original como plano B.
       const capa = paraCapa(chosen[i]) ? chosen[i] : newest[i];
       const coverUrl = paraCapa(capa);
-      // A capa nunca se repete nas pré-visualizações: no cartão ela já está
-      // à frente, e vê-la outra vez na pilha lê-se como um tema com fotos
-      // repetidas.
-      const tiras = extras[i]
-        .map((p) => ({ url: paraTira(p), original: urls.get(p) }))
-        .filter((x): x is { url: string; original: string | undefined } =>
-          Boolean(x.url && x.url !== coverUrl),
-        )
-        .slice(0, PREVIEWS_POR_CARTAO);
-      const previewUrls = tiras.map((x) => x.url);
-      // O ORIGINAL de cada uma, para o navegador ter para onde cair quando a
-      // derivada não existir. Ver `ThemeSummary.previewFallbackUrls`: assinar
-      // um caminho NÃO garante que o ficheiro lá está, e era isso que deixava
-      // os cartões cinzentos.
-      const previewFallbackUrls = tiras.map((x) => x.original ?? "");
       const coverFallbackUrl = capa ? urls.get(capa) : undefined;
       const coverLqip = capa ? lqips.get(capa) : undefined;
       // Só se oferece o AVIF do tamanho que se está a servir: um AVIF de 400 px
       // proposto ao lado de uma micro de 96 seria mandar buscar dezassete vezes
       // os pixéis, com um cabeçalho a dizer que era uma poupança.
       const coverAvif = capa && thumbs.get(capa) ? avifs.get(capa) : undefined;
-      const previewAvifs = extras[i]
-        .filter((p) => paraTira(p) && paraTira(p) !== coverUrl)
-        .slice(0, PREVIEWS_POR_CARTAO)
-        .map((p) => (micros.get(p) ? (avifMicros.get(p) ?? "") : (avifs.get(p) ?? "")));
-      const previewLqips = extras[i]
-        .filter((p) => paraTira(p) && paraTira(p) !== coverUrl)
-        .slice(0, PREVIEWS_POR_CARTAO)
-        .map((p) => lqips.get(p) ?? "");
       return {
         ...t,
         imageCount: ok ? names.length : null,
@@ -450,9 +433,6 @@ export async function GET(request: NextRequest) {
         ...(coverFallbackUrl ? { coverFallbackUrl } : {}),
         ...(coverLqip ? { coverLqip } : {}),
         ...(coverAvif ? { coverAvif } : {}),
-        ...(previewUrls.length ? { previewUrls, previewFallbackUrls } : {}),
-        ...(previewLqips.some(Boolean) ? { previewLqips } : {}),
-        ...(previewAvifs.some(Boolean) ? { previewAvifs } : {}),
       };
     });
     /**
@@ -476,8 +456,6 @@ export async function GET(request: NextRequest) {
       ...s,
       coverUrl: semAssinatura(s.coverUrl),
       coverFallbackUrl: semAssinatura(s.coverFallbackUrl),
-      previewUrls: s.previewUrls?.map(semAssinatura),
-      previewFallbackUrls: s.previewFallbackUrls?.map(semAssinatura),
     }));
     return jsonWithEtag(request, summaries, validador);
   } catch (err) {
