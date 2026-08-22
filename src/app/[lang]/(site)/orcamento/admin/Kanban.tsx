@@ -9,6 +9,7 @@ import { eur0 as eur } from "@/lib/money";
 import type { ActivityEntry } from "@/lib/orcamento/types";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { Card } from "./ui";
+import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "pendente", label: "Novo", color: "#8a8a82" },
@@ -298,23 +299,48 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
   // ontem, e o selo de seguimento passava de «hoje» a «em atraso» nos cartões.
   const chaveDeHoje = todayKey();
 
-  // Shared by drag-and-drop and keyboard moves: optimistic update + PATCH,
-  // reverting (and toasting) on failure.
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O CARTÃO QUE SALTA PARA TRÁS SOZINHO — E UM AVISO QUE NÃO O DIZIA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Shared by drag-and-drop and keyboard moves: optimistic update + PATCH,
+   * reverting (and toasting) on failure.
+   *
+   * O movimento é optimista: o cartão muda de coluna no instante do gesto e o
+   * servidor só é ouvido depois. Quando ele recusa, o cartão VOLTA — à frente
+   * dos olhos de quem está a olhar para ele — e o aviso dizia «Não foi possível
+   * atualizar». Três palavras que não dizem o pedido, não dizem porquê, não
+   * dizem o que fazer, e sobretudo não dizem que aquilo que acabou de saltar no
+   * ecrã foi este aviso a acontecer.
+   *
+   * Num quadro com trezentos cartões, um cartão a recuar em silêncio lê-se como
+   * um defeito do ecrã, e o gesto seguinte é arrastá-lo outra vez — que com a
+   * sessão expirada não pode funcionar nunca. Agora a frase nomeia o pedido, a
+   * coluna para onde ia, o motivo, e a coluna para onde o cartão voltou.
+   */
   const changeStatus = useCallback(
     async function changeStatus(q: Quote, status: QuoteStatus) {
       const { onStatusChange, userName } = latest.current;
       if (q.status === status) return;
       onStatusChange(q.id, status); // optimistic
+      const fromLabel = COLUMNS.find((c) => c.id === q.status)?.label ?? q.status;
+      const toLabel = COLUMNS.find((c) => c.id === status)?.label ?? status;
+      const oQue = `mover «${q.name}» para «${toLabel}»`;
+      /** Repõe a coluna de origem e conta as duas coisas na mesma frase. */
+      const reverter = (falha: Falha) => {
+        onStatusChange(q.id, q.status); // revert
+        toast(`${falha.mensagem} O cartão voltou para «${fromLabel}».`, "error");
+      };
+      const entry: ActivityEntry = {
+        id: randomId(),
+        at: new Date().toISOString(),
+        kind: "status_change",
+        actor: userName,
+        summary: `${fromLabel} → ${toLabel}`,
+      };
+      let res: Response;
       try {
-        const fromLabel = COLUMNS.find((c) => c.id === q.status)?.label ?? q.status;
-        const toLabel = COLUMNS.find((c) => c.id === status)?.label ?? status;
-        const entry: ActivityEntry = {
-          id: randomId(),
-          at: new Date().toISOString(),
-          kind: "status_change",
-          actor: userName,
-          summary: `${fromLabel} → ${toLabel}`,
-        };
         /**
          * ACRESCENTAR, e não reescrever o registo inteiro.
          *
@@ -324,22 +350,25 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
          * não o excepcional. O servidor já tinha o caminho seguro, que junta ao
          * registo fresco; a gaveta do back office já o usava, este ecrã não.
          */
-        const res = await fetch(`/api/orcamento/${q.id}`, {
+        res = await fetch(`/api/orcamento/${q.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status, activityLogAppend: [entry] }),
         });
-        if (!res.ok) throw new Error();
-        const updated = await res.json();
-        // Propagate the updated activityLog back via onStatusChange-like mechanism.
-        // We reuse onStatusChange only for status; for the full updated quote we
-        // call it once and the parent syncs state (activityLog will be on next open).
-        onStatusChange(q.id, updated.status ?? status);
-        toast(`${q.name} → ${toLabel}`, "success");
       } catch {
-        onStatusChange(q.id, q.status); // revert
-        toast("Não foi possível atualizar", "error");
+        reverter(porqueRebentou(oQue));
+        return;
       }
+      const corpo = await res.json().catch(() => null);
+      if (!res.ok) {
+        reverter(porqueFalhou(oQue, res, corpo));
+        return;
+      }
+      // Propagate the updated activityLog back via onStatusChange-like mechanism.
+      // We reuse onStatusChange only for status; for the full updated quote we
+      // call it once and the parent syncs state (activityLog will be on next open).
+      onStatusChange(q.id, (corpo as { status?: QuoteStatus } | null)?.status ?? status);
+      toast(`${q.name} → ${toLabel}`, "success");
     },
     [toast],
   );

@@ -18,13 +18,16 @@ import type { Quote } from "@/lib/orcamento/types";
  * seguinte gravava por cima da lista já sem elas.
  */
 
-const quote = { id: "q1", tags: [] as string[] } as unknown as Quote;
+const quote = { id: "q1", name: "Ana e Rui", tags: [] as string[] } as unknown as Quote;
+
+/** A forma mínima de uma resposta: o `porqueFalhou` lê o estado e o corpo, e
+ *  uma recusa sem estado nenhum não distingue a sessão expirada do servidor em
+ *  baixo — que é exactamente a distinção que ele existe para fazer. */
+type RespostaFalsa = { ok: boolean; status: number; json: () => Promise<unknown> };
 
 /** Cada PATCH fica pendurado até o teste decidir se resultou. */
-let porResponder: ((res: { ok: boolean }) => void)[] = [];
-const fetchMock = vi.fn(
-  () => new Promise<{ ok: boolean }>((resolve) => porResponder.push(resolve)),
-);
+let porResponder: ((res: RespostaFalsa) => void)[] = [];
+const fetchMock = vi.fn(() => new Promise<RespostaFalsa>((resolve) => porResponder.push(resolve)));
 
 beforeEach(() => {
   porResponder = [];
@@ -40,7 +43,7 @@ afterEach(() => {
 /** Responde a um PATCH e deixa as promessas correrem até ao fim. */
 async function responder(indice: number, ok: boolean) {
   await act(async () => {
-    porResponder[indice]({ ok });
+    porResponder[indice]({ ok, status: ok ? 200 : 503, json: async () => null });
   });
 }
 
@@ -90,6 +93,12 @@ describe("TagsField com duas gravações ao mesmo tempo", () => {
     expect(screen.queryByText("VIP")).toBeNull();
     expect(screen.queryByText("Urgente")).toBeNull();
     expect(onChange.mock.calls.at(-1)?.[0]).toEqual([]);
-    expect(screen.getByText(/Não foi possível guardar as etiquetas/)).toBeTruthy();
+    // E o aviso diz as três coisas: a etiqueta pelo nome, o porquê, e que a
+    // lista RECUOU no ecrã — sem esta última, ela vê a etiqueta sumir-se e não
+    // liga o aviso ao que acabou de ver.
+    const aviso = screen.getByRole("alert").textContent ?? "";
+    expect(aviso).toContain("Urgente");
+    expect(aviso).toMatch(/não está a aceitar gravações/);
+    expect(aviso).toMatch(/voltou à que está gravada/);
   });
 });

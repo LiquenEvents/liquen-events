@@ -23,6 +23,7 @@ import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { MEDIDA_LG, useMedida } from "./useMedida";
 import { Ajuda, Button } from "./ui";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { CuradoriaDeFotos } from "./CuradoriaDeFotos";
 import { PaginaEmConstrucao, type FotoDaPagina } from "./PaginaEmConstrucao";
 import {
@@ -690,6 +691,15 @@ function reservePhotos(job: ImportJob, photos: readonly JobPhoto[]): void {
   job.reserve(photos.map((p) => ({ marcador: p.marcador, thumbUrl: p.thumb, sourcePath: p.path })));
 }
 
+/**
+ * Uma recusa do SERVIDOR com a frase já escolhida.
+ *
+ * Distingue-se do que a rede atira sozinha (um `TypeError: Failed to fetch`,
+ * que é inglês de browser e não diz nada a ninguém): o que sai daqui vai
+ * direito à pastilha, e o resto passa pelo `porqueRebentou`.
+ */
+class RecusaDoLote extends Error {}
+
 async function runJob(job: ImportJob): Promise<void> {
   job.running = true;
   job.error = null;
@@ -721,7 +731,27 @@ async function runJob(job: ImportJob): Promise<void> {
         signal: job.emVoo.signal,
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "Falha ao adicionar as imagens.");
+      if (!res.ok) {
+        /**
+         * A FRASE DO SERVIDOR GANHA AQUI, INCLUSIVE NUM 500.
+         *
+         * Esta rota não devolve rastos de pilha: devolve queixas escritas para
+         * ela ler («Não foi possível copiar as fotos», o tema que sumiu, o
+         * espaço que acabou). É a única coisa na resposta que diz o que se
+         * passou com ESTE lote. Quando não vem nenhuma, entra a classificação
+         * do `porqueFalhou` — que ao menos separa a sessão expirada (onde
+         * repetir não pode funcionar) do servidor em baixo.
+         */
+        const doServidor = typeof data?.error === "string" ? data.error.trim() : "";
+        throw new RecusaDoLote(
+          doServidor ||
+            porqueFalhou(
+              `adicionar ${chunk.length === 1 ? "1 foto" : `${chunk.length} fotos`} ao mood board`,
+              res,
+              data,
+            ).mensagem,
+        );
+      }
       const copied: ImportedImage[] = Array.isArray(data?.images) ? data.images : [];
       const failedHere: string[] = Array.isArray(data?.failed) ? data.failed : [];
       // A ORIGEM de cada foto vem agora NA RESPOSTA (`sourcePath`), desde que a
@@ -759,7 +789,15 @@ async function runJob(job: ImportJob): Promise<void> {
       // fosse o servidor a queixar-se.
       const abortado = err instanceof DOMException && err.name === "AbortError";
       if (!job.error && !abortado) {
-        job.error = err instanceof Error ? err.message : "Falha ao adicionar as imagens.";
+        // Só a recusa do servidor traz frase pronta. Tudo o resto que rebenta
+        // aqui é a rede (ou um corpo ilegível), e aí o que importa dizer é que
+        // nada se perdeu e que repetir resolve — não «Failed to fetch».
+        job.error =
+          err instanceof RecusaDoLote
+            ? err.message
+            : porqueRebentou(
+                `adicionar ${chunk.length === 1 ? "1 foto" : `${chunk.length} fotos`} ao mood board`,
+              ).mensagem;
       }
       for (const p of chunk) mark(job, p, "failed");
       largar(chunk);

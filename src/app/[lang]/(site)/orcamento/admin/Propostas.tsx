@@ -10,6 +10,7 @@ import type { SegmentedOption } from "./ui";
 import { randomId } from "./util";
 import { useCachedList } from "./useCachedList";
 import { metaFor } from "./status-meta";
+import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 
 const eur = (n: number) =>
   new Intl.NumberFormat("pt-PT", {
@@ -191,8 +192,25 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
     return m;
   }, [quotes]);
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * «NÃO FOI POSSÍVEL ATUALIZAR A PROPOSTA» ERA A MESMA FRASE PARA SEIS COISAS
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Aceitar uma proposta é o gesto mais consequente deste ecrã — move o pedido,
+   * fecha o negócio, e não se desfaz. Falhava com uma frase que servia à rede
+   * em baixo, à sessão expirada, à proposta apagada por outra pessoa e ao
+   * servidor em baixo por igual, e a única saída que oferecia («Tenta
+   * novamente») não pode funcionar em três desses casos.
+   *
+   * Ao contrário do Quadro, aqui NÃO há actualização optimista: a linha só muda
+   * depois de o servidor confirmar. Por isso a frase não tem de falar de nada
+   * que tenha recuado no ecrã — não recuou nada.
+   */
   async function updateStatus(id: string, status: ProposalStatus) {
     setActionBusy(id);
+    const nome = proposals.find((p) => p.id === id)?.clientName ?? "esta proposta";
+    const oQue = `marcar a proposta de «${nome}» como ${STATUS_META[status].label.toLowerCase()}`;
     try {
       const res = await fetch(`/api/propostas/${id}`, {
         method: "PATCH",
@@ -200,7 +218,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
         body: JSON.stringify({ status, respondedAt: new Date().toISOString() }),
       });
       if (!res.ok) {
-        toast("Não foi possível atualizar a proposta. Tenta novamente.", "error");
+        toast(porqueFalhou(oQue, res, await res.json().catch(() => null)).mensagem, "error");
         return;
       }
       const updated: Proposal = await res.json();
@@ -244,7 +262,14 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
             const updatedQuote: Quote = await qRes.json();
             onQuoteUpdated?.(updatedQuote);
           } else {
-            toast("Proposta aceite, mas não foi possível atualizar o pedido associado.", "info");
+            // A proposta FICOU aceite — só o pedido é que não acompanhou. As
+            // duas metades vão em frases separadas: dizer só «não foi possível»
+            // fá-la repetir o gesto inteiro, e a metade que passou passa outra
+            // vez.
+            const falha = qRes
+              ? porqueFalhou(`mover o pedido «${lq.name}» para Aceite`, qRes)
+              : porqueRebentou(`mover o pedido «${lq.name}» para Aceite`);
+            toast(`Proposta de «${updated.clientName}» aceite. ${falha.mensagem}`, "info");
           }
         }
         toast(`Proposta de ${updated.clientName} aceite.`, "success");
@@ -252,7 +277,7 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
         toast("Proposta marcada como recusada.", "info");
       }
     } catch {
-      toast("Erro de ligação. Verifica a internet e tenta novamente.", "error");
+      toast(porqueRebentou(oQue).mensagem, "error");
     } finally {
       setActionBusy(null);
     }
@@ -287,8 +312,18 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
     [],
   );
 
-  // Apagar uma proposta da lista. Pede confirmação (é irreversível) e repõe a
-  // proposta se o servidor recusar, para nunca desaparecer sem ter sido guardado.
+  /**
+   * Apagar uma proposta da lista. Pede confirmação (é irreversível) e repõe a
+   * proposta se o servidor recusar, para nunca desaparecer sem ter sido
+   * guardado.
+   *
+   * A LINHA QUE VOLTA À LISTA TEM DE APARECER NA FRASE. A remoção é optimista:
+   * a linha sai da lista no instante do clique e, quando o servidor recusa,
+   * reaparece onde estava. Quem estava a olhar vê uma linha que tinha apagado
+   * voltar sozinha, e o aviso — «Não foi possível apagar a proposta» — nem
+   * dizia de quem era, nem que aquela ressurreição era a reversão. Numa lista
+   * com dezenas de propostas, isso lê-se como um defeito do ecrã.
+   */
   const deleteProposal = useCallback(
     async (id: string) => {
       const snapshot = latest.current.proposals;
@@ -302,16 +337,22 @@ export default function Propostas({ quotes, onOpenQuote, onQuoteUpdated, userNam
       }
       setActionBusy(id);
       setProposals((prev) => prev.filter((x) => x.id !== id));
-      try {
-        const res = await fetch(`/api/propostas/${id}`, { method: "DELETE" });
-        if (!res.ok) throw new Error();
-        toast("Proposta apagada.", "success");
-      } catch {
+      const oQue = `apagar a proposta de «${name}»`;
+      const reverter = (falha: Falha) => {
         setProposals(snapshot);
-        toast("Não foi possível apagar a proposta. Tenta novamente.", "error");
-      } finally {
+        toast(`${falha.mensagem} A proposta voltou à lista.`, "error");
+      };
+      let res: Response;
+      try {
+        res = await fetch(`/api/propostas/${id}`, { method: "DELETE" });
+      } catch {
+        reverter(porqueRebentou(oQue));
         setActionBusy(null);
+        return;
       }
+      if (!res.ok) reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
+      else toast("Proposta apagada.", "success");
+      setActionBusy(null);
     },
     [setProposals, toast],
   );
