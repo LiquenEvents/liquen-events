@@ -16,6 +16,7 @@ import {
   inspectStoredImage,
   removeStoredObject,
   UPLOAD_MIME_TYPES,
+  DERIVADA_MIME_TYPES,
   BUCKET_FILE_SIZE_LIMIT,
   MAX_UPLOAD_TICKETS,
   PROPOSAL_THUMB_BUCKET,
@@ -27,6 +28,8 @@ import {
   THEME_BUCKET,
   THEME_THUMB_BUCKET,
   THEME_MICRO_BUCKET,
+  THEME_AVIF_BUCKET,
+  THEME_AVIF_MICRO_BUCKET,
   THEME_SIGNED_TTL,
   isThemePath,
   refDeTema,
@@ -229,7 +232,11 @@ async function ensureBucket(bucket: string): Promise<boolean> {
       const { error: createError } = await sb.storage.createBucket(bucket, {
         public: false,
         fileSizeLimit: BUCKET_FILE_SIZE_LIMIT,
-        allowedMimeTypes: UPLOAD_MIME_TYPES,
+        // O bucket dos ORIGINAIS é o único que recebe ficheiros de fora, e é o
+        // único que fica com a lista estreita. Os das derivadas têm de aceitar
+        // o que nós fabricamos — sem `image/avif` a geração falhava em
+        // silêncio, com o contador a dizer «geradas 0» sem dizer porquê.
+        allowedMimeTypes: bucket === THEME_BUCKET ? UPLOAD_MIME_TYPES : DERIVADA_MIME_TYPES,
       });
       // Ignora corridas "already exists"; qualquer outro erro é reportado.
       if (createError && !/exist/i.test(createError.message)) {
@@ -291,6 +298,19 @@ export interface ThemeThumbInput {
  * chave tem de ser idêntica à do original para se poder derivar uma da outra
  * sem índice, e quem serve o ficheiro vai pelo content-type, não pelo nome.
  */
+/**
+ * Garante um bucket de DERIVADAS a partir de fora.
+ *
+ * O gerador em lote (`derivadas.ts`) escreve directamente no Storage, sem
+ * passar pelo `uploadThemeDerivada` — e um bucket que não existe faz esse
+ * `upload` falhar em silêncio, para sempre. Antes só acontecia a instalações
+ * antigas; com os buckets do AVIF passou a ser o caso de TODAS, porque nenhum
+ * deles existe ainda em lado nenhum.
+ */
+export function garantirBucketDeDerivadas(bucket: string): Promise<boolean> {
+  return ensureBucket(bucket);
+}
+
 async function uploadThemeDerivada(
   bucket: string,
   path: string,
@@ -1001,6 +1021,28 @@ export function signThemeThumbs(paths: string[]): Promise<Map<string, string>> {
  *  simplesmente não entra no mapa, e quem chama cai para a miniatura. */
 export function signThemeMicros(paths: string[]): Promise<Map<string, string>> {
   return signThemePaths(paths, THEME_MICRO_BUCKET);
+}
+
+/**
+ * ── A OFERTA EM AVIF, E O QUE A TORNA SEGURA ─────────────────────────────
+ *
+ * Um `<source type="image/avif">` que dá 404 NÃO faz o navegador recuar para o
+ * `<img>`: a escolha faz-se pelo `type`, uma vez, antes de haver resposta.
+ * Oferecer um AVIF que não existe é uma célula vazia, sem recurso.
+ *
+ * O que torna isto seguro é a mesma propriedade em que as miniaturas já
+ * assentam: o Supabase **só assina o que lá está**. Um caminho sem AVIF
+ * simplesmente não vem no mapa, e quem desenha não o oferece. Não é uma
+ * suposição — é o mesmo mecanismo que faz `signThemeThumbs` devolver um mapa
+ * esparso para as fotos anteriores às miniaturas.
+ */
+export function signThemeAvif(paths: string[]): Promise<Map<string, string>> {
+  return signThemePaths(paths, THEME_AVIF_BUCKET);
+}
+
+/** O irmão das micro, em AVIF. Ver `signThemeAvif`. */
+export function signThemeAvifMicros(paths: string[]): Promise<Map<string, string>> {
+  return signThemePaths(paths, THEME_AVIF_MICRO_BUCKET);
 }
 
 /**

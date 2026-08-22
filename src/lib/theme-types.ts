@@ -197,6 +197,27 @@ export interface ThemeSummary extends ProposalTheme {
    */
   coverLqip?: string;
   previewLqips?: string[];
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * A OFERTA EM AVIF
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * Um AVIF pesa mais 25 a 40% menos do que o WebP com a mesma qualidade
+   * percebida. Mas o Safari só o lê desde o iOS 16 — e estas fotografias são
+   * também as que um casal abre na página da proposta, no telemóvel que tiver.
+   *
+   * Por isso viaja SEPARADO e é uma proposta, não uma troca: o `<picture>`
+   * oferece-o primeiro e quem não o souber ler pede o `coverUrl`, que existe
+   * sempre.
+   *
+   * Ausente quer dizer «não há» — e é uma ausência de confiança, não uma
+   * suposição: o Supabase só assina o que está lá. Isso importa porque um
+   * `<source>` que dá 404 NÃO faz o navegador recuar para o `<img>`.
+   *
+   * `previewAvifs` está alinhado por índice com `previewUrls`.
+   */
+  coverAvif?: string;
+  previewAvifs?: string[];
 }
 
 /** Limites de escrita partilhados entre o formulário e as rotas de API. */

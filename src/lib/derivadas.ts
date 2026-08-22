@@ -11,12 +11,15 @@ import {
 } from "@/lib/proposal-storage";
 import {
   THEME_BUCKET,
+  THEME_AVIF_BUCKET,
+  THEME_AVIF_MICRO_BUCKET,
   THEME_MID_BUCKET,
   THEME_THUMB_BUCKET,
   THEME_MICRO_BUCKET,
   ehRefDeTema,
   caminhoDoRefDeTema,
 } from "@/lib/theme-ref";
+import { garantirBucketDeDerivadas } from "@/lib/theme-storage";
 import { log } from "@/lib/logger";
 
 /**
@@ -147,9 +150,35 @@ const FORMATO = {
 } as const;
 
 /** Aplica o formato da casa a um `sharp` já redimensionado. */
-function codificar(pipeline: Sharp, qualidade: number) {
+function codificar(pipeline: Sharp, qualidade: number, avif = false) {
+  if (avif) {
+    return pipeline.avif({
+      quality: Math.max(30, qualidade - AVIF.desconto),
+      effort: AVIF.esforco,
+    });
+  }
   return pipeline.webp({ quality: Math.max(40, qualidade - FORMATO.desconto) });
 }
+
+/** O tipo que uma derivada anuncia. */
+const tipoDe = (avif = false) => (avif ? "image/avif" : FORMATO.contentType);
+
+/**
+ * ── O AVIF, AO LADO E NÃO EM VEZ DE ──────────────────────────────────────
+ *
+ * Pesa mais 25 a 40% menos do que o WebP com a mesma qualidade percebida — e
+ * contra o JPEG de onde isto partiu, cerca de metade.
+ *
+ * `esforco: 4` e não o 6 por omissão: o AVIF é caro de codificar, e num lote de
+ * 25 fotografias a diferença entre 4 e 6 é meio segundo por foto contra uns 3%
+ * de tamanho. O tecto de uma função é o que decide, e é o mesmo tecto que já
+ * fazia a geração em lotes.
+ *
+ * A qualidade leva outro desconto: a escala do AVIF não é a do WebP, e um AVIF
+ * q60 tem a qualidade percebida de um WebP q73. É por isso que os números não
+ * se copiam de uma família para a outra.
+ */
+const AVIF = { formato: "avif" as const, desconto: 13, esforco: 4 };
 
 const FAMILIAS = [
   {
@@ -157,6 +186,10 @@ const FAMILIAS = [
     derivadas: [
       { bucket: THEME_THUMB_BUCKET, ...MINIATURA },
       { bucket: THEME_MICRO_BUCKET, lado: 96, qualidade: 65 },
+      // Os mesmos dois tamanhos, na oferta que só alguns navegadores aceitam.
+      // Ver `THEME_AVIF_BUCKET`: é uma proposta, não uma substituição.
+      { bucket: THEME_AVIF_BUCKET, ...MINIATURA, avif: true },
+      { bucket: THEME_AVIF_MICRO_BUCKET, lado: 96, qualidade: 65, avif: true },
     ],
   },
   {
@@ -315,9 +348,15 @@ async function gerarUma(
   sb: Cliente,
   origem: string,
   caminho: string,
-  alvo: { bucket: string; lado: number; qualidade: number },
+  alvo: { bucket: string; lado: number; qualidade: number; avif?: boolean },
 ): Promise<boolean> {
   try {
+    // O bucket TEM de existir antes de se escrever nele: o gerador em lote não
+    // passa pelo `uploadThemeDerivada`, e um `upload` para um bucket que não
+    // existe falha em silêncio — para sempre, e com o contador a dizer
+    // «geradas 0». Com os buckets do AVIF isto deixou de ser um caso de
+    // instalações antigas e passou a ser o caso de todas.
+    if (!(await garantirBucketDeDerivadas(alvo.bucket))) return false;
     const { data, error } = await sb.storage.from(origem).download(caminho);
     if (error || !data) return false;
     const bytes = Buffer.from(await data.arrayBuffer());
@@ -330,10 +369,10 @@ async function gerarUma(
       // Ampliar produzia uma miniatura MAIOR do que o original, que é o
       // contrário do que isto serve.
       .resize(alvo.lado, alvo.lado, { fit: "inside", withoutEnlargement: true });
-    const bytesDerivada = await codificar(derivada, alvo.qualidade).toBuffer();
+    const bytesDerivada = await codificar(derivada, alvo.qualidade, alvo.avif).toBuffer();
     const { error: erroSubida } = await sb.storage
       .from(alvo.bucket)
-      .upload(caminho, bytesDerivada, opcoesDeCarregamento(FORMATO.contentType));
+      .upload(caminho, bytesDerivada, opcoesDeCarregamento(tipoDe(alvo.avif)));
     return !erroSubida;
   } catch {
     return false;

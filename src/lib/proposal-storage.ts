@@ -44,6 +44,20 @@ let bucketReady = false;
  * ele não se consegue escrever um executável, nem um ficheiro de 2 GB.
  */
 export const UPLOAD_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+/**
+ * ── O QUE UM BUCKET DE DERIVADAS ACEITA ──────────────────────────────────
+ *
+ * Outra lista, e não a de cima. A de cima é uma medida de SEGURANÇA: limita o
+ * que uma pessoa consegue escrever com um bilhete de carregamento, e alargá-la
+ * alarga essa porta. As derivadas não vêm de fora — são fabricadas aqui — e o
+ * que precisam é de aceitar o que nós produzimos.
+ *
+ * Sem `image/avif` nesta lista, o bucket recusaria os AVIF e a geração falhava
+ * em silêncio: o contador diria «geradas 0» sem dizer porquê. Ficam também os
+ * dois anteriores, porque os buckets já existentes têm derivadas JPEG lá dentro
+ * e continuam a ter de as poder substituir.
+ */
+export const DERIVADA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 export const BUCKET_FILE_SIZE_LIMIT = 12 * 1024 * 1024; // 12 MB, como a rota
 
 /**

@@ -28,11 +28,36 @@ import { useState } from "react";
  */
 export default function ImagemComPlanoB({
   src,
+  avif,
   planoB,
   lqip,
   className,
 }: {
   src: string;
+  /**
+   * ── A OFERTA QUE SÓ ALGUNS NAVEGADORES ACEITAM ──────────────────────────
+   *
+   * Pedido dela: «tudo aquilo que seja carregamento de imagens, quero que
+   * melhores mesmo o máximo possível».
+   *
+   * Um AVIF pesa mais 25 a 40% menos do que o WebP com a mesma qualidade
+   * percebida — e contra o JPEG de onde isto partiu, cerca de metade. Mas o
+   * Safari só o lê desde o iOS 16, e estas fotografias são também as que um
+   * casal abre na página da proposta, no telemóvel que tiver.
+   *
+   * Por isso é uma PROPOSTA e não uma troca: o `<picture>` oferece o AVIF
+   * primeiro, e quem não o souber ler pede o `src`, que existe sempre. Quem
+   * ganha ganha; quem não ganha fica exactamente como estava.
+   *
+   * ── E porque é que a cascata de erro continua no `<img>` ───────────────
+   *
+   * Porque um `<source>` que dá 404 NÃO faz o navegador recuar para o `<img>`:
+   * a escolha faz-se pelo `type`, uma vez, antes de haver resposta. É por isso
+   * que o AVIF só é oferecido quando o servidor tem a certeza de que existe —
+   * e é por isso que o plano B de sempre (o original) continua a viver aqui em
+   * baixo, no `onError`, que é o único sítio onde ainda se pode corrigir.
+   */
+  avif?: string;
   planoB?: string;
   /**
    * ── O CARTÃO NÃO NASCE CINZENTO ─────────────────────────────────────────
@@ -62,7 +87,12 @@ export default function ImagemComPlanoB({
     setActual(src);
     setPintada(false);
   }
-  return (
+  /* Depois de cair para o plano B, o AVIF sai da mesa: a oferta era para a
+     derivada que falhou, e insistir nela era oferecer outra vez o que não
+     está lá. */
+  const oferta = avif && actual === src ? avif : undefined;
+
+  const imagem = (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={actual}
@@ -93,5 +123,13 @@ export default function ImagemComPlanoB({
         pintada || !lqip ? "opacity-100" : "opacity-0"
       } motion-safe:transition-opacity motion-safe:duration-elemento`}
     />
+  );
+
+  if (!oferta) return imagem;
+  return (
+    <picture className="contents">
+      <source srcSet={oferta} type="image/avif" />
+      {imagem}
+    </picture>
   );
 }

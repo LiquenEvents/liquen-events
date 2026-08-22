@@ -1292,6 +1292,7 @@ export default function Temas() {
                   {t.coverUrl ? (
                     <ImagemComPlanoB
                       src={t.coverUrl}
+                      avif={t.coverAvif}
                       planoB={t.coverFallbackUrl}
                       lqip={t.coverLqip}
                       className="h-full min-w-0 flex-1 object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
@@ -1311,6 +1312,7 @@ export default function Temas() {
                         <ImagemComPlanoB
                           key={u}
                           src={u}
+                          avif={t.previewAvifs?.[k]}
                           planoB={t.previewFallbackUrls?.[k]}
                           lqip={t.previewLqips?.[k]}
                           className="min-h-0 w-full flex-1 object-cover"

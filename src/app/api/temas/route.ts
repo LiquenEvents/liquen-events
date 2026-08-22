@@ -7,6 +7,8 @@ import {
   signThemePaths,
   signThemeThumbs,
   signThemeMicros,
+  signThemeAvif,
+  signThemeAvifMicros,
   themeFolder,
   isThemePath,
 } from "@/lib/theme-storage";
@@ -384,15 +386,20 @@ export async function GET(request: NextRequest) {
        Os `lqip` lêem-se por PASTA e a chave é o caminho REAL, sem o prefixo
        `tema:` que só existe dentro de um documento. Aqui os caminhos já são os
        reais — vêm da listagem da pasta. */
-    const [urls, thumbs, micros, lqips] = await comOrcamento(
+    const [urls, thumbs, micros, avifs, avifMicros, lqips] = await comOrcamento(
       Promise.all([
         signThemePaths(todos),
         signThemeThumbs(todos),
         signThemeMicros(todos),
+        // A oferta em AVIF, quando existe. O Supabase só assina o que lá está,
+        // e é isso que a torna segura: um `<source>` que dá 404 não faz o
+        // navegador recuar para o `<img>`. Ver `signThemeAvif`.
+        signThemeAvif(todos),
+        signThemeAvifMicros(todos),
         lqipsDeCaminhos(todos),
       ]),
       limite - Date.now(),
-      [vazio(), vazio(), vazio(), vazio()],
+      [vazio(), vazio(), vazio(), vazio(), vazio(), vazio()],
       "assinatura das capas",
     );
     /** O melhor que existe para uma tira de 43 px. */
@@ -423,6 +430,14 @@ export async function GET(request: NextRequest) {
       const previewFallbackUrls = tiras.map((x) => x.original ?? "");
       const coverFallbackUrl = capa ? urls.get(capa) : undefined;
       const coverLqip = capa ? lqips.get(capa) : undefined;
+      // Só se oferece o AVIF do tamanho que se está a servir: um AVIF de 400 px
+      // proposto ao lado de uma micro de 96 seria mandar buscar dezassete vezes
+      // os pixéis, com um cabeçalho a dizer que era uma poupança.
+      const coverAvif = capa && thumbs.get(capa) ? avifs.get(capa) : undefined;
+      const previewAvifs = extras[i]
+        .filter((p) => paraTira(p) && paraTira(p) !== coverUrl)
+        .slice(0, PREVIEWS_POR_CARTAO)
+        .map((p) => (micros.get(p) ? (avifMicros.get(p) ?? "") : (avifs.get(p) ?? "")));
       const previewLqips = extras[i]
         .filter((p) => paraTira(p) && paraTira(p) !== coverUrl)
         .slice(0, PREVIEWS_POR_CARTAO)
@@ -434,8 +449,10 @@ export async function GET(request: NextRequest) {
         coverUrl,
         ...(coverFallbackUrl ? { coverFallbackUrl } : {}),
         ...(coverLqip ? { coverLqip } : {}),
+        ...(coverAvif ? { coverAvif } : {}),
         ...(previewUrls.length ? { previewUrls, previewFallbackUrls } : {}),
         ...(previewLqips.some(Boolean) ? { previewLqips } : {}),
+        ...(previewAvifs.some(Boolean) ? { previewAvifs } : {}),
       };
     });
     /**
