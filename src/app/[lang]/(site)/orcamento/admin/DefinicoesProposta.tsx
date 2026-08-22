@@ -9,6 +9,7 @@ import { Button, Card } from "./ui";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import Miniaturas from "./Miniaturas";
+import ValoresSuspeitos from "./ValoresSuspeitos";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -557,6 +558,16 @@ export default function DefinicoesProposta() {
         código que já é carregado só quando esta vista abre.
       */}
       <Miniaturas />
+
+      {/*
+        A AUDITORIA DOS VALORES INCHADOS.
+
+        Ao lado da manutenção das fotografias e pela mesma razão: é uma leitura
+        sobre a base inteira, não é uma acção sobre UMA proposta, e não tem
+        lugar nenhum dentro do estúdio — quem a corre está a olhar para o
+        conjunto, e não para um casamento.
+      */}
+      <ValoresSuspeitos />
     </div>
   );
 }

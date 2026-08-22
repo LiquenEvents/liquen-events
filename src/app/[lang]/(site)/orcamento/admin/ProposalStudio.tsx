@@ -4387,27 +4387,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
   /**
    * ════════════════════════════════════════════════════════════════════════
-   * OS BOARDS FECHADOS — POR DISPOSITIVO, NÃO NO DOCUMENTO
+   * OS BOARDS FECHADOS — NESTA SESSÃO, E SÓ NESTA
    * ════════════════════════════════════════════════════════════════════════
    *
-   * A mesma regra das secções do estúdio (ver `SECOES_KEY`): dobrar um board
-   * terminado é uma preferência de quem está a trabalhar, não uma propriedade
-   * da proposta. No documento, abrir a proposta noutro computador herdava as
-   * dobras de outra pessoa — e uma alteração de disposição contava como
-   * alteração por gravar.
+   * A mesma regra das secções (ver `Section`), e pela mesma razão: um mood
+   * board fechado é uma pilha de fotografias que não se vê, e reabrir a
+   * proposta tem de mostrar a proposta.
+   *
+   * Isto ficava guardado no `localStorage` por proposta. Um «Fechar todos» de
+   * há três semanas — feito uma vez para chegar depressa ao fundo da página —
+   * continuava a esconder as páginas de inspiração hoje, sem nada no ecrã que
+   * o explicasse. E foi a mesma memória que apareceu no relato dela como
+   * «secções colapsadas».
+   *
+   * O gesto fica: fechar um board, ou fechá-los todos, continua a valer
+   * enquanto ela lá está. Deixa é de atravessar visitas.
    *
    * A chave é o ID do board e não a posição: arrastar um board para outro
    * sítio trocaria as dobras todas de lugar.
    */
   const [dobrados, setDobrados] = useState<Record<string, boolean>>({});
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDobrados(lerDobrasDeBoards(quote.id));
-  }, [quote.id]);
 
   function escreverDobras(proximas: Record<string, boolean>) {
     setDobrados(proximas);
-    gravarDobrasDeBoards(quote.id, proximas);
   }
 
   /**
@@ -5611,24 +5613,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const [boardActivo, setBoardActivo] = useState<number | null>(null);
 
-  /**
-   * O que já estava feito quando esta proposta ABRIU.
-   *
-   * Uma fotografia tirada uma vez, e não uma leitura contínua: é ela que decide
-   * que secções nascem dobradas, e uma leitura contínua fechava uma secção no
-   * instante em que ela acabasse de a preencher — com o cursor lá dentro.
-   *
-   * Só se tira depois de o documento chegar. Antes disso «está tudo por
-   * preencher» é uma resposta sobre um documento que ainda não existe, e
-   * dobrava zero secções em todas as propostas.
-   */
-  const [feitoAoAbrir, setFeitoAoAbrir] = useState<Record<string, boolean> | null>(null);
-  useEffect(() => {
-    if (feitoAoAbrir) return;
-    if (!seccoes.some((s) => s.preenchida)) return;
-    setFeitoAoAbrir(Object.fromEntries(seccoes.map((s) => [s.id, s.preenchida])));
-  }, [seccoes, feitoAoAbrir]);
-
   /** As páginas COM fotografias, pela ordem em que saem — a ordem do PDF. */
   const paginasParaOPainel = useMemo(
     () =>
@@ -5940,7 +5924,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Event fields */}
-          <Section title="Evento" id="evento" fechadaPorOmissao={feitoAoAbrir?.evento}>
+          <Section title="Evento" id="evento">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field
                 label="Clientes"
@@ -6135,7 +6119,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Cover images */}
-          <Section title="Imagens de capa (2)" id="capas" fechadaPorOmissao={feitoAoAbrir?.capas}>
+          <Section title="Imagens de capa (2)" id="capas">
             <div className="grid grid-cols-2 gap-3">
               {[0, 1].map((idx) => {
                 const path = doc.coverImages?.[idx];
@@ -6248,7 +6232,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Service groups */}
-          <Section title="Serviços" id="servicos" fechadaPorOmissao={feitoAoAbrir?.servicos}>
+          <Section title="Serviços" id="servicos">
             {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
             <ServicesEditor
               groups={doc.serviceGroups}
@@ -6268,12 +6252,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Mood boards — decoracao only */}
           {isDeco && (
-            <Section
-              title="Mood boards"
-              id="moodboards"
-              nota={contagemDosBoards}
-              fechadaPorOmissao={feitoAoAbrir?.moodboards}
-            >
+            <Section title="Mood boards" id="moodboards" nota={contagemDosBoards}>
               <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
                 grupos de imagens de inspiração para o cliente
               </p>
@@ -7256,11 +7235,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Cronograma — organizacao only */}
           {!isDeco && (
-            <Section
-              title="Cronograma de Organização"
-              id="cronograma"
-              fechadaPorOmissao={feitoAoAbrir?.cronograma}
-            >
+            <Section title="Cronograma de Organização" id="cronograma">
               <div className="flex flex-col gap-3">
                 {(doc.cronograma ?? []).map((ph, pi) => (
                   <div
@@ -7330,11 +7305,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Budget */}
-          <Section
-            title="Orçamento Proposto"
-            id="orcamento"
-            fechadaPorOmissao={feitoAoAbrir?.orcamento}
-          >
+          <Section title="Orçamento Proposto" id="orcamento">
             {isDeco ? (
               <>
                 <AvisoDeOrdem
@@ -8095,7 +8066,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             }}
           />
 
-          <Section title="Total, IVA e validade" id="total" fechadaPorOmissao={feitoAoAbrir?.total}>
+          <Section title="Total, IVA e validade" id="total">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
                 É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido
@@ -9309,24 +9280,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 // ── Small presentational helpers ──
 
 /**
- * Onde ficam guardadas as secções fechadas.
- *
- * Por DISPOSITIVO e não no documento: fechar o «Cronograma» é uma preferência
- * de quem está a trabalhar, não uma propriedade da proposta. Guardá-la no
- * documento fazia com que abrir a proposta noutro computador herdasse as
- * dobras de outra pessoa — e, pior, fazia uma alteração de disposição contar
- * como alteração por gravar.
- */
-const SECOES_KEY = "liquen-estudio-secoes";
-
-/**
- * As dobras dos mood boards, por PROPOSTA e por dispositivo.
- *
- * Chave própria (e não a das secções) porque isto é por proposta: as dobras de
- * um casamento não dizem nada sobre as do seguinte. Guardado por `quote.id` +
- * id do board — ver `withMoodBoardIds`.
- */
-/**
  * As páginas que uma proposta tem SEM contar com a inspiração.
  *
  * MEDIDO, não estimado: gerou-se o PDF de um documento com 0, 1 e 3 mood
@@ -9356,36 +9309,6 @@ const AMOSTRAS_KEY = "liquen-proposal-studio:geracoes";
  * composição e não um erro, e por isso diz-se em voz baixa.
  */
 const FOTOS_QUE_ENCHEM_A_PAGINA = 8;
-
-const BOARDS_KEY = "liquen-estudio-boards";
-
-function lerDobrasDeBoards(quoteId: string): Record<string, boolean> {
-  try {
-    const cru = localStorage.getItem(`${BOARDS_KEY}:${quoteId}`);
-    const v = cru ? JSON.parse(cru) : null;
-    return v && typeof v === "object" ? (v as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function gravarDobrasDeBoards(quoteId: string, dobras: Record<string, boolean>) {
-  try {
-    localStorage.setItem(`${BOARDS_KEY}:${quoteId}`, JSON.stringify(dobras));
-  } catch {
-    /* quota / armazenamento desligado — as dobras valem só nesta sessão */
-  }
-}
-
-function lerFechadas(): Record<string, boolean> {
-  try {
-    const cru = localStorage.getItem(SECOES_KEY);
-    const v = cru ? JSON.parse(cru) : null;
-    return v && typeof v === "object" ? (v as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
 
 /**
  * Uma linha do bloco de totais: o nome à esquerda, o número à direita.
@@ -9939,14 +9862,48 @@ function AvisoDeOrdem({
   );
 }
 
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * UMA SECÇÃO NUNCA APARECE FECHADA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «as secções aparecem colapsadas». E aparecer colapsada é o
+ * mesmo que não existir — a proposta abria com o Evento, as Capas, os
+ * Serviços, os Mood boards, o Orçamento e o Total todos dobrados, e o que se
+ * via era uma pilha de títulos.
+ *
+ * ── O QUE ISTO ERA, E PORQUE É QUE PARECIA BOA IDEIA ──────────────────────
+ *
+ * Havia um automatismo escrito a partir de um pedido antigo — «secções
+ * concluídas recolhem-se automaticamente» — que tirava uma fotografia do que
+ * já estava preenchido quando a proposta abria e fechava essas. Numa proposta
+ * a meio, funciona. Numa proposta ACABADA, que é o caso de todas as que ela
+ * reabre para conferir antes de enviar, está tudo preenchido — portanto
+ * fechava-se tudo. O automatismo era mais certeiro precisamente onde fazia
+ * mais estrago.
+ *
+ * E havia uma segunda camada: a dobra ficava guardada no `localStorage`. Um
+ * «fechar» de há três semanas, feito para chegar depressa ao fundo da página,
+ * continuava a fechar a secção hoje — sem nada no ecrã que dissesse porquê.
+ *
+ * ── O QUE FICA ────────────────────────────────────────────────────────────
+ *
+ * A dobra continua a existir e continua a ser útil: dobrar os Serviços para
+ * chegar ao Total num telemóvel é um gesto legítimo. O que deixa de existir é
+ * a dobra que ninguém pediu AGORA — nem o automatismo, nem a memória entre
+ * visitas. Abrir a proposta mostra a proposta.
+ *
+ * A excepção é o «Só para ti» (`PainelInterno.tsx`), que nasce fechado de
+ * propósito e por outra razão: são custos e margem, e não é isso que se quer
+ * no ecrã quando alguém está ao lado a ver.
+ */
 function Section({
   title,
   children,
-  /** Chave estável para lembrar a dobra. Sem ela a secção não colapsa. */
+  /** Chave estável — a âncora do salto da Conferência. */
   id,
   /** Marca à direita do título — "3 linhas", "por preencher". */
   nota,
-  fechadaPorOmissao,
   /** Um controlo à direita do título — o "Reordenar" dos Serviços, por
    *  exemplo. Fica FORA do botão que dobra a secção: um botão dentro de outro
    *  botão não é HTML válido, e clicar num fecharia o outro. */
@@ -9957,66 +9914,12 @@ function Section({
   id?: string;
   nota?: string;
   accao?: React.ReactNode;
-  /**
-   * Esta secção já estava feita quando a proposta abriu?
-   *
-   * `undefined` quer dizer «ainda não se sabe» e não «não estava» — ver o
-   * efeito lá dentro. Só vale onde ela nunca dobrou a secção à mão.
-   */
-  fechadaPorOmissao?: boolean;
 }) {
   const [fechada, setFechada] = useState(false);
-  const jaDecidiu = useRef(false);
-  /**
-   * ════════════════════════════════════════════════════════════════════════
-   * O QUE JÁ ESTÁ FEITO ABRE FECHADO — MAS SÓ AO ABRIR
-   * ════════════════════════════════════════════════════════════════════════
-   *
-   * «Secções concluídas recolhem-se automaticamente. Só a secção em que se
-   * está a trabalhar fica aberta.»
-   *
-   * Com um limite que ela não pediu e que é o que torna isto usável: **uma
-   * secção nunca se fecha por baixo das mãos dela.** Se fechasse quando fica
-   * completa, escrever o último campo de um grupo fazia o ecrã saltar e o
-   * cursor desaparecer — um editor que se mexe sozinho enquanto se escreve é
-   * pior do que um editor comprido.
-   *
-   * Por isso a decisão é tomada UMA vez, quando a proposta abre, e o que
-   * decide é o que já estava feito nesse momento.
-   *
-   * ── E A ESCOLHA DELA GANHA SEMPRE ───────────────────────────────────────
-   *
-   * Uma secção que ela tenha aberto ou fechado à mão tem a resposta guardada,
-   * e essa manda. O automatismo só fala onde ninguém disse nada.
-   *
-   * Ler no efeito e não no `useState` inicial: o servidor não tem
-   * `localStorage`, e uma diferença entre o que o servidor desenha e o que o
-   * browser desenha dá um erro de hidratação.
-   */
-  useEffect(() => {
-    if (!id || jaDecidiu.current) return;
-    const guardadas = lerFechadas();
-    if (id in guardadas) {
-      setFechada(!!guardadas[id]);
-      jaDecidiu.current = true;
-      return;
-    }
-    // Ainda não se sabe se esta secção estava feita — o documento pode não ter
-    // chegado. Espera-se, em vez de se decidir com uma resposta que é «não sei».
-    if (fechadaPorOmissao === undefined) return;
-    setFechada(fechadaPorOmissao);
-    jaDecidiu.current = true;
-  }, [id, fechadaPorOmissao]);
 
   function alternar() {
     if (!id) return;
-    const proxima = !fechada;
-    setFechada(proxima);
-    try {
-      localStorage.setItem(SECOES_KEY, JSON.stringify({ ...lerFechadas(), [id]: proxima }));
-    } catch {
-      /* sem localStorage a dobra não sobrevive à sessão; o resto funciona */
-    }
+    setFechada((v) => !v);
   }
 
   const corpoId = id ? `sec-${id}` : undefined;

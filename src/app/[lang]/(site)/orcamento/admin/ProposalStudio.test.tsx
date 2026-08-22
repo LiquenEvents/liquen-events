@@ -374,36 +374,8 @@ function corpos(parte: string, metodo = "PUT"): string[] {
     .map((p) => String(p.init?.body ?? ""));
 }
 
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * AS SECÇÕES ABREM ABERTAS, NESTES TESTES
- * ════════════════════════════════════════════════════════════════════════════
- *
- * O estúdio passou a abrir DOBRADAS as secções que já estavam feitas quando a
- * proposta abriu (ver o efeito em `Section`), e a esmagadora maioria destes
- * testes semeia uma proposta completa para ir mexer num campo lá dentro.
- *
- * Semear a preferência dela é a maneira honesta de os pôr a medir outra vez o
- * que dizem medir: a escolha guardada GANHA ao automatismo — é essa a regra —,
- * e por isso isto não desliga a funcionalidade nem finge que ela não existe.
- * Escreve-se aqui a mesma coisa que um clique dela escreveria.
- *
- * Quem quiser medir o automatismo apaga esta chave primeiro. É o que o bloco
- * «o que já está feito abre fechado» faz, ali em baixo.
- */
-const SECCOES_ABERTAS = {
-  evento: false,
-  capas: false,
-  servicos: false,
-  moodboards: false,
-  cronograma: false,
-  orcamento: false,
-  total: false,
-};
-
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem("liquen-estudio-secoes", JSON.stringify(SECCOES_ABERTAS));
   seletor.marcadores.length = 0;
   seletor.n = 0;
   pedidos = [];
@@ -6358,65 +6330,91 @@ describe("a configuração ao nível da proposta", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * O QUE JÁ ESTÁ FEITO ABRE FECHADO
+ * UMA SECÇÃO NUNCA APARECE FECHADA
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * «Secções concluídas recolhem-se automaticamente. Só a secção em que se está
- * a trabalhar fica aberta.»
+ * Palavras dela: «as secções aparecem colapsadas». E uma secção colapsada é o
+ * mesmo que uma secção que não existe — a proposta abria e o que se via era
+ * uma pilha de títulos.
  *
- * A afirmação que vale por todas é a segunda: **uma secção nunca se fecha por
- * baixo das mãos dela.** Se fechasse ao ficar completa, escrever o último campo
- * de um grupo fazia o ecrã saltar e o cursor desaparecer.
+ * Havia um automatismo — «secções concluídas recolhem-se automaticamente» —
+ * que fotografava o que já estava preenchido ao abrir e fechava essas. Numa
+ * proposta a meio, funciona; numa proposta ACABADA, que é o caso de todas as
+ * que ela reabre para conferir antes de enviar, está tudo preenchido e
+ * fechava-se tudo. Era mais certeiro onde fazia mais estrago.
+ *
+ * E havia a memória: a dobra ficava no `localStorage`, e um «fechar» de há três
+ * semanas continuava a fechar a secção hoje sem nada que o explicasse.
+ *
+ * As três regras que ficam presas aqui: **abre aberta**, **não se fecha por
+ * baixo das mãos dela**, e **nada de visitas anteriores lhe fecha nada**.
  */
-describe("o que já está feito abre fechado", () => {
-  const semPreferencias = () => localStorage.removeItem("liquen-estudio-secoes");
-
-  it("uma secção já preenchida nasce dobrada", async () => {
-    semPreferencias();
-    seedDraft(1);
-    renderStudio();
-    const evento = await waitFor(() => {
-      const el = document.getElementById("seccao-evento");
+describe("as secções nunca aparecem fechadas", () => {
+  async function seccao(id: string) {
+    return waitFor(() => {
+      const el = document.getElementById(`seccao-${id}`);
       if (!el) throw new Error("ainda não");
       return el;
     });
-    await waitFor(() => expect(evento.querySelector('[aria-expanded="false"]')).not.toBeNull());
+  }
+
+  /**
+   * O botão do TÍTULO da secção, e não um `aria-expanded` qualquer lá dentro.
+   *
+   * O mesmo `:scope > div >` que o salto da Conferência usa, e pela mesma
+   * razão: dentro de uma secção há outras coisas que abrem e fecham — os mood
+   * boards têm as suas dobras, os Serviços têm as suas —, e apanhá-las aqui
+   * fazia este teste falhar por uma dobra que não é a que se está a medir.
+   */
+  const cabecalho = (el: HTMLElement) =>
+    el.querySelector<HTMLButtonElement>(":scope > div > button[aria-expanded]");
+
+  it("uma proposta acabada abre com tudo à vista", async () => {
+    seedDraft(1);
+    renderStudio();
+    for (const id of ["evento", "capas", "servicos", "orcamento", "total"]) {
+      const el = await seccao(id);
+      expect(cabecalho(el)?.getAttribute("aria-expanded"), `a secção «${id}» abriu fechada`).toBe(
+        "true",
+      );
+    }
+  });
+
+  it("uma dobra guardada numa visita anterior já não fecha nada", async () => {
+    // A chave antiga pode continuar no browser dela durante meses. Ignorá-la é
+    // o que faz esta correcção valer também para quem já a tem escrita.
+    localStorage.setItem("liquen-estudio-secoes", JSON.stringify({ evento: true, total: true }));
+    seedDraft(1);
+    renderStudio();
+    const evento = await seccao("evento");
+    await waitFor(() => expect(cabecalho(evento)?.getAttribute("aria-expanded")).toBe("true"));
+    expect(cabecalho(await seccao("total"))?.getAttribute("aria-expanded")).toBe("true");
   });
 
   /**
    * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   *
+   * Um editor que se mexe sozinho enquanto se escreve é pior do que um editor
+   * comprido.
    */
   it("uma secção que fica completa ENQUANTO ela escreve não se fecha", async () => {
-    // A decisão é tomada uma vez, quando a proposta abre. Um editor que se
-    // mexe sozinho enquanto se escreve é pior do que um editor comprido.
-    semPreferencias();
     seedDraft(1);
     renderStudio();
-    const total = await waitFor(() => {
-      const el = document.getElementById("seccao-total");
-      if (!el) throw new Error("ainda não");
-      return el;
-    });
-    const comoAbriu = total.querySelector("[aria-expanded]")?.getAttribute("aria-expanded");
-    // Mexer no documento não pode mudar a dobra de nada.
+    const total = await seccao("total");
+    const comoAbriu = cabecalho(total)?.getAttribute("aria-expanded");
     const campo = document.querySelector<HTMLInputElement>('[data-campo="clientNames"]');
     if (campo) fireEvent.change(campo, { target: { value: "Ana & Rui" } });
-    await waitFor(() =>
-      expect(total.querySelector("[aria-expanded]")?.getAttribute("aria-expanded")).toBe(comoAbriu),
-    );
+    await waitFor(() => expect(cabecalho(total)?.getAttribute("aria-expanded")).toBe(comoAbriu));
   });
 
-  it("a escolha dela ganha ao automatismo", async () => {
-    // Uma secção que ela deixou aberta continua aberta, mesmo estando feita.
-    localStorage.setItem("liquen-estudio-secoes", JSON.stringify({ evento: false }));
+  it("mas dobrar à mão continua a dobrar", async () => {
+    // O gesto não desapareceu: fechar os Serviços para chegar ao Total num
+    // telemóvel é legítimo. O que desapareceu foi a dobra que ninguém pediu.
     seedDraft(1);
     renderStudio();
-    const evento = await waitFor(() => {
-      const el = document.getElementById("seccao-evento");
-      if (!el) throw new Error("ainda não");
-      return el;
-    });
-    await waitFor(() => expect(evento.querySelector('[aria-expanded="true"]')).not.toBeNull());
+    const servicos = await seccao("servicos");
+    fireEvent.click(cabecalho(servicos)!);
+    await waitFor(() => expect(cabecalho(servicos)?.getAttribute("aria-expanded")).toBe("false"));
   });
 });
 
