@@ -88,7 +88,15 @@ import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, type View } from "./nav";
 import { useDesceu } from "./ui/adaptativo";
-import { Button, EmCurso, SectionCard, Segmented, TabelaOuCartoes, type Coluna } from "./ui";
+import {
+  Button,
+  EmCurso,
+  PerguntaDestrutiva,
+  SectionCard,
+  Segmented,
+  TabelaOuCartoes,
+  type Coluna,
+} from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
@@ -878,6 +886,39 @@ const porqueNaoGravou = razaoDaRecusa;
  */
 type LeituraDoPedido = { ok: true; quote: Quote } | { ok: false; porque: string };
 
+/**
+ * O que desaparece com um pedido — em linhas, com números.
+ *
+ * Só o que EXISTE entra na lista: uma pergunta com «0 pagamentos» a meio é
+ * ruído, e ruído numa pergunta destrutiva é o que ensina a saltá-la. Um pedido
+ * sem nada por baixo dá uma lista vazia, e aí a `PerguntaDestrutiva` mostra só
+ * o título e o aviso — que continua a ser melhor do que «tens a certeza».
+ */
+function oQueSePerdeComOPedido(q: Quote | null): string[] {
+  if (!q) return [];
+  const linhas: string[] = [];
+  const conta = (n: number, um: string, muitos: string) =>
+    n > 0 ? linhas.push(`${n} ${n === 1 ? um : muitos}`) : undefined;
+  conta(q.messages?.length ?? 0, "mensagem trocada", "mensagens trocadas");
+  conta(q.payments?.length ?? 0, "pagamento registado", "pagamentos registados");
+  conta(q.guestList?.length ?? 0, "convidado", "convidados");
+  conta(q.checklist?.length ?? 0, "linha da checklist", "linhas da checklist");
+  conta(q.productionPlan?.length ?? 0, "tarefa de produção", "tarefas de produção");
+  conta(q.activityLog?.length ?? 0, "entrada no histórico", "entradas no histórico");
+  if (q.quotedPrice) {
+    linhas.push(
+      `o valor combinado, ${q.quotedPrice.toLocaleString("pt-PT", {
+        style: "currency",
+        currency: "EUR",
+      })}`,
+    );
+  }
+  return linhas;
+}
+
+/** No máximo esta lista, e o resto contado. Trinta nomes não se leem. */
+const NOMES_A_MOSTRAR = 8;
+
 export default function AdminClient({ initialQuotes, userName = "Catarina" }: Props) {
   // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
   // estado tem mesmo de ser `Quote[]`: assim que um pedido é aberto ou gravado,
@@ -904,6 +945,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
    */
   /** O pedido que está a ser aberto agora — ver `openQuote`. */
   const [aAbrir, setAAbrir] = useState<{ id: string; nome: string } | null>(null);
+  /**
+   * As perguntas destrutivas abertas.
+   *
+   * Estado e não `window.confirm`: a pergunta tem de caber uma LISTA lá dentro
+   * — ver `PerguntaDestrutiva`, e a razão por que «tens a certeza?» não é uma
+   * pergunta.
+   */
+  const [aApagar, setAApagar] = useState<Quote | null>(null);
+  const [aApagarLote, setAApagarLote] = useState<string[] | null>(null);
+  const [aSair, setASair] = useState(false);
   const [filterEspera, setFilterEspera] = useState<"all" | "3" | "7">("all");
   const [filterMes, setFilterMes] = useState<string>("all");
   const [filterRegiao, setFilterRegiao] = useState<string>("all");
@@ -2288,7 +2339,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     };
   }, [revalidarPedidos]);
 
-  async function logout() {
+  /**
+   * ── SAIR NÃO PERGUNTAVA NADA ──────────────────────────────────────────
+   *
+   * Nem sequer com trabalho por gravar. Fechar o painel de um pedido pergunta
+   * (ver `discardGuard`); sair do back office inteiro — que fecha o painel e
+   * mais tudo o resto — não perguntava. Era o buraco maior dos dois, e o mais
+   * fácil de encontrar por acidente: o «Sair» está na barra, ao lado de tudo.
+   */
+  function pedirParaSair() {
+    if (isDirty) {
+      setASair(true);
+      return;
+    }
+    void sairMesmo();
+  }
+
+  async function sairMesmo() {
+    setASair(false);
     await fetch("/api/admin/logout", { method: "POST" });
     // Sair é uma decisão, e tem de aguentar a chegada ao ecrã de entrada: sem
     // esta marca, a entrada automática pela passkey voltava a abrir a sessão
@@ -2763,14 +2831,25 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // confirm covers the whole batch; each id is DELETEd, then the successful
   // ones are dropped from local state and the selection is cleared. Os `ids`
   // são os que estão À VISTA — ver `applyBulkStatus`.
-  async function deleteSelected(ids: string[]) {
+  function deleteSelected(ids: string[]) {
     if (ids.length === 0 || bulkBusy) return;
-    if (
-      !window.confirm(
-        `Apagar ${ids.length} pedido${ids.length !== 1 ? "s" : ""} definitivamente? Esta ação não pode ser anulada.`,
-      )
-    )
-      return;
+    // A pergunta NOMEIA-OS. «Apagar 12 pedidos?» é um número que não se
+    // consegue verificar: quem o lê não sabe se a selecção é a que pensa que
+    // é, e a única maneira de saber era cancelar e contar à mão.
+    setAApagarLote(ids);
+  }
+
+  /** Os nomes dos pedidos seleccionados, cortados a `NOMES_A_MOSTRAR`. */
+  function nomesDoLote(ids: string[] | null): string[] {
+    if (!ids || ids.length === 0) return [];
+    const porId = new Map(quotes.map((q) => [q.id, q]));
+    const nomes = ids.map((id) => porId.get(id)?.name ?? id);
+    if (nomes.length <= NOMES_A_MOSTRAR) return nomes;
+    return [...nomes.slice(0, NOMES_A_MOSTRAR), `… e mais ${nomes.length - NOMES_A_MOSTRAR}`];
+  }
+
+  async function apagarMesmo(ids: string[]) {
+    setAApagarLote(null);
     setLote({ titulo: "A apagar os pedidos…", feito: 0, total: ids.length });
     try {
       const results = await Promise.all(
@@ -3483,7 +3562,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   Repor
                 </button>
                 <button
-                  onClick={logout}
+                  onClick={pedirParaSair}
                   className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                   title="Terminar sessão"
                 >
@@ -3838,6 +3917,72 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               servidor diz que há mesmo alguma coisa errada. Ver o cabeçalho do
               componente. */}
           <AvisoDeArmazenamento />
+
+          {/* ── AS PERGUNTAS DESTRUTIVAS ────────────────────────────────────
+              Aqui e não junto de cada botão: as três podem ser disparadas de
+              sítios diferentes (o menu do detalhe, a barra do lote, a
+              navegação) e uma caixa modal não pertence a nenhum deles. */}
+          <PerguntaDestrutiva
+            aberto={aApagar !== null}
+            onFechar={() => setAApagar(null)}
+            titulo={`Apagar o pedido de ${aApagar?.name ?? ""}?`}
+            oQueSePerde={oQueSePerdeComOPedido(aApagar)}
+            aviso="Não pode ser anulado. Para o tirar da lista sem o apagar, usa «Arquivar»."
+            rotuloConfirmar="Apagar o pedido"
+            onConfirmar={async () => {
+              const alvo = aApagar;
+              if (!alvo) return;
+              const oQue = `apagar o pedido de ${alvo.name}`;
+              let res: Response;
+              try {
+                res = await fetch(`/api/orcamento/${alvo.id}`, { method: "DELETE" });
+              } catch {
+                toast(porqueRebentou(oQue).mensagem, "error");
+                return;
+              }
+              if (!res.ok) {
+                const corpo = await res.json().catch(() => null);
+                toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+                return;
+              }
+              setQuotes((prev) => prev.filter((q) => q.id !== alvo.id));
+              setSelected(null);
+              setAApagar(null);
+              toast(`Pedido de ${alvo.name} apagado`, "success");
+            }}
+          />
+
+          <PerguntaDestrutiva
+            aberto={aApagarLote !== null}
+            onFechar={() => setAApagarLote(null)}
+            titulo={`Apagar ${aApagarLote?.length ?? 0} pedido${
+              (aApagarLote?.length ?? 0) === 1 ? "" : "s"
+            }?`}
+            /* Os NOMES, e não só a conta. Quem lê «12 pedidos» não tem como
+               saber se a selecção é a que pensa que é — e a única maneira de
+               confirmar era cancelar e contar à mão. */
+            oQueSePerde={nomesDoLote(aApagarLote)}
+            aviso="Não pode ser anulado."
+            rotuloConfirmar={`Apagar ${aApagarLote?.length ?? 0} pedido${
+              (aApagarLote?.length ?? 0) === 1 ? "" : "s"
+            }`}
+            onConfirmar={() => apagarMesmo(aApagarLote ?? [])}
+          />
+
+          <PerguntaDestrutiva
+            aberto={aSair}
+            onFechar={() => setASair(false)}
+            titulo="Sair com alterações por guardar?"
+            oQueSePerde={[
+              <>
+                O que está no painel de <strong>{selected?.name ?? "um pedido"}</strong> e ainda não
+                foi confirmado.
+              </>,
+            ]}
+            aviso="Fechar o painel primeiro guarda-as."
+            rotuloConfirmar="Sair mesmo assim"
+            onConfirmar={sairMesmo}
+          />
 
           {/* A espera de abrir um pedido, aqui pelo mesmo motivo que o aviso
               acima: as seis portas que abrem um pedido estão espalhadas por
@@ -4791,25 +4936,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 {
                                   label: "Apagar pedido",
                                   hint: "Ação definitiva — não pode ser anulada",
-                                  onClick: async () => {
-                                    if (
-                                      !window.confirm(
-                                        "Apagar definitivamente este pedido? Esta ação não pode ser anulada.",
-                                      )
-                                    )
-                                      return;
-                                    try {
-                                      const res = await fetch(`/api/orcamento/${selected.id}`, {
-                                        method: "DELETE",
-                                      });
-                                      if (!res.ok) throw new Error("delete failed");
-                                      setQuotes((prev) => prev.filter((q) => q.id !== selected.id));
-                                      setSelected(null);
-                                      toast("Pedido apagado", "success");
-                                    } catch {
-                                      toast("Não foi possível apagar o pedido", "error");
-                                    }
-                                  },
+                                  // A pergunta nomeia o pedido e enumera o que
+                                  // vai atrás dele. Ver `PerguntaDestrutiva`.
+                                  onClick: () => setAApagar(selected),
                                   icon: (
                                     <svg
                                       width="16"

@@ -70,7 +70,9 @@ function storageFalso() {
           async download(caminho: string) {
             const b = st.ficheiros.get(caminho);
             if (!b) return { data: null, error: { message: "Object not found" } };
-            return { data: new Blob([b]), error: null };
+            // `new Uint8Array(b)` e não o `Buffer` directo: o `Buffer` do Node
+            // é um `ArrayBufferLike` e o `BlobPart` quer um `ArrayBuffer`.
+            return { data: new Blob([new Uint8Array(b)]), error: null };
           },
         };
       },

@@ -740,21 +740,33 @@ describe("a selecção em lote e o que está à vista", () => {
   });
 
   it("apagar só apaga o que ela tem à frente", async () => {
-    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
     procurar("Ana");
     await waitFor(() => expect(screen.queryByText("Bruno Dias")).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: /^Apagar \(/ }));
 
-    await waitFor(() => expect(confirmar).toHaveBeenCalled());
-    expect(confirmar.mock.calls[0][0]).toMatch(/Apagar 1 pedido/);
+    /**
+     * A pergunta deixou de ser um `window.confirm` e passou a NOMEAR os
+     * pedidos — «Apagar 12 pedidos?» é um número que não se consegue
+     * verificar, e a única maneira de o confirmar era cancelar e contar à
+     * mão. Ver `PerguntaDestrutiva`.
+     *
+     * O que este teste mede continua a ser o mesmo, e fica melhor medido: o
+     * lote alcança só o que está à frente dela, e agora isso lê-se na própria
+     * pergunta.
+     */
+    const caixa = await screen.findByRole("dialog");
+    expect(within(caixa).getByText(/Apagar 1 pedido\?/i)).toBeInTheDocument();
+    expect(within(caixa).getByText("Ana Marques")).toBeInTheDocument();
+    expect(within(caixa).queryByText("Bruno Dias")).toBeNull();
+    fireEvent.click(within(caixa).getByRole("button", { name: /^Apagar 1 pedido$/i }));
 
-    const apagados = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
-      .filter((args) => (args[1] as RequestInit | undefined)?.method === "DELETE")
-      .map((args) => String(args[0]));
-    await waitFor(() => expect(apagados.length).toBeGreaterThan(0));
-    expect(apagados).toEqual(["/api/orcamento/LQ-101"]);
-    confirmar.mockRestore();
+    const apagados = () =>
+      (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
+        .filter((args) => (args[1] as RequestInit | undefined)?.method === "DELETE")
+        .map((args) => String(args[0]));
+    await waitFor(() => expect(apagados().length).toBeGreaterThan(0));
+    expect(apagados()).toEqual(["/api/orcamento/LQ-101"]);
   });
 
   it("«marcar como» também não alcança o que saiu do ecrã", async () => {
