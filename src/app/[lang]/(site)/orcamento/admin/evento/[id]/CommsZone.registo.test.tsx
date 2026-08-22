@@ -66,6 +66,7 @@ function montar() {
       onQuoteChange={() => {}}
       onAddEntry={async (e) => {
         entradas.push(e);
+        return true;
       }}
     />,
   );
@@ -115,6 +116,7 @@ describe("Zona de Comunicação — o que fica escrito no histórico", () => {
         onQuoteChange={() => {}}
         onAddEntry={async (e) => {
           entradas.push(e);
+          return true;
         }}
       />,
     );

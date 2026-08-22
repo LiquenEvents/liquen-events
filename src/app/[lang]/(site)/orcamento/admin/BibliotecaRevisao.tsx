@@ -6,6 +6,7 @@ import { MAX_THEME_NAME } from "@/lib/theme-types";
 import { Button, Card, EmCurso } from "./ui";
 import { useToast } from "./Toast";
 import ImagemComPlanoB from "./ImagemComPlanoB";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
  * REVER ETIQUETAS — o ecrã onde se arruma a biblioteca em lote.
@@ -178,22 +179,51 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
     [fotos],
   );
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * «NÃO FOI POSSÍVEL GUARDAR.» A TRINTA FOTOS DE UMA VEZ
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Este ecrã existe para UMA coisa: pôr uma etiqueta a trinta fotos em três
+   * cliques. Quando esses três cliques falhavam, a resposta era a frase mais
+   * vazia do back office — a mesma para a rede em baixo, para a sessão
+   * expirada e para o servidor a recusar o conteúdo. E como a selecção se
+   * MANTÉM depois de aplicar (é de propósito: pôr o tipo e a seguir a paleta é
+   * o gesto normal), o ecrã ficava exactamente igual ao de antes do clique —
+   * sem forma de saber se ficou gravado.
+   *
+   * Agora a frase nomeia a etiqueta e quantas fotos ficaram por etiquetar, e
+   * acaba na instrução certa para o motivo. A gravação é atómica do lado do
+   * servidor — ou foram todas ou não foi nenhuma — por isso a contagem pode ser
+   * dita sem ressalvas.
+   */
   async function aplicar(etiquetaId: string, accao: "por" | "tirar") {
     const paths = [...seleccionadas];
     if (paths.length === 0) return;
+    const nome = vocabulario.find((e) => e.id === etiquetaId)?.nome ?? etiquetaId;
+    const quantas = `${paths.length} ${paths.length === 1 ? "foto" : "fotos"}`;
+    const oQue = accao === "por" ? `pôr “${nome}” em ${quantas}` : `tirar “${nome}” de ${quantas}`;
     setAGuardar(true);
     // 200 fotos são segundos a dezenas de segundos com o ecrã calado: o que se
     // via era dois `select` desactivados. Ver `ui/EmCurso.tsx`.
     setAEtiquetar({ quantas: paths.length, accao });
     try {
-      const res = await fetch("/api/biblioteca/etiquetar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paths, etiquetaId, accao }),
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/biblioteca/etiquetar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paths, etiquetaId, accao }),
+        });
+      } catch {
+        toast(porqueRebentou(oQue).mensagem, "error");
+        return;
+      }
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "falhou");
-      const nome = vocabulario.find((e) => e.id === etiquetaId)?.nome ?? etiquetaId;
+      if (!res.ok) {
+        toast(porqueFalhou(oQue, res, data).mensagem, "error");
+        return;
+      }
       // Diz quantas MUDARAM, não quantas foram pedidas: com 30 seleccionadas
       // das quais 8 já tinham a etiqueta, dizer 30 era uma conta inflacionada
       // que se descobre à segunda vez que se usa o ecrã.
@@ -207,11 +237,6 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
       // A selecção MANTÉM-SE: pôr o tipo e a seguir a paleta ao mesmo conjunto
       // é o gesto normal, e limpá-la obrigava a escolher tudo outra vez.
       await recarregar();
-    } catch (e) {
-      toast(
-        e instanceof Error && e.message !== "falhou" ? e.message : "Não foi possível guardar.",
-        "error",
-      );
     } finally {
       setAGuardar(false);
       setAEtiquetar(null);
@@ -242,18 +267,29 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
       etiquetas,
     }));
     setACriarTema(true);
+    const oQue = `criar o tema “${nome}” com esta procura`;
     try {
-      const res = await fetch("/api/temas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: nome, filterRule: { v: 1, eixos } }),
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/temas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: nome, filterRule: { v: 1, eixos } }),
+        });
+      } catch {
+        toast(porqueRebentou(oQue).mensagem, "error");
+        return;
+      }
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "Não foi possível criar o tema.");
+      if (!res.ok) {
+        // O nome repetido chega como recusa do CONTEÚDO e o servidor sabe
+        // dizê-lo («Já existe um tema com esse nome») — é a frase dele que
+        // ganha, porque é a única que diz o que mudar.
+        toast(porqueFalhou(oQue, res, data).mensagem, "error");
+        return;
+      }
       setNomeDoTema("");
       toast(`Tema “${nome}” criado com esta procura`, "success");
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Não foi possível criar o tema.", "error");
     } finally {
       setACriarTema(false);
     }

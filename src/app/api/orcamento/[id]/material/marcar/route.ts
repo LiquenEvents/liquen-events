@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { getForQuote } from "@/lib/event-material-store";
+import { getForQuote, updateEventMaterial } from "@/lib/event-material-store";
 import { listItemsOfEvent, updateEventItem } from "@/lib/event-material-items-store";
 import { registar } from "@/lib/event-material-log-store";
 import type { AccaoOffline } from "@/lib/material-offline";
@@ -15,7 +15,15 @@ export const dynamic = "force-dynamic";
  *  via um erro de rede depois de duas horas offline. */
 export const maxDuration = 60;
 
-const ACCOES: AccaoOffline[] = ["loaded", "unloaded", "returned", "missing", "note", "used"];
+const ACCOES: AccaoOffline[] = [
+  "loaded",
+  "unloaded",
+  "returned",
+  "missing",
+  "note",
+  "used",
+  "fechado",
+];
 
 /** Um lote grande é duas horas sem rede; acima disto é engano ou abuso. */
 const MAX_MARCACOES = 500;
@@ -54,6 +62,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     let aplicadas = 0;
     let ignoradas = 0;
+    /** O estado para onde o «Dar por carregada» leva a checklist, se ele veio. */
+    let estadoDoFecho: "carregada" | "preparada" | null = null;
+    let fechoEm = "";
     // Marcações que perderam uma corrida de escrita (não uma corrida de
     // relógios, que é a `ignoradas`). Contam-se à parte porque significam outra
     // coisa: alguém marcou a MESMA linha no mesmo instante a partir de outro
@@ -65,6 +76,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const accao = ACCOES.includes(m?.accao) ? (m.accao as AccaoOffline) : null;
       const markedAt = typeof m?.markedAt === "string" ? m.markedAt : "";
       const actor = typeof m?.actor === "string" ? m.actor.slice(0, 120) : "";
+      /**
+       * ── O FECHO NÃO É SOBRE NENHUMA LINHA ────────────────────────────────
+       *
+       * Sai daqui antes da procura pelo item, porque não tem item nenhum: é o
+       * «Dar por carregada» do fim do carregamento, e diz respeito à checklist
+       * inteira. Aplica-se DEPOIS do ciclo, com o último carimbo que chegar —
+       * um telemóvel que esteve offline pode trazer um fecho mais antigo do
+       * que o reabrir que outra pessoa fez entretanto, e é a mesma regra de
+       * sempre: ganha o relógio de quem marcou.
+       */
+      if (accao === "fechado") {
+        if (!markedAt) {
+          ignoradas++;
+          continue;
+        }
+        const para = m?.valor === "preparada" ? "preparada" : "carregada";
+        if (markedAt >= fechoEm) {
+          estadoDoFecho = para;
+          fechoEm = markedAt;
+        }
+        await registar({
+          eventId: evento.id,
+          itemId: "",
+          action: "fechado",
+          value: para,
+          actor,
+          markedAt,
+          superseded: false,
+        });
+        aplicadas++;
+        continue;
+      }
+
       const item = porId.get(itemId);
       if (!item || !accao || !markedAt) {
         ignoradas++;
@@ -153,11 +197,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
+    // O estado da checklist escreve-se UMA vez, no fim, e só se mudou mesmo:
+    // um lote com quarenta marcações e um fecho não pode dar quarenta
+    // escritas no cabeçalho.
+    let estado = evento.status;
+    if (estadoDoFecho && estadoDoFecho !== evento.status) {
+      // Nunca por cima de «devolvida»: o material já voltou, e um fecho
+      // atrasado de um telemóvel que esteve sem rede não pode fazer o evento
+      // andar para trás no tempo.
+      if (evento.status !== "devolvida") {
+        await updateEventMaterial(evento.id, { status: estadoDoFecho });
+        estado = estadoDoFecho;
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       aplicadas,
       ignoradas,
       conflitos,
+      estado,
       itens: await listItemsOfEvent(evento.id),
     });
   } catch (err) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { quandoGravado } from "@/lib/quando-gravado";
 import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import { parseMoney } from "./util";
 import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
@@ -80,6 +81,19 @@ const MS_DO_ENVIO = tempoEstimado(0) + MS_DO_CORREIO;
  */
 const RASCUNHO_VARIANTE = "orcamento-linhas";
 
+/** Os três atalhos que substituem a tabela inteira. */
+type Modelo = "single" | "breakdown" | "last";
+
+/** Como se lhes chama numa frase — as palavras dos próprios botões. */
+const NOME_DO_MODELO: Record<Modelo, string> = {
+  single: "Pacote único",
+  breakdown: "Por componentes",
+  last: "Última proposta",
+};
+
+/** Quantos segundos o «Anular» fica de pé — os mesmos do Estúdio. */
+const SEGUNDOS_PARA_ANULAR = 10;
+
 /** O que se guarda: exactamente os quatro sítios onde ela escreve. */
 interface RascunhoDoOrcamento {
   items: ProposalLineItem[];
@@ -132,7 +146,8 @@ async function enviarRascunhoParaServidor(
 
 /** A hora tal como o indicador do estúdio a escreve — «14:32», e nada mais. */
 function horaCurta(quando: Date | null): string {
-  return quando ? quando.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }) : "";
+  // Ver `quando-gravado`: hoje é só a hora, ontem e mais atrás levam o dia.
+  return quandoGravado(quando);
 }
 
 /** Um rascunho vindo do servidor (ou do navegador) tem de ser lido com
@@ -270,6 +285,17 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
   const [validUntil, setValidUntil] = useState(inicial.validUntil);
   const [notes, setNotes] = useState(inicial.notes);
   const [sending, setSending] = useState(false);
+  /** A tabela tal como estava antes do último «×», à espera do «Anular». */
+  const [linhaRemovida, setLinhaRemovida] = useState<{
+    items: ProposalLineItem[];
+    frase: string;
+    segundos: number;
+  } | null>(null);
+  /** O atalho de modelo que está à espera de resposta. */
+  const [modeloAConfirmar, setModeloAConfirmar] = useState<{
+    novos: ProposalLineItem[];
+    pergunta: string;
+  } | null>(null);
   /**
    * ════════════════════════════════════════════════════════════════════════
    * O PREÇO ZERAVA QUANDO ELA ESCREVIA A VÍRGULA
@@ -524,6 +550,21 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
    *  `porGravar` anda em estado a par do `ref` (ver a declaração). */
   useTravaoDeSaida(!oRegistoFalaPorMim && (porGravar || estado === "so-neste-computador"));
 
+  // A contagem decrescente do «Anular» de uma linha removida. Um `setTimeout`
+  // por segundo, como no Estúdio.
+  useEffect(() => {
+    if (!linhaRemovida) return;
+    if (linhaRemovida.segundos <= 0) {
+      setLinhaRemovida(null);
+      return;
+    }
+    const t = setTimeout(
+      () => setLinhaRemovida((l) => (l ? { ...l, segundos: l.segundos - 1 } : null)),
+      1000,
+    );
+    return () => clearTimeout(t);
+  }, [linhaRemovida]);
+
   /* Os mesmos três `round2` da rota, e pela mesma razão: o ecrã tem de dizer o
      que a folha vai dizer. Sem eles, este painel mostrava «Subtotal 36,50 € ·
      IVA 8,40 € · TOTAL 44,89 €» — e a proposta que saía dizia o mesmo, errado
@@ -541,31 +582,133 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
   function addRow() {
     setItems((prev) => [...prev, { description: "", qty: 1, unitPrice: 0 }]);
   }
+
+  /** O que a linha vale — a mesma multiplicação do subtotal, para o aviso não
+   *  dizer um número diferente do que a tabela acabou de tirar. */
+  const valorDaLinha = (it: ProposalLineItem) =>
+    round2((Number(it.qty) || 0) * (Number(it.unitPrice) || 0));
+
+  /** Tem alguma coisa dentro? Uma linha em branco não é trabalho a perder. */
+  const linhaEscrita = (it: ProposalLineItem) =>
+    (it.description ?? "").trim() !== "" || valorDaLinha(it) > 0;
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * REMOVER UMA LINHA: ANULAR, E NÃO PERGUNTA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Compor um orçamento nesta tabela É acrescentar e tirar linhas: escreve-se
+   * doze, o cliente corta três, muda-se de ideias em duas. O gesto é o mais
+   * frequente do ecrã e refazê-lo custa uma descrição e dois números.
+   *
+   * Uma caixa a perguntar em cada «×» é uma caixa respondida vinte vezes numa
+   * tarde — e uma caixa respondida vinte vezes deixa de ser lida à terceira.
+   * Pior: passa a ser respondida por reflexo, e a vez em que a resposta
+   * interessava é a vez em que ninguém a leu.
+   *
+   * Por isso faz-se, e fica um «Anular» ao lado durante dez segundos, a dizer
+   * QUAL linha saiu e QUANTO tirou ao total. É o mesmo desenho do Estúdio (ver
+   * o `limpo`, em `ProposalStudio.tsx`): a pergunta chega antes de se ver o
+   * estrago, a anulação chega quando ele já está no ecrã.
+   *
+   * A linha em branco sai sem aviso nenhum: não há nada para trazer de volta, e
+   * uma barra a oferecer o resgate de nada é ruído a cada linha mal começada.
+   */
   function removeRow(i: number) {
     if (items.length === 1) return;
+    const linha = items[i];
+    if (linha && linhaEscrita(linha)) {
+      const nome = (linha.description ?? "").trim() || `linha ${i + 1}`;
+      const valor = valorDaLinha(linha);
+      setLinhaRemovida({
+        items,
+        frase: `Linha «${nome}» removida${valor > 0 ? ` — menos ${eur(valor)} no total` : ""}.`,
+        segundos: SEGUNDOS_PARA_ANULAR,
+      });
+    }
     setItems((prev) => prev.filter((_, idx) => idx !== i));
   }
 
-  function applyTemplate(tpl: "single" | "breakdown" | "last") {
+  /** As linhas que o atalho iria escrever, ou `null` quando não há nenhumas. */
+  function itensDoModelo(tpl: Modelo): ProposalLineItem[] | null {
     if (tpl === "single") {
-      setItems([
+      return [
         {
           description: "Organização e produção do evento",
           qty: 1,
           unitPrice: Math.round(seedPrice),
         },
-      ]);
-    } else if (tpl === "breakdown") {
-      setItems(buildFromBreakdown(quote));
-    } else {
-      const last = loadLastItems();
-      if (last) setItems(last);
+      ];
     }
+    if (tpl === "breakdown") {
+      const linhas = buildFromBreakdown(quote);
+      return linhas.length ? linhas : null;
+    }
+    const last = loadLastItems();
+    return last && last.length ? last : null;
+  }
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * OS ATALHOS DE MODELO: PERGUNTA, E NÃO ANULAR
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Estes três botões não acrescentam nada — SUBSTITUEM a tabela inteira. Doze
+   * linhas escritas à mão, uma a uma, desapareciam com uma carregada num botão
+   * cinzento de dois centímetros que fica mesmo por cima delas, e o mais
+   * perigoso dos três («Última proposta») tem um ícone de recuperação, que se
+   * lê como se fosse trazer alguma coisa de volta em vez de levar tudo.
+   *
+   * É o oposto do «×» de uma linha: raro (faz-se uma vez, no princípio) e caro
+   * (perde-se a tabela toda). Por isso leva PERGUNTA e não anulação — e a
+   * pergunta diz quantas linhas se perdem e quanto somam, que é o que decide a
+   * resposta. Um «Tens a certeza?» aqui não dizia nada de nada.
+   *
+   * Mas só quando há mesmo o que perder: com a tabela em branco — que é como
+   * ela está quando estes botões servem para o que foram feitos — o modelo
+   * entra sem pergunta nenhuma. Uma tarefa que não é destrutiva não pode ser
+   * atrasada por uma caixa.
+   */
+  function applyTemplate(tpl: Modelo) {
+    const novos = itensDoModelo(tpl);
+    // Nada para escrever (uma «última proposta» que não existe) não é uma
+    // acção destrutiva nenhuma: não se pergunta e não se mexe na tabela.
+    if (!novos) return;
+    const escritas = items.filter(linhaEscrita);
+    if (escritas.length === 0) {
+      setItems(novos);
+      return;
+    }
+    const soma = round2(escritas.reduce((s, it) => s + valorDaLinha(it), 0));
+    setModeloAConfirmar({
+      novos,
+      pergunta:
+        `Substituir ${escritas.length === 1 ? "a linha já escrita" : `as ${escritas.length} linhas já escritas`}` +
+        `${soma > 0 ? ` (${eur(soma)})` : ""} por «${NOME_DO_MODELO[tpl]}»? O que está na tabela não volta atrás.`,
+    });
   }
 
   async function send() {
     if (sending) return;
-    if (!window.confirm(`Enviar a proposta de ${eur(total)} por e-mail para ${quote.email}?`))
+    /* ── A PERGUNTA DIZ O QUE VAI, E NÃO SÓ QUANTO ─────────────────────────
+       O envio é a acção irreversível deste ecrã — o PDF é desenhado, o email
+       sai e o cliente lê-o — e a pergunta trazia o total e a morada. Faltava a
+       parte que se pode ter enganado sem dar por isso: QUANTAS linhas seguem.
+       Uma linha apagada por engano há dois minutos não muda o total o
+       suficiente para dar nas vistas, e é a última vez que alguém a pode
+       contar. É a mesma frase do Estúdio, em ponto pequeno.
+
+       O `total` é o mesmo que a tabela mostra e que a rota vai imprimir (ver
+       os `round2` acima): uma segunda conta aqui era garantir que um dia a
+       pergunta e o documento diziam números diferentes. */
+    const escritas = items.filter(linhaEscrita).length;
+    if (
+      !window.confirm(
+        `Enviar a proposta para ${quote.email || "o cliente"}?\n\n` +
+          `Vai um PDF com ${escritas} ${escritas === 1 ? "linha" : "linhas"}, ` +
+          `${eur(total)} com IVA incluído.`,
+      )
+    )
       return;
     setSending(true);
     setError(null);
@@ -765,6 +908,67 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
           </Button>
         )}
       </div>
+
+      {/* ── A PERGUNTA DO ATALHO, POR BAIXO DO BOTÃO QUE A LEVANTOU ─────────
+          Encostada aos três botões e por cima da tabela que vai desaparecer:
+          quem lê a frase tem o que ela conta mesmo ali à vista.
+
+          `alertdialog` + `assertive` porque está à espera de resposta — um
+          botão que não anuncia nada carrega-se outra vez. */}
+      {modeloAConfirmar && (
+        <div
+          role="alertdialog"
+          aria-live="assertive"
+          aria-label="Confirmar substituição das linhas"
+          className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+        >
+          <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-foreground/80">
+            {modeloAConfirmar.pergunta}
+          </span>
+          {/* Cancelar não escreve NADA: fecha a pergunta e a tabela fica onde
+              estava, linha por linha. */}
+          <Button variant="ghost" size="sm" onClick={() => setModeloAConfirmar(null)}>
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setItems(modeloAConfirmar.novos);
+              setModeloAConfirmar(null);
+            }}
+          >
+            Substituir
+          </Button>
+        </div>
+      )}
+
+      {/* ── O «ANULAR» DA LINHA REMOVIDA ───────────────────────────────────
+          Por cima da tabela e não no lugar da linha: a linha saiu, e as de
+          baixo subiram — uma oferta pendurada num sítio que já mudou de forma
+          é uma oferta que salta enquanto se procura.
+
+          SEM `aria-live`, como a barra irmã do Estúdio (ver `limpo`, em
+          `ProposalStudio.tsx`): a contagem muda de segundo a segundo, e uma
+          região viva com um número lá dentro põe o leitor de ecrã a repetir a
+          mesma frase dez vezes seguidas. Isso não é anunciar — é tapar o que
+          quer que ela estivesse a ouvir a seguir. */}
+      {linhaRemovida && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2">
+          <span className="min-w-0 flex-1 text-xs leading-relaxed text-foreground/70">
+            {linhaRemovida.frase} Pode anular durante {linhaRemovida.segundos}s.
+          </span>
+          <button
+            type="button"
+            className="alvo-toque shrink-0 text-xs font-medium text-[#4d6350] underline-offset-2 hover:underline"
+            onClick={() => {
+              setItems(linhaRemovida.items);
+              setLinhaRemovida(null);
+            }}
+          >
+            Anular
+          </button>
+        </div>
+      )}
 
       {/*
         Line items

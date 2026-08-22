@@ -88,7 +88,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     // recebeu por email. Uma fotografia em falta no armazenamento fazia isto
     // responder 503 sem corpo — e o botão não fazia nada. Ver a nota em
     // `proposal-pdf-cache.ts`; o anexo do email continua a recusar.
-    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true);
+    // O mesmo desenho guardado que o link do email serve — a chave é o
+    // conteúdo, portanto as duas portas partilham o ficheiro.
+    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true, proposal.id);
     // `Content-Length`, pedaços e `ETag` — a razão está em `pdf-resposta.ts`.
     // O nome é o mesmo do anexo que seguiu no email, para o ficheiro ser
     // reconhecível como o documento que o casal já tem.

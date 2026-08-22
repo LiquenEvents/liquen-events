@@ -15,6 +15,8 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { razaoDaRecusa, porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { AvisoDeArmazenamento } from "./AvisoDeArmazenamento";
@@ -87,7 +89,15 @@ import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, type View } from "./nav";
 import { useDesceu } from "./ui/adaptativo";
-import { Button, EmCurso, SectionCard, Segmented, TabelaOuCartoes, type Coluna } from "./ui";
+import {
+  Button,
+  EmCurso,
+  PerguntaDestrutiva,
+  SectionCard,
+  Segmented,
+  TabelaOuCartoes,
+  type Coluna,
+} from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
@@ -297,6 +307,13 @@ interface Props {
    */
   initialQuotes: QuoteSummary[];
   userName?: string;
+  /**
+   * A leitura dos pedidos falhou do lado do servidor?
+   *
+   * Vem do `page.tsx`, que até aqui engolia a falha e devolvia `[]` — e o back
+   * office abria como se ela não tivesse pedido nenhum. Ver o comentário lá.
+   */
+  falhaDosPedidos?: LeituraFalhada | null;
 }
 
 // Status pill. Module-level (was inside AdminClient) so the memoised QuoteCard
@@ -856,20 +873,65 @@ function textoDoPreco(q: Quote): string {
 }
 
 /**
- * O que se diz de uma gravação recusada, pelo código que voltou. O código não é
- * um detalhe técnico a esconder: é a única coisa que distingue «a sessão
- * expirou» (volta a entrar) de «o servidor está em baixo» (espera um pouco), e
- * cada um tem uma acção diferente do outro lado.
+ * O que se diz de uma gravação recusada, pelo código que voltou.
+ *
+ * A regra vive agora em `razaoDaRecusa` (`lib/porque-falhou.ts`), e este nome
+ * fica como o atalho local. Havia DUAS cópias disto — esta e a da
+ * `PerguntaDeDesfecho` — e tinham divergido: uma tratava o 413 e a outra o 404,
+ * portanto o mesmo 404 dizia «este pedido já não existe» num sítio e nada no
+ * outro, no mesmo ecrã.
  */
-function porqueNaoGravou(status: number): string | undefined {
-  if (status === 401 || status === 403) return "A sessão expirou — volta a entrar.";
-  if (status === 413) return "O texto é grande demais para ser guardado assim.";
-  if (status === 400) return "O servidor recusou o conteúdo.";
-  if (status >= 500) return "O servidor não está a aceitar gravações neste momento.";
-  return undefined;
+const porqueNaoGravou = razaoDaRecusa;
+
+/**
+ * O que a leitura de um pedido devolve.
+ *
+ * `Quote | null` não chegava: o `null` servia quatro avarias diferentes — rede
+ * em baixo, recusa do servidor, sessão caída (que responde **200**, ver abaixo)
+ * e resposta truncada — e quem chamava só sabia dizer «Verifica a ligação e
+ * tenta de novo». Numa sessão caída, essa frase manda fazer a única coisa que
+ * não resolve nada.
+ */
+type LeituraDoPedido = { ok: true; quote: Quote } | { ok: false; porque: string };
+
+/**
+ * O que desaparece com um pedido — em linhas, com números.
+ *
+ * Só o que EXISTE entra na lista: uma pergunta com «0 pagamentos» a meio é
+ * ruído, e ruído numa pergunta destrutiva é o que ensina a saltá-la. Um pedido
+ * sem nada por baixo dá uma lista vazia, e aí a `PerguntaDestrutiva` mostra só
+ * o título e o aviso — que continua a ser melhor do que «tens a certeza».
+ */
+function oQueSePerdeComOPedido(q: Quote | null): string[] {
+  if (!q) return [];
+  const linhas: string[] = [];
+  const conta = (n: number, um: string, muitos: string) =>
+    n > 0 ? linhas.push(`${n} ${n === 1 ? um : muitos}`) : undefined;
+  conta(q.messages?.length ?? 0, "mensagem trocada", "mensagens trocadas");
+  conta(q.payments?.length ?? 0, "pagamento registado", "pagamentos registados");
+  conta(q.guestList?.length ?? 0, "convidado", "convidados");
+  conta(q.checklist?.length ?? 0, "linha da checklist", "linhas da checklist");
+  conta(q.productionPlan?.length ?? 0, "tarefa de produção", "tarefas de produção");
+  conta(q.activityLog?.length ?? 0, "entrada no histórico", "entradas no histórico");
+  if (q.quotedPrice) {
+    linhas.push(
+      `o valor combinado, ${q.quotedPrice.toLocaleString("pt-PT", {
+        style: "currency",
+        currency: "EUR",
+      })}`,
+    );
+  }
+  return linhas;
 }
 
-export default function AdminClient({ initialQuotes, userName = "Catarina" }: Props) {
+/** No máximo esta lista, e o resto contado. Trinta nomes não se leem. */
+const NOMES_A_MOSTRAR = 8;
+
+export default function AdminClient({
+  initialQuotes,
+  userName = "Catarina",
+  falhaDosPedidos = null,
+}: Props) {
   // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
   // estado tem mesmo de ser `Quote[]`: assim que um pedido é aberto ou gravado,
   // o elemento da lista passa a ser o pedido INTEIRO devolvido pelo servidor.
@@ -893,6 +955,18 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
    * três dias ou mais"), porque a pergunta que serve não é "quais esperam há
    * exactamente quatro dias" mas "o que é que já esperou de mais".
    */
+  /** O pedido que está a ser aberto agora — ver `openQuote`. */
+  const [aAbrir, setAAbrir] = useState<{ id: string; nome: string } | null>(null);
+  /**
+   * As perguntas destrutivas abertas.
+   *
+   * Estado e não `window.confirm`: a pergunta tem de caber uma LISTA lá dentro
+   * — ver `PerguntaDestrutiva`, e a razão por que «tens a certeza?» não é uma
+   * pergunta.
+   */
+  const [aApagar, setAApagar] = useState<Quote | null>(null);
+  const [aApagarLote, setAApagarLote] = useState<string[] | null>(null);
+  const [aSair, setASair] = useState(false);
   const [filterEspera, setFilterEspera] = useState<"all" | "3" | "7">("all");
   const [filterMes, setFilterMes] = useState<string>("all");
   const [filterRegiao, setFilterRegiao] = useState<string>("all");
@@ -954,6 +1028,55 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     (filterPlanner !== "all" ? 1 : 0);
   const haFiltroAActuar =
     filtrosActivos > 0 || search.trim() !== "" || filterStatus !== "all" || tagFilter !== null;
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A SAÍDA TEM DE ESTAR ONDE SE DÁ POR ELA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A lista filtrada e vazia já sabia dizer que estava filtrada — o que não
+   * fazia era dar a saída. Dizia «Limpa a pesquisa ou os filtros» e mandava
+   * procurá-los: no telemóvel estão dentro de um painel RECOLHIDO, que é
+   * precisamente o que faz ninguém dar por eles.
+   *
+   * Do inventário: vinte e cinco vazios explicam-se bem e não põem a acção ao
+   * alcance. Um vazio que manda ir a outro sítio é meio vazio — e este é o
+   * mais caro de todos, porque a conclusão errada («não entrou nada») fecha o
+   * telemóvel e deixa um pedido sem resposta.
+   */
+  function limparFiltros() {
+    setSearch("");
+    setFilterStatus("all");
+    setTagFilter(null);
+    setFilterCategory("all");
+    setFilterEspera("all");
+    setFilterMes("all");
+    setFilterRegiao("all");
+    setFilterPlanner("all");
+    setMineOnly(false);
+  }
+
+  /**
+   * O que está a esconder os pedidos, por extenso.
+   *
+   * «Nenhum pedido corresponde» não diz o que fazer se não se souber o que
+   * está ligado — e o que está ligado pode ser uma pesquisa de há dez minutos
+   * ou um filtro de mês escolhido noutro separador.
+   */
+  function oQueEstaAFiltrar(): string {
+    const partes: string[] = [];
+    if (search.trim()) partes.push(`a pesquisa «${search.trim()}»`);
+    if (filterStatus !== "all") partes.push("um estado");
+    if (tagFilter) partes.push(`a etiqueta «${tagFilter}»`);
+    if (filtrosActivos > 0) {
+      partes.push(
+        filtrosActivos === 1 ? "um filtro do painel" : `${filtrosActivos} filtros do painel`,
+      );
+    }
+    if (partes.length === 0) return "";
+    if (partes.length === 1) return partes[0];
+    return `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`;
+  }
   const [saving, setSaving] = useState(false);
   /**
    * O id do pedido cujo desfecho acabou de ser marcado NO PAINEL.
@@ -1985,33 +2108,47 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
    * quem chamou avisa. Uma falha visível é melhor do que um painel que parece
    * completo e não está.
    */
-  async function comPedidoInteiro(q: Quote): Promise<Quote | null> {
-    if (completos.current.has(q.id)) return q;
+  async function comPedidoInteiro(q: Quote): Promise<LeituraDoPedido> {
+    if (completos.current.has(q.id)) return { ok: true, quote: q };
+    const oQue = `abrir o pedido de ${q.name || "este cliente"}`;
+    let res: Response;
     try {
-      const res = await fetch(`/api/orcamento/${encodeURIComponent(q.id)}`, {
+      res = await fetch(`/api/orcamento/${encodeURIComponent(q.id)}`, {
         cache: "no-store",
       });
-      if (!res.ok) return null;
-      /**
-       * SESSÃO EXPIRADA RESPONDE 200. Esta rota é pública — a página de
-       * confirmação do casal lê-a — e sem sessão devolve uma lista curta de
-       * factos do evento que TAMBÉM tem `id` e TAMBÉM vem com 200. Aceitá-la
-       * era abrir o painel sem nome, sem contacto, sem pagamentos e sem
-       * convidados, e ainda substituir o pedido na lista por essa versão.
-       *
-       * O cabeçalho é a única marca fiável de que veio o pedido inteiro; a
-       * rota explica porquê. Sem ele, isto é uma falha — e uma falha visível é
-       * melhor do que um painel que parece completo e não está.
-       */
-      if (res.headers.get("x-pedido") !== "completo") return null;
-      const inteiro = (await res.json()) as Quote;
-      if (!inteiro?.id) return null;
-      completos.current.add(inteiro.id);
-      setQuotes((prev) => prev.map((x) => (x.id === inteiro.id ? inteiro : x)));
-      return inteiro;
     } catch {
-      return null;
+      return { ok: false, porque: porqueRebentou(oQue).mensagem };
     }
+    if (!res.ok) {
+      const corpo = await res.json().catch(() => null);
+      return { ok: false, porque: porqueFalhou(oQue, res, corpo).mensagem };
+    }
+    /**
+     * SESSÃO EXPIRADA RESPONDE 200. Esta rota é pública — a página de
+     * confirmação do casal lê-a — e sem sessão devolve uma lista curta de
+     * factos do evento que TAMBÉM tem `id` e TAMBÉM vem com 200. Aceitá-la
+     * era abrir o painel sem nome, sem contacto, sem pagamentos e sem
+     * convidados, e ainda substituir o pedido na lista por essa versão.
+     *
+     * O cabeçalho é a única marca fiável de que veio o pedido inteiro; a
+     * rota explica porquê. Sem ele, isto é uma falha — e uma falha visível é
+     * melhor do que um painel que parece completo e não está.
+     */
+    if (res.headers.get("x-pedido") !== "completo") {
+      // Este 200 não é um 200: é a sessão caída, e dizer «verifica a ligação»
+      // sobre ela mandava-a fazer a única coisa que não resolve nada.
+      return {
+        ok: false,
+        porque: `A sessão expirou — não deu para ${oQue}. Volta a entrar e tenta outra vez.`,
+      };
+    }
+    const inteiro = (await res.json().catch(() => null)) as Quote | null;
+    if (!inteiro?.id) {
+      return { ok: false, porque: `A resposta veio incompleta — não deu para ${oQue}. Repete.` };
+    }
+    completos.current.add(inteiro.id);
+    setQuotes((prev) => prev.map((x) => (x.id === inteiro.id ? inteiro : x)));
+    return { ok: true, quote: inteiro };
   }
 
   /**
@@ -2031,8 +2168,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     const actual = quotes.find((q) => q.id === id);
     if (!actual) return;
     completos.current.delete(id);
-    const inteiro = await comPedidoInteiro(actual);
-    if (inteiro) absorverDoServidor(inteiro);
+    const r = await comPedidoInteiro(actual);
+    if (r.ok) absorverDoServidor(r.quote);
   }
 
   async function openQuote(pedido: Quote) {
@@ -2045,11 +2182,34 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     // resposta ao clique no mesmo instante em que a dava antes. O que espera
     // pelo servidor é só o painel de detalhe.
     setView("pedidos");
-    const q = await comPedidoInteiro(pedido);
-    if (!q) {
-      toast("Não foi possível abrir o pedido. Verifica a ligação e tenta de novo.", "error");
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * ABRIR UM PEDIDO ERA MUDO — SEIS VEZES
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Do inventário: **seis portas para abrir um pedido — a lista, o Kanban, o
+     * Calendário, os Clientes, o Acompanhamento e a Visão Geral — e todas
+     * mudas.** Toca-se, e não acontece nada visível enquanto o servidor não
+     * responder. Num 4G de quinta são segundos, e o gesto seguinte é tocar
+     * outra vez.
+     *
+     * O painel espera de propósito e por boa razão (ver `comPedidoInteiro`:
+     * abrir com o resumo apagava listas de convidados). O que não pode é
+     * esperar em silêncio.
+     *
+     * As seis portas passam todas por aqui, portanto o aviso escreve-se uma
+     * vez. Fica por cima de todas as vistas, ao lado do
+     * `AvisoDeArmazenamento` — porque quem tocou pode ter tocado no
+     * Calendário, e é lá que ele tem de aparecer.
+     */
+    setAAbrir({ id: pedido.id, nome: pedido.name || "este pedido" });
+    const r = await comPedidoInteiro(pedido);
+    setAAbrir(null);
+    if (!r.ok) {
+      toast(r.porque, "error");
       return;
     }
+    const q = r.quote;
     setSelected(q);
     // Track in recently-viewed list (localStorage)
     try {
@@ -2240,7 +2400,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     };
   }, [revalidarPedidos]);
 
-  async function logout() {
+  /**
+   * ── SAIR NÃO PERGUNTAVA NADA ──────────────────────────────────────────
+   *
+   * Nem sequer com trabalho por gravar. Fechar o painel de um pedido pergunta
+   * (ver `discardGuard`); sair do back office inteiro — que fecha o painel e
+   * mais tudo o resto — não perguntava. Era o buraco maior dos dois, e o mais
+   * fácil de encontrar por acidente: o «Sair» está na barra, ao lado de tudo.
+   */
+  function pedirParaSair() {
+    if (isDirty) {
+      setASair(true);
+      return;
+    }
+    void sairMesmo();
+  }
+
+  async function sairMesmo() {
+    setASair(false);
     await fetch("/api/admin/logout", { method: "POST" });
     // Sair é uma decisão, e tem de aguentar a chegada ao ecrã de entrada: sem
     // esta marca, a entrada automática pela passkey voltava a abrir a sessão
@@ -2249,24 +2426,56 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     window.location.href = "/orcamento/admin";
   }
 
-  async function appendActivity(quoteId: string, entries: ActivityEntry[]) {
-    if (entries.length === 0) return;
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O HISTÓRICO DEIXA DE SE PERDER EM SILÊNCIO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Isto era `if (res.ok) { … }` sem `else`, e um `catch {}` vazio por baixo.
+   * Uma linha de histórico que não chegasse ao servidor desaparecia sem uma
+   * palavra — e o histórico é o que se lê meses depois para saber o que se
+   * disse a quem.
+   *
+   * O caso caro é o registo de uma CHAMADA: quem acaba de falar ao telefone
+   * escreve o que combinou, a caixa limpa-se como se tivesse gravado, e o que
+   * foi escrito não existe em lado nenhum. Ver o `ActivityLog`, que agora só
+   * limpa a caixa quando isto devolver `true`.
+   *
+   * O `oQue` importa aqui mais do que noutros sítios: nas chamadas vindas de um
+   * `onSent`, a acção principal JÁ correu bem — a proposta seguiu, a mensagem
+   * saiu. A frase tem de dizer que o que falhou foi a linha do histórico, e não
+   * o envio.
+   */
+  async function appendActivity(
+    quoteId: string,
+    entries: ActivityEntry[],
+    oQue = "escrever no histórico",
+  ): Promise<boolean> {
+    if (entries.length === 0) return true;
+    let res: Response;
     try {
       // Só as entradas NOVAS — o servidor junta ao histórico mais recente, para
       // que duas ferramentas a gravar em simultâneo nunca se sobrescrevam.
-      const res = await fetch(`/api/orcamento/${quoteId}`, {
+      res = await fetch(`/api/orcamento/${quoteId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ activityLogAppend: entries }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setQuotes((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-        setSelected((prev) => (prev?.id === updated.id ? updated : prev));
-      }
     } catch {
-      /* best-effort */
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return false;
     }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return false;
+    }
+    const updated = corpo as Quote | null;
+    if (updated?.id) {
+      setQuotes((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      setSelected((prev) => (prev?.id === updated.id ? updated : prev));
+    }
+    return true;
   }
 
   /**
@@ -2683,14 +2892,25 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // confirm covers the whole batch; each id is DELETEd, then the successful
   // ones are dropped from local state and the selection is cleared. Os `ids`
   // são os que estão À VISTA — ver `applyBulkStatus`.
-  async function deleteSelected(ids: string[]) {
+  function deleteSelected(ids: string[]) {
     if (ids.length === 0 || bulkBusy) return;
-    if (
-      !window.confirm(
-        `Apagar ${ids.length} pedido${ids.length !== 1 ? "s" : ""} definitivamente? Esta ação não pode ser anulada.`,
-      )
-    )
-      return;
+    // A pergunta NOMEIA-OS. «Apagar 12 pedidos?» é um número que não se
+    // consegue verificar: quem o lê não sabe se a selecção é a que pensa que
+    // é, e a única maneira de saber era cancelar e contar à mão.
+    setAApagarLote(ids);
+  }
+
+  /** Os nomes dos pedidos seleccionados, cortados a `NOMES_A_MOSTRAR`. */
+  function nomesDoLote(ids: string[] | null): string[] {
+    if (!ids || ids.length === 0) return [];
+    const porId = new Map(quotes.map((q) => [q.id, q]));
+    const nomes = ids.map((id) => porId.get(id)?.name ?? id);
+    if (nomes.length <= NOMES_A_MOSTRAR) return nomes;
+    return [...nomes.slice(0, NOMES_A_MOSTRAR), `… e mais ${nomes.length - NOMES_A_MOSTRAR}`];
+  }
+
+  async function apagarMesmo(ids: string[]) {
+    setAApagarLote(null);
     setLote({ titulo: "A apagar os pedidos…", feito: 0, total: ids.length });
     try {
       const results = await Promise.all(
@@ -2725,6 +2945,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   }
 
   const archivedCount = useMemo(() => quotes.filter((q) => q.archived).length, [quotes]);
+
+  /**
+   * «Ver os arquivados» — a saída dos vazios da Visão Geral e do Kanban.
+   *
+   * Os três gestos andam juntos: levar à lista sem destapar os arquivados, ou
+   * com um filtro de estado ainda por limpar, dava outra lista vazia — e essa
+   * já não tinha saída nenhuma.
+   */
+  const verArquivados = useCallback(() => {
+    setShowArchived(true);
+    setFilterStatus("all");
+    setView("pedidos");
+  }, []);
 
   // Archived quotes are soft-deleted: keep them out of the analytical surfaces
   // (overview, pipeline, clientes, calendário, estatísticas) so a junk or
@@ -3403,7 +3636,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   Repor
                 </button>
                 <button
-                  onClick={logout}
+                  onClick={pedirParaSair}
                   className="alvo-toque flex-1 flex items-center justify-center gap-1.5 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] transition-colors"
                   title="Terminar sessão"
                 >
@@ -3759,6 +3992,86 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               componente. */}
           <AvisoDeArmazenamento />
 
+          {/* ── AS PERGUNTAS DESTRUTIVAS ────────────────────────────────────
+              Aqui e não junto de cada botão: as três podem ser disparadas de
+              sítios diferentes (o menu do detalhe, a barra do lote, a
+              navegação) e uma caixa modal não pertence a nenhum deles. */}
+          <PerguntaDestrutiva
+            aberto={aApagar !== null}
+            onFechar={() => setAApagar(null)}
+            titulo={`Apagar o pedido de ${aApagar?.name ?? ""}?`}
+            oQueSePerde={oQueSePerdeComOPedido(aApagar)}
+            aviso="Não pode ser anulado. Para o tirar da lista sem o apagar, usa «Arquivar»."
+            rotuloConfirmar="Apagar o pedido"
+            onConfirmar={async () => {
+              const alvo = aApagar;
+              if (!alvo) return;
+              const oQue = `apagar o pedido de ${alvo.name}`;
+              let res: Response;
+              try {
+                res = await fetch(`/api/orcamento/${alvo.id}`, { method: "DELETE" });
+              } catch {
+                toast(porqueRebentou(oQue).mensagem, "error");
+                return;
+              }
+              if (!res.ok) {
+                const corpo = await res.json().catch(() => null);
+                toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+                return;
+              }
+              setQuotes((prev) => prev.filter((q) => q.id !== alvo.id));
+              setSelected(null);
+              setAApagar(null);
+              toast(`Pedido de ${alvo.name} apagado`, "success");
+            }}
+          />
+
+          <PerguntaDestrutiva
+            aberto={aApagarLote !== null}
+            onFechar={() => setAApagarLote(null)}
+            titulo={`Apagar ${aApagarLote?.length ?? 0} pedido${
+              (aApagarLote?.length ?? 0) === 1 ? "" : "s"
+            }?`}
+            /* Os NOMES, e não só a conta. Quem lê «12 pedidos» não tem como
+               saber se a selecção é a que pensa que é — e a única maneira de
+               confirmar era cancelar e contar à mão. */
+            oQueSePerde={nomesDoLote(aApagarLote)}
+            aviso="Não pode ser anulado."
+            rotuloConfirmar={`Apagar ${aApagarLote?.length ?? 0} pedido${
+              (aApagarLote?.length ?? 0) === 1 ? "" : "s"
+            }`}
+            onConfirmar={() => apagarMesmo(aApagarLote ?? [])}
+          />
+
+          <PerguntaDestrutiva
+            aberto={aSair}
+            onFechar={() => setASair(false)}
+            titulo="Sair com alterações por guardar?"
+            oQueSePerde={[
+              <>
+                O que está no painel de <strong>{selected?.name ?? "um pedido"}</strong> e ainda não
+                foi confirmado.
+              </>,
+            ]}
+            aviso="Fechar o painel primeiro guarda-as."
+            rotuloConfirmar="Sair mesmo assim"
+            onConfirmar={sairMesmo}
+          />
+
+          {/* A espera de abrir um pedido, aqui pelo mesmo motivo que o aviso
+              acima: as seis portas que abrem um pedido estão espalhadas por
+              cinco vistas, e o sinal tem de aparecer naquela em que o dedo
+              tocou. */}
+          {aAbrir && (
+            <EmCurso
+              className="mb-4"
+              titulo={`A abrir o pedido de ${aAbrir.nome}`}
+              estimadoMs={1200}
+              nota="Vai buscar os convidados, a checklist e o cronograma — é o que falta ao resumo da lista."
+              notaDemorada="A ligação está lenta. Podes esperar, ou voltar atrás e tentar daqui a pouco."
+            />
+          )}
+
           {/* ── Overview ── */}
           {view === "overview" && (
             <div className={`${VIEW_WRAP} view-in`}>
@@ -3773,6 +4086,10 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 // grava no servidor; sem isto, a lista continuava a mostrar o
                 // pedido pendurado e o ecrã ficava a dizer o contrário.
                 onQuoteAtualizado={marcarDesfecho}
+                falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
+                aoTentarDeNovo={() => void revalidarPedidos()}
+                arquivados={archivedCount}
+                onVerArquivados={verArquivados}
               />
             </div>
           )}
@@ -3788,6 +4105,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                   setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
                   setSelected((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
                 }}
+                falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
+                aoTentarDeNovo={() => void revalidarPedidos()}
+                onNovoPedido={() => setNewQuoteOpen(true)}
+                arquivados={archivedCount}
+                onVerArquivados={verArquivados}
               />
             </div>
           )}
@@ -3795,7 +4117,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {/* ── Clientes ── */}
           {view === "clientes" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Clientes quotes={activeQuotes} onOpen={openQuote} />
+              <Clientes
+                quotes={activeQuotes}
+                onOpen={openQuote}
+                /* Só quando a lista está mesmo vazia: com pedidos no ecrã, uma
+                   falha da leitura INICIAL já não é o que se está a ver. */
+                falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
+                aoTentarDeNovo={() => void revalidarPedidos()}
+              />
             </div>
           )}
 
@@ -3865,7 +4194,11 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {/* ── Acompanhamento: o que ficou à espera de resposta ── */}
           {view === "acompanhamento" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Acompanhamento quotes={quotes} onOpenQuote={openQuote} />
+              <Acompanhamento
+                quotes={quotes}
+                onOpenQuote={openQuote}
+                onFazerProposta={() => setView("fazer-proposta")}
+              />
             </div>
           )}
 
@@ -4388,12 +4721,13 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                       title={haFiltroAActuar ? "Nenhum pedido corresponde" : "Sem pedidos ainda"}
                       hint={
                         haFiltroAActuar
-                          ? "Limpa a pesquisa ou os filtros para ver todos os pedidos."
+                          ? `Estão a esconder pedidos: ${oQueEstaAFiltrar()}.`
                           : "Os pedidos de orçamento do site aparecem aqui. Podes também criar um manualmente."
                       }
+                      /* A saída AQUI, e não «vai procurar os filtros». */
                       action={
                         haFiltroAActuar
-                          ? undefined
+                          ? { label: "Limpar tudo e ver todos", onClick: limparFiltros }
                           : { label: "+ Novo pedido", onClick: () => setNewQuoteOpen(true) }
                       }
                     />
@@ -4566,22 +4900,43 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                         `Arquivar "${selected.name}"? Ficará oculto da lista principal.`,
                                       );
                                     if (!confirm_) return;
-                                    const res = await fetch(`/api/orcamento/${selected.id}`, {
-                                      method: "PATCH",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ archived: next }),
-                                    });
-                                    if (res.ok) {
-                                      const updated = await res.json();
-                                      setQuotes((prev) =>
-                                        prev.map((q) => (q.id === updated.id ? updated : q)),
-                                      );
-                                      setSelected(updated);
-                                      toast(
-                                        next ? "Pedido arquivado" : "Pedido restaurado",
-                                        "success",
-                                      );
+                                    /**
+                                     * ── UM `if (res.ok)` SEM `else` NEM `catch` ──
+                                     *
+                                     * Era esta a forma anterior, e o resultado é o
+                                     * pior possível num gesto que faz um pedido
+                                     * DESAPARECER da lista: com a rede em baixo não
+                                     * acontecia nada nenhum — nem o pedido saía da
+                                     * lista, nem havia aviso. Ficava-se a olhar para
+                                     * um menu que não respondeu, sem saber se foi o
+                                     * dedo que falhou ou o servidor.
+                                     */
+                                    const oQue = `${next ? "arquivar" : "restaurar"} «${selected.name}»`;
+                                    let res: Response;
+                                    try {
+                                      res = await fetch(`/api/orcamento/${selected.id}`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ archived: next }),
+                                      });
+                                    } catch {
+                                      toast(porqueRebentou(oQue).mensagem, "error");
+                                      return;
                                     }
+                                    const corpo = await res.json().catch(() => null);
+                                    if (!res.ok) {
+                                      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+                                      return;
+                                    }
+                                    const updated = corpo as Quote;
+                                    setQuotes((prev) =>
+                                      prev.map((q) => (q.id === updated.id ? updated : q)),
+                                    );
+                                    setSelected(updated);
+                                    toast(
+                                      next ? "Pedido arquivado" : "Pedido restaurado",
+                                      "success",
+                                    );
                                   },
                                   icon: (
                                     <svg
@@ -4676,25 +5031,9 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                 {
                                   label: "Apagar pedido",
                                   hint: "Ação definitiva — não pode ser anulada",
-                                  onClick: async () => {
-                                    if (
-                                      !window.confirm(
-                                        "Apagar definitivamente este pedido? Esta ação não pode ser anulada.",
-                                      )
-                                    )
-                                      return;
-                                    try {
-                                      const res = await fetch(`/api/orcamento/${selected.id}`, {
-                                        method: "DELETE",
-                                      });
-                                      if (!res.ok) throw new Error("delete failed");
-                                      setQuotes((prev) => prev.filter((q) => q.id !== selected.id));
-                                      setSelected(null);
-                                      toast("Pedido apagado", "success");
-                                    } catch {
-                                      toast("Não foi possível apagar o pedido", "error");
-                                    }
-                                  },
+                                  // A pergunta nomeia o pedido e enumera o que
+                                  // vai atrás dele. Ver `PerguntaDestrutiva`.
+                                  onClick: () => setAApagar(selected),
                                   icon: (
                                     <svg
                                       width="16"
@@ -5813,15 +6152,23 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                             prev ? { ...prev, status: "cotado" } : prev,
                                           );
                                           setEditStatus("cotado");
-                                          appendActivity(selected.id, [
-                                            {
-                                              id: randomId(),
-                                              at: new Date().toISOString(),
-                                              kind: "proposal_sent",
-                                              actor: userName,
-                                              summary: "Proposta enviada ao cliente (Studio)",
-                                            },
-                                          ]);
+                                          // A proposta JÁ seguiu — o que pode
+                                          // falhar aqui é a linha do histórico, e a
+                                          // frase tem de dizer isso e não o
+                                          // contrário.
+                                          void appendActivity(
+                                            selected.id,
+                                            [
+                                              {
+                                                id: randomId(),
+                                                at: new Date().toISOString(),
+                                                kind: "proposal_sent",
+                                                actor: userName,
+                                                summary: "Proposta enviada ao cliente (Studio)",
+                                              },
+                                            ],
+                                            "escrever no histórico que a proposta seguiu",
+                                          );
                                         }}
                                       />
                                     </>
@@ -5852,15 +6199,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                               : prev,
                                           );
                                           setEditStatus("cotado");
-                                          appendActivity(selected.id, [
-                                            {
-                                              id: randomId(),
-                                              at: new Date().toISOString(),
-                                              kind: "proposal_sent",
-                                              actor: userName,
-                                              summary: `Proposta enviada — ${eur(total)}`,
-                                            },
-                                          ]);
+                                          void appendActivity(
+                                            selected.id,
+                                            [
+                                              {
+                                                id: randomId(),
+                                                at: new Date().toISOString(),
+                                                kind: "proposal_sent",
+                                                actor: userName,
+                                                summary: `Proposta enviada — ${eur(total)}`,
+                                              },
+                                            ],
+                                            "escrever no histórico que a proposta seguiu",
+                                          );
                                         }}
                                       />
                                     </>
@@ -5882,27 +6233,33 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                       );
                                       setSelected((prev) => (prev ? { ...prev, messages } : prev));
                                       if (messages.length > prev_count) {
-                                        appendActivity(selected.id, [
-                                          {
-                                            id: randomId(),
-                                            at: new Date().toISOString(),
-                                            kind: "message_sent",
-                                            actor: userName,
-                                            /**
-                                             * O QUE ACONTECEU, E NÃO O QUE SE QUIS FAZER.
-                                             *
-                                             * Um pedido que entrou por telefonema não tem
-                                             * email. A rota grava a mensagem à mesma e
-                                             * responde que o email NÃO saiu; o mensageiro
-                                             * diz-o a vermelho, mas o histórico ficava com
-                                             * «Mensagem enviada ao cliente» — e o histórico
-                                             * é o que se lê meses depois para saber o que se
-                                             * disse a quem. Mesma frase que a zona de
-                                             * comunicações do dossiê já usa.
-                                             */
-                                            summary: resumoDoEnvio(envio),
-                                          },
-                                        ]);
+                                        // A mensagem JÁ saiu; o que pode falhar
+                                        // aqui é a linha do histórico.
+                                        void appendActivity(
+                                          selected.id,
+                                          [
+                                            {
+                                              id: randomId(),
+                                              at: new Date().toISOString(),
+                                              kind: "message_sent",
+                                              actor: userName,
+                                              /**
+                                               * O QUE ACONTECEU, E NÃO O QUE SE QUIS FAZER.
+                                               *
+                                               * Um pedido que entrou por telefonema não tem
+                                               * email. A rota grava a mensagem à mesma e
+                                               * responde que o email NÃO saiu; o mensageiro
+                                               * diz-o a vermelho, mas o histórico ficava com
+                                               * «Mensagem enviada ao cliente» — e o histórico
+                                               * é o que se lê meses depois para saber o que se
+                                               * disse a quem. Mesma frase que a zona de
+                                               * comunicações do dossiê já usa.
+                                               */
+                                              summary: resumoDoEnvio(envio),
+                                            },
+                                          ],
+                                          "escrever no histórico que a mensagem saiu",
+                                        );
                                       }
                                     }}
                                   />
@@ -5931,7 +6288,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                       <ActivityLog
                                         quote={selected}
                                         actor={userName}
-                                        onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                                        onAddEntry={(entry) =>
+                                          appendActivity(
+                                            selected.id,
+                                            [entry],
+                                            entry.kind === "call_logged"
+                                              ? "guardar o registo da chamada"
+                                              : "guardar a nota",
+                                          )
+                                        }
                                       />
                                     </div>
                                   </details>

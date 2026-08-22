@@ -107,7 +107,10 @@ describe("Checklist do evento — duas marcações ao mesmo tempo", () => {
     await waitFor(() =>
       expect(caixaDe("Confirmar catering").getAttribute("aria-checked")).toBe("false"),
     );
-    expect(screen.getByText(/Não foi possível guardar a checklist/)).toBeTruthy();
+    // A frase nomeia o item e diz o que fazer a seguir — «Não foi possível
+    // guardar a checklist» servia para seis situações com respostas diferentes.
+    expect(screen.getByText(/não está a aceitar gravações/)).toBeTruthy();
+    expect(screen.getByText(/marcar «Confirmar catering»/)).toBeTruthy();
   });
 });
 

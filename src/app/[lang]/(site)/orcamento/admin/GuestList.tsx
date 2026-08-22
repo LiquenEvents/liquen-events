@@ -7,6 +7,7 @@ import { metaFor } from "./status-meta";
 import { downloadCsv, guestsToCsvRows, printGuestList, dateStamp } from "./export";
 import type { Quote, Guest, RsvpStatus } from "@/lib/orcamento/types";
 import { Button, Field } from "./ui";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const RSVP_META: Record<RsvpStatus, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "#8a8a82" },
@@ -62,55 +63,92 @@ export default function GuestList({ quote, onChange }: Props) {
   const gravacoes = useRef(0);
   const gravado = useRef<Guest[]>(quote.guestList ?? []);
 
-  function persist(next: Guest[]) {
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ QUE FAMÍLIA
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Todas as alterações desta lista — acrescentar, remover, mudar o RSVP,
+   * corrigir o número de pessoas — falhavam com «Não foi possível guardar a
+   * lista de convidados. Tenta novamente.». A mesma frase para a rede em
+   * baixo, a sessão expirada e o servidor em baixo, e num ecrã em que a
+   * alteração que se perdeu é sempre a de UMA família.
+   *
+   * Ao contrário do `gravar` dos outros ecrãs, este DEVOLVE a frase em vez de
+   * a dizer: aqui há gravações que ficam para trás (ver o `persist`), e essas
+   * não têm nada a dizer a ninguém — o aviso delas seria sobre trabalho que a
+   * gravação seguinte já leva lá dentro.
+   */
+  async function gravar(oQue: string, next: Guest[]): Promise<{ ok: boolean; aviso: string }> {
+    let res: Response;
+    try {
+      res = await fetch(`/api/orcamento/${quote.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guestList: next }),
+      });
+    } catch {
+      return { ok: false, aviso: porqueRebentou(oQue).mensagem };
+    }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) return { ok: false, aviso: porqueFalhou(oQue, res, corpo).mensagem };
+    return { ok: true, aviso: "" };
+  }
+
+  async function persist(next: Guest[], oQue: string) {
     const minha = ++gravacoes.current;
     setGuests(next);
     onChange(next);
-    fetch(`/api/orcamento/${quote.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ guestList: next }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error();
-        if (minha === gravacoes.current) gravado.current = next;
-      })
-      .catch(() => {
-        // Já foi substituída por uma gravação mais recente: o que essa levar
-        // contém o que esta levava, portanto não há nada a desfazer nem nada a
-        // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
-        if (minha !== gravacoes.current) return;
-        setGuests(gravado.current);
-        onChange(gravado.current);
-        toast("Não foi possível guardar a lista de convidados. Tenta novamente.", "error");
-      });
+    const { ok, aviso } = await gravar(oQue, next);
+    if (ok) {
+      if (minha === gravacoes.current) gravado.current = next;
+      return;
+    }
+    // Já foi substituída por uma gravação mais recente: o que essa levar
+    // contém o que esta levava, portanto não há nada a desfazer nem nada a
+    // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
+    if (minha !== gravacoes.current) return;
+    setGuests(gravado.current);
+    onChange(gravado.current);
+    toast(aviso, "error");
   }
 
   function add() {
     const n = name.trim();
     if (!n) return;
     const trimmedNote = note.trim();
-    persist([
-      ...guests,
-      {
-        id: randomId(),
-        name: n,
-        party: Math.max(1, parseInt(party) || 1),
-        rsvp: "pendente",
-        note: trimmedNote || undefined,
-      },
-    ]);
+    persist(
+      [
+        ...guests,
+        {
+          id: randomId(),
+          name: n,
+          party: Math.max(1, parseInt(party) || 1),
+          rsvp: "pendente",
+          note: trimmedNote || undefined,
+        },
+      ],
+      `acrescentar «${n}» à lista de convidados`,
+    );
     setName("");
     setParty("1");
     setNote("");
   }
   function remove(id: string) {
-    persist(guests.filter((g) => g.id !== id));
+    const g = guests.find((x) => x.id === id);
+    persist(
+      guests.filter((x) => x.id !== id),
+      `remover «${g?.name ?? "convidado"}» da lista`,
+    );
   }
   // Estado do RSVP escolhido diretamente (um clique para qualquer estado), em vez
   // de ciclar tocando no badge (que ninguém adivinhava).
   function setRsvpOf(id: string, rsvp: RsvpStatus) {
-    persist(guests.map((x) => (x.id === id ? { ...x, rsvp } : x)));
+    const g = guests.find((x) => x.id === id);
+    persist(
+      guests.map((x) => (x.id === id ? { ...x, rsvp } : x)),
+      `marcar «${g?.name ?? "convidado"}» como ${metaFor(RSVP_META, rsvp).label.toLowerCase()}`,
+    );
   }
   // Escrever no campo atualiza o número no ecrã de imediato (aceita vazio para se
   // poder reescrever); só grava (um PATCH) ao sair do campo, com o mínimo de 1.
@@ -122,7 +160,10 @@ export default function GuestList({ quote, onChange }: Props) {
     const g = guests.find((x) => x.id === id);
     if (!g) return;
     const n = Math.max(1, g.party || 1);
-    persist(guests.map((x) => (x.id === id ? { ...x, party: n } : x)));
+    persist(
+      guests.map((x) => (x.id === id ? { ...x, party: n } : x)),
+      `guardar o número de pessoas de «${g.name}»`,
+    );
   }
 
   const estimate = quote.guests || 0;

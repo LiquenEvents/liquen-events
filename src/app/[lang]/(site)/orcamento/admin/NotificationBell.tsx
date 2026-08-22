@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useToast } from "./Toast";
 import { log } from "@/lib/logger";
 import { Button } from "./ui";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 function BellIcon() {
   return (
@@ -58,45 +59,59 @@ export default function NotificationBell() {
   const { toast } = useToast();
   const [state, setState] = useState<State>("loading");
   const [publicKey, setPublicKey] = useState<string | null>(null);
+  /** A perguntar outra vez, a pedido dela. Só para o botão não aceitar dez
+   *  cliques enquanto a primeira pergunta ainda vai a caminho. */
+  const [aSondar, setASondar] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      if (
-        typeof window === "undefined" ||
-        !("serviceWorker" in navigator) ||
-        !("PushManager" in window)
-      ) {
-        setState("unsupported");
+  /** Perguntar ao servidor em que pé estão as notificações. Deixou de estar
+   *  enterrada no efeito para o ramo «não consegui ler» poder repeti-la. */
+  const sondar = useCallback(async () => {
+    if (
+      typeof window === "undefined" ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window)
+    ) {
+      setState("unsupported");
+      return;
+    }
+    try {
+      const res = await fetch("/api/push/subscribe", { cache: "no-store" });
+      if (!res.ok) {
+        log.error("push: a rota das notificações respondeu em erro", null, {
+          estado: res.status,
+        });
+        setState("indisponivel");
         return;
       }
-      try {
-        const res = await fetch("/api/push/subscribe", { cache: "no-store" });
-        if (!res.ok) {
-          log.error("push: a rota das notificações respondeu em erro", null, {
-            estado: res.status,
-          });
-          setState("indisponivel");
-          return;
-        }
-        const data = (await res.json()) as { configured?: boolean; publicKey?: string | null };
-        if (!data.configured || !data.publicKey) {
-          // Resposta legítima: não está montado. Não é erro, e não se regista —
-          // um aviso que aparece todos os dias é um aviso que se aprende a ignorar.
-          setState("unconfigured");
-          return;
-        }
-        setPublicKey(data.publicKey);
-        setState(Notification.permission as State);
-      } catch (e) {
-        log.error("push: não consegui perguntar ao servidor pelas notificações", e);
-        setState("indisponivel");
+      const data = (await res.json()) as { configured?: boolean; publicKey?: string | null };
+      if (!data.configured || !data.publicKey) {
+        // Resposta legítima: não está montado. Não é erro, e não se regista —
+        // um aviso que aparece todos os dias é um aviso que se aprende a ignorar.
+        setState("unconfigured");
+        return;
       }
-    })();
+      setPublicKey(data.publicKey);
+      setState(Notification.permission as State);
+    } catch (e) {
+      log.error("push: não consegui perguntar ao servidor pelas notificações", e);
+      setState("indisponivel");
+    }
   }, []);
 
-  async function enable() {
-    if (!publicKey) return;
-    setState("loading");
+  useEffect(() => {
+    // A sondagem é assíncrona: o `setState` acontece quando o servidor
+    // responde, não no corpo do efeito.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void sondar();
+  }, [sondar]);
+
+  /**
+   * O lado do NAVEGADOR: registar o service worker, pedir a permissão,
+   * subscrever. Separado do pedido ao servidor de propósito — enquanto os dois
+   * partilhavam um `try`, a frase de falha tinha de servir para as duas
+   * causas, e acabava em «Não foi possível ativar», que não é nenhuma delas.
+   */
+  async function subscreverNoNavegador(chave: string): Promise<PushSubscription | null> {
     try {
       const reg = await navigator.serviceWorker.register("/sw.js");
       await navigator.serviceWorker.ready;
@@ -105,39 +120,118 @@ export default function NotificationBell() {
       if (permission !== "granted") {
         setState(permission as State);
         toast("Notificações não autorizadas", "info");
-        return;
+        return null;
       }
 
-      const sub = await reg.pushManager.subscribe({
+      return await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey).buffer as ArrayBuffer,
+        applicationServerKey: urlBase64ToUint8Array(chave).buffer as ArrayBuffer,
       });
+    } catch (e) {
+      log.error("push: registo de notificações falhou", e);
+      setState("default");
+      toast(
+        "O navegador não deixou ativar as notificações neste dispositivo. Recarrega a página e tenta outra vez.",
+        "error",
+      );
+      return null;
+    }
+  }
 
-      await fetch("/api/push/subscribe", {
+  async function enable() {
+    if (!publicKey) return;
+    setState("loading");
+    const sub = await subscreverNoNavegador(publicKey);
+    if (!sub) return;
+
+    /**
+     * ── A GRAVAÇÃO QUE NINGUÉM OLHAVA ───────────────────────────────────────
+     *
+     * Isto era um `await fetch(…)` sem `res.ok` e sem nada a seguir. Com um 500
+     * ou com a sessão expirada, a subscrição ficava só no navegador — o
+     * servidor não a conhece, portanto nunca lhe manda nada — e o ecrã dizia
+     * na mesma «Notificações ativadas neste dispositivo». A frase mais fácil de
+     * acreditar do painel, dita exactamente quando não se cumpre; e o preço
+     * paga-se semanas depois, num pedido que entra sem avisar ninguém.
+     *
+     * A falhar, o estado volta a «default»: o botão fica outra vez em «Ativar
+     * notificações», que é o gesto que a resolve.
+     */
+    const oQue = "guardar as notificações neste dispositivo";
+    let res: Response;
+    try {
+      res = await fetch("/api/push/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(sub),
       });
-
-      setState("granted");
-      toast("Notificações ativadas neste dispositivo", "success");
     } catch (e) {
-      log.error("push: registo de notificações falhou", e);
+      log.error("push: a subscrição não chegou ao servidor", e);
       setState("default");
-      toast("Não foi possível ativar", "error");
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return;
     }
+    if (!res.ok) {
+      const corpo = await res.json().catch(() => null);
+      log.error("push: a subscrição não ficou guardada", null, { estado: res.status });
+      setState("default");
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return;
+    }
+
+    setState("granted");
+    toast("Notificações ativadas neste dispositivo", "success");
   }
 
-  if (
-    state === "loading" ||
-    state === "unsupported" ||
-    state === "unconfigured" ||
-    state === "indisponivel"
-  ) {
-    // Hidden when unsupported/unconfigured to keep the UI clean. Com a rota em
-    // baixo também se esconde — não há botão que resolva —, mas aí o registo já
-    // levou o motivo, que era o que faltava.
+  if (state === "loading" || state === "unsupported" || state === "unconfigured") {
+    // Hidden when unsupported/unconfigured to keep the UI clean. Nos dois casos
+    // o desaparecimento é a leitura certa: o navegador não sabe fazer isto, ou
+    // o servidor RESPONDEU que não está montado.
     return null;
+  }
+
+  /**
+   * ── COM A ROTA EM BAIXO, O SINO FICA ──────────────────────────────────────
+   *
+   * A escolha aqui foi entre desaparecer e ficar calado a dizer que não sabe.
+   * Fica.
+   *
+   * Desaparecer era a pior das duas porque não se lê como avaria: lê-se como
+   * «isto ainda não está montado» — que é exactamente o que o ramo de cima
+   * quer dizer. Duas situações opostas com o mesmo desenho, e a que precisa de
+   * alguém é justamente a que fica invisível. Foi assim que a rota pôde estar
+   * a rebentar durante semanas com o motivo só no registo do servidor, que
+   * ninguém no back office lê.
+   *
+   * Ficar não é inventar: sem resposta do servidor não se sabe se as
+   * notificações estão ligadas, por isso o sino fica SEM contagem e sem
+   * estado, e o rótulo diz «sem resposta» — não «bloqueadas» nem «desligadas»,
+   * que seriam afirmações que ninguém aqui pode fazer.
+   *
+   * Carregar volta a perguntar em vez de mandar recarregar a página: quase
+   * sempre isto é um servidor a acordar, e a segunda pergunta resolve. Sem
+   * toast na montagem — um aviso a saltar sempre que ela abre o painel é um
+   * aviso que se aprende a fechar sem ler, e o motivo já vai no registo.
+   */
+  if (state === "indisponivel") {
+    return (
+      <Button
+        variant="secondary"
+        size="sm"
+        // O mesmo 41×44 dos outros ramos, e pela mesma razão: sem rótulo no
+        // telemóvel, o sino fica com a largura dos `px-3` e mais nada.
+        className="pointer-coarse:min-w-11"
+        iconLeft={<BellIcon />}
+        loading={aSondar}
+        onClick={() => {
+          setASondar(true);
+          void sondar().finally(() => setASondar(false));
+        }}
+        title="Não foi possível saber se as notificações estão ligadas — o servidor não respondeu. Carrega para perguntar outra vez."
+      >
+        <span className="hidden sm:inline">Notificações: sem resposta</span>
+      </Button>
+    );
   }
 
   if (state === "granted") {
@@ -165,6 +259,7 @@ export default function NotificationBell() {
            * coisas diferentes, e é a diferença entre elas que decide se alguém
            * vai ver o que entrou hoje.
            */
+          const oQue = "enviar o resumo agora";
           try {
             const res = await fetch("/api/cron/reminders", { cache: "no-store" });
             const data = (await res.json().catch(() => ({}))) as {
@@ -173,7 +268,10 @@ export default function NotificationBell() {
             };
             if (!res.ok) {
               log.error("push: o resumo não pôde ser pedido", null, { estado: res.status });
-              toast("Não foi possível enviar o resumo", "error");
+              // «Não foi possível enviar o resumo» dizia o mesmo à sessão
+              // expirada e ao servidor em baixo, e em nenhum dos dois dizia o
+              // que fazer a seguir.
+              toast(porqueFalhou(oQue, res, data).mensagem, "error");
               return;
             }
             if ((data.sent ?? 0) > 0) {
@@ -185,7 +283,7 @@ export default function NotificationBell() {
             }
           } catch (e) {
             log.error("push: o resumo não pôde ser pedido", e);
-            toast("Não foi possível enviar o resumo", "error");
+            toast(porqueRebentou(oQue).mensagem, "error");
           }
         }}
         title="Notificações ativas — clique para enviar o resumo agora"

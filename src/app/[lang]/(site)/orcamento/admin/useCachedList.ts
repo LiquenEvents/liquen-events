@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { porqueNaoLeu, porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
 
 /**
  * Stale-while-revalidate cache for the back-office list views.
@@ -29,6 +30,14 @@ import { useCallback, useEffect, useState } from "react";
  *
  * Nada foi desligado para o número ficar bonito: se os dados mudaram, o
  * servidor manda 200 com o corpo completo, como sempre.
+ *
+ * ── E QUANDO A LEITURA NÃO VOLTA ──────────────────────────────────────────
+ * Por aqui passam quase todas as listas do back office, portanto é aqui que a
+ * diferença entre «está vazio» e «não consegui perguntar» se decide uma vez
+ * para todas. Quem chama recebe três estados, e não dois: `loading` (a ler),
+ * `error`+`falha` (não voltou — com a razão e uma saída) e `data` vazio (vazio
+ * a sério). Ver `src/lib/porque-nao-leu.ts`: uma lista que não veio não sabe
+ * afirmar que não há nada.
  */
 interface Entry<T = unknown> {
   data: T;
@@ -63,6 +72,26 @@ const escritas = new Map<string, number>();
  */
 const inFlight = new Map<string, Promise<Entry | null>>();
 
+/**
+ * A leitura falhou, e leva consigo a RAZÃO até quem desenha o ecrã.
+ *
+ * Antes ia um `Error` com o texto do servidor — ou, quando ele não dizia nada,
+ * com o estado em cru: `new Error("500")`. Esse "500" não morria no `catch`,
+ * era o que a vista mostrava à Catarina dentro do aviso, porque o
+ * `AvisoDeFalha` só sabe pôr no ecrã a mensagem que lhe dão. Um número sozinho
+ * não diz o que se passou nem o que fazer a seguir.
+ *
+ * O que viaja agora é a `LeituraFalhada` inteira: a frase, se vale a pena
+ * oferecer um «Tentar de novo» (com a sessão caída, não vale — dá o mesmo 401)
+ * e se foi a sessão que caiu.
+ */
+class ErroDeLeitura extends Error {
+  constructor(readonly falha: LeituraFalhada) {
+    super(falha.mensagem);
+    this.name = "ErroDeLeitura";
+  }
+}
+
 function loadOnce(key: string, url: string): Promise<Entry | null> {
   const running = inFlight.get(key);
   if (running) return running;
@@ -86,10 +115,15 @@ function loadOnce(key: string, url: string): Promise<Entry | null> {
       // A MENSAGEM do servidor, quando ele deu uma. É a diferença entre a
       // vista dizer "não foi possível ler" e dizer "falta correr o
       // db/schema.sql" — e essa segunda frase é a que resolve o problema
-      // sozinha, sem ninguém ter de ir aos registos.
+      // sozinha, sem ninguém ter de ir aos registos. É o `porqueNaoLeu` que
+      // decide quando ela ganha; o que não pode voltar a acontecer é o que
+      // acontecia sem explicação nenhuma, que era o ecrã mostrar «500».
+      //
+      // Sem NOME da lista de propósito: quem chama põe isto no `AvisoDeFalha`,
+      // cujo título já diz «Não foi possível ler as tarefas». Repetir a coisa
+      // na linha de baixo era dizer duas vezes o que já se vê.
       const corpo = await res.json().catch(() => null);
-      const dito = typeof corpo?.error === "string" ? corpo.error : "";
-      throw new Error(dito || String(res.status));
+      throw new ErroDeLeitura(porqueNaoLeu("", res, corpo));
     }
 
     const corpo = await res.json();
@@ -129,9 +163,20 @@ export interface CachedList<T> {
   setData: (updater: T | ((prev: T) => T)) => void;
   loading: boolean;
   error: boolean;
-  /** O que o servidor disse, quando disse alguma coisa. Vazio se a falha não
-   *  trouxe explicação (rede em baixo, 500 mudo). */
+  /**
+   * A frase a mostrar quando `error` é `true` — a do servidor quando ele deu
+   * uma, senão a que o `porqueNaoLeu` escreve para aquele estado. Nunca é um
+   * número em cru, e nunca fala de gravações: isto é uma LEITURA, e a
+   * instrução certa é recarregar ou tentar outra vez.
+   */
   errorMessage: string;
+  /**
+   * A mesma falha, inteira: a razão, se vale a pena tentar de novo e se foi a
+   * sessão que caiu. É o que a vista precisa para desenhar o estado — em
+   * particular para NÃO oferecer um «Tentar de novo» que não pode funcionar.
+   * `null` enquanto não falhou nada.
+   */
+  falha: LeituraFalhada | null;
   /** Force a foreground refresh (shows loading). */
   refresh: () => void;
 }
@@ -142,7 +187,7 @@ export function useCachedList<T>(key: string, url: string): CachedList<T> {
   // Only the true first load (nothing cached) shows the skeleton.
   const [loading, setLoading] = useState(cached === undefined);
   const [error, setError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [falha, setFalha] = useState<LeituraFalhada | null>(null);
 
   const revalidate = useCallback(
     async (silent: boolean) => {
@@ -153,10 +198,13 @@ export function useCachedList<T>(key: string, url: string): CachedList<T> {
         // React descarta a actualização e não há render nenhum.
         if (entry) setDataState(entry.data as T);
         setError(false);
-        setErrorMessage("");
+        setFalha(null);
       } catch (e) {
         setError(true);
-        setErrorMessage(e instanceof Error ? e.message : "");
+        // Um `ErroDeLeitura` já traz a razão apurada com a resposta em mão. O
+        // resto é o `fetch` a rebentar antes de haver resposta nenhuma — a
+        // rede em baixo, quase sempre —, e aí a razão apura-se do que veio.
+        setFalha(e instanceof ErroDeLeitura ? e.falha : porqueNaoLeuDoErro("", e));
       } finally {
         setLoading(false);
       }
@@ -198,7 +246,7 @@ export function useCachedList<T>(key: string, url: string): CachedList<T> {
     void revalidate(false);
   }, [key, revalidate]);
 
-  return { data, setData, loading, error, errorMessage, refresh };
+  return { data, setData, loading, error, errorMessage: falha?.mensagem ?? "", falha, refresh };
 }
 
 /** Esquece tudo o que está em cache. Só para testes — o produto não precisa. */

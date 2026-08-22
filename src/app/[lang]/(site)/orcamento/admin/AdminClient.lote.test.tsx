@@ -237,7 +237,6 @@ describe("«Marcar como …» em lote", () => {
 
 describe("«Apagar (N)» em lote", () => {
   it("mostra a mesma contagem enquanto os pedidos vão sendo apagados", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderAdmin([
       makeQuote({ id: "LQ-201", name: "Ana Marques" }),
       makeQuote({ id: "LQ-202", name: "Bruno Dias" }),
@@ -247,6 +246,9 @@ describe("«Apagar (N)» em lote", () => {
     seleccionar("Bruno Dias");
 
     fireEvent.click(screen.getByRole("button", { name: "Apagar (2)" }));
+    // A pergunta passou a nomear os dois — ver `PerguntaDestrutiva`.
+    const caixa = await screen.findByRole("dialog");
+    fireEvent.click(within(caixa).getByRole("button", { name: /^Apagar 2 pedidos$/i }));
     await waitFor(() => expect(espera("A apagar os pedidos…")).toBeTruthy());
 
     expect(screen.getByText("0 de 2")).toBeTruthy();

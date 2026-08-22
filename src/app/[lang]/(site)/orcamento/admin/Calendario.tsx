@@ -9,6 +9,7 @@ import { Button, Card, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 const MONTHS = [
@@ -262,6 +263,39 @@ export default function Calendario({ quotes, onOpen }: Props) {
   // Day peek: the day whose events are expanded in the panel under the grid.
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE FICOU POR FAZER
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As duas escritas deste ecrã diziam «Não foi possível guardar» e «Não foi
+   * possível remover. Tenta novamente.» — a mesma frase para a rede em baixo,
+   * a sessão expirada, a marcação que outra pessoa já apagou e o servidor em
+   * baixo. E «tenta novamente» é conselho errado em três desses quatro casos.
+   *
+   * Aqui há um sítio só a pedir, a verificar o `ok` e a escolher a frase
+   * (`porque-falhou`), que nomeia a marcação. É o padrão de `MaterialListas`.
+   */
+  async function gravar(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch {
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return { ok: false, corpo: null };
+    }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return { ok: false, corpo };
+    }
+    return { ok: true, corpo };
+  }
+
   // The add form now lives in <AddEventModal> with LOCAL state, so typing a
   // title no longer re-renders this component (and its 42-cell grid) per
   // keystroke. This just persists a completed payload and appends the result.
@@ -272,38 +306,56 @@ export default function Calendario({ quotes, onOpen }: Props) {
     note: string;
     date: string;
   }): Promise<boolean> {
-    try {
-      const res = await fetch("/api/calendario", {
+    const { ok, corpo } = await gravar(
+      `acrescentar «${payload.title}» ao calendário`,
+      "/api/calendario",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error();
-      const ev = await res.json();
-      setEvents((prev) => [...prev, ev]);
-      toast("Adicionado ao calendário", "success");
-      setModalDate(null);
-      return true;
-    } catch {
-      toast("Não foi possível guardar", "error");
+      },
+    );
+    if (!ok) return false;
+    const ev = corpo as CalendarEvent | null;
+    // Um 200 sem marcação no corpo não dá uma linha para desenhar. Ficou
+    // gravada — o que falta é a versão do servidor, e essa vem ao recarregar.
+    if (!ev?.id) {
+      toast(
+        `«${payload.title}» ficou no calendário, mas não voltou do servidor. Atualiza a página.`,
+        "error",
+      );
       return false;
     }
+    setEvents((prev) => [...prev, ev]);
+    toast("Adicionado ao calendário", "success");
+    setModalDate(null);
+    return true;
   }
 
   async function deleteEvent(id: string, title: string) {
     // Single-click delete is a footgun on a tiny target — confirm first.
     if (!window.confirm(`Remover "${title}" do calendário?`)) return;
-    // Optimistic remove, but keep the previous list so we can put the event
-    // back if the server rejects the delete — otherwise it silently reappears
-    // on the next reload and the team never learns it failed.
-    const snapshot = events;
+    // Optimistic remove, but put THIS event back if the server rejects the
+    // delete — otherwise it silently reappears on the next reload and the team
+    // never learns it failed.
+    //
+    // Antes repunha-se a lista inteira de antes do pedido (`setEvents(snapshot)`),
+    // e isso apagava do ecrã o que tivesse gravado bem entretanto: ela remove
+    // duas marcações seguidas, a segunda passa, a primeira volta com erro — e a
+    // segunda reaparecia no calendário apesar de já não existir na base de
+    // dados. Guarda-se a marcação e o sítio dela, e devolve-se só essa.
+    const posicao = events.findIndex((e) => e.id === id);
+    const removido = posicao < 0 ? null : events[posicao];
     setEvents((prev) => prev.filter((e) => e.id !== id));
-    try {
-      const res = await fetch(`/api/calendario/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-    } catch {
-      setEvents(snapshot);
-      toast("Não foi possível remover. Tenta novamente.", "error");
+    const { ok } = await gravar(`remover «${title}» do calendário`, `/api/calendario/${id}`, {
+      method: "DELETE",
+    });
+    if (!ok && removido) {
+      setEvents((prev) => {
+        if (prev.some((e) => e.id === id)) return prev;
+        const onde = Math.min(posicao, prev.length);
+        return [...prev.slice(0, onde), removido, ...prev.slice(onde)];
+      });
     }
   }
 

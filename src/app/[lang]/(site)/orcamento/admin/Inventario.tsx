@@ -1,14 +1,24 @@
 "use client";
 
-import { useMemo, useState, useDeferredValue } from "react";
+import { useMemo, useState, useDeferredValue, type ReactNode } from "react";
 import type { PropItem } from "@/lib/inventory-types";
 import { PROP_CATEGORIES } from "@/lib/inventory-types";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
-import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  MenuDeAccoes,
+  PerguntaDestrutiva,
+  Toolbar,
+  type AccaoDeItem,
+} from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import ModoDeCarga from "./ModoDeCarga";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /* Os dois ícones da linha, escritos uma vez: servem os botões soltos da tabela
    do computador e os itens do menu «⋯» de quem não tem rato. */
@@ -43,6 +53,42 @@ const CruzIcon = (
     <path d="M18 6 6 18M6 6l12 12" />
   </svg>
 );
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PERGUNTA DE REMOVER — porque é que deixou de ser um `confirm()`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O que estava aqui era `confirm('Remover o item "X"? Esta ação não pode ser
+ * anulada.')`, e tinha três defeitos, por esta ordem de gravidade:
+ *
+ *   1. «Esta ação não pode ser anulada» não diz o que se perde. Diz que é
+ *      grave, que é a única coisa que quem carregou no botão já sabia.
+ *   2. A caixa do browser não cabe num telemóvel de 375 px sem cortar a frase,
+ *      não se traduz e não tem nada do desenho da casa — e este inventário
+ *      usa-se no armazém, no telemóvel.
+ *   3. `confirm()` bloqueia o fio principal do browser. Numa aba com gravações
+ *      automáticas a decorrer, é a pior altura para congelar tudo.
+ *
+ * Fica uma pergunta que NOMEIA o adereço e diz o tamanho do que sai do
+ * inventário — a quantidade e onde estava. Remover um adereço é raro e é caro
+ * (o registo não volta, e nem sequer é o adereço que desaparece: é o
+ * conhecimento de que ele existe e de onde está), portanto leva pergunta e não
+ * janela para anular.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Remover do inventário», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
+}
 
 type Condition = PropItem["condition"];
 
@@ -159,31 +205,82 @@ export default function Inventario() {
   // gere-se (editar, corrigir, exportar), no modo de carga percorre-se e
   // risca-se. Ver ModoDeCarga.
   const [aCarregar, setACarregar] = useState(false);
+  /** A pergunta em curso — ver o comentário no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As três escritas deste ecrã tinham seis frases entre elas — «Não foi
+   * possível guardar o item.», «Erro de ligação ao guardar.», «Não foi
+   * possível remover o item.» e companhia — e nenhuma distinguia a rede em
+   * baixo da sessão expirada, do item que outra pessoa já apagou, do valor que
+   * o servidor recusou. Quem lê carrega outra vez, e com a sessão caduca isso
+   * não pode funcionar.
+   *
+   * Um sítio só a fazer fetch, a verificar o `ok` e a escolher a frase — o
+   * mesmo padrão do `MaterialListas`. Devolve o corpo porque o item criado e o
+   * item actualizado vêm de lá, e devolve `ok` em vez de atirar, porque quem
+   * chama tem de poder repor o ecrã.
+   */
+  async function gravar(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch {
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return { ok: false, corpo: null };
+    }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return { ok: false, corpo };
+    }
+    return { ok: true, corpo };
+  }
+
+  /**
+   * Gravou-se, mas o que voltou não tem a forma de um item.
+   *
+   * Antes entrava na lista à mesma (`await res.json()` sem olhar) e a linha
+   * seguinte a desenhar `i.name` atirava — com o inventário dentro do back
+   * office, a excepção levava-o todo. Uma resposta 200 sem corpo de item
+   * acontece com um proxy pelo meio a devolver HTML.
+   */
+  const pareceItem = (c: unknown): c is PropItem =>
+    !!c && typeof (c as PropItem).id === "string" && typeof (c as PropItem).name === "string";
+
+  const AVISO_SEM_RELEITURA = "Gravado, mas não deu para reler o inventário. Atualiza a página.";
 
   async function add() {
     const payload = toPayload(form);
     if (!payload.name) return;
     setSaving(true);
-    try {
-      const res = await fetch("/api/inventario", {
+    const { ok, corpo } = await gravar(
+      `adicionar «${payload.name}» ao inventário`,
+      "/api/inventario",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const created: PropItem = await res.json();
-        setItems((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-        setForm(EMPTY_FORM);
-        setAdding(false);
-        toast("Item adicionado.", "success");
-      } else {
-        toast("Não foi possível guardar o item.", "error");
-      }
-    } catch {
-      toast("Erro de ligação ao guardar.", "error");
-    } finally {
-      setSaving(false);
+      },
+    );
+    setSaving(false);
+    if (!ok) return;
+    if (!pareceItem(corpo)) {
+      toast(AVISO_SEM_RELEITURA, "error");
+      return;
     }
+    setItems((prev) => [...prev, corpo].sort((a, b) => a.name.localeCompare(b.name)));
+    setForm(EMPTY_FORM);
+    setAdding(false);
+    toast("Item adicionado.", "success");
   }
 
   async function saveEdit(id: string) {
@@ -206,55 +303,78 @@ export default function Inventario() {
      * ecrã continua a dizer 40. Na véspera carrega-se a carrinha por um número
      * que nunca existiu na base de dados.
      *
-     * O `remove()` aqui em baixo já guardava o estado anterior e o repunha nos
-     * dois desfechos maus. É o mesmo gesto.
+     * Repõe-se SÓ esta linha, e sobre o que a lista tiver AGORA: guardar a
+     * lista inteira antes do pedido era guardar um instante que já passou, e
+     * com duas gravações no ar a que falhasse desfazia também a que passou.
      */
-    const snapshot = items;
+    const anterior = items.find((i) => i.id === id);
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...payload } : i)));
-    try {
-      const res = await fetch(`/api/inventario/${id}`, {
+    const { ok, corpo } = await gravar(
+      `guardar as alterações a «${payload.name}»`,
+      `/api/inventario/${id}`,
+      {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const updated: PropItem = await res.json();
-        setItems((prev) =>
-          prev.map((i) => (i.id === id ? updated : i)).sort((a, b) => a.name.localeCompare(b.name)),
-        );
-        setEditingId(null);
-        toast("Alterações guardadas.", "success");
-      } else {
-        // A edição fica ABERTA de propósito: o que ela escreveu não se perde, e
-        // o campo por onde recomeçar é o mesmo em que estava.
-        setItems(snapshot);
-        toast("Não foi possível guardar as alterações.", "error");
-      }
-    } catch {
-      setItems(snapshot);
-      toast("Erro de ligação ao guardar.", "error");
-    } finally {
-      setSaving(false);
+      },
+    );
+    setSaving(false);
+    if (!ok) {
+      // A edição fica ABERTA de propósito: o que ela escreveu não se perde, e
+      // o campo por onde recomeçar é o mesmo em que estava.
+      if (anterior) setItems((prev) => prev.map((i) => (i.id === id ? anterior : i)));
+      return;
     }
+    if (!pareceItem(corpo)) {
+      toast(AVISO_SEM_RELEITURA, "error");
+      return;
+    }
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? corpo : i)).sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    setEditingId(null);
+    toast("Alterações guardadas.", "success");
+  }
+
+  /** A pergunta, com a quantidade e o sítio lá dentro. Ver o topo do ficheiro. */
+  function perguntarSeRemove(i: PropItem) {
+    const unidade = i.unit?.trim() || "un.";
+    setAPerguntar({
+      titulo: `Remover «${i.name}» do inventário?`,
+      oQueSePerde: [
+        `${i.quantity} ${unidade} registadas${i.location ? ` em ${i.location}` : ""}`,
+        "a linha sai da lista, do modo de carga e das exportações",
+      ],
+      aviso: "Não pode ser anulado.",
+      rotulo: "Remover do inventário",
+      fazer: () => remove(i.id),
+    });
   }
 
   async function remove(id: string) {
     const it = items.find((x) => x.id === id);
-    if (!confirm(`Remover o item${it ? ` "${it.name}"` : ""}? Esta ação não pode ser anulada.`))
-      return;
-    const snapshot = items;
+    if (!it) return;
     setItems((prev) => prev.filter((x) => x.id !== id));
-    try {
-      const res = await fetch(`/api/inventario/${id}`, { method: "DELETE" });
-      if (res.ok) toast("Item removido.", "success");
-      else {
-        setItems(snapshot);
-        toast("Não foi possível remover o item.", "error");
-      }
-    } catch {
-      setItems(snapshot);
-      toast("Erro de ligação ao remover.", "error");
+    const { ok } = await gravar(
+      `remover «${it?.name ?? "o item"}» do inventário`,
+      `/api/inventario/${id}`,
+      { method: "DELETE" },
+    );
+    if (!ok) {
+      // Repõe-se SÓ esta linha, e só se ela não estiver já na lista. Guardar a
+      // lista inteira antes do pedido — como se fazia — era guardar um instante
+      // que já passou: dois «Remover» confirmados de seguida põem duas chamadas
+      // no ar, e a que falhasse ressuscitava no ecrã a que o servidor tinha
+      // mesmo apagado. E o `setItems` escreve através para a cache, portanto a
+      // linha fantasma ficava lá até alguém recarregar.
+      setItems((prev) =>
+        prev.some((x) => x.id === id)
+          ? prev
+          : [...prev, it].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      return;
     }
+    toast("Item removido.", "success");
   }
 
   function startEdit(i: PropItem) {
@@ -276,7 +396,7 @@ export default function Inventario() {
       rotulo: "Remover",
       icone: CruzIcon,
       destrutiva: true,
-      onAccao: () => remove(i.id),
+      onAccao: () => perguntarSeRemove(i),
     },
   ];
 
@@ -695,7 +815,7 @@ export default function Inventario() {
                       <Button size="sm" variant="ghost" onClick={() => startEdit(i)}>
                         Editar
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => remove(i.id)}>
+                      <Button size="sm" variant="ghost" onClick={() => perguntarSeRemove(i)}>
                         Remover
                       </Button>
                     </div>
@@ -856,7 +976,7 @@ export default function Inventario() {
                             {LapisIcon}
                           </button>
                           <button
-                            onClick={() => remove(i.id)}
+                            onClick={() => perguntarSeRemove(i)}
                             className="alvo-toque text-foreground/25 sem-rato:text-foreground/55 hover:text-[#8a2a22] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
                             aria-label="Remover"
                           >
@@ -877,6 +997,30 @@ export default function Inventario() {
           </Card>
         </>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </div>
   );
 }

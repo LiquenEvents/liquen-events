@@ -14,6 +14,7 @@ import { useToast } from "./Toast";
 import { Button, Card, EmptyState } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -118,6 +119,15 @@ interface Props {
   quotes: Quote[];
   /** Abrir o pedido correspondente no painel de detalhe. */
   onOpenQuote?: (q: Quote) => void;
+  /**
+   * Abre o «Fazer proposta».
+   *
+   * É o primeiro passo deste ecrã, e é o que faltava ao vazio: sem uma
+   * proposta enviada não pode haver nada à espera de resposta, e a única saída
+   * de um Acompanhamento vazio é fazer a primeira. Sem este callback o vazio
+   * continua a explicar-se, só que sem botão — que é o que já fazia.
+   */
+  onFazerProposta?: () => void;
 }
 
 /**
@@ -130,13 +140,14 @@ interface Props {
  */
 type PatchDeProposta = Partial<{ [K in keyof Proposal]: Proposal[K] | null }>;
 
-export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
+export default function Acompanhamento({ quotes, onOpenQuote, onFazerProposta }: Props) {
   const {
     data: propostas,
     loading,
     setData,
     error,
     errorMessage,
+    falha,
     refresh,
   } = useCachedList<PropostaLeve[]>("propostas-leves", "/api/propostas?semDoc=1");
   const { toast } = useToast();
@@ -165,8 +176,41 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
     [propostas],
   );
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * NOVE GESTOS QUE DESFAZIAM O ECRÃ EM SILÊNCIO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Todos os gestos deste painel são optimistas: a linha muda no instante do
+   * clique e, se o servidor recusar, VOLTA ao que era. O aviso dizia sempre
+   * «Não foi possível gravar. Verifica a ligação.» — a mesma frase para a rede
+   * em baixo, a sessão expirada, a proposta apagada por outra pessoa e o
+   * servidor em baixo, e sem uma palavra sobre a linha que acabou de recuar à
+   * frente dela.
+   *
+   * É o pior sítio do back office para isso acontecer: marcar «Aceite» e ver a
+   * etiqueta voltar a «Enviada» meio segundo depois, com um aviso que fala de
+   * ligações, parece o ecrã a portar-se mal — e não uma gravação que não ficou.
+   * Meia hora depois esta proposta está a contar como aberta e ninguém sabe
+   * porquê.
+   *
+   * Por isso as palavras entram como DADOS a par do patch: o que se estava a
+   * fazer (a nomear a proposta) e para onde é que a linha recuou.
+   */
   const gravar = useCallback(
-    async (id: string, patch: PatchDeProposta, comoDizer: string) => {
+    async (
+      id: string,
+      patch: PatchDeProposta,
+      palavras: {
+        /** A frase de sucesso, como sempre foi. */
+        sucesso: string;
+        /** O gesto, em minúsculas e a nomear a proposta: «marcar «Ana e João» como aceite». */
+        oQue: string;
+        /** O que o ecrã desfez: «A linha voltou a «Enviada».» */
+        reverteu: string;
+      },
+    ) => {
+      const { sucesso: comoDizer, oQue, reverteu } = palavras;
       setAGravar(id);
       // Otimista: o ecrã muda já e desfaz-se se o servidor recusar. Ver a
       // decisão em PaymentsPanel — o mesmo padrão, pelas mesmas razões.
@@ -196,22 +240,43 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
        */
       const linhaAntes = (propostas ?? []).find((p) => p.id === id);
       setData((prev) => (prev ?? []).map((p) => (p.id === id ? { ...p, ...paraOEcra } : p)));
+      const reverter = (falha: Falha) => {
+        setData((prev) => (prev ?? []).map((p) => (p.id === id && linhaAntes ? linhaAntes : p)));
+        toast(`${falha.mensagem} ${reverteu}`, "error");
+      };
       try {
-        const res = await fetch(`/api/propostas/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patch),
-        });
-        if (!res.ok) throw new Error("falhou");
+        let res: Response;
+        try {
+          res = await fetch(`/api/propostas/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+          });
+        } catch {
+          reverter(porqueRebentou(oQue));
+          return;
+        }
+        if (!res.ok) {
+          reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
+          return;
+        }
         // O PATCH devolve a proposta COMPLETA (com `doc`): esta lista só guarda
         // a forma leve, por isso converte-se antes de voltar a pousá-la na
         // cache. Sem isto, o `doc` inteiro reentrava aqui por uma porta lateral.
-        const actualizada = paraLeve((await res.json()) as Proposal);
+        //
+        // Um corpo ilegível numa resposta boa conta como «não chegou»: sem isto
+        // a linha ficava com a alteração no ecrã e nada no estado — que é o
+        // caso pior dos dois.
+        let corpo: unknown;
+        try {
+          corpo = await res.json();
+        } catch {
+          reverter(porqueRebentou(oQue));
+          return;
+        }
+        const actualizada = paraLeve(corpo as Proposal);
         setData((prev) => (prev ?? []).map((p) => (p.id === id ? actualizada : p)));
         toast(comoDizer, "success");
-      } catch {
-        setData((prev) => (prev ?? []).map((p) => (p.id === id && linhaAntes ? linhaAntes : p)));
-        toast("Não foi possível gravar. Verifica a ligação.", "error");
       } finally {
         setAGravar(null);
       }
@@ -228,6 +293,10 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
       <AvisoDeFalha
         titulo="Não foi possível ler as propostas"
         mensagem={errorMessage}
+        /* A falha inteira, e não só a frase: com a sessão caída o «Tentar de
+           novo» dá o mesmo 401, e um botão que não pode funcionar é pior do que
+           nenhum — quem resolve é o painel de reentrada que aparece por cima. */
+        falha={falha}
         aoTentarDeNovo={refresh}
       />
     );
@@ -237,9 +306,22 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
 
   if (linhas.length === 0 && porRegistar.length === 0) {
     return (
+      /* ── UM VAZIO VERDADEIRO, COM A SAÍDA DENTRO DELE ──────────────────
+         Este é o vazio bom: as propostas foram lidas (a falha e a espera já
+         saíram à frente, aqui em cima), portanto pode mesmo dizer-se que não
+         há nenhuma à espera. Continua a ser um vazio e não um alarme — um
+         Acompanhamento limpo é o que se quer ver.
+
+         O que lhe faltava era a terceira coisa: o passo. Dizia o que APARECE
+         aqui e não dizia como é que alguma coisa chega cá — e a resposta é
+         uma só, enviar uma proposta. O botão fica no vazio, e não noutro
+         canto do ecrã. */
       <EmptyState
         title="Nenhuma proposta à espera de resposta"
-        description="Aqui ficam as propostas enviadas e em negociação, por ordem do que está mais perto de acabar — a validade, o casamento, ou o seguimento que marcar."
+        description="Aqui ficam as propostas enviadas e em negociação, por ordem do que está mais perto de acabar — a validade, o casamento, ou o seguimento que marcar. Enquanto nenhuma seguir, fica assim."
+        action={
+          onFazerProposta ? { label: "Fazer uma proposta", onClick: onFazerProposta } : undefined
+        }
       />
     );
   }
@@ -334,7 +416,12 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
                       gravar(
                         p.id,
                         { versaoEscolhida: v.id },
-                        v.id === "base" ? "Ficaram pela versão base." : "Levaram os extras.",
+                        {
+                          sucesso:
+                            v.id === "base" ? "Ficaram pela versão base." : "Levaram os extras.",
+                          oQue: `registar «${v.label}» na proposta de «${p.clientName}»`,
+                          reverteu: "A pergunta voltou a ficar por responder.",
+                        },
                       )
                     }
                     className="alvo-toque rounded-full border border-foreground/12 px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase text-foreground/55 transition-colors hover:border-[#4d6350]/40 hover:text-foreground/85 disabled:opacity-50"
@@ -357,19 +444,34 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
               aRecusar={aRecusar === l.proposta.id}
               onRecusar={() => setARecusar(l.proposta.id)}
               onCancelarRecusa={() => setARecusar(null)}
-              onEstado={(status) =>
-                gravar(
+              onEstado={(status) => {
+                const para = ESTADOS.find((e) => e.id === status)?.label ?? status;
+                const antes =
+                  ESTADOS.find((e) => e.id === l.proposta.status)?.label ?? l.proposta.status;
+                return gravar(
                   l.proposta.id,
                   { status },
-                  `${l.proposta.clientName} — ${ESTADOS.find((e) => e.id === status)?.label}`,
-                )
-              }
+                  {
+                    sucesso: `${l.proposta.clientName} — ${para}`,
+                    oQue: `marcar «${l.proposta.clientName}» como «${para}»`,
+                    reverteu: `A linha voltou a «${antes}».`,
+                  },
+                );
+              }}
               onMotivo={(lostReason, lostNote) => {
                 setARecusar(null);
+                const antes =
+                  ESTADOS.find((e) => e.id === l.proposta.status)?.label ?? l.proposta.status;
                 return gravar(
                   l.proposta.id,
                   { status: "rejeitada", lostReason, lostNote: lostNote || undefined },
-                  "Registado. Fica na contagem dos motivos.",
+                  {
+                    sucesso: "Registado. Fica na contagem dos motivos.",
+                    oQue: `registar «${l.proposta.clientName}» como recusada por «${
+                      MOTIVOS.find((m) => m.id === lostReason)?.label ?? lostReason
+                    }»`,
+                    reverteu: `A linha voltou a «${antes}», e o motivo não ficou registado.`,
+                  },
                 );
               }}
               /**
@@ -389,7 +491,17 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
                 gravar(
                   l.proposta.id,
                   { followUpAt: followUpAt || null, followUpNote: followUpNote || null },
-                  followUpAt ? `Seguimento a ${dataCurta(followUpAt)}` : "Seguimento retirado",
+                  {
+                    sucesso: followUpAt
+                      ? `Seguimento a ${dataCurta(followUpAt)}`
+                      : "Seguimento retirado",
+                    oQue: followUpAt
+                      ? `marcar o seguimento de «${l.proposta.clientName}» para ${dataCurta(followUpAt)}`
+                      : `retirar o seguimento de «${l.proposta.clientName}»`,
+                    reverteu: l.proposta.followUpAt
+                      ? `O seguimento voltou a ${dataCurta(l.proposta.followUpAt)}.`
+                      : "A linha voltou a ficar sem seguimento marcado.",
+                  },
                 )
               }
               onAbrirPedido={l.quote && onOpenQuote ? () => onOpenQuote(l.quote!) : undefined}

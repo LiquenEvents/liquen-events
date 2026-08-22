@@ -206,13 +206,24 @@ describe("a geração faz primeiro o que dói", () => {
   });
 
   it("o que sobra depois de um lote diz quantas dessas ainda doem", async () => {
-    // 20 fotografias × 2 essenciais = 40, mais do que o lote de 25.
+    // O lote deixou de parar às 25 derivadas e passou a parar pelo RELÓGIO —
+    // é o relógio que conhece o tecto da função, e o número não conhecia
+    // (ver `derivadas.lote.test.ts`). O que este teste mede continua a ser o
+    // mesmo: quando o lote pára a meio, o que sobra diz quantas ainda doem.
     temaSemNada("tema-a", 20);
 
-    const r = await gerarLoteDeDerivadas("essencial");
+    // Cada leitura do relógio avança 1 s; o tecto são 5 s.
+    let t = 0;
+    const r = await gerarLoteDeDerivadas("essencial", {
+      tectoMs: 5_000,
+      agora: () => (t += 1_000),
+    });
 
-    expect(r.geradas).toBe(25);
-    expect(r.restantes).toBe(15);
-    expect(r.restantesEssenciais).toBe(15);
+    expect(r.fotografiasFeitas).toBeGreaterThan(0);
+    expect(r.fotografiasFeitas).toBeLessThan(20);
+    // Duas essenciais por fotografia, e todas as que sobram doem.
+    expect(r.geradas).toBe(r.fotografiasFeitas * 2);
+    expect(r.restantes).toBe((20 - r.fotografiasFeitas) * 2);
+    expect(r.restantesEssenciais).toBe(r.restantes);
   });
 });

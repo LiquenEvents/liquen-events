@@ -127,6 +127,10 @@ describe("escrever", () => {
     const duas = [UMA[0], { ...UMA[0], id: "e2", titulo: "Corredor" }];
     const onChange = desenhar(duas);
     await user.click(screen.getByRole("button", { name: /Apagar a alternativa 1/ }));
+    // Passou a haver uma pergunta pelo meio — ver a suite «o que apaga e não
+    // volta», mais abaixo. O que este teste prende continua a ser o mesmo: sai
+    // a que se escolheu, e não a outra.
+    await user.click(screen.getByRole("button", { name: /^Apagar a alternativa$/ }));
     expect(onChange).toHaveBeenCalledWith([duas[1]]);
   });
 });
@@ -220,5 +224,125 @@ describe("o destaque do «À escolha do casal»", () => {
     // E continua a dizer as duas coisas que evitam uma surpresa: onde aparece,
     // e para onde volta a resposta.
     expect(screen.getByText(/não\s*no PDF/i)).toBeTruthy();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE APAGA E NÃO VOLTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * As duas acções irreversíveis deste ecrã, e a razão de levarem tratamento
+ * diferente — pergunta-se o que é raro e caro, oferece-se anular o que é
+ * frequente e barato de refazer (está escrita por extenso no cabeçalho do
+ * `EditorDeEscolhas.tsx`).
+ *
+ * O que aqui se prende é o que faz a diferença entre uma pergunta útil e um
+ * «Tens a certeza?»: que a frase NOMEIA a coisa, que DIZ O NÚMERO do que vai
+ * com ela, e que responder «não» não perde nada nem escreve nada.
+ */
+describe("apagar a alternativa — pergunta que conta o que se perde", () => {
+  const COM_FOTOS: Escolha[] = [
+    {
+      id: "e1",
+      titulo: "Paleta da cerimónia",
+      opcoes: [
+        { id: "o1", rotulo: "Verde-oliva e branco", imagem: "ped/uma.jpg" },
+        { id: "o2", rotulo: "Terracota e creme", imagem: "ped/duas.jpg" },
+        { id: "o3", rotulo: "Azul-pó" },
+      ],
+    },
+  ];
+
+  it("a pergunta nomeia a alternativa, conta as opções e as fotografias", async () => {
+    const user = userEvent.setup();
+    desenhar(COM_FOTOS);
+    await user.click(screen.getByRole("button", { name: /Apagar a alternativa 1/ }));
+    const pergunta = screen.getByRole("alertdialog").textContent ?? "";
+    // O NOME que ela lhe deu, e não «esta alternativa».
+    expect(pergunta).toMatch(/Paleta da cerimónia/);
+    // OS NÚMEROS: três opções, duas já com fotografia escolhida à mão.
+    expect(pergunta).toMatch(/3 opções/);
+    expect(pergunta).toMatch(/2 com fotografia/);
+    // E A CONSEQUÊNCIA — o que o casal deixa de ter.
+    expect(pergunta).toMatch(/casal fica sem esta escolha/i);
+    // Nunca a frase que não acrescenta nada.
+    expect(pergunta).not.toMatch(/certeza/i);
+  });
+
+  it("cancelar não perde nada nem escreve nada", async () => {
+    const user = userEvent.setup();
+    const onChange = desenhar(COM_FOTOS);
+    await user.click(screen.getByRole("button", { name: /Apagar a alternativa 1/ }));
+    await user.click(screen.getByRole("button", { name: /^Cancelar$/ }));
+    // Nem uma escrita no documento: cancelar fecha a pergunta e mais nada.
+    expect(onChange).not.toHaveBeenCalled();
+    // A pergunta sai do ecrã e a alternativa continua inteira.
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByDisplayValue("Paleta da cerimónia")).toBeTruthy();
+    expect(screen.getByDisplayValue("Azul-pó")).toBeTruthy();
+  });
+
+  it("uma alternativa ainda em branco sai sem pergunta nenhuma", async () => {
+    // Regra da casa: nada que não seja destrutivo pode ser atrasado por uma
+    // caixa. Uma alternativa acabada de acrescentar por engano não tem nada
+    // dentro — perguntar aí é ensinar a responder que sim sem ler.
+    const user = userEvent.setup();
+    const vazia: Escolha[] = [
+      {
+        id: "e1",
+        titulo: "",
+        opcoes: [
+          { id: "o1", rotulo: "" },
+          { id: "o2", rotulo: "" },
+        ],
+      },
+    ];
+    const onChange = desenhar(vazia);
+    await user.click(screen.getByRole("button", { name: /Apagar a alternativa 1/ }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+});
+
+describe("apagar a opção — anular, e não pergunta", () => {
+  const TRES: Escolha[] = [
+    {
+      id: "e1",
+      titulo: "Paleta da cerimónia",
+      opcoes: [
+        { id: "o1", rotulo: "Verde-oliva e branco" },
+        { id: "o2", rotulo: "Terracota e creme" },
+        { id: "o3", rotulo: "Azul-pó" },
+      ],
+    },
+  ];
+
+  it("apaga já — e o «Anular» diz qual saiu e com quantas fica", async () => {
+    const user = userEvent.setup();
+    const onChange = desenhar(TRES);
+    await user.click(screen.getAllByRole("button", { name: /Apagar a opção/ })[1]);
+    // Sem pergunta pelo meio: é o gesto de escrever, e uma caixa a cada um
+    // seria uma caixa que se despacha sem ler.
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    const nova: Escolha[] = onChange.mock.calls[0][0];
+    expect(nova[0].opcoes.map((o) => o.id)).toEqual(["o1", "o3"]);
+    // A barra NOMEIA a opção e a alternativa, e dá o NÚMERO do que ficou.
+    const barra = screen.getByText(/Pode anular durante/).textContent ?? "";
+    expect(barra).toMatch(/Terracota e creme/);
+    expect(barra).toMatch(/Paleta da cerimónia/);
+    expect(barra).toMatch(/ficam 2/);
+  });
+
+  it("anular devolve a opção exactamente onde estava", async () => {
+    const user = userEvent.setup();
+    const onChange = desenhar(TRES);
+    await user.click(screen.getAllByRole("button", { name: /Apagar a opção/ })[1]);
+    onChange.mockClear();
+    await user.click(screen.getByRole("button", { name: /^Anular$/ }));
+    // A lista INTEIRA como estava — a opção volta ao meio, e não ao fim.
+    expect(onChange).toHaveBeenCalledWith(TRES);
+    // E a oferta desaparece: anulada uma vez, não fica a pedir de novo.
+    expect(screen.queryByText(/Pode anular durante/)).toBeNull();
   });
 });

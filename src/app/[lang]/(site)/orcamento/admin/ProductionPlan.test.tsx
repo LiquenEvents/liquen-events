@@ -113,7 +113,9 @@ describe("Plano de produção — duas marcações ao mesmo tempo", () => {
     await user.click(caixaDe(PLANO[0].label));
 
     await waitFor(() => expect(caixaDe(PLANO[0].label).getAttribute("aria-checked")).toBe("false"));
-    expect(screen.getByText(/Não foi possível guardar o plano de produção/)).toBeTruthy();
+    // A frase nomeia a tarefa que se desriscou sozinha e diz o que fazer.
+    expect(screen.getByText(/não está a aceitar gravações/)).toBeTruthy();
+    expect(screen.getByText(new RegExp(`marcar «${PLANO[0].label}»`))).toBeTruthy();
   });
 });
 

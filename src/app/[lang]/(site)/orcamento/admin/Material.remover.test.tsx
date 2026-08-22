@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
 import { __resetListCache } from "./useCachedList";
@@ -20,9 +20,10 @@ import Material from "./Material";
  *     catch { setItems(antes); }    // ← e agora, depois de dois `await`
  *
  * Esse `antes` foi lido antes do `await`, e é a lista de um instante que já
- * passou. Com duas remoções a caminho ao mesmo tempo — e aqui não há confirmação
- * nenhuma pelo meio, são dois cliques seguidos — a que falha repõe o mundo
- * anterior às DUAS e traz de volta a que o servidor já tinha apagado.
+ * passou. Com duas remoções a caminho ao mesmo tempo — e há como as pôr no ar
+ * seguidas, porque a pergunta fecha assim que se responde e não espera pelo
+ * servidor — a que falha repõe o mundo anterior às DUAS e traz de volta a que o
+ * servidor já tinha apagado.
  *
  * O resultado é um catálogo que afirma haver material que já não existe. E como
  * o `setData` do `useCachedList` escreve através para a cache, o fantasma
@@ -93,8 +94,18 @@ describe("Catálogo — duas remoções ao mesmo tempo", () => {
         .closest("li")!
         .querySelector("button:last-of-type") as HTMLButtonElement;
 
+    // A remoção pergunta antes (ver `Material.perguntas.test.tsx`); aqui
+    // responde-se que sim às duas, seguidas.
+    const confirmar = async () => {
+      const caixa = await screen.findByRole("dialog");
+      await user.click(within(caixa).getByRole("button", { name: /^Remover do catálogo$/i }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    };
+
     await user.click(removerDe("Escadote 3 degraus"));
+    await confirmar();
     await user.click(removerDe("Fita-cola americana"));
+    await confirmar();
     await waitFor(() => expect(screen.queryByText("Fita-cola americana")).toBeNull());
 
     // Só agora o servidor recusa o primeiro apagamento.

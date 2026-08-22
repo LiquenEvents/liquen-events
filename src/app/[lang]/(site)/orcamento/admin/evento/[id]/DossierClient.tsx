@@ -121,6 +121,19 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
     async (entry: ActivityEntry) => {
       setQuote((prev) => ({ ...prev, activityLog: [...(prev.activityLog ?? []), entry] }));
       if (!(await gravarEntradas([entry]))) setRecusadas((prev) => [...prev, entry]);
+      /**
+       * SEMPRE `true`, e é uma afirmação sobre este ecrã e não sobre a rede.
+       *
+       * O `ActivityLog` usa esta resposta para decidir se limpa a caixa. Aqui a
+       * entrada nunca se perde: ou ficou gravada, ou está na lista das
+       * `recusadas`, à vista e com um «tentar de novo» ao lado. Devolver
+       * `false` deixava o texto na caixa E a entrada na lista — a mesma nota
+       * duas vezes no ecrã.
+       *
+       * No painel do pedido (`AdminClient`) não há esta rede de apanha, e por
+       * isso lá a resposta é a verdade sobre a gravação.
+       */
+      return true;
     },
     [gravarEntradas],
   );

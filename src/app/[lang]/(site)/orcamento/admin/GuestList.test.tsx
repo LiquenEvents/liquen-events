@@ -118,7 +118,12 @@ describe("Lista de convidados — duas gravações ao mesmo tempo", () => {
     await user.selectOptions(rsvpDe("Família Andrade"), "confirmado");
 
     await waitFor(() => expect(rsvpDe("Família Andrade").value).toBe("pendente"));
-    expect(screen.getByText(/Não foi possível guardar a lista de convidados/)).toBeTruthy();
+    // E o aviso diz QUE família ficou por gravar, e que o servidor é que está
+    // em baixo — não «Não foi possível guardar a lista de convidados», que era
+    // a mesma frase para a rede, para a sessão expirada e para isto.
+    const aviso = screen.getByText(/não está a aceitar gravações/);
+    expect(aviso).toHaveTextContent("Família Andrade");
+    expect(aviso).toHaveTextContent(/repete/i);
   });
 });
 

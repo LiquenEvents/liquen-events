@@ -6,15 +6,33 @@ import { useToast } from "./Toast";
 import { metaFor } from "./status-meta";
 import { Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import {
   DECOR_PRODUCTION,
   PRODUCTION_PHASE_SEP,
   buildProductionPlanItems,
 } from "@/lib/production-templates";
+import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
 
 interface Props {
   quote: Quote;
   onChange?: (productionPlan: ChecklistItem[]) => void;
+}
+
+/**
+ * Uma gravação que o servidor recusou por o plano ter mudado noutro sítio.
+ *
+ * Guarda-se o GESTO, não a lista que ele produziu: voltar a mandar a lista era
+ * apagar as tarefas que a outra pessoa acrescentou — exactamente o que o 409
+ * existe para impedir. O gesto volta a aplicar-se POR CIMA da versão adoptada.
+ */
+interface Colisao {
+  /** O número da gravação que colidiu — é o que põe os gestos por ordem. */
+  n: number;
+  /** O gesto, nomeado: «marcar «Sourcing · Encomendar flores»». */
+  oQue: string;
+  /** O mesmo gesto, para o repetir sobre a versão que veio do servidor. */
+  reaplicar: (atuais: ChecklistItem[]) => ChecklistItem[];
 }
 
 const STATUS_LABEL: Record<EventSupplierStatus, { label: string; color: string }> = {
@@ -43,6 +61,9 @@ export default function ProductionPlan({ quote, onChange }: Props) {
   const [items, setItems] = useState<ChecklistItem[]>(quote.productionPlan ?? []);
   const [newLabel, setNewLabel] = useState("");
   const [newPhase, setNewPhase] = useState<string>(DECOR_PRODUCTION[0].key);
+  // A colisão fica no ECRÃ, e não num toast que desaparece: é onde o gesto que
+  // não passou continua à vista e recuperável com um clique.
+  const [colisoes, setColisoes] = useState<Colisao[]>([]);
   const suppliers = quote.eventSuppliers ?? [];
 
   /**
@@ -58,42 +79,158 @@ export default function ProductionPlan({ quote, onChange }: Props) {
   const gravacoes = useRef(0);
   const gravado = useRef<ChecklistItem[]>(quote.productionPlan ?? []);
 
-  async function persist(next: ChecklistItem[]) {
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * DE ONDE ESTE PLANO FOI COPIADO
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * O plano é copiado UMA vez, ao montar, e ao gravar vai INTEIRO — logo a
+   * gravação é «substitui o plano por este», e não «risca esta tarefa».
+   *
+   * O CENÁRIO, sem corrida nenhuma e com as duas gravações a responder 200:
+   * duas pessoas no atelier, cada uma com o seu telemóvel, a riscar o mesmo
+   * plano ao longo da manhã. A que abriu o painel primeiro risca uma tarefa às
+   * onze e manda o plano que copiou às nove — e as seis tarefas que a colega
+   * riscou pelo meio voltam todas a por fazer. Ninguém vê nada; o que se vê é
+   * o trabalho a aparecer por fazer no dia seguinte.
+   *
+   * `base` é a versão de que este plano partiu. Vai no pedido, o servidor
+   * compara-a com a que tem e recusa com 409 (ver `api/orcamento/[id]`).
+   *
+   * Avança ao ENVIAR e não ao confirmar: riscar duas tarefas seguidas põe dois
+   * PATCH no ar e o segundo já leva o primeiro lá dentro — declarar a versão
+   * de antes do primeiro era inventar uma colisão dela consigo própria.
+   */
+  const base = useRef<ChecklistItem[]>(quote.productionPlan ?? []);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * A GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As quatro acções do plano passam por aqui, e todas falhavam com «Não foi
+   * possível guardar o plano de produção. Tenta novamente.» — a mesma frase
+   * para a rede em baixo, a sessão expirada, o pedido apagado por outra pessoa
+   * e o servidor em baixo. Nos dois do meio, repetir não resolve nada.
+   *
+   * O `oQue` nomeia a TAREFA: o plano tem trinta linhas, a reversão desfaz uma
+   * só, e sem o nome ninguém sabe qual delas se desriscou sozinha no ecrã.
+   */
+  async function persist(oQue: string, reaplicar: (atuais: ChecklistItem[]) => ChecklistItem[]) {
+    const next = reaplicar(items);
     const minha = ++gravacoes.current;
     setItems(next);
     onChange?.(next);
-    try {
-      const res = await fetch(`/api/orcamento/${quote.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productionPlan: next }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      if (minha === gravacoes.current) gravado.current = next;
-    } catch {
-      // Já foi substituída por uma gravação mais recente: o que essa levar
-      // contém o que esta levava, portanto não há nada a desfazer nem nada a
-      // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
+    const baseAnterior = base.current;
+    base.current = next;
+
+    // Desfaz o que foi posto no ecrã e diz porquê — a não ser que já haja uma
+    // gravação mais recente: o que essa levar contém o que esta levava,
+    // portanto não há nada a desfazer nem nada a dizer. Se ELA também falhar, é
+    // ela que repõe — e para o mesmo sítio.
+    const reporEDizer = (mensagem: string) => {
       if (minha !== gravacoes.current) return;
+      // A base acompanha o que fica no ecrã: declarar uma versão que nunca
+      // chegou a ser gravada dava um 409 inventado na gravação seguinte.
+      base.current = gravado.current;
       setItems(gravado.current);
       onChange?.(gravado.current);
-      toast("Não foi possível guardar o plano de produção. Tenta novamente.", "error");
+      toast(mensagem, "error");
+    };
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/orcamento/${quote.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productionPlan: next, base: { productionPlan: baseAnterior } }),
+      });
+    } catch {
+      reporEDizer(porqueRebentou(oQue).mensagem);
+      return;
     }
+    /**
+     * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir a
+     * mesma lista era desriscar o que a colega riscou. Adopta-se o que o
+     * servidor tem — e o gesto fica guardado no aviso, para o poder voltar a
+     * aplicar por cima dessa versão sem perder nem um lado nem o outro. Por
+     * isso a frase não é a do `porqueFalhou`: aqui não se manda recarregar
+     * nada, o plano já está em dia no ecrã.
+     */
+    if (res.status === 409) {
+      const corpo = (await res.json().catch(() => null)) as {
+        current?: { productionPlan?: ChecklistItem[] };
+      } | null;
+      const doServidor = corpo?.current?.productionPlan ?? gravado.current;
+      gravado.current = doServidor;
+      base.current = doServidor;
+      if (minha === gravacoes.current) {
+        setItems(doServidor);
+        onChange?.(doServidor);
+      }
+      // Dois gestos podem colidir os dois (dois toques dela enquanto a
+      // outra pessoa gravava). Cada gesto é um DELTA, portanto o mais
+      // recente não contém o anterior: guardam-se todos, por ordem de
+      // envio, e reaplicam-se por essa ordem — senão o primeiro perdia-se
+      // ao chegar o segundo, e as respostas nem sequer vêm por ordem.
+      setColisoes((c) => [...c, { n: minha, oQue, reaplicar }].sort((a, b) => a.n - b.n));
+      return;
+    }
+    if (!res.ok) {
+      const corpo = await res.json().catch(() => null);
+      reporEDizer(porqueFalhou(oQue, res, corpo).mensagem);
+      return;
+    }
+    if (minha === gravacoes.current) gravado.current = next;
+  }
+
+  /**
+   * Os gestos que o 409 travou, agora POR CIMA do plano que veio do servidor
+   * — e pela ordem por que ela os fez, que é a única em que dão o mesmo
+   * resultado. Uma gravação só: o que ela quis fica todo dentro dela.
+   */
+  function voltarAAplicar() {
+    if (colisoes.length === 0) return;
+    const gestos = colisoes;
+    setColisoes([]);
+    void persist(gestos.map((g) => g.oQue).join(" e "), (atuais) =>
+      gestos.reduce((lista: ChecklistItem[], g) => g.reaplicar(lista), atuais),
+    );
   }
 
   function applyPlan() {
     const existing = new Set(items.map((i) => i.label));
     const additions = buildProductionPlanItems(randomId, existing);
     if (additions.length === 0) return;
-    persist([...items, ...additions]);
+    void persist(
+      `aplicar o plano de produção (${additions.length} ${
+        additions.length === 1 ? "tarefa" : "tarefas"
+      })`,
+      // O dedupe por rótulo repete-se aqui dentro: se isto for reaplicado
+      // depois de uma colisão, o plano de que parte já é o do servidor — e a
+      // colega pode ter aplicado o mesmo modelo entretanto. Sem isto, voltar a
+      // aplicar duplicava trinta tarefas.
+      (atuais) => [...atuais, ...additions.filter((a) => !atuais.some((i) => i.label === a.label))],
+    );
   }
 
   function toggle(id: string) {
-    persist(items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
+    const tarefa = items.find((i) => i.id === id);
+    // O alvo é o `done` que ela quis, e não «o contrário do que lá estiver»:
+    // reaplicado por cima da versão do servidor, um `!i.done` cego voltava a
+    // desriscar a tarefa se a colega já a tivesse riscado entretanto.
+    const querFicar = !tarefa?.done;
+    void persist(
+      `${tarefa?.done ? "desmarcar" : "marcar"} «${tarefa?.label ?? "a tarefa"}»`,
+      (atuais) => atuais.map((i) => (i.id === id ? { ...i, done: querFicar } : i)),
+    );
   }
 
   function removeItem(id: string) {
-    persist(items.filter((i) => i.id !== id));
+    const tarefa = items.find((i) => i.id === id);
+    void persist(`remover «${tarefa?.label ?? "a tarefa"}» do plano`, (atuais) =>
+      atuais.filter((i) => i.id !== id),
+    );
   }
 
   // Tarefa própria: prefixa a fase escolhida (mesmo formato do seed) para o
@@ -102,7 +239,10 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     const label = newLabel.trim();
     if (!label) return;
     const phase = DECOR_PRODUCTION.find((p) => p.key === newPhase) ?? DECOR_PRODUCTION[0];
-    persist([...items, { id: randomId(), label: `${phase.label}${SEP}${label}`, done: false }]);
+    // O id nasce aqui e não dentro do gesto: reaplicar depois de uma colisão
+    // tem de acrescentar a MESMA tarefa, não uma segunda cópia.
+    const tarefa = { id: randomId(), label: `${phase.label}${SEP}${label}`, done: false };
+    void persist(`acrescentar «${label}» a ${phase.label}`, (atuais) => [...atuais, tarefa]);
     setNewLabel("");
   }
 
@@ -169,6 +309,37 @@ export default function ProductionPlan({ quote, onChange }: Props) {
         </div>
       </div>
 
+      {/* ── A COLISÃO FICA À VISTA, E COM SAÍDA ────────────────────────────
+          Um toast desaparece sozinho e leva com ele a única pista do que não
+          ficou guardado. Aqui o plano do servidor já está no ecrã (é a
+          verdade), e este aviso fica ao lado a dizer o que é que ela estava a
+          fazer quando ele chegou — com o gesto ainda por aplicar, à distância
+          de um clique. Reaplicar é somar-se ao que a colega riscou, não
+          apagá-lo: o gesto corre por cima da versão adoptada. */}
+      {colisoes.length > 0 && (
+        <div
+          role="alert"
+          className="mb-4 rounded-xl border border-[#a03a1a]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+        >
+          <p className="font-medium text-[#a03a1a]">
+            Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: o plano mudou noutro sítio
+            entretanto.
+          </p>
+          <p className="bo-text-muted mt-1">
+            O plano que está no ecrã é o que ficou guardado. Não se perdeu nada — podes voltar a
+            aplicar o que estavas a fazer por cima dele.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={voltarAAplicar}>
+              Voltar a aplicar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setColisoes([])}>
+              Ficar com a versão guardada
+            </Button>
+          </div>
+        </div>
+      )}
+
       {!seeded ? (
         <EmptyState
           className="px-4 py-10"
@@ -209,8 +380,8 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                 </div>
                 <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mb-2">
                   <div
-                    className="h-full bg-[#4d6350] rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%` }}
+                    className="h-full w-full origin-left bg-[#4d6350] rounded-full motion-safe:transition-transform motion-safe:duration-500"
+                    style={{ transform: `scaleX(${fraccaoDaBarra(pct, 100)})` }}
                   />
                 </div>
                 <div className="flex flex-col gap-0.5">

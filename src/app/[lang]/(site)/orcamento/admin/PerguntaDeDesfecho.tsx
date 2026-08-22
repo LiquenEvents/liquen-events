@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { razaoDaRecusa } from "@/lib/porque-falhou";
 import type { MotivoDeRecusa, Quote } from "@/lib/orcamento/types";
 import {
   MOTIVOS_DE_PERDA,
@@ -49,13 +50,19 @@ function textoDoValor(q: Quote): string {
   return q.quotedPrice != null ? String(q.quotedPrice) : "";
 }
 
-/** O que se diz de uma gravação recusada, pelo código que voltou. */
+/**
+ * O que se diz de uma gravação recusada, pelo código que voltou.
+ *
+ * A regra vive em `razaoDaRecusa` (`lib/porque-falhou.ts`). Isto era a segunda
+ * cópia dela — a primeira está no `AdminClient` — e as duas tinham divergido:
+ * esta conhecia o 404 e a outra o 413, portanto o mesmo servidor dizia coisas
+ * diferentes conforme o sítio do ecrã em que se estava a carregar.
+ *
+ * A frase de reserva fica aqui, e não na peça partilhada: «não foi possível
+ * MARCAR» é sobre este diálogo e mais nenhum.
+ */
 function porqueNaoGravou(status: number): string {
-  if (status === 401 || status === 403) return "A sessão expirou — volta a entrar.";
-  if (status === 400) return "O servidor recusou o valor.";
-  if (status === 404) return "Este pedido já não existe.";
-  if (status >= 500) return "O servidor não está a aceitar gravações neste momento.";
-  return "Não foi possível marcar.";
+  return razaoDaRecusa(status) ?? "Não foi possível marcar.";
 }
 
 /**

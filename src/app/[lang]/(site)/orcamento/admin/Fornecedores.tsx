@@ -7,6 +7,7 @@ import { SkeletonCard } from "./Skeleton";
 import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { useToast } from "./Toast";
 
 const CATEGORIES = [
@@ -132,7 +133,12 @@ export default function Fornecedores() {
       id: "preferido",
       rotulo: s.preferred ? "Remover dos preferidos" : "Marcar como preferido",
       icone: EstrelaIcon(!!s.preferred),
-      onAccao: () => patchSupplier(s.id, { preferred: !s.preferred }),
+      onAccao: () =>
+        patchSupplier(
+          s.preferred ? `tirar «${s.name}» dos preferidos` : `marcar «${s.name}» como preferido`,
+          s.id,
+          { preferred: !s.preferred },
+        ),
     },
     { id: "editar", rotulo: "Editar", icone: LapisIcon, onAccao: () => startEdit(s) },
     {
@@ -168,49 +174,98 @@ export default function Fornecedores() {
    * produção, Cronograma): guardar o estado anterior, verificar a resposta,
    * repor e dizer o que aconteceu.
    */
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ QUAL FORNECEDOR
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As três escritas tinham seis frases entre si («Não foi possível guardar o
+   * fornecedor.», «Erro de ligação ao remover…»), e nenhuma dizia de QUEM se
+   * estava a falar nem o que fazer a seguir. A sessão expirada e a rede em
+   * baixo levavam o mesmo aviso, e são o caso em que repetir resolve e o caso
+   * em que repetir não pode resolver.
+   *
+   * Um sítio só a pedir, a verificar o `ok` e a escolher a frase
+   * (`porque-falhou`). É o padrão de `MaterialListas`.
+   */
+  async function gravar(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch {
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return { ok: false, corpo: null };
+    }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return { ok: false, corpo };
+    }
+    return { ok: true, corpo };
+  }
+
   async function add() {
     if (!form.name.trim()) return;
-    try {
-      const res = await fetch("/api/fornecedores", {
+    // O formulário fica ABERTO e preenchido quando falha: o que ela escreveu
+    // não se perde, e o campo por onde recomeçar é o mesmo em que estava.
+    const { ok, corpo } = await gravar(
+      `guardar o fornecedor «${form.name.trim()}»`,
+      "/api/fornecedores",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
-      });
-      if (!res.ok) {
-        // O formulário fica ABERTO e preenchido: o que ela escreveu não se
-        // perde, e o campo por onde recomeçar é o mesmo em que estava.
-        toast("Não foi possível guardar o fornecedor.", "error");
-        return;
-      }
-      const created = await res.json();
-      setSuppliers((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-      setForm({ name: "", category: "Catering", phone: "", email: "", location: "", notes: "" });
-      setAdding(false);
-    } catch {
-      toast("Erro de ligação ao guardar o fornecedor.", "error");
+      },
+    );
+    if (!ok) return;
+    const created = corpo as Supplier | null;
+    // Um 200 sem ficha no corpo não é uma ficha para pôr na lista — sem este
+    // guarda entrava um `null` e a ordenação por nome rebentava a seguir.
+    if (!created?.id) {
+      toast(
+        `«${form.name.trim()}» ficou guardado, mas não voltou do servidor. Atualiza a página.`,
+        "error",
+      );
+      return;
     }
+    setSuppliers((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+    setForm({ name: "", category: "Catering", phone: "", email: "", location: "", notes: "" });
+    setAdding(false);
   }
 
   async function remove(id: string) {
     const s = suppliers.find((x) => x.id === id);
     if (!confirm(`Remover o fornecedor${s ? ` "${s.name}"` : ""}? Esta ação não pode ser anulada.`))
       return;
-    const snapshot = suppliers;
+    // Repõe-se ESTA ficha no sítio dela, não a lista inteira de antes do
+    // pedido. Repor a lista desfazia o que tivesse gravado bem enquanto este
+    // pedido ia a caminho: ela apaga dois fornecedores seguidos, o segundo
+    // passa, o primeiro volta com erro — e o segundo reaparecia no ecrã apesar
+    // de já não existir na base de dados.
+    const posicao = suppliers.findIndex((x) => x.id === id);
     setSuppliers((prev) => prev.filter((x) => x.id !== id));
-    try {
-      const res = await fetch(`/api/fornecedores/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        setSuppliers(snapshot);
-        toast("Não foi possível remover o fornecedor.", "error");
-      }
-    } catch {
-      setSuppliers(snapshot);
-      toast("Erro de ligação ao remover o fornecedor.", "error");
+    const { ok } = await gravar(
+      `remover o fornecedor «${s?.name ?? "sem nome"}»`,
+      `/api/fornecedores/${id}`,
+      { method: "DELETE" },
+    );
+    if (!ok && s) {
+      setSuppliers((prev) => {
+        if (prev.some((x) => x.id === id)) return prev;
+        const onde = Math.min(posicao < 0 ? prev.length : posicao, prev.length);
+        return [...prev.slice(0, onde), s, ...prev.slice(onde)];
+      });
     }
   }
 
-  async function patchSupplier(id: string, patch: PatchFornecedor): Promise<boolean> {
-    const snapshot = suppliers;
+  async function patchSupplier(oQue: string, id: string, patch: PatchFornecedor): Promise<boolean> {
+    // O anterior é DESTA ficha (ver a nota em `remove`): repor a lista inteira
+    // apagava do ecrã as alterações que outra gravação tivesse feito entretanto.
+    const anterior = suppliers.find((s) => s.id === id);
     // `null` é o "apagar este campo" que a rota entende; em memória o campo
     // passa a não existir — que é exactamente como ele volta a ser lido depois
     // (o `fromRow` do store traduz a coluna nula para `undefined`).
@@ -218,23 +273,16 @@ export default function Fornecedores() {
       Object.entries(patch).map(([k, v]) => [k, v ?? undefined]),
     ) as Partial<Supplier>;
     setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...emMemoria } : s)));
-    try {
-      const res = await fetch(`/api/fornecedores/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      if (!res.ok) {
-        setSuppliers(snapshot);
-        toast("Não foi possível guardar as alterações.", "error");
-        return false;
-      }
-      return true;
-    } catch {
-      setSuppliers(snapshot);
-      toast("Erro de ligação ao guardar as alterações.", "error");
+    const { ok } = await gravar(oQue, `/api/fornecedores/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!ok) {
+      if (anterior) setSuppliers((prev) => prev.map((s) => (s.id === id ? anterior : s)));
       return false;
     }
+    return true;
   }
 
   function startEdit(s: Supplier) {
@@ -252,7 +300,8 @@ export default function Fornecedores() {
   async function saveEdit(id: string) {
     // A edição só FECHA se o servidor tiver aceitado. Fechá-la de qualquer
     // maneira era mostrar-lhe o valor antigo de volta sem explicação nenhuma.
-    if (!(await patchSupplier(id, editForm))) return;
+    const nome = suppliers.find((x) => x.id === id)?.name ?? editForm.name.trim();
+    if (!(await patchSupplier(`guardar as alterações a «${nome}»`, id, editForm))) return;
     setEditingId(null);
   }
 
@@ -609,7 +658,15 @@ export default function Fornecedores() {
                         editar é um engano à espera de acontecer. */}
                     <div className="hidden com-rato:flex items-center gap-2 shrink-0">
                       <button
-                        onClick={() => patchSupplier(s.id, { preferred: !s.preferred })}
+                        onClick={() =>
+                          patchSupplier(
+                            s.preferred
+                              ? `tirar «${s.name}» dos preferidos`
+                              : `marcar «${s.name}» como preferido`,
+                            s.id,
+                            { preferred: !s.preferred },
+                          )
+                        }
                         className={`alvo-toque p-1.5 transition-colors ${s.preferred ? "text-amber-500 hover:text-amber-400" : "text-foreground/15 sem-rato:text-foreground/55 hover:text-amber-400 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"}`}
                         title={s.preferred ? "Remover dos preferidos" : "Marcar como preferido"}
                       >
@@ -647,7 +704,13 @@ export default function Fornecedores() {
                         // ficava um "não foi possível guardar" sem explicação. É
                         // o único caminho para desfazer um clique enganado.
                         onClick={() =>
-                          patchSupplier(s.id, { rating: s.rating === star ? null : star })
+                          patchSupplier(
+                            s.rating === star
+                              ? `tirar a avaliação de «${s.name}»`
+                              : `avaliar «${s.name}» com ${star} estrela${star !== 1 ? "s" : ""}`,
+                            s.id,
+                            { rating: s.rating === star ? null : star },
+                          )
                         }
                         /* MEDIDO a 375px: 13×13 px, 2px de uma estrela para a
                            outra — o dedo não acerta na que quer, e acaba a
