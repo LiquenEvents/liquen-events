@@ -763,6 +763,32 @@ describe("o fecho", () => {
     expect(imagens[imagens.length - 1].getAttribute("src")).toBe("mini/capa1");
   });
 
+  it("com a derivada assinada, o fecho não passa pela nossa rota", () => {
+    // A capa já fazia isto; o fecho tinha ficado de fora e ia SEMPRE pela
+    // rota — que abre o token, descarrega os bytes para dentro da função e só
+    // então os reencaminha, com um arranque a frio pelo meio. Numa página que
+    // ela quer instantânea, é a última fotografia a ser a mais cara.
+    comCapas(
+      [DUAS_CAPAS[0], { ...DUAS_CAPAS[1], media: "https://cdn/media-capa1" }],
+      ["ped/capa0.jpg", "ped/capa1.jpg"],
+    );
+    const imagens = Array.from(document.querySelectorAll("img"));
+    const srcset = imagens[imagens.length - 1].getAttribute("srcset") ?? "";
+    expect(srcset).toContain("https://cdn/media-capa1 1200w");
+    expect(srcset).not.toContain("/api/proposta/");
+  });
+
+  it("sem derivada, o fecho continua a ter a rota que a fabrica", () => {
+    // A rota deixa de ser o caminho de todos os dias e passa a ser o de
+    // arranque — mas tem de continuar lá, senão uma fotografia ainda sem
+    // derivada ficava sem candidato de 1200 px nenhum.
+    comCapas(DUAS_CAPAS, ["ped/capa0.jpg", "ped/capa1.jpg"]);
+    const imagens = Array.from(document.querySelectorAll("img"));
+    expect(imagens[imagens.length - 1].getAttribute("srcset")).toContain(
+      "/api/proposta/tk/foto/c1 1200w",
+    );
+  });
+
   it("a fotografia do fecho entra preguiçosa", () => {
     // Está no fim de uma página com quarenta e seis fotografias; quem lá chega
     // já esperou o que tinha a esperar.

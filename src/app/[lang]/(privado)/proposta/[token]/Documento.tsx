@@ -1207,7 +1207,18 @@ export default function Documento({
             src={fecho.miniatura ?? fecho.original}
             {...(fecho.miniatura
               ? {
-                  srcSet: `${fecho.miniatura} 400w, /api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(fecho.id)} 1200w`,
+                  /* A MESMA regra da capa, que esta tinha ficado sem: com a
+                     derivada assinada (`fecho.media`), os bytes vêm do CDN
+                     directos ao telemóvel. A nossa rota abre o token,
+                     descarrega os bytes para dentro da função e só então os
+                     reencaminha — os mesmos bytes a atravessar-nos a caminho
+                     de um sítio onde já estavam, com um arranque a frio pelo
+                     meio. Fica para quando a derivada ainda não existe: é ela
+                     que a fabrica e guarda. */
+                  srcSet: `${fecho.miniatura} 400w, ${
+                    fecho.media ??
+                    `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(fecho.id)}`
+                  } 1200w`,
                   sizes: "(min-width: 1024px) 1024px, 100vw",
                 }
               : {})}
