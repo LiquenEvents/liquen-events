@@ -79,3 +79,67 @@ describe("arrumosDeNomes", () => {
     ]);
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PONTUAÇÃO QUE FICOU TORTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O nome real da biblioteca dela, com três defeitos numa linha: um espaço a
+ * seguir ao parêntese aberto, um parêntese fechado a mais, e um `0` onde devia
+ * estar um `o`. É o que sai de escrever um nome no telemóvel, com pressa, no
+ * meio de um evento — e depois nunca mais se volta a esse campo.
+ */
+describe("nomes escritos com pressa", () => {
+  it("O NOME DELA: «Clássico Intemporal ( Branco/dourad0))»", () => {
+    expect(arrumarNomeDeTema("Clássico Intemporal ( Branco/dourad0))")).toBe(
+      "Clássico Intemporal (Branco/Dourado)",
+    );
+  });
+
+  it("o espaço encostado por dentro do parêntese sai", () => {
+    expect(arrumarNomeDeTema("Boho ( verão )")).toBe("Boho (Verão)");
+  });
+
+  it("um fecha-parêntese a mais cai", () => {
+    expect(arrumarNomeDeTema("Praia (areia))")).toBe("Praia (Areia)");
+  });
+
+  /**
+   * Fechar um parêntese que ela não abriu era pôr no nome dela uma coisa que
+   * ela não escreveu — e um nome é escolha de quem o escreve.
+   */
+  it("um parêntese que falta NÃO se inventa", () => {
+    expect(arrumarNomeDeTema("Praia (areia")).toBe("Praia (Areia");
+  });
+
+  it("a barra separa palavras, e as duas levam maiúscula", () => {
+    expect(arrumarNomeDeTema("branco/verde")).toBe("Branco/Verde");
+  });
+});
+
+/**
+ * O zero é o gémeo visual do «o». A regra é apertada de propósito: o risco
+ * aqui é estragar um nome legítimo, e o teste é sobretudo do que ela NÃO toca.
+ */
+describe("o zero no lugar do «o»", () => {
+  it("«dourad0» é «dourado»", () => {
+    expect(arrumarNomeDeTema("dourad0")).toBe("Dourado");
+  });
+
+  it("«Mesa 1» fica como está — o número é a palavra toda", () => {
+    expect(arrumarNomeDeTema("Mesa 1")).toBe("Mesa 1");
+  });
+
+  it("«Tema 0» fica como está", () => {
+    expect(arrumarNomeDeTema("Tema 0")).toBe("Tema 0");
+  });
+
+  it("uma palavra curta com um zero não se adivinha", () => {
+    expect(arrumarNomeDeTema("G0")).toBe("G0");
+  });
+
+  it("dois dígitos não são um engano de tecla", () => {
+    expect(arrumarNomeDeTema("Top10")).toBe("Top10");
+  });
+});
