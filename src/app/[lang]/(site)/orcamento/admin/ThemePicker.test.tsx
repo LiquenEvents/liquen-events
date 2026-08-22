@@ -826,7 +826,7 @@ describe("ThemePicker", () => {
 
     // E o Shift+clique ao contrário desmarca o intervalo todo.
     fireEvent.click(photo(1), { shiftKey: true });
-    expect(screen.getByText("Toca nas fotos que queres usar.")).toBeInTheDocument();
+    expect(screen.getByText("Escolhe pelo menos uma foto.")).toBeInTheDocument();
   });
 
   it("marca as fotos que já estão nesta proposta", async () => {
@@ -1155,14 +1155,44 @@ describe("o que se escolhe, dito pelo número", () => {
     expect(screen.getByRole("button", { name: "Adicionar 1 e escolher mais" })).toBeInTheDocument();
   });
 
-  it("no telemóvel diz o que o dedo faz e o que a lupa faz", async () => {
+  /**
+   * ── UMA INSTRUÇÃO, E OS ATALHOS ATRÁS DO «?» ────────────────────────────
+   *
+   * Palavras dela: «há três textos de ajuda a competir; devia ser uma
+   * instrução curta e os atalhos atrás de um "?"».
+   *
+   * Eram três: duas versões da mesma frase na barra (uma para o dedo, outra
+   * para o rato, ambas sempre visíveis) e a do rodapé. Ficou a do rodapé.
+   */
+  it("a barra não repete a instrução do rodapé", async () => {
     photos = folder(6);
     await openPicker(true);
-    // A dica de teclado é do computador (`hidden sm:inline`); esta é a do dedo,
-    // e não existia.
-    const dica = screen.getByText(/Toca para escolher/);
-    expect(dica.className).toContain("sm:hidden");
-    expect(dica.textContent).toContain("lupa");
+    expect(screen.queryByText(/Toca para escolher/)).toBeNull();
+    expect(screen.queryByText(/Shift \+ clique escolhe/)).toBeNull();
+  });
+
+  it("os atalhos estão a um toque, e não sempre no ecrã", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    const ajuda = screen.getByRole("button", { name: /como escolher fotos/i });
+    // Fechado: nada do que ele explica está no ecrã.
+    expect(screen.queryByText(/escolhe tudo o que está pelo meio/i)).toBeNull();
+    fireEvent.click(ajuda);
+    expect(screen.getByText(/escolhe tudo o que está pelo meio/i)).toBeInTheDocument();
+    expect(screen.getByText(/mostra-a em grande/i)).toBeInTheDocument();
+  });
+
+  /**
+   * O painel está encostado à margem direita da barra: ancorado à esquerda,
+   * as 18 rem dele saíam do diálogo e lia-se metade de cada linha.
+   */
+  it("o painel dos atalhos abre para dentro do diálogo", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    fireEvent.click(screen.getByRole("button", { name: /como escolher fotos/i }));
+    const painel = screen.getByRole("note");
+    expect(painel.className).toContain("right-0");
+    expect(painel.className).not.toContain("left-0");
   });
 });
 
@@ -1362,7 +1392,7 @@ describe("o painel a 390 px", () => {
 
   it("o rodapé quebra em vez de espremer a contagem", async () => {
     await openPicker(true);
-    const contagem = screen.getByText(/Toca nas fotos que queres usar/);
+    const contagem = screen.getByText("Escolhe pelo menos uma foto.");
     const linha = contagem.closest("div")?.parentElement;
     expect(linha?.className, "sem `flex-wrap` os botões comem o texto").toContain("flex-wrap");
     // O texto ocupa a linha toda no telemóvel e volta ao lado dos botões
@@ -1370,10 +1400,44 @@ describe("o painel a 390 px", () => {
     expect(contagem.closest("div")?.className).toContain("basis-full");
   });
 
-  it("e a frase inteira está lá — não «Toca»", async () => {
+  it("e a frase inteira está lá — não uma palavra cortada", async () => {
     await openPicker(true);
-    // O controlo positivo do de cima: a frase que era cortada.
-    expect(screen.getByText("Toca nas fotos que queres usar.")).toBeInTheDocument();
+    // O controlo positivo do de cima: a frase que era cortada. Hoje é outra
+    // — «Escolhe pelo menos uma foto.» —, e o que se prende é o mesmo: que
+    // cabe inteira.
+    expect(screen.getByText("Escolhe pelo menos uma foto.")).toBeInTheDocument();
+  });
+
+  /**
+   * ── O BOTÃO DESLIGADO PASSA A DIZER PORQUÊ ────────────────────────────
+   *
+   * Palavras dela: «o botão de adicionar aparece desativado sem dizer porquê».
+   * A razão já estava escrita ao lado; o que faltava era estar LIGADA ao
+   * botão, para quem ouve o ecrã em vez de o ver.
+   */
+  it("os botões de adicionar apontam para a razão de estarem desligados", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    const razao = screen.getByText("Escolhe pelo menos uma foto.");
+    expect(razao.id).toBeTruthy();
+    // Os dois: o «e escolher mais» e o de confirmar. Ambos estão desligados
+    // pela mesma razão, e ambos têm de a apontar.
+    const botoes = screen.getAllByRole("button", { name: /^Adicionar/ });
+    expect(botoes).toHaveLength(2);
+    for (const b of botoes) {
+      expect(b).toBeDisabled();
+      expect(b.getAttribute("aria-describedby")).toBe(razao.id);
+    }
+  });
+
+  it("e deixam de apontar assim que há uma foto escolhida", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    fireEvent.click(photo(1));
+    for (const b of screen.getAllByRole("button", { name: /^Adicionar/ })) {
+      expect(b).not.toBeDisabled();
+      expect(b.getAttribute("aria-describedby")).toBeNull();
+    }
   });
 
   it("o fundo separa o painel da página, em vez de a deixar ler", async () => {
@@ -1388,7 +1452,7 @@ describe("o painel a 390 px", () => {
 
   it("e o rodapé não fica debaixo da barra de gestos do iPhone", async () => {
     await openPicker(true);
-    const contagem = screen.getByText(/Toca nas fotos que queres usar/);
+    const contagem = screen.getByText("Escolhe pelo menos uma foto.");
     const linha = contagem.closest("div")?.parentElement as HTMLElement;
     expect(linha.style.paddingBottom).toContain("safe-area-inset-bottom");
   });

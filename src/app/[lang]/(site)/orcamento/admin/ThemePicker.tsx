@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { idUnico } from "@/lib/id-unico";
 import { PENDING_IMAGE_PREFIX } from "@/lib/proposal-doc";
@@ -13,7 +21,8 @@ import {
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
-import { Button } from "./ui";
+import { MEDIDA_LG, useMedida } from "./useMedida";
+import { Ajuda, Button } from "./ui";
 import { CuradoriaDeFotos } from "./CuradoriaDeFotos";
 import { PaginaEmConstrucao, type FotoDaPagina } from "./PaginaEmConstrucao";
 import {
@@ -1535,6 +1544,21 @@ export default function ThemePicker({
    * sair de graça.
    */
   const [curadoria, setCuradoria] = useState(false);
+  /** Há coluna de temas? É ela que decide onde o cartão da página vive. */
+  const largoQueChegue = useMedida(MEDIDA_LG);
+  /**
+   * ── PORQUE É QUE O BOTÃO ESTÁ DESLIGADO ────────────────────────────────
+   *
+   * Palavras dela: «o botão de adicionar aparece desativado sem dizer porquê».
+   *
+   * A razão já estava escrita — «Escolhe pelo menos uma foto», no rodapé, ao
+   * lado da contagem —, mas não estava LIGADA ao botão: quem usa leitor de
+   * ecrã ouvia «Adicionar, indisponível» e mais nada, e quem lê com os olhos
+   * tinha de adivinhar que aquela frase a três centímetros era sobre este
+   * botão. `aria-describedby` fecha essa distância sem repetir o texto — que
+   * era como estas três instruções se multiplicaram da primeira vez.
+   */
+  const idDaRazao = useId();
 
   const procuraVisivel = procuraAberta || procuraTema !== "";
 
@@ -2115,6 +2139,31 @@ export default function ThemePicker({
                 )}
               </div>
             )}
+            {/* ── O QUE SE ESTÁ A COMPOR ────────────────────────────────
+                «O cartão está por cima das fotos, a tapar conteúdo. Deve estar
+                ancorado no layout, não sobreposto.»
+
+                Tem razão, e a razão de ele flutuar deixou de valer: quando
+                nasceu, o painel era uma coluna só e qualquer sítio que ele
+                ocupasse era uma linha de fotografias a menos. Com os temas na
+                lateral há um sítio que NÃO é das fotos — o fundo desta coluna —
+                e ali cabe com a largura toda, ao lado de onde se escolhe.
+
+                UMA instância, e não duas escondidas com CSS: duas ficariam
+                montadas ao mesmo tempo, cada uma com o seu aberto/fechado e as
+                duas a escrever na mesma chave do `localStorage`. Ver
+                `useMedida`. */}
+            {paginaEmConstrucao && multiple && largoQueChegue && (
+              <div className="mt-3 shrink-0">
+                <PaginaEmConstrucao
+                  titulo={paginaEmConstrucao.titulo}
+                  jaLa={paginaEmConstrucao.fotos}
+                  aEntrar={aEntrar}
+                  maximo={paginaEmConstrucao.maximo}
+                  ancorada
+                />
+              </div>
+            )}
           </div>
 
           {/* A coluna da direita: a barra de selecção e a grelha. Um invólucro só,
@@ -2156,18 +2205,43 @@ export default function ThemePicker({
                     Uma de cada vez
                   </Button>
                 )}
-                {/* ── O QUE O DEDO FAZ, E O QUE A LUPA FAZ ────────────────────
-                A dica de teclado é do computador e continua lá. No telemóvel
-                não havia dica nenhuma, e as duas acções que uma célula tem —
-                escolher e ver em grande — só se descobriam por tentativa.
-                Palavras dela: «a distinção tem de ser óbvia». */}
-                <span className="bo-text-muted ml-auto text-xs sm:hidden">
-                  Toca para escolher · a lupa mostra em grande
-                </span>
-                <span className="bo-text-muted ml-auto hidden text-xs sm:inline">
-                  Shift + clique escolhe tudo o que está pelo meio · <strong>V</strong> mostra a
-                  foto em grande
-                </span>
+                {/* ── TRÊS TEXTOS DE AJUDA A COMPETIR, E AGORA UM ─────────────
+                Palavras dela: «há três textos de ajuda a competir; devia ser
+                uma instrução curta e os atalhos atrás de um "?"».
+
+                Havia mesmo. Aqui em cima duas versões da MESMA frase, uma para
+                o dedo e outra para o rato, ambas sempre no ecrã; e lá em baixo,
+                no rodapé, «Toca nas fotos que queres usar.» a dizer a terceira
+                vez a mesma coisa. Nenhum dos três é falso — o problema é que
+                são úteis na primeira vez e ruído a partir da segunda, e quem
+                lê três instruções ao mesmo tempo não fica a saber mais.
+
+                Fica UMA, no rodapé, onde já está a contagem: é o mesmo sítio
+                para onde o olho vai ver quantas escolheu, e é a mesma frase que
+                explica porque é que o botão de adicionar está desligado. Os
+                atalhos — que são de teclado e não se adivinham de qualquer
+                maneira — mudam-se para aqui, atrás do «?», e continuam a estar
+                a um toque de quem os quiser.
+
+                `alinhar="direita"` porque o botão está encostado à margem: um
+                painel a crescer para a direita a partir daqui saía do diálogo. */}
+                <Ajuda sobre="como escolher fotos" alinhar="direita" className="ml-auto">
+                  <span className="block text-[11px] font-medium text-foreground/80">
+                    Como escolher
+                  </span>
+                  <ul className="mt-1.5 space-y-1">
+                    <li>Toca numa foto para a escolher. Toca outra vez para a tirar.</li>
+                    <li>A lupa de cada foto mostra-a em grande sem sair daqui.</li>
+                    <li>
+                      No computador: <strong>setas</strong> andam pela grelha e <strong>V</strong>{" "}
+                      mostra em grande.
+                    </li>
+                    <li>
+                      <strong>Shift</strong> + clique (ou Shift + seta) escolhe tudo o que está pelo
+                      meio.
+                    </li>
+                  </ul>
+                </Ajuda>
               </div>
             )}
 
@@ -2412,7 +2486,10 @@ export default function ThemePicker({
                 </>
               )}
 
-              {paginaEmConstrucao && multiple && (
+              {/* Sem coluna, o canto de sempre: aqui a alternativa seria
+                  roubar altura à grelha, que é o problema que a coluna
+                  acabou de resolver. */}
+              {paginaEmConstrucao && multiple && !largoQueChegue && (
                 <PaginaEmConstrucao
                   titulo={paginaEmConstrucao.titulo}
                   jaLa={paginaEmConstrucao.fotos}
@@ -2467,10 +2544,17 @@ export default function ThemePicker({
               o limite e não outra vez a cada toque bloqueado (esses não mudam
               nada, logo não anunciam nada). */}
           <div className="min-w-0 basis-full sm:basis-auto" aria-live="polite">
-            <p className="bo-text-muted text-xs">
+            {/* Esta é A instrução — a única que sobrou das três — e é também a
+                razão de os botões ao lado estarem desligados. Ver `idDaRazao`.
+                «Escolhe pelo menos uma foto» e não «Toca nas fotos que queres
+                usar»: a segunda é um convite e lê-se bem quando o ecrã abre,
+                mas não responde à pergunta «porque é que não posso carregar
+                aqui?» — e é essa a pergunta que se faz com o botão apagado à
+                frente. */}
+            <p className="bo-text-muted text-xs" id={idDaRazao}>
               {selected.length === 0
                 ? multiple
-                  ? "Toca nas fotos que queres usar."
+                  ? "Escolhe pelo menos uma foto."
                   : "Escolhe uma foto."
                 : multiple && selected.length >= COUNTDOWN_FROM
                   ? `${selected.length} de ${MAX_IMPORT_BATCH} fotos selecionadas`
@@ -2507,6 +2591,7 @@ export default function ThemePicker({
                 variant="secondary"
                 onClick={() => submit(false)}
                 disabled={selected.length === 0}
+                aria-describedby={selected.length === 0 ? idDaRazao : undefined}
               >
                 {selected.length > 0
                   ? `Adicionar ${selected.length} e escolher mais`
@@ -2521,6 +2606,7 @@ export default function ThemePicker({
               size="sm"
               onClick={() => submit(true)}
               disabled={selected.length === 0}
+              aria-describedby={selected.length === 0 ? idDaRazao : undefined}
             >
               {/* ── O NÚMERO NO BOTÃO ────────────────────────────────────
                   «Adicionar 4 fotos» e não «Adicionar e fechar»: o que se

@@ -1,11 +1,12 @@
 "use client";
 
-import { useSyncExternalStore, useState } from "react";
+import { useState } from "react";
 import type { MoodBoard } from "@/lib/proposal-doc";
 import { MOOD_BOARD_MAX_IMAGES } from "@/lib/proposal-doc";
 import { ASPETO_POR_OMISSAO, type LayoutDeMoodboard } from "@/lib/proposal-geometria";
 import { layoutDoBoard as layoutEfectivo, ordemDasFotos } from "@/lib/proposal-moodboard";
 import PreviaDaPagina from "./PreviaDaPagina";
+import { useMedida } from "./useMedida";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -64,25 +65,7 @@ export interface PaginaParaOPainel {
  */
 const MEDIDA_DO_PAINEL = "(min-width: 1536px)";
 
-function useLarguraQueChega(): boolean {
-  return useSyncExternalStore(
-    (avisar) => {
-      // Sem `matchMedia` não há a quem perguntar nem a quem ouvir. Acontece no
-      // servidor e em ambientes de teste, e a resposta é a mesma que a de um
-      // ecrã estreito: não há painel. Um painel que rebentasse por não saber a
-      // largura seria pior do que não haver painel.
-      const mq = typeof window !== "undefined" ? window.matchMedia?.(MEDIDA_DO_PAINEL) : undefined;
-      if (!mq) return () => {};
-      mq.addEventListener("change", avisar);
-      return () => mq.removeEventListener("change", avisar);
-    },
-    () =>
-      typeof window !== "undefined"
-        ? (window.matchMedia?.(MEDIDA_DO_PAINEL).matches ?? false)
-        : false,
-    () => false,
-  );
-}
+const useLarguraQueChega = () => useMedida(MEDIDA_DO_PAINEL);
 
 export default function PainelDoEstudio({
   paginas,

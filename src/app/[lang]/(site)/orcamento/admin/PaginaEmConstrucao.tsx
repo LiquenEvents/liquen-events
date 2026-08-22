@@ -76,6 +76,7 @@ export function PaginaEmConstrucao({
   jaLa,
   aEntrar,
   maximo,
+  ancorada = false,
 }: {
   /** O título da página, como ela lhe chamou. */
   titulo?: string;
@@ -85,8 +86,27 @@ export function PaginaEmConstrucao({
   aEntrar: readonly FotoDaPagina[];
   /** Quantas a página do PDF imprime. */
   maximo: number;
+  /**
+   * ── ANCORADA, E NÃO POR CIMA DAS FOTOS ────────────────────────────────
+   *
+   * Palavras dela: «o cartão "Decoração Cerimónia · 4 de 10" está por cima das
+   * fotos, a tapar conteúdo. Deve estar ancorado no layout, não sobreposto».
+   *
+   * Tem razão, e a razão de ele flutuar deixou de valer. Quando nasceu, o
+   * painel era uma coluna só: qualquer sítio que ele ocupasse era uma linha de
+   * fotografias a menos, e por isso ficou a flutuar no canto, pequeno e
+   * dispensável. Com os temas na lateral (Fase 4) passou a haver um sítio que
+   * NÃO é das fotos — o fundo da coluna dos temas — e aí ele cabe com a largura
+   * toda, sem tapar nada.
+   *
+   * Abaixo de `lg` não há coluna nenhuma, e aí continua a flutuar: é isso ou
+   * roubar altura à grelha, que é o problema que a Fase 4 acabou de resolver.
+   */
+  ancorada?: boolean;
 }) {
   const [aberta, setAberta] = useState(guardada);
+  /** Onde o cartão se põe. Ancorado não flutua; a flutuar, no canto de sempre. */
+  const flutuante = ancorada ? "" : "absolute bottom-3 right-3";
 
   const total = jaLa.length + aEntrar.length;
   if (total === 0) return null;
@@ -111,7 +131,7 @@ export function PaginaEmConstrucao({
         type="button"
         onClick={alternar}
         aria-expanded={false}
-        className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-full border border-foreground/15 bg-white/95 px-3 py-1.5 text-xs shadow-sm backdrop-blur"
+        className={`z-10 flex items-center gap-1.5 rounded-full border border-foreground/15 bg-white/95 px-3 py-1.5 text-xs shadow-sm backdrop-blur ${flutuante}`}
       >
         <span className="tabular-nums text-foreground/75">
           {total} {total === 1 ? "foto" : "fotos"}
@@ -123,7 +143,9 @@ export function PaginaEmConstrucao({
 
   return (
     <div
-      className="absolute bottom-3 right-3 z-10 w-[7.5rem] rounded-xl border border-foreground/15 bg-white/95 p-2 shadow-md backdrop-blur"
+      className={`z-10 rounded-xl border border-foreground/15 bg-white/95 p-2 shadow-md backdrop-blur ${
+        ancorada ? "w-full" : "w-[7.5rem]"
+      } ${flutuante}`}
       aria-label="A página em construção"
     >
       <div className="flex items-start justify-between gap-1">
