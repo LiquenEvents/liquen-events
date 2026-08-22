@@ -7,6 +7,7 @@ import { progresso } from "@/lib/event-material-types";
 import { useToast } from "./Toast";
 import { Button, SectionCard } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
  * A CHECKLIST DE MATERIAL DESTE EVENTO.
@@ -86,26 +87,55 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
     void buscar();
   }, [buscar]);
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * GERAR, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Isto falhava com «Não foi possível gerar a checklist.» para a rede em
+   * baixo, a sessão expirada, o pedido apagado por outra pessoa, as listas
+   * base que ainda não existem e o servidor em baixo. Quem lê carrega outra
+   * vez — e com a sessão caduca isso não pode funcionar nunca.
+   *
+   * A frase nomeia o EVENTO porque este painel vive dentro da gaveta de um
+   * pedido, e quem tem seis gavetas abertas não sabe de qual é o aviso.
+   */
   async function gerar() {
+    const oQue = `gerar a checklist de material de «${quote.name}»`;
     setGerando(true);
+    let res: Response;
     try {
-      const res = await fetch(`/api/orcamento/${quote.id}/material`, { method: "POST" });
-      const r = await res.json();
-      if (!res.ok) throw new Error();
-      // A mesma regra do `buscar`: só entra no estado o que tem a forma certa.
-      setDados({ evento: r?.evento ?? null, itens: Array.isArray(r?.itens) ? r.itens : [] });
-      setFalha(null);
-      toast(
-        r.preservadas > 0
-          ? `Checklist atualizada. ${r.preservadas} marcações mantidas.`
-          : `Checklist gerada: ${r.itens.length} itens.`,
-        "success",
-      );
+      res = await fetch(`/api/orcamento/${quote.id}/material`, { method: "POST" });
     } catch {
-      toast("Não foi possível gerar a checklist.", "error");
-    } finally {
       setGerando(false);
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return;
     }
+    const r = await res.json().catch(() => null);
+    setGerando(false);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, r).mensagem, "error");
+      return;
+    }
+    // A mesma regra do `buscar`: só entra no estado o que tem a forma certa.
+    const itensGerados = Array.isArray(r?.itens) ? r.itens : [];
+    setDados({ evento: r?.evento ?? null, itens: itensGerados });
+    setFalha(null);
+    /**
+     * A contagem sai da lista JÁ VERIFICADA, e não de `r.itens.length`.
+     *
+     * Com um corpo sem `itens`, o `.length` atirava DEPOIS de o estado estar
+     * escrito: o painel ficava com a checklist gerada no ecrã e, por cima
+     * dela, um aviso a dizer que a geração falhou. Quem o lê carrega em
+     * «Voltar a gerar» — e é isso que perde as marcações de devolvido e de
+     * em falta, que a geração não preserva.
+     */
+    toast(
+      r?.preservadas > 0
+        ? `Checklist atualizada. ${r.preservadas} marcações mantidas.`
+        : `Checklist gerada: ${itensGerados.length} itens.`,
+      "success",
+    );
   }
 
   const { itens } = dados;

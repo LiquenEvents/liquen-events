@@ -16,6 +16,7 @@ import MaterialListas from "./MaterialListas";
 import MaterialRegras from "./MaterialRegras";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
  * CATÁLOGO DE MATERIAL DE LOGÍSTICA.
@@ -166,6 +167,9 @@ function Catalogo() {
   // ── Importação CSV ────────────────────────────────────────────────────────
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [csv, setCsv] = useState<string | null>(null);
+  /** O nome do ficheiro escolhido, só para as frases o poderem dizer: quem
+   *  tenta duas importações seguidas precisa de saber QUAL delas falhou. */
+  const [nomeCsv, setNomeCsv] = useState("");
   const [plano, setPlano] = useState<PlanoCsv | null>(null);
   const [importando, setImportando] = useState(false);
   /**
@@ -195,65 +199,113 @@ function Catalogo() {
     });
   }, [items, dSearch, cat, kind, soEmFalta]);
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Este ecrã tinha cinco escritas e três frases entre elas: «Não foi possível
+   * guardar.», «Erro de ligação ao guardar.» e «Não foi possível remover.» —
+   * as mesmas palavras para a rede em baixo, a sessão expirada, o item apagado
+   * por outra pessoa, o nome repetido e o servidor em baixo. Nenhuma dizia de
+   * QUE material falava, num ecrã que mostra o catálogo inteiro.
+   *
+   * Agora há um sítio só a fazer fetch, a verificar o `ok` e a escolher a
+   * frase — o mesmo padrão do `MaterialListas`. Devolve o corpo porque as
+   * escritas daqui precisam dele (a linha criada, a linha actualizada, o
+   * ensaio do CSV), e devolve `ok` em vez de atirar, porque quem chama tem de
+   * poder repor o ecrã quando falhou.
+   */
+  async function gravar(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch {
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return { ok: false, corpo: null };
+    }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return { ok: false, corpo };
+    }
+    return { ok: true, corpo };
+  }
+
+  /**
+   * Gravou-se, mas o que voltou não tem a forma de um item do catálogo.
+   *
+   * Antes isto entrava na lista à mesma (`await res.json()` sem olhar), e a
+   * linha seguinte a desenhar `i.name` atirava — com o catálogo dentro do back
+   * office, a excepção levava o back office todo. Uma resposta 200 sem corpo
+   * de item acontece com um proxy pelo meio a devolver HTML.
+   */
+  const pareceItem = (c: unknown): c is MaterialItem =>
+    !!c &&
+    typeof (c as MaterialItem).id === "string" &&
+    typeof (c as MaterialItem).name === "string";
+
+  const AVISO_SEM_RELEITURA = "Gravado, mas não deu para reler o catálogo. Atualiza a página.";
+
   async function add() {
     const payload = toPayload(form);
     if (!payload.name) return;
     setSaving(true);
-    try {
-      const res = await fetch("/api/material", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const created: MaterialItem = await res.json();
-        setItems((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-        setForm(EMPTY_FORM);
-        setAdding(false);
-        toast("Material adicionado.", "success");
-      } else {
-        toast("Não foi possível guardar.", "error");
-      }
-    } catch {
-      toast("Erro de ligação ao guardar.", "error");
-    } finally {
-      setSaving(false);
+    const { ok, corpo } = await gravar(`adicionar «${payload.name}» ao catálogo`, "/api/material", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setSaving(false);
+    if (!ok) return;
+    if (!pareceItem(corpo)) {
+      toast(AVISO_SEM_RELEITURA, "error");
+      return;
     }
+    setItems((prev) => [...prev, corpo].sort((a, b) => a.name.localeCompare(b.name)));
+    setForm(EMPTY_FORM);
+    setAdding(false);
+    toast("Material adicionado.", "success");
   }
 
   async function saveEdit(id: string) {
     const payload = toPayload(editForm);
     if (!payload.name) return;
     setSaving(true);
-    try {
-      const res = await fetch(`/api/material/${id}`, {
+    const { ok, corpo } = await gravar(
+      `guardar as alterações a «${payload.name}»`,
+      `/api/material/${id}`,
+      {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const updated: MaterialItem = await res.json();
-        setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
-        setEditingId(null);
-        toast("Guardado.", "success");
-      } else {
-        toast("Não foi possível guardar.", "error");
-      }
-    } catch {
-      toast("Erro de ligação ao guardar.", "error");
-    } finally {
-      setSaving(false);
+      },
+    );
+    setSaving(false);
+    // A edição fica ABERTA quando falha: o que ela escreveu não se perde, e o
+    // campo por onde recomeçar é o mesmo em que estava.
+    if (!ok) return;
+    if (!pareceItem(corpo)) {
+      toast(AVISO_SEM_RELEITURA, "error");
+      return;
     }
+    setItems((prev) => prev.map((i) => (i.id === id ? corpo : i)));
+    setEditingId(null);
+    toast("Guardado.", "success");
   }
 
   async function remove(id: string) {
     const removido = items.find((i) => i.id === id);
     if (!removido) return;
     setItems((prev) => prev.filter((i) => i.id !== id));
-    try {
-      const res = await fetch(`/api/material/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-    } catch {
+    const { ok } = await gravar(`remover «${removido.name}» do catálogo`, `/api/material/${id}`, {
+      method: "DELETE",
+    });
+    if (!ok) {
       // Reversão: o catálogo no ecrã não pode divergir do que está gravado.
       //
       // Repõe-se SÓ esta linha, e sobre o que a lista tiver agora. Guardar a
@@ -268,7 +320,6 @@ function Catalogo() {
           ? prev
           : [...prev, removido].sort((a, b) => a.name.localeCompare(b.name)),
       );
-      toast("Não foi possível remover.", "error");
     }
   }
 
@@ -279,21 +330,28 @@ function Catalogo() {
   async function lerFicheiro(file: File) {
     const texto = await file.text();
     setCsv(texto);
+    setNomeCsv(file.name);
     setImportando(true);
-    try {
-      const res = await fetch("/api/material/importar", {
+    // «ensaiar» e não «ler»: o pedido é o ENSAIO do CSV (aplicar: false), e é
+    // esse o gesto que a frase tem de nomear para se repetir o certo.
+    const { ok, corpo } = await gravar(
+      `ensaiar a importação de «${file.name}»`,
+      "/api/material/importar",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csv: texto, aplicar: false }),
-      });
-      if (!res.ok) throw new Error();
-      setPlano(await res.json());
-    } catch {
-      toast("Não foi possível ler o ficheiro.", "error");
+      },
+    );
+    setImportando(false);
+    // Sem ensaio não há nada a gravar: deitar fora o CSV é o que impede o
+    // painel de "Antes de gravar" de aparecer vazio sobre um ficheiro que o
+    // servidor nunca chegou a ler.
+    if (!ok || !corpo) {
       setCsv(null);
-    } finally {
-      setImportando(false);
+      return;
     }
+    setPlano(corpo as PlanoCsv);
   }
 
   /**
@@ -350,39 +408,60 @@ function Catalogo() {
     if (!csv) return;
     setImportando(true);
     setAGravar(plano ? plano.novos + plano.atualizados : 0);
-    try {
-      const res = await fetch("/api/material/importar", {
+    const { ok, corpo } = await gravar(
+      `gravar a importação de «${nomeCsv || "o ficheiro"}»`,
+      "/api/material/importar",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csv, aplicar: true }),
-      });
-      if (!res.ok) throw new Error();
-      const r = await res.json();
-      setCsv(null);
-      setPlano(null);
-      toast(
-        `${r.criados} novos, ${r.atualizados} atualizados` +
-          (r.ignorados ? `, ${r.ignorados} ignorados` : "") +
-          ".",
-        "success",
-      );
-      // Recarrega em vez de remendar o estado: a importação mexe em muitas
-      // linhas de uma vez e adivinhar o resultado aqui era a maneira de o ecrã
-      // ficar a dizer uma coisa e a base de dados outra.
-      //
-      // A releitura é OUTRA operação, e por isso está FORA do desfecho da
-      // gravação: falhar a reler não desmente o que já ficou gravado, e dizer
-      // "a importação falhou" depois de ela ter corrido era mandar repetir uma
-      // importação que já lá está.
-      if (!(await recarregarCatalogo())) {
-        toast("Gravado, mas não foi possível reler o catálogo. Atualiza a página.", "error");
-      }
-    } catch {
-      toast("A importação falhou.", "error");
-    } finally {
+      },
+    );
+    // O painel do ensaio FICA quando a gravação falha: é dele que se repete, e
+    // deitá-lo fora obrigava a escolher o ficheiro outra vez.
+    if (!ok) {
       setImportando(false);
       setAGravar(null);
+      return;
     }
+    const r = corpo as { criados?: number; atualizados?: number; ignorados?: number } | null;
+    setCsv(null);
+    setPlano(null);
+    /**
+     * A contagem só se diz quando ela VEIO.
+     *
+     * `${r.criados} novos` era lido de um corpo que se assumia bom: se a
+     * resposta não trouxesse números, o antigo `await res.json()` atirava DEPOIS
+     * de a importação já ter corrido, e o ecrã dizia «A importação falhou» sobre
+     * centenas de linhas que tinham entrado. Quem lê isso importa o ficheiro
+     * outra vez. Dizer «0 novos» seria a mesma mentira ao contrário.
+     */
+    toast(
+      typeof r?.criados === "number"
+        ? `${r.criados} novos, ${r.atualizados ?? 0} atualizados` +
+            (r.ignorados ? `, ${r.ignorados} ignorados` : "") +
+            "."
+        : "Importação gravada. O servidor não disse quantas linhas entraram — confere o catálogo.",
+      "success",
+    );
+    // Recarrega em vez de remendar o estado: a importação mexe em muitas
+    // linhas de uma vez e adivinhar o resultado aqui era a maneira de o ecrã
+    // ficar a dizer uma coisa e a base de dados outra.
+    //
+    // A releitura é OUTRA operação, e por isso está FORA do desfecho da
+    // gravação: falhar a reler não desmente o que já ficou gravado, e dizer
+    // "a importação falhou" depois de ela ter corrido era mandar repetir uma
+    // importação que já lá está.
+    //
+    // A espera («A gravar o material…») só se fecha DEPOIS da releitura: era
+    // por isso que o `setAGravar(null)` estava num `finally` e não a seguir à
+    // resposta — sem isto o ecrã ficava mudo durante a leitura do catálogo
+    // inteiro, que é a parte lenta em ficheiros grandes.
+    if (!(await recarregarCatalogo())) {
+      toast("Gravado, mas não foi possível reler o catálogo. Atualiza a página.", "error");
+    }
+    setImportando(false);
+    setAGravar(null);
   }
 
   function exportar() {
@@ -598,6 +677,7 @@ function Catalogo() {
               onClick={() => {
                 setPlano(null);
                 setCsv(null);
+                setNomeCsv("");
               }}
             >
               Cancelar

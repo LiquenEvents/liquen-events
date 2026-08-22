@@ -7,6 +7,7 @@ import { printRunSheet } from "./export";
 import type { Quote, TimelineItem } from "@/lib/orcamento/types";
 import { Button, Field, EmptyState } from "./ui";
 import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 interface Props {
   quote: Quote;
@@ -66,44 +67,80 @@ export default function EventTimeline({ quote, onChange }: Props) {
   const gravacoes = useRef(0);
   const gravado = useRef<TimelineItem[]>(quote.timeline ?? []);
 
-  function persist(next: TimelineItem[]) {
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * A GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As seis acções deste painel passam por aqui, e todas falhavam com «Não foi
+   * possível guardar o guião. Tenta novamente.» — a mesma frase para a rede em
+   * baixo, a sessão expirada, o pedido apagado por outra pessoa e o servidor em
+   * baixo. Nos dois do meio, repetir falha sempre.
+   *
+   * E o `oQue` nomeia o MOMENTO: a reversão desfaz uma linha de um guião com
+   * uma dúzia delas, e sem o nome ninguém sabe qual é que voltou atrás.
+   */
+  function persist(oQue: string, next: TimelineItem[]) {
     const sorted = sortByTime(next);
     const minha = ++gravacoes.current;
     setItems(sorted);
     onChange(sorted);
-    fetch(`/api/orcamento/${quote.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ timeline: sorted }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error();
-        if (minha === gravacoes.current) gravado.current = sorted;
-      })
-      .catch(() => {
-        // Já foi substituída por uma gravação mais recente: o que essa levar
-        // contém o que esta levava, portanto não há nada a desfazer nem nada a
-        // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
-        if (minha !== gravacoes.current) return;
-        setItems(gravado.current);
-        onChange(gravado.current);
-        toast("Não foi possível guardar o guião. Tenta novamente.", "error");
-      });
+
+    // Desfaz o que foi posto no ecrã e diz porquê — a não ser que já haja uma
+    // gravação mais recente: o que essa levar contém o que esta levava,
+    // portanto não há nada a desfazer nem nada a dizer. Se ELA também falhar, é
+    // ela que repõe — e para o mesmo sítio.
+    const reporEDizer = (mensagem: string) => {
+      if (minha !== gravacoes.current) return;
+      setItems(gravado.current);
+      onChange(gravado.current);
+      toast(mensagem, "error");
+    };
+
+    void (async () => {
+      let res: Response;
+      try {
+        res = await fetch(`/api/orcamento/${quote.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ timeline: sorted }),
+        });
+      } catch {
+        reporEDizer(porqueRebentou(oQue).mensagem);
+        return;
+      }
+      if (!res.ok) {
+        const corpo = await res.json().catch(() => null);
+        reporEDizer(porqueFalhou(oQue, res, corpo).mensagem);
+        return;
+      }
+      if (minha === gravacoes.current) gravado.current = sorted;
+    })();
   }
 
   function seed() {
-    persist(TEMPLATE.map((t) => ({ ...t, id: randomId() })));
+    persist(
+      "gerar o cronograma-base",
+      TEMPLATE.map((t) => ({ ...t, id: randomId() })),
+    );
   }
   function add() {
     const t = title.trim();
     if (!t || !time) return;
-    persist([...items, { id: randomId(), time, title: t, owner: owner.trim() || undefined }]);
+    persist(`acrescentar «${time} ${t}» ao guião`, [
+      ...items,
+      { id: randomId(), time, title: t, owner: owner.trim() || undefined },
+    ]);
     setTime("");
     setTitle("");
     setOwner("");
   }
   function remove(id: string) {
-    persist(items.filter((i) => i.id !== id));
+    const momento = items.find((i) => i.id === id);
+    persist(
+      `remover «${momento ? `${momento.time} ${momento.title}` : "o momento"}» do guião`,
+      items.filter((i) => i.id !== id),
+    );
   }
 
   function startEdit(id: string, field: EditableField, current: string) {
@@ -120,12 +157,18 @@ export default function EventTimeline({ quote, onChange }: Props) {
     if (field === "owner") {
       const next = v || undefined;
       if (next === item.owner) return;
-      persist(items.map((i) => (i.id === id ? { ...i, owner: next } : i)));
+      persist(
+        `mudar o responsável de «${item.title}»`,
+        items.map((i) => (i.id === id ? { ...i, owner: next } : i)),
+      );
       return;
     }
     // Hora/título vazios cancelam em vez de gravar uma linha inválida.
     if (!v || v === item[field]) return;
-    persist(items.map((i) => (i.id === id ? { ...i, [field]: v } : i)));
+    persist(
+      field === "time" ? `mudar a hora de «${item.title}»` : `mudar «${item.title}» para «${v}»`,
+      items.map((i) => (i.id === id ? { ...i, [field]: v } : i)),
+    );
   }
   function editKeys(e: React.KeyboardEvent) {
     if (e.key === "Enter") commitEdit();

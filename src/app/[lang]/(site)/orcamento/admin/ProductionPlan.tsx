@@ -6,6 +6,7 @@ import { useToast } from "./Toast";
 import { metaFor } from "./status-meta";
 import { Button, EmptyState } from "./ui";
 import type { Quote, ChecklistItem, EventSupplierStatus } from "@/lib/orcamento/types";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import {
   DECOR_PRODUCTION,
   PRODUCTION_PHASE_SEP,
@@ -58,42 +59,80 @@ export default function ProductionPlan({ quote, onChange }: Props) {
   const gravacoes = useRef(0);
   const gravado = useRef<ChecklistItem[]>(quote.productionPlan ?? []);
 
-  async function persist(next: ChecklistItem[]) {
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * A GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As quatro acções do plano passam por aqui, e todas falhavam com «Não foi
+   * possível guardar o plano de produção. Tenta novamente.» — a mesma frase
+   * para a rede em baixo, a sessão expirada, o pedido apagado por outra pessoa
+   * e o servidor em baixo. Nos dois do meio, repetir não resolve nada.
+   *
+   * O `oQue` nomeia a TAREFA: o plano tem trinta linhas, a reversão desfaz uma
+   * só, e sem o nome ninguém sabe qual delas se desriscou sozinha no ecrã.
+   */
+  async function persist(oQue: string, next: ChecklistItem[]) {
     const minha = ++gravacoes.current;
     setItems(next);
     onChange?.(next);
+
+    // Desfaz o que foi posto no ecrã e diz porquê — a não ser que já haja uma
+    // gravação mais recente: o que essa levar contém o que esta levava,
+    // portanto não há nada a desfazer nem nada a dizer. Se ELA também falhar, é
+    // ela que repõe — e para o mesmo sítio.
+    const reporEDizer = (mensagem: string) => {
+      if (minha !== gravacoes.current) return;
+      setItems(gravado.current);
+      onChange?.(gravado.current);
+      toast(mensagem, "error");
+    };
+
+    let res: Response;
     try {
-      const res = await fetch(`/api/orcamento/${quote.id}`, {
+      res = await fetch(`/api/orcamento/${quote.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productionPlan: next }),
       });
-      if (!res.ok) throw new Error(String(res.status));
-      if (minha === gravacoes.current) gravado.current = next;
     } catch {
-      // Já foi substituída por uma gravação mais recente: o que essa levar
-      // contém o que esta levava, portanto não há nada a desfazer nem nada a
-      // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
-      if (minha !== gravacoes.current) return;
-      setItems(gravado.current);
-      onChange?.(gravado.current);
-      toast("Não foi possível guardar o plano de produção. Tenta novamente.", "error");
+      reporEDizer(porqueRebentou(oQue).mensagem);
+      return;
     }
+    if (!res.ok) {
+      const corpo = await res.json().catch(() => null);
+      reporEDizer(porqueFalhou(oQue, res, corpo).mensagem);
+      return;
+    }
+    if (minha === gravacoes.current) gravado.current = next;
   }
 
   function applyPlan() {
     const existing = new Set(items.map((i) => i.label));
     const additions = buildProductionPlanItems(randomId, existing);
     if (additions.length === 0) return;
-    persist([...items, ...additions]);
+    persist(
+      `aplicar o plano de produção (${additions.length} ${
+        additions.length === 1 ? "tarefa" : "tarefas"
+      })`,
+      [...items, ...additions],
+    );
   }
 
   function toggle(id: string) {
-    persist(items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
+    const tarefa = items.find((i) => i.id === id);
+    persist(
+      `${tarefa?.done ? "desmarcar" : "marcar"} «${tarefa?.label ?? "a tarefa"}»`,
+      items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)),
+    );
   }
 
   function removeItem(id: string) {
-    persist(items.filter((i) => i.id !== id));
+    const tarefa = items.find((i) => i.id === id);
+    persist(
+      `remover «${tarefa?.label ?? "a tarefa"}» do plano`,
+      items.filter((i) => i.id !== id),
+    );
   }
 
   // Tarefa própria: prefixa a fase escolhida (mesmo formato do seed) para o
@@ -102,7 +141,10 @@ export default function ProductionPlan({ quote, onChange }: Props) {
     const label = newLabel.trim();
     if (!label) return;
     const phase = DECOR_PRODUCTION.find((p) => p.key === newPhase) ?? DECOR_PRODUCTION[0];
-    persist([...items, { id: randomId(), label: `${phase.label}${SEP}${label}`, done: false }]);
+    persist(`acrescentar «${label}» a ${phase.label}`, [
+      ...items,
+      { id: randomId(), label: `${phase.label}${SEP}${label}`, done: false },
+    ]);
     setNewLabel("");
   }
 

@@ -7,6 +7,7 @@ import { useToast } from "./Toast";
 import type { Quote, ChecklistItem } from "@/lib/orcamento/types";
 import { checklistTemplate } from "@/lib/checklist-templates";
 import { Button, Field, EmptyState } from "./ui";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 interface Props {
   quote: Quote;
@@ -54,50 +55,80 @@ export default function EventChecklist({ quote, onChange }: Props) {
    */
   const base = useRef<ChecklistItem[]>(quote.checklist ?? []);
 
-  function persist(next: ChecklistItem[]) {
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * A GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Todas as oito acções deste painel passam por aqui, e todas falhavam com a
+   * mesma frase: «Não foi possível guardar a checklist. Tenta novamente.» —
+   * para a rede em baixo, a sessão expirada, o pedido apagado por outra
+   * pessoa e o servidor em baixo. Nos dois do meio, «tenta novamente» é um
+   * conselho que não pode funcionar.
+   *
+   * O `oQue` diz qual foi o gesto («marcar «Confirmar catering»», «remover as
+   * 3 concluídas»): a lista tem dezenas de linhas e a reversão desfaz UMA
+   * delas — sem o nome, quem lê não sabe qual é que voltou atrás.
+   */
+  function persist(oQue: string, next: ChecklistItem[]) {
     const minha = ++gravacoes.current;
     setItems(next);
     onChange(next);
     const baseAnterior = base.current;
     base.current = next;
-    fetch(`/api/orcamento/${quote.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ checklist: next, base: { checklist: baseAnterior } }),
-    })
-      .then(async (res) => {
-        /**
-         * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir
-         * era escrever por cima do trabalho da outra pessoa. Adopta-se o que o
-         * servidor tem e diz-se-lhe.
-         */
-        if (res.status === 409) {
-          const corpo = (await res.json().catch(() => null)) as {
-            current?: { checklist?: ChecklistItem[] };
-          } | null;
-          const doServidor = corpo?.current?.checklist ?? gravado.current;
-          base.current = doServidor;
-          gravado.current = doServidor;
-          if (minha === gravacoes.current) {
-            setItems(doServidor);
-            onChange(doServidor);
-          }
-          toast("A checklist foi alterada noutro sítio. Está aqui a versão guardada.", "error");
-          return;
+
+    // Desfaz o que foi posto no ecrã e diz porquê — a não ser que já haja uma
+    // gravação mais recente: o que essa levar contém o que esta levava,
+    // portanto não há nada a desfazer nem nada a dizer. Se ELA também falhar, é
+    // ela que repõe — e para o mesmo sítio.
+    const reporEDizer = (mensagem: string) => {
+      base.current = baseAnterior;
+      if (minha !== gravacoes.current) return;
+      setItems(gravado.current);
+      onChange(gravado.current);
+      toast(mensagem, "error");
+    };
+
+    void (async () => {
+      let res: Response;
+      try {
+        res = await fetch(`/api/orcamento/${quote.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ checklist: next, base: { checklist: baseAnterior } }),
+        });
+      } catch {
+        reporEDizer(porqueRebentou(oQue).mensagem);
+        return;
+      }
+      /**
+       * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir
+       * era escrever por cima do trabalho da outra pessoa. Adopta-se o que o
+       * servidor tem e diz-se-lhe — e por isso esta frase é a da colisão, e
+       * não a do `porqueFalhou`: aqui não se repõe nada, fica a versão
+       * guardada.
+       */
+      if (res.status === 409) {
+        const corpo = (await res.json().catch(() => null)) as {
+          current?: { checklist?: ChecklistItem[] };
+        } | null;
+        const doServidor = corpo?.current?.checklist ?? gravado.current;
+        base.current = doServidor;
+        gravado.current = doServidor;
+        if (minha === gravacoes.current) {
+          setItems(doServidor);
+          onChange(doServidor);
         }
-        if (!res.ok) throw new Error();
-        if (minha === gravacoes.current) gravado.current = next;
-      })
-      .catch(() => {
-        base.current = baseAnterior;
-        // Já foi substituída por uma gravação mais recente: o que essa levar
-        // contém o que esta levava, portanto não há nada a desfazer nem nada a
-        // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
-        if (minha !== gravacoes.current) return;
-        setItems(gravado.current);
-        onChange(gravado.current);
-        toast("Não foi possível guardar a checklist. Tenta novamente.", "error");
-      });
+        toast("A checklist foi alterada noutro sítio. Está aqui a versão guardada.", "error");
+        return;
+      }
+      if (!res.ok) {
+        const corpo = await res.json().catch(() => null);
+        reporEDizer(porqueFalhou(oQue, res, corpo).mensagem);
+        return;
+      }
+      if (minha === gravacoes.current) gravado.current = next;
+    })();
   }
 
   function seed() {
@@ -106,23 +137,37 @@ export default function EventChecklist({ quote, onChange }: Props) {
       label,
       done: false,
     }));
-    persist(next);
+    persist("gerar a checklist deste evento", next);
   }
   function toggle(id: string) {
-    persist(items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)));
+    const item = items.find((i) => i.id === id);
+    persist(
+      `${item?.done ? "desmarcar" : "marcar"} «${item?.label ?? "o item"}»`,
+      items.map((i) => (i.id === id ? { ...i, done: !i.done } : i)),
+    );
   }
   function remove(id: string) {
-    persist(items.filter((i) => i.id !== id));
+    const item = items.find((i) => i.id === id);
+    persist(
+      `remover «${item?.label ?? "o item"}» da checklist`,
+      items.filter((i) => i.id !== id),
+    );
   }
   function add() {
     const l = newItem.trim();
     if (!l) return;
-    persist([...items, { id: randomId(), label: l, done: false }]);
+    persist(`acrescentar «${l}» à checklist`, [
+      ...items,
+      { id: randomId(), label: l, done: false },
+    ]);
     setNewItem("");
   }
 
   function markAll() {
-    persist(items.map((i) => (i.done ? i : { ...i, done: true })));
+    persist(
+      "marcar toda a checklist como feita",
+      items.map((i) => (i.done ? i : { ...i, done: true })),
+    );
   }
   function clearCompleted() {
     // Primeiro clique arma a confirmação; o segundo executa. Blur desarma.
@@ -131,7 +176,11 @@ export default function EventChecklist({ quote, onChange }: Props) {
       return;
     }
     setConfirmClear(false);
-    persist(items.filter((i) => !i.done));
+    const quantas = items.filter((i) => i.done).length;
+    persist(
+      `remover ${quantas} ${quantas === 1 ? "concluída" : "concluídas"} da checklist`,
+      items.filter((i) => !i.done),
+    );
   }
 
   function startEdit(item: ChecklistItem) {
@@ -146,7 +195,10 @@ export default function EventChecklist({ quote, onChange }: Props) {
     const l = draft.trim();
     // Vazio ou inalterado cancela em vez de gravar um item sem texto.
     if (!item || !l || l === item.label) return;
-    persist(items.map((i) => (i.id === id ? { ...i, label: l } : i)));
+    persist(
+      `mudar «${item.label}» para «${l}»`,
+      items.map((i) => (i.id === id ? { ...i, label: l } : i)),
+    );
   }
 
   // Itens do modelo ainda em falta (dedupe por label exato, como o applyPlan
@@ -157,10 +209,12 @@ export default function EventChecklist({ quote, onChange }: Props) {
   );
   function addTemplateItems() {
     if (missingFromTemplate.length === 0) return;
-    persist([
-      ...items,
-      ...missingFromTemplate.map((label) => ({ id: randomId(), label, done: false })),
-    ]);
+    persist(
+      `acrescentar ${missingFromTemplate.length} ${
+        missingFromTemplate.length === 1 ? "item" : "itens"
+      } do modelo à checklist`,
+      [...items, ...missingFromTemplate.map((label) => ({ id: randomId(), label, done: false }))],
+    );
   }
 
   const doneCount = items.filter((i) => i.done).length;

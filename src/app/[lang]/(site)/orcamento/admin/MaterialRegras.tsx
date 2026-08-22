@@ -8,6 +8,7 @@ import { useToast } from "./Toast";
 import { Button, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
  * AS REGRAS — o que a proposta implica em material.
@@ -79,63 +80,85 @@ export default function MaterialRegras() {
     }
   }
 
-  async function criar() {
-    setOcupado(true);
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As três escritas deste ficheiro diziam «Não foi possível criar a regra.»,
+   * «Não foi possível guardar.» e «Não foi possível apagar.» — três frases
+   * para seis situações com respostas diferentes: a rede em baixo, a sessão
+   * expirada, a regra apagada por outra pessoa, o nome repetido, o servidor em
+   * baixo. Nenhuma delas dizia DE QUE REGRA se estava a falar, e este ecrã
+   * mostra dez de uma vez.
+   *
+   * Agora há um sítio só a fazer fetch e a escolher a frase, como no
+   * `MaterialListas`. Devolve `ok` em vez de atirar, porque quem chama tem de
+   * poder decidir o que faz a seguir.
+   */
+  async function gravar(oQue: string, url: string, init?: RequestInit): Promise<boolean> {
+    let res: Response;
     try {
-      const res = await fetch("/api/material/regras", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: nome.trim(),
-          matchKind: tipo,
-          matchValue: valor.trim(),
-          action: acao,
-          listId: acao === "add_list" ? listaId : undefined,
-          itemId: acao === "add_item" ? itemId : undefined,
-          qty: acao === "add_item" ? Number(qty) || 1 : undefined,
-        }),
-      });
-      const r = await res.json();
-      if (!res.ok) throw new Error(r?.error ?? "");
-      setNome("");
-      setValor("");
-      toast("Regra criada.", "success");
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    } catch (e) {
-      toast(
-        e instanceof Error && e.message ? e.message : "Não foi possível criar a regra.",
-        "error",
-      );
-    } finally {
-      setOcupado(false);
+      res = await fetch(url, init);
+    } catch {
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return false;
     }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return false;
+    }
+    return true;
+  }
+
+  async function criar() {
+    const comoSeChama = nome.trim();
+    setOcupado(true);
+    const ok = await gravar(`criar a regra «${comoSeChama}»`, "/api/material/regras", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: comoSeChama,
+        matchKind: tipo,
+        matchValue: valor.trim(),
+        action: acao,
+        listId: acao === "add_list" ? listaId : undefined,
+        itemId: acao === "add_item" ? itemId : undefined,
+        qty: acao === "add_item" ? Number(qty) || 1 : undefined,
+      }),
+    });
+    setOcupado(false);
+    if (!ok) return;
+    setNome("");
+    setValor("");
+    toast("Regra criada.", "success");
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
   async function alternar(regra: MaterialRule) {
     // Desligar em vez de apagar: deixa experimentar sem perder o que se
     // escreveu, que é o gesto mais útil quando se está a afinar regras.
-    try {
-      const res = await fetch(`/api/material/regras/${regra.id}`, {
+    const ok = await gravar(
+      `${regra.enabled ? "desligar" : "ligar"} a regra «${regra.name}»`,
+      `/api/material/regras/${regra.id}`,
+      {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: !regra.enabled }),
-      });
-      if (!res.ok) throw new Error();
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    } catch {
-      toast("Não foi possível guardar.", "error");
-    }
+      },
+    );
+    if (!ok) return;
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
   async function apagar(regra: MaterialRule) {
-    try {
-      const res = await fetch(`/api/material/regras/${regra.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      toast("Regra apagada.", "success");
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    } catch {
-      toast("Não foi possível apagar.", "error");
-    }
+    const ok = await gravar(`apagar a regra «${regra.name}»`, `/api/material/regras/${regra.id}`, {
+      method: "DELETE",
+    });
+    if (!ok) return;
+    toast("Regra apagada.", "success");
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
   const alvo = (r: MaterialRule) =>
