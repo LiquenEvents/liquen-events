@@ -95,3 +95,34 @@ describe("Kanban no telemóvel — os botões de mover são alvos de 44 px", () 
     expect(barra?.className).toContain("pointer-coarse:gap-2");
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UMA INSTRUÇÃO QUE O ECRÃ NÃO CUMPRE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Do registo do audit: «a coluna vazia dá a instrução "Arrasta para aqui" a
+ * quem não pode arrastar». O arrasto é a API do HTML5, e no Safari do iOS ela
+ * não dispara com o dedo — não há `dragstart`, não há `drop`.
+ *
+ * O gesto do dedo existe, e está no CARTÃO: as setas de 44 px que os testes
+ * aqui em cima prendem. O que faltava era a coluna vazia dizer isso, em vez de
+ * prometer o outro.
+ */
+describe("a coluna vazia", () => {
+  it("no telemóvel, manda usar as setas do cartão", () => {
+    desenhar();
+    const noDedo = screen.getAllByText(/Move um cartão para aqui com as setas dele/);
+    expect(noDedo.length).toBeGreaterThan(0);
+    // E some acima de `lg`, onde o arrasto funciona mesmo.
+    expect(noDedo[0].className).toContain("lg:hidden");
+  });
+
+  it("e com rato continua a dizer para arrastar", () => {
+    desenhar();
+    const comRato = screen.getAllByText("Arrasta para aqui");
+    expect(comRato.length).toBeGreaterThan(0);
+    expect(comRato[0].className).toContain("hidden");
+    expect(comRato[0].className).toContain("lg:block");
+  });
+});

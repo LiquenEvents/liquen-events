@@ -509,7 +509,21 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                     >
                       <path d="M12 5v14M5 12h14" strokeLinecap="round" />
                     </svg>
-                    <p className="text-[10px] text-center px-2">Arrasta para aqui</p>
+                    {/* ── UMA INSTRUÇÃO QUE O ECRÃ NÃO CUMPRE ────────────────
+                        Do registo do audit: «a coluna vazia dá a instrução
+                        "Arrasta para aqui" a quem não pode arrastar». O arrasto
+                        é a API do HTML5, e no Safari do iOS ela não dispara com
+                        o dedo — não há `dragstart`, não há `drop`.
+
+                        O gesto do dedo existe e está no CARTÃO: as setas de
+                        44 px que só aparecem abaixo de `lg`. O que faltava era
+                        a coluna vazia dizer isso em vez de prometer o outro. */}
+                    <p className="px-2 text-center text-[10px] lg:hidden">
+                      Move um cartão para aqui com as setas dele
+                    </p>
+                    <p className="hidden px-2 text-center text-[10px] lg:block">
+                      Arrasta para aqui
+                    </p>
                   </div>
                 )}
               </div>
