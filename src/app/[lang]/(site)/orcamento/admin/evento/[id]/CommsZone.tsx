@@ -16,7 +16,9 @@ interface Props {
   quote: Quote;
   userName: string;
   onQuoteChange: (patch: Partial<Quote>) => void;
-  onAddEntry: (entry: ActivityEntry) => Promise<void>;
+  /** Devolve se ficou gravada — ver `ActivityLog`, que só limpa a caixa
+   *  quando ficou. */
+  onAddEntry: (entry: ActivityEntry) => Promise<boolean>;
 }
 
 export default function CommsZone({ quote, userName, onQuoteChange, onAddEntry }: Props) {

@@ -15,6 +15,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { razaoDaRecusa, porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { AvisoDeArmazenamento } from "./AvisoDeArmazenamento";
@@ -856,18 +857,15 @@ function textoDoPreco(q: Quote): string {
 }
 
 /**
- * O que se diz de uma gravação recusada, pelo código que voltou. O código não é
- * um detalhe técnico a esconder: é a única coisa que distingue «a sessão
- * expirou» (volta a entrar) de «o servidor está em baixo» (espera um pouco), e
- * cada um tem uma acção diferente do outro lado.
+ * O que se diz de uma gravação recusada, pelo código que voltou.
+ *
+ * A regra vive agora em `razaoDaRecusa` (`lib/porque-falhou.ts`), e este nome
+ * fica como o atalho local. Havia DUAS cópias disto — esta e a da
+ * `PerguntaDeDesfecho` — e tinham divergido: uma tratava o 413 e a outra o 404,
+ * portanto o mesmo 404 dizia «este pedido já não existe» num sítio e nada no
+ * outro, no mesmo ecrã.
  */
-function porqueNaoGravou(status: number): string | undefined {
-  if (status === 401 || status === 403) return "A sessão expirou — volta a entrar.";
-  if (status === 413) return "O texto é grande demais para ser guardado assim.";
-  if (status === 400) return "O servidor recusou o conteúdo.";
-  if (status >= 500) return "O servidor não está a aceitar gravações neste momento.";
-  return undefined;
-}
+const porqueNaoGravou = razaoDaRecusa;
 
 export default function AdminClient({ initialQuotes, userName = "Catarina" }: Props) {
   // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
@@ -2249,24 +2247,56 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     window.location.href = "/orcamento/admin";
   }
 
-  async function appendActivity(quoteId: string, entries: ActivityEntry[]) {
-    if (entries.length === 0) return;
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O HISTÓRICO DEIXA DE SE PERDER EM SILÊNCIO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Isto era `if (res.ok) { … }` sem `else`, e um `catch {}` vazio por baixo.
+   * Uma linha de histórico que não chegasse ao servidor desaparecia sem uma
+   * palavra — e o histórico é o que se lê meses depois para saber o que se
+   * disse a quem.
+   *
+   * O caso caro é o registo de uma CHAMADA: quem acaba de falar ao telefone
+   * escreve o que combinou, a caixa limpa-se como se tivesse gravado, e o que
+   * foi escrito não existe em lado nenhum. Ver o `ActivityLog`, que agora só
+   * limpa a caixa quando isto devolver `true`.
+   *
+   * O `oQue` importa aqui mais do que noutros sítios: nas chamadas vindas de um
+   * `onSent`, a acção principal JÁ correu bem — a proposta seguiu, a mensagem
+   * saiu. A frase tem de dizer que o que falhou foi a linha do histórico, e não
+   * o envio.
+   */
+  async function appendActivity(
+    quoteId: string,
+    entries: ActivityEntry[],
+    oQue = "escrever no histórico",
+  ): Promise<boolean> {
+    if (entries.length === 0) return true;
+    let res: Response;
     try {
       // Só as entradas NOVAS — o servidor junta ao histórico mais recente, para
       // que duas ferramentas a gravar em simultâneo nunca se sobrescrevam.
-      const res = await fetch(`/api/orcamento/${quoteId}`, {
+      res = await fetch(`/api/orcamento/${quoteId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ activityLogAppend: entries }),
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setQuotes((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-        setSelected((prev) => (prev?.id === updated.id ? updated : prev));
-      }
     } catch {
-      /* best-effort */
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return false;
     }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return false;
+    }
+    const updated = corpo as Quote | null;
+    if (updated?.id) {
+      setQuotes((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      setSelected((prev) => (prev?.id === updated.id ? updated : prev));
+    }
+    return true;
   }
 
   /**
@@ -4566,22 +4596,43 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                         `Arquivar "${selected.name}"? Ficará oculto da lista principal.`,
                                       );
                                     if (!confirm_) return;
-                                    const res = await fetch(`/api/orcamento/${selected.id}`, {
-                                      method: "PATCH",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ archived: next }),
-                                    });
-                                    if (res.ok) {
-                                      const updated = await res.json();
-                                      setQuotes((prev) =>
-                                        prev.map((q) => (q.id === updated.id ? updated : q)),
-                                      );
-                                      setSelected(updated);
-                                      toast(
-                                        next ? "Pedido arquivado" : "Pedido restaurado",
-                                        "success",
-                                      );
+                                    /**
+                                     * ── UM `if (res.ok)` SEM `else` NEM `catch` ──
+                                     *
+                                     * Era esta a forma anterior, e o resultado é o
+                                     * pior possível num gesto que faz um pedido
+                                     * DESAPARECER da lista: com a rede em baixo não
+                                     * acontecia nada nenhum — nem o pedido saía da
+                                     * lista, nem havia aviso. Ficava-se a olhar para
+                                     * um menu que não respondeu, sem saber se foi o
+                                     * dedo que falhou ou o servidor.
+                                     */
+                                    const oQue = `${next ? "arquivar" : "restaurar"} «${selected.name}»`;
+                                    let res: Response;
+                                    try {
+                                      res = await fetch(`/api/orcamento/${selected.id}`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ archived: next }),
+                                      });
+                                    } catch {
+                                      toast(porqueRebentou(oQue).mensagem, "error");
+                                      return;
                                     }
+                                    const corpo = await res.json().catch(() => null);
+                                    if (!res.ok) {
+                                      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+                                      return;
+                                    }
+                                    const updated = corpo as Quote;
+                                    setQuotes((prev) =>
+                                      prev.map((q) => (q.id === updated.id ? updated : q)),
+                                    );
+                                    setSelected(updated);
+                                    toast(
+                                      next ? "Pedido arquivado" : "Pedido restaurado",
+                                      "success",
+                                    );
                                   },
                                   icon: (
                                     <svg
@@ -5813,15 +5864,23 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                             prev ? { ...prev, status: "cotado" } : prev,
                                           );
                                           setEditStatus("cotado");
-                                          appendActivity(selected.id, [
-                                            {
-                                              id: randomId(),
-                                              at: new Date().toISOString(),
-                                              kind: "proposal_sent",
-                                              actor: userName,
-                                              summary: "Proposta enviada ao cliente (Studio)",
-                                            },
-                                          ]);
+                                          // A proposta JÁ seguiu — o que pode
+                                          // falhar aqui é a linha do histórico, e a
+                                          // frase tem de dizer isso e não o
+                                          // contrário.
+                                          void appendActivity(
+                                            selected.id,
+                                            [
+                                              {
+                                                id: randomId(),
+                                                at: new Date().toISOString(),
+                                                kind: "proposal_sent",
+                                                actor: userName,
+                                                summary: "Proposta enviada ao cliente (Studio)",
+                                              },
+                                            ],
+                                            "escrever no histórico que a proposta seguiu",
+                                          );
                                         }}
                                       />
                                     </>
@@ -5852,15 +5911,19 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                               : prev,
                                           );
                                           setEditStatus("cotado");
-                                          appendActivity(selected.id, [
-                                            {
-                                              id: randomId(),
-                                              at: new Date().toISOString(),
-                                              kind: "proposal_sent",
-                                              actor: userName,
-                                              summary: `Proposta enviada — ${eur(total)}`,
-                                            },
-                                          ]);
+                                          void appendActivity(
+                                            selected.id,
+                                            [
+                                              {
+                                                id: randomId(),
+                                                at: new Date().toISOString(),
+                                                kind: "proposal_sent",
+                                                actor: userName,
+                                                summary: `Proposta enviada — ${eur(total)}`,
+                                              },
+                                            ],
+                                            "escrever no histórico que a proposta seguiu",
+                                          );
                                         }}
                                       />
                                     </>
@@ -5882,27 +5945,33 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                       );
                                       setSelected((prev) => (prev ? { ...prev, messages } : prev));
                                       if (messages.length > prev_count) {
-                                        appendActivity(selected.id, [
-                                          {
-                                            id: randomId(),
-                                            at: new Date().toISOString(),
-                                            kind: "message_sent",
-                                            actor: userName,
-                                            /**
-                                             * O QUE ACONTECEU, E NÃO O QUE SE QUIS FAZER.
-                                             *
-                                             * Um pedido que entrou por telefonema não tem
-                                             * email. A rota grava a mensagem à mesma e
-                                             * responde que o email NÃO saiu; o mensageiro
-                                             * diz-o a vermelho, mas o histórico ficava com
-                                             * «Mensagem enviada ao cliente» — e o histórico
-                                             * é o que se lê meses depois para saber o que se
-                                             * disse a quem. Mesma frase que a zona de
-                                             * comunicações do dossiê já usa.
-                                             */
-                                            summary: resumoDoEnvio(envio),
-                                          },
-                                        ]);
+                                        // A mensagem JÁ saiu; o que pode falhar
+                                        // aqui é a linha do histórico.
+                                        void appendActivity(
+                                          selected.id,
+                                          [
+                                            {
+                                              id: randomId(),
+                                              at: new Date().toISOString(),
+                                              kind: "message_sent",
+                                              actor: userName,
+                                              /**
+                                               * O QUE ACONTECEU, E NÃO O QUE SE QUIS FAZER.
+                                               *
+                                               * Um pedido que entrou por telefonema não tem
+                                               * email. A rota grava a mensagem à mesma e
+                                               * responde que o email NÃO saiu; o mensageiro
+                                               * diz-o a vermelho, mas o histórico ficava com
+                                               * «Mensagem enviada ao cliente» — e o histórico
+                                               * é o que se lê meses depois para saber o que se
+                                               * disse a quem. Mesma frase que a zona de
+                                               * comunicações do dossiê já usa.
+                                               */
+                                              summary: resumoDoEnvio(envio),
+                                            },
+                                          ],
+                                          "escrever no histórico que a mensagem saiu",
+                                        );
                                       }
                                     }}
                                   />
@@ -5931,7 +6000,15 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                                       <ActivityLog
                                         quote={selected}
                                         actor={userName}
-                                        onAddEntry={(entry) => appendActivity(selected.id, [entry])}
+                                        onAddEntry={(entry) =>
+                                          appendActivity(
+                                            selected.id,
+                                            [entry],
+                                            entry.kind === "call_logged"
+                                              ? "guardar o registo da chamada"
+                                              : "guardar a nota",
+                                          )
+                                        }
                                       />
                                     </div>
                                   </details>

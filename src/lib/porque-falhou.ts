@@ -186,3 +186,30 @@ export function porqueFalhou(
 export function porqueRebentou(oQue: string): Falha {
   return porqueFalhou(oQue, null);
 }
+
+/**
+ * A RAZÃO SEM A COISA — para onde o contexto já está no ecrã.
+ *
+ * A gravação automática do painel do pedido e a `PerguntaDeDesfecho` mostram o
+ * aviso ENCOSTADO ao que falhou: a barra de gravação está por baixo do campo, o
+ * cartão do desfecho está dentro do próprio diálogo. Aí, repetir o nome da
+ * coisa na frase é dizer duas vezes o que já se vê.
+ *
+ * Existiam duas cópias desta função — uma no `AdminClient`, outra na
+ * `PerguntaDeDesfecho` — e tinham DIVERGIDO: uma tratava o 413 e a outra o 404,
+ * portanto o mesmo 404 dizia «Este pedido já não existe» num sítio e nada no
+ * outro. É o que acontece a uma regra escrita duas vezes.
+ *
+ * `undefined` quando não há nada de útil a dizer: quem chama tem a sua própria
+ * frase de reserva, e uma genérica por cima dela só a piorava.
+ */
+export function razaoDaRecusa(status: number): string | undefined {
+  if (status === 401 || status === 403) return "A sessão expirou — volta a entrar.";
+  if (status === 404) return "Isto já não existe — alguém apagou entretanto.";
+  if (status === 409) return "Alguém mexeu nisto ao mesmo tempo — recarrega para ver o que ficou.";
+  if (status === 413) return "O texto é grande demais para ser guardado assim.";
+  if (status === 429) return "Pedidos a mais seguidos — espera um minuto.";
+  if (status === 400 || status === 422) return "O servidor recusou o conteúdo.";
+  if (status >= 500) return "O servidor não está a aceitar gravações neste momento.";
+  return undefined;
+}

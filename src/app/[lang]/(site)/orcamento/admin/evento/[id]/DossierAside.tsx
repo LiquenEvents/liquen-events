@@ -12,7 +12,9 @@ import { ActivityLog } from "../../lazy";
 interface Props {
   quote: Quote;
   actor: string;
-  onAddEntry: (entry: ActivityEntry) => Promise<void>;
+  /** Devolve se ficou gravada — ver `ActivityLog`, que só limpa a caixa
+   *  quando ficou. */
+  onAddEntry: (entry: ActivityEntry) => Promise<boolean>;
 }
 
 export default function DossierAside({ quote, actor, onAddEntry }: Props) {
