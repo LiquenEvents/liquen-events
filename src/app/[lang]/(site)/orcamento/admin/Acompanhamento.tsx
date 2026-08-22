@@ -119,6 +119,15 @@ interface Props {
   quotes: Quote[];
   /** Abrir o pedido correspondente no painel de detalhe. */
   onOpenQuote?: (q: Quote) => void;
+  /**
+   * Abre o «Fazer proposta».
+   *
+   * É o primeiro passo deste ecrã, e é o que faltava ao vazio: sem uma
+   * proposta enviada não pode haver nada à espera de resposta, e a única saída
+   * de um Acompanhamento vazio é fazer a primeira. Sem este callback o vazio
+   * continua a explicar-se, só que sem botão — que é o que já fazia.
+   */
+  onFazerProposta?: () => void;
 }
 
 /**
@@ -131,13 +140,14 @@ interface Props {
  */
 type PatchDeProposta = Partial<{ [K in keyof Proposal]: Proposal[K] | null }>;
 
-export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
+export default function Acompanhamento({ quotes, onOpenQuote, onFazerProposta }: Props) {
   const {
     data: propostas,
     loading,
     setData,
     error,
     errorMessage,
+    falha,
     refresh,
   } = useCachedList<PropostaLeve[]>("propostas-leves", "/api/propostas?semDoc=1");
   const { toast } = useToast();
@@ -283,6 +293,10 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
       <AvisoDeFalha
         titulo="Não foi possível ler as propostas"
         mensagem={errorMessage}
+        /* A falha inteira, e não só a frase: com a sessão caída o «Tentar de
+           novo» dá o mesmo 401, e um botão que não pode funcionar é pior do que
+           nenhum — quem resolve é o painel de reentrada que aparece por cima. */
+        falha={falha}
         aoTentarDeNovo={refresh}
       />
     );
@@ -292,9 +306,22 @@ export default function Acompanhamento({ quotes, onOpenQuote }: Props) {
 
   if (linhas.length === 0 && porRegistar.length === 0) {
     return (
+      /* ── UM VAZIO VERDADEIRO, COM A SAÍDA DENTRO DELE ──────────────────
+         Este é o vazio bom: as propostas foram lidas (a falha e a espera já
+         saíram à frente, aqui em cima), portanto pode mesmo dizer-se que não
+         há nenhuma à espera. Continua a ser um vazio e não um alarme — um
+         Acompanhamento limpo é o que se quer ver.
+
+         O que lhe faltava era a terceira coisa: o passo. Dizia o que APARECE
+         aqui e não dizia como é que alguma coisa chega cá — e a resposta é
+         uma só, enviar uma proposta. O botão fica no vazio, e não noutro
+         canto do ecrã. */
       <EmptyState
         title="Nenhuma proposta à espera de resposta"
-        description="Aqui ficam as propostas enviadas e em negociação, por ordem do que está mais perto de acabar — a validade, o casamento, ou o seguimento que marcar."
+        description="Aqui ficam as propostas enviadas e em negociação, por ordem do que está mais perto de acabar — a validade, o casamento, ou o seguimento que marcar. Enquanto nenhuma seguir, fica assim."
+        action={
+          onFazerProposta ? { label: "Fazer uma proposta", onClick: onFazerProposta } : undefined
+        }
       />
     );
   }

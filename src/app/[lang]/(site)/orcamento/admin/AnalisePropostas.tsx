@@ -81,8 +81,10 @@ function Numero({ valor, rotulo, nota }: { valor: string; rotulo: string; nota?:
 export default function AnalisePropostas() {
   const {
     data: propostas,
+    loading,
     error,
     errorMessage,
+    falha,
     refresh,
   } = useCachedList<PropostaLeve[]>("propostas-leves", "/api/propostas?semDoc=1");
   const a = useMemo(() => analisar(propostas ?? []), [propostas]);
@@ -100,14 +102,58 @@ export default function AnalisePropostas() {
       <AvisoDeFalha
         titulo="Não foi possível ler as propostas"
         mensagem={errorMessage}
+        /* A falha inteira, e não só a frase: com a sessão caída o «Tentar de
+           novo» dá o mesmo 401, e um botão que não pode funcionar é pior do que
+           nenhum — quem resolve é o painel de reentrada que aparece por cima. */
+        falha={falha}
         aoTentarDeNovo={refresh}
       />
     );
   }
 
-  // Sem propostas enviadas não há nada a dizer, e um painel de zeros ensina a
-  // não voltar a este ecrã.
-  if (a.enviadas === 0) return null;
+  // A LER não é VAZIO, e não é falha. Sem isto, o instante entre abrir as
+  // Estatísticas e a lista chegar era desenhado como «ainda não enviaste
+  // nenhuma proposta» — a mesma afirmação de baixo, dita antes de haver
+  // resposta.
+  if (loading && !propostas) {
+    return (
+      <p role="status" aria-busy="true" className="bo-text-muted text-sm">
+        A ler as propostas…
+      </p>
+    );
+  }
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * DESAPARECER TAMBÉM É DIZER ALGUMA COISA — E DIZIA A COISA ERRADA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Isto era `return null`, com a justificação de que «um painel de zeros ensina
+   * a não voltar a este ecrã». A intenção continua certa: nenhum destes números
+   * assenta em nada com zero propostas enviadas, e quatro travessões em fila
+   * não são informação.
+   *
+   * O que estava errado era o resultado. Este painel vive dentro de uma secção
+   * chamada «Propostas» que fica ABERTA de propósito (`defaultOpen` no
+   * StatsDashboard): ao desaparecer, deixava um título e um espaço em branco
+   * por baixo dele. E um espaço em branco por baixo de um título lê-se de duas
+   * maneiras, ambas falsas — «isto avariou» ou «isto ainda não existe». Existe,
+   * e está à espera de dados.
+   *
+   * Continua a não haver um painel de zeros: há uma linha que diz que está
+   * vazio, PORQUÊ (a conta precisa de propostas enviadas, e não há nenhuma) e
+   * o que começa a enchê-lo. Sem alarme nenhum: um estúdio na primeira semana
+   * lê isto e está tudo bem.
+   */
+  if (a.enviadas === 0) {
+    return (
+      <p className="bo-text-muted text-sm leading-relaxed">
+        Ainda não seguiu nenhuma proposta, por isso não há aqui contas para fazer — o fecho, os
+        motivos de recusa e os extras contam-se todos sobre propostas enviadas. A primeira que
+        enviares começa a encher este painel.
+      </p>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">

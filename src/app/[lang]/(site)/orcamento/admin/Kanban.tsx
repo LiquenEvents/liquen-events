@@ -8,8 +8,10 @@ import { eventCountdown, randomId, todayKey } from "./util";
 import { eur0 as eur } from "@/lib/money";
 import type { ActivityEntry } from "@/lib/orcamento/types";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
-import { Card } from "./ui";
+import { Card, EmptyState } from "./ui";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
+import type { LeituraFalhada } from "@/lib/porque-nao-leu";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 const COLUMNS: { id: QuoteStatus; label: string; color: string }[] = [
   { id: "pendente", label: "Novo", color: "#8a8a82" },
@@ -272,9 +274,44 @@ interface Props {
   onOpen: (q: Quote) => void;
   onStatusChange: (id: string, status: QuoteStatus) => void;
   userName?: string;
+  /**
+   * A leitura dos pedidos não voltou.
+   *
+   * O quadro não lê nada: recebe os pedidos já lidos pelo AdminClient, e o
+   * desenho do servidor engole a falha e devolve uma lista vazia. Vista daqui,
+   * uma leitura que rebentou é indistinguível de um estúdio sem trabalho — e
+   * cinco colunas a zero, com um «Ganho: 0 €» por cima, é uma afirmação sobre
+   * o negócio dela que ninguém pôde verificar. A distinção só pode vir de quem
+   * fez a leitura; sem ela, o quadro comporta-se como antes.
+   */
+  falhaDeLeitura?: LeituraFalhada | null;
+  /** Volta a pedir a lista de pedidos, quando quem lê sabe repeti-la. */
+  aoTentarDeNovo?: () => void;
+  /** Abre o formulário de pedido novo — o primeiro passo de um quadro vazio. */
+  onNovoPedido?: () => void;
+  /**
+   * Quantos pedidos existem mas estão arquivados.
+   *
+   * O quadro recebe só os activos. Com tudo arquivado ficava exactamente igual
+   * a um back office acabado de instalar, e a frase de boas-vindas era falsa:
+   * o trabalho existe, está noutra gaveta.
+   */
+  arquivados?: number;
+  /** Leva à lista de pedidos já com os arquivados à vista. */
+  onVerArquivados?: () => void;
 }
 
-export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Props) {
+export default function Kanban({
+  quotes,
+  onOpen,
+  onStatusChange,
+  userName,
+  falhaDeLeitura,
+  aoTentarDeNovo,
+  onNovoPedido,
+  arquivados = 0,
+  onVerArquivados,
+}: Props) {
   const { toast } = useToast();
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<QuoteStatus | null>(null);
@@ -445,15 +482,22 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
     };
   }, [quotes]);
 
+  const quadroVazio = quotes.length === 0;
+  // Com a leitura em baixo, os quatro números do topo são zeros inventados: a
+  // conta correu sobre uma lista que nunca chegou. Um travessão é o que se
+  // sabe. (Com pedidos no ecrã já não é a leitura inicial que se está a ver, e
+  // os números voltam a ser os de sempre.)
+  const semNumeros = quadroVazio && Boolean(falhaDeLeitura);
+
   return (
     <div className="flex flex-col gap-6">
       {/* Pipeline summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { v: String(summary.active), l: "Pedidos ativos" },
-          { v: eur(summary.proposta), l: "Em proposta (com IVA)" },
-          { v: eur(summary.ganho), l: "Ganho (com IVA)" },
-          { v: `${summary.winRate}%`, l: "Taxa de conversão" },
+          { v: semNumeros ? "—" : String(summary.active), l: "Pedidos ativos" },
+          { v: semNumeros ? "—" : eur(summary.proposta), l: "Em proposta (com IVA)" },
+          { v: semNumeros ? "—" : eur(summary.ganho), l: "Ganho (com IVA)" },
+          { v: semNumeros ? "—" : `${summary.winRate}%`, l: "Taxa de conversão" },
         ].map((k) => (
           <Card key={k.l} padding="sm" className="p-4 sm:p-5">
             <p
@@ -466,6 +510,73 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
           </Card>
         ))}
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          O QUADRO INTEIRO VAZIO — CINCO CAIXAS E NEM UMA PALAVRA
+          ══════════════════════════════════════════════════════════════════
+          Do inventário: quem abre o back office pela primeira vez, ou quem tem
+          tudo arquivado, via cinco colunas com «Arrasta para aqui» e nada que
+          dissesse em que estado é que o quadro está. Cinco instruções para um
+          gesto sem objecto não são um estado vazio — são um ecrã por acabar.
+
+          Aqui diz-se as três coisas: que está vazio, PORQUÊ (nunca houve
+          pedidos, estão todos arquivados, ou a leitura não voltou) e qual é o
+          passo a dar, no mesmo sítio onde se lê o problema. As colunas ficam
+          onde estavam — é este quadro, não outro —, mas calam a instrução que
+          ninguém pode cumprir. */}
+      {quadroVazio &&
+        (falhaDeLeitura ? (
+          <AvisoDeFalha
+            titulo="Não foi possível ler os pedidos"
+            falha={falhaDeLeitura}
+            aoTentarDeNovo={aoTentarDeNovo}
+          />
+        ) : (
+          <Card padding="none">
+            <EmptyState
+              icon={
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="4" width="4" height="16" rx="1" />
+                  <rect x="10" y="4" width="4" height="11" rx="1" />
+                  <rect x="17" y="4" width="4" height="7" rx="1" />
+                </svg>
+              }
+              title={
+                arquivados > 0
+                  ? "O quadro está vazio — está tudo arquivado"
+                  : "O quadro ainda não tem pedidos"
+              }
+              description={
+                arquivados > 0
+                  ? `Não há nenhum pedido activo. ${arquivados === 1 ? "O único que existe está arquivado" : `Os ${arquivados} que existem estão arquivados`}, e os arquivados não entram no quadro — por isso as colunas estão a zero.`
+                  : "As cinco colunas são as fases por que um pedido passa, do primeiro contacto ao ganho ou perdido. Cada pedido entra em «Novo» e vai andando; enquanto não houver nenhum, ficam assim — e isso é o normal numa primeira semana."
+              }
+              action={
+                arquivados > 0 && onVerArquivados
+                  ? {
+                      label: `Ver os ${arquivados} arquivados`,
+                      onClick: onVerArquivados,
+                    }
+                  : onNovoPedido
+                    ? { label: "Criar o primeiro pedido", onClick: onNovoPedido }
+                    : undefined
+              }
+              secondaryAction={
+                arquivados > 0 && onVerArquivados && onNovoPedido
+                  ? { label: "Criar um pedido", onClick: onNovoPedido }
+                  : undefined
+              }
+            />
+          </Card>
+        ))}
 
       <div className="flex gap-3.5 overflow-x-auto pb-4 scroll-hide">
         {COLUMNS.map((col, colIndex) => {
@@ -525,7 +636,11 @@ export default function Kanban({ quotes, onOpen, onStatusChange, userName }: Pro
                     onMove={moveByKeyboard}
                   />
                 ))}
-                {items.length === 0 && (
+                {/* Só quando HÁ cartões noutras colunas. Com o quadro todo
+                    vazio não há nada para arrastar, e cinco vezes a mesma
+                    instrução impossível era o que tapava o estado do quadro —
+                    que agora está dito uma vez, aqui em cima. */}
+                {items.length === 0 && !quadroVazio && (
                   <div className="flex flex-col items-center justify-center py-8 text-foreground/30">
                     <svg
                       width="20"

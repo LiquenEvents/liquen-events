@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import type { Quote, CalendarEvent, Task } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { eur0 as eur } from "@/lib/money";
 import { todayKey } from "./util";
-import { Card, EmptyState } from "./ui";
+import { Button, Card, EmptyState } from "./ui";
 import { useCachedList } from "./useCachedList";
+import { AvisoDeFalha } from "./AvisoDeFalha";
+import { SkeletonRow } from "./Skeleton";
 
 const DAYS_AHEAD = 14;
 
@@ -81,8 +83,54 @@ export default function Agenda({ quotes, onOpen }: Props) {
    * tempo — que é exactamente o que aqui acontecia. Uma falha continua a
    * dar-nos uma lista vazia e uma agenda com o que dá para mostrar, como antes.
    */
-  const { data: calEvents = [] } = useCachedList<CalendarEvent[]>("calendario", "/api/calendario");
-  const { data: tasks = [] } = useCachedList<Task[]>("tarefas", "/api/tarefas");
+  const {
+    data: calEvents = [],
+    loading: aLerMarcacoes,
+    falha: falhaDasMarcacoes,
+    refresh: recarregarMarcacoes,
+  } = useCachedList<CalendarEvent[]>("calendario", "/api/calendario");
+  const {
+    data: tasks = [],
+    loading: aLerTarefas,
+    falha: falhaDasTarefas,
+    refresh: recarregarTarefas,
+  } = useCachedList<Task[]>("tarefas", "/api/tarefas");
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * «AGENDA TRANQUILA» É UMA AFIRMAÇÃO — E ELA NÃO A PODIA FAZER
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * O comentário aqui em cima dizia, sem se envergonhar, que «uma falha
+   * continua a dar-nos uma lista vazia e uma agenda com o que dá para
+   * mostrar». Só que com AS DUAS leituras em baixo — que é o que acontece
+   * assim que o cookie caduca, e o back office fica aberto horas — não sobra
+   * nada para mostrar, e o ecrã escrevia «Agenda tranquila. Nada agendado para
+   * os próximos 14 dias.» É a pior frase possível: a única que dispensa alguém
+   * de ir ver, dita precisamente no momento em que ninguém conseguiu ver.
+   *
+   * Um erro vê-se; isto não se via. Por isso são três estados e não dois — a
+   * ler, não deu para ler, e vazio a sério. Ver `src/lib/porque-nao-leu.ts`.
+   *
+   * Os eventos e os pagamentos vêm dos `quotes`, que já estão em memória: se
+   * houver alguma coisa deles na janela, a agenda continua a desenhar-se como
+   * sempre — mas com uma linha por cima a dizer o que lhe falta, porque uma
+   * agenda a que faltam as tarefas todas não é a agenda.
+   */
+  const falha = falhaDasMarcacoes ?? falhaDasTarefas;
+  const aLer = aLerMarcacoes || aLerTarefas;
+  const oQueFaltou =
+    falhaDasMarcacoes && falhaDasTarefas
+      ? "as marcações do calendário e as tarefas"
+      : falhaDasMarcacoes
+        ? "as marcações do calendário"
+        : "as tarefas";
+  // Só se repete o que falhou: pedir outra vez a lista que veio bem era gastar
+  // uma viagem para chegar ao mesmo sítio.
+  const tentarDeNovo = useCallback(() => {
+    if (falhaDasMarcacoes) recarregarMarcacoes();
+    if (falhaDasTarefas) recarregarTarefas();
+  }, [falhaDasMarcacoes, falhaDasTarefas, recarregarMarcacoes, recarregarTarefas]);
 
   const { byDay, days } = useMemo(() => {
     const today = new Date();
@@ -199,25 +247,71 @@ export default function Agenda({ quotes, onOpen }: Props) {
       </div>
 
       <div className="max-h-[420px] overflow-y-auto">
+        {/* ── A AGENDA QUE ESTÁ LÁ, MENOS O QUE NÃO SE CONSEGUIU LER ────────
+            Há eventos dos pedidos para mostrar, mas falta-lhe metade. Sem esta
+            linha, uma agenda incompleta é indistinguível de uma agenda
+            completa — e a diferença entre as duas é uma tarefa que ninguém faz
+            hoje. Fica em cima do primeiro dia, que é onde o olho começa. */}
+        {falha && days.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#a03a1a]/20 bg-[#f6e6df]/40 px-5 py-2.5 sm:px-6">
+            <p className="bo-text-muted min-w-0 flex-1 text-[11px] leading-snug">
+              Falta aqui o que não deu para ler — {oQueFaltou}. O que está em baixo vem dos pedidos,
+              e está certo.
+            </p>
+            {falha.valeTentarDeNovo && (
+              <Button size="sm" variant="ghost" onClick={tentarDeNovo}>
+                Tentar de novo
+              </Button>
+            )}
+          </div>
+        )}
         {days.length === 0 ? (
-          <EmptyState
-            icon={
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                aria-hidden="true"
-              >
-                <rect x="3" y="4" width="18" height="17" rx="2" />
-                <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
-              </svg>
-            }
-            title="Agenda tranquila"
-            description={`Nada agendado para os próximos ${DAYS_AHEAD} dias. Os eventos, tarefas e pagamentos aparecem aqui à medida que se aproximam.`}
-          />
+          aLer ? (
+            /* A LER não é VAZIO. Enquanto as duas listas não voltarem, esta
+               agenda não sabe nada sobre os próximos dias — e uma frase que
+               diga o contrário chega sempre antes da resposta. */
+            <div role="status" aria-busy="true" className="divide-y divide-foreground/[0.06]">
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+              <span className="sr-only">A ler a agenda…</span>
+            </div>
+          ) : falha ? (
+            /* NÃO DEU PARA LER: aqui não se afirma nada sobre os próximos dias.
+               Diz-se o que faltou, porquê, e o passo a dar — que numa leitura é
+               sempre tentar outra vez, nunca «repete», que não há gesto nenhum
+               para repetir. */
+            <div className="px-5 pb-5 sm:px-6">
+              <AvisoDeFalha
+                titulo={`Não foi possível ler ${oQueFaltou}`}
+                mensagem={`${falha.mensagem} Dos pedidos não há nada nos próximos ${DAYS_AHEAD} dias; o resto ficou por ler, e não por estar vazio.`}
+                falha={falha}
+                aoTentarDeNovo={tentarDeNovo}
+              />
+            </div>
+          ) : (
+            /* VAZIO A SÉRIO — e continua a ser um vazio, sem alarme nenhum: as
+               primeiras semanas são feitas disto. O que mudou é dizer de onde
+               é que estas linhas vêm, para não parecer um ecrã por acabar. */
+            <EmptyState
+              icon={
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="4" width="18" height="17" rx="2" />
+                  <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
+                </svg>
+              }
+              title="Agenda tranquila"
+              description={`Já li os pedidos, as marcações do calendário e as tarefas: nenhum deles tem nada marcado para os próximos ${DAYS_AHEAD} dias. Os eventos, tarefas e pagamentos aparecem aqui à medida que se aproximam.`}
+            />
+          )
         ) : (
           days.map((key) => (
             <div key={key} className="border-b border-foreground/[0.06] last:border-0">

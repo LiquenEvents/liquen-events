@@ -15,6 +15,8 @@ import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { esperaEmPalavras } from "@/lib/orcamento/espera";
+import type { LeituraFalhada } from "@/lib/porque-nao-leu";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 
 /**
  * A chave `YYYY-MM-DD` LOCAL de um dia qualquer — a regra do `todayKey()` do
@@ -1016,6 +1018,29 @@ interface Props {
    * Geral mudava o servidor e deixava o ecrã a dizer o contrário.
    */
   onQuoteAtualizado?: (q: Quote) => void;
+  /**
+   * A leitura dos pedidos não voltou.
+   *
+   * Esta vista não lê nada: recebe os pedidos já lidos pelo AdminClient, e o
+   * desenho do servidor engole a falha e devolve uma lista vazia. Daqui, uma
+   * base de dados que não respondeu é indistinguível de um estúdio acabado de
+   * abrir — e o ecrã dava as boas-vindas («Este é o teu ponto de partida») a
+   * quem tem cinquenta casamentos marcados. A distinção só pode vir de quem
+   * fez a leitura; sem ela, a vista comporta-se exactamente como antes.
+   */
+  falhaDeLeitura?: LeituraFalhada | null;
+  /** Volta a pedir a lista de pedidos, quando quem lê sabe repeti-la. */
+  aoTentarDeNovo?: () => void;
+  /**
+   * Quantos pedidos existem mas estão arquivados.
+   *
+   * A Visão Geral recebe só os activos. Com tudo arquivado ficava igualzinha a
+   * uma instalação nova, e a frase de boas-vindas era falsa: o trabalho existe,
+   * está noutra gaveta.
+   */
+  arquivados?: number;
+  /** Leva à lista de pedidos já com os arquivados à vista. */
+  onVerArquivados?: () => void;
 }
 
 export default function Overview({
@@ -1026,6 +1051,10 @@ export default function Overview({
   onGo,
   onNew,
   onQuoteAtualizado,
+  falhaDeLeitura,
+  aoTentarDeNovo,
+  arquivados = 0,
+  onVerArquivados,
 }: Props) {
   /**
    * ── O QUE AQUI DENTRO AINDA LÊ O RELÓGIO, E PORQUE É QUE FICA ─────────────
@@ -1310,9 +1339,30 @@ export default function Overview({
           month: "long",
         });
 
-  // Warm onboarding state — a fresh back office with no pedidos yet. Instead of a
-  // grid of empty cards, greet the user and point them at their first action.
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O ECRÃ DE BOAS-VINDAS É UMA AFIRMAÇÃO — E HAVIA DUAS MANEIRAS DE SER FALSA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * «Ainda sem pedidos por aqui. Este é o teu ponto de partida.» é a primeira
+   * coisa que se lê ao abrir o back office, e diz duas coisas de uma vez: que a
+   * lista está vazia, e que está vazia porque nunca houve nada. A segunda
+   * metade estava a ser inventada em dois casos:
+   *
+   *   · a leitura dos pedidos não voltou (a base de dados em baixo, ou — o
+   *     caso comum — a sessão a caducar num separador aberto desde a manhã).
+   *     Aí não se sabe se há pedidos: não se chegou a perguntar. Ver
+   *     `src/lib/porque-nao-leu.ts`;
+   *   · está tudo ARQUIVADO. Esta vista recebe só os activos, e um estúdio que
+   *     acabou a época e arrumou tudo lia exactamente o mesmo que uma
+   *     instalação nova.
+   *
+   * Nos dois casos o vazio continua a ser um vazio — não se transforma num
+   * alarme —, o que muda é dizer o PORQUÊ certo e dar o passo que resolve
+   * aquele porquê, e não outro.
+   */
   if (quotes.length === 0) {
+    const tudoArquivado = arquivados > 0;
     return (
       <div className="flex flex-col gap-7">
         <div>
@@ -1326,49 +1376,94 @@ export default function Overview({
             {greeting}, {userName}.
           </h2>
         </div>
-        <div className="bo-card p-8 sm:p-12 text-center flex flex-col items-center">
-          <span
-            className="flex items-center justify-center w-14 h-14 rounded-2xl mb-5 bg-[#4d6350]/[0.08] text-[#4d6350]"
-            aria-hidden="true"
-          >
-            <svg
-              width="26"
-              height="26"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
+        {falhaDeLeitura ? (
+          <AvisoDeFalha
+            titulo="Não foi possível ler os pedidos"
+            falha={falhaDeLeitura}
+            aoTentarDeNovo={aoTentarDeNovo}
+          />
+        ) : (
+          <div className="bo-card p-8 sm:p-12 text-center flex flex-col items-center">
+            <span
+              className="flex items-center justify-center w-14 h-14 rounded-2xl mb-5 bg-[#4d6350]/[0.08] text-[#4d6350]"
+              aria-hidden="true"
             >
-              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-            </svg>
-          </span>
-          <h3
-            className="text-foreground/80 font-bold text-xl mb-2"
-            style={{ fontFamily: "var(--font-playfair)" }}
-          >
-            Ainda sem pedidos por aqui.
-          </h3>
-          <p className="text-foreground/45 text-sm max-w-sm leading-relaxed mb-6">
-            Este é o teu ponto de partida. Assim que registares o primeiro pedido, a Visão Geral
-            enche-se de vida — eventos, propostas e receita, tudo num só olhar.
-          </p>
-          <button
-            onClick={onNew}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] shadow-sm transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.7"
+              <svg
+                width="26"
+                height="26"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+              >
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+            </span>
+            <h3
+              className="text-foreground/80 font-bold text-xl mb-2"
+              style={{ fontFamily: "var(--font-playfair)" }}
             >
-              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-            </svg>
-            Criar o primeiro pedido
-          </button>
-        </div>
+              {tudoArquivado ? "Está tudo arquivado." : "Ainda sem pedidos por aqui."}
+            </h3>
+            <p className="text-foreground/45 text-sm max-w-sm leading-relaxed mb-6">
+              {tudoArquivado
+                ? `Não há nenhum pedido activo. ${
+                    arquivados === 1
+                      ? "O único que existe está arquivado"
+                      : `Os ${arquivados} que existem estão arquivados`
+                  }, e os arquivados não contam para nada do que se vê aqui — por isso a Visão Geral está assim.`
+                : "Este é o teu ponto de partida. Assim que registares o primeiro pedido, a Visão Geral enche-se de vida — eventos, propostas e receita, tudo num só olhar."}
+            </p>
+            {/* A acção DENTRO do vazio, e a que resolve este vazio: com tudo
+              arquivado o primeiro passo não é criar mais um pedido, é ir ver os
+              que já existem. */}
+            {tudoArquivado && onVerArquivados && (
+              <button
+                onClick={onVerArquivados}
+                /* `alvo-toque` (globals.css) porque este botão é escrito à
+                   mão e não passa pelo `ui/Button.tsx`, que é onde vive o piso
+                   de 44 px do dedo: media 37 px de altura, e é o único caminho
+                   para sair de um ecrã que não tem mais nada. Só cresce com
+                   dedo — com rato fica exactamente como está desenhado. */
+                className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-[#1b2119] text-white/90 hover:bg-[#2a3227] shadow-sm transition-colors motion-reduce:transition-none mb-3 ${FOCUS_RING}`}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                >
+                  <path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7ZM2 3h20v4H2z" />
+                </svg>
+                Ver os {arquivados} arquivados
+              </button>
+            )}
+            <button
+              onClick={onNew}
+              /* `alvo-toque` pela mesma razão do botão acima — e para os dois
+                 ficarem da mesma altura quando aparecem juntos. */
+              className={`alvo-toque inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium shadow-sm transition-colors motion-reduce:transition-none ${
+                tudoArquivado && onVerArquivados
+                  ? "bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15"
+                  : "bg-[#1b2119] text-white/90 hover:bg-[#2a3227]"
+              } ${FOCUS_RING}`}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+              >
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+              {tudoArquivado && onVerArquivados ? "Criar um pedido" : "Criar o primeiro pedido"}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -1900,10 +1995,48 @@ export default function Overview({
                 />
               </button>
             ))}
+            {/* ── «AINDA SEM MOVIMENTOS POR AQUI.» ─────────────────────────
+                Cinco palavras que não diziam nem o que é este painel, nem
+                porque é que está vazio, nem o que fazer a seguir. Uma frase
+                dessas, num canto de um ecrã cheio, lê-se como uma parte da
+                página que não carregou.
+
+                Passa a dizer as três coisas — o que a lista mostra, porque é
+                que não tem nada, e o passo a dar — sem virar alarme: uma
+                atividade recente vazia é o estado normal de quem ainda não
+                recebeu o primeiro pedido.
+
+                NOTA para quem vier a seguir: hoje isto está fora de alcance.
+                Esta lista são os `quotes` ordenados por data, e um `quotes`
+                vazio é apanhado lá em cima pelo ecrã de boas-vindas, que
+                devolve antes de se chegar aqui. Fica escrito na mesma, porque
+                o dia em que a Visão Geral deixar de ter esse atalho — ou em que
+                a lista passar a ter janela — este é o texto certo. */}
             {data.recent.length === 0 && (
-              <p className="text-foreground/35 text-sm text-center py-10">
-                Ainda sem movimentos por aqui.
-              </p>
+              <div className="text-center py-10 px-5">
+                <p className="text-foreground/45 text-sm">Ainda sem movimentos por aqui.</p>
+                <p className="text-foreground/30 text-xs mt-1.5 leading-relaxed">
+                  Esta lista são os últimos pedidos que entraram, do mais recente para trás.
+                  Enquanto não entrar nenhum — pelo formulário do site ou criado à mão — fica assim.
+                </p>
+                <button
+                  onClick={onNew}
+                  className={`alvo-toque mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] tracking-[0.15em] uppercase font-medium bg-white border border-foreground/[0.08] text-foreground/55 hover:text-foreground/80 hover:border-foreground/15 shadow-sm transition-colors motion-reduce:transition-none ${FOCUS_RING}`}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+                  </svg>
+                  Criar um pedido
+                </button>
+              </div>
             )}
           </div>
         </div>

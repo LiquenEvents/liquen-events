@@ -2946,6 +2946,19 @@ export default function AdminClient({
 
   const archivedCount = useMemo(() => quotes.filter((q) => q.archived).length, [quotes]);
 
+  /**
+   * «Ver os arquivados» — a saída dos vazios da Visão Geral e do Kanban.
+   *
+   * Os três gestos andam juntos: levar à lista sem destapar os arquivados, ou
+   * com um filtro de estado ainda por limpar, dava outra lista vazia — e essa
+   * já não tinha saída nenhuma.
+   */
+  const verArquivados = useCallback(() => {
+    setShowArchived(true);
+    setFilterStatus("all");
+    setView("pedidos");
+  }, []);
+
   // Archived quotes are soft-deleted: keep them out of the analytical surfaces
   // (overview, pipeline, clientes, calendário, estatísticas) so a junk or
   // duplicate lead never pollutes the numbers. They stay reachable via the
@@ -4073,6 +4086,10 @@ export default function AdminClient({
                 // grava no servidor; sem isto, a lista continuava a mostrar o
                 // pedido pendurado e o ecrã ficava a dizer o contrário.
                 onQuoteAtualizado={marcarDesfecho}
+                falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
+                aoTentarDeNovo={() => void revalidarPedidos()}
+                arquivados={archivedCount}
+                onVerArquivados={verArquivados}
               />
             </div>
           )}
@@ -4088,6 +4105,11 @@ export default function AdminClient({
                   setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
                   setSelected((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
                 }}
+                falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
+                aoTentarDeNovo={() => void revalidarPedidos()}
+                onNovoPedido={() => setNewQuoteOpen(true)}
+                arquivados={archivedCount}
+                onVerArquivados={verArquivados}
               />
             </div>
           )}
@@ -4172,7 +4194,11 @@ export default function AdminClient({
           {/* ── Acompanhamento: o que ficou à espera de resposta ── */}
           {view === "acompanhamento" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Acompanhamento quotes={quotes} onOpenQuote={openQuote} />
+              <Acompanhamento
+                quotes={quotes}
+                onOpenQuote={openQuote}
+                onFazerProposta={() => setView("fazer-proposta")}
+              />
             </div>
           )}
 
