@@ -8,6 +8,7 @@ import { downloadCsv, quotesToCsvRows, paymentsToCsvRows, dateStamp } from "./ex
 import { eur0 as eur } from "@/lib/money";
 import { Button, Card, EmptyState, Segmented } from "./ui";
 import AnalisePropostas from "./AnalisePropostas";
+import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
 
 // Unified status vocabulary — the same words a newcomer sees everywhere else in
 // the back office (Overview, Kanban): Novo / Aguardar resposta / Proposta enviada /
@@ -127,8 +128,8 @@ function VBars({
               aria-label={`${d.label}: ${valueLabel}`}
             >
               <div
-                className="absolute bottom-0 left-0 right-0 bg-moss/70 group-hover:bg-moss rounded-sm transition-all duration-500 motion-reduce:transition-none"
-                style={{ height: `${(d.value / max) * 100}%` }}
+                className="absolute inset-0 origin-bottom bg-moss/70 group-hover:bg-moss rounded-sm transition-[transform,background-color] duration-500 motion-reduce:transition-[background-color]"
+                style={{ transform: `scaleY(${fraccaoDaBarra(d.value, max)})` }}
               />
             </div>
             <span className="text-foreground/40 text-[9px] tracking-wide">{d.label}</span>
@@ -154,8 +155,11 @@ function HBars({ data }: { data: { label: string; value: number; color?: string 
           </div>
           <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${(d.value / max) * 100}%`, background: d.color ?? "#7c854b" }}
+              className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
+              style={{
+                transform: `scaleX(${fraccaoDaBarra(d.value, max)})`,
+                background: d.color ?? "#7c854b",
+              }}
             />
           </div>
         </div>
@@ -671,17 +675,17 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
               {/* received vs outstanding bar */}
               {stats.received + stats.outstanding > 0 && (
                 <div>
-                  <div className="h-2 rounded-full overflow-hidden flex bg-foreground/6">
+                  <div className="relative h-2 rounded-full overflow-hidden bg-foreground/6">
                     <div
-                      className="h-full bg-moss transition-all duration-700"
+                      className="absolute inset-0 origin-left bg-moss motion-safe:transition-transform motion-safe:duration-700"
                       style={{
-                        width: `${(stats.received / (stats.received + stats.outstanding)) * 100}%`,
+                        transform: `scaleX(${fraccaoDaBarra(stats.received, stats.received + stats.outstanding)})`,
                       }}
                     />
                     <div
-                      className="h-full bg-[#b5894a]/70 transition-all duration-700"
+                      className="absolute inset-0 origin-left bg-[#b5894a]/70 motion-safe:transition-transform motion-safe:duration-700"
                       style={{
-                        width: `${(stats.outstanding / (stats.received + stats.outstanding)) * 100}%`,
+                        transform: `translateX(${fraccaoDaBarra(stats.received, stats.received + stats.outstanding) * 100}%) scaleX(${fraccaoDaBarra(stats.outstanding, stats.received + stats.outstanding)})`,
                       }}
                     />
                   </div>
@@ -791,9 +795,9 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                         </div>
                         <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
                           <div
-                            className="h-full rounded-full transition-all duration-700"
+                            className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
                             style={{
-                              width: `${(Math.max(0, row.margin) / maxMargin) * 100}%`,
+                              transform: `scaleX(${fraccaoDaBarra(row.margin, maxMargin)})`,
                               background: color,
                             }}
                           />
@@ -865,8 +869,10 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                   </div>
                   <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-[#8a8a82]/60 transition-all duration-700"
-                      style={{ width: `${(row.value / stats.lostReasonRows[0].value) * 100}%` }}
+                      className="h-full w-full origin-left rounded-full bg-[#8a8a82]/60 motion-safe:transition-transform motion-safe:duration-700"
+                      style={{
+                        transform: `scaleX(${fraccaoDaBarra(row.value, stats.lostReasonRows[0].value)})`,
+                      }}
                     />
                   </div>
                 </div>
@@ -902,9 +908,9 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
                 </div>
                 <div className="h-1.5 bg-foreground/6 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-700"
+                    className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
                     style={{
-                      width: `${row.rate}%`,
+                      transform: `scaleX(${fraccaoDaBarra(row.rate, 100)})`,
                       background:
                         row.rate >= 50 ? "#4d6350" : row.rate >= 20 ? "#7c854b" : "#8a8a82",
                     }}

@@ -212,6 +212,96 @@ function propriedadesDeKeyframes(fonte: string): { nome: string; props: string[]
   return fora;
 }
 
+/**
+ * ── AS BARRAS DO DOSSIER ──────────────────────────────────────────────────
+ *
+ * A rede acima cobre o `globals.css` e a cromagem pública: o que está no ecrã
+ * durante o scroll do SÍTIO. O dossier ficou de fora — e é onde ela trabalha,
+ * de pé numa quinta, num iPhone com 4G fraco.
+ *
+ * O defeito é uma família inteira e escreve-se sempre da mesma maneira: uma
+ * barra cujo enchimento leva a percentagem numa `width` (ou numa `height`) em
+ * linha, e por cima uma transição. Animar a largura obriga o browser a
+ * recalcular a geometria a cada frame, na linha principal — e nestes ecrãs há
+ * barras aos pares e aos seis, todas a animar ao mesmo tempo assim que os
+ * números chegam do servidor.
+ *
+ * A forma correcta já existe no repositório e é a do `ui/EmCurso`: um traço
+ * cheio (`w-full`) encolhido por `scaleX` a partir de `origin-left`. O
+ * compositor faz o mesmo desenho sem tocar na geometria.
+ *
+ * Esta rede não proíbe transições nas barras — proíbe que a coisa animada seja
+ * a própria geometria. `transition-transform`, `transition-colors` e
+ * `transition-opacity` passam todas.
+ */
+const BARRAS = [
+  "src/app/[lang]/(site)/orcamento/admin/StatsDashboard.tsx",
+  "src/app/[lang]/(site)/orcamento/admin/ProductionPlan.tsx",
+  "src/app/[lang]/(site)/orcamento/admin/ModoDeCarga.tsx",
+  "src/app/[lang]/(site)/orcamento/admin/EventChecklist.tsx",
+  "src/app/[lang]/(site)/galeria/GaleriaClient.tsx",
+];
+
+/**
+ * Comentários de TSX. Sem isto, um `<` ou umas aspas soltas dentro de prosa
+ * desalinham o varredor de etiquetas. O `(?<!:)` poupa os `https://`.
+ *
+ * Apaga SEM ENCOLHER — cada carácter vira um espaço e as mudanças de linha
+ * ficam. É o que faz o número de linha do relatório apontar para o ficheiro
+ * verdadeiro; a primeira versão contava as linhas no texto já encolhido e
+ * mandava-a procurar duzentas linhas acima do sítio certo.
+ */
+const semComentariosTsx = (src: string) => {
+  const branco = (m: string) => m.replace(/[^\n]/g, " ");
+  return src.replace(/\/\*[\s\S]*?\*\//g, branco).replace(/(?<!:)\/\/[^\n]*/g, branco);
+};
+
+/**
+ * As ETIQUETAS DE ABERTURA de um ficheiro JSX, uma a uma.
+ *
+ * Um `/<[^>]*>/` não serve: estas etiquetas trazem expressões com `>` lá dentro
+ * (`{n > 0 ? …}`) e literais de modelo com `${…}`. Este varredor conta chavetas
+ * e respeita aspas, portanto só pára no `>` que fecha mesmo a etiqueta.
+ */
+function etiquetasDeAbertura(fonte: string): string[] {
+  const fora: string[] = [];
+  for (let i = 0; i < fonte.length; i++) {
+    if (fonte[i] !== "<" || !/[A-Za-z]/.test(fonte[i + 1] ?? "")) continue;
+    let j = i + 1;
+    let chaves = 0;
+    let aspas: string | null = null;
+    while (j < fonte.length) {
+      const c = fonte[j];
+      if (aspas) {
+        if (c === "\\") j++;
+        else if (c === aspas) aspas = null;
+      } else if (c === '"' || c === "'" || c === "`") aspas = c;
+      else if (c === "{") chaves++;
+      else if (c === "}") chaves--;
+      else if (c === ">" && chaves === 0) break;
+      j++;
+    }
+    fora.push(fonte.slice(i, j));
+    i = j;
+  }
+  return fora;
+}
+
+/** A etiqueta põe a geometria em linha? É o que faz dela uma barra. */
+const levaGeometriaEmLinha = (etiqueta: string) => {
+  const estilo = /style=\{\{([\s\S]*?)\}\}/.exec(etiqueta)?.[1];
+  return estilo
+    ? /\b(width|height|maxWidth|maxHeight|minWidth|minHeight|flexBasis)\s*:/.test(estilo)
+    : false;
+};
+
+/** As classes de transição da etiqueta que prometem animar layout. */
+const transicoesDeLayout = (etiqueta: string) =>
+  [...etiqueta.matchAll(/\btransition-(all|\[[^\]]+\])/g)]
+    .map((m) => m[1])
+    .filter((p) => (p === "all" ? true : p.slice(1, -1).split(",").some(eLayout)))
+    .map((p) => `transition-${p}`);
+
 describe("contrato da fluidez: o movimento anima o compositor, não a geometria", () => {
   it("nenhuma transição do globals.css anima uma propriedade de layout", () => {
     const infractoras = propriedadesDeTransicao(css)
@@ -339,6 +429,47 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
     expect(Number(m![1]), "o anel de foco demora demasiado a ficar legível").toBeLessThanOrEqual(
       200,
     );
+  });
+
+  it("nenhuma barra do dossier anima a própria geometria", () => {
+    const infractoras: string[] = [];
+    for (const rel of BARRAS) {
+      const fonte = semComentariosTsx(readFileSync(join(RAIZ, rel), "utf8"));
+      for (const etiqueta of etiquetasDeAbertura(fonte)) {
+        if (!levaGeometriaEmLinha(etiqueta)) continue;
+        for (const classe of transicoesDeLayout(etiqueta)) {
+          // A linha, para se poder ir lá directo em vez de procurar à mão num
+          // ficheiro de três mil linhas.
+          const linha = fonte.slice(0, fonte.indexOf(etiqueta)).split("\n").length;
+          infractoras.push(`${rel}:${linha} :: ${classe}`);
+        }
+      }
+    }
+    expect(
+      infractoras,
+      "esta barra leva a percentagem numa `width`/`height` em linha E promete animá-la: são recálculos de geometria na linha principal, aos seis ao mesmo tempo, num telemóvel a meio de um evento. Faz como o `ui/EmCurso`: `w-full origin-left` + `transform: scaleX(fracção)`.",
+    ).toEqual([]);
+  });
+
+  it("o varredor de barras está mesmo armado", () => {
+    // A mesma falha estúpida do teste acima, na versão JSX: o varredor deixar
+    // de encontrar etiquetas e a rede passar sobre uma lista vazia.
+    const painel = semComentariosTsx(
+      readFileSync(join(RAIZ, "src/app/[lang]/(site)/orcamento/admin/StatsDashboard.tsx"), "utf8"),
+    );
+    const etiquetas = etiquetasDeAbertura(painel);
+    expect(etiquetas.length, "o varredor deixou de ver etiquetas de abertura").toBeGreaterThan(100);
+    // E continua a saber reconhecer uma barra: as do painel passaram a `scaleX`,
+    // portanto há etiquetas com `transform` em linha e nenhuma com `width`.
+    expect(
+      etiquetas.filter((t) => /style=\{\{[\s\S]*?transform:\s*`scaleX/.test(t)).length,
+      "as barras do painel deixaram de encolher por `scaleX`",
+    ).toBeGreaterThan(3);
+    // O classificador reconhece o par que interessa.
+    expect(levaGeometriaEmLinha("<div style={{ width: `${p}%` }} />")).toBe(true);
+    expect(levaGeometriaEmLinha("<div style={{ transform: `scaleX(${p})` }} />")).toBe(false);
+    expect(transicoesDeLayout('<div className="transition-all" />')).toEqual(["transition-all"]);
+    expect(transicoesDeLayout('<div className="transition-transform" />')).toEqual([]);
   });
 
   it("a rede está mesmo armada (não passa por vacuidade)", () => {

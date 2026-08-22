@@ -12,6 +12,7 @@ import {
   PRODUCTION_PHASE_SEP,
   buildProductionPlanItems,
 } from "@/lib/production-templates";
+import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
 
 interface Props {
   quote: Quote;
@@ -379,8 +380,8 @@ export default function ProductionPlan({ quote, onChange }: Props) {
                 </div>
                 <div className="h-1 bg-foreground/[0.06] rounded-full overflow-hidden mb-2">
                   <div
-                    className="h-full bg-[#4d6350] rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%` }}
+                    className="h-full w-full origin-left bg-[#4d6350] rounded-full motion-safe:transition-transform motion-safe:duration-500"
+                    style={{ transform: `scaleX(${fraccaoDaBarra(pct, 100)})` }}
                   />
                 </div>
                 <div className="flex flex-col gap-0.5">

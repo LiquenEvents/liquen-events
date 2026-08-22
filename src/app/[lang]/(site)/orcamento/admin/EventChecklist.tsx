@@ -8,6 +8,7 @@ import type { Quote, ChecklistItem } from "@/lib/orcamento/types";
 import { checklistTemplate } from "@/lib/checklist-templates";
 import { Button, Field, EmptyState, PerguntaDestrutiva } from "./ui";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -394,8 +395,8 @@ export default function EventChecklist({ quote, onChange }: Props) {
             aria-label="Progresso da checklist"
           >
             <div
-              className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-500"
-              style={{ width: `${pct}%` }}
+              className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-500"
+              style={{ transform: `scaleX(${fraccaoDaBarra(pct, 100)})` }}
             />
           </div>
           {/* Os três botões desta barra mediam 27 px de altura a 375 px — e
