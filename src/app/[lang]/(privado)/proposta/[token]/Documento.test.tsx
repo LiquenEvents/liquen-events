@@ -520,10 +520,17 @@ describe("as secções de condições", () => {
   const dobra = (nome: RegExp) =>
     screen.getByRole("heading", { name: nome }).closest("details") as HTMLDetailsElement;
 
-  it("saem fechadas — é essa a razão de existirem", () => {
+  it("saem ABERTAS — o que aqui está é o que ninguém pode dizer que não leu", () => {
+    // Saíam fechadas, para o documento não abrir com quatro paredes de texto
+    // legal. Decisão dela, e a certa: estas quatro são as condições em que o
+    // casal se compromete — IVA, faseamento, cancelamento —, e uma secção
+    // fechada é uma secção que se pode não ler.
+    //
+    // Continuam a poder fechar-se: o `open` é o estado inicial de um
+    // `<details>`, não um cadeado.
     desenhar(COM_TUDO);
     for (const nome of [/Condições Gerais/i, /Observações/i, /Faseamento/i, /Cancelamento/i]) {
-      expect(dobra(nome).open).toBe(false);
+      expect(dobra(nome).open).toBe(true);
     }
   });
 

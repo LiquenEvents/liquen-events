@@ -200,7 +200,20 @@ function SeccaoDobrada({
 }) {
   return (
     <section className="mt-16 max-w-2xl sm:mt-24">
-      <details className="group">
+      {/*
+       * ABERTAS DE RAIZ — decisão dela, e a certa.
+       *
+       * Estavam fechadas para o documento não abrir com quatro paredes de
+       * texto legal. Só que estas quatro são as condições em que o casal se
+       * compromete: uma secção fechada é uma secção que se pode não ler, e o
+       * que aqui está — IVA, faseamento, cancelamento — é precisamente o que
+       * ninguém pode dizer depois que não sabia.
+       *
+       * Continua a poder fechar-se: o `open` é o estado INICIAL de um
+       * `<details>`, não um cadeado. Quem já leu arruma, e o resumo por baixo
+       * do título volta a aparecer (`group-open:hidden`).
+       */}
+      <details className="group" open>
         {/*
          * `list-none` e o marcador do WebKit escondido: o triângulo do
          * navegador entra ANTES do sobretítulo e desalinha um cabeçalho que é
