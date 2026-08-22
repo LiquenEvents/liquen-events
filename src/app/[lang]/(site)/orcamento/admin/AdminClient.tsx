@@ -81,6 +81,7 @@ import { onIdle } from "@/lib/onIdle";
 import { marcarSaidaDeProposito } from "./entrada-destino";
 import { eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
 import { useFocusTrap } from "./useFocusTrap";
+import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
@@ -1781,6 +1782,23 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   // mesmo dos diálogos (`useTrincoDeScroll`), agora num sítio só: era daqui que
   // o padrão vinha, e faltava em dez caixas que também tapam a página.
   useTrincoDeScroll(navOpen);
+
+  /* ── O GESTO DE VOLTAR FECHA O QUE ESTÁ ABERTO ─────────────────────────────
+     Do registo do audit, e são dois dos oito bloqueios de uma vez.
+
+     O primeiro: «zero `pushState` em todo o `src/` … no iPhone, deslizar da
+     esquerda É o botão de voltar, portanto isto acontece por acidente, a
+     qualquer profundidade».
+
+     O segundo: «com um pedido aberto sobra UM alvo de saída no ecrã todo» — o
+     «×» do canto superior direito, que é o ponto do ecrã mais longe do polegar.
+     A partir daqui o gesto é uma segunda saída, e é a que a mão já faz.
+
+     E o `closeDetail` é o caminho, e não o `setSelected(null)`: é ele que
+     pergunta «tem alterações por guardar?». Era esse guarda que o audit dizia
+     que nunca chegava a correr. */
+  useCamadaDeHistoria(navOpen, () => setNavOpen(false));
+  useCamadaDeHistoria(!!selected, () => closeDetail());
 
   // A barra lateral é gaveta abaixo de `lg` (1024px) — o mesmo ponto de corte
   // do `lg:sticky` / `lg:translate-x-0` que a desenha. Mesmo guarda do efeito
