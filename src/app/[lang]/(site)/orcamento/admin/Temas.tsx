@@ -38,6 +38,7 @@ import { adiantarTema, paginaDaResposta, usarAdiantada } from "./prefetch-de-tem
 import { SugestaoDeNome } from "./SugestaoDeNome";
 import { NomesPorArrumar } from "./NomesPorArrumar";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
+import { porqueNaoLeu, porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
 
 /**
  * Biblioteca de Temas — o sítio onde o estúdio guarda, uma vez, as fotos de
@@ -2036,6 +2037,15 @@ function ThemeFolder({
   const [truncated, setTruncated] = useState(false);
   /** A última página veio cheia → é provável que haja mais. */
   const [pageFull, setPageFull] = useState(false);
+  /**
+   * PORQUE é que a pasta não se deixou ler. A pasta ilegível já não era
+   * confundida com uma pasta vazia — isso estava feito —, mas a razão era
+   * sempre a mesma: «é uma falha temporária, recarrega a página daqui a
+   * pouco». Com a sessão caída (o caso comum: este ecrã fica aberto horas)
+   * isso é falso e o conselho não leva a lado nenhum — recarregar devolve o
+   * mesmo 401. Com um 404 também: a pasta não volta por esperar.
+   */
+  const [falhaDaPasta, setFalhaDaPasta] = useState<LeituraFalhada | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   /** Lotes a decorrer — não um booleano: com dois lotes ao mesmo tempo, o
@@ -2129,6 +2139,11 @@ function ThemeFolder({
   useEffect(() => {
     let active = true;
     (async () => {
+      // Guardados para o `catch`: é lá que se escreve a frase, e sem estes
+      // chegava lá um "falhou" que não diz nem o estado nem o que o servidor
+      // explicou.
+      let resposta: { status: number } | null = null;
+      let corpo: unknown = null;
       try {
         // O rato já pousou neste cartão? Então a listagem pode já estar cá —
         // ver `adiantarTema`. `null` quer dizer «não havia, ou já não vale», e
@@ -2141,12 +2156,17 @@ function ThemeFolder({
               `/api/temas/${theme.id}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`,
               { cache: "no-store" },
             );
-            if (!res.ok) throw new Error("falhou");
+            if (!res.ok) {
+              resposta = res;
+              corpo = await res.json().catch(() => null);
+              throw new Error(String(res.status));
+            }
             return paginaDaResposta(await res.json());
           })());
         if (!active) return;
         const page = pagina.images;
         setImages(page);
+        setFalhaDaPasta(null);
         // `total: null` é uma pasta que NÃO pôde ser lida — ver
         // `paginaDaResposta`. Aceitá-la como zero faria a grelha dizer "arrasta
         // aqui as fotos" a um tema que pode ter 3000, e ela a carregá-las outra
@@ -2154,10 +2174,18 @@ function ThemeFolder({
         setTotal(pagina.total);
         setTruncated(pagina.truncated);
         setPageFull(page.length >= THEME_PAGE_SIZE);
-      } catch {
+      } catch (e) {
         // Sem lista não se avisa o pai: o cartão guarda a contagem que veio do
         // servidor (que pode ser "Fotos indisponíveis") em vez de dizer "0".
-        if (active) toast("Não foi possível carregar as fotos do tema.", "error");
+        if (!active) return;
+        // A MESMA falha, dita de duas maneiras. O aviso passageiro flutua por
+        // cima de qualquer ecrã e por isso nomeia a coisa; o painel que FICA na
+        // grelha já tem o nome no título, e repeti-lo lá era dizer duas vezes o
+        // que se está a ver.
+        const frase = (oQue: string) =>
+          resposta ? porqueNaoLeu(oQue, resposta, corpo) : porqueNaoLeuDoErro(oQue, e);
+        setFalhaDaPasta(frase(""));
+        toast(frase("as fotos deste tema").mensagem, "error");
       } finally {
         if (active) setLoading(false);
       }
@@ -3698,7 +3726,12 @@ function ThemeFolder({
               Não foi possível ler a pasta deste tema agora.
             </p>
             <p className="bo-text-muted mt-1 text-xs">
-              É uma falha temporária — as fotos não desapareceram. Recarrega a página daqui a pouco.
+              {/* A razão, quando se sabe qual foi. O texto de reserva é para a
+                  pasta que o SERVIDOR disse não ter conseguido ler (um 200 com
+                  `ok: false`): aí ele já respondeu, e o que se sabe é mesmo só
+                  que a falha é do lado de lá e passageira. */}
+              {falhaDaPasta?.mensagem ??
+                "É uma falha temporária — as fotos não desapareceram. Recarrega a página daqui a pouco."}
             </p>
           </div>
         ) : images.length === 0 && pending.length === 0 ? (
