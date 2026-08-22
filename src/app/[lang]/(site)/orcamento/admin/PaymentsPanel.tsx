@@ -10,6 +10,7 @@ import type { Quote, Payment, PaymentKind } from "@/lib/orcamento/types";
 import { splitSinal } from "@/lib/money";
 import { usePercentagemDoSinal } from "./percentagem-do-sinal";
 import { computeEventMetrics, paidTotal, type DossierData } from "@/lib/orcamento/dossier";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const KIND_LABEL: Record<PaymentKind, string> = {
   sinal: "Sinal",
@@ -62,6 +63,8 @@ interface FailedOp {
   /** Cópia do pagamento para desenhar a linha que o registo perdeu. */
   ghost: Payment | null;
   label: string;
+  /** A acção, nomeada, para o aviso do «Repetir» dizer o mesmo da primeira vez. */
+  oQue: string;
 }
 
 interface Props {
@@ -113,26 +116,57 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
   );
   const metrics = useMemo(() => computeEventMetrics(dossier), [dossier]);
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UM PEDIDO, E UMA FRASE QUE DIZ QUE DINHEIRO
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As duas escritas deste painel diziam «Não foi possível guardar o nº de
+   * contrato. Tenta novamente.» e «Não foi possível guardar. Usa o Repetir na
+   * linha marcada.» — a mesma frase para a rede em baixo, a sessão expirada e
+   * o servidor em baixo, e num painel onde cada linha é uma quantia. Sem o
+   * valor lá dentro, o aviso não diz que pagamento é que não ficou registado.
+   *
+   * Este devolve a resposta e a frase em vez de a dizer, porque quem chama
+   * ainda tem de decidir o que fazer: o 409 tem tratamento próprio (adopta a
+   * versão do servidor), e o resto marca a linha antes de avisar.
+   */
+  async function pedir(
+    oQue: string,
+    init: RequestInit,
+  ): Promise<{ res: Response | null; corpo: unknown; aviso: string }> {
+    let res: Response;
+    try {
+      res = await fetch(`/api/orcamento/${quote.id}`, init);
+    } catch {
+      return { res: null, corpo: null, aviso: porqueRebentou(oQue).mensagem };
+    }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) return { res, corpo, aviso: porqueFalhou(oQue, res, corpo).mensagem };
+    return { res, corpo, aviso: "" };
+  }
+
   async function saveContractRef() {
     const next = contractRef.trim();
     if (next === (quote.contractRef ?? "")) return;
     setSavingRef(true);
-    try {
-      const res = await fetch(`/api/orcamento/${quote.id}`, {
+    const { res, aviso } = await pedir(
+      next ? `guardar o nº de contrato «${next}»` : "apagar o nº de contrato",
+      {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         // null (não undefined): limpar o campo tem de chegar ao servidor —
         // undefined desaparece no JSON e o valor antigo voltava sozinho.
         body: JSON.stringify({ contractRef: next || null }),
-      });
-      if (!res.ok) throw new Error();
-      onContractRef?.(next);
-      toast("Nº de contrato guardado", "success");
-    } catch {
-      toast("Não foi possível guardar o nº de contrato. Tenta novamente.", "error");
-    } finally {
-      setSavingRef(false);
+      },
+    );
+    setSavingRef(false);
+    if (!res?.ok) {
+      toast(aviso, "error");
+      return;
     }
+    onContractRef?.(next);
+    toast("Nº de contrato guardado", "success");
   }
 
   // Total COM IVA (o que o cliente paga): a mesma base dos pagamentos, que são
@@ -262,55 +296,60 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
    * ficar diferente no ecrã e na base de dados sem ninguém dar por isso. Além de
    * reverter, marca a linha em causa e guarda a tentativa para o botão "Repetir".
    */
-  function persist(next: Payment[], op: { id: string; ghost?: Payment | null; label: string }) {
+  async function persist(
+    next: Payment[],
+    op: { id: string; ghost?: Payment | null; label: string; oQue: string },
+  ) {
     const snapshot = payments;
     setPayments(next);
     onChange(next);
     setFailed((f) => (f && f.id === op.id ? null : f));
     const baseAnterior = base.current;
     base.current = next;
-    fetch(`/api/orcamento/${quote.id}`, {
+
+    const { res, corpo, aviso } = await pedir(op.oQue, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ payments: next, base: { payments: baseAnterior } }),
-    })
-      .then(async (res) => {
-        /**
-         * 409 NÃO é «tenta outra vez». É «isto mudou noutro sítio», e repetir
-         * seria escrever por cima do que a outra pessoa acabou de fazer — que é
-         * exactamente o que este guarda existe para impedir. Por isso NÃO se
-         * marca a linha para o botão «Repetir»: adopta-se o que o servidor tem,
-         * diz-se-lhe, e ela decide o que fazer já a olhar para a verdade.
-         */
-        if (res.status === 409) {
-          const corpo = (await res.json().catch(() => null)) as {
-            current?: { payments?: Payment[] };
-          } | null;
-          const doServidor = corpo?.current?.payments ?? snapshot;
-          setPayments(doServidor);
-          onChange(doServidor);
-          base.current = doServidor;
-          setFailed(null);
-          toast(
-            "Os pagamentos foram alterados noutro sítio. Está aqui a versão guardada.",
-            "error",
-          );
-          return;
-        }
-        if (!res.ok) throw new Error();
-      })
-      .catch(() => {
-        base.current = baseAnterior;
-        setPayments(snapshot);
-        onChange(snapshot);
-        setFailed({ id: op.id, next, ghost: op.ghost ?? null, label: op.label });
-        toast("Não foi possível guardar. Usa o Repetir na linha marcada.", "error");
-      });
+    });
+
+    /**
+     * 409 NÃO é «tenta outra vez». É «isto mudou noutro sítio», e repetir
+     * seria escrever por cima do que a outra pessoa acabou de fazer — que é
+     * exactamente o que este guarda existe para impedir. Por isso NÃO se
+     * marca a linha para o botão «Repetir»: adopta-se o que o servidor tem,
+     * diz-se-lhe, e ela decide o que fazer já a olhar para a verdade.
+     */
+    if (res?.status === 409) {
+      const doServidor =
+        (corpo as { current?: { payments?: Payment[] } } | null)?.current?.payments ?? snapshot;
+      setPayments(doServidor);
+      onChange(doServidor);
+      base.current = doServidor;
+      setFailed(null);
+      toast("Os pagamentos foram alterados noutro sítio. Está aqui a versão guardada.", "error");
+      return;
+    }
+
+    if (res?.ok) return;
+
+    base.current = baseAnterior;
+    setPayments(snapshot);
+    onChange(snapshot);
+    setFailed({ id: op.id, next, ghost: op.ghost ?? null, label: op.label, oQue: op.oQue });
+    // A frase diz o que aconteceu e o que fazer; esta segunda parte diz ONDE —
+    // sem ela, o aviso desaparece e a linha marcada fica sem explicação.
+    toast(`${aviso} A linha ficou marcada, com «Repetir».`, "error");
   }
 
   function retryFailed() {
     if (!failed) return;
-    persist(failed.next, { id: failed.id, ghost: failed.ghost, label: failed.label });
+    void persist(failed.next, {
+      id: failed.id,
+      ghost: failed.ghost,
+      label: failed.label,
+      oQue: failed.oQue,
+    });
   }
 
   /** Submissão do formulário — Enter em QUALQUER campo passa por aqui. */
@@ -331,10 +370,11 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
       paid: paidOnAdd,
       note: note.trim() || undefined,
     };
-    persist([...payments, p], {
+    void persist([...payments, p], {
       id: p.id,
       ghost: p,
       label: `${KIND_LABEL[p.kind]} ${eur2(p.amount)}`,
+      oQue: `registar o ${KIND_LABEL[p.kind].toLowerCase()} de ${eur2(p.amount)}`,
     });
     setAmount("");
     setNote("");
@@ -344,15 +384,27 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
   }
 
   function togglePaid(p: Payment) {
-    persist(
+    void persist(
       payments.map((x) => (x.id === p.id ? { ...x, paid: !x.paid } : x)),
-      { id: p.id, ghost: null, label: `${KIND_LABEL[p.kind]} ${eur2(p.amount)}` },
+      {
+        id: p.id,
+        ghost: null,
+        label: `${KIND_LABEL[p.kind]} ${eur2(p.amount)}`,
+        oQue: `dar o ${KIND_LABEL[p.kind].toLowerCase()} de ${eur2(p.amount)} por ${
+          p.paid ? "por receber" : "recebido"
+        }`,
+      },
     );
   }
   function remove(p: Payment) {
-    persist(
+    void persist(
       payments.filter((x) => x.id !== p.id),
-      { id: p.id, ghost: p, label: `${KIND_LABEL[p.kind]} ${eur2(p.amount)}` },
+      {
+        id: p.id,
+        ghost: p,
+        label: `${KIND_LABEL[p.kind]} ${eur2(p.amount)}`,
+        oQue: `apagar o ${KIND_LABEL[p.kind].toLowerCase()} de ${eur2(p.amount)}`,
+      },
     );
   }
 
@@ -374,9 +426,14 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
     setEditingId(null);
     setEditValue("");
     if (v == null || !(v > 0) || v === p.amount) return;
-    persist(
+    void persist(
       payments.map((x) => (x.id === p.id ? { ...x, amount: v } : x)),
-      { id: p.id, ghost: null, label: `${KIND_LABEL[p.kind]} ${eur2(v)}` },
+      {
+        id: p.id,
+        ghost: null,
+        label: `${KIND_LABEL[p.kind]} ${eur2(v)}`,
+        oQue: `mudar o ${KIND_LABEL[p.kind].toLowerCase()} de ${eur2(p.amount)} para ${eur2(v)}`,
+      },
     );
   }
 

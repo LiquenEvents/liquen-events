@@ -100,7 +100,12 @@ describe("Fornecedores — o servidor recusa a escrita", () => {
     );
 
     // A falha é DITA — sem isto ela fecha o portátil convencida de que gravou.
-    expect(await screen.findByText(/Não foi possível guardar as alterações/)).toBeInTheDocument();
+    // E DIZ QUAL: a frase nomeia o fornecedor, diz que a sessão caiu (é um 401)
+    // e manda entrar de novo, em vez do «Não foi possível guardar as
+    // alterações» que servia para tudo e mandava repetir o que não pode passar.
+    const aviso = await screen.findByText(/A sessão expirou/);
+    expect(aviso).toHaveTextContent("Flores do Alentejo");
+    expect(aviso).toHaveTextContent(/Volta a entrar/);
     // E a edição fica ABERTA: o que ela escreveu não se perde.
     expect(screen.getAllByLabelText("Notas")[0]).toHaveValue("Factura a 60 dias");
   });
@@ -138,7 +143,8 @@ describe("Fornecedores — o servidor recusa a escrita", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Remover" })[0]);
 
-    expect(await screen.findByText(/Não foi possível remover o fornecedor/)).toBeInTheDocument();
+    const aviso = await screen.findByText(/A sessão expirou/);
+    expect(aviso).toHaveTextContent("Flores do Alentejo");
     // Um fornecedor que continua na base de dados não pode desaparecer do ecrã:
     // ela deixa de o ver, deixa de lhe ligar, e ninguém percebe porquê.
     expect(screen.getAllByText("Flores do Alentejo").length).toBeGreaterThan(0);

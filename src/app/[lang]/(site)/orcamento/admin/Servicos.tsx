@@ -5,6 +5,7 @@ import type { ServicoDaBiblioteca } from "./BibliotecaServicos";
 import { Button, Card, EmptyState } from "./ui";
 import { SkeletonList } from "./Skeleton";
 import { useToast } from "./Toast";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -27,8 +28,50 @@ import { useToast } from "./Toast";
  * ter entrado, e por isso pede confirmação.
  */
 
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ QUAL SERVIÇO
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * As escritas deste ficheiro diziam «Não foi possível gravar. Verifica a
+ * ligação.» e «Não foi possível gravar.» — a mesma frase para a rede em baixo,
+ * a sessão expirada, o serviço apagado por outra pessoa e o servidor em baixo.
+ * Só uma dessas quatro se resolve a verificar a ligação.
+ *
+ * O gancho está aqui, e não dentro de um dos componentes, porque os dois deste
+ * ficheiro gravam — a lista (arquivar) e o formulário (criar/corrigir) — e não
+ * podem voltar a ter duas versões da mesma frase. É o padrão de
+ * `MaterialListas`.
+ */
+function useGravar() {
+  const { toast } = useToast();
+  return useCallback(
+    async (
+      oQue: string,
+      url: string,
+      init?: RequestInit,
+    ): Promise<{ ok: boolean; corpo: unknown }> => {
+      let res: Response;
+      try {
+        res = await fetch(url, init);
+      } catch {
+        toast(porqueRebentou(oQue).mensagem, "error");
+        return { ok: false, corpo: null };
+      }
+      const corpo = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+        return { ok: false, corpo };
+      }
+      return { ok: true, corpo };
+    },
+    [toast],
+  );
+}
+
 export default function Servicos() {
   const { toast } = useToast();
+  const gravar = useGravar();
   const [servicos, setServicos] = useState<ServicoDaBiblioteca[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aEditar, setAEditar] = useState<string | null>(null);
@@ -36,16 +79,19 @@ export default function Servicos() {
   const [aCriar, setACriar] = useState(false);
 
   const carregar = useCallback(async () => {
+    // A leitura passa pela mesma escolha de palavras das gravações: um 401 aqui
+    // dizia «Não foi possível ler a biblioteca.» e mandava-a olhar para um ecrã
+    // vazio sem lhe dizer que a sessão tinha caído.
     try {
       const res = await fetch("/api/servicos-catalogo");
-      const j = await res.json();
-      if (!res.ok) setErro(j?.error ?? "Não foi possível ler a biblioteca.");
+      const j = await res.json().catch(() => null);
+      if (!res.ok) setErro(porqueFalhou("ler a biblioteca de serviços", res, j).mensagem);
       else {
         setServicos(j as ServicoDaBiblioteca[]);
         setErro(null);
       }
     } catch {
-      setErro("Não foi possível falar com o servidor.");
+      setErro(porqueRebentou("ler a biblioteca de serviços").mensagem);
     }
   }, []);
 
@@ -63,26 +109,39 @@ export default function Servicos() {
     [servicos],
   );
 
-  const gravar = useCallback(
-    async (id: string, patch: Partial<ServicoDaBiblioteca>, comoDizer: string) => {
-      const antes = servicos ?? [];
-      setServicos(antes.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-      try {
-        const res = await fetch(`/api/servicos-catalogo/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patch),
-        });
-        if (!res.ok) throw new Error("falhou");
-        const actualizado = (await res.json()) as ServicoDaBiblioteca;
-        setServicos(antes.map((s) => (s.id === id ? actualizado : s)));
-        toast(comoDizer, "success");
-      } catch {
-        setServicos(antes);
-        toast("Não foi possível gravar. Verifica a ligação.", "error");
+  /**
+   * Arquivar e desarquivar, otimista — e a reposição é DESTE serviço.
+   *
+   * Guardava-se a lista inteira de antes do pedido e repunha-se essa. Arquivar
+   * dois serviços seguidos punha dois PATCH no ar; o segundo, ao passar,
+   * escrevia a lista velha de volta com o primeiro por arquivar, e o primeiro,
+   * ao falhar, desfazia o segundo — em qualquer das ordens ficava um serviço a
+   * aparecer no seletor do estúdio depois de ela o ter arquivado, sem nada a
+   * assinalá-lo. Mexe-se só na linha em causa, e por função (`prev => …`), que
+   * é o que impede uma gravação de escrever por cima da outra.
+   */
+  const alterarServico = useCallback(
+    async (id: string, patch: Partial<ServicoDaBiblioteca>, oQue: string, comoDizer: string) => {
+      const anterior = (servicos ?? []).find((s) => s.id === id);
+      setServicos((prev) => (prev ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s)));
+      const { ok, corpo } = await gravar(oQue, `/api/servicos-catalogo/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!ok) {
+        if (anterior) {
+          setServicos((prev) => (prev ?? []).map((s) => (s.id === id ? anterior : s)));
+        }
+        return;
       }
+      const actualizado = corpo as ServicoDaBiblioteca | null;
+      if (actualizado?.id) {
+        setServicos((prev) => (prev ?? []).map((s) => (s.id === id ? actualizado : s)));
+      }
+      toast(comoDizer, "success");
     },
-    [servicos, toast],
+    [servicos, toast, gravar],
   );
 
   if (erro && servicos === null) {
@@ -196,9 +255,10 @@ export default function Servicos() {
                         variant="ghost"
                         size="sm"
                         onClick={() =>
-                          gravar(
+                          alterarServico(
                             s.id,
                             { arquivado: !s.arquivado },
+                            s.arquivado ? `desarquivar «${s.nome}»` : `arquivar «${s.nome}»`,
                             s.arquivado
                               ? `"${s.nome}" volta ao seletor`
                               : `"${s.nome}" arquivado — continua nas propostas antigas`,
@@ -230,6 +290,7 @@ function Editor({
   onGravado: () => void | Promise<void>;
 }) {
   const { toast } = useToast();
+  const gravar = useGravar();
   const [nome, setNome] = useState(servico?.nome ?? "");
   const [descricao, setDescricao] = useState(servico?.descricao ?? "");
   const [nomeEn, setNomeEn] = useState(servico?.nomeEn ?? "");
@@ -242,27 +303,24 @@ function Editor({
     if (!nome.trim() || ocupado) return;
     setOcupado(true);
     const corpo = { nome: nome.trim(), descricao, nomeEn, descricaoEn, categoria };
-    try {
-      const res = servico
-        ? await fetch(`/api/servicos-catalogo/${servico.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(corpo),
-          })
-        : await fetch("/api/servicos-catalogo", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(corpo),
-          });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.error ?? "falhou");
-      toast(servico ? "Serviço corrigido" : "Serviço guardado na biblioteca", "success");
-      await onGravado();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Não foi possível gravar.", "error");
-    } finally {
-      setOcupado(false);
-    }
+    const { ok } = servico
+      ? await gravar(`corrigir «${servico.nome}»`, `/api/servicos-catalogo/${servico.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(corpo),
+        })
+      : await gravar(`guardar «${nome.trim()}» na biblioteca`, "/api/servicos-catalogo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(corpo),
+        });
+    setOcupado(false);
+    // O formulário só fecha quando o servidor aceitou (é o `onGravado` que o
+    // fecha): fechá-lo à mesma deixava-a a olhar para o texto antigo na lista,
+    // com o que escreveu perdido e um aviso que já desapareceu.
+    if (!ok) return;
+    toast(servico ? "Serviço corrigido" : "Serviço guardado na biblioteca", "success");
+    await onGravado();
   }
 
   const campo = "bo-input w-full px-2.5 py-2 text-xs";
