@@ -16,6 +16,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { razaoDaRecusa, porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
 import type { RecentQuote } from "./CommandPalette";
 import { AvisoDeArmazenamento } from "./AvisoDeArmazenamento";
@@ -306,6 +307,13 @@ interface Props {
    */
   initialQuotes: QuoteSummary[];
   userName?: string;
+  /**
+   * A leitura dos pedidos falhou do lado do servidor?
+   *
+   * Vem do `page.tsx`, que até aqui engolia a falha e devolvia `[]` — e o back
+   * office abria como se ela não tivesse pedido nenhum. Ver o comentário lá.
+   */
+  falhaDosPedidos?: LeituraFalhada | null;
 }
 
 // Status pill. Module-level (was inside AdminClient) so the memoised QuoteCard
@@ -919,7 +927,11 @@ function oQueSePerdeComOPedido(q: Quote | null): string[] {
 /** No máximo esta lista, e o resto contado. Trinta nomes não se leem. */
 const NOMES_A_MOSTRAR = 8;
 
-export default function AdminClient({ initialQuotes, userName = "Catarina" }: Props) {
+export default function AdminClient({
+  initialQuotes,
+  userName = "Catarina",
+  falhaDosPedidos = null,
+}: Props) {
   // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
   // estado tem mesmo de ser `Quote[]`: assim que um pedido é aberto ou gravado,
   // o elemento da lista passa a ser o pedido INTEIRO devolvido pelo servidor.
@@ -4034,7 +4046,14 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
           {/* ── Clientes ── */}
           {view === "clientes" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Clientes quotes={activeQuotes} onOpen={openQuote} />
+              <Clientes
+                quotes={activeQuotes}
+                onOpen={openQuote}
+                /* Só quando a lista está mesmo vazia: com pedidos no ecrã, uma
+                   falha da leitura INICIAL já não é o que se está a ver. */
+                falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
+                aoTentarDeNovo={() => void revalidarPedidos()}
+              />
             </div>
           )}
 
