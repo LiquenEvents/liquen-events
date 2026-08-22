@@ -31,20 +31,13 @@
  * fingir e diz o que interessa: isto demora, não feches o separador.
  */
 
-/** A barra pára aqui. O que a fecha é a resposta, e só ela. */
-export const TECTO_DA_BARRA = 0.94;
-
 /**
- * Quanto da barra está cheia, de 0 a {@link TECTO_DA_BARRA}.
- *
- * `1 - e^(-2·t/estimado)`: no tempo estimado vai em 86%, ao dobro em 98% do
- * tecto, e nunca lá chega. Uma recta chegava ao fim e parava — que é o gesto
- * que faz uma barra deixar de ser acreditada.
+ * A curva e o tecto vivem em `espera-em-curso.ts`: a pergunta «como se desenha
+ * uma espera de que não se sabe o fim» não é do envio, é de toda a casa. Ficam
+ * aqui reexportados porque este módulo já era o nome por que eram conhecidos.
  */
-export function avancoDoEnvio(decorridoMs: number, estimadoMs: number): number {
-  if (!(estimadoMs > 0) || !(decorridoMs > 0)) return 0;
-  return TECTO_DA_BARRA * (1 - Math.exp((-2 * decorridoMs) / estimadoMs));
-}
+export { TECTO_DA_BARRA, avancoDaEspera as avancoDoEnvio } from "./espera-em-curso";
+import { esperaDemorada } from "./espera-em-curso";
 
 /**
  * O que o servidor está a fazer, dito pela ordem por que o faz.
@@ -60,8 +53,10 @@ export function avancoDoEnvio(decorridoMs: number, estimadoMs: number): number {
  * enviado») e quem dá o envio por feito continua a ser só a resposta.
  */
 export function passoDoEnvio(decorridoMs: number, estimadoMs: number): string {
+  if (esperaDemorada(decorridoMs, estimadoMs)) {
+    return "Ainda a enviar. Com rede fraca demora — não feches o separador.";
+  }
   const t = estimadoMs > 0 ? decorridoMs / estimadoMs : 0;
-  if (t > 2) return "Ainda a enviar. Com rede fraca demora — não feches o separador.";
   if (t < 0.5) return "A desenhar o PDF…";
   if (t < 0.8) return "A guardar a proposta…";
   return "A enviar o email…";
