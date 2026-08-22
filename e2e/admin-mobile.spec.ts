@@ -619,7 +619,32 @@ test.describe("Back office — mobile", () => {
       aviso,
       "A criação da tarefa falhou e o ecrã não disse nada — um erro calado leva-a a repetir.",
     ).toBeVisible();
-    await expect(aviso).toContainText(/não foi possível/i);
+    /**
+     * O QUE SE EXIGE É A FRASE COMPLETA, E NÃO UMAS PALAVRAS EM PARTICULAR.
+     *
+     * Isto pedia `/não foi possível/` — que era a frase da casa quando o teste
+     * foi escrito, e era exactamente a frase que o inventário de esperas veio
+     * a apontar: a MESMA para seis avarias com respostas diferentes. Agora diz
+     * «O servidor não está a aceitar gravações agora — não deu para criar a
+     * tarefa «…». Espera um pouco e repete.»
+     *
+     * Fixar as palavras antigas fazia este teste puxar o ecrã para trás. O que
+     * ele tem de guardar são as três partes que a tornam útil: **nomeia a
+     * coisa**, **diz porquê**, e **acaba numa instrução** — mais a regra que
+     * lhe deu origem, que é não haver aqui um código de erro nem um «algo
+     * correu mal».
+     */
+    await expect(
+      aviso,
+      "o aviso não nomeia a tarefa — sem isso não se sabe sobre o que é",
+    ).toContainText(/tarefa que não vai gravar/i);
+    await expect(aviso, "o aviso não diz porquê").toContainText(
+      /não está a aceitar gravações|sem ligação|sessão expirou/i,
+    );
+    await expect(aviso, "o aviso não diz o que fazer a seguir").toContainText(
+      /repete|recarrega|volta a entrar/i,
+    );
+    await expect(aviso).not.toContainText(/algo correu mal|erro interno|500/i);
 
     // 2. NÃO TAPA A BARRA DE BAIXO.
     const barra = page.getByRole("navigation", { name: /Destinos principais/i });
