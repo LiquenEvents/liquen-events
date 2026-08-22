@@ -1481,42 +1481,74 @@ export default function Temas() {
                   )}
                 </div>
                 <div className="px-3 py-2.5">
-                  <p className="font-display truncate text-[14px] text-foreground/85">{t.name}</p>
+                  {/* ══════════════════════════════════════════════════════
+                      O NOME NÃO SE CORTA
+                      ══════════════════════════════════════════════════════
+
+                      Palavras dela: «os títulos longos são cortados».
+
+                      Era `truncate`, ou seja uma linha e reticências. O nome é
+                      a ÚNICA coisa por que ela procura um tema — «Clássico
+                      Intemporal (Branco/dourado)» virava «Clássico Intempor…»,
+                      e dois temas parecidos ficavam indistinguíveis
+                      exactamente no sítio onde é preciso distingui-los.
+
+                      Duas linhas, e a altura reservada mesmo quando só se usa
+                      uma: sem isso, um cartão de nome curto ficava mais baixo
+                      do que o vizinho e a grelha perdia a linha de base. Ao
+                      fim de duas linhas ainda pode cortar — mas aí já se leu o
+                      que distingue. */}
+                  <p className="font-display line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-foreground/85">
+                    {t.name}
+                  </p>
+                  {/* ══════════════════════════════════════════════════════
+                      UMA LINHA DE NÚMEROS, E NÃO TRÊS
+                      ══════════════════════════════════════════════════════
+
+                      Palavras dela: «os metadados pesam mais do que a imagem».
+
+                      Pesavam: o cartão chegou a ter o nome, a contagem, a data,
+                      o uso, o aviso de poucas fotos e a nota — seis linhas de
+                      texto debaixo de uma fotografia, num cartão de 165 px.
+                      Nenhuma era falsa; juntas, nenhuma se lia.
+
+                      Agora os números são um só rasto, pela ordem em que
+                      respondem à pergunta «o que é este tema?»: quantas fotos
+                      tem, quantas vezes saiu, e há quanto tempo não lhe tocam.
+                      Com `truncate`, o que cai primeiro é a data — que é a
+                      menos decisiva das três, e é por isso que está no fim. */}
                   <p className="bo-text-muted mt-0.5 truncate text-xs">
                     {photoCountLabel(t.imageCount, t.truncated)}
-                    {/* Quando foi mexido pela última vez: é o que separa um tema
-                      vivo de um que ficou para trás, e cabe onde já havia
-                      espaço.
-                      NÃO aparece quando a pasta não pôde ser lida — "Fotos
-                      indisponíveis · há 2 meses" mistura um aviso com uma
-                      informação de rotina, e é o aviso que tem de se ler. */}
+                    {/* «7 propostas» ou «por usar» — a segunda é a metade mais
+                        útil: é o que distingue um tema que a biblioteca TEM de
+                        um tema que o estúdio USA. Só entra quando a contagem
+                        chegou (vem de outro pedido, depois dos cartães). */}
+                    {usos
+                      ? usos[t.id]
+                        ? ` · ${plural(usos[t.id], "proposta", "propostas")}`
+                        : " · por usar"
+                      : ""}
+                    {/* NÃO aparece quando a pasta não pôde ser lida: «Fotos
+                        indisponíveis · há 2 meses» mistura um aviso com uma
+                        informação de rotina, e é o aviso que tem de se ler. */}
                     {t.imageCount !== null && desdeQuando(t.updatedAt)
                       ? ` · ${desdeQuando(t.updatedAt)}`
                       : ""}
                   </p>
-                  {/* «Usado em 7 propostas» — ou «Ainda não saiu numa
-                      proposta», que é a metade mais útil da informação: é o que
-                      distingue um tema que a biblioteca tem de um tema que o
-                      estúdio usa. Só aparece quando a contagem chegou; sem ela
-                      o cartão fica como estava. Ver `usos`. */}
-                  {usos && (
-                    <p className="bo-text-muted mt-0.5 truncate text-xs">
-                      {usos[t.id]
-                        ? `Usado em ${plural(usos[t.id], "proposta", "propostas")}`
-                        : "Ainda não saiu numa proposta"}
-                    </p>
-                  )}
-                  {/* AINDA A MEIO, e não «mau». Um mood board enche-se com 6 a
-                      8 fotografias: um tema com menos de três não dá para
-                      ESCOLHER, dá para usar o que lá está. Dito em texto
-                      apagado e sem ícone de erro — é uma nota de curadoria, não
-                      uma avaria. */}
-                  {temPoucasFotos(t) && (
+                  {/* ── UMA RESSALVA DE CADA VEZ ────────────────────────
+                      Duas notas apagadas empilhadas leem-se como nenhuma. Este
+                      cartão tem três candidatas — o par quase igual (que vive
+                      por baixo, e é a única accionável), o «poucas fotos» e a
+                      nota escrita à mão — e mostra UMA.
+
+                      A ordem é a de quem pede acção: um tema repetido tem
+                      remédio a um toque, um tema com poucas fotos é uma nota de
+                      curadoria, e a nota é contexto. */}
+                  {parecidos.get(t.id) ? null : temPoucasFotos(t) ? (
                     <p className="mt-0.5 truncate text-xs text-[#8a6d3b]">
                       Ainda com poucas fotos para escolher
                     </p>
-                  )}
-                  {t.notes ? (
+                  ) : t.notes ? (
                     <p className="bo-text-muted mt-0.5 truncate text-xs opacity-70">{t.notes}</p>
                   ) : null}
                 </div>

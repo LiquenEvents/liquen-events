@@ -945,8 +945,12 @@ describe("Biblioteca de Temas — em quantas propostas saiu", () => {
     renderTemas();
     await acharCartaoDoTema(/Terracotta/);
     await act(async () => {});
-    expect(screen.getByText("Usado em 7 propostas")).toBeTruthy();
-    expect(screen.getByText("Ainda não saiu numa proposta")).toBeTruthy();
+    // No mesmo rasto da contagem de fotos, e não numa linha só para ele: seis
+    // linhas de texto debaixo de uma fotografia não se leem (ver a Fase 2).
+    expect(screen.getByText(/9 fotos · 7 propostas/)).toBeTruthy();
+    // «Por usar» é a metade mais útil: distingue um tema que a biblioteca TEM
+    // de um tema que o estúdio USA.
+    expect(screen.getByText(/9 fotos · por usar/)).toBeTruthy();
   });
 
   it("uma proposta só não se diz no plural", async () => {
@@ -955,7 +959,7 @@ describe("Biblioteca de Temas — em quantas propostas saiu", () => {
     renderTemas();
     await acharCartaoDoTema(/Terracotta/);
     await act(async () => {});
-    expect(screen.getByText("Usado em 1 proposta")).toBeTruthy();
+    expect(screen.getByText(/· 1 proposta\b/)).toBeTruthy();
   });
 
   /** É um número decorativo: sem ele o cartão fica exactamente como estava. */
@@ -965,8 +969,98 @@ describe("Biblioteca de Temas — em quantas propostas saiu", () => {
     renderTemas();
     await acharCartaoDoTema(/Terracotta/);
     await act(async () => {});
-    expect(screen.queryByText(/Usado em/)).toBeNull();
-    expect(screen.queryByText(/Ainda não saiu/)).toBeNull();
+    // Dentro do CARTÃO, e não na página: a frase de introdução também fala em
+    // propostas, e uma busca solta encontrava-a.
+    const cartao = cartaoDoTema(/Terracotta/);
+    expect(cartao.textContent).toMatch(/9 fotos/);
+    expect(cartao.textContent).not.toMatch(/proposta/);
+    expect(cartao.textContent).not.toMatch(/por usar/);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O CARTÃO DE UM TEMA — FASE 2
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «os títulos longos são cortados» e «os metadados pesam mais
+ * do que a imagem».
+ *
+ * Pesavam mesmo: o cartão chegou a ter seis linhas de texto debaixo de uma
+ * fotografia — nome, contagem, data, uso, aviso de poucas fotos, nota — num
+ * cartão de 165 px. Nenhuma era falsa; juntas, nenhuma se lia.
+ */
+describe("Biblioteca de Temas — o cartão", () => {
+  const LONGO = "Clássico Intemporal Branco e Dourado com Velas Altas";
+
+  /**
+   * O nome é a ÚNICA coisa por que ela procura um tema. Cortá-lo à primeira
+   * linha tornava dois temas parecidos indistinguíveis exactamente no sítio
+   * onde é preciso distingui-los.
+   */
+  it("o nome tem duas linhas, e não uma cortada", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", name: LONGO, imageCount: 9 }]));
+    renderTemas();
+    const titulo = await screen.findByText(LONGO);
+    expect(titulo.className, "`truncate` corta à primeira linha").not.toMatch(/\btruncate\b/);
+    expect(titulo.className).toMatch(/line-clamp-2/);
+    // A altura das duas linhas fica reservada mesmo com um nome curto, senão a
+    // grelha perdia a linha de base entre cartões vizinhos.
+    expect(titulo.className).toMatch(/min-h-/);
+  });
+
+  it("os números vão todos no mesmo rasto", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, updatedAt: T0 }]),
+    );
+    route("GET /api/temas/uso", () => ok({ ok: true, usos: { t1: 4 } }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+    // Uma linha só: fotos, uso, e a data por último — que é a que cai primeiro
+    // quando não cabe, por ser a menos decisiva das três.
+    const rasto = screen.getByText(/9 fotos · 4 propostas/);
+    expect(rasto.className).toMatch(/truncate/);
+  });
+
+  /**
+   * DUAS RESSALVAS APAGADAS EMPILHADAS LEEM-SE COMO NENHUMA.
+   *
+   * O par quase igual tem remédio a um toque; o «poucas fotos» é uma nota de
+   * curadoria. Quando as duas se aplicam, ganha a que pede acção.
+   */
+  it("mostra uma ressalva de cada vez, e a accionável primeiro", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Itália", imageCount: 1, notes: "limões" },
+        { ...THEME, id: "t2", name: "italia", imageCount: 9 },
+      ]),
+    );
+    renderTemas();
+    // O par está apontado…
+    expect(await screen.findByText("Lê-se como “italia”")).toBeTruthy();
+    // …e o «poucas fotos» do mesmo cartão cala-se, apesar de a condição valer.
+    expect(screen.queryByText(/Ainda com poucas fotos/)).toBeNull();
+    // A nota também: é a menos urgente das três.
+    expect(screen.queryByText("limões")).toBeNull();
+  });
+
+  it("sem par, o aviso de poucas fotos aparece — e a nota cala-se", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Itália", imageCount: 1, notes: "limões" }]),
+    );
+    renderTemas();
+    expect(await screen.findByText(/Ainda com poucas fotos/)).toBeTruthy();
+    expect(screen.queryByText("limões")).toBeNull();
+  });
+
+  it("sem par e com fotos que cheguem, sobra a nota", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Itália", imageCount: 40, notes: "limões" }]),
+    );
+    renderTemas();
+    expect(await screen.findByText("limões")).toBeTruthy();
+    expect(screen.queryByText(/Ainda com poucas fotos/)).toBeNull();
   });
 });
 
