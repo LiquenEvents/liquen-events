@@ -1028,6 +1028,55 @@ export default function AdminClient({
     (filterPlanner !== "all" ? 1 : 0);
   const haFiltroAActuar =
     filtrosActivos > 0 || search.trim() !== "" || filterStatus !== "all" || tagFilter !== null;
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A SAÍDA TEM DE ESTAR ONDE SE DÁ POR ELA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A lista filtrada e vazia já sabia dizer que estava filtrada — o que não
+   * fazia era dar a saída. Dizia «Limpa a pesquisa ou os filtros» e mandava
+   * procurá-los: no telemóvel estão dentro de um painel RECOLHIDO, que é
+   * precisamente o que faz ninguém dar por eles.
+   *
+   * Do inventário: vinte e cinco vazios explicam-se bem e não põem a acção ao
+   * alcance. Um vazio que manda ir a outro sítio é meio vazio — e este é o
+   * mais caro de todos, porque a conclusão errada («não entrou nada») fecha o
+   * telemóvel e deixa um pedido sem resposta.
+   */
+  function limparFiltros() {
+    setSearch("");
+    setFilterStatus("all");
+    setTagFilter(null);
+    setFilterCategory("all");
+    setFilterEspera("all");
+    setFilterMes("all");
+    setFilterRegiao("all");
+    setFilterPlanner("all");
+    setMineOnly(false);
+  }
+
+  /**
+   * O que está a esconder os pedidos, por extenso.
+   *
+   * «Nenhum pedido corresponde» não diz o que fazer se não se souber o que
+   * está ligado — e o que está ligado pode ser uma pesquisa de há dez minutos
+   * ou um filtro de mês escolhido noutro separador.
+   */
+  function oQueEstaAFiltrar(): string {
+    const partes: string[] = [];
+    if (search.trim()) partes.push(`a pesquisa «${search.trim()}»`);
+    if (filterStatus !== "all") partes.push("um estado");
+    if (tagFilter) partes.push(`a etiqueta «${tagFilter}»`);
+    if (filtrosActivos > 0) {
+      partes.push(
+        filtrosActivos === 1 ? "um filtro do painel" : `${filtrosActivos} filtros do painel`,
+      );
+    }
+    if (partes.length === 0) return "";
+    if (partes.length === 1) return partes[0];
+    return `${partes.slice(0, -1).join(", ")} e ${partes[partes.length - 1]}`;
+  }
   const [saving, setSaving] = useState(false);
   /**
    * O id do pedido cujo desfecho acabou de ser marcado NO PAINEL.
@@ -4646,12 +4695,13 @@ export default function AdminClient({
                       title={haFiltroAActuar ? "Nenhum pedido corresponde" : "Sem pedidos ainda"}
                       hint={
                         haFiltroAActuar
-                          ? "Limpa a pesquisa ou os filtros para ver todos os pedidos."
+                          ? `Estão a esconder pedidos: ${oQueEstaAFiltrar()}.`
                           : "Os pedidos de orçamento do site aparecem aqui. Podes também criar um manualmente."
                       }
+                      /* A saída AQUI, e não «vai procurar os filtros». */
                       action={
                         haFiltroAActuar
-                          ? undefined
+                          ? { label: "Limpar tudo e ver todos", onClick: limparFiltros }
                           : { label: "+ Novo pedido", onClick: () => setNewQuoteOpen(true) }
                       }
                     />
