@@ -964,8 +964,8 @@ function ImportChip({ job }: { job: ImportJob }) {
           className="mt-2 h-1 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
         >
           <div
-            className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-300"
-            style={{ width: `${Math.round(((done + failed) / total) * 100)}%` }}
+            className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+            style={{ transform: `scaleX(${Math.round(((done + failed) / total) * 100) / 100})` }}
           />
         </div>
       )}
@@ -2810,7 +2810,7 @@ function Photo({ image, priority }: { image: ThemeImage; priority?: boolean }) {
            cima da sua própria versão desfocada, que já lá está e já tem a cor
            certa. `motion-safe` porque quem pede menos movimento não quer um
            fade — quer a imagem. */
-        className={`h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-200 ${
+        className={`h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-elemento ${
           pintada || !image.lqip ? "opacity-100" : "opacity-0"
         }`}
       />

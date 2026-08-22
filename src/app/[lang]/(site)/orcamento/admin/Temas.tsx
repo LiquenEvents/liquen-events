@@ -1464,7 +1464,7 @@ export default function Temas() {
                          `opacity-100` em toda a parte. Os outros escondem-se só
                          onde há rato, que é onde o `group-hover` os pode trazer
                          de volta. */
-                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm transition-opacity ${
+                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm motion-safe:transition-opacity motion-safe:duration-micro ${
                         fixar && t.favorito
                           ? "text-[#8a6d2f]"
                           : "text-foreground/45 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
@@ -1935,7 +1935,7 @@ function Photo({
           finished();
           if (!heavy) setLightBroken(true);
         }}
-        className={`h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-200 ${
+        className={`h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-elemento ${
           pintada || localSrc || !image.lqip ? "opacity-100" : "opacity-0"
         }`}
       />
@@ -3264,8 +3264,8 @@ function ThemeFolder({
             className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
           >
             <div
-              className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-300"
-              style={{ width: `${pct}%` }}
+              className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+              style={{ transform: `scaleX(${pct / 100})` }}
             />
           </div>
           <p className="bo-text-muted mt-2 text-xs">
@@ -3301,8 +3301,8 @@ function ThemeFolder({
                 className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
               >
                 <div
-                  className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-300"
-                  style={{ width: `${thumbPct}%` }}
+                  className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+                  style={{ transform: `scaleX(${thumbPct / 100})` }}
                 />
               </div>
               <div className="mt-3 flex items-center gap-3">
