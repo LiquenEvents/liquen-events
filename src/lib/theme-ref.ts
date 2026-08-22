@@ -74,10 +74,13 @@ export const THEME_MICRO_BUCKET = "theme-micro";
  * Pedido dela: «tudo aquilo que seja carregamento de imagens, quero que
  * melhores mesmo o máximo possível».
  *
- * Um AVIF pesa mais 25 a 40% MENOS do que o WebP com a mesma qualidade
- * percebida — e contra o JPEG de onde isto partiu, metade. Numa lista de 25
- * temas é a diferença entre ~0,6 MB e ~0,4 MB; num tema aberto com 60
- * miniaturas, entre ~1,5 MB e ~0,9 MB.
+ * MEDIDO sobre oito fotografias de casamento reais, à medida da miniatura de
+ * 400 px: 137,7 KB em WebP contra 102,8 KB em AVIF, com a mesma fidelidade —
+ * 25% menos. Num tema aberto com 60 miniaturas são ~1,0 MB contra ~1,4 MB.
+ *
+ * O desconto de qualidade que lá chega está escrito em `derivadas.ts`, com a
+ * tabela toda: a escala do AVIF não é a do WebP, e copiar o número de uma para
+ * a outra dava ficheiros MAIORES.
  *
  * ── PORQUE É QUE VIVE NUM BUCKET SEPARADO ────────────────────────────────
  *

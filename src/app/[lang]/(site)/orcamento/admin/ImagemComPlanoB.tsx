@@ -40,10 +40,10 @@ export default function ImagemComPlanoB({
    * Pedido dela: «tudo aquilo que seja carregamento de imagens, quero que
    * melhores mesmo o máximo possível».
    *
-   * Um AVIF pesa mais 25 a 40% menos do que o WebP com a mesma qualidade
-   * percebida — e contra o JPEG de onde isto partiu, cerca de metade. Mas o
-   * Safari só o lê desde o iOS 16, e estas fotografias são também as que um
-   * casal abre na página da proposta, no telemóvel que tiver.
+   * Um AVIF à medida da miniatura pesa menos 25% do que o WebP com a mesma
+   * fidelidade (medido em `derivadas.ts`). Mas o Safari só o lê desde o iOS 16,
+   * e estas fotografias são também as que um casal abre na página da proposta,
+   * no telemóvel que tiver.
    *
    * Por isso é uma PROPOSTA e não uma troca: o `<picture>` oferece o AVIF
    * primeiro, e quem não o souber ler pede o `src`, que existe sempre. Quem

@@ -202,8 +202,8 @@ export interface ThemeSummary extends ProposalTheme {
    * A OFERTA EM AVIF
    * ═══════════════════════════════════════════════════════════════════════
    *
-   * Um AVIF pesa mais 25 a 40% menos do que o WebP com a mesma qualidade
-   * percebida. Mas o Safari só o lê desde o iOS 16 — e estas fotografias são
+   * Um AVIF pesa menos 25% do que o WebP com a mesma fidelidade — medido, e a
+   * tabela está em `derivadas.ts`. Mas o Safari só o lê desde o iOS 16 — e estas fotografias são
    * também as que um casal abre na página da proposta, no telemóvel que tiver.
    *
    * Por isso viaja SEPARADO e é uma proposta, não uma troca: o `<picture>`

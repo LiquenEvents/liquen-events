@@ -166,19 +166,37 @@ const tipoDe = (avif = false) => (avif ? "image/avif" : FORMATO.contentType);
 /**
  * ── O AVIF, AO LADO E NÃO EM VEZ DE ──────────────────────────────────────
  *
- * Pesa mais 25 a 40% menos do que o WebP com a mesma qualidade percebida — e
- * contra o JPEG de onde isto partiu, cerca de metade.
- *
  * `esforco: 4` e não o 6 por omissão: o AVIF é caro de codificar, e num lote de
  * 25 fotografias a diferença entre 4 e 6 é meio segundo por foto contra uns 3%
  * de tamanho. O tecto de uma função é o que decide, e é o mesmo tecto que já
  * fazia a geração em lotes.
  *
- * A qualidade leva outro desconto: a escala do AVIF não é a do WebP, e um AVIF
- * q60 tem a qualidade percebida de um WebP q73. É por isso que os números não
- * se copiam de uma família para a outra.
+ * ── O DESCONTO, QUE FOI MEDIDO E NÃO COPIADO ────────────────────────────
+ *
+ * A escala do AVIF NÃO é a do WebP, e a diferença é muito maior do que parece.
+ * O primeiro número aqui escrito foi 13 — «um AVIF q65 pesa menos do que um
+ * WebP q73» — e era falso: MEDIDO sobre oito fotografias de casamento reais
+ * (as do `e2e/fotos-de-teste`), à medida da miniatura de 400 px:
+ *
+ *     webp q73    137,7 KB   PSNR 32,82 dB   ← a referência
+ *     avif q65    145,0 KB   PSNR 34,66 dB   5% MAIS pesado
+ *     avif q60    127,5 KB   PSNR 33,82 dB   7% menos
+ *     avif q55    102,8 KB   PSNR 32,49 dB   25% menos
+ *     avif q50     85,8 KB   PSNR 31,55 dB   38% menos
+ *
+ * Aos 1200 px a curva é a mesma (q65 é 3% mais pesado; q55 é 28% menos).
+ *
+ * Escolhido o **q55**, ou seja um desconto de 23: é o ponto onde a fidelidade
+ * medida iguala a do WebP (−0,33 dB, que ninguém vê) e o ficheiro perde um
+ * quarto do peso. E é um limite conservador, porque o PSNR é injusto para o
+ * AVIF — ele guarda o detalhe fino de outra maneira, e a comparação por olho
+ * dá-lhe mais margem do que a matemática.
+ *
+ * Um AVIF q65 continuava a ser uma imagem melhor do que o WebP; só que a
+ * melhoria era paga com bytes, e o que se quer aqui são menos bytes na mão de
+ * quem está numa quinta com 4G fraco.
  */
-const AVIF = { formato: "avif" as const, desconto: 13, esforco: 4 };
+const AVIF = { formato: "avif" as const, desconto: 23, esforco: 4 };
 
 const FAMILIAS = [
   {
