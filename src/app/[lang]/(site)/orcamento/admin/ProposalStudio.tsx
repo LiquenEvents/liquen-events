@@ -449,6 +449,52 @@ const STEPS: { id: Step; n: string; label: string }[] = [
  * BRUTO em "incluído" — por isso o valor guardado tem de ser derivado, para a
  * base ser sempre o número do pedido nos dois modos.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PREÇO DO PEDIDO NÃO É O NÚMERO QUE ELA ESCREVE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Com «estes valores somam-se», estes dois números são DIFERENTES:
+ *
+ *   · o que ela escreve em «Valor (sem IVA)» — só os serviços;
+ *   · o «Preço final (sem IVA)» do pedido — o que o casal paga, ou seja os
+ *     serviços MAIS os adicionais. É de lá que a Visão Geral, as Estatísticas
+ *     e o dossier leem o dinheiro, e guardar lá só os serviços fazia as
+ *     deslocações desaparecerem desses ecrãs em silêncio.
+ *
+ * Há portanto duas conversões, inversas uma da outra:
+ *
+ *   escrito → pedido   soma os adicionais   (`baseDoEcraParaOPedido`)
+ *   pedido  → escrito  tira-os              (esta)
+ *
+ * ── O DEFEITO QUE ISTO VEIO FECHAR ────────────────────────────────────────
+ *
+ * Palavras dela: «ao voltar à mesma proposta, o valor total está diferente».
+ * Numa proposta observada: 3.000 → 3.140 → 3.280 → 3.420, com uma deslocação
+ * de 140 €. Três visitas, três somas.
+ *
+ * A causa era esta função existir e NÃO ser usada na abertura. A montagem
+ * fazia `setTotalInput(textoDoTotal(quote.quotedPrice))` — punha no campo do
+ * ESCRITO um número que já trazia os adicionais lá dentro. A partir daí tudo
+ * o que lesse esse campo como «os serviços» voltava a somar-lhes a deslocação:
+ * a gravação seguinte punha 3.140 + 140 no pedido, e a visita seguinte
+ * começava daí.
+ *
+ * Vive no topo do módulo, e não dentro do componente, por causa disso mesmo:
+ * era uma função interna que dois caminhos deviam usar e só um usava. Aqui
+ * fora, os dois vêem-na e o teste também.
+ */
+function baseDoPedidoParaOEcra(base: number, d: StudioDoc): number {
+  if (!d.budgetExtrasSomam) return base;
+  const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
+  const semExtras = round2(
+    base - somaDosExtrasSemIva(d.budgetExtras, { mode, vatRate: d.vatRate ?? DEFAULT_VAT_RATE }),
+  );
+  // Nunca negativo: um pedido com preço mais baixo do que os adicionais
+  // escritos é um estado por arrumar, e o aviso de desalinhamento já o diz.
+  return semExtras > 0 ? semExtras : 0;
+}
+
 function aplicarBase(d: StudioDoc, base: number): StudioDoc {
   const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
   const rate = d.vatRate ?? DEFAULT_VAT_RATE;
@@ -536,9 +582,15 @@ function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
     // «IVA incluído» perder 23% em silêncio — o número do pedido passava a ser
     // lido como se já trouxesse o imposto dentro.
     const modo: VatMode = next.totalVatMode ?? "acrescer";
+    // Pela mesma razão da abertura: o preço do pedido traz os adicionais lá
+    // dentro e este campo significa só os serviços. Num pedido virgem não há
+    // adicionais e a conversão não faz nada — mas um pedido cujo rascunho foi
+    // limpo TEM preço com adicionais somados, e sem isto voltava a nascer
+    // inflacionado.
+    const escrito = baseDoPedidoParaOEcra(quotedPrice, next);
     next = {
       ...next,
-      totalAmount: totalAmountParaBase(quotedPrice, modo, next.vatRate ?? DEFAULT_VAT_RATE),
+      totalAmount: totalAmountParaBase(escrito, modo, next.vatRate ?? DEFAULT_VAT_RATE),
       totalVatMode: modo,
     };
   }
@@ -1810,8 +1862,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const doPedido = quote.quotedPrice;
     if (typeof doPedido === "number" && doPedido > 0) {
       precoEnviado.current = doPedido;
-      setTotalInput(textoDoTotal(doPedido));
-      setDoc((d) => aplicarBase(d, doPedido));
+      /**
+       * ── AQUI ESTAVA O VALOR A CRESCER SOZINHO ──────────────────────────
+       *
+       * Isto punha o preço do PEDIDO no campo do ESCRITO, sem lhe tirar os
+       * adicionais. O pedido guarda o que o casal paga (serviços + deslocação);
+       * o campo diz «Valor (sem IVA)» e significa só os serviços. Com os dois
+       * a receber o mesmo número, a gravação seguinte somava a deslocação
+       * outra vez — e a visita seguinte começava do número já inflacionado.
+       *
+       * 3.000 → 3.140 → 3.280 → 3.420. Uma soma por visita.
+       *
+       * A conversão é a mesma que o outro sentido da sincronização já fazia
+       * (ver o efeito de `quote.quotedPrice`). O que faltava era usá-la aqui.
+       *
+       * O `setTotalInput` vai DENTRO do `setDoc` porque a conversão precisa do
+       * documento — dos adicionais e do modo de IVA — e ler `doc` fora do
+       * actualizador daria o estado anterior à hidratação do rascunho.
+       */
+      setDoc((d) => {
+        const paraOEcra = baseDoPedidoParaOEcra(doPedido, d);
+        setTotalInput(paraOEcra > 0 ? textoDoTotal(paraOEcra) : "");
+        return paraOEcra > 0 ? aplicarBase(d, paraOEcra) : d;
+      });
     } else if (hadDraft) {
       // O pedido ainda não tem preço mas o rascunho tem um valor escrito antes
       // de isto existir. Não se deita fora: adopta-se, e GRAVA-SE no pedido —
@@ -2745,17 +2818,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     return round2(
       base + somaDosExtrasSemIva(doc.budgetExtras, { mode: vatMode, vatRate: money.vatRate }),
     );
-  }
-
-  function baseDoPedidoParaOEcra(base: number, d: StudioDoc): number {
-    if (!d.budgetExtrasSomam) return base;
-    const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
-    const semExtras = round2(
-      base - somaDosExtrasSemIva(d.budgetExtras, { mode, vatRate: d.vatRate ?? DEFAULT_VAT_RATE }),
-    );
-    // Nunca negativo: um pedido com preço mais baixo do que os adicionais
-    // escritos é um estado por arrumar, e o aviso de desalinhamento já o diz.
-    return semExtras > 0 ? semExtras : 0;
   }
 
   /** O que se grava no pedido, com a mão travada: escrever "3000" são quatro

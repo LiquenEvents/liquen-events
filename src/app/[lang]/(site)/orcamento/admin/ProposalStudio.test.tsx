@@ -1743,6 +1743,209 @@ describe("uma célula que não conseguiu desenhar a foto", () => {
  * e é dele que saem o sinal de 30% e a factura. Uma deslocação escrita aqui
  * aparecia na proposta que o cliente lê e não entrava em nada do que se cobra.
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * P0 — O VALOR NÃO PODE MUDAR SOZINHO ENTRE VISITAS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «ao voltar à mesma proposta, o valor total está diferente do
+ * que estava». Numa proposta observada: 3.000 → 3.140 → 3.280 → 3.420, com uma
+ * deslocação de 140 €. Três visitas, três somas. 3.420 − 3.000 = 3 × 140.
+ *
+ * ── A CAUSA ───────────────────────────────────────────────────────────────
+ *
+ * Com «estes valores somam-se» há dois números diferentes: o que ela escreve
+ * (só os serviços) e o «Preço final (sem IVA)» do pedido (o que o casal paga,
+ * serviços MAIS adicionais). Há duas conversões inversas para atravessar entre
+ * eles — e a abertura do estúdio usava só uma. Punha o preço do pedido no
+ * campo do escrito sem lhe tirar os adicionais, e a gravação seguinte
+ * voltava a somá-los.
+ *
+ * ── O QUE ESTE BLOCO PRENDE ───────────────────────────────────────────────
+ *
+ * O que ela pediu, literalmente: abrir, gravar, recarregar dez vezes, e o
+ * valor não mexer nem um cêntimo. Dez e não duas porque o defeito era de UM
+ * cêntimo por volta em alguns arredondamentos e de 140 € noutros — e uma
+ * acumulação lenta é a que passa despercebida durante meses.
+ *
+ * O valor que o utilizador introduz é IMUTÁVEL. Só muda quando ele o altera.
+ */
+describe("P0: o valor não muda sozinho entre visitas", () => {
+  const desenhar = (preco: number | undefined) =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: preco } as Quote} />
+      </ToastProvider>,
+    );
+
+  /** O que está escrito no campo «Valor (sem IVA)» — o número DELA. */
+  async function valorEscrito(): Promise<string> {
+    return ((await screen.findByLabelText(/Valor \(sem IVA\)/i)) as HTMLInputElement).value;
+  }
+
+  /**
+   * Abre, deixa assentar, fecha — e devolve o que ficou no campo e o último
+   * preço que o estúdio mandou gravar no pedido. É uma VISITA.
+   */
+  async function umaVisita(precoDoPedido: number | undefined, gravados: number[]) {
+    desenhar(precoDoPedido);
+    await screen.findByLabelText(/Valor \(sem IVA\)/i);
+    // O tempo de tudo assentar: a hidratação do rascunho, a sincronização do
+    // preço e a gravação com a mão travada (600 ms).
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    const escrito = await valorEscrito();
+    cleanup();
+    return { escrito, gravado: gravados.at(-1) ?? precoDoPedido };
+  }
+
+  /** Um `fetch` que guarda cada preço gravado e o devolve como o pedido novo. */
+  function espiarGravacoes(gravados: number[]) {
+    const original = global.fetch;
+    global.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const corpo = String(init?.body ?? "");
+      if (String(url).includes("/api/orcamento/") && corpo.includes("quotedPrice")) {
+        const lido = JSON.parse(corpo) as { quotedPrice: number | null };
+        if (typeof lido.quotedPrice === "number") gravados.push(lido.quotedPrice);
+        return new Response(JSON.stringify({ ...quote, quotedPrice: lido.quotedPrice }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return original(url, init);
+    }) as typeof fetch;
+    return () => {
+      global.fetch = original;
+    };
+  }
+
+  /**
+   * ── O CASO DELA, EXACTAMENTE ────────────────────────────────────────────
+   * 3.000 de serviços, 140 de deslocação, «Somam ao valor». Dez visitas.
+   */
+  it("com os adicionais a SOMAREM, dez visitas não mexem um cêntimo", async () => {
+    const gravados: number[] = [];
+    const parar = espiarGravacoes(gravados);
+    try {
+      // Primeira visita: escreve o valor e a deslocação.
+      desenhar(3000);
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
+      const campo = await screen.findByLabelText(/^Valor de /i);
+      await user.type(campo, "140");
+      await user.tab();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 700));
+      });
+      // O pedido leva o efectivo — serviços mais deslocação.
+      expect(gravados.at(-1)).toBe(3140);
+      expect(await valorEscrito()).toBe("3000");
+      cleanup();
+
+      // E agora dez visitas seguidas, cada uma a abrir com o preço que a
+      // anterior deixou no pedido.
+      let preco: number | undefined = gravados.at(-1);
+      for (let volta = 1; volta <= 10; volta += 1) {
+        const r = await umaVisita(preco, gravados);
+        expect(r.escrito, `o valor escrito mudou na visita ${volta}`).toBe("3000");
+        expect(r.gravado, `o preço do pedido mudou na visita ${volta}`).toBe(3140);
+        preco = r.gravado;
+      }
+    } finally {
+      parar();
+    }
+    // Onze montagens de um ecrã com onze mil linhas, cada uma com a mão
+    // travada da gravação (600 ms) a assentar. Não cabe nos 5 s por omissão —
+    // e a alternativa, relógios falsos, não convive com o `userEvent`.
+  }, 60_000);
+
+  /**
+   * Com os adicionais DENTRO do valor escrito, as duas conversões não fazem
+   * nada — e o valor tem de ficar igualmente parado. É o controlo do teste de
+   * cima: prova que a estabilidade não vem de a conversão estar desligada.
+   */
+  it("com os adicionais DENTRO do valor, dez visitas também não mexem", async () => {
+    const gravados: number[] = [];
+    const parar = espiarGravacoes(gravados);
+    try {
+      desenhar(3000);
+      const user = userEvent.setup();
+      await user.selectOptions(
+        await screen.findByLabelText(/Como contam os valores adicionais/i),
+        "dentro",
+      );
+      await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
+      const campo = await screen.findByLabelText(/^Valor de /i);
+      await user.type(campo, "140");
+      await user.tab();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 700));
+      });
+      const depoisDeEscrever = await valorEscrito();
+      cleanup();
+
+      let preco: number | undefined = gravados.at(-1);
+      for (let volta = 1; volta <= 10; volta += 1) {
+        const r = await umaVisita(preco, gravados);
+        expect(r.escrito, `o valor escrito mudou na visita ${volta}`).toBe(depoisDeEscrever);
+        preco = r.gravado;
+      }
+    } finally {
+      parar();
+    }
+    // Onze montagens de um ecrã com onze mil linhas, cada uma com a mão
+    // travada da gravação (600 ms) a assentar. Não cabe nos 5 s por omissão —
+    // e a alternativa, relógios falsos, não convive com o `userEvent`.
+  }, 60_000);
+
+  /**
+   * Trocar de modo de IVA muda o que o casal VÊ, nunca a base. E não pode
+   * deixar rasto: dez visitas depois de a trocar, o valor continua o mesmo.
+   */
+  it("trocar o modo de IVA não move a base, e não deixa rasto nas visitas", async () => {
+    const gravados: number[] = [];
+    const parar = espiarGravacoes(gravados);
+    try {
+      desenhar(3000);
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
+      const campo = await screen.findByLabelText(/^Valor de /i);
+      await user.type(campo, "140");
+      await user.tab();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 700));
+      });
+      const antes = await valorEscrito();
+      // Pelas OPÇÕES e não pelo rótulo: «IVA» aparece em vários sítios deste
+      // ecrã, e o que interessa aqui é o único selector que decide entre
+      // «acrescer» e «incluído».
+      const seletorDeIva = [...document.querySelectorAll("select")].find((sel) =>
+        [...sel.options].some((o) => o.value === "acrescer"),
+      );
+      expect(seletorDeIva, "não encontrei o selector do modo de IVA").toBeTruthy();
+      await user.selectOptions(seletorDeIva!, "incluido");
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 700));
+      });
+      expect(await valorEscrito(), "trocar o modo de IVA mexeu na base").toBe(antes);
+      cleanup();
+
+      let preco: number | undefined = gravados.at(-1);
+      for (let volta = 1; volta <= 10; volta += 1) {
+        const r = await umaVisita(preco, gravados);
+        expect(r.escrito, `o valor escrito mudou na visita ${volta}`).toBe(antes);
+        preco = r.gravado;
+      }
+    } finally {
+      parar();
+    }
+    // Onze montagens de um ecrã com onze mil linhas, cada uma com a mão
+    // travada da gravação (600 ms) a assentar. Não cabe nos 5 s por omissão —
+    // e a alternativa, relógios falsos, não convive com o `userEvent`.
+  }, 60_000);
+});
+
 describe("os valores adicionais somam ao total", () => {
   const comPreco = (preco?: number) => ({ ...quote, quotedPrice: preco }) as Quote;
   const desenhar = (q: Quote) =>
