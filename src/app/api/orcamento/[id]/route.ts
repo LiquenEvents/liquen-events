@@ -193,8 +193,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
    * DE QUE VERSÃO É QUE ESTA LISTA FOI COPIADA
    * ══════════════════════════════════════════════════════════════════════════
    *
-   * O painel de Pagamentos e a Checklist copiam a colecção INTEIRA para estado
-   * interno quando abrem, e ao gravar mandam-na inteira de volta. Isso quer
+   * Os painéis do dossier — Pagamentos, Checklist, Guião do dia, Produção e
+   * Custos — copiam a colecção INTEIRA para estado interno quando abrem, e ao
+   * gravar mandam-na inteira de volta (ver `COLECCOES_INTEIRAS`). Isso quer
    * dizer que a gravação não é «marca este pagamento como recebido» — é
    * «substitui a lista de pagamentos por esta». Uma cópia de há duas horas
    * escreve por cima de tudo o que entretanto aconteceu.
@@ -227,8 +228,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     string,
     unknown
   >;
-  /** As colecções que se mandam INTEIRAS e que, por isso, se podem sobrepor. */
-  const COLECCOES_INTEIRAS = ["payments", "checklist", "productionPlan", "guestList"] as const;
+  /**
+   * As colecções que se mandam INTEIRAS e que, por isso, se podem sobrepor.
+   *
+   * As três últimas entraram depois, e cada uma tem um par de pessoas por
+   * trás — que é a razão de estarem aqui e não a apanhar 200 em silêncio:
+   *
+   *   · `timeline` — o guião do dia. Ela abre-o no telemóvel na véspera; ele
+   *     acrescenta «19:30 Discurso do pai» no portátil. O momento dele
+   *     desaparecia no toque seguinte dela, e o guião imprime-se e entrega-se
+   *     à equipa na manhã do evento: o que não está no papel não acontece.
+   *
+   *   · `eventSuppliers` — os custos. Ele escreve o custo real do catering;
+   *     ela, com o painel aberto de manhã, muda o estado de outro fornecedor
+   *     ao almoço — e manda a lista inteira com o orçado antigo do catering
+   *     lá dentro. A margem do evento voltava atrás sem nada no ecrã a dizê-lo.
+   *
+   *   · `productionPlan` — o plano de atelier, pela mesma razão da checklist:
+   *     duas pessoas a riscar tarefas do mesmo plano em telemóveis diferentes.
+   */
+  const COLECCOES_INTEIRAS = [
+    "payments",
+    "checklist",
+    "productionPlan",
+    "guestList",
+    "timeline",
+    "eventSuppliers",
+  ] as const;
   const aConferir = COLECCOES_INTEIRAS.filter((campo) => campo in picked && campo in base);
 
   /**

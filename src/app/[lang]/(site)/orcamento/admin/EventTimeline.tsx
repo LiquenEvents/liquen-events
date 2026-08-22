@@ -42,6 +42,23 @@ function sortByTime(items: TimelineItem[]): TimelineItem[] {
 
 type EditableField = "time" | "title" | "owner";
 
+/**
+ * Uma gravação que o servidor recusou por o guião ter mudado noutro sítio.
+ *
+ * Guarda-se o GESTO, não a lista que ele produziu: voltar a mandar a lista era
+ * apagar o que a outra pessoa escreveu — exactamente o que o 409 existe para
+ * impedir. O gesto volta a aplicar-se POR CIMA da versão adoptada, e ficam as
+ * duas coisas: o momento que ela acrescentou e o que ele acrescentou.
+ */
+interface Colisao {
+  /** O número da gravação que colidiu — é o que põe os gestos por ordem. */
+  n: number;
+  /** O gesto, nomeado: «acrescentar «19:30 Discursos» ao guião». */
+  oQue: string;
+  /** O mesmo gesto, para o repetir sobre a versão que veio do servidor. */
+  reaplicar: (atuais: TimelineItem[]) => TimelineItem[];
+}
+
 export default function EventTimeline({ quote, onChange }: Props) {
   const { toast } = useToast();
   const [items, setItems] = useState<TimelineItem[]>(quote.timeline ?? []);
@@ -51,6 +68,9 @@ export default function EventTimeline({ quote, onChange }: Props) {
   // Edição inline de um campo de uma linha: commit em blur/Enter, Escape cancela.
   const [editing, setEditing] = useState<{ id: string; field: EditableField } | null>(null);
   const [draft, setDraft] = useState("");
+  // A colisão fica no ECRÃ, e não num toast que desaparece: é onde o que ela
+  // escreveu continua à vista e recuperável com um clique.
+  const [colisoes, setColisoes] = useState<Colisao[]>([]);
 
   /**
    * Otimista com reversão — mas a reversão é para o último estado que o SERVIDOR
@@ -69,6 +89,30 @@ export default function EventTimeline({ quote, onChange }: Props) {
 
   /**
    * ══════════════════════════════════════════════════════════════════════
+   * DE ONDE ESTE GUIÃO FOI COPIADO
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * O guião é copiado UMA vez, ao montar, e ao gravar vai INTEIRO — logo a
+   * gravação é «substitui o guião por este», e não «acrescenta este momento».
+   *
+   * O CENÁRIO, sem corrida nenhuma e com as duas gravações a responder 200:
+   * ela abre o guião no telemóvel na véspera; ele, no portátil, acrescenta
+   * «19:30 Discurso do pai»; ela corrige a hora da cerimónia à noite e manda o
+   * guião que copiou de manhã — o discurso do pai desaparece. E este é o papel
+   * que se imprime e se entrega à equipa na manhã do evento: o que não está
+   * nele não acontece, e ninguém dá pela falta até ao dia.
+   *
+   * `base` é a versão de que este guião partiu. Vai no pedido, o servidor
+   * compara-a com a que tem e recusa com 409 (ver `api/orcamento/[id]`).
+   *
+   * Avança ao ENVIAR e não ao confirmar: dois toques seguidos põem dois PATCH
+   * no ar e o segundo já leva o primeiro lá dentro — declarar a versão de
+   * antes do primeiro era inventar uma colisão dela consigo própria.
+   */
+  const base = useRef<TimelineItem[]>(quote.timeline ?? []);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
    * A GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
    * ══════════════════════════════════════════════════════════════════════
    *
@@ -80,11 +124,13 @@ export default function EventTimeline({ quote, onChange }: Props) {
    * E o `oQue` nomeia o MOMENTO: a reversão desfaz uma linha de um guião com
    * uma dúzia delas, e sem o nome ninguém sabe qual é que voltou atrás.
    */
-  function persist(oQue: string, next: TimelineItem[]) {
-    const sorted = sortByTime(next);
+  function persist(oQue: string, reaplicar: (atuais: TimelineItem[]) => TimelineItem[]) {
+    const sorted = sortByTime(reaplicar(items));
     const minha = ++gravacoes.current;
     setItems(sorted);
     onChange(sorted);
+    const baseAnterior = base.current;
+    base.current = sorted;
 
     // Desfaz o que foi posto no ecrã e diz porquê — a não ser que já haja uma
     // gravação mais recente: o que essa levar contém o que esta levava,
@@ -92,6 +138,9 @@ export default function EventTimeline({ quote, onChange }: Props) {
     // ela que repõe — e para o mesmo sítio.
     const reporEDizer = (mensagem: string) => {
       if (minha !== gravacoes.current) return;
+      // A base acompanha o que fica no ecrã: declarar uma versão que nunca
+      // chegou a ser gravada dava um 409 inventado na gravação seguinte.
+      base.current = gravado.current;
       setItems(gravado.current);
       onChange(gravado.current);
       toast(mensagem, "error");
@@ -103,10 +152,37 @@ export default function EventTimeline({ quote, onChange }: Props) {
         res = await fetch(`/api/orcamento/${quote.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ timeline: sorted }),
+          body: JSON.stringify({ timeline: sorted, base: { timeline: baseAnterior } }),
         });
       } catch {
         reporEDizer(porqueRebentou(oQue).mensagem);
+        return;
+      }
+      /**
+       * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir a
+       * mesma lista era apagar o que a outra pessoa escreveu. Adopta-se o que
+       * o servidor tem — e o gesto dela fica guardado no aviso, para o poder
+       * voltar a aplicar por cima dessa versão sem perder nem um lado nem o
+       * outro. Por isso a frase não é a do `porqueFalhou`: aqui não se manda
+       * recarregar nada, o guião já está em dia no ecrã.
+       */
+      if (res.status === 409) {
+        const corpo = (await res.json().catch(() => null)) as {
+          current?: { timeline?: TimelineItem[] };
+        } | null;
+        const doServidor = sortByTime(corpo?.current?.timeline ?? gravado.current);
+        gravado.current = doServidor;
+        base.current = doServidor;
+        if (minha === gravacoes.current) {
+          setItems(doServidor);
+          onChange(doServidor);
+        }
+        // Dois gestos podem colidir os dois (dois toques dela enquanto a
+        // outra pessoa gravava). Cada gesto é um DELTA, portanto o mais
+        // recente não contém o anterior: guardam-se todos, por ordem de
+        // envio, e reaplicam-se por essa ordem — senão o primeiro perdia-se
+        // ao chegar o segundo, e as respostas nem sequer vêm por ordem.
+        setColisoes((c) => [...c, { n: minha, oQue, reaplicar }].sort((a, b) => a.n - b.n));
         return;
       }
       if (!res.ok) {
@@ -118,19 +194,37 @@ export default function EventTimeline({ quote, onChange }: Props) {
     })();
   }
 
-  function seed() {
-    persist(
-      "gerar o cronograma-base",
-      TEMPLATE.map((t) => ({ ...t, id: randomId() })),
+  /**
+   * Os gestos que o 409 travou, agora POR CIMA do guião que veio do servidor
+   * — e pela ordem por que ela os fez, que é a única em que dão o mesmo
+   * resultado. Uma gravação só: o que ela quis fica todo dentro dela.
+   */
+  function voltarAAplicar() {
+    if (colisoes.length === 0) return;
+    const gestos = colisoes;
+    setColisoes([]);
+    persist(gestos.map((g) => g.oQue).join(" e "), (atuais) =>
+      gestos.reduce((lista: TimelineItem[], g) => g.reaplicar(lista), atuais),
     );
+  }
+
+  function seed() {
+    // Os ids nascem AQUI e não dentro do gesto: se o cronograma-base tiver de
+    // ser reaplicado depois de uma colisão, tem de ser o mesmo, e não uma
+    // segunda cópia com ids novos. E acrescenta em vez de substituir — o botão
+    // só aparece com o guião vazio, portanto no uso normal dá o mesmo, mas
+    // reaplicá-lo por cima do guião de outra pessoa não o pode deitar fora.
+    const novos = TEMPLATE.map((t) => ({ ...t, id: randomId() }));
+    persist("gerar o cronograma-base", (atuais) => [
+      ...atuais,
+      ...novos.filter((n) => !atuais.some((a) => a.id === n.id)),
+    ]);
   }
   function add() {
     const t = title.trim();
     if (!t || !time) return;
-    persist(`acrescentar «${time} ${t}» ao guião`, [
-      ...items,
-      { id: randomId(), time, title: t, owner: owner.trim() || undefined },
-    ]);
+    const momento = { id: randomId(), time, title: t, owner: owner.trim() || undefined };
+    persist(`acrescentar «${time} ${t}» ao guião`, (atuais) => [...atuais, momento]);
     setTime("");
     setTitle("");
     setOwner("");
@@ -139,7 +233,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
     const momento = items.find((i) => i.id === id);
     persist(
       `remover «${momento ? `${momento.time} ${momento.title}` : "o momento"}» do guião`,
-      items.filter((i) => i.id !== id),
+      (atuais) => atuais.filter((i) => i.id !== id),
     );
   }
 
@@ -157,9 +251,8 @@ export default function EventTimeline({ quote, onChange }: Props) {
     if (field === "owner") {
       const next = v || undefined;
       if (next === item.owner) return;
-      persist(
-        `mudar o responsável de «${item.title}»`,
-        items.map((i) => (i.id === id ? { ...i, owner: next } : i)),
+      persist(`mudar o responsável de «${item.title}»`, (atuais) =>
+        atuais.map((i) => (i.id === id ? { ...i, owner: next } : i)),
       );
       return;
     }
@@ -167,7 +260,7 @@ export default function EventTimeline({ quote, onChange }: Props) {
     if (!v || v === item[field]) return;
     persist(
       field === "time" ? `mudar a hora de «${item.title}»` : `mudar «${item.title}» para «${v}»`,
-      items.map((i) => (i.id === id ? { ...i, [field]: v } : i)),
+      (atuais) => atuais.map((i) => (i.id === id ? { ...i, [field]: v } : i)),
     );
   }
   function editKeys(e: React.KeyboardEvent) {
@@ -212,6 +305,37 @@ export default function EventTimeline({ quote, onChange }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── A COLISÃO FICA À VISTA, E COM SAÍDA ────────────────────────────
+          Um toast desaparece sozinho e leva com ele a única pista do que não
+          ficou guardado. Aqui o guião do servidor já está no ecrã (é a
+          verdade), e este aviso fica ao lado a dizer o que é que ela estava a
+          fazer quando ele chegou — com o gesto ainda por aplicar, à distância
+          de um clique. Reaplicar é somar-se ao que o outro escreveu, não
+          apagá-lo: o gesto corre por cima da versão adoptada. */}
+      {colisoes.length > 0 && (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-[#a03a1a]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+        >
+          <p className="font-medium text-[#a03a1a]">
+            Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: o guião mudou noutro sítio
+            entretanto.
+          </p>
+          <p className="bo-text-muted mt-1">
+            O guião que está no ecrã é o que ficou guardado. Não se perdeu nada — podes voltar a
+            aplicar o que estavas a fazer por cima dele.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={voltarAAplicar}>
+              Voltar a aplicar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setColisoes([])}>
+              Ficar com a versão guardada
+            </Button>
+          </div>
+        </div>
+      )}
 
       {items.length === 0 ? (
         <EmptyState

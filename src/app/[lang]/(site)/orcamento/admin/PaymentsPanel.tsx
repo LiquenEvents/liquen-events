@@ -292,6 +292,44 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
   const base = useRef<Payment[]>(quote.payments ?? []);
 
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A QUE FALHA NÃO PODE DESFAZER A QUE PASSOU
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A reversão guardava `const snapshot = payments` ANTES do pedido e repunha
+   * esse instante no erro. Um instante que já passou: entre o envio e a
+   * resposta cabe outra gravação inteira, e neste painel cabe mesmo — registar
+   * um pagamento e dar o anterior por recebido são dois toques seguidos, e o
+   * segundo PATCH leva a lista INTEIRA já com o primeiro lá dentro.
+   *
+   * O CENÁRIO, com duas pessoas e dinheiro: ela dá o sinal de 3 000 € por
+   * recebido no telemóvel e, sem esperar, regista o saldo de 7 000 €. O
+   * segundo pedido chega primeiro e é aceite — o servidor fica com o sinal
+   * recebido E o saldo. O primeiro volta com um 503 do balanceador e repunha o
+   * snapshot: o saldo de 7 000 € desaparecia do ecrã apesar de estar gravado,
+   * e o «Em falta» passava a mentir. O toque seguinte dela gravava esse ecrã
+   * por cima da verdade e o saldo morria também na base de dados.
+   *
+   * A correcção são duas referências (a mesma da checklist, do guião, do plano
+   * e dos custos — este painel era o último por fazer):
+   *
+   *   · `gravacoes` — o contador. Cada gravação leva um número; só a MAIS
+   *     RECENTE tem direito a desfazer o ecrã e a avisar. Uma resposta
+   *     atrasada de uma gravação já ultrapassada não escreve nada: o que a
+   *     mais recente levou CONTÉM o que ela levava.
+   *
+   *   · `gravado` — o último estado que o SERVIDOR confirmou. É para aqui que
+   *     se reverte, e não para o instante anterior ao pedido; assim a reversão
+   *     nunca deita fora uma gravação que passou entretanto.
+   *
+   * Nada se perde na ultrapassagem: a gravação mais recente inclui o que a
+   * ultrapassada queria escrever, portanto se ELA falhar é ela que repõe, que
+   * marca a linha e que oferece o «Repetir» — com as duas alterações lá dentro.
+   */
+  const gravacoes = useRef(0);
+  const gravado = useRef<Payment[]>(quote.payments ?? []);
+
+  /**
    * Gravação otimista COM REVERSÃO: se o servidor recusar, o dinheiro não pode
    * ficar diferente no ecrã e na base de dados sem ninguém dar por isso. Além de
    * reverter, marca a linha em causa e guarda a tentativa para o botão "Repetir".
@@ -300,7 +338,7 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
     next: Payment[],
     op: { id: string; ghost?: Payment | null; label: string; oQue: string },
   ) {
-    const snapshot = payments;
+    const minha = ++gravacoes.current;
     setPayments(next);
     onChange(next);
     setFailed((f) => (f && f.id === op.id ? null : f));
@@ -321,21 +359,43 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
      * diz-se-lhe, e ela decide o que fazer já a olhar para a verdade.
      */
     if (res?.status === 409) {
+      // A lista que o servidor tem AGORA passa a ser a verdade conhecida — e é
+      // dela que a próxima gravação parte (`base`) e para onde uma reversão
+      // futura reverte (`gravado`). Sem a fallback ser o `gravado`, um 409 sem
+      // corpo legível repunha um instante qualquer.
       const doServidor =
-        (corpo as { current?: { payments?: Payment[] } } | null)?.current?.payments ?? snapshot;
-      setPayments(doServidor);
-      onChange(doServidor);
+        (corpo as { current?: { payments?: Payment[] } } | null)?.current?.payments ??
+        gravado.current;
+      gravado.current = doServidor;
       base.current = doServidor;
-      setFailed(null);
+      // Se já há gravação mais recente, é ela que manda no ecrã: ela declarou
+      // esta base e vai bater na mesma parede, e é ela que põe a verdade lá.
+      if (minha === gravacoes.current) {
+        setPayments(doServidor);
+        onChange(doServidor);
+        setFailed(null);
+      }
       toast("Os pagamentos foram alterados noutro sítio. Está aqui a versão guardada.", "error");
       return;
     }
 
-    if (res?.ok) return;
+    if (res?.ok) {
+      if (minha === gravacoes.current) gravado.current = next;
+      return;
+    }
 
-    base.current = baseAnterior;
-    setPayments(snapshot);
-    onChange(snapshot);
+    // Ultrapassada por uma gravação mais recente: o que ESSA leva contém o que
+    // esta levava, portanto não há ecrã a desfazer, não há linha a marcar (o
+    // «Repetir» mandaria uma lista velha, sem o que veio depois) e não há nada
+    // a dizer. Se ela também falhar, é ela que repõe — e com as duas dentro.
+    if (minha !== gravacoes.current) return;
+
+    // Reverte-se para o último estado CONFIRMADO, não para o instante anterior
+    // ao pedido, e a base acompanha o que fica no ecrã — declarar uma versão
+    // que nunca foi gravada dava um 409 inventado na gravação seguinte.
+    base.current = gravado.current;
+    setPayments(gravado.current);
+    onChange(gravado.current);
     setFailed({ id: op.id, next, ghost: op.ghost ?? null, label: op.label, oQue: op.oQue });
     // A frase diz o que aconteceu e o que fazer; esta segunda parte diz ONDE —
     // sem ela, o aviso desaparece e a linha marcada fica sem explicação.

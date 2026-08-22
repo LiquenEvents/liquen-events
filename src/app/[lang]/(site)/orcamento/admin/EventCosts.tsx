@@ -35,6 +35,23 @@ interface Props {
 }
 
 /**
+ * Uma gravação que o servidor recusou por os custos terem mudado noutro sítio.
+ *
+ * Guarda-se o GESTO, não a lista que ele produziu: voltar a mandar a lista era
+ * apagar o custo que a outra pessoa acabou de escrever — exactamente o que o
+ * 409 existe para impedir. O gesto volta a aplicar-se POR CIMA da versão
+ * adoptada, e ficam os dois números.
+ */
+interface Colisao {
+  /** O número da gravação que colidiu — é o que põe os gestos por ordem. */
+  n: number;
+  /** O gesto, nomeado: «guardar o custo real de «Flores da Vila»». */
+  oQue: string;
+  /** O mesmo gesto, para o repetir sobre a versão que veio do servidor. */
+  reaplicar: (atuais: EventSupplier[]) => EventSupplier[];
+}
+
+/**
  * Per-event supplier bookings with budgeted vs actual cost. Combined with the
  * event's revenue (quotedPrice) it gives a live margin — the single most useful
  * number for running events profitably. Suppliers can be picked from the
@@ -49,6 +66,9 @@ export default function EventCosts({ quote, onChange }: Props) {
    *  que não se conseguiu ler não é um diretório vazio. */
   const [diretorioFalhou, setDiretorioFalhou] = useState(false);
   const [adding, setAdding] = useState(false);
+  // A colisão fica no ECRÃ, e não num toast que desaparece: é onde o número
+  // que ela escreveu continua à vista e recuperável com um clique.
+  const [colisoes, setColisoes] = useState<Colisao[]>([]);
   // Buffer de escrita por campo ("id:est" / "id:act") — deixa escrever "1.500,50"
   // livremente e só grava (um PATCH) ao sair do campo, em vez de a cada tecla.
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -134,16 +154,48 @@ export default function EventCosts({ quote, onChange }: Props) {
   const gravacoes = useRef(0);
   const gravado = useRef<EventSupplier[]>(quote.eventSuppliers ?? []);
 
-  function persist(oQue: string, next: EventSupplier[]) {
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * DE ONDE ESTA LISTA DE CUSTOS FOI COPIADA
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * A lista é copiada UMA vez, ao montar, e ao gravar vai INTEIRA — logo a
+   * gravação é «substitui os custos por estes», e não «muda o real deste
+   * fornecedor».
+   *
+   * O CENÁRIO, sem corrida nenhuma e com as duas gravações a responder 200:
+   * ele recebe a factura do catering e escreve o custo real, 4 200 €. Ela tem
+   * o painel aberto desde a manhã e, à tarde, marca a florista como paga — e
+   * manda a lista de manhã, onde o catering ainda tem só o orçado de 3 000 €.
+   * O real do catering desaparece e a margem do evento sobe 1 200 € sozinha.
+   * É por este número que se decide se o evento valeu a pena.
+   *
+   * `base` é a versão de que esta lista partiu. Vai no pedido, o servidor
+   * compara-a com a que tem e recusa com 409 (ver `api/orcamento/[id]`).
+   *
+   * Avança ao ENVIAR e não ao confirmar: escrever o orçado, saltar para o real
+   * e sair põe dois PATCH no ar, e o segundo já leva o primeiro lá dentro —
+   * declarar a versão de antes do primeiro era inventar uma colisão dela
+   * consigo própria a meio de um gesto normal.
+   */
+  const base = useRef<EventSupplier[]>(quote.eventSuppliers ?? []);
+
+  function persist(oQue: string, reaplicar: (atuais: EventSupplier[]) => EventSupplier[]) {
+    const next = reaplicar(items);
     const minha = ++gravacoes.current;
     setItems(next);
     onChange(next);
+    const baseAnterior = base.current;
+    base.current = next;
 
     const reporEDizer = (mensagem: string) => {
       // Já foi substituída por uma gravação mais recente: o que essa levar
       // contém o que esta levava, portanto não há nada a desfazer nem nada a
       // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
       if (minha !== gravacoes.current) return;
+      // A base acompanha o que fica no ecrã: declarar uma versão que nunca
+      // chegou a ser gravada dava um 409 inventado na gravação seguinte.
+      base.current = gravado.current;
       setItems(gravado.current);
       onChange(gravado.current);
       toast(mensagem, "error");
@@ -155,10 +207,37 @@ export default function EventCosts({ quote, onChange }: Props) {
         res = await fetch(`/api/orcamento/${quote.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventSuppliers: next }),
+          body: JSON.stringify({ eventSuppliers: next, base: { eventSuppliers: baseAnterior } }),
         });
       } catch {
         reporEDizer(porqueRebentou(oQue).mensagem);
+        return;
+      }
+      /**
+       * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir a
+       * mesma lista era apagar o custo que ele acabou de lançar. Adopta-se o
+       * que o servidor tem — e o gesto dela fica guardado no aviso, para o
+       * poder voltar a aplicar por cima dessa versão sem perder nem um número
+       * nem o outro. Por isso a frase não é a do `porqueFalhou`: aqui não se
+       * manda recarregar nada, a lista já está em dia no ecrã.
+       */
+      if (res.status === 409) {
+        const corpo = (await res.json().catch(() => null)) as {
+          current?: { eventSuppliers?: EventSupplier[] };
+        } | null;
+        const doServidor = corpo?.current?.eventSuppliers ?? gravado.current;
+        gravado.current = doServidor;
+        base.current = doServidor;
+        if (minha === gravacoes.current) {
+          setItems(doServidor);
+          onChange(doServidor);
+        }
+        // Dois gestos podem colidir os dois (dois toques dela enquanto a
+        // outra pessoa gravava). Cada gesto é um DELTA, portanto o mais
+        // recente não contém o anterior: guardam-se todos, por ordem de
+        // envio, e reaplicam-se por essa ordem — senão o primeiro perdia-se
+        // ao chegar o segundo, e as respostas nem sequer vêm por ordem.
+        setColisoes((c) => [...c, { n: minha, oQue, reaplicar }].sort((a, b) => a.n - b.n));
         return;
       }
       if (!res.ok) {
@@ -170,36 +249,46 @@ export default function EventCosts({ quote, onChange }: Props) {
     })();
   }
 
+  /**
+   * Os gestos que o 409 travou, agora POR CIMA da lista que veio do servidor
+   * — e pela ordem por que ela os fez, que é a única em que dão o mesmo
+   * resultado. Uma gravação só: o que ela quis fica todo dentro dela.
+   */
+  function voltarAAplicar() {
+    if (colisoes.length === 0) return;
+    const gestos = colisoes;
+    setColisoes([]);
+    persist(gestos.map((g) => g.oQue).join(" e "), (atuais) =>
+      gestos.reduce((lista: EventSupplier[], g) => g.reaplicar(lista), atuais),
+    );
+  }
+
   function add() {
     const name = form.name.trim();
     if (!name) return;
     const est = parseMoney(form.estimatedCost) ?? 0;
-    persist(`acrescentar «${name}» aos custos do evento`, [
-      ...items,
-      {
-        id: randomId(),
-        supplierId: form.supplierId || undefined,
-        name,
-        category: form.category,
-        estimatedCost: est,
-        status: "contactado",
-      },
-    ]);
+    // A reserva nasce AQUI e não dentro do gesto: reaplicá-la depois de uma
+    // colisão tem de acrescentar a MESMA linha, e não uma segunda com id novo.
+    const reserva: EventSupplier = {
+      id: randomId(),
+      supplierId: form.supplierId || undefined,
+      name,
+      category: form.category,
+      estimatedCost: est,
+      status: "contactado",
+    };
+    persist(`acrescentar «${name}» aos custos do evento`, (atuais) => [...atuais, reserva]);
     setForm({ name: "", category: "Catering", estimatedCost: "", supplierId: "" });
     setAdding(false);
   }
 
   function update(oQue: string, id: string, patch: Partial<EventSupplier>) {
-    persist(
-      oQue,
-      items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
-    );
+    persist(oQue, (atuais) => atuais.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   }
   function remove(id: string) {
     const it = items.find((x) => x.id === id);
-    persist(
-      `remover «${it?.name ?? "o fornecedor"}» dos custos`,
-      items.filter((x) => x.id !== id),
+    persist(`remover «${it?.name ?? "o fornecedor"}» dos custos`, (atuais) =>
+      atuais.filter((x) => x.id !== id),
     );
   }
 
@@ -237,6 +326,38 @@ export default function EventCosts({ quote, onChange }: Props) {
           </span>
         )}
       </div>
+
+      {/* ── A COLISÃO FICA À VISTA, E COM SAÍDA ────────────────────────────
+          Um toast desaparece sozinho e leva com ele a única pista do que não
+          ficou guardado — e aqui o que não ficou guardado é um número que ela
+          copiou de uma factura em papel. A lista do servidor já está no ecrã
+          (é a verdade) e este aviso fica em cima a dizer o que é que ela
+          estava a fazer quando ele chegou, com o gesto à distância de um
+          clique. Reaplicar é somar-se ao que ele lançou, não apagá-lo: o gesto
+          corre por cima da versão adoptada. */}
+      {colisoes.length > 0 && (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-[#a03a1a]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+        >
+          <p className="font-medium text-[#a03a1a]">
+            Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: os custos mudaram noutro sítio
+            entretanto.
+          </p>
+          <p className="bo-text-muted mt-1">
+            A lista que está no ecrã é a que ficou guardada. Não se perdeu nada — podes voltar a
+            aplicar o que estavas a fazer por cima dela.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={voltarAAplicar}>
+              Voltar a aplicar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setColisoes([])}>
+              Ficar com a versão guardada
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Margin summary — the headline number. Receita/Custos/Margem na mesma base
           (sem IVA) para reconciliarem no ecrã; o valor com IVA vai por baixo. */}

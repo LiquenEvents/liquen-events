@@ -974,6 +974,77 @@ describe("PATCH /api/orcamento/[id] — a base de uma lista inteira", () => {
     expect(store.update).not.toHaveBeenCalled();
   });
 
+  it("vale para o guião do dia — o momento que ele acrescentou não se apaga", async () => {
+    authed.ok = true;
+    // O que ELE acrescentou no portátil ao meio-dia.
+    store.override = {
+      timeline: [
+        { id: "t1", time: "17:00", title: "Cerimónia" },
+        { id: "t9", time: "19:30", title: "Discurso do pai" },
+      ],
+    };
+    // O que o telemóvel dela copiou de manhã, e continua a declarar.
+    const deManha = [{ id: "t1", time: "17:30", title: "Cerimónia" }];
+    const res = await PATCH(
+      req("PATCH", { timeline: deManha, base: { timeline: deManha } }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(409);
+    expect(store.update).not.toHaveBeenCalled();
+    const corpo = await res.json();
+    // As duas versões voltam: a do servidor para o ecrã se pôr em dia, e a
+    // dela para o gesto não se perder na recusa.
+    expect(corpo.current.timeline).toHaveLength(2);
+    expect(corpo.submetido.timeline).toEqual(deManha);
+  });
+
+  it("vale para os custos do evento — o custo real que ele lançou não desaparece", async () => {
+    authed.ok = true;
+    store.override = {
+      eventSuppliers: [
+        {
+          id: "f1",
+          name: "Flores da Vila",
+          category: "Floristas",
+          estimatedCost: 400,
+          actualCost: 4200,
+          status: "contactado",
+        },
+      ],
+    };
+    // A lista de manhã, sem o `actualCost` — a margem do evento depende disto.
+    const deManha = [
+      {
+        id: "f1",
+        name: "Flores da Vila",
+        category: "Floristas",
+        estimatedCost: 400,
+        status: "confirmado",
+      },
+    ];
+    const res = await PATCH(
+      req("PATCH", { eventSuppliers: deManha, base: { eventSuppliers: deManha } }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(409);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("e aceita o guião quando a base é exactamente a que está guardada", async () => {
+    authed.ok = true;
+    const guardado = [{ id: "t1", time: "17:00", title: "Cerimónia" }];
+    store.override = { timeline: guardado };
+    const res = await PATCH(
+      req("PATCH", {
+        timeline: [...guardado, { id: "t2", time: "20:00", title: "Jantar" }],
+        base: { timeline: guardado },
+      }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(200);
+    expect(store.update).toHaveBeenCalled();
+  });
+
   it("uma lista ausente e uma lista vazia são a mesma base", async () => {
     authed.ok = true;
     store.override = { productionPlan: undefined };
