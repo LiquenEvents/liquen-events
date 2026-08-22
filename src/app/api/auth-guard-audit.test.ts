@@ -552,6 +552,14 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./temas/[id]/imagens/copiar/route", methods: ["POST"] },
   { path: "./temas/[id]/miniaturas/route", methods: ["POST"] },
   { path: "./temas/[id]/repetidas/route", methods: ["POST"] },
+  // Fundir dois temas: MOVE a pasta inteira de um para o outro e arquiva a
+  // origem. É a operação mais destrutiva desta família — não apaga fotos, mas
+  // esvazia um tema —, e por isso é a que menos pode viver sem sessão.
+  { path: "./temas/[id]/fundir/route", methods: ["POST"] },
+  // «Usado em 7 propostas»: lê os documentos das propostas TODAS para os
+  // contar. Não devolve nada de nenhuma delas — só um número por tema —, mas o
+  // que ele lê são dados de clientes, e é aí que a guarda tem de estar.
+  { path: "./temas/uso/route", methods: ["GET"] },
   // Notas da equipa e meta de receita — texto interno, e uma escrita.
   { path: "./visao-geral/route", methods: ["GET", "PUT"] },
   // Os números com que o estúdio faz contas (combustível, margem mínima). Ler
@@ -917,10 +925,7 @@ describe("TOKEN-guarded routes deny a bad token", () => {
 describe("SECRET-guarded cron routes fail closed", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  for (const path of [
-    "./cron/reminders/route",
-    "./cron/backup/route",
-  ]) {
+  for (const path of ["./cron/reminders/route", "./cron/backup/route"]) {
     it(`GET ${path} → 401 in production with no CRON_SECRET, and never scans`, async () => {
       vi.stubEnv("CRON_SECRET", "");
       vi.stubEnv("NODE_ENV", "production");
