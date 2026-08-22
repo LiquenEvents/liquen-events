@@ -220,3 +220,109 @@ describe("ProposalBuilder — o preço escreve-se à portuguesa", () => {
     expect(preco.getAttribute("type")).toBe("text");
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ENQUANTO A PROPOSTA VAI A CAMINHO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre o envio do Estúdio: «quero que haja uma animação que eu
+ * perceba que está a ser enviado» — e depois, a olhar para o resultado, «quero
+ * estes detalhes espalhados por imensas coisas».
+ *
+ * Este botão é o gémeo desse: a mesma rota, o mesmo trabalho, e dezenas de
+ * segundos numa quinta com 4G fraco. O que havia era o botão a rodar, que diz
+ * «estou ocupado» e mais nada — nem o que está a acontecer, nem para quem vai,
+ * nem que o separador não se fecha.
+ *
+ * O que estes testes prendem é o COMPORTAMENTO, e não as classes: o cartão
+ * aparece ao carregar, diz o que se está a passar e para quem, some-se quando a
+ * resposta chega — e NUNCA diz «enviada» antes disso.
+ */
+describe("ProposalBuilder — enquanto a proposta vai a caminho", () => {
+  /**
+   * Um envio que fica pendurado até nós o soltarmos.
+   *
+   * É a única maneira de olhar para o meio da espera: com o `fetch` a responder
+   * de imediato, o instante que se quer medir não chega a existir.
+   */
+  function envioPendurado() {
+    let soltar!: (corpo: unknown) => void;
+    const pendurado = new Promise<unknown>((r) => (soltar = r));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/proposta") && (init?.method ?? "GET") === "POST") {
+          const corpo = await pendurado;
+          return { ok: true, status: 200, json: async () => corpo } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true, draft: null }) } as Response;
+      }),
+    );
+    return soltar;
+  }
+
+  const ENVIADA = { ok: true, total: 3690, emailed: true, pdfBase64: "JVBERi0=" };
+
+  async function comecarOEnvio() {
+    const soltar = envioPendurado();
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ProposalBuilder quote={quote} onSent={onSent} />
+      </ToastProvider>,
+    );
+    await user.click(screen.getByRole("button", { name: /Gerar PDF e enviar ao cliente/i }));
+    return soltar;
+  }
+
+  /** O cartão da espera — pela FRASE, que é o que ela lê, e não pela classe. */
+  async function cartaoDaEspera(): Promise<HTMLElement> {
+    const frase = await screen.findByText(/A gerar o PDF e a enviar ao cliente/i);
+    // Tem de ser uma região viva: sem isso, quem ouve o ecrã não sabe de nada.
+    const cartao = frase.closest('[role="status"]');
+    expect(cartao).not.toBeNull();
+    return cartao as HTMLElement;
+  }
+
+  it("põe no ecrã o que está a acontecer, e para quem vai", async () => {
+    await comecarOEnvio();
+
+    const cartao = await cartaoDaEspera();
+    // Para quem vai, que é o que distingue este envio do errado.
+    expect(cartao).toHaveTextContent(/maria@example\.pt/);
+    // E a barra que anda: é ela que responde à pergunta «isto está a andar?».
+    expect(cartao.querySelector('[data-barra="preenchimento"]')).toBeTruthy();
+  });
+
+  it("NUNCA diz «enviada» enquanto a resposta não chega", async () => {
+    await comecarOEnvio();
+    await cartaoDaEspera();
+
+    // Quem dá o envio por feito é a resposta, e a resposta ainda não veio.
+    expect(screen.queryByText(/Enviada por e-mail/i)).toBeNull();
+    expect(screen.queryByText(/Proposta criada/i)).toBeNull();
+    expect(onSent).not.toHaveBeenCalled();
+  });
+
+  it("não deixa lá um segundo botão de enviar — duas propostas não se desfazem", async () => {
+    await comecarOEnvio();
+    await cartaoDaEspera();
+
+    expect(screen.queryByRole("button", { name: /Gerar PDF e enviar ao cliente/i })).toBeNull();
+  });
+
+  it("some-se quando a resposta chega, e só então é que foi enviada", async () => {
+    const soltar = await comecarOEnvio();
+    await cartaoDaEspera();
+
+    soltar(ENVIADA);
+
+    await waitFor(() =>
+      expect(screen.queryByText(/A gerar o PDF e a enviar ao cliente/i)).toBeNull(),
+    );
+    expect(await screen.findByText(/Enviada por e-mail/i)).toBeTruthy();
+    expect(onSent).toHaveBeenCalledWith(3690);
+  });
+});
