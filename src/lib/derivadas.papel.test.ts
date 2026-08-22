@@ -1,0 +1,218 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE DÓI E O QUE É GANHO NÃO SE SOMAM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel dela dizia «1140 miniaturas em falta, em 683 fotografias». O número
+ * é verdadeiro e a frase é falsa: a esmagadora maioria daquelas 1140 eram AVIF,
+ * acrescentado depois de as fotografias existirem e que nenhuma podia ter. Uma
+ * foto sem AVIF vê-se na mesma — cai no WebP e ninguém dá por isso. Uma foto
+ * sem MINIATURA é que puxa o original de dois ou três MB para desenhar um
+ * quadrado de 150 px, e é essa a avaria.
+ *
+ * O que estes testes prendem:
+ *
+ *  1. a contagem separa as duas, e conta em FOTOGRAFIAS — não em derivadas.
+ *     Uma foto sem miniatura e sem micro está mal uma vez, não duas;
+ *  2. a geração faz as ESSENCIAIS primeiro, na biblioteca inteira, antes de
+ *     tocar num AVIF. Parar a meio tem de deixar as coisas melhores;
+ *  3. `gerarLoteDeDerivadas("essencial")` não gera AVIF nenhum — é isso que
+ *     deixa arranjar a avaria em dois minutos sem esperar por centenas de
+ *     codificações caras.
+ */
+
+const st = vi.hoisted(() => ({
+  /** Conteúdo por bucket: conjunto de caminhos. */
+  conteudo: {} as Record<string, Set<string>>,
+  /** Os `upload` feitos, por ordem: é a ordem do trabalho. */
+  escritos: [] as string[],
+  cliente: null as unknown,
+}));
+
+vi.mock("./supabase", () => ({ getSupabase: () => st.cliente }));
+vi.mock("./logger", () => ({ log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
+// `sharp` não interessa aqui: o que se está a medir é O QUE se decide gerar e
+// por que ordem, não os bytes que saem. Um encoder a sério tornava isto lento
+// e não provava nada de novo — o formato tem os seus testes.
+vi.mock("sharp", () => {
+  const falso = () => ({
+    rotate: () => falso(),
+    resize: () => falso(),
+    webp: () => falso(),
+    avif: () => falso(),
+    toBuffer: async () => Buffer.from("bytes"),
+  });
+  return { default: falso };
+});
+
+import { contarDerivadasEmFalta, gerarLoteDeDerivadas } from "./derivadas";
+import {
+  THEME_BUCKET,
+  THEME_THUMB_BUCKET,
+  THEME_MICRO_BUCKET,
+  THEME_AVIF_BUCKET,
+  THEME_AVIF_MICRO_BUCKET,
+} from "./theme-ref";
+
+function storageFalso() {
+  return {
+    storage: {
+      async getBucket() {
+        return { data: { name: "existe" }, error: null };
+      },
+      from(bucket: string) {
+        return {
+          async list(prefixo: string, opcoes?: { limit?: number; offset?: number }) {
+            const todos = [...(st.conteudo[bucket] ?? [])];
+            const base = prefixo ? `${prefixo}/` : "";
+            const nomes = new Set<string>();
+            const entradas: unknown[] = [];
+            for (const caminho of todos) {
+              if (!caminho.startsWith(base)) continue;
+              const resto = caminho.slice(base.length);
+              const barra = resto.indexOf("/");
+              const nome = barra === -1 ? resto : resto.slice(0, barra);
+              if (nomes.has(nome)) continue;
+              nomes.add(nome);
+              entradas.push(
+                barra === -1
+                  ? { name: nome, id: `id-${caminho}`, metadata: { size: 10 } }
+                  : { name: nome, id: null, metadata: null },
+              );
+            }
+            const inicio = opcoes?.offset ?? 0;
+            return { data: entradas.slice(inicio, inicio + (opcoes?.limit ?? 100)), error: null };
+          },
+          async download() {
+            return { data: new Blob([Buffer.from("original")]), error: null };
+          },
+          async upload(caminho: string) {
+            st.escritos.push(`${bucket}/${caminho}`);
+            (st.conteudo[bucket] ??= new Set()).add(caminho);
+            return { error: null };
+          },
+        };
+      },
+    },
+  };
+}
+
+/** Um tema com `quantas` fotografias e nenhuma derivada. */
+function temaSemNada(pasta: string, quantas: number) {
+  st.conteudo[THEME_BUCKET] ??= new Set();
+  for (let i = 0; i < quantas; i += 1) st.conteudo[THEME_BUCKET].add(`${pasta}/f${i}.jpg`);
+}
+
+beforeEach(() => {
+  st.conteudo = {};
+  st.escritos = [];
+  st.cliente = storageFalso();
+});
+
+describe("a contagem separa a avaria do ganho", () => {
+  it("conta em fotografias, e não soma a miniatura com o micro", async () => {
+    temaSemNada("tema-a", 3);
+
+    const c = await contarDerivadasEmFalta();
+
+    expect(c.fotos).toBe(3);
+    // Três fotos × quatro derivadas de tema = doze em falta ao todo…
+    expect(c.emFalta).toBe(12);
+    // …das quais seis são essenciais (miniatura + micro) e seis são AVIF.
+    expect(c.emFaltaEssenciais).toBe(6);
+    expect(c.emFaltaLeves).toBe(6);
+    // Mas as FOTOGRAFIAS mal são três, e não seis: é este o número que se diz
+    // em voz alta, e o que a versão anterior não sabia dizer.
+    expect(c.fotosSemMiniatura).toBe(3);
+    expect(c.fotosSemVersaoLeve).toBe(3);
+  });
+
+  it("uma foto com miniatura e sem AVIF não conta como avaria", async () => {
+    temaSemNada("tema-a", 2);
+    st.conteudo[THEME_THUMB_BUCKET] = new Set(["tema-a/f0.jpg", "tema-a/f1.jpg"]);
+    st.conteudo[THEME_MICRO_BUCKET] = new Set(["tema-a/f0.jpg", "tema-a/f1.jpg"]);
+
+    const c = await contarDerivadasEmFalta();
+
+    expect(c.fotosSemMiniatura).toBe(0);
+    expect(c.emFaltaEssenciais).toBe(0);
+    // O ganho continua por cobrar, e é dito — sem ser dado como avaria.
+    expect(c.fotosSemVersaoLeve).toBe(2);
+    expect(c.emFaltaLeves).toBe(4);
+  });
+
+  it("uma pasta sem nada em falta não gera linha nenhuma", async () => {
+    temaSemNada("tema-a", 1);
+    for (const b of [
+      THEME_THUMB_BUCKET,
+      THEME_MICRO_BUCKET,
+      THEME_AVIF_BUCKET,
+      THEME_AVIF_MICRO_BUCKET,
+    ]) {
+      st.conteudo[b] = new Set(["tema-a/f0.jpg"]);
+    }
+
+    const c = await contarDerivadasEmFalta();
+
+    expect(c.emFalta).toBe(0);
+    expect(c.linhas).toEqual([]);
+  });
+
+  it("a lista põe à frente o tema com mais fotografias a servir o original", async () => {
+    temaSemNada("poucas", 1);
+    temaSemNada("muitas", 5);
+    // «poucas» já tem as miniaturas: só lhe falta o ganho.
+    st.conteudo[THEME_THUMB_BUCKET] = new Set(["poucas/f0.jpg"]);
+    st.conteudo[THEME_MICRO_BUCKET] = new Set(["poucas/f0.jpg"]);
+
+    const c = await contarDerivadasEmFalta();
+
+    expect(c.linhas[0].pasta).toBe("muitas");
+    expect(c.linhas[0].semMiniatura).toBe(5);
+    expect(c.linhas[1].semMiniatura).toBe(0);
+  });
+});
+
+describe("a geração faz primeiro o que dói", () => {
+  it("nenhum AVIF é escrito antes de a última miniatura da biblioteca estar feita", async () => {
+    temaSemNada("tema-a", 2);
+    temaSemNada("tema-b", 2);
+
+    await gerarLoteDeDerivadas();
+
+    const primeiroAvif = st.escritos.findIndex((c) => c.startsWith("theme-avif"));
+    const ultimaEssencial = st.escritos.reduce(
+      (ultima, c, i) => (c.startsWith("theme-avif") ? ultima : i),
+      -1,
+    );
+    expect(primeiroAvif).toBeGreaterThan(-1);
+    expect(ultimaEssencial).toBeLessThan(primeiroAvif);
+  });
+
+  it("`essencial` não escreve um único AVIF", async () => {
+    temaSemNada("tema-a", 3);
+
+    const r = await gerarLoteDeDerivadas("essencial");
+
+    expect(st.escritos.filter((c) => c.startsWith("theme-avif"))).toEqual([]);
+    expect(st.escritos).toHaveLength(6);
+    expect(r.geradas).toBe(6);
+    // Acabou o que era essencial; o AVIF continua por fazer e não é contado
+    // como resto desta tarefa.
+    expect(r.restantes).toBe(0);
+    expect(r.papel).toBe("essencial");
+  });
+
+  it("o que sobra depois de um lote diz quantas dessas ainda doem", async () => {
+    // 20 fotografias × 2 essenciais = 40, mais do que o lote de 25.
+    temaSemNada("tema-a", 20);
+
+    const r = await gerarLoteDeDerivadas("essencial");
+
+    expect(r.geradas).toBe(25);
+    expect(r.restantes).toBe(15);
+    expect(r.restantesEssenciais).toBe(15);
+  });
+});

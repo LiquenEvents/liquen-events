@@ -7,18 +7,22 @@ import Miniaturas from "./Miniaturas";
 vi.mock("./Toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 /**
- * O que aqui interessa provar são três coisas, e nenhuma delas é «desenha uma
+ * O que aqui interessa provar são cinco coisas, e nenhuma delas é «desenha uma
  * caixa»:
  *
  *  1. **contar não escreve.** É a propriedade que faz o botão ser carregável
  *     sem medo, e é a única maneira de a hipótese cair depressa se estiver
  *     errada;
- *  2. **a geração anda aos poucos até acabar.** O servidor faz um lote de cada
+ *  2. **a avaria e o ganho não se somam.** Uma foto sem miniatura puxa o
+ *     original; uma foto sem AVIF vê-se na mesma. Um número só, grande e
+ *     vermelho, é o que fazia este painel ser ignorado;
+ *  3. **as pastas dizem-se pelo nome.** Um UUID não é o nome de nada;
+ *  4. **a geração anda aos poucos até acabar.** O servidor faz um lote de cada
  *     vez; se este ecrã não repetisse, ela via «25 geradas» e ficava a achar
  *     que tinha acabado com quatrocentas por fazer;
- *  3. **um lote que não gera nada pára o ciclo.** Sem isso, uma fotografia
+ *  5. **um lote que não gera nada pára o ciclo.** Sem isso, uma fotografia
  *     corrompida — que falha sempre — punha o browser a repetir o mesmo pedido
- *     duzentas vezes.
+ *     quatrocentas vezes.
  */
 
 function respostaDe(corpo: unknown, status = 200) {
@@ -28,8 +32,39 @@ function respostaDe(corpo: unknown, status = 200) {
   });
 }
 
+/** Uma contagem completa, com os campos que a rota manda mesmo. */
+function contagemDe(p: Partial<Record<string, unknown>> = {}) {
+  return {
+    ok: true,
+    linhas: [],
+    fotos: 100,
+    emFalta: 0,
+    emFaltaEssenciais: 0,
+    emFaltaLeves: 0,
+    fotosSemMiniatura: 0,
+    fotosSemVersaoLeve: 0,
+    avisos: [],
+    ...p,
+  };
+}
+
+function lote(p: Partial<Record<string, unknown>> = {}) {
+  return {
+    ok: true,
+    geradas: 0,
+    falhas: [],
+    restantes: 0,
+    restantesEssenciais: 0,
+    papel: "essencial",
+    ...p,
+  };
+}
+
+/** O traço da barra do `EmCurso`, que se mede pelo `scaleX`. */
+const barra = () => document.querySelector('[data-barra="preenchimento"]') as HTMLElement | null;
+
 describe("Miniaturas", () => {
-  let chamadas: { metodo: string }[] = [];
+  let chamadas: { metodo: string; url: string }[] = [];
 
   beforeEach(() => {
     chamadas = [];
@@ -42,51 +77,152 @@ describe("Miniaturas", () => {
   it("contar não escreve nada — só faz GET", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_url: string, init?: RequestInit) => {
-        chamadas.push({ metodo: init?.method ?? "GET" });
-        return respostaDe({ ok: true, linhas: [], fotos: 120, emFalta: 0, avisos: [] });
+      vi.fn(async (url: string, init?: RequestInit) => {
+        chamadas.push({ metodo: init?.method ?? "GET", url: String(url) });
+        return respostaDe(contagemDe({ fotos: 120 }));
       }),
     );
 
     render(<Miniaturas />);
     await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
 
-    await waitFor(() => expect(screen.getByText(/nenhuma em falta/i)).toBeInTheDocument());
-    expect(chamadas).toEqual([{ metodo: "GET" }]);
-    // Sem nada em falta não há nada para gerar, e o botão não aparece.
+    await waitFor(() => expect(screen.getByText(/nada em falta/i)).toBeInTheDocument());
+    expect(chamadas).toEqual([{ metodo: "GET", url: "/api/admin/derivadas" }]);
+    // Sem nada em falta não há nada para gerar, e nenhum botão de gerar aparece.
     expect(screen.queryByRole("button", { name: /gerar/i })).toBeNull();
+  });
+
+  /**
+   * O DEFEITO QUE DEU ORIGEM A ISTO.
+   *
+   * O ecrã dela dizia «1140 miniaturas em falta, em 683 fotografias». Das 1140,
+   * 1366 seriam AVIF de fotografias que se veem perfeitamente — o AVIF foi
+   * acrescentado depois de elas existirem, e nenhuma o podia ter. O número
+   * grande escondia o que interessava: quantas fotos é que estão MESMO a puxar
+   * o original.
+   */
+  it("separa as fotografias sem miniatura das que só não têm versão leve", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respostaDe(
+          contagemDe({
+            fotos: 683,
+            emFalta: 1140,
+            emFaltaEssenciais: 94,
+            emFaltaLeves: 1046,
+            fotosSemMiniatura: 47,
+            fotosSemVersaoLeve: 683,
+          }),
+        ),
+      ),
+    );
+
+    render(<Miniaturas />);
+    await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
+
+    // A avaria, em fotografias e não em derivadas.
+    await waitFor(() => expect(screen.getByText(/descarregadas inteiras/i)).toBeInTheDocument());
+    expect(screen.getAllByText("47 fotografias").length).toBeGreaterThan(0);
+    // O ganho, dito à parte e sem alarme.
+    expect(screen.getByText(/não parte nada/i)).toBeInTheDocument();
+    // E dois botões, cada um com o seu trabalho.
+    expect(
+      screen.getByRole("button", { name: /gerar as miniaturas de 47 fotografias/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /gerar as versões leves de 683 fotografias/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("as pastas aparecem pelo nome do tema, não pelo id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respostaDe(
+          contagemDe({
+            fotos: 52,
+            emFalta: 94,
+            emFaltaEssenciais: 94,
+            fotosSemMiniatura: 47,
+            linhas: [
+              {
+                origem: "theme-assets",
+                pasta: "6b9d0c4e-1f2a-4d3b-9c8e-0a1b2c3d4e5f",
+                nome: "Bouquets Campestres",
+                daBiblioteca: true,
+                fotos: 52,
+                semMiniatura: 47,
+                semVersaoLeve: 0,
+                emFalta: 94,
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+
+    render(<Miniaturas />);
+    await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
+
+    await waitFor(() => expect(screen.getByText("Bouquets Campestres")).toBeInTheDocument());
+    expect(screen.getByText(/47 de 52 sem miniatura/)).toBeInTheDocument();
+    expect(screen.queryByText(/6b9d0c4e/)).toBeNull();
+    expect(screen.queryByText(/theme-avif/)).toBeNull();
+  });
+
+  it("gerar só as miniaturas pede só as essenciais ao servidor", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const metodo = init?.method ?? "GET";
+        chamadas.push({ metodo, url: String(url) });
+        if (metodo === "POST") return respostaDe(lote({ geradas: 94, restantes: 0 }));
+        return respostaDe(
+          contagemDe({ emFalta: 94, emFaltaEssenciais: 94, fotosSemMiniatura: 47 }),
+        );
+      }),
+    );
+
+    render(<Miniaturas />);
+    await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
+    await waitFor(() => screen.getByRole("button", { name: /gerar as miniaturas/i }));
+    await userEvent.click(screen.getByRole("button", { name: /gerar as miniaturas/i }));
+
+    await waitFor(() => expect(chamadas.some((c) => c.metodo === "POST")).toBe(true));
+    expect(chamadas.find((c) => c.metodo === "POST")?.url).toBe(
+      "/api/admin/derivadas?papel=essencial",
+    );
   });
 
   it("gera aos poucos até não sobrar nenhuma", async () => {
     const lotes = [
-      { ok: true, geradas: 25, falhas: [], restantes: 30 },
-      { ok: true, geradas: 25, falhas: [], restantes: 5 },
-      { ok: true, geradas: 5, falhas: [], restantes: 0 },
+      lote({ geradas: 25, restantes: 30 }),
+      lote({ geradas: 25, restantes: 5 }),
+      lote({ geradas: 5, restantes: 0 }),
     ];
     let volta = 0;
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_url: string, init?: RequestInit) => {
+      vi.fn(async (url: string, init?: RequestInit) => {
         const metodo = init?.method ?? "GET";
-        chamadas.push({ metodo });
+        chamadas.push({ metodo, url: String(url) });
         if (metodo === "POST") return respostaDe(lotes[volta++] ?? lotes[2]);
         // A contagem: cheia antes de gerar, vazia depois.
-        return respostaDe({
-          ok: true,
-          linhas: [],
-          fotos: 100,
-          emFalta: volta === 0 ? 55 : 0,
-          avisos: [],
-        });
+        return respostaDe(
+          volta === 0
+            ? contagemDe({ emFalta: 55, emFaltaEssenciais: 55, fotosSemMiniatura: 55 })
+            : contagemDe(),
+        );
       }),
     );
 
     render(<Miniaturas />);
     await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
-    await waitFor(() => screen.getByRole("button", { name: /gerar as 55/i }));
-    await userEvent.click(screen.getByRole("button", { name: /gerar as 55/i }));
+    await waitFor(() => screen.getByRole("button", { name: /gerar as miniaturas/i }));
+    await userEvent.click(screen.getByRole("button", { name: /gerar as miniaturas/i }));
 
-    await waitFor(() => expect(screen.getByText(/nenhuma em falta/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/nada em falta/i)).toBeInTheDocument());
     // Três lotes, nem mais nem menos: parar ao segundo deixava trinta por fazer.
     expect(chamadas.filter((c) => c.metodo === "POST")).toHaveLength(3);
   });
@@ -94,11 +230,10 @@ describe("Miniaturas", () => {
   /**
    * A SEGUNDA PASSAGEM COMEÇA DO ZERO.
    *
-   * A primeira faz 52 e deixa 8 por fazer. Ao carregar em "Gerar as 8", a
-   * contagem anterior ficava lá: enquanto o primeiro lote não respondia — que
-   * num lote grande são segundos — o botão dizia «A gerar… 52/8» e a barra
-   * estava cheia sem nada ter sido feito. Uma barra que mente uma vez deixa de
-   * se poder ler.
+   * A primeira faz 52 e deixa 8 por fazer. Ao carregar outra vez, a contagem
+   * anterior ficava lá: enquanto o primeiro lote não respondia — que num lote
+   * grande são segundos — o cartão dizia «52 de 8» com a barra cheia e nada
+   * feito. Uma barra que mente uma vez deixa de se poder ler.
    */
   it("uma segunda passagem não começa com a contagem da primeira", async () => {
     let posts = 0;
@@ -108,39 +243,51 @@ describe("Miniaturas", () => {
       "fetch",
       vi.fn(async (_url: string, init?: RequestInit) => {
         const metodo = init?.method ?? "GET";
-        chamadas.push({ metodo });
         if (metodo === "POST") {
           posts += 1;
           if (posts === 1) {
             emFalta = 8;
-            return respostaDe({
-              ok: true,
-              geradas: 52,
-              falhas: Array.from({ length: 8 }, (_, i) => `theme-thumbs/x/${i}.jpg`),
-              restantes: 0,
-            });
+            return respostaDe(
+              lote({
+                geradas: 52,
+                falhas: Array.from({ length: 8 }, (_, i) => `theme-thumbs/x/${i}.jpg`),
+                restantes: 0,
+              }),
+            );
           }
           // A segunda fica pendurada: é este o instante que interessa ver.
           return new Promise<Response>((resolve) => {
-            soltar.push(() =>
-              resolve(respostaDe({ ok: true, geradas: 0, falhas: [], restantes: 0 })),
-            );
+            soltar.push(() => resolve(respostaDe(lote({ geradas: 0, restantes: 0 }))));
           });
         }
-        return respostaDe({ ok: true, linhas: [], fotos: 100, emFalta, avisos: [] });
+        return respostaDe(
+          contagemDe({
+            emFalta,
+            emFaltaEssenciais: emFalta,
+            fotosSemMiniatura: emFalta,
+          }),
+        );
       }),
     );
 
     render(<Miniaturas />);
     await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
-    await waitFor(() => screen.getByRole("button", { name: /gerar as 60/i }));
-    await userEvent.click(screen.getByRole("button", { name: /gerar as 60/i }));
+    await waitFor(() =>
+      screen.getByRole("button", { name: /gerar as miniaturas de 60 fotografias/i }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /gerar as miniaturas de 60 fotografias/i }),
+    );
 
-    await waitFor(() => screen.getByRole("button", { name: /gerar as 8/i }));
-    await userEvent.click(screen.getByRole("button", { name: /gerar as 8/i }));
+    await waitFor(() =>
+      screen.getByRole("button", { name: /gerar as miniaturas de 8 fotografias/i }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /gerar as miniaturas de 8 fotografias/i }),
+    );
 
-    expect(screen.getByRole("button", { name: /a gerar/i }).textContent).toBe("A gerar… 0/8");
-    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("0");
+    expect(screen.getByText("0 de 8")).toBeInTheDocument();
+    expect(barra()?.style.transform).toBe("scaleX(0)");
     soltar[0]?.();
   });
 
@@ -149,26 +296,62 @@ describe("Miniaturas", () => {
       "fetch",
       vi.fn(async (_url: string, init?: RequestInit) => {
         const metodo = init?.method ?? "GET";
-        chamadas.push({ metodo });
+        chamadas.push({ metodo, url: "" });
         // Sempre a mesma resposta: nada gerado, e continua a haver que fazer.
         // É o que uma fotografia corrompida produz.
         if (metodo === "POST")
-          return respostaDe({
-            ok: true,
-            geradas: 0,
-            falhas: ["theme-thumbs/x/a.jpg"],
-            restantes: 8,
-          });
-        return respostaDe({ ok: true, linhas: [], fotos: 10, emFalta: 8, avisos: [] });
+          return respostaDe(lote({ geradas: 0, falhas: ["theme-thumbs/x/a.jpg"], restantes: 8 }));
+        return respostaDe(
+          contagemDe({ fotos: 10, emFalta: 8, emFaltaEssenciais: 8, fotosSemMiniatura: 8 }),
+        );
       }),
     );
 
     render(<Miniaturas />);
     await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
-    await waitFor(() => screen.getByRole("button", { name: /gerar as 8/i }));
-    await userEvent.click(screen.getByRole("button", { name: /gerar as 8/i }));
+    await waitFor(() => screen.getByRole("button", { name: /gerar as miniaturas/i }));
+    await userEvent.click(screen.getByRole("button", { name: /gerar as miniaturas/i }));
 
     await waitFor(() => expect(screen.getByText(/não deu/i)).toBeInTheDocument());
     expect(chamadas.filter((c) => c.metodo === "POST")).toHaveLength(1);
+  });
+
+  /**
+   * O «Parar» tem de parar mesmo.
+   *
+   * Sem ele, começar a gerar 683 fotografias era um compromisso de que não se
+   * saía a não ser fechando o separador — e fechar o separador a meio de uma
+   * coisa é exactamente o gesto que faz duvidar se ficou tudo estragado.
+   */
+  it("parar a meio interrompe o ciclo e não perde o que já foi feito", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const metodo = init?.method ?? "GET";
+        chamadas.push({ metodo, url: "" });
+        if (metodo === "POST") {
+          // Um lote leva tempo. Sem isto o ciclo dava as quatrocentas voltas
+          // antes de o React conseguir desenhar o cartão — e não havia
+          // instante nenhum em que carregar no «Parar».
+          await new Promise((r) => setTimeout(r, 15));
+          return respostaDe(lote({ geradas: 25, restantes: 900 }));
+        }
+        return respostaDe(
+          contagemDe({ emFalta: 925, emFaltaEssenciais: 925, fotosSemMiniatura: 925 }),
+        );
+      }),
+    );
+
+    render(<Miniaturas />);
+    await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
+    await waitFor(() => screen.getByRole("button", { name: /gerar as miniaturas/i }));
+    await userEvent.click(screen.getByRole("button", { name: /gerar as miniaturas/i }));
+
+    await waitFor(() => screen.getByRole("button", { name: /parar/i }));
+    await userEvent.click(screen.getByRole("button", { name: /parar/i }));
+
+    await waitFor(() => expect(screen.queryByText(/a gerar/i)).toBeNull());
+    // Longe dos 400 lotes que o travão permite: parou por ordem dela.
+    expect(chamadas.filter((c) => c.metodo === "POST").length).toBeLessThan(5);
   });
 });

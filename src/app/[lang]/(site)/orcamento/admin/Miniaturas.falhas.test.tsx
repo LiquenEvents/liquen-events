@@ -38,14 +38,28 @@ function respostaDe(corpo: unknown, status = 200) {
 
 const FALHAS = ["theme-thumbs/t-1/a.jpg", "theme-thumbs/t-1/b.jpg", "theme-thumbs/t-1/c.jpg"];
 
+/** Uma contagem completa, com os campos que a rota manda mesmo. */
+function contagemDe(p: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    linhas: [],
+    fotos: 100,
+    emFalta: 55,
+    emFaltaEssenciais: 55,
+    emFaltaLeves: 0,
+    fotosSemMiniatura: 55,
+    fotosSemVersaoLeve: 0,
+    avisos: [],
+    ...p,
+  };
+}
+
 /** Conta, e depois gera — o gesto que ela faz. */
-async function contarEGerar(quantas: number) {
+async function contarEGerar() {
   render(<Miniaturas />);
   await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
-  await waitFor(() => screen.getByRole("button", { name: new RegExp(`gerar as ${quantas}`, "i") }));
-  await userEvent.click(
-    screen.getByRole("button", { name: new RegExp(`gerar as ${quantas}`, "i") }),
-  );
+  await waitFor(() => screen.getByRole("button", { name: /gerar as miniaturas/i }));
+  await userEvent.click(screen.getByRole("button", { name: /gerar as miniaturas/i }));
 }
 
 describe("Miniaturas — a rede cai a meio dos lotes", () => {
@@ -66,15 +80,22 @@ describe("Miniaturas — a rede cai a meio dos lotes", () => {
           posts += 1;
           // Primeiro lote: gera umas quantas e diz QUAIS não deram.
           if (posts === 1)
-            return respostaDe({ ok: true, geradas: 22, falhas: FALHAS, restantes: 30 });
+            return respostaDe({
+              ok: true,
+              geradas: 22,
+              falhas: FALHAS,
+              restantes: 30,
+              restantesEssenciais: 30,
+              papel: "essencial",
+            });
           // Segundo: a rede foi-se. É aqui que a lista desaparecia.
           throw new TypeError("Failed to fetch");
         }
-        return respostaDe({ ok: true, linhas: [], fotos: 100, emFalta: 55, avisos: [] });
+        return respostaDe(contagemDe());
       }),
     );
 
-    await contarEGerar(55);
+    await contarEGerar();
 
     await waitFor(() => expect(screen.getByText(/não deram/i)).toBeInTheDocument());
     for (const f of FALHAS) expect(screen.getByText(f)).toBeInTheDocument();
@@ -90,14 +111,21 @@ describe("Miniaturas — a rede cai a meio dos lotes", () => {
         if ((init?.method ?? "GET") === "POST") {
           posts += 1;
           if (posts === 1)
-            return respostaDe({ ok: true, geradas: 22, falhas: FALHAS, restantes: 30 });
+            return respostaDe({
+              ok: true,
+              geradas: 22,
+              falhas: FALHAS,
+              restantes: 30,
+              restantesEssenciais: 30,
+              papel: "essencial",
+            });
           return respostaDe({ error: "Storage indisponível" }, 503);
         }
-        return respostaDe({ ok: true, linhas: [], fotos: 100, emFalta: 55, avisos: [] });
+        return respostaDe(contagemDe());
       }),
     );
 
-    await contarEGerar(55);
+    await contarEGerar();
 
     await waitFor(() => expect(screen.getByText(/não deram/i)).toBeInTheDocument());
     expect(screen.getByText(FALHAS[0])).toBeInTheDocument();

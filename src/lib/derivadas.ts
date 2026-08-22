@@ -198,21 +198,55 @@ const tipoDe = (avif = false) => (avif ? "image/avif" : FORMATO.contentType);
  */
 const AVIF = { formato: "avif" as const, desconto: 23, esforco: 4 };
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * NEM TUDO O QUE FALTA DÓI DA MESMA MANEIRA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel dizia «1140 miniaturas em falta, em 683 fotografias» — um número
+ * grande, vermelho, e falso na parte que interessa. Das 1140, a maioria eram
+ * AVIF, que foi acrescentado ontem e que **nenhuma** fotografia anterior tem.
+ *
+ * São duas coisas com nomes diferentes e urgências opostas:
+ *
+ *   · **essencial** — sem esta derivada a grelha cai para o ORIGINAL e puxa
+ *     megabytes para desenhar um quadrado de 150 px. É uma avaria: dói hoje,
+ *     no telemóvel dela, com 4G de quinta.
+ *   · **leve** — a mesma imagem em AVIF, um quarto mais leve para quem o saiba
+ *     ler. Não a ter não parte nada: o `<picture>` cai no WebP e ninguém dá
+ *     por isso. É um ganho por cobrar, não um defeito.
+ *
+ * Somar as duas num número só é dizer «tens 1140 avarias» a quem tem 683 mais
+ * um trabalho por fazer — e um alarme que exagera é um alarme que se ignora.
+ *
+ * O `papel` também MANDA NA ORDEM da geração: as essenciais de toda a
+ * biblioteca primeiro, as leves depois. Sem isso, parar a meio (ou fechar o
+ * portátil) deixava os dois primeiros temas com AVIF e os últimos sem
+ * miniatura nenhuma — o pior dos dois mundos, e por acidente.
+ */
+type Papel = "essencial" | "leve";
+
 const FAMILIAS = [
   {
     origem: THEME_BUCKET,
     derivadas: [
-      { bucket: THEME_THUMB_BUCKET, ...MINIATURA },
-      { bucket: THEME_MICRO_BUCKET, lado: 96, qualidade: 65 },
+      { bucket: THEME_THUMB_BUCKET, ...MINIATURA, papel: "essencial" as Papel },
+      { bucket: THEME_MICRO_BUCKET, lado: 96, qualidade: 65, papel: "essencial" as Papel },
       // Os mesmos dois tamanhos, na oferta que só alguns navegadores aceitam.
       // Ver `THEME_AVIF_BUCKET`: é uma proposta, não uma substituição.
-      { bucket: THEME_AVIF_BUCKET, ...MINIATURA, avif: true },
-      { bucket: THEME_AVIF_MICRO_BUCKET, lado: 96, qualidade: 65, avif: true },
+      { bucket: THEME_AVIF_BUCKET, ...MINIATURA, avif: true, papel: "leve" as Papel },
+      {
+        bucket: THEME_AVIF_MICRO_BUCKET,
+        lado: 96,
+        qualidade: 65,
+        avif: true,
+        papel: "leve" as Papel,
+      },
     ],
   },
   {
     origem: PROPOSAL_BUCKET,
-    derivadas: [{ bucket: PROPOSAL_THUMB_BUCKET, ...MINIATURA }],
+    derivadas: [{ bucket: PROPOSAL_THUMB_BUCKET, ...MINIATURA, papel: "essencial" as Papel }],
   },
 ] as const;
 
@@ -241,19 +275,42 @@ async function ficheiros(sb: Cliente, bucket: string, pasta: string): Promise<st
   }
 }
 
+/**
+ * Uma PASTA — um tema, ou um pedido —, e não uma pasta vezes um bucket.
+ *
+ * A versão anterior emitia uma linha por (pasta × derivada), e o painel
+ * mostrava-as em bruto: o mesmo tema aparecia quatro vezes seguidas, todas a
+ * dizer «47 de 47», e não havia maneira de ler dali quantas FOTOGRAFIAS
+ * estavam mal. Estão aqui as duas contas que se fazem em fotografias, que é a
+ * unidade em que ela pensa e a única que se pode dizer em voz alta.
+ */
 export interface LinhaDeContagem {
-  /** `theme-assets → theme-thumbs`, para o painel dizer de que se trata. */
+  /** O bucket de onde vêm os originais (`theme-assets` ou `proposal-assets`). */
   origem: string;
-  destino: string;
+  /** O id da pasta. Quem o traduz para um nome é a rota — ver `pastas-com-nome`. */
   pasta: string;
   fotos: number;
+  /** Fotografias a que falta pelo menos uma derivada ESSENCIAL: as que doem. */
+  semMiniatura: number;
+  /** Fotografias sem a versão AVIF. Funcionam; só pesam mais. */
+  semVersaoLeve: number;
+  /** Derivadas em falta ao todo — é este o trabalho que a geração tem pela frente. */
   emFalta: number;
 }
 
 export interface Contagem {
   linhas: LinhaDeContagem[];
   fotos: number;
+  /** Derivadas em falta ao todo (essenciais + leves). O trabalho a fazer. */
   emFalta: number;
+  /** Só as essenciais. É este o número da avaria. */
+  emFaltaEssenciais: number;
+  /** Só as leves (AVIF). É este o número do ganho por cobrar. */
+  emFaltaLeves: number;
+  /** Quantas FOTOGRAFIAS estão a servir o original por falta de miniatura. */
+  fotosSemMiniatura: number;
+  /** Quantas FOTOGRAFIAS ainda não têm a versão leve. */
+  fotosSemVersaoLeve: number;
   /** Buckets que não deu para listar — ditos, não escondidos. */
   avisos: string[];
 }
@@ -267,12 +324,27 @@ export interface Contagem {
  */
 export async function contarDerivadasEmFalta(): Promise<Contagem> {
   const sb = getSupabase();
-  if (!sb) return { linhas: [], fotos: 0, emFalta: 0, avisos: ["Storage não configurado."] };
+  if (!sb) {
+    return {
+      linhas: [],
+      fotos: 0,
+      emFalta: 0,
+      emFaltaEssenciais: 0,
+      emFaltaLeves: 0,
+      fotosSemMiniatura: 0,
+      fotosSemVersaoLeve: 0,
+      avisos: ["Storage não configurado."],
+    };
+  }
 
   const linhas: LinhaDeContagem[] = [];
   const avisos: string[] = [];
   let fotos = 0;
   let emFalta = 0;
+  let emFaltaEssenciais = 0;
+  let emFaltaLeves = 0;
+  let fotosSemMiniatura = 0;
+  let fotosSemVersaoLeve = 0;
 
   for (const familia of FAMILIAS) {
     let asPastas: string[];
@@ -286,23 +358,56 @@ export async function contarDerivadasEmFalta(): Promise<Contagem> {
       const caminhos = await ficheiros(sb, familia.origem, pasta);
       if (caminhos.length === 0) continue;
       fotos += caminhos.length;
+
+      // Conjuntos, e não somas: uma fotografia sem miniatura E sem micro está
+      // mal UMA vez, não duas. Somar contava-a duas e dava um número maior do
+      // que o total de fotografias — que é como se perde a confiança num
+      // painel.
+      const semMiniatura = new Set<string>();
+      const semVersaoLeve = new Set<string>();
+      let daPasta = 0;
+
       for (const derivada of familia.derivadas) {
         const jaLa = new Set(await ficheiros(sb, derivada.bucket, pasta).catch(() => []));
-        const faltam = caminhos.filter((c) => !jaLa.has(c)).length;
-        emFalta += faltam;
-        linhas.push({
-          origem: familia.origem,
-          destino: derivada.bucket,
-          pasta,
-          fotos: caminhos.length,
-          emFalta: faltam,
-        });
+        const faltam = caminhos.filter((c) => !jaLa.has(c));
+        daPasta += faltam.length;
+        if (derivada.papel === "essencial") {
+          emFaltaEssenciais += faltam.length;
+          for (const c of faltam) semMiniatura.add(c);
+        } else {
+          emFaltaLeves += faltam.length;
+          for (const c of faltam) semVersaoLeve.add(c);
+        }
       }
+
+      emFalta += daPasta;
+      fotosSemMiniatura += semMiniatura.size;
+      fotosSemVersaoLeve += semVersaoLeve.size;
+      if (daPasta === 0) continue;
+      linhas.push({
+        origem: familia.origem,
+        pasta,
+        fotos: caminhos.length,
+        semMiniatura: semMiniatura.size,
+        semVersaoLeve: semVersaoLeve.size,
+        emFalta: daPasta,
+      });
     }
   }
 
-  linhas.sort((a, b) => b.emFalta - a.emFalta);
-  return { linhas, fotos, emFalta, avisos };
+  // As que doem primeiro, e só depois as que pesam: a ordem da lista é a ordem
+  // por que se resolve.
+  linhas.sort((a, b) => b.semMiniatura - a.semMiniatura || b.emFalta - a.emFalta);
+  return {
+    linhas,
+    fotos,
+    emFalta,
+    emFaltaEssenciais,
+    emFaltaLeves,
+    fotosSemMiniatura,
+    fotosSemVersaoLeve,
+    avisos,
+  };
 }
 
 export interface ResultadoDoLote {
@@ -310,6 +415,13 @@ export interface ResultadoDoLote {
   falhas: string[];
   /** Quantas ficaram por fazer depois deste lote. Zero = acabou. */
   restantes: number;
+  /** Destas, quantas são ESSENCIAIS — as fotografias que ainda servem o
+   *  original. Zero com `restantes` a sobrar quer dizer que a avaria está
+   *  resolvida e o que falta é só o ganho. */
+  restantesEssenciais: number;
+  /** O papel do que este lote esteve a fazer, para o ecrã poder dizê-lo em vez
+   *  de anunciar «miniaturas» enquanto gera AVIF. */
+  papel: Papel | null;
 }
 
 /**
@@ -320,37 +432,63 @@ export interface ResultadoDoLote {
  * falhe não pára as outras — uma execução que morre à terceira de quatrocentas
  * obriga a recomeçar, e recomeçar é o que faz ninguém correr isto.
  */
-export async function gerarLoteDeDerivadas(): Promise<ResultadoDoLote> {
+export async function gerarLoteDeDerivadas(soPapel?: Papel): Promise<ResultadoDoLote> {
   const sb = getSupabase();
-  if (!sb) return { geradas: 0, falhas: ["Storage não configurado."], restantes: 0 };
+  if (!sb) {
+    return {
+      geradas: 0,
+      falhas: ["Storage não configurado."],
+      restantes: 0,
+      restantesEssenciais: 0,
+      papel: null,
+    };
+  }
 
   const falhas: string[] = [];
   let geradas = 0;
   let restantes = 0;
+  let restantesEssenciais = 0;
+  let papel: Papel | null = null;
 
-  for (const familia of FAMILIAS) {
-    let asPastas: string[];
-    try {
-      asPastas = await pastas(sb, familia.origem);
-    } catch {
-      continue;
-    }
-    for (const pasta of asPastas) {
-      const caminhos = await ficheiros(sb, familia.origem, pasta);
-      if (caminhos.length === 0) continue;
-      for (const derivada of familia.derivadas) {
-        const jaLa = new Set(await ficheiros(sb, derivada.bucket, pasta).catch(() => []));
-        const faltam = caminhos.filter((c) => !jaLa.has(c));
-        for (const caminho of faltam) {
-          if (geradas >= LOTE) {
-            // Já se fez o lote: daqui para a frente só se CONTA, para quem
-            // chama saber se vale a pena voltar.
-            restantes += 1;
-            continue;
+  // DUAS passagens, e não uma: primeiro tudo o que é essencial na biblioteca
+  // inteira, e só depois o AVIF. Ver `Papel` — parar a meio tem de deixar as
+  // coisas melhores do que estavam, e não meio-arranjadas de um lado e
+  // intactas do outro.
+  for (const passagem of ["essencial", "leve"] as const) {
+    // `soPapel` é o que deixa arranjar a avaria sem esperar pelo ganho: as
+    // miniaturas de toda a biblioteca são um punhado de lotes; o AVIF são 683
+    // fotografias vezes duas codificações caras. Obrigá-la a esperar por um
+    // para ter o outro era transformar uma correcção de dois minutos numa
+    // tarde. Sem argumento, faz tudo — pela ordem certa.
+    if (soPapel && passagem !== soPapel) continue;
+    for (const familia of FAMILIAS) {
+      if (!familia.derivadas.some((d) => d.papel === passagem)) continue;
+      let asPastas: string[];
+      try {
+        asPastas = await pastas(sb, familia.origem);
+      } catch {
+        continue;
+      }
+      for (const pasta of asPastas) {
+        const caminhos = await ficheiros(sb, familia.origem, pasta);
+        if (caminhos.length === 0) continue;
+        for (const derivada of familia.derivadas) {
+          if (derivada.papel !== passagem) continue;
+          const jaLa = new Set(await ficheiros(sb, derivada.bucket, pasta).catch(() => []));
+          const faltam = caminhos.filter((c) => !jaLa.has(c));
+          for (const caminho of faltam) {
+            if (geradas >= LOTE) {
+              // Já se fez o lote: daqui para a frente só se CONTA, para quem
+              // chama saber se vale a pena voltar.
+              restantes += 1;
+              if (passagem === "essencial") restantesEssenciais += 1;
+              continue;
+            }
+            papel = passagem;
+            const r = await gerarUma(sb, familia.origem, caminho, derivada);
+            if (r) geradas += 1;
+            else falhas.push(`${derivada.bucket}/${caminho}`);
           }
-          const r = await gerarUma(sb, familia.origem, caminho, derivada);
-          if (r) geradas += 1;
-          else falhas.push(`${derivada.bucket}/${caminho}`);
         }
       }
     }
@@ -359,7 +497,7 @@ export async function gerarLoteDeDerivadas(): Promise<ResultadoDoLote> {
   if (falhas.length > 0) {
     log.warn("derivadas: algumas não foram geradas", { quantas: falhas.length });
   }
-  return { geradas, falhas, restantes };
+  return { geradas, falhas, restantes, restantesEssenciais, papel };
 }
 
 async function gerarUma(
