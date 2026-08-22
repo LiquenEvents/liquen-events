@@ -762,6 +762,116 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
   });
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * JUNTAR DOIS TEMAS DUPLICADOS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «"Clássico Intemporal" aparece duas vezes com nomes quase
+ * iguais — não tenho como os juntar».
+ *
+ * O ciclo está preso em `FundirTemas.test.tsx`; o que se prende AQUI é a
+ * ligação: que a acção existe nos dois desenhos do cartão (o do rato e o do
+ * dedo) e que o que o servidor responde chega à lista sem recarregar a página.
+ */
+describe("Biblioteca de Temas — juntar temas duplicados", () => {
+  const dois = () =>
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Clássico Intemporal", imageCount: 3 },
+        { ...THEME, id: "t2", name: "Intemporal Clássico", imageCount: 12 },
+      ]),
+    );
+
+  /**
+   * O comentário do `accoesDoTema` promete que os dois desenhos do cartão
+   * mostram a MESMA lista. Enquanto os ícones do rato eram escritos à mão, a
+   * promessa era só um comentário — e partiu-se na primeira acção nova.
+   */
+  it("a acção existe no desenho do rato e no do dedo", async () => {
+    dois();
+    renderTemas();
+    await acharCartaoDoTema(/Clássico Intemporal/);
+    // O do rato: um botão por cartão, com o rótulo por extenso.
+    expect(screen.getAllByRole("button", { name: "Juntar a outro tema…" })).toHaveLength(2);
+    // O do dedo: dentro do «⋯», que é o mesmo `accoesDoTema`.
+    const menus = screen.getAllByRole("button", { name: /Acções de Clássico Intemporal/ });
+    fireEvent.click(menus[0]);
+    expect(
+      screen.getAllByRole("menuitem", { name: "Juntar a outro tema…" }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("a origem sai da lista e o destino soma as fotos", async () => {
+    dois();
+    renderTemas();
+    await acharCartaoDoTema(/Clássico Intemporal/);
+    fireEvent.click(screen.getAllByRole("button", { name: "Juntar a outro tema…" })[0]);
+
+    route("POST /api/temas/t1/fundir", () =>
+      ok({
+        ok: true,
+        moved: 3,
+        existing: 0,
+        failed: 0,
+        thumbsMissing: 0,
+        nextOffset: 0,
+        done: true,
+        leftBehind: 0,
+        archived: true,
+      }),
+    );
+    fireEvent.click(await screen.findByRole("radio", { name: /Intemporal Clássico/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Juntar os temas" }));
+    // Sem `tick`: este bloco corre com o relógio a sério (os relógios falsos
+    // são de outros `describe`), e o que se espera é só que as promessas do
+    // `fetch` assentem.
+    await act(async () => {});
+    await act(async () => {});
+
+    // Arquivado sai da vista principal; o destino passa a 15.
+    expect(haCartaoDoTema(/Clássico Intemporal/)).toBe(false);
+    expect(screen.getByText(/15 fotos/)).toBeTruthy();
+  });
+
+  /**
+   * A RAZÃO DE O TEMA NÃO TER DESAPARECIDO.
+   *
+   * Uma foto que já está no destino fica na origem, e por isso a origem não é
+   * arquivada. Sem o dizer, ela vê o tema na lista e conclui que falhou.
+   */
+  it("diz porque é que a origem ficou, quando ficou", async () => {
+    dois();
+    renderTemas();
+    await acharCartaoDoTema(/Clássico Intemporal/);
+    fireEvent.click(screen.getAllByRole("button", { name: "Juntar a outro tema…" })[0]);
+
+    route("POST /api/temas/t1/fundir", () =>
+      ok({
+        ok: true,
+        moved: 1,
+        existing: 2,
+        failed: 0,
+        thumbsMissing: 0,
+        nextOffset: 2,
+        done: true,
+        leftBehind: 2,
+        archived: false,
+      }),
+    );
+    fireEvent.click(await screen.findByRole("radio", { name: /Intemporal Clássico/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Juntar os temas" }));
+    // Sem `tick`: este bloco corre com o relógio a sério (os relógios falsos
+    // são de outros `describe`), e o que se espera é só que as promessas do
+    // `fetch` assentem.
+    await act(async () => {});
+    await act(async () => {});
+
+    expect(haCartaoDoTema(/Clássico Intemporal/)).toBe(true);
+    expect(screen.getByText(/2 fotos já estavam em/)).toBeTruthy();
+  });
+});
+
 describe("Biblioteca de Temas — as fotos aparecem enquanto sobem", () => {
   it("a foto entra na grelha ANTES de o servidor responder, vinda do ficheiro dela", async () => {
     route("GET /api/temas", () => ok([THEME]));

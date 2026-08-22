@@ -114,7 +114,14 @@ export const updateTheme = (
   patch: Partial<
     Pick<
       ProposalTheme,
-      "name" | "notes" | "coverPath" | "favorito" | "arquivado" | "kind" | "filterRule"
+      | "name"
+      | "notes"
+      | "coverPath"
+      | "photoOrder"
+      | "favorito"
+      | "arquivado"
+      | "kind"
+      | "filterRule"
     >
   >,
 ): Promise<ProposalTheme | null> => repo.update(id, patch);

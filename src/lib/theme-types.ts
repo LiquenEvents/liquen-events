@@ -342,3 +342,73 @@ export interface ThemeCopyResult {
    *  O tema de destino passa a puxar originais e é preciso dizê-lo. */
   thumbsMissing: number;
 }
+
+// ── Juntar dois temas num só ───────────────────────────────────────────────
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * FUNDIR TEMAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre a biblioteca: «há temas duplicados — "Itália" e
+ * "Italia", "Branco e verde" e "Branco & Verde" —, e a única saída é apagar um
+ * dos dois, que leva as fotos atrás».
+ *
+ * Fundir é uma composição do que já existe — mover cada foto para o outro tema
+ * (`transferThemeImage`, a mesma primitiva do «Copiar para…») — mais duas
+ * coisas que só uma fusão faz: juntar as notas e tirar da lista o tema que
+ * ficou vazio.
+ *
+ * ── O QUE NUNCA ACONTECE ────────────────────────────────────────────────
+ *
+ * Nenhuma fotografia é APAGADA. Nem uma. Isso deixa duas consequências à
+ * vista, e as duas são propositadas:
+ *
+ *  · uma foto que já esteja no destino com o mesmo nome de ficheiro FICA na
+ *    origem. É quase de certeza a mesma fotografia — desde o
+ *    `theme-fingerprint.ts` o nome É o resumo do conteúdo, e as antigas, de
+ *    nome UUID, só colidem se uma tiver saído da outra —, mas «quase de
+ *    certeza» não chega para apagar. O Storage responde 409 e ficamos por aí;
+ *  · por isso a origem pode não ficar vazia, e nesse caso NÃO é arquivada. O
+ *    relatório diz quantas ficaram e porquê, e apagar o tema continua a ser
+ *    uma decisão dela, no botão que já existe para isso.
+ *
+ * É lento de propósito: uma fusão que apaga fotos por dedução é uma fusão que
+ * um dia apaga a errada.
+ */
+
+/**
+ * Fotos por chamada de `POST /api/temas/[id]/fundir`.
+ *
+ * O mesmo 40 do `MAX_THEME_COPY_BATCH`, e pela mesma razão: são ~120 chamadas
+ * de Storage (a foto e as suas derivadas) e ZERO bytes a atravessar a função,
+ * o que cabe folgado nos 60 s de `maxDuration`.
+ */
+export const THEME_MERGE_BATCH = MAX_THEME_COPY_BATCH;
+
+/** O que uma chamada de `POST /api/temas/[id]/fundir` devolve. */
+export interface ThemeMergeBatch {
+  ok: true;
+  /** Foram mesmo para o destino, e saíram da origem. */
+  moved: number;
+  /** Já lá estavam com o mesmo nome de ficheiro. Ficaram na origem. */
+  existing: number;
+  /** Não foi possível levar — continuam na origem, intactas. */
+  failed: number;
+  /** Chegaram ao destino sem miniatura: esse tema passa a puxar originais. */
+  thumbsMissing: number;
+  /**
+   * Por onde a chamada seguinte continua a listar.
+   *
+   * As que SAEM encolhem a pasta e não contam; as que ficam (repetidas ou
+   * falhadas) têm de ser saltadas, senão a chamada seguinte tentava-as outra
+   * vez e a fusão nunca acabava.
+   */
+  nextOffset: number;
+  /** A pasta da origem acabou — não há mais nada para tentar. */
+  done: boolean;
+  /** Quantas fotos ficaram na origem no fim de tudo (só faz sentido com `done`). */
+  leftBehind: number;
+  /** A origem ficou vazia e saiu da lista. Ver `ThemeMergeBatch` acima. */
+  archived: boolean;
+}

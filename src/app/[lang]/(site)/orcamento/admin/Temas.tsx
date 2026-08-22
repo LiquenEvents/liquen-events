@@ -4,6 +4,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
 import PhotoLightbox from "./PhotoLightbox";
 import ThemeCopyDialog, { type ThemeCopyOutcome } from "./ThemeCopyDialog";
+import FundirTemas, { type ThemeMergeOutcome } from "./FundirTemas";
 import { downloadMany, downloadName, downloadOne } from "./photo-download";
 import {
   CHECK_CHUNK,
@@ -595,6 +596,17 @@ export default function Temas() {
       : base;
   }, [themes]);
   const [verArquivados, setVerArquivados] = useState(false);
+  /**
+   * ── O TEMA QUE ESTÁ A SER JUNTO A OUTRO ────────────────────────────────
+   *
+   * Palavras dela: «"Clássico Intemporal" aparece duas vezes com nomes quase
+   * iguais — não tenho como os juntar».
+   *
+   * Vive na LISTA e não dentro de uma pasta, porque é aqui que os duplicados
+   * se vêem: dois cartões lado a lado com o mesmo nome mal escrito de duas
+   * maneiras. Dentro de uma pasta não há com que comparar.
+   */
+  const [aFundir, setAFundir] = useState<ThemeSummary | null>(null);
   const [revendo, setRevendo] = useState(false);
   // Lidas depois do primeiro desenho, e não durante: o servidor não tem
   // `localStorage`, e ler ali daria um HTML diferente do que o browser desenha.
@@ -725,6 +737,31 @@ export default function Temas() {
           </svg>
         ),
         onAccao: () => alternarMarca(t, "arquivado"),
+      },
+      {
+        id: "fundir",
+        rotulo: "Juntar a outro tema…",
+        icone: (
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {/* Dois caminhos que se encontram num só — o desenho do que a acção
+                faz, e não uma pasta com uma seta (que é o que já significa
+                arquivar, aqui mesmo por cima). */}
+            <path d="M4 4c0 6 4 8 8 8s8 2 8 8" />
+            <path d="M20 4c0 6-4 8-8 8" />
+            <path d="m17 17 3 3-3 3" />
+          </svg>
+        ),
+        onAccao: () => setAFundir(t),
       },
     ],
     [alternarMarca],
@@ -888,6 +925,75 @@ export default function Temas() {
     );
   }, []);
 
+  /**
+   * ── DEPOIS DE JUNTAR DOIS TEMAS ────────────────────────────────────────
+   *
+   * A lista corrige-se sem recarregar: o destino ganha as fotos que chegaram,
+   * a origem fica com as que sobraram, e — se ficou vazia — sai da vista, que
+   * é o que o servidor já lhe fez.
+   *
+   * O relatório é um toast por assunto, e não uma frase com tudo lá dentro:
+   * «foram X» é a confirmação, «Y já lá estavam» é uma explicação de porque é
+   * que o tema não desapareceu, e «sem miniatura» é uma instrução. Três coisas
+   * diferentes numa linha só lêem-se como nenhuma.
+   */
+  const aplicarFusao = useCallback(
+    (r: ThemeMergeOutcome) => {
+      setAFundir(null);
+      setThemes((prev) =>
+        prev.map((t) => {
+          if (t.id === r.destId && t.imageCount !== null) {
+            return { ...t, imageCount: t.imageCount + r.moved };
+          }
+          if (t.id === r.sourceId) {
+            return {
+              ...t,
+              imageCount: r.leftBehind,
+              truncated: false,
+              ...(r.archived ? { arquivado: true } : {}),
+            };
+          }
+          return t;
+        }),
+      );
+      bibliotecaAlterada();
+      if (r.stopped) {
+        toast(
+          `Parou a meio — ${plural(r.moved, "foto passou", "fotos passaram")} para "${r.destName}". Podes continuar quando quiseres.`,
+          "info",
+        );
+        return;
+      }
+      if (r.moved === 0 && r.existing === 0 && r.failed === 0) {
+        toast(`"${r.sourceName}" não tinha fotos. Nada mudou.`, "info");
+      } else {
+        toast(
+          r.archived
+            ? `"${r.sourceName}" passou para "${r.destName}" e foi arquivado.`
+            : `${plural(r.moved, "foto passou", "fotos passaram")} para "${r.destName}".`,
+          "success",
+        );
+      }
+      // A razão de o tema não ter desaparecido. Sem isto, ela vê-o na lista com
+      // três fotos e conclui que a fusão falhou.
+      if (!r.archived && r.leftBehind > 0) {
+        toast(
+          r.failed > 0
+            ? `${plural(r.failed, "foto não saiu", "fotos não saíram")} de "${r.sourceName}". Tenta juntar outra vez.`
+            : `${plural(r.leftBehind, "foto já estava", "fotos já estavam")} em "${r.destName}" e ficou em "${r.sourceName}". Podes apagá-lo quando quiseres.`,
+          "info",
+        );
+      }
+      if (r.thumbsMissing > 0) {
+        toast(
+          `${plural(r.thumbsMissing, "foto chegou", "fotos chegaram")} a "${r.destName}" sem miniatura. Abre esse tema e usa "Gerar miniaturas em falta".`,
+          "info",
+        );
+      }
+    },
+    [toast],
+  );
+
   const open = themes.find((t) => t.id === openId) ?? null;
 
   /** Quantos temas estão arquivados — o que autoriza (ou não) mostrar o
@@ -956,6 +1062,14 @@ export default function Temas() {
 
   return (
     <div>
+      {aFundir && (
+        <FundirTemas
+          sourceTheme={aFundir}
+          themes={themes}
+          onClose={() => setAFundir(null)}
+          onDone={aplicarFusao}
+        />
+      )}
       {blocked && (
         <Card padding="sm" className="mb-6 border-[#8a6d2f]/30 bg-[#f6efe1]/60">
           {/* O título vem da causa: dizer "Falta um passo de instalação" a quem
@@ -1194,69 +1308,51 @@ export default function Temas() {
                   Nenhuma das duas apaga nada (arquivar é arrumar, não apagar —
                   daí não haver aqui nada marcado como destrutivo). */}
               <div className="absolute right-2 top-2 z-10 hidden com-rato:flex gap-1">
-                <button
-                  type="button"
-                  /* Sem o nome do tema no rótulo: o cartão está dentro de um
-                     grupo com esse nome, portanto quem usa leitor de ecrã já o
-                     ouviu — e repeti-lo aqui faria "Terracotta" identificar
-                     três botões diferentes no mesmo sítio. */
-                  aria-label={t.favorito ? "Desafixar" : "Fixar no topo"}
-                  aria-pressed={!!t.favorito}
-                  title={t.favorito ? "Desafixar" : "Fixar no topo"}
-                  onClick={() => alternarMarca(t, "favorito")}
-                  /* Um favorito JÁ FIXADO vê-se sempre — a estrela acesa é o
-                     que diz que está fixado, esconder--la apagava a informação.
-                     Por isso é ele que NÃO leva variante nenhuma: fica em
-                     `opacity-100` em toda a parte. Os outros escondem-se só
-                     onde há rato, que é onde o `group-hover` os pode trazer de
-                     volta. */
-                  className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm transition-opacity ${
-                    t.favorito
-                      ? "text-[#8a6d2f]"
-                      : "text-foreground/45 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
-                  }`}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill={t.favorito ? "currentColor" : "none"}
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                  >
-                    <path
-                      d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8Z"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  aria-label={t.arquivado ? "Repor na lista" : "Arquivar"}
-                  title={t.arquivado ? "Repor na lista" : "Arquivar (não apaga nada)"}
-                  onClick={() => alternarMarca(t, "arquivado")}
-                  className="alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 text-foreground/45 backdrop-blur-sm transition-opacity opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                  >
-                    {t.arquivado ? (
-                      <path d="M12 19V7m0 0-4 4m4-4 4 4M4 4h16" strokeLinecap="round" />
-                    ) : (
-                      <>
-                        <path d="M4 8h16v11H4z" strokeLinejoin="round" />
-                        <path d="M3 4h18v4H3zM10 12h4" strokeLinecap="round" />
-                      </>
-                    )}
-                  </svg>
-                </button>
+                {/* ── UMA LISTA, DOIS DESENHOS ──────────────────────────
+                    Isto era escrito à mão: duas acções copiadas do
+                    `accoesDoTema` para aqui, ícone a ícone. A promessa («é a
+                    MESMA lista, e nenhum dos dois desenhos pode ganhar uma
+                    acção que o outro não tenha») era só um comentário — e
+                    partiu-se no minuto em que a lista ganhou o «Juntar a outro
+                    tema…», que passou a existir no menu do dedo e não aqui.
+
+                    Agora é mesmo a mesma lista, percorrida. O que era especial
+                    na estrela continua a sê-lo, mas por uma regra escrita e
+                    não por uma cópia: ver `fixar`. */}
+                {accoesDoTema(t).map((a) => {
+                  const fixar = a.id === "favorito";
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      /* Sem o nome do tema no rótulo: o cartão está dentro de um
+                         grupo com esse nome, portanto quem usa leitor de ecrã já
+                         o ouviu — e repeti-lo aqui faria "Terracotta" identificar
+                         três botões diferentes no mesmo sítio. */
+                      aria-label={a.rotulo}
+                      aria-pressed={fixar ? !!t.favorito : undefined}
+                      title={
+                        a.id === "arquivar" && !t.arquivado ? "Arquivar (não apaga nada)" : a.rotulo
+                      }
+                      onClick={a.onAccao}
+                      /* Um favorito JÁ FIXADO vê-se sempre — a estrela acesa é o
+                         que diz que está fixado, escondê-la apagava a informação.
+                         Por isso é ele que NÃO leva variante nenhuma: fica em
+                         `opacity-100` em toda a parte. Os outros escondem-se só
+                         onde há rato, que é onde o `group-hover` os pode trazer
+                         de volta. */
+                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm transition-opacity ${
+                        fixar && t.favorito
+                          ? "text-[#8a6d2f]"
+                          : "text-foreground/45 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
+                      }`}
+                    >
+                      {a.icone}
+                    </button>
+                  );
+                })}
               </div>
-              {/* Sem rato: um «⋯» só, com as mesmas duas acções lá dentro.
+              {/* Sem rato: um «⋯» só, com as MESMAS acções lá dentro.
                   O `absolute` vai numa caixa à volta e não no próprio
                   `MenuDeAccoes`: ele já se dá a si mesmo um `relative` (é o que
                   ancora a gaveta) e, entre dois utilitários de `position` na
