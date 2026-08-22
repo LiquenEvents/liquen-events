@@ -2090,6 +2090,8 @@ function ThemeFolder({
    *  contagem verdadeira. `null` = nada a acontecer. */
   const [emBloco, setEmBloco] = useState<AccaoEmBloco | null>(null);
   const [coverPath, setCoverPath] = useState<string | undefined>(theme.coverPath);
+  /** Quantas arrumações da grelha já foram mandadas — ver `persistOrder`. */
+  const ordemMandada = useRef(0);
   const [name, setName] = useState(theme.name);
   const [renaming, setRenaming] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -2972,7 +2974,16 @@ function ThemeFolder({
         }.`,
         "error",
       );
-    } else if (targets.length > 1) {
+    } else {
+      // TAMBÉM QUANDO É UMA SÓ. O `targets.length > 1` que aqui estava não era
+      // uma decisão — era o resto de uma frase escrita a pensar no bloco, e
+      // deixava o gesto mais comum de todos mudo.
+      //
+      // O buraco na grelha não serve de resposta: a remoção é OTIMISTA, a
+      // célula sai no instante do clique e o servidor só responde depois. Quem
+      // prova a diferença é o ramo de cima — quando ele recusa, a foto volta ao
+      // sítio onde estava. Sem esta frase, ver a foto sair não distingue «foi
+      // removida» de «ainda vai a caminho».
       toast(`${plural(targets.length, "foto removida", "fotos removidas")}.`, "success");
     }
   }
@@ -3038,8 +3049,13 @@ function ThemeFolder({
    * data, atrás delas. É o que faz "pôr as boas à frente" custar meia dúzia de
    * caminhos em vez de uma cópia do catálogo.
    */
-  async function persistOrder(next: ThemeImage[], previous: ThemeImage[]) {
+  async function persistOrder(next: ThemeImage[], previous: ThemeImage[], destino: number) {
     const oQue = `guardar a nova ordem das fotos de "${theme.name}"`;
+    // SÓ A ÚLTIMA ARRUMAÇÃO FALA. Cada Alt+seta é um PATCH seu, e cinco toques
+    // seguidos a empurrar a mesma foto davam cinco avisos iguais empilhados —
+    // ruído que ensina a não ler os avisos. O número diz qual é a arrumação
+    // mais recente; as que ficaram para trás guardam-se na mesma, caladas.
+    const minha = ++ordemMandada.current;
     /** A ordem volta ao que estava — e a frase diz que voltou. Mostrar uma
      *  arrumação que o servidor não guardou seria mentir-lhe até ao próximo
      *  recarregamento; deixá-la voltar sem aviso é pior ainda, porque ela vê a
@@ -3060,7 +3076,23 @@ function ThemeFolder({
       reverter(porqueRebentou(oQue).mensagem);
       return;
     }
-    if (res.ok) return;
+    if (res.ok) {
+      // O QUE NÃO SE VÊ É O SERVIDOR. A foto salta para o lugar novo no
+      // instante do arrasto — o que ficava por dizer era se a arrumação lá
+      // ficou, e a única pista era a grelha saltar para trás quando falhava.
+      // Um ecrã que só fala quando corre mal é um ecrã em que o silêncio não
+      // quer dizer nada.
+      //
+      // E diz a POSIÇÃO: numa grelha de sessenta fotos iguais, «ordem
+      // guardada» não deixa reconhecer o gesto que foi mesmo guardado.
+      if (alive.current && minha === ordemMandada.current) {
+        toast(
+          `Ordem guardada — a foto ficou na posição ${destino + 1} de ${next.length}.`,
+          "success",
+        );
+      }
+      return;
+    }
     const data = await res.json().catch(() => null);
     // A queixa da instalação por acabar (`db/schema.sql`) passa inteira: é uma
     // instrução para quem monta isto, e nenhuma frase nossa a substitui.
@@ -3078,7 +3110,7 @@ function ThemeFolder({
     setImages((prev) => {
       const next = moveItem(prev, from, to);
       if (next === prev) return prev;
-      void persistOrder(next, prev);
+      void persistOrder(next, prev, to);
       return next;
     });
   }
@@ -3143,7 +3175,13 @@ function ThemeFolder({
     setCoverPath(im.path);
     onCover(im.path, im.thumbUrl || im.url);
     clearSelection();
-    toast("Capa do tema definida.", "success");
+    // AQUI NÃO SE DIZ NADA, e é de propósito. A capa só muda depois de o
+    // servidor confirmar, e o que ele confirmou aparece na própria foto que ela
+    // escolheu — a etiqueta «Capa» no canto da célula, mais a barra da seleção
+    // a desaparecer. Um aviso a dizer o que já está à frente dos olhos é ruído,
+    // e é a mesma decisão que a estrela dos temas já tinha: o `alternarMarca`
+    // avisa ao arquivar (o cartão sai da lista) e cala-se ao fixar (a estrela
+    // acende-se à vista).
   }
 
   async function rename() {
@@ -3157,7 +3195,10 @@ function ThemeFolder({
       return;
     }
     renamingBusy.current = true;
-    const oQue = `mudar "${theme.name}" para "${trimmed}"`;
+    // O nome antigo fica guardado aqui: depois do `onRename` a lista lá fora já
+    // mudou, e a frase precisa dos DOIS nomes para dizer o que mudou.
+    const antigo = theme.name;
+    const oQue = `mudar "${antigo}" para "${trimmed}"`;
     /** O campo volta ao nome antigo — e a frase diz que voltou, senão ela lê o
      *  nome antigo no cabeçalho e julga que escreveu no sítio errado. */
     const reverter = (falha: Falha) => {
@@ -3182,7 +3223,11 @@ function ThemeFolder({
         return;
       }
       onRename(trimmed);
-      toast("Tema renomeado.", "success");
+      // COM OS DOIS NOMES, como o renomear que se faz a partir da lista
+      // (`renomearDaLista`) já dizia. «Tema renomeado.» obrigava a ir conferir
+      // ao cabeçalho se o que lá ficou era mesmo o que ela escreveu — e com
+      // seis pastas abertas em separadores diferentes, nem dizia qual.
+      toast(`"${antigo}" passou a "${trimmed}"`, "success");
     } finally {
       renamingBusy.current = false;
       setRenaming(false);

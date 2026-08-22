@@ -6832,3 +6832,199 @@ describe("acções irreversíveis: pergunta ou anulação, nunca nada", () => {
     expect(await screen.findByRole("button", { name: /Gerar e enviar ao cliente/ })).toBeTruthy();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE MUDOU, DITO ONDE O GESTO FOI FEITO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Quatro acções do estúdio corriam bem e deixavam a pessoa na dúvida: o
+ * resultado acontecia FORA do sítio onde ela carregou — a meio de um documento
+ * de catorze páginas, dentro de uma secção fechada, ou em lado nenhum que se
+ * visse.
+ *
+ * A régua destes testes é a mesma da casa: a frase diz o que MUDOU, com o
+ * número do que mudou mesmo — nunca o do que foi pedido.
+ */
+describe("o estúdio diz o que mudou quando não se vê", () => {
+  it("inserir um bloco de modelo diz em que página do PDF ele calhou", async () => {
+    // O bloco entra no FIM do array; o PDF sai pela ordem dos Serviços, e por
+    // isso ele aterra em PRIMEIRO. É exactamente essa diferença que não se vê.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [
+          { letter: "a)", title: "Cerimónia", items: [{ label: "Igreja" }] },
+          { letter: "b)", title: "Jantar", items: [{ label: "Mesas" }] },
+        ],
+        moodBoards: [{ title: "Jantar", annotation: "", images: ["q1/jantar-1.jpg"] }],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+    // As fotos do modelo já são deste pedido — não há recópia a fazer, e o que
+    // se está a medir é só a frase.
+    modelosServidor = [
+      {
+        id: "mb1",
+        nome: "Cerimónia",
+        tipo: "moodboard",
+        moodboard: { title: "Cerimónia", annotation: "", images: ["q1/cerimonia-1.jpg"] },
+      },
+    ];
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click((await screen.findAllByRole("button", { name: /De um modelo…/ }))[0]);
+    await user.click(await screen.findByRole("button", { name: "Cerimónia" }));
+
+    expect(
+      await screen.findByText("«Cerimónia» entrou como a 1.ª das 2 páginas de inspiração do PDF."),
+    ).toBeTruthy();
+  });
+
+  it("«Arrumar eu» conta as linhas que MUDARAM de sítio, não as que existem", async () => {
+    // Três linhas, e só duas trocam de lugar: a Cerimónia já estava no sítio.
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [
+          { letter: "a)", title: "Cerimónia", items: [{ label: "Igreja" }] },
+          { letter: "b)", title: "Jantar", items: [{ label: "Mesas" }] },
+          { letter: "c)", title: "Bolo", items: [{ label: "Bolo de noiva" }] },
+        ],
+        moodBoards: [],
+        budgetItems: ["Decor Cerimónia", "Decor Bolo", "Decor Jantar"],
+        budgetAmounts: [100, 200, 300],
+        coverImages: ["", ""],
+        totalAmount: 600,
+        totalVatMode: "acrescer",
+      }),
+    );
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click((await screen.findAllByRole("button", { name: "Arrumar eu" }))[0]);
+
+    expect(
+      await screen.findByText(
+        "2 linhas do orçamento mudaram de sítio. Daqui para a frente manda a ordem que aqui está.",
+      ),
+    ).toBeTruthy();
+    // «3 linhas» seria a mentira pequena: é o tamanho da lista, não o do que
+    // se mexeu.
+    expect(screen.queryByText(/3 linhas do orçamento/)).toBeNull();
+    // As páginas de inspiração não entram na frase quando não há nenhuma a
+    // mexer — um zero na conta é ruído.
+    expect(screen.queryByText(/páginas de inspiração/)).toBeNull();
+  });
+
+  it("corrigir UMA gralha diz que palavra ficou escrita, e em que campo", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [{ letter: "a)", title: "Decoração", items: [{ label: "Cerimónia" }] }],
+        moodBoards: [],
+        budgetItems: ["Decor Cerimonia"],
+        budgetAmounts: [100],
+        coverImages: ["", ""],
+        totalAmount: 100,
+        totalVatMode: "acrescer",
+      }),
+    );
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^3\s*Enviar$/ }));
+    await user.click(await screen.findByRole("button", { name: "Corrigir" }));
+
+    // A palavra muda numa linha do orçamento que está no passo 1 — fora do
+    // ecrã. O que se vê aqui é a linha sair da lista, e isso não diz o que
+    // ficou escrito lá.
+    expect(
+      await screen.findByText("«Cerimonia» passou a «Cerimónia» — Orçamento · linha 1."),
+    ).toBeTruthy();
+  });
+
+  it("o «Tentar» de uma célula sem fotografia diz quando também não deu", async () => {
+    seedDraft(1);
+    assetsFalham = true;
+    renderStudio();
+
+    await user_clicarNoTentar();
+    // Falha outra vez: a célula volta EXACTAMENTE ao que era antes do clique,
+    // e sem esta frase isso é indistinguível de um botão que não faz nada.
+    expect(
+      await screen.findByText(
+        "Também não deu desta vez. As fotografias estão guardadas — é a lista que não vem.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("duplicar um mood board diz QUAL foi e em que página caiu a cópia", async () => {
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        template: "decoracao",
+        ref: "PO Decoração",
+        clientNames: "Maria & Zé",
+        eventType: "Casamento",
+        eventDate: "12 de setembro de 2026",
+        location: "Évora",
+        guests: "80 pax",
+        serviceGroups: [
+          { letter: "a)", title: "Cerimónia", items: [{ label: "Igreja" }] },
+          { letter: "b)", title: "Jantar", items: [{ label: "Mesas" }] },
+        ],
+        moodBoards: [
+          { title: "Cerimónia", annotation: "", images: ["q1/c1.jpg"] },
+          { title: "Jantar", annotation: "", images: ["q1/j1.jpg"] },
+        ],
+        budgetItems: [],
+        coverImages: ["", ""],
+        totalAmount: 3000,
+        totalVatMode: "acrescer",
+      }),
+    );
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Duplicar o mood board 1" }));
+
+    // O botão é um ícone de 28 px repetido em cada cartão, e o cartão é alto:
+    // a cópia nasce abaixo da dobra. «Mood board duplicado.» não dizia nem
+    // qual deles nem onde.
+    expect(
+      await screen.findByText(
+        "«Cerimónia» duplicado — a cópia é a 2.ª das 3 páginas de inspiração do PDF.",
+      ),
+    ).toBeTruthy();
+  });
+
+  /** O botão da célula que não tem URL nenhum para mostrar. */
+  async function user_clicarNoTentar() {
+    const botao = (
+      await screen.findAllByRole("button", { name: /Ir buscar outra vez as fotografias/i })
+    )[0];
+    await userEvent.click(botao);
+  }
+});

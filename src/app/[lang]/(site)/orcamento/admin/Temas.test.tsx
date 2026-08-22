@@ -2401,3 +2401,118 @@ describe("criar um tema com a instalação por acabar", () => {
     expect(screen.getByText(/db\/schema\.sql/)).toBeInTheDocument();
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE MUDOU DIZ-SE — E SÓ QUANDO NÃO SE VÊ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A regra da casa é não deixar ninguém sem saber se alguma coisa aconteceu. O
+ * corolário é o que estes testes prendem: **quando o resultado não é visível no
+ * sítio do gesto, tem de ser dito** — e quando é visível, cala-se, porque um
+ * aviso a confirmar o que está à frente dos olhos ensina a ignorar avisos.
+ *
+ * Três gestos desta pasta ficavam do lado errado da linha, e o quarto ficava do
+ * outro.
+ */
+describe("a pasta de um tema diz o que mudou", () => {
+  it("remover UMA foto confirma, tal como remover várias", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 2 }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 2, true), total: 2 }));
+    route("DELETE /api/temas/t1/imagens", () => ok({ ok: true }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Remover foto 1 de 2" }));
+    });
+
+    // O buraco na grelha aparece no instante do clique, muito antes de o
+    // servidor responder: é a frase que diz que a remoção PEGOU.
+    expect(await screen.findByText("1 foto removida.")).toBeInTheDocument();
+    // E o número é o das que saíram mesmo — não o das que estavam na grelha.
+    expect(screen.queryByText("2 fotos removidas.")).toBeNull();
+  });
+
+  it("reordenar diz que a nova ordem ficou guardada, e em que lugar", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 3 }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 3, true), total: 3 }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Mover a foto 2 para o início" }));
+    });
+
+    // A foto salta para o lugar novo no instante do arrasto; o que não se via
+    // era se o servidor tinha ficado com ela lá.
+    expect(
+      await screen.findByText("Ordem guardada — a foto ficou na posição 1 de 3."),
+      "reordenar continua a ser mudo quando corre bem",
+    ).toBeInTheDocument();
+  });
+
+  it("uma segunda arrumação não empilha um segundo aviso igual", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 3 }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 3, true), total: 3 }));
+    hold("PATCH /api/temas/t1");
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    // Duas setas seguidas na mesma foto — o gesto de quem a empurra para o
+    // fim da grelha. As duas gravam; só a ÚLTIMA fala.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Mover a foto 2 para o início" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Mover a foto 3 para o início" }));
+    });
+    await releaseAll("PATCH /api/temas/t1");
+
+    expect(screen.queryByText("Ordem guardada — a foto ficou na posição 1 de 3.")).not.toBeNull();
+    expect(
+      screen.queryAllByText("Ordem guardada — a foto ficou na posição 1 de 3."),
+      "dois avisos iguais empilhados é o ruído que ensina a não os ler",
+    ).toHaveLength(1);
+  });
+
+  it("renomear dentro da pasta cita o nome novo, como o renomear da lista", async () => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: [], total: 0 }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Terracotta" }));
+    const campo = screen.getByLabelText("Nome do tema");
+    fireEvent.change(campo, { target: { value: "Itália" } });
+    await act(async () => {
+      fireEvent.keyDown(campo, { key: "Enter" });
+    });
+
+    expect(await screen.findByText('"Terracotta" passou a "Itália"')).toBeInTheDocument();
+    // A frase antiga não dizia QUAL tema nem o que lá ficou escrito.
+    expect(screen.queryByText("Tema renomeado.")).toBeNull();
+  });
+
+  it("definir a capa NÃO diz nada — a etiqueta aparece na própria foto", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, imageCount: 2 }]));
+    route("GET /api/temas/t1/imagens", () => ok({ ok: true, images: many(1, 2, true), total: 2 }));
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 2 de 2" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Definir como capa" }));
+    });
+
+    // O resultado está à vista, no sítio do gesto: a etiqueta na célula.
+    expect(await screen.findByText("Capa")).toBeInTheDocument();
+    // E por isso não há aviso nenhum a repetir o que já se lê.
+    expect(screen.queryByText("Capa do tema definida.")).toBeNull();
+  });
+});

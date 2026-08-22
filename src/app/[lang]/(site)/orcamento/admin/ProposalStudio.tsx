@@ -2218,7 +2218,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // parcial traz fotos de outro pedido e elas são recopiadas para cá. Sem uma
   // segunda leitura, as células ficavam sem miniatura até recarregar a página.
   const hidratarAssets = useCallback(
-    async (vivo: () => boolean = () => true) => {
+    async (vivo: () => boolean = () => true): Promise<EstadoDosUrls> => {
       {
         // «A caminho» também no reenvio: uma segunda tentativa que aparecesse
         // como «falhou» até responder era um botão que parece não fazer nada.
@@ -2234,18 +2234,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               estado: res.status,
             });
             if (vivo()) setEstadoDosUrls("falhou");
-            return;
+            return "falhou";
           }
           const data = await res.json().catch(() => null);
           const imgs: { path: string; url: string; thumbUrl?: string; cor?: string }[] =
             Array.isArray(data?.images) ? data.images : [];
-          if (!vivo()) return;
+          // Saiu de cena a meio: não há veredicto nenhum a dar a ninguém.
+          if (!vivo()) return "a-caminho";
           // Zero fotografias É uma resposta: uma proposta sem fotos nenhumas
           // não tem células, e um pedido que respondeu vazio não é um pedido
           // que falhou.
           if (imgs.length === 0) {
             setEstadoDosUrls("pronto");
-            return;
+            return "pronto";
           }
           /**
            * O guardado só conta se ainda for um candidato: um URL que uma
@@ -2285,17 +2286,42 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             return next;
           });
           setEstadoDosUrls("pronto");
+          return "pronto";
         } catch (e) {
           // Offline, ou o Storage em baixo. O estúdio continua a servir para
           // carregar fotos — o que não continua a servir é fingir que as que já
           // lá estão simplesmente não existem.
           log.warn("estúdio: não deu para ir buscar as fotografias", { erro: String(e) });
           if (vivo()) setEstadoDosUrls("falhou");
+          return "falhou";
         }
       }
     },
     [quote.id],
   );
+
+  /**
+   * O «Tentar» de uma célula que não carregou.
+   *
+   * ── QUANDO RESULTA, NÃO SE DIZ NADA ───────────────────────────────────────
+   * A fotografia aparece na própria célula onde ela carregou. Um aviso a dizer
+   * «pronto» por cima de uma foto que já se vê é ruído.
+   *
+   * ── QUANDO NÃO RESULTA, TEM DE SE DIZER ───────────────────────────────────
+   * E era este o buraco: falhar outra vez devolve exactamente a mesma caixa
+   * cinzenta de antes do clique — indistinguível de um botão que não fez nada.
+   * Ela carregava três, quatro vezes, sem maneira de saber se estava a pedir
+   * alguma coisa ao servidor.
+   */
+  const tentarBuscarFotos = useCallback(async () => {
+    const fim = await hidratarAssets();
+    if (fim === "falhou") {
+      toast(
+        "Também não deu desta vez. As fotografias estão guardadas — é a lista que não vem.",
+        "error",
+      );
+    }
+  }, [hidratarAssets, toast]);
 
   useEffect(() => {
     let alive = true;
@@ -3216,9 +3242,37 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * a divergência que isto veio fechar, e desta vez sem sugestão nenhuma a
    * corrigi-la.
    */
-  function fixarOrdem(porque: string) {
+  function fixarOrdem() {
     setDoc(arrumadoEExplicito);
-    toast(porque, "info");
+    // ── O QUE ARRUMOU, E NÃO «PRONTO» ──────────────────────────────────────
+    // As duas listas JÁ estão à vista pela ordem de saída (é o que a sugestão
+    // faz), portanto o clique não mexe um pixel no ecrã: o que se vê é o aviso
+    // desaparecer. «Ordem fixada.» deixava por responder a única pergunta que
+    // se faz a seguir — o que é que isto foi arrumar?
+    //
+    // A conta é das que MUDARAM DE LUGAR, e não das que existem: numa lista de
+    // catorze linhas com duas trocadas, «14 linhas arrumadas» seria uma
+    // mentira pequena a estragar a confiança no resto dos avisos.
+    //
+    // As duas listas contam-se em separado porque o gesto arruma SEMPRE as
+    // duas (ver `arrumadoEExplicito`) e o botão vive só numa delas — quem
+    // carrega no aviso do orçamento tem de saber que os mood boards também
+    // andaram.
+    const linhas = ordemDoOrcamento.filter((idx, i) => idx !== i).length;
+    const paginas = ordemDosBoards.filter((idx, i) => idx !== i).length;
+    const partes = [
+      linhas > 0 ? `${linhas} ${linhas === 1 ? "linha do orçamento" : "linhas do orçamento"}` : "",
+      paginas > 0
+        ? `${paginas} ${paginas === 1 ? "página de inspiração" : "páginas de inspiração"}`
+        : "",
+    ].filter(Boolean);
+    const mudaram = linhas + paginas;
+    toast(
+      partes.length === 0
+        ? "Já estava tudo pela ordem dos Serviços. Daqui para a frente manda a ordem que aqui está."
+        : `${partes.join(" e ")} ${mudaram === 1 ? "mudou" : "mudaram"} de sítio. Daqui para a frente manda a ordem que aqui está.`,
+      "info",
+    );
   }
 
   /**
@@ -4162,6 +4216,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const novo: MoodBoard = { ...modelo, images: [...(modelo.images ?? [])] };
     setDoc((d) => ({ ...d, moodBoards: [...d.moodBoards, novo] }));
 
+    // ── ONDE É QUE O BLOCO FICOU ──────────────────────────────────────────
+    // O botão «De um modelo…» está ao FUNDO da secção e o bloco entra no fim
+    // do array — mas o que sai impresso obedece à ordem dos capítulos, e um
+    // bloco chamado «Cerimónia na igreja» aterra a meio da lista, muitas vezes
+    // acima da dobra. Num documento comprido, «bloco inserido» é a única coisa
+    // que não interessa saber: o que interessa é a página em que ele calhou.
+    //
+    // A posição SAI do `boardsQueSaem`, que é a mesma função que o gerador do
+    // PDF usa — contar cartões no ecrã dizia «a 3.ª» de uma página que é a 5.ª
+    // no documento. Uma página sem fotografias não chega a sair, e a frase
+    // di-lo em vez de inventar um número.
+    const depois = { ...doc, moodBoards: [...doc.moodBoards, novo] } as ProposalDoc;
+    const saem = boardsQueSaem(depois);
+    const pos = saem.indexOf(doc.moodBoards.length);
+    const nome = (novo.title ?? "").trim() || `Inspiração ${doc.moodBoards.length + 1}`;
+    toast(
+      pos >= 0
+        ? `«${nome}» entrou como a ${pos + 1}.ª das ${saem.length} páginas de inspiração do PDF.`
+        : `«${nome}» entrou no fim das páginas de inspiração. Sem fotografias, não sai no PDF.`,
+      "success",
+    );
+
     // O predicado é uma função à parte, e a referência à Biblioteca fica para
     // ÚLTIMO: `ehRefDeTema` é um type guard (`ref is string`), portanto negá-lo
     // a meio estreita a string até `never` e o TypeScript recusa tudo o que
@@ -4881,7 +4957,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       boards.splice(bi + 1, 0, copia);
       return { ...d, moodBoards: boards };
     });
-    toast("Mood board duplicado.", "info");
+    // QUAL DELES, E ONDE FICOU A CÓPIA. «Mood board duplicado.» não dizia
+    // nenhuma das duas coisas, e numa secção de oito páginas são as duas que
+    // interessam: o botão é um ícone de 28 px repetido em cada cartão, e a
+    // cópia sai pela ordem dos capítulos como tudo o resto — num cartão alto
+    // (uma grelha de seis fotos mais os campos), ela nasce abaixo da dobra.
+    const original = doc.moodBoards[bi];
+    if (!original) return;
+    const nome = (original.title ?? "").trim() || `Inspiração ${bi + 1}`;
+    const copiado = { ...original, title: nome ? `${nome} (cópia)` : "" };
+    const depois = {
+      ...doc,
+      moodBoards: [...doc.moodBoards.slice(0, bi + 1), copiado, ...doc.moodBoards.slice(bi + 1)],
+    } as ProposalDoc;
+    const saem = boardsQueSaem(depois);
+    const pos = saem.indexOf(bi + 1);
+    toast(
+      pos >= 0
+        ? `«${nome}» duplicado — a cópia é a ${pos + 1}.ª das ${saem.length} páginas de inspiração do PDF.`
+        : `«${nome}» duplicado — a cópia ficou logo a seguir. Sem fotografias, não sai no PDF.`,
+      "info",
+    );
   }
 
   /** Fechar (ou reabrir) um board a alterações — ver `MoodBoard.bloqueado`. */
@@ -6467,7 +6563,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           url={assetUrls[path]}
                           planoB={assetOriginais[path]}
                           estadoDosUrls={estadoDosUrls}
-                          aoTentarDeNovo={() => void hidratarAssets()}
+                          aoTentarDeNovo={() => void tentarBuscarFotos()}
                           aoMorrer={marcarUrlMorto}
                           // As capas são duas e estão no topo do passo: nunca
                           // esperam pela fila das fotos que estão fora do ecrã.
@@ -6561,9 +6657,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <AvisoDeOrdem
                 mostrar={ordemSugerida}
                 onde="As páginas de inspiração"
-                onFixar={() =>
-                  fixarOrdem("Ordem fixada. Daqui para a frente manda a ordem que aqui está.")
-                }
+                onFixar={fixarOrdem}
               />
               <BarraDaSeleccao
                 quantas={seleccionadas.size}
@@ -7102,7 +7196,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             url={assetUrls[path]}
                                             planoB={assetOriginais[path]}
                                             estadoDosUrls={estadoDosUrls}
-                                            aoTentarDeNovo={() => void hidratarAssets()}
+                                            aoTentarDeNovo={() => void tentarBuscarFotos()}
                                             aoMorrer={marcarUrlMorto}
                                             // A PRIMEIRA DOBRA do primeiro
                                             // board. Medido: sem prioridade
@@ -7622,9 +7716,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <AvisoDeOrdem
                   mostrar={ordemSugerida}
                   onde="As linhas do orçamento"
-                  onFixar={() =>
-                    fixarOrdem("Ordem fixada. Daqui para a frente manda a ordem que aqui está.")
-                  }
+                  onFixar={fixarOrdem}
                 />
                 <div className="flex flex-col gap-2 mb-3">
                   {/* ── OS CABEÇALHOS DAS COLUNAS ────────────────────────────
@@ -8982,7 +9074,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   está a ser escrita quando o aviso apareceria. */}
               <Gralhas
                 doc={doc as ProposalDoc}
-                onCorrigir={(g) => setDoc((d) => corrigirGralha(d, g))}
+                onCorrigir={(g) => {
+                  setDoc((d) => corrigirGralha(d, g));
+                  // A palavra muda num campo que pode estar a catorze páginas
+                  // daqui, dentro de uma secção que não se está a ver. No sítio
+                  // do clique só se vê a linha sair desta lista — e uma linha a
+                  // desaparecer não diz o que ficou escrito lá em cima.
+                  //
+                  // Com as duas palavras e o campo, é a mesma prestação de
+                  // contas que o «Corrigir as N» ao lado já fazia com o número.
+                  toast(`«${g.escrita}» passou a «${g.sugerida}» — ${g.rotulo}.`, "info");
+                }}
                 onIr={(g) => irParaCampo(g.campo)}
                 onCorrigirTudo={() => {
                   const quantas = gralhasDoDocumento(doc as ProposalDoc).length;

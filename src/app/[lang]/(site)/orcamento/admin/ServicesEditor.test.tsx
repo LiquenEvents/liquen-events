@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ServicesEditor from "./ServicesEditor";
+import { ToastProvider } from "./Toast";
 import type { ServiceGroup } from "@/lib/proposal-doc";
 
 /**
@@ -262,6 +263,50 @@ describe("guardar na biblioteca", () => {
     // visto nenhum: manda-a embora convencida de que ficou guardado.
     await screen.findByLabelText("Guardar «Arco floral» na biblioteca");
     expect(screen.getByLabelText("Guardar «Arco floral» na biblioteca")).not.toBeDisabled();
+  });
+
+  /**
+   * ── O BOTÃO QUE VOLTA AO SÍTIO NÃO CHEGA ─────────────────────────────────
+   *
+   * O teste de cima prende metade: o botão fica outra vez carregável. Só que o
+   * ecrã que ele deixa é, ao pixel, o de quem AINDA NÃO carregou em nada — e
+   * ela sai dali convencida de que o serviço está na biblioteca. Resultar
+   * continua a não dizer nada (o visto aparece no próprio botão, à vista);
+   * falhar tem de o dizer.
+   */
+  it("se a gravação falhar, DIZ que o serviço não foi para a biblioteca", async () => {
+    comRede(false);
+    render(
+      <ToastProvider>
+        <Host initial={grupo(["Arco floral"])} />
+      </ToastProvider>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText("Guardar «Arco floral» na biblioteca"));
+
+    // A frase nomeia o serviço — na proposta há dezenas de linhas, e uma delas
+    // é que falhou.
+    expect(
+      await screen.findByText(
+        "«Arco floral» não foi para a biblioteca. Tenta outra vez — a linha aqui não se perde.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("quando resulta, não há aviso nenhum — o visto está no próprio botão", async () => {
+    comRede();
+    render(
+      <ToastProvider>
+        <Host initial={grupo(["Arco floral"])} />
+      </ToastProvider>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(screen.getByLabelText("Guardar «Arco floral» na biblioteca"));
+
+    await screen.findByLabelText("«Arco floral» está na biblioteca");
+    expect(screen.queryByText(/não foi para a biblioteca/)).toBeNull();
   });
 });
 
