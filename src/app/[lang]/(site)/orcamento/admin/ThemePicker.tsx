@@ -1841,7 +1841,14 @@ export default function ThemePicker({
         role="dialog"
         aria-modal="true"
         aria-label="Escolher fotos da biblioteca de temas"
-        className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
+        /* ── MAIS LARGO ONDE HÁ COLUNA LATERAL ──────────────────────────
+           768 px era estreito para escolher fotografias mesmo antes de os
+           temas irem para o lado; com uma coluna de 14 rem a comer 224, seria
+           um seletor de fotos com meia janela para fotos. A partir de `lg` o
+           painel abre até 1120: a coluna leva 20% e a grelha fica com 80%, que
+           é o que ela pediu («cerca de 70%») com folga. Abaixo disso nada
+           muda — lá os temas continuam a ser uma fila de chips por cima. */
+        className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl lg:max-w-[70rem]"
         /* O painel segue o dedo enquanto se arrasta a pega. Sem transição
            durante o arrasto (seria um atraso entre o dedo e o painel) e com ela
            ao largar, que é o que faz o painel voltar ao sítio em vez de
@@ -1897,22 +1904,37 @@ export default function ThemePicker({
           </button>
         </div>
 
-        {/* Temas */}
-        <div className="border-b border-foreground/[0.06] px-5 py-3">
-          {loadingThemes ? (
-            <div className="flex gap-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="bo-skeleton h-8 w-24 rounded-xl" aria-hidden />
-              ))}
-            </div>
-          ) : themes.length === 0 ? (
-            <p className="bo-text-muted text-sm">
-              Ainda não há temas. Cria o primeiro em <strong>Temas</strong>, no menu lateral, e
-              carrega lá as fotos de inspiração.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {/* ── A PROCURA E OS TEMAS, NA MESMA LINHA ──────────────────
+        {/* ── O CORPO: UMA COLUNA NO TELEMÓVEL, DUAS NO COMPUTADOR ────────
+            Palavras dela: «sete linhas de temas ocupam mais de metade da altura
+            do modal; as fotos ficam num terço no fundo, com uma linha e meia
+            visível».
+
+            Ao alto, os temas comem altura à grelha e a conta é implacável: 25
+            temas embrulhados em chips fazem sete filas, e a altura que sobra é
+            a que sobra. Ao LADO, os temas passam a comer LARGURA — e largura é
+            o que um seletor de fotos tem de sobra e altura é o que não tem.
+
+            A partir de `lg` a lista de temas vira uma coluna estreita com
+            scroll próprio, e a grelha fica com toda a altura do painel. Abaixo
+            disso não muda nada: no telemóvel os temas já eram uma fila de chips
+            que rola de lado, que é a resposta certa para um ecrã estreito. */}
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          {/* Temas */}
+          <div className="shrink-0 border-b border-foreground/[0.06] px-5 py-3 lg:flex lg:w-56 lg:flex-col lg:overflow-hidden lg:border-r lg:border-b-0 lg:px-3">
+            {loadingThemes ? (
+              <div className="flex gap-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bo-skeleton h-8 w-24 rounded-xl" aria-hidden />
+                ))}
+              </div>
+            ) : themes.length === 0 ? (
+              <p className="bo-text-muted text-sm">
+                Ainda não há temas. Cria o primeiro em <strong>Temas</strong>, no menu lateral, e
+                carrega lá as fotos de inspiração.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {/* ── A PROCURA E OS TEMAS, NA MESMA LINHA ──────────────────
                   Duas correcções na mesma fila.
 
                   A PROCURA ocupava uma linha inteira e permanente por cima dos
@@ -1942,90 +1964,94 @@ export default function ThemePicker({
                   O `-mx-5 px-5` é para a fila sangrar até às arestas do painel:
                   um chip cortado a meio na margem é o que diz que há mais para
                   o lado. */}
-              <div className="-mx-5 flex items-center gap-2 px-5 sm:mx-0 sm:flex-col sm:items-start sm:gap-2 sm:px-0">
-                {procuraVisivel ? (
-                  <div className="flex shrink-0 items-center gap-1 sm:w-full sm:max-w-xs">
-                    <input
-                      ref={campoDaProcura}
-                      value={procuraTema}
-                      onChange={(e) => setProcuraTema(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Escape") return;
-                        // Esc limpa e fecha — e NÃO fecha o diálogo, que é o que
-                        // faria se a tecla subisse até ao ouvinte de cima.
-                        e.stopPropagation();
-                        setProcuraTema("");
-                        setProcuraAberta(false);
-                      }}
-                      placeholder="Procurar tema…"
-                      aria-label="Procurar tema"
-                      className="bo-input w-36 shrink-0 px-3 py-1.5 text-xs sm:w-full sm:max-w-none"
-                    />
-                    {/* A saída da procura. Sem ela, uma caixa aberta num
+                <div className="-mx-5 flex items-center gap-2 px-5 sm:mx-0 sm:flex-col sm:items-start sm:gap-2 sm:px-0">
+                  {procuraVisivel ? (
+                    <div className="flex shrink-0 items-center gap-1 sm:w-full sm:max-w-xs">
+                      <input
+                        ref={campoDaProcura}
+                        value={procuraTema}
+                        onChange={(e) => setProcuraTema(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Escape") return;
+                          // Esc limpa e fecha — e NÃO fecha o diálogo, que é o que
+                          // faria se a tecla subisse até ao ouvinte de cima.
+                          e.stopPropagation();
+                          setProcuraTema("");
+                          setProcuraAberta(false);
+                        }}
+                        placeholder="Procurar tema…"
+                        aria-label="Procurar tema"
+                        className="bo-input w-36 shrink-0 px-3 py-1.5 text-xs sm:w-full sm:max-w-none"
+                      />
+                      {/* A saída da procura. Sem ela, uma caixa aberta num
                       telemóvel só se fechava com uma tecla Esc que muitos
                       teclados não têm — e limpar o texto não bastava, porque a
                       caixa fica aberta de propósito enquanto se escreve. */}
-                    <button
-                      type="button"
-                      onClick={abrirOuFecharProcura}
-                      aria-expanded
-                      aria-label="Fechar a procura"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
-                    >
-                      <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        aria-hidden="true"
+                      <button
+                        type="button"
+                        onClick={abrirOuFecharProcura}
+                        aria-expanded
+                        aria-label="Fechar a procura"
+                        className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
                       >
-                        <path d="M18 6 6 18M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  themes.length > 3 && (
-                    <button
-                      type="button"
-                      onClick={abrirOuFecharProcura}
-                      aria-expanded={false}
-                      aria-label="Procurar tema"
-                      className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        aria-hidden="true"
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    themes.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={abrirOuFecharProcura}
+                        aria-expanded={false}
+                        aria-label="Procurar tema"
+                        className="alvo-invisivel relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground/60 hover:bg-foreground/[0.06] hover:text-foreground/85"
                       >
-                        <circle cx="11" cy="11" r="7" />
-                        <path d="m20 20-3.5-3.5" />
-                      </svg>
-                    </button>
-                  )
-                )}
-                <div
-                  ref={listaRef}
-                  className="flex min-w-0 flex-1 snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] sm:max-h-[34vh] sm:w-full sm:flex-none sm:snap-none sm:flex-wrap sm:overflow-x-visible sm:overflow-y-auto [&::-webkit-scrollbar]:hidden"
-                  role="group"
-                  aria-label="Temas"
-                >
-                  {temasVisiveis.map((t) => (
-                    <Button
-                      key={t.id}
-                      size="sm"
-                      variant={t.id === themeId ? "subtle" : "ghost"}
-                      aria-pressed={t.id === themeId}
-                      aria-label={themeButtonLabel(t)}
-                      onClick={() => pickTheme(t.id)}
-                      /* `shrink-0` e `snap-start`: numa fila que rola, um chip
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          aria-hidden="true"
+                        >
+                          <circle cx="11" cy="11" r="7" />
+                          <path d="m20 20-3.5-3.5" />
+                        </svg>
+                      </button>
+                    )
+                  )}
+                  <div
+                    ref={listaRef}
+                    /* Três formas, uma por largura. Telemóvel: fila que rola de
+                     lado, com encaixe. `sm`: chips embrulhados, com tecto de
+                     altura. `lg`: uma COLUNA — um tema por linha, com o scroll
+                     dela e sem tecto, porque a altura passou a ser toda dela. */
+                    className="flex min-w-0 flex-1 snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] sm:max-h-[34vh] sm:w-full sm:flex-none sm:snap-none sm:flex-wrap sm:overflow-x-visible sm:overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1 lg:flex-col lg:flex-nowrap lg:gap-0.5 [&::-webkit-scrollbar]:hidden"
+                    role="group"
+                    aria-label="Temas"
+                  >
+                    {temasVisiveis.map((t) => (
+                      <Button
+                        key={t.id}
+                        size="sm"
+                        variant={t.id === themeId ? "subtle" : "ghost"}
+                        aria-pressed={t.id === themeId}
+                        aria-label={themeButtonLabel(t)}
+                        onClick={() => pickTheme(t.id)}
+                        /* `shrink-0` e `snap-start`: numa fila que rola, um chip
                          que encolhe deixa de se ler, e sem o encaixe o dedo
                          larga a fila a meio de um nome.
 
@@ -2034,57 +2060,68 @@ export default function ThemePicker({
                          Palavras dela: «contadores em cinzento demasiado claro,
                          quase ilegíveis». Estes chips são a navegação deste
                          painel, não uma acção secundária. */
-                      className="shrink-0 snap-start text-foreground/75"
-                      /* PRÉ-CARREGAR AO APROXIMAR, não ao carregar. Entre o
+                        /* E na COLUNA (`lg`) o chip vira linha: largura toda,
+                           nome encostado à esquerda e a truncar. Centrado, um
+                           nome curto ao lado de um comprido lia-se como duas
+                           listas — e é a coluna que a pessoa percorre com os
+                           olhos de cima a baixo. */
+                        className="shrink-0 snap-start text-foreground/75 lg:w-full lg:!justify-start lg:truncate"
+                        /* PRÉ-CARREGAR AO APROXIMAR, não ao carregar. Entre o
                          rato chegar ao separador e o clique passam ~150–300 ms
                          — que é praticamente o que a rota demora. Buscar aí faz
                          o tema estar pronto no instante do clique.
 
                          `focus` para quem navega por teclado; `touchstart` para
                          o telemóvel, onde não há hover nenhum. */
-                      onPointerEnter={() => prefetchTheme(t.id)}
-                      onFocus={() => prefetchTheme(t.id)}
-                      onTouchStart={() => prefetchTheme(t.id)}
-                    >
-                      {t.name}
-                      <span className="tabular-nums text-foreground/55">{themeCountLabel(t)}</span>
-                    </Button>
-                  ))}
+                        onPointerEnter={() => prefetchTheme(t.id)}
+                        onFocus={() => prefetchTheme(t.id)}
+                        onTouchStart={() => prefetchTheme(t.id)}
+                      >
+                        {t.name}
+                        <span className="tabular-nums text-foreground/55">
+                          {themeCountLabel(t)}
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* ── QUANDO A PROCURA NÃO DEVOLVE NADA ─────────────────────
+                {/* ── QUANDO A PROCURA NÃO DEVOLVE NADA ─────────────────────
                   Era uma linha cinzenta dentro da própria fila — «Nenhum tema
                   com esse nome.» — do tamanho de uma legenda, no sítio onde
                   deviam estar os temas. Um vazio sem saída não é um estado, é
                   um beco: passa a dizer o que se procurou e a ter o caminho de
                   volta no mesmo sítio onde se lê o problema. */}
-              {temasVisiveis.length === 0 && (
-                <div className="rounded-xl border border-dashed border-foreground/15 px-4 py-3 text-center">
-                  <p className="text-sm text-foreground/75">
-                    Nenhum tema com «{procuraTema.trim()}».
-                  </p>
-                  <p className="bo-text-muted mt-0.5 text-xs">
-                    A procura olha para o nome e para a nota do tema.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="mt-1.5"
-                    onClick={() => {
-                      setProcuraTema("");
-                      setProcuraAberta(false);
-                    }}
-                  >
-                    Ver os {themes.length} temas
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                {temasVisiveis.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-foreground/15 px-4 py-3 text-center">
+                    <p className="text-sm text-foreground/75">
+                      Nenhum tema com «{procuraTema.trim()}».
+                    </p>
+                    <p className="bo-text-muted mt-0.5 text-xs">
+                      A procura olha para o nome e para a nota do tema.
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="mt-1.5"
+                      onClick={() => {
+                        setProcuraTema("");
+                        setProcuraAberta(false);
+                      }}
+                    >
+                      Ver os {themes.length} temas
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
-        {/* ── Barra de seleção ──────────────────────────────────────────────
+          {/* A coluna da direita: a barra de selecção e a grelha. Um invólucro só,
+            para que a coluna dos temas não empurre nada — e para que o `flex-1`
+            que a grelha já ocupava passe a ser desta coluna. */}
+          <div className="flex min-h-0 flex-1 flex-col">
+            {/* ── Barra de seleção ──────────────────────────────────────────────
             Só faz sentido com várias fotos a escolher.
 
             ── «SELECIONAR TODAS AS VISÍVEIS» NÃO DIZIA O QUE FAZIA ──────────
@@ -2098,102 +2135,106 @@ export default function ThemePicker({
             mostradas» quando o tema tem mais e ainda não desceram. Um botão
             que diz um número é também um botão que se pode recusar antes de
             carregar nele. */}
-        {multiple && images.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-foreground/[0.06] px-5 py-2.5">
-            <Button size="sm" variant="ghost" onClick={selectAllVisible} disabled={atLimit}>
-              {hasMore
-                ? `Escolher as ${images.length} já mostradas`
-                : `Escolher as ${images.length} deste tema`}
-            </Button>
-            {selected.length > 0 && (
-              <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
-                Limpar seleção
-              </Button>
-            )}
-            {/* ── A PORTA DA CURADORIA ────────────────────────────────────
+            {multiple && images.length > 0 && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-foreground/[0.06] px-5 py-2.5">
+                <Button size="sm" variant="ghost" onClick={selectAllVisible} disabled={atLimit}>
+                  {hasMore
+                    ? `Escolher as ${images.length} já mostradas`
+                    : `Escolher as ${images.length} deste tema`}
+                </Button>
+                {selected.length > 0 && (
+                  <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+                    Limpar seleção
+                  </Button>
+                )}
+                {/* ── A PORTA DA CURADORIA ────────────────────────────────────
                 Só com fotos que cheguem para valer a pena: com seis, a grelha
                 mostra-as todas de uma vez e uma de cada vez seria mais lento.
                 É a partir de uma grelha que não cabe no ecrã que o modo ganha. */}
-            {images.length > 8 && (
-              <Button size="sm" variant="ghost" onClick={() => setCuradoria(true)}>
-                Uma de cada vez
-              </Button>
-            )}
-            {/* ── O QUE O DEDO FAZ, E O QUE A LUPA FAZ ────────────────────
+                {images.length > 8 && (
+                  <Button size="sm" variant="ghost" onClick={() => setCuradoria(true)}>
+                    Uma de cada vez
+                  </Button>
+                )}
+                {/* ── O QUE O DEDO FAZ, E O QUE A LUPA FAZ ────────────────────
                 A dica de teclado é do computador e continua lá. No telemóvel
                 não havia dica nenhuma, e as duas acções que uma célula tem —
                 escolher e ver em grande — só se descobriam por tentativa.
                 Palavras dela: «a distinção tem de ser óbvia». */}
-            <span className="bo-text-muted ml-auto text-xs sm:hidden">
-              Toca para escolher · a lupa mostra em grande
-            </span>
-            <span className="bo-text-muted ml-auto hidden text-xs sm:inline">
-              Shift + clique escolhe tudo o que está pelo meio · <strong>V</strong> mostra a foto em
-              grande
-            </span>
-          </div>
-        )}
+                <span className="bo-text-muted ml-auto text-xs sm:hidden">
+                  Toca para escolher · a lupa mostra em grande
+                </span>
+                <span className="bo-text-muted ml-auto hidden text-xs sm:inline">
+                  Shift + clique escolhe tudo o que está pelo meio · <strong>V</strong> mostra a
+                  foto em grande
+                </span>
+              </div>
+            )}
 
-        {/* ── UMA DE CADA VEZ, OU A GRELHA ─────────────────────────────────
+            {/* ── UMA DE CADA VEZ, OU A GRELHA ─────────────────────────────────
             Os dois modos partilham tudo o que interessa — a selecção, o tema, o
             teto do lote — e por isso a troca é só uma questão de o que se
             desenha. A curadoria substitui a grelha e mais nada: o cabeçalho, a
             fila dos temas e o rodapé continuam onde estavam, e o botão de
             confirmar conta o mesmo que contava. */}
-        {/* ── O CANTO ONDE A PÁGINA SE VÊ A COMPOR ────────────────────────
+            {/* ── O CANTO ONDE A PÁGINA SE VÊ A COMPOR ────────────────────────
             `relative` para o canto flutuar POR CIMA das fotos em vez de lhes
             tirar uma linha — palavras dela: «não pode roubar espaço às fotos.
             Pequena, num canto, e dispensável». O invólucro não muda nada do que
             está cá dentro: era este `flex-1` que a grelha ocupava, e continua a
             ser. */}
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          {curadoria && multiple ? (
-            <CuradoriaDeFotos
-              images={images}
-              escolhidas={selectedSet}
-              usadas={usedSet}
-              podeEscolherMais={!atLimit}
-              aoDecidir={decidirNaCuradoria}
-              aoVerGrande={(i) => setPreviewIndex(i)}
-              aoSair={() => setCuradoria(false)}
-            />
-          ) : (
-            <>
-              {/* Fotos */}
-              <div
-                ref={scrollRef}
-                onScroll={(e) => {
-                  if (themeId) themeScroll.set(themeId, e.currentTarget.scrollTop);
-                }}
-                className="min-h-[10rem] flex-1 overflow-y-auto px-5 py-4"
-              >
-                {loadingImages ? (
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                    {Array.from({ length: 10 }).map((_, i) => (
-                      <div key={i} className="bo-skeleton aspect-square rounded-lg" aria-hidden />
-                    ))}
-                  </div>
-                ) : !themeId ? null : unreadable ? (
-                  // Falha de leitura NÃO é "tema sem fotos" — dizer-lhe que o tema
-                  // está vazio seria mentira, e mandava-a carregar tudo outra vez.
-                  <div className="py-8 text-center">
-                    <p className="text-sm text-foreground/75">
-                      Não foi possível ler a pasta deste tema agora.
-                    </p>
-                    <p className="bo-text-muted mt-1 text-xs">
-                      É uma falha temporária — as fotos não desapareceram. Tenta daqui a pouco.
-                    </p>
-                  </div>
-                ) : images.length === 0 ? (
-                  <p className="bo-text-muted py-8 text-center text-sm">
-                    Este tema ainda não tem fotos. Adiciona-as em <strong>Temas</strong>.
-                  </p>
-                ) : (
-                  <>
-                    <div
-                      ref={gridRef}
-                      onKeyDown={onGridKeyDown}
-                      /* ── DUAS COLUNAS NO TELEMÓVEL ───────────────────────────
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              {curadoria && multiple ? (
+                <CuradoriaDeFotos
+                  images={images}
+                  escolhidas={selectedSet}
+                  usadas={usedSet}
+                  podeEscolherMais={!atLimit}
+                  aoDecidir={decidirNaCuradoria}
+                  aoVerGrande={(i) => setPreviewIndex(i)}
+                  aoSair={() => setCuradoria(false)}
+                />
+              ) : (
+                <>
+                  {/* Fotos */}
+                  <div
+                    ref={scrollRef}
+                    onScroll={(e) => {
+                      if (themeId) themeScroll.set(themeId, e.currentTarget.scrollTop);
+                    }}
+                    className="min-h-[10rem] flex-1 overflow-y-auto px-5 py-4"
+                  >
+                    {loadingImages ? (
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                        {Array.from({ length: 10 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="bo-skeleton aspect-square rounded-lg"
+                            aria-hidden
+                          />
+                        ))}
+                      </div>
+                    ) : !themeId ? null : unreadable ? (
+                      // Falha de leitura NÃO é "tema sem fotos" — dizer-lhe que o tema
+                      // está vazio seria mentira, e mandava-a carregar tudo outra vez.
+                      <div className="py-8 text-center">
+                        <p className="text-sm text-foreground/75">
+                          Não foi possível ler a pasta deste tema agora.
+                        </p>
+                        <p className="bo-text-muted mt-1 text-xs">
+                          É uma falha temporária — as fotos não desapareceram. Tenta daqui a pouco.
+                        </p>
+                      </div>
+                    ) : images.length === 0 ? (
+                      <p className="bo-text-muted py-8 text-center text-sm">
+                        Este tema ainda não tem fotos. Adiciona-as em <strong>Temas</strong>.
+                      </p>
+                    ) : (
+                      <>
+                        <div
+                          ref={gridRef}
+                          onKeyDown={onGridKeyDown}
+                          /* ── DUAS COLUNAS NO TELEMÓVEL ───────────────────────────
                      Três colunas a 390 px dão miniaturas de 111 px — pequenas de
                      mais para escolher decoração, que é o que aqui se faz. A duas
                      colunas cada foto tem 171 px e vê-se o que lá está.
@@ -2202,109 +2243,109 @@ export default function ThemePicker({
                      três (a foto ainda tem 148), e a partir de `sm` as cinco de
                      sempre — num diálogo de 768 px isso são 140 px por foto, que
                      com o rato e o passar por cima chegam. */
-                      className="grid select-none grid-cols-2 gap-2 min-[480px]:grid-cols-3 sm:grid-cols-5"
-                    >
-                      {images.map((im, i) => {
-                        const on = selectedSet.has(im.path);
-                        const going = pendingSet.has(im.path);
-                        const used = !going && usedSet.has(im.path);
-                        // "Já noutra proposta" só aparece quando NÃO está nesta: as
-                        // duas marcas no mesmo sítio tapavam-se uma à outra, e a que
-                        // interessa primeiro é a desta proposta.
-                        const noutra = !going && !used ? usadasNoutras?.[im.path] : undefined;
-                        const failed = failedPaths.includes(im.path);
-                        // No teto, as fotos por escolher ficam apagadas e anunciadas
-                        // como indisponíveis (aria-disabled, não `disabled`: o botão
-                        // continua alcançável pelo teclado). O mesmo para as que já
-                        // vão a caminho.
-                        const blocked = (atLimit && !on) || going;
-                        return (
-                          // `aspect-square` PASSOU PARA AQUI, do botão para o
-                          // invólucro. É o que torna a altura da célula independente
-                          // do que está lá dentro — e sem isso `content-visibility`
-                          // não podia saltar o conteúdo sem a célula encolher.
-                          <div
-                            key={im.path}
-                            className="celula-saltavel group relative aspect-square"
-                          >
-                            <button
-                              type="button"
-                              data-cell={i}
-                              tabIndex={i === focusIndex ? 0 : -1}
-                              aria-pressed={on}
-                              aria-disabled={blocked || undefined}
-                              // Nome ESTÁVEL: quem diz se está escolhida é o
-                              // aria-pressed. O "já nesta proposta" entra no nome
-                              // porque é a única forma de a marca visual chegar a
-                              // quem não vê a grelha.
-                              aria-label={`Foto ${i + 1} de ${images.length}${
-                                going
-                                  ? " (a adicionar)"
-                                  : used
-                                    ? " (já nesta proposta)"
-                                    : noutra
-                                      ? ` (já usada em ${noutra})`
-                                      : ""
-                              }${failed ? " (não entrou)" : ""}`}
-                              onClick={(e) => toggleAt(i, e.shiftKey)}
-                              onFocus={() => setFocusIndex(i)}
-                              /* `h-full w-full` e não `aspect-square`: quem é
+                          className="grid select-none grid-cols-2 gap-2 min-[480px]:grid-cols-3 sm:grid-cols-5"
+                        >
+                          {images.map((im, i) => {
+                            const on = selectedSet.has(im.path);
+                            const going = pendingSet.has(im.path);
+                            const used = !going && usedSet.has(im.path);
+                            // "Já noutra proposta" só aparece quando NÃO está nesta: as
+                            // duas marcas no mesmo sítio tapavam-se uma à outra, e a que
+                            // interessa primeiro é a desta proposta.
+                            const noutra = !going && !used ? usadasNoutras?.[im.path] : undefined;
+                            const failed = failedPaths.includes(im.path);
+                            // No teto, as fotos por escolher ficam apagadas e anunciadas
+                            // como indisponíveis (aria-disabled, não `disabled`: o botão
+                            // continua alcançável pelo teclado). O mesmo para as que já
+                            // vão a caminho.
+                            const blocked = (atLimit && !on) || going;
+                            return (
+                              // `aspect-square` PASSOU PARA AQUI, do botão para o
+                              // invólucro. É o que torna a altura da célula independente
+                              // do que está lá dentro — e sem isso `content-visibility`
+                              // não podia saltar o conteúdo sem a célula encolher.
+                              <div
+                                key={im.path}
+                                className="celula-saltavel group relative aspect-square"
+                              >
+                                <button
+                                  type="button"
+                                  data-cell={i}
+                                  tabIndex={i === focusIndex ? 0 : -1}
+                                  aria-pressed={on}
+                                  aria-disabled={blocked || undefined}
+                                  // Nome ESTÁVEL: quem diz se está escolhida é o
+                                  // aria-pressed. O "já nesta proposta" entra no nome
+                                  // porque é a única forma de a marca visual chegar a
+                                  // quem não vê a grelha.
+                                  aria-label={`Foto ${i + 1} de ${images.length}${
+                                    going
+                                      ? " (a adicionar)"
+                                      : used
+                                        ? " (já nesta proposta)"
+                                        : noutra
+                                          ? ` (já usada em ${noutra})`
+                                          : ""
+                                  }${failed ? " (não entrou)" : ""}`}
+                                  onClick={(e) => toggleAt(i, e.shiftKey)}
+                                  onFocus={() => setFocusIndex(i)}
+                                  /* `h-full w-full` e não `aspect-square`: quem é
                              quadrado agora é o INVÓLUCRO (ver `celula-saltavel`
                              em globals.css) — é isso que deixa o browser saltar
                              a célula sem ela colapsar. */
-                              className={`relative block h-full w-full overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-all ${
-                                failed
-                                  ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
-                                  : on
-                                    ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
-                                    : "border-foreground/[0.1] hover:border-[#4d6350]/45"
-                              } ${blocked ? "opacity-50" : ""}`}
-                            >
-                              <Photo image={im} priority={i < ABOVE_FOLD} />
-                              {on && (
-                                <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-white">
-                                  <svg
-                                    width="12"
-                                    height="12"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                  >
-                                    <path d="m5 13 4 4L19 7" />
-                                  </svg>
-                                </span>
-                              )}
-                              {(used || going) && (
-                                <span
-                                  aria-hidden
-                                  className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-black/65 px-1.5 py-0.5 text-center text-[10px] uppercase tracking-[0.06em] text-white"
+                                  className={`relative block h-full w-full overflow-hidden rounded-lg border bg-foreground/[0.04] motion-safe:transition-all ${
+                                    failed
+                                      ? "border-[#8a2a22]/60 ring-2 ring-[#8a2a22]/25"
+                                      : on
+                                        ? "border-[#4d6350] ring-2 ring-[#4d6350]/35"
+                                        : "border-foreground/[0.1] hover:border-[#4d6350]/45"
+                                  } ${blocked ? "opacity-50" : ""}`}
                                 >
-                                  {going ? "A adicionar…" : "Já nesta proposta"}
-                                </span>
-                              )}
-                              {noutra && (
-                                <span
-                                  aria-hidden
-                                  title={`Já usada em ${noutra}`}
-                                  className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-[#8a6420]/85 px-1.5 py-0.5 text-center text-[10px] tracking-[0.04em] text-white"
-                                >
-                                  {noutra}
-                                </span>
-                              )}
-                            </button>
-                            {/* A lupa é o caminho do rato/toque para a foto em
+                                  <Photo image={im} priority={i < ABOVE_FOLD} />
+                                  {on && (
+                                    <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4d6350] text-white">
+                                      <svg
+                                        width="12"
+                                        height="12"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="3"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        aria-hidden="true"
+                                      >
+                                        <path d="m5 13 4 4L19 7" />
+                                      </svg>
+                                    </span>
+                                  )}
+                                  {(used || going) && (
+                                    <span
+                                      aria-hidden
+                                      className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-black/65 px-1.5 py-0.5 text-center text-[10px] uppercase tracking-[0.06em] text-white"
+                                    >
+                                      {going ? "A adicionar…" : "Já nesta proposta"}
+                                    </span>
+                                  )}
+                                  {noutra && (
+                                    <span
+                                      aria-hidden
+                                      title={`Já usada em ${noutra}`}
+                                      className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-md bg-[#8a6420]/85 px-1.5 py-0.5 text-center text-[10px] tracking-[0.04em] text-white"
+                                    >
+                                      {noutra}
+                                    </span>
+                                  )}
+                                </button>
+                                {/* A lupa é o caminho do rato/toque para a foto em
                             grande; pelo teclado é a tecla V. Só é focável na
                             célula ativa, para o Tab não passar por 60 lupas. */}
-                            <button
-                              type="button"
-                              tabIndex={i === focusIndex ? 0 : -1}
-                              aria-label={`Ver a foto ${i + 1} em grande`}
-                              onClick={() => setPreviewIndex(i)}
-                              /* ── O ALVO CRESCE, O DISCO NÃO ──────────────────
+                                <button
+                                  type="button"
+                                  tabIndex={i === focusIndex ? 0 : -1}
+                                  aria-label={`Ver a foto ${i + 1} em grande`}
+                                  onClick={() => setPreviewIndex(i)}
+                                  /* ── O ALVO CRESCE, O DISCO NÃO ──────────────────
                              Isto levava `.alvo-toque`, que sob `(pointer:
                              coarse)` força 44×44 — e num telemóvel, com células
                              de 111 px, o disco preto passou a tapar o canto
@@ -2320,65 +2361,67 @@ export default function ThemePicker({
 
                              Fica também mais discreto: um disco a 45% em vez de
                              55%, e mais pequeno, porque a foto é que interessa. */
-                              className="alvo-invisivel absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-[2px] motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                                  className="alvo-invisivel absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white opacity-0 backdrop-blur-[2px] motion-safe:transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                                >
+                                  <svg
+                                    width="13"
+                                    height="13"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    aria-hidden="true"
+                                  >
+                                    <circle cx="11" cy="11" r="7" />
+                                    <path d="m20 20-3.5-3.5" />
+                                  </svg>
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {hasMore ? (
+                          <div className="mt-4 flex flex-col items-center gap-1">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              loading={loadingMore}
+                              onClick={loadMore}
                             >
-                              <svg
-                                width="13"
-                                height="13"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.2"
-                                strokeLinecap="round"
-                                aria-hidden="true"
-                              >
-                                <circle cx="11" cy="11" r="7" />
-                                <path d="m20 20-3.5-3.5" />
-                              </svg>
-                            </button>
+                              {remaining && remaining > 0
+                                ? `Mostrar mais (faltam ${remaining}${truncated ? "+" : ""})`
+                                : "Mostrar mais"}
+                            </Button>
+                            <p className="bo-text-muted text-xs">
+                              As mais recentes aparecem primeiro. A grelha mostra {THEME_PAGE_SIZE}{" "}
+                              de cada vez para o tema abrir depressa.
+                            </p>
                           </div>
-                        );
-                      })}
-                    </div>
-
-                    {hasMore ? (
-                      <div className="mt-4 flex flex-col items-center gap-1">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          loading={loadingMore}
-                          onClick={loadMore}
-                        >
-                          {remaining && remaining > 0
-                            ? `Mostrar mais (faltam ${remaining}${truncated ? "+" : ""})`
-                            : "Mostrar mais"}
-                        </Button>
-                        <p className="bo-text-muted text-xs">
-                          As mais recentes aparecem primeiro. A grelha mostra {THEME_PAGE_SIZE} de
-                          cada vez para o tema abrir depressa.
-                        </p>
-                      </div>
-                    ) : (
-                      images.length > THEME_PAGE_SIZE && (
-                        <p className="bo-text-muted mt-4 text-center text-xs">
-                          Fim do tema — {plural(images.length, "foto", "fotos")}.
-                        </p>
-                      )
+                        ) : (
+                          images.length > THEME_PAGE_SIZE && (
+                            <p className="bo-text-muted mt-4 text-center text-xs">
+                              Fim do tema — {plural(images.length, "foto", "fotos")}.
+                            </p>
+                          )
+                        )}
+                      </>
                     )}
-                  </>
-                )}
-              </div>
-            </>
-          )}
+                  </div>
+                </>
+              )}
 
-          {paginaEmConstrucao && multiple && (
-            <PaginaEmConstrucao
-              titulo={paginaEmConstrucao.titulo}
-              jaLa={paginaEmConstrucao.fotos}
-              aEntrar={aEntrar}
-              maximo={paginaEmConstrucao.maximo}
-            />
-          )}
+              {paginaEmConstrucao && multiple && (
+                <PaginaEmConstrucao
+                  titulo={paginaEmConstrucao.titulo}
+                  jaLa={paginaEmConstrucao.fotos}
+                  aEntrar={aEntrar}
+                  maximo={paginaEmConstrucao.maximo}
+                />
+              )}
+            </div>
+          </div>
         </div>
 
         {/* O que não entrou da última vez — os caminhos ficam guardados e

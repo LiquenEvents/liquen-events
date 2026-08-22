@@ -1441,3 +1441,50 @@ describe("o painel a 390 px", () => {
     );
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * OS TEMAS AO LADO, E NÃO EM CIMA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «sete linhas de temas ocupam mais de metade da altura do
+ * modal. As fotos ficam num terço no fundo, com uma linha e meia visível».
+ *
+ * Ao alto, os temas comem ALTURA à grelha, e a conta é implacável: 25 temas
+ * embrulhados em chips fazem sete filas. Ao lado, comem LARGURA — e largura é o
+ * que um seletor de fotos tem de sobra, altura é o que não tem.
+ *
+ * O jsdom não faz layout: não há aqui píxeis para medir. O que se prende é a
+ * DECISÃO, para que ninguém a desfaça sem dar por isso — a mesma escolha do
+ * `Overview.movel.test`, que afirma sobre classes pela mesma razão.
+ */
+describe("o seletor a partir de 1024 px", () => {
+  it("a lista de temas vira uma coluna com scroll próprio", async () => {
+    await openPicker(true);
+    const lista = screen.getByRole("group", { name: "Temas" });
+    // Coluna, sem tecto de altura, e a ocupar o que sobra da lateral.
+    expect(lista.className).toContain("lg:flex-col");
+    expect(lista.className).toContain("lg:max-h-none");
+    expect(lista.className).toContain("lg:flex-1");
+    // E abaixo disso continua a ser a fila que rola de lado, que é a resposta
+    // certa para um ecrã estreito.
+    expect(lista.className).toContain("overflow-x-auto");
+    expect(lista.className).toContain("snap-x");
+  });
+
+  it("o painel abre mais largo, para a coluna não roubar à grelha", async () => {
+    await openPicker(true);
+    const painel = screen.getByRole("dialog");
+    expect(painel.className).toContain("lg:max-w-[70rem]");
+    // Abaixo de `lg` fica como estava.
+    expect(painel.className).toContain("max-w-3xl");
+  });
+
+  it("e cada tema ocupa a linha toda, encostado à esquerda", async () => {
+    await openPicker(true);
+    const primeiro = screen.getByRole("group", { name: "Temas" }).querySelector("button")!;
+    // Centrado, um nome curto ao lado de um comprido lê-se como duas listas.
+    expect(primeiro.className).toContain("lg:w-full");
+    expect(primeiro.className).toContain("lg:!justify-start");
+  });
+});
