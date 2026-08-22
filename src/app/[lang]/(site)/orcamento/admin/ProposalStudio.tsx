@@ -9581,9 +9581,22 @@ function AccoesDaFoto({
         </div>
       </FolhaOuDialogo>
 
-      {/* ── O CAMINHO DO RATO: a barra de sempre, ao pixel ──────────────────
+      {/* ── O CAMINHO DO RATO: DUAS ACÇÕES, E O RESTO A UM TOQUE ───────────
+          Palavras dela: «controlos sobrepostos à imagem». Eram seis círculos
+          escuros a tapar a faixa de baixo da fotografia — que é onde costuma
+          estar o que interessa numa foto de mesa posta —, e tapavam-na
+          precisamente enquanto ela está a olhar para ela.
+
+          Ficam duas: as setas. São o gesto que se faz cem vezes por proposta, e
+          mandá-las para dentro de uma folha era trocar um clique por dois no
+          trabalho de todos os dias. As outras quatro — ver em grande, trocar,
+          principal, escolher — e a que APAGA passam para a folha, que já existe
+          e já é a única coisa que o dedo vê. Uma lista escrita por extenso, com
+          o «Remover» separado por um traço, é melhor sítio para o botão
+          destrutivo do que um círculo de 24 px ao lado de outros cinco iguais.
+
           `hidden com-rato:flex`: não existe até haver rato — nem desenhada nem
-          a apanhar toques. Onde há rato, nada nesta barra mudou. */}
+          a apanhar toques. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 transition-opacity group-hover/foto:opacity-100 focus-within:opacity-100 com-rato:flex">
         <span className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5">
           <button
@@ -9604,48 +9617,24 @@ function AccoesDaFoto({
           >
             <span aria-hidden="true">→</span>
           </button>
-          <button type="button" className={botao} onClick={onAmpliar} aria-label="Ver em grande">
-            <span aria-hidden="true">⤢</span>
-          </button>
+          {/* A MESMA folha do dedo, e não uma segunda lista: a acção
+              acrescentada num sítio e esquecida no outro é a forma mais barata
+              de os dois caminhos divergirem. */}
+          {/* SEM tom de estado: a célula já diz o que está ligado — anel verde
+              à volta quando está escolhida, etiqueta «principal» no canto. Um
+              «⋯» verde ler-se-ia como se o próprio botão estivesse ligado. */}
           <button
             type="button"
             className={botao}
-            onClick={onSubstituir}
-            aria-label="Trocar por outra fotografia"
+            onClick={() => setFolhaAberta(true)}
+            aria-haspopup="dialog"
+            aria-label={`Mais acções de ${nome}`}
           >
-            <span aria-hidden="true">⇄</span>
-          </button>
-          {principal !== undefined && (
-            <button
-              type="button"
-              className={`${botao} ${principal ? "bg-[#4d6350]" : ""}`}
-              onClick={onPrincipal}
-              aria-pressed={principal}
-              aria-label={
-                principal
-                  ? "Deixar de ser a fotografia principal"
-                  : "Fotografia principal desta página"
-              }
-            >
-              <span aria-hidden="true">★</span>
-            </button>
-          )}
-          <button
-            type="button"
-            className={`${botao} ${seleccionada ? "bg-[#4d6350]" : ""}`}
-            onClick={onSeleccionar}
-            aria-pressed={seleccionada}
-            aria-label={seleccionada ? "Retirar da selecção" : "Escolher para mover em conjunto"}
-          >
-            <span aria-hidden="true">✓</span>
-          </button>
-          <button
-            type="button"
-            className={`${botao} hover:bg-[#8a2a22]`}
-            onClick={onRemover}
-            aria-label="Remover fotografia"
-          >
-            <span aria-hidden="true">×</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <circle cx="5" cy="12" r="1.8" />
+              <circle cx="12" cy="12" r="1.8" />
+              <circle cx="19" cy="12" r="1.8" />
+            </svg>
           </button>
         </span>
       </div>

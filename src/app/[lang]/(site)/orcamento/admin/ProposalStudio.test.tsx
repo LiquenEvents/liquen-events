@@ -4788,9 +4788,12 @@ describe("traduzir com as fotos a meio", () => {
     const botao = await botaoDeTraduzir(user);
     await user.click(botao);
 
-    const remover = document.querySelectorAll<HTMLElement>('[aria-label="Remover fotografia"]');
-    await user.click(remover[0]);
-    expect(celulas()).toHaveLength(1);
+    // Remover passou a ser uma acção da folha, e não um círculo em cima da
+    // fotografia — ver «SEIS CÍRCULOS EM CIMA DA FOTOGRAFIA». O caminho é o
+    // mesmo dela: abrir as acções da primeira foto e escolher «Remover».
+    await user.click(screen.getAllByRole("button", { name: /^Acções de / })[0]);
+    await user.click(await screen.findByRole("button", { name: "Remover fotografia" }));
+    await waitFor(() => expect(celulas()).toHaveLength(1));
 
     await act(async () => {
       soltar();
@@ -5205,6 +5208,64 @@ describe("o estúdio no telemóvel: fotos, acções e descrições", () => {
     const pontos = document.querySelector('button[aria-label^="Acções de"]')!;
     expect(pontos.className).toContain("com-rato:hidden");
     expect(pontos.className).toContain("alvo-toque");
+  });
+
+  /**
+   * ── SEIS CÍRCULOS EM CIMA DA FOTOGRAFIA ──────────────────────────────────
+   *
+   * Palavras dela: «controlos sobrepostos à imagem». A barra do rato tinha seis
+   * botões escuros a tapar a faixa de baixo da fotografia — que é onde costuma
+   * estar o que interessa numa foto de mesa posta —, e tapava-a precisamente
+   * enquanto ela estava a olhar para ela.
+   *
+   * Ficam as setas, que são o gesto de todos os dias: mandá-las para dentro de
+   * uma folha era trocar um clique por dois no trabalho normal. As outras
+   * quatro, e a que APAGA, passam para a folha que o dedo já usa.
+   */
+  it("a barra do rato tem as setas e mais nada — o resto está na folha", async () => {
+    seedDraft(2);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/0.jpg", thumbUrl: "https://sb/mini-0.jpg" },
+      { path: "board/foto-1.jpg", url: "https://sb/1.jpg", thumbUrl: "https://sb/mini-1.jpg" },
+    ];
+    renderStudio();
+    await waitFor(() => expect(barraDasAccoes()).not.toBeNull());
+
+    const rotulos = Array.from(barraDasAccoes()!.querySelectorAll("button")).map((b) =>
+      b.getAttribute("aria-label"),
+    );
+    expect(rotulos).toEqual([
+      "Mover para trás",
+      "Mover para a frente",
+      expect.stringMatching(/^Mais acções de /),
+    ]);
+
+    // O botão que APAGA sai da barra: uma lista escrita por extenso, com o
+    // «Remover» separado por um traço, é melhor sítio para ele do que um
+    // círculo de 24 px ao lado de outros cinco iguais.
+    expect(rotulos).not.toContain("Remover fotografia");
+    expect(rotulos).not.toContain("Ver em grande");
+  });
+
+  it("e as quatro que saíram continuam todas na folha", async () => {
+    // Duas listas seriam duas versões da verdade — a acção acrescentada num
+    // sítio e esquecida no outro é a forma mais barata de os caminhos
+    // divergirem. É a MESMA folha do dedo.
+    seedDraft(1);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/0.jpg", thumbUrl: "https://sb/mini-0.jpg" },
+    ];
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^Mais acções de / }));
+    for (const nome of [
+      "Ver em grande",
+      "Trocar por outra fotografia",
+      "Escolher para mover em conjunto",
+      "Remover fotografia",
+    ]) {
+      expect(await screen.findByRole("button", { name: nome }), nome).toBeTruthy();
+    }
   });
 
   /**
