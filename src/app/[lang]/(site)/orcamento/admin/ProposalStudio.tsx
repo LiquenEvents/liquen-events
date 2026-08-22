@@ -192,7 +192,10 @@ import {
   porTraduzirPorSeccao,
 } from "@/lib/proposal-doc-bilingue";
 import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
-import { Ajuda, Button, Card, Field, FolhaOuDialogo, Segmented } from "./ui";
+// A espera desenhada de uma maneira só. Ver `ui/EmCurso.tsx`: uma barra, um
+// ponto a pulsar, e a contagem quando o código sabe contar — este ficheiro não
+// inventa nenhuma espera sua.
+import { Ajuda, Button, Card, EmCurso, Field, FolhaOuDialogo, Segmented } from "./ui";
 
 /**
  * Visual editor for the studio's multi-page proposal PDF. Produces a
@@ -209,6 +212,53 @@ type StudioDoc = Parameters<typeof withProposalDefaults>[0];
  * é a mesma por onde ela está a trabalhar.
  */
 const UPLOAD_CONCURRENCY = 4;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANTO DEMORA UMA TRADUÇÃO — E PORQUE É QUE ISTO É UM PALPITE E NÃO UMA CONTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A espera da tradução é OPACA vista daqui, e não por preguiça: o estúdio faz
+ * UM pedido à rota (`motorPelaRota` só parte em vários acima de 300 campos, e
+ * uma proposta pesada tem ~218). Os lotes de 50 que se veem no código são do
+ * outro lado da rota — é o motor do serviço que os manda, um a seguir ao
+ * outro, e do lado de cá não há nenhum sinal de que o terceiro acabou.
+ *
+ * Partir o pedido aqui para poder contar os lotes seria trocar um pedido por
+ * cinco: mais viagens na rede dela para desenhar uma barra. Uma animação que
+ * atrasa a tarefa que retrata não se faz, e por isso isto fica um palpite.
+ *
+ * O palpite, escrito para poder ser corrigido: uma ida à rota mais a resposta
+ * do serviço rondam o segundo, e cada lote de 50 campos que o serviço manda a
+ * seguir custa outro tanto. Sobra por cima do que se mede num portátil, porque
+ * quem espera está numa quinta com 4G — e a curva do `EmCurso` perdoa um erro
+ * de dois para um: o que ela não perdoa é uma barra que chega ao fim e fica lá.
+ */
+const TRADUCAO_MS_FIXOS = 800;
+const TRADUCAO_MS_POR_LOTE = 1_500;
+/** O tamanho do lote do motor do serviço (`MAX_TEXTOS_POR_PEDIDO`, no DeepL). */
+const TRADUCAO_CAMPOS_POR_LOTE = 50;
+
+/** Quanto tempo, mais ou menos, traduzir `campos` campos de prosa. */
+function esperaDaTraducao(campos: number): number {
+  const lotes = Math.max(1, Math.ceil(Math.max(0, campos) / TRADUCAO_CAMPOS_POR_LOTE));
+  return TRADUCAO_MS_FIXOS + TRADUCAO_MS_POR_LOTE * lotes;
+}
+
+/**
+ * Quanto demora copiar `fotos` fotografias de um modelo para este pedido.
+ *
+ * Também opaca, e também um pedido só (`/api/propostas/copiar`): o servidor
+ * copia OITO de cada vez (`EM_PARALELO`, em `proposal-storage`), cada foto são
+ * duas cópias no armazenamento — o original e a miniatura —, e nada disso é
+ * observável daqui. O palpite é essa aritmética, com a folga de sempre para a
+ * rede de quem espera.
+ */
+const COPIA_FOTOS_EM_PARALELO = 8;
+function esperaDaCopiaDeFotos(fotos: number): number {
+  const lotes = Math.max(1, Math.ceil(Math.max(0, fotos) / COPIA_FOTOS_EM_PARALELO));
+  return 900 + 1_500 * lotes;
+}
 
 const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-foreground/85";
 const ADD_BTN =
@@ -1297,7 +1347,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setAspetosDasFotos((m) => (m[ref] === aspeto ? m : { ...m, [ref]: aspeto }));
   }, []);
   const [refEdited, setRefEdited] = useState(false);
-  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  /**
+   * ── O CARREGAMENTO DE FOTOS, CONTADO ────────────────────────────────────
+   *
+   * Era um `boolean` por zona de largar, e a zona só sabia dizer «A carregar…».
+   * Vinte fotografias de telemóvel com 4G são minutos, e a contagem existia o
+   * tempo todo dentro do `handleUpload` (`results[]` e `files.length`) a ser
+   * deitada fora — que é a única coisa que responde à pergunta dela: isto está
+   * a andar ou está preso?
+   *
+   * A chave é a mesma de sempre (`cover-0`, `board-3`), e é por ela que o
+   * progresso chega à `UploadArea` pelo caminho por onde o `busy` já ia. A
+   * ausência da chave É o «não está a carregar nada».
+   */
+  const [uploading, setUploading] = useState<Record<string, { feito: number; total: number }>>({});
+  /**
+   * Quantas fotos de modelo estão a ser copiadas para a pasta deste pedido.
+   *
+   * Zero é «nenhuma». Soma-se e subtrai-se em vez de se escrever o número do
+   * último lote: inserir dois modelos seguidos é um gesto normal, e o segundo
+   * não pode apagar a espera do primeiro.
+   */
+  const [fotosACopiar, setFotosACopiar] = useState(0);
   const [busy, setBusy] = useState<null | "preview" | "send">(null);
   /**
    * ── A LÍNGUA ESCOLHE-SE AO GERAR ──────────────────────────────────────────
@@ -3571,7 +3642,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
   async function handleUpload(key: string, files: File[], onPaths: (paths: string[]) => void) {
     if (files.length === 0) return;
-    setUploading((u) => ({ ...u, [key]: true }));
+    setUploading((u) => ({ ...u, [key]: { feito: 0, total: files.length } }));
+    /**
+     * Mais uma arrumada — e conta tanto a que subiu como a que falhou.
+     *
+     * A barra retrata o que JÁ NÃO SE ESPERA, e uma foto que falhou também
+     * deixou de se esperar: contar só as boas deixava a barra a faltar-lhe um
+     * bocado para sempre, num lote com um ficheiro mau. O que correu mal
+     * continua a ser dito pelo `toast`, no fim e com o número.
+     */
+    const maisUma = () =>
+      setUploading((u) => {
+        const p = u[key];
+        if (!p) return u;
+        return { ...u, [key]: { ...p, feito: Math.min(p.total, p.feito + 1) } };
+      });
     // Cover photos print large (the document's hero) so they keep more pixels and
     // a higher JPEG quality; mood-board photos render as small collage cells and
     // use a tighter cap. The upload key encodes which is which ("cover-…"/"board-…").
@@ -3597,6 +3682,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           results[i] = { path: im.path };
         } catch (e) {
           errors.push(e instanceof Error ? e.message : `Falha ao carregar "${f.name}".`);
+        } finally {
+          maisUma();
         }
       }
     }
@@ -3615,7 +3702,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         toast(`${paths.length} imagens carregadas`, "success");
       }
     } finally {
-      setUploading((u) => ({ ...u, [key]: false }));
+      // A chave SAI do mapa: «não está a carregar nada» é a ausência, e não um
+      // `{feito, total}` velho à espera de ser lido como se fosse de agora.
+      setUploading((u) => {
+        if (!(key in u)) return u;
+        const resto = { ...u };
+        delete resto[key];
+        return resto;
+      });
     }
   }
 
@@ -3896,6 +3990,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     );
     if (deOutroPedido.length === 0) return;
 
+    // ── ISTO DEIXA DE SER MUDO ────────────────────────────────────────────
+    // O bloco aparece na proposta no instante do clique e as fotos vêm a
+    // seguir, num pedido só que demora de dois a vinte segundos. Não havia
+    // sinal nenhum disso — só um toast lá ao fim, e apenas quando corria mal.
+    setFotosACopiar((n) => n + deOutroPedido.length);
     try {
       const res = await fetch("/api/propostas/copiar", {
         method: "POST",
@@ -3921,6 +4020,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         "As fotos deste modelo ficaram na pasta da proposta de origem — volta a escolhê-las se essa proposta for apagada.",
         "error",
       );
+    } finally {
+      setFotosACopiar((n) => Math.max(0, n - deOutroPedido.length));
     }
   }
   function updateBoard(bi: number, p: Partial<StudioDoc["moodBoards"][number]>) {
@@ -5711,15 +5812,43 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               preenche estão à vista. */}
           {bilingue && (
             <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <button
-                type="button"
-                disabled={!traducaoLigada || aTraduzir}
-                onClick={() => void traduzirTudo()}
-                className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-foreground/15 px-3 py-1.5 text-xs font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <span aria-hidden="true">⇄</span>
-                {aTraduzir ? "A traduzir…" : "Traduzir para inglês"}
-              </button>
+              {/* ── ENQUANTO A TRADUÇÃO VEM A CAMINHO ─────────────────────
+                  O botão dizia «A traduzir…» e mais nada, durante uma ida à
+                  rede que numa proposta cheia são vários segundos — e a única
+                  coisa que aparecia a seguir era um toast. A caixa fica no
+                  lugar do botão, que é onde o estado já vivia. Quantos campos
+                  vão é do que o código sabe, e por isso é dito; quantos já
+                  voltaram, não — ver `esperaDaTraducao`. */}
+              {aTraduzir ? (
+                (() => {
+                  // Os mesmos campos que o `traduzirParaIngles` vai buscar: os
+                  // vazios e os que ficaram para trás do português.
+                  const campos = camposPorRever(doc as ProposalDoc).length;
+                  return (
+                    <EmCurso
+                      className="max-w-xs"
+                      titulo="A traduzir para inglês…"
+                      estimadoMs={esperaDaTraducao(campos)}
+                      nota={
+                        campos === 1
+                          ? "Vai 1 campo ao serviço de tradução. O que já escreveste fica como está."
+                          : `Vão ${campos} campos ao serviço de tradução. O que já escreveste fica como está.`
+                      }
+                      notaDemorada="O serviço está a demorar. As caixas «EN» preenchem-se assim que a resposta chegar."
+                    />
+                  );
+                })()
+              ) : (
+                <button
+                  type="button"
+                  disabled={!traducaoLigada}
+                  onClick={() => void traduzirTudo()}
+                  className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-foreground/15 px-3 py-1.5 text-xs font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span aria-hidden="true">⇄</span>
+                  Traduzir para inglês
+                </button>
+              )}
               {/* ── AS TRÊS FRASES, E PORQUE É QUE NÃO SÃO DUAS ─────────────
                   O botão fica desligado nos dois casos maus, e isso está certo.
                   A frase é que não pode ser a mesma: «ainda não está ligada
@@ -6024,7 +6153,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           // O lado é fixo: a posição 0 imprime à esquerda do
                           // painel do logótipo, a 1 à direita.
                           label={idx === 0 ? "Capa esquerda" : "Capa direita"}
-                          busy={!!uploading[`cover-${idx}`]}
+                          progresso={uploading[`cover-${idx}`]}
                           multiple={false}
                           curto
                           onFiles={(files) =>
@@ -6687,7 +6816,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       <div className="mt-2">
                                         <UploadArea
                                           label="+ Imagens"
-                                          busy={!!uploading[`board-${bi}`]}
+                                          progresso={uploading[`board-${bi}`]}
                                           multiple
                                           faixa
                                           onFiles={(files) =>
@@ -7027,6 +7156,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       toast={toast}
                       onInserir={(b) => void inserirMoodBoardDeModelo(b as MoodBoard)}
                     />
+                    {/* ── AS FOTOS DO MODELO A CHEGAR ────────────────────
+                        Ao lado do botão que as pediu, e não em cima do bloco:
+                        o bloco já está na lista com as fotografias à vista (é
+                        o caminho de origem que ainda lá está), e uma caixa
+                        entre os cartões empurrava a grelha para baixo a meio
+                        do gesto seguinte. Sai sozinha quando a cópia acaba. */}
+                    {fotosACopiar > 0 && (
+                      <EmCurso
+                        className="max-w-xs"
+                        titulo={
+                          fotosACopiar === 1
+                            ? "A copiar 1 foto do modelo…"
+                            : `A copiar ${fotosACopiar} fotos do modelo…`
+                        }
+                        estimadoMs={esperaDaCopiaDeFotos(fotosACopiar)}
+                        nota="O bloco já está na proposta; as fotografias estão a passar para a pasta deste pedido."
+                        notaDemorada="A cópia está a demorar. O bloco fica na proposta de qualquer maneira."
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -8787,22 +8935,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   },
                 ]}
               />
-              <Button
-                variant="secondary"
-                onClick={preview}
-                disabled={busy !== null}
-                loading={busy === "preview"}
-              >
-                {busy === "preview"
-                  ? // Enquanto roda, o botão diz em que língua está a desenhar.
-                    // São dezenas de segundos numa proposta cheia, e é tempo
-                    // que chega para deixar de haver a certeza do que se
-                    // escolheu — o português cala-se porque é o de sempre.
-                    idiomaDoPdf === "en"
-                    ? "A gerar em inglês…"
-                    : "A gerar…"
-                  : "Descarregar PDF"}
-              </Button>
+              {/* ══════════════════════════════════════════════════════════
+                  ENQUANTO O PDF SE DESENHA
+                  ══════════════════════════════════════════════════════════
+
+                  É o MESMO desenho de documento que o envio faz, na mesma
+                  rota, com a mesma espera de 10 a 60 segundos — e aqui havia
+                  só um botão a rodar, que ao fim de meio minuto se lê como
+                  «isto encravou». A caixa entra no lugar do botão (é onde o
+                  estado já vivia, e assim não empurra o selector de idioma
+                  nem a ressalva de baixo) e a estimativa é a mesma que o
+                  `AEnviarAProposta` usa: aprendida das gerações anteriores
+                  desta instalação, e não um número escrito à mão.
+
+                  A espera é OPACA de propósito: é um pedido só, e do lado de
+                  cá não há nada para contar até a resposta chegar. */}
+              {busy === "preview" ? (
+                <EmCurso
+                  className="max-w-xs"
+                  // A língua continua dita enquanto roda: são dezenas de
+                  // segundos numa proposta cheia, tempo que chega para deixar
+                  // de haver a certeza do que se escolheu — o português
+                  // cala-se porque é o de sempre.
+                  titulo={idiomaDoPdf === "en" ? "A gerar o PDF em inglês…" : "A gerar o PDF…"}
+                  estimadoMs={tempoEstimado(totalDeFotos, amostras)}
+                  nota="Assim que estiver desenhado, o PDF é descarregado."
+                  notaDemorada="Com a rede fraca isto demora. Não feches a página — o PDF é descarregado assim que estiver."
+                />
+              ) : (
+                <Button variant="secondary" onClick={preview} disabled={busy !== null}>
+                  Descarregar PDF
+                </Button>
+              )}
               {/* ══════════════════════════════════════════════════════════
                   A RESSALVA TEM DE SER VERIFICÁVEL NO PAPEL
                   ══════════════════════════════════════════════════════════
@@ -11244,7 +11408,7 @@ function Thumb({
 
 function UploadArea({
   label,
-  busy,
+  progresso,
   multiple,
   compact = false,
   curto = false,
@@ -11252,7 +11416,15 @@ function UploadArea({
   onFiles,
 }: {
   label: string;
-  busy: boolean;
+  /**
+   * O lote que está a subir, ou nada.
+   *
+   * Era um `busy: boolean`, e a caixa só sabia escrever «A carregar…» — em
+   * cima de vinte fotografias de telemóvel numa rede de quinta, que são
+   * minutos, «ocupado» e «preso» leem-se exactamente igual. A contagem já
+   * existia no `handleUpload`; passa a chegar ao ecrã.
+   */
+  progresso?: { feito: number; total: number };
   multiple: boolean;
   compact?: boolean;
   /**
@@ -11289,6 +11461,31 @@ function UploadArea({
     if (files.length) onFiles(files);
   }
 
+  /**
+   * A ALTURA É A MESMA, esteja a carregar ou não.
+   *
+   * A caixa de espera vai EXACTAMENTE onde o «A carregar…» já vivia, e no
+   * mesmo tamanho: uma faixa de 56 px que crescesse a meio de um lote
+   * empurrava a grelha de fotografias para baixo debaixo do dedo dela — que é
+   * a maneira mais certa de uma animação de progresso piorar o telemóvel. Por
+   * isso a medida sai daqui e serve os dois estados; o que muda lá dentro é só
+   * o conteúdo.
+   */
+  const caixa = faixa ? "h-14" : curto ? "h-24" : compact ? "aspect-square" : "aspect-[4/3]";
+
+  if (progresso) {
+    return (
+      <div className={`flex w-full items-center justify-center ${caixa}`}>
+        <EmCurso
+          titulo={progresso.total === 1 ? "A carregar a foto…" : "A carregar as fotos…"}
+          // A contagem a sério, que o `handleUpload` sempre soube e nunca disse.
+          feito={progresso.feito}
+          total={progresso.total}
+        />
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -11307,26 +11504,22 @@ function UploadArea({
       // por cima: duas utilidades da mesma propriedade decidem-se pela ordem na
       // folha de estilo e não pela ordem na string, e um `flex-col` de base
       // ganharia ao `flex-row` da faixa sem nada o denunciar.
-      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
+      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${caixa} ${
         faixa
-          ? "h-14 flex-row gap-2 p-2"
+          ? "flex-row gap-2 p-2"
           : curto
-            ? "h-24 flex-col gap-1 p-2"
+            ? "flex-col gap-1 p-2"
             : compact
-              ? "aspect-square flex-col gap-1 p-2"
-              : "aspect-[4/3] flex-col gap-1 p-3"
+              ? "flex-col gap-1 p-2"
+              : "flex-col gap-1 p-3"
       } ${
         drag
           ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"
           : "border-foreground/[0.18] bg-foreground/[0.02] hover:border-[#4d6350]/45"
       }`}
     >
-      <span className="text-[9px] tracking-[0.15em] uppercase text-foreground/35">
-        {busy ? "A carregar…" : label}
-      </span>
-      {!busy && !compact && (
-        <span className="text-[9px] text-foreground/25">arraste ou clique</span>
-      )}
+      <span className="text-[9px] tracking-[0.15em] uppercase text-foreground/35">{label}</span>
+      {!compact && <span className="text-[9px] text-foreground/25">arraste ou clique</span>}
       <input
         ref={inputRef}
         type="file"

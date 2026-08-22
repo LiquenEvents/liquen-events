@@ -3719,7 +3719,18 @@ describe("gerar a proposta em inglês", () => {
 
     // Dezenas de segundos numa proposta com fotografias a sério — tempo que
     // chega para deixar de haver a certeza do que se escolheu.
-    expect(await screen.findByRole("button", { name: /A gerar em inglês…/ })).toBeInTheDocument();
+    //
+    // A frase mudou de sítio, e é por isso que este teste mudou: enquanto o
+    // documento se desenha, o botão dá o lugar ao cartão de espera partilhado
+    // (`ui/EmCurso`) — um botão a rodar durante meio minuto lê-se como «isto
+    // encravou». O que se prende continua a ser o mesmo: que a língua está
+    // dita enquanto se espera.
+    const frase = await screen.findByText(/A gerar o PDF em inglês…/);
+    // E é o cartão de espera da casa, não um texto solto: o `role="status"` é
+    // o que faz um leitor de ecrã dar pela espera sem ninguém lhe roubar o foco.
+    expect(frase.closest('[role="status"]')).not.toBeNull();
+    // E o botão não fica ao lado a convidar a um segundo pedido.
+    expect(screen.queryByRole("button", { name: /Descarregar PDF/ })).toBeNull();
     await act(async () => {
       libertar(reply({ headers: {} }));
     });
@@ -4535,6 +4546,64 @@ describe("traduzir para inglês", () => {
     // Diz o que se sabe — que não se soube — e o que fazer a seguir.
     expect(screen.getByText(/não deu para saber/i)).toBeTruthy();
     expect(screen.getByText(/recarrega/i)).toBeTruthy();
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * ENQUANTO A TRADUÇÃO VEM A CAMINHO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Pedido dela: «quero estes detalhes de animações em imensas coisas
+   * espalhadas pelo site» — ou seja, onde ela carrega e fica sem saber se
+   * aquilo está a andar, tem de passar a ver que está.
+   *
+   * O botão dizia «A traduzir…» e mais nada, durante uma ida à rede que numa
+   * proposta cheia são vários segundos. Passa a ser o cartão de espera da casa
+   * (`ui/EmCurso`), no lugar onde o botão estava — e diz QUANTOS campos vão,
+   * que é do que o código sabe. Quantos já voltaram não se diz, porque é um
+   * pedido só e inventar essa contagem seria mentir.
+   */
+  it("enquanto traduz, o cartão de espera diz quantos campos vão", async () => {
+    traducaoLigadaNoServidor = true;
+    seedDraft(1);
+    // A resposta fica PENDURADA: o estado que se quer ver é o do meio.
+    let libertar: () => void = () => {};
+    const pendurada = new Promise<void>((r) => {
+      libertar = r;
+    });
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/propostas/traduzir") && (init?.method ?? "GET") !== "GET") {
+        await pendurada;
+      }
+      return fetchDeSempre(input, init);
+    });
+
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    const botao = await waitFor(async () => {
+      const b = (await screen.findByRole("button", {
+        name: /Traduzir para inglês/i,
+      })) as HTMLButtonElement;
+      if (b.disabled) throw new Error("ainda a perguntar ao servidor");
+      return b;
+    });
+    await user.click(botao);
+
+    const frase = await screen.findByText(/A traduzir para inglês…/);
+    // É o cartão de espera da casa, e não um texto solto: o `role="status"` é o
+    // que faz um leitor de ecrã dar pela espera sem lhe roubar o foco.
+    expect(frase.closest('[role="status"]')).not.toBeNull();
+    // Quantos campos vão — o número que o servidor ainda não sabe, mas o
+    // documento sabe.
+    expect(screen.getByText(/campos? ao serviço de tradução/)).toBeTruthy();
+    // E o botão não fica ao lado a convidar a um segundo pedido.
+    expect(screen.queryByRole("button", { name: /Traduzir para inglês/i })).toBeNull();
+
+    await act(async () => {
+      libertar();
+    });
   });
 
   it("com o serviço ligado, o botão preenche as caixas «EN» de uma vez", async () => {
