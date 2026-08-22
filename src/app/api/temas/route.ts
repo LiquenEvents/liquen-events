@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { lqipsDeCaminhos } from "@/lib/biblioteca-fotos-store";
 import { isAuthed } from "@/lib/admin-auth";
 import { listThemes, createTheme } from "@/lib/themes-store";
 import {
@@ -371,10 +372,27 @@ export async function GET(request: NextRequest) {
      */
     const todos = [...new Set([...chosen, ...newest, ...extras.flat()].filter(Boolean))];
     const vazio = () => new Map<string, string>();
-    const [urls, thumbs, micros] = await comOrcamento(
-      Promise.all([signThemePaths(todos), signThemeThumbs(todos), signThemeMicros(todos)]),
+    /* ── E OS BORRÕES, NO MESMO FÔLEGO ────────────────────────────────────
+       «Placeholder blur por foto — acaba o ecrã de cartões cinzentos.»
+
+       São poucas centenas de bytes por fotografia, e viajam nesta resposta:
+       estão pintados no primeiro fotograma, antes de qualquer ida ao Storage.
+       Vão na MESMA espera das assinaturas, e não a seguir — encadeá-los somava
+       a latência de uma consulta à de três assinaturas, e o orçamento de tempo
+       desta rota é o mesmo.
+
+       Os `lqip` lêem-se por PASTA e a chave é o caminho REAL, sem o prefixo
+       `tema:` que só existe dentro de um documento. Aqui os caminhos já são os
+       reais — vêm da listagem da pasta. */
+    const [urls, thumbs, micros, lqips] = await comOrcamento(
+      Promise.all([
+        signThemePaths(todos),
+        signThemeThumbs(todos),
+        signThemeMicros(todos),
+        lqipsDeCaminhos(todos),
+      ]),
       limite - Date.now(),
-      [vazio(), vazio(), vazio()],
+      [vazio(), vazio(), vazio(), vazio()],
       "assinatura das capas",
     );
     /** O melhor que existe para uma tira de 43 px. */
@@ -404,13 +422,20 @@ export async function GET(request: NextRequest) {
       // os cartões cinzentos.
       const previewFallbackUrls = tiras.map((x) => x.original ?? "");
       const coverFallbackUrl = capa ? urls.get(capa) : undefined;
+      const coverLqip = capa ? lqips.get(capa) : undefined;
+      const previewLqips = extras[i]
+        .filter((p) => paraTira(p) && paraTira(p) !== coverUrl)
+        .slice(0, PREVIEWS_POR_CARTAO)
+        .map((p) => lqips.get(p) ?? "");
       return {
         ...t,
         imageCount: ok ? names.length : null,
         ...(ok && truncated ? { truncated: true } : {}),
         coverUrl,
         ...(coverFallbackUrl ? { coverFallbackUrl } : {}),
+        ...(coverLqip ? { coverLqip } : {}),
         ...(previewUrls.length ? { previewUrls, previewFallbackUrls } : {}),
+        ...(previewLqips.some(Boolean) ? { previewLqips } : {}),
       };
     });
     /**

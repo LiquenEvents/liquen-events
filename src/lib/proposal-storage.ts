@@ -1,4 +1,5 @@
 import "server-only";
+import { opcoesDeCarregamento } from "./cache-das-fotos";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { getSupabase } from "./supabase";
@@ -453,7 +454,7 @@ export async function uploadProposalImage(
   const path = `${safeId}/${randomUUID()}.${extFor(contentType)}`;
   const { error } = await sb.storage
     .from(PROPOSAL_BUCKET)
-    .upload(path, bytes, { contentType, upsert: false });
+    .upload(path, bytes, opcoesDeCarregamento(contentType));
   if (error) {
     log.error("proposal-storage: upload falhou", error, { quoteId });
     return null;
@@ -867,14 +868,21 @@ async function ensureMidBucket(): Promise<boolean> {
  * Melhor esforço, como a miniatura: falhar aqui só quer dizer que a abertura
  * seguinte volta a pagar o `sharp`. Nunca impede a imagem de ser servida.
  */
-export async function uploadProposalMid(path: string, bytes: Buffer): Promise<boolean> {
+export async function uploadProposalMid(
+  path: string,
+  bytes: Buffer,
+  // As derivadas saem em WebP desde a Fase 1 da biblioteca — ver `FORMATO` em
+  // `derivadas.ts`. Fica em parâmetro para o formato viver num sítio só: um
+  // «image/jpeg» escrito aqui era um cabeçalho a mentir sobre os bytes.
+  contentType = "image/webp",
+): Promise<boolean> {
   const sb = getSupabase();
   if (!sb || !path) return false;
   try {
     if (!(await ensureMidBucket())) return false;
     const { error } = await sb.storage
       .from(PROPOSAL_MID_BUCKET)
-      .upload(path, bytes, { contentType: "image/jpeg", upsert: true });
+      .upload(path, bytes, opcoesDeCarregamento(contentType, true));
     if (error && !/exist/i.test(error.message)) {
       log.warn("proposal-storage: intermédia não guardada", { path, erro: error.message });
       return false;
@@ -905,7 +913,7 @@ export async function uploadProposalThumb(
     if (!(await ensureThumbBucket())) return "";
     const { error } = await sb.storage
       .from(PROPOSAL_THUMB_BUCKET)
-      .upload(path, bytes, { contentType, upsert: true });
+      .upload(path, bytes, opcoesDeCarregamento(contentType, true));
     if (error) {
       log.warn("proposal-storage: miniatura não guardada", { path, erro: error.message });
       return "";
@@ -1003,7 +1011,7 @@ export async function uploadProposalCover(ref: string, bytes: Buffer): Promise<b
     const { error } = await Promise.race([
       sb.storage
         .from(destino.bucket)
-        .upload(destino.caminho, bytes, { contentType: "image/jpeg", upsert: true }),
+        .upload(destino.caminho, bytes, opcoesDeCarregamento("image/jpeg", true)),
       new Promise<{ error: { message: string } }>((r) =>
         setTimeout(() => r({ error: { message: "tempo esgotado" } }), 5000),
       ),

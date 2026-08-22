@@ -175,6 +175,28 @@ export interface ThemeSummary extends ProposalTheme {
    */
   coverFallbackUrl?: string;
   previewFallbackUrls?: string[];
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * O BORRÃO QUE FAZ O CARTÃO NÃO NASCER CINZENTO
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «placeholder blur por foto — acaba o ecrã de cartões
+   * cinzentos».
+   *
+   * São poucas centenas de bytes por fotografia, e viajam DENTRO desta
+   * resposta: estão pintados no primeiro fotograma, antes de qualquer ida ao
+   * Storage. A grelha de fotos de um tema e o seletor já os usavam; os
+   * CARTÕES, que são a primeira coisa que se vê ao abrir a biblioteca, eram os
+   * únicos a ficar à espera em cinzento.
+   *
+   * Não custam uma ida a mais: os `lqip` lêem-se por PASTA, e a lista de temas
+   * já sabe de que pastas precisa. Podem faltar (fotos anteriores à migração),
+   * e aí o cartão fica como estava.
+   *
+   * `previewLqips` está alinhado por índice com `previewUrls`.
+   */
+  coverLqip?: string;
+  previewLqips?: string[];
 }
 
 /** Limites de escrita partilhados entre o formulário e as rotas de API. */

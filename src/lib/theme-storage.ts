@@ -1,4 +1,5 @@
 import "server-only";
+import { opcoesDeCarregamento } from "./cache-das-fotos";
 import { createHash, randomUUID } from "node:crypto";
 import { getSupabase } from "./supabase";
 import {
@@ -301,7 +302,7 @@ async function uploadThemeDerivada(
     if (!(await ensureBucket(bucket))) return "";
     const { error } = await sb.storage
       .from(bucket)
-      .upload(path, thumb.bytes, { contentType: thumb.contentType, upsert: true });
+      .upload(path, thumb.bytes, opcoesDeCarregamento(thumb.contentType, true));
     if (error) {
       log.warn("theme-storage: derivada não guardada", { bucket, path, erro: error.message });
       return "";
@@ -374,7 +375,7 @@ export async function uploadThemeImage(
   const path = `${folder}/${name}.${extFor(contentType)}`;
   const { error } = await sb.storage
     .from(THEME_BUCKET)
-    .upload(path, bytes, { contentType, upsert: false });
+    .upload(path, bytes, opcoesDeCarregamento(contentType));
   if (error) {
     // A foto já lá estava — o guarda atómico a fazer o seu trabalho. Não é uma
     // avaria e não pode sair daqui como uma.

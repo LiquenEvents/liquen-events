@@ -1,5 +1,6 @@
 import "server-only";
-import sharp from "sharp";
+import { opcoesDeCarregamento } from "./cache-das-fotos";
+import sharp, { type Sharp } from "sharp";
 import { getSupabase } from "@/lib/supabase";
 import {
   PROPOSAL_BUCKET,
@@ -95,6 +96,60 @@ const MINIATURA = { lado: 400, qualidade: 78 } as const;
  * dois pontos custam ~15 KB numa imagem que já pesa 200.
  */
 const MEDIA = { lado: 1200, qualidade: 80 } as const;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS DERIVADAS SAEM EM WEBP
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Do briefing da biblioteca: «AVIF e WebP com fallback».
+ *
+ * ── Porquê WebP, e porquê sem fallback nenhum ─────────────────────────────
+ *
+ * Um WebP com a mesma qualidade percebida pesa **25 a 35% menos** do que um
+ * JPEG mozjpeg. Nas 100 imagens que a lista de temas puxa (25 capas de 400 px e
+ * 75 tiras de 96 px), é a diferença entre ~0,9 MB e ~0,6 MB.
+ *
+ * E não precisa de fallback: o WebP é suportado por todos os navegadores desde
+ * 2020 — Safari desde o iOS 14, que é anterior ao telemóvel mais antigo com que
+ * alguém abre uma proposta. Um `<picture>` aqui seria uma segunda assinatura,
+ * um segundo bucket e um segundo caminho de erro, para cobrir navegadores que
+ * já não existem.
+ *
+ * O AVIF é OUTRA conversa, e está por fazer de propósito: pesa mais uns 10–15%
+ * a menos, mas o Safari só o lê desde o iOS 16, e estas fotografias não são só
+ * dela — são as que um casal abre no telemóvel que tiver. Servi-lo sem
+ * alternativa era arriscar uma página de proposta sem imagens; servi-lo COM
+ * alternativa é um bucket a mais, uma assinatura a mais e um `<picture>` em
+ * cada sítio. É trabalho a sério e tem de ser decidido, não assumido.
+ *
+ * ── O que acontece às derivadas que já existem ────────────────────────────
+ *
+ * Nada, e é de propósito. Ficam JPEG e continuam a servir: o navegador lê o
+ * tipo da RESPOSTA, e não a extensão do caminho. As novas nascem WebP no mesmo
+ * caminho. Quem quiser converter as antigas tem o botão «Gerar derivadas em
+ * falta» — mas nada obriga, e uma migração forçada de 395 fotos não é o preço
+ * certo por 30% de uma coisa que já é pequena.
+ *
+ * (A extensão do caminho passa a mentir sobre o conteúdo. Não incomoda ninguém:
+ * uma derivada nunca é descarregada — o que se descarrega é sempre o original.)
+ */
+const FORMATO = {
+  contentType: "image/webp",
+  /**
+   * A qualidade do WebP não é a mesma escala do JPEG.
+   *
+   * Um WebP q75 tem a qualidade percebida de um JPEG q80 e pesa menos. Passar
+   * cá para dentro os 78/65/80 do JPEG dava ficheiros maiores do que o
+   * necessário — que é o contrário disto.
+   */
+  desconto: 5,
+} as const;
+
+/** Aplica o formato da casa a um `sharp` já redimensionado. */
+function codificar(pipeline: Sharp, qualidade: number) {
+  return pipeline.webp({ quality: Math.max(40, qualidade - FORMATO.desconto) });
+}
 
 const FAMILIAS = [
   {
@@ -266,7 +321,7 @@ async function gerarUma(
     const { data, error } = await sb.storage.from(origem).download(caminho);
     if (error || !data) return false;
     const bytes = Buffer.from(await data.arrayBuffer());
-    const derivada = await sharp(bytes)
+    const derivada = sharp(bytes)
       // `rotate()` sem argumento aplica a orientação do EXIF. Sem isto, uma
       // foto de telemóvel deitada sai com os lados trocados face ao original —
       // e a miniatura ficava com outra proporção do que a grelha reserva.
@@ -274,12 +329,11 @@ async function gerarUma(
       // `withoutEnlargement`: uma foto já menor do que o alvo fica como está.
       // Ampliar produzia uma miniatura MAIOR do que o original, que é o
       // contrário do que isto serve.
-      .resize(alvo.lado, alvo.lado, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: alvo.qualidade, mozjpeg: true })
-      .toBuffer();
+      .resize(alvo.lado, alvo.lado, { fit: "inside", withoutEnlargement: true });
+    const bytesDerivada = await codificar(derivada, alvo.qualidade).toBuffer();
     const { error: erroSubida } = await sb.storage
       .from(alvo.bucket)
-      .upload(caminho, derivada, { contentType: "image/jpeg", upsert: false });
+      .upload(caminho, bytesDerivada, opcoesDeCarregamento(FORMATO.contentType));
     return !erroSubida;
   } catch {
     return false;
@@ -386,7 +440,7 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
     const derivada = await sharp(bytes)
       .rotate()
       .resize(MINIATURA.lado, MINIATURA.lado, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: MINIATURA.qualidade, mozjpeg: true })
+      .webp({ quality: MINIATURA.qualidade - FORMATO.desconto })
       .toBuffer();
     // Guardar é melhor esforço: falhar aqui só quer dizer que a próxima
     // abertura volta a pagar o `sharp`. NUNCA impede esta de ser servida.
@@ -399,7 +453,7 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
     if (daBiblioteca) {
       const { error: erroSubida } = await sb.storage
         .from(destino)
-        .upload(chave, derivada, { contentType: "image/jpeg", upsert: false });
+        .upload(chave, derivada, opcoesDeCarregamento(FORMATO.contentType));
       if (erroSubida && !/exist/i.test(erroSubida.message)) {
         log.warn("derivadas: miniatura a pedido não ficou guardada", {
           destino,
@@ -407,7 +461,7 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
         });
       }
     } else {
-      await uploadProposalThumb(chave, derivada, "image/jpeg");
+      await uploadProposalThumb(chave, derivada, FORMATO.contentType);
     }
     return { bytes: derivada, motivo: "ok" };
   } catch (e) {
@@ -474,14 +528,14 @@ export async function derivadaMediaAPedido(
       // 1200 sai como está. Esticá-la aqui seria fabricar pixéis que não
       // existem e cobrar os bytes deles ao telemóvel do casal.
       .resize(MEDIA.lado, MEDIA.lado, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: MEDIA.qualidade, mozjpeg: true })
+      .webp({ quality: MEDIA.qualidade - FORMATO.desconto })
       .toBuffer();
     // Guardar é melhor esforço, como na miniatura: falhar só quer dizer que a
     // visita seguinte volta a pagar o `sharp`.
     if (daBiblioteca) {
       const { error: erroSubida } = await sb.storage
         .from(destino)
-        .upload(chave, derivada, { contentType: "image/jpeg", upsert: false });
+        .upload(chave, derivada, opcoesDeCarregamento(FORMATO.contentType));
       if (erroSubida && !/exist/i.test(erroSubida.message)) {
         log.warn("derivadas: intermédia a pedido não ficou guardada", {
           destino,
@@ -492,7 +546,7 @@ export async function derivadaMediaAPedido(
       // Pelo `uploadProposalMid` e não por um `upload` cru: é ele que GARANTE
       // o bucket. Sem isso, numa instalação onde ele ainda não existe, cada
       // visita voltava a pagar o `sharp` de cada fotografia, para sempre.
-      await uploadProposalMid(chave, derivada);
+      await uploadProposalMid(chave, derivada, FORMATO.contentType);
     }
     return { bytes: derivada, motivo: "ok" };
   } catch (e) {

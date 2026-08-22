@@ -23,6 +23,7 @@ import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeIte
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import ImagemComPlanoB from "./ImagemComPlanoB";
+import { adiantarTema, paginaDaResposta, usarAdiantada } from "./prefetch-de-tema";
 import { SugestaoDeNome } from "./SugestaoDeNome";
 import { NomesPorArrumar } from "./NomesPorArrumar";
 
@@ -1268,6 +1269,20 @@ export default function Temas() {
               <button
                 type="button"
                 onClick={() => setOpenId(t.id)}
+                /* ── O RATO POUSA, AS FOTOS COMEÇAM A VIR ─────────────────
+                   «Prefetch on hover: passar o rato sobre um tema começa a
+                   carregar as suas fotos.» Abrir um tema são duas esperas em
+                   fila — a listagem da pasta e só DEPOIS as miniaturas —, e
+                   enquanto a primeira não volta a grelha nem tem endereços
+                   para pedir. O rato costuma pousar um segundo antes do
+                   clique, e esse segundo chega.
+
+                   Só com rato: num telemóvel não há «passar por cima», há
+                   tocar — e tocar já abre. Ver `adiantarTema`. */
+                onPointerEnter={(e) => {
+                  if (e.pointerType === "mouse") adiantarTema(t.id);
+                }}
+                onFocus={() => adiantarTema(t.id)}
                 className="block w-full overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white text-left shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-colors hover:border-[#4d6350]/40"
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
@@ -1278,6 +1293,7 @@ export default function Temas() {
                     <ImagemComPlanoB
                       src={t.coverUrl}
                       planoB={t.coverFallbackUrl}
+                      lqip={t.coverLqip}
                       className="h-full min-w-0 flex-1 object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
                     />
                   ) : (
@@ -1296,6 +1312,7 @@ export default function Temas() {
                           key={u}
                           src={u}
                           planoB={t.previewFallbackUrls?.[k]}
+                          lqip={t.previewLqips?.[k]}
                           className="min-h-0 w-full flex-1 object-cover"
                         />
                       ))}
@@ -1773,23 +1790,29 @@ function ThemeFolder({
     let active = true;
     (async () => {
       try {
-        const res = await fetch(
-          `/api/temas/${theme.id}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`,
-          { cache: "no-store" },
-        );
-        if (!res.ok) throw new Error("falhou");
-        const data = await res.json();
+        // O rato já pousou neste cartão? Então a listagem pode já estar cá —
+        // ver `adiantarTema`. `null` quer dizer «não havia, ou já não vale», e
+        // aí paga-se a ida normal, exactamente como antes disto existir.
+        const adiantada = await usarAdiantada(theme.id);
+        const pagina =
+          adiantada ??
+          (await (async () => {
+            const res = await fetch(
+              `/api/temas/${theme.id}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`,
+              { cache: "no-store" },
+            );
+            if (!res.ok) throw new Error("falhou");
+            return paginaDaResposta(await res.json());
+          })());
         if (!active) return;
-        const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
+        const page = pagina.images;
         setImages(page);
-        // `ok: false` é uma pasta que NÃO pôde ser lida — o servidor manda
-        // `total: 0` porque não tem outro número para dar. Aceitá-lo como zero
-        // faria a grelha dizer "arraste aqui as fotos" a um tema que pode ter
-        // 3000 — e ela a carregá-las outra vez. `null` = não sabemos.
-        setTotal(
-          data?.ok === false ? null : typeof data?.total === "number" ? data.total : page.length,
-        );
-        setTruncated(Boolean(data?.truncated));
+        // `total: null` é uma pasta que NÃO pôde ser lida — ver
+        // `paginaDaResposta`. Aceitá-la como zero faria a grelha dizer "arrasta
+        // aqui as fotos" a um tema que pode ter 3000, e ela a carregá-las outra
+        // vez.
+        setTotal(pagina.total);
+        setTruncated(pagina.truncated);
         setPageFull(page.length >= THEME_PAGE_SIZE);
       } catch {
         // Sem lista não se avisa o pai: o cartão guarda a contagem que veio do
