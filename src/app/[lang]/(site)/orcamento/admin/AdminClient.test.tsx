@@ -315,9 +315,13 @@ describe("AdminClient shell", () => {
     } as never);
 
     fireEvent.click(screen.getByText("Sara Lopes"));
-    // A falha é DITA. O silêncio aqui seria um painel de convidados vazio a
-    // fingir que aquele casamento não tem convidados nenhuns.
-    expect(await screen.findByText(/Não foi possível abrir o pedido/)).toBeInTheDocument();
+    // A falha é DITA, e NOMEIA o pedido: «Não foi possível abrir o pedido» era
+    // a mesma frase para quatro avarias com respostas diferentes, e nenhuma
+    // delas dizia de que pedido se tratava.
+    const aviso = await screen.findByText(/não está a aceitar gravações/i);
+    // E o aviso NOMEIA o pedido — «Não foi possível abrir o pedido» servia
+    // quatro avarias diferentes e nenhuma dizia de qual se tratava.
+    expect(aviso.textContent).toContain("Sara Lopes");
     // O painel ecoa a referência do pedido no cabeçalho; com ele fechado, a
     // referência aparece uma vez só — na linha da lista.
     expect(screen.getAllByText(/LQ-777/)).toHaveLength(1);
@@ -348,7 +352,11 @@ describe("AdminClient shell", () => {
 
     fireEvent.click(screen.getByText("Sara Lopes"));
 
-    expect(await screen.findByText(/Não foi possível abrir o pedido/)).toBeInTheDocument();
+    // E aqui a frase certa é OUTRA: isto não é uma falha de ligação, é a
+    // sessão caída — e mandar «verificar a ligação» era mandar fazer a única
+    // coisa que não resolve nada.
+    expect(await screen.findByText(/sessão expirou/i)).toBeInTheDocument();
+    expect(screen.getByText(/volta a entrar/i)).toBeInTheDocument();
     expect(screen.getAllByText(/LQ-777/)).toHaveLength(1);
   });
 

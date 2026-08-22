@@ -867,6 +867,17 @@ function textoDoPreco(q: Quote): string {
  */
 const porqueNaoGravou = razaoDaRecusa;
 
+/**
+ * O que a leitura de um pedido devolve.
+ *
+ * `Quote | null` não chegava: o `null` servia quatro avarias diferentes — rede
+ * em baixo, recusa do servidor, sessão caída (que responde **200**, ver abaixo)
+ * e resposta truncada — e quem chamava só sabia dizer «Verifica a ligação e
+ * tenta de novo». Numa sessão caída, essa frase manda fazer a única coisa que
+ * não resolve nada.
+ */
+type LeituraDoPedido = { ok: true; quote: Quote } | { ok: false; porque: string };
+
 export default function AdminClient({ initialQuotes, userName = "Catarina" }: Props) {
   // `QuoteSummary` é atribuível a `Quote` (só faltam campos opcionais), e o
   // estado tem mesmo de ser `Quote[]`: assim que um pedido é aberto ou gravado,
@@ -891,6 +902,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
    * três dias ou mais"), porque a pergunta que serve não é "quais esperam há
    * exactamente quatro dias" mas "o que é que já esperou de mais".
    */
+  /** O pedido que está a ser aberto agora — ver `openQuote`. */
+  const [aAbrir, setAAbrir] = useState<{ id: string; nome: string } | null>(null);
   const [filterEspera, setFilterEspera] = useState<"all" | "3" | "7">("all");
   const [filterMes, setFilterMes] = useState<string>("all");
   const [filterRegiao, setFilterRegiao] = useState<string>("all");
@@ -1983,33 +1996,47 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
    * quem chamou avisa. Uma falha visível é melhor do que um painel que parece
    * completo e não está.
    */
-  async function comPedidoInteiro(q: Quote): Promise<Quote | null> {
-    if (completos.current.has(q.id)) return q;
+  async function comPedidoInteiro(q: Quote): Promise<LeituraDoPedido> {
+    if (completos.current.has(q.id)) return { ok: true, quote: q };
+    const oQue = `abrir o pedido de ${q.name || "este cliente"}`;
+    let res: Response;
     try {
-      const res = await fetch(`/api/orcamento/${encodeURIComponent(q.id)}`, {
+      res = await fetch(`/api/orcamento/${encodeURIComponent(q.id)}`, {
         cache: "no-store",
       });
-      if (!res.ok) return null;
-      /**
-       * SESSÃO EXPIRADA RESPONDE 200. Esta rota é pública — a página de
-       * confirmação do casal lê-a — e sem sessão devolve uma lista curta de
-       * factos do evento que TAMBÉM tem `id` e TAMBÉM vem com 200. Aceitá-la
-       * era abrir o painel sem nome, sem contacto, sem pagamentos e sem
-       * convidados, e ainda substituir o pedido na lista por essa versão.
-       *
-       * O cabeçalho é a única marca fiável de que veio o pedido inteiro; a
-       * rota explica porquê. Sem ele, isto é uma falha — e uma falha visível é
-       * melhor do que um painel que parece completo e não está.
-       */
-      if (res.headers.get("x-pedido") !== "completo") return null;
-      const inteiro = (await res.json()) as Quote;
-      if (!inteiro?.id) return null;
-      completos.current.add(inteiro.id);
-      setQuotes((prev) => prev.map((x) => (x.id === inteiro.id ? inteiro : x)));
-      return inteiro;
     } catch {
-      return null;
+      return { ok: false, porque: porqueRebentou(oQue).mensagem };
     }
+    if (!res.ok) {
+      const corpo = await res.json().catch(() => null);
+      return { ok: false, porque: porqueFalhou(oQue, res, corpo).mensagem };
+    }
+    /**
+     * SESSÃO EXPIRADA RESPONDE 200. Esta rota é pública — a página de
+     * confirmação do casal lê-a — e sem sessão devolve uma lista curta de
+     * factos do evento que TAMBÉM tem `id` e TAMBÉM vem com 200. Aceitá-la
+     * era abrir o painel sem nome, sem contacto, sem pagamentos e sem
+     * convidados, e ainda substituir o pedido na lista por essa versão.
+     *
+     * O cabeçalho é a única marca fiável de que veio o pedido inteiro; a
+     * rota explica porquê. Sem ele, isto é uma falha — e uma falha visível é
+     * melhor do que um painel que parece completo e não está.
+     */
+    if (res.headers.get("x-pedido") !== "completo") {
+      // Este 200 não é um 200: é a sessão caída, e dizer «verifica a ligação»
+      // sobre ela mandava-a fazer a única coisa que não resolve nada.
+      return {
+        ok: false,
+        porque: `A sessão expirou — não deu para ${oQue}. Volta a entrar e tenta outra vez.`,
+      };
+    }
+    const inteiro = (await res.json().catch(() => null)) as Quote | null;
+    if (!inteiro?.id) {
+      return { ok: false, porque: `A resposta veio incompleta — não deu para ${oQue}. Repete.` };
+    }
+    completos.current.add(inteiro.id);
+    setQuotes((prev) => prev.map((x) => (x.id === inteiro.id ? inteiro : x)));
+    return { ok: true, quote: inteiro };
   }
 
   /**
@@ -2029,8 +2056,8 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     const actual = quotes.find((q) => q.id === id);
     if (!actual) return;
     completos.current.delete(id);
-    const inteiro = await comPedidoInteiro(actual);
-    if (inteiro) absorverDoServidor(inteiro);
+    const r = await comPedidoInteiro(actual);
+    if (r.ok) absorverDoServidor(r.quote);
   }
 
   async function openQuote(pedido: Quote) {
@@ -2043,11 +2070,34 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
     // resposta ao clique no mesmo instante em que a dava antes. O que espera
     // pelo servidor é só o painel de detalhe.
     setView("pedidos");
-    const q = await comPedidoInteiro(pedido);
-    if (!q) {
-      toast("Não foi possível abrir o pedido. Verifica a ligação e tenta de novo.", "error");
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * ABRIR UM PEDIDO ERA MUDO — SEIS VEZES
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Do inventário: **seis portas para abrir um pedido — a lista, o Kanban, o
+     * Calendário, os Clientes, o Acompanhamento e a Visão Geral — e todas
+     * mudas.** Toca-se, e não acontece nada visível enquanto o servidor não
+     * responder. Num 4G de quinta são segundos, e o gesto seguinte é tocar
+     * outra vez.
+     *
+     * O painel espera de propósito e por boa razão (ver `comPedidoInteiro`:
+     * abrir com o resumo apagava listas de convidados). O que não pode é
+     * esperar em silêncio.
+     *
+     * As seis portas passam todas por aqui, portanto o aviso escreve-se uma
+     * vez. Fica por cima de todas as vistas, ao lado do
+     * `AvisoDeArmazenamento` — porque quem tocou pode ter tocado no
+     * Calendário, e é lá que ele tem de aparecer.
+     */
+    setAAbrir({ id: pedido.id, nome: pedido.name || "este pedido" });
+    const r = await comPedidoInteiro(pedido);
+    setAAbrir(null);
+    if (!r.ok) {
+      toast(r.porque, "error");
       return;
     }
+    const q = r.quote;
     setSelected(q);
     // Track in recently-viewed list (localStorage)
     try {
@@ -3788,6 +3838,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
               servidor diz que há mesmo alguma coisa errada. Ver o cabeçalho do
               componente. */}
           <AvisoDeArmazenamento />
+
+          {/* A espera de abrir um pedido, aqui pelo mesmo motivo que o aviso
+              acima: as seis portas que abrem um pedido estão espalhadas por
+              cinco vistas, e o sinal tem de aparecer naquela em que o dedo
+              tocou. */}
+          {aAbrir && (
+            <EmCurso
+              className="mb-4"
+              titulo={`A abrir o pedido de ${aAbrir.nome}`}
+              estimadoMs={1200}
+              nota="Vai buscar os convidados, a checklist e o cronograma — é o que falta ao resumo da lista."
+              notaDemorada="A ligação está lenta. Podes esperar, ou voltar atrás e tentar daqui a pouco."
+            />
+          )}
 
           {/* ── Overview ── */}
           {view === "overview" && (
