@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   aplicarFila,
+  fechoPendente,
   juntarAFila,
   resolverConflito,
   lerFila,
@@ -143,5 +144,68 @@ describe("aplicarFila", () => {
   it("a fila de OUTRO evento não se mete nesta", () => {
     const fila = [marca({ itemId: "i1", eventId: "outro" })];
     expect(aplicarFila([item("i1")], fila, "e1")[0].loadedAt).toBeUndefined();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O FECHO DO CARREGAMENTO VIAJA NA MESMA FILA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * «Dar por carregada» é o último gesto do carregamento — e portanto o mais
+ * provável de apanhar uma quinta sem rede: é o que se faz já com tudo lá
+ * dentro, ao portão. Por isso vai na fila como tudo o resto, em vez de exigir
+ * ligação.
+ *
+ * Não é sobre nenhuma linha: leva `itemId` vazio. É essa diferença que estes
+ * testes guardam, dos dois lados — que ele não se meta nas linhas, e que as
+ * linhas não o escondam.
+ */
+const fecho = (over: Partial<MarcacaoPendente> = {}): MarcacaoPendente =>
+  marca({ id: "f1", itemId: "", accao: "fechado", valor: "carregada", ...over });
+
+describe("o fecho do carregamento", () => {
+  it("não toca em linha nenhuma", () => {
+    const itens = [
+      { id: "escadote", loadedAt: undefined as string | undefined },
+      { id: "", loadedAt: undefined as string | undefined },
+    ];
+    const out = aplicarFila(itens, [fecho()], "e1");
+    expect(out[0].loadedAt).toBeUndefined();
+    // Nem sequer numa linha com id vazio, que é o caso que a filtragem por
+    // `itemId` sozinha deixaria passar.
+    expect(out[1].loadedAt).toBeUndefined();
+  });
+
+  it("fechar e reabrir deixa UMA entrada, e é a última", () => {
+    let fila: MarcacaoPendente[] = [];
+    fila = juntarAFila(fila, fecho({ id: "a", valor: "carregada" }));
+    fila = juntarAFila(fila, fecho({ id: "b", valor: "preparada" }));
+    fila = juntarAFila(fila, fecho({ id: "c", valor: "carregada" }));
+    expect(fila).toHaveLength(1);
+    expect(fila[0].valor).toBe("carregada");
+  });
+
+  it("convive com as marcações das linhas sem as substituir", () => {
+    let fila: MarcacaoPendente[] = [];
+    fila = juntarAFila(fila, marca({ id: "a", itemId: "escadote", accao: "loaded" }));
+    fila = juntarAFila(fila, fecho({ id: "f" }));
+    expect(fila).toHaveLength(2);
+  });
+
+  it("`fechoPendente` devolve o último pelo relógio de quem marcou", () => {
+    const fila = [
+      fecho({ id: "b", valor: "preparada", markedAt: "2026-09-12T09:00:00.000Z" }),
+      fecho({ id: "a", valor: "carregada", markedAt: "2026-09-12T08:00:00.000Z" }),
+    ];
+    expect(fechoPendente(fila, "e1")?.valor).toBe("preparada");
+  });
+
+  it("sem fecho na fila, não inventa nenhum", () => {
+    expect(fechoPendente([marca()], "e1")).toBeNull();
+  });
+
+  it("o fecho de OUTRO evento não fecha este", () => {
+    expect(fechoPendente([fecho({ eventId: "outro" })], "e1")).toBeNull();
   });
 });

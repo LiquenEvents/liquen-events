@@ -6,10 +6,12 @@ import type { EventMaterialItem } from "@/lib/event-material-types";
 import { progresso } from "@/lib/event-material-types";
 import {
   aplicarFila,
+  fechoPendente,
   juntarAFila,
   lerFila,
   escreverFila,
   chaveEvento,
+  type EstadoDoFecho,
   type MarcacaoPendente,
 } from "@/lib/material-offline";
 import { AvisoDeFalha } from "../../AvisoDeFalha";
@@ -47,6 +49,21 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
   const [aSincronizar, setASincronizar] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
   const [veiculo, setVeiculo] = useState<string>("todos");
+  /**
+   * O estado da checklist como o SERVIDOR o conhece. A fila local manda por
+   * cima — ver `estado`, mais abaixo.
+   */
+  const [estadoNoServidor, setEstadoNoServidor] = useState<string>("preparada");
+  /**
+   * O último envio da fila falhou?
+   *
+   * Isto existia como um `catch` vazio, e o vazio era o defeito: uma fila que
+   * nunca chega ao servidor ficava indistinguível de uma a caminho. O
+   * cabeçalho dizia «3 marcações guardadas para enviar» tanto no caso em que
+   * iam a caminho como no caso em que estavam presas — e é a diferença entre
+   * fechar a carrinha descansada e voltar ao computador a confirmar.
+   */
+  const [envioFalhou, setEnvioFalhou] = useState(false);
   /**
    * O que a leitura disse quando falhou. `null` é "correu bem"; a string vazia é
    * "falhou e o servidor não explicou". São três estados e não dois, pela mesma
@@ -116,6 +133,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
         return;
       }
       const r = await res.json();
+      if (typeof r?.evento?.status === "string") setEstadoNoServidor(r.evento.status);
       if (Array.isArray(r?.itens)) {
         // A fila por cima: uma marcação feita enquanto este pedido ia a
         // caminho não pode ser apagada pela resposta dele.
@@ -149,13 +167,19 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
       const resto = lerFila(localStorage).filter((m) => !enviados.has(m.id));
       escreverFila(localStorage, resto);
       setFila(resto);
+      if (typeof r?.estado === "string") setEstadoNoServidor(r.estado);
       if (Array.isArray(r?.itens)) {
         const juntos = aplicarFila<EventMaterialItem>(r.itens, resto, eventId);
         setItens(juntos);
         guardarLocal(juntos);
       }
+      setEnvioFalhou(false);
     } catch {
-      /* continua na fila; tenta-se outra vez à próxima */
+      // Continua na fila — nada se perde, que é o que esta página promete. Mas
+      // DIZ-SE: um `catch` vazio aqui fazia uma fila presa parecer uma fila a
+      // caminho, e quem está ao lado da carrinha não tem como saber a
+      // diferença.
+      setEnvioFalhou(true);
     } finally {
       setASincronizar(false);
     }
@@ -205,6 +229,41 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
     if (navigator.onLine) void sincronizar();
   }
 
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * O GESTO QUE FECHA O CARREGAMENTO PASSA A GRAVAR ALGUMA COISA
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * O botão «Dar por carregada» existia, ocupava a barra inferior inteira, e
+   * **não fazia nada**: quando não faltava nenhum crítico, o `onClick` não
+   * executava acção nenhuma. O «Seguir assim», do outro lado do aviso, só
+   * fechava o aviso. O gesto que encerra a tarefa era o único da página que não
+   * escrevia.
+   *
+   * Agora escreve, e escreve como tudo o resto aqui escreve: **primeiro no
+   * telemóvel, e a rede a seguir**. Fechar a carrinha é o momento MAIS provável
+   * de não haver rede — é o último gesto, já com tudo lá dentro e a caminho do
+   * portão —, e um fecho que exigisse ligação era um fecho que se perdia
+   * precisamente quando conta.
+   */
+  function marcarFecho(para: EstadoDoFecho) {
+    const marca: MarcacaoPendente = {
+      id: idMarca(),
+      eventId,
+      // Vazio de propósito: isto não é sobre nenhuma linha.
+      itemId: "",
+      accao: "fechado",
+      valor: para,
+      markedAt: new Date().toISOString(),
+      actor,
+    };
+    const novaFila = juntarAFila(lerFila(localStorage), marca);
+    escreverFila(localStorage, novaFila);
+    setFila(novaFila);
+    setConfirmar(false);
+    if (navigator.onLine) void sincronizar();
+  }
+
   const visiveis = useMemo(
     () => (veiculo === "todos" ? itens : itens.filter((i) => (i.vehicleId ?? "") === veiculo)),
     [itens, veiculo],
@@ -229,6 +288,19 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
 
   const pendentesDeste = fila.filter((m) => m.eventId === eventId).length;
 
+  /**
+   * O estado que se MOSTRA: a fila por cima do servidor, pela mesma razão que
+   * o `aplicarFila` existe para as linhas. Sem isto, fechar a carrinha sem rede
+   * não mudava nada no ecrã — e é aí que se carrega no botão.
+   */
+  const fecho = fechoPendente(fila, eventId);
+  const estado = fecho ? fecho.valor : estadoNoServidor;
+  const fechada = estado === "carregada" || estado === "devolvida";
+  /** A hora do fecho, quando é este telemóvel que a sabe. */
+  const horaDoFecho = fecho
+    ? new Date(fecho.markedAt).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })
+    : "";
+
   return (
     <div className="mx-auto min-h-dvh w-full max-w-[640px] bg-background pb-28">
       {/* Cabeçalho fixo: o contador é a única coisa que se olha a meio do
@@ -247,17 +319,31 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
           aria-valuenow={p.carregados}
           className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
         >
+          {/* `scaleX` e não `width`: mudar a largura obriga o telemóvel a
+              refazer a disposição a cada marcação, e este é o ecrã que corre
+              num telemóvel com a carrinha a abanar. `motion-safe:` porque quem
+              desligou o movimento no sistema não o quer aqui. */}
           <div
-            className="h-full rounded-full bg-[#4d6350] transition-[width] duration-300"
-            style={{ width: p.total ? `${(p.carregados / p.total) * 100}%` : "0%" }}
+            className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+            style={{ transform: `scaleX(${p.total ? p.carregados / p.total : 0})` }}
           />
         </div>
         {(!online || pendentesDeste > 0) && (
-          <p className="mt-2 text-xs text-foreground/60">
+          <p
+            className={`mt-2 text-xs ${envioFalhou && online ? "text-[#8a2a22]" : "text-foreground/60"}`}
+          >
             {!online && "Sem rede. "}
             {pendentesDeste > 0 &&
               `${pendentesDeste} ${pendentesDeste === 1 ? "marcação guardada" : "marcações guardadas"} para enviar.`}
             {aSincronizar && " A enviar…"}
+            {/* Três estados e não dois: a caminho, presa, e guardada sem rede.
+                Antes eram todos a mesma frase — e uma fila presa lida como uma
+                fila a caminho é como se descobre no dia seguinte que o
+                carregamento nunca chegou ao escritório. */}
+            {!aSincronizar &&
+              online &&
+              envioFalhou &&
+              " Não deu para enviar — nada se perdeu, e tenta outra vez sozinho."}
           </p>
         )}
         {veiculos.length > 0 && (
@@ -375,7 +461,30 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
           polegar, sem ter de rolar até ao fim de 41 linhas. */}
       {itens.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t border-foreground/10 bg-background/95 p-4 backdrop-blur">
-          {confirmar && p.criticosPorCarregar.length > 0 ? (
+          {fechada ? (
+            /* O DESFECHO À VISTA, e uma saída.
+               Uma acção que não deixa marca é indistinguível de uma que não
+               aconteceu; e uma que não se desfaz, num ecrã usado com uma mão a
+               abanar dentro de uma carrinha, é um toque enganado que fica. */
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <p className="min-w-0 flex-1 text-sm">
+                <strong className="font-medium text-[#4d6350]">Carrinha dada por carregada</strong>
+                {horaDoFecho && <span className="text-foreground/60"> às {horaDoFecho}</span>}
+                {p.carregados < p.total && (
+                  <span className="text-foreground/55"> · {p.total - p.carregados} por marcar</span>
+                )}
+              </p>
+              {estado !== "devolvida" && (
+                <button
+                  type="button"
+                  onClick={() => marcarFecho("preparada")}
+                  className="alvo-toque shrink-0 rounded-lg px-2 text-xs text-foreground/60 underline decoration-dotted underline-offset-2"
+                >
+                  Reabrir
+                </button>
+              )}
+            </div>
+          ) : confirmar && p.criticosPorCarregar.length > 0 ? (
             <div>
               <p className="text-sm">
                 Faltam {p.criticosPorCarregar.length} itens críticos:{" "}
@@ -389,9 +498,12 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
                 >
                   Voltar
                 </button>
+                {/* «Seguir assim» fechava o aviso e mais nada — a pessoa
+                    carregava, o aviso sumia, e ficava a achar que tinha
+                    fechado o carregamento. Agora fecha-o mesmo. */}
                 <button
                   type="button"
-                  onClick={() => setConfirmar(false)}
+                  onClick={() => marcarFecho("carregada")}
                   className="min-h-[48px] flex-1 rounded-xl bg-[#4d6350] px-4 text-white"
                 >
                   Seguir assim
@@ -403,6 +515,7 @@ export default function Carregamento({ quoteId, eventId, titulo, actor }: Props)
               type="button"
               onClick={() => {
                 if (p.criticosPorCarregar.length > 0) setConfirmar(true);
+                else marcarFecho("carregada");
               }}
               className="min-h-[52px] w-full rounded-xl bg-[#4d6350] px-4 text-white disabled:opacity-45"
               disabled={p.carregados === 0}

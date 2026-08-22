@@ -25,12 +25,34 @@
  * marcações, e tem de poder ser testada sem montar um ecrã.
  */
 
-export type AccaoOffline = "loaded" | "unloaded" | "returned" | "missing" | "note" | "used";
+/**
+ * As acções que viajam na fila.
+ *
+ * Todas dizem respeito a UMA LINHA — menos a última. `fechado` é sobre a
+ * checklist inteira: é o «Dar por carregada» do fim, com `valor` a dizer para
+ * que estado («carregada» quando se fecha, «preparada» quando se reabre).
+ *
+ * Viaja na MESMA fila e não numa segunda, e a razão é a que fez esta fila
+ * existir: quem carrega a carrinha está numa quinta onde a rede vai e vem, e o
+ * gesto que fecha o carregamento é o mais provável de apanhar o pior momento —
+ * é o último, já com a carrinha à porta. Uma segunda fila era um segundo sítio
+ * onde se pode perder trabalho, e um segundo sítio para alguém se esquecer de
+ * o reenviar.
+ */
+export type AccaoOffline =
+  | "loaded"
+  | "unloaded"
+  | "returned"
+  | "missing"
+  | "note"
+  | "used"
+  | "fechado";
 
 export interface MarcacaoPendente {
   /** Único por marcação, para o servidor poder ignorar repetições. */
   id: string;
   eventId: string;
+  /** Vazio em `fechado`: essa não é sobre nenhuma linha. */
   itemId: string;
   accao: AccaoOffline;
   valor?: string;
@@ -38,6 +60,9 @@ export interface MarcacaoPendente {
   markedAt: string;
   actor: string;
 }
+
+/** O estado para que o `fechado` leva a checklist. */
+export type EstadoDoFecho = "carregada" | "preparada";
 
 /** O que vive no armazenamento local, por evento. */
 export interface EstadoLocal<T> {
@@ -106,7 +131,10 @@ export function juntarAFila(fila: MarcacaoPendente[], marca: MarcacaoPendente): 
 export function aplicarFila<
   T extends { id: string; loadedAt?: string; loadedBy?: string; note?: string },
 >(itens: T[], fila: MarcacaoPendente[], eventId: string): T[] {
-  const pendentes = fila.filter((m) => m.eventId === eventId);
+  // O `fechado` fica de fora por escrito, e não por acidente: ele tem
+  // `itemId` vazio, portanto nunca casaria com linha nenhuma — mas depender
+  // disso era deixar a correcção à mercê de uma linha com id vazio.
+  const pendentes = fila.filter((m) => m.eventId === eventId && m.accao !== "fechado");
   if (pendentes.length === 0) return itens;
   const porItem = new Map<string, MarcacaoPendente[]>();
   for (const m of pendentes) {
@@ -143,4 +171,23 @@ export function resolverConflito(
   return local.markedAt > servidor.markedAt
     ? { ganha: "local" }
     : { ganha: "servidor", perdida: local };
+}
+
+/**
+ * O «Dar por carregada» que ainda não chegou ao servidor.
+ *
+ * O ecrã precisa dele para poder mostrar a carrinha como fechada **antes** de a
+ * rede confirmar — que é a regra desta página inteira: o dedo nunca espera. Sem
+ * isto, carregar no botão numa quinta sem rede não mudava nada no ecrã, e é
+ * exactamente aí que se carrega nele.
+ */
+export function fechoPendente(
+  fila: readonly MarcacaoPendente[],
+  eventId: string,
+): MarcacaoPendente | null {
+  const meus = fila.filter((m) => m.eventId === eventId && m.accao === "fechado");
+  if (meus.length === 0) return null;
+  // A última pelo relógio de quem marcou, pela mesma razão de sempre: fechar e
+  // reabrir duas vezes tem de acabar no que se fez por último.
+  return [...meus].sort((a, b) => a.markedAt.localeCompare(b.markedAt))[meus.length - 1];
 }

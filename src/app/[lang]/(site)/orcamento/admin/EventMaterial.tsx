@@ -177,6 +177,22 @@ export default function EventMaterialPanel({ quote }: { quote: Quote }) {
               }`}
           </span>
         )}
+        {/* ── O DESFECHO DO CARREGAMENTO CHEGA AQUI ────────────────────────
+            Quem carrega está numa quinta; quem quer saber se a carrinha já
+            saiu está no escritório. Este selo é o único sítio onde essa
+            pergunta tem resposta — e até há pouco não tinha nenhuma, porque o
+            botão que fecha o carregamento não gravava nada e o estado da
+            checklist era uma coluna morta. */}
+        {dados.evento?.status === "carregada" && (
+          <span className="rounded-full bg-[#4d6350]/12 px-2 py-0.5 text-[11px] font-medium text-[#4d6350]">
+            Carrinha carregada
+          </span>
+        )}
+        {dados.evento?.status === "devolvida" && (
+          <span className="rounded-full bg-foreground/[0.07] px-2 py-0.5 text-[11px] font-medium text-foreground/60">
+            Material devolvido
+          </span>
+        )}
       </div>
 
       {carregando ? null : !dados.evento ? (
