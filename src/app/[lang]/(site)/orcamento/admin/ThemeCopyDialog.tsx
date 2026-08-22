@@ -403,8 +403,8 @@ export default function ThemeCopyDialog({
               className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
             >
               <div
-                className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-300"
-                style={{ width: `${pct}%` }}
+                className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+                style={{ transform: `scaleX(${pct / 100})` }}
               />
             </div>
           </div>

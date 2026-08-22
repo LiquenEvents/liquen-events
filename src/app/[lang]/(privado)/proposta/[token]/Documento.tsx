@@ -630,7 +630,39 @@ export default function Documento({
           num telemóvel antes de se chegar a uma palavra. Só quando há mesmo
           fotografia de capa resolvida. */}
       {capa && (
-        <div className="mb-12 overflow-hidden rounded-sm">
+        <div
+          className="relative mb-12 overflow-hidden rounded-sm"
+          style={{
+            // 21:9 no telemóvel seria uma nesga; 3:2 numa janela larga seria
+            // meia página antes de uma palavra. A forma real da fotografia,
+            // quando se sabe, com um tecto de altura para o ecrã largo.
+            //
+            // A caixa é que fica com a forma, e não a imagem: é ela que tem de
+            // reservar o espaço ANTES de haver imagem, senão o texto que está
+            // por baixo salta quando a fotografia chega — e um salto lê-se como
+            // lentidão mesmo quando não é.
+            aspectRatio: capa.largura && capa.altura ? `${capa.largura} / ${capa.altura}` : "3 / 2",
+            maxHeight: "min(56vh, 520px)",
+          }}
+        >
+          {/* ── A CAPA NÃO NASCE EM BRANCO ──────────────────────────────────
+              Palavras dela: «esta foto demora imenso tempo a carregar, e eu
+              quero que seja super rápida e fluida a aparecer».
+
+              O `lqip` são poucas centenas de bytes que VÊM NO HTML: está
+              pintado no primeiro fotograma, antes de qualquer ida à rede. A
+              fotografia a sério assenta por cima quando chegar. É o mesmo que a
+              galeria já fazia em cada célula — e a capa, que é a primeira coisa
+              que o casal vê, era a única que ficava um rectângulo vazio. */}
+          {capa.lqip && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={capa.lqip}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-105 object-cover blur-xl"
+            />
+          )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={capa.miniatura ?? capa.original}
@@ -645,12 +677,23 @@ export default function Documento({
                    * conta da galeria, no sítio onde ela se vê mais: a primeira
                    * coisa que o casal olha ao abrir a proposta.
                    *
-                   * A derivada intermédia (1200 px) vem da mesma rota da
-                   * galeria — ver `api/proposta/[token]/foto/[id]`. O `src`
-                   * fica com a miniatura por ser o que um navegador sem
-                   * `srcset` usa.
+                   * ── E VEM DIRECTA DO STORAGE, QUANDO JÁ EXISTE ──────────
+                   *
+                   * A derivada de 1200 px era servida SEMPRE pela nossa rota —
+                   * que abre o token, descarrega os bytes para dentro da função
+                   * e só então os reencaminha. Os mesmos bytes a atravessar-nos
+                   * a caminho de um sítio onde já estavam, com um arranque a
+                   * frio pelo meio. Assinada (`capa.media`), vem do CDN
+                   * directamente ao telemóvel.
+                   *
+                   * A rota fica para quando a derivada ainda não foi fabricada:
+                   * é ela que a fabrica, guarda e serve. Deixa de ser o caminho
+                   * de todos os dias e passa a ser o de arranque.
                    */
-                  srcSet: `${capa.miniatura} 400w, /api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)} 1200w`,
+                  srcSet: `${capa.miniatura} 400w, ${
+                    capa.media ??
+                    `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(capa.id)}`
+                  } 1200w`,
                   /* A capa ocupa a largura da página, com o tecto de 1024 px
                      do `max-w-5xl`. Sem isto o navegador assume `100vw` e num
                      ecrã grande pede a maior sem precisar. */
@@ -661,16 +704,13 @@ export default function Documento({
             /* A capa é a primeira coisa à vista: entra ansiosa, com prioridade
                de busca, porque é ela o elemento de maior pintura da página. */
             fetchPriority="high"
-            decoding="async"
-            className="w-full object-cover"
-            style={{
-              // 21:9 no telemóvel seria uma nesga; 3:2 numa janela larga seria
-              // meia página antes de uma palavra. A forma real da fotografia,
-              // quando se sabe, com um tecto de altura para o ecrã largo.
-              aspectRatio:
-                capa.largura && capa.altura ? `${capa.largura} / ${capa.altura}` : "3 / 2",
-              maxHeight: "min(56vh, 520px)",
-            }}
+            /* `sync` e não `async`: numa imagem que já foi buscada com
+               prioridade alta, descodificar fora do fio principal só adiciona um
+               fotograma de espera entre «os bytes chegaram» e «vê-se». Nas
+               outras da página continua `async`, que aí é o certo — são muitas
+               e nenhuma é a que se está a olhar. */
+            decoding="sync"
+            className="relative block h-full w-full object-cover"
           />
         </div>
       )}

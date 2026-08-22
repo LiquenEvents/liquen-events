@@ -374,36 +374,8 @@ function corpos(parte: string, metodo = "PUT"): string[] {
     .map((p) => String(p.init?.body ?? ""));
 }
 
-/**
- * ════════════════════════════════════════════════════════════════════════════
- * AS SECÇÕES ABREM ABERTAS, NESTES TESTES
- * ════════════════════════════════════════════════════════════════════════════
- *
- * O estúdio passou a abrir DOBRADAS as secções que já estavam feitas quando a
- * proposta abriu (ver o efeito em `Section`), e a esmagadora maioria destes
- * testes semeia uma proposta completa para ir mexer num campo lá dentro.
- *
- * Semear a preferência dela é a maneira honesta de os pôr a medir outra vez o
- * que dizem medir: a escolha guardada GANHA ao automatismo — é essa a regra —,
- * e por isso isto não desliga a funcionalidade nem finge que ela não existe.
- * Escreve-se aqui a mesma coisa que um clique dela escreveria.
- *
- * Quem quiser medir o automatismo apaga esta chave primeiro. É o que o bloco
- * «o que já está feito abre fechado» faz, ali em baixo.
- */
-const SECCOES_ABERTAS = {
-  evento: false,
-  capas: false,
-  servicos: false,
-  moodboards: false,
-  cronograma: false,
-  orcamento: false,
-  total: false,
-};
-
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem("liquen-estudio-secoes", JSON.stringify(SECCOES_ABERTAS));
   seletor.marcadores.length = 0;
   seletor.n = 0;
   pedidos = [];
@@ -935,6 +907,56 @@ describe("pontos de decoração escolhidos no pedido", () => {
   });
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DUAS PÁGINAS COM O MESMO NOME, UMA A SEGUIR À OUTRA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «páginas 6 e 7 dos mood boards: "Complementos Dos Noivos" e
+ * "Complementos Noivos". Uma é bouquet, outra lapelas — mas na proposta
+ * aparecem dois títulos praticamente idênticos seguidos».
+ *
+ * As regras de o que é «parecido» estão presas em `proposal-titulos-parecidos`.
+ * O que se prende AQUI é que o aviso chegue ao ecrã onde ela escreve o título —
+ * é o único sítio onde o problema se resolve.
+ */
+describe("títulos de páginas quase iguais", () => {
+  /** Um rascunho com os títulos que interessam, e uma foto em cada página. */
+  function seedComTitulos(...titulos: string[]) {
+    seedDraft(1);
+    const doc = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>;
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        ...doc,
+        moodBoards: titulos.map((title, i) => ({
+          title,
+          annotation: "",
+          images: [`board/foto-${i}.jpg`],
+        })),
+      }),
+    );
+  }
+
+  it("avisa no cartão do board, e cita o outro título", async () => {
+    seedComTitulos("Complementos Dos Noivos", "Complementos Noivos");
+    renderStudio();
+    const avisos = await screen.findAllByText(/lê-se como esta página/i);
+    expect(avisos).toHaveLength(2);
+    expect(avisos[0].textContent).toContain("«Complementos Noivos»");
+    expect(avisos[1].textContent).toContain("«Complementos Dos Noivos»");
+  });
+
+  it("«Mesa 1» e «Mesa 2» não levam aviso nenhum", async () => {
+    // Um aviso que trava uma escolha legítima ensina-se a ignorar, e o próximo
+    // — o que interessa — ignora-se com ele.
+    seedComTitulos("Mesa 1", "Mesa 2");
+    renderStudio();
+    await screen.findByDisplayValue("Mesa 1");
+    expect(screen.queryByText(/lê-se como esta página/i)).toBeNull();
+  });
+});
+
 describe("mood board com mais fotos do que a página desenha", () => {
   it("marca AO MONTAR as fotos que não vão ser impressas", async () => {
     // A lotação subiu de 6 para 10 quando os layouts passaram a ser cinco (a
@@ -947,6 +969,31 @@ describe("mood board com mais fotos do que a página desenha", () => {
     expect(screen.getByText(/A página deste mood board mostra 10 fotos/i).textContent).toMatch(
       /as 2 últimas.*não são impressas/i,
     );
+  });
+
+  /**
+   * ── UM AVISO CORTADO NÃO É UM AVISO ─────────────────────────────────────
+   *
+   * Palavras dela: «"9 fotos numa página: cada uma fica peque…" — cortado à
+   * direita».
+   *
+   * `white-space` e `text-overflow` HERDAM-SE: um `truncate` em qualquer
+   * antepassado deste parágrafo desce até ele, e o `overflow: hidden` desse
+   * antepassado faz o resto. Não é preciso o parágrafo ter classe nenhuma para
+   * sair com «…» — basta estar debaixo de alguém que a tenha.
+   *
+   * Por isso a defesa é declarada no próprio parágrafo, e é isso que se prende
+   * aqui: seja o que for que lhe esteja por cima, este aviso quebra.
+   */
+  it("o aviso quebra a linha, aconteça o que acontecer por cima dele", async () => {
+    seedDraft(12);
+    renderStudio();
+    for (const aviso of [
+      screen.getByText(/A página deste mood board mostra 10 fotos/i),
+      ...screen.queryAllByText(/fotos numa página: cada uma fica pequena/i),
+    ]) {
+      expect(aviso.className, aviso.textContent ?? "").toContain("whitespace-normal");
+    }
   });
 
   it("avisa NO INSTANTE em que a foto a mais entra no mood board", async () => {
@@ -1668,6 +1715,209 @@ describe("uma célula que não conseguiu desenhar a foto", () => {
  * e é dele que saem o sinal de 30% e a factura. Uma deslocação escrita aqui
  * aparecia na proposta que o cliente lê e não entrava em nada do que se cobra.
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * P0 — O VALOR NÃO PODE MUDAR SOZINHO ENTRE VISITAS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «ao voltar à mesma proposta, o valor total está diferente do
+ * que estava». Numa proposta observada: 3.000 → 3.140 → 3.280 → 3.420, com uma
+ * deslocação de 140 €. Três visitas, três somas. 3.420 − 3.000 = 3 × 140.
+ *
+ * ── A CAUSA ───────────────────────────────────────────────────────────────
+ *
+ * Com «estes valores somam-se» há dois números diferentes: o que ela escreve
+ * (só os serviços) e o «Preço final (sem IVA)» do pedido (o que o casal paga,
+ * serviços MAIS adicionais). Há duas conversões inversas para atravessar entre
+ * eles — e a abertura do estúdio usava só uma. Punha o preço do pedido no
+ * campo do escrito sem lhe tirar os adicionais, e a gravação seguinte
+ * voltava a somá-los.
+ *
+ * ── O QUE ESTE BLOCO PRENDE ───────────────────────────────────────────────
+ *
+ * O que ela pediu, literalmente: abrir, gravar, recarregar dez vezes, e o
+ * valor não mexer nem um cêntimo. Dez e não duas porque o defeito era de UM
+ * cêntimo por volta em alguns arredondamentos e de 140 € noutros — e uma
+ * acumulação lenta é a que passa despercebida durante meses.
+ *
+ * O valor que o utilizador introduz é IMUTÁVEL. Só muda quando ele o altera.
+ */
+describe("P0: o valor não muda sozinho entre visitas", () => {
+  const desenhar = (preco: number | undefined) =>
+    render(
+      <ToastProvider>
+        <ProposalStudio quote={{ ...quote, quotedPrice: preco } as Quote} />
+      </ToastProvider>,
+    );
+
+  /** O que está escrito no campo «Valor (sem IVA)» — o número DELA. */
+  async function valorEscrito(): Promise<string> {
+    return ((await screen.findByLabelText(/Valor \(sem IVA\)/i)) as HTMLInputElement).value;
+  }
+
+  /**
+   * Abre, deixa assentar, fecha — e devolve o que ficou no campo e o último
+   * preço que o estúdio mandou gravar no pedido. É uma VISITA.
+   */
+  async function umaVisita(precoDoPedido: number | undefined, gravados: number[]) {
+    desenhar(precoDoPedido);
+    await screen.findByLabelText(/Valor \(sem IVA\)/i);
+    // O tempo de tudo assentar: a hidratação do rascunho, a sincronização do
+    // preço e a gravação com a mão travada (600 ms).
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700));
+    });
+    const escrito = await valorEscrito();
+    cleanup();
+    return { escrito, gravado: gravados.at(-1) ?? precoDoPedido };
+  }
+
+  /** Um `fetch` que guarda cada preço gravado e o devolve como o pedido novo. */
+  function espiarGravacoes(gravados: number[]) {
+    const original = global.fetch;
+    global.fetch = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const corpo = String(init?.body ?? "");
+      if (String(url).includes("/api/orcamento/") && corpo.includes("quotedPrice")) {
+        const lido = JSON.parse(corpo) as { quotedPrice: number | null };
+        if (typeof lido.quotedPrice === "number") gravados.push(lido.quotedPrice);
+        return new Response(JSON.stringify({ ...quote, quotedPrice: lido.quotedPrice }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return original(url, init);
+    }) as typeof fetch;
+    return () => {
+      global.fetch = original;
+    };
+  }
+
+  /**
+   * ── O CASO DELA, EXACTAMENTE ────────────────────────────────────────────
+   * 3.000 de serviços, 140 de deslocação, «Somam ao valor». Dez visitas.
+   */
+  it("com os adicionais a SOMAREM, dez visitas não mexem um cêntimo", async () => {
+    const gravados: number[] = [];
+    const parar = espiarGravacoes(gravados);
+    try {
+      // Primeira visita: escreve o valor e a deslocação.
+      desenhar(3000);
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
+      const campo = await screen.findByLabelText(/^Valor de /i);
+      await user.type(campo, "140");
+      await user.tab();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 700));
+      });
+      // O pedido leva o efectivo — serviços mais deslocação.
+      expect(gravados.at(-1)).toBe(3140);
+      expect(await valorEscrito()).toBe("3000");
+      cleanup();
+
+      // E agora dez visitas seguidas, cada uma a abrir com o preço que a
+      // anterior deixou no pedido.
+      let preco: number | undefined = gravados.at(-1);
+      for (let volta = 1; volta <= 10; volta += 1) {
+        const r = await umaVisita(preco, gravados);
+        expect(r.escrito, `o valor escrito mudou na visita ${volta}`).toBe("3000");
+        expect(r.gravado, `o preço do pedido mudou na visita ${volta}`).toBe(3140);
+        preco = r.gravado;
+      }
+    } finally {
+      parar();
+    }
+    // Onze montagens de um ecrã com onze mil linhas, cada uma com a mão
+    // travada da gravação (600 ms) a assentar. Não cabe nos 5 s por omissão —
+    // e a alternativa, relógios falsos, não convive com o `userEvent`.
+  }, 60_000);
+
+  /**
+   * Com os adicionais DENTRO do valor escrito, as duas conversões não fazem
+   * nada — e o valor tem de ficar igualmente parado. É o controlo do teste de
+   * cima: prova que a estabilidade não vem de a conversão estar desligada.
+   */
+  it("com os adicionais DENTRO do valor, dez visitas também não mexem", async () => {
+    const gravados: number[] = [];
+    const parar = espiarGravacoes(gravados);
+    try {
+      desenhar(3000);
+      const user = userEvent.setup();
+      await user.selectOptions(
+        await screen.findByLabelText(/Como contam os valores adicionais/i),
+        "dentro",
+      );
+      await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
+      const campo = await screen.findByLabelText(/^Valor de /i);
+      await user.type(campo, "140");
+      await user.tab();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 700));
+      });
+      const depoisDeEscrever = await valorEscrito();
+      cleanup();
+
+      let preco: number | undefined = gravados.at(-1);
+      for (let volta = 1; volta <= 10; volta += 1) {
+        const r = await umaVisita(preco, gravados);
+        expect(r.escrito, `o valor escrito mudou na visita ${volta}`).toBe(depoisDeEscrever);
+        preco = r.gravado;
+      }
+    } finally {
+      parar();
+    }
+    // Onze montagens de um ecrã com onze mil linhas, cada uma com a mão
+    // travada da gravação (600 ms) a assentar. Não cabe nos 5 s por omissão —
+    // e a alternativa, relógios falsos, não convive com o `userEvent`.
+  }, 60_000);
+
+  /**
+   * Trocar de modo de IVA muda o que o casal VÊ, nunca a base. E não pode
+   * deixar rasto: dez visitas depois de a trocar, o valor continua o mesmo.
+   */
+  it("trocar o modo de IVA não move a base, e não deixa rasto nas visitas", async () => {
+    const gravados: number[] = [];
+    const parar = espiarGravacoes(gravados);
+    try {
+      desenhar(3000);
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole("button", { name: /Adicionar valor adicional/i }));
+      const campo = await screen.findByLabelText(/^Valor de /i);
+      await user.type(campo, "140");
+      await user.tab();
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 700));
+      });
+      const antes = await valorEscrito();
+      // Pelas OPÇÕES e não pelo rótulo: «IVA» aparece em vários sítios deste
+      // ecrã, e o que interessa aqui é o único selector que decide entre
+      // «acrescer» e «incluído».
+      const seletorDeIva = [...document.querySelectorAll("select")].find((sel) =>
+        [...sel.options].some((o) => o.value === "acrescer"),
+      );
+      expect(seletorDeIva, "não encontrei o selector do modo de IVA").toBeTruthy();
+      await user.selectOptions(seletorDeIva!, "incluido");
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 700));
+      });
+      expect(await valorEscrito(), "trocar o modo de IVA mexeu na base").toBe(antes);
+      cleanup();
+
+      let preco: number | undefined = gravados.at(-1);
+      for (let volta = 1; volta <= 10; volta += 1) {
+        const r = await umaVisita(preco, gravados);
+        expect(r.escrito, `o valor escrito mudou na visita ${volta}`).toBe(antes);
+        preco = r.gravado;
+      }
+    } finally {
+      parar();
+    }
+    // Onze montagens de um ecrã com onze mil linhas, cada uma com a mão
+    // travada da gravação (600 ms) a assentar. Não cabe nos 5 s por omissão —
+    // e a alternativa, relógios falsos, não convive com o `userEvent`.
+  }, 60_000);
+});
+
 describe("os valores adicionais somam ao total", () => {
   const comPreco = (preco?: number) => ({ ...quote, quotedPrice: preco }) as Quote;
   const desenhar = (q: Quote) =>
@@ -3644,7 +3894,18 @@ describe("gerar a proposta em inglês", () => {
 
     // Dezenas de segundos numa proposta com fotografias a sério — tempo que
     // chega para deixar de haver a certeza do que se escolheu.
-    expect(await screen.findByRole("button", { name: /A gerar em inglês…/ })).toBeInTheDocument();
+    //
+    // A frase mudou de sítio, e é por isso que este teste mudou: enquanto o
+    // documento se desenha, o botão dá o lugar ao cartão de espera partilhado
+    // (`ui/EmCurso`) — um botão a rodar durante meio minuto lê-se como «isto
+    // encravou». O que se prende continua a ser o mesmo: que a língua está
+    // dita enquanto se espera.
+    const frase = await screen.findByText(/A gerar o PDF em inglês…/);
+    // E é o cartão de espera da casa, não um texto solto: o `role="status"` é
+    // o que faz um leitor de ecrã dar pela espera sem ninguém lhe roubar o foco.
+    expect(frase.closest('[role="status"]')).not.toBeNull();
+    // E o botão não fica ao lado a convidar a um segundo pedido.
+    expect(screen.queryByRole("button", { name: /Descarregar PDF/ })).toBeNull();
     await act(async () => {
       libertar(reply({ headers: {} }));
     });
@@ -4462,6 +4723,64 @@ describe("traduzir para inglês", () => {
     expect(screen.getByText(/recarrega/i)).toBeTruthy();
   });
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * ENQUANTO A TRADUÇÃO VEM A CAMINHO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Pedido dela: «quero estes detalhes de animações em imensas coisas
+   * espalhadas pelo site» — ou seja, onde ela carrega e fica sem saber se
+   * aquilo está a andar, tem de passar a ver que está.
+   *
+   * O botão dizia «A traduzir…» e mais nada, durante uma ida à rede que numa
+   * proposta cheia são vários segundos. Passa a ser o cartão de espera da casa
+   * (`ui/EmCurso`), no lugar onde o botão estava — e diz QUANTOS campos vão,
+   * que é do que o código sabe. Quantos já voltaram não se diz, porque é um
+   * pedido só e inventar essa contagem seria mentir.
+   */
+  it("enquanto traduz, o cartão de espera diz quantos campos vão", async () => {
+    traducaoLigadaNoServidor = true;
+    seedDraft(1);
+    // A resposta fica PENDURADA: o estado que se quer ver é o do meio.
+    let libertar: () => void = () => {};
+    const pendurada = new Promise<void>((r) => {
+      libertar = r;
+    });
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/propostas/traduzir") && (init?.method ?? "GET") !== "GET") {
+        await pendurada;
+      }
+      return fetchDeSempre(input, init);
+    });
+
+    renderStudio();
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByDisplayValue("Cerimónia").length).toBeGreaterThan(0));
+    await user.click(interruptor());
+    const botao = await waitFor(async () => {
+      const b = (await screen.findByRole("button", {
+        name: /Traduzir para inglês/i,
+      })) as HTMLButtonElement;
+      if (b.disabled) throw new Error("ainda a perguntar ao servidor");
+      return b;
+    });
+    await user.click(botao);
+
+    const frase = await screen.findByText(/A traduzir para inglês…/);
+    // É o cartão de espera da casa, e não um texto solto: o `role="status"` é o
+    // que faz um leitor de ecrã dar pela espera sem lhe roubar o foco.
+    expect(frase.closest('[role="status"]')).not.toBeNull();
+    // Quantos campos vão — o número que o servidor ainda não sabe, mas o
+    // documento sabe.
+    expect(screen.getByText(/campos? ao serviço de tradução/)).toBeTruthy();
+    // E o botão não fica ao lado a convidar a um segundo pedido.
+    expect(screen.queryByRole("button", { name: /Traduzir para inglês/i })).toBeNull();
+
+    await act(async () => {
+      libertar();
+    });
+  });
+
   it("com o serviço ligado, o botão preenche as caixas «EN» de uma vez", async () => {
     traducaoLigadaNoServidor = true;
     seedDraft(1);
@@ -4713,9 +5032,12 @@ describe("traduzir com as fotos a meio", () => {
     const botao = await botaoDeTraduzir(user);
     await user.click(botao);
 
-    const remover = document.querySelectorAll<HTMLElement>('[aria-label="Remover fotografia"]');
-    await user.click(remover[0]);
-    expect(celulas()).toHaveLength(1);
+    // Remover passou a ser uma acção da folha, e não um círculo em cima da
+    // fotografia — ver «SEIS CÍRCULOS EM CIMA DA FOTOGRAFIA». O caminho é o
+    // mesmo dela: abrir as acções da primeira foto e escolher «Remover».
+    await user.click(screen.getAllByRole("button", { name: /^Acções de / })[0]);
+    await user.click(await screen.findByRole("button", { name: "Remover fotografia" }));
+    await waitFor(() => expect(celulas()).toHaveLength(1));
 
     await act(async () => {
       soltar();
@@ -5130,6 +5452,64 @@ describe("o estúdio no telemóvel: fotos, acções e descrições", () => {
     const pontos = document.querySelector('button[aria-label^="Acções de"]')!;
     expect(pontos.className).toContain("com-rato:hidden");
     expect(pontos.className).toContain("alvo-toque");
+  });
+
+  /**
+   * ── SEIS CÍRCULOS EM CIMA DA FOTOGRAFIA ──────────────────────────────────
+   *
+   * Palavras dela: «controlos sobrepostos à imagem». A barra do rato tinha seis
+   * botões escuros a tapar a faixa de baixo da fotografia — que é onde costuma
+   * estar o que interessa numa foto de mesa posta —, e tapava-a precisamente
+   * enquanto ela estava a olhar para ela.
+   *
+   * Ficam as setas, que são o gesto de todos os dias: mandá-las para dentro de
+   * uma folha era trocar um clique por dois no trabalho normal. As outras
+   * quatro, e a que APAGA, passam para a folha que o dedo já usa.
+   */
+  it("a barra do rato tem as setas e mais nada — o resto está na folha", async () => {
+    seedDraft(2);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/0.jpg", thumbUrl: "https://sb/mini-0.jpg" },
+      { path: "board/foto-1.jpg", url: "https://sb/1.jpg", thumbUrl: "https://sb/mini-1.jpg" },
+    ];
+    renderStudio();
+    await waitFor(() => expect(barraDasAccoes()).not.toBeNull());
+
+    const rotulos = Array.from(barraDasAccoes()!.querySelectorAll("button")).map((b) =>
+      b.getAttribute("aria-label"),
+    );
+    expect(rotulos).toEqual([
+      "Mover para trás",
+      "Mover para a frente",
+      expect.stringMatching(/^Mais acções de /),
+    ]);
+
+    // O botão que APAGA sai da barra: uma lista escrita por extenso, com o
+    // «Remover» separado por um traço, é melhor sítio para ele do que um
+    // círculo de 24 px ao lado de outros cinco iguais.
+    expect(rotulos).not.toContain("Remover fotografia");
+    expect(rotulos).not.toContain("Ver em grande");
+  });
+
+  it("e as quatro que saíram continuam todas na folha", async () => {
+    // Duas listas seriam duas versões da verdade — a acção acrescentada num
+    // sítio e esquecida no outro é a forma mais barata de os caminhos
+    // divergirem. É a MESMA folha do dedo.
+    seedDraft(1);
+    assetsServidor = [
+      { path: "board/foto-0.jpg", url: "https://sb/0.jpg", thumbUrl: "https://sb/mini-0.jpg" },
+    ];
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^Mais acções de / }));
+    for (const nome of [
+      "Ver em grande",
+      "Trocar por outra fotografia",
+      "Escolher para mover em conjunto",
+      "Remover fotografia",
+    ]) {
+      expect(await screen.findByRole("button", { name: nome }), nome).toBeTruthy();
+    }
   });
 
   /**
@@ -5950,64 +6330,146 @@ describe("a configuração ao nível da proposta", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * O QUE JÁ ESTÁ FEITO ABRE FECHADO
+ * UMA SECÇÃO NUNCA APARECE FECHADA
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * «Secções concluídas recolhem-se automaticamente. Só a secção em que se está
- * a trabalhar fica aberta.»
+ * Palavras dela: «as secções aparecem colapsadas». E uma secção colapsada é o
+ * mesmo que uma secção que não existe — a proposta abria e o que se via era
+ * uma pilha de títulos.
  *
- * A afirmação que vale por todas é a segunda: **uma secção nunca se fecha por
- * baixo das mãos dela.** Se fechasse ao ficar completa, escrever o último campo
- * de um grupo fazia o ecrã saltar e o cursor desaparecer.
+ * Havia um automatismo — «secções concluídas recolhem-se automaticamente» —
+ * que fotografava o que já estava preenchido ao abrir e fechava essas. Numa
+ * proposta a meio, funciona; numa proposta ACABADA, que é o caso de todas as
+ * que ela reabre para conferir antes de enviar, está tudo preenchido e
+ * fechava-se tudo. Era mais certeiro onde fazia mais estrago.
+ *
+ * E havia a memória: a dobra ficava no `localStorage`, e um «fechar» de há três
+ * semanas continuava a fechar a secção hoje sem nada que o explicasse.
+ *
+ * As três regras que ficam presas aqui: **abre aberta**, **não se fecha por
+ * baixo das mãos dela**, e **nada de visitas anteriores lhe fecha nada**.
  */
-describe("o que já está feito abre fechado", () => {
-  const semPreferencias = () => localStorage.removeItem("liquen-estudio-secoes");
-
-  it("uma secção já preenchida nasce dobrada", async () => {
-    semPreferencias();
-    seedDraft(1);
-    renderStudio();
-    const evento = await waitFor(() => {
-      const el = document.getElementById("seccao-evento");
+describe("as secções nunca aparecem fechadas", () => {
+  async function seccao(id: string) {
+    return waitFor(() => {
+      const el = document.getElementById(`seccao-${id}`);
       if (!el) throw new Error("ainda não");
       return el;
     });
-    await waitFor(() => expect(evento.querySelector('[aria-expanded="false"]')).not.toBeNull());
+  }
+
+  /**
+   * O botão do TÍTULO da secção, e não um `aria-expanded` qualquer lá dentro.
+   *
+   * O mesmo `:scope > div >` que o salto da Conferência usa, e pela mesma
+   * razão: dentro de uma secção há outras coisas que abrem e fecham — os mood
+   * boards têm as suas dobras, os Serviços têm as suas —, e apanhá-las aqui
+   * fazia este teste falhar por uma dobra que não é a que se está a medir.
+   */
+  const cabecalho = (el: HTMLElement) =>
+    el.querySelector<HTMLButtonElement>(":scope > div > button[aria-expanded]");
+
+  it("uma proposta acabada abre com tudo à vista", async () => {
+    seedDraft(1);
+    renderStudio();
+    for (const id of ["evento", "capas", "servicos", "orcamento", "total"]) {
+      const el = await seccao(id);
+      expect(cabecalho(el)?.getAttribute("aria-expanded"), `a secção «${id}» abriu fechada`).toBe(
+        "true",
+      );
+    }
+  });
+
+  it("uma dobra guardada numa visita anterior já não fecha nada", async () => {
+    // A chave antiga pode continuar no browser dela durante meses. Ignorá-la é
+    // o que faz esta correcção valer também para quem já a tem escrita.
+    localStorage.setItem("liquen-estudio-secoes", JSON.stringify({ evento: true, total: true }));
+    seedDraft(1);
+    renderStudio();
+    const evento = await seccao("evento");
+    await waitFor(() => expect(cabecalho(evento)?.getAttribute("aria-expanded")).toBe("true"));
+    expect(cabecalho(await seccao("total"))?.getAttribute("aria-expanded")).toBe("true");
   });
 
   /**
    * ── A AFIRMAÇÃO QUE VALE POR TODAS ────────────────────────────────────
+   *
+   * Um editor que se mexe sozinho enquanto se escreve é pior do que um editor
+   * comprido.
    */
   it("uma secção que fica completa ENQUANTO ela escreve não se fecha", async () => {
-    // A decisão é tomada uma vez, quando a proposta abre. Um editor que se
-    // mexe sozinho enquanto se escreve é pior do que um editor comprido.
-    semPreferencias();
     seedDraft(1);
     renderStudio();
-    const total = await waitFor(() => {
-      const el = document.getElementById("seccao-total");
-      if (!el) throw new Error("ainda não");
-      return el;
-    });
-    const comoAbriu = total.querySelector("[aria-expanded]")?.getAttribute("aria-expanded");
-    // Mexer no documento não pode mudar a dobra de nada.
+    const total = await seccao("total");
+    const comoAbriu = cabecalho(total)?.getAttribute("aria-expanded");
     const campo = document.querySelector<HTMLInputElement>('[data-campo="clientNames"]');
     if (campo) fireEvent.change(campo, { target: { value: "Ana & Rui" } });
-    await waitFor(() =>
-      expect(total.querySelector("[aria-expanded]")?.getAttribute("aria-expanded")).toBe(comoAbriu),
-    );
+    await waitFor(() => expect(cabecalho(total)?.getAttribute("aria-expanded")).toBe(comoAbriu));
   });
 
-  it("a escolha dela ganha ao automatismo", async () => {
-    // Uma secção que ela deixou aberta continua aberta, mesmo estando feita.
-    localStorage.setItem("liquen-estudio-secoes", JSON.stringify({ evento: false }));
+  it("mas dobrar à mão continua a dobrar", async () => {
+    // O gesto não desapareceu: fechar os Serviços para chegar ao Total num
+    // telemóvel é legítimo. O que desapareceu foi a dobra que ninguém pediu.
     seedDraft(1);
     renderStudio();
-    const evento = await waitFor(() => {
-      const el = document.getElementById("seccao-evento");
-      if (!el) throw new Error("ainda não");
-      return el;
-    });
-    await waitFor(() => expect(evento.querySelector('[aria-expanded="true"]')).not.toBeNull());
+    const servicos = await seccao("servicos");
+    fireEvent.click(cabecalho(servicos)!);
+    await waitFor(() => expect(cabecalho(servicos)?.getAttribute("aria-expanded")).toBe("false"));
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AS CAIXAS DE TEXTO DO ORÇAMENTO NUM TELEMÓVEL
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Do registo do audit, e é um dos oito bloqueios: «a caixa do nome da linha do
+ * orçamento tem 62 px — 27 com a proposta bilingue ligada».
+ *
+ * MEDIDO a 390 px: a fila tem 318 px dentro do cartão, e as colunas fixas (a
+ * escala, o preço) mais os espaços comem 264. Sobram 54 px para os campos de
+ * texto — e como eles são `flex-1` com `min-w-0`, não quebram: encolhem.
+ * Escrever «Decoração da Cerimónia» numa caixa de 62 px é escrever às cegas, e
+ * o que ali se escreve é o texto que o casal lê no PDF.
+ *
+ * O jsdom não faz layout: não há aqui píxeis para medir — a geometria está
+ * medida no browser e vive no relatório. O que se prende é a DECISÃO, para que
+ * ninguém a desfaça sem dar por isso.
+ */
+describe("o orçamento a 390 px", () => {
+  it("o nome de uma linha não encolhe abaixo do mínimo da casa", async () => {
+    seedDraft(1);
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        ...(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>),
+        budgetItems: ["Decor Cerimónia"],
+      }),
+    );
+    renderStudio();
+    const nome = await screen.findByRole("textbox", { name: "Item de orçamento" });
+    // `min-w-[12rem]` é o mesmo mínimo que a fase do cronograma e os títulos de
+    // grupo do `ServicesEditor` já usam. Com ele, o `flex-wrap` que já lá estava
+    // passa a fazer o que existe para fazer: o nome fica sozinho numa fila.
+    expect(nome.className).toContain("min-w-[12rem]");
+  });
+
+  it("e a linha do modelo de Organização parte em duas filas no telemóvel", async () => {
+    seedDraft(1, {});
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        ...(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>),
+        template: "organizacao",
+        budgetRows: [{ item: "Coordenação do dia", price: "1.500,00 €" }],
+      }),
+    );
+    renderStudio();
+    const item = await screen.findByRole("textbox", { name: "Item" });
+    // A descrição ocupa a fila toda até `sm`, e o valor desce para baixo — o
+    // mesmo desenho que as linhas adicionais já usavam.
+    expect(item.className).toContain("col-span-2");
+    expect(item.className).toContain("sm:col-span-1");
+    expect(item.parentElement?.className).toContain("sm:grid-cols-[minmax(0,1fr)_10rem_auto]");
   });
 });

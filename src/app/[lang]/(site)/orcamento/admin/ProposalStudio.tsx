@@ -63,6 +63,8 @@ import MoodBoardIndice from "./MoodBoardIndice";
 import PreviaDaPagina from "./PreviaDaPagina";
 import PainelDoEstudio from "./PainelDoEstudio";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
+import AEnviarAProposta from "./AEnviarAProposta";
+import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
 import VistaDeConjunto from "./VistaDeConjunto";
 import LupaDeFotos from "./LupaDeFotos";
 import {
@@ -124,6 +126,7 @@ import NotasInternas from "./NotasInternas";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
 import { folhasAproximadas } from "@/lib/proposal-paginas";
+import { avisoDeTituloParecido, titulosParecidos } from "@/lib/proposal-titulos-parecidos";
 import { depositPercentOf } from "@/lib/proposal-doc";
 // A geometria do documento, para a pré-visualização mostrar a forma que cada
 // foto vai MESMO ter. Módulo próprio, sem `server-only`, exactamente para poder
@@ -189,7 +192,10 @@ import {
   porTraduzirPorSeccao,
 } from "@/lib/proposal-doc-bilingue";
 import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-cache";
-import { Ajuda, Button, Card, Field, FolhaOuDialogo, Segmented } from "./ui";
+// A espera desenhada de uma maneira só. Ver `ui/EmCurso.tsx`: uma barra, um
+// ponto a pulsar, e a contagem quando o código sabe contar — este ficheiro não
+// inventa nenhuma espera sua.
+import { Ajuda, Button, Card, EmCurso, Field, FolhaOuDialogo, Segmented } from "./ui";
 
 /**
  * Visual editor for the studio's multi-page proposal PDF. Produces a
@@ -207,11 +213,94 @@ type StudioDoc = Parameters<typeof withProposalDefaults>[0];
  */
 const UPLOAD_CONCURRENCY = 4;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANTO DEMORA UMA TRADUÇÃO — E PORQUE É QUE ISTO É UM PALPITE E NÃO UMA CONTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A espera da tradução é OPACA vista daqui, e não por preguiça: o estúdio faz
+ * UM pedido à rota (`motorPelaRota` só parte em vários acima de 300 campos, e
+ * uma proposta pesada tem ~218). Os lotes de 50 que se veem no código são do
+ * outro lado da rota — é o motor do serviço que os manda, um a seguir ao
+ * outro, e do lado de cá não há nenhum sinal de que o terceiro acabou.
+ *
+ * Partir o pedido aqui para poder contar os lotes seria trocar um pedido por
+ * cinco: mais viagens na rede dela para desenhar uma barra. Uma animação que
+ * atrasa a tarefa que retrata não se faz, e por isso isto fica um palpite.
+ *
+ * O palpite, escrito para poder ser corrigido: uma ida à rota mais a resposta
+ * do serviço rondam o segundo, e cada lote de 50 campos que o serviço manda a
+ * seguir custa outro tanto. Sobra por cima do que se mede num portátil, porque
+ * quem espera está numa quinta com 4G — e a curva do `EmCurso` perdoa um erro
+ * de dois para um: o que ela não perdoa é uma barra que chega ao fim e fica lá.
+ */
+const TRADUCAO_MS_FIXOS = 800;
+const TRADUCAO_MS_POR_LOTE = 1_500;
+/** O tamanho do lote do motor do serviço (`MAX_TEXTOS_POR_PEDIDO`, no DeepL). */
+const TRADUCAO_CAMPOS_POR_LOTE = 50;
+
+/** Quanto tempo, mais ou menos, traduzir `campos` campos de prosa. */
+function esperaDaTraducao(campos: number): number {
+  const lotes = Math.max(1, Math.ceil(Math.max(0, campos) / TRADUCAO_CAMPOS_POR_LOTE));
+  return TRADUCAO_MS_FIXOS + TRADUCAO_MS_POR_LOTE * lotes;
+}
+
+/**
+ * Quanto demora copiar `fotos` fotografias de um modelo para este pedido.
+ *
+ * Também opaca, e também um pedido só (`/api/propostas/copiar`): o servidor
+ * copia OITO de cada vez (`EM_PARALELO`, em `proposal-storage`), cada foto são
+ * duas cópias no armazenamento — o original e a miniatura —, e nada disso é
+ * observável daqui. O palpite é essa aritmética, com a folga de sempre para a
+ * rede de quem espera.
+ */
+const COPIA_FOTOS_EM_PARALELO = 8;
+function esperaDaCopiaDeFotos(fotos: number): number {
+  const lotes = Math.max(1, Math.ceil(Math.max(0, fotos) / COPIA_FOTOS_EM_PARALELO));
+  return 900 + 1_500 * lotes;
+}
+
 const INPUT_SM = "bo-input min-w-0 px-3 py-2 text-xs text-foreground/85";
 const ADD_BTN =
   "alvo-toque !justify-start gap-1 text-xs font-medium text-[#4d6350] hover:text-[#415440] transition-colors inline-flex items-center";
 const REMOVE_BTN =
   "alvo-toque text-foreground/30 hover:text-[#8a2a22] transition-colors text-base leading-none shrink-0";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM AVISO QUE NÃO PODE SER CORTADO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «"9 fotos numa página: cada uma fica peque…" — cortado à
+ * direita, no editor de mood boards, por cima da grelha de fotos dessa página».
+ *
+ * ── Porque é que um parágrafo que quebra saía cortado ─────────────────────
+ *
+ * Porque `white-space` e `text-overflow` HERDAM-SE. Um `truncate` em qualquer
+ * antepassado deste parágrafo — e o cartão de um board tem cabeçalhos, tiras e
+ * linhas de resumo que o usam — desce até aqui como `white-space: nowrap` mais
+ * `text-overflow: ellipsis`, e o `overflow: hidden` desse antepassado faz o
+ * resto. O parágrafo não precisa de ter classe nenhuma para sair com «…»: basta
+ * estar debaixo de alguém que a tenha.
+ *
+ * Por isso a defesa é aqui e é explícita: este parágrafo declara que quebra,
+ * seja o que for que lhe esteja por cima. `whitespace-normal` corta a herança
+ * do `nowrap`, e o `overflow-wrap: anywhere` garante que uma palavra comprida
+ * também não empurra a linha para fora.
+ *
+ * ── E porque é que é uma constante ────────────────────────────────────────
+ *
+ * Porque são dois avisos irmãos — «a página está a ficar cheia» e «estas não
+ * são impressas» — e o segundo é o mais grave dos dois. Corrigir um e deixar o
+ * outro à mercê do mesmo antepassado era resolver metade do problema no sítio
+ * onde ele importa menos.
+ */
+const AVISO_DO_BOARD =
+  // Sem cor: os dois avisos têm cores diferentes, e duas classes `text-*` na
+  // mesma string não se resolvem pela ordem em que estão escritas — quem ganha
+  // é a que aparece depois na FOLHA DE ESTILO. O aviso vermelho podia sair
+  // cinzento sem ninguém perceber porquê.
+  "mb-2 text-xs leading-relaxed whitespace-normal [overflow-wrap:anywhere]";
 
 /* ── Os campos que o estúdio semeia a partir do pedido ─────────────────────
  *
@@ -360,6 +449,52 @@ const STEPS: { id: Step; n: string; label: string }[] = [
  * BRUTO em "incluído" — por isso o valor guardado tem de ser derivado, para a
  * base ser sempre o número do pedido nos dois modos.
  */
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PREÇO DO PEDIDO NÃO É O NÚMERO QUE ELA ESCREVE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Com «estes valores somam-se», estes dois números são DIFERENTES:
+ *
+ *   · o que ela escreve em «Valor (sem IVA)» — só os serviços;
+ *   · o «Preço final (sem IVA)» do pedido — o que o casal paga, ou seja os
+ *     serviços MAIS os adicionais. É de lá que a Visão Geral, as Estatísticas
+ *     e o dossier leem o dinheiro, e guardar lá só os serviços fazia as
+ *     deslocações desaparecerem desses ecrãs em silêncio.
+ *
+ * Há portanto duas conversões, inversas uma da outra:
+ *
+ *   escrito → pedido   soma os adicionais   (`baseDoEcraParaOPedido`)
+ *   pedido  → escrito  tira-os              (esta)
+ *
+ * ── O DEFEITO QUE ISTO VEIO FECHAR ────────────────────────────────────────
+ *
+ * Palavras dela: «ao voltar à mesma proposta, o valor total está diferente».
+ * Numa proposta observada: 3.000 → 3.140 → 3.280 → 3.420, com uma deslocação
+ * de 140 €. Três visitas, três somas.
+ *
+ * A causa era esta função existir e NÃO ser usada na abertura. A montagem
+ * fazia `setTotalInput(textoDoTotal(quote.quotedPrice))` — punha no campo do
+ * ESCRITO um número que já trazia os adicionais lá dentro. A partir daí tudo
+ * o que lesse esse campo como «os serviços» voltava a somar-lhes a deslocação:
+ * a gravação seguinte punha 3.140 + 140 no pedido, e a visita seguinte
+ * começava daí.
+ *
+ * Vive no topo do módulo, e não dentro do componente, por causa disso mesmo:
+ * era uma função interna que dois caminhos deviam usar e só um usava. Aqui
+ * fora, os dois vêem-na e o teste também.
+ */
+function baseDoPedidoParaOEcra(base: number, d: StudioDoc): number {
+  if (!d.budgetExtrasSomam) return base;
+  const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
+  const semExtras = round2(
+    base - somaDosExtrasSemIva(d.budgetExtras, { mode, vatRate: d.vatRate ?? DEFAULT_VAT_RATE }),
+  );
+  // Nunca negativo: um pedido com preço mais baixo do que os adicionais
+  // escritos é um estado por arrumar, e o aviso de desalinhamento já o diz.
+  return semExtras > 0 ? semExtras : 0;
+}
+
 function aplicarBase(d: StudioDoc, base: number): StudioDoc {
   const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
   const rate = d.vatRate ?? DEFAULT_VAT_RATE;
@@ -447,9 +582,15 @@ function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
     // «IVA incluído» perder 23% em silêncio — o número do pedido passava a ser
     // lido como se já trouxesse o imposto dentro.
     const modo: VatMode = next.totalVatMode ?? "acrescer";
+    // Pela mesma razão da abertura: o preço do pedido traz os adicionais lá
+    // dentro e este campo significa só os serviços. Num pedido virgem não há
+    // adicionais e a conversão não faz nada — mas um pedido cujo rascunho foi
+    // limpo TEM preço com adicionais somados, e sem isto voltava a nascer
+    // inflacionado.
+    const escrito = baseDoPedidoParaOEcra(quotedPrice, next);
     next = {
       ...next,
-      totalAmount: totalAmountParaBase(quotedPrice, modo, next.vatRate ?? DEFAULT_VAT_RATE),
+      totalAmount: totalAmountParaBase(escrito, modo, next.vatRate ?? DEFAULT_VAT_RATE),
       totalVatMode: modo,
     };
   }
@@ -1258,7 +1399,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     setAspetosDasFotos((m) => (m[ref] === aspeto ? m : { ...m, [ref]: aspeto }));
   }, []);
   const [refEdited, setRefEdited] = useState(false);
-  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  /**
+   * ── O CARREGAMENTO DE FOTOS, CONTADO ────────────────────────────────────
+   *
+   * Era um `boolean` por zona de largar, e a zona só sabia dizer «A carregar…».
+   * Vinte fotografias de telemóvel com 4G são minutos, e a contagem existia o
+   * tempo todo dentro do `handleUpload` (`results[]` e `files.length`) a ser
+   * deitada fora — que é a única coisa que responde à pergunta dela: isto está
+   * a andar ou está preso?
+   *
+   * A chave é a mesma de sempre (`cover-0`, `board-3`), e é por ela que o
+   * progresso chega à `UploadArea` pelo caminho por onde o `busy` já ia. A
+   * ausência da chave É o «não está a carregar nada».
+   */
+  const [uploading, setUploading] = useState<Record<string, { feito: number; total: number }>>({});
+  /**
+   * Quantas fotos de modelo estão a ser copiadas para a pasta deste pedido.
+   *
+   * Zero é «nenhuma». Soma-se e subtrai-se em vez de se escrever o número do
+   * último lote: inserir dois modelos seguidos é um gesto normal, e o segundo
+   * não pode apagar a espera do primeiro.
+   */
+  const [fotosACopiar, setFotosACopiar] = useState(0);
   const [busy, setBusy] = useState<null | "preview" | "send">(null);
   /**
    * ── A LÍNGUA ESCOLHE-SE AO GERAR ──────────────────────────────────────────
@@ -1700,8 +1862,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const doPedido = quote.quotedPrice;
     if (typeof doPedido === "number" && doPedido > 0) {
       precoEnviado.current = doPedido;
-      setTotalInput(textoDoTotal(doPedido));
-      setDoc((d) => aplicarBase(d, doPedido));
+      /**
+       * ── AQUI ESTAVA O VALOR A CRESCER SOZINHO ──────────────────────────
+       *
+       * Isto punha o preço do PEDIDO no campo do ESCRITO, sem lhe tirar os
+       * adicionais. O pedido guarda o que o casal paga (serviços + deslocação);
+       * o campo diz «Valor (sem IVA)» e significa só os serviços. Com os dois
+       * a receber o mesmo número, a gravação seguinte somava a deslocação
+       * outra vez — e a visita seguinte começava do número já inflacionado.
+       *
+       * 3.000 → 3.140 → 3.280 → 3.420. Uma soma por visita.
+       *
+       * A conversão é a mesma que o outro sentido da sincronização já fazia
+       * (ver o efeito de `quote.quotedPrice`). O que faltava era usá-la aqui.
+       *
+       * O `setTotalInput` vai DENTRO do `setDoc` porque a conversão precisa do
+       * documento — dos adicionais e do modo de IVA — e ler `doc` fora do
+       * actualizador daria o estado anterior à hidratação do rascunho.
+       */
+      setDoc((d) => {
+        const paraOEcra = baseDoPedidoParaOEcra(doPedido, d);
+        setTotalInput(paraOEcra > 0 ? textoDoTotal(paraOEcra) : "");
+        return paraOEcra > 0 ? aplicarBase(d, paraOEcra) : d;
+      });
     } else if (hadDraft) {
       // O pedido ainda não tem preço mas o rascunho tem um valor escrito antes
       // de isto existir. Não se deita fora: adopta-se, e GRAVA-SE no pedido —
@@ -2637,17 +2820,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     );
   }
 
-  function baseDoPedidoParaOEcra(base: number, d: StudioDoc): number {
-    if (!d.budgetExtrasSomam) return base;
-    const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
-    const semExtras = round2(
-      base - somaDosExtrasSemIva(d.budgetExtras, { mode, vatRate: d.vatRate ?? DEFAULT_VAT_RATE }),
-    );
-    // Nunca negativo: um pedido com preço mais baixo do que os adicionais
-    // escritos é um estado por arrumar, e o aviso de desalinhamento já o diz.
-    return semExtras > 0 ? semExtras : 0;
-  }
-
   /** O que se grava no pedido, com a mão travada: escrever "3000" são quatro
    *  teclas e não podem ser quatro gravações. */
   const gravarPreco = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2825,6 +2997,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // contas sobre o mesmo documento — «7 páginas» na vista e «cerca de 14» na
     // frase — e discordavam porque contavam coisas diferentes.
     `PDF com cerca de ${folhasAproximadas(doc as ProposalDoc)}${tempoDaProposta}`;
+
+  /**
+   * ── OS TÍTULOS QUE SE LÊEM COMO O MESMO NOME ────────────────────────────
+   *
+   * Um por board, e `undefined` na esmagadora maioria. Calculado uma vez para
+   * a lista toda e não board a board: a pergunta é sobre PARES, e fazê-la
+   * dentro do cartão dava um varrimento de todos os títulos por cada cartão
+   * desenhado — oito páginas, sessenta e quatro comparações, a cada tecla
+   * escrita num título.
+   */
+  const avisosDeTitulo = useMemo(() => {
+    const por: Record<number, string> = {};
+    for (const grupo of titulosParecidos(doc as ProposalDoc)) {
+      for (const bi of grupo.bis) {
+        const aviso = avisoDeTituloParecido(doc as ProposalDoc, bi);
+        if (aviso) por[bi] = aviso;
+      }
+    }
+    return por;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.moodBoards, doc.serviceGroups, doc.ordemExplicita]);
 
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -3511,7 +3704,21 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
   async function handleUpload(key: string, files: File[], onPaths: (paths: string[]) => void) {
     if (files.length === 0) return;
-    setUploading((u) => ({ ...u, [key]: true }));
+    setUploading((u) => ({ ...u, [key]: { feito: 0, total: files.length } }));
+    /**
+     * Mais uma arrumada — e conta tanto a que subiu como a que falhou.
+     *
+     * A barra retrata o que JÁ NÃO SE ESPERA, e uma foto que falhou também
+     * deixou de se esperar: contar só as boas deixava a barra a faltar-lhe um
+     * bocado para sempre, num lote com um ficheiro mau. O que correu mal
+     * continua a ser dito pelo `toast`, no fim e com o número.
+     */
+    const maisUma = () =>
+      setUploading((u) => {
+        const p = u[key];
+        if (!p) return u;
+        return { ...u, [key]: { ...p, feito: Math.min(p.total, p.feito + 1) } };
+      });
     // Cover photos print large (the document's hero) so they keep more pixels and
     // a higher JPEG quality; mood-board photos render as small collage cells and
     // use a tighter cap. The upload key encodes which is which ("cover-…"/"board-…").
@@ -3537,6 +3744,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           results[i] = { path: im.path };
         } catch (e) {
           errors.push(e instanceof Error ? e.message : `Falha ao carregar "${f.name}".`);
+        } finally {
+          maisUma();
         }
       }
     }
@@ -3555,7 +3764,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         toast(`${paths.length} imagens carregadas`, "success");
       }
     } finally {
-      setUploading((u) => ({ ...u, [key]: false }));
+      // A chave SAI do mapa: «não está a carregar nada» é a ausência, e não um
+      // `{feito, total}` velho à espera de ser lido como se fosse de agora.
+      setUploading((u) => {
+        if (!(key in u)) return u;
+        const resto = { ...u };
+        delete resto[key];
+        return resto;
+      });
     }
   }
 
@@ -3836,6 +4052,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     );
     if (deOutroPedido.length === 0) return;
 
+    // ── ISTO DEIXA DE SER MUDO ────────────────────────────────────────────
+    // O bloco aparece na proposta no instante do clique e as fotos vêm a
+    // seguir, num pedido só que demora de dois a vinte segundos. Não havia
+    // sinal nenhum disso — só um toast lá ao fim, e apenas quando corria mal.
+    setFotosACopiar((n) => n + deOutroPedido.length);
     try {
       const res = await fetch("/api/propostas/copiar", {
         method: "POST",
@@ -3861,6 +4082,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         "As fotos deste modelo ficaram na pasta da proposta de origem — volta a escolhê-las se essa proposta for apagada.",
         "error",
       );
+    } finally {
+      setFotosACopiar((n) => Math.max(0, n - deOutroPedido.length));
     }
   }
   function updateBoard(bi: number, p: Partial<StudioDoc["moodBoards"][number]>) {
@@ -4164,27 +4387,29 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
   /**
    * ════════════════════════════════════════════════════════════════════════
-   * OS BOARDS FECHADOS — POR DISPOSITIVO, NÃO NO DOCUMENTO
+   * OS BOARDS FECHADOS — NESTA SESSÃO, E SÓ NESTA
    * ════════════════════════════════════════════════════════════════════════
    *
-   * A mesma regra das secções do estúdio (ver `SECOES_KEY`): dobrar um board
-   * terminado é uma preferência de quem está a trabalhar, não uma propriedade
-   * da proposta. No documento, abrir a proposta noutro computador herdava as
-   * dobras de outra pessoa — e uma alteração de disposição contava como
-   * alteração por gravar.
+   * A mesma regra das secções (ver `Section`), e pela mesma razão: um mood
+   * board fechado é uma pilha de fotografias que não se vê, e reabrir a
+   * proposta tem de mostrar a proposta.
+   *
+   * Isto ficava guardado no `localStorage` por proposta. Um «Fechar todos» de
+   * há três semanas — feito uma vez para chegar depressa ao fundo da página —
+   * continuava a esconder as páginas de inspiração hoje, sem nada no ecrã que
+   * o explicasse. E foi a mesma memória que apareceu no relato dela como
+   * «secções colapsadas».
+   *
+   * O gesto fica: fechar um board, ou fechá-los todos, continua a valer
+   * enquanto ela lá está. Deixa é de atravessar visitas.
    *
    * A chave é o ID do board e não a posição: arrastar um board para outro
    * sítio trocaria as dobras todas de lugar.
    */
   const [dobrados, setDobrados] = useState<Record<string, boolean>>({});
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDobrados(lerDobrasDeBoards(quote.id));
-  }, [quote.id]);
 
   function escreverDobras(proximas: Record<string, boolean>) {
     setDobrados(proximas);
-    gravarDobrasDeBoards(quote.id, proximas);
   }
 
   /**
@@ -5388,24 +5613,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const [boardActivo, setBoardActivo] = useState<number | null>(null);
 
-  /**
-   * O que já estava feito quando esta proposta ABRIU.
-   *
-   * Uma fotografia tirada uma vez, e não uma leitura contínua: é ela que decide
-   * que secções nascem dobradas, e uma leitura contínua fechava uma secção no
-   * instante em que ela acabasse de a preencher — com o cursor lá dentro.
-   *
-   * Só se tira depois de o documento chegar. Antes disso «está tudo por
-   * preencher» é uma resposta sobre um documento que ainda não existe, e
-   * dobrava zero secções em todas as propostas.
-   */
-  const [feitoAoAbrir, setFeitoAoAbrir] = useState<Record<string, boolean> | null>(null);
-  useEffect(() => {
-    if (feitoAoAbrir) return;
-    if (!seccoes.some((s) => s.preenchida)) return;
-    setFeitoAoAbrir(Object.fromEntries(seccoes.map((s) => [s.id, s.preenchida])));
-  }, [seccoes, feitoAoAbrir]);
-
   /** As páginas COM fotografias, pela ordem em que saem — a ordem do PDF. */
   const paginasParaOPainel = useMemo(
     () =>
@@ -5651,15 +5858,43 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               preenche estão à vista. */}
           {bilingue && (
             <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <button
-                type="button"
-                disabled={!traducaoLigada || aTraduzir}
-                onClick={() => void traduzirTudo()}
-                className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-foreground/15 px-3 py-1.5 text-xs font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <span aria-hidden="true">⇄</span>
-                {aTraduzir ? "A traduzir…" : "Traduzir para inglês"}
-              </button>
+              {/* ── ENQUANTO A TRADUÇÃO VEM A CAMINHO ─────────────────────
+                  O botão dizia «A traduzir…» e mais nada, durante uma ida à
+                  rede que numa proposta cheia são vários segundos — e a única
+                  coisa que aparecia a seguir era um toast. A caixa fica no
+                  lugar do botão, que é onde o estado já vivia. Quantos campos
+                  vão é do que o código sabe, e por isso é dito; quantos já
+                  voltaram, não — ver `esperaDaTraducao`. */}
+              {aTraduzir ? (
+                (() => {
+                  // Os mesmos campos que o `traduzirParaIngles` vai buscar: os
+                  // vazios e os que ficaram para trás do português.
+                  const campos = camposPorRever(doc as ProposalDoc).length;
+                  return (
+                    <EmCurso
+                      className="max-w-xs"
+                      titulo="A traduzir para inglês…"
+                      estimadoMs={esperaDaTraducao(campos)}
+                      nota={
+                        campos === 1
+                          ? "Vai 1 campo ao serviço de tradução. O que já escreveste fica como está."
+                          : `Vão ${campos} campos ao serviço de tradução. O que já escreveste fica como está.`
+                      }
+                      notaDemorada="O serviço está a demorar. As caixas «EN» preenchem-se assim que a resposta chegar."
+                    />
+                  );
+                })()
+              ) : (
+                <button
+                  type="button"
+                  disabled={!traducaoLigada}
+                  onClick={() => void traduzirTudo()}
+                  className="alvo-toque inline-flex items-center gap-2 rounded-lg border border-foreground/15 px-3 py-1.5 text-xs font-medium text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span aria-hidden="true">⇄</span>
+                  Traduzir para inglês
+                </button>
+              )}
               {/* ── AS TRÊS FRASES, E PORQUE É QUE NÃO SÃO DUAS ─────────────
                   O botão fica desligado nos dois casos maus, e isso está certo.
                   A frase é que não pode ser a mesma: «ainda não está ligada
@@ -5689,7 +5924,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Event fields */}
-          <Section title="Evento" id="evento" fechadaPorOmissao={feitoAoAbrir?.evento}>
+          <Section title="Evento" id="evento">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field
                 label="Clientes"
@@ -5884,7 +6119,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Cover images */}
-          <Section title="Imagens de capa (2)" id="capas" fechadaPorOmissao={feitoAoAbrir?.capas}>
+          <Section title="Imagens de capa (2)" id="capas">
             <div className="grid grid-cols-2 gap-3">
               {[0, 1].map((idx) => {
                 const path = doc.coverImages?.[idx];
@@ -5964,7 +6199,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           // O lado é fixo: a posição 0 imprime à esquerda do
                           // painel do logótipo, a 1 à direita.
                           label={idx === 0 ? "Capa esquerda" : "Capa direita"}
-                          busy={!!uploading[`cover-${idx}`]}
+                          progresso={uploading[`cover-${idx}`]}
                           multiple={false}
                           curto
                           onFiles={(files) =>
@@ -5997,7 +6232,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           </Section>
 
           {/* Service groups */}
-          <Section title="Serviços" id="servicos" fechadaPorOmissao={feitoAoAbrir?.servicos}>
+          <Section title="Serviços" id="servicos">
             {/* O editor com teclado, arrasto e anular vive em ServicesEditor. */}
             <ServicesEditor
               groups={doc.serviceGroups}
@@ -6017,12 +6252,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Mood boards — decoracao only */}
           {isDeco && (
-            <Section
-              title="Mood boards"
-              id="moodboards"
-              nota={contagemDosBoards}
-              fechadaPorOmissao={feitoAoAbrir?.moodboards}
-            >
+            <Section title="Mood boards" id="moodboards" nota={contagemDosBoards}>
               <p className="-mt-2 mb-4 text-sm leading-relaxed text-foreground/55">
                 grupos de imagens de inspiração para o cliente
               </p>
@@ -6053,8 +6283,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   comparam. */}
               {vistaDeConjunto && (
                 <VistaDeConjunto
-                  boards={doc.moodBoards}
+                  doc={doc as ProposalDoc}
                   ordem={ordemDosBoards}
+                  idioma={idiomaDoPdf}
                   urls={assetUrls}
                   originais={assetOriginais}
                   aspetos={aspetosDasFotos}
@@ -6066,6 +6297,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       .getElementById(`mood-board-${bi}`)
                       ?.scrollIntoView({ behavior: "smooth", block: "start" });
                   }}
+                  // O salto de uma folha de texto usa o MESMO caminho da
+                  // Conferência: abre a secção se estiver dobrada e só então
+                  // leva a vista. Uma segunda maneira de saltar era uma segunda
+                  // maneira de falhar a abertura da dobra.
+                  onIrParaSeccao={(seccao) => irParaAFalta(seccao)}
                   onFechar={() => setVistaDeConjunto(false)}
                 />
               )}
@@ -6426,6 +6662,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         cresce: true,
                                       },
                                     )}
+                                    {/* ── DUAS PÁGINAS COM O MESMO NOME ───────
+                                        «"Complementos Dos Noivos" e
+                                        "Complementos Noivos". Uma é bouquet,
+                                        outra lapelas — mas na proposta aparecem
+                                        dois títulos praticamente idênticos
+                                        seguidos.»
+
+                                        Não é vermelho e não trava nada: «Mesa
+                                        1» e «Mesa 2» é uma decisão, não um
+                                        descuido, e um aviso que trava uma
+                                        escolha legítima ensina-se a ignorar. Diz
+                                        o que viu, cita o outro título, e deixa-a
+                                        decidir. */}
+                                    {avisosDeTitulo[bi] && (
+                                      <p className={`${AVISO_DO_BOARD} text-[#8a6420]`}>
+                                        {avisosDeTitulo[bi]}
+                                      </p>
+                                    )}
                                     {/* ── A PÁGINA ESTÁ A FICAR CHEIA ─────────
                                         Discreto, e antes do limite: às oito
                                         fotos a página ainda sai inteira, mas
@@ -6434,7 +6688,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                         ser impressa. */}
                                     {b.images.length >= FOTOS_QUE_ENCHEM_A_PAGINA &&
                                       b.images.length <= MOOD_BOARD_MAX_IMAGES && (
-                                        <p className="mb-2 text-xs leading-relaxed text-foreground/45">
+                                        <p className={`${AVISO_DO_BOARD} text-foreground/45`}>
                                           {b.images.length} fotos numa página: cada uma fica
                                           pequena. Duas páginas com metade lêem-se melhor do que uma
                                           cheia.
@@ -6445,7 +6699,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           extenso a seguir — em vez de desaparecerem caladas no
                           PDF. */}
                                     {b.images.length > MOOD_BOARD_MAX_IMAGES && (
-                                      <p className="mb-2 text-xs leading-relaxed text-[#8a2a22]">
+                                      <p className={`${AVISO_DO_BOARD} text-[#8a2a22]`}>
                                         A página deste mood board mostra {MOOD_BOARD_MAX_IMAGES}{" "}
                                         fotos:{" "}
                                         {b.images.length - MOOD_BOARD_MAX_IMAGES === 1
@@ -6603,7 +6857,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                       <div className="mt-2">
                                         <UploadArea
                                           label="+ Imagens"
-                                          busy={!!uploading[`board-${bi}`]}
+                                          progresso={uploading[`board-${bi}`]}
                                           multiple
                                           faixa
                                           onFiles={(files) =>
@@ -6706,6 +6960,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                               titulo={b.title}
                                               subtitulo={b.subtitulo}
                                               legenda={b.annotation}
+                                              // Aqui o rótulo ainda diz alguma
+                                              // coisa: é a única miniatura do
+                                              // cartão, e sem ele lê-se como
+                                              // mais uma fotografia. Ver
+                                              // `comRotulo`.
+                                              comRotulo
                                             />
                                           </div>
                                         </div>
@@ -6937,6 +7197,25 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       toast={toast}
                       onInserir={(b) => void inserirMoodBoardDeModelo(b as MoodBoard)}
                     />
+                    {/* ── AS FOTOS DO MODELO A CHEGAR ────────────────────
+                        Ao lado do botão que as pediu, e não em cima do bloco:
+                        o bloco já está na lista com as fotografias à vista (é
+                        o caminho de origem que ainda lá está), e uma caixa
+                        entre os cartões empurrava a grelha para baixo a meio
+                        do gesto seguinte. Sai sozinha quando a cópia acaba. */}
+                    {fotosACopiar > 0 && (
+                      <EmCurso
+                        className="max-w-xs"
+                        titulo={
+                          fotosACopiar === 1
+                            ? "A copiar 1 foto do modelo…"
+                            : `A copiar ${fotosACopiar} fotos do modelo…`
+                        }
+                        estimadoMs={esperaDaCopiaDeFotos(fotosACopiar)}
+                        nota="O bloco já está na proposta; as fotografias estão a passar para a pasta deste pedido."
+                        notaDemorada="A cópia está a demorar. O bloco fica na proposta de qualquer maneira."
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -6956,11 +7235,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           {/* Cronograma — organizacao only */}
           {!isDeco && (
-            <Section
-              title="Cronograma de Organização"
-              id="cronograma"
-              fechadaPorOmissao={feitoAoAbrir?.cronograma}
-            >
+            <Section title="Cronograma de Organização" id="cronograma">
               <div className="flex flex-col gap-3">
                 {(doc.cronograma ?? []).map((ph, pi) => (
                   <div
@@ -7030,11 +7305,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           )}
 
           {/* Budget */}
-          <Section
-            title="Orçamento Proposto"
-            id="orcamento"
-            fechadaPorOmissao={feitoAoAbrir?.orcamento}
-          >
+          <Section title="Orçamento Proposto" id="orcamento">
             {isDeco ? (
               <>
                 <AvisoDeOrdem
@@ -7099,8 +7370,30 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     const semPreco = l.preco === null;
                     return (
                       <div key={i} className="flex flex-wrap items-center gap-2">
+                        {/* ── O NOME DA LINHA NÃO ENCOLHE ABAIXO DE 12 REM ────
+                            Do registo do audit, e é um dos oito bloqueios: «a
+                            caixa do nome da linha do orçamento tem 62 px — 27
+                            com a proposta bilingue ligada».
+
+                            MEDIDO a 390 px: a fila tem 318 px dentro do cartão,
+                            e as colunas fixas (a escala `w-32`, o preço `w-28`)
+                            mais os espaços comem 264. Sobram 54 para os campos
+                            de texto — e como eles são `flex-1` com `min-w-0`
+                            escrito à mão, não quebram: ENCOLHEM. Escrever
+                            «Decoração da Cerimónia» numa caixa de 62 px é
+                            escrever às cegas, e o que ali se escreve é o texto
+                            que o casal lê no PDF.
+
+                            O `min-w` é o remédio da própria casa — é o que a
+                            fase do cronograma faz cento e trinta linhas acima,
+                            e o que o `ServicesEditor` faz nos títulos de grupo.
+                            Com um mínimo, o `flex-wrap` que já cá estava passa a
+                            fazer o que existe para fazer: o nome fica sozinho
+                            numa fila inteira e a escala, o preço e o «Extra»
+                            descem para a de baixo. Acima de 520 px nada muda —
+                            aí já cabia. */}
                         <input
-                          className={`${INPUT_SM} flex-1`}
+                          className={`${INPUT_SM} min-w-[12rem] flex-1`}
                           value={l.item}
                           onChange={(e) => updateBudgetItem(i, e.target.value)}
                           // A pega do salto. Faltava: o «Ver no campo» das
@@ -7111,8 +7404,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           placeholder="Decor Cerimónia"
                           aria-label="Item de orçamento"
                         />
+                        {/* A inglesa com o mesmo mínimo: com o bilingue ligado
+                            eram os dois a repartir os mesmos 54 px, 27 para
+                            cada. */}
                         {caixaDeIngles({ tipo: "linhaDeOrcamento", i }, "Item de orçamento", {
-                          className: `${INPUT_SM} flex-1`,
+                          className: `${INPUT_SM} min-w-[12rem] flex-1`,
                           placeholder: "Ceremony Decor",
                         })}
                         {/* COMO É QUE ESTA LINHA ESCALA. Metade das linhas de um
@@ -7605,7 +7901,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             ) : (
               <>
                 <div className="flex flex-col gap-2 mb-3">
-                  <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                  {/* Os cabeçalhos só a partir de `sm`: no telemóvel a linha
+                      passa a duas filas, e três títulos por cima de duas filas
+                      nomeiam colunas que ali não existem. */}
+                  <div className="hidden grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25 sm:grid">
                     <span>Item</span>
                     <span className="text-right">Valor</span>
                     <span className="w-5" />
@@ -7613,10 +7912,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   {(doc.budgetRows ?? []).map((r, i) => (
                     <div
                       key={i}
-                      className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
+                      /* ── A DESCRIÇÃO SOZINHA EM CIMA, NO TELEMÓVEL ──────────
+                         Do registo do audit: «a descrição da linha fica com 122
+                         px numa grelha que não tem variante de telemóvel».
+
+                         MEDIDO a 390 px: as duas colunas fixas (160 do valor,
+                         ~20 do botão) mais os espaços comem 196 dos 318 px da
+                         fila. É o irmão mais sortudo do nome da linha do
+                         orçamento de Decoração — dá para ler três palavras em
+                         vez de uma — mas é a mesma omissão no mesmo ecrã.
+
+                         O desenho é o que as linhas adicionais aqui em cima já
+                         fazem: a descrição a ocupar a fila toda, e o valor mais
+                         o botão de apagar por baixo. Acima de `sm` fica
+                         exactamente como estava. */
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto]"
                     >
                       <input
-                        className="bo-input px-2.5 py-2 text-xs text-foreground/75"
+                        className="bo-input col-span-2 px-2.5 py-2 text-xs text-foreground/75 sm:col-span-1"
                         value={r.item}
                         onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
                         placeholder="Coordenação do dia"
@@ -7753,7 +8066,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             }}
           />
 
-          <Section title="Total, IVA e validade" id="total" fechadaPorOmissao={feitoAoAbrir?.total}>
+          <Section title="Total, IVA e validade" id="total">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
                 É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido
@@ -8655,22 +8968,38 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   },
                 ]}
               />
-              <Button
-                variant="secondary"
-                onClick={preview}
-                disabled={busy !== null}
-                loading={busy === "preview"}
-              >
-                {busy === "preview"
-                  ? // Enquanto roda, o botão diz em que língua está a desenhar.
-                    // São dezenas de segundos numa proposta cheia, e é tempo
-                    // que chega para deixar de haver a certeza do que se
-                    // escolheu — o português cala-se porque é o de sempre.
-                    idiomaDoPdf === "en"
-                    ? "A gerar em inglês…"
-                    : "A gerar…"
-                  : "Descarregar PDF"}
-              </Button>
+              {/* ══════════════════════════════════════════════════════════
+                  ENQUANTO O PDF SE DESENHA
+                  ══════════════════════════════════════════════════════════
+
+                  É o MESMO desenho de documento que o envio faz, na mesma
+                  rota, com a mesma espera de 10 a 60 segundos — e aqui havia
+                  só um botão a rodar, que ao fim de meio minuto se lê como
+                  «isto encravou». A caixa entra no lugar do botão (é onde o
+                  estado já vivia, e assim não empurra o selector de idioma
+                  nem a ressalva de baixo) e a estimativa é a mesma que o
+                  `AEnviarAProposta` usa: aprendida das gerações anteriores
+                  desta instalação, e não um número escrito à mão.
+
+                  A espera é OPACA de propósito: é um pedido só, e do lado de
+                  cá não há nada para contar até a resposta chegar. */}
+              {busy === "preview" ? (
+                <EmCurso
+                  className="max-w-xs"
+                  // A língua continua dita enquanto roda: são dezenas de
+                  // segundos numa proposta cheia, tempo que chega para deixar
+                  // de haver a certeza do que se escolheu — o português
+                  // cala-se porque é o de sempre.
+                  titulo={idiomaDoPdf === "en" ? "A gerar o PDF em inglês…" : "A gerar o PDF…"}
+                  estimadoMs={tempoEstimado(totalDeFotos, amostras)}
+                  nota="Assim que estiver desenhado, o PDF é descarregado."
+                  notaDemorada="Com a rede fraca isto demora. Não feches a página — o PDF é descarregado assim que estiver."
+                />
+              ) : (
+                <Button variant="secondary" onClick={preview} disabled={busy !== null}>
+                  Descarregar PDF
+                </Button>
+              )}
               {/* ══════════════════════════════════════════════════════════
                   A RESSALVA TEM DE SER VERIFICÁVEL NO PAPEL
                   ══════════════════════════════════════════════════════════
@@ -8750,16 +9079,37 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
         {step === "enviar" && !sent && (
           <>
-            <Button variant="ghost" onClick={() => setStep("prever")}>
+            <Button
+              variant="ghost"
+              onClick={() => setStep("prever")}
+              // A meio de um envio, voltar atrás não cancela nada — o pedido já
+              // está a correr no servidor — e só serve para ela deixar de ver o
+              // que está a acontecer.
+              disabled={busy === "send"}
+            >
               ← Pré-visualizar
             </Button>
-            {/* ── O QUE FICA DE FORA, PERGUNTADO ANTES DE SEGUIR ──────────
-                O servidor desenhou o documento, viu o que a composição cortou
-                e parou. O email ainda não saiu e a proposta ainda não foi
-                gravada — é o último instante em que voltar atrás não custa
-                nada. A frase de cada corte é a mesma que o aviso da
-                pré-visualização usa; o que muda é a altura em que aparece. */}
-            {cortesPorConfirmar ? (
+            {/* ── ENQUANTO ESTÁ A IR ──────────────────────────────────────
+                «Ao enviar a proposta quero que haja uma animação que eu perceba
+                que está a ser enviado.» Não havia nenhuma: o `send()` fechava a
+                confirmação e o ecrã voltava ao botão apagado, durante os
+                dezenas de segundos que o desenho do PDF e o email demoram numa
+                quinta com 4G fraco. */}
+            {busy === "send" ? (
+              <div className="ml-auto flex justify-end">
+                <AEnviarAProposta
+                  fotos={totalDeFotos}
+                  amostras={amostras}
+                  para={quote.email || undefined}
+                />
+              </div>
+            ) : /* ── O QUE FICA DE FORA, PERGUNTADO ANTES DE SEGUIR ────────
+                O servidor desenhou o documento, viu o que a composição cortou e
+                parou. O email ainda não saiu e a proposta ainda não foi gravada
+                — é o último instante em que voltar atrás não custa nada. A
+                frase de cada corte é a mesma que o aviso da pré-visualização
+                usa; o que muda é a altura em que aparece. */
+            cortesPorConfirmar ? (
               <div className="ml-auto flex flex-col items-end gap-2">
                 <div className="max-w-lg rounded-xl border border-[#c98a2e]/35 bg-[#c98a2e]/[0.06] px-3 py-2 text-xs leading-relaxed text-foreground/75">
                   <p className="font-medium">O documento sai com conteúdo cortado:</p>
@@ -8778,9 +9128,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     variant="primary"
                     onClick={() => void send(true)}
                     disabled={busy !== null}
-                    loading={busy === "send"}
                   >
-                    {busy === "send" ? "A enviar…" : "Enviar assim mesmo"}
+                    Enviar assim mesmo
                   </Button>
                   <Button
                     variant="ghost"
@@ -8798,49 +9147,57 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <span className="text-sm text-foreground/60">
                   Enviar para {quote.email || "o cliente"}?
                 </span>
-                <Button
-                  variant="primary"
-                  onClick={() => void send()}
-                  disabled={busy !== null}
-                  loading={busy === "send"}
-                >
-                  {busy === "send" ? "A enviar…" : "Confirmar"}
+                <Button variant="primary" onClick={() => void send()} disabled={busy !== null}>
+                  Confirmar
                 </Button>
                 <Button variant="ghost" onClick={() => setConfirmSend(false)}>
                   Cancelar
                 </Button>
               </div>
             ) : (
-              <Button
-                variant="primary"
-                onClick={() => setConfirmSend(true)}
-                disabled={busy !== null || !canSend}
-                /**
-                 * ── O BOTÃO DIZ O QUE FALTA, E NÃO UMA LISTA DECORADA ──────
-                 *
-                 * Isto dizia «Preenche clientes, referência e um total maior
-                 * que 0» — os três bloqueios que existiam quando foi escrito.
-                 * Passaram a ser oito, e uma frase fixa que nomeia três deles
-                 * é pior do que uma genérica: manda procurar no sítio errado.
-                 *
-                 * Agora sai do MESMO sítio que trava o botão, portanto não
-                 * pode discordar dele.
-                 */
-                title={
-                  canSend
-                    ? undefined
-                    : fotosPorConfirmar > 0
-                      ? "Há fotos ainda a entrar na proposta. Falta pouco."
-                      : faltas
-                          .filter((f) => f.trava)
-                          .map((f) => f.texto)
-                          .join(" · ") || "Falta preencher a proposta antes de enviar."
-                }
-                iconRight={<span aria-hidden="true">→</span>}
-                className="ml-auto"
-              >
-                Gerar e enviar ao cliente
-              </Button>
+              /* ── O BOTÃO, E POR CIMA DELE A RAZÃO ────────────────────────
+                 «Quando falta alguma coisa na proposta, quero que apareça um
+                 aviso a dizer que não dá para enviar porque não preenchi tal
+                 coisa.» A razão já existia — vivia no `title`, que num iPhone
+                 não aparece. Passa a estar escrita ao lado do botão, com cada
+                 falta a saltar para onde se resolve. */
+              <div className="ml-auto flex flex-col items-end gap-2">
+                <PorqueNaoDaParaEnviar
+                  faltas={faltas}
+                  fotosPorConfirmar={fotosPorConfirmar}
+                  emailDoCliente={quote.email}
+                  onIr={(f) => irParaAFalta(f.seccao, f.campo)}
+                />
+                <Button
+                  variant="primary"
+                  onClick={() => setConfirmSend(true)}
+                  disabled={busy !== null || !canSend}
+                  /**
+                   * ── O BOTÃO DIZ O QUE FALTA, E NÃO UMA LISTA DECORADA ──────
+                   *
+                   * Isto dizia «Preenche clientes, referência e um total maior
+                   * que 0» — os três bloqueios que existiam quando foi escrito.
+                   * Passaram a ser oito, e uma frase fixa que nomeia três deles
+                   * é pior do que uma genérica: manda procurar no sítio errado.
+                   *
+                   * Agora sai do MESMO sítio que trava o botão, portanto não
+                   * pode discordar dele.
+                   */
+                  title={
+                    canSend
+                      ? undefined
+                      : fotosPorConfirmar > 0
+                        ? "Há fotos ainda a entrar na proposta. Falta pouco."
+                        : faltas
+                            .filter((f) => f.trava)
+                            .map((f) => f.texto)
+                            .join(" · ") || "Falta preencher a proposta antes de enviar."
+                  }
+                  iconRight={<span aria-hidden="true">→</span>}
+                >
+                  Gerar e enviar ao cliente
+                </Button>
+              </div>
             )}
           </>
         )}
@@ -8923,24 +9280,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 // ── Small presentational helpers ──
 
 /**
- * Onde ficam guardadas as secções fechadas.
- *
- * Por DISPOSITIVO e não no documento: fechar o «Cronograma» é uma preferência
- * de quem está a trabalhar, não uma propriedade da proposta. Guardá-la no
- * documento fazia com que abrir a proposta noutro computador herdasse as
- * dobras de outra pessoa — e, pior, fazia uma alteração de disposição contar
- * como alteração por gravar.
- */
-const SECOES_KEY = "liquen-estudio-secoes";
-
-/**
- * As dobras dos mood boards, por PROPOSTA e por dispositivo.
- *
- * Chave própria (e não a das secções) porque isto é por proposta: as dobras de
- * um casamento não dizem nada sobre as do seguinte. Guardado por `quote.id` +
- * id do board — ver `withMoodBoardIds`.
- */
-/**
  * As páginas que uma proposta tem SEM contar com a inspiração.
  *
  * MEDIDO, não estimado: gerou-se o PDF de um documento com 0, 1 e 3 mood
@@ -8970,36 +9309,6 @@ const AMOSTRAS_KEY = "liquen-proposal-studio:geracoes";
  * composição e não um erro, e por isso diz-se em voz baixa.
  */
 const FOTOS_QUE_ENCHEM_A_PAGINA = 8;
-
-const BOARDS_KEY = "liquen-estudio-boards";
-
-function lerDobrasDeBoards(quoteId: string): Record<string, boolean> {
-  try {
-    const cru = localStorage.getItem(`${BOARDS_KEY}:${quoteId}`);
-    const v = cru ? JSON.parse(cru) : null;
-    return v && typeof v === "object" ? (v as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function gravarDobrasDeBoards(quoteId: string, dobras: Record<string, boolean>) {
-  try {
-    localStorage.setItem(`${BOARDS_KEY}:${quoteId}`, JSON.stringify(dobras));
-  } catch {
-    /* quota / armazenamento desligado — as dobras valem só nesta sessão */
-  }
-}
-
-function lerFechadas(): Record<string, boolean> {
-  try {
-    const cru = localStorage.getItem(SECOES_KEY);
-    const v = cru ? JSON.parse(cru) : null;
-    return v && typeof v === "object" ? (v as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
 
 /**
  * Uma linha do bloco de totais: o nome à esquerda, o número à direita.
@@ -9463,9 +9772,22 @@ function AccoesDaFoto({
         </div>
       </FolhaOuDialogo>
 
-      {/* ── O CAMINHO DO RATO: a barra de sempre, ao pixel ──────────────────
+      {/* ── O CAMINHO DO RATO: DUAS ACÇÕES, E O RESTO A UM TOQUE ───────────
+          Palavras dela: «controlos sobrepostos à imagem». Eram seis círculos
+          escuros a tapar a faixa de baixo da fotografia — que é onde costuma
+          estar o que interessa numa foto de mesa posta —, e tapavam-na
+          precisamente enquanto ela está a olhar para ela.
+
+          Ficam duas: as setas. São o gesto que se faz cem vezes por proposta, e
+          mandá-las para dentro de uma folha era trocar um clique por dois no
+          trabalho de todos os dias. As outras quatro — ver em grande, trocar,
+          principal, escolher — e a que APAGA passam para a folha, que já existe
+          e já é a única coisa que o dedo vê. Uma lista escrita por extenso, com
+          o «Remover» separado por um traço, é melhor sítio para o botão
+          destrutivo do que um círculo de 24 px ao lado de outros cinco iguais.
+
           `hidden com-rato:flex`: não existe até haver rato — nem desenhada nem
-          a apanhar toques. Onde há rato, nada nesta barra mudou. */}
+          a apanhar toques. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden flex-wrap items-center justify-center gap-0.5 p-1 opacity-0 transition-opacity group-hover/foto:opacity-100 focus-within:opacity-100 com-rato:flex">
         <span className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5">
           <button
@@ -9486,48 +9808,24 @@ function AccoesDaFoto({
           >
             <span aria-hidden="true">→</span>
           </button>
-          <button type="button" className={botao} onClick={onAmpliar} aria-label="Ver em grande">
-            <span aria-hidden="true">⤢</span>
-          </button>
+          {/* A MESMA folha do dedo, e não uma segunda lista: a acção
+              acrescentada num sítio e esquecida no outro é a forma mais barata
+              de os dois caminhos divergirem. */}
+          {/* SEM tom de estado: a célula já diz o que está ligado — anel verde
+              à volta quando está escolhida, etiqueta «principal» no canto. Um
+              «⋯» verde ler-se-ia como se o próprio botão estivesse ligado. */}
           <button
             type="button"
             className={botao}
-            onClick={onSubstituir}
-            aria-label="Trocar por outra fotografia"
+            onClick={() => setFolhaAberta(true)}
+            aria-haspopup="dialog"
+            aria-label={`Mais acções de ${nome}`}
           >
-            <span aria-hidden="true">⇄</span>
-          </button>
-          {principal !== undefined && (
-            <button
-              type="button"
-              className={`${botao} ${principal ? "bg-[#4d6350]" : ""}`}
-              onClick={onPrincipal}
-              aria-pressed={principal}
-              aria-label={
-                principal
-                  ? "Deixar de ser a fotografia principal"
-                  : "Fotografia principal desta página"
-              }
-            >
-              <span aria-hidden="true">★</span>
-            </button>
-          )}
-          <button
-            type="button"
-            className={`${botao} ${seleccionada ? "bg-[#4d6350]" : ""}`}
-            onClick={onSeleccionar}
-            aria-pressed={seleccionada}
-            aria-label={seleccionada ? "Retirar da selecção" : "Escolher para mover em conjunto"}
-          >
-            <span aria-hidden="true">✓</span>
-          </button>
-          <button
-            type="button"
-            className={`${botao} hover:bg-[#8a2a22]`}
-            onClick={onRemover}
-            aria-label="Remover fotografia"
-          >
-            <span aria-hidden="true">×</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <circle cx="5" cy="12" r="1.8" />
+              <circle cx="12" cy="12" r="1.8" />
+              <circle cx="19" cy="12" r="1.8" />
+            </svg>
           </button>
         </span>
       </div>
@@ -9564,14 +9862,48 @@ function AvisoDeOrdem({
   );
 }
 
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * UMA SECÇÃO NUNCA APARECE FECHADA
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «as secções aparecem colapsadas». E aparecer colapsada é o
+ * mesmo que não existir — a proposta abria com o Evento, as Capas, os
+ * Serviços, os Mood boards, o Orçamento e o Total todos dobrados, e o que se
+ * via era uma pilha de títulos.
+ *
+ * ── O QUE ISTO ERA, E PORQUE É QUE PARECIA BOA IDEIA ──────────────────────
+ *
+ * Havia um automatismo escrito a partir de um pedido antigo — «secções
+ * concluídas recolhem-se automaticamente» — que tirava uma fotografia do que
+ * já estava preenchido quando a proposta abria e fechava essas. Numa proposta
+ * a meio, funciona. Numa proposta ACABADA, que é o caso de todas as que ela
+ * reabre para conferir antes de enviar, está tudo preenchido — portanto
+ * fechava-se tudo. O automatismo era mais certeiro precisamente onde fazia
+ * mais estrago.
+ *
+ * E havia uma segunda camada: a dobra ficava guardada no `localStorage`. Um
+ * «fechar» de há três semanas, feito para chegar depressa ao fundo da página,
+ * continuava a fechar a secção hoje — sem nada no ecrã que dissesse porquê.
+ *
+ * ── O QUE FICA ────────────────────────────────────────────────────────────
+ *
+ * A dobra continua a existir e continua a ser útil: dobrar os Serviços para
+ * chegar ao Total num telemóvel é um gesto legítimo. O que deixa de existir é
+ * a dobra que ninguém pediu AGORA — nem o automatismo, nem a memória entre
+ * visitas. Abrir a proposta mostra a proposta.
+ *
+ * A excepção é o «Só para ti» (`PainelInterno.tsx`), que nasce fechado de
+ * propósito e por outra razão: são custos e margem, e não é isso que se quer
+ * no ecrã quando alguém está ao lado a ver.
+ */
 function Section({
   title,
   children,
-  /** Chave estável para lembrar a dobra. Sem ela a secção não colapsa. */
+  /** Chave estável — a âncora do salto da Conferência. */
   id,
   /** Marca à direita do título — "3 linhas", "por preencher". */
   nota,
-  fechadaPorOmissao,
   /** Um controlo à direita do título — o "Reordenar" dos Serviços, por
    *  exemplo. Fica FORA do botão que dobra a secção: um botão dentro de outro
    *  botão não é HTML válido, e clicar num fecharia o outro. */
@@ -9582,66 +9914,12 @@ function Section({
   id?: string;
   nota?: string;
   accao?: React.ReactNode;
-  /**
-   * Esta secção já estava feita quando a proposta abriu?
-   *
-   * `undefined` quer dizer «ainda não se sabe» e não «não estava» — ver o
-   * efeito lá dentro. Só vale onde ela nunca dobrou a secção à mão.
-   */
-  fechadaPorOmissao?: boolean;
 }) {
   const [fechada, setFechada] = useState(false);
-  const jaDecidiu = useRef(false);
-  /**
-   * ════════════════════════════════════════════════════════════════════════
-   * O QUE JÁ ESTÁ FEITO ABRE FECHADO — MAS SÓ AO ABRIR
-   * ════════════════════════════════════════════════════════════════════════
-   *
-   * «Secções concluídas recolhem-se automaticamente. Só a secção em que se
-   * está a trabalhar fica aberta.»
-   *
-   * Com um limite que ela não pediu e que é o que torna isto usável: **uma
-   * secção nunca se fecha por baixo das mãos dela.** Se fechasse quando fica
-   * completa, escrever o último campo de um grupo fazia o ecrã saltar e o
-   * cursor desaparecer — um editor que se mexe sozinho enquanto se escreve é
-   * pior do que um editor comprido.
-   *
-   * Por isso a decisão é tomada UMA vez, quando a proposta abre, e o que
-   * decide é o que já estava feito nesse momento.
-   *
-   * ── E A ESCOLHA DELA GANHA SEMPRE ───────────────────────────────────────
-   *
-   * Uma secção que ela tenha aberto ou fechado à mão tem a resposta guardada,
-   * e essa manda. O automatismo só fala onde ninguém disse nada.
-   *
-   * Ler no efeito e não no `useState` inicial: o servidor não tem
-   * `localStorage`, e uma diferença entre o que o servidor desenha e o que o
-   * browser desenha dá um erro de hidratação.
-   */
-  useEffect(() => {
-    if (!id || jaDecidiu.current) return;
-    const guardadas = lerFechadas();
-    if (id in guardadas) {
-      setFechada(!!guardadas[id]);
-      jaDecidiu.current = true;
-      return;
-    }
-    // Ainda não se sabe se esta secção estava feita — o documento pode não ter
-    // chegado. Espera-se, em vez de se decidir com uma resposta que é «não sei».
-    if (fechadaPorOmissao === undefined) return;
-    setFechada(fechadaPorOmissao);
-    jaDecidiu.current = true;
-  }, [id, fechadaPorOmissao]);
 
   function alternar() {
     if (!id) return;
-    const proxima = !fechada;
-    setFechada(proxima);
-    try {
-      localStorage.setItem(SECOES_KEY, JSON.stringify({ ...lerFechadas(), [id]: proxima }));
-    } catch {
-      /* sem localStorage a dobra não sobrevive à sessão; o resto funciona */
-    }
+    setFechada((v) => !v);
   }
 
   const corpoId = id ? `sec-${id}` : undefined;
@@ -11095,7 +11373,7 @@ function Thumb({
 
 function UploadArea({
   label,
-  busy,
+  progresso,
   multiple,
   compact = false,
   curto = false,
@@ -11103,7 +11381,15 @@ function UploadArea({
   onFiles,
 }: {
   label: string;
-  busy: boolean;
+  /**
+   * O lote que está a subir, ou nada.
+   *
+   * Era um `busy: boolean`, e a caixa só sabia escrever «A carregar…» — em
+   * cima de vinte fotografias de telemóvel numa rede de quinta, que são
+   * minutos, «ocupado» e «preso» leem-se exactamente igual. A contagem já
+   * existia no `handleUpload`; passa a chegar ao ecrã.
+   */
+  progresso?: { feito: number; total: number };
   multiple: boolean;
   compact?: boolean;
   /**
@@ -11140,6 +11426,31 @@ function UploadArea({
     if (files.length) onFiles(files);
   }
 
+  /**
+   * A ALTURA É A MESMA, esteja a carregar ou não.
+   *
+   * A caixa de espera vai EXACTAMENTE onde o «A carregar…» já vivia, e no
+   * mesmo tamanho: uma faixa de 56 px que crescesse a meio de um lote
+   * empurrava a grelha de fotografias para baixo debaixo do dedo dela — que é
+   * a maneira mais certa de uma animação de progresso piorar o telemóvel. Por
+   * isso a medida sai daqui e serve os dois estados; o que muda lá dentro é só
+   * o conteúdo.
+   */
+  const caixa = faixa ? "h-14" : curto ? "h-24" : compact ? "aspect-square" : "aspect-[4/3]";
+
+  if (progresso) {
+    return (
+      <div className={`flex w-full items-center justify-center ${caixa}`}>
+        <EmCurso
+          titulo={progresso.total === 1 ? "A carregar a foto…" : "A carregar as fotos…"}
+          // A contagem a sério, que o `handleUpload` sempre soube e nunca disse.
+          feito={progresso.feito}
+          total={progresso.total}
+        />
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -11158,26 +11469,22 @@ function UploadArea({
       // por cima: duas utilidades da mesma propriedade decidem-se pela ordem na
       // folha de estilo e não pela ordem na string, e um `flex-col` de base
       // ganharia ao `flex-row` da faixa sem nada o denunciar.
-      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${
+      className={`flex w-full items-center justify-center rounded-lg border border-dashed text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4d6350]/55 ${caixa} ${
         faixa
-          ? "h-14 flex-row gap-2 p-2"
+          ? "flex-row gap-2 p-2"
           : curto
-            ? "h-24 flex-col gap-1 p-2"
+            ? "flex-col gap-1 p-2"
             : compact
-              ? "aspect-square flex-col gap-1 p-2"
-              : "aspect-[4/3] flex-col gap-1 p-3"
+              ? "flex-col gap-1 p-2"
+              : "flex-col gap-1 p-3"
       } ${
         drag
           ? "border-[#4d6350]/60 bg-[#4d6350]/[0.06]"
           : "border-foreground/[0.18] bg-foreground/[0.02] hover:border-[#4d6350]/45"
       }`}
     >
-      <span className="text-[9px] tracking-[0.15em] uppercase text-foreground/35">
-        {busy ? "A carregar…" : label}
-      </span>
-      {!busy && !compact && (
-        <span className="text-[9px] text-foreground/25">arraste ou clique</span>
-      )}
+      <span className="text-[9px] tracking-[0.15em] uppercase text-foreground/35">{label}</span>
+      {!compact && <span className="text-[9px] text-foreground/25">arraste ou clique</span>}
       <input
         ref={inputRef}
         type="file"

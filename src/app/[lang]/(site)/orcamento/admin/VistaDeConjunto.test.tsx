@@ -2,17 +2,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import VistaDeConjunto from "./VistaDeConjunto";
-import type { MoodBoard } from "@/lib/proposal-doc";
+import type { MoodBoard, ProposalDoc } from "@/lib/proposal-doc";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * AS SETAS MOVEM CONTRA O QUE SE VÊ
+ * A VISTA MOSTRA O DOCUMENTO, E NÃO UM PEDAÇO DELE
  * ════════════════════════════════════════════════════════════════════════════
  *
- * A vista só desenha as páginas COM fotografias — as vazias não são impressas.
- * As setas moviam contra a ordem COMPLETA: com uma página vazia pelo meio, a
- * seta trocava a página com essa, o ecrã ficava exactamente igual e lia-se como
- * uma seta avariada.
+ * Palavras dela: «"Todas" mostra 7 páginas quando o PDF tem cerca de 14 — uma
+ * pré-visualização parcial dá falsa confiança», e «hoje vê-se um problema na
+ * página 5 e tem de se procurar onde ele nasce».
+ *
+ * Duas coisas se prendem aqui. A primeira é a contagem: o que esta vista desenha
+ * é a lista de `paginasDaProposta`, a espinha do gerador, e não os mood boards.
+ * A segunda é o salto: cada miniatura leva ao sítio do formulário onde aquela
+ * folha se escreve — sem isso a vista mostra o problema e esconde a solução.
+ *
+ * E o que já cá estava continua: as setas movem contra a inspiração VIZINHA, e
+ * não contra a posição ao lado. Com uma página vazia pelo meio a seta trocava a
+ * página com ESSA, o ecrã ficava igual, e lia-se como uma seta avariada.
  */
 
 afterEach(cleanup);
@@ -23,96 +31,172 @@ const board = (over: Partial<MoodBoard> = {}): MoodBoard => ({
   ...over,
 });
 
-/** Três páginas com a do meio VAZIA: é o caso que a seta não resolvia. */
-function desenhar(onMover = vi.fn()) {
-  const boards = [
-    board({ title: "Cocktail" }),
-    board({ title: "Vazia", images: [] }),
-    board({ title: "Jantar" }),
-  ];
+const docCom = (boards: MoodBoard[]): ProposalDoc =>
+  ({
+    template: "decoracao",
+    ref: "PO",
+    clientNames: "Maria & Zé",
+    eventType: "Casamento",
+    eventDate: "3 de julho de 2027",
+    location: "Monte da Oliveirinha",
+    guests: "150 pax",
+    serviceGroups: [{ title: "Decoração", items: [{ label: "Cerimónia" }] }],
+    moodBoards: boards,
+    budgetItems: ["Decor Cerimónia"],
+    totalLabel: "Valor Total Decoração",
+    totalText: "3.000,00 € + IVA",
+    coverImages: [],
+    notasImportantes: [],
+    incluido: [],
+    naoIncluido: [],
+    condicoesGerais: ["O valor não inclui IVA."],
+    observacoesGerais: ["A montagem é na véspera."],
+    faseamento: [],
+    cancelamento: [],
+    cronograma: [],
+  }) as unknown as ProposalDoc;
+
+function desenhar(
+  boards: MoodBoard[],
+  acoes: { onMover?: () => void; onSaltar?: () => void; onIrParaSeccao?: () => void } = {},
+) {
+  const props = {
+    onMover: vi.fn(),
+    onSaltar: vi.fn(),
+    onIrParaSeccao: vi.fn(),
+    ...acoes,
+  };
   render(
     <VistaDeConjunto
-      boards={boards}
-      ordem={[0, 1, 2]}
+      doc={docCom(boards)}
+      ordem={boards.map((_, i) => i)}
       urls={{ "a.jpg": "/a.jpg" }}
       aspetos={{ "a.jpg": 1.5 }}
-      onMover={onMover}
-      onSaltar={vi.fn()}
       onFechar={vi.fn()}
+      {...props}
     />,
   );
-  return onMover;
+  return props;
 }
 
-describe("VistaDeConjunto: reordenar", () => {
-  it("a página vazia não aparece na lista", () => {
-    desenhar();
-    expect(screen.queryAllByText(/Vazia/)).toHaveLength(0);
-    expect(screen.getAllByText(/Cocktail/).length).toBeGreaterThan(0);
+/**
+ * ── A CONTAGEM ──────────────────────────────────────────────────────────────
+ *
+ * Uma proposta com dois boards com fotografias tem OITO páginas: capa,
+ * apresentação, as duas de inspiração, orçamento, condições, observações e
+ * contracapa. A vista antiga desenhava duas.
+ */
+describe("VistaDeConjunto: o documento inteiro", () => {
+  it("desenha as folhas que não são de inspiração", () => {
+    desenhar([board({ title: "Cocktail" }), board({ title: "Jantar" })]);
+    for (const titulo of [
+      "Capa",
+      "Apresentação e serviços",
+      "Cocktail",
+      "Jantar",
+      "Orçamento",
+      "Condições gerais",
+      "Observações e contactos",
+      "Contracapa",
+    ]) {
+      expect(screen.getAllByText(titulo).length, `sem a página «${titulo}»`).toBeGreaterThan(0);
+    }
   });
 
-  /** O defeito: a última visível está na posição 3, a vizinha VISÍVEL na 1. */
+  it("cada miniatura diz que página é, e de quantas", () => {
+    desenhar([board({ title: "Cocktail" }), board({ title: "Jantar" })]);
+    expect(screen.getByText("Página 1 de 8")).toBeTruthy();
+    expect(screen.getByText("Página 8 de 8")).toBeTruthy();
+  });
+
+  it("uma página de inspiração sem fotografias não é desenhada", () => {
+    // O gerador salta-a de propósito: nunca mostrar a um cliente uma folha
+    // vazia. Desenhá-la aqui era prometer uma página que não existe.
+    desenhar([board({ title: "Cocktail" }), board({ title: "Vazia", images: [] })]);
+    expect(screen.queryAllByText("Vazia")).toHaveLength(0);
+  });
+
+  /**
+   * ── O SALTO ───────────────────────────────────────────────────────────────
+   *
+   * «Hoje vê-se um problema na página 5 e tem de se procurar onde ele nasce.»
+   */
+  it("clicar numa folha de texto abre a secção que a escreve", () => {
+    const { onIrParaSeccao } = desenhar([board({ title: "Cocktail" })]);
+    fireEvent.click(screen.getByLabelText(/página 4, Orçamento/));
+    expect(onIrParaSeccao).toHaveBeenCalledWith("orcamento");
+  });
+
+  it("clicar numa página de inspiração vai ao board, e não só à secção", () => {
+    const { onSaltar, onIrParaSeccao } = desenhar([
+      board({ title: "Cocktail" }),
+      board({ title: "Jantar" }),
+    ]);
+    fireEvent.click(screen.getByLabelText(/página 4, Jantar/));
+    expect(onSaltar).toHaveBeenCalledWith(1);
+    expect(onIrParaSeccao).not.toHaveBeenCalled();
+  });
+
+  it("as setas só existem onde há ordem para mudar", () => {
+    desenhar([board({ title: "Cocktail" }), board({ title: "Jantar" })]);
+    // A capa não troca de sítio com o orçamento.
+    expect(screen.queryByLabelText("Mover a página 1 para trás")).toBeNull();
+    expect(screen.queryByLabelText("Mover a página 5 para a frente")).toBeNull();
+    expect(screen.getByLabelText("Mover a página 4 para trás")).toBeTruthy();
+  });
+});
+
+describe("VistaDeConjunto: reordenar", () => {
+  /** As duas inspirações visíveis são as páginas 3 e 4 do documento. */
   it("a seta para trás salta por cima da página vazia", () => {
-    const onMover = desenhar();
-    fireEvent.click(screen.getByLabelText("Mover a página 3 para trás"));
+    const { onMover } = desenhar([
+      board({ title: "Cocktail" }),
+      board({ title: "Vazia", images: [] }),
+      board({ title: "Jantar" }),
+    ]);
+    fireEvent.click(screen.getByLabelText("Mover a página 4 para trás"));
     expect(onMover).toHaveBeenCalledWith(2, 0);
   });
 
   it("a seta para a frente também", () => {
-    const onMover = desenhar();
-    fireEvent.click(screen.getByLabelText("Mover a página 1 para a frente"));
+    const { onMover } = desenhar([
+      board({ title: "Cocktail" }),
+      board({ title: "Vazia", images: [] }),
+      board({ title: "Jantar" }),
+    ]);
+    fireEvent.click(screen.getByLabelText("Mover a página 3 para a frente"));
     expect(onMover).toHaveBeenCalledWith(0, 2);
   });
 
-  /** Nas pontas da lista VISÍVEL não há para onde ir. A última visível estava
-   *  na posição 3 de 3 e a sua seta para a frente já ficava desligada; a
-   *  primeira é que ficava ligada a mexer no que não se vê. */
   it("nas pontas da lista visível as setas ficam desligadas", () => {
-    desenhar();
-    expect(screen.getByLabelText("Mover a página 1 para trás").hasAttribute("disabled")).toBe(true);
-    expect(screen.getByLabelText("Mover a página 3 para a frente").hasAttribute("disabled")).toBe(
+    desenhar([
+      board({ title: "Cocktail" }),
+      board({ title: "Vazia", images: [] }),
+      board({ title: "Jantar" }),
+    ]);
+    expect(screen.getByLabelText("Mover a página 3 para trás").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByLabelText("Mover a página 4 para a frente").hasAttribute("disabled")).toBe(
       true,
     );
-    expect(screen.getByLabelText("Mover a página 1 para a frente").hasAttribute("disabled")).toBe(
+    expect(screen.getByLabelText("Mover a página 3 para a frente").hasAttribute("disabled")).toBe(
       false,
     );
   });
 
-  /** E a ponta da lista visível não é a ponta da lista toda: com a última
-   *  página vazia, a seta da penúltima ficava ligada a trocar com ela — outro
-   *  clique que não muda nada no ecrã. */
   it("a última visível não tem para onde ir, mesmo com páginas vazias por baixo", () => {
-    render(
-      <VistaDeConjunto
-        boards={[board({ title: "Cocktail" }), board({ title: "Jantar" }), board({ images: [] })]}
-        ordem={[0, 1, 2]}
-        urls={{ "a.jpg": "/a.jpg" }}
-        aspetos={{ "a.jpg": 1.5 }}
-        onMover={vi.fn()}
-        onSaltar={vi.fn()}
-        onFechar={vi.fn()}
-      />,
-    );
-    expect(screen.getByLabelText("Mover a página 2 para a frente").hasAttribute("disabled")).toBe(
+    desenhar([
+      board({ title: "Cocktail" }),
+      board({ title: "Jantar" }),
+      board({ title: "Vazia", images: [] }),
+    ]);
+    expect(screen.getByLabelText("Mover a página 4 para a frente").hasAttribute("disabled")).toBe(
       true,
     );
   });
 
-  /** Sem páginas vazias pelo meio, é o vizinho do lado — como sempre foi. */
   it("sem páginas vazias, move para a posição ao lado", () => {
-    const onMover = vi.fn();
-    render(
-      <VistaDeConjunto
-        boards={[board({ title: "Cocktail" }), board({ title: "Jantar" })]}
-        ordem={[0, 1]}
-        urls={{ "a.jpg": "/a.jpg" }}
-        aspetos={{ "a.jpg": 1.5 }}
-        onMover={onMover}
-        onSaltar={vi.fn()}
-        onFechar={vi.fn()}
-      />,
-    );
-    fireEvent.click(screen.getByLabelText("Mover a página 2 para trás"));
+    const { onMover } = desenhar([board({ title: "Cocktail" }), board({ title: "Jantar" })]);
+    fireEvent.click(screen.getByLabelText("Mover a página 4 para trás"));
     expect(onMover).toHaveBeenCalledWith(1, 0);
   });
 });

@@ -10,6 +10,7 @@ import {
 } from "@/lib/theme-types";
 import { ToastProvider } from "./Toast";
 import Temas, {
+  COLUNAS,
   GRELHA_DE_FOTOS,
   contarFotosDaBiblioteca,
   desdeQuando,
@@ -173,6 +174,21 @@ const sameAs = (file: File, name: string) =>
 function withContent(file: File, content: string): File {
   fp.content.set(file, content);
   return file;
+}
+
+/**
+ * Quanto está cheia a barra da espera partilhada (`ui/EmCurso.tsx`).
+ *
+ * Lê-se o `scaleX` e não uma classe: o que se prende é o COMPORTAMENTO — a
+ * barra diz a fracção verdadeira do lote —, e o desenho é assunto do `EmCurso`.
+ * A marca `data-barra` existe precisamente para isto (o traço é `aria-hidden`,
+ * não tem papel nem nome por onde lhe pegar).
+ */
+function preenchimento(): number {
+  const barra = document.querySelector("[data-barra=preenchimento]") as HTMLElement | null;
+  const m = /scaleX\(([\d.]+)\)/.exec(barra?.style.transform ?? "");
+  if (!m) throw new Error("não há barra da espera no ecrã");
+  return Number(m[1]);
 }
 
 const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -762,6 +778,371 @@ describe("Biblioteca de Temas — milhares de fotos", () => {
   });
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * JUNTAR DOIS TEMAS DUPLICADOS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «"Clássico Intemporal" aparece duas vezes com nomes quase
+ * iguais — não tenho como os juntar».
+ *
+ * O ciclo está preso em `FundirTemas.test.tsx`; o que se prende AQUI é a
+ * ligação: que a acção existe nos dois desenhos do cartão (o do rato e o do
+ * dedo) e que o que o servidor responde chega à lista sem recarregar a página.
+ */
+describe("Biblioteca de Temas — juntar temas duplicados", () => {
+  const dois = () =>
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Clássico Intemporal", imageCount: 3 },
+        { ...THEME, id: "t2", name: "Zen", imageCount: 12 },
+      ]),
+    );
+
+  /**
+   * O comentário do `accoesDoTema` promete que os dois desenhos do cartão
+   * mostram a MESMA lista. Enquanto os ícones do rato eram escritos à mão, a
+   * promessa era só um comentário — e partiu-se na primeira acção nova.
+   */
+  it("a acção existe no desenho do rato e no do dedo", async () => {
+    dois();
+    renderTemas();
+    await acharCartaoDoTema(/Clássico Intemporal/);
+    // O do rato: um botão por cartão, com o rótulo por extenso.
+    expect(screen.getAllByRole("button", { name: "Juntar a outro tema…" })).toHaveLength(2);
+    // O do dedo: dentro do «⋯», que é o mesmo `accoesDoTema`.
+    const menus = screen.getAllByRole("button", { name: /Acções de Clássico Intemporal/ });
+    fireEvent.click(menus[0]);
+    expect(
+      screen.getAllByRole("menuitem", { name: "Juntar a outro tema…" }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  /**
+   * ── O PAR APONTADO, EM VEZ DE PROCURADO ────────────────────────────────
+   *
+   * Sem isto, juntar duplicados exigia dar por eles: dois cartões com o mesmo
+   * nome escrito de duas maneiras, numa grelha de 25. O critério está preso em
+   * `temas-parecidos.test.ts`; aqui prende-se que ele CHEGA ao cartão e que
+   * leva a algum lado.
+   */
+  it("aponta o par e abre a fusão a partir dele", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Branco e Verde", imageCount: 3 },
+        { ...THEME, id: "t2", name: "Verde & Branco", imageCount: 12 },
+      ]),
+    );
+    renderTemas();
+    // Pelo próprio aviso e não pelo cartão: o nome «Branco e Verde» passa a
+    // identificar dois botões — o cartão dele e o aviso do OUTRO cartão, que o
+    // cita. É o preço de o aviso dizer qual é o par, e vale a pena.
+    const aviso = await screen.findByText("Lê-se como “Verde & Branco”");
+    fireEvent.click(aviso);
+    // E abre já com este tema como origem.
+    expect(await screen.findByText(/Juntar “Branco e Verde” a/)).toBeTruthy();
+  });
+
+  it("um tema sem par não diz nada", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Branco", imageCount: 3 },
+        { ...THEME, id: "t2", name: "Branco & Verde", imageCount: 12 },
+      ]),
+    );
+    renderTemas();
+    await acharCartaoDoTema(/Branco & Verde/);
+    expect(screen.queryByText(/Lê-se como/)).toBeNull();
+  });
+
+  it("a origem sai da lista e o destino soma as fotos", async () => {
+    dois();
+    renderTemas();
+    await acharCartaoDoTema(/Clássico Intemporal/);
+    fireEvent.click(screen.getAllByRole("button", { name: "Juntar a outro tema…" })[0]);
+
+    route("POST /api/temas/t1/fundir", () =>
+      ok({
+        ok: true,
+        moved: 3,
+        existing: 0,
+        failed: 0,
+        thumbsMissing: 0,
+        nextOffset: 0,
+        done: true,
+        leftBehind: 0,
+        archived: true,
+      }),
+    );
+    fireEvent.click(await screen.findByRole("radio", { name: /Zen/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Juntar os temas" }));
+    // Sem `tick`: este bloco corre com o relógio a sério (os relógios falsos
+    // são de outros `describe`), e o que se espera é só que as promessas do
+    // `fetch` assentem.
+    await act(async () => {});
+    await act(async () => {});
+
+    // Arquivado sai da vista principal; o destino passa a 15.
+    expect(haCartaoDoTema(/Clássico Intemporal/)).toBe(false);
+    expect(screen.getByText(/15 fotos/)).toBeTruthy();
+  });
+
+  /**
+   * A RAZÃO DE O TEMA NÃO TER DESAPARECIDO.
+   *
+   * Uma foto que já está no destino fica na origem, e por isso a origem não é
+   * arquivada. Sem o dizer, ela vê o tema na lista e conclui que falhou.
+   */
+  it("diz porque é que a origem ficou, quando ficou", async () => {
+    dois();
+    renderTemas();
+    await acharCartaoDoTema(/Clássico Intemporal/);
+    fireEvent.click(screen.getAllByRole("button", { name: "Juntar a outro tema…" })[0]);
+
+    route("POST /api/temas/t1/fundir", () =>
+      ok({
+        ok: true,
+        moved: 1,
+        existing: 2,
+        failed: 0,
+        thumbsMissing: 0,
+        nextOffset: 2,
+        done: true,
+        leftBehind: 2,
+        archived: false,
+      }),
+    );
+    fireEvent.click(await screen.findByRole("radio", { name: /Zen/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Juntar os temas" }));
+    // Sem `tick`: este bloco corre com o relógio a sério (os relógios falsos
+    // são de outros `describe`), e o que se espera é só que as promessas do
+    // `fetch` assentem.
+    await act(async () => {});
+    await act(async () => {});
+
+    expect(haCartaoDoTema(/Clássico Intemporal/)).toBe(true);
+    expect(screen.getByText(/2 fotos já estavam em/)).toBeTruthy();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «USADO EM 7 PROPOSTAS»
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A contagem está presa em `temas-uso.test.ts`. Aqui prende-se o que o ecrã
+ * promete: que o número chega DEPOIS dos cartões (e por isso não os atrasa) e
+ * que a sua ausência não estraga nada.
+ */
+describe("Biblioteca de Temas — em quantas propostas saiu", () => {
+  it("o número entra depois, e diz quando um tema nunca saiu", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Terracotta", imageCount: 9 },
+        { ...THEME, id: "t2", name: "Boho", imageCount: 9 },
+      ]),
+    );
+    route("GET /api/temas/uso", () => ok({ ok: true, usos: { t1: 7 } }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+    // No mesmo rasto da contagem de fotos, e não numa linha só para ele: seis
+    // linhas de texto debaixo de uma fotografia não se leem (ver a Fase 2).
+    expect(screen.getByText(/9 fotos · 7 propostas/)).toBeTruthy();
+    // «Por usar» é a metade mais útil: distingue um tema que a biblioteca TEM
+    // de um tema que o estúdio USA.
+    expect(screen.getByText(/9 fotos · por usar/)).toBeTruthy();
+  });
+
+  it("uma proposta só não se diz no plural", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", imageCount: 9 }]));
+    route("GET /api/temas/uso", () => ok({ ok: true, usos: { t1: 1 } }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+    expect(screen.getByText(/· 1 proposta\b/)).toBeTruthy();
+  });
+
+  /** É um número decorativo: sem ele o cartão fica exactamente como estava. */
+  it("sem resposta, o cartão não fica a dizer nada de errado", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", imageCount: 9 }]));
+    route("GET /api/temas/uso", () => bad(500));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+    // Dentro do CARTÃO, e não na página: a frase de introdução também fala em
+    // propostas, e uma busca solta encontrava-a.
+    const cartao = cartaoDoTema(/Terracotta/);
+    expect(cartao.textContent).toMatch(/9 fotos/);
+    expect(cartao.textContent).not.toMatch(/proposta/);
+    expect(cartao.textContent).not.toMatch(/por usar/);
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O CARTÃO DE UM TEMA — FASE 2
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «os títulos longos são cortados» e «os metadados pesam mais
+ * do que a imagem».
+ *
+ * Pesavam mesmo: o cartão chegou a ter seis linhas de texto debaixo de uma
+ * fotografia — nome, contagem, data, uso, aviso de poucas fotos, nota — num
+ * cartão de 165 px. Nenhuma era falsa; juntas, nenhuma se lia.
+ */
+describe("Biblioteca de Temas — o cartão", () => {
+  const LONGO = "Clássico Intemporal Branco e Dourado com Velas Altas";
+
+  /**
+   * O nome é a ÚNICA coisa por que ela procura um tema. Cortá-lo à primeira
+   * linha tornava dois temas parecidos indistinguíveis exactamente no sítio
+   * onde é preciso distingui-los.
+   */
+  it("o nome tem duas linhas, e não uma cortada", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", name: LONGO, imageCount: 9 }]));
+    renderTemas();
+    const titulo = await screen.findByText(LONGO);
+    expect(titulo.className, "`truncate` corta à primeira linha").not.toMatch(/\btruncate\b/);
+    expect(titulo.className).toMatch(/line-clamp-2/);
+    // A altura das duas linhas fica reservada mesmo com um nome curto, senão a
+    // grelha perdia a linha de base entre cartões vizinhos.
+    expect(titulo.className).toMatch(/min-h-/);
+  });
+
+  it("os números vão todos no mesmo rasto", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Terracotta", imageCount: 9, updatedAt: T0 }]),
+    );
+    route("GET /api/temas/uso", () => ok({ ok: true, usos: { t1: 4 } }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+    // Uma linha só: fotos, uso, e a data por último — que é a que cai primeiro
+    // quando não cabe, por ser a menos decisiva das três.
+    const rasto = screen.getByText(/9 fotos · 4 propostas/);
+    expect(rasto.className).toMatch(/truncate/);
+  });
+
+  /**
+   * DUAS RESSALVAS APAGADAS EMPILHADAS LEEM-SE COMO NENHUMA.
+   *
+   * O par quase igual tem remédio a um toque; o «poucas fotos» é uma nota de
+   * curadoria. Quando as duas se aplicam, ganha a que pede acção.
+   */
+  it("mostra uma ressalva de cada vez, e a accionável primeiro", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Itália", imageCount: 1, notes: "limões" },
+        { ...THEME, id: "t2", name: "italia", imageCount: 9 },
+      ]),
+    );
+    renderTemas();
+    // O par está apontado…
+    expect(await screen.findByText("Lê-se como “italia”")).toBeTruthy();
+    // …e o «poucas fotos» do mesmo cartão cala-se, apesar de a condição valer.
+    expect(screen.queryByText(/Ainda com poucas fotos/)).toBeNull();
+    // A nota também: é a menos urgente das três.
+    expect(screen.queryByText("limões")).toBeNull();
+  });
+
+  it("sem par, o aviso de poucas fotos aparece — e a nota cala-se", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Itália", imageCount: 1, notes: "limões" }]),
+    );
+    renderTemas();
+    expect(await screen.findByText(/Ainda com poucas fotos/)).toBeTruthy();
+    expect(screen.queryByText("limões")).toBeNull();
+  });
+
+  it("sem par e com fotos que cheguem, sobra a nota", async () => {
+    route("GET /api/temas", () =>
+      ok([{ ...THEME, id: "t1", name: "Itália", imageCount: 40, notes: "limões" }]),
+    );
+    renderTemas();
+    expect(await screen.findByText("limões")).toBeTruthy();
+    expect(screen.queryByText(/Ainda com poucas fotos/)).toBeNull();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A BARRA DE CONTROLOS — FASE 3
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «os controlos estão todos alinhados sem agrupamento», «"395
+ * fotos em 25 temas" está órfão» e «mais folga entre os cartões».
+ */
+describe("Biblioteca de Temas — a barra de controlos", () => {
+  const cinco = () =>
+    route("GET /api/temas", () =>
+      ok(
+        ["Terracotta", "Itália", "Boho", "Praia", "Verde"].map((name, i) => ({
+          ...THEME,
+          id: `t${i + 1}`,
+          name,
+          imageCount: 9,
+        })),
+      ),
+    );
+
+  /**
+   * O resumo descreve a BIBLIOTECA, e continua verdadeiro com a procura
+   * vazia. Vivia dentro da caixa que ancora o ícone da lupa — herdava a
+   * largura do campo e lia-se como se descrevesse o que lá estava escrito.
+   */
+  it("o resumo da biblioteca não é filho do campo de procura", async () => {
+    cinco();
+    renderTemas();
+    const resumo = await screen.findByText(/fotos em 5 temas/);
+    expect(
+      resumo.closest(".relative"),
+      "a caixa `relative` existe só para pôr a lupa em cima do campo",
+    ).toBeNull();
+    // E o campo continua lá, ao lado.
+    expect(screen.getByLabelText(/Procurar tema/)).toBeTruthy();
+  });
+
+  /**
+   * Espaçamento igual quer dizer «cinco coisas sem relação», e não era
+   * verdade: umas mudam como a lista se vê, outra o que ela contém, duas
+   * fazem alguma coisa.
+   */
+  it("as duas acções ficam juntas, e separadas do resto", async () => {
+    cinco();
+    renderTemas();
+    const novo = await screen.findByRole("button", { name: /Novo tema/ });
+    const grupo = novo.parentElement!;
+    expect(grupo.textContent).toMatch(/Rever etiquetas/);
+    // O que muda a VISTA não está no mesmo grupo do que FAZ.
+    expect(grupo.textContent).not.toMatch(/Compacto/);
+    expect(grupo.querySelector("select")).toBeNull();
+  });
+
+  it("a ordenação e o tamanho dos cartões ficam no mesmo grupo", async () => {
+    cinco();
+    renderTemas();
+    await screen.findByRole("button", { name: /Novo tema/ });
+    const tamanhos = screen.getByRole("group", { name: /Tamanho dos cartões/ });
+    expect(tamanhos.parentElement!.querySelector("select")).not.toBeNull();
+  });
+
+  /**
+   * A FOLGA NÃO É QUADRADA, E ISSO É A CORRECÇÃO.
+   *
+   * Desde que um cartão pode ter uma linha pendurada por baixo («Lê-se
+   * como…»), uma folga igual nos dois sentidos punha essa linha à mesma
+   * distância do cartão a que pertence e do cartão de baixo.
+   */
+  it("a folga vertical é maior do que a horizontal", () => {
+    for (const classes of Object.values(COLUNAS)) {
+      const x = Number(/gap-x-(\d+)/.exec(classes)![1]);
+      const y = Number(/gap-y-(\d+)/.exec(classes)![1]);
+      expect(y, `folga vertical curta em "${classes}"`).toBeGreaterThan(x);
+    }
+  });
+});
+
 describe("Biblioteca de Temas — as fotos aparecem enquanto sobem", () => {
   it("a foto entra na grelha ANTES de o servidor responder, vinda do ficheiro dela", async () => {
     route("GET /api/temas", () => ok([THEME]));
@@ -1156,6 +1537,87 @@ describe("Biblioteca de Temas — seleção e ações em bloco", () => {
     expect(screen.getByText("Capa")).toBeInTheDocument();
     // A ação de capa só faz sentido para UMA foto.
     expect(screen.queryByRole("button", { name: "Definir como capa" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * ────────────────────────────────────────────────────────────────────────
+   * O QUE ELA VÊ ENQUANTO ESPERA
+   * ────────────────────────────────────────────────────────────────────────
+   *
+   * Quarenta fotos a descarregar são um a dois minutos. O `downloadMany` já
+   * contava as que iam saindo — e o ecrã passava-lhe um `() => {}`, ou seja,
+   * deitava a conta ao lixo e deixava um botão parado.
+   */
+  it("transferir em bloco mostra a contagem verdadeira, que sobe a cada foto", async () => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok(five));
+    // Cada foto é puxada do CDN por `fetch` (o `download` é ignorado entre
+    // origens); travá-las é o que deixa parar o lote a meio e olhar.
+    for (const n of [1, 2, 3]) {
+      route(`GET ${photo(n).url}`, () => ok({}));
+      hold(`GET ${photo(n).url}`);
+    }
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 1 de 5" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 3 de 5" }), {
+      shiftKey: true,
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Transferir" }));
+    });
+
+    expect(screen.getByText("A transferir as fotos…")).toBeInTheDocument();
+    expect(screen.getByText("0 de 3")).toBeInTheDocument();
+    expect(preenchimento()).toBe(0);
+
+    await release(`GET ${photo(1).url}`);
+    expect(screen.getByText("1 de 3")).toBeInTheDocument();
+    expect(preenchimento()).toBeCloseTo(1 / 3, 4);
+
+    await release(`GET ${photo(2).url}`);
+    expect(screen.getByText("2 de 3")).toBeInTheDocument();
+
+    // A resposta da última é que fecha a espera — não um temporizador.
+    await release(`GET ${photo(3).url}`);
+    expect(screen.queryByText("A transferir as fotos…")).not.toBeInTheDocument();
+  });
+
+  /**
+   * A remoção é OTIMISTA: as fotos saem da grelha e a seleção esvazia-se no
+   * instante do clique, e com ela vai-se a barra de ações. Os pedidos, esses,
+   * continuam a caminho do servidor — e é aí que ela ficava sem saber se
+   * aquilo estava a andar.
+   */
+  it("remover em bloco continua a contar depois de a barra de seleção desaparecer", async () => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok(five));
+    route("DELETE /api/temas/t1/imagens", () => ok({ ok: true }));
+    hold("DELETE /api/temas/t1/imagens");
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 1 de 5" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 4 de 5" }), {
+      shiftKey: true,
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Remover" }));
+    });
+
+    expect(screen.queryByText("4 fotos selecionadas")).not.toBeInTheDocument();
+    expect(screen.getByText("A remover as fotos…")).toBeInTheDocument();
+    expect(screen.getByText("0 de 4")).toBeInTheDocument();
+
+    await release("DELETE /api/temas/t1/imagens");
+    expect(screen.getByText("1 de 4")).toBeInTheDocument();
+    expect(preenchimento()).toBeCloseTo(0.25, 4);
+
+    await releaseAll("DELETE /api/temas/t1/imagens");
+    expect(screen.queryByText("A remover as fotos…")).not.toBeInTheDocument();
   });
 });
 

@@ -6,6 +6,7 @@ import { useToast } from "./Toast";
 import { printRunSheet } from "./export";
 import type { Quote, TimelineItem } from "@/lib/orcamento/types";
 import { Button, Field, EmptyState } from "./ui";
+import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
 
 interface Props {
   quote: Quote;
@@ -203,16 +204,22 @@ export default function EventTimeline({ quote, onChange }: Props) {
                 className="group relative flex items-start gap-3 rounded-xl py-2.5 pr-1 hover:bg-foreground/[0.02]"
               >
                 {editing?.id === i.id && editing.field === "time" ? (
-                  <input
-                    type="time"
-                    autoFocus
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onBlur={commitEdit}
-                    onKeyDown={editKeys}
-                    aria-label="Editar hora"
-                    className="bo-input w-[100px] shrink-0 px-2 py-0.5 text-xs tabular-nums text-foreground/80"
-                  />
+                  /* ── A SAÍDA, PARA QUEM NÃO TEM ESCAPE ──────────────────
+                     Ver `DesistirDaEdicao`: num telemóvel não há tecla que
+                     devolva o valor anterior, e tudo o que tira o foco GRAVA. */
+                  <span className="flex shrink-0 items-center gap-1">
+                    <input
+                      type="time"
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={commitEdit}
+                      onKeyDown={editKeys}
+                      aria-label="Editar hora"
+                      className="bo-input w-[100px] shrink-0 px-2 py-0.5 text-xs tabular-nums text-foreground/80"
+                    />
+                    <DesistirDaEdicao onDesistir={() => setEditing(null)} oQue="a hora" />
+                  </span>
                 ) : (
                   <button
                     type="button"
@@ -234,15 +241,18 @@ export default function EventTimeline({ quote, onChange }: Props) {
                 <span className="relative z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#4d6350] ring-4 ring-white" />
                 <div className="min-w-0 flex-1">
                   {editing?.id === i.id && editing.field === "title" ? (
-                    <input
-                      autoFocus
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onBlur={commitEdit}
-                      onKeyDown={editKeys}
-                      aria-label="Editar momento"
-                      className="bo-input w-full px-2 py-0.5 text-sm text-foreground/80"
-                    />
+                    <span className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onBlur={commitEdit}
+                        onKeyDown={editKeys}
+                        aria-label="Editar momento"
+                        className="bo-input w-full px-2 py-0.5 text-sm text-foreground/80"
+                      />
+                      <DesistirDaEdicao onDesistir={() => setEditing(null)} oQue="o momento" />
+                    </span>
                   ) : (
                     <button
                       type="button"
@@ -254,16 +264,19 @@ export default function EventTimeline({ quote, onChange }: Props) {
                     </button>
                   )}
                   {editing?.id === i.id && editing.field === "owner" ? (
-                    <input
-                      autoFocus
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onBlur={commitEdit}
-                      onKeyDown={editKeys}
-                      aria-label="Editar responsável"
-                      placeholder="Responsável"
-                      className="bo-input mt-1 w-full px-2 py-0.5 text-xs text-foreground/70"
-                    />
+                    <span className="mt-1 flex items-center gap-1">
+                      <input
+                        autoFocus
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onBlur={commitEdit}
+                        onKeyDown={editKeys}
+                        aria-label="Editar responsável"
+                        placeholder="Responsável"
+                        className="bo-input w-full px-2 py-0.5 text-xs text-foreground/70"
+                      />
+                      <DesistirDaEdicao onDesistir={() => setEditing(null)} oQue="o responsável" />
+                    </span>
                   ) : (
                     i.owner && (
                       <button

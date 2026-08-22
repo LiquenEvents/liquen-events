@@ -34,10 +34,21 @@ import { cn } from "./cn";
 export function Ajuda({
   /** O que o botão explica, para quem não vê o ícone («o que faz a caixa Extra»). */
   sobre,
+  /**
+   * De que lado do botão é que o painel cresce. Por omissão para a direita,
+   * que é onde ele cabe na esmagadora maioria dos sítios — um `?` ao lado de
+   * uma etiqueta tem o cartão inteiro à sua direita.
+   *
+   * `"direita"` para quando o botão está encostado à margem direita (a barra
+   * de selecção do seletor de fotos): aí um painel de 18 rem ancorado à
+   * esquerda saía do diálogo, e o que se lia era metade de cada linha.
+   */
+  alinhar = "esquerda",
   children,
   className,
 }: {
   sobre: string;
+  alinhar?: "esquerda" | "direita";
   children: ReactNode;
   className?: string;
 }) {
@@ -88,9 +99,13 @@ export function Ajuda({
         <span
           id={id}
           role="note"
-          // `left-0` e não centrado: encostado ao botão, um painel de 18rem cabe
-          // sem sair do cartão em qualquer largura de ecrã.
-          className="absolute top-full left-0 z-20 mt-1.5 w-[18rem] max-w-[80vw] rounded-xl border border-foreground/15 bg-white p-3 text-[11px] leading-relaxed text-foreground/70 normal-case tracking-normal shadow-[0_6px_20px_rgba(42,38,32,0.10)]"
+          // Encostado ao botão e não centrado: um painel de 18rem cabe sem sair
+          // do cartão em qualquer largura de ecrã — desde que cresça para o
+          // lado onde há espaço, que é o que `alinhar` escolhe.
+          className={cn(
+            "absolute top-full z-20 mt-1.5 w-[18rem] max-w-[80vw] rounded-xl border border-foreground/15 bg-white p-3 text-[11px] leading-relaxed text-foreground/70 normal-case tracking-normal shadow-[0_6px_20px_rgba(42,38,32,0.10)]",
+            alinhar === "direita" ? "right-0" : "left-0",
+          )}
         >
           {children}
         </span>

@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import { parseMoney } from "./util";
 import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
-import { Card, Field, Button, EmptyState } from "@/app/[lang]/(site)/orcamento/admin/ui";
+import { Card, Field, Button, EmptyState, EmCurso } from "@/app/[lang]/(site)/orcamento/admin/ui";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 import { useTravaoDeSaida } from "./useGravacaoAutomatica";
+import { tempoEstimado } from "@/lib/custo-do-pdf";
 import { eur, round2 } from "@/lib/money";
 
 /* O `eur` e o `round2` da casa. Havia aqui uma quinta cópia local do
@@ -14,6 +15,35 @@ import { eur, round2 } from "@/lib/money";
    por isso — e este ficheiro é justamente onde o dinheiro divergiu. */
 
 const LS_KEY = "liquen-last-proposal-items";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANTO DEMORA O «GERAR PDF E ENVIAR» — O PALPITE MAIS HONESTO DAQUI
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O gémeo deste botão é o envio do Estúdio (`AEnviarAProposta`), que sabe
+ * quantas fotografias o documento leva e afina a estimativa com as gerações
+ * anteriores. Este construtor não tem NENHUM desses dois dados:
+ *
+ *  · fotografias não tem nenhumas — o PDF que esta rota manda desenhar é o de
+ *    linhas (`proposal-pdf.ts`), texto e tabela, sem uma única imagem. Por isso
+ *    `tempoEstimado(0)` e não um número inventado: é o custo fixo do modelo,
+ *    que é exactamente a parte do desenho que este documento paga;
+ *  · amostras não tem nenhumas — as gerações medidas vivem numa chave de
+ *    `localStorage` privada do Estúdio, que este ficheiro não pode ler sem
+ *    duplicar a chave à mão. Fica-se pelo modelo de arranque.
+ *
+ * O que aqui manda não é o desenho, é o que a rota faz DEPOIS: falar com o SMTP
+ * com o PDF em anexo e a assinatura junto, pedir o link curto ao armazenamento
+ * e gravar a proposta. É a mesma ordem de grandeza do envio de um modelo de
+ * email (3–10 s) e é esse o palpite — 7 s.
+ *
+ * Errar por baixo não estraga nada: a barra nunca chega ao fim sozinha (só a
+ * resposta a fecha) e ao dobro do estimado a `notaDemorada` toma conta do
+ * recado. Errar por cima é que era mau — uma barra parada no princípio.
+ */
+const MS_DO_CORREIO = 7_000;
+const MS_DO_ENVIO = tempoEstimado(0) + MS_DO_CORREIO;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -889,17 +919,41 @@ export default function ProposalBuilder({ quote, onSent }: Props) {
         </p>
       )}
 
-      <Button
-        variant="primary"
-        size="lg"
-        fullWidth
-        onClick={send}
-        loading={sending}
-        disabled={subtotal <= 0}
-        iconRight={<span aria-hidden="true">→</span>}
-      >
-        {sending ? "A gerar e enviar…" : "Gerar PDF e enviar ao cliente"}
-      </Button>
+      {/* ── ENQUANTO ESTÁ A IR ───────────────────────────────────────────────
+          Isto é a operação irreversível deste ecrã, e é a gémea do envio do
+          Estúdio: a mesma rota, o mesmo trabalho, e dezenas de segundos numa
+          quinta com 4G fraco. O que havia era o botão a rodar — que diz «estou
+          ocupado» e não diz mais nada: nem o que está a acontecer, nem para
+          quem vai, nem que o separador não se fecha.
+
+          O cartão substitui o botão em vez de ficar por cima dele: o botão
+          desaparecido é a garantia de que não há segundo envio a caminho, e
+          duas propostas no email do casal é a avaria que não se desfaz. */}
+      {sending ? (
+        <EmCurso
+          titulo="A gerar o PDF e a enviar ao cliente…"
+          estimadoMs={MS_DO_ENVIO}
+          nota={
+            /* Nunca «Enviada»: quem dá o envio por feito é a resposta, e
+               enquanto isto está no ecrã a resposta não chegou. */
+            quote.email
+              ? `A proposta vai para ${quote.email}. Não feches nem recarregues esta página.`
+              : "Não feches nem recarregues esta página."
+          }
+          notaDemorada="Com rede fraca demora — não feches o separador. O email pode estar mesmo a sair."
+        />
+      ) : (
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          onClick={send}
+          disabled={subtotal <= 0}
+          iconRight={<span aria-hidden="true">→</span>}
+        >
+          Gerar PDF e enviar ao cliente
+        </Button>
+      )}
     </Card>
   );
 }

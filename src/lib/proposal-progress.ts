@@ -2,6 +2,7 @@ import { type ProposalDoc } from "./proposal-doc";
 import { desalinhamento, dinheiroDaProposta } from "./proposal-budget";
 import { camposPorTraduzir } from "./proposal-doc-bilingue";
 import { camposDoDocumento, lerCampo } from "./proposal-ortografia";
+import { eur } from "./money";
 
 /**
  * ONDE ESTOU, O QUE JÁ ESTÁ FEITO, E O QUE FALTA PARA PODER ENVIAR.
@@ -123,18 +124,47 @@ export function estadoDasSeccoes(doc: ProposalDoc): EstadoSeccao[] {
     });
   }
 
+  /**
+   * ── O ÍNDICE CONTAVA LINHAS ONDE O QUE INTERESSA É O VALOR ──────────────
+   *
+   * Palavras dela: «o Orçamento conta linhas e não o total».
+   *
+   * E contava mesmo: «3 linhas», com um visto verde, numa proposta cujo valor
+   * era zero. As duas coisas que o índice tem de responder num relance — está
+   * feito? e quanto é? — respondia mal às duas. A primeira porque um orçamento
+   * com linhas e sem preço não está feito; a segunda porque o número que se
+   * procura ali é o dos milhares de euros, e não o das linhas.
+   *
+   * E a linha de baixo dizia «definido», que é a palavra que diz que existe um
+   * número sem dizer qual. Passa a dizer o número. Ver `dinheiroDaProposta`:
+   * é o MESMO cálculo do quadro e do PDF, com IVA e adicionais, e não uma
+   * segunda soma que um dia discordaria.
+   */
+  const dinheiro = dinheiroDaProposta(doc);
+  const temValor = dinheiro.gross > 0;
+
   seccoes.push(
     {
       id: "orcamento",
       titulo: "Orçamento",
-      preenchida: linhas.length > 0,
-      resumo: linhas.length === 0 ? "por preencher" : plural(linhas.length, "linha", "linhas"),
+      // As duas coisas: as linhas E o preço. Uma lista de serviços sem valor
+      // nenhum é um orçamento por acabar, por mais linhas que tenha.
+      preenchida: linhas.length > 0 && temValor,
+      resumo:
+        linhas.length === 0
+          ? "por preencher"
+          : temValor
+            ? `${plural(linhas.length, "linha", "linhas")} · ${eur(dinheiro.gross)}`
+            : `${plural(linhas.length, "linha", "linhas")} · sem valor`,
     },
     {
       id: "total",
       titulo: "Total e validade",
-      preenchida: (doc.totalAmount ?? 0) > 0,
-      resumo: (doc.totalAmount ?? 0) > 0 ? "definido" : "por definir",
+      preenchida: temValor,
+      // O número, e não a palavra que diz que ele existe. É por este que ela
+      // passa os olhos antes de enviar, e «definido» obrigava a ir lá abaixo
+      // confirmar qual era.
+      resumo: temValor ? eur(dinheiro.gross) : "por definir",
     },
   );
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCamadaDeHistoria } from "../useCamadaDeHistoria";
 import { useFocusTrap } from "../useFocusTrap";
 import { useTrincoDeScroll } from "../useTrincoDeScroll";
 import { useAdaptativo } from "./adaptativo";
@@ -65,6 +66,15 @@ export function FolhaOuDialogo({
   // folha aberta por cima de um diálogo não destrancar o de baixo ao fechar);
   // vem ANTES da armadilha de foco para o foco a entrar não rolar a página.
   useTrincoDeScroll(aberto);
+  /* ── O GESTO DE VOLTAR FECHA ISTO, E NÃO O BACK OFFICE ─────────────────────
+     Num iPhone, deslizar da esquerda É o botão de voltar, e faz-se sem pensar —
+     numa quinta, com o telemóvel numa mão e uma caixa de flores na outra,
+     faz-se por acidente. Sem uma entrada na história, o Safari saía da
+     aplicação e levava com ele o que estivesse escrito aqui dentro.
+
+     Ao pé do Escape de propósito: é a mesma promessa, no gesto que o telemóvel
+     tem em vez do teclado que não tem. Ver `useCamadaDeHistoria`. */
+  useCamadaDeHistoria(aberto, onFechar);
   const caixaRef = useFocusTrap<HTMLDivElement>(aberto);
   const [arrasto, setArrasto] = useState(0);
   const inicioY = useRef<number | null>(null);

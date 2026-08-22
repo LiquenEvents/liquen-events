@@ -826,7 +826,7 @@ describe("ThemePicker", () => {
 
     // E o Shift+clique ao contrário desmarca o intervalo todo.
     fireEvent.click(photo(1), { shiftKey: true });
-    expect(screen.getByText("Toca nas fotos que queres usar.")).toBeInTheDocument();
+    expect(screen.getByText("Escolhe pelo menos uma foto.")).toBeInTheDocument();
   });
 
   it("marca as fotos que já estão nesta proposta", async () => {
@@ -1155,14 +1155,44 @@ describe("o que se escolhe, dito pelo número", () => {
     expect(screen.getByRole("button", { name: "Adicionar 1 e escolher mais" })).toBeInTheDocument();
   });
 
-  it("no telemóvel diz o que o dedo faz e o que a lupa faz", async () => {
+  /**
+   * ── UMA INSTRUÇÃO, E OS ATALHOS ATRÁS DO «?» ────────────────────────────
+   *
+   * Palavras dela: «há três textos de ajuda a competir; devia ser uma
+   * instrução curta e os atalhos atrás de um "?"».
+   *
+   * Eram três: duas versões da mesma frase na barra (uma para o dedo, outra
+   * para o rato, ambas sempre visíveis) e a do rodapé. Ficou a do rodapé.
+   */
+  it("a barra não repete a instrução do rodapé", async () => {
     photos = folder(6);
     await openPicker(true);
-    // A dica de teclado é do computador (`hidden sm:inline`); esta é a do dedo,
-    // e não existia.
-    const dica = screen.getByText(/Toca para escolher/);
-    expect(dica.className).toContain("sm:hidden");
-    expect(dica.textContent).toContain("lupa");
+    expect(screen.queryByText(/Toca para escolher/)).toBeNull();
+    expect(screen.queryByText(/Shift \+ clique escolhe/)).toBeNull();
+  });
+
+  it("os atalhos estão a um toque, e não sempre no ecrã", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    const ajuda = screen.getByRole("button", { name: /como escolher fotos/i });
+    // Fechado: nada do que ele explica está no ecrã.
+    expect(screen.queryByText(/escolhe tudo o que está pelo meio/i)).toBeNull();
+    fireEvent.click(ajuda);
+    expect(screen.getByText(/escolhe tudo o que está pelo meio/i)).toBeInTheDocument();
+    expect(screen.getByText(/mostra-a em grande/i)).toBeInTheDocument();
+  });
+
+  /**
+   * O painel está encostado à margem direita da barra: ancorado à esquerda,
+   * as 18 rem dele saíam do diálogo e lia-se metade de cada linha.
+   */
+  it("o painel dos atalhos abre para dentro do diálogo", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    fireEvent.click(screen.getByRole("button", { name: /como escolher fotos/i }));
+    const painel = screen.getByRole("note");
+    expect(painel.className).toContain("right-0");
+    expect(painel.className).not.toContain("left-0");
   });
 });
 
@@ -1362,7 +1392,7 @@ describe("o painel a 390 px", () => {
 
   it("o rodapé quebra em vez de espremer a contagem", async () => {
     await openPicker(true);
-    const contagem = screen.getByText(/Toca nas fotos que queres usar/);
+    const contagem = screen.getByText("Escolhe pelo menos uma foto.");
     const linha = contagem.closest("div")?.parentElement;
     expect(linha?.className, "sem `flex-wrap` os botões comem o texto").toContain("flex-wrap");
     // O texto ocupa a linha toda no telemóvel e volta ao lado dos botões
@@ -1370,10 +1400,44 @@ describe("o painel a 390 px", () => {
     expect(contagem.closest("div")?.className).toContain("basis-full");
   });
 
-  it("e a frase inteira está lá — não «Toca»", async () => {
+  it("e a frase inteira está lá — não uma palavra cortada", async () => {
     await openPicker(true);
-    // O controlo positivo do de cima: a frase que era cortada.
-    expect(screen.getByText("Toca nas fotos que queres usar.")).toBeInTheDocument();
+    // O controlo positivo do de cima: a frase que era cortada. Hoje é outra
+    // — «Escolhe pelo menos uma foto.» —, e o que se prende é o mesmo: que
+    // cabe inteira.
+    expect(screen.getByText("Escolhe pelo menos uma foto.")).toBeInTheDocument();
+  });
+
+  /**
+   * ── O BOTÃO DESLIGADO PASSA A DIZER PORQUÊ ────────────────────────────
+   *
+   * Palavras dela: «o botão de adicionar aparece desativado sem dizer porquê».
+   * A razão já estava escrita ao lado; o que faltava era estar LIGADA ao
+   * botão, para quem ouve o ecrã em vez de o ver.
+   */
+  it("os botões de adicionar apontam para a razão de estarem desligados", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    const razao = screen.getByText("Escolhe pelo menos uma foto.");
+    expect(razao.id).toBeTruthy();
+    // Os dois: o «e escolher mais» e o de confirmar. Ambos estão desligados
+    // pela mesma razão, e ambos têm de a apontar.
+    const botoes = screen.getAllByRole("button", { name: /^Adicionar/ });
+    expect(botoes).toHaveLength(2);
+    for (const b of botoes) {
+      expect(b).toBeDisabled();
+      expect(b.getAttribute("aria-describedby")).toBe(razao.id);
+    }
+  });
+
+  it("e deixam de apontar assim que há uma foto escolhida", async () => {
+    photos = folder(6);
+    await openPicker(true);
+    fireEvent.click(photo(1));
+    for (const b of screen.getAllByRole("button", { name: /^Adicionar/ })) {
+      expect(b).not.toBeDisabled();
+      expect(b.getAttribute("aria-describedby")).toBeNull();
+    }
   });
 
   it("o fundo separa o painel da página, em vez de a deixar ler", async () => {
@@ -1388,7 +1452,7 @@ describe("o painel a 390 px", () => {
 
   it("e o rodapé não fica debaixo da barra de gestos do iPhone", async () => {
     await openPicker(true);
-    const contagem = screen.getByText(/Toca nas fotos que queres usar/);
+    const contagem = screen.getByText("Escolhe pelo menos uma foto.");
     const linha = contagem.closest("div")?.parentElement as HTMLElement;
     expect(linha.style.paddingBottom).toContain("safe-area-inset-bottom");
   });
@@ -1439,5 +1503,132 @@ describe("o painel a 390 px", () => {
     expect(canto.parentElement?.className, "sem `relative` o canto sai do painel").toContain(
       "relative",
     );
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * OS TEMAS AO LADO, E NÃO EM CIMA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «sete linhas de temas ocupam mais de metade da altura do
+ * modal. As fotos ficam num terço no fundo, com uma linha e meia visível».
+ *
+ * Ao alto, os temas comem ALTURA à grelha, e a conta é implacável: 25 temas
+ * embrulhados em chips fazem sete filas. Ao lado, comem LARGURA — e largura é o
+ * que um seletor de fotos tem de sobra, altura é o que não tem.
+ *
+ * O jsdom não faz layout: não há aqui píxeis para medir. O que se prende é a
+ * DECISÃO, para que ninguém a desfaça sem dar por isso — a mesma escolha do
+ * `Overview.movel.test`, que afirma sobre classes pela mesma razão.
+ */
+describe("o seletor a partir de 1024 px", () => {
+  it("a lista de temas vira uma coluna com scroll próprio", async () => {
+    await openPicker(true);
+    const lista = screen.getByRole("group", { name: "Temas" });
+    // Coluna, sem tecto de altura, e a ocupar o que sobra da lateral.
+    expect(lista.className).toContain("lg:flex-col");
+    expect(lista.className).toContain("lg:max-h-none");
+    expect(lista.className).toContain("lg:flex-1");
+    // E abaixo disso continua a ser a fila que rola de lado, que é a resposta
+    // certa para um ecrã estreito.
+    expect(lista.className).toContain("overflow-x-auto");
+    expect(lista.className).toContain("snap-x");
+  });
+
+  it("o painel abre mais largo, para a coluna não roubar à grelha", async () => {
+    await openPicker(true);
+    const painel = screen.getByRole("dialog");
+    expect(painel.className).toContain("lg:max-w-[70rem]");
+    // Abaixo de `lg` fica como estava.
+    expect(painel.className).toContain("max-w-3xl");
+  });
+
+  it("e cada tema ocupa a linha toda, encostado à esquerda", async () => {
+    await openPicker(true);
+    const primeiro = screen.getByRole("group", { name: "Temas" }).querySelector("button")!;
+    // Centrado, um nome curto ao lado de um comprido lê-se como duas listas.
+    expect(primeiro.className).toContain("lg:w-full");
+    expect(primeiro.className).toContain("lg:!justify-start");
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O SELETOR ABRE A SABER EM QUE PROPOSTA ESTÁ — FASE 6
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «o seletor abre sem saber em que proposta estou».
+ *
+ * Abria no tema em que se tocou por último — que, ao fim de um dia de
+ * trabalho, é muitas vezes de OUTRO casamento. Encher o quarto mood board de
+ * um casamento cujos três primeiros vieram todos de «Itália» e ver o diálogo
+ * abrir em «Terracotta» é abrir no sítio errado com toda a informação para
+ * acertar.
+ *
+ * A ordem de escolha é o que aqui se prende: o que ela fez NESTA sessão ganha
+ * sempre (é o acto mais recente e mais explícito), e o contexto do pedido só
+ * entra quando não há nada dessa sessão — mas ganha à memória do dia anterior.
+ */
+describe("por que tema é que o diálogo abre", () => {
+  const varios = Array.from({ length: 4 }, (_, i) => ({
+    ...THEME,
+    id: `t${i + 1}`,
+    name: `Tema ${i + 1}`,
+  }));
+  /** O nome do tema que está aberto — o chip com `aria-pressed`. */
+  function temaActivo(): string {
+    const lista = screen.getByRole("group", { name: "Temas" });
+    const activos = [...lista.querySelectorAll('button[aria-pressed="true"]')];
+    expect(activos, "esperava UM tema activo").toHaveLength(1);
+    // Pelo nome ACESSÍVEL e não pelo texto: o chip escreve o nome e a
+    // contagem lado a lado, e o `textContent` cola-os («Tema 341»).
+    return (activos[0].getAttribute("aria-label") ?? "").split(",")[0].trim();
+  }
+
+  beforeEach(() => {
+    route("GET /api/temas", () => ok(varios));
+    // A pasta responde por qualquer um dos quatro: o que se está a testar é
+    // por QUAL deles o diálogo abre, e todos têm de poder abrir.
+    for (const t of varios) {
+      route(`GET /api/temas/${t.id}/imagens`, (url) => {
+        const q = new URL(url, "http://test").searchParams;
+        const offset = Number(q.get("offset") ?? 0);
+        const limit = Number(q.get("limit") ?? THEME_PAGE_SIZE);
+        return ok({
+          ok: true,
+          images: photos.slice(offset, offset + limit),
+          total: photos.length,
+          truncated: false,
+        });
+      });
+    }
+    // A memória da sessão passada aponta para o «Tema 3» — outro dia, muitas
+    // vezes outro casamento. É o palpite que o contexto tem de bater.
+    localStorage.setItem("liquen-tema-recente", "t3");
+  });
+
+  it("abre no tema de que esta proposta já está a beber", async () => {
+    // Nomes que NÃO existem na pasta de mentira: o que se está a testar é por
+    // que tema o diálogo abre, e uma foto que também esteja na grelha ganhava
+    // o sufixo «(já nesta proposta)» e mudava o nome acessível da célula.
+    await openPicker(true, ["t1/usada-a.jpg", "t1/usada-b.jpg", "t2/usada-c.jpg"]);
+    expect(temaActivo()).toBe("Tema 1");
+  });
+
+  it("uma foto solta de outro tema não muda o rumo", async () => {
+    await openPicker(true, ["t2/a.jpg", "t2/b.jpg", "t2/c.jpg", "t4/z.jpg"]);
+    expect(temaActivo()).toBe("Tema 2");
+  });
+
+  it("sem contexto nenhum, fica a memória da sessão passada", async () => {
+    await openPicker(true, []);
+    expect(temaActivo()).toBe("Tema 3");
+  });
+
+  /** Um caminho que não tem a forma `<tema>/<ficheiro>` não inventa um tema. */
+  it("caminhos mal formados são ignorados", async () => {
+    await openPicker(true, ["", "/solto.jpg", "sem-barra.jpg"]);
+    expect(temaActivo()).toBe("Tema 3");
   });
 });

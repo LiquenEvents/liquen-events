@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
 import { randomId } from "./util";
 import { useToast } from "./Toast";
 import type { Quote, ChecklistItem } from "@/lib/orcamento/types";
@@ -307,18 +308,23 @@ export default function EventChecklist({ quote, onChange }: Props) {
                   </span>
                 </button>
                 {editingId === i.id ? (
-                  <input
-                    autoFocus
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onBlur={commitEdit}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitEdit();
-                      if (e.key === "Escape") setEditingId(null);
-                    }}
-                    aria-label="Editar item"
-                    className="bo-input flex-1 px-2 py-0.5 text-sm text-foreground/80"
-                  />
+                  <>
+                    <input
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={commitEdit}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitEdit();
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      aria-label="Editar item"
+                      className="bo-input flex-1 px-2 py-0.5 text-sm text-foreground/80"
+                    />
+                    {/* Num telemóvel não há Escape, e tudo o que tira o foco
+                        GRAVA — ver `DesistirDaEdicao`. */}
+                    <DesistirDaEdicao onDesistir={() => setEditingId(null)} oQue="o item" />
+                  </>
                 ) : (
                   <button
                     type="button"

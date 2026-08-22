@@ -28,6 +28,7 @@ import {
 import { textosDoEmailDaProposta } from "@/lib/email-proposta-textos";
 import { enderecoDaProposta } from "@/lib/proposta-link-curto";
 import { proximaVersao, seloDoConteudo } from "@/lib/proposta-versao";
+import { aquecerDerivadasDaCapa } from "@/lib/derivadas";
 import { sendMail, esc, MAIL_TO } from "@/lib/mail";
 import { emailAoCliente } from "@/lib/email-assinatura";
 import { assinaturaDeQuemEnvia } from "@/lib/email-quem-assina";
@@ -1209,6 +1210,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             ].join("\n"),
           });
 
+    /* ── A CAPA FABRICADA ENQUANTO O CORREIO SAI ──────────────────────────
+       «Esta foto demora imenso tempo a carregar.» A derivada de 1200 px da capa
+       era fabricada pela primeira visita — que numa proposta acabada de enviar é
+       a do casal a abrir o email, com um `sharp` a acontecer enquanto eles olham
+       para um rectângulo vazio.
+
+       Começa AQUI e é esperada depois do `sendMail`: corre em paralelo com a ida
+       ao servidor de correio, portanto não acrescenta praticamente nada ao
+       envio. O `.catch` é obrigatório — entre este ponto e o `await` lá em baixo
+       há um `await` pelo meio, e uma promessa rejeitada sem tratamento nesse
+       intervalo derrubaria o processo. */
+    const capaAQuecer = aquecerDerivadasDaCapa(doc.coverImages ?? []).catch(() => 0);
+
     // A proposta JÁ foi guardada acima. O envio do email é um passo separado: se
     // falhar (SMTP em baixo, credenciais erradas, email do cliente inválido) NÃO
     // pode deitar abaixo a geração inteira com um 500 — senão o utilizador vê
@@ -1261,6 +1275,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         emailError = "A proposta foi guardada, mas o email ao cliente falhou.";
       }
     }
+
+    // A capa, se ainda não estava pronta. Nunca lança e tem tecto próprio: se
+    // passou dele, fica para a visita, como era antes.
+    await capaAQuecer;
 
     /**
      * ══════════════════════════════════════════════════════════════════════

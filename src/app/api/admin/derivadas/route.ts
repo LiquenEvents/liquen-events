@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
 import { isDatabaseConfigured } from "@/lib/supabase";
 import { contarDerivadasEmFalta, gerarLoteDeDerivadas } from "@/lib/derivadas";
+import { nomesDasPastas, nomeDeReserva } from "@/lib/pastas-com-nome";
+import { THEME_BUCKET } from "@/lib/theme-ref";
 import { log } from "@/lib/logger";
 
 // `sharp` precisa do runtime de Node.
@@ -33,7 +35,18 @@ export async function GET(request: NextRequest) {
   }
   try {
     const contagem = await contarDerivadasEmFalta();
-    return NextResponse.json({ ok: true, ...contagem });
+    // O nome vem depois da contagem e à parte dela: `contarDerivadasEmFalta`
+    // fala com o Storage e não sabe o que é um tema. Traduzir aqui mantém a
+    // contagem ignorante do domínio e o painel legível — e se os nomes não
+    // vierem, a contagem sai na mesma com o id.
+    const nomes = await nomesDasPastas().catch(() => new Map<string, string>());
+    const linhas = contagem.linhas.map((l) => ({
+      ...l,
+      nome: nomes.get(`${l.origem}/${l.pasta}`) ?? nomeDeReserva(l.pasta),
+      /** A biblioteca ou um pedido — o painel diz-lhes coisas diferentes. */
+      daBiblioteca: l.origem === THEME_BUCKET,
+    }));
+    return NextResponse.json({ ok: true, ...contagem, linhas });
   } catch (e) {
     log.error("derivadas: contagem falhou", e);
     return NextResponse.json({ error: "Não consegui contar." }, { status: 500 });
@@ -58,7 +71,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Armazenamento indisponível." }, { status: 503 });
   }
   try {
-    const r = await gerarLoteDeDerivadas();
+    // `?papel=essencial` faz só as miniaturas — as que fazem a grelha puxar o
+    // original. Qualquer outro valor (ou nenhum) faz tudo, essenciais
+    // primeiro. Validado por igualdade e não passado adiante em bruto: o que
+    // vem do pedido nunca escolhe um bucket.
+    const pedido = request.nextUrl.searchParams.get("papel");
+    const papel = pedido === "essencial" || pedido === "leve" ? pedido : undefined;
+    const r = await gerarLoteDeDerivadas(papel);
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     log.error("derivadas: geração falhou", e);

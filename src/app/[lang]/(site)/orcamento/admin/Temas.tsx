@@ -4,6 +4,8 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
 import PhotoLightbox from "./PhotoLightbox";
 import ThemeCopyDialog, { type ThemeCopyOutcome } from "./ThemeCopyDialog";
+import FundirTemas, { type ThemeMergeOutcome } from "./FundirTemas";
+import { avisoDeTemaParecido, temasParecidos } from "@/lib/temas-parecidos";
 import { downloadMany, downloadName, downloadOne } from "./photo-download";
 import {
   CHECK_CHUNK,
@@ -19,10 +21,20 @@ import { fingerprintBlob } from "@/lib/theme-fingerprint";
 import { textoDaRecusa, tituloDaRecusa } from "@/lib/erro-do-servidor";
 import { useToast } from "./Toast";
 import { prepareImageWithThumb } from "./image-prep";
-import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
+import {
+  Button,
+  Card,
+  EmCurso,
+  EmptyState,
+  Field,
+  MenuDeAccoes,
+  Toolbar,
+  type AccaoDeItem,
+} from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import ImagemComPlanoB from "./ImagemComPlanoB";
+import { adiantarTema, paginaDaResposta, usarAdiantada } from "./prefetch-de-tema";
 import { SugestaoDeNome } from "./SugestaoDeNome";
 import { NomesPorArrumar } from "./NomesPorArrumar";
 
@@ -310,9 +322,23 @@ export function guardarDensidade(d: Densidade): void {
  * "Compacto" chega a seis colunas porque é exactamente o número de temas de
  * hoje — o pedido era vê-los todos de uma vez, sem scroll.
  */
+/**
+ * ── AS COLUNAS, E PORQUE É QUE A FOLGA NÃO É QUADRADA ─────────────────────
+ *
+ * Pedido dela, na Fase 3: «mais folga entre os cartões».
+ *
+ * A folga VERTICAL é maior do que a horizontal, e não por gosto: desde que um
+ * cartão pode ter uma linha pendurada por baixo dele — «Lê-se como "italia" ·
+ * Juntar» —, uma folga igual nos dois sentidos punha essa linha à mesma
+ * distância do cartão a que pertence e do cartão de baixo. Lia-se como sendo
+ * do outro.
+ *
+ * Horizontalmente muda pouco: a 390 px são duas colunas, e cada píxel de folga
+ * sai da fotografia. É o lado onde a folga custa e o lado onde não fazia falta.
+ */
 export const COLUNAS: Record<Densidade, string> = {
-  confortavel: "grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4",
-  compacto: "grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6",
+  confortavel: "grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 lg:grid-cols-4",
+  compacto: "grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4 lg:grid-cols-6",
 };
 
 /**
@@ -402,6 +428,13 @@ function bibliotecaAlterada(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("liquen:biblioteca-alterada"));
 }
+
+/**
+ * O retrato de uma ação em bloco a decorrer, para o `EmCurso` da barra de
+ * seleção. Transferir 40 fotos e remover 40 fotos são 40 coisas cada uma: há
+ * sempre contagem, por isso a barra diz a verdade e nunca é uma estimativa.
+ */
+type AccaoEmBloco = { tipo: "transferir" | "remover"; feito: number; total: number };
 
 async function pool<T>(
   items: T[],
@@ -594,6 +627,33 @@ export default function Temas() {
       : base;
   }, [themes]);
   const [verArquivados, setVerArquivados] = useState(false);
+  /**
+   * ── EM QUANTAS PROPOSTAS É QUE CADA TEMA JÁ SAIU ───────────────────────
+   *
+   * O cartão dizia quantas FOTOS tem e quando foi mexido. Nenhuma das duas
+   * responde à pergunta que se faz a olhar para 25 temas: qual é que eu uso
+   * mesmo? Um tema com 80 fotos que nunca saiu de casa e um com 12 que foi a
+   * metade dos casamentos do ano parecem iguais na grelha, e são o oposto um
+   * do outro.
+   *
+   * Chega DEPOIS dos cartões, num pedido próprio: a contagem lê os documentos
+   * das propostas todos, e a rota da lista é a que desenha o primeiro ecrã da
+   * Biblioteca — a Fase 1 foi passada a tirar-lhe trabalho de cima. Ver
+   * `temas-uso.ts`. Enquanto não chega (ou se nunca chegar) o cartão fica
+   * exactamente como estava.
+   */
+  const [usos, setUsos] = useState<Record<string, number> | null>(null);
+  /**
+   * ── O TEMA QUE ESTÁ A SER JUNTO A OUTRO ────────────────────────────────
+   *
+   * Palavras dela: «"Clássico Intemporal" aparece duas vezes com nomes quase
+   * iguais — não tenho como os juntar».
+   *
+   * Vive na LISTA e não dentro de uma pasta, porque é aqui que os duplicados
+   * se vêem: dois cartões lado a lado com o mesmo nome mal escrito de duas
+   * maneiras. Dentro de uma pasta não há com que comparar.
+   */
+  const [aFundir, setAFundir] = useState<ThemeSummary | null>(null);
   const [revendo, setRevendo] = useState(false);
   // Lidas depois do primeiro desenho, e não durante: o servidor não tem
   // `localStorage`, e ler ali daria um HTML diferente do que o browser desenha.
@@ -725,6 +785,31 @@ export default function Temas() {
         ),
         onAccao: () => alternarMarca(t, "arquivado"),
       },
+      {
+        id: "fundir",
+        rotulo: "Juntar a outro tema…",
+        icone: (
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {/* Dois caminhos que se encontram num só — o desenho do que a acção
+                faz, e não uma pasta com uma seta (que é o que já significa
+                arquivar, aqui mesmo por cima). */}
+            <path d="M4 4c0 6 4 8 8 8s8 2 8 8" />
+            <path d="M20 4c0 6-4 8-8 8" />
+            <path d="m17 17 3 3-3 3" />
+          </svg>
+        ),
+        onAccao: () => setAFundir(t),
+      },
     ],
     [alternarMarca],
   );
@@ -750,6 +835,26 @@ export default function Temas() {
    * que é o que se cita a pedir ajuda.
    */
   const [blocked, setBlocked] = useState<{ titulo: string; texto: string } | null>(null);
+
+  // Um pedido só, à entrada. Não acompanha o que ela faz na Biblioteca de
+  // propósito: o que muda este número é gravar uma PROPOSTA, e isso acontece
+  // noutro ecrã.
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/temas/uso", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (vivo && data?.usos) setUsos(data.usos as Record<string, number>);
+      } catch {
+        /* fica sem número, que é como estava antes de isto existir */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -887,12 +992,91 @@ export default function Temas() {
     );
   }, []);
 
+  /**
+   * ── DEPOIS DE JUNTAR DOIS TEMAS ────────────────────────────────────────
+   *
+   * A lista corrige-se sem recarregar: o destino ganha as fotos que chegaram,
+   * a origem fica com as que sobraram, e — se ficou vazia — sai da vista, que
+   * é o que o servidor já lhe fez.
+   *
+   * O relatório é um toast por assunto, e não uma frase com tudo lá dentro:
+   * «foram X» é a confirmação, «Y já lá estavam» é uma explicação de porque é
+   * que o tema não desapareceu, e «sem miniatura» é uma instrução. Três coisas
+   * diferentes numa linha só lêem-se como nenhuma.
+   */
+  const aplicarFusao = useCallback(
+    (r: ThemeMergeOutcome) => {
+      setAFundir(null);
+      setThemes((prev) =>
+        prev.map((t) => {
+          if (t.id === r.destId && t.imageCount !== null) {
+            return { ...t, imageCount: t.imageCount + r.moved };
+          }
+          if (t.id === r.sourceId) {
+            return {
+              ...t,
+              imageCount: r.leftBehind,
+              truncated: false,
+              ...(r.archived ? { arquivado: true } : {}),
+            };
+          }
+          return t;
+        }),
+      );
+      bibliotecaAlterada();
+      if (r.stopped) {
+        toast(
+          `Parou a meio — ${plural(r.moved, "foto passou", "fotos passaram")} para "${r.destName}". Podes continuar quando quiseres.`,
+          "info",
+        );
+        return;
+      }
+      if (r.moved === 0 && r.existing === 0 && r.failed === 0) {
+        toast(`"${r.sourceName}" não tinha fotos. Nada mudou.`, "info");
+      } else {
+        toast(
+          r.archived
+            ? `"${r.sourceName}" passou para "${r.destName}" e foi arquivado.`
+            : `${plural(r.moved, "foto passou", "fotos passaram")} para "${r.destName}".`,
+          "success",
+        );
+      }
+      // A razão de o tema não ter desaparecido. Sem isto, ela vê-o na lista com
+      // três fotos e conclui que a fusão falhou.
+      if (!r.archived && r.leftBehind > 0) {
+        toast(
+          r.failed > 0
+            ? `${plural(r.failed, "foto não saiu", "fotos não saíram")} de "${r.sourceName}". Tenta juntar outra vez.`
+            : `${plural(r.leftBehind, "foto já estava", "fotos já estavam")} em "${r.destName}" e ficou em "${r.sourceName}". Podes apagá-lo quando quiseres.`,
+          "info",
+        );
+      }
+      if (r.thumbsMissing > 0) {
+        toast(
+          `${plural(r.thumbsMissing, "foto chegou", "fotos chegaram")} a "${r.destName}" sem miniatura. Abre esse tema e usa "Gerar miniaturas em falta".`,
+          "info",
+        );
+      }
+    },
+    [toast],
+  );
+
   const open = themes.find((t) => t.id === openId) ?? null;
 
   /** Quantos temas estão arquivados — o que autoriza (ou não) mostrar o
    *  interruptor do arquivo. Sem nada lá dentro, seria um controlo a explicar
    *  uma funcionalidade que ninguém ainda usou. */
   const arquivados = useMemo(() => themes.filter((t) => t.arquivado).length, [themes]);
+
+  /**
+   * ── OS PARES QUE ELA NÃO TEM DE ENCONTRAR A OLHO ───────────────────────
+   *
+   * Sobre a lista TODA e não sobre a filtrada: um par onde só uma das metades
+   * corresponde à procura continua a ser um par, e escondê-lo por causa do
+   * filtro era transformar o aviso numa coisa que aparece e desaparece
+   * consoante o que está escrito no campo. Ver `temas-parecidos.ts`.
+   */
+  const parecidos = useMemo(() => temasParecidos(themes), [themes]);
 
   const visible = useMemo(() => {
     const needle = normalizedThemeName(deferredSearch);
@@ -955,6 +1139,14 @@ export default function Temas() {
 
   return (
     <div>
+      {aFundir && (
+        <FundirTemas
+          sourceTheme={aFundir}
+          themes={themes}
+          onClose={() => setAFundir(null)}
+          onDone={aplicarFusao}
+        />
+      )}
       {blocked && (
         <Card padding="sm" className="mb-6 border-[#8a6d2f]/30 bg-[#f6efe1]/60">
           {/* O título vem da causa: dizer "Falta um passo de instalação" a quem
@@ -968,15 +1160,28 @@ export default function Temas() {
         className="mb-6"
         start={
           searchable ? (
-            <div className="relative w-full max-w-md sm:w-72">
-              {SearchIcon}
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Procurar tema…"
-                aria-label="Procurar tema por nome ou nota"
-                className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
-              />
+            /* ── O RESUMO DEIXA DE SER FILHO DO CAMPO ────────────────────
+               Pedido dela, na Fase 3: «"395 fotos em 25 temas" está órfão».
+
+               Estava dentro da caixa `relative` do campo de procura — uma caixa
+               que só existe para ancorar o ícone da lupa. Herdava a largura do
+               campo, encostava-se a ele, e lia-se como se descrevesse o que
+               estava escrito na procura. Não descreve: descreve a BIBLIOTECA, e
+               continua verdadeiro com o campo vazio.
+
+               Passa a irmão do campo, na mesma coluna. O que muda é a quem ele
+               parece pertencer. */
+            <div className="w-full max-w-md sm:w-72">
+              <div className="relative">
+                {SearchIcon}
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Procurar tema…"
+                  aria-label="Procurar tema por nome ou nota"
+                  className="bo-input py-2.5 pl-10 pr-3 text-sm text-foreground/80 placeholder-foreground/30"
+                />
+              </div>
               {/* O TAMANHO DA BIBLIOTECA, dito por ela própria. Era preciso
                   somar os cartões à mão para responder a «quantas fotos
                   temos?» — e este é o activo mais valioso do back office. */}
@@ -1000,37 +1205,89 @@ export default function Temas() {
              ficava-se sem navegação nenhuma. Tirar a caixa devolve a fila ao
              contentor que sabe quebrá-la; medido, o documento volta aos
              390 px. Ver `e2e/geometria-dos-alvos.spec.ts` (D4). */
-          <>
+          /* ══════════════════════════════════════════════════════════
+             OS CONTROLOS AGRUPADOS PELO QUE FAZEM
+             ══════════════════════════════════════════════════════════
+
+             Pedido dela, na Fase 3: «os controlos estão todos alinhados sem
+             agrupamento».
+
+             Estavam: cinco controlos em fila, todos com a mesma folga entre
+             si — a ordenação, «Rever etiquetas», «Arquivados», o tamanho dos
+             cartões e «Novo tema». Espaçamento igual quer dizer «isto é uma
+             lista de cinco coisas sem relação», e não era verdade: três deles
+             mudam COMO a lista se vê, um muda O QUE ela contém, e dois FAZEM
+             alguma coisa.
+
+             O agrupamento é feito com folga e não com linhas divisórias, de
+             propósito: uma linha vertical entre grupos parte-se assim que a
+             fila quebra no telemóvel — e ela quebra sempre. A folga quebra
+             bem. Dentro de um grupo `gap-1.5`; entre grupos, `gap-x-5`. A
+             razão entre as duas é o que se lê.
+
+             (A fila não leva caixa própria: o `Toolbar` já dá uma ao `end`, e
+             uma segunda por dentro custou-lhe uma vez a navegação inteira no
+             telemóvel — ver a nota acima e o `geometria-dos-alvos.spec.ts`.) */
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {/* ── VER: como a lista se mostra ─────────────────────────── */}
             {themes.length > 2 && (
-              <label className="flex items-center gap-1.5">
-                <span className="sr-only">Ordenar os temas</span>
-                <select
-                  value={ordem}
-                  onChange={(e) => {
-                    const o = e.target.value as Ordem;
-                    setOrdem(o);
-                    guardarOrdem(o);
-                  }}
-                  className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-foreground/70"
+              <div className="flex flex-wrap items-center gap-1.5">
+                <label className="flex items-center">
+                  <span className="sr-only">Ordenar os temas</span>
+                  <select
+                    value={ordem}
+                    onChange={(e) => {
+                      const o = e.target.value as Ordem;
+                      setOrdem(o);
+                      guardarOrdem(o);
+                    }}
+                    className="bo-input w-auto py-2 pl-3 pr-8 text-xs text-foreground/70"
+                  >
+                    {ORDENS.map((o) => (
+                      <option key={o.valor} value={o.valor}>
+                        {o.rotulo}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div
+                  role="group"
+                  aria-label="Tamanho dos cartões"
+                  className="flex overflow-hidden rounded-lg border border-foreground/[0.1]"
                 >
-                  {ORDENS.map((o) => (
-                    <option key={o.valor} value={o.valor}>
-                      {o.rotulo}
-                    </option>
+                  {(
+                    [
+                      ["compacto", "Compacto"],
+                      ["confortavel", "Confortável"],
+                    ] as const
+                  ).map(([valor, rotulo]) => (
+                    <button
+                      key={valor}
+                      type="button"
+                      aria-pressed={densidade === valor}
+                      onClick={() => {
+                        setDensidade(valor);
+                        guardarDensidade(valor);
+                      }}
+                      className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
+                        densidade === valor
+                          ? "bg-foreground/[0.06] text-foreground/70"
+                          : "text-foreground/40 hover:text-foreground/60"
+                      }`}
+                    >
+                      {rotulo}
+                    </button>
                   ))}
-                </select>
-              </label>
+                </div>
+              </div>
             )}
-            {/* MANUTENÇÃO, não acção principal. Estava em `secondary`, ao lado
-                do «Novo tema» em verde cheio, e os dois competiam no topo — um
-                é o que se faz todos os dias, o outro é o que se faz de vez em
-                quando. Passa a `ghost`: continua à mão de quem o procura, sem
-                disputar o olhar com a acção que traz alguém a este ecrã. */}
-            <Button variant="ghost" size="sm" onClick={() => setRevendo(true)}>
-              Rever etiquetas
-            </Button>
-            {/* Só aparece quando há mesmo alguma coisa arquivada — senão seria
-                um interruptor a explicar uma funcionalidade que ninguém usou. */}
+
+            {/* ── O QUE A LISTA CONTÉM ────────────────────────────────────
+                Sozinho no seu grupo porque é a única coisa aqui que troca o
+                CONJUNTO que se está a ver — o arquivo é uma vista, não um
+                filtro que se soma. Só aparece quando há mesmo alguma coisa
+                arquivada: senão seria um interruptor a explicar uma
+                funcionalidade que ninguém usou. */}
             {arquivados > 0 && (
               <button
                 type="button"
@@ -1045,46 +1302,27 @@ export default function Temas() {
                 Arquivados ({arquivados})
               </button>
             )}
-            {themes.length > 2 && (
-              <div
-                role="group"
-                aria-label="Tamanho dos cartões"
-                className="flex overflow-hidden rounded-lg border border-foreground/[0.1]"
+
+            {/* ── FAZER ───────────────────────────────────────────────────
+                «Rever etiquetas» é MANUTENÇÃO e fica em `ghost`: um faz-se
+                todos os dias, o outro de vez em quando, e em `secondary` os
+                dois competiam no topo. Ficam no mesmo grupo porque são as duas
+                acções do ecrã — é o grupo que o olho procura quando veio aqui
+                para fazer alguma coisa, e não para olhar. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button variant="ghost" size="sm" onClick={() => setRevendo(true)}>
+                Rever etiquetas
+              </Button>
+              <Button
+                variant={adding ? "secondary" : "primary"}
+                size="sm"
+                iconLeft={adding ? undefined : PlusIcon}
+                onClick={() => setAdding(!adding)}
               >
-                {(
-                  [
-                    ["compacto", "Compacto"],
-                    ["confortavel", "Confortável"],
-                  ] as const
-                ).map(([valor, rotulo]) => (
-                  <button
-                    key={valor}
-                    type="button"
-                    aria-pressed={densidade === valor}
-                    onClick={() => {
-                      setDensidade(valor);
-                      guardarDensidade(valor);
-                    }}
-                    className={`alvo-toque px-3 py-2 text-[10px] uppercase tracking-[0.12em] transition-colors ${
-                      densidade === valor
-                        ? "bg-foreground/[0.06] text-foreground/70"
-                        : "text-foreground/40 hover:text-foreground/60"
-                    }`}
-                  >
-                    {rotulo}
-                  </button>
-                ))}
-              </div>
-            )}
-            <Button
-              variant={adding ? "secondary" : "primary"}
-              size="sm"
-              iconLeft={adding ? undefined : PlusIcon}
-              onClick={() => setAdding(!adding)}
-            >
-              {adding ? "Cancelar" : "Novo tema"}
-            </Button>
-          </>
+                {adding ? "Cancelar" : "Novo tema"}
+              </Button>
+            </div>
+          </div>
         }
       />
 
@@ -1193,69 +1431,51 @@ export default function Temas() {
                   Nenhuma das duas apaga nada (arquivar é arrumar, não apagar —
                   daí não haver aqui nada marcado como destrutivo). */}
               <div className="absolute right-2 top-2 z-10 hidden com-rato:flex gap-1">
-                <button
-                  type="button"
-                  /* Sem o nome do tema no rótulo: o cartão está dentro de um
-                     grupo com esse nome, portanto quem usa leitor de ecrã já o
-                     ouviu — e repeti-lo aqui faria "Terracotta" identificar
-                     três botões diferentes no mesmo sítio. */
-                  aria-label={t.favorito ? "Desafixar" : "Fixar no topo"}
-                  aria-pressed={!!t.favorito}
-                  title={t.favorito ? "Desafixar" : "Fixar no topo"}
-                  onClick={() => alternarMarca(t, "favorito")}
-                  /* Um favorito JÁ FIXADO vê-se sempre — a estrela acesa é o
-                     que diz que está fixado, esconder--la apagava a informação.
-                     Por isso é ele que NÃO leva variante nenhuma: fica em
-                     `opacity-100` em toda a parte. Os outros escondem-se só
-                     onde há rato, que é onde o `group-hover` os pode trazer de
-                     volta. */
-                  className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm transition-opacity ${
-                    t.favorito
-                      ? "text-[#8a6d2f]"
-                      : "text-foreground/45 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
-                  }`}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill={t.favorito ? "currentColor" : "none"}
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                  >
-                    <path
-                      d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.7l5.8-.8Z"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  aria-label={t.arquivado ? "Repor na lista" : "Arquivar"}
-                  title={t.arquivado ? "Repor na lista" : "Arquivar (não apaga nada)"}
-                  onClick={() => alternarMarca(t, "arquivado")}
-                  className="alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 text-foreground/45 backdrop-blur-sm transition-opacity opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                  >
-                    {t.arquivado ? (
-                      <path d="M12 19V7m0 0-4 4m4-4 4 4M4 4h16" strokeLinecap="round" />
-                    ) : (
-                      <>
-                        <path d="M4 8h16v11H4z" strokeLinejoin="round" />
-                        <path d="M3 4h18v4H3zM10 12h4" strokeLinecap="round" />
-                      </>
-                    )}
-                  </svg>
-                </button>
+                {/* ── UMA LISTA, DOIS DESENHOS ──────────────────────────
+                    Isto era escrito à mão: duas acções copiadas do
+                    `accoesDoTema` para aqui, ícone a ícone. A promessa («é a
+                    MESMA lista, e nenhum dos dois desenhos pode ganhar uma
+                    acção que o outro não tenha») era só um comentário — e
+                    partiu-se no minuto em que a lista ganhou o «Juntar a outro
+                    tema…», que passou a existir no menu do dedo e não aqui.
+
+                    Agora é mesmo a mesma lista, percorrida. O que era especial
+                    na estrela continua a sê-lo, mas por uma regra escrita e
+                    não por uma cópia: ver `fixar`. */}
+                {accoesDoTema(t).map((a) => {
+                  const fixar = a.id === "favorito";
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      /* Sem o nome do tema no rótulo: o cartão está dentro de um
+                         grupo com esse nome, portanto quem usa leitor de ecrã já
+                         o ouviu — e repeti-lo aqui faria "Terracotta" identificar
+                         três botões diferentes no mesmo sítio. */
+                      aria-label={a.rotulo}
+                      aria-pressed={fixar ? !!t.favorito : undefined}
+                      title={
+                        a.id === "arquivar" && !t.arquivado ? "Arquivar (não apaga nada)" : a.rotulo
+                      }
+                      onClick={a.onAccao}
+                      /* Um favorito JÁ FIXADO vê-se sempre — a estrela acesa é o
+                         que diz que está fixado, escondê-la apagava a informação.
+                         Por isso é ele que NÃO leva variante nenhuma: fica em
+                         `opacity-100` em toda a parte. Os outros escondem-se só
+                         onde há rato, que é onde o `group-hover` os pode trazer
+                         de volta. */
+                      className={`alvo-toque flex h-8 w-8 items-center justify-center rounded-lg bg-white/85 opacity-100 backdrop-blur-sm motion-safe:transition-opacity motion-safe:duration-micro ${
+                        fixar && t.favorito
+                          ? "text-[#8a6d2f]"
+                          : "text-foreground/45 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100"
+                      }`}
+                    >
+                      {a.icone}
+                    </button>
+                  );
+                })}
               </div>
-              {/* Sem rato: um «⋯» só, com as mesmas duas acções lá dentro.
+              {/* Sem rato: um «⋯» só, com as MESMAS acções lá dentro.
                   O `absolute` vai numa caixa à volta e não no próprio
                   `MenuDeAccoes`: ele já se dá a si mesmo um `relative` (é o que
                   ancora a gaveta) e, entre dois utilitários de `position` na
@@ -1268,69 +1488,160 @@ export default function Temas() {
               <button
                 type="button"
                 onClick={() => setOpenId(t.id)}
+                /* ── O RATO POUSA, AS FOTOS COMEÇAM A VIR ─────────────────
+                   «Prefetch on hover: passar o rato sobre um tema começa a
+                   carregar as suas fotos.» Abrir um tema são duas esperas em
+                   fila — a listagem da pasta e só DEPOIS as miniaturas —, e
+                   enquanto a primeira não volta a grelha nem tem endereços
+                   para pedir. O rato costuma pousar um segundo antes do
+                   clique, e esse segundo chega.
+
+                   Só com rato: num telemóvel não há «passar por cima», há
+                   tocar — e tocar já abre. Ver `adiantarTema`. */
+                onPointerEnter={(e) => {
+                  if (e.pointerType === "mouse") adiantarTema(t.id);
+                }}
+                onFocus={() => adiantarTema(t.id)}
                 className="block w-full overflow-hidden rounded-2xl border border-foreground/[0.08] bg-white text-left shadow-[0_1px_2px_rgba(42,38,32,0.04)] motion-safe:transition-colors hover:border-[#4d6350]/40"
               >
                 {/* A moldura é 4:3 SEMPRE, aconteça o que acontecer lá dentro: é
                   ela que mantém a primeira linha alinhada quando as fotos têm
                   proporções diferentes umas das outras. */}
-                <div className="flex aspect-[4/3] w-full gap-px overflow-hidden bg-foreground/[0.04]">
+                {/* ══════════════════════════════════════════════════════
+                    UMA FOTOGRAFIA, INTEIRA
+                    ══════════════════════════════════════════════════════
+
+                    Decisão dela na Fase 2: uma imagem por cartão.
+
+                    Aqui havia a capa e, encostada à direita, uma tira com mais
+                    três fotos do tema — «uma capa só diz o que é a foto de
+                    capa; três fotos dizem o que é o TEMA». A ideia estava
+                    certa; o desenho é que não chegava lá: na grelha compacta a
+                    tira tinha 41 px de largura e cada foto ~41 × 33. Pequena de
+                    mais para se ler como uma fotografia — o que se via era
+                    textura no canto do cartão, e a capa ficava com três quartos
+                    do espaço.
+
+                    O conjunto continua dito, noutro sítio e melhor: «9 fotos»
+                    no rasto de números, que custa uma linha de texto em vez de
+                    um quarto da imagem, e a grelha inteira ao abrir o tema, que
+                    é onde se escolhe.
+
+                    A moldura é 4:3 SEMPRE: é ela que mantém a primeira linha
+                    alinhada quando as fotos têm proporções diferentes. */}
+                <div className="aspect-[4/3] w-full overflow-hidden bg-foreground/[0.04]">
                   {t.coverUrl ? (
                     <ImagemComPlanoB
                       src={t.coverUrl}
+                      avif={t.coverAvif}
                       planoB={t.coverFallbackUrl}
-                      className="h-full min-w-0 flex-1 object-cover motion-safe:transition-transform group-hover:scale-[1.02]"
+                      lqip={t.coverLqip}
+                      className="h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-elemento group-hover:scale-[1.02]"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-foreground/40">
                       {FolderIcon}
                     </div>
                   )}
-                  {/* Uma capa só diz o que é a foto de capa; três fotos dizem o que
-                    é o TEMA. Só aparecem quando existem mesmo — um tema com uma
-                    foto continua a ser uma imagem inteira, e não uma tira com
-                    dois buracos. */}
-                  {t.coverUrl && t.previewUrls && t.previewUrls.length > 0 && (
-                    <div className="flex w-1/4 shrink-0 flex-col gap-px">
-                      {t.previewUrls.slice(0, 3).map((u, k) => (
-                        <ImagemComPlanoB
-                          key={u}
-                          src={u}
-                          planoB={t.previewFallbackUrls?.[k]}
-                          className="min-h-0 w-full flex-1 object-cover"
-                        />
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <div className="px-3 py-2.5">
-                  <p className="font-display truncate text-[14px] text-foreground/85">{t.name}</p>
+                  {/* ══════════════════════════════════════════════════════
+                      O NOME NÃO SE CORTA
+                      ══════════════════════════════════════════════════════
+
+                      Palavras dela: «os títulos longos são cortados».
+
+                      Era `truncate`, ou seja uma linha e reticências. O nome é
+                      a ÚNICA coisa por que ela procura um tema — «Clássico
+                      Intemporal (Branco/dourado)» virava «Clássico Intempor…»,
+                      e dois temas parecidos ficavam indistinguíveis
+                      exactamente no sítio onde é preciso distingui-los.
+
+                      Duas linhas, e a altura reservada mesmo quando só se usa
+                      uma: sem isso, um cartão de nome curto ficava mais baixo
+                      do que o vizinho e a grelha perdia a linha de base. Ao
+                      fim de duas linhas ainda pode cortar — mas aí já se leu o
+                      que distingue. */}
+                  <p className="font-display line-clamp-2 min-h-[2.7em] text-[14px] leading-snug text-foreground/85">
+                    {t.name}
+                  </p>
+                  {/* ══════════════════════════════════════════════════════
+                      UMA LINHA DE NÚMEROS, E NÃO TRÊS
+                      ══════════════════════════════════════════════════════
+
+                      Palavras dela: «os metadados pesam mais do que a imagem».
+
+                      Pesavam: o cartão chegou a ter o nome, a contagem, a data,
+                      o uso, o aviso de poucas fotos e a nota — seis linhas de
+                      texto debaixo de uma fotografia, num cartão de 165 px.
+                      Nenhuma era falsa; juntas, nenhuma se lia.
+
+                      Agora os números são um só rasto, pela ordem em que
+                      respondem à pergunta «o que é este tema?»: quantas fotos
+                      tem, quantas vezes saiu, e há quanto tempo não lhe tocam.
+                      Com `truncate`, o que cai primeiro é a data — que é a
+                      menos decisiva das três, e é por isso que está no fim. */}
                   <p className="bo-text-muted mt-0.5 truncate text-xs">
                     {photoCountLabel(t.imageCount, t.truncated)}
-                    {/* Quando foi mexido pela última vez: é o que separa um tema
-                      vivo de um que ficou para trás, e cabe onde já havia
-                      espaço.
-                      NÃO aparece quando a pasta não pôde ser lida — "Fotos
-                      indisponíveis · há 2 meses" mistura um aviso com uma
-                      informação de rotina, e é o aviso que tem de se ler. */}
+                    {/* «7 propostas» ou «por usar» — a segunda é a metade mais
+                        útil: é o que distingue um tema que a biblioteca TEM de
+                        um tema que o estúdio USA. Só entra quando a contagem
+                        chegou (vem de outro pedido, depois dos cartães). */}
+                    {usos
+                      ? usos[t.id]
+                        ? ` · ${plural(usos[t.id], "proposta", "propostas")}`
+                        : " · por usar"
+                      : ""}
+                    {/* NÃO aparece quando a pasta não pôde ser lida: «Fotos
+                        indisponíveis · há 2 meses» mistura um aviso com uma
+                        informação de rotina, e é o aviso que tem de se ler. */}
                     {t.imageCount !== null && desdeQuando(t.updatedAt)
                       ? ` · ${desdeQuando(t.updatedAt)}`
                       : ""}
                   </p>
-                  {/* AINDA A MEIO, e não «mau». Um mood board enche-se com 6 a
-                      8 fotografias: um tema com menos de três não dá para
-                      ESCOLHER, dá para usar o que lá está. Dito em texto
-                      apagado e sem ícone de erro — é uma nota de curadoria, não
-                      uma avaria. */}
-                  {temPoucasFotos(t) && (
+                  {/* ── UMA RESSALVA DE CADA VEZ ────────────────────────
+                      Duas notas apagadas empilhadas leem-se como nenhuma. Este
+                      cartão tem três candidatas — o par quase igual (que vive
+                      por baixo, e é a única accionável), o «poucas fotos» e a
+                      nota escrita à mão — e mostra UMA.
+
+                      A ordem é a de quem pede acção: um tema repetido tem
+                      remédio a um toque, um tema com poucas fotos é uma nota de
+                      curadoria, e a nota é contexto. */}
+                  {parecidos.get(t.id) ? null : temPoucasFotos(t) ? (
                     <p className="mt-0.5 truncate text-xs text-[#8a6d3b]">
                       Ainda com poucas fotos para escolher
                     </p>
-                  )}
-                  {t.notes ? (
+                  ) : t.notes ? (
                     <p className="bo-text-muted mt-0.5 truncate text-xs opacity-70">{t.notes}</p>
                   ) : null}
                 </div>
               </button>
+              {/* ── «ISTO JÁ EXISTE COM OUTRO NOME» ───────────────────────
+                  Palavras dela: «"Clássico Intemporal" aparece duas vezes com
+                  nomes quase iguais».
+
+                  IRMÃO do cartão e não filho, pela mesma razão que as acções:
+                  um botão dentro de outro botão é HTML inválido, e o resultado
+                  prático seria carregar aqui abrir o tema. Por baixo e não por
+                  cima da capa — é uma nota de arrumação, não um alarme, e não
+                  pode tapar a fotografia que faz o tema reconhecível.
+
+                  Cita o outro nome: «este tema está repetido» obrigava a
+                  procurar qual. E é um botão porque a saída existe agora — abre
+                  o «Juntar a outro tema…» já com este de origem. */}
+              {avisoDeTemaParecido(parecidos.get(t.id)) && (
+                <button
+                  type="button"
+                  onClick={() => setAFundir(t)}
+                  className="alvo-toque mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs text-[#8a6d3b] hover:bg-[#8a6d3b]/[0.07]"
+                >
+                  <span className="truncate">{avisoDeTemaParecido(parecidos.get(t.id))}</span>
+                  <span className="shrink-0 underline decoration-dotted underline-offset-2">
+                    Juntar
+                  </span>
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -1628,7 +1939,7 @@ function Photo({
           finished();
           if (!heavy) setLightBroken(true);
         }}
-        className={`h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-200 ${
+        className={`h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-elemento ${
           pintada || localSrc || !image.lqip ? "opacity-100" : "opacity-0"
         }`}
       />
@@ -1722,6 +2033,9 @@ function ThemeFolder({
   /** Onde ela cairia se a largasse agora — é o que desenha o espaço aberto. */
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  /** A ação em bloco que está a decorrer (transferir ou remover), com a
+   *  contagem verdadeira. `null` = nada a acontecer. */
+  const [emBloco, setEmBloco] = useState<AccaoEmBloco | null>(null);
   const [coverPath, setCoverPath] = useState<string | undefined>(theme.coverPath);
   const [name, setName] = useState(theme.name);
   const [renaming, setRenaming] = useState(false);
@@ -1773,23 +2087,29 @@ function ThemeFolder({
     let active = true;
     (async () => {
       try {
-        const res = await fetch(
-          `/api/temas/${theme.id}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`,
-          { cache: "no-store" },
-        );
-        if (!res.ok) throw new Error("falhou");
-        const data = await res.json();
+        // O rato já pousou neste cartão? Então a listagem pode já estar cá —
+        // ver `adiantarTema`. `null` quer dizer «não havia, ou já não vale», e
+        // aí paga-se a ida normal, exactamente como antes disto existir.
+        const adiantada = await usarAdiantada(theme.id);
+        const pagina =
+          adiantada ??
+          (await (async () => {
+            const res = await fetch(
+              `/api/temas/${theme.id}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`,
+              { cache: "no-store" },
+            );
+            if (!res.ok) throw new Error("falhou");
+            return paginaDaResposta(await res.json());
+          })());
         if (!active) return;
-        const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
+        const page = pagina.images;
         setImages(page);
-        // `ok: false` é uma pasta que NÃO pôde ser lida — o servidor manda
-        // `total: 0` porque não tem outro número para dar. Aceitá-lo como zero
-        // faria a grelha dizer "arraste aqui as fotos" a um tema que pode ter
-        // 3000 — e ela a carregá-las outra vez. `null` = não sabemos.
-        setTotal(
-          data?.ok === false ? null : typeof data?.total === "number" ? data.total : page.length,
-        );
-        setTruncated(Boolean(data?.truncated));
+        // `total: null` é uma pasta que NÃO pôde ser lida — ver
+        // `paginaDaResposta`. Aceitá-la como zero faria a grelha dizer "arrasta
+        // aqui as fotos" a um tema que pode ter 3000, e ela a carregá-las outra
+        // vez.
+        setTotal(pagina.total);
+        setTruncated(pagina.truncated);
         setPageFull(page.length >= THEME_PAGE_SIZE);
       } catch {
         // Sem lista não se avisa o pai: o cartão guarda a contagem que veio do
@@ -2515,7 +2835,7 @@ function ThemeFolder({
 
   /** Remove um conjunto de fotos. Uma só confirmação para o conjunto todo, e
    *  as que o servidor recusar voltam ao sítio onde estavam. */
-  async function removeImages(targets: ThemeImage[]) {
+  async function removeImages(targets: ThemeImage[], aoProgredir?: (feitas: number) => void) {
     if (targets.length === 0) return;
     const positions = new Map(images.map((im, i) => [im.path, i]));
     const gone = new Set(targets.map((t) => t.path));
@@ -2530,6 +2850,10 @@ function ThemeFolder({
     bibliotecaAlterada();
 
     const errors: ThemeImage[] = [];
+    // As remoções correm com concorrência: a contagem é de quantas JÁ
+    // RESPONDERAM, e conta tanto as que foram como as que falharam — a barra
+    // retrata a espera, não o sucesso (o que falhou tem o seu próprio aviso).
+    let respondidas = 0;
     await pool(targets, DELETE_CONCURRENCY, async (im) => {
       try {
         const res = await fetch(
@@ -2539,6 +2863,9 @@ function ThemeFolder({
         if (!res.ok) throw new Error("falhou");
       } catch {
         errors.push(im);
+      } finally {
+        respondidas += 1;
+        aoProgredir?.(respondidas);
       }
     });
     if (!alive.current) return;
@@ -2672,10 +2999,21 @@ function ThemeFolder({
     )
       return;
     setBulkBusy(true);
+    // A remoção é otimista: a grelha e a seleção esvaziam-se já, e a barra de
+    // ações desaparece com elas. O cartão fica no lugar dela, no mesmo sítio
+    // colado ao topo — senão as fotos sumiam e mais nada dizia que ainda havia
+    // pedidos a caminho do servidor.
+    setEmBloco({ tipo: "remover", feito: 0, total: targets.length });
     try {
-      await removeImages(targets);
+      await removeImages(targets, (feitas) => {
+        if (!alive.current) return;
+        setEmBloco((p) => (p && p.tipo === "remover" ? { ...p, feito: feitas } : p));
+      });
     } finally {
-      if (alive.current) setBulkBusy(false);
+      if (alive.current) {
+        setBulkBusy(false);
+        setEmBloco(null);
+      }
     }
   }
 
@@ -2793,10 +3131,17 @@ function ThemeFolder({
     const chosen = images.map((im, i) => ({ im, i })).filter(({ im }) => selected.has(im.path));
     if (chosen.length === 0) return;
     setDownloading(true);
+    // O `downloadMany` já contava — e o `() => {}` que estava aqui deitava a
+    // conta fora. Quarenta fotos são um a dois minutos: sem isto, o que ela vê
+    // é um botão parado.
+    setEmBloco({ tipo: "transferir", feito: 0, total: chosen.length });
     const res = await downloadMany(
       chosen.map(({ im, i }) => ({ url: im.url, filename: downloadName(im, theme.name, i) })),
-      () => {},
+      (p) => {
+        if (alive.current) setEmBloco({ tipo: "transferir", feito: p.done, total: p.total });
+      },
     );
+    if (alive.current) setEmBloco(null);
     setDownloading(false);
     if (res.failed > 0) {
       toast(
@@ -2923,8 +3268,8 @@ function ThemeFolder({
             className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
           >
             <div
-              className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-300"
-              style={{ width: `${pct}%` }}
+              className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+              style={{ transform: `scaleX(${pct / 100})` }}
             />
           </div>
           <p className="bo-text-muted mt-2 text-xs">
@@ -2960,8 +3305,8 @@ function ThemeFolder({
                 className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[0.08]"
               >
                 <div
-                  className="h-full rounded-full bg-[#4d6350] motion-safe:transition-[width] motion-safe:duration-300"
-                  style={{ width: `${thumbPct}%` }}
+                  className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-elemento motion-safe:ease-out"
+                  style={{ transform: `scaleX(${thumbPct / 100})` }}
                 />
               </div>
               <div className="mt-3 flex items-center gap-3">
@@ -3121,46 +3466,85 @@ function ThemeFolder({
         </Card>
       )}
 
-      {selectedCount > 0 && (
-        <div className="sticky top-2 z-20 mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 shadow-[0_1px_2px_rgba(42,38,32,0.04)] backdrop-blur">
-          <p className="text-sm text-foreground/85">
-            {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
-          </p>
-          <span className="bo-text-muted hidden text-xs sm:inline">
-            Shift + clique seleciona tudo o que está pelo meio.
-          </span>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {selectedCount === 1 && (
-              <Button
-                size="sm"
-                variant="subtle"
-                onClick={() => {
-                  const one = images.find((i) => selected.has(i.path));
-                  if (one) setAsCover(one);
-                }}
-              >
-                Definir como capa
-              </Button>
-            )}
-            {/* ⚠️ "Transferir", aqui ao lado, já significa DESCARREGAR. Esta
+      {/* A BARRA DA SELEÇÃO E A ESPERA DO QUE ELA MANDOU FAZER, no mesmo
+          bloco colado ao topo.
+
+          São dois cartões e não um: a remoção esvazia a seleção logo (é
+          otimista), a barra de ações desaparece nesse instante e o cartão da
+          espera tem de FICAR — os pedidos ainda vão a caminho. A "Transferir"
+          faz o contrário: a seleção mantém-se e os dois vêem-se juntos.
+
+          O `sticky` está no invólucro para que a espera acompanhe o scroll tal
+          como a barra acompanhava; a 390 px cada um ocupa a largura toda e
+          empilham. */}
+      {(selectedCount > 0 || emBloco) && (
+        <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
+          {selectedCount > 0 && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 shadow-[0_1px_2px_rgba(42,38,32,0.04)] backdrop-blur">
+              <p className="text-sm text-foreground/85">
+                {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
+              </p>
+              <span className="bo-text-muted hidden text-xs sm:inline">
+                Shift + clique seleciona tudo o que está pelo meio.
+              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                {selectedCount === 1 && (
+                  <Button
+                    size="sm"
+                    variant="subtle"
+                    onClick={() => {
+                      const one = images.find((i) => selected.has(i.path));
+                      if (one) setAsCover(one);
+                    }}
+                  >
+                    Definir como capa
+                  </Button>
+                )}
+                {/* ⚠️ "Transferir", aqui ao lado, já significa DESCARREGAR. Esta
                 ação chama-se "Copiar para…" — a palavra transferir está
                 proibida para ela, senão passam a existir dois significados no
                 mesmo sítio. Só aparece havendo outro tema para onde levar. */}
-            {otherThemes.length > 0 && (
-              <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
-                Copiar para…
-              </Button>
-            )}
-            <Button size="sm" variant="secondary" loading={downloading} onClick={downloadSelected}>
-              Transferir
-            </Button>
-            <Button size="sm" variant="secondary" onClick={clearSelection}>
-              Limpar seleção
-            </Button>
-            <Button size="sm" variant="danger" loading={bulkBusy} onClick={removeSelected}>
-              Remover
-            </Button>
-          </div>
+                {otherThemes.length > 0 && (
+                  <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
+                    Copiar para…
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={downloading}
+                  onClick={downloadSelected}
+                >
+                  Transferir
+                </Button>
+                <Button size="sm" variant="secondary" onClick={clearSelection}>
+                  Limpar seleção
+                </Button>
+                <Button size="sm" variant="danger" loading={bulkBusy} onClick={removeSelected}>
+                  Remover
+                </Button>
+              </div>
+            </div>
+          )}
+          {emBloco && (
+            /* Fundo opaco por baixo: o cartão da espera é translúcido de
+               propósito (é um tom sobre o papel), e colado ao topo passava a
+               ter as fotos a rolar por trás. */
+            <div className="rounded-xl bg-white/95 shadow-[0_1px_2px_rgba(42,38,32,0.04)] backdrop-blur">
+              <EmCurso
+                titulo={
+                  emBloco.tipo === "transferir" ? "A transferir as fotos…" : "A remover as fotos…"
+                }
+                feito={emBloco.feito}
+                total={emBloco.total}
+                nota={
+                  emBloco.tipo === "transferir"
+                    ? "Uma de cada vez — é assim que o navegador as deixa passar todas. Podes continuar a usar o ecrã."
+                    : "As propostas já feitas com estas fotos não são afetadas."
+                }
+              />
+            </div>
+          )}
         </div>
       )}
 

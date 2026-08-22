@@ -82,7 +82,11 @@ export async function GET(
 
     return new NextResponse(new Uint8Array(finais), {
       headers: {
-        "Content-Type": bytes ? "image/jpeg" : "application/octet-stream",
+        // As derivadas saem em WebP desde a Fase 1 da biblioteca (ver `FORMATO`
+        // em `derivadas.ts`). Um «image/jpeg» aqui era um cabeçalho a mentir
+        // sobre os bytes — e um cabeçalho que mente sobre uma imagem é como o
+        // navegador acaba a desenhar um ícone partido.
+        "Content-Type": bytes ? "image/webp" : "application/octet-stream",
         "Content-Length": String(finais.length),
         /**
          * `private` e não `public`: isto é a fotografia do casamento de um

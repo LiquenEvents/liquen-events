@@ -112,13 +112,39 @@ export interface BoardParaEcra {
 const FOTOS_ANSIOSAS = 4;
 
 /**
- * A forma de uma fotografia que ainda não se mediu.
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FORMA DE UMA FOTOGRAFIA QUE AINDA NÃO SE MEDIU
+ * ════════════════════════════════════════════════════════════════════════════
  *
  * Três por dois deitada — a forma mais comum num mood board de decoração. Uma
  * foto sem medida não pode ficar de fora do equilíbrio: seria uma coluna a
  * crescer sem que a conta desse por isso.
+ *
+ * ── E É A MESMA QUE A CÉLULA DESENHA ─────────────────────────────────────
+ *
+ * Palavras dela: «Seating Plan e Corredor Nupcial, colunas que acabam antes das
+ * outras».
+ *
+ * Era aqui que estava. A conta que reparte as fotografias pelas colunas assumia
+ * três por dois para as que não têm medida guardada; a CÉLULA dessas mesmas
+ * fotografias não reservava forma nenhuma e ficava com a altura natural do
+ * ficheiro. Uma coluna com duas fotos de retrato sem medida crescia o dobro do
+ * que a conta julgava — e o resultado é exactamente o que ela viu: uma coluna a
+ * acabar muito antes da outra.
+ *
+ * Não é um defeito da repartição: é as duas metades a usarem números
+ * diferentes para a mesma fotografia. Passam a usar este.
+ *
+ * O preço é uma foto sem medida poder sair recortada para três por dois em vez
+ * de sair inteira. É o preço certo: as fotografias medidas — que são a esmagadora
+ * maioria — saem com a forma delas como sempre saíram, e as outras deixam de
+ * partir a página das que saem bem.
  */
-const ALTURA_POR_OMISSAO = 2 / 3;
+const FORMA_POR_OMISSAO = { largura: 3, altura: 2 } as const;
+/** A altura por unidade de largura — é assim que a repartição por colunas soma. */
+const ALTURA_POR_OMISSAO = FORMA_POR_OMISSAO.altura / FORMA_POR_OMISSAO.largura;
+/** A mesma forma, como o CSS a escreve. Uma forma só, em duas gramáticas. */
+const PROPORCAO_POR_OMISSAO = `${FORMA_POR_OMISSAO.largura} / ${FORMA_POR_OMISSAO.altura}`;
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -606,11 +632,23 @@ function Celula({
     foto?.miniatura ?? foto?.original,
     foto?.original,
   );
-  const proporcao = foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : undefined;
-  /** A derivada intermédia desta fotografia, pelo id OPACO — nunca por um
-   *  caminho. Ver a rota `api/proposta/[token]/foto/[id]`. */
+  // Sem medida guardada, vale a forma que a repartição por colunas assumiu —
+  // ver `PROPORCAO_POR_OMISSAO`. Deixá-la em branco era o que punha uma coluna
+  // a acabar antes da outra.
+  const proporcao =
+    foto?.largura && foto?.altura ? `${foto.largura} / ${foto.altura}` : PROPORCAO_POR_OMISSAO;
+  /**
+   * A derivada intermédia desta fotografia.
+   *
+   * Assinada, quando já foi fabricada: vem do CDN do Storage directamente ao
+   * telemóvel, sem passar pela nossa função. Enquanto não existir, é a rota que
+   * a fabrica, guarda e serve — pelo id OPACO, nunca por um caminho (ver
+   * `api/proposta/[token]/foto/[id]`). Ver `signProposalMids` para o porquê de
+   * a rota ter deixado de ser o caminho de todos os dias.
+   */
   const media = foto
-    ? `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`
+    ? (foto.media ??
+      `/api/proposta/${encodeURIComponent(token)}/foto/${encodeURIComponent(foto.id)}`)
     : "";
   /**
    * O `srcset` só vale enquanto a primeira escolha está de pé.

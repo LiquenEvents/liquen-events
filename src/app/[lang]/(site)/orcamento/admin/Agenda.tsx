@@ -28,6 +28,21 @@ interface AgendaItem {
   kind: ItemKind;
   color: string;
   onClick?: () => void;
+  /**
+   * ── UM ATALHO PARA A CARGA, NA LINHA DO EVENTO ─────────────────────────
+   *
+   * Do registo do audit: «a checklist da carrinha — a única tarefa que É de
+   * telemóvel — está a quatro toques e não tem entrada nenhuma na navegação».
+   *
+   * O caminho normal são quatro toques e quatro ecrãs de rolo: barra de baixo →
+   * Pedidos → encontrar o pedido → «Produção» → «Abrir para carregar». A
+   * Agenda já mostra o evento do dia; falta-lhe só levar lá.
+   *
+   * É um `<a href>` e não um `onClick`: assim o voltar do browser funciona de
+   * borla, e a rota da carga — que o service worker guarda de propósito para
+   * abrir sem rede — abre como abriria escrita à mão.
+   */
+  atalho?: { href: string; rotulo: string };
 }
 
 const KIND_LABEL: Record<ItemKind, string> = {
@@ -94,6 +109,13 @@ export default function Agenda({ quotes, onOpen }: Props) {
           kind: "evento",
           color: "#7c854b",
           onClick: () => onOpen(q),
+          // Pelo id do PEDIDO: a rota da carga é indexada pelo id da checklist,
+          // que a Agenda não conhece — e era essa a razão técnica de a única
+          // ligação em todo o repositório estar escondida a quatro toques.
+          atalho: {
+            href: `/orcamento/admin/carregamento/pedido/${encodeURIComponent(q.id)}`,
+            rotulo: "Carregar",
+          },
         });
       }
       for (const p of q.payments ?? []) {
@@ -208,35 +230,50 @@ export default function Agenda({ quotes, onOpen }: Props) {
                 {byDay.get(key)!.map((it, i) => {
                   const Wrap = it.onClick ? "button" : "div";
                   return (
-                    <Wrap
-                      key={i}
-                      onClick={it.onClick}
-                      className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.onClick ? "hover:bg-foreground/[0.02] motion-safe:transition-colors cursor-pointer" : ""}`}
-                    >
-                      <span
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ background: it.color }}
-                      />
-                      {it.time && (
-                        <span className="text-foreground/45 text-[11px] tabular-nums shrink-0 w-10">
-                          {it.time}
-                        </span>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-foreground/70 text-sm truncate">{it.title}</p>
-                        {it.sub && (
-                          <p className="text-foreground/40 text-[11px] truncate capitalize">
-                            {it.sub}
-                          </p>
-                        )}
-                      </div>
-                      <span
-                        className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0"
-                        style={{ background: `${it.color}1f`, color: it.color }}
+                    /* ── O ATALHO É IRMÃO DA LINHA, E NÃO FILHO ──────────────
+                       A linha inteira já é um botão que abre o pedido, e um
+                       link dentro de um botão é HTML inválido — o toque fica
+                       entregue ao navegador e cada um decide o que quer. Fica
+                       ao lado, sobreposto à direita: a linha mantém o realce
+                       de ponta a ponta e o alvo do atalho é só dele. */
+                    <div key={i} className="relative">
+                      <Wrap
+                        onClick={it.onClick}
+                        className={`w-full text-left px-5 sm:px-6 py-2.5 flex items-center gap-3 ${it.atalho ? "pr-24 sm:pr-28" : ""} ${it.onClick ? "hover:bg-foreground/[0.02] motion-safe:transition-colors cursor-pointer" : ""}`}
                       >
-                        {KIND_LABEL[it.kind]}
-                      </span>
-                    </Wrap>
+                        <span
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ background: it.color }}
+                        />
+                        {it.time && (
+                          <span className="text-foreground/45 text-[11px] tabular-nums shrink-0 w-10">
+                            {it.time}
+                          </span>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-foreground/70 text-sm truncate">{it.title}</p>
+                          {it.sub && (
+                            <p className="text-foreground/40 text-[11px] truncate capitalize">
+                              {it.sub}
+                            </p>
+                          )}
+                        </div>
+                        <span
+                          className="text-[9px] tracking-[0.12em] uppercase px-1.5 py-0.5 rounded-sm shrink-0"
+                          style={{ background: `${it.color}1f`, color: it.color }}
+                        >
+                          {KIND_LABEL[it.kind]}
+                        </span>
+                      </Wrap>
+                      {it.atalho && (
+                        <a
+                          href={it.atalho.href}
+                          className="alvo-toque absolute inset-y-0 right-3 sm:right-4 my-auto inline-flex h-8 items-center rounded-lg border border-[#4d6350]/30 bg-white px-2.5 text-[11px] font-medium text-[#4d6350] transition-colors hover:bg-[#4d6350]/[0.06]"
+                        >
+                          {it.atalho.rotulo}
+                        </a>
+                      )}
+                    </div>
                   );
                 })}
               </div>

@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
-import { Button } from "./ui";
+import { Button, EmCurso } from "./ui";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { ModeloProposta } from "@/lib/proposal-templates";
-import type { CampoAMudar } from "@/lib/proposal-copy";
+import { fotosDoDocumento, type CampoAMudar } from "@/lib/proposal-copy";
 
 /**
  * CRIAR A PARTIR DE… — escolher a proposta (ou o modelo) de onde partir.
@@ -74,6 +74,58 @@ function dataCurta(iso: string): string {
   return Number.isNaN(+d)
     ? ""
     : d.toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANTO DEMORA A CÓPIA — E PORQUE É UMA ESTIMATIVA E NÃO UMA CONTAGEM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Copiar é o atalho que ela usa quase sempre («a maioria é uma variação de uma
+ * proposta anterior»), e é o que aqui demora: as fotos todas são recopiadas
+ * para a pasta do pedido novo, e isso são 5 a 40 segundos em que o ecrã dizia
+ * só «A copiar as fotos…», parado.
+ *
+ * ── Porquê `estimadoMs` e não `feito`/`total` ────────────────────────────
+ * Porque é UM PEDIDO SÓ: `POST /api/propostas/copiar` vai, o servidor copia as
+ * fotos em lotes de oito lá dentro, e do lado de cá o que existe é uma resposta
+ * que chega ou não chega. Não há contagem nenhuma para mostrar — inventar uma
+ * era desenhar uma barra que não sabe o que diz.
+ *
+ * ── De onde saem os números ──────────────────────────────────────────────
+ * O número de fotos este ecrã já o tem (é ele que escreve «14 fotos» em cada
+ * linha), e o custo divide-se em dois:
+ *
+ *  · um ARRANQUE fixo — o pedido a sair do telemóvel, o servidor a ler a
+ *    proposta de origem e a resposta a voltar com o documento inteiro. Com 4G
+ *    fraco não é pouco;
+ *  · um custo POR FOTOGRAFIA — cada uma são duas cópias no Storage, a foto e a
+ *    miniatura (`duplicarFotosParaPedido`), oito em paralelo.
+ *
+ * Calibrados pela ponta a ponta que se observa (5 a 40 s): dá 5,2 s numa
+ * proposta de 3 fotos e 38,5 s numa de 40 — as duas pontas. Uma proposta sem
+ * fotos nenhumas fica nos 2,5 s, que é só a ida e a volta.
+ */
+const ARRANQUE_DA_COPIA_MS = 2_500;
+const MS_POR_FOTO_COPIADA = 900;
+
+function tempoDaCopia(fotos: number): number {
+  return ARRANQUE_DA_COPIA_MS + MS_POR_FOTO_COPIADA * Math.max(0, fotos);
+}
+
+/**
+ * Quantas fotos esta linha manda copiar.
+ *
+ * Nas propostas é a contagem que o resumo já traz. Nos modelos conta-se com o
+ * `fotosDoDocumento` — a MESMA função que o servidor usa para decidir o que
+ * recopiar, e não uma segunda soma escrita à mão que divergisse dela.
+ */
+function fotosDaLinha(linha: Linha): number {
+  return linha.tipo === "modelo"
+    ? linha.modelo.doc
+      ? fotosDoDocumento(linha.modelo.doc).length
+      : 0
+    : linha.proposta.fotos;
 }
 
 /** Comparação sem acentos nem maiúsculas — «Évora» tem de encontrar «evora». */
@@ -316,12 +368,27 @@ export default function CriarAPartirDe({
                         ? resumirModelo(linha.modelo)
                         : resumirProposta(linha.proposta)}
                     </span>
-                    {aTrabalhar && (
-                      <span className="mt-1 block text-xs text-foreground/50">
-                        A copiar as fotos…
-                      </span>
-                    )}
                   </button>
+                  {/* ── ENQUANTO ESTÁ A COPIAR ──────────────────────────────
+                      Fica DEBAIXO da linha em que ela carregou, e não num canto
+                      do diálogo: com a lista toda apagada, o que interessa
+                      dizer é qual delas é que está a vir. Fora do `<button>`
+                      de propósito — o botão está desactivado, e o que está
+                      dentro de um botão desactivado não é lido por toda a
+                      gente. */}
+                  {aTrabalhar && (
+                    <EmCurso
+                      className="mt-1"
+                      titulo={
+                        fotosDaLinha(linha) > 0
+                          ? `A copiar as ${fotosDaLinha(linha)} fotos…`
+                          : "A copiar a proposta…"
+                      }
+                      estimadoMs={tempoDaCopia(fotosDaLinha(linha))}
+                      nota="Os serviços, os mood boards e o orçamento vêm com elas. Não feches esta janela."
+                      notaDemorada="Com rede fraca demora — não feches o separador. As fotos estão a ser copiadas uma a uma."
+                    />
+                  )}
                 </li>
               );
             })}

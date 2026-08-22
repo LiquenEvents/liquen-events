@@ -11,8 +11,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const H = vi.hoisted(() => ({
   originais: new Map<string, string>(),
   miniaturas: new Map<string, string>(),
+  medias: new Map<string, string>(),
   pedidosOriginais: [] as string[][],
   pedidosMiniaturas: [] as string[][],
+  pedidosMedias: [] as string[][],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,6 +26,10 @@ vi.mock("@/lib/proposal-storage", () => ({
   signProposalThumbs: vi.fn(async (paths: string[]) => {
     H.pedidosMiniaturas.push([...paths]);
     return new Map(paths.filter((p) => H.miniaturas.has(p)).map((p) => [p, H.miniaturas.get(p)!]));
+  }),
+  signProposalMids: vi.fn(async (paths: string[]) => {
+    H.pedidosMedias.push([...paths]);
+    return new Map(paths.filter((p) => H.medias.has(p)).map((p) => [p, H.medias.get(p)!]));
   }),
 }));
 vi.mock("@/lib/biblioteca-fotos-store", () => ({
@@ -47,8 +53,10 @@ const DOC = {
 beforeEach(() => {
   H.pedidosOriginais.length = 0;
   H.pedidosMiniaturas.length = 0;
+  H.pedidosMedias.length = 0;
   H.originais.clear();
   H.miniaturas.clear();
+  H.medias.clear();
   for (const p of [
     "ped-42/capa.jpg",
     "ped-42/aaa.jpg",
@@ -62,6 +70,43 @@ beforeEach(() => {
   for (const p of ["ped-42/capa.jpg", "ped-42/aaa.jpg", "tema:outono-quente/bbb.jpg"]) {
     H.miniaturas.set(p, `https://storage.example/mini:${p}?token=X`);
   }
+  // A derivada de 1200 px só existe depois de alguém a ter fabricado. A capa
+  // tem-na (o envio aquece-a); a `aaa.jpg` ainda não — e é essa que prova que a
+  // ausência não parte nada.
+  for (const p of ["ped-42/capa.jpg", "tema:outono-quente/bbb.jpg"]) {
+    H.medias.set(p, `https://storage.example/media:${p}?token=X`);
+  }
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A DERIVADA DE 1200 PX VEM DIRECTA DO STORAGE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre a capa: «esta foto demora imenso tempo a carregar».
+ *
+ * Era servida SEMPRE pela nossa rota, que abre o token, descarrega os bytes
+ * para dentro da função e só então os reencaminha. Assinada, vem do CDN.
+ */
+describe("a derivada intermédia", () => {
+  it("vem assinada quando já existe", async () => {
+    const fotos = await fotosDaProposta(DOC);
+    expect(fotos.find((f) => f.id === "c0")?.media).toContain("media:ped-42/capa.jpg");
+  });
+
+  it("e não vem quando ainda não foi fabricada", async () => {
+    // É a ausência que manda quem desenha usar a rota — que a fabrica. Assinar
+    // às cegas dava um endereço válido para um ficheiro que não está lá, e um
+    // 404 dentro de um `srcset` é uma imagem partida, não um candidato a menos.
+    const fotos = await fotosDaProposta(DOC);
+    expect(fotos.find((f) => f.id === "b0f0")?.media).toBeUndefined();
+  });
+
+  it("assina-se num lote só, como os outros dois", async () => {
+    await fotosDaProposta(DOC);
+    expect(H.pedidosMedias).toHaveLength(1);
+    expect(H.pedidosMedias[0]).toEqual(H.pedidosMiniaturas[0]);
+  });
 });
 
 describe("regra 1 — nada do que sai é um caminho de bucket", () => {

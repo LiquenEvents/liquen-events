@@ -67,6 +67,40 @@ export const THEME_THUMB_BUCKET = "theme-thumbs";
 export const THEME_MICRO_BUCKET = "theme-micro";
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A MESMA MINIATURA, EM AVIF
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Pedido dela: «tudo aquilo que seja carregamento de imagens, quero que
+ * melhores mesmo o máximo possível».
+ *
+ * MEDIDO sobre oito fotografias de casamento reais, à medida da miniatura de
+ * 400 px: 137,7 KB em WebP contra 102,8 KB em AVIF, com a mesma fidelidade —
+ * 25% menos. Num tema aberto com 60 miniaturas são ~1,0 MB contra ~1,4 MB.
+ *
+ * O desconto de qualidade que lá chega está escrito em `derivadas.ts`, com a
+ * tabela toda: a escala do AVIF não é a do WebP, e copiar o número de uma para
+ * a outra dava ficheiros MAIORES.
+ *
+ * ── PORQUE É QUE VIVE NUM BUCKET SEPARADO ────────────────────────────────
+ *
+ * Porque o AVIF NÃO é universal: o Safari só o lê desde o iOS 16, e estas
+ * fotografias são também as que um casal abre na página da proposta, no
+ * telemóvel que tiver. Substituir o WebP por AVIF era arriscar uma proposta sem
+ * imagens em troca de uns quilobytes.
+ *
+ * Em bucket próprio, o AVIF é uma OFERTA: o `<picture>` propõe-o primeiro e o
+ * navegador que não o souber ler pede o WebP, que está no bucket de sempre e
+ * existe sempre. Quem ganha ganha; quem não ganha fica exactamente como estava.
+ *
+ * O caminho dentro do bucket é o mesmo — é o que permite assinar os dois lados
+ * com a mesma lista e alinhar as respostas sem um segundo mapa.
+ */
+export const THEME_AVIF_BUCKET = "theme-avif";
+/** O irmão das micro (96 px) em AVIF. Ver `THEME_AVIF_BUCKET`. */
+export const THEME_AVIF_MICRO_BUCKET = "theme-avif-micro";
+
+/**
  * Validade dos URLs assinados da biblioteca: 6 horas.
  *
  * Está aqui, e não junto ao resto do `theme-storage.ts`, por causa da

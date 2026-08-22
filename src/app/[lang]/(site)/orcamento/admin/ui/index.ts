@@ -17,6 +17,11 @@ export type { CardProps, CardPadding, SectionCardProps } from "./Card";
 
 export { Ajuda } from "./Ajuda";
 
+// A espera desenhada de uma maneira só. Ver `EmCurso.tsx`: uma espera com doze
+// desenhos diferentes não é uma linguagem, e o olho reaprende em cada ecrã.
+export { EmCurso, useDecorrido } from "./EmCurso";
+export type { EmCursoProps } from "./EmCurso";
+
 export { Field } from "./Field";
 export type { FieldProps } from "./Field";
 

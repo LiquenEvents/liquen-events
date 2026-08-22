@@ -225,6 +225,30 @@ export default async function RootLayout({
   } catch {
     /* malformed value — skip the hint */
   }
+  /**
+   * ── E A ORIGEM DE ONDE AS FOTOGRAFIAS VÊM MESMO ─────────────────────────
+   *
+   * Pedido dela: «tudo aquilo que seja carregamento de imagens, quero que
+   * melhores mesmo o máximo possível».
+   *
+   * O aviso acima só existe quando há um CDN próprio configurado, e não há.
+   * TODAS as fotografias — as capas dos temas, as miniaturas da biblioteca, as
+   * da página do casal — vêm de outra origem: o Storage do Supabase, com URLs
+   * assinados. É uma origem diferente da do site, portanto a primeira imagem
+   * paga DNS + TCP + TLS antes do primeiro byte. Num 4G fraco, numa quinta, são
+   * 200 a 400 ms em que não acontece nada.
+   *
+   * `preconnect` faz esse aperto de mão enquanto o HTML ainda está a ser lido.
+   * `crossOrigin` porque é o que um `<img>` de outra origem usa — sem ele o
+   * navegador abre uma segunda ligação e o aviso não serve para nada.
+   */
+  let storageOrigin = "";
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+    if (url) storageOrigin = new URL(url).origin;
+  } catch {
+    /* valor mal formado — sem aviso, que é o que havia antes */
+  }
   return (
     <html
       lang={htmlLang(locale)}
@@ -343,6 +367,10 @@ export default async function RootLayout({
               "setTimeout(s,2500);",
           }}
         />
+        {/* O aperto de mão com o Storage começa aqui, e não quando o primeiro
+            `<img>` aparecer. Ver `storageOrigin`. */}
+        {storageOrigin && <link rel="preconnect" href={storageOrigin} crossOrigin="" />}
+        {storageOrigin && <link rel="dns-prefetch" href={storageOrigin} />}
       </head>
       <body className="flex flex-col min-h-screen antialiased">
         <LocaleProvider locale={locale} dict={pickChromeDict(t)}>

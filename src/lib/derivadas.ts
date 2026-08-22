@@ -1,5 +1,6 @@
 import "server-only";
-import sharp from "sharp";
+import { opcoesDeCarregamento } from "./cache-das-fotos";
+import sharp, { type Sharp } from "sharp";
 import { getSupabase } from "@/lib/supabase";
 import {
   PROPOSAL_BUCKET,
@@ -10,12 +11,15 @@ import {
 } from "@/lib/proposal-storage";
 import {
   THEME_BUCKET,
+  THEME_AVIF_BUCKET,
+  THEME_AVIF_MICRO_BUCKET,
   THEME_MID_BUCKET,
   THEME_THUMB_BUCKET,
   THEME_MICRO_BUCKET,
   ehRefDeTema,
   caminhoDoRefDeTema,
 } from "@/lib/theme-ref";
+import { garantirBucketDeDerivadas } from "@/lib/theme-storage";
 import { log } from "@/lib/logger";
 
 /**
@@ -96,17 +100,153 @@ const MINIATURA = { lado: 400, qualidade: 78 } as const;
  */
 const MEDIA = { lado: 1200, qualidade: 80 } as const;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS DERIVADAS SAEM EM WEBP
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Do briefing da biblioteca: «AVIF e WebP com fallback».
+ *
+ * ── Porquê WebP, e porquê sem fallback nenhum ─────────────────────────────
+ *
+ * Um WebP com a mesma qualidade percebida pesa **25 a 35% menos** do que um
+ * JPEG mozjpeg. Nas 100 imagens que a lista de temas puxa (25 capas de 400 px e
+ * 75 tiras de 96 px), é a diferença entre ~0,9 MB e ~0,6 MB.
+ *
+ * E não precisa de fallback: o WebP é suportado por todos os navegadores desde
+ * 2020 — Safari desde o iOS 14, que é anterior ao telemóvel mais antigo com que
+ * alguém abre uma proposta. Um `<picture>` aqui seria uma segunda assinatura,
+ * um segundo bucket e um segundo caminho de erro, para cobrir navegadores que
+ * já não existem.
+ *
+ * O AVIF é OUTRA conversa, e está por fazer de propósito: pesa mais uns 10–15%
+ * a menos, mas o Safari só o lê desde o iOS 16, e estas fotografias não são só
+ * dela — são as que um casal abre no telemóvel que tiver. Servi-lo sem
+ * alternativa era arriscar uma página de proposta sem imagens; servi-lo COM
+ * alternativa é um bucket a mais, uma assinatura a mais e um `<picture>` em
+ * cada sítio. É trabalho a sério e tem de ser decidido, não assumido.
+ *
+ * ── O que acontece às derivadas que já existem ────────────────────────────
+ *
+ * Nada, e é de propósito. Ficam JPEG e continuam a servir: o navegador lê o
+ * tipo da RESPOSTA, e não a extensão do caminho. As novas nascem WebP no mesmo
+ * caminho. Quem quiser converter as antigas tem o botão «Gerar derivadas em
+ * falta» — mas nada obriga, e uma migração forçada de 395 fotos não é o preço
+ * certo por 30% de uma coisa que já é pequena.
+ *
+ * (A extensão do caminho passa a mentir sobre o conteúdo. Não incomoda ninguém:
+ * uma derivada nunca é descarregada — o que se descarrega é sempre o original.)
+ */
+const FORMATO = {
+  contentType: "image/webp",
+  /**
+   * A qualidade do WebP não é a mesma escala do JPEG.
+   *
+   * Um WebP q75 tem a qualidade percebida de um JPEG q80 e pesa menos. Passar
+   * cá para dentro os 78/65/80 do JPEG dava ficheiros maiores do que o
+   * necessário — que é o contrário disto.
+   */
+  desconto: 5,
+} as const;
+
+/** Aplica o formato da casa a um `sharp` já redimensionado. */
+function codificar(pipeline: Sharp, qualidade: number, avif = false) {
+  if (avif) {
+    return pipeline.avif({
+      quality: Math.max(30, qualidade - AVIF.desconto),
+      effort: AVIF.esforco,
+    });
+  }
+  return pipeline.webp({ quality: Math.max(40, qualidade - FORMATO.desconto) });
+}
+
+/** O tipo que uma derivada anuncia. */
+const tipoDe = (avif = false) => (avif ? "image/avif" : FORMATO.contentType);
+
+/**
+ * ── O AVIF, AO LADO E NÃO EM VEZ DE ──────────────────────────────────────
+ *
+ * `esforco: 4` e não o 6 por omissão: o AVIF é caro de codificar, e num lote de
+ * 25 fotografias a diferença entre 4 e 6 é meio segundo por foto contra uns 3%
+ * de tamanho. O tecto de uma função é o que decide, e é o mesmo tecto que já
+ * fazia a geração em lotes.
+ *
+ * ── O DESCONTO, QUE FOI MEDIDO E NÃO COPIADO ────────────────────────────
+ *
+ * A escala do AVIF NÃO é a do WebP, e a diferença é muito maior do que parece.
+ * O primeiro número aqui escrito foi 13 — «um AVIF q65 pesa menos do que um
+ * WebP q73» — e era falso: MEDIDO sobre oito fotografias de casamento reais
+ * (as do `e2e/fotos-de-teste`), à medida da miniatura de 400 px:
+ *
+ *     webp q73    137,7 KB   PSNR 32,82 dB   ← a referência
+ *     avif q65    145,0 KB   PSNR 34,66 dB   5% MAIS pesado
+ *     avif q60    127,5 KB   PSNR 33,82 dB   7% menos
+ *     avif q55    102,8 KB   PSNR 32,49 dB   25% menos
+ *     avif q50     85,8 KB   PSNR 31,55 dB   38% menos
+ *
+ * Aos 1200 px a curva é a mesma (q65 é 3% mais pesado; q55 é 28% menos).
+ *
+ * Escolhido o **q55**, ou seja um desconto de 23: é o ponto onde a fidelidade
+ * medida iguala a do WebP (−0,33 dB, que ninguém vê) e o ficheiro perde um
+ * quarto do peso. E é um limite conservador, porque o PSNR é injusto para o
+ * AVIF — ele guarda o detalhe fino de outra maneira, e a comparação por olho
+ * dá-lhe mais margem do que a matemática.
+ *
+ * Um AVIF q65 continuava a ser uma imagem melhor do que o WebP; só que a
+ * melhoria era paga com bytes, e o que se quer aqui são menos bytes na mão de
+ * quem está numa quinta com 4G fraco.
+ */
+const AVIF = { formato: "avif" as const, desconto: 23, esforco: 4 };
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * NEM TUDO O QUE FALTA DÓI DA MESMA MANEIRA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O painel dizia «1140 miniaturas em falta, em 683 fotografias» — um número
+ * grande, vermelho, e falso na parte que interessa. Das 1140, a maioria eram
+ * AVIF, que foi acrescentado ontem e que **nenhuma** fotografia anterior tem.
+ *
+ * São duas coisas com nomes diferentes e urgências opostas:
+ *
+ *   · **essencial** — sem esta derivada a grelha cai para o ORIGINAL e puxa
+ *     megabytes para desenhar um quadrado de 150 px. É uma avaria: dói hoje,
+ *     no telemóvel dela, com 4G de quinta.
+ *   · **leve** — a mesma imagem em AVIF, um quarto mais leve para quem o saiba
+ *     ler. Não a ter não parte nada: o `<picture>` cai no WebP e ninguém dá
+ *     por isso. É um ganho por cobrar, não um defeito.
+ *
+ * Somar as duas num número só é dizer «tens 1140 avarias» a quem tem 683 mais
+ * um trabalho por fazer — e um alarme que exagera é um alarme que se ignora.
+ *
+ * O `papel` também MANDA NA ORDEM da geração: as essenciais de toda a
+ * biblioteca primeiro, as leves depois. Sem isso, parar a meio (ou fechar o
+ * portátil) deixava os dois primeiros temas com AVIF e os últimos sem
+ * miniatura nenhuma — o pior dos dois mundos, e por acidente.
+ */
+type Papel = "essencial" | "leve";
+
 const FAMILIAS = [
   {
     origem: THEME_BUCKET,
     derivadas: [
-      { bucket: THEME_THUMB_BUCKET, ...MINIATURA },
-      { bucket: THEME_MICRO_BUCKET, lado: 96, qualidade: 65 },
+      { bucket: THEME_THUMB_BUCKET, ...MINIATURA, papel: "essencial" as Papel },
+      { bucket: THEME_MICRO_BUCKET, lado: 96, qualidade: 65, papel: "essencial" as Papel },
+      // Os mesmos dois tamanhos, na oferta que só alguns navegadores aceitam.
+      // Ver `THEME_AVIF_BUCKET`: é uma proposta, não uma substituição.
+      { bucket: THEME_AVIF_BUCKET, ...MINIATURA, avif: true, papel: "leve" as Papel },
+      {
+        bucket: THEME_AVIF_MICRO_BUCKET,
+        lado: 96,
+        qualidade: 65,
+        avif: true,
+        papel: "leve" as Papel,
+      },
     ],
   },
   {
     origem: PROPOSAL_BUCKET,
-    derivadas: [{ bucket: PROPOSAL_THUMB_BUCKET, ...MINIATURA }],
+    derivadas: [{ bucket: PROPOSAL_THUMB_BUCKET, ...MINIATURA, papel: "essencial" as Papel }],
   },
 ] as const;
 
@@ -135,19 +275,42 @@ async function ficheiros(sb: Cliente, bucket: string, pasta: string): Promise<st
   }
 }
 
+/**
+ * Uma PASTA — um tema, ou um pedido —, e não uma pasta vezes um bucket.
+ *
+ * A versão anterior emitia uma linha por (pasta × derivada), e o painel
+ * mostrava-as em bruto: o mesmo tema aparecia quatro vezes seguidas, todas a
+ * dizer «47 de 47», e não havia maneira de ler dali quantas FOTOGRAFIAS
+ * estavam mal. Estão aqui as duas contas que se fazem em fotografias, que é a
+ * unidade em que ela pensa e a única que se pode dizer em voz alta.
+ */
 export interface LinhaDeContagem {
-  /** `theme-assets → theme-thumbs`, para o painel dizer de que se trata. */
+  /** O bucket de onde vêm os originais (`theme-assets` ou `proposal-assets`). */
   origem: string;
-  destino: string;
+  /** O id da pasta. Quem o traduz para um nome é a rota — ver `pastas-com-nome`. */
   pasta: string;
   fotos: number;
+  /** Fotografias a que falta pelo menos uma derivada ESSENCIAL: as que doem. */
+  semMiniatura: number;
+  /** Fotografias sem a versão AVIF. Funcionam; só pesam mais. */
+  semVersaoLeve: number;
+  /** Derivadas em falta ao todo — é este o trabalho que a geração tem pela frente. */
   emFalta: number;
 }
 
 export interface Contagem {
   linhas: LinhaDeContagem[];
   fotos: number;
+  /** Derivadas em falta ao todo (essenciais + leves). O trabalho a fazer. */
   emFalta: number;
+  /** Só as essenciais. É este o número da avaria. */
+  emFaltaEssenciais: number;
+  /** Só as leves (AVIF). É este o número do ganho por cobrar. */
+  emFaltaLeves: number;
+  /** Quantas FOTOGRAFIAS estão a servir o original por falta de miniatura. */
+  fotosSemMiniatura: number;
+  /** Quantas FOTOGRAFIAS ainda não têm a versão leve. */
+  fotosSemVersaoLeve: number;
   /** Buckets que não deu para listar — ditos, não escondidos. */
   avisos: string[];
 }
@@ -161,12 +324,27 @@ export interface Contagem {
  */
 export async function contarDerivadasEmFalta(): Promise<Contagem> {
   const sb = getSupabase();
-  if (!sb) return { linhas: [], fotos: 0, emFalta: 0, avisos: ["Storage não configurado."] };
+  if (!sb) {
+    return {
+      linhas: [],
+      fotos: 0,
+      emFalta: 0,
+      emFaltaEssenciais: 0,
+      emFaltaLeves: 0,
+      fotosSemMiniatura: 0,
+      fotosSemVersaoLeve: 0,
+      avisos: ["Storage não configurado."],
+    };
+  }
 
   const linhas: LinhaDeContagem[] = [];
   const avisos: string[] = [];
   let fotos = 0;
   let emFalta = 0;
+  let emFaltaEssenciais = 0;
+  let emFaltaLeves = 0;
+  let fotosSemMiniatura = 0;
+  let fotosSemVersaoLeve = 0;
 
   for (const familia of FAMILIAS) {
     let asPastas: string[];
@@ -180,23 +358,56 @@ export async function contarDerivadasEmFalta(): Promise<Contagem> {
       const caminhos = await ficheiros(sb, familia.origem, pasta);
       if (caminhos.length === 0) continue;
       fotos += caminhos.length;
+
+      // Conjuntos, e não somas: uma fotografia sem miniatura E sem micro está
+      // mal UMA vez, não duas. Somar contava-a duas e dava um número maior do
+      // que o total de fotografias — que é como se perde a confiança num
+      // painel.
+      const semMiniatura = new Set<string>();
+      const semVersaoLeve = new Set<string>();
+      let daPasta = 0;
+
       for (const derivada of familia.derivadas) {
         const jaLa = new Set(await ficheiros(sb, derivada.bucket, pasta).catch(() => []));
-        const faltam = caminhos.filter((c) => !jaLa.has(c)).length;
-        emFalta += faltam;
-        linhas.push({
-          origem: familia.origem,
-          destino: derivada.bucket,
-          pasta,
-          fotos: caminhos.length,
-          emFalta: faltam,
-        });
+        const faltam = caminhos.filter((c) => !jaLa.has(c));
+        daPasta += faltam.length;
+        if (derivada.papel === "essencial") {
+          emFaltaEssenciais += faltam.length;
+          for (const c of faltam) semMiniatura.add(c);
+        } else {
+          emFaltaLeves += faltam.length;
+          for (const c of faltam) semVersaoLeve.add(c);
+        }
       }
+
+      emFalta += daPasta;
+      fotosSemMiniatura += semMiniatura.size;
+      fotosSemVersaoLeve += semVersaoLeve.size;
+      if (daPasta === 0) continue;
+      linhas.push({
+        origem: familia.origem,
+        pasta,
+        fotos: caminhos.length,
+        semMiniatura: semMiniatura.size,
+        semVersaoLeve: semVersaoLeve.size,
+        emFalta: daPasta,
+      });
     }
   }
 
-  linhas.sort((a, b) => b.emFalta - a.emFalta);
-  return { linhas, fotos, emFalta, avisos };
+  // As que doem primeiro, e só depois as que pesam: a ordem da lista é a ordem
+  // por que se resolve.
+  linhas.sort((a, b) => b.semMiniatura - a.semMiniatura || b.emFalta - a.emFalta);
+  return {
+    linhas,
+    fotos,
+    emFalta,
+    emFaltaEssenciais,
+    emFaltaLeves,
+    fotosSemMiniatura,
+    fotosSemVersaoLeve,
+    avisos,
+  };
 }
 
 export interface ResultadoDoLote {
@@ -204,6 +415,13 @@ export interface ResultadoDoLote {
   falhas: string[];
   /** Quantas ficaram por fazer depois deste lote. Zero = acabou. */
   restantes: number;
+  /** Destas, quantas são ESSENCIAIS — as fotografias que ainda servem o
+   *  original. Zero com `restantes` a sobrar quer dizer que a avaria está
+   *  resolvida e o que falta é só o ganho. */
+  restantesEssenciais: number;
+  /** O papel do que este lote esteve a fazer, para o ecrã poder dizê-lo em vez
+   *  de anunciar «miniaturas» enquanto gera AVIF. */
+  papel: Papel | null;
 }
 
 /**
@@ -214,37 +432,63 @@ export interface ResultadoDoLote {
  * falhe não pára as outras — uma execução que morre à terceira de quatrocentas
  * obriga a recomeçar, e recomeçar é o que faz ninguém correr isto.
  */
-export async function gerarLoteDeDerivadas(): Promise<ResultadoDoLote> {
+export async function gerarLoteDeDerivadas(soPapel?: Papel): Promise<ResultadoDoLote> {
   const sb = getSupabase();
-  if (!sb) return { geradas: 0, falhas: ["Storage não configurado."], restantes: 0 };
+  if (!sb) {
+    return {
+      geradas: 0,
+      falhas: ["Storage não configurado."],
+      restantes: 0,
+      restantesEssenciais: 0,
+      papel: null,
+    };
+  }
 
   const falhas: string[] = [];
   let geradas = 0;
   let restantes = 0;
+  let restantesEssenciais = 0;
+  let papel: Papel | null = null;
 
-  for (const familia of FAMILIAS) {
-    let asPastas: string[];
-    try {
-      asPastas = await pastas(sb, familia.origem);
-    } catch {
-      continue;
-    }
-    for (const pasta of asPastas) {
-      const caminhos = await ficheiros(sb, familia.origem, pasta);
-      if (caminhos.length === 0) continue;
-      for (const derivada of familia.derivadas) {
-        const jaLa = new Set(await ficheiros(sb, derivada.bucket, pasta).catch(() => []));
-        const faltam = caminhos.filter((c) => !jaLa.has(c));
-        for (const caminho of faltam) {
-          if (geradas >= LOTE) {
-            // Já se fez o lote: daqui para a frente só se CONTA, para quem
-            // chama saber se vale a pena voltar.
-            restantes += 1;
-            continue;
+  // DUAS passagens, e não uma: primeiro tudo o que é essencial na biblioteca
+  // inteira, e só depois o AVIF. Ver `Papel` — parar a meio tem de deixar as
+  // coisas melhores do que estavam, e não meio-arranjadas de um lado e
+  // intactas do outro.
+  for (const passagem of ["essencial", "leve"] as const) {
+    // `soPapel` é o que deixa arranjar a avaria sem esperar pelo ganho: as
+    // miniaturas de toda a biblioteca são um punhado de lotes; o AVIF são 683
+    // fotografias vezes duas codificações caras. Obrigá-la a esperar por um
+    // para ter o outro era transformar uma correcção de dois minutos numa
+    // tarde. Sem argumento, faz tudo — pela ordem certa.
+    if (soPapel && passagem !== soPapel) continue;
+    for (const familia of FAMILIAS) {
+      if (!familia.derivadas.some((d) => d.papel === passagem)) continue;
+      let asPastas: string[];
+      try {
+        asPastas = await pastas(sb, familia.origem);
+      } catch {
+        continue;
+      }
+      for (const pasta of asPastas) {
+        const caminhos = await ficheiros(sb, familia.origem, pasta);
+        if (caminhos.length === 0) continue;
+        for (const derivada of familia.derivadas) {
+          if (derivada.papel !== passagem) continue;
+          const jaLa = new Set(await ficheiros(sb, derivada.bucket, pasta).catch(() => []));
+          const faltam = caminhos.filter((c) => !jaLa.has(c));
+          for (const caminho of faltam) {
+            if (geradas >= LOTE) {
+              // Já se fez o lote: daqui para a frente só se CONTA, para quem
+              // chama saber se vale a pena voltar.
+              restantes += 1;
+              if (passagem === "essencial") restantesEssenciais += 1;
+              continue;
+            }
+            papel = passagem;
+            const r = await gerarUma(sb, familia.origem, caminho, derivada);
+            if (r) geradas += 1;
+            else falhas.push(`${derivada.bucket}/${caminho}`);
           }
-          const r = await gerarUma(sb, familia.origem, caminho, derivada);
-          if (r) geradas += 1;
-          else falhas.push(`${derivada.bucket}/${caminho}`);
         }
       }
     }
@@ -253,20 +497,26 @@ export async function gerarLoteDeDerivadas(): Promise<ResultadoDoLote> {
   if (falhas.length > 0) {
     log.warn("derivadas: algumas não foram geradas", { quantas: falhas.length });
   }
-  return { geradas, falhas, restantes };
+  return { geradas, falhas, restantes, restantesEssenciais, papel };
 }
 
 async function gerarUma(
   sb: Cliente,
   origem: string,
   caminho: string,
-  alvo: { bucket: string; lado: number; qualidade: number },
+  alvo: { bucket: string; lado: number; qualidade: number; avif?: boolean },
 ): Promise<boolean> {
   try {
+    // O bucket TEM de existir antes de se escrever nele: o gerador em lote não
+    // passa pelo `uploadThemeDerivada`, e um `upload` para um bucket que não
+    // existe falha em silêncio — para sempre, e com o contador a dizer
+    // «geradas 0». Com os buckets do AVIF isto deixou de ser um caso de
+    // instalações antigas e passou a ser o caso de todas.
+    if (!(await garantirBucketDeDerivadas(alvo.bucket))) return false;
     const { data, error } = await sb.storage.from(origem).download(caminho);
     if (error || !data) return false;
     const bytes = Buffer.from(await data.arrayBuffer());
-    const derivada = await sharp(bytes)
+    const derivada = sharp(bytes)
       // `rotate()` sem argumento aplica a orientação do EXIF. Sem isto, uma
       // foto de telemóvel deitada sai com os lados trocados face ao original —
       // e a miniatura ficava com outra proporção do que a grelha reserva.
@@ -274,12 +524,11 @@ async function gerarUma(
       // `withoutEnlargement`: uma foto já menor do que o alvo fica como está.
       // Ampliar produzia uma miniatura MAIOR do que o original, que é o
       // contrário do que isto serve.
-      .resize(alvo.lado, alvo.lado, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: alvo.qualidade, mozjpeg: true })
-      .toBuffer();
+      .resize(alvo.lado, alvo.lado, { fit: "inside", withoutEnlargement: true });
+    const bytesDerivada = await codificar(derivada, alvo.qualidade, alvo.avif).toBuffer();
     const { error: erroSubida } = await sb.storage
       .from(alvo.bucket)
-      .upload(caminho, derivada, { contentType: "image/jpeg", upsert: false });
+      .upload(caminho, bytesDerivada, opcoesDeCarregamento(tipoDe(alvo.avif)));
     return !erroSubida;
   } catch {
     return false;
@@ -386,7 +635,7 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
     const derivada = await sharp(bytes)
       .rotate()
       .resize(MINIATURA.lado, MINIATURA.lado, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: MINIATURA.qualidade, mozjpeg: true })
+      .webp({ quality: MINIATURA.qualidade - FORMATO.desconto })
       .toBuffer();
     // Guardar é melhor esforço: falhar aqui só quer dizer que a próxima
     // abertura volta a pagar o `sharp`. NUNCA impede esta de ser servida.
@@ -399,7 +648,7 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
     if (daBiblioteca) {
       const { error: erroSubida } = await sb.storage
         .from(destino)
-        .upload(chave, derivada, { contentType: "image/jpeg", upsert: false });
+        .upload(chave, derivada, opcoesDeCarregamento(FORMATO.contentType));
       if (erroSubida && !/exist/i.test(erroSubida.message)) {
         log.warn("derivadas: miniatura a pedido não ficou guardada", {
           destino,
@@ -407,7 +656,7 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
         });
       }
     } else {
-      await uploadProposalThumb(chave, derivada, "image/jpeg");
+      await uploadProposalThumb(chave, derivada, FORMATO.contentType);
     }
     return { bytes: derivada, motivo: "ok" };
   } catch (e) {
@@ -419,7 +668,6 @@ export async function miniaturaAPedidoComMotivo(caminho: string): Promise<Result
     return { bytes: null, motivo: "sharp-falhou", detalhe: dito.slice(0, 300) };
   }
 }
-
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -475,14 +723,14 @@ export async function derivadaMediaAPedido(
       // 1200 sai como está. Esticá-la aqui seria fabricar pixéis que não
       // existem e cobrar os bytes deles ao telemóvel do casal.
       .resize(MEDIA.lado, MEDIA.lado, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: MEDIA.qualidade, mozjpeg: true })
+      .webp({ quality: MEDIA.qualidade - FORMATO.desconto })
       .toBuffer();
     // Guardar é melhor esforço, como na miniatura: falhar só quer dizer que a
     // visita seguinte volta a pagar o `sharp`.
     if (daBiblioteca) {
       const { error: erroSubida } = await sb.storage
         .from(destino)
-        .upload(chave, derivada, { contentType: "image/jpeg", upsert: false });
+        .upload(chave, derivada, opcoesDeCarregamento(FORMATO.contentType));
       if (erroSubida && !/exist/i.test(erroSubida.message)) {
         log.warn("derivadas: intermédia a pedido não ficou guardada", {
           destino,
@@ -493,12 +741,65 @@ export async function derivadaMediaAPedido(
       // Pelo `uploadProposalMid` e não por um `upload` cru: é ele que GARANTE
       // o bucket. Sem isso, numa instalação onde ele ainda não existe, cada
       // visita voltava a pagar o `sharp` de cada fotografia, para sempre.
-      await uploadProposalMid(chave, derivada);
+      await uploadProposalMid(chave, derivada, FORMATO.contentType);
     }
     return { bytes: derivada, motivo: "ok" };
   } catch (e) {
     const dito = e instanceof Error ? e.message : String(e);
     log.warn("derivadas: intermédia a pedido falhou", { caminho: chave, erro: dito });
     return { bytes: null, motivo: "sharp-falhou" };
+  }
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A CAPA JÁ FABRICADA QUANDO O CASAL ABRE O LINK
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «esta foto demora imenso tempo a carregar, e eu quero que seja
+ * super rápida e fluida a aparecer».
+ *
+ * A derivada de 1200 px passou a vir assinada, directa do CDN — mas só depois de
+ * existir, e quem a fabrica é a PRIMEIRA visita. Numa proposta acabada de
+ * enviar, essa primeira visita é a do casal a abrir o email: um `sharp` sobre
+ * uma fotografia de 2200 px, mais um download e um upload, a acontecer enquanto
+ * eles olham para um rectângulo. O ganho todo ia para a segunda visita, que é a
+ * que não interessa.
+ *
+ * Isto fabrica-a no envio, e só a da CAPA: são uma ou duas fotografias, é a
+ * primeira coisa que se vê, e é a única que não pode esperar. As dos mood boards
+ * ficam para a visita — estão mais abaixo na página, entram preguiçosas, e
+ * fabricar quarenta e seis aqui era pôr o envio a demorar o que ela acabou de
+ * pedir que não demorasse.
+ *
+ * ── MELHOR ESFORÇO, E COM RELÓGIO ────────────────────────────────────────
+ *
+ * Nunca lança e nunca demora mais do que o tecto: uma derivada por fabricar não
+ * pode atrasar — nem muito menos travar — o envio de uma proposta. O que falhar
+ * aqui volta a ser tentado pela rota, na visita, exactamente como era antes.
+ */
+export async function aquecerDerivadasDaCapa(
+  capas: readonly string[],
+  tectoMs = 6000,
+): Promise<number> {
+  const refs = [...new Set(capas.filter((r) => typeof r === "string" && r.trim() !== ""))]
+    // Uma foto embutida ou de fora não tem derivada para fabricar.
+    .filter((r) => !r.startsWith("data:") && !/^https?:\/\//i.test(r))
+    .slice(0, 2);
+  if (refs.length === 0) return 0;
+
+  const relogio = new Promise<null>((resolve) => setTimeout(() => resolve(null), tectoMs));
+  try {
+    const feitas = await Promise.race([
+      Promise.all(refs.map((r) => derivadaMediaAPedido(r).catch(() => ({ motivo: "" })))),
+      relogio,
+    ]);
+    if (!feitas) {
+      log.warn("derivadas: aquecimento da capa passou do tecto", { n: refs.length, tectoMs });
+      return 0;
+    }
+    return feitas.filter((f) => f.motivo === "ok").length;
+  } catch {
+    return 0;
   }
 }

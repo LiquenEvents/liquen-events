@@ -141,24 +141,14 @@ export interface ThemeSummary extends ProposalTheme {
    *  escolha — ou se a escolhida já não existir —, a foto mais recente. */
   coverUrl?: string;
   /**
-   * Mais duas ou três fotos do tema, para o cartão dar uma ideia do CONJUNTO em
-   * vez de uma imagem só. A capa vem sempre à frente; estas são as seguintes.
-   *
-   * Não custam uma ida a mais ao Storage: os nomes já vinham na listagem que a
-   * rota faz por tema, e a assinatura de todos os temas continua a ser um único
-   * pedido — só com mais caminhos lá dentro. Podem faltar (tema com uma foto
-   * só, ou assinatura falhada), e nesse caso o cartão mostra o que tiver.
-   */
-  previewUrls?: string[];
-  /**
    * ═══════════════════════════════════════════════════════════════════════
    * O PLANO B, QUE TEM DE VIAJAR ATÉ AO NAVEGADOR
    * ═══════════════════════════════════════════════════════════════════════
    *
-   * `coverUrl` e `previewUrls` trazem a DERIVADA mais adequada — 96 px para
-   * uma tira, 400 px para a capa. Essas derivadas podem não existir: nascem
-   * no carregamento, e as fotos anteriores a elas (ou migradas em massa) não
-   * as têm.
+   * `coverUrl` traz a DERIVADA mais adequada — a miniatura de 400 px para uma
+   * capa desenhada com ~128. Essa derivada pode não existir: nasce no
+   * carregamento, e as fotos anteriores a ela (ou migradas em massa) não a
+   * têm.
    *
    * E aqui está a armadilha que partiu a página: **assinar um caminho não
    * verifica que o ficheiro existe.** O `createSignedUrls` devolve um URL
@@ -171,10 +161,47 @@ export interface ThemeSummary extends ProposalTheme {
    * tem de ir com ele: o URL do ORIGINAL, que é o único que veio da LISTAGEM
    * da pasta e portanto o único que existe de certeza.
    *
-   * Alinhados por índice com `previewUrls`.
    */
   coverFallbackUrl?: string;
-  previewFallbackUrls?: string[];
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * O BORRÃO QUE FAZ O CARTÃO NÃO NASCER CINZENTO
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «placeholder blur por foto — acaba o ecrã de cartões
+   * cinzentos».
+   *
+   * São poucas centenas de bytes por fotografia, e viajam DENTRO desta
+   * resposta: estão pintados no primeiro fotograma, antes de qualquer ida ao
+   * Storage. A grelha de fotos de um tema e o seletor já os usavam; os
+   * CARTÕES, que são a primeira coisa que se vê ao abrir a biblioteca, eram os
+   * únicos a ficar à espera em cinzento.
+   *
+   * Não custam uma ida a mais: os `lqip` lêem-se por PASTA, e a lista de temas
+   * já sabe de que pastas precisa. Podem faltar (fotos anteriores à migração),
+   * e aí o cartão fica como estava.
+   *
+   */
+  coverLqip?: string;
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * A OFERTA EM AVIF
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * Um AVIF pesa menos 25% do que o WebP com a mesma fidelidade — medido, e a
+   * tabela está em `derivadas.ts`. Mas o Safari só o lê desde o iOS 16 — e estas fotografias são
+   * também as que um casal abre na página da proposta, no telemóvel que tiver.
+   *
+   * Por isso viaja SEPARADO e é uma proposta, não uma troca: o `<picture>`
+   * oferece-o primeiro e quem não o souber ler pede o `coverUrl`, que existe
+   * sempre.
+   *
+   * Ausente quer dizer «não há» — e é uma ausência de confiança, não uma
+   * suposição: o Supabase só assina o que está lá. Isso importa porque um
+   * `<source>` que dá 404 NÃO faz o navegador recuar para o `<img>`.
+   *
+   */
+  coverAvif?: string;
 }
 
 /** Limites de escrita partilhados entre o formulário e as rotas de API. */
@@ -298,4 +325,74 @@ export interface ThemeCopyResult {
   /** Fotos que chegaram ao destino SEM miniatura porque a cópia dela falhou.
    *  O tema de destino passa a puxar originais e é preciso dizê-lo. */
   thumbsMissing: number;
+}
+
+// ── Juntar dois temas num só ───────────────────────────────────────────────
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * FUNDIR TEMAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre a biblioteca: «há temas duplicados — "Itália" e
+ * "Italia", "Branco e verde" e "Branco & Verde" —, e a única saída é apagar um
+ * dos dois, que leva as fotos atrás».
+ *
+ * Fundir é uma composição do que já existe — mover cada foto para o outro tema
+ * (`transferThemeImage`, a mesma primitiva do «Copiar para…») — mais duas
+ * coisas que só uma fusão faz: juntar as notas e tirar da lista o tema que
+ * ficou vazio.
+ *
+ * ── O QUE NUNCA ACONTECE ────────────────────────────────────────────────
+ *
+ * Nenhuma fotografia é APAGADA. Nem uma. Isso deixa duas consequências à
+ * vista, e as duas são propositadas:
+ *
+ *  · uma foto que já esteja no destino com o mesmo nome de ficheiro FICA na
+ *    origem. É quase de certeza a mesma fotografia — desde o
+ *    `theme-fingerprint.ts` o nome É o resumo do conteúdo, e as antigas, de
+ *    nome UUID, só colidem se uma tiver saído da outra —, mas «quase de
+ *    certeza» não chega para apagar. O Storage responde 409 e ficamos por aí;
+ *  · por isso a origem pode não ficar vazia, e nesse caso NÃO é arquivada. O
+ *    relatório diz quantas ficaram e porquê, e apagar o tema continua a ser
+ *    uma decisão dela, no botão que já existe para isso.
+ *
+ * É lento de propósito: uma fusão que apaga fotos por dedução é uma fusão que
+ * um dia apaga a errada.
+ */
+
+/**
+ * Fotos por chamada de `POST /api/temas/[id]/fundir`.
+ *
+ * O mesmo 40 do `MAX_THEME_COPY_BATCH`, e pela mesma razão: são ~120 chamadas
+ * de Storage (a foto e as suas derivadas) e ZERO bytes a atravessar a função,
+ * o que cabe folgado nos 60 s de `maxDuration`.
+ */
+export const THEME_MERGE_BATCH = MAX_THEME_COPY_BATCH;
+
+/** O que uma chamada de `POST /api/temas/[id]/fundir` devolve. */
+export interface ThemeMergeBatch {
+  ok: true;
+  /** Foram mesmo para o destino, e saíram da origem. */
+  moved: number;
+  /** Já lá estavam com o mesmo nome de ficheiro. Ficaram na origem. */
+  existing: number;
+  /** Não foi possível levar — continuam na origem, intactas. */
+  failed: number;
+  /** Chegaram ao destino sem miniatura: esse tema passa a puxar originais. */
+  thumbsMissing: number;
+  /**
+   * Por onde a chamada seguinte continua a listar.
+   *
+   * As que SAEM encolhem a pasta e não contam; as que ficam (repetidas ou
+   * falhadas) têm de ser saltadas, senão a chamada seguinte tentava-as outra
+   * vez e a fusão nunca acabava.
+   */
+  nextOffset: number;
+  /** A pasta da origem acabou — não há mais nada para tentar. */
+  done: boolean;
+  /** Quantas fotos ficaram na origem no fim de tudo (só faz sentido com `done`). */
+  leftBehind: number;
+  /** A origem ficou vazia e saiu da lista. Ver `ThemeMergeBatch` acima. */
+  archived: boolean;
 }

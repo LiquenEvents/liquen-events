@@ -1,9 +1,11 @@
 import "server-only";
+import { opcoesDeCarregamento } from "./cache-das-fotos";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { getSupabase } from "./supabase";
 import {
   THEME_BUCKET,
+  THEME_MID_BUCKET,
   THEME_SIGNED_TTL,
   THEME_THUMB_BUCKET,
   caminhoDoRefDeTema,
@@ -42,6 +44,20 @@ let bucketReady = false;
  * ele não se consegue escrever um executável, nem um ficheiro de 2 GB.
  */
 export const UPLOAD_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+/**
+ * ── O QUE UM BUCKET DE DERIVADAS ACEITA ──────────────────────────────────
+ *
+ * Outra lista, e não a de cima. A de cima é uma medida de SEGURANÇA: limita o
+ * que uma pessoa consegue escrever com um bilhete de carregamento, e alargá-la
+ * alarga essa porta. As derivadas não vêm de fora — são fabricadas aqui — e o
+ * que precisam é de aceitar o que nós produzimos.
+ *
+ * Sem `image/avif` nesta lista, o bucket recusaria os AVIF e a geração falhava
+ * em silêncio: o contador diria «geradas 0» sem dizer porquê. Ficam também os
+ * dois anteriores, porque os buckets já existentes têm derivadas JPEG lá dentro
+ * e continuam a ter de as poder substituir.
+ */
+export const DERIVADA_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
 export const BUCKET_FILE_SIZE_LIMIT = 12 * 1024 * 1024; // 12 MB, como a rota
 
 /**
@@ -452,7 +468,7 @@ export async function uploadProposalImage(
   const path = `${safeId}/${randomUUID()}.${extFor(contentType)}`;
   const { error } = await sb.storage
     .from(PROPOSAL_BUCKET)
-    .upload(path, bytes, { contentType, upsert: false });
+    .upload(path, bytes, opcoesDeCarregamento(contentType));
   if (error) {
     log.error("proposal-storage: upload falhou", error, { quoteId });
     return null;
@@ -866,14 +882,21 @@ async function ensureMidBucket(): Promise<boolean> {
  * Melhor esforço, como a miniatura: falhar aqui só quer dizer que a abertura
  * seguinte volta a pagar o `sharp`. Nunca impede a imagem de ser servida.
  */
-export async function uploadProposalMid(path: string, bytes: Buffer): Promise<boolean> {
+export async function uploadProposalMid(
+  path: string,
+  bytes: Buffer,
+  // As derivadas saem em WebP desde a Fase 1 da biblioteca — ver `FORMATO` em
+  // `derivadas.ts`. Fica em parâmetro para o formato viver num sítio só: um
+  // «image/jpeg» escrito aqui era um cabeçalho a mentir sobre os bytes.
+  contentType = "image/webp",
+): Promise<boolean> {
   const sb = getSupabase();
   if (!sb || !path) return false;
   try {
     if (!(await ensureMidBucket())) return false;
     const { error } = await sb.storage
       .from(PROPOSAL_MID_BUCKET)
-      .upload(path, bytes, { contentType: "image/jpeg", upsert: true });
+      .upload(path, bytes, opcoesDeCarregamento(contentType, true));
     if (error && !/exist/i.test(error.message)) {
       log.warn("proposal-storage: intermédia não guardada", { path, erro: error.message });
       return false;
@@ -904,7 +927,7 @@ export async function uploadProposalThumb(
     if (!(await ensureThumbBucket())) return "";
     const { error } = await sb.storage
       .from(PROPOSAL_THUMB_BUCKET)
-      .upload(path, bytes, { contentType, upsert: true });
+      .upload(path, bytes, opcoesDeCarregamento(contentType, true));
     if (error) {
       log.warn("proposal-storage: miniatura não guardada", { path, erro: error.message });
       return "";
@@ -1002,7 +1025,7 @@ export async function uploadProposalCover(ref: string, bytes: Buffer): Promise<b
     const { error } = await Promise.race([
       sb.storage
         .from(destino.bucket)
-        .upload(destino.caminho, bytes, { contentType: "image/jpeg", upsert: true }),
+        .upload(destino.caminho, bytes, opcoesDeCarregamento("image/jpeg", true)),
       new Promise<{ error: { message: string } }>((r) =>
         setTimeout(() => r({ error: { message: "tempo esgotado" } }), 5000),
       ),
@@ -1136,6 +1159,41 @@ export async function signProposalPaths(paths: string[]): Promise<Map<string, st
 
 export async function signProposalThumbs(paths: string[]): Promise<Map<string, string>> {
   return assinarRefs(paths, PROPOSAL_THUMB_BUCKET, THEME_THUMB_BUCKET, true);
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS DERIVADAS DE 1200 PX, DIRECTAS DO STORAGE
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela, sobre a capa da proposta: «esta foto demora imenso tempo a
+ * carregar, e eu quero que seja super rápida e fluida a aparecer».
+ *
+ * ── O caminho longo ───────────────────────────────────────────────────────
+ *
+ * A derivada intermédia era servida SEMPRE pela rota `/api/proposta/…/foto/…`,
+ * e essa rota é um desvio: abre o token na base de dados, descarrega os bytes
+ * do Storage para dentro da função, e só então os manda para o telemóvel. Os
+ * mesmos bytes atravessam a nossa função a caminho de um sítio onde já estavam.
+ * Com o arranque a frio de uma função é o dobro ou o triplo do tempo — e a capa
+ * é a primeira coisa que o casal vê ao abrir o link.
+ *
+ * Assinada, a fotografia vem do CDN do Storage directamente ao telemóvel. É o
+ * mesmo caminho que as miniaturas de 400 px já fazem, e é por isso que elas
+ * apareciam depressa e a grande não aparecia.
+ *
+ * ── E porque é que a rota continua a existir ──────────────────────────────
+ *
+ * Porque uma derivada pode não existir ainda: o Supabase só assina o que lá
+ * está, e um caminho em falta simplesmente não vem no mapa. Onde não vier, quem
+ * desenha usa a rota — que a fabrica, guarda e serve. A rota deixa de ser o
+ * caminho de todos os dias e passa a ser o de arranque, que é o seu lugar.
+ *
+ * `silencioso` como nas miniaturas: uma derivada por fabricar é o caso normal
+ * de uma proposta acabada de enviar, e não um erro para escrever no registo.
+ */
+export async function signProposalMids(paths: string[]): Promise<Map<string, string>> {
+  return assinarRefs(paths, PROPOSAL_MID_BUCKET, THEME_MID_BUCKET, true);
 }
 
 /**

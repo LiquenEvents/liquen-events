@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
-import { Button } from "../../ui";
+import { Button, EmCurso } from "../../ui";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -65,6 +65,25 @@ const MODELOS: { chave: string; nome: string; quando: string }[] = [
     quando: "depois do evento",
   },
 ];
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUANTO DEMORA O ENVIO — um palpite, e assumido como tal
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É UM PEDIDO SÓ (`POST …/modelo` com `enviar:true`), e por isso é a espera
+ * OPACA: não há nada para contar entre a ida e a volta. Daí `estimadoMs`.
+ *
+ * O número não vem de medição nenhuma — não há aqui amostras guardadas como as
+ * do Estúdio tem para os PDF. Vem do que a operação É: um handshake com o SMTP,
+ * a mensagem com a assinatura da Líquen em anexo, e a volta. Anda pelos 3 a 10
+ * segundos, e o meio disso são 6.
+ *
+ * Errar por baixo custa pouco: a barra abranda e nunca chega ao fim sozinha, e
+ * ao dobro do estimado a `notaDemorada` diz o que interessa. Errar por cima é
+ * que era mau — uma barra quase parada durante um envio que já acabou.
+ */
+const MS_DO_ENVIO = 6_000;
 
 interface Previsao {
   chave: string;
@@ -216,22 +235,41 @@ export default function EnviarModelo({ quote, onEnviado }: Props) {
           <p className="text-[11px] text-foreground/35 mt-2 leading-relaxed">
             A assinatura da Líquen (Catarina Gaspar, contactos, logótipo) entra sozinha no fim.
           </p>
-          <div className="flex gap-2 mt-3">
-            <Button variant="primary" size="sm" loading={aEnviar} onClick={enviar}>
-              Enviar ao cliente
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={aEnviar}
-              onClick={() => {
-                setPrevisao(null);
-                setErro(null);
-              }}
-            >
-              Cancelar
-            </Button>
-          </div>
+          {/* ── ENQUANTO ESTÁ A IR ─────────────────────────────────────────
+              Um email a um cliente não se desfaz, e este sai várias vezes por
+              evento. O que havia era o botão a rodar durante os 3 a 10 segundos
+              do SMTP — e o «Cancelar» ao lado, aceso, a convidar a carregar
+              outra vez. Os dois saem e fica o que está a acontecer, para quem,
+              e nunca «enviado»: isso diz-o a resposta, quando chegar. */}
+          {aEnviar ? (
+            <EmCurso
+              className="mt-3"
+              titulo={`A enviar «${previsao.nome}»…`}
+              estimadoMs={MS_DO_ENVIO}
+              nota={
+                previsao.destinatario
+                  ? `O email vai para ${previsao.destinatario}.`
+                  : "O email está a ser entregue ao servidor."
+              }
+              notaDemorada="Com rede fraca demora — não feches o separador nem voltes a carregar."
+            />
+          ) : (
+            <div className="flex gap-2 mt-3">
+              <Button variant="primary" size="sm" onClick={enviar}>
+                Enviar ao cliente
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setPrevisao(null);
+                  setErro(null);
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

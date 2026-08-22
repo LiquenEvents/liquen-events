@@ -91,15 +91,93 @@ function comMaiusculaInicial(palavra: string): string {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A PONTUAÇÃO QUE FICOU TORTA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Nome real da biblioteca dela: `Clássico Intemporal ( Branco/dourad0))`.
+ *
+ * Três defeitos numa linha, e nenhum deles é uma escolha: um espaço a seguir ao
+ * parêntese aberto, um parêntese fechado a mais, e um `0` onde devia estar um
+ * `o`. É o que sai de escrever um nome num telemóvel, com pressa, no meio de um
+ * evento — e depois nunca mais se volta a esse campo, portanto fica lá para
+ * sempre a ser o nome por que se procura o tema.
+ *
+ * ── PORQUE É QUE SÃO REGRAS E NÃO UMA CORRECÇÃO À MÃO ─────────────────────
+ *
+ * Porque à mão corrige-se este e não o próximo. É a mesma lição do «Seatings
+ * Plans»: o erro já existia noutra forma e voltou. Estas três regras apanham a
+ * classe, e a revisão em lote passa a oferecê-la em todos os temas de uma vez.
+ *
+ * E continuam a PROPOR: quem decide é ela, com o «Deixar como está» ao lado.
+ */
+
+/** Fecha-parênteses a mais, e espaços encostados por dentro. */
+function arrumarPontuacao(nome: string): string {
+  let fora = nome
+    // «( Branco» → «(Branco»; «dourado )» → «dourado)». O espaço por dentro do
+    // parêntese não quer dizer nada e lê-se como um erro — porque é.
+    .replace(/([([{])\s+/g, "$1")
+    .replace(/\s+([)\]}])/g, "$1")
+    // «,,» e «..» — o dedo que bateu duas vezes na mesma tecla.
+    .replace(/([,.;:!?])\1+/g, "$1");
+
+  // Os fecha-parênteses a MAIS saem; os que faltam NÃO se inventam. Fechar um
+  // parêntese que ela não abriu era pôr no nome dela uma coisa que ela não
+  // escreveu — e um nome é escolha de quem o escreve.
+  const PARES: ReadonlyArray<readonly [string, string]> = [
+    ["(", ")"],
+    ["[", "]"],
+    ["{", "}"],
+  ];
+  for (const [abre, fecha] of PARES) {
+    let saldo = 0;
+    let saida = "";
+    for (const c of fora) {
+      if (c === abre) saldo += 1;
+      else if (c === fecha) {
+        if (saldo === 0) continue; // fecha sem abrir: cai
+        saldo -= 1;
+      }
+      saida += c;
+    }
+    fora = saida;
+  }
+  return fora.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * `dourad0` → `dourado`.
+ *
+ * O zero é o gémeo visual do «o» e fica ao lado do «p» no teclado do telemóvel.
+ * A regra é apertada de propósito, porque o risco aqui é estragar um nome
+ * legítimo: só toca em palavras com CINCO letras ou mais, com UM único dígito,
+ * e só quando esse dígito é o `0`.
+ *
+ * O que isto deliberadamente NÃO toca: «Mesa 1» e «Tema 2» (o número é a
+ * palavra toda), «A4» e «G0» (curtas de mais), «Top10» (dois dígitos). Um nome
+ * que precise mesmo de um zero no meio de letras — e não me ocorre nenhum —
+ * tem o «Deixar como está».
+ */
+function arrumarZeroPorO(palavra: string): string {
+  const digitos = palavra.replace(/\D/g, "");
+  if (digitos !== "0") return palavra;
+  if (palavra.replace(/[^\p{L}]/gu, "").length < 5) return palavra;
+  return palavra.replace("0", "o");
+}
+
+/**
  * O nome arrumado. Puro e total: qualquer entrada devolve uma cadeia.
  *
  * Colapsa também os espaços a mais — «Bouquets  Campestres » é o mesmo tema, e
  * um espaço invisível no fim é dos erros mais difíceis de ver e de procurar.
  */
 export function arrumarNomeDeTema(bruto: string): string {
-  const limpo = String(bruto ?? "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const limpo = arrumarPontuacao(
+    String(bruto ?? "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
   if (!limpo) return "";
 
   const conhecido = ERROS_CONHECIDOS.find(([errado]) => semAcentos(limpo) === errado);
@@ -107,15 +185,28 @@ export function arrumarNomeDeTema(bruto: string): string {
 
   return limpo
     .split(" ")
-    .map((palavra, i) => {
-      const chave = semAcentos(palavra);
-      if (SIGLAS.has(chave)) return palavra.toUpperCase();
+    .map((bruta, i) => {
+      // A pontuação da frente e de trás sai da conta e volta no fim: sem isto,
+      // «(branco/dourado)» pedia a maiúscula ao PARÊNTESE — que não a tem — e o
+      // «b» ficava minúsculo para sempre. O mesmo para o que vem a seguir a uma
+      // barra, que é uma palavra nova e não uma sílaba.
+      const [, antes, nucleo, depois] = /^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}]*)$/u.exec(bruta)!;
+      if (!nucleo) return bruta;
+      const arrumada = nucleo
+        .split("/")
+        .map((parte) => {
+          const palavra = arrumarZeroPorO(parte);
+          const chave = semAcentos(palavra);
+          if (SIGLAS.has(chave)) return palavra.toUpperCase();
 
-      // O acento primeiro: a forma certa do dicionário traz a sua própria
-      // grafia, e é sobre ela que a caixa de título decide.
-      const comAcento = POR_CHAVE.get(chave) ?? palavra;
-      if (i > 0 && MINUSCULAS_NO_MEIO.has(chave)) return comAcento.toLowerCase();
-      return comMaiusculaInicial(comAcento.toLowerCase());
+          // O acento primeiro: a forma certa do dicionário traz a sua própria
+          // grafia, e é sobre ela que a caixa de título decide.
+          const comAcento = POR_CHAVE.get(chave) ?? palavra;
+          if (i > 0 && MINUSCULAS_NO_MEIO.has(chave)) return comAcento.toLowerCase();
+          return comMaiusculaInicial(comAcento.toLowerCase());
+        })
+        .join("/");
+      return `${antes}${arrumada}${depois}`;
     })
     .join(" ");
 }

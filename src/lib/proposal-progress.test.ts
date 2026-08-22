@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "./proposal-progress";
 import type { ProposalDoc } from "./proposal-doc";
+import { eur } from "./money";
 
 /** O documento tal como o estúdio o ABRE: a estrutura montada, nada escrito. */
 const RECEM_ABERTO = {
@@ -70,8 +71,56 @@ describe("estadoDasSeccoes", () => {
   it("o singular e o plural estão certos", () => {
     // Um indicador que diz "1 linhas" faz duvidar de tudo o resto que diz.
     const uma = { ...COMPLETO, budgetItems: ["Só uma"] } as unknown as ProposalDoc;
-    expect(estadoDasSeccoes(uma).find((x) => x.id === "orcamento")?.resumo).toBe("1 linha");
-    expect(estadoDasSeccoes(COMPLETO).find((x) => x.id === "orcamento")?.resumo).toBe("2 linhas");
+    expect(estadoDasSeccoes(uma).find((x) => x.id === "orcamento")?.resumo).toContain("1 linha");
+    expect(estadoDasSeccoes(COMPLETO).find((x) => x.id === "orcamento")?.resumo).toContain(
+      "2 linhas",
+    );
+  });
+
+  /**
+   * ── O ÍNDICE CONTAVA LINHAS ONDE O QUE INTERESSA É O VALOR ───────────────
+   *
+   * Palavras dela: «o Orçamento conta linhas e não o total».
+   *
+   * As duas perguntas que se fazem a um índice num relance são «está feito?» e
+   * «quanto é?». Ele respondia mal às duas: dava um visto verde a um orçamento
+   * de zero euros com três linhas, e o número que mostrava era o das linhas.
+   */
+  it("o orçamento diz o valor, e não só quantas linhas tem", () => {
+    const s = estadoDasSeccoes(COMPLETO).find((x) => x.id === "orcamento");
+    // O formato é o da casa, e é por isso que a afirmação passa por `eur`: o
+    // que se prende é que o VALOR aparece, não como o pt-PT agrupa milhares.
+    expect(s?.resumo).toBe(`2 linhas · ${eur(3250)}`);
+    expect(s?.preenchida).toBe(true);
+  });
+
+  it("linhas sem valor nenhum não são um orçamento feito", () => {
+    const semValor = { ...COMPLETO, totalAmount: 0 } as unknown as ProposalDoc;
+    const s = estadoDasSeccoes(semValor).find((x) => x.id === "orcamento");
+    expect(s?.preenchida).toBe(false);
+    expect(s?.resumo).toBe("2 linhas · sem valor");
+  });
+
+  it("e o total diz o número, e não a palavra «definido»", () => {
+    // «Definido» diz que existe um número sem dizer qual, e obrigava a ir lá
+    // abaixo confirmar — que é exactamente o que um índice existe para evitar.
+    const s = estadoDasSeccoes(COMPLETO).find((x) => x.id === "total");
+    expect(s?.resumo).toBe(eur(3250));
+    expect(estadoDasSeccoes(RECEM_ABERTO).find((x) => x.id === "total")?.resumo).toBe(
+      "por definir",
+    );
+  });
+
+  it("o valor é o MESMO do quadro: com IVA e com adicionais", () => {
+    // Uma segunda soma aqui discordaria do orçamento um dia — e o sítio onde
+    // ela repara nisso é a folha que já seguiu para o casal.
+    const comIva = {
+      ...COMPLETO,
+      totalAmount: 1000,
+      totalVatMode: "acrescer",
+      vatRate: 0.23,
+    } as unknown as ProposalDoc;
+    expect(estadoDasSeccoes(comIva).find((x) => x.id === "total")?.resumo).toBe(eur(1230));
   });
 
   it("no modelo de Organização mostra o cronograma, não os mood boards", () => {

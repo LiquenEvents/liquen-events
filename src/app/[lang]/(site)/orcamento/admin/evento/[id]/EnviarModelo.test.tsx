@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Quote } from "@/lib/orcamento/types";
 import EnviarModelo from "./EnviarModelo";
@@ -157,5 +157,85 @@ describe("EnviarModelo — confirmar", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Enviar ao cliente$/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("O modelo está vazio.");
     expect(onEnviado).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ENQUANTO O EMAIL ESTÁ A SAIR
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto fala com o SMTP: 3 a 10 segundos, irreversível, e feito várias vezes por
+ * evento. O que havia era o botão a rodar — e o «Cancelar» ao lado, aceso, a
+ * convidar a carregar outra vez.
+ *
+ * O que estes testes prendem é o comportamento, e não as classes: o cartão
+ * aparece ao confirmar, diz o que está a acontecer e para quem, some-se quando
+ * a resposta chega — e NUNCA diz «enviado» antes disso.
+ */
+describe("EnviarModelo — enquanto o email está a sair", () => {
+  /** Um envio pendurado: sem isto, o meio da espera não chega a existir. */
+  function envioPendurado() {
+    let soltar!: (corpo: unknown) => void;
+    const pendurado = new Promise<unknown>((r) => (soltar = r));
+    fetchMock.mockReturnValueOnce(
+      pendurado.then((corpo) => ({ ok: true, status: 200, json: async () => corpo }) as Response),
+    );
+    return soltar;
+  }
+
+  async function confirmar() {
+    const soltar = envioPendurado();
+    await userEvent.click(screen.getByRole("button", { name: /^Enviar ao cliente$/ }));
+    return soltar;
+  }
+
+  it("diz o que está a acontecer, e para quem", async () => {
+    render(<EnviarModelo quote={QUOTE} />);
+    await escolherAgradecimento();
+    await confirmar();
+
+    const frase = await screen.findByText(/A enviar «Agradecimento pós-evento»/i);
+    const cartao = frase.closest('[role="status"]');
+    expect(cartao).not.toBeNull();
+    expect(cartao).toHaveTextContent("ana@x.pt");
+    // A barra que anda: é ela que responde a «isto está a andar?».
+    expect(cartao!.querySelector('[data-barra="preenchimento"]')).toBeTruthy();
+  });
+
+  it("NUNCA diz «enviado» antes de a resposta chegar, e não deixa reenviar", async () => {
+    const onEnviado = vi.fn();
+    render(<EnviarModelo quote={QUOTE} onEnviado={onEnviado} />);
+    await escolherAgradecimento();
+    await confirmar();
+    await screen.findByText(/A enviar «Agradecimento pós-evento»/i);
+
+    expect(screen.queryByText(/enviado para/i)).toBeNull();
+    expect(onEnviado).not.toHaveBeenCalled();
+    // Um email a um cliente não se desfaz: enquanto este vai, não há segundo
+    // botão para carregar — nem um «Cancelar» que já não cancela nada.
+    expect(screen.queryByRole("button", { name: /^Enviar ao cliente$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Cancelar$/ })).toBeNull();
+  });
+
+  it("some-se quando a resposta chega, e só então é que foi enviado", async () => {
+    const onEnviado = vi.fn();
+    render(<EnviarModelo quote={QUOTE} onEnviado={onEnviado} />);
+    await escolherAgradecimento();
+    const soltar = await confirmar();
+    await screen.findByText(/A enviar «Agradecimento pós-evento»/i);
+
+    soltar({ ok: true, emailed: true, assunto: PREVISTO.assunto });
+
+    await waitFor(() =>
+      expect(screen.queryByText(/A enviar «Agradecimento pós-evento»/i)).toBeNull(),
+    );
+    expect(
+      await screen.findByText(/«Agradecimento pós-evento» enviado para ana@x\.pt/),
+    ).toBeTruthy();
+    expect(onEnviado).toHaveBeenCalledWith(
+      "Agradecimento pós-evento",
+      expect.objectContaining({ emailed: true }),
+    );
   });
 });
