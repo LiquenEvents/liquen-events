@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import { Button } from "./ui";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 import { insertToken } from "@/lib/email-template-format";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { renderizarAssunto, renderizarCorpo, validarModelo } from "@/lib/email-template-engine";
 import {
   VALORES_DE_EXEMPLO,
@@ -106,6 +108,22 @@ export default function EmailTemplatesBilingue() {
   const { toast } = useToast();
   const [modelos, setModelos] = useState<ModeloBilingue[]>([]);
   const [aCarregar, setACarregar] = useState(true);
+  /**
+   * ── «MODELOS (0)» É UMA AFIRMAÇÃO, E UMA LEITURA FALHADA NÃO A SABE FAZER ─
+   *
+   * Falhando a leitura, `modelos` ficava a zero e o ecrã dizia «Modelos (0)» e
+   * «Seleciona um modelo para editar.» — com a mesma cara com que o diria se o
+   * servidor tivesse mesmo respondido que não há nenhum. O toast que dizia a
+   * verdade dura cinco segundos; o ecrã que mente fica lá o dia todo.
+   *
+   * E o passo seguinte que essa mentira sugere é o pior possível: reescrever à
+   * mão um texto que está inteiro do outro lado — e aqui gravar é PUBLICAR, ou
+   * seja, é o que o próximo cliente recebe.
+   *
+   * `null` = correu bem. String = falhou, e é o que o servidor disse (vazia
+   * quando não disse nada).
+   */
+  const [falhaAoLer, setFalhaAoLer] = useState<string | null>(null);
   const [chave, setChave] = useState<string | null>(null);
   const [idioma, setIdioma] = useState<Idioma>("pt");
 
@@ -120,10 +138,28 @@ export default function EmailTemplatesBilingue() {
   const campoActivo = useRef<Campo>("corpo");
 
   const [pedidos, setPedidos] = useState<PedidoParaPreVisualizar[]>([]);
+  /**
+   * A lista de pedidos falhava em SILÊNCIO TOTAL: um `if (rp.ok)` sem `else`.
+   * O seletor ficava só com «Dados de exemplo» e nada dizia porquê — e quem
+   * abriu isto para ver o modelo com um pedido a sério conclui que a
+   * funcionalidade não existe, ou que não há pedidos nenhuns.
+   */
+  const [falhaNosPedidos, setFalhaNosPedidos] = useState<string | null>(null);
   const [pedidoId, setPedidoId] = useState("");
   const [valoresReais, setValoresReais] = useState<Record<string, string> | null>(null);
 
   const [versoes, setVersoes] = useState<VersaoDeModelo[]>([]);
+  /**
+   * ── TRÊS ESTADOS QUE PARTILHAVAM UMA FRASE VERDADEIRA NUM SÓ ──────────────
+   *
+   * «Ainda não há versões anteriores desta língua» aparecia enquanto a leitura
+   * ainda ia a caminho E depois de ela rebentar — e nos dois casos é falso: as
+   * versões podem estar todas lá. Pior do que falso, é a frase que convida a
+   * publicar «para criar a primeira», que é exactamente o gesto que não se
+   * quer a seguir a uma falha, porque publicar aqui é enviar.
+   */
+  const [estadoDoHistorico, setEstadoDoHistorico] = useState<"a-ler" | "lido" | "falhou">("lido");
+  const [falhaDoHistorico, setFalhaDoHistorico] = useState("");
   const [historicoAberto, setHistoricoAberto] = useState(false);
 
   const [destinoDoTeste, setDestinoDoTeste] = useState("");
@@ -142,33 +178,64 @@ export default function EmailTemplatesBilingue() {
     setHistoricoAberto(false);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [rm, rp] = await Promise.all([
-          fetch("/api/email-templates/bilingues", { cache: "no-store" }),
-          fetch("/api/email-templates/dados", { cache: "no-store" }),
-        ]);
-        if (rm.ok) {
-          const dados: unknown = await rm.json();
-          const lista = Array.isArray(dados) ? dados.filter(ehModelo) : [];
-          setModelos(lista);
-          if (lista.length) abrir(lista[0], "pt");
-        } else {
-          toast("Não foi possível carregar os modelos.", "error");
-        }
-        if (rp.ok) {
-          const d = (await rp.json()) as { pedidos?: PedidoParaPreVisualizar[] };
-          setPedidos(Array.isArray(d?.pedidos) ? d.pedidos : []);
-        }
-      } catch {
-        toast("Não foi possível carregar os modelos.", "error");
-      } finally {
-        setACarregar(false);
+  /**
+   * As duas leituras estavam num `Promise.all` com um `catch` só, portanto a
+   * rede em baixo do lado dos pedidos levava também os modelos — e vice-versa.
+   * Separadas, cada uma falha por si e diz-se onde dói.
+   */
+  const lerModelos = useCallback(async () => {
+    try {
+      const r = await fetch("/api/email-templates/bilingues", { cache: "no-store" });
+      if (!r.ok) {
+        // A frase do servidor tal e qual: um «falta correr o db/schema.sql»
+        // resolve o problema sozinho, e trocá-lo por um genérico deitava fora
+        // a única coisa útil que veio na resposta.
+        const d = (await r.json().catch(() => null)) as { error?: unknown } | null;
+        setFalhaAoLer(typeof d?.error === "string" ? d.error : "");
+        return;
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      const dados: unknown = await r.json();
+      const lista = Array.isArray(dados) ? dados.filter(ehModelo) : [];
+      setFalhaAoLer(null);
+      setModelos(lista);
+      if (lista.length) abrir(lista[0], "pt");
+    } catch {
+      setFalhaAoLer("");
+    } finally {
+      setACarregar(false);
+    }
+  }, [abrir]);
+
+  const lerPedidos = useCallback(async () => {
+    try {
+      const r = await fetch("/api/email-templates/dados", { cache: "no-store" });
+      if (!r.ok) {
+        const d = (await r.json().catch(() => null)) as { error?: unknown } | null;
+        setFalhaNosPedidos(typeof d?.error === "string" ? d.error : "");
+        return;
+      }
+      const d = (await r.json()) as { pedidos?: PedidoParaPreVisualizar[] };
+      setFalhaNosPedidos(null);
+      setPedidos(Array.isArray(d?.pedidos) ? d.pedidos : []);
+    } catch {
+      setFalhaNosPedidos("");
+    }
   }, []);
+
+  useEffect(() => {
+    // As duas leituras são assíncronas: os `setState` acontecem quando as
+    // respostas chegam, não no corpo do efeito. Mesmo padrão do `useCachedList`.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void lerModelos();
+    void lerPedidos();
+  }, [lerModelos, lerPedidos]);
+
+  /** O «Tentar de novo» do painel de falha: volta ao esqueleto e repete. */
+  function lerModelosOutraVez() {
+    setACarregar(true);
+    setFalhaAoLer(null);
+    void lerModelos();
+  }
 
   /** Os valores da pré-visualização: de um pedido a sério, ou os de exemplo. */
   useEffect(() => {
@@ -253,6 +320,42 @@ export default function EmailTemplatesBilingue() {
     });
   }
 
+  /**
+   * ── UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU ─────────────────────
+   *
+   * Este ficheiro tinha três cópias do mesmo `try { fetch } catch { toast("Não
+   * foi possível …") }` — publicar, repor e enviar o teste —, e as três diziam
+   * a mesma coisa à rede em baixo, à sessão expirada, ao servidor em baixo e a
+   * uma recusa do conteúdo. Em metade dos casos «tenta outra vez» não podia
+   * funcionar, e é a segunda tentativa falhada que faz alguém desistir do ecrã.
+   *
+   * Mesmo padrão do `MaterialListas`: um sítio só, a frase vem do
+   * `porque-falhou`, nomeia a coisa e acaba numa instrução. Devolve o corpo
+   * porque o teste precisa dele para dizer para onde é que o email foi.
+   */
+  async function gravar(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
+    let r: Response;
+    try {
+      r = await fetch(url, init);
+    } catch {
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return { ok: false, corpo: null };
+    }
+    const corpo = await r.json().catch(() => null);
+    if (!r.ok) {
+      toast(porqueFalhou(oQue, r, corpo).mensagem, "error");
+      return { ok: false, corpo };
+    }
+    return { ok: true, corpo };
+  }
+
+  /** O nome da língua por extenso — «guardar o modelo «X» em pt» não se lê. */
+  const nomeDaLingua = (l: Idioma) => (l === "pt" ? "português" : "inglês");
+
   async function guardar() {
     if (!modelo || aGuardar) return;
     if (!assunto.trim()) {
@@ -265,23 +368,23 @@ export default function EmailTemplatesBilingue() {
     }
     setAGuardar(true);
     try {
-      const r = await fetch("/api/email-templates/bilingues", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chave: modelo.chave,
-          nome: modelo.nome,
-          idioma,
-          subject: assunto.trim(),
-          body: corpo,
-        }),
-      });
-      if (!r.ok) {
-        const d = await r.json().catch(() => null);
-        toast(d?.error ?? "Não foi possível guardar.", "error");
-        return;
-      }
-      const guardado = (await r.json()) as LadoDoModelo;
+      const { ok, corpo: resposta } = await gravar(
+        `publicar o modelo «${modelo.nome}» em ${nomeDaLingua(idioma)}`,
+        "/api/email-templates/bilingues",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chave: modelo.chave,
+            nome: modelo.nome,
+            idioma,
+            subject: assunto.trim(),
+            body: corpo,
+          }),
+        },
+      );
+      if (!ok) return;
+      const guardado = resposta as LadoDoModelo | null;
       setModelos((prev) =>
         prev.map((m) =>
           m.chave === modelo.chave
@@ -300,8 +403,6 @@ export default function EmailTemplatesBilingue() {
       setBaseCorpo(corpo);
       if (historicoAberto) void carregarVersoes();
       toast("Modelo publicado.", "success");
-    } catch {
-      toast("Não foi possível guardar.", "error");
     } finally {
       setAGuardar(false);
     }
@@ -309,14 +410,30 @@ export default function EmailTemplatesBilingue() {
 
   const carregarVersoes = useCallback(async () => {
     if (!chave) return;
+    setEstadoDoHistorico("a-ler");
     try {
       const r = await fetch(
         `/api/email-templates/versoes?chave=${encodeURIComponent(chave)}&idioma=${idioma}`,
         { cache: "no-store" },
       );
-      setVersoes(r.ok ? ((await r.json()) as VersaoDeModelo[]) : []);
+      if (!r.ok) {
+        const d = (await r.json().catch(() => null)) as { error?: unknown } | null;
+        // A lista antiga vai fora: era de outro modelo ou de outra língua, e
+        // uma lista velha mostrada como se fosse desta é pior do que nenhuma —
+        // «Repor» ao lado dela repõe a versão errada.
+        setVersoes([]);
+        setFalhaDoHistorico(typeof d?.error === "string" ? d.error : "");
+        setEstadoDoHistorico("falhou");
+        return;
+      }
+      const lista = (await r.json()) as VersaoDeModelo[];
+      setVersoes(Array.isArray(lista) ? lista : []);
+      setFalhaDoHistorico("");
+      setEstadoDoHistorico("lido");
     } catch {
       setVersoes([]);
+      setFalhaDoHistorico("");
+      setEstadoDoHistorico("falhou");
     }
   }, [chave, idioma]);
 
@@ -332,56 +449,64 @@ export default function EmailTemplatesBilingue() {
       "Voltar a esta versão? O texto que está a sair agora fica guardado no histórico, por isso podes desfazer.",
     );
     if (!ok) return;
-    try {
-      const r = await fetch("/api/email-templates/versoes", {
+    const { ok: passou, corpo: resposta } = await gravar(
+      `repor a versão de ${horaCurta(versaoEm)} do modelo «${modelo.nome}»`,
+      "/api/email-templates/versoes",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chave: modelo.chave, idioma, versaoEm }),
-      });
-      if (!r.ok) {
-        const d = await r.json().catch(() => null);
-        toast(d?.error ?? "Não foi possível reverter.", "error");
-        return;
-      }
-      const reposto = (await r.json()) as { subject: string; body: string; updatedAt: string };
-      setModelos((prev) =>
-        prev.map((m) => (m.chave === modelo.chave ? { ...m, [idioma]: reposto } : m)),
+      },
+    );
+    if (!passou) return;
+    const reposto = resposta as { subject: string; body: string; updatedAt: string } | null;
+    if (!reposto || typeof reposto.body !== "string") {
+      // Repôs (o servidor disse que sim) mas a resposta não veio legível.
+      // Escrever isto nas caixas era pôr `undefined` no texto que sai para
+      // clientes — mais vale não mexer no editor e mandar recarregar.
+      toast(
+        "Versão reposta, mas não deu para ler o texto que ficou. Atualiza a página antes de continuares.",
+        "error",
       );
-      setAssunto(reposto.subject);
-      setCorpo(reposto.body);
-      setBaseAssunto(reposto.subject);
-      setBaseCorpo(reposto.body);
-      await carregarVersoes();
-      toast("Versão reposta.", "success");
-    } catch {
-      toast("Não foi possível reverter.", "error");
+      return;
     }
+    setModelos((prev) =>
+      prev.map((m) => (m.chave === modelo.chave ? { ...m, [idioma]: reposto } : m)),
+    );
+    setAssunto(reposto.subject);
+    setCorpo(reposto.body);
+    setBaseAssunto(reposto.subject);
+    setBaseCorpo(reposto.body);
+    await carregarVersoes();
+    toast("Versão reposta.", "success");
   }
 
   async function enviarTeste() {
     if (!modelo || aEnviarTeste) return;
     setAEnviarTeste(true);
     try {
-      const r = await fetch("/api/email-templates/teste", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nome: modelo.nome,
-          subject: assunto,
-          body: corpo,
-          idioma,
-          pedido: pedidoId,
-          para: destinoDoTeste.trim(),
-        }),
-      });
-      const d = await r.json().catch(() => null);
-      if (!r.ok) {
-        toast(d?.error ?? "Não foi possível enviar o teste.", "error");
-        return;
-      }
-      toast(`Teste enviado para ${d?.para ?? "a caixa da Líquen"}.`, "success");
-    } catch {
-      toast("Não foi possível enviar o teste.", "error");
+      const { ok, corpo: resposta } = await gravar(
+        `enviar o teste do modelo «${modelo.nome}»`,
+        "/api/email-templates/teste",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome: modelo.nome,
+            subject: assunto,
+            body: corpo,
+            idioma,
+            pedido: pedidoId,
+            para: destinoDoTeste.trim(),
+          }),
+        },
+      );
+      if (!ok) return;
+      const para = (resposta as { para?: unknown } | null)?.para;
+      toast(
+        `Teste enviado para ${typeof para === "string" ? para : "a caixa da Líquen"}.`,
+        "success",
+      );
     } finally {
       setAEnviarTeste(false);
     }
@@ -391,6 +516,20 @@ export default function EmailTemplatesBilingue() {
     return (
       <div className="max-w-6xl">
         <SkeletonList rows={4} />
+      </div>
+    );
+  }
+
+  // A falha ANTES da lista, como no resto da casa: «Modelos (0)» só se pode
+  // dizer depois de o servidor ter respondido que não há nenhum.
+  if (falhaAoLer !== null) {
+    return (
+      <div className="max-w-6xl">
+        <AvisoDeFalha
+          titulo="Não foi possível ler os modelos de email"
+          mensagem={falhaAoLer}
+          aoTentarDeNovo={lerModelosOutraVez}
+        />
       </div>
     );
   }
@@ -603,8 +742,23 @@ export default function EmailTemplatesBilingue() {
 
             {historicoAberto && (
               <div className="mt-5 border-t border-foreground/[0.07] pt-4">
-                <p className="bo-eyebrow mb-2">Histórico ({versoes.length})</p>
-                {versoes.length === 0 ? (
+                {/* A contagem também espera: «(0)» é uma afirmação, e faz-se
+                    com a lista na mão, não a caminho dela nem depois de a
+                    leitura ter falhado. */}
+                <p className="bo-eyebrow mb-2">
+                  Histórico{estadoDoHistorico === "lido" ? ` (${versoes.length})` : ""}
+                </p>
+                {estadoDoHistorico === "a-ler" ? (
+                  <p className="text-[11px] text-foreground/40 leading-relaxed" aria-live="polite">
+                    A ler as versões anteriores…
+                  </p>
+                ) : estadoDoHistorico === "falhou" ? (
+                  <AvisoDeFalha
+                    titulo="Não foi possível ler as versões anteriores"
+                    mensagem={falhaDoHistorico}
+                    aoTentarDeNovo={() => void carregarVersoes()}
+                  />
+                ) : versoes.length === 0 ? (
                   <p className="text-[11px] text-foreground/40 leading-relaxed">
                     Ainda não há versões anteriores desta língua. A primeira aparece quando
                     publicares uma alteração.
@@ -656,6 +810,26 @@ export default function EmailTemplatesBilingue() {
                 </option>
               ))}
             </select>
+            {/* NÃO é o `AvisoDeFalha` de página inteira, de propósito: a
+                pré-visualização continua a funcionar com os dados de exemplo,
+                e um painel vermelho por cima dela diria que rebentou tudo. O
+                que falhou foi só a lista de pedidos — diz-se onde ela está, e
+                dá-se por onde repetir. */}
+            {falhaNosPedidos !== null && (
+              <div
+                role="alert"
+                className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-[#f6e6df]/60 px-3 py-2 text-[11px] leading-relaxed text-[#a03a1a]"
+              >
+                <span>
+                  Não foi possível ler os pedidos para pré-visualizar
+                  {falhaNosPedidos ? ` — ${falhaNosPedidos}` : ""}. A lista acima ficou só com os
+                  dados de exemplo.
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => void lerPedidos()}>
+                  Tentar de novo
+                </Button>
+              </div>
+            )}
             <p className="text-[11px] text-foreground/40 mb-3 leading-relaxed">
               Escolhe um pedido a sério para veres o que este modelo diz com os dados dele — um
               pedido sem data é a melhor maneira de ver os blocos a funcionar. No fim, a assinatura
@@ -704,6 +878,13 @@ export default function EmailTemplatesBilingue() {
               </p>
             </div>
           </div>
+        </div>
+      ) : modelos.length === 0 ? (
+        /* Uma leitura BOA que não trouxe nada. A falhada nunca chega aqui —
+           sai no `AvisoDeFalha` lá em cima —, e é por isso que esta frase pode
+           afirmar o que afirma. */
+        <div className="bo-card p-8 text-center text-foreground/30 text-sm">
+          Ainda não há modelos de email guardados.
         </div>
       ) : (
         <div className="bo-card p-8 text-center text-foreground/30 text-sm">

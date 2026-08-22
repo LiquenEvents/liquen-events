@@ -193,3 +193,130 @@ describe("NotificationBell — o botão «Ativas»", () => {
     expect(espia.avisos.at(-1)?.tipo).toBe("success");
   });
 });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * DESAPARECER DA BARRA NÃO SE LÊ COMO AVARIA — LÊ-SE COMO «AINDA NÃO EXISTE»
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O registo passou a levar o motivo, mas o ecrã continuava a fazer o mesmo nos
+ * dois casos: com a rota em baixo o sino sumia-se, exactamente como quando o
+ * servidor RESPONDE que as notificações não estão montadas. Duas situações
+ * opostas com o mesmo desenho — e a que precisa de alguém é a que fica
+ * invisível, com o motivo num sítio que ninguém no back office abre.
+ *
+ * O tratamento honesto é ficar e dizer que não se sabe: sem contagem, sem
+ * estado, e com um clique que volta a perguntar. O que não se pode é afirmar
+ * «bloqueadas» ou «desligadas», que ninguém aqui tem como saber.
+ */
+describe("NotificationBell — com a rota em baixo", () => {
+  it("o sino fica na barra, calado, em vez de desaparecer", async () => {
+    browserComPush();
+    servidor({ "/api/push/subscribe": () => json({ error: "Erro" }, 500) });
+
+    render(<NotificationBell />);
+
+    const sino = await screen.findByRole("button");
+    expect(sino.getAttribute("title")).toMatch(/não foi possível saber/i);
+    // Não inventa um estado que não conhece.
+    expect(sino.textContent).not.toMatch(/bloqueadas|ativas/i);
+  });
+
+  it("carregar volta a perguntar, em vez de mandar recarregar a página", async () => {
+    browserComPush();
+    let emBaixo = true;
+    servidor({
+      "/api/push/subscribe": () =>
+        emBaixo
+          ? json({ error: "Erro" }, 500)
+          : json({ configured: true, publicKey: "BPuBlIcKeY" }),
+    });
+
+    render(<NotificationBell />);
+    const sino = await screen.findByTitle(/não foi possível saber/i);
+    emBaixo = false;
+    await userEvent.click(sino);
+
+    await waitFor(() => expect(screen.getByTitle(/Ativar notificações/i)).toBeTruthy());
+  });
+});
+
+/**
+ * A subscrição era mandada com `await fetch(…)` e mais nada — sem `res.ok`,
+ * sem `catch`. Falhando o servidor, ela ficava só no navegador (que o servidor
+ * não conhece, portanto nunca lhe manda nada) e o ecrã dizia na mesma
+ * «Notificações ativadas neste dispositivo». A promessa mais fácil de
+ * acreditar do painel, feita precisamente quando não se cumpre — e o preço
+ * paga-se semanas depois, num pedido que entra sem avisar ninguém.
+ */
+describe("NotificationBell — ativar as notificações", () => {
+  /** Um navegador que chega até ao fim da subscrição, para sobrar só o servidor. */
+  function browserQueSubscreve() {
+    vi.stubGlobal("navigator", {
+      ...window.navigator,
+      serviceWorker: {
+        register: vi.fn(async () => ({
+          pushManager: {
+            subscribe: vi.fn(async () => ({ endpoint: "https://push.exemplo/abc" })),
+          },
+        })),
+        ready: Promise.resolve({}),
+      },
+    });
+    vi.stubGlobal("PushManager", class {});
+    vi.stubGlobal("Notification", {
+      permission: "default",
+      requestPermission: vi.fn(async () => "granted"),
+    });
+  }
+
+  /** O GET do arranque e o POST da subscrição são a mesma rota, e têm de
+   *  poder falhar em separado. */
+  function servidorPush(aoGuardar: () => Response) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) =>
+        (init?.method ?? "GET") === "GET"
+          ? json({ configured: true, publicKey: "BPuBlIcKeY" })
+          : aoGuardar(),
+      ),
+    );
+  }
+
+  async function ativar() {
+    render(<NotificationBell />);
+    await userEvent.click(await screen.findByTitle(/Ativar notificações/i));
+    await waitFor(() => expect(espia.avisos.length).toBeGreaterThan(0));
+    return espia.avisos.at(-1)!;
+  }
+
+  it("uma subscrição que não ficou guardada não sai como «ativadas»", async () => {
+    browserQueSubscreve();
+    servidorPush(() => json({ error: "Erro interno" }, 500));
+
+    const aviso = await ativar();
+    expect(aviso.tipo).toBe("error");
+    expect(aviso.texto).not.toMatch(/ativadas/i);
+    expect(aviso.texto).toContain("guardar as notificações neste dispositivo");
+    // E o botão volta ao gesto que resolve, em vez de ficar a dizer que está feito.
+    expect(screen.getByTitle(/Ativar notificações/i)).toBeTruthy();
+  });
+
+  it("a sessão expirada manda entrar de novo, e não repetir", async () => {
+    browserQueSubscreve();
+    servidorPush(() => json({ error: "Não autenticado" }, 401));
+
+    const aviso = await ativar();
+    expect(aviso.texto).toMatch(/sessão expirou/i);
+    expect(aviso.texto).toMatch(/volta a entrar/i);
+  });
+
+  it("e quando fica mesmo guardada, continua a dizer que ficou", async () => {
+    browserQueSubscreve();
+    servidorPush(() => json({ ok: true }));
+
+    const aviso = await ativar();
+    expect(aviso.tipo).toBe("success");
+    expect(aviso.texto).toMatch(/ativadas neste dispositivo/i);
+  });
+});

@@ -180,9 +180,14 @@ describe("o painel do «Guardar tudo»", () => {
 });
 
 describe("o sino das notificações", () => {
-  it("tem 44 px de largura nos dois estados em que se pode tocar", () => {
+  it("tem 44 px de largura nos três estados em que se pode tocar", () => {
     // Sem VAPID configurado o componente devolve `null` e nunca se vê — foi
     // por isso que ficou de fora de todas as medições anteriores.
-    expect(SINO.match(/className="pointer-coarse:min-w-11"/g)).toHaveLength(2);
+    //
+    // Passaram a ser TRÊS e não dois: com a rota em baixo o sino deixou de
+    // desaparecer da barra (desaparecer lia-se como «ainda não está montado»,
+    // que é o oposto do que se passa) e fica lá, sem contagem e sem estado, com
+    // um clique que volta a perguntar. É um alvo a mais para medir.
+    expect(SINO.match(/className="pointer-coarse:min-w-11"/g)).toHaveLength(3);
   });
 });
