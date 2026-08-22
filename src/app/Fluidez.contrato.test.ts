@@ -236,6 +236,7 @@ function propriedadesDeKeyframes(fonte: string): { nome: string; props: string[]
  */
 const BARRAS = [
   "src/app/[lang]/(site)/orcamento/admin/StatsDashboard.tsx",
+  "src/app/[lang]/(site)/orcamento/admin/Overview.tsx",
   "src/app/[lang]/(site)/orcamento/admin/ProductionPlan.tsx",
   "src/app/[lang]/(site)/orcamento/admin/ModoDeCarga.tsx",
   "src/app/[lang]/(site)/orcamento/admin/EventChecklist.tsx",

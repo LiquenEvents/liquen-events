@@ -17,6 +17,7 @@ import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { esperaEmPalavras } from "@/lib/orcamento/espera";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
 
 /**
  * A chave `YYYY-MM-DD` LOCAL de um dia qualquer — a regra do `todayKey()` do
@@ -640,9 +641,9 @@ const MetaReceita = memo(function MetaReceita({
           </div>
           <div className="h-2.5 bg-foreground/[0.06] rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full transition-all duration-700"
+              className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
               style={{
-                width: `${Math.min(100, (wonThisMonth / goal) * 100)}%`,
+                transform: `scaleX(${fraccaoDaBarra(wonThisMonth, goal)})`,
                 background: wonThisMonth >= goal ? "#3a5c39" : "#4d6350",
               }}
             />
@@ -1815,9 +1816,9 @@ export default function Overview({
                   </div>
                   <div className="h-1.5 bg-foreground/[0.06] rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-700"
+                      className="h-full w-full origin-left rounded-full motion-safe:transition-transform motion-safe:duration-700"
                       style={{
-                        width: `${(count / data.funnelMax) * 100}%`,
+                        transform: `scaleX(${fraccaoDaBarra(count, data.funnelMax)})`,
                         background: STATUS_META[f.id].color,
                       }}
                     />
@@ -1872,14 +1873,16 @@ export default function Overview({
           </div>
           {data.billed > 0 ? (
             <>
-              <div className="h-2 rounded-full overflow-hidden flex bg-foreground/[0.06]">
+              <div className="relative h-2 rounded-full overflow-hidden bg-foreground/[0.06]">
                 <div
-                  className="h-full bg-[#4d6350] transition-all duration-700"
-                  style={{ width: `${(data.received / data.billed) * 100}%` }}
+                  className="absolute inset-0 origin-left bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-700"
+                  style={{ transform: `scaleX(${fraccaoDaBarra(data.received, data.billed)})` }}
                 />
                 <div
-                  className="h-full bg-[#c0a060]/70 transition-all duration-700"
-                  style={{ width: `${(data.outstanding / data.billed) * 100}%` }}
+                  className="absolute inset-0 origin-left bg-[#c0a060]/70 motion-safe:transition-transform motion-safe:duration-700"
+                  style={{
+                    transform: `translateX(${fraccaoDaBarra(data.received, data.billed) * 100}%) scaleX(${fraccaoDaBarra(data.outstanding, data.billed)})`,
+                  }}
                 />
               </div>
               <div className="flex items-center gap-4 mt-2.5 text-[10px] text-foreground/40">
