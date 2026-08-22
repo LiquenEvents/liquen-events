@@ -85,7 +85,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     // recebeu por email. Uma fotografia em falta no armazenamento fazia isto
     // responder 503 sem corpo — e o botão não fazia nada. Ver a nota em
     // `proposal-pdf-cache.ts`; o anexo do email continua a recusar.
-    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true);
+    // O `proposal.id` entra para o desenho guardado no ENVIO poder ser
+    // servido tal e qual — é este o caminho que o casal usa, e o que o
+    // inventário apanhou como «um link que não diz nada enquanto trabalha».
+    // Ver `proposal-pdf-guardado.ts`.
+    const pdf = await pdfDaPropostaEmCache(proposal.doc, idioma, true, proposal.id);
     // O nome do ficheiro vai dentro de um cabeçalho: saneia-se a referência
     // (aspas, espaços, acentos) em vez de a confiar tal como está gravada.
     const ref = (proposal.quoteId || proposal.id).replace(/[^A-Za-z0-9_-]/g, "");

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
+import { guardarPdfDaProposta, lerPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { log } from "@/lib/logger";
 
 /**
@@ -66,7 +67,7 @@ let bytesGuardados = 0;
  * sem erro nenhum. É a mesma falha do «documento revisto» que a chave por
  * conteúdo já evita, só que por um eixo que o JSON do documento não vê.
  */
-function chaveDe(doc: ProposalDoc, idioma: IdiomaDaProposta): string {
+export function chaveDoPdf(doc: ProposalDoc, idioma: IdiomaDaProposta): string {
   return createHash("sha256")
     .update(`${idioma}:${JSON.stringify(doc)}`)
     .digest("base64url")
@@ -117,14 +118,49 @@ export async function pdfDaPropostaEmCache(
    * seja o documento de registo. Ver a nota longa lá em baixo.
    */
   servirIncompleto = false,
+  /**
+   * O id da proposta, para se poder procurar (e guardar) o desenho no Storage.
+   *
+   * Opcional de propósito: quem não o tiver continua a ter exactamente o
+   * comportamento anterior — memória e desenho. Não se inventa aqui um id a
+   * partir do documento, porque duas propostas podem partilhar conteúdo (uma
+   * cópia) e o ficheiro é o mesmo; o que muda é só onde fica arrumado.
+   */
+  proposalId?: string,
 ): Promise<Buffer<ArrayBuffer>> {
-  const chave = chaveDe(doc, idioma);
+  const chave = chaveDoPdf(doc, idioma);
   const guardado = cache.get(chave);
   if (guardado) {
     // Reinserir para ficar no fim da fila — foi usado agora.
     cache.delete(chave);
     cache.set(chave, guardado);
     return guardado;
+  }
+
+  /**
+   * ── E ANTES DE DESENHAR, O QUE FICOU GUARDADO NO ENVIO ─────────────────
+   *
+   * A cache acima vive por processo, e isso resolve o leitor de PDF a pedir o
+   * ficheiro aos bocados. Não resolve o caso que interessa: o casal abre o
+   * link do email às onze da noite, três dias depois, num processo que acabou
+   * de arrancar. Aí a memória está vazia e ele paga o desenho inteiro —
+   * oitenta fotografias reencodadas — atrás de um link que não diz nada
+   * enquanto trabalha.
+   *
+   * O ficheiro já foi desenhado uma vez, no envio, e está guardado com esta
+   * mesma chave. Ver `proposal-pdf-guardado.ts`, incluindo a razão de a chave
+   * ser o CONTEÚDO: um documento revisto não encontra nada e desenha-se, em
+   * vez de servir a versão que o casal não viu.
+   *
+   * `proposalId` opcional porque nem todos os caminhos o têm à mão — sem ele
+   * salta-se esta camada e faz-se o que se fazia antes.
+   */
+  if (proposalId) {
+    const doStorage = await lerPdfDaProposta(proposalId, chave);
+    if (doStorage) {
+      guardar(chave, doStorage as Buffer<ArrayBuffer>);
+      return doStorage as Buffer<ArrayBuffer>;
+    }
   }
 
   /**
@@ -200,6 +236,11 @@ export async function pdfDaPropostaEmCache(
   }
 
   guardar(chave, ultimo.pdf);
+  // E fica também no Storage, para o próximo processo não voltar a desenhar.
+  // Sem `await` no caminho de leitura seria uma escrita a apanhar o fim da
+  // função; com `await` são uns milissegundos numa resposta que acabou de
+  // gastar segundos a desenhar.
+  if (proposalId) await guardarPdfDaProposta(proposalId, chave, ultimo.pdf);
   return ultimo.pdf;
 }
 
