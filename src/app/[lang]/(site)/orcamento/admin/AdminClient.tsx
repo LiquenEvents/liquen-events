@@ -87,7 +87,7 @@ import EmptyState from "./EmptyState";
 import LifecycleStepper, { deriveRequestLifecycle } from "./LifecycleStepper";
 import { NAV, CORE_NAV, MORE_NAV, BARRA_INFERIOR, type View } from "./nav";
 import { useDesceu } from "./ui/adaptativo";
-import { Button, SectionCard, Segmented, TabelaOuCartoes, type Coluna } from "./ui";
+import { Button, EmCurso, SectionCard, Segmented, TabelaOuCartoes, type Coluna } from "./ui";
 import { MoreMenu } from "./MoreMenu";
 import {
   Overview,
@@ -1066,7 +1066,24 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
   const [passkeysOpen, setPasskeysOpen] = useState(false);
   const [ajudaOpen, setAjudaOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState(false);
+  /**
+   * O LOTE QUE ESTÁ A CORRER, E QUANTOS JÁ LÁ VÃO.
+   *
+   * Era um booleano (`bulkBusy`), e o único sinal que dava vivia dentro de um
+   * `<option>` de um `<select>` FECHADO — ou seja, na prática ela carregava e
+   * não via nada acontecer. Guardar a contagem é o que permite ao `EmCurso`
+   * dizer a verdade: são N pedidos, e a barra sobe a cada um que responde.
+   *
+   * `bulkBusy` continua a existir logo abaixo, derivado, porque o que os botões
+   * precisam de saber (está a correr? então não se carrega outra vez) não mudou.
+   */
+  const [lote, setLote] = useState<{ titulo: string; feito: number; total: number } | null>(null);
+  const bulkBusy = lote !== null;
+
+  /** Mais um pedido respondeu. Ver a nota em `applyBulkStatus`. */
+  function contarMaisUmNoLote() {
+    setLote((l) => (l ? { ...l, feito: l.feito + 1 } : l));
+  }
   const [recentQuotes, setRecentQuotes] = useState<RecentQuote[]>([]);
   // Below xl the detail panel is a modal slide-over (overlay + scrim); at xl+ it
   // is an inline sticky column. Only the overlay should behave as a dialog (focus
@@ -2614,7 +2631,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
    */
   async function applyBulkStatus(status: QuoteStatus, ids: string[]) {
     if (ids.length === 0 || bulkBusy) return;
-    setBulkBusy(true);
+    setLote({ titulo: "A marcar os pedidos…", feito: 0, total: ids.length });
     try {
       const results = await Promise.all(
         ids.map((id) =>
@@ -2624,7 +2641,16 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
             body: JSON.stringify({ status }),
           })
             .then((r) => (r.ok ? r.json() : null))
-            .catch(() => null),
+            .catch(() => null)
+            // A contagem sobe à medida que cada pedido responde — e não há
+            // outra maneira de a ter, porque um `Promise.all` puro só fala no
+            // fim. Isto é uma nota à passagem: os N pedidos já foram todos
+            // lançados na linha acima, continuam a correr ao mesmo tempo, e
+            // ninguém espera por ninguém. A espera não atrasa o trabalho.
+            .then((v) => {
+              contarMaisUmNoLote();
+              return v;
+            }),
         ),
       );
       const updated = new Map<string, Quote>(results.filter(Boolean).map((u: Quote) => [u.id, u]));
@@ -2642,7 +2668,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       );
       esquecerDaSeleccao(ids);
     } finally {
-      setBulkBusy(false);
+      setLote(null);
     }
   }
 
@@ -2665,13 +2691,18 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       )
     )
       return;
-    setBulkBusy(true);
+    setLote({ titulo: "A apagar os pedidos…", feito: 0, total: ids.length });
     try {
       const results = await Promise.all(
         ids.map((id) =>
           fetch(`/api/orcamento/${id}`, { method: "DELETE" })
             .then((r) => (r.ok ? id : null))
-            .catch(() => null),
+            .catch(() => null)
+            // Ver `applyBulkStatus`: conta à passagem, sem serializar nada.
+            .then((v) => {
+              contarMaisUmNoLote();
+              return v;
+            }),
         ),
       );
       const removed = new Set(results.filter((x): x is string => x !== null));
@@ -2689,7 +2720,7 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
       );
       esquecerDaSeleccao(ids);
     } finally {
-      setBulkBusy(false);
+      setLote(null);
     }
   }
 
@@ -4246,7 +4277,12 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                     aria-label="Marcar pedidos selecionados como"
                     className="bo-input px-2 py-1.5 text-xs text-foreground/70 disabled:opacity-50"
                   >
-                    <option value="">{bulkBusy ? "A aplicar…" : "—"}</option>
+                    {/* Era aqui que vivia o «A aplicar…». Um `<option>` de um
+                        `<select>` fechado é texto que ninguém vê: quem está a
+                        olhar para a barra não abre o selector para ir ver se o
+                        que pediu está a andar. O sinal passou para o `EmCurso`
+                        no fundo desta barra. */}
+                    <option value="">—</option>
                     {STATUS_OPTIONS.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.label}
@@ -4295,6 +4331,20 @@ export default function AdminClient({ initialQuotes, userName = "Catarina" }: Pr
                 >
                   Limpar
                 </button>
+                {/* A espera fica DENTRO da barra da seleção, por baixo dos
+                    botões que a lançaram — é onde os olhos já estão.
+                    `basis-full` para tomar uma linha só sua: a 390 px esta
+                    barra já quebra em várias filas e um cartão encaixado entre
+                    dois botões não cabia. */}
+                {lote && (
+                  <EmCurso
+                    className="basis-full"
+                    titulo={lote.titulo}
+                    feito={lote.feito}
+                    total={lote.total}
+                    nota="Não feches a página até acabar."
+                  />
+                )}
               </div>
             )}
 

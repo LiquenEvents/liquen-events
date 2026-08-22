@@ -11,7 +11,7 @@ import {
 import type { PlanoCsv } from "@/lib/material-csv";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
-import { Button, Card, EmptyState, Field, Segmented, Toolbar } from "./ui";
+import { Button, Card, EmCurso, EmptyState, Field, Segmented, Toolbar } from "./ui";
 import MaterialListas from "./MaterialListas";
 import MaterialRegras from "./MaterialRegras";
 import { useCachedList } from "./useCachedList";
@@ -168,6 +168,15 @@ function Catalogo() {
   const [csv, setCsv] = useState<string | null>(null);
   const [plano, setPlano] = useState<PlanoCsv | null>(null);
   const [importando, setImportando] = useState(false);
+  /**
+   * Quantas linhas estão a ser gravadas AGORA, ou `null` quando não há
+   * gravação nenhuma a correr.
+   *
+   * Separado do `importando` (que também cobre a leitura do ficheiro) porque a
+   * espera só tem de aparecer no gesto que demora: o ensaio é rápido e devolve
+   * o painel; a gravação é que são 5 a 30 segundos com a página muda.
+   */
+  const [aGravar, setAGravar] = useState<number | null>(null);
 
   const emFalta = useMemo(() => items.filter(abaixoDoMinimo), [items]);
 
@@ -313,9 +322,34 @@ function Catalogo() {
     }
   }
 
+  /**
+   * QUANTO É QUE ESTA GRAVAÇÃO COSTUMA DEMORAR, EM MILISSEGUNDOS.
+   *
+   * A escrita é UM pedido só: o servidor recebe o CSV inteiro e só responde no
+   * fim, portanto do lado de cá não há nada que se possa contar e a espera é
+   * das opacas (ver `espera-em-curso.ts`). O que há é o TAMANHO — e é ele que
+   * separa um segundo de meio minuto.
+   *
+   * De onde saem os números: o que se mede neste ecrã são 5 a 30 segundos para
+   * ficheiros de centenas de linhas. ~1000 ms de arranque (a viagem até ao
+   * servidor, que num 4G fraco não é de borla, mais o ensaio do CSV) e ~25 ms
+   * por linha escrita dá 6 s a 200 linhas, 11 s a 400 e 26 s a 1000 — dentro
+   * do que se vê. É um palpite honesto, e a barra trata-o como tal: abranda,
+   * nunca chega ao fim sozinha, e quem a fecha é a resposta.
+   *
+   * As linhas são as que VÃO SER ESCRITAS (`novos + atualizados`), que é o
+   * mesmo número que o ensaio já mostra por cima do botão. As linhas por
+   * perceber não entram: não são gravadas, e contá-las era esticar a
+   * estimativa por causa de trabalho que não se faz.
+   */
+  function esperaDaGravacao(linhas: number): number {
+    return 1000 + linhas * 25;
+  }
+
   async function aplicarImportacao() {
     if (!csv) return;
     setImportando(true);
+    setAGravar(plano ? plano.novos + plano.atualizados : 0);
     try {
       const res = await fetch("/api/material/importar", {
         method: "POST",
@@ -347,6 +381,7 @@ function Catalogo() {
       toast("A importação falhou.", "error");
     } finally {
       setImportando(false);
+      setAGravar(null);
     }
   }
 
@@ -569,6 +604,21 @@ function Catalogo() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* FORA do painel do ensaio de propósito: o `aplicarImportacao` faz
+          `setPlano(null)` assim que a escrita responde, e o que vem a seguir —
+          reler o catálogo inteiro — ainda demora. Lá dentro, a espera
+          desaparecia a meio do trabalho e o ecrã voltava a ficar mudo.
+          Aparece exactamente onde o botão «Gravar» estava. */}
+      {aGravar !== null && (
+        <EmCurso
+          className="mt-4"
+          titulo="A gravar o material…"
+          estimadoMs={esperaDaGravacao(aGravar)}
+          nota={`${aGravar} linha${aGravar !== 1 ? "s" : ""} a entrar no catálogo. Não feches a página.`}
+          notaDemorada="Está a demorar mais do que o costume. A gravação continua — não feches a página."
+        />
       )}
 
       {adding && (
