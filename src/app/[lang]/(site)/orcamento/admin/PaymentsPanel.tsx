@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DesistirDaEdicao } from "./ui/DesistirDaEdicao";
 import type { FormEvent } from "react";
 import { parseMoney, randomId, eur2, todayKey, isDateKey } from "./util";
 import { Button } from "./ui";
@@ -785,25 +786,30 @@ export default function PaymentsPanel({ quote, onChange, onContractRef }: Props)
               <span className="text-foreground/75 text-xs truncate">{KIND_LABEL[p.kind]}</span>
 
               {editingId === p.id ? (
-                <input
-                  ref={editRef}
-                  type="text"
-                  inputMode="decimal"
-                  aria-label={`Valor de ${KIND_LABEL[p.kind]} em euros`}
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={() => commitEdit(p)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      commitEdit(p);
-                    } else if (e.key === "Escape") {
-                      e.preventDefault();
-                      cancelEdit();
-                    }
-                  }}
-                  className="bo-input px-1.5 py-1 text-xs text-right tabular-nums text-foreground/85"
-                />
+                <span className="flex items-center gap-1">
+                  <input
+                    ref={editRef}
+                    type="text"
+                    inputMode="decimal"
+                    aria-label={`Valor de ${KIND_LABEL[p.kind]} em euros`}
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={() => commitEdit(p)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitEdit(p);
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelEdit();
+                      }
+                    }}
+                    className="bo-input px-1.5 py-1 text-xs text-right tabular-nums text-foreground/85"
+                  />
+                  {/* Num telemóvel não há Escape, e tudo o que tira o foco
+                      GRAVA — ver `DesistirDaEdicao`. */}
+                  <DesistirDaEdicao onDesistir={cancelEdit} oQue="o valor" />
+                </span>
               ) : (
                 <button
                   type="button"
