@@ -175,6 +175,21 @@ function withContent(file: File, content: string): File {
   return file;
 }
 
+/**
+ * Quanto está cheia a barra da espera partilhada (`ui/EmCurso.tsx`).
+ *
+ * Lê-se o `scaleX` e não uma classe: o que se prende é o COMPORTAMENTO — a
+ * barra diz a fracção verdadeira do lote —, e o desenho é assunto do `EmCurso`.
+ * A marca `data-barra` existe precisamente para isto (o traço é `aria-hidden`,
+ * não tem papel nem nome por onde lhe pegar).
+ */
+function preenchimento(): number {
+  const barra = document.querySelector("[data-barra=preenchimento]") as HTMLElement | null;
+  const m = /scaleX\(([\d.]+)\)/.exec(barra?.style.transform ?? "");
+  if (!m) throw new Error("não há barra da espera no ecrã");
+  return Number(m[1]);
+}
+
 const fileInput = () => document.querySelector('input[type="file"]') as HTMLInputElement;
 const dropZone = () => document.querySelector("div.border-dashed") as HTMLElement;
 const imgs = () => Array.from(document.querySelectorAll("img"));
@@ -1349,6 +1364,87 @@ describe("Biblioteca de Temas — seleção e ações em bloco", () => {
     expect(screen.getByText("Capa")).toBeInTheDocument();
     // A ação de capa só faz sentido para UMA foto.
     expect(screen.queryByRole("button", { name: "Definir como capa" })).not.toBeInTheDocument();
+  });
+
+  /**
+   * ────────────────────────────────────────────────────────────────────────
+   * O QUE ELA VÊ ENQUANTO ESPERA
+   * ────────────────────────────────────────────────────────────────────────
+   *
+   * Quarenta fotos a descarregar são um a dois minutos. O `downloadMany` já
+   * contava as que iam saindo — e o ecrã passava-lhe um `() => {}`, ou seja,
+   * deitava a conta ao lixo e deixava um botão parado.
+   */
+  it("transferir em bloco mostra a contagem verdadeira, que sobe a cada foto", async () => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok(five));
+    // Cada foto é puxada do CDN por `fetch` (o `download` é ignorado entre
+    // origens); travá-las é o que deixa parar o lote a meio e olhar.
+    for (const n of [1, 2, 3]) {
+      route(`GET ${photo(n).url}`, () => ok({}));
+      hold(`GET ${photo(n).url}`);
+    }
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 1 de 5" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 3 de 5" }), {
+      shiftKey: true,
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Transferir" }));
+    });
+
+    expect(screen.getByText("A transferir as fotos…")).toBeInTheDocument();
+    expect(screen.getByText("0 de 3")).toBeInTheDocument();
+    expect(preenchimento()).toBe(0);
+
+    await release(`GET ${photo(1).url}`);
+    expect(screen.getByText("1 de 3")).toBeInTheDocument();
+    expect(preenchimento()).toBeCloseTo(1 / 3, 4);
+
+    await release(`GET ${photo(2).url}`);
+    expect(screen.getByText("2 de 3")).toBeInTheDocument();
+
+    // A resposta da última é que fecha a espera — não um temporizador.
+    await release(`GET ${photo(3).url}`);
+    expect(screen.queryByText("A transferir as fotos…")).not.toBeInTheDocument();
+  });
+
+  /**
+   * A remoção é OTIMISTA: as fotos saem da grelha e a seleção esvazia-se no
+   * instante do clique, e com ela vai-se a barra de ações. Os pedidos, esses,
+   * continuam a caminho do servidor — e é aí que ela ficava sem saber se
+   * aquilo estava a andar.
+   */
+  it("remover em bloco continua a contar depois de a barra de seleção desaparecer", async () => {
+    route("GET /api/temas", () => ok([THEME]));
+    route("GET /api/temas/t1/imagens", () => ok(five));
+    route("DELETE /api/temas/t1/imagens", () => ok({ ok: true }));
+    hold("DELETE /api/temas/t1/imagens");
+
+    renderTemas();
+    await openFolder(/Terracotta/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 1 de 5" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar foto 4 de 5" }), {
+      shiftKey: true,
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Remover" }));
+    });
+
+    expect(screen.queryByText("4 fotos selecionadas")).not.toBeInTheDocument();
+    expect(screen.getByText("A remover as fotos…")).toBeInTheDocument();
+    expect(screen.getByText("0 de 4")).toBeInTheDocument();
+
+    await release("DELETE /api/temas/t1/imagens");
+    expect(screen.getByText("1 de 4")).toBeInTheDocument();
+    expect(preenchimento()).toBeCloseTo(0.25, 4);
+
+    await releaseAll("DELETE /api/temas/t1/imagens");
+    expect(screen.queryByText("A remover as fotos…")).not.toBeInTheDocument();
   });
 });
 

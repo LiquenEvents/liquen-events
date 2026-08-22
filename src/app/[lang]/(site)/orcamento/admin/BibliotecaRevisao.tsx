@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EIXOS, type Eixo, type EixoDaRegra, type Etiqueta } from "@/lib/biblioteca-types";
 import { MAX_THEME_NAME } from "@/lib/theme-types";
-import { Button, Card } from "./ui";
+import { Button, Card, EmCurso } from "./ui";
 import { useToast } from "./Toast";
 import ImagemComPlanoB from "./ImagemComPlanoB";
 
@@ -32,6 +32,19 @@ interface FotoDaBiblioteca {
 
 const PAGINA = 60;
 
+/**
+ * Quanto costuma demorar etiquetar em bloco, para a espera OPACA do `EmCurso`.
+ *
+ * É UM pedido só — não há nada para contar enquanto ele não volta (o servidor
+ * é que devolve quantas `mudadas`) —, mas o tempo cresce com o tamanho do
+ * lote: são duas idas à base de dados por foto, em série. Daí um palpite com
+ * duas partes: a ida e volta, mais o trabalho por foto. É um palpite, e a
+ * curva do `espera-em-curso.ts` é feita para nunca chegar ao fim sozinha — o
+ * que a fecha é a resposta.
+ */
+const ESPERA_BASE_MS = 900;
+const ESPERA_POR_FOTO_MS = 40;
+
 /** Os eixos como se lêem. */
 const NOME_DO_EIXO: Record<Eixo, string> = {
   tipo: "Tipo de peça",
@@ -55,6 +68,11 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
   /** A última foto tocada — é a âncora do Shift+clique. */
   const ancora = useRef<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
+  /** Quantas fotos leva o lote que está a ser etiquetado agora. `null` = nada
+   *  a decorrer. É o que dá tamanho à espera e o que se lê no cartão. */
+  const [aEtiquetar, setAEtiquetar] = useState<{ quantas: number; accao: "por" | "tirar" } | null>(
+    null,
+  );
   const [nomeDoTema, setNomeDoTema] = useState("");
   const [aCriarTema, setACriarTema] = useState(false);
 
@@ -164,6 +182,9 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
     const paths = [...seleccionadas];
     if (paths.length === 0) return;
     setAGuardar(true);
+    // 200 fotos são segundos a dezenas de segundos com o ecrã calado: o que se
+    // via era dois `select` desactivados. Ver `ui/EmCurso.tsx`.
+    setAEtiquetar({ quantas: paths.length, accao });
     try {
       const res = await fetch("/api/biblioteca/etiquetar", {
         method: "POST",
@@ -193,6 +214,7 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
       );
     } finally {
       setAGuardar(false);
+      setAEtiquetar(null);
     }
   }
 
@@ -522,6 +544,31 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
               </select>
             </label>
           </div>
+
+          {/* A ESPERA, DENTRO DA BARRA E NÃO POR CIMA DELA.
+
+              Este ecrã já tem duas barras coladas em baixo — esta e a navegação
+              de destinos do telemóvel, que vive no token `--bo-barra-inferior`.
+              Um cartão flutuante era o terceiro andar e tapava um dos dois
+              `select`, que é o bloqueio que esta barra já teve uma vez. Aqui
+              dentro ela cresce para CIMA e nada fica escondido.
+
+              É a espera OPACA: um pedido só, e quantas mudaram é o servidor que
+              diz no fim. O número de fotos vai no título, que é a informação que
+              ela tem antes da resposta. */}
+          {aEtiquetar && (
+            <EmCurso
+              className="mt-3"
+              titulo={
+                aEtiquetar.accao === "por"
+                  ? `A etiquetar ${aEtiquetar.quantas} ${aEtiquetar.quantas === 1 ? "foto" : "fotos"}…`
+                  : `A tirar a etiqueta a ${aEtiquetar.quantas} ${aEtiquetar.quantas === 1 ? "foto" : "fotos"}…`
+              }
+              estimadoMs={ESPERA_BASE_MS + aEtiquetar.quantas * ESPERA_POR_FOTO_MS}
+              nota="A grelha é lida outra vez no fim, e a selecção mantém-se."
+              notaDemorada="Está a demorar mais do que o costume. Não feches o separador — o lote continua a ser gravado."
+            />
+          )}
         </div>
       )}
     </div>

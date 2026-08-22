@@ -21,7 +21,16 @@ import { fingerprintBlob } from "@/lib/theme-fingerprint";
 import { textoDaRecusa, tituloDaRecusa } from "@/lib/erro-do-servidor";
 import { useToast } from "./Toast";
 import { prepareImageWithThumb } from "./image-prep";
-import { Button, Card, EmptyState, Field, MenuDeAccoes, Toolbar, type AccaoDeItem } from "./ui";
+import {
+  Button,
+  Card,
+  EmCurso,
+  EmptyState,
+  Field,
+  MenuDeAccoes,
+  Toolbar,
+  type AccaoDeItem,
+} from "./ui";
 import { esquecerBiblioteca } from "./theme-picker-cache";
 import BibliotecaRevisao from "./BibliotecaRevisao";
 import ImagemComPlanoB from "./ImagemComPlanoB";
@@ -405,6 +414,13 @@ function bibliotecaAlterada(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("liquen:biblioteca-alterada"));
 }
+
+/**
+ * O retrato de uma ação em bloco a decorrer, para o `EmCurso` da barra de
+ * seleção. Transferir 40 fotos e remover 40 fotos são 40 coisas cada uma: há
+ * sempre contagem, por isso a barra diz a verdade e nunca é uma estimativa.
+ */
+type AccaoEmBloco = { tipo: "transferir" | "remover"; feito: number; total: number };
 
 async function pool<T>(
   items: T[],
@@ -1921,6 +1937,9 @@ function ThemeFolder({
   /** Onde ela cairia se a largasse agora — é o que desenha o espaço aberto. */
   const [dragOver, setDragOver] = useState<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  /** A ação em bloco que está a decorrer (transferir ou remover), com a
+   *  contagem verdadeira. `null` = nada a acontecer. */
+  const [emBloco, setEmBloco] = useState<AccaoEmBloco | null>(null);
   const [coverPath, setCoverPath] = useState<string | undefined>(theme.coverPath);
   const [name, setName] = useState(theme.name);
   const [renaming, setRenaming] = useState(false);
@@ -2720,7 +2739,7 @@ function ThemeFolder({
 
   /** Remove um conjunto de fotos. Uma só confirmação para o conjunto todo, e
    *  as que o servidor recusar voltam ao sítio onde estavam. */
-  async function removeImages(targets: ThemeImage[]) {
+  async function removeImages(targets: ThemeImage[], aoProgredir?: (feitas: number) => void) {
     if (targets.length === 0) return;
     const positions = new Map(images.map((im, i) => [im.path, i]));
     const gone = new Set(targets.map((t) => t.path));
@@ -2735,6 +2754,10 @@ function ThemeFolder({
     bibliotecaAlterada();
 
     const errors: ThemeImage[] = [];
+    // As remoções correm com concorrência: a contagem é de quantas JÁ
+    // RESPONDERAM, e conta tanto as que foram como as que falharam — a barra
+    // retrata a espera, não o sucesso (o que falhou tem o seu próprio aviso).
+    let respondidas = 0;
     await pool(targets, DELETE_CONCURRENCY, async (im) => {
       try {
         const res = await fetch(
@@ -2744,6 +2767,9 @@ function ThemeFolder({
         if (!res.ok) throw new Error("falhou");
       } catch {
         errors.push(im);
+      } finally {
+        respondidas += 1;
+        aoProgredir?.(respondidas);
       }
     });
     if (!alive.current) return;
@@ -2877,10 +2903,21 @@ function ThemeFolder({
     )
       return;
     setBulkBusy(true);
+    // A remoção é otimista: a grelha e a seleção esvaziam-se já, e a barra de
+    // ações desaparece com elas. O cartão fica no lugar dela, no mesmo sítio
+    // colado ao topo — senão as fotos sumiam e mais nada dizia que ainda havia
+    // pedidos a caminho do servidor.
+    setEmBloco({ tipo: "remover", feito: 0, total: targets.length });
     try {
-      await removeImages(targets);
+      await removeImages(targets, (feitas) => {
+        if (!alive.current) return;
+        setEmBloco((p) => (p && p.tipo === "remover" ? { ...p, feito: feitas } : p));
+      });
     } finally {
-      if (alive.current) setBulkBusy(false);
+      if (alive.current) {
+        setBulkBusy(false);
+        setEmBloco(null);
+      }
     }
   }
 
@@ -2998,10 +3035,17 @@ function ThemeFolder({
     const chosen = images.map((im, i) => ({ im, i })).filter(({ im }) => selected.has(im.path));
     if (chosen.length === 0) return;
     setDownloading(true);
+    // O `downloadMany` já contava — e o `() => {}` que estava aqui deitava a
+    // conta fora. Quarenta fotos são um a dois minutos: sem isto, o que ela vê
+    // é um botão parado.
+    setEmBloco({ tipo: "transferir", feito: 0, total: chosen.length });
     const res = await downloadMany(
       chosen.map(({ im, i }) => ({ url: im.url, filename: downloadName(im, theme.name, i) })),
-      () => {},
+      (p) => {
+        if (alive.current) setEmBloco({ tipo: "transferir", feito: p.done, total: p.total });
+      },
     );
+    if (alive.current) setEmBloco(null);
     setDownloading(false);
     if (res.failed > 0) {
       toast(
@@ -3326,46 +3370,85 @@ function ThemeFolder({
         </Card>
       )}
 
-      {selectedCount > 0 && (
-        <div className="sticky top-2 z-20 mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 shadow-[0_1px_2px_rgba(42,38,32,0.04)] backdrop-blur">
-          <p className="text-sm text-foreground/85">
-            {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
-          </p>
-          <span className="bo-text-muted hidden text-xs sm:inline">
-            Shift + clique seleciona tudo o que está pelo meio.
-          </span>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {selectedCount === 1 && (
-              <Button
-                size="sm"
-                variant="subtle"
-                onClick={() => {
-                  const one = images.find((i) => selected.has(i.path));
-                  if (one) setAsCover(one);
-                }}
-              >
-                Definir como capa
-              </Button>
-            )}
-            {/* ⚠️ "Transferir", aqui ao lado, já significa DESCARREGAR. Esta
+      {/* A BARRA DA SELEÇÃO E A ESPERA DO QUE ELA MANDOU FAZER, no mesmo
+          bloco colado ao topo.
+
+          São dois cartões e não um: a remoção esvazia a seleção logo (é
+          otimista), a barra de ações desaparece nesse instante e o cartão da
+          espera tem de FICAR — os pedidos ainda vão a caminho. A "Transferir"
+          faz o contrário: a seleção mantém-se e os dois vêem-se juntos.
+
+          O `sticky` está no invólucro para que a espera acompanhe o scroll tal
+          como a barra acompanhava; a 390 px cada um ocupa a largura toda e
+          empilham. */}
+      {(selectedCount > 0 || emBloco) && (
+        <div className="sticky top-2 z-20 mb-4 flex flex-col gap-2">
+          {selectedCount > 0 && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#4d6350]/25 bg-white/95 px-4 py-3 shadow-[0_1px_2px_rgba(42,38,32,0.04)] backdrop-blur">
+              <p className="text-sm text-foreground/85">
+                {plural(selectedCount, "foto selecionada", "fotos selecionadas")}
+              </p>
+              <span className="bo-text-muted hidden text-xs sm:inline">
+                Shift + clique seleciona tudo o que está pelo meio.
+              </span>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                {selectedCount === 1 && (
+                  <Button
+                    size="sm"
+                    variant="subtle"
+                    onClick={() => {
+                      const one = images.find((i) => selected.has(i.path));
+                      if (one) setAsCover(one);
+                    }}
+                  >
+                    Definir como capa
+                  </Button>
+                )}
+                {/* ⚠️ "Transferir", aqui ao lado, já significa DESCARREGAR. Esta
                 ação chama-se "Copiar para…" — a palavra transferir está
                 proibida para ela, senão passam a existir dois significados no
                 mesmo sítio. Só aparece havendo outro tema para onde levar. */}
-            {otherThemes.length > 0 && (
-              <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
-                Copiar para…
-              </Button>
-            )}
-            <Button size="sm" variant="secondary" loading={downloading} onClick={downloadSelected}>
-              Transferir
-            </Button>
-            <Button size="sm" variant="secondary" onClick={clearSelection}>
-              Limpar seleção
-            </Button>
-            <Button size="sm" variant="danger" loading={bulkBusy} onClick={removeSelected}>
-              Remover
-            </Button>
-          </div>
+                {otherThemes.length > 0 && (
+                  <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
+                    Copiar para…
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={downloading}
+                  onClick={downloadSelected}
+                >
+                  Transferir
+                </Button>
+                <Button size="sm" variant="secondary" onClick={clearSelection}>
+                  Limpar seleção
+                </Button>
+                <Button size="sm" variant="danger" loading={bulkBusy} onClick={removeSelected}>
+                  Remover
+                </Button>
+              </div>
+            </div>
+          )}
+          {emBloco && (
+            /* Fundo opaco por baixo: o cartão da espera é translúcido de
+               propósito (é um tom sobre o papel), e colado ao topo passava a
+               ter as fotos a rolar por trás. */
+            <div className="rounded-xl bg-white/95 shadow-[0_1px_2px_rgba(42,38,32,0.04)] backdrop-blur">
+              <EmCurso
+                titulo={
+                  emBloco.tipo === "transferir" ? "A transferir as fotos…" : "A remover as fotos…"
+                }
+                feito={emBloco.feito}
+                total={emBloco.total}
+                nota={
+                  emBloco.tipo === "transferir"
+                    ? "Uma de cada vez — é assim que o navegador as deixa passar todas. Podes continuar a usar o ecrã."
+                    : "As propostas já feitas com estas fotos não são afetadas."
+                }
+              />
+            </div>
+          )}
         </div>
       )}
 

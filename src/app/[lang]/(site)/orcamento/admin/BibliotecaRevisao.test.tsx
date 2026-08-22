@@ -312,6 +312,108 @@ describe("rever etiquetas", () => {
  * O jsdom não faz layout. O que se prende é a DECISÃO — a distância ao fundo é
  * a altura da navegação, e sai do token que já existe.
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ETIQUETAR DUZENTAS FOTOS NÃO PODE SER UM ECRÃ CALADO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * O pedido é UM só e o servidor faz duas idas à base de dados por foto, em
+ * série: com um lote grande são segundos a dezenas de segundos em que a única
+ * coisa que muda no ecrã são dois `select` que deixam de se poder usar.
+ *
+ * Como não há nada para CONTAR antes da resposta (quantas mudaram é o servidor
+ * que diz no fim), a espera é a OPACA do `ui/EmCurso.tsx`: anda com o relógio,
+ * nunca chega ao fim sozinha, e quem a fecha é a resposta. O que se prende
+ * aqui é isso — aparece, anda, e sai.
+ */
+describe("etiquetar em bloco, com o ecrã a dizer o que está a acontecer", () => {
+  /** Quanto está cheia a barra da espera. Lê-se o `scaleX` e não uma classe: o
+   *  desenho é assunto do `EmCurso`, o comportamento é assunto daqui. */
+  const preenchimento = () => {
+    const barra = document.querySelector("[data-barra=preenchimento]") as HTMLElement | null;
+    const m = /scaleX\(([\d.]+)\)/.exec(barra?.style.transform ?? "");
+    if (!m) throw new Error("não há barra da espera no ecrã");
+    return Number(m[1]);
+  };
+
+  /**
+   * Deixa o pedido de etiquetar PENDURADO e devolve a maneira de o soltar. Sem
+   * isto o lote resolvia-se na volta seguinte de microtarefas e nunca se via o
+   * meio da espera — que é precisamente o que está aqui em causa.
+   */
+  function travarEtiquetar(): (() => void)[] {
+    const responder: (() => void)[] = [];
+    vi.stubGlobal("fetch", (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("/api/biblioteca/etiquetas")) {
+        return Promise.resolve(new Response(JSON.stringify(ETIQUETAS), { status: 200 }));
+      }
+      if (url.startsWith("/api/biblioteca/fotos")) {
+        return Promise.resolve(new Response(JSON.stringify(resposta), { status: 200 }));
+      }
+      if (url.startsWith("/api/biblioteca/etiquetar")) {
+        return new Promise<Response>((resolve) => {
+          responder.push(() =>
+            resolve(new Response(JSON.stringify({ ok: true, mudadas: 3 }), { status: 200 })),
+          );
+        });
+      }
+      return Promise.resolve(new Response("{}", { status: 404 }));
+    });
+    return responder;
+  }
+
+  it("a espera aparece com o tamanho do lote, anda sozinha, e sai com a resposta", async () => {
+    // O pedido de etiquetar fica pendurado: é assim que se olha para o meio da
+    // espera em vez de para o depois.
+    const responder = travarEtiquetar();
+
+    abrir();
+    await waitFor(() => expect(fotos()).toHaveLength(3));
+    fireEvent.click(fotos()[0]);
+    fireEvent.click(fotos()[2], { shiftKey: true });
+    await waitFor(() => expect(contador()?.textContent).toBe("3 fotos escolhidas"));
+
+    fireEvent.change(screen.getByLabelText("Etiqueta a aplicar"), {
+      target: { value: "tipo:bouquet" },
+    });
+
+    // Quantas vão no lote é o que ela sabe ANTES da resposta — e é o que se lê.
+    expect(await screen.findByText("A etiquetar 3 fotos…")).toBeInTheDocument();
+    expect(preenchimento()).toBe(0);
+
+    // Anda com o relógio, sem esperar por resposta nenhuma.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 500));
+    });
+    expect(preenchimento()).toBeGreaterThan(0);
+
+    await waitFor(() => expect(responder).toHaveLength(1));
+    await act(async () => {
+      responder[0]();
+    });
+
+    // Quem fecha a espera é a resposta — e só depois de a grelha ser relida.
+    await waitFor(() => expect(screen.queryByText("A etiquetar 3 fotos…")).not.toBeInTheDocument());
+  });
+
+  /** Tirar não é pôr: a frase tem de dizer o que está mesmo a acontecer. */
+  it("tirar uma etiqueta a um lote diz que está a tirar, não a pôr", async () => {
+    travarEtiquetar();
+    abrir();
+    await waitFor(() => expect(fotos()).toHaveLength(3));
+    fireEvent.click(fotos()[0]);
+    await waitFor(() => expect(contador()?.textContent).toBe("1 foto escolhida"));
+
+    // O segundo `select` da barra é o "Tirar etiqueta…" (os dois vivem debaixo
+    // do mesmo rótulo, que é do primeiro).
+    fireEvent.change(screen.getAllByRole("combobox")[1], {
+      target: { value: "paleta:terracotta" },
+    });
+    expect(await screen.findByText("A tirar a etiqueta a 1 foto…")).toBeInTheDocument();
+  });
+});
+
 describe("a barra de etiquetas, no telemóvel", () => {
   it("pousa ACIMA da navegação de baixo, e não por trás dela", async () => {
     abrir();
