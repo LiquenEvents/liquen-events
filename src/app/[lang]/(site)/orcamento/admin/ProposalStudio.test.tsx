@@ -6147,3 +6147,59 @@ describe("o que já está feito abre fechado", () => {
     await waitFor(() => expect(evento.querySelector('[aria-expanded="true"]')).not.toBeNull());
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AS CAIXAS DE TEXTO DO ORÇAMENTO NUM TELEMÓVEL
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Do registo do audit, e é um dos oito bloqueios: «a caixa do nome da linha do
+ * orçamento tem 62 px — 27 com a proposta bilingue ligada».
+ *
+ * MEDIDO a 390 px: a fila tem 318 px dentro do cartão, e as colunas fixas (a
+ * escala, o preço) mais os espaços comem 264. Sobram 54 px para os campos de
+ * texto — e como eles são `flex-1` com `min-w-0`, não quebram: encolhem.
+ * Escrever «Decoração da Cerimónia» numa caixa de 62 px é escrever às cegas, e
+ * o que ali se escreve é o texto que o casal lê no PDF.
+ *
+ * O jsdom não faz layout: não há aqui píxeis para medir — a geometria está
+ * medida no browser e vive no relatório. O que se prende é a DECISÃO, para que
+ * ninguém a desfaça sem dar por isso.
+ */
+describe("o orçamento a 390 px", () => {
+  it("o nome de uma linha não encolhe abaixo do mínimo da casa", async () => {
+    seedDraft(1);
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        ...(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>),
+        budgetItems: ["Decor Cerimónia"],
+      }),
+    );
+    renderStudio();
+    const nome = await screen.findByRole("textbox", { name: "Item de orçamento" });
+    // `min-w-[12rem]` é o mesmo mínimo que a fase do cronograma e os títulos de
+    // grupo do `ServicesEditor` já usam. Com ele, o `flex-wrap` que já lá estava
+    // passa a fazer o que existe para fazer: o nome fica sozinho numa fila.
+    expect(nome.className).toContain("min-w-[12rem]");
+  });
+
+  it("e a linha do modelo de Organização parte em duas filas no telemóvel", async () => {
+    seedDraft(1, {});
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        ...(JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>),
+        template: "organizacao",
+        budgetRows: [{ item: "Coordenação do dia", price: "1.500,00 €" }],
+      }),
+    );
+    renderStudio();
+    const item = await screen.findByRole("textbox", { name: "Item" });
+    // A descrição ocupa a fila toda até `sm`, e o valor desce para baixo — o
+    // mesmo desenho que as linhas adicionais já usavam.
+    expect(item.className).toContain("col-span-2");
+    expect(item.className).toContain("sm:col-span-1");
+    expect(item.parentElement?.className).toContain("sm:grid-cols-[minmax(0,1fr)_10rem_auto]");
+  });
+});

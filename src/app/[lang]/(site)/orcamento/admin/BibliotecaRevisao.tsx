@@ -433,9 +433,27 @@ export default function BibliotecaRevisao({ onBack }: { onBack: () => void }) {
 
       {/* A barra de acções aparece com a selecção e fica colada em baixo: com
           oitenta fotos no ecrã, ter de subir ao topo para aplicar uma etiqueta
-          era o que fazia desistir a meio. */}
+          era o que fazia desistir a meio.
+
+          ── E COLADA ACIMA DA NAVEGAÇÃO, NÃO POR BAIXO DELA ─────────────────
+          Do registo do audit, e é um dos oito bloqueios: «a barra que aplica
+          etiquetas fica por trás da barra de destinos do telemóvel — escolhem-se
+          as fotos e não se etiqueta».
+
+          `bottom-0` cola ao fundo do que ROLA, que aqui é a janela; a navegação
+          do back office é `fixed bottom-0` no plano seguinte, com 72 px mais a
+          área segura. O `padding` que o `AdminClient` põe no conteúdo não salva
+          nada: um elemento `sticky` posiciona-se contra o scrollport e não
+          contra o padding do pai. A 390 px o conteúdo desta barra quebra em
+          quatro filas, e as duas que ficavam tapadas eram precisamente os dois
+          `select` — a única forma de aplicar ou tirar uma etiqueta.
+
+          A distância ao fundo passa a ser a altura dessa navegação, que vive no
+          token `--bo-barra-inferior`. É o mesmo remédio que a barra de acções do
+          estúdio já usa, escrito no mesmo token; era só propagá-lo. `lg:bottom-0`
+          porque acima de 1024 a navegação é lateral e não há nada por baixo. */}
       {seleccionadas.size > 0 && (
-        <div className="sticky bottom-0 z-20 mt-4 rounded-xl border border-foreground/[0.1] bg-[var(--bo-surface,#ffffff)] p-3 shadow-[0_-2px_12px_rgba(42,38,32,0.06)]">
+        <div className="sticky bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))] z-20 mt-4 rounded-xl border border-foreground/[0.1] bg-[var(--bo-surface,#ffffff)] p-3 shadow-[0_-2px_12px_rgba(42,38,32,0.06)] lg:bottom-0">
           <div className="flex flex-wrap items-center gap-3">
             {/* `role="status"` porque o número muda com o teclado e com o
                 Shift+clique, e quem não vê o ecrã tem de ouvir quantas leva —

@@ -292,3 +292,42 @@ describe("rever etiquetas", () => {
     expect(await screen.findByText(/está tudo etiquetado/)).toBeInTheDocument();
   });
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ESCOLHEM-SE AS FOTOS E NÃO SE ETIQUETA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Do registo do audit, e é um dos oito bloqueios: «a barra que aplica etiquetas
+ * fica por trás da barra de destinos do telemóvel».
+ *
+ * `bottom-0` cola ao fundo do que ROLA, que é a janela; a navegação do back
+ * office é `fixed bottom-0` no plano seguinte, com 72 px mais a área segura. O
+ * `padding` que o `AdminClient` põe no conteúdo não salva nada — um elemento
+ * `sticky` posiciona-se contra o scrollport e não contra o padding do pai.
+ *
+ * A 390 px o conteúdo desta barra quebra em quatro filas, e as duas tapadas
+ * eram precisamente os dois `select`: a única forma de etiquetar.
+ *
+ * O jsdom não faz layout. O que se prende é a DECISÃO — a distância ao fundo é
+ * a altura da navegação, e sai do token que já existe.
+ */
+describe("a barra de etiquetas, no telemóvel", () => {
+  it("pousa ACIMA da navegação de baixo, e não por trás dela", async () => {
+    abrir();
+    await waitFor(() => expect(fotos()).toHaveLength(3));
+    fireEvent.click(fotos()[0]);
+    await waitFor(() => expect(contador()?.textContent).toBe("1 foto escolhida"));
+
+    // A barra é o cartão que contém o contador da selecção.
+    const barraDeAccoes = contador()!.closest("div.sticky")!;
+    expect(barraDeAccoes.className).toContain(
+      "bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom))]",
+    );
+    // Acima de 1024 a navegação é lateral e não há nada por baixo.
+    expect(barraDeAccoes.className).toContain("lg:bottom-0");
+    // E a folga NÃO é um número escrito à mão: era a quarta cópia do «56px»
+    // quando a barra passou a 72, e foi assim que ela ficou a tapar isto.
+    expect(barraDeAccoes.className).not.toMatch(/bottom-\[\d+px\]/);
+  });
+});

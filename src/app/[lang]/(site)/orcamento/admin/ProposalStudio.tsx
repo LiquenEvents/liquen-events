@@ -7189,8 +7189,30 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     const semPreco = l.preco === null;
                     return (
                       <div key={i} className="flex flex-wrap items-center gap-2">
+                        {/* ── O NOME DA LINHA NÃO ENCOLHE ABAIXO DE 12 REM ────
+                            Do registo do audit, e é um dos oito bloqueios: «a
+                            caixa do nome da linha do orçamento tem 62 px — 27
+                            com a proposta bilingue ligada».
+
+                            MEDIDO a 390 px: a fila tem 318 px dentro do cartão,
+                            e as colunas fixas (a escala `w-32`, o preço `w-28`)
+                            mais os espaços comem 264. Sobram 54 para os campos
+                            de texto — e como eles são `flex-1` com `min-w-0`
+                            escrito à mão, não quebram: ENCOLHEM. Escrever
+                            «Decoração da Cerimónia» numa caixa de 62 px é
+                            escrever às cegas, e o que ali se escreve é o texto
+                            que o casal lê no PDF.
+
+                            O `min-w` é o remédio da própria casa — é o que a
+                            fase do cronograma faz cento e trinta linhas acima,
+                            e o que o `ServicesEditor` faz nos títulos de grupo.
+                            Com um mínimo, o `flex-wrap` que já cá estava passa a
+                            fazer o que existe para fazer: o nome fica sozinho
+                            numa fila inteira e a escala, o preço e o «Extra»
+                            descem para a de baixo. Acima de 520 px nada muda —
+                            aí já cabia. */}
                         <input
-                          className={`${INPUT_SM} flex-1`}
+                          className={`${INPUT_SM} min-w-[12rem] flex-1`}
                           value={l.item}
                           onChange={(e) => updateBudgetItem(i, e.target.value)}
                           // A pega do salto. Faltava: o «Ver no campo» das
@@ -7201,8 +7223,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           placeholder="Decor Cerimónia"
                           aria-label="Item de orçamento"
                         />
+                        {/* A inglesa com o mesmo mínimo: com o bilingue ligado
+                            eram os dois a repartir os mesmos 54 px, 27 para
+                            cada. */}
                         {caixaDeIngles({ tipo: "linhaDeOrcamento", i }, "Item de orçamento", {
-                          className: `${INPUT_SM} flex-1`,
+                          className: `${INPUT_SM} min-w-[12rem] flex-1`,
                           placeholder: "Ceremony Decor",
                         })}
                         {/* COMO É QUE ESTA LINHA ESCALA. Metade das linhas de um
@@ -7695,7 +7720,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             ) : (
               <>
                 <div className="flex flex-col gap-2 mb-3">
-                  <div className="grid grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25">
+                  {/* Os cabeçalhos só a partir de `sm`: no telemóvel a linha
+                      passa a duas filas, e três títulos por cima de duas filas
+                      nomeiam colunas que ali não existem. */}
+                  <div className="hidden grid-cols-[minmax(0,1fr)_10rem_auto] gap-2 text-[9px] tracking-[0.2em] uppercase text-foreground/25 sm:grid">
                     <span>Item</span>
                     <span className="text-right">Valor</span>
                     <span className="w-5" />
@@ -7703,10 +7731,24 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   {(doc.budgetRows ?? []).map((r, i) => (
                     <div
                       key={i}
-                      className="grid grid-cols-[minmax(0,1fr)_10rem_auto] items-center gap-2"
+                      /* ── A DESCRIÇÃO SOZINHA EM CIMA, NO TELEMÓVEL ──────────
+                         Do registo do audit: «a descrição da linha fica com 122
+                         px numa grelha que não tem variante de telemóvel».
+
+                         MEDIDO a 390 px: as duas colunas fixas (160 do valor,
+                         ~20 do botão) mais os espaços comem 196 dos 318 px da
+                         fila. É o irmão mais sortudo do nome da linha do
+                         orçamento de Decoração — dá para ler três palavras em
+                         vez de uma — mas é a mesma omissão no mesmo ecrã.
+
+                         O desenho é o que as linhas adicionais aqui em cima já
+                         fazem: a descrição a ocupar a fila toda, e o valor mais
+                         o botão de apagar por baixo. Acima de `sm` fica
+                         exactamente como estava. */
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_auto]"
                     >
                       <input
-                        className="bo-input px-2.5 py-2 text-xs text-foreground/75"
+                        className="bo-input col-span-2 px-2.5 py-2 text-xs text-foreground/75 sm:col-span-1"
                         value={r.item}
                         onChange={(e) => updateBudgetRow(i, { item: e.target.value })}
                         placeholder="Coordenação do dia"
