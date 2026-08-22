@@ -8,6 +8,7 @@ import { useToast } from "./Toast";
 import { Button, EmptyState, Field } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
  * LISTAS BASE — as receitas do que costuma ir em cada montagem.
@@ -85,126 +86,156 @@ export default function MaterialListas() {
 
   async function semear() {
     setOcupado(true);
-    try {
-      const res = await fetch("/api/material/listas", {
+    const { ok, corpo } = await gravar(
+      "criar os «Essenciais de carrinha»",
+      "/api/material/listas",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ semear: true }),
-      });
-      const r = await res.json();
-      if (!res.ok) throw new Error(r?.error);
-      toast(
-        r.criados > 0
-          ? `Lista criada, com ${r.criados} itens novos no catálogo.`
-          : "Lista criada a partir do catálogo que já tinha.",
-        "success",
-      );
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
+      },
+    );
+    setOcupado(false);
+    if (!ok) return;
+    const criados = Number((corpo as { criados?: unknown } | null)?.criados) || 0;
+    toast(
+      criados > 0
+        ? `Lista criada, com ${criados} itens novos no catálogo.`
+        : "Lista criada a partir do catálogo que já tinha.",
+      "success",
+    );
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
+  }
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Este ficheiro tinha SETE cópias do mesmo `try { fetch } catch { toast("Não
+   * foi possível …") }`, e as sete diziam a mesma coisa a seis situações
+   * diferentes — a rede em baixo, a sessão expirada, a lista apagada por
+   * outra pessoa, o nome repetido, o servidor em baixo. Quem lia carregava
+   * outra vez, e em metade dos casos isso não podia funcionar.
+   *
+   * Agora há um sítio só, e a frase vem do `porque-falhou`, que nomeia a coisa
+   * e acaba sempre numa instrução.
+   *
+   * Devolve o corpo porque há chamadas que precisam dele («Lista criada, com 4
+   * itens novos no catálogo») — e devolve `ok` em vez de atirar, porque quem
+   * chama tem de poder REPOR o ecrã quando falhou. É essa a segunda metade da
+   * correcção: ver `alterarLinha`.
+   */
+  async function gravar(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
     } catch {
-      toast("Não foi possível criar os essenciais.", "error");
-    } finally {
-      setOcupado(false);
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return { ok: false, corpo: null };
     }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return { ok: false, corpo };
+    }
+    return { ok: true, corpo };
   }
 
   async function criar() {
     const nome = novoNome.trim();
     if (!nome) return;
     setOcupado(true);
-    try {
-      const res = await fetch("/api/material/listas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: nome }),
-      });
-      if (!res.ok) throw new Error();
-      setNovoNome("");
-      toast("Lista criada.", "success");
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    } catch {
-      toast("Não foi possível criar a lista.", "error");
-    } finally {
-      setOcupado(false);
-    }
+    const { ok } = await gravar(`criar a lista «${nome}»`, "/api/material/listas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: nome }),
+    });
+    setOcupado(false);
+    if (!ok) return;
+    setNovoNome("");
+    toast("Lista criada.", "success");
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
   async function duplicar(lista: MaterialList) {
     setOcupado(true);
-    try {
-      const res = await fetch("/api/material/listas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ duplicarDe: lista.id, name: `${lista.name} (cópia)` }),
-      });
-      if (!res.ok) throw new Error();
-      toast("Lista duplicada.", "success");
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    } catch {
-      toast("Não foi possível duplicar.", "error");
-    } finally {
-      setOcupado(false);
-    }
+    const { ok } = await gravar(`duplicar a lista «${lista.name}»`, "/api/material/listas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ duplicarDe: lista.id, name: `${lista.name} (cópia)` }),
+    });
+    setOcupado(false);
+    if (!ok) return;
+    toast("Lista duplicada.", "success");
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
   async function apagar(lista: MaterialList) {
     setOcupado(true);
-    try {
-      const res = await fetch(`/api/material/listas/${lista.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      toast("Lista apagada.", "success");
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    } catch {
-      toast("Não foi possível apagar.", "error");
-    } finally {
-      setOcupado(false);
-    }
+    const { ok } = await gravar(
+      `apagar a lista «${lista.name}»`,
+      `/api/material/listas/${lista.id}`,
+      { method: "DELETE" },
+    );
+    setOcupado(false);
+    if (!ok) return;
+    toast("Lista apagada.", "success");
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
   async function acrescentarLinha(listId: string) {
     if (!aAcrescentar) return;
+    const nome = porId.get(aAcrescentar)?.name ?? "o item";
     setOcupado(true);
-    try {
-      const res = await fetch(`/api/material/listas/${listId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ linha: { itemId: aAcrescentar, qty: 1 } }),
-      });
-      if (!res.ok) throw new Error();
-      setAAcrescentar("");
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    } catch {
-      toast("Não foi possível acrescentar.", "error");
-    } finally {
-      setOcupado(false);
-    }
+    const { ok } = await gravar(`acrescentar «${nome}»`, `/api/material/listas/${listId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ linha: { itemId: aAcrescentar, qty: 1 } }),
+    });
+    setOcupado(false);
+    if (!ok) return;
+    setAAcrescentar("");
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
-  async function alterarLinha(listId: string, linhaId: string, patch: Record<string, unknown>) {
-    try {
-      const res = await fetch(`/api/material/listas/${listId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ linhaId, patch }),
-      });
-      if (!res.ok) throw new Error();
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    } catch {
-      toast("Não foi possível guardar.", "error");
-    }
+  /**
+   * DEVOLVE SE PASSOU, e é isso que corrige o defeito.
+   *
+   * A caixa da quantidade é não-controlada (`defaultValue`), e ninguém a
+   * repunha quando a gravação era recusada: o ecrã ficava a dizer 12 e a base
+   * de dados 8, sem nada a assinalar a diferença. E o pior é o que vem a
+   * seguir — a checklist do evento é COPIADA da lista base, e quem carrega a
+   * carrinha lê o número errado sem ter como o pôr em causa.
+   */
+  async function alterarLinha(
+    oQue: string,
+    listId: string,
+    linhaId: string,
+    patch: Record<string, unknown>,
+  ): Promise<boolean> {
+    const { ok } = await gravar(oQue, `/api/material/listas/${listId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ linhaId, patch }),
+    });
+    if (!ok) return false;
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
+    return true;
   }
 
-  async function removerLinha(listId: string, linhaId: string) {
-    try {
-      const res = await fetch(`/api/material/listas/${listId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ remover: linhaId }),
-      });
-      if (!res.ok) throw new Error();
-      if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    } catch {
-      toast("Não foi possível remover.", "error");
-    }
+  async function removerLinha(oQue: string, listId: string, linhaId: string) {
+    const { ok } = await gravar(oQue, `/api/material/listas/${listId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ remover: linhaId }),
+    });
+    if (!ok) return;
+    if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
   // A falha primeiro: sem isto, uma leitura que rebentou passava por "ainda
@@ -361,9 +392,33 @@ export default function MaterialListas() {
                                     e.target.value = String(l.qty);
                                     return;
                                   }
-                                  if (v !== l.qty) {
-                                    void alterarLinha(lista.id, l.id, { qty: v });
-                                  }
+                                  if (v === l.qty) return;
+                                  /**
+                                   * ── E A GRAVAÇÃO RECUSADA TINHA O MESMO
+                                   *    DEFEITO, PELO OUTRO LADO ────────────
+                                   *
+                                   * A guarda acima repunha a caixa quando o
+                                   * TEXTO era inválido. Não repunha nada
+                                   * quando o texto era válido e o SERVIDOR
+                                   * recusava: a caixa ficava com 12, a base de
+                                   * dados com 8, e o único sinal era um toast
+                                   * a dizer «Não foi possível guardar.» — que
+                                   * desaparece sozinho.
+                                   *
+                                   * E o número errado não fica só aqui: a
+                                   * checklist de cada evento é COPIADA desta
+                                   * lista, e quem carrega a carrinha lê o
+                                   * número sem ter como o pôr em causa.
+                                   */
+                                  const caixa = e.target;
+                                  void alterarLinha(
+                                    `guardar a quantidade de «${item?.name ?? "item"}»`,
+                                    lista.id,
+                                    l.id,
+                                    { qty: v },
+                                  ).then((passou) => {
+                                    if (!passou) caixa.value = String(l.qty);
+                                  });
                                 }}
                               />
                               <span className="bo-text-muted text-xs">{item?.unit ?? ""}</span>
@@ -385,9 +440,14 @@ export default function MaterialListas() {
                                   type="checkbox"
                                   checked={l.critical}
                                   onChange={(e) =>
-                                    void alterarLinha(lista.id, l.id, {
-                                      critical: e.target.checked,
-                                    })
+                                    void alterarLinha(
+                                      `${e.target.checked ? "marcar" : "desmarcar"} «${
+                                        item?.name ?? "item"
+                                      }» como crítico`,
+                                      lista.id,
+                                      l.id,
+                                      { critical: e.target.checked },
+                                    )
                                   }
                                 />
                                 crítico
@@ -395,7 +455,13 @@ export default function MaterialListas() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => removerLinha(lista.id, l.id)}
+                                onClick={() =>
+                                  removerLinha(
+                                    `remover «${item?.name ?? "item"}» da lista`,
+                                    lista.id,
+                                    l.id,
+                                  )
+                                }
                               >
                                 Remover
                               </Button>
