@@ -598,6 +598,22 @@ export default function Temas() {
   }, [themes]);
   const [verArquivados, setVerArquivados] = useState(false);
   /**
+   * ── EM QUANTAS PROPOSTAS É QUE CADA TEMA JÁ SAIU ───────────────────────
+   *
+   * O cartão dizia quantas FOTOS tem e quando foi mexido. Nenhuma das duas
+   * responde à pergunta que se faz a olhar para 25 temas: qual é que eu uso
+   * mesmo? Um tema com 80 fotos que nunca saiu de casa e um com 12 que foi a
+   * metade dos casamentos do ano parecem iguais na grelha, e são o oposto um
+   * do outro.
+   *
+   * Chega DEPOIS dos cartões, num pedido próprio: a contagem lê os documentos
+   * das propostas todos, e a rota da lista é a que desenha o primeiro ecrã da
+   * Biblioteca — a Fase 1 foi passada a tirar-lhe trabalho de cima. Ver
+   * `temas-uso.ts`. Enquanto não chega (ou se nunca chegar) o cartão fica
+   * exactamente como estava.
+   */
+  const [usos, setUsos] = useState<Record<string, number> | null>(null);
+  /**
    * ── O TEMA QUE ESTÁ A SER JUNTO A OUTRO ────────────────────────────────
    *
    * Palavras dela: «"Clássico Intemporal" aparece duas vezes com nomes quase
@@ -789,6 +805,26 @@ export default function Temas() {
    * que é o que se cita a pedir ajuda.
    */
   const [blocked, setBlocked] = useState<{ titulo: string; texto: string } | null>(null);
+
+  // Um pedido só, à entrada. Não acompanha o que ela faz na Biblioteca de
+  // propósito: o que muda este número é gravar uma PROPOSTA, e isso acontece
+  // noutro ecrã.
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/temas/uso", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (vivo && data?.usos) setUsos(data.usos as Record<string, number>);
+      } catch {
+        /* fica sem número, que é como estava antes de isto existir */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -1442,6 +1478,18 @@ export default function Temas() {
                       ? ` · ${desdeQuando(t.updatedAt)}`
                       : ""}
                   </p>
+                  {/* «Usado em 7 propostas» — ou «Ainda não saiu numa
+                      proposta», que é a metade mais útil da informação: é o que
+                      distingue um tema que a biblioteca tem de um tema que o
+                      estúdio usa. Só aparece quando a contagem chegou; sem ela
+                      o cartão fica como estava. Ver `usos`. */}
+                  {usos && (
+                    <p className="bo-text-muted mt-0.5 truncate text-xs">
+                      {usos[t.id]
+                        ? `Usado em ${plural(usos[t.id], "proposta", "propostas")}`
+                        : "Ainda não saiu numa proposta"}
+                    </p>
+                  )}
                   {/* AINDA A MEIO, e não «mau». Um mood board enche-se com 6 a
                       8 fotografias: um tema com menos de três não dá para
                       ESCOLHER, dá para usar o que lá está. Dito em texto

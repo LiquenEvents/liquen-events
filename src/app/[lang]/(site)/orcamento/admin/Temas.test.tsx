@@ -909,6 +909,52 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
   });
 });
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «USADO EM 7 PROPOSTAS»
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * A contagem está presa em `temas-uso.test.ts`. Aqui prende-se o que o ecrã
+ * promete: que o número chega DEPOIS dos cartões (e por isso não os atrasa) e
+ * que a sua ausência não estraga nada.
+ */
+describe("Biblioteca de Temas — em quantas propostas saiu", () => {
+  it("o número entra depois, e diz quando um tema nunca saiu", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Terracotta", imageCount: 9 },
+        { ...THEME, id: "t2", name: "Boho", imageCount: 9 },
+      ]),
+    );
+    route("GET /api/temas/uso", () => ok({ ok: true, usos: { t1: 7 } }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+    expect(screen.getByText("Usado em 7 propostas")).toBeTruthy();
+    expect(screen.getByText("Ainda não saiu numa proposta")).toBeTruthy();
+  });
+
+  it("uma proposta só não se diz no plural", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", imageCount: 9 }]));
+    route("GET /api/temas/uso", () => ok({ ok: true, usos: { t1: 1 } }));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+    expect(screen.getByText("Usado em 1 proposta")).toBeTruthy();
+  });
+
+  /** É um número decorativo: sem ele o cartão fica exactamente como estava. */
+  it("sem resposta, o cartão não fica a dizer nada de errado", async () => {
+    route("GET /api/temas", () => ok([{ ...THEME, id: "t1", imageCount: 9 }]));
+    route("GET /api/temas/uso", () => bad(500));
+    renderTemas();
+    await acharCartaoDoTema(/Terracotta/);
+    await act(async () => {});
+    expect(screen.queryByText(/Usado em/)).toBeNull();
+    expect(screen.queryByText(/Ainda não saiu/)).toBeNull();
+  });
+});
+
 describe("Biblioteca de Temas — as fotos aparecem enquanto sobem", () => {
   it("a foto entra na grelha ANTES de o servidor responder, vinda do ficheiro dela", async () => {
     route("GET /api/temas", () => ok([THEME]));
