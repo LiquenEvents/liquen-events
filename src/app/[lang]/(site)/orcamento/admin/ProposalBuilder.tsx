@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { quandoGravado } from "@/lib/quando-gravado";
 import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import { parseMoney } from "./util";
 import type { Quote, ProposalLineItem } from "@/lib/orcamento/types";
@@ -132,7 +133,8 @@ async function enviarRascunhoParaServidor(
 
 /** A hora tal como o indicador do estúdio a escreve — «14:32», e nada mais. */
 function horaCurta(quando: Date | null): string {
-  return quando ? quando.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }) : "";
+  // Ver `quando-gravado`: hoje é só a hora, ontem e mais atrás levam o dia.
+  return quandoGravado(quando);
 }
 
 /** Um rascunho vindo do servidor (ou do navegador) tem de ser lido com

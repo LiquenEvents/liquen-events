@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { gravadoEmPorExtenso } from "@/lib/quando-gravado";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
 
 /**
@@ -106,16 +107,18 @@ export function textoDaGravacao(
   if (estado === "a-guardar") {
     return { curto: "…", longo: "a guardar…", leitor: "a guardar" };
   }
-  const horas = gravadoEm
-    ? gravadoEm.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })
-    : "";
+  // Hoje só a hora; ontem e mais atrás, com o dia. Ver `quando-gravado`: a
+  // barra reaberta no dia seguinte dizia «guardado às 14:32» e parecia acabada
+  // de gravar — e nas variantes de alarme, que dizem quanto trabalho está em
+  // risco, a data importa ainda mais.
+  const quando = gravadoEmPorExtenso(gravadoEm);
   if (estado === "nao-chegou-ao-servidor") {
     if (opcoes.copiaLocal) {
       // A hora entra na frase porque a pergunta seguinte dela é sempre «desde
       // quando?» — é o que lhe diz quanto trabalho está em risco.
       return {
         curto: "⚠ guardado só neste computador",
-        longo: horas ? `guardado só neste computador às ${horas}` : "guardado só neste computador",
+        longo: quando ? `guardado só neste computador ${quando}` : "guardado só neste computador",
         leitor: "atenção: está guardado só neste computador e não chegou ao servidor",
       };
     }
@@ -126,7 +129,13 @@ export function textoDaGravacao(
         "atenção: as alterações não chegaram ao servidor e não estão guardadas em lado nenhum",
     };
   }
-  return { curto: "✓", longo: `guardado às ${horas}`, leitor: "guardado no servidor" };
+  return {
+    curto: "✓",
+    // Sem hora nenhuma diz-se só «guardado»: «guardado às » era o que saía de
+    // interpolar uma cadeia vazia atrás da preposição.
+    longo: quando ? `guardado ${quando}` : "guardado",
+    leitor: "guardado no servidor",
+  };
 }
 
 /** O que UMA tentativa de envio devolve. A repetição é desta casa, não de quem

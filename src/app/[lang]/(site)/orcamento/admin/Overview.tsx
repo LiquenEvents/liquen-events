@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useEffect, useRef, memo } from "react";
+import { quandoGravado } from "@/lib/quando-gravado";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import Reminders from "./Reminders";
@@ -205,12 +206,9 @@ type Estado =
 
 type Conflito = Extract<Estado, { tipo: "conflito" }>;
 
-function horaCurta(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? ""
-    : d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
-}
+/** Hoje só a hora; ontem e mais atrás, com o dia. Ver `quando-gravado` —
+ *  a meta e as notas guardadas ontem diziam «14:32» e pareciam de agora. */
+const horaCurta = (iso: string): string => quandoGravado(iso);
 
 function motivo(err: unknown): string {
   // Um `fetch` que nem chega ao servidor rejeita com TypeError e uma mensagem

@@ -10,6 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { quandoGravado } from "@/lib/quando-gravado";
 import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import { useToast } from "./Toast";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -787,9 +788,7 @@ export function textoDaGravacao(
   if (estado === "a-guardar") {
     return { curto: "…", longo: "a guardar…", leitor: "a guardar" };
   }
-  const horas = gravadoEm
-    ? gravadoEm.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })
-    : "";
+  const horas = gravadoEm ? quandoGravado(gravadoEm) : "";
   if (estado === "so-neste-computador") {
     // A hora entra na frase porque a pergunta seguinte dela é sempre «desde
     // quando?» — é o que lhe diz quanto trabalho está em risco.
