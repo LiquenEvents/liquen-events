@@ -5,6 +5,7 @@ import type { ThemeImage, ThemeSummary } from "@/lib/theme-types";
 import PhotoLightbox from "./PhotoLightbox";
 import ThemeCopyDialog, { type ThemeCopyOutcome } from "./ThemeCopyDialog";
 import FundirTemas, { type ThemeMergeOutcome } from "./FundirTemas";
+import { avisoDeTemaParecido, temasParecidos } from "@/lib/temas-parecidos";
 import { downloadMany, downloadName, downloadOne } from "./photo-download";
 import {
   CHECK_CHUNK,
@@ -1001,6 +1002,16 @@ export default function Temas() {
    *  uma funcionalidade que ninguém ainda usou. */
   const arquivados = useMemo(() => themes.filter((t) => t.arquivado).length, [themes]);
 
+  /**
+   * ── OS PARES QUE ELA NÃO TEM DE ENCONTRAR A OLHO ───────────────────────
+   *
+   * Sobre a lista TODA e não sobre a filtrada: um par onde só uma das metades
+   * corresponde à procura continua a ser um par, e escondê-lo por causa do
+   * filtro era transformar o aviso numa coisa que aparece e desaparece
+   * consoante o que está escrito no campo. Ver `temas-parecidos.ts`.
+   */
+  const parecidos = useMemo(() => temasParecidos(themes), [themes]);
+
   const visible = useMemo(() => {
     const needle = normalizedThemeName(deferredSearch);
     // O arquivo é uma VISTA, não um filtro que se soma: ou se está a ver o que
@@ -1446,6 +1457,31 @@ export default function Temas() {
                   ) : null}
                 </div>
               </button>
+              {/* ── «ISTO JÁ EXISTE COM OUTRO NOME» ───────────────────────
+                  Palavras dela: «"Clássico Intemporal" aparece duas vezes com
+                  nomes quase iguais».
+
+                  IRMÃO do cartão e não filho, pela mesma razão que as acções:
+                  um botão dentro de outro botão é HTML inválido, e o resultado
+                  prático seria carregar aqui abrir o tema. Por baixo e não por
+                  cima da capa — é uma nota de arrumação, não um alarme, e não
+                  pode tapar a fotografia que faz o tema reconhecível.
+
+                  Cita o outro nome: «este tema está repetido» obrigava a
+                  procurar qual. E é um botão porque a saída existe agora — abre
+                  o «Juntar a outro tema…» já com este de origem. */}
+              {avisoDeTemaParecido(parecidos.get(t.id)) && (
+                <button
+                  type="button"
+                  onClick={() => setAFundir(t)}
+                  className="alvo-toque mt-1 flex w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs text-[#8a6d3b] hover:bg-[#8a6d3b]/[0.07]"
+                >
+                  <span className="truncate">{avisoDeTemaParecido(parecidos.get(t.id))}</span>
+                  <span className="shrink-0 underline decoration-dotted underline-offset-2">
+                    Juntar
+                  </span>
+                </button>
+              )}
             </div>
           ))}
         </div>

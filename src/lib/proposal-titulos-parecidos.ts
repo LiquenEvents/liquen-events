@@ -43,53 +43,16 @@ import { boardsQueSaem } from "./proposal-paginas";
  */
 
 /**
- * As palavras que não distinguem um título de outro.
+ * O que sobra de um nome depois de tirar o que não o distingue.
  *
- * Artigos, preposições e as suas contracções — o que uma pessoa salta ao ler um
- * índice. Deliberadamente curta: cada palavra a mais nesta lista é um par de
- * títulos que se passa a acusar sem razão.
+ * Vive em `essencia-do-nome.ts` porque tem DOIS clientes que não se conhecem:
+ * os títulos das páginas de inspiração (aqui) e os nomes dos temas da
+ * biblioteca (`temas-parecidos.ts`). É a mesma pergunta — «isto lê-se como
+ * aquilo?» — e duas cópias eram duas oportunidades de só uma delas ganhar a
+ * palavra vazia que faltava.
  */
-const VAZIAS = new Set([
-  "a",
-  "as",
-  "o",
-  "os",
-  "de",
-  "do",
-  "dos",
-  "da",
-  "das",
-  "e",
-  "em",
-  "no",
-  "nos",
-  "na",
-  "nas",
-  "para",
-  "com",
-  "the",
-  "of",
-  "and",
-]);
-
-/** O que sobra de um título depois de tirar o que não o distingue. */
-export function essenciaDoTitulo(titulo: string): string {
-  const palavras = titulo
-    .normalize("NFD")
-    // Os acentos saem: «Cerimónia» e «Cerimonia» são o mesmo nome escrito com
-    // e sem o dedo no acento.
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    // A pontuação vira espaço, e não nada: «Mesas—1» tem de virar «mesas 1» e
-    // não «mesas1», senão os números colavam-se às palavras.
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .split(/\s+/)
-    .filter((p) => p && !VAZIAS.has(p));
-  // ORDENADAS: «Noivos Complementos» e «Complementos Noivos» são o mesmo nome
-  // dito ao contrário, e no índice lêem-se como um só.
-  return [...new Set(palavras)].sort().join(" ");
-}
+export { essenciaDoNome as essenciaDoTitulo } from "./essencia-do-nome";
+import { essenciaDoNome as essenciaDoTitulo } from "./essencia-do-nome";
 
 export interface TitulosParecidos {
   /** Os índices REAIS no `doc.moodBoards`, pela ordem em que as páginas saem. */

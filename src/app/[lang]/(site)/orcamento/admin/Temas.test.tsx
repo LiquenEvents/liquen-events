@@ -779,7 +779,7 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
     route("GET /api/temas", () =>
       ok([
         { ...THEME, id: "t1", name: "Clássico Intemporal", imageCount: 3 },
-        { ...THEME, id: "t2", name: "Intemporal Clássico", imageCount: 12 },
+        { ...THEME, id: "t2", name: "Zen", imageCount: 12 },
       ]),
     );
 
@@ -802,6 +802,43 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
     ).toBeGreaterThan(0);
   });
 
+  /**
+   * ── O PAR APONTADO, EM VEZ DE PROCURADO ────────────────────────────────
+   *
+   * Sem isto, juntar duplicados exigia dar por eles: dois cartões com o mesmo
+   * nome escrito de duas maneiras, numa grelha de 25. O critério está preso em
+   * `temas-parecidos.test.ts`; aqui prende-se que ele CHEGA ao cartão e que
+   * leva a algum lado.
+   */
+  it("aponta o par e abre a fusão a partir dele", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Branco e Verde", imageCount: 3 },
+        { ...THEME, id: "t2", name: "Verde & Branco", imageCount: 12 },
+      ]),
+    );
+    renderTemas();
+    // Pelo próprio aviso e não pelo cartão: o nome «Branco e Verde» passa a
+    // identificar dois botões — o cartão dele e o aviso do OUTRO cartão, que o
+    // cita. É o preço de o aviso dizer qual é o par, e vale a pena.
+    const aviso = await screen.findByText("Lê-se como “Verde & Branco”");
+    fireEvent.click(aviso);
+    // E abre já com este tema como origem.
+    expect(await screen.findByText(/Juntar “Branco e Verde” a/)).toBeTruthy();
+  });
+
+  it("um tema sem par não diz nada", async () => {
+    route("GET /api/temas", () =>
+      ok([
+        { ...THEME, id: "t1", name: "Branco", imageCount: 3 },
+        { ...THEME, id: "t2", name: "Branco & Verde", imageCount: 12 },
+      ]),
+    );
+    renderTemas();
+    await acharCartaoDoTema(/Branco & Verde/);
+    expect(screen.queryByText(/Lê-se como/)).toBeNull();
+  });
+
   it("a origem sai da lista e o destino soma as fotos", async () => {
     dois();
     renderTemas();
@@ -821,7 +858,7 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
         archived: true,
       }),
     );
-    fireEvent.click(await screen.findByRole("radio", { name: /Intemporal Clássico/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /Zen/ }));
     fireEvent.click(screen.getByRole("button", { name: "Juntar os temas" }));
     // Sem `tick`: este bloco corre com o relógio a sério (os relógios falsos
     // são de outros `describe`), e o que se espera é só que as promessas do
@@ -859,7 +896,7 @@ describe("Biblioteca de Temas — juntar temas duplicados", () => {
         archived: false,
       }),
     );
-    fireEvent.click(await screen.findByRole("radio", { name: /Intemporal Clássico/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /Zen/ }));
     fireEvent.click(screen.getByRole("button", { name: "Juntar os temas" }));
     // Sem `tick`: este bloco corre com o relógio a sério (os relógios falsos
     // são de outros `describe`), e o que se espera é só que as promessas do
