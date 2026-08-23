@@ -5,6 +5,8 @@ import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { downloadCsv, dateStamp } from "./export";
 import { Button, Card, EmptyState, Segmented, Toolbar } from "./ui";
+import { AvisoDeFalha } from "./AvisoDeFalha";
+import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import { eur0 as eur } from "@/lib/money";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
 import { metaFor } from "./status-meta";
@@ -83,9 +85,26 @@ interface Client {
 interface Props {
   quotes: Quote[];
   onOpen: (q: Quote) => void;
+  /**
+   * ── «SEM CLIENTES AINDA» É UMA AFIRMAÇÃO, E ESTE ECRÃ NÃO A SABE FAZER ──
+   *
+   * Os clientes não são lidos aqui: formam-se a partir dos `quotes` que vêm
+   * de cima, e esses vêm do desenho do servidor (`getQuotes` em page.tsx),
+   * que engole a falha e devolve uma lista vazia. Vista daqui, uma leitura
+   * que rebentou é indistinguível de uma agenda em branco — e o vazio diz,
+   * com toda a confiança, que ela ainda não tem clientes nenhuns, quando o
+   * que se passou foi a base de dados não ter respondido.
+   *
+   * A distinção só pode vir de quem fez a leitura. Quando vier, é este vazio
+   * que sai da frente e dá lugar à razão e a uma saída; sem ela, o ecrã
+   * comporta-se exactamente como antes.
+   */
+  falhaDeLeitura?: LeituraFalhada | null;
+  /** Volta a pedir a lista de pedidos, quando quem lê sabe repeti-la. */
+  aoTentarDeNovo?: () => void;
 }
 
-export default function Clientes({ quotes, onOpen }: Props) {
+export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNovo }: Props) {
   const [search, setSearch] = useState("");
   // Defer the search term so the O(n) aggregate-and-filter over the full lead
   // history (and the row reconcile) runs off the keystroke: the input stays
@@ -553,38 +572,50 @@ export default function Clientes({ quotes, onOpen }: Props) {
             </Card>
           );
         })}
-        {clients.length === 0 && (
-          <Card padding="none">
-            <EmptyState
-              icon={
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  aria-hidden="true"
-                >
-                  <circle cx="9" cy="8" r="3" />
-                  <path d="M3 20c0-3 2.7-5 6-5s6 2 6 5" />
-                  <path
-                    d="M16 5.5a3 3 0 0 1 0 5.5M21 20c0-2.5-1.8-4.3-4-4.8"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              }
-              title={search.trim() || vipOnly ? "Nenhum cliente encontrado" : "Sem clientes ainda"}
-              description={
-                search.trim()
-                  ? "Tenta procurar por outro nome, email ou empresa."
-                  : vipOnly
-                    ? "Ainda não há clientes VIP."
-                    : "Os clientes formam-se automaticamente a partir dos pedidos recebidos."
-              }
+        {clients.length === 0 &&
+          (falhaDeLeitura ? (
+            /* A leitura não voltou: aqui não se afirma nada sobre os clientes
+               dela — nem que não há nenhum, nem que a procura não encontrou.
+               Diz-se o que se passou e o passo a dar. */
+            <AvisoDeFalha
+              titulo="Não foi possível ler os pedidos"
+              falha={falhaDeLeitura}
+              aoTentarDeNovo={aoTentarDeNovo}
             />
-          </Card>
-        )}
+          ) : (
+            <Card padding="none">
+              <EmptyState
+                icon={
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    aria-hidden="true"
+                  >
+                    <circle cx="9" cy="8" r="3" />
+                    <path d="M3 20c0-3 2.7-5 6-5s6 2 6 5" />
+                    <path
+                      d="M16 5.5a3 3 0 0 1 0 5.5M21 20c0-2.5-1.8-4.3-4-4.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                }
+                title={
+                  search.trim() || vipOnly ? "Nenhum cliente encontrado" : "Sem clientes ainda"
+                }
+                description={
+                  search.trim()
+                    ? "Tenta procurar por outro nome, email ou empresa."
+                    : vipOnly
+                      ? "Ainda não há clientes VIP."
+                      : "Os clientes formam-se automaticamente a partir dos pedidos recebidos."
+                }
+              />
+            </Card>
+          ))}
       </div>
     </div>
   );

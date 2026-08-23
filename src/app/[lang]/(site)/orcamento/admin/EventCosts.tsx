@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseMoney, randomId, eur2 } from "./util";
 import { useToast } from "./Toast";
 import type { Quote, EventSupplier, EventSupplierStatus, Supplier } from "@/lib/orcamento/types";
@@ -8,6 +8,7 @@ import { contractedAmounts, effectiveVatRate } from "@/lib/orcamento/dossier";
 import { round2 } from "@/lib/money";
 import { Button, Field, EmptyState } from "./ui";
 import { metaFor } from "./status-meta";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const STATUS_META: Record<EventSupplierStatus, { label: string; color: string }> = {
   contactado: { label: "Contactado", color: "#8a8a82" },
@@ -34,6 +35,23 @@ interface Props {
 }
 
 /**
+ * Uma gravação que o servidor recusou por os custos terem mudado noutro sítio.
+ *
+ * Guarda-se o GESTO, não a lista que ele produziu: voltar a mandar a lista era
+ * apagar o custo que a outra pessoa acabou de escrever — exactamente o que o
+ * 409 existe para impedir. O gesto volta a aplicar-se POR CIMA da versão
+ * adoptada, e ficam os dois números.
+ */
+interface Colisao {
+  /** O número da gravação que colidiu — é o que põe os gestos por ordem. */
+  n: number;
+  /** O gesto, nomeado: «guardar o custo real de «Flores da Vila»». */
+  oQue: string;
+  /** O mesmo gesto, para o repetir sobre a versão que veio do servidor. */
+  reaplicar: (atuais: EventSupplier[]) => EventSupplier[];
+}
+
+/**
  * Per-event supplier bookings with budgeted vs actual cost. Combined with the
  * event's revenue (quotedPrice) it gives a live margin — the single most useful
  * number for running events profitably. Suppliers can be picked from the
@@ -44,7 +62,13 @@ export default function EventCosts({ quote, onChange }: Props) {
   const { toast } = useToast();
   const [items, setItems] = useState<EventSupplier[]>(quote.eventSuppliers ?? []);
   const [directory, setDirectory] = useState<Supplier[]>([]);
+  /** A leitura do diretório falhou. Ver o `useEffect` mais abaixo: um diretório
+   *  que não se conseguiu ler não é um diretório vazio. */
+  const [diretorioFalhou, setDiretorioFalhou] = useState(false);
   const [adding, setAdding] = useState(false);
+  // A colisão fica no ECRÃ, e não num toast que desaparece: é onde o número
+  // que ela escreveu continua à vista e recuperável com um clique.
+  const [colisoes, setColisoes] = useState<Colisao[]>([]);
   // Buffer de escrita por campo ("id:est" / "id:act") — deixa escrever "1.500,50"
   // livremente e só grava (um PATCH) ao sair do campo, em vez de a cada tecla.
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -55,12 +79,33 @@ export default function EventCosts({ quote, onChange }: Props) {
     supplierId: "" as string | "",
   });
 
-  // Load the supplier directory so bookings can be picked from it.
+  /**
+   * Lê o diretório de fornecedores, para as reservas se poderem escolher lá.
+   *
+   * O `catch(() => {})` que aqui estava engolia a falha inteira: sem diretório,
+   * o seletor «Do diretório de fornecedores» simplesmente NÃO APARECE — e o
+   * formulário fica igual ao de quem ainda não tem fornecedores nenhuns. Quem
+   * o vê escreve o nome à mão, e a reserva nasce solta do diretório (sem
+   * `supplierId`), que é precisamente o que a denormalização do nome existe
+   * para evitar. Uma leitura que não aconteceu não pode passar por «não há
+   * nada»: agora diz-se, no sítio onde o seletor devia estar.
+   */
   useEffect(() => {
-    fetch("/api/fornecedores", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d) => Array.isArray(d) && setDirectory(d))
-      .catch(() => {});
+    let vivo = true;
+    void (async () => {
+      try {
+        const r = await fetch("/api/fornecedores", { cache: "no-store" });
+        const d = r.ok ? await r.json().catch(() => null) : null;
+        if (!vivo) return;
+        if (Array.isArray(d)) setDirectory(d);
+        else setDiretorioFalhou(true);
+      } catch {
+        if (vivo) setDiretorioFalhou(true);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
   }, []);
 
   // Receita e custos comparados na MESMA base (sem IVA): o preço "Preço final
@@ -83,58 +128,177 @@ export default function EventCosts({ quote, onChange }: Props) {
     return { estimated, actual, actualNet, revenueNet, margin, marginPct };
   }, [items, amounts.net, vatRate]);
 
-  function persist(next: EventSupplier[]) {
-    // Otimista com reversão + aviso: custos errados no ecrã sem estarem na base
-    // de dados corrompiam a margem sem ninguém saber.
-    const snapshot = items;
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * A GRAVAÇÃO, E DOIS DEFEITOS QUE ESTAVAM AQUI
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * O primeiro é a frase: todas as escritas deste painel falhavam com «Não foi
+   * possível guardar o custo. Tenta novamente.» — a mesma para a rede em
+   * baixo, a sessão expirada, o pedido apagado por outra pessoa e o servidor
+   * em baixo. Nos dois do meio, repetir não pode funcionar; e nenhuma dizia de
+   * QUE fornecedor falava, num painel que mostra nove linhas.
+   *
+   * O segundo é a reversão. `const snapshot = items` era lido ANTES do pedido,
+   * ou seja um instante que já passou. Aqui grava-se campo a campo, ao sair de
+   * cada caixa: escrever o orçado, saltar para o real e sair põe dois PATCH no
+   * ar, e o segundo leva a lista INTEIRA (já com o primeiro valor dentro). Se o
+   * primeiro falhasse, repunha o instante anterior aos DOIS e apagava do ecrã
+   * um custo que o servidor tinha aceitado — e estes números são a margem, o
+   * número por que ela decide se o evento vale a pena.
+   *
+   * A correcção é a mesma dos outros painéis do dossier: repõe-se para o
+   * último estado que o SERVIDOR confirmou, e só quando não há gravação mais
+   * recente.
+   */
+  const gravacoes = useRef(0);
+  const gravado = useRef<EventSupplier[]>(quote.eventSuppliers ?? []);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * DE ONDE ESTA LISTA DE CUSTOS FOI COPIADA
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * A lista é copiada UMA vez, ao montar, e ao gravar vai INTEIRA — logo a
+   * gravação é «substitui os custos por estes», e não «muda o real deste
+   * fornecedor».
+   *
+   * O CENÁRIO, sem corrida nenhuma e com as duas gravações a responder 200:
+   * ele recebe a factura do catering e escreve o custo real, 4 200 €. Ela tem
+   * o painel aberto desde a manhã e, à tarde, marca a florista como paga — e
+   * manda a lista de manhã, onde o catering ainda tem só o orçado de 3 000 €.
+   * O real do catering desaparece e a margem do evento sobe 1 200 € sozinha.
+   * É por este número que se decide se o evento valeu a pena.
+   *
+   * `base` é a versão de que esta lista partiu. Vai no pedido, o servidor
+   * compara-a com a que tem e recusa com 409 (ver `api/orcamento/[id]`).
+   *
+   * Avança ao ENVIAR e não ao confirmar: escrever o orçado, saltar para o real
+   * e sair põe dois PATCH no ar, e o segundo já leva o primeiro lá dentro —
+   * declarar a versão de antes do primeiro era inventar uma colisão dela
+   * consigo própria a meio de um gesto normal.
+   */
+  const base = useRef<EventSupplier[]>(quote.eventSuppliers ?? []);
+
+  function persist(oQue: string, reaplicar: (atuais: EventSupplier[]) => EventSupplier[]) {
+    const next = reaplicar(items);
+    const minha = ++gravacoes.current;
     setItems(next);
     onChange(next);
-    fetch(`/api/orcamento/${quote.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventSuppliers: next }),
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error();
-      })
-      .catch(() => {
-        setItems(snapshot);
-        onChange(snapshot);
-        toast("Não foi possível guardar o custo. Tenta novamente.", "error");
-      });
+    const baseAnterior = base.current;
+    base.current = next;
+
+    const reporEDizer = (mensagem: string) => {
+      // Já foi substituída por uma gravação mais recente: o que essa levar
+      // contém o que esta levava, portanto não há nada a desfazer nem nada a
+      // dizer. Se ELA também falhar, é ela que repõe — e para o mesmo sítio.
+      if (minha !== gravacoes.current) return;
+      // A base acompanha o que fica no ecrã: declarar uma versão que nunca
+      // chegou a ser gravada dava um 409 inventado na gravação seguinte.
+      base.current = gravado.current;
+      setItems(gravado.current);
+      onChange(gravado.current);
+      toast(mensagem, "error");
+    };
+
+    void (async () => {
+      let res: Response;
+      try {
+        res = await fetch(`/api/orcamento/${quote.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventSuppliers: next, base: { eventSuppliers: baseAnterior } }),
+        });
+      } catch {
+        reporEDizer(porqueRebentou(oQue).mensagem);
+        return;
+      }
+      /**
+       * 409 não é «tenta outra vez»: é «isto mudou noutro sítio», e repetir a
+       * mesma lista era apagar o custo que ele acabou de lançar. Adopta-se o
+       * que o servidor tem — e o gesto dela fica guardado no aviso, para o
+       * poder voltar a aplicar por cima dessa versão sem perder nem um número
+       * nem o outro. Por isso a frase não é a do `porqueFalhou`: aqui não se
+       * manda recarregar nada, a lista já está em dia no ecrã.
+       */
+      if (res.status === 409) {
+        const corpo = (await res.json().catch(() => null)) as {
+          current?: { eventSuppliers?: EventSupplier[] };
+        } | null;
+        const doServidor = corpo?.current?.eventSuppliers ?? gravado.current;
+        gravado.current = doServidor;
+        base.current = doServidor;
+        if (minha === gravacoes.current) {
+          setItems(doServidor);
+          onChange(doServidor);
+        }
+        // Dois gestos podem colidir os dois (dois toques dela enquanto a
+        // outra pessoa gravava). Cada gesto é um DELTA, portanto o mais
+        // recente não contém o anterior: guardam-se todos, por ordem de
+        // envio, e reaplicam-se por essa ordem — senão o primeiro perdia-se
+        // ao chegar o segundo, e as respostas nem sequer vêm por ordem.
+        setColisoes((c) => [...c, { n: minha, oQue, reaplicar }].sort((a, b) => a.n - b.n));
+        return;
+      }
+      if (!res.ok) {
+        const corpo = await res.json().catch(() => null);
+        reporEDizer(porqueFalhou(oQue, res, corpo).mensagem);
+        return;
+      }
+      if (minha === gravacoes.current) gravado.current = next;
+    })();
+  }
+
+  /**
+   * Os gestos que o 409 travou, agora POR CIMA da lista que veio do servidor
+   * — e pela ordem por que ela os fez, que é a única em que dão o mesmo
+   * resultado. Uma gravação só: o que ela quis fica todo dentro dela.
+   */
+  function voltarAAplicar() {
+    if (colisoes.length === 0) return;
+    const gestos = colisoes;
+    setColisoes([]);
+    persist(gestos.map((g) => g.oQue).join(" e "), (atuais) =>
+      gestos.reduce((lista: EventSupplier[], g) => g.reaplicar(lista), atuais),
+    );
   }
 
   function add() {
     const name = form.name.trim();
     if (!name) return;
     const est = parseMoney(form.estimatedCost) ?? 0;
-    persist([
-      ...items,
-      {
-        id: randomId(),
-        supplierId: form.supplierId || undefined,
-        name,
-        category: form.category,
-        estimatedCost: est,
-        status: "contactado",
-      },
-    ]);
+    // A reserva nasce AQUI e não dentro do gesto: reaplicá-la depois de uma
+    // colisão tem de acrescentar a MESMA linha, e não uma segunda com id novo.
+    const reserva: EventSupplier = {
+      id: randomId(),
+      supplierId: form.supplierId || undefined,
+      name,
+      category: form.category,
+      estimatedCost: est,
+      status: "contactado",
+    };
+    persist(`acrescentar «${name}» aos custos do evento`, (atuais) => [...atuais, reserva]);
     setForm({ name: "", category: "Catering", estimatedCost: "", supplierId: "" });
     setAdding(false);
   }
 
-  function update(id: string, patch: Partial<EventSupplier>) {
-    persist(items.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  function update(oQue: string, id: string, patch: Partial<EventSupplier>) {
+    persist(oQue, (atuais) => atuais.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   }
   function remove(id: string) {
-    persist(items.filter((it) => it.id !== id));
+    const it = items.find((x) => x.id === id);
+    persist(`remover «${it?.name ?? "o fornecedor"}» dos custos`, (atuais) =>
+      atuais.filter((x) => x.id !== id),
+    );
   }
 
   // Cycle the booking status with a single tap (contactado → confirmado → pago).
   function cycleStatus(it: EventSupplier) {
     const order: EventSupplierStatus[] = ["contactado", "confirmado", "pago"];
     const next = order[(order.indexOf(it.status) + 1) % order.length];
-    update(it.id, { status: next });
+    update(`marcar «${it.name}» como ${STATUS_META[next].label.toLowerCase()}`, it.id, {
+      status: next,
+    });
   }
 
   // Picking a directory supplier prefills name + category.
@@ -162,6 +326,38 @@ export default function EventCosts({ quote, onChange }: Props) {
           </span>
         )}
       </div>
+
+      {/* ── A COLISÃO FICA À VISTA, E COM SAÍDA ────────────────────────────
+          Um toast desaparece sozinho e leva com ele a única pista do que não
+          ficou guardado — e aqui o que não ficou guardado é um número que ela
+          copiou de uma factura em papel. A lista do servidor já está no ecrã
+          (é a verdade) e este aviso fica em cima a dizer o que é que ela
+          estava a fazer quando ele chegou, com o gesto à distância de um
+          clique. Reaplicar é somar-se ao que ele lançou, não apagá-lo: o gesto
+          corre por cima da versão adoptada. */}
+      {colisoes.length > 0 && (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-[#a03a1a]/25 bg-[#f6e6df]/50 px-4 py-3 text-sm"
+        >
+          <p className="font-medium text-[#a03a1a]">
+            Não deu para {colisoes.map((c) => c.oQue).join(" e ")}: os custos mudaram noutro sítio
+            entretanto.
+          </p>
+          <p className="bo-text-muted mt-1">
+            A lista que está no ecrã é a que ficou guardada. Não se perdeu nada — podes voltar a
+            aplicar o que estavas a fazer por cima dela.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={voltarAAplicar}>
+              Voltar a aplicar
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setColisoes([])}>
+              Ficar com a versão guardada
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Margin summary — the headline number. Receita/Custos/Margem na mesma base
           (sem IVA) para reconciliarem no ecrã; o valor com IVA vai por baixo. */}
@@ -293,7 +489,9 @@ export default function EventCosts({ quote, onChange }: Props) {
                   value={draft[`${it.id}:est`] ?? (it.estimatedCost || "")}
                   onChange={(e) => setDraft((d) => ({ ...d, [`${it.id}:est`]: e.target.value }))}
                   onBlur={(e) => {
-                    update(it.id, { estimatedCost: parseMoney(e.target.value) ?? 0 });
+                    update(`guardar o orçado de «${it.name}»`, it.id, {
+                      estimatedCost: parseMoney(e.target.value) ?? 0,
+                    });
                     setDraft((d) => {
                       const n = { ...d };
                       delete n[`${it.id}:est`];
@@ -311,7 +509,9 @@ export default function EventCosts({ quote, onChange }: Props) {
                   onChange={(e) => setDraft((d) => ({ ...d, [`${it.id}:act`]: e.target.value }))}
                   onBlur={(e) => {
                     const v = e.target.value.trim();
-                    update(it.id, { actualCost: v === "" ? undefined : (parseMoney(v) ?? 0) });
+                    update(`guardar o custo real de «${it.name}»`, it.id, {
+                      actualCost: v === "" ? undefined : (parseMoney(v) ?? 0),
+                    });
                     setDraft((d) => {
                       const n = { ...d };
                       delete n[`${it.id}:act`];
@@ -329,6 +529,15 @@ export default function EventCosts({ quote, onChange }: Props) {
       {/* Add booking */}
       {adding ? (
         <div className="flex flex-col gap-3 rounded-2xl border border-foreground/[0.08] bg-foreground/[0.02] p-4">
+          {diretorioFalhou && (
+            // Sem esta linha, o formulário de quem não conseguiu ler o
+            // diretório é igual ao de quem ainda não tem nenhum fornecedor
+            // guardado — e o nome escrito à mão nasce solto do diretório.
+            <p className="text-[11px] text-[#a03a1a]">
+              Não deu para ler o diretório de fornecedores. Podes escrever o nome à mão, ou
+              atualizar a página para o voltar a tentar.
+            </p>
+          )}
           {directory.length > 0 && (
             <Field
               as="select"

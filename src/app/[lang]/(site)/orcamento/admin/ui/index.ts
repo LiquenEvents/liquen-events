@@ -22,6 +22,9 @@ export { Ajuda } from "./Ajuda";
 export { EmCurso, useDecorrido } from "./EmCurso";
 export type { EmCursoProps } from "./EmCurso";
 
+export { PerguntaDestrutiva } from "./PerguntaDestrutiva";
+export type { PerguntaDestrutivaProps } from "./PerguntaDestrutiva";
+
 export { Field } from "./Field";
 export type { FieldProps } from "./Field";
 

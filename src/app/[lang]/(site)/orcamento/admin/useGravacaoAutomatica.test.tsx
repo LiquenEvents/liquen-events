@@ -440,7 +440,20 @@ describe("useGravacaoAutomatica — o travão de fechar o separador", () => {
 });
 
 describe("textoDaGravacao", () => {
-  const hora = new Date("2026-08-11T13:32:00");
+  /**
+   * HOJE, e não uma data fixa no passado.
+   *
+   * A barra passou a dizer o DIA quando a gravação não é de hoje — era o
+   * defeito que o inventário apanhou: uma proposta reaberta no dia seguinte
+   * dizia «guardado às 14:32» e parecia acabada de gravar. Uma data de agosto
+   * de 2026 escrita à mão deixava de exercer o caso normal (hoje) assim que o
+   * relógio passasse dela. Ver `quando-gravado`, que tem os outros dias.
+   */
+  const hora = (() => {
+    const d = new Date();
+    d.setHours(13, 32, 0, 0);
+    return d;
+  })();
 
   it("os três estados do estúdio, palavra por palavra", () => {
     expect(textoDaGravacao("a-guardar", null)).toEqual({

@@ -37,6 +37,8 @@ import ImagemComPlanoB from "./ImagemComPlanoB";
 import { adiantarTema, paginaDaResposta, usarAdiantada } from "./prefetch-de-tema";
 import { SugestaoDeNome } from "./SugestaoDeNome";
 import { NomesPorArrumar } from "./NomesPorArrumar";
+import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
+import { porqueNaoLeu, porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
 
 /**
  * Biblioteca de Temas — o sítio onde o estúdio guarda, uma vez, as fotos de
@@ -666,24 +668,49 @@ export default function Temas() {
 
   /** Fixar/desafixar e arquivar/desarquivar. Guarda-se PRIMEIRO no ecrã e
    *  desfaz-se se o servidor recusar: é uma preferência de arrumação, e esperar
-   *  por uma ida à rede para ver uma estrela acender não serve ninguém. */
+   *  por uma ida à rede para ver uma estrela acender não serve ninguém.
+   *
+   *  E QUANDO SE DESFAZ, A FRASE DIZ QUE SE DESFEZ. Arquivar tira o cartão da
+   *  lista à vista; falhar volta a pô-lo lá. Com «Não foi possível guardar.» o
+   *  que ela via era um tema que tinha arrumado a reaparecer sozinho — e a
+   *  conclusão natural é que o ecrã se enganou, não que a gravação não ficou. */
   const alternarMarca = useCallback(
     async (t: ThemeSummary, campo: "favorito" | "arquivado") => {
       const novo = !t[campo];
+      const oQue =
+        campo === "arquivado"
+          ? `${novo ? "arquivar" : "desarquivar"} o tema "${t.name}"`
+          : `${novo ? "fixar" : "desafixar"} o tema "${t.name}"`;
+      const desfez =
+        campo === "arquivado"
+          ? novo
+            ? `"${t.name}" voltou à lista.`
+            : `"${t.name}" continua arquivado.`
+          : novo
+            ? `"${t.name}" voltou a ficar sem estrela.`
+            : `"${t.name}" continua fixado.`;
       setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, [campo]: novo } : x)));
+      const reverter = (falha: Falha) => {
+        setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, [campo]: !novo } : x)));
+        toast(`${falha.mensagem} ${desfez}`, "error");
+      };
+      let res: Response;
       try {
-        const res = await fetch(`/api/temas/${t.id}`, {
+        res = await fetch(`/api/temas/${t.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ [campo]: novo }),
         });
-        if (!res.ok) throw new Error(String(res.status));
-        if (campo === "arquivado") {
-          toast(novo ? `"${t.name}" arquivado` : `"${t.name}" de volta à lista`, "success");
-        }
       } catch {
-        setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, [campo]: !novo } : x)));
-        toast("Não foi possível guardar. Verifica a ligação.", "error");
+        reverter(porqueRebentou(oQue));
+        return;
+      }
+      if (!res.ok) {
+        reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
+        return;
+      }
+      if (campo === "arquivado") {
+        toast(novo ? `"${t.name}" arquivado` : `"${t.name}" de volta à lista`, "success");
       }
     },
     [toast],
@@ -702,30 +729,35 @@ export default function Temas() {
    */
   const renomearDaLista = useCallback(
     async (t: ThemeSummary, nome: string): Promise<boolean> => {
+      const oQue = `mudar "${t.name}" para "${nome}"`;
+      let res: Response;
       try {
-        const res = await fetch(`/api/temas/${t.id}`, {
+        res = await fetch(`/api/temas/${t.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: nome }),
         });
-        if (!res.ok) {
-          // 409 é o nome já existir noutro tema — e aí a frase tem de o dizer,
-          // porque «não foi possível» mandava-a tentar outra vez para sempre.
-          toast(
-            res.status === 409
-              ? `Já há um tema chamado "${nome}".`
-              : "Não foi possível mudar o nome. Verifica a ligação.",
-            "error",
-          );
-          return false;
-        }
-        setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, name: nome } : x)));
-        toast(`"${t.name}" passou a "${nome}"`, "success");
-        return true;
       } catch {
-        toast("Não foi possível mudar o nome. Verifica a ligação.", "error");
+        toast(porqueRebentou(oQue).mensagem, "error");
         return false;
       }
+      if (!res.ok) {
+        // 409 é o nome já existir noutro tema — e aí a frase tem de o dizer,
+        // porque «não foi possível» mandava-a tentar outra vez para sempre.
+        // Fica aqui à mão em vez de vir do `porqueFalhou`: o 409 genérico dele
+        // fala de duas pessoas a mexerem ao mesmo tempo, e não é isso que se
+        // passa — o outro nome pode estar lá desde o ano passado.
+        toast(
+          res.status === 409
+            ? `Já há um tema chamado "${nome}".`
+            : porqueFalhou(oQue, res, await res.json().catch(() => null)).mensagem,
+          "error",
+        );
+        return false;
+      }
+      setThemes((prev) => prev.map((x) => (x.id === t.id ? { ...x, name: nome } : x)));
+      toast(`"${t.name}" passou a "${nome}"`, "success");
+      return true;
     },
     [toast],
   );
@@ -893,12 +925,19 @@ export default function Temas() {
     const name = newName.trim();
     if (!name) return;
     setSaving(true);
+    const oQue = `criar o tema "${name}"`;
     try {
-      const res = await fetch("/api/temas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, notes: newNotes.trim() }),
-      });
+      let res: Response;
+      try {
+        res = await fetch("/api/temas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, notes: newNotes.trim() }),
+        });
+      } catch {
+        toast(porqueRebentou(oQue).mensagem, "error");
+        return;
+      }
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         // O 503 da criação é o mesmo impedimento de instalação da leitura, e
@@ -907,7 +946,7 @@ export default function Temas() {
         // pertence ao lado do botão em que carregou.
         if (res.status === 503 && data?.error) {
           setBlocked({ titulo: data.titulo || tituloDaRecusa(res.status), texto: data.error });
-        } else toast(data?.error || "Não foi possível criar o tema.", "error");
+        } else toast(porqueFalhou(oQue, res, data).mensagem, "error");
         return;
       }
       setBlocked(null);
@@ -920,8 +959,6 @@ export default function Temas() {
       setSearch("");
       setOpenId(created.id);
       toast(`Tema "${created.name}" criado. Agora carrega as fotos.`, "success");
-    } catch {
-      toast("Erro de ligação ao criar o tema.", "error");
     } finally {
       setSaving(false);
     }
@@ -956,20 +993,27 @@ export default function Temas() {
       return;
     setThemes((prev) => prev.filter((x) => x.id !== t.id));
     if (openId === t.id) setOpenId(null);
+    // O cartão sai da lista já e volta se o servidor recusar — e é isso que a
+    // frase tem de dizer. Um tema que ela acabou de eliminar a reaparecer com
+    // um aviso que só fala de ligações é indistinguível de um ecrã avariado.
+    const oQue = `eliminar o tema "${t.name}"`;
+    const reverter = (falha: Falha) => {
+      restoreTheme(t);
+      toast(`${falha.mensagem} "${t.name}" voltou à lista.`, "error");
+    };
+    let res: Response;
     try {
-      const res = await fetch(`/api/temas/${t.id}`, { method: "DELETE" });
-      if (res.ok) {
-        bibliotecaAlterada();
-        toast("Tema eliminado.", "success");
-        return;
-      }
-      restoreTheme(t);
-      const data = await res.json().catch(() => null);
-      toast(data?.error || "Não foi possível eliminar o tema.", "error");
+      res = await fetch(`/api/temas/${t.id}`, { method: "DELETE" });
     } catch {
-      restoreTheme(t);
-      toast("Erro de ligação ao eliminar.", "error");
+      reverter(porqueRebentou(oQue));
+      return;
     }
+    if (res.ok) {
+      bibliotecaAlterada();
+      toast("Tema eliminado.", "success");
+      return;
+    }
+    reverter(porqueFalhou(oQue, res, await res.json().catch(() => null)));
   }
 
   /** Mantém o cartão do tema a par do que a pasta diz. A pasta é a fonte de
@@ -1993,6 +2037,15 @@ function ThemeFolder({
   const [truncated, setTruncated] = useState(false);
   /** A última página veio cheia → é provável que haja mais. */
   const [pageFull, setPageFull] = useState(false);
+  /**
+   * PORQUE é que a pasta não se deixou ler. A pasta ilegível já não era
+   * confundida com uma pasta vazia — isso estava feito —, mas a razão era
+   * sempre a mesma: «é uma falha temporária, recarrega a página daqui a
+   * pouco». Com a sessão caída (o caso comum: este ecrã fica aberto horas)
+   * isso é falso e o conselho não leva a lado nenhum — recarregar devolve o
+   * mesmo 401. Com um 404 também: a pasta não volta por esperar.
+   */
+  const [falhaDaPasta, setFalhaDaPasta] = useState<LeituraFalhada | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   /** Lotes a decorrer — não um booleano: com dois lotes ao mesmo tempo, o
@@ -2037,6 +2090,8 @@ function ThemeFolder({
    *  contagem verdadeira. `null` = nada a acontecer. */
   const [emBloco, setEmBloco] = useState<AccaoEmBloco | null>(null);
   const [coverPath, setCoverPath] = useState<string | undefined>(theme.coverPath);
+  /** Quantas arrumações da grelha já foram mandadas — ver `persistOrder`. */
+  const ordemMandada = useRef(0);
   const [name, setName] = useState(theme.name);
   const [renaming, setRenaming] = useState(false);
   const [drag, setDrag] = useState(false);
@@ -2086,6 +2141,11 @@ function ThemeFolder({
   useEffect(() => {
     let active = true;
     (async () => {
+      // Guardados para o `catch`: é lá que se escreve a frase, e sem estes
+      // chegava lá um "falhou" que não diz nem o estado nem o que o servidor
+      // explicou.
+      let resposta: { status: number } | null = null;
+      let corpo: unknown = null;
       try {
         // O rato já pousou neste cartão? Então a listagem pode já estar cá —
         // ver `adiantarTema`. `null` quer dizer «não havia, ou já não vale», e
@@ -2098,12 +2158,17 @@ function ThemeFolder({
               `/api/temas/${theme.id}/imagens?offset=0&limit=${THEME_PAGE_SIZE}`,
               { cache: "no-store" },
             );
-            if (!res.ok) throw new Error("falhou");
+            if (!res.ok) {
+              resposta = res;
+              corpo = await res.json().catch(() => null);
+              throw new Error(String(res.status));
+            }
             return paginaDaResposta(await res.json());
           })());
         if (!active) return;
         const page = pagina.images;
         setImages(page);
+        setFalhaDaPasta(null);
         // `total: null` é uma pasta que NÃO pôde ser lida — ver
         // `paginaDaResposta`. Aceitá-la como zero faria a grelha dizer "arrasta
         // aqui as fotos" a um tema que pode ter 3000, e ela a carregá-las outra
@@ -2111,10 +2176,18 @@ function ThemeFolder({
         setTotal(pagina.total);
         setTruncated(pagina.truncated);
         setPageFull(page.length >= THEME_PAGE_SIZE);
-      } catch {
+      } catch (e) {
         // Sem lista não se avisa o pai: o cartão guarda a contagem que veio do
         // servidor (que pode ser "Fotos indisponíveis") em vez de dizer "0".
-        if (active) toast("Não foi possível carregar as fotos do tema.", "error");
+        if (!active) return;
+        // A MESMA falha, dita de duas maneiras. O aviso passageiro flutua por
+        // cima de qualquer ecrã e por isso nomeia a coisa; o painel que FICA na
+        // grelha já tem o nome no título, e repeti-lo lá era dizer duas vezes o
+        // que se está a ver.
+        const frase = (oQue: string) =>
+          resposta ? porqueNaoLeu(oQue, resposta, corpo) : porqueNaoLeuDoErro(oQue, e);
+        setFalhaDaPasta(frase(""));
+        toast(frase("as fotos deste tema").mensagem, "error");
       } finally {
         if (active) setLoading(false);
       }
@@ -2850,6 +2923,16 @@ function ThemeFolder({
     bibliotecaAlterada();
 
     const errors: ThemeImage[] = [];
+    /**
+     * A primeira recusa que trouxe RESPOSTA — é ela que classifica a frase.
+     *
+     * As remoções vão em paralelo (ver `pool`) e não há uma resposta só para
+     * ler. Fica-se pela primeira: numa remoção em bloco o motivo é sempre o
+     * mesmo para todas (a sessão caiu, o servidor está em baixo), e é a
+     * diferença entre mandar voltar a entrar e mandar esperar. `null` quer
+     * dizer que nenhuma chegou a responder — a rede em baixo.
+     */
+    let primeiraRecusa: Response | null = null;
     // As remoções correm com concorrência: a contagem é de quantas JÁ
     // RESPONDERAM, e conta tanto as que foram como as que falharam — a barra
     // retrata a espera, não o sucesso (o que falhou tem o seu próprio aviso).
@@ -2860,7 +2943,10 @@ function ThemeFolder({
           `/api/temas/${theme.id}/imagens?path=${encodeURIComponent(im.path)}`,
           { method: "DELETE" },
         );
-        if (!res.ok) throw new Error("falhou");
+        if (!res.ok) {
+          primeiraRecusa ??= res;
+          throw new Error("falhou");
+        }
       } catch {
         errors.push(im);
       } finally {
@@ -2875,13 +2961,29 @@ function ThemeFolder({
       // entretanto acrescentado.
       setImages((prev) => reinsertAt(prev, errors, positions));
       setTotal((t) => (t === null ? null : t + errors.length));
+      // E a frase diz que elas VOLTARAM. A remoção é optimista: as fotos saem
+      // da grelha no instante do clique e reaparecem no lugar delas quando o
+      // servidor recusa. Com «Não foi possível remover 3 fotos» ela via três
+      // fotos ressuscitar sem perceber que era o aviso a acontecer.
+      const uma = errors.length === 1;
+      const oQue = `remover ${plural(errors.length, "foto", "fotos")} de "${theme.name}"`;
+      const falha = primeiraRecusa ? porqueFalhou(oQue, primeiraRecusa) : porqueRebentou(oQue);
       toast(
-        targets.length === 1
-          ? "Não foi possível remover a foto."
-          : `Não foi possível remover ${plural(errors.length, "foto", "fotos")}.`,
+        `${falha.mensagem} ${uma ? "Voltou" : "Voltaram"} ao sítio onde ${
+          uma ? "estava" : "estavam"
+        }.`,
         "error",
       );
-    } else if (targets.length > 1) {
+    } else {
+      // TAMBÉM QUANDO É UMA SÓ. O `targets.length > 1` que aqui estava não era
+      // uma decisão — era o resto de uma frase escrita a pensar no bloco, e
+      // deixava o gesto mais comum de todos mudo.
+      //
+      // O buraco na grelha não serve de resposta: a remoção é OTIMISTA, a
+      // célula sai no instante do clique e o servidor só responde depois. Quem
+      // prova a diferença é o ramo de cima — quando ele recusa, a foto volta ao
+      // sítio onde estava. Sem esta frase, ver a foto sair não distingue «foi
+      // removida» de «ainda vai a caminho».
       toast(`${plural(targets.length, "foto removida", "fotos removidas")}.`, "success");
     }
   }
@@ -2947,29 +3049,59 @@ function ThemeFolder({
    * data, atrás delas. É o que faz "pôr as boas à frente" custar meia dúzia de
    * caminhos em vez de uma cópia do catálogo.
    */
-  async function persistOrder(next: ThemeImage[], previous: ThemeImage[]) {
+  async function persistOrder(next: ThemeImage[], previous: ThemeImage[], destino: number) {
+    const oQue = `guardar a nova ordem das fotos de "${theme.name}"`;
+    // SÓ A ÚLTIMA ARRUMAÇÃO FALA. Cada Alt+seta é um PATCH seu, e cinco toques
+    // seguidos a empurrar a mesma foto davam cinco avisos iguais empilhados —
+    // ruído que ensina a não ler os avisos. O número diz qual é a arrumação
+    // mais recente; as que ficaram para trás guardam-se na mesma, caladas.
+    const minha = ++ordemMandada.current;
+    /** A ordem volta ao que estava — e a frase diz que voltou. Mostrar uma
+     *  arrumação que o servidor não guardou seria mentir-lhe até ao próximo
+     *  recarregamento; deixá-la voltar sem aviso é pior ainda, porque ela vê a
+     *  foto que arrastou saltar de novo para o sítio antigo. */
+    const reverter = (mensagem: string) => {
+      if (!alive.current) return;
+      setImages(previous);
+      toast(`${mensagem} A grelha voltou à ordem anterior.`, "error");
+    };
+    let res: Response;
     try {
-      const res = await fetch(`/api/temas/${theme.id}`, {
+      res = await fetch(`/api/temas/${theme.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ photoOrder: next.slice(0, MAX_PHOTO_ORDER).map((im) => im.path) }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || "falhou");
-      }
-    } catch (e) {
-      // A ordem volta ao que estava: mostrar uma arrumação que o servidor não
-      // guardou seria mentir-lhe até ao próximo recarregamento.
-      if (!alive.current) return;
-      setImages(previous);
-      toast(
-        e instanceof Error && /db\/schema\.sql|base de dados/i.test(e.message)
-          ? e.message
-          : "Não foi possível guardar a nova ordem das fotos.",
-        "error",
-      );
+    } catch {
+      reverter(porqueRebentou(oQue).mensagem);
+      return;
     }
+    if (res.ok) {
+      // O QUE NÃO SE VÊ É O SERVIDOR. A foto salta para o lugar novo no
+      // instante do arrasto — o que ficava por dizer era se a arrumação lá
+      // ficou, e a única pista era a grelha saltar para trás quando falhava.
+      // Um ecrã que só fala quando corre mal é um ecrã em que o silêncio não
+      // quer dizer nada.
+      //
+      // E diz a POSIÇÃO: numa grelha de sessenta fotos iguais, «ordem
+      // guardada» não deixa reconhecer o gesto que foi mesmo guardado.
+      if (alive.current && minha === ordemMandada.current) {
+        toast(
+          `Ordem guardada — a foto ficou na posição ${destino + 1} de ${next.length}.`,
+          "success",
+        );
+      }
+      return;
+    }
+    const data = await res.json().catch(() => null);
+    // A queixa da instalação por acabar (`db/schema.sql`) passa inteira: é uma
+    // instrução para quem monta isto, e nenhuma frase nossa a substitui.
+    const doServidor = typeof data?.error === "string" ? data.error : "";
+    reverter(
+      /db\/schema\.sql|base de dados/i.test(doServidor)
+        ? doServidor
+        : porqueFalhou(oQue, res, data).mensagem,
+    );
   }
 
   /** Move uma foto para outra posição da grelha (arrasto, setas ou "para o início"). */
@@ -2978,7 +3110,7 @@ function ThemeFolder({
     setImages((prev) => {
       const next = moveItem(prev, from, to);
       if (next === prev) return prev;
-      void persistOrder(next, prev);
+      void persistOrder(next, prev, to);
       return next;
     });
   }
@@ -3019,24 +3151,37 @@ function ThemeFolder({
 
   /** Escolhe a foto que representa o tema na lista. */
   async function setAsCover(im: ThemeImage) {
+    // Aqui não há nada a reverter: a capa só muda no ecrã depois de o servidor
+    // confirmar. O que faltava era a frase saber distinguir a sessão expirada
+    // do servidor em baixo — e nomear o tema, que é o que ela tem seis vezes
+    // aberto em separadores diferentes.
+    const oQue = `definir a capa de "${theme.name}"`;
+    let res: Response;
     try {
-      const res = await fetch(`/api/temas/${theme.id}`, {
+      res = await fetch(`/api/temas/${theme.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ coverPath: im.path }),
       });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        toast(data?.error || "Não foi possível definir a capa.", "error");
-        return;
-      }
-      setCoverPath(im.path);
-      onCover(im.path, im.thumbUrl || im.url);
-      clearSelection();
-      toast("Capa do tema definida.", "success");
     } catch {
-      toast("Erro de ligação ao definir a capa.", "error");
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return;
     }
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, data).mensagem, "error");
+      return;
+    }
+    setCoverPath(im.path);
+    onCover(im.path, im.thumbUrl || im.url);
+    clearSelection();
+    // AQUI NÃO SE DIZ NADA, e é de propósito. A capa só muda depois de o
+    // servidor confirmar, e o que ele confirmou aparece na própria foto que ela
+    // escolheu — a etiqueta «Capa» no canto da célula, mais a barra da seleção
+    // a desaparecer. Um aviso a dizer o que já está à frente dos olhos é ruído,
+    // e é a mesma decisão que a estrela dos temas já tinha: o `alternarMarca`
+    // avisa ao arquivar (o cartão sai da lista) e cala-se ao fixar (a estrela
+    // acende-se à vista).
   }
 
   async function rename() {
@@ -3050,23 +3195,39 @@ function ThemeFolder({
       return;
     }
     renamingBusy.current = true;
+    // O nome antigo fica guardado aqui: depois do `onRename` a lista lá fora já
+    // mudou, e a frase precisa dos DOIS nomes para dizer o que mudou.
+    const antigo = theme.name;
+    const oQue = `mudar "${antigo}" para "${trimmed}"`;
+    /** O campo volta ao nome antigo — e a frase diz que voltou, senão ela lê o
+     *  nome antigo no cabeçalho e julga que escreveu no sítio errado. */
+    const reverter = (falha: Falha) => {
+      setName(theme.name);
+      toast(`${falha.mensagem} O nome voltou a "${theme.name}".`, "error");
+    };
     try {
-      const res = await fetch(`/api/temas/${theme.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`/api/temas/${theme.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: trimmed }),
+        });
+      } catch {
+        reverter(porqueRebentou(oQue));
+        return;
+      }
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setName(theme.name);
-        toast(data?.error || "Não foi possível renomear o tema.", "error");
+        reverter(porqueFalhou(oQue, res, data));
         return;
       }
       onRename(trimmed);
-      toast("Tema renomeado.", "success");
-    } catch {
-      setName(theme.name);
-      toast("Erro de ligação ao renomear.", "error");
+      // COM OS DOIS NOMES, como o renomear que se faz a partir da lista
+      // (`renomearDaLista`) já dizia. «Tema renomeado.» obrigava a ir conferir
+      // ao cabeçalho se o que lá ficou era mesmo o que ela escreveu — e com
+      // seis pastas abertas em separadores diferentes, nem dizia qual.
+      toast(`"${antigo}" passou a "${trimmed}"`, "success");
     } finally {
       renamingBusy.current = false;
       setRenaming(false);
@@ -3610,7 +3771,12 @@ function ThemeFolder({
               Não foi possível ler a pasta deste tema agora.
             </p>
             <p className="bo-text-muted mt-1 text-xs">
-              É uma falha temporária — as fotos não desapareceram. Recarrega a página daqui a pouco.
+              {/* A razão, quando se sabe qual foi. O texto de reserva é para a
+                  pasta que o SERVIDOR disse não ter conseguido ler (um 200 com
+                  `ok: false`): aí ele já respondeu, e o que se sabe é mesmo só
+                  que a falha é do lado de lá e passageira. */}
+              {falhaDaPasta?.mensagem ??
+                "É uma falha temporária — as fotos não desapareceram. Recarrega a página daqui a pouco."}
             </p>
           </div>
         ) : images.length === 0 && pending.length === 0 ? (

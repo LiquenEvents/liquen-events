@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
+import { log } from "@/lib/logger";
 import type { QuoteSummary } from "@/lib/orcamento/types";
 import AdminClient from "./AdminClient";
 import MedidorDeTransbordo from "./MedidorDeTransbordo";
@@ -24,11 +26,29 @@ export const metadata: Metadata = {
  * filtros e os painéis de conjunto lêem continua cá todo; o resto vai buscar-se
  * quando um pedido é ABERTO. Ver `resumirQuote` em quotes-store.
  */
-async function getQuotes(): Promise<QuoteSummary[]> {
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UMA LISTA VAZIA E UMA LEITURA FALHADA NÃO SÃO A MESMA COISA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Isto era um `catch { return [] }`. Com a base de dados em baixo, o back
+ * office inteiro abria como se ela não tivesse pedido nenhum — e o ecrã de
+ * Clientes dizia-lhe, com toda a confiança, «Sem clientes ainda».
+ *
+ * É a mesma classe de mentira que o `porque-nao-leu` veio nomear: **uma
+ * leitura que não aconteceu não sabe afirmar que não há nada.** E é a pior das
+ * versões dela, porque é a primeira coisa que se vê ao entrar.
+ *
+ * A falha viaja agora até quem a pode dizer. Nada mais muda: a lista continua
+ * a ser `[]`, o back office continua a abrir, e os ecrãs que não recebem a
+ * falha comportam-se exactamente como antes.
+ */
+async function getQuotes(): Promise<{ quotes: QuoteSummary[]; falha: LeituraFalhada | null }> {
   try {
-    return await listQuoteSummaries();
-  } catch {
-    return [];
+    return { quotes: await listQuoteSummaries(), falha: null };
+  } catch (e) {
+    log.error("admin: a lista de pedidos não veio", e);
+    return { quotes: [], falha: porqueNaoLeuDoErro("os pedidos", e) };
   }
 }
 
@@ -40,7 +60,7 @@ export default async function AdminPage() {
     return <AdminLogin />;
   }
 
-  const quotes = await getQuotes();
+  const { quotes, falha: falhaDosPedidos } = await getQuotes();
   // Trust the signed session name first; fall back to the display cookie.
   const userName =
     session.name || store.get(ADMIN_NAME_COOKIE)?.value || process.env.ADMIN_NAME || "Equipa";
@@ -57,7 +77,7 @@ export default async function AdminPage() {
   return (
     <ToastProvider>
       <RegistoDeGravacoesProvider>
-        <AdminClient initialQuotes={quotes} userName={userName} />
+        <AdminClient initialQuotes={quotes} userName={userName} falhaDosPedidos={falhaDosPedidos} />
         {/* Instrumento, não funcionalidade: só aparece com `?medir=1` no
             endereço. Ver o cabeçalho do ficheiro — existe porque o transbordo
             horizontal que ela vê no iPhone não se reproduz em Chromium, e a

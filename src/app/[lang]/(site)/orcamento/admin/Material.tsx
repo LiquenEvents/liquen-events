@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useDeferredValue, useRef } from "react";
+import { useMemo, useState, useDeferredValue, useRef, type ReactNode } from "react";
 import type { MaterialItem, MaterialKind } from "@/lib/material-types";
 import {
   MATERIAL_CATEGORIES,
@@ -11,11 +11,21 @@ import {
 import type { PlanoCsv } from "@/lib/material-csv";
 import { useToast } from "./Toast";
 import { downloadCsv, dateStamp } from "./export";
-import { Button, Card, EmCurso, EmptyState, Field, Segmented, Toolbar } from "./ui";
+import {
+  Button,
+  Card,
+  EmCurso,
+  EmptyState,
+  Field,
+  PerguntaDestrutiva,
+  Segmented,
+  Toolbar,
+} from "./ui";
 import MaterialListas from "./MaterialListas";
 import MaterialRegras from "./MaterialRegras";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 /**
  * CATÁLOGO DE MATERIAL DE LOGÍSTICA.
@@ -51,6 +61,45 @@ const PlusIcon = (
     <path d="M12 5v14M5 12h14" strokeLinecap="round" />
   </svg>
 );
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE LEVA PERGUNTA NESTE ECRÃ, E O QUE NÃO LEVA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Duas coisas daqui deitam trabalho fora, e as duas são RARAS e CARAS — por
+ * isso as duas levam pergunta, e nenhuma leva janela para anular:
+ *
+ *   REMOVER DO CATÁLOGO tira o item de vez. As listas base que o usem ficam com
+ *   a linha a dizer «(item removido do catálogo)» — o defeito não aparece aqui,
+ *   aparece na véspera de um evento, na lista de quem carrega a carrinha.
+ *
+ *   CANCELAR UMA IMPORTAÇÃO JÁ LIDA deita fora um ensaio de centenas de linhas
+ *   que o servidor já correu, e o botão está encostado ao «Gravar». Para voltar
+ *   ao mesmo sítio é preciso ir buscar o ficheiro outra vez.
+ *
+ * E o que NÃO leva pergunta, para não se andar a acrescentar depois:
+ *   · GRAVAR A IMPORTAÇÃO já tem a sua — é o painel «Antes de gravar», com os
+ *     números lá dentro. Uma segunda caixa por cima dessa era perguntar duas
+ *     vezes a mesma coisa.
+ *   · O «Cancelar» dos formulários de adicionar e editar é a declaração de que
+ *     não se quer aquilo. Perguntar a quem já disse que não é atrito puro.
+ *   · ESCOLHER UM SEGUNDO CSV com um ensaio aberto substitui o ensaio — mas
+ *     quem está no selector de ficheiros está exactamente a pedir isso.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Remover do catálogo», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
+}
 
 interface FormState {
   name: string;
@@ -166,6 +215,9 @@ function Catalogo() {
   // ── Importação CSV ────────────────────────────────────────────────────────
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [csv, setCsv] = useState<string | null>(null);
+  /** O nome do ficheiro escolhido, só para as frases o poderem dizer: quem
+   *  tenta duas importações seguidas precisa de saber QUAL delas falhou. */
+  const [nomeCsv, setNomeCsv] = useState("");
   const [plano, setPlano] = useState<PlanoCsv | null>(null);
   const [importando, setImportando] = useState(false);
   /**
@@ -177,6 +229,9 @@ function Catalogo() {
    * o painel; a gravação é que são 5 a 30 segundos com a página muda.
    */
   const [aGravar, setAGravar] = useState<number | null>(null);
+
+  /** A pergunta em curso — ver o comentário grande no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
 
   const emFalta = useMemo(() => items.filter(abaixoDoMinimo), [items]);
 
@@ -195,65 +250,141 @@ function Catalogo() {
     });
   }, [items, dSearch, cat, kind, soEmFalta]);
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * Este ecrã tinha cinco escritas e três frases entre elas: «Não foi possível
+   * guardar.», «Erro de ligação ao guardar.» e «Não foi possível remover.» —
+   * as mesmas palavras para a rede em baixo, a sessão expirada, o item apagado
+   * por outra pessoa, o nome repetido e o servidor em baixo. Nenhuma dizia de
+   * QUE material falava, num ecrã que mostra o catálogo inteiro.
+   *
+   * Agora há um sítio só a fazer fetch, a verificar o `ok` e a escolher a
+   * frase — o mesmo padrão do `MaterialListas`. Devolve o corpo porque as
+   * escritas daqui precisam dele (a linha criada, a linha actualizada, o
+   * ensaio do CSV), e devolve `ok` em vez de atirar, porque quem chama tem de
+   * poder repor o ecrã quando falhou.
+   */
+  async function gravar(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch {
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return { ok: false, corpo: null };
+    }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return { ok: false, corpo };
+    }
+    return { ok: true, corpo };
+  }
+
+  /**
+   * Gravou-se, mas o que voltou não tem a forma de um item do catálogo.
+   *
+   * Antes isto entrava na lista à mesma (`await res.json()` sem olhar), e a
+   * linha seguinte a desenhar `i.name` atirava — com o catálogo dentro do back
+   * office, a excepção levava o back office todo. Uma resposta 200 sem corpo
+   * de item acontece com um proxy pelo meio a devolver HTML.
+   */
+  const pareceItem = (c: unknown): c is MaterialItem =>
+    !!c &&
+    typeof (c as MaterialItem).id === "string" &&
+    typeof (c as MaterialItem).name === "string";
+
+  const AVISO_SEM_RELEITURA = "Gravado, mas não deu para reler o catálogo. Atualiza a página.";
+
   async function add() {
     const payload = toPayload(form);
     if (!payload.name) return;
     setSaving(true);
-    try {
-      const res = await fetch("/api/material", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const created: MaterialItem = await res.json();
-        setItems((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
-        setForm(EMPTY_FORM);
-        setAdding(false);
-        toast("Material adicionado.", "success");
-      } else {
-        toast("Não foi possível guardar.", "error");
-      }
-    } catch {
-      toast("Erro de ligação ao guardar.", "error");
-    } finally {
-      setSaving(false);
+    const { ok, corpo } = await gravar(`adicionar «${payload.name}» ao catálogo`, "/api/material", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setSaving(false);
+    if (!ok) return;
+    if (!pareceItem(corpo)) {
+      toast(AVISO_SEM_RELEITURA, "error");
+      return;
     }
+    setItems((prev) => [...prev, corpo].sort((a, b) => a.name.localeCompare(b.name)));
+    setForm(EMPTY_FORM);
+    setAdding(false);
+    toast("Material adicionado.", "success");
   }
 
   async function saveEdit(id: string) {
     const payload = toPayload(editForm);
     if (!payload.name) return;
     setSaving(true);
-    try {
-      const res = await fetch(`/api/material/${id}`, {
+    const { ok, corpo } = await gravar(
+      `guardar as alterações a «${payload.name}»`,
+      `/api/material/${id}`,
+      {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const updated: MaterialItem = await res.json();
-        setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
-        setEditingId(null);
-        toast("Guardado.", "success");
-      } else {
-        toast("Não foi possível guardar.", "error");
-      }
-    } catch {
-      toast("Erro de ligação ao guardar.", "error");
-    } finally {
-      setSaving(false);
+      },
+    );
+    setSaving(false);
+    // A edição fica ABERTA quando falha: o que ela escreveu não se perde, e o
+    // campo por onde recomeçar é o mesmo em que estava.
+    if (!ok) return;
+    if (!pareceItem(corpo)) {
+      toast(AVISO_SEM_RELEITURA, "error");
+      return;
     }
+    setItems((prev) => prev.map((i) => (i.id === id ? corpo : i)));
+    setEditingId(null);
+    toast("Guardado.", "success");
+  }
+
+  /**
+   * A PERGUNTA DE REMOVER, com o tamanho do que se perde lá dentro.
+   *
+   * O que estava aqui era nada: um botão «Remover» que apagava à primeira.
+   * Numa lista de dezenas de linhas todas com o mesmo botão no mesmo sítio,
+   * é o clique ao lado que apaga o material errado — e sem o nome à frente dos
+   * olhos ninguém dá por isso até faltar o escadote.
+   *
+   * O número é o stock: é a medida do que estava registado e deixa de estar. A
+   * segunda frase é a consequência que não se vê deste ecrã — a linha
+   * «(item removido do catálogo)» que fica nas listas base.
+   */
+  function perguntarSeRemove(i: MaterialItem) {
+    const unidade = i.unit?.trim() || "un.";
+    setAPerguntar({
+      titulo: `Remover «${i.name}» do catálogo?`,
+      oQueSePerde: [
+        `${i.stock} ${unidade} em stock${
+          typeof i.minStock === "number" ? `, e o mínimo de ${i.minStock} por que se vigia` : ""
+        }`,
+        "nas listas base, a linha dele passa a dizer «(item removido do catálogo)»",
+      ],
+      aviso: "As checklists já geradas não mudam — foram copiadas. Não pode ser anulado.",
+      rotulo: "Remover do catálogo",
+      fazer: () => remove(i.id),
+    });
   }
 
   async function remove(id: string) {
     const removido = items.find((i) => i.id === id);
     if (!removido) return;
     setItems((prev) => prev.filter((i) => i.id !== id));
-    try {
-      const res = await fetch(`/api/material/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-    } catch {
+    const { ok } = await gravar(`remover «${removido.name}» do catálogo`, `/api/material/${id}`, {
+      method: "DELETE",
+    });
+    if (!ok) {
       // Reversão: o catálogo no ecrã não pode divergir do que está gravado.
       //
       // Repõe-se SÓ esta linha, e sobre o que a lista tiver agora. Guardar a
@@ -268,8 +399,36 @@ function Catalogo() {
           ? prev
           : [...prev, removido].sort((a, b) => a.name.localeCompare(b.name)),
       );
-      toast("Não foi possível remover.", "error");
     }
+  }
+
+  /**
+   * A PERGUNTA DE DEITAR FORA UM ENSAIO JÁ LIDO.
+   *
+   * O «Cancelar» está a dois centímetros do «Gravar», e o que ele deita fora
+   * não é um formulário meio escrito: é um ficheiro já lido e um ensaio que o
+   * servidor já correu por cima do catálogo inteiro. A pergunta diz QUAL
+   * ficheiro e QUANTAS linhas estavam à espera — e diz também que nada foi
+   * gravado, que é a dúvida imediata de quem carregou por engano.
+   */
+  function perguntarSeDeitaForaOEnsaio() {
+    const novos = plano?.novos ?? 0;
+    const atualizados = plano?.atualizados ?? 0;
+    setAPerguntar({
+      titulo: `Deitar fora a importação de «${nomeCsv || "o ficheiro"}»?`,
+      oQueSePerde: [
+        `${novos} ${novos === 1 ? "linha nova" : "linhas novas"} e ${atualizados} a atualizar — ${
+          novos + atualizados
+        } ao todo, já lidas e conferidas pelo servidor`,
+      ],
+      aviso: "Nada foi gravado. Para voltar aqui tens de escolher o ficheiro outra vez.",
+      rotulo: "Deitar fora",
+      fazer: () => {
+        setPlano(null);
+        setCsv(null);
+        setNomeCsv("");
+      },
+    });
   }
 
   function pedirFicheiro() {
@@ -279,21 +438,28 @@ function Catalogo() {
   async function lerFicheiro(file: File) {
     const texto = await file.text();
     setCsv(texto);
+    setNomeCsv(file.name);
     setImportando(true);
-    try {
-      const res = await fetch("/api/material/importar", {
+    // «ensaiar» e não «ler»: o pedido é o ENSAIO do CSV (aplicar: false), e é
+    // esse o gesto que a frase tem de nomear para se repetir o certo.
+    const { ok, corpo } = await gravar(
+      `ensaiar a importação de «${file.name}»`,
+      "/api/material/importar",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csv: texto, aplicar: false }),
-      });
-      if (!res.ok) throw new Error();
-      setPlano(await res.json());
-    } catch {
-      toast("Não foi possível ler o ficheiro.", "error");
+      },
+    );
+    setImportando(false);
+    // Sem ensaio não há nada a gravar: deitar fora o CSV é o que impede o
+    // painel de "Antes de gravar" de aparecer vazio sobre um ficheiro que o
+    // servidor nunca chegou a ler.
+    if (!ok || !corpo) {
       setCsv(null);
-    } finally {
-      setImportando(false);
+      return;
     }
+    setPlano(corpo as PlanoCsv);
   }
 
   /**
@@ -350,39 +516,60 @@ function Catalogo() {
     if (!csv) return;
     setImportando(true);
     setAGravar(plano ? plano.novos + plano.atualizados : 0);
-    try {
-      const res = await fetch("/api/material/importar", {
+    const { ok, corpo } = await gravar(
+      `gravar a importação de «${nomeCsv || "o ficheiro"}»`,
+      "/api/material/importar",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csv, aplicar: true }),
-      });
-      if (!res.ok) throw new Error();
-      const r = await res.json();
-      setCsv(null);
-      setPlano(null);
-      toast(
-        `${r.criados} novos, ${r.atualizados} atualizados` +
-          (r.ignorados ? `, ${r.ignorados} ignorados` : "") +
-          ".",
-        "success",
-      );
-      // Recarrega em vez de remendar o estado: a importação mexe em muitas
-      // linhas de uma vez e adivinhar o resultado aqui era a maneira de o ecrã
-      // ficar a dizer uma coisa e a base de dados outra.
-      //
-      // A releitura é OUTRA operação, e por isso está FORA do desfecho da
-      // gravação: falhar a reler não desmente o que já ficou gravado, e dizer
-      // "a importação falhou" depois de ela ter corrido era mandar repetir uma
-      // importação que já lá está.
-      if (!(await recarregarCatalogo())) {
-        toast("Gravado, mas não foi possível reler o catálogo. Atualiza a página.", "error");
-      }
-    } catch {
-      toast("A importação falhou.", "error");
-    } finally {
+      },
+    );
+    // O painel do ensaio FICA quando a gravação falha: é dele que se repete, e
+    // deitá-lo fora obrigava a escolher o ficheiro outra vez.
+    if (!ok) {
       setImportando(false);
       setAGravar(null);
+      return;
     }
+    const r = corpo as { criados?: number; atualizados?: number; ignorados?: number } | null;
+    setCsv(null);
+    setPlano(null);
+    /**
+     * A contagem só se diz quando ela VEIO.
+     *
+     * `${r.criados} novos` era lido de um corpo que se assumia bom: se a
+     * resposta não trouxesse números, o antigo `await res.json()` atirava DEPOIS
+     * de a importação já ter corrido, e o ecrã dizia «A importação falhou» sobre
+     * centenas de linhas que tinham entrado. Quem lê isso importa o ficheiro
+     * outra vez. Dizer «0 novos» seria a mesma mentira ao contrário.
+     */
+    toast(
+      typeof r?.criados === "number"
+        ? `${r.criados} novos, ${r.atualizados ?? 0} atualizados` +
+            (r.ignorados ? `, ${r.ignorados} ignorados` : "") +
+            "."
+        : "Importação gravada. O servidor não disse quantas linhas entraram — confere o catálogo.",
+      "success",
+    );
+    // Recarrega em vez de remendar o estado: a importação mexe em muitas
+    // linhas de uma vez e adivinhar o resultado aqui era a maneira de o ecrã
+    // ficar a dizer uma coisa e a base de dados outra.
+    //
+    // A releitura é OUTRA operação, e por isso está FORA do desfecho da
+    // gravação: falhar a reler não desmente o que já ficou gravado, e dizer
+    // "a importação falhou" depois de ela ter corrido era mandar repetir uma
+    // importação que já lá está.
+    //
+    // A espera («A gravar o material…») só se fecha DEPOIS da releitura: era
+    // por isso que o `setAGravar(null)` estava num `finally` e não a seguir à
+    // resposta — sem isto o ecrã ficava mudo durante a leitura do catálogo
+    // inteiro, que é a parte lenta em ficheiros grandes.
+    if (!(await recarregarCatalogo())) {
+      toast("Gravado, mas não foi possível reler o catálogo. Atualiza a página.", "error");
+    }
+    setImportando(false);
+    setAGravar(null);
   }
 
   function exportar() {
@@ -592,14 +779,7 @@ function Catalogo() {
             >
               {importando ? "A gravar…" : "Gravar"}
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setPlano(null);
-                setCsv(null);
-              }}
-            >
+            <Button size="sm" variant="ghost" onClick={perguntarSeDeitaForaOEnsaio}>
               Cancelar
             </Button>
           </div>
@@ -697,7 +877,7 @@ function Catalogo() {
                   >
                     Editar
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => remove(i.id)}>
+                  <Button size="sm" variant="ghost" onClick={() => perguntarSeRemove(i)}>
                     Remover
                   </Button>
                 </span>
@@ -706,6 +886,30 @@ function Catalogo() {
           )}
         </ul>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </>
   );
 }

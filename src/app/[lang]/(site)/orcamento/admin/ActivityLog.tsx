@@ -113,7 +113,15 @@ function timeLabel(iso: string): string {
 
 interface Props {
   quote: Quote;
-  onAddEntry?: (entry: ActivityEntry) => Promise<void>;
+  /**
+   * Grava a entrada, e diz se ficou gravada.
+   *
+   * `boolean` e não `void`: era o `void` que fazia o defeito. A caixa limpava-se
+   * a seguir ao `await` acontecesse o que acontecesse, e uma nota de chamada que
+   * não chegou ao servidor desaparecia do ecrã como se tivesse sido guardada —
+   * com quem a escreveu a acabar de desligar o telefone.
+   */
+  onAddEntry?: (entry: ActivityEntry) => Promise<boolean>;
   actor?: string;
 }
 
@@ -137,13 +145,17 @@ export default function ActivityLog({ quote, onAddEntry, actor }: Props) {
     if (!text.trim() || !onAddEntry || saving) return;
     setSaving(true);
     try {
-      await onAddEntry({
+      const guardou = await onAddEntry({
         id: randomId(),
         at: new Date().toISOString(),
         kind: mode === "call" ? "call_logged" : "manual_note",
         actor,
         summary: text.trim(),
       });
+      // Só se limpa o que ficou GRAVADO. Quem falhou fica com o texto na caixa
+      // e a caixa aberta — a razão já foi dita pelo `appendActivity`, e o que
+      // se escreveu continua ali para se voltar a tentar.
+      if (!guardou) return;
       setText("");
       setMode(null);
     } finally {

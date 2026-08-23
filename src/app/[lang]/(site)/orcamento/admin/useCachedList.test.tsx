@@ -70,11 +70,48 @@ describe("useCachedList — primeira visita", () => {
     expect(result.current.errorMessage).toBe("Falta correr o db/schema.sql.");
   });
 
-  it("uma falha muda não inventa mensagem nenhuma", async () => {
+  it("uma falha muda não põe «500» no ecrã — diz o número dentro de uma frase", async () => {
+    // O aviso mostra a `errorMessage` tal e qual, portanto o que aqui saía em
+    // cru era o que ela lia: «500». O número continua lá (é o que se cita a
+    // pedir ajuda), agora com o que se passou e o que fazer à volta dele.
     replies = [{ status: 500, body: null }];
     const { result } = renderHook(() => useCachedList("k", "/api/k"));
     await waitFor(() => expect(result.current.error).toBe(true));
-    expect(result.current.errorMessage).toBe("500");
+    expect(result.current.errorMessage).not.toBe("500");
+    expect(result.current.errorMessage).toContain("(500)");
+    expect(result.current.errorMessage).toMatch(/tenta outra vez/i);
+    expect(result.current.falha?.valeTentarDeNovo).toBe(true);
+  });
+
+  it("com a sessão caída não oferece um «Tentar de novo» que não pode funcionar", async () => {
+    // O caso mais comum de uma leitura falhada: o back office fica aberto
+    // horas e o cookie caduca sozinho. Pedir outra vez com a mesma sessão dá
+    // o mesmo 401 — quem resolve isto é a reentrada.
+    replies = [{ status: 401, body: { error: "Não autorizado" } }];
+    const { result } = renderHook(() => useCachedList("k", "/api/k"));
+    await waitFor(() => expect(result.current.error).toBe(true));
+    expect(result.current.falha?.sessaoExpirou).toBe(true);
+    expect(result.current.falha?.valeTentarDeNovo).toBe(false);
+    expect(result.current.errorMessage).toMatch(/sessão expirou/i);
+    expect(result.current.errorMessage).toMatch(/volta a entrar/i);
+  });
+
+  it("a frase de uma LEITURA não manda repetir nem fala do que se escreveu", async () => {
+    replies = [{ status: 503, body: null }];
+    const { result } = renderHook(() => useCachedList("k", "/api/k"));
+    await waitFor(() => expect(result.current.error).toBe(true));
+    expect(result.current.errorMessage).not.toMatch(/\brepete\b|escreveste|gravaç/i);
+  });
+
+  it("sem rede, diz que foi a ligação — e não inventa um número", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
+    );
+    const { result } = renderHook(() => useCachedList("k", "/api/k"));
+    await waitFor(() => expect(result.current.error).toBe(true));
+    expect(result.current.falha?.razao).toBe("sem-rede");
+    expect(result.current.errorMessage).toContain("Sem ligação");
   });
 
   it("uma leitura que corre bem a seguir limpa o erro E a mensagem", async () => {
@@ -86,6 +123,7 @@ describe("useCachedList — primeira visita", () => {
     act(() => result.current.refresh());
     await waitFor(() => expect(result.current.error).toBe(false));
     expect(result.current.errorMessage).toBe("");
+    expect(result.current.falha).toBeNull();
   });
 });
 

@@ -92,7 +92,11 @@ describe("Tarefas — reposição depois de uma gravação recusada", () => {
 
     // 3. Só agora o servidor recusa a alteração de A.
     recusarGravacaoDeA();
-    expect(await screen.findByText(/Não foi possível guardar as alterações/)).toBeInTheDocument();
+    // O aviso nomeia a tarefa (e é um 500, portanto diz que o servidor é que
+    // está em baixo): numa lista de dezasseis linhas, «Não foi possível guardar
+    // as alterações» não diz o que ficou por gravar.
+    const aviso = await screen.findByText(/não está a aceitar gravações/);
+    expect(aviso).toHaveTextContent("Confirmar catering");
 
     // O título de A volta ao que era — isso é a reposição a fazer o seu trabalho.
     expect(screen.getByText("Confirmar catering")).toBeInTheDocument();
@@ -124,7 +128,8 @@ describe("Tarefas — reposição depois de uma gravação recusada", () => {
     await waitFor(() => expect(screen.queryByText("Ligar à florista")).not.toBeInTheDocument());
 
     recusarGravacaoDeA();
-    expect(await screen.findByText(/Não foi possível guardar as alterações/)).toBeInTheDocument();
+    const aviso = await screen.findByText(/não está a aceitar gravações/);
+    expect(aviso).toHaveTextContent("Confirmar catering");
 
     // Uma tarefa que já não existe na base de dados não pode ressuscitar no ecrã.
     expect(screen.queryByText("Ligar à florista")).not.toBeInTheDocument();

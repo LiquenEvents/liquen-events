@@ -20,6 +20,8 @@ import { getQuote, updateQuoteWith } from "@/lib/quotes-store";
 import { eur, eurDocumento } from "@/lib/money";
 import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { renderStoredProposalDocPdfWithReport } from "@/lib/proposal-doc-render";
+import { chaveDoPdf } from "@/lib/proposal-pdf-cache";
+import { guardarPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import {
   ehIdiomaDaProposta,
   IDIOMA_POR_OMISSAO,
@@ -1493,6 +1495,41 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // fora, o que deixava a porta aberta exactamente para o caso que a magoou:
     // a proposta segue para o noivo com fotos a menos, em silêncio.
     //
+    /**
+     * ══════════════════════════════════════════════════════════════════════
+     * O PDF FICA GUARDADO, PARA O CASAL NÃO O MANDAR DESENHAR OUTRA VEZ
+     * ══════════════════════════════════════════════════════════════════════
+     *
+     * Na página onde o casal aceita a proposta há um «Ver a proposta completa
+     * (PDF)». Era um link directo: carregava-se, e a página não sabia de nada
+     * — nem que estava a trabalhar, nem que tinha falhado. Do outro lado, o
+     * servidor REDESENHAVA o documento inteiro, com as oitenta fotografias a
+     * passar outra vez pelo `sharp`. Num processo acabado de arrancar — que é
+     * o caso normal três dias depois do envio — são segundos.
+     *
+     * A escolha entre dar-lhe uma espera com nome e tirar-lhe a espera foi
+     * fácil: **o ficheiro já está desenhado.** É este `pdfBuffer`, o mesmo que
+     * acabou de seguir em anexo e cujo `sha256` ficou selado no contrato.
+     *
+     * ── PORQUÊ AQUI, DEPOIS DO EMAIL ─────────────────────────────────────
+     *
+     * Porque nada disto pode atrasar o correio. Se a escrita falhar, o casal
+     * recebe a proposta na mesma e o botão volta a desenhar como sempre fez —
+     * é memória, não é a verdade. Por isso não há `throw`, e o desfecho vai
+     * no registo e não na resposta: quem enviou não tem nada a fazer com esta
+     * informação.
+     */
+    try {
+      const guardou = await guardarPdfDaProposta(proposal.id, chaveDoPdf(doc, idioma), pdfBuffer);
+      if (!guardou) {
+        log.warn("proposta-doc: o PDF não ficou guardado — o link do casal vai redesenhar", {
+          id: proposal.id,
+        });
+      }
+    } catch (e) {
+      log.warn("proposta-doc: o PDF não ficou guardado", { erro: String(e) });
+    }
+
     // `truncations` viaja pelo mesmo motivo e pelo mesmo caminho: é a mesma
     // perda vista do outro lado — conteúdo que chegou e que a página não
     // desenhou.

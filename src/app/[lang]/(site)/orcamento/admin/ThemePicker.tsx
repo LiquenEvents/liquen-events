@@ -23,6 +23,8 @@ import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
 import { MEDIDA_LG, useMedida } from "./useMedida";
 import { Ajuda, Button } from "./ui";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
+import { porqueNaoLeu, porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
 import { CuradoriaDeFotos } from "./CuradoriaDeFotos";
 import { PaginaEmConstrucao, type FotoDaPagina } from "./PaginaEmConstrucao";
 import {
@@ -690,6 +692,24 @@ function reservePhotos(job: ImportJob, photos: readonly JobPhoto[]): void {
   job.reserve(photos.map((p) => ({ marcador: p.marcador, thumbUrl: p.thumb, sourcePath: p.path })));
 }
 
+/**
+ * Uma recusa do SERVIDOR com a frase já escolhida.
+ *
+ * Distingue-se do que a rede atira sozinha (um `TypeError: Failed to fetch`,
+ * que é inglês de browser e não diz nada a ninguém): o que sai daqui vai
+ * direito à pastilha, e o resto passa pelo `porqueRebentou`.
+ */
+class RecusaDoLote extends Error {}
+
+/** O mesmo para as LEITURAS da grelha: leva a razão apurada até ao `catch`,
+ *  em vez de lá chegar um «falhou» que não diz nem o estado nem o porquê. */
+class ErroDaPagina extends Error {
+  constructor(readonly falha: LeituraFalhada) {
+    super(falha.mensagem);
+    this.name = "ErroDaPagina";
+  }
+}
+
 async function runJob(job: ImportJob): Promise<void> {
   job.running = true;
   job.error = null;
@@ -721,7 +741,27 @@ async function runJob(job: ImportJob): Promise<void> {
         signal: job.emVoo.signal,
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "Falha ao adicionar as imagens.");
+      if (!res.ok) {
+        /**
+         * A FRASE DO SERVIDOR GANHA AQUI, INCLUSIVE NUM 500.
+         *
+         * Esta rota não devolve rastos de pilha: devolve queixas escritas para
+         * ela ler («Não foi possível copiar as fotos», o tema que sumiu, o
+         * espaço que acabou). É a única coisa na resposta que diz o que se
+         * passou com ESTE lote. Quando não vem nenhuma, entra a classificação
+         * do `porqueFalhou` — que ao menos separa a sessão expirada (onde
+         * repetir não pode funcionar) do servidor em baixo.
+         */
+        const doServidor = typeof data?.error === "string" ? data.error.trim() : "";
+        throw new RecusaDoLote(
+          doServidor ||
+            porqueFalhou(
+              `adicionar ${chunk.length === 1 ? "1 foto" : `${chunk.length} fotos`} ao mood board`,
+              res,
+              data,
+            ).mensagem,
+        );
+      }
       const copied: ImportedImage[] = Array.isArray(data?.images) ? data.images : [];
       const failedHere: string[] = Array.isArray(data?.failed) ? data.failed : [];
       // A ORIGEM de cada foto vem agora NA RESPOSTA (`sourcePath`), desde que a
@@ -759,7 +799,15 @@ async function runJob(job: ImportJob): Promise<void> {
       // fosse o servidor a queixar-se.
       const abortado = err instanceof DOMException && err.name === "AbortError";
       if (!job.error && !abortado) {
-        job.error = err instanceof Error ? err.message : "Falha ao adicionar as imagens.";
+        // Só a recusa do servidor traz frase pronta. Tudo o resto que rebenta
+        // aqui é a rede (ou um corpo ilegível), e aí o que importa dizer é que
+        // nada se perdeu e que repetir resolve — não «Failed to fetch».
+        job.error =
+          err instanceof RecusaDoLote
+            ? err.message
+            : porqueRebentou(
+                `adicionar ${chunk.length === 1 ? "1 foto" : `${chunk.length} fotos`} ao mood board`,
+              ).mensagem;
       }
       for (const p of chunk) mark(job, p, "failed");
       largar(chunk);
@@ -1080,6 +1128,17 @@ export default function ThemePicker({
   const [themes, setThemes] = useState<ThemeSummary[]>(() => temasEmCache() ?? []);
   const [loadingThemes, setLoadingThemes] = useState(() => temasEmCache() === null);
   /**
+   * A lista de temas não veio — e isso NÃO é uma biblioteca vazia.
+   *
+   * O que acontecia: a leitura falhava, saía um aviso passageiro, e o painel
+   * ficava a dizer «Ainda não há temas. Cria o primeiro em Temas, no menu
+   * lateral, e carrega lá as fotos de inspiração.» a quem tem vinte e cinco
+   * temas cheios. A frase é uma AFIRMAÇÃO sobre a biblioteca dela, e uma
+   * leitura que não aconteceu não a sabe fazer. Pior: o passo que manda dar é
+   * ir criar de novo o que já existe.
+   */
+  const [falhaTemas, setFalhaTemas] = useState<LeituraFalhada | null>(null);
+  /**
    * Começa JÁ num tema, sem esperar por rede nenhuma.
    *
    * Com a lista em cache, é o tema PREFERIDO — o desta sessão, o da sessão
@@ -1130,6 +1189,13 @@ export default function ThemePicker({
   const [pageFull, setPageFull] = useState(() => cachedTheme(themeId)?.pageFull ?? false);
   /** A pasta não pôde ser LIDA. Não é o mesmo que "tema sem fotos". */
   const [unreadable, setUnreadable] = useState(false);
+  /**
+   * A leitura da pasta REBENTOU (e não «o servidor leu-a e não conseguiu»,
+   * que é o `unreadable` acima). Ficava só num aviso passageiro, e a grelha
+   * por baixo dizia «Este tema ainda não tem fotos» — a mentira que manda
+   * carregar outra vez o que já lá está.
+   */
+  const [falhaFotos, setFalhaFotos] = useState<LeituraFalhada | null>(null);
   const [loadingImages, setLoadingImages] = useState(() => cachedTheme(themeId) === null);
   const [loadingMore, setLoadingMore] = useState(false);
   /** A página seguinte, já pedida e guardada — ver o efeito de adiantamento. */
@@ -1296,6 +1362,7 @@ export default function ThemePicker({
         const list = await buscarTemas();
         if (!active) return;
         setThemes(list);
+        setFalhaTemas(null);
         // A lista chega DEPOIS de já se estarem a pedir as imagens do tema
         // adivinhado. Aqui só se corrige o palpite quando ele estava errado: o
         // tema guardado foi apagado, ou nunca houve nenhum. Quando estava
@@ -1305,8 +1372,15 @@ export default function ThemePicker({
           if (atual && list.some((t) => t.id === atual)) return atual;
           return preferredThemeId(list, usadasRef.current);
         });
-      } catch {
-        if (active) toast("Não foi possível carregar os temas.", "error");
+      } catch (e) {
+        if (!active) return;
+        // O `buscarTemas` da cache não deixa passar o estado da resposta (só um
+        // «falhou»), portanto a razão é tão precisa quanto o que chega aqui:
+        // sem rede diz-se sem rede, e no resto diz-se que não veio explicação
+        // — que é a verdade, e é diferente de dizer que não há temas.
+        const falha = porqueNaoLeuDoErro("os temas", e);
+        setFalhaTemas(falha);
+        toast(falha.mensagem, "error");
       } finally {
         if (active) setLoadingThemes(false);
       }
@@ -1333,6 +1407,7 @@ export default function ThemePicker({
       setTruncated(pagina.truncated);
       setPageFull(pagina.pageFull);
       setUnreadable(pagina.unreadable);
+      setFalhaFotos(null);
     };
 
     setFocusIndex(0);
@@ -1367,6 +1442,7 @@ export default function ThemePicker({
     setTruncated(false);
     setPageFull(false);
     setUnreadable(false);
+    setFalhaFotos(null);
     (async () => {
       // Vai haver pedido: a grelha está a CARREGAR, não vazia. Sem isto, o
       // tema corrigido depois de um palpite errado passava um instante pela
@@ -1382,7 +1458,17 @@ export default function ThemePicker({
         // mostrar um erro por causa de um palpite nosso.
         const foi404 = err instanceof Error && err.message === "404";
         if (foi404 && !themesRef.current.some((t) => t.id === themeId)) return;
-        if (active) toast("Não foi possível carregar as fotos deste tema.", "error");
+        if (!active) return;
+        // A `buscarPrimeiraPagina` guarda o estado da resposta na mensagem do
+        // erro (é o que o teste do 404 acima já lia), portanto aqui sabe-se
+        // mesmo porquê: a sessão que caiu diz «volta a entrar», e não «tenta
+        // outra vez daqui a pouco», que era o que ela ia fazer para sempre.
+        //
+        // Como no aviso do lado de lá: o passageiro nomeia a coisa, o painel
+        // que fica na grelha já a tem no título.
+        const frase = (oQue: string) => porqueNaoLeuDoErro(oQue, err);
+        setFalhaFotos(frase(""));
+        toast(frase("as fotos deste tema").mensagem, "error");
       } finally {
         if (active) setLoadingImages(false);
       }
@@ -1451,7 +1537,10 @@ export default function ThemePicker({
         `/api/temas/${themeId}/imagens?offset=${nextOffset}&limit=${THEME_PAGE_SIZE}`,
         { cache: "no-store" },
       );
-      if (!res.ok) throw new Error("falhou");
+      if (!res.ok) {
+        const corpo = await res.json().catch(() => null);
+        throw new ErroDaPagina(porqueNaoLeu("mais fotos deste tema", res, corpo));
+      }
       const data = await res.json();
       if (!alive.current) return;
       const page: ThemeImage[] = Array.isArray(data?.images) ? data.images : [];
@@ -1461,8 +1550,15 @@ export default function ThemePicker({
         Boolean(data?.truncated),
         page.length >= THEME_PAGE_SIZE,
       );
-    } catch {
-      toast("Não foi possível carregar mais fotos.", "error");
+    } catch (e) {
+      // As fotos que já estão na grelha ficam — o que falhou foi o PEDAÇO
+      // seguinte, e deitar fora o que já se vê seria trocar uma lista curta
+      // por nenhuma. O que muda é o aviso: diz porquê e o que fazer.
+      toast(
+        (e instanceof ErroDaPagina ? e.falha : porqueNaoLeuDoErro("mais fotos deste tema", e))
+          .mensagem,
+        "error",
+      );
     } finally {
       if (alive.current) setLoadingMore(false);
     }
@@ -2032,6 +2128,14 @@ export default function ThemePicker({
                   <div key={i} className="bo-skeleton h-8 w-24 rounded-xl" aria-hidden />
                 ))}
               </div>
+            ) : falhaTemas && themes.length === 0 ? (
+              /* Uma leitura que não aconteceu não sabe afirmar que não há
+                 temas — e o convite a criar o primeiro mandava-a refazer o que
+                 já tem. Aqui diz-se o que se passou e o passo a dar. */
+              <div>
+                <p className="text-sm text-foreground/75">Não foi possível ler os temas.</p>
+                <p className="bo-text-muted mt-1 text-xs">{falhaTemas.mensagem}</p>
+              </div>
             ) : themes.length === 0 ? (
               <p className="bo-text-muted text-sm">
                 Ainda não há temas. Cria o primeiro em <strong>Temas</strong>, no menu lateral, e
@@ -2369,7 +2473,7 @@ export default function ThemePicker({
                           />
                         ))}
                       </div>
-                    ) : !themeId ? null : unreadable ? (
+                    ) : !themeId ? null : unreadable || falhaFotos ? (
                       // Falha de leitura NÃO é "tema sem fotos" — dizer-lhe que o tema
                       // está vazio seria mentira, e mandava-a carregar tudo outra vez.
                       <div className="py-8 text-center">
@@ -2377,7 +2481,12 @@ export default function ThemePicker({
                           Não foi possível ler a pasta deste tema agora.
                         </p>
                         <p className="bo-text-muted mt-1 text-xs">
-                          É uma falha temporária — as fotos não desapareceram. Tenta daqui a pouco.
+                          {/* A razão, quando se sabe qual foi. O texto de reserva é
+                              para a pasta que o SERVIDOR leu e não conseguiu abrir
+                              (um 200 com `ok: false`): aí sabe-se mesmo só que a
+                              falha é do lado de lá e passageira. */}
+                          {falhaFotos?.mensagem ??
+                            "É uma falha temporária — as fotos não desapareceram. Tenta daqui a pouco."}
                         </p>
                       </div>
                     ) : images.length === 0 ? (

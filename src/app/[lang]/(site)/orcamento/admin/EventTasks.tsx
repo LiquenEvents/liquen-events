@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Quote, Task, TaskPriority } from "@/lib/orcamento/types";
 import { todayKey } from "./util";
 import { useToast } from "./Toast";
-import { Button, Field, EmptyState } from "./ui";
+import { Button, Field, EmptyState, PerguntaDestrutiva } from "./ui";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useCachedList } from "./useCachedList";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
   baixa: "#8a8a82",
@@ -22,6 +23,45 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
 
 // Para ordenar as tarefas por fazer: mais urgente primeiro.
 const PRIORITY_RANK: Record<TaskPriority, number> = { alta: 0, normal: 1, baixa: 2 };
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * ELIMINAR UMA TAREFA — porque é que deixou de ser um `window.confirm`
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O que estava aqui era `window.confirm('Eliminar a tarefa "X"?')`. Nomeava a
+ * tarefa, que já é mais do que a maioria fazia — mas ficava-se por aí, e tinha
+ * os defeitos da caixa do browser: não cabe em 375 px sem cortar a frase, não se
+ * traduz, não tem o desenho da casa e bloqueia o fio principal do browser
+ * enquanto está aberta.
+ *
+ * A pergunta que fica diz também o que se perde ALÉM do título — a prioridade,
+ * a data limite, quem estava encarregado — porque é isso que não se reescreve
+ * de cabeça, e porque a tarefa desaparece também da vista global de Tarefas, da
+ * Agenda e dos Lembretes, que leem esta mesma lista.
+ *
+ * PERGUNTA e não janela para anular: apagar uma tarefa é raro (ao contrário de
+ * a riscar, que é o gesto do dia) e é caro — repô-la seria criar OUTRA, com
+ * outro id, e tudo o que apontasse para a primeira ficava a apontar para o
+ * nada. Um «Anular» que não devolve a mesma coisa é pior do que não haver
+ * nenhum.
+ *
+ * CONCLUIR e REABRIR continuam sem pergunta nenhuma: é o mesmo botão nos dois
+ * sentidos, e desfaz-se com o mesmo dedo.
+ */
+
+/** Uma pergunta que nomeia o que se perde, e o que fazer se a resposta for sim. */
+interface Pergunta {
+  /** A pergunta, com o NOME da coisa lá dentro. Nunca «Tens a certeza?». */
+  titulo: string;
+  /** Uma linha por coisa que desaparece, cada uma com o seu número. */
+  oQueSePerde: ReactNode[];
+  /** A frase por baixo da lista. */
+  aviso?: ReactNode;
+  /** O verbo, repetido no botão: «Eliminar a tarefa», não «Confirmar». */
+  rotulo: string;
+  fazer: () => void | Promise<void>;
+}
 
 interface Props {
   quote: Quote;
@@ -66,68 +106,147 @@ export default function EventTasks({ quote, userName }: Props) {
   const [newPriority, setNewPriority] = useState<TaskPriority>("normal");
   const [newDue, setNewDue] = useState("");
   const [busy, setBusy] = useState(false);
+  /** A pergunta em curso — ver o comentário no topo do ficheiro. */
+  const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As três escritas diziam «Não foi possível atualizar a tarefa. Tenta
+   * novamente.», «Não foi possível criar a tarefa. Tenta novamente.» e «Erro
+   * de ligação. Verifica a internet e tenta novamente.» — a mesma resposta
+   * («tenta novamente») para a sessão expirada e para a tarefa que outra
+   * pessoa já apagou, onde repetir falha sempre. E nenhuma dizia QUAL tarefa,
+   * num painel que mostra a lista toda do evento.
+   *
+   * Um sítio só a fazer fetch e a escolher a frase. Devolve o corpo porque o
+   * `addTask` precisa da tarefa criada, e `ok` porque as outras duas têm de
+   * poder desfazer o que puseram no ecrã.
+   */
+  async function gravar(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch {
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return { ok: false, corpo: null };
+    }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return { ok: false, corpo };
+    }
+    return { ok: true, corpo };
+  }
 
   async function toggleDone(task: Task) {
     setAllTasks((prev) =>
       (prev ?? []).map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)),
     );
-    const res = await fetch(`/api/tarefas/${task.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !task.done }),
-    }).catch(() => null);
-    if (!res?.ok) {
-      setAllTasks((prev) => (prev ?? []).map((t) => (t.id === task.id ? task : t)));
-      toast("Não foi possível atualizar a tarefa. Tenta novamente.", "error");
-    }
+    const { ok } = await gravar(
+      `${task.done ? "reabrir" : "concluir"} a tarefa «${task.title}»`,
+      `/api/tarefas/${task.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done: !task.done }),
+      },
+    );
+    if (!ok) setAllTasks((prev) => (prev ?? []).map((t) => (t.id === task.id ? task : t)));
   }
 
   async function addTask() {
     if (!newTitle.trim() || busy) return;
+    const titulo = newTitle.trim();
     setBusy(true);
-    try {
-      const res = await fetch("/api/tarefas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTitle.trim(),
-          priority: newPriority,
-          dueDate: newDue || undefined,
-          quoteId: quote.id,
-          clientName: quote.name,
-          assignee: userName || undefined,
-          // Marca a área para estas tarefas poderem ser filtradas/agrupadas numa
-          // vista global de tarefas (antes ficavam sem área e perdiam-se).
-          area: "Produção",
-        }),
-      });
-      const created = res.ok ? await res.json().catch(() => null) : null;
-      if (created?.id) {
-        setAllTasks((prev) => [...(prev ?? []), created]);
-        setNewTitle("");
-        setNewPriority("normal");
-        setNewDue("");
-        setAdding(false);
-      } else {
-        toast("Não foi possível criar a tarefa. Tenta novamente.", "error");
-      }
-    } catch {
-      toast("Erro de ligação. Verifica a internet e tenta novamente.", "error");
-    } finally {
-      setBusy(false);
+    const { ok, corpo } = await gravar(`criar a tarefa «${titulo}»`, "/api/tarefas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: titulo,
+        priority: newPriority,
+        dueDate: newDue || undefined,
+        quoteId: quote.id,
+        clientName: quote.name,
+        assignee: userName || undefined,
+        // Marca a área para estas tarefas poderem ser filtradas/agrupadas numa
+        // vista global de tarefas (antes ficavam sem área e perdiam-se).
+        area: "Produção",
+      }),
+    });
+    setBusy(false);
+    if (!ok) return;
+    const criada = corpo as Task | null;
+    /**
+     * Gravou-se, mas o que voltou não é uma tarefa.
+     *
+     * Isto dizia «Não foi possível criar a tarefa» e deixava o formulário
+     * cheio — sobre uma tarefa que o servidor ACEITOU. Quem lê carrega outra
+     * vez e fica com ela duas vezes na lista do evento. O que se diz agora é o
+     * contrário: ficou gravada, só não a conseguimos mostrar.
+     */
+    if (!criada?.id) {
+      toast("Tarefa criada, mas não deu para a mostrar. Atualiza a página.", "error");
+      return;
     }
+    setAllTasks((prev) => [...(prev ?? []), criada]);
+    setNewTitle("");
+    setNewPriority("normal");
+    setNewDue("");
+    setAdding(false);
+  }
+
+  /** A pergunta de eliminar — ver o comentário no topo do ficheiro. */
+  function perguntarSeElimina(task: Task) {
+    const ficam = tasks.length - 1;
+    const perde: string[] = [
+      `${task.done ? "está concluída" : "está por fazer"}, prioridade ${PRIORITY_LABEL[
+        task.priority
+      ].toLowerCase()}`,
+    ];
+    if (task.dueDate) {
+      perde.push(
+        `a data limite de ${new Date(task.dueDate + "T12:00:00").toLocaleDateString("pt-PT", {
+          day: "numeric",
+          month: "long",
+        })}`,
+      );
+    }
+    if (task.assignee) perde.push(`o nome de quem ficou com ela (${task.assignee})`);
+    perde.push(
+      `sai também da lista global de tarefas — ficam ${ficam} ${
+        ficam === 1 ? "tarefa" : "tarefas"
+      } em «${quote.name}»`,
+    );
+    setAPerguntar({
+      titulo: `Eliminar a tarefa «${task.title}»?`,
+      oQueSePerde: perde,
+      aviso: "Não pode ser anulado.",
+      rotulo: "Eliminar a tarefa",
+      fazer: () => removeTask(task.id),
+    });
   }
 
   async function removeTask(id: string) {
     const task = tasks.find((t) => t.id === id);
-    if (task && !window.confirm(`Eliminar a tarefa "${task.title}"?`)) return;
     setAllTasks((prev) => (prev ?? []).filter((t) => t.id !== id));
-    try {
-      const res = await fetch(`/api/tarefas/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-    } catch {
-      if (task) setAllTasks((prev) => [...(prev ?? []), task]);
-      toast("Não foi possível eliminar a tarefa. Tenta novamente.", "error");
+    const { ok } = await gravar(
+      `eliminar a tarefa «${task?.title ?? "sem título"}»`,
+      `/api/tarefas/${id}`,
+      { method: "DELETE" },
+    );
+    // Só volta ao ecrã se ainda lá não estiver: com duas remoções no ar, a que
+    // falha não pode ressuscitar a que o servidor já apagou.
+    if (!ok && task) {
+      setAllTasks((prev) =>
+        (prev ?? []).some((t) => t.id === id) ? (prev ?? []) : [...(prev ?? []), task],
+      );
     }
   }
 
@@ -363,7 +482,7 @@ export default function EventTasks({ quote, userName }: Props) {
                   como aparecia. E `alvo-toque` porque, quando finalmente
                   aparecia, media 13×13 px contra os 44 da casa. */}
               <button
-                onClick={() => removeTask(task.id)}
+                onClick={() => perguntarSeElimina(task)}
                 className="alvo-toque mt-0.5 shrink-0 text-foreground/25 sem-rato:text-foreground/55 opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 hover:text-[#8a2a22] motion-safe:transition-all"
                 aria-label="Remover tarefa"
               >
@@ -383,6 +502,30 @@ export default function EventTasks({ quote, userName }: Props) {
           ))}
         </div>
       )}
+
+      {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
+          `ui/PerguntaDestrutiva`: folha inferior no telemóvel (ao pé do
+          polegar), diálogo centrado no computador, e o verbo repetido no botão
+          em vez de «OK». Um `confirm()` do browser não cabe em 375 px, não se
+          traduz e não leva uma lista de números lá dentro — que é a única
+          coisa que faz a pergunta valer a pena. */}
+      <PerguntaDestrutiva
+        aberto={!!aPerguntar}
+        onFechar={() => setAPerguntar(null)}
+        titulo={aPerguntar?.titulo ?? ""}
+        oQueSePerde={aPerguntar?.oQueSePerde}
+        aviso={aPerguntar?.aviso}
+        rotuloConfirmar={aPerguntar?.rotulo ?? ""}
+        // Fecha PRIMEIRO e só depois age, em vez de esperar pela resposta com a
+        // caixa aberta: estes ecrãs são optimistas — tiram a linha logo e
+        // repõem-na se o servidor recusar — e uma caixa a rodar por cima deles
+        // atrasaria um gesto que hoje é instantâneo, e impedia dois seguidos.
+        onConfirmar={() => {
+          const escolhido = aPerguntar;
+          setAPerguntar(null);
+          void escolhido?.fazer();
+        }}
+      />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Button, Card, EmptyState, Field, MenuDeAccoes, type AccaoDeItem } from 
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { metaFor } from "./status-meta";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string }> = {
   alta: { label: "Alta", color: "#b5654a" },
@@ -330,9 +331,52 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
     });
   }, []);
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════
+   * UMA GRAVAÇÃO, E UMA FRASE QUE DIZ QUAL TAREFA
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * As quatro escritas deste ficheiro tinham cada uma a sua cópia do mesmo
+   * `try { fetch } catch { toast("Não foi possível …") }`, e as quatro frases
+   * serviam seis situações com respostas diferentes — a rede em baixo, a
+   * sessão expirada, a tarefa apagada por outra pessoa, o servidor em baixo.
+   * Nenhuma delas dizia QUAL tarefa: numa lista de dezasseis linhas, «Não foi
+   * possível atualizar a tarefa» não chega para saber o que não ficou feito.
+   *
+   * Agora há um sítio só a fazer o pedido, a verificar o `ok` e a escolher a
+   * frase (`porque-falhou`), e devolve `ok` em vez de atirar porque quem chama
+   * tem de poder REPOR o ecrã. É o padrão de `MaterialListas`.
+   */
+  const gravar = useCallback(
+    async (
+      oQue: string,
+      url: string,
+      init?: RequestInit,
+    ): Promise<{ ok: boolean; corpo: unknown }> => {
+      let res: Response;
+      try {
+        res = await fetch(url, init);
+      } catch {
+        toast(porqueRebentou(oQue).mensagem, "error");
+        return { ok: false, corpo: null };
+      }
+      const corpo = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+        return { ok: false, corpo };
+      }
+      return { ok: true, corpo };
+    },
+    [toast],
+  );
+
   async function saveEditTask(id: string) {
     // Repõe-se ESTA tarefa, não a lista. Ver a nota sobre a reposição em `toggle`.
     const anterior = tasksRef.current.find((t) => t.id === id);
+    // O nome no aviso é o que ela vê na lista DEPOIS da reposição — o antigo.
+    // Nomear a tarefa pelo título novo mandava-a procurar uma linha que o ecrã
+    // já não tem.
+    const titulo = anterior?.title || editTaskFields.title.trim() || "tarefa";
     setTasks((prev) =>
       prev.map((t) =>
         t.id === id
@@ -341,54 +385,51 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       ),
     );
     setEditingTaskId(null);
-    try {
-      const res = await fetch(`/api/tarefas/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...editTaskFields,
-          title: editTaskFields.title.trim() || undefined,
-        }),
-      });
-      if (!res.ok) throw new Error();
-    } catch {
-      if (anterior) setTasks((prev) => prev.map((t) => (t.id === id ? anterior : t)));
-      toast("Não foi possível guardar as alterações. Tenta novamente.", "error");
-    }
+    const { ok } = await gravar(`guardar as alterações a «${titulo}»`, `/api/tarefas/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...editTaskFields,
+        title: editTaskFields.title.trim() || undefined,
+      }),
+    });
+    if (!ok && anterior) setTasks((prev) => prev.map((t) => (t.id === id ? anterior : t)));
   }
 
   async function add() {
     const t = title.trim();
     if (!t || adding) return;
     setAdding(true);
-    try {
-      const res = await fetch("/api/tarefas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: t,
-          priority,
-          dueDate: dueDate || undefined,
-          assignee: assignee.trim() || undefined,
-          area: area || undefined,
-        }),
-      });
-      if (res.ok) {
-        const task = await res.json();
-        setTasks((prev) => [task, ...prev]);
-        setTitle("");
-        setDueDate("");
-        setPriority("normal");
-        setArea("");
-        setAssignee(defaultAssignee && defaultAssignee !== "Equipa" ? defaultAssignee : "");
-      } else {
-        toast("Não foi possível criar a tarefa. Tenta novamente.", "error");
-      }
-    } catch {
-      toast("Erro de ligação. Verifica a internet e tenta novamente.", "error");
-    } finally {
-      setAdding(false);
+    const { ok, corpo } = await gravar(`criar a tarefa «${t}»`, "/api/tarefas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: t,
+        priority,
+        dueDate: dueDate || undefined,
+        assignee: assignee.trim() || undefined,
+        area: area || undefined,
+      }),
+    });
+    setAdding(false);
+    if (!ok) return;
+    const task = corpo as Task | null;
+    // Um 200 sem tarefa no corpo não é uma tarefa criada: enfiar `null` na
+    // lista rebentava a linha a seguir, ao desenhá-la. Gravada está — o que
+    // falta é a versão do servidor, e essa vem no recarregamento.
+    if (!task?.id) {
+      toast(
+        `A tarefa «${t}» ficou gravada, mas não voltou do servidor. Atualiza a página.`,
+        "error",
+      );
+      return;
     }
+    setTasks((prev) => [task, ...prev]);
+    setTitle("");
+    setDueDate("");
+    setPriority("normal");
+    setArea("");
+    setAssignee(defaultAssignee && defaultAssignee !== "Equipa" ? defaultAssignee : "");
   }
 
   const toggle = useCallback(
@@ -403,19 +444,22 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       // concluída no servidor — o desfecho que o `touch` do `tasks-store` existe
       // para impedir, só que aqui sem servidor nenhum pelo meio.
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
-      try {
-        const res = await fetch(`/api/tarefas/${task.id}`, {
+      const { ok } = await gravar(
+        task.done
+          ? `reabrir a tarefa «${task.title}»`
+          : `dar por concluída a tarefa «${task.title}»`,
+        `/api/tarefas/${task.id}`,
+        {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ done: !task.done }),
-        });
-        if (!res.ok) throw new Error();
-      } catch {
+        },
+      );
+      if (!ok) {
         setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: task.done } : t)));
-        toast("Não foi possível atualizar a tarefa. Tenta novamente.", "error");
       }
     },
-    [setTasks, toast],
+    [setTasks, gravar],
   );
 
   const remove = useCallback(
@@ -428,20 +472,22 @@ export default function Tarefas({ defaultAssignee = "" }: { defaultAssignee?: st
       // gravações tenham feito entretanto (ver a nota em `toggle`).
       const posicao = tasksRef.current.findIndex((x) => x.id === id);
       setTasks((prev) => prev.filter((x) => x.id !== id));
-      try {
-        const res = await fetch(`/api/tarefas/${id}`, { method: "DELETE" });
-        if (!res.ok) throw new Error();
-      } catch {
-        if (t)
-          setTasks((prev) => {
-            if (prev.some((x) => x.id === id)) return prev;
-            const onde = Math.min(posicao < 0 ? prev.length : posicao, prev.length);
-            return [...prev.slice(0, onde), t, ...prev.slice(onde)];
-          });
-        toast("Não foi possível eliminar a tarefa. Tenta novamente.", "error");
+      const { ok } = await gravar(
+        `eliminar a tarefa «${t?.title ?? "sem título"}»`,
+        `/api/tarefas/${id}`,
+        {
+          method: "DELETE",
+        },
+      );
+      if (!ok && t) {
+        setTasks((prev) => {
+          if (prev.some((x) => x.id === id)) return prev;
+          const onde = Math.min(posicao < 0 ? prev.length : posicao, prev.length);
+          return [...prev.slice(0, onde), t, ...prev.slice(onde)];
+        });
       }
     },
-    [setTasks, toast],
+    [setTasks, gravar],
   );
 
   // Uma passagem só: as pessoas, e quantas tarefas por fazer tem cada uma. Antes

@@ -10,6 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { quandoGravado } from "@/lib/quando-gravado";
 import { porqueFalhouOEnvio } from "./porque-falhou-o-envio";
 import { useToast } from "./Toast";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -125,7 +126,7 @@ import NavEstudio from "./NavEstudio";
 import NotasInternas from "./NotasInternas";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
-import { folhasAproximadas } from "@/lib/proposal-paginas";
+import { boardsQueSaem, folhasAproximadas } from "@/lib/proposal-paginas";
 import { avisoDeTituloParecido, titulosParecidos } from "@/lib/proposal-titulos-parecidos";
 import { depositPercentOf } from "@/lib/proposal-doc";
 // A geometria do documento, para a pré-visualização mostrar a forma que cada
@@ -787,9 +788,7 @@ export function textoDaGravacao(
   if (estado === "a-guardar") {
     return { curto: "…", longo: "a guardar…", leitor: "a guardar" };
   }
-  const horas = gravadoEm
-    ? gravadoEm.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })
-    : "";
+  const horas = gravadoEm ? quandoGravado(gravadoEm) : "";
   if (estado === "so-neste-computador") {
     // A hora entra na frase porque a pergunta seguinte dela é sempre «desde
     // quando?» — é o que lhe diz quanto trabalho está em risco.
@@ -1253,6 +1252,54 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
      * preciso. Comparado por identidade porque o documento é imutável: cada
      * alteração devolve um objecto novo.
      */
+    docNoMomento: StudioDoc;
+    aplicar: () => void;
+  } | null>(null);
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * O QUE SE APAGA E NÃO VOLTA: OU UMA PERGUNTA QUE CONTA, OU UM «ANULAR»
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A regra desta casa, escrita de uma vez para não ser decidida gesto a gesto:
+   *
+   *  · PERGUNTA-SE o que é RARO E CARO. Uma página de inspiração leva consigo
+   *    as fotografias todas que se escolheram para ela, uma a uma, e uma folha
+   *    do PDF; uma fase do cronograma leva as tarefas todas que lhe estão
+   *    dentro. Fazem-se poucas vezes por proposta e refazê-las é meia hora. A
+   *    pergunta NOMEIA a coisa, CONTA o que vai com ela e diz a consequência —
+   *    nunca «Tens a certeza?», que não acrescenta informação nenhuma e por
+   *    isso se responde sem ler.
+   *
+   *  · OFERECE-SE ANULAR o que é FREQUENTE E BARATO de refazer. Uma linha de
+   *    orçamento, uma tarefa do cronograma, uma fotografia de uma grelha: são
+   *    os gestos de que uma tarde de trabalho é feita, e uma caixa a perguntar
+   *    em cada um é um editor que ninguém usa. Faz-se, e fica o «Anular» dos
+   *    dez segundos (ver `limpo`) a dizer o que saiu.
+   *
+   * Uma coisa OU a outra, nunca as duas — a excepção está escrita em
+   * `confirmacaoDeDinheiro` e vale só para o dinheiro, onde a pergunta protege
+   * de carregar por engano e a anulação de confirmar por engano.
+   *
+   * E nada disto atrasa o que não é destrutivo: uma página em branco, uma fase
+   * sem título nem tarefas, uma linha por escrever — saem sem pergunta nenhuma
+   * e sem barra nenhuma. Perguntar por nada ensina a responder sem ler.
+   *
+   * ── PORQUE É QUE A PERGUNTA SE DESENHA ONDE O DEDO CARREGOU ───────────────
+   * Ao contrário da do dinheiro, que vive no topo do estúdio de propósito: as
+   * acções do dinheiro estão espalhadas por três secções e uma pergunta que
+   * aparecesse cada vez noutro sítio responder-se-ia sem se procurar o que ela
+   * diz. Estas são o contrário — com oito páginas escritas, o topo do estúdio
+   * está a metros do «×» que se carregou, e uma pergunta fora do ecrã é um
+   * botão que não fez nada. Portanto fica dentro do cartão, encostada ao gesto.
+   *
+   * `chave` é o que decide ONDE se desenha (`board:2`, `fase:0`), e o
+   * `docNoMomento` é a mesma cautela da pergunta do dinheiro: a frase foi
+   * composta com os números daquele instante, e se o documento mudar por baixo
+   * dela deixa de falar do que está no ecrã. Caducada, desaparece.
+   */
+  const [aRemover, setARemover] = useState<{
+    chave: string;
+    pergunta: string;
     docNoMomento: StudioDoc;
     aplicar: () => void;
   } | null>(null);
@@ -2171,7 +2218,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // parcial traz fotos de outro pedido e elas são recopiadas para cá. Sem uma
   // segunda leitura, as células ficavam sem miniatura até recarregar a página.
   const hidratarAssets = useCallback(
-    async (vivo: () => boolean = () => true) => {
+    async (vivo: () => boolean = () => true): Promise<EstadoDosUrls> => {
       {
         // «A caminho» também no reenvio: uma segunda tentativa que aparecesse
         // como «falhou» até responder era um botão que parece não fazer nada.
@@ -2187,18 +2234,19 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               estado: res.status,
             });
             if (vivo()) setEstadoDosUrls("falhou");
-            return;
+            return "falhou";
           }
           const data = await res.json().catch(() => null);
           const imgs: { path: string; url: string; thumbUrl?: string; cor?: string }[] =
             Array.isArray(data?.images) ? data.images : [];
-          if (!vivo()) return;
+          // Saiu de cena a meio: não há veredicto nenhum a dar a ninguém.
+          if (!vivo()) return "a-caminho";
           // Zero fotografias É uma resposta: uma proposta sem fotos nenhumas
           // não tem células, e um pedido que respondeu vazio não é um pedido
           // que falhou.
           if (imgs.length === 0) {
             setEstadoDosUrls("pronto");
-            return;
+            return "pronto";
           }
           /**
            * O guardado só conta se ainda for um candidato: um URL que uma
@@ -2238,17 +2286,42 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             return next;
           });
           setEstadoDosUrls("pronto");
+          return "pronto";
         } catch (e) {
           // Offline, ou o Storage em baixo. O estúdio continua a servir para
           // carregar fotos — o que não continua a servir é fingir que as que já
           // lá estão simplesmente não existem.
           log.warn("estúdio: não deu para ir buscar as fotografias", { erro: String(e) });
           if (vivo()) setEstadoDosUrls("falhou");
+          return "falhou";
         }
       }
     },
     [quote.id],
   );
+
+  /**
+   * O «Tentar» de uma célula que não carregou.
+   *
+   * ── QUANDO RESULTA, NÃO SE DIZ NADA ───────────────────────────────────────
+   * A fotografia aparece na própria célula onde ela carregou. Um aviso a dizer
+   * «pronto» por cima de uma foto que já se vê é ruído.
+   *
+   * ── QUANDO NÃO RESULTA, TEM DE SE DIZER ───────────────────────────────────
+   * E era este o buraco: falhar outra vez devolve exactamente a mesma caixa
+   * cinzenta de antes do clique — indistinguível de um botão que não fez nada.
+   * Ela carregava três, quatro vezes, sem maneira de saber se estava a pedir
+   * alguma coisa ao servidor.
+   */
+  const tentarBuscarFotos = useCallback(async () => {
+    const fim = await hidratarAssets();
+    if (fim === "falhou") {
+      toast(
+        "Também não deu desta vez. As fotografias estão guardadas — é a lista que não vem.",
+        "error",
+      );
+    }
+  }, [hidratarAssets, toast]);
 
   useEffect(() => {
     let alive = true;
@@ -3169,9 +3242,37 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * a divergência que isto veio fechar, e desta vez sem sugestão nenhuma a
    * corrigi-la.
    */
-  function fixarOrdem(porque: string) {
+  function fixarOrdem() {
     setDoc(arrumadoEExplicito);
-    toast(porque, "info");
+    // ── O QUE ARRUMOU, E NÃO «PRONTO» ──────────────────────────────────────
+    // As duas listas JÁ estão à vista pela ordem de saída (é o que a sugestão
+    // faz), portanto o clique não mexe um pixel no ecrã: o que se vê é o aviso
+    // desaparecer. «Ordem fixada.» deixava por responder a única pergunta que
+    // se faz a seguir — o que é que isto foi arrumar?
+    //
+    // A conta é das que MUDARAM DE LUGAR, e não das que existem: numa lista de
+    // catorze linhas com duas trocadas, «14 linhas arrumadas» seria uma
+    // mentira pequena a estragar a confiança no resto dos avisos.
+    //
+    // As duas listas contam-se em separado porque o gesto arruma SEMPRE as
+    // duas (ver `arrumadoEExplicito`) e o botão vive só numa delas — quem
+    // carrega no aviso do orçamento tem de saber que os mood boards também
+    // andaram.
+    const linhas = ordemDoOrcamento.filter((idx, i) => idx !== i).length;
+    const paginas = ordemDosBoards.filter((idx, i) => idx !== i).length;
+    const partes = [
+      linhas > 0 ? `${linhas} ${linhas === 1 ? "linha do orçamento" : "linhas do orçamento"}` : "",
+      paginas > 0
+        ? `${paginas} ${paginas === 1 ? "página de inspiração" : "páginas de inspiração"}`
+        : "",
+    ].filter(Boolean);
+    const mudaram = linhas + paginas;
+    toast(
+      partes.length === 0
+        ? "Já estava tudo pela ordem dos Serviços. Daqui para a frente manda a ordem que aqui está."
+        : `${partes.join(" e ")} ${mudaram === 1 ? "mudou" : "mudaram"} de sítio. Daqui para a frente manda a ordem que aqui está.`,
+      "info",
+    );
   }
 
   /**
@@ -3503,6 +3604,47 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     });
   }
 
+  /**
+   * A pergunta de remoção, desenhada no cartão que a levantou.
+   *
+   * Uma função e não um componente: fecha sobre `aRemover` e sobre o `doc`
+   * deste desenho, e um componente novo a cada tecla escrita num título
+   * remontava a caixa (e tirava-lhe o foco) por causa de uma identidade que
+   * muda. `rotulo` é o que o botão diz — «Remover a página», «Remover a fase» —
+   * porque um botão que diga só «Remover» ao lado de outros nove obriga a ler
+   * a frase toda outra vez para saber o que ele apaga.
+   */
+  function perguntaDeRemocao(chave: string, rotulo: string) {
+    if (!aRemover || aRemover.chave !== chave || aRemover.docNoMomento !== doc) return null;
+    return (
+      <div
+        role="alertdialog"
+        aria-live="assertive"
+        aria-label={rotulo}
+        className="mb-2 flex flex-wrap items-center gap-3 rounded-xl border border-[#c98a2e]/45 bg-[#c98a2e]/[0.08] px-3 py-2.5"
+      >
+        <span className="min-w-[12rem] flex-1 text-xs leading-relaxed text-foreground/80">
+          {aRemover.pergunta}
+        </span>
+        {/* Cancelar primeiro, e não escreve NADA: nem apaga, nem toca no
+            documento, nem deixa rasto no rascunho. Fecha a pergunta. */}
+        <Button variant="ghost" size="sm" onClick={() => setARemover(null)}>
+          Cancelar
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            aRemover.aplicar();
+            setARemover(null);
+          }}
+        >
+          {rotulo}
+        </Button>
+      </div>
+    );
+  }
+
   /** Aplica o que estava por confirmar: escreve, regista e abre a anulação. */
   function confirmarDinheiro() {
     const c = confirmacaoDeDinheiro;
@@ -3593,10 +3735,46 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     toast("Parágrafo inserido na mensagem para o cliente. Revê antes de enviar.", "info");
   }
 
+  /**
+   * O que o «Limpar» está prestes a deitar fora, em palavras e com os números.
+   *
+   * Só o que se conta e se perde mesmo, pela ordem por que custou a fazer. Uma
+   * proposta acabada de abrir não tem nada disto, e então a frase não diz nada
+   * — «rascunho limpo — 0 páginas, 0 fotografias» é ruído com aritmética.
+   */
+  function oQueOLimparLevou(d: StudioDoc): string {
+    const fotos = d.moodBoards.reduce((n, b) => n + b.images.length, 0);
+    const paginas = d.moodBoards.filter((b) => b.images.length > 0).length;
+    const servicos = (d.serviceGroups ?? []).reduce((n, g) => n + (g.items ?? []).length, 0);
+    const orcamento =
+      linhasDe(d).filter((l) => (l.item ?? "").trim() !== "").length +
+      (d.budgetRows ?? []).filter((r) => (r.item ?? "").trim() !== "").length;
+    const partes = [
+      paginas > 0 ? `${paginas} ${paginas === 1 ? "página" : "páginas"} de inspiração` : null,
+      fotos > 0 ? `${fotos} ${fotos === 1 ? "fotografia" : "fotografias"}` : null,
+      servicos > 0 ? `${servicos} ${servicos === 1 ? "serviço" : "serviços"}` : null,
+      orcamento > 0 ? `${orcamento} ${orcamento === 1 ? "linha" : "linhas"} de orçamento` : null,
+    ].filter((x): x is string => x !== null);
+    return partes.length === 0 ? "Rascunho limpo." : `Rascunho limpo — levou ${partes.join(", ")}.`;
+  }
+
   function clearDraft() {
-    // Sem caixa de confirmação: guarda-se o que estava e dá-se dez segundos
-    // para o trazer de volta. Ver a razão em `limpo`, mais acima.
-    setLimpo({ doc, total: totalInput, segundos: 10, motivo: "Rascunho limpo." });
+    /*
+     * ── CONTINUA SEM CAIXA DE CONFIRMAÇÃO, E DE PROPÓSITO ─────────────────
+     *
+     * A regra desta casa dá a cada acção irreversível UMA das duas coisas, e
+     * esta já tem a sua: dez segundos e um botão. A razão está escrita em
+     * `limpo` e não mudou — a caixa pergunta ANTES, quando ainda não se viu o
+     * que se ia perder, e a resposta certa é quase sempre «sim», por isso
+     * carrega-se sem ler. Pôr aqui as duas era pedir duas respostas ao mesmo
+     * gesto e ensinar a despachar ambas.
+     *
+     * O que faltava não era a pergunta: era o NÚMERO. A barra dizia «Rascunho
+     * limpo» — a frase mais vaga possível sobre o gesto mais largo do ecrã, e
+     * quem não sabe o que perdeu não sabe se vale a pena anular. Agora diz o
+     * que levou (`oQueOLimparLevou`), enquanto ainda dá para o trazer de volta.
+     */
+    setLimpo({ doc, total: totalInput, segundos: 10, motivo: oQueOLimparLevou(doc) });
     try {
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(`${DRAFT_KEY}:at`);
@@ -4038,6 +4216,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     const novo: MoodBoard = { ...modelo, images: [...(modelo.images ?? [])] };
     setDoc((d) => ({ ...d, moodBoards: [...d.moodBoards, novo] }));
 
+    // ── ONDE É QUE O BLOCO FICOU ──────────────────────────────────────────
+    // O botão «De um modelo…» está ao FUNDO da secção e o bloco entra no fim
+    // do array — mas o que sai impresso obedece à ordem dos capítulos, e um
+    // bloco chamado «Cerimónia na igreja» aterra a meio da lista, muitas vezes
+    // acima da dobra. Num documento comprido, «bloco inserido» é a única coisa
+    // que não interessa saber: o que interessa é a página em que ele calhou.
+    //
+    // A posição SAI do `boardsQueSaem`, que é a mesma função que o gerador do
+    // PDF usa — contar cartões no ecrã dizia «a 3.ª» de uma página que é a 5.ª
+    // no documento. Uma página sem fotografias não chega a sair, e a frase
+    // di-lo em vez de inventar um número.
+    const depois = { ...doc, moodBoards: [...doc.moodBoards, novo] } as ProposalDoc;
+    const saem = boardsQueSaem(depois);
+    const pos = saem.indexOf(doc.moodBoards.length);
+    const nome = (novo.title ?? "").trim() || `Inspiração ${doc.moodBoards.length + 1}`;
+    toast(
+      pos >= 0
+        ? `«${nome}» entrou como a ${pos + 1}.ª das ${saem.length} páginas de inspiração do PDF.`
+        : `«${nome}» entrou no fim das páginas de inspiração. Sem fotografias, não sai no PDF.`,
+      "success",
+    );
+
     // O predicado é uma função à parte, e a referência à Biblioteca fica para
     // ÚLTIMO: `ehRefDeTema` é um type guard (`ref is string`), portanto negá-lo
     // a meio estreita a string até `never` e o TypeScript recusa tudo o que
@@ -4092,8 +4292,56 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       moodBoards: d.moodBoards.map((b, i) => (i === bi ? { ...b, ...p } : b)),
     }));
   }
+  /**
+   * Remover uma página de inspiração — COM PERGUNTA, e a pergunta conta.
+   *
+   * É a acção mais cara do estúdio inteiro: leva com ela as fotografias todas
+   * daquela página, escolhidas uma a uma de entre a biblioteca e os mood boards
+   * (e às vezes carregadas do telemóvel à beira do cliente), mais a folha que
+   * elas ocupam no PDF. Refazê-la não é escrever outra vez um título — é voltar
+   * a curar uma página inteira.
+   *
+   * Por isso PERGUNTA e não anulação: é rara (uma proposta tem três a oito
+   * páginas e removem-se poucas), é cara, e dez segundos de «Anular» são pouco
+   * para quem só dá pelo estrago ao chegar à pré-visualização.
+   *
+   * A frase nomeia a página pelo nome que ela lhe deu, conta as fotografias e
+   * diz ONDE ela estava a sair no documento — que é a parte que decide a
+   * resposta, e a única que não se vê a olhar para o cartão.
+   *
+   * Uma página em branco (sem título, sem descrição e sem fotos) sai sem
+   * pergunta nenhuma: não há ali nada a perder, e perguntar por nada é ensinar
+   * a responder que sim sem ler.
+   */
   function removeBoard(bi: number) {
-    setDoc((d) => ({ ...d, moodBoards: d.moodBoards.filter((_, i) => i !== bi) }));
+    const b = doc.moodBoards[bi];
+    const apagar = () =>
+      setDoc((d) => ({ ...d, moodBoards: d.moodBoards.filter((_, i) => i !== bi) }));
+    if (!b) return;
+    const nome = (b.title ?? "").trim();
+    const fotos = b.images.length;
+    const temTexto = nome !== "" || (b.annotation ?? "").trim() !== "";
+    if (fotos === 0 && !temTexto) {
+      apagar();
+      return;
+    }
+    // A posição SAI da mesma função que o gerador do PDF usa (`boardsQueSaem`),
+    // e não de contar cartões no ecrã: a ordem de saída respeita os capítulos
+    // dos serviços, e as páginas sem fotos não chegam a sair. Uma segunda
+    // contagem aqui dizia «a página 3» de uma página que é a 5.ª no documento.
+    const saem = boardsQueSaem(doc as ProposalDoc);
+    const pos = saem.indexOf(bi);
+    const conta =
+      fotos > 0
+        ? `Leva com ela ${fotos} ${fotos === 1 ? "fotografia" : "fotografias"}` +
+          (pos >= 0 ? `, e é a ${pos + 1}.ª das ${saem.length} páginas de inspiração do PDF.` : ".")
+        : "Ainda não tem fotografias nenhumas — leva o título e a descrição, e mais nada.";
+    setARemover({
+      chave: `board:${bi}`,
+      pergunta: `Remover a página «${nome || `Inspiração ${bi + 1}`}»? ${conta}`,
+      docNoMomento: doc,
+      aplicar: apagar,
+    });
   }
   /**
    * Move o board que está NA POSIÇÃO `pos` do ecrã.
@@ -4709,7 +4957,27 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       boards.splice(bi + 1, 0, copia);
       return { ...d, moodBoards: boards };
     });
-    toast("Mood board duplicado.", "info");
+    // QUAL DELES, E ONDE FICOU A CÓPIA. «Mood board duplicado.» não dizia
+    // nenhuma das duas coisas, e numa secção de oito páginas são as duas que
+    // interessam: o botão é um ícone de 28 px repetido em cada cartão, e a
+    // cópia sai pela ordem dos capítulos como tudo o resto — num cartão alto
+    // (uma grelha de seis fotos mais os campos), ela nasce abaixo da dobra.
+    const original = doc.moodBoards[bi];
+    if (!original) return;
+    const nome = (original.title ?? "").trim() || `Inspiração ${bi + 1}`;
+    const copiado = { ...original, title: nome ? `${nome} (cópia)` : "" };
+    const depois = {
+      ...doc,
+      moodBoards: [...doc.moodBoards.slice(0, bi + 1), copiado, ...doc.moodBoards.slice(bi + 1)],
+    } as ProposalDoc;
+    const saem = boardsQueSaem(depois);
+    const pos = saem.indexOf(bi + 1);
+    toast(
+      pos >= 0
+        ? `«${nome}» duplicado — a cópia é a ${pos + 1}.ª das ${saem.length} páginas de inspiração do PDF.`
+        : `«${nome}» duplicado — a cópia ficou logo a seguir. Sem fotografias, não sai no PDF.`,
+      "info",
+    );
   }
 
   /** Fechar (ou reabrir) um board a alterações — ver `MoodBoard.bloqueado`. */
@@ -4771,8 +5039,53 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       cronograma: (d.cronograma ?? []).map((ph, i) => (i === pi ? { ...ph, ...p } : ph)),
     }));
   }
+  /**
+   * Remover uma fase — COM PERGUNTA, pela mesma razão da página de inspiração.
+   *
+   * Uma fase não é uma linha: é um título e a lista de tarefas que lhe está
+   * dentro, e o «×» que a apaga fica ao lado dos «×» das tarefas, dois
+   * centímetros acima e do mesmo tamanho. Carregar no de cima em vez do de
+   * baixo levava seis tarefas escritas à mão sem dizer nada a ninguém.
+   *
+   * Rara (um cronograma tem três ou quatro fases, escritas uma vez) e cara
+   * (voltar a escrever a lista toda) — portanto pergunta. E a pergunta conta as
+   * tarefas, que é exactamente o que o cartão não mostra quando a fase está
+   * cheia e o ecrã cortado.
+   *
+   * A fase que ainda não tem nome nem tarefas sai sem perguntar: uma fase
+   * acabada de acrescentar por engano não é trabalho a proteger.
+   */
   function removePhase(pi: number) {
-    setDoc((d) => ({ ...d, cronograma: (d.cronograma ?? []).filter((_, i) => i !== pi) }));
+    const ph = (doc.cronograma ?? [])[pi];
+    const apagar = () =>
+      setDoc((d) => ({ ...d, cronograma: (d.cronograma ?? []).filter((_, i) => i !== pi) }));
+    if (!ph) return;
+    const nome = (ph.title ?? "").trim();
+    const escritas = (ph.items ?? []).filter((it) => (it ?? "").trim() !== "");
+    if (nome === "" && escritas.length === 0) {
+      apagar();
+      return;
+    }
+    // A MESMA regra do gerador: uma fase sem tarefas não imprime nada, e um
+    // cronograma sem nenhuma fase com tarefas não tem página nenhuma no PDF
+    // (ver `fasesComTarefas`, em `proposal-paginas.ts`). Se esta é a última que
+    // ainda tem tarefas, o documento perde uma folha inteira — e isso é a
+    // consequência que decide a resposta.
+    const comTarefas = (doc.cronograma ?? []).filter((f) =>
+      (f.items ?? []).some((it) => (it ?? "").trim() !== ""),
+    ).length;
+    const ultima = escritas.length > 0 && comTarefas === 1;
+    const conta =
+      escritas.length > 0
+        ? `Leva com ela ${escritas.length} ${escritas.length === 1 ? "tarefa" : "tarefas"}` +
+          (ultima ? ", e o cronograma deixa de ter página no PDF." : " do cronograma.")
+        : "Ainda não tem tarefas nenhumas — leva o título, e mais nada.";
+    setARemover({
+      chave: `fase:${pi}`,
+      pergunta: `Remover a fase «${nome || `fase ${pi + 1}`}»? ${conta}`,
+      docNoMomento: doc,
+      aplicar: apagar,
+    });
   }
   function movePhase(pi: number, dir: -1 | 1) {
     setDoc((d) => ({ ...d, cronograma: move(d.cronograma ?? [], pi, dir) }));
@@ -4793,11 +5106,41 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       ),
     }));
   }
+  /**
+   * Remover uma tarefa — ANULAR, e não pergunta.
+   *
+   * É o gesto frequente desta secção: escreve-se a lista de uma fase às
+   * apalpadelas, acrescentam-se cinco tarefas e tiram-se duas. Refazer uma é
+   * escrever outra vez meia dúzia de palavras. Uma caixa por cada «×» seria
+   * cinco caixas para compor uma fase — e uma caixa respondida cinco vezes
+   * seguidas deixa de ser lida, o que é o oposto do que ela existe para fazer.
+   *
+   * Vai pela anulação dos dez segundos que já serve o «Limpar» e o «×» das
+   * fotografias (`setLimpo`): guarda o documento inteiro antes de mexer, e a
+   * barra diz QUAL tarefa saiu e com quantas a fase fica.
+   *
+   * A tarefa em branco sai calada — não há nada para trazer de volta.
+   */
   function removePhaseItem(pi: number, ii: number) {
+    const ph = (doc.cronograma ?? [])[pi];
+    const tarefa = (ph?.items ?? [])[ii] ?? "";
+    if (tarefa.trim() !== "") {
+      const ficam = (ph?.items ?? []).filter((_, j) => j !== ii).length;
+      const fase = (ph?.title ?? "").trim();
+      setLimpo({
+        doc,
+        total: totalInput,
+        segundos: 10,
+        motivo:
+          `Tarefa «${tarefa.trim()}» removida` +
+          (fase ? ` de «${fase}»` : "") +
+          ` — a fase fica com ${ficam}.`,
+      });
+    }
     setDoc((d) => ({
       ...d,
-      cronograma: (d.cronograma ?? []).map((ph, i) =>
-        i === pi ? { ...ph, items: ph.items.filter((_, j) => j !== ii) } : ph,
+      cronograma: (d.cronograma ?? []).map((ph2, i) =>
+        i === pi ? { ...ph2, items: ph2.items.filter((_, j) => j !== ii) } : ph2,
       ),
     }));
   }
@@ -4813,7 +5156,41 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   function updateBudgetItem(i: number, value: string) {
     setDoc((d) => definirItem(d, i, value));
   }
+  /**
+   * Remover uma linha do orçamento — ANULAR, e não pergunta.
+   *
+   * É o gesto mais repetido do estúdio: um orçamento de decoração compõe-se
+   * linha a linha com o cliente ao telefone, e tira-se e põe-se enquanto se
+   * fala. Perguntar em cada «×» é atrito diário, e o preço desse atrito
+   * paga-se todo no mesmo sítio: uma caixa que se despacha vinte vezes numa
+   * tarde é uma caixa que não protege nada na vigésima primeira.
+   *
+   * ── E PORQUE É QUE A LINHA ADICIONAL LEVA PERGUNTA E ESTA NÃO ────────────
+   * Parecem irmãs e não são. Apagar um VALOR ADICIONAL muda o preço final do
+   * pedido — e portanto o sinal e a factura que saem a seguir —, e por isso
+   * passa pela pergunta do dinheiro com os dois números à vista (ver
+   * `removeBudgetExtra`). Esta não: o total desta proposta é um campo escrito à
+   * parte, e tirar uma linha daqui mexe na soma das linhas, que o ecrã já
+   * mostra e assinala quando as duas divergem. É trabalho de escrita, não
+   * dinheiro cobrado.
+   *
+   * A barra diz o nome da linha e o que ela valia — sem isso, «linha removida»
+   * numa lista de catorze não diz qual.
+   */
   function removeBudgetItem(i: number) {
+    const linha = linhasDe(doc)[i];
+    const nome = (linha?.item ?? "").trim();
+    const preco = precosDe(doc)[i];
+    if (nome !== "" || (typeof preco === "number" && preco > 0)) {
+      setLimpo({
+        doc,
+        total: totalInput,
+        segundos: 10,
+        motivo:
+          `Linha «${nome || `sem nome (${i + 1})`}» removida do orçamento` +
+          (typeof preco === "number" && preco > 0 ? ` — valia ${eur(preco)}.` : "."),
+      });
+    }
     setDoc((d) => removerLinha(d, i));
   }
   function updateBudgetPrice(i: number, texto: string) {
@@ -4987,7 +5364,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       budgetRows: (d.budgetRows ?? []).map((r, j) => (j === i ? { ...r, ...p } : r)),
     }));
   }
+  /**
+   * Remover uma linha do orçamento de organização — ANULAR, pela mesma razão
+   * escrita em `removeBudgetItem`: é frequente, é barato de refazer, e uma
+   * pergunta por linha é um editor que ninguém usa.
+   *
+   * Aqui o valor é TEXTO («1.500,00 €», às vezes «a combinar»), por isso a
+   * barra diz o que lá estava escrito, à letra, em vez de o tentar somar.
+   */
   function removeBudgetRow(i: number) {
+    const linha = (doc.budgetRows ?? [])[i];
+    const nome = (linha?.item ?? "").trim();
+    const valor = (linha?.price ?? "").trim();
+    if (nome !== "" || valor !== "") {
+      setLimpo({
+        doc,
+        total: totalInput,
+        segundos: 10,
+        motivo:
+          `Linha «${nome || `sem nome (${i + 1})`}» removida do orçamento` +
+          (valor ? ` — valia ${valor}.` : "."),
+      });
+    }
     setDoc((d) => ({ ...d, budgetRows: (d.budgetRows ?? []).filter((_, j) => j !== i) }));
   }
 
@@ -6165,7 +6563,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                           url={assetUrls[path]}
                           planoB={assetOriginais[path]}
                           estadoDosUrls={estadoDosUrls}
-                          aoTentarDeNovo={() => void hidratarAssets()}
+                          aoTentarDeNovo={() => void tentarBuscarFotos()}
                           aoMorrer={marcarUrlMorto}
                           // As capas são duas e estão no topo do passo: nunca
                           // esperam pela fila das fotos que estão fora do ecrã.
@@ -6259,9 +6657,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
               <AvisoDeOrdem
                 mostrar={ordemSugerida}
                 onde="As páginas de inspiração"
-                onFixar={() =>
-                  fixarOrdem("Ordem fixada. Daqui para a frente manda a ordem que aqui está.")
-                }
+                onFixar={fixarOrdem}
               />
               <BarraDaSeleccao
                 quantas={seleccionadas.size}
@@ -6600,6 +6996,12 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                     ×
                                   </button>
                                 </div>
+                                {/* A pergunta fica DENTRO do cartão, logo por
+                                    baixo da barra que a levantou — e antes da
+                                    tira de miniaturas, para se ver ao mesmo
+                                    tempo a frase e as fotografias que ela
+                                    conta. Ver `aRemover`. */}
+                                {perguntaDeRemocao(`board:${bi}`, "Remover a página")}
                                 {/* ── O QUE SE VÊ COM O BOARD FECHADO ───────────
                                 Título e subtítulo já estão no cabeçalho; falta
                                 o que diz se está pronto: quantas fotos, e quais.
@@ -6794,7 +7196,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                             url={assetUrls[path]}
                                             planoB={assetOriginais[path]}
                                             estadoDosUrls={estadoDosUrls}
-                                            aoTentarDeNovo={() => void hidratarAssets()}
+                                            aoTentarDeNovo={() => void tentarBuscarFotos()}
                                             aoMorrer={marcarUrlMorto}
                                             // A PRIMEIRA DOBRA do primeiro
                                             // board. Medido: sem prioridade
@@ -7270,6 +7672,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                         ×
                       </button>
                     </div>
+                    {/* Entre o título da fase e a lista de tarefas: a frase
+                        conta-as, e elas estão logo por baixo. Ver `aRemover`. */}
+                    {perguntaDeRemocao(`fase:${pi}`, "Remover a fase")}
                     <div className="flex flex-col gap-2 pl-1">
                       {ph.items.map((it, ii) => (
                         <div key={ii} className="flex items-center gap-2">
@@ -7311,9 +7716,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 <AvisoDeOrdem
                   mostrar={ordemSugerida}
                   onde="As linhas do orçamento"
-                  onFixar={() =>
-                    fixarOrdem("Ordem fixada. Daqui para a frente manda a ordem que aqui está.")
-                  }
+                  onFixar={fixarOrdem}
                 />
                 <div className="flex flex-col gap-2 mb-3">
                   {/* ── OS CABEÇALHOS DAS COLUNAS ────────────────────────────
@@ -8671,7 +9074,17 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   está a ser escrita quando o aviso apareceria. */}
               <Gralhas
                 doc={doc as ProposalDoc}
-                onCorrigir={(g) => setDoc((d) => corrigirGralha(d, g))}
+                onCorrigir={(g) => {
+                  setDoc((d) => corrigirGralha(d, g));
+                  // A palavra muda num campo que pode estar a catorze páginas
+                  // daqui, dentro de uma secção que não se está a ver. No sítio
+                  // do clique só se vê a linha sair desta lista — e uma linha a
+                  // desaparecer não diz o que ficou escrito lá em cima.
+                  //
+                  // Com as duas palavras e o campo, é a mesma prestação de
+                  // contas que o «Corrigir as N» ao lado já fazia com o número.
+                  toast(`«${g.escrita}» passou a «${g.sugerida}» — ${g.rotulo}.`, "info");
+                }}
                 onIr={(g) => irParaCampo(g.campo)}
                 onCorrigirTudo={() => {
                   const quantas = gralhasDoDocumento(doc as ProposalDoc).length;
@@ -9143,16 +9556,48 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 </div>
               </div>
             ) : confirmSend ? (
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                <span className="text-sm text-foreground/60">
-                  Enviar para {quote.email || "o cliente"}?
-                </span>
-                <Button variant="primary" onClick={() => void send()} disabled={busy !== null}>
-                  Confirmar
-                </Button>
-                <Button variant="ghost" onClick={() => setConfirmSend(false)}>
-                  Cancelar
-                </Button>
+              /* ── A ÚLTIMA PERGUNTA, COM O QUE VAI LÁ DENTRO ───────────────
+                 Dizia «Enviar para maria@example.pt?» e mais nada. É a acção
+                 mais irreversível da casa — o PDF é desenhado, o email sai, a
+                 proposta fica gravada e o casal lê-a — e a pergunta só
+                 confirmava a MORADA. Tudo o que se pode ter enganado sem dar
+                 por isso ficava de fora: a língua (tirou-se uma prova em
+                 inglês no passo anterior e o selector ficou lá), o valor (o
+                 total mudou depois de se rever) e o tamanho do documento (uma
+                 página de inspiração que se removeu sem se dar conta).
+
+                 Passa a dizer as quatro coisas: PARA QUEM, QUANTAS páginas, QUE
+                 total, e EM QUE LÍNGUA. São exactamente os quatro dados que o
+                 cliente vai ver, e é a última vez que alguém os pode olhar.
+
+                 Os números saem de onde já saíam antes: `folhasAproximadas` é a
+                 mesma conta do «PDF com cerca de N páginas» que a barra mostra,
+                 e `totais.aPagar` é o mesmo bloco de totais que o gerador do
+                 PDF usa. Uma segunda conta aqui era garantir que um dia a
+                 pergunta e o documento diziam números diferentes.
+
+                 «cerca de» porque é isso que é: um texto muito longo empurra
+                 uma secção para a folha seguinte (ver `proposal-paginas.ts`),
+                 e prometer um número exacto seria mentir na última frase. */
+              <div className="ml-auto flex max-w-lg flex-col items-end gap-2">
+                <p className="text-right text-sm leading-relaxed text-foreground/70">
+                  Enviar para{" "}
+                  <strong className="font-medium text-foreground/85">
+                    {quote.email || "o cliente"}
+                  </strong>
+                  ? Vai um PDF de cerca de {folhasAproximadas(doc as ProposalDoc)} páginas,{" "}
+                  {idiomaDoPdf === "en" ? "em inglês" : "em português"}, com{" "}
+                  <strong className="font-medium text-foreground/85">{eur(totais.aPagar)}</strong> a
+                  pagar.
+                </p>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setConfirmSend(false)}>
+                    Cancelar
+                  </Button>
+                  <Button variant="primary" onClick={() => void send()} disabled={busy !== null}>
+                    Confirmar
+                  </Button>
+                </div>
               </div>
             ) : (
               /* ── O BOTÃO, E POR CIMA DELE A RAZÃO ────────────────────────

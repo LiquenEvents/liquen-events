@@ -411,28 +411,86 @@ export async function contarDerivadasEmFalta(): Promise<Contagem> {
 }
 
 export interface ResultadoDoLote {
+  /** Derivadas escritas neste lote. */
   geradas: number;
   falhas: string[];
-  /** Quantas ficaram por fazer depois deste lote. Zero = acabou. */
+  /** Quantas derivadas ficaram por fazer depois deste lote. Zero = acabou. */
   restantes: number;
   /** Destas, quantas são ESSENCIAIS — as fotografias que ainda servem o
    *  original. Zero com `restantes` a sobrar quer dizer que a avaria está
    *  resolvida e o que falta é só o ganho. */
   restantesEssenciais: number;
+  /**
+   * O MESMO trabalho contado em FOTOGRAFIAS.
+   *
+   * Os botões do painel falam de fotografias («Gerar as versões leves de 389
+   * fotografias») porque é a unidade em que ela pensa. A barra falava de
+   * derivadas, e dizia «0 de 765» logo a seguir a ela ter carregado num botão
+   * que prometia 389 — dois números para o mesmo trabalho, sem nada no ecrã a
+   * explicar a diferença. Agora quem chama tem as duas contas e pode usar a
+   * mesma dos botões.
+   */
+  fotografiasRestantes: number;
+  /** Fotografias tocadas neste lote (uma, faça ela uma derivada ou quatro). */
+  fotografiasFeitas: number;
   /** O papel do que este lote esteve a fazer, para o ecrã poder dizê-lo em vez
    *  de anunciar «miniaturas» enquanto gera AVIF. */
   papel: Papel | null;
 }
 
+/** O que uma fotografia deve, e a quem. */
+type Alvo = { bucket: string; lado: number; qualidade: number; avif?: boolean };
+
 /**
- * Gera até `LOTE` derivadas em falta e diz quantas ficaram.
+ * ════════════════════════════════════════════════════════════════════════════
+ * O LOTE PÁRA PELO RELÓGIO, E NÃO POR UM NÚMERO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Era um número — 25 derivadas — e o número não sabe nada sobre o tecto da
+ * função. Sabe o relógio.
+ *
+ * Aconteceu isto: 389 fotografias sem AVIF, 765 derivadas, e a barra dela
+ * parada em «0 de 765». O `sharp` não tinha culpa (medido: 25 codificações
+ * AVIF a esforço 4 são ~9,7 s no total). A rede é que não cabia:
+ *
+ *   · o original era descarregado uma vez por DERIVADA — a mesma fotografia de
+ *     ~2 MB duas vezes, para lhe fazer o AVIF grande e o AVIF micro;
+ *   · e cada lote varria a biblioteca inteira do princípio: uma listagem por
+ *     pasta e por bucket, repetida nos ~31 lotes.
+ *
+ * Um lote que não cabe nos 60 s morre a meio, e quem está do outro lado vê uma
+ * barra a zero. Com um tecto de tempo o lote encolhe sozinho quando a rede
+ * está má, em vez de rebentar — e como o varrimento é a parte cara, vale a
+ * pena aproveitá-lo para gerar o máximo que couber em vez de parar às 25.
+ */
+const TECTO_DO_LOTE_MS = 40_000;
+
+/**
+ * Um tecto de fotografias por lote, por segurança.
+ *
+ * Quem manda é o relógio; isto é só para o caso de o relógio andar depressa e
+ * a rede estar excelente — uma resposta com dez mil linhas de falhas não
+ * ajudaria ninguém.
+ */
+const LOTE_FOTOS = 200;
+
+/**
+ * Gera as derivadas em falta até ao tecto de tempo, e diz quantas ficaram.
  *
  * **Nunca substitui o que já existe** (`upsert: false`), portanto repetir é
  * seguro e é assim que se retoma. E é melhor esforço por fotografia: uma que
  * falhe não pára as outras — uma execução que morre à terceira de quatrocentas
  * obriga a recomeçar, e recomeçar é o que faz ninguém correr isto.
  */
-export async function gerarLoteDeDerivadas(soPapel?: Papel): Promise<ResultadoDoLote> {
+export async function gerarLoteDeDerivadas(
+  soPapel?: Papel,
+  opcoes?: {
+    /** Quanto tempo esta chamada tem para gerar. */
+    tectoMs?: number;
+    /** O relógio, injectável para os testes não precisarem de esperar. */
+    agora?: () => number;
+  },
+): Promise<ResultadoDoLote> {
   const sb = getSupabase();
   if (!sb) {
     return {
@@ -440,15 +498,25 @@ export async function gerarLoteDeDerivadas(soPapel?: Papel): Promise<ResultadoDo
       falhas: ["Storage não configurado."],
       restantes: 0,
       restantesEssenciais: 0,
+      fotografiasRestantes: 0,
+      fotografiasFeitas: 0,
       papel: null,
     };
   }
 
+  const agora = opcoes?.agora ?? Date.now;
+  const ate = agora() + (opcoes?.tectoMs ?? TECTO_DO_LOTE_MS);
+
   const falhas: string[] = [];
   let geradas = 0;
+  let fotografiasFeitas = 0;
   let restantes = 0;
   let restantesEssenciais = 0;
+  let fotografiasRestantes = 0;
   let papel: Papel | null = null;
+  /** Os buckets já confirmados NESTE lote. Confirmar é uma ida ao servidor, e
+   *  era feita uma vez por derivada — cinco fotografias davam dez idas. */
+  const bucketsProntos = new Map<string, boolean>();
 
   // DUAS passagens, e não uma: primeiro tudo o que é essencial na biblioteca
   // inteira, e só depois o AVIF. Ver `Papel` — parar a meio tem de deixar as
@@ -462,7 +530,8 @@ export async function gerarLoteDeDerivadas(soPapel?: Papel): Promise<ResultadoDo
     // tarde. Sem argumento, faz tudo — pela ordem certa.
     if (soPapel && passagem !== soPapel) continue;
     for (const familia of FAMILIAS) {
-      if (!familia.derivadas.some((d) => d.papel === passagem)) continue;
+      const doPapel = familia.derivadas.filter((d) => d.papel === passagem);
+      if (doPapel.length === 0) continue;
       let asPastas: string[];
       try {
         asPastas = await pastas(sb, familia.origem);
@@ -472,22 +541,42 @@ export async function gerarLoteDeDerivadas(soPapel?: Papel): Promise<ResultadoDo
       for (const pasta of asPastas) {
         const caminhos = await ficheiros(sb, familia.origem, pasta);
         if (caminhos.length === 0) continue;
-        for (const derivada of familia.derivadas) {
-          if (derivada.papel !== passagem) continue;
-          const jaLa = new Set(await ficheiros(sb, derivada.bucket, pasta).catch(() => []));
-          const faltam = caminhos.filter((c) => !jaLa.has(c));
-          for (const caminho of faltam) {
-            if (geradas >= LOTE) {
-              // Já se fez o lote: daqui para a frente só se CONTA, para quem
-              // chama saber se vale a pena voltar.
-              restantes += 1;
-              if (passagem === "essencial") restantesEssenciais += 1;
-              continue;
-            }
-            papel = passagem;
-            const r = await gerarUma(sb, familia.origem, caminho, derivada);
-            if (r) geradas += 1;
-            else falhas.push(`${derivada.bucket}/${caminho}`);
+        // UMA listagem por bucket de derivada e por pasta — não uma por
+        // fotografia. É o que permite decidir tudo o que esta pasta deve com o
+        // número de idas ao Storage a depender das pastas, e não das fotos.
+        const jaLa = new Map<string, Set<string>>();
+        for (const d of doPapel) {
+          jaLa.set(d.bucket, new Set(await ficheiros(sb, d.bucket, pasta).catch(() => [])));
+        }
+        for (const caminho of caminhos) {
+          const emFalta = doPapel.filter((d) => !jaLa.get(d.bucket)?.has(caminho));
+          if (emFalta.length === 0) continue;
+
+          // ── Já não há tempo: daqui para a frente só se CONTA ──────────────
+          //
+          // `fotografiasFeitas > 0` e não um corte seco: um lote que devolve
+          // zero geradas faz quem chama parar o ciclo (é assim que se sabe que
+          // acabou), portanto um lote que chegasse atrasado e não gerasse nada
+          // parava a geração para sempre. Uma fotografia é o mínimo que
+          // garante que a coisa anda.
+          if (fotografiasFeitas >= LOTE_FOTOS || (fotografiasFeitas > 0 && agora() >= ate)) {
+            fotografiasRestantes += 1;
+            restantes += emFalta.length;
+            if (passagem === "essencial") restantesEssenciais += emFalta.length;
+            continue;
+          }
+
+          papel = passagem;
+          const r = await gerarAsDeUmaFoto(sb, familia.origem, caminho, emFalta, bucketsProntos);
+          geradas += r.feitas;
+          fotografiasFeitas += 1;
+          if (r.falhas.length > 0) {
+            falhas.push(...r.falhas);
+            // O que falhou continua em falta — senão o painel dizia que estava
+            // tudo feito e a grelha continuava lenta.
+            fotografiasRestantes += 1;
+            restantes += r.falhas.length;
+            if (passagem === "essencial") restantesEssenciais += r.falhas.length;
           }
         }
       }
@@ -497,42 +586,91 @@ export async function gerarLoteDeDerivadas(soPapel?: Papel): Promise<ResultadoDo
   if (falhas.length > 0) {
     log.warn("derivadas: algumas não foram geradas", { quantas: falhas.length });
   }
-  return { geradas, falhas, restantes, restantesEssenciais, papel };
+  return {
+    geradas,
+    falhas,
+    restantes,
+    restantesEssenciais,
+    fotografiasRestantes,
+    fotografiasFeitas,
+    papel,
+  };
 }
 
-async function gerarUma(
+/**
+ * Todas as derivadas em falta de UMA fotografia, com UM download.
+ *
+ * O original era descarregado uma vez por derivada. Uma fotografia a que
+ * faltasse o AVIF grande e o AVIF micro atravessava os mesmos ~2 MB duas vezes
+ * — nas 389 fotografias dela, ~1,5 GB para fazer trabalho que precisa de
+ * metade. É a conta que não deixava o lote caber no tecto da função.
+ *
+ * Melhor esforço por derivada: uma que falhe não leva atrás as irmãs, e o
+ * caminho de cada uma que falhou sai daqui para o painel poder dizer QUAIS.
+ */
+async function gerarAsDeUmaFoto(
   sb: Cliente,
   origem: string,
   caminho: string,
-  alvo: { bucket: string; lado: number; qualidade: number; avif?: boolean },
-): Promise<boolean> {
-  try {
-    // O bucket TEM de existir antes de se escrever nele: o gerador em lote não
-    // passa pelo `uploadThemeDerivada`, e um `upload` para um bucket que não
-    // existe falha em silêncio — para sempre, e com o contador a dizer
-    // «geradas 0». Com os buckets do AVIF isto deixou de ser um caso de
-    // instalações antigas e passou a ser o caso de todas.
-    if (!(await garantirBucketDeDerivadas(alvo.bucket))) return false;
-    const { data, error } = await sb.storage.from(origem).download(caminho);
-    if (error || !data) return false;
-    const bytes = Buffer.from(await data.arrayBuffer());
-    const derivada = sharp(bytes)
-      // `rotate()` sem argumento aplica a orientação do EXIF. Sem isto, uma
-      // foto de telemóvel deitada sai com os lados trocados face ao original —
-      // e a miniatura ficava com outra proporção do que a grelha reserva.
-      .rotate()
-      // `withoutEnlargement`: uma foto já menor do que o alvo fica como está.
-      // Ampliar produzia uma miniatura MAIOR do que o original, que é o
-      // contrário do que isto serve.
-      .resize(alvo.lado, alvo.lado, { fit: "inside", withoutEnlargement: true });
-    const bytesDerivada = await codificar(derivada, alvo.qualidade, alvo.avif).toBuffer();
-    const { error: erroSubida } = await sb.storage
-      .from(alvo.bucket)
-      .upload(caminho, bytesDerivada, opcoesDeCarregamento(tipoDe(alvo.avif)));
-    return !erroSubida;
-  } catch {
-    return false;
+  alvos: Alvo[],
+  bucketsProntos: Map<string, boolean>,
+): Promise<{ feitas: number; falhas: string[] }> {
+  const falhas: string[] = [];
+  let feitas = 0;
+
+  // O bucket TEM de existir antes de se escrever nele: o gerador em lote não
+  // passa pelo `uploadThemeDerivada`, e um `upload` para um bucket que não
+  // existe falha em silêncio — para sempre, e com o contador a dizer «geradas
+  // 0». Com os buckets do AVIF isto deixou de ser um caso de instalações
+  // antigas e passou a ser o caso de todas.
+  const bons: Alvo[] = [];
+  for (const alvo of alvos) {
+    let ok = bucketsProntos.get(alvo.bucket);
+    if (ok === undefined) {
+      ok = await garantirBucketDeDerivadas(alvo.bucket).catch(() => false);
+      bucketsProntos.set(alvo.bucket, ok);
+    }
+    if (ok) bons.push(alvo);
+    else falhas.push(`${alvo.bucket}/${caminho}`);
   }
+  if (bons.length === 0) return { feitas, falhas };
+
+  let bytes: Buffer;
+  try {
+    const { data, error } = await sb.storage.from(origem).download(caminho);
+    if (error || !data) throw new Error("sem original");
+    bytes = Buffer.from(await data.arrayBuffer());
+  } catch {
+    // Sem o original não há nenhuma delas — e todas contam como falhadas, para
+    // continuarem a aparecer como em falta na contagem seguinte.
+    for (const alvo of bons) falhas.push(`${alvo.bucket}/${caminho}`);
+    return { feitas, falhas };
+  }
+
+  for (const alvo of bons) {
+    try {
+      // Um `sharp` novo por derivada, sobre os MESMOS bytes: um pipeline não se
+      // reaproveita depois de `toBuffer`. O que não se repete é a viagem.
+      const derivada = sharp(bytes)
+        // `rotate()` sem argumento aplica a orientação do EXIF. Sem isto, uma
+        // foto de telemóvel deitada sai com os lados trocados face ao original —
+        // e a miniatura ficava com outra proporção do que a grelha reserva.
+        .rotate()
+        // `withoutEnlargement`: uma foto já menor do que o alvo fica como está.
+        // Ampliar produzia uma miniatura MAIOR do que o original, que é o
+        // contrário do que isto serve.
+        .resize(alvo.lado, alvo.lado, { fit: "inside", withoutEnlargement: true });
+      const bytesDerivada = await codificar(derivada, alvo.qualidade, alvo.avif).toBuffer();
+      const { error: erroSubida } = await sb.storage
+        .from(alvo.bucket)
+        .upload(caminho, bytesDerivada, opcoesDeCarregamento(tipoDe(alvo.avif)));
+      if (erroSubida) falhas.push(`${alvo.bucket}/${caminho}`);
+      else feitas += 1;
+    } catch {
+      falhas.push(`${alvo.bucket}/${caminho}`);
+    }
+  }
+  return { feitas, falhas };
 }
 
 /**

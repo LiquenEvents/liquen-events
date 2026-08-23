@@ -29,6 +29,7 @@ import {
 } from "@/lib/proposal-doc";
 import BibliotecaServicos, { guardarNaBiblioteca } from "./BibliotecaServicos";
 import CaixaInglesa from "./CaixaInglesa";
+import { useToast } from "./Toast";
 
 /**
  * A secção «Serviços» do estúdio de propostas — grupos (a, b, c…) e as suas
@@ -242,6 +243,7 @@ export default function ServicesEditor({
   onSave,
   bilingue = false,
 }: ServicesEditorProps) {
+  const { toast } = useToast();
   // Campos por chave estável, para o foco poder ir para uma linha que ACABOU de
   // nascer (o nó só existe depois do render seguinte).
   const inputs = useRef(new Map<string, CampoDeEscrita>());
@@ -275,18 +277,34 @@ export default function ServicesEditor({
    * junto, porque é metade do serviço; a versão inglesa fica por escrever e o
    * ecrã dos Serviços diz quantas faltam.
    */
-  const guardar = useCallback(async (label: string, desc: string) => {
-    const chave = label.trim().toLowerCase();
-    setGuardados((g) => ({ ...g, [chave]: "a-guardar" }));
-    const ok = await guardarNaBiblioteca(label.trim(), desc.trim());
-    setGuardados((g) => {
-      // Falhou: volta ao estado de antes, para o botão poder ser carregado
-      // outra vez. Um visto sobre uma gravação que não aconteceu era pior do
-      // que não haver visto nenhum.
-      if (!ok) return Object.fromEntries(Object.entries(g).filter(([k]) => k !== chave));
-      return { ...g, [chave]: "guardado" };
-    });
-  }, []);
+  const guardar = useCallback(
+    async (label: string, desc: string) => {
+      const chave = label.trim().toLowerCase();
+      setGuardados((g) => ({ ...g, [chave]: "a-guardar" }));
+      const ok = await guardarNaBiblioteca(label.trim(), desc.trim());
+      setGuardados((g) => {
+        // Falhou: volta ao estado de antes, para o botão poder ser carregado
+        // outra vez. Um visto sobre uma gravação que não aconteceu era pior do
+        // que não haver visto nenhum.
+        if (!ok) return Object.fromEntries(Object.entries(g).filter(([k]) => k !== chave));
+        return { ...g, [chave]: "guardado" };
+      });
+      // ── E A FALHA TEM DE SE DIZER ────────────────────────────────────────
+      // Resultar já se vê: o ícone passa a visto, no mesmo botão em que ela
+      // carregou, e por isso não há aviso nenhum a acrescentar aí. Falhar é
+      // que era mudo — o botão voltava exactamente ao que era antes do clique,
+      // que é o mesmo ecrã de quem ainda não carregou em nada. Ela ficava a
+      // pensar que o serviço estava na biblioteca; a única forma de descobrir
+      // que não estava era ir lá abrir a gaveta.
+      if (!ok) {
+        toast(
+          `«${label.trim()}» não foi para a biblioteca. Tenta outra vez — a linha aqui não se perde.`,
+          "error",
+        );
+      }
+    },
+    [toast],
+  );
   const [removal, setRemoval] = useState<{
     label: string;
     groups: Groups;

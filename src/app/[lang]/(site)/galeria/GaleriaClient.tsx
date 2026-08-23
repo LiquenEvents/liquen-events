@@ -22,6 +22,7 @@ import {
 import { snapGalleryWidth } from "./gallery-image-loader";
 import { useAntecipacao } from "./useAntecipacao";
 import { useBlurTardio } from "./useBlurTardio";
+import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
 
 /**
  * Morph thumbnail→lightbox (View Transitions API). Cada miniatura e a foto do
@@ -1519,8 +1520,8 @@ export default function GaleriaClient({
             </button>
             <div className="relative h-px w-40 overflow-hidden bg-white/10">
               <div
-                className="absolute left-0 top-0 h-full bg-moss/60 transition-all duration-500"
-                style={{ width: `${(shown / pool.length) * 100}%` }}
+                className="absolute inset-0 origin-left bg-moss/60 motion-safe:transition-transform motion-safe:duration-500"
+                style={{ transform: `scaleX(${fraccaoDaBarra(shown, pool.length)})` }}
               />
             </div>
           </>

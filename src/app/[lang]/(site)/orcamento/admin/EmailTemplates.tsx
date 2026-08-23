@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } f
 import { useToast } from "./Toast";
 import { SkeletonList } from "./Skeleton";
 import { Button } from "./ui";
+import { AvisoDeFalha } from "./AvisoDeFalha";
 import { RichEmailEditor, type RichEmailEditorHandle } from "./RichEmailEditor";
 import EmailTemplatesBilingue from "./EmailTemplatesBilingue";
 import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravacoes";
@@ -21,6 +22,7 @@ import {
   extractRichDoc,
   type RichDoc,
 } from "@/lib/email-rich-format";
+import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 
 interface EmailTemplate {
   key: string;
@@ -202,6 +204,24 @@ function EditorClassico() {
   const { toast } = useToast();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  /**
+   * ── TRÊS DESFECHOS DE UMA LEITURA, E O ECRÃ SÓ CONHECIA DOIS ──────────────
+   *
+   * Uma leitura falhada deixava `templates` a zero, e o ecrã dizia com toda a
+   * confiança «Modelos (0)» e «Seleciona um modelo para editar.» — duas
+   * afirmações que quem não conseguiu perguntar não sabe fazer. O toast que
+   * dizia a verdade some-se em cinco segundos; o ecrã que mente fica.
+   *
+   * E aqui a mentira é cara: quem lê «Modelos (0)» conclui que os modelos se
+   * perderam, e o gesto seguinte é reescrever à mão um texto que está inteiro
+   * do outro lado — só que escrever por cima, nesta rota, é PUBLICAR, e
+   * publicar é enviar.
+   *
+   * `null` = correu bem. String = falhou, e é o que o servidor disse (vazia
+   * quando não disse nada). «Não há nenhum» e «não consegui ler» passam a ser
+   * dois ecrãs diferentes, como já são no resto da casa.
+   */
+  const [falhaAoLer, setFalhaAoLer] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [savedKey, setSavedKey] = useState<string | null>(null);
@@ -235,26 +255,45 @@ function EditorClassico() {
    */
   const rascunhoFalhou = useRef(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/email-templates", { cache: "no-store" });
-        if (res.ok) {
-          const data: EmailTemplate[] = await res.json();
-          setTemplates(data);
-          setPorPublicar(modelosComRascunho(data.map((t) => t.key)));
-          if (data.length) selectInto(data[0]);
-        } else {
-          toast("Não foi possível carregar os modelos.", "error");
-        }
-      } catch {
-        toast("Não foi possível carregar os modelos.", "error");
-      } finally {
-        setLoading(false);
+  const carregar = useCallback(async () => {
+    try {
+      const res = await fetch("/api/email-templates", { cache: "no-store" });
+      if (!res.ok) {
+        // A frase do servidor tal e qual, quando ele deu uma: um «falta correr
+        // o db/schema.sql» resolve o problema sozinho, e trocá-lo por um
+        // genérico deitava fora a única coisa útil que veio na resposta.
+        const corpo = (await res.json().catch(() => null)) as { error?: unknown } | null;
+        setFalhaAoLer(typeof corpo?.error === "string" ? corpo.error : "");
+        return;
       }
-    })();
+      const data: EmailTemplate[] = await res.json();
+      setFalhaAoLer(null);
+      setTemplates(data);
+      setPorPublicar(modelosComRascunho(data.map((t) => t.key)));
+      if (data.length) selectInto(data[0]);
+    } catch {
+      setFalhaAoLer("");
+    } finally {
+      setLoading(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // A leitura é assíncrona: os `setState` acontecem quando a resposta chega,
+    // não no corpo do efeito. É o mesmo padrão (e a mesma dispensa) do
+    // `useCachedList`.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void carregar();
+  }, [carregar]);
+
+  /** O «Tentar de novo» do painel de falha: volta ao esqueleto e repete. Um
+   *  painel que explica sem dar por onde sair é meia correcção. */
+  function lerOutraVez() {
+    setLoading(true);
+    setFalhaAoLer(null);
+    void carregar();
+  }
 
   /**
    * Abre um modelo: primeiro o que está PUBLICADO (que é o que define a linha
@@ -546,6 +585,38 @@ function EditorClassico() {
     activeFieldRef.current = "visual";
   }
 
+  /**
+   * ── UMA GRAVAÇÃO, E UMA FRASE QUE DIZ O QUE ACONTECEU ─────────────────────
+   *
+   * Publicar um modelo falhava com «Não foi possível guardar. Tenta
+   * novamente.» — a mesma frase para a rede em baixo, para a sessão expirada e
+   * para um assunto que o servidor recusou. Nos dois últimos, «tenta
+   * novamente» é conselho errado, e é a segunda tentativa falhada que faz
+   * alguém deixar de acreditar no ecrã.
+   *
+   * Mesmo padrão do `MaterialListas`: um sítio só, a frase vem do
+   * `porque-falhou`, nomeia o modelo e acaba numa instrução que pode funcionar.
+   */
+  async function gravar(
+    oQue: string,
+    url: string,
+    init?: RequestInit,
+  ): Promise<{ ok: boolean; corpo: unknown }> {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch {
+      toast(porqueRebentou(oQue).mensagem, "error");
+      return { ok: false, corpo: null };
+    }
+    const corpo = await res.json().catch(() => null);
+    if (!res.ok) {
+      toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
+      return { ok: false, corpo };
+    }
+    return { ok: true, corpo };
+  }
+
   async function save() {
     if (!selected || saving) return;
     if (!subject.trim()) {
@@ -555,21 +626,32 @@ function EditorClassico() {
     setSaving(true);
     try {
       const body = effectiveBody;
-      const res = await fetch("/api/email-templates", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key: selected.key,
-          name: selected.name,
-          subject: subject.trim(),
-          body,
-        }),
-      });
-      if (!res.ok) {
-        toast("Não foi possível guardar. Tenta novamente.", "error");
+      const { ok, corpo } = await gravar(
+        `guardar o modelo «${selected.name}»`,
+        "/api/email-templates",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            key: selected.key,
+            name: selected.name,
+            subject: subject.trim(),
+            body,
+          }),
+        },
+      );
+      if (!ok) return;
+      const saved = corpo as EmailTemplate | null;
+      if (!saved || typeof saved.key !== "string") {
+        // Gravou (o servidor disse que sim) mas a resposta não veio legível.
+        // Actualizar a lista com isto era inventar; e apagar o rascunho era
+        // deitar fora a única cópia do texto. Fica tudo como está, e diz-se.
+        toast(
+          "Modelo guardado, mas não deu para reler o que ficou gravado. Atualiza a página antes de continuares.",
+          "error",
+        );
         return;
       }
-      const saved: EmailTemplate = await res.json();
       setTemplates((prev) => prev.map((t) => (t.key === saved.key ? saved : t)));
       setBaselineBody(saved.body);
       setSavedKey(saved.key);
@@ -586,8 +668,6 @@ function EditorClassico() {
         return next;
       });
       toast("Modelo guardado.", "success");
-    } catch {
-      toast("Não foi possível guardar. Tenta novamente.", "error");
     } finally {
       setSaving(false);
     }
@@ -597,6 +677,20 @@ function EditorClassico() {
     return (
       <div className="max-w-6xl">
         <SkeletonList rows={4} />
+      </div>
+    );
+  }
+
+  // A falha ANTES da lista, como no resto da casa: «Modelos (0)» só se pode
+  // dizer depois de o servidor ter respondido que não há nenhum.
+  if (falhaAoLer !== null) {
+    return (
+      <div className="max-w-6xl">
+        <AvisoDeFalha
+          titulo="Não foi possível ler os modelos de email"
+          mensagem={falhaAoLer}
+          aoTentarDeNovo={lerOutraVez}
+        />
       </div>
     );
   }
@@ -823,6 +917,13 @@ function EditorClassico() {
               />
             </div>
           </div>
+        </div>
+      ) : templates.length === 0 ? (
+        /* Uma leitura BOA que não trouxe nada. A falhada nunca chega aqui —
+           sai no `AvisoDeFalha` lá em cima —, e é por isso que esta frase pode
+           afirmar o que afirma. */
+        <div className="bo-card p-8 text-center text-foreground/30 text-sm">
+          Ainda não há modelos de email guardados.
         </div>
       ) : (
         <div className="bo-card p-8 text-center text-foreground/30 text-sm">

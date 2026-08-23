@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PropItem } from "@/lib/inventory-types";
 import { Button } from "./ui";
+import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
 
 /**
  * MODO DE CARGA — o inventário para quem está de pé numa quinta a encher a
@@ -150,8 +151,8 @@ export default function ModoDeCarga({ itens, onSair }: ModoDeCargaProps) {
             cheia vê-se de relance. */}
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
           <div
-            className="h-full rounded-full bg-[#4d6350] transition-[width] duration-200"
-            style={{ width: total ? `${(feitos / total) * 100}%` : "0%" }}
+            className="h-full w-full origin-left rounded-full bg-[#4d6350] motion-safe:transition-transform motion-safe:duration-200"
+            style={{ transform: `scaleX(${fraccaoDaBarra(feitos, total)})` }}
           />
         </div>
       </div>
