@@ -9308,21 +9308,52 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 a discussão que o bloco de totais já resolve.
                 Ficam o total sem IVA, o total a pagar e o estado de guardado. */}
             <p className="mr-auto min-w-0 truncate text-xs text-foreground/55">
+              {/* ── A ETIQUETA VIAJA COM O NÚMERO ────────────────────────────
+                  A escolha acima — no telemóvel, o que o CLIENTE paga — estava
+                  certa. O que estava errado era a palavra: «Total» ficava FORA
+                  do corte e servia os dois números. No telemóvel lia-se
+                  «Total 3.025,80 €» (com IVA); no computador, «Total 2.460,00 €
+                  sem IVA». A mesma proposta, a mesma palavra, dois valores —
+                  e ela trabalha no telemóvel e confere no computador.
+
+                  Não é a conta que muda: é a etiqueta que mentia num dos dois.
+                  Em todo o resto do ficheiro `totais.aPagar` aparece sempre
+                  como «total a pagar» (ver o bloco de totais e o gerador do
+                  PDF); só esta barra lhe chamava «Total».
+
+                  Por isso o rótulo e o valor passam a viver DENTRO do mesmo
+                  ramo. Separá-los com dois `hidden` independentes foi o que
+                  deixou a palavra emparelhar-se com o número errado — e é um
+                  engano que volta sozinho se o par se voltar a separar. */}
               {money.base > 0 ? (
                 <>
-                  <span className="text-foreground/45">Total</span>{" "}
-                  <strong className="font-semibold text-foreground/85">
-                    <span className="sm:hidden">{eur(totais.aPagar)}</span>
-                    <span className="hidden sm:inline">{eur(totais.total)}</span>
-                  </strong>{" "}
-                  <span className="hidden text-foreground/45 sm:inline">
-                    sem IVA · a pagar {eur(totais.aPagar)}
+                  <span className="sm:hidden">
+                    <span className="text-foreground/45">A pagar</span>{" "}
+                    <strong className="font-semibold text-foreground/85">
+                      {eur(totais.aPagar)}
+                    </strong>
+                  </span>
+                  <span className="hidden sm:inline">
+                    <span className="text-foreground/45">Total</span>{" "}
+                    <strong className="font-semibold text-foreground/85">
+                      {eur(totais.total)}
+                    </strong>{" "}
+                    <span className="text-foreground/45">
+                      sem IVA · a pagar {eur(totais.aPagar)}
+                    </span>
                   </span>
                 </>
               ) : (
-                <span className="hidden sm:inline">
-                  Preenche o conteúdo e avança para pré-visualizar.
-                </span>
+                /* A instrução do estado vazio estava `hidden sm:inline`: quem
+                   abre uma proposta em branco no telemóvel não via nada a dizer
+                   o que fazer a seguir. Fica, numa versão curta que cabe na
+                   barra sem ser cortada pelo `truncate` do `<p>`. */
+                <>
+                  <span className="sm:hidden">Preenche o conteúdo para avançar.</span>
+                  <span className="hidden sm:inline">
+                    Preenche o conteúdo e avança para pré-visualizar.
+                  </span>
+                </>
               )}
               {(gravadoEm || porGravar || soNesteComputador || naoDuraAoDeploy) &&
                 (() => {
