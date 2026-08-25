@@ -42,10 +42,41 @@ export interface FolhaOuDialogoProps {
    *  polegar; no computador, no rodapé do diálogo. */
   accoes?: ReactNode;
   /** Largura máxima do DIÁLOGO (não afecta a folha, que usa o ecrã todo). */
-  largura?: "sm" | "md" | "lg";
+  largura?: "sm" | "md" | "lg" | "largo";
   /** A folha ocupa quase o ecrã todo — para grelhas de fotos, onde ver muito é
    *  o objectivo. Sem isto ajusta-se ao conteúdo. */
   folhaAlta?: boolean;
+  /**
+   * O CONTEÚDO TRATA DA SUA PRÓPRIA MOLDURA E DO SEU PRÓPRIO SCROLL.
+   *
+   * Por omissão os `children` vêm embrulhados num `px-5 py-4` que rola inteiro,
+   * e é o que serve a um formulário. Não serve a uma caixa de DUAS COLUNAS com
+   * scroll próprio em cada uma — o seletor de fotos: lá, quem rola é a GRELHA,
+   * e a coluna dos temas ao lado tem o seu scroll e fica quieta. Com a moldura
+   * por omissão eram três defeitos de uma vez: a caixa inteira passava a rolar
+   * (a coluna dos temas ia atrás das fotos), as duas colunas deixavam de poder
+   * colar-se às arestas, e as fotos perdiam 40 px de cada lado por cima dos 20
+   * que a grelha já se dá a si própria.
+   *
+   * Com isto ligado o invólucro fica só com o que faz falta para o filho poder
+   * pedir a altura (`flex min-h-0 flex-1 flex-col`): nem padding, nem scroll.
+   * Quem liga isto passa a ser responsável por pôr um `overflow-y-auto` algures
+   * lá dentro — senão o conteúdo é cortado em silêncio.
+   */
+  corpoProprio?: boolean;
+  /**
+   * O RODAPÉ PARTE EM LINHAS QUANDO NÃO CABE.
+   *
+   * Por omissão as acções são uma fila só, porque é o que dois ou três botões
+   * são. Um rodapé que tenha mais do que botões — uma contagem viva («4 fotos
+   * selecionadas»), um aviso de teto — não cabe numa fila a 375 px: MEDIDO,
+   * a contagem ficava reduzida a uma palavra cortada a meio porque os botões
+   * não encolhem e o texto sim.
+   *
+   * Isto não decide onde é que a linha parte: quem chama diz qual dos blocos
+   * toma a linha toda (`basis-full`). Aqui só se dá licença para partir.
+   */
+  accoesQuebram?: boolean;
   /**
    * ENQUANTO ISTO FOR VERDADE, ISTO NÃO SE FECHA SEM SE DIZER QUE SIM.
    *
@@ -75,7 +106,23 @@ export interface FolhaOuDialogoProps {
   nivel?: number;
 }
 
-const LARGURAS = { sm: "max-w-md", md: "max-w-2xl", lg: "max-w-4xl" } as const;
+/**
+ * As larguras do DIÁLOGO. Os três primeiros degraus são um valor só; o quarto
+ * são dois, e a razão é geométrica.
+ *
+ * `largo` é para uma caixa com COLUNA LATERAL. A partir de `lg` a lista de
+ * temas ocupa 14 rem fixas — num diálogo de `lg` (56 rem) sobravam 42 rem para
+ * a grelha de fotos, ou seja a coluna comia um quarto da caixa. Às 70 rem a
+ * coluna leva 20% e a grelha fica com 80%, que é a proporção pedida. Abaixo de
+ * `lg` não há coluna nenhuma (os temas são uma fila por cima) e a caixa volta
+ * às 48 rem, que é o que cabe num iPad ao alto sem margens absurdas.
+ */
+const LARGURAS = {
+  sm: "max-w-md",
+  md: "max-w-2xl",
+  lg: "max-w-4xl",
+  largo: "max-w-3xl lg:max-w-[70rem]",
+} as const;
 
 /** Distância, em píxeis, a partir da qual o arrasto para baixo fecha a folha.
  *  Curto de mais fecha sozinho ao rolar; longo de mais parece que não responde. */
@@ -91,6 +138,8 @@ export function FolhaOuDialogo({
   accoes,
   largura = "md",
   folhaAlta = false,
+  corpoProprio = false,
+  accoesQuebram = false,
   bloqueado = false,
   nivel = 50,
 }: FolhaOuDialogoProps) {
@@ -232,7 +281,16 @@ export function FolhaOuDialogo({
 
         {cabecalho}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+        <div
+          className={cn(
+            "min-h-0 flex-1",
+            corpoProprio
+              ? // Só o que faz falta para o filho poder pedir a altura. Ver
+                // `corpoProprio`: o scroll e a margem passam a ser dele.
+                "flex flex-col"
+              : "overflow-y-auto overscroll-contain px-5 py-4",
+          )}
+        >
           {children}
         </div>
 
@@ -240,6 +298,10 @@ export function FolhaOuDialogo({
           <div
             className={cn(
               "flex shrink-0 gap-2 border-t border-foreground/[0.08] px-5 py-3",
+              // Ver `accoesQuebram`: a fila parte, e o que estiver marcado com
+              // `basis-full` toma a linha toda. `items-center` porque uma
+              // contagem de duas linhas ao lado de um botão fica torta sem ele.
+              accoesQuebram && "flex-wrap items-center",
               // No telemóvel as acções encostam ao fundo e respeitam a área
               // segura do iPhone; no computador vão para a direita, como num
               // diálogo de sempre.
