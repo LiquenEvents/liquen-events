@@ -175,7 +175,11 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
         onScrollTo={scrollTo}
       />
 
-      <main className="flex-1 px-4 sm:px-6 lg:px-10 py-6 lg:py-8 flex flex-col gap-6">
+      {/* O respiro e os intervalos passam a ler a escala do espaço: 12 px de
+          respiro e 20 de intervalo no telemóvel, 24 e 28 a partir de 640. Eram
+          24 e 24 fixos — números desenhados num monitor e servidos tal e qual a
+          um ecrã de 667 px de altura. */}
+      <main className="flex-1 px-4 sm:px-6 lg:px-10 py-[var(--bo-p-vista)] flex flex-col gap-[var(--bo-gap-vista)]">
         {recusadas.length > 0 && (
           <div
             role="alert"
@@ -210,9 +214,19 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
 
         <MetricStrip metrics={metrics} />
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem] gap-6 items-start">
+        {/* ── A COLUNA LATERAL COMEÇA AOS 1024, E NÃO AOS 1280 ───────────────
+            Era `xl:` (1280). Entre 1024 e 1280 — que é o portátil dela — a
+            grelha tinha uma coluna só e o `DossierAside` (contacto, factos do
+            evento, registo de atividade) ia parar ao FIM da página, depois das
+            três zonas inteiras. Havia espaço para ele desde os 1024: 1024 − 80
+            de margens − 320 da coluna − 20 de intervalo deixam 604 px à coluna
+            principal, que é mais do que ela tem hoje a 1024 com o painel em
+            baixo. `md:`/`xl:`/`2xl:` não existem neste back office (ver
+            `ui/adaptativo.ts`), e este ficheiro era um dos quatro que faltavam
+            — o tecto dele saiu do `Cortes.contrato.test.ts`. */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_20rem] gap-[var(--bo-gap-vista)] items-start">
           {/* Coluna principal */}
-          <div className="flex flex-col gap-6 min-w-0">
+          <div className="flex flex-col gap-[var(--bo-gap-vista)] min-w-0">
             <FinanceZone quote={quote} onQuoteChange={onQuoteChange} />
             <ProductionZone
               quote={quote}
@@ -229,7 +243,9 @@ export default function DossierClient({ data, portalUrl, lang, userName }: Props
           </div>
 
           {/* Coluna lateral (fixa em ecrãs largos) */}
-          <aside className="xl:sticky xl:top-40 min-w-0">
+          {/* `top-40` (160 px) é a altura do cabeçalho JÁ ENCOLHIDO — e quando
+              esta coluna se cola já se desceu, portanto é a altura certa. */}
+          <aside className="lg:sticky lg:top-40 min-w-0">
             <DossierAside quote={quote} actor={userName} onAddEntry={appendActivity} />
           </aside>
         </div>

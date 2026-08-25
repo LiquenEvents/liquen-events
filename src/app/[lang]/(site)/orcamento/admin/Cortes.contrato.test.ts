@@ -76,8 +76,9 @@ const TECTO_POR_TRATAR = new Map<string, number>([
   ["ProposalStudio.tsx", 4],
   // A grelha de miniaturas de tema: `… sm:grid-cols-4 md:grid-cols-5 lg:…`.
   ["Temas.tsx", 1],
-  // A coluna lateral do dossier do evento (`xl:grid-cols` + `xl:sticky`).
-  ["evento/[id]/DossierClient.tsx", 2],
+  // (`evento/[id]/DossierClient.tsx` esteve aqui com tecto 2 — a coluna lateral
+  // do dossier, `xl:grid-cols` + `xl:sticky`. Passou a `lg:` e chegou a zero,
+  // portanto a linha saiu e ele passa a ser guardado como todos os outros.)
 ]);
 
 /**

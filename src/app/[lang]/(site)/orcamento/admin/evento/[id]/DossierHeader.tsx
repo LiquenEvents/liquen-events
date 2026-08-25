@@ -14,6 +14,7 @@ import {
 import { eventTagLabel } from "@/lib/orcamento/data";
 import { downloadEventIcs, printEventDossier, printRunSheet } from "../../export";
 import { Button } from "../../ui";
+import { useDesceu } from "../../ui/adaptativo";
 
 /** Ghost-style toolbar control shared by the header's link + button actions.
  *
@@ -99,6 +100,41 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
   const { quote } = data;
   const stepRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * ── O CABEÇALHO ENCOLHE ASSIM QUE ELA COMEÇA A DESCER ──────────────────
+   *
+   * MEDIDO a 375×667 (iPhone SE), somando as classes: este cabeçalho gastava
+   * 513 px — 77% do ecrã — e ficava lá, colado (`sticky top-0`), enquanto ela
+   * rolava o dossier inteiro. Dos 513, 315 são gente que só se lê UMA vez: o
+   * link de voltar com o rótulo «Pedidos» (44 de alvo + 12 de folga), o eyebrow
+   * «Dossier do Evento» (23), a linha de factos por baixo do nome (26) e o
+   * cartão de «Próxima ação» (190, mais os 20 de folga acima dele).
+   *
+   * Depois desta mudança: 485 px em repouso (a escala do espaço aperta o
+   * enchimento) e 178 px assim que ela começa a descer — de 77% do ecrã para
+   * 27%.
+   *
+   * O que NÃO pode sair, porque é o que dá contexto a quem já rolou: o NOME do
+   * evento (senão a faixa colada deixa de dizer de que evento se trata) e a
+   * FILA DE ACÇÕES (partilhar, imprimir, .ics — é o que se vai buscar a meio de
+   * uma montagem).
+   *
+   * E a SAÍDA fica sempre. O dossier vive em `evento/[id]`, fora do
+   * `AdminClient`: não há aqui barra de baixo nem gaveta, e este link é o único
+   * caminho de volta ao back office. Esconder o único caminho de volta atrás de
+   * «rola até cima outra vez» era trocar altura por uma pessoa presa num ecrã;
+   * o que sai é só a PALAVRA «Pedidos», e a seta sobe para a linha do nome —
+   * a linha já tem 44 px de alto por causa do alvo de toque, portanto os 56 px
+   * da linha própria devolvem-se quase inteiros.
+   *
+   * Sem transição nenhuma, de propósito: o que muda aqui é geometria (linhas
+   * que saem da árvore), e animar geometria é recalcular layout a cada frame no
+   * meio do scroll — exactamente o que o `Fluidez.contrato.test.ts` existe para
+   * travar. Ver a nota do `useDesceu` para a histerese (encolhe aos 24 px,
+   * volta a crescer aos 8) que impede a faixa de piscar com o dedo pousado.
+   */
+  const desceu = useDesceu();
+
   // Confirmação inline da cópia — a árvore do Dossier não está dentro do
   // ToastProvider (só a raiz de administração está), por isso mostramos um
   // "Copiado ✓" transitório no próprio botão em vez de um toast.
@@ -155,11 +191,26 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
 
   return (
     <header className="sticky top-0 z-20 bg-white/97 border-b border-foreground/[0.07]">
-      <div className="px-4 sm:px-6 lg:px-10 py-5 flex flex-col gap-5">
+      <div
+        className={`px-4 sm:px-6 lg:px-10 flex flex-col ${
+          desceu ? "py-2 gap-2" : "py-[var(--bo-p-vista)] gap-[var(--bo-gap-vista)]"
+        }`}
+      >
         {/* Linha 1 — voltar + título + próxima ação */}
-        <div className="flex flex-col lg:flex-row lg:items-start gap-5">
+        <div
+          className={`flex flex-col lg:flex-row lg:items-start ${
+            desceu ? "gap-2" : "gap-[var(--bo-gap-vista)]"
+          }`}
+        >
           <div className="min-w-0 flex-1">
-            {/* A ÚNICA SAÍDA DESTE ECRÃ, e media 65×16 px.
+            {/* A LINHA DE IDENTIDADE. Ao descer vira uma linha só — seta +
+                nome —; em repouso o `div` não tem classe nenhuma e os três
+                filhos empilham-se em fluxo normal, exactamente como antes.
+                Um só `<Link>` e um só `<h1>`: montar duas cópias com
+                `hidden`/`sm:hidden` dava dois títulos de nível 1 na página e
+                dois estados a viver ao mesmo tempo (ver `useMedida.ts`). */}
+            <div className={desceu ? "flex items-center gap-2 min-w-0" : undefined}>
+              {/* A ÚNICA SAÍDA DESTE ECRÃ, e media 65×16 px.
                 O dossier vive numa rota própria (`evento/[id]`), fora do
                 `AdminClient`: aqui não há barra de baixo nem gaveta — medido,
                 as duas dão `false`. Este link é o único caminho de volta ao
@@ -170,30 +221,43 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
                 aqui, custa procurar como se sai de um ecrã que não tem outra
                 porta. `alvo-toque` dá-lhe 44 px de altura sem lhe mexer na
                 letra nem na cor. */}
-            <Link
-              href={`/${lang}/orcamento/admin`}
-              className="alvo-toque !justify-start inline-flex items-center gap-1.5 text-foreground/45 text-xs font-medium hover:text-[#4d6350] motion-safe:transition-colors mb-3"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
+              <Link
+                href={`/${lang}/orcamento/admin`}
+                className={`alvo-toque !justify-start inline-flex items-center gap-1.5 text-foreground/45 text-xs font-medium hover:text-[#4d6350] motion-safe:transition-colors ${
+                  desceu ? "shrink-0" : "mb-3"
+                }`}
               >
-                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Pedidos
-            </Link>
-            <p className="bo-eyebrow mb-1.5">Dossier do Evento</p>
-            <h1
-              className="font-display text-foreground/90 font-bold leading-tight truncate"
-              style={{ fontSize: "clamp(22px, 2.6vw, 32px)" }}
-            >
-              {quote.name}
-            </h1>
-            {titleBits.length > 0 && (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {/* A palavra sai do ECRÃ, não da acessibilidade: `sr-only`
+                    mantém o nome do link igual nos dois estados, e um leitor de
+                    ecrã continua a anunciar «Pedidos». (`hidden` estava fora de
+                    questão — o `.alvo-toque` põe `display:inline-flex` sob
+                    ponteiro grosso e ressuscitava-a.) */}
+                <span className={desceu ? "sr-only" : undefined}>Pedidos</span>
+              </Link>
+              {/* «Dossier do Evento» por cima do nome do evento diz o que o
+                  ecrã inteiro já diz. Fica para quem chega; sai para quem já
+                  desceu. */}
+              {!desceu && <p className="bo-eyebrow mb-1.5">Dossier do Evento</p>}
+              <h1
+                className="font-display text-foreground/90 font-bold leading-tight truncate min-w-0"
+                style={{ fontSize: "clamp(22px, 2.6vw, 32px)" }}
+              >
+                {quote.name}
+              </h1>
+            </div>
+            {/* Tipo · data · local. É a ficha do evento, lê-se à chegada, e
+                está toda outra vez na coluna lateral. */}
+            {!desceu && titleBits.length > 0 && (
               <p className="text-foreground/55 text-sm mt-1.5 truncate">{titleBits.join(" · ")}</p>
             )}
 
@@ -377,73 +441,82 @@ export default function DossierHeader({ data, stage, next, portalUrl, lang, onSc
             </div>
           </div>
 
-          {/* Cartão de próxima ação */}
-          <div className="shrink-0 lg:max-w-xs w-full lg:w-auto bg-[#4d6350]/[0.06] border border-[#4d6350]/20 rounded-2xl p-5">
-            <p className="text-[#4d6350]/70 text-[10px] tracking-[0.16em] uppercase font-semibold mb-2">
-              Próxima ação
-            </p>
-            <p className="text-foreground/85 text-sm font-medium leading-snug mb-1.5">
-              {next.label}
-            </p>
-            <p className="text-foreground/55 text-xs leading-relaxed mb-4">{next.hint}</p>
-            {/* O botão da próxima acção media 148×40 — quatro píxeis abaixo do
-                mínimo, e é o alvo que este cartão inteiro existe para oferecer.
-                `pointer-coarse:h-11` é o mesmo degrau que o `ui/Button.tsx` já
-                dá aos tamanhos `sm` e `md`; estes três estão escritos à mão e
-                por isso ficaram de fora. Os três estados (portal, zona,
-                desactivado) sobem juntos: um cartão onde a altura do botão
-                muda com o estado lê-se como um salto. */}
-            {next.kind === "portal" ? (
-              <a
-                href={portalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
-              >
+          {/* ── O CARTÃO DE «PRÓXIMA AÇÃO», E PORQUE É ELE O MAIOR CORTE ──────
+              MEDIDO a 375 px: 191 px de altura com a folga acima — mais de um
+              quarto do ecrã. Diz o que fazer a seguir, que é a primeira coisa
+              a ler ao abrir o dossier e a menos útil quando já se está a meio
+              dele. Sai ao descer; o botão que ele oferece leva a uma zona que a
+              essa altura já está debaixo do dedo.
+              O enchimento passa a ler `--bo-p-cartao` (14 no telemóvel, 24 a
+              partir de 640) em vez dos 20 fixos que vinham de um monitor. */}
+          {!desceu && (
+            <div className="shrink-0 lg:max-w-xs w-full lg:w-auto bg-[#4d6350]/[0.06] border border-[#4d6350]/20 rounded-2xl p-[var(--bo-p-cartao)]">
+              <p className="text-[#4d6350]/70 text-[10px] tracking-[0.16em] uppercase font-semibold mb-2">
+                Próxima ação
+              </p>
+              <p className="text-foreground/85 text-sm font-medium leading-snug mb-1.5">
                 {next.label}
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  aria-hidden="true"
+              </p>
+              <p className="text-foreground/55 text-xs leading-relaxed mb-4">{next.hint}</p>
+              {/* O botão da próxima acção media 148×40 — quatro píxeis abaixo do
+                  mínimo, e é o alvo que este cartão inteiro existe para oferecer.
+                  `pointer-coarse:h-11` é o mesmo degrau que o `ui/Button.tsx` já
+                  dá aos tamanhos `sm` e `md`; estes três estão escritos à mão e
+                  por isso ficaram de fora. Os três estados (portal, zona,
+                  desactivado) sobem juntos: um cartão onde a altura do botão
+                  muda com o estado lê-se como um salto. */}
+              {next.kind === "portal" ? (
+                <a
+                  href={portalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
                 >
-                  <path d="M7 17 17 7M8 7h9v9" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </a>
-            ) : zone ? (
-              <button
-                type="button"
-                onClick={() => onScrollTo(zone)}
-                className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
-              >
-                {next.label}
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  aria-hidden="true"
+                  {next.label}
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden="true"
+                  >
+                    <path d="M7 17 17 7M8 7h9v9" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </a>
+              ) : zone ? (
+                <button
+                  type="button"
+                  onClick={() => onScrollTo(zone)}
+                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-[#4d6350] hover:bg-[#59745b] text-white/95 text-sm font-medium rounded-xl motion-safe:transition-colors motion-safe:duration-150 motion-safe:active:scale-[0.98]"
                 >
-                  <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            ) : (
-              // arquivar / none — ainda por ligar (fase de quick-actions).
-              <button
-                type="button"
-                disabled
-                title="Disponível na fase de ações rápidas"
-                className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-white/10 text-white/45 text-sm font-medium rounded-xl cursor-not-allowed"
-              >
-                {next.label}
-              </button>
-            )}
-          </div>
+                  {next.label}
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ) : (
+                // arquivar / none — ainda por ligar (fase de quick-actions).
+                <button
+                  type="button"
+                  disabled
+                  title="Disponível na fase de ações rápidas"
+                  className="inline-flex items-center gap-2 h-10 pointer-coarse:h-11 px-4 bg-white/10 text-white/45 text-sm font-medium rounded-xl cursor-not-allowed"
+                >
+                  {next.label}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Linha 2 — stepper de fases (roving tabindex, setas navegam) */}

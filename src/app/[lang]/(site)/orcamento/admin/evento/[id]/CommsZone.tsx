@@ -21,9 +21,14 @@ interface Props {
   onAddEntry: (entry: ActivityEntry) => Promise<boolean>;
 }
 
+/** A moldura desta zona sai abaixo de 640 e fica um risco no lugar dela — a
+ *  conta está no cabeçalho do `FinanceZone`, que tem a mesma linha. */
 export default function CommsZone({ quote, userName, onQuoteChange, onAddEntry }: Props) {
   return (
-    <section id="zone-comunicacao" className="bo-card p-5 sm:p-6 scroll-mt-40 flex flex-col gap-6">
+    <section
+      id="zone-comunicacao"
+      className="scroll-mt-40 flex flex-col gap-[var(--bo-gap-vista)] border-t border-[var(--bo-hairline)] pt-[var(--bo-p-cartao)] sm:rounded-[var(--bo-radius-lg)] sm:border sm:bg-[var(--bo-surface)] sm:shadow-[var(--bo-shadow-sm)] sm:p-[var(--bo-p-cartao)]"
+    >
       <p className="bo-eyebrow">Comunicação</p>
 
       <ProposalStudio

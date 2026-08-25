@@ -327,33 +327,47 @@ export default function Acompanhamento({ quotes, onOpenQuote, onFazerProposta }:
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="@container flex flex-col gap-4">
       {/*
         ── O resumo: as duas perguntas de segunda-feira de manhã ──────────
 
-        TRÊS NÚMEROS EM LINHA, NO TELEMÓVEL TAMBÉM — não só a partir de `sm`
-        (640 px). Media a 375 px: as três empilhavam a toda a largura (343 px
-        cada), 20 px de reentrância à roda de um só número, e a soma das três
-        chegava aos 344 px de altura — mais de metade do ecrã (667 px) só para
-        mostrar "7", "4" e "0". A primeira proposta em aberto só começava aos
-        460 px.
+        DUAS COLUNAS PRIMEIRO, TRÊS SÓ QUANDO CABEM.
 
-        O resto deste ecrã já resolveu o mesmo problema doutra maneira — as
-        linhas de três números do Faseamento (`PaymentsPanel.tsx`) e dos Custos
-        do Evento (`EventCosts.tsx`) usam sempre `grid-cols-3`, com `p-3` — e é
-        essa a régua que se segue aqui, com `padding="sm"` do `Card` (16 px, a
-        mesma que a Propostas.tsx já usa nos seus próprios cartões de resumo)
-        em vez do `md` por omissão (20–24 px).
+        Isto começou por ser `grid-cols-3` cru, para fugir ao defeito oposto: as
+        três empilhadas a toda a largura (343 px cada) somavam 344 px de altura
+        a 375 px, e a primeira proposta em aberto só começava aos 460. A saída
+        dizia copiar o padrão do `EventCosts` — mas o que o `EventCosts` faz não
+        é `grid-cols-3`: é `grid-cols-2` com `@min-[26rem]:grid-cols-3` e o
+        número herói a atravessar as duas colunas em baixo.
+
+        E a diferença mede-se. Com três colunas a 375 px cada caixa fica com
+        105 px — 73 de conteúdo depois do enchimento — e nesses 73 px
+        «Seguimentos devidos» parte-se em duas linhas e «Validade nos próximos
+        7 dias» em três: a fila que existia para poupar altura estava a gastá-la
+        em quebras de palavra, com um `text-2xl` (24 px) em cima. Com duas
+        colunas são 133 px de conteúdo, as legendas cabem, e o terceiro cartão
+        toma a linha de baixo inteira em vez de ficar sozinho a meia largura.
+
+        `@container` e não `sm:` porque a pergunta é sobre a CAIXA: este bloco
+        vive na vista de Acompanhamento e dentro dela a largura não é a da
+        janela. O limiar (26 rem) é o mesmo do `EventCosts` e do
+        `PaymentsPanel`, para os três não divergirem.
+
+        O `padding="sm"` do `Card` (16 px) fica como estava — é a régua que a
+        `Propostas.tsx` já usa nos seus cartões de resumo.
       */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 @min-[26rem]:grid-cols-3 gap-3">
         <Card padding="sm">
           <p className="bo-eyebrow mb-1">Em aberto</p>
-          <p className="text-2xl font-light text-foreground/85">{linhas.length}</p>
+          {/* 24 px de algarismo num cartão de 105 é o que não deixava a legenda
+              caber ao lado dele. `text-xl` no telemóvel, o tamanho de sempre a
+              partir de 640. */}
+          <p className="text-xl sm:text-2xl font-light text-foreground/85">{linhas.length}</p>
         </Card>
         <Card padding="sm">
           <p className="bo-eyebrow mb-1">Prazo a acabar</p>
           <p
-            className={`text-2xl font-light ${expirando.length > 0 ? "text-[#b5654a]" : "text-foreground/85"}`}
+            className={`text-xl sm:text-2xl font-light ${expirando.length > 0 ? "text-[#b5654a]" : "text-foreground/85"}`}
           >
             {expirando.length}
           </p>
@@ -361,10 +375,13 @@ export default function Acompanhamento({ quotes, onOpenQuote, onFazerProposta }:
             Validade nos próximos 7 dias
           </p>
         </Card>
-        <Card padding="sm">
+        {/* Atravessa as duas colunas na linha de baixo — a mesma escolha que o
+            `EventCosts` faz com a Margem: melhor uma linha inteira do que meia
+            largura a fazer companhia a um espaço vazio. */}
+        <Card padding="sm" className="col-span-2 @min-[26rem]:col-span-1">
           <p className="bo-eyebrow mb-1">Seguimentos devidos</p>
           <p
-            className={`text-2xl font-light ${devidos.length > 0 ? "text-[#c08a3e]" : "text-foreground/85"}`}
+            className={`text-xl sm:text-2xl font-light ${devidos.length > 0 ? "text-[#c08a3e]" : "text-foreground/85"}`}
           >
             {devidos.length}
           </p>
