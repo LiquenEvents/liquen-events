@@ -435,29 +435,38 @@ export async function contarDerivadasEmFalta(): Promise<Contagem> {
   };
 }
 
+/** Onde um lote parou, para o seguinte continuar daí. */
+export interface Retoma {
+  papel: Papel;
+  origem: string;
+  pasta: string;
+  /** A fotografia onde parou — inclusive: é por ela que se recomeça. */
+  caminho: string;
+}
+
 export interface ResultadoDoLote {
   /** Derivadas escritas neste lote. */
   geradas: number;
   falhas: string[];
-  /** Quantas derivadas ficaram por fazer depois deste lote. Zero = acabou. */
-  restantes: number;
-  /** Destas, quantas são ESSENCIAIS — as fotografias que ainda servem o
-   *  original. Zero com `restantes` a sobrar quer dizer que a avaria está
-   *  resolvida e o que falta é só o ganho. */
-  restantesEssenciais: number;
-  /**
-   * O MESMO trabalho contado em FOTOGRAFIAS.
-   *
-   * Os botões do painel falam de fotografias («Gerar as versões leves de 389
-   * fotografias») porque é a unidade em que ela pensa. A barra falava de
-   * derivadas, e dizia «0 de 765» logo a seguir a ela ter carregado num botão
-   * que prometia 389 — dois números para o mesmo trabalho, sem nada no ecrã a
-   * explicar a diferença. Agora quem chama tem as duas contas e pode usar a
-   * mesma dos botões.
-   */
-  fotografiasRestantes: number;
   /** Fotografias tocadas neste lote (uma, faça ela uma derivada ou quatro). */
   fotografiasFeitas: number;
+  /**
+   * Onde continuar. `null` quer dizer que a passagem chegou ao fim.
+   *
+   * É ISTO que diz a quem chama se há mais — e não um contador. Ver o cabeçalho
+   * de `gerarLoteDeDerivadas`.
+   */
+  retoma: Retoma | null;
+  /**
+   * Quantas derivadas ficaram por fazer — só preenchido quando `retoma` é
+   * `null`, isto é, quando se percorreu tudo. Aí o que falta são as que
+   * FALHARAM, e é um número honesto. A meio de uma passagem seria preciso
+   * varrer o resto da biblioteca para o saber, e varrer é exactamente o que
+   * este lote deixou de fazer duas vezes.
+   */
+  restantes: number;
+  restantesEssenciais: number;
+  fotografiasRestantes: number;
   /** O papel do que este lote esteve a fazer, para o ecrã poder dizê-lo em vez
    *  de anunciar «miniaturas» enquanto gera AVIF. */
   papel: Papel | null;
@@ -468,25 +477,36 @@ type Alvo = { bucket: string; lado: number; qualidade: number; avif?: boolean };
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O LOTE PÁRA PELO RELÓGIO, E NÃO POR UM NÚMERO
+ * O LOTE RETOMA DE ONDE FICOU — E É POR ISSO QUE ACABA
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Era um número — 25 derivadas — e o número não sabe nada sobre o tecto da
- * função. Sabe o relógio.
+ * A barra dela ficou em «0 de 427» com o primeiro lote ainda por voltar. Não
+ * era lentidão: era trabalho a crescer ao quadrado.
  *
- * Aconteceu isto: 389 fotografias sem AVIF, 765 derivadas, e a barra dela
- * parada em «0 de 765». O `sharp` não tinha culpa (medido: 25 codificações
- * AVIF a esforço 4 são ~9,7 s no total). A rede é que não cabia:
+ * Cada lote começava na PRIMEIRA pasta da biblioteca. O décimo sétimo voltava a
+ * listar tudo o que os dezasseis anteriores já tinham feito, para descobrir que
+ * não havia lá nada a fazer. E o varrimento é a parte cara: três idas ao
+ * Storage por pasta — os originais e cada bucket de derivada —, uma de cada
+ * vez, com a latência da rede a somar-se em série.
  *
- *   · o original era descarregado uma vez por DERIVADA — a mesma fotografia de
- *     ~2 MB duas vezes, para lhe fazer o AVIF grande e o AVIF micro;
- *   · e cada lote varria a biblioteca inteira do princípio: uma listagem por
- *     pasta e por bucket, repetida nos ~31 lotes.
+ * Pior: depois de esgotar o tempo de geração, continuava a varrer o RESTO da
+ * biblioteca só para contar o que faltava. Um número que o ecrã já tinha, da
+ * contagem que ela pediu antes de carregar no botão.
  *
- * Um lote que não cabe nos 60 s morre a meio, e quem está do outro lado vê uma
- * barra a zero. Com um tecto de tempo o lote encolhe sozinho quando a rede
- * está má, em vez de rebentar — e como o varrimento é a parte cara, vale a
- * pena aproveitá-lo para gerar o máximo que couber em vez de parar às 25.
+ * Somadas, as três faziam com que o tempo de cada lote crescesse com o número
+ * de lotes já feitos — e com 427 fotografias a 25 por lote, os últimos nunca
+ * chegariam.
+ *
+ * Agora:
+ *
+ *  · cada lote diz ONDE parou (`retoma`), e o seguinte começa aí. Os lotes
+ *    passam a ser disjuntos, e o trabalho total é linear;
+ *  · as listagens de uma pasta vão em paralelo — uma latência em vez de três;
+ *  · esgotado o tempo, devolve-se imediatamente. Não se varre para contar.
+ *
+ * E porque os lotes são disjuntos, quem chama pode SOMAR o que cada um fez sem
+ * contar a mesma fotografia duas vezes — que era a razão de o contador ter de
+ * ser calculado por subtracção.
  */
 const TECTO_DO_LOTE_MS = 40_000;
 
@@ -500,7 +520,7 @@ const TECTO_DO_LOTE_MS = 40_000;
 const LOTE_FOTOS = 200;
 
 /**
- * Gera as derivadas em falta até ao tecto de tempo, e diz quantas ficaram.
+ * Gera as derivadas em falta até ao tecto de tempo, e diz onde parou.
  *
  * **Nunca substitui o que já existe** (`upsert: false`), portanto repetir é
  * seguro e é assim que se retoma. E é melhor esforço por fotografia: uma que
@@ -514,34 +534,38 @@ export async function gerarLoteDeDerivadas(
     tectoMs?: number;
     /** O relógio, injectável para os testes não precisarem de esperar. */
     agora?: () => number;
+    /** Onde o lote anterior parou. Ausente = começar do princípio. */
+    retoma?: Retoma | null;
   },
 ): Promise<ResultadoDoLote> {
   const sb = getSupabase();
-  if (!sb) {
-    return {
-      geradas: 0,
-      falhas: ["Storage não configurado."],
-      restantes: 0,
-      restantesEssenciais: 0,
-      fotografiasRestantes: 0,
-      fotografiasFeitas: 0,
-      papel: null,
-    };
-  }
+  const vazio = (falhas: string[]): ResultadoDoLote => ({
+    geradas: 0,
+    falhas,
+    fotografiasFeitas: 0,
+    retoma: null,
+    restantes: 0,
+    restantesEssenciais: 0,
+    fotografiasRestantes: 0,
+    papel: null,
+  });
+  if (!sb) return vazio(["Storage não configurado."]);
 
   const agora = opcoes?.agora ?? Date.now;
   const ate = agora() + (opcoes?.tectoMs ?? TECTO_DO_LOTE_MS);
+  const alvo = opcoes?.retoma ?? null;
 
   const falhas: string[] = [];
   let geradas = 0;
   let fotografiasFeitas = 0;
-  let restantes = 0;
-  let restantesEssenciais = 0;
-  let fotografiasRestantes = 0;
   let papel: Papel | null = null;
   /** Os buckets já confirmados NESTE lote. Confirmar é uma ida ao servidor, e
    *  era feita uma vez por derivada — cinco fotografias davam dez idas. */
   const bucketsProntos = new Map<string, boolean>();
+  /** Ainda a saltar até chegar ao ponto de retoma? */
+  let aSaltar = alvo !== null;
+  /** O ponto de retoma foi encontrado? Se não, ele está velho — ver abaixo. */
+  let encontrou = alvo === null;
 
   // DUAS passagens, e não uma: primeiro tudo o que é essencial na biblioteca
   // inteira, e só depois o AVIF. Ver `Papel` — parar a meio tem de deixar as
@@ -549,75 +573,104 @@ export async function gerarLoteDeDerivadas(
   // intactas do outro.
   for (const passagem of ["essencial", "leve"] as const) {
     // `soPapel` é o que deixa arranjar a avaria sem esperar pelo ganho: as
-    // miniaturas de toda a biblioteca são um punhado de lotes; o AVIF são 683
-    // fotografias vezes duas codificações caras. Obrigá-la a esperar por um
-    // para ter o outro era transformar uma correcção de dois minutos numa
-    // tarde. Sem argumento, faz tudo — pela ordem certa.
+    // miniaturas de toda a biblioteca são um punhado de lotes; o AVIF são
+    // centenas de codificações caras.
     if (soPapel && passagem !== soPapel) continue;
     for (const familia of FAMILIAS) {
       const doPapel = familia.derivadas.filter((d) => d.papel === passagem);
       if (doPapel.length === 0) continue;
       let asPastas: string[];
       try {
-        asPastas = await pastas(sb, familia.origem);
+        // Ordenadas: a retoma só funciona se a travessia for sempre a mesma.
+        asPastas = (await pastas(sb, familia.origem)).sort();
       } catch {
         continue;
       }
       for (const pasta of asPastas) {
-        const caminhos = await ficheiros(sb, familia.origem, pasta);
-        if (caminhos.length === 0) continue;
-        // UMA listagem por bucket de derivada e por pasta — não uma por
-        // fotografia. É o que permite decidir tudo o que esta pasta deve com o
-        // número de idas ao Storage a depender das pastas, e não das fotos.
-        const jaLa = new Map<string, Set<string>>();
-        for (const d of doPapel) {
-          jaLa.set(d.bucket, new Set(await ficheiros(sb, d.bucket, pasta).catch(() => [])));
+        if (
+          aSaltar &&
+          !(alvo!.papel === passagem && alvo!.origem === familia.origem && alvo!.pasta === pasta)
+        ) {
+          continue;
         }
+        // AS LISTAGENS EM PARALELO — os originais e cada bucket de derivada não
+        // dependem uns dos outros. Em série era a latência da rede vezes três,
+        // por pasta, e a travessia tem dezenas de pastas.
+        const [caminhosCrus, ...conjuntos] = await Promise.all([
+          ficheiros(sb, familia.origem, pasta).catch(() => [] as string[]),
+          ...doPapel.map((d) => ficheiros(sb, d.bucket, pasta).catch(() => [] as string[])),
+        ]);
+        const caminhos = caminhosCrus.sort();
+        if (caminhos.length === 0) continue;
+        const jaLa = new Map<string, Set<string>>(
+          doPapel.map((d, i) => [d.bucket, new Set(conjuntos[i])]),
+        );
         for (const caminho of caminhos) {
+          if (aSaltar) {
+            if (caminho !== alvo!.caminho) continue;
+            // Chegámos ao ponto de retoma. Esta fotografia é a primeira a
+            // fazer, e não a primeira a saltar: o lote anterior parou ANTES de
+            // lhe tocar.
+            aSaltar = false;
+            encontrou = true;
+          }
           const emFalta = doPapel.filter((d) => !jaLa.get(d.bucket)?.has(caminho));
           if (emFalta.length === 0) continue;
 
-          // ── Já não há tempo: daqui para a frente só se CONTA ──────────────
+          // ── Acabou o tempo: diz-se onde se ficou e volta-se JÁ ────────────
           //
-          // `fotografiasFeitas > 0` e não um corte seco: um lote que devolve
-          // zero geradas faz quem chama parar o ciclo (é assim que se sabe que
-          // acabou), portanto um lote que chegasse atrasado e não gerasse nada
-          // parava a geração para sempre. Uma fotografia é o mínimo que
-          // garante que a coisa anda.
+          // `fotografiasFeitas > 0` e não um corte seco: um lote que não gera
+          // nada não faz a travessia avançar, e a geração ficava presa. Uma
+          // fotografia é o mínimo que garante que a coisa anda.
           if (fotografiasFeitas >= LOTE_FOTOS || (fotografiasFeitas > 0 && agora() >= ate)) {
-            fotografiasRestantes += 1;
-            restantes += emFalta.length;
-            if (passagem === "essencial") restantesEssenciais += emFalta.length;
-            continue;
+            return {
+              geradas,
+              falhas,
+              fotografiasFeitas,
+              retoma: { papel: passagem, origem: familia.origem, pasta, caminho },
+              restantes: 0,
+              restantesEssenciais: 0,
+              fotografiasRestantes: 0,
+              papel,
+            };
           }
 
           papel = passagem;
           const r = await gerarAsDeUmaFoto(sb, familia.origem, caminho, emFalta, bucketsProntos);
           geradas += r.feitas;
           fotografiasFeitas += 1;
-          if (r.falhas.length > 0) {
-            falhas.push(...r.falhas);
-            // O que falhou continua em falta — senão o painel dizia que estava
-            // tudo feito e a grelha continuava lenta.
-            fotografiasRestantes += 1;
-            restantes += r.falhas.length;
-            if (passagem === "essencial") restantesEssenciais += r.falhas.length;
-          }
+          if (r.falhas.length > 0) falhas.push(...r.falhas);
         }
       }
     }
   }
 
+  /**
+   * O ponto de retoma não apareceu na travessia — a pasta foi apagada, ou o
+   * tema mudou de nome entre dois lotes. Sem isto, o lote devolvia «acabou»
+   * sobre uma biblioteca por fazer, e a geração parava em silêncio a meio.
+   *
+   * Recomeça-se do princípio: nada foi gerado nesta volta, portanto repetir a
+   * travessia não repete trabalho nenhum.
+   */
+  if (!encontrou && fotografiasFeitas === 0) {
+    return gerarLoteDeDerivadas(soPapel, { ...opcoes, retoma: null });
+  }
+
   if (falhas.length > 0) {
     log.warn("derivadas: algumas não foram geradas", { quantas: falhas.length });
   }
+  // Percorreu-se TUDO: o que continua em falta são as que falharam, e essas
+  // sabem-se sem varrer nada.
+  const fotosFalhadas = new Set(falhas.map((f) => f.slice(f.indexOf("/") + 1)));
   return {
     geradas,
     falhas,
-    restantes,
-    restantesEssenciais,
-    fotografiasRestantes,
     fotografiasFeitas,
+    retoma: null,
+    restantes: falhas.length,
+    restantesEssenciais: papel === "essencial" ? falhas.length : 0,
+    fotografiasRestantes: fotosFalhadas.size,
     papel,
   };
 }

@@ -228,9 +228,11 @@ describe("a geração faz primeiro o que dói", () => {
 
     expect(r.fotografiasFeitas).toBeGreaterThan(0);
     expect(r.fotografiasFeitas).toBeLessThan(20);
-    // Duas essenciais por fotografia, e todas as que sobram doem.
+    // Três essenciais por fotografia — a miniatura, o micro e a de 1200 px.
     expect(r.geradas).toBe(r.fotografiasFeitas * 3);
-    expect(r.restantes).toBe((20 - r.fotografiasFeitas) * 3);
-    expect(r.restantesEssenciais).toBe(r.restantes);
+    // E o que sobra diz-se dizendo ONDE se ficou: contar o resto obrigava a
+    // varrer a biblioteca toda, que é o que este lote deixou de fazer.
+    expect(r.retoma).not.toBeNull();
+    expect(r.retoma?.papel).toBe("essencial");
   });
 });
