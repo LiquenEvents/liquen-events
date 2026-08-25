@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useCamadaDeHistoria } from "../useCamadaDeHistoria";
 import { useFocusTrap } from "../useFocusTrap";
 import { useTrincoDeScroll } from "../useTrincoDeScroll";
@@ -28,8 +28,13 @@ import { cn } from "./cn";
 export interface FolhaOuDialogoProps {
   aberto: boolean;
   onFechar: () => void;
-  /** Título — obrigatório, é o nome acessível da caixa. */
+  /** Título — obrigatório. É ele, mais o `sobretitulo` se houver, que dá o
+   *  nome acessível da caixa. */
   titulo: string;
+  /** A linha pequena POR CIMA do título (`bo-eyebrow`), quando o título sozinho
+   *  não diz de que trabalho se trata: «Juntar “Itália” a» + «312 fotos». Entra
+   *  no nome acessível junto com o título, porque na leitura é uma frase só. */
+  sobretitulo?: string;
   /** Uma linha por baixo do título. */
   descricao?: string;
   children: ReactNode;
@@ -41,6 +46,33 @@ export interface FolhaOuDialogoProps {
   /** A folha ocupa quase o ecrã todo — para grelhas de fotos, onde ver muito é
    *  o objectivo. Sem isto ajusta-se ao conteúdo. */
   folhaAlta?: boolean;
+  /**
+   * ENQUANTO ISTO FOR VERDADE, ISTO NÃO SE FECHA SEM SE DIZER QUE SIM.
+   *
+   * A regra da casa é «se falhar, não perder trabalho». Uma fusão de temas ou
+   * uma cópia de 300 fotos correm em voltas de rede, e fechar a meio deixa o
+   * trabalho pelo meio — por isso o fundo, o Escape, o arrasto para baixo e o
+   * gesto de voltar deixam de fechar, e o «×» fica desactivado como já ficava
+   * nos diálogos escritos à mão que isto substitui.
+   *
+   * NÃO é uma prisão, e quem chama responde por isso: ou a operação acaba
+   * sempre sozinha (um registo de passkey), ou há uma saída nas `accoes` (o
+   * botão «Parar» das duas operações por lotes). Sem uma das duas isto era uma
+   * barreira — e barreiras têm outro sítio: o `SessaoExpirada`, que existe
+   * precisamente para não ter saída nenhuma.
+   */
+  bloqueado?: boolean;
+  /**
+   * Em que nível se empilha (z-index). Omitido, 50 — o mesmo do resto.
+   *
+   * Existe porque as camadas desta casa já estão ordenadas entre si e a ordem
+   * importa: os avisos passageiros estão a 80, a paleta de comandos a 90, a
+   * barreira da sessão expirada a 110, e a gaveta do pedido a 50 mas DEPOIS
+   * destes diálogos na árvore — com o mesmo nível, é ela que fica por cima e o
+   * diálogo desaparece por trás dela. Quem sobe acima de 50 diz porquê no
+   * sítio onde o faz.
+   */
+  nivel?: number;
 }
 
 const LARGURAS = { sm: "max-w-md", md: "max-w-2xl", lg: "max-w-4xl" } as const;
@@ -53,11 +85,14 @@ export function FolhaOuDialogo({
   aberto,
   onFechar,
   titulo,
+  sobretitulo,
   descricao,
   children,
   accoes,
   largura = "md",
   folhaAlta = false,
+  bloqueado = false,
+  nivel = 50,
 }: FolhaOuDialogoProps) {
   const { telemovel, montado } = useAdaptativo();
   // Trava o scroll do fundo enquanto está aberto. Sem isto, arrastar dentro da
@@ -66,6 +101,13 @@ export function FolhaOuDialogo({
   // folha aberta por cima de um diálogo não destrancar o de baixo ao fechar);
   // vem ANTES da armadilha de foco para o foco a entrar não rolar a página.
   useTrincoDeScroll(aberto);
+  /* AS QUATRO SAÍDAS DE ATALHO PASSAM TODAS POR AQUI — fundo, Escape, arrasto
+     e o gesto de voltar. Um sítio só de propósito: com o `bloqueado` espalhado
+     por quatro `if`, esquecer um deles não dá erro nenhum — dá uma fusão de
+     temas interrompida a meio, uma vez em cada dez. */
+  const pedirFecho = () => {
+    if (!bloqueado) onFechar();
+  };
   /* ── O GESTO DE VOLTAR FECHA ISTO, E NÃO O BACK OFFICE ─────────────────────
      Num iPhone, deslizar da esquerda É o botão de voltar, e faz-se sem pensar —
      numa quinta, com o telemóvel numa mão e uma caixa de flores na outra,
@@ -74,21 +116,22 @@ export function FolhaOuDialogo({
 
      Ao pé do Escape de propósito: é a mesma promessa, no gesto que o telemóvel
      tem em vez do teclado que não tem. Ver `useCamadaDeHistoria`. */
-  useCamadaDeHistoria(aberto, onFechar);
+  useCamadaDeHistoria(aberto, pedirFecho);
   const caixaRef = useFocusTrap<HTMLDivElement>(aberto);
   const [arrasto, setArrasto] = useState(0);
   const inicioY = useRef<number | null>(null);
+  const idTitulo = useId();
 
   // Escape fecha, nos dois formatos. Um `keydown` no documento e não no
   // elemento: o foco pode estar num campo lá dentro.
   useEffect(() => {
-    if (!aberto) return;
+    if (!aberto || bloqueado) return;
     const aoTeclar = (e: KeyboardEvent) => {
       if (e.key === "Escape") onFechar();
     };
     document.addEventListener("keydown", aoTeclar);
     return () => document.removeEventListener("keydown", aoTeclar);
-  }, [aberto, onFechar]);
+  }, [aberto, bloqueado, onFechar]);
 
   // Cada abertura começa sem arrasto acumulado: sem isto, uma folha fechada a
   // meio de um gesto reabria já puxada para baixo.
@@ -104,21 +147,31 @@ export function FolhaOuDialogo({
   const comoFolha = telemovel || !montado;
 
   const cabecalho = (
-    <div className="px-5 pt-4">
-      <h2 className="font-display text-lg text-foreground/85">{titulo}</h2>
+    // `pr-14` e não `pr-5`: o «×» é um alvo de 44 px encostado à direita, e sem
+    // esta folga um título longo passava-lhe por baixo.
+    <div className="px-5 pt-4 pr-14">
+      {sobretitulo && (
+        <p id={`${idTitulo}-sobre`} className="bo-eyebrow">
+          {sobretitulo}
+        </p>
+      )}
+      <h2 id={idTitulo} className="font-display text-lg text-foreground/85">
+        {titulo}
+      </h2>
       {descricao && <p className="bo-text-muted mt-1 text-sm">{descricao}</p>}
     </div>
   );
 
   return (
     <div
-      className="fixed inset-0 z-50 flex"
+      className="fixed inset-0 flex"
+      style={{ zIndex: nivel }}
       role="presentation"
       // O fundo fecha — mas só quando o toque COMEÇOU nele. Sem esta condição,
       // arrastar de dentro para fora (a seleccionar texto, por exemplo) fechava
       // a caixa e perdia-se o que lá estava escrito.
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onFechar();
+        if (e.target === e.currentTarget) pedirFecho();
       }}
     >
       <div className="absolute inset-0 bg-[#1b2119]/40 backdrop-blur-[2px]" aria-hidden />
@@ -127,7 +180,10 @@ export function FolhaOuDialogo({
         ref={caixaRef}
         role="dialog"
         aria-modal="true"
-        aria-label={titulo}
+        // O nome vem do que está ESCRITO no cabeçalho, e não de uma cópia
+        // paralela numa `aria-label`: com sobretítulo são as duas linhas, que
+        // na leitura são uma frase só («Juntar “Itália” a 312 fotos»).
+        aria-labelledby={sobretitulo ? `${idTitulo}-sobre ${idTitulo}` : idTitulo}
         style={comoFolha && arrasto ? { transform: `translateY(${arrasto}px)` } : undefined}
         className={cn(
           "relative z-10 flex flex-col overflow-hidden bg-[var(--bo-surface,#ffffff)] shadow-xl",
@@ -162,7 +218,7 @@ export function FolhaOuDialogo({
               const passou = arrasto > FECHAR_A_PARTIR_DE;
               inicioY.current = null;
               setArrasto(0);
-              if (passou) onFechar();
+              if (passou) pedirFecho();
             }}
             onPointerCancel={() => {
               inicioY.current = null;
@@ -195,13 +251,15 @@ export function FolhaOuDialogo({
         )}
 
         {/* Fechar por botão existe SEMPRE. O gesto é um atalho, não a única
-            saída: quem usa leitor de ecrã ou teclado não arrasta nada. */}
+            saída: quem usa leitor de ecrã ou teclado não arrasta nada. A
+            excepção é `bloqueado`, e aí a saída é o «Parar» das acções. */}
         <button
           type="button"
           onClick={onFechar}
+          disabled={bloqueado}
           aria-label="Fechar"
           className={cn(
-            "alvo-toque absolute right-2 flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:bg-foreground/[0.06] hover:text-foreground/70",
+            "alvo-toque absolute right-2 flex h-11 w-11 items-center justify-center rounded-lg text-foreground/45 hover:bg-foreground/[0.06] hover:text-foreground/70 disabled:opacity-40",
             comoFolha ? "top-8" : "top-2",
           )}
         >

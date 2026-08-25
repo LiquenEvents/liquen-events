@@ -67,6 +67,20 @@ describe("os pontos de corte", () => {
 });
 
 describe("FolhaOuDialogo", () => {
+  /**
+   * Puxar a pega para baixo. A pega é o primeiro filho da folha de propósito —
+   * o gesto começa nela e não no conteúdo, senão competia com o scroll da lista
+   * lá dentro. O `setPointerCapture` do jsdom não existe em todas as versões;
+   * um nada serve, porque o que se exercita é o cálculo do arrasto.
+   */
+  function arrastarPega(caixa: HTMLElement, px: number) {
+    const pega = caixa.firstElementChild as HTMLElement;
+    pega.setPointerCapture ??= () => {};
+    fireEvent.pointerDown(pega, { clientY: 0, pointerId: 1 });
+    fireEvent.pointerMove(pega, { clientY: px, pointerId: 1 });
+    fireEvent.pointerUp(pega, { clientY: px, pointerId: 1 });
+  }
+
   const abrir = (props: Partial<Parameters<typeof FolhaOuDialogo>[0]> = {}) =>
     render(
       <FolhaOuDialogo aberto onFechar={props.onFechar ?? (() => {})} titulo="Escolher fotos">
@@ -111,6 +125,86 @@ describe("FolhaOuDialogo", () => {
     await screen.findByRole("dialog");
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onFechar).toHaveBeenCalled();
+  });
+
+  /**
+   * ── `bloqueado`: SE FALHAR, NÃO PERDER TRABALHO ──────────────────────────
+   *
+   * Uma fusão de temas ou uma cópia de 300 fotos correm em voltas de rede.
+   * Cada volta é atómica, mas o que fica de uma interrompida é um tema com
+   * menos fotos e outro com mais — trabalho pelo meio. Num telemóvel isto não
+   * é hipotético: o fundo é uma faixa estreita à volta da folha e o gesto de
+   * voltar do iPhone faz-se sem se pensar nele.
+   *
+   * As TRÊS saídas de atalho são fechadas de uma vez, e é por isso que passam
+   * todas pelo mesmo sítio no primitivo: espalhadas por quatro `if`, esquecer
+   * uma não dá erro nenhum — dá uma fusão interrompida, uma vez em cada dez.
+   */
+  it("bloqueado: nem o fundo, nem o Escape, nem o arrasto fecham", async () => {
+    simularAparelho(TELEMOVEL);
+    const onFechar = vi.fn();
+    render(
+      <FolhaOuDialogo aberto onFechar={onFechar} titulo="A juntar" bloqueado>
+        <p>conteúdo</p>
+      </FolhaOuDialogo>,
+    );
+    const caixa = await screen.findByRole("dialog");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.mouseDown(caixa.parentElement as HTMLElement);
+    arrastarPega(caixa, 200);
+    expect(onFechar).not.toHaveBeenCalled();
+
+    // E o «×» fica desactivado — é o que os diálogos escritos à mão já faziam.
+    // A saída não desaparece: fica nas `accoes`, que é onde o «Parar» vive.
+    expect(screen.getByRole("button", { name: "Fechar" })).toBeDisabled();
+  });
+
+  /** O contraste do teste acima: sem `bloqueado` o mesmo gesto fecha. Sem
+   *  isto, aquele passava com um arrasto que nunca chegou a funcionar. */
+  it("o arrasto para baixo fecha a folha", async () => {
+    simularAparelho(TELEMOVEL);
+    const onFechar = vi.fn();
+    abrir({ onFechar });
+    const caixa = await screen.findByRole("dialog");
+    arrastarPega(caixa, 200);
+    expect(onFechar).toHaveBeenCalled();
+  });
+
+  /** O sobretítulo não é decoração: sem ele, «312 fotos» era o nome inteiro da
+   *  caixa, e quem ouve o ecrã não sabia o que ia acontecer a elas. */
+  it("o sobretítulo entra no nome acessível, junto com o título", async () => {
+    simularAparelho(DESKTOP);
+    render(
+      <FolhaOuDialogo aberto onFechar={() => {}} sobretitulo="Juntar “Itália” a" titulo="312 fotos">
+        <p>conteúdo</p>
+      </FolhaOuDialogo>,
+    );
+    // O nome vem do que está ESCRITO no cabeçalho, e não de uma cópia paralela
+    // numa `aria-label` que ninguém se lembra de actualizar com o texto.
+    await screen.findByRole("dialog", { name: "Juntar “Itália” a 312 fotos" });
+  });
+
+  /**
+   * As camadas desta casa estão ordenadas entre si: avisos passageiros a 80,
+   * paleta de comandos a 90, barreira da sessão expirada a 110 — e a gaveta do
+   * pedido a 50, mas DEPOIS destes diálogos na árvore. Com o mesmo nível é ela
+   * que fica por cima, e o diálogo abre por trás dela.
+   */
+  it("empilha-se no nível que quem chama pedir, e a 50 por omissão", async () => {
+    simularAparelho(DESKTOP);
+    const { unmount } = abrir();
+    const porOmissao = (await screen.findByRole("dialog")).parentElement as HTMLElement;
+    expect(porOmissao.style.zIndex).toBe("50");
+    unmount();
+
+    render(
+      <FolhaOuDialogo aberto onFechar={() => {}} titulo="Os meus dispositivos" nivel={95}>
+        <p>conteúdo</p>
+      </FolhaOuDialogo>,
+    );
+    const acima = (await screen.findByRole("dialog")).parentElement as HTMLElement;
+    expect(acima.style.zIndex).toBe("95");
   });
 });
 
