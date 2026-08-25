@@ -9548,10 +9548,48 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   Diz agora as três coisas que são verdade, e nenhuma a mais:
                   o que ela traduziu sai em inglês, o que não traduziu sai em
                   português, e os valores ficam à portuguesa. */}
+              {/* ── ISTO É PROSA DENTRO DE UMA BARRA COLADA, E ISSO CUSTA ECRÃ ──
+                  A barra do fundo é `sticky` e `flex-wrap`: um filho `w-full`
+                  não ocupa uma linha, ocupa uma LINHA SÓ PARA ELE. A 375 px
+                  estas três frases dão cinco linhas de texto, e a barra —
+                  que já se sobrepõe ao conteúdo e já lhe rouba a folga por
+                  baixo — cresce outro tanto. Ela mandou a fotografia: com a
+                  barra de navegação por baixo, sobrava menos de metade do ecrã
+                  para a proposta que estava a escrever.
+
+                  Já havia uma máquina a MEDIR a barra e a reservar essa altura
+                  ao conteúdo (ver o comentário do passo 1). Resolvia o sintoma
+                  — o que ficava por baixo deixou de ser inalcançável — e
+                  deixava a causa de pé: uma barra livre de crescer cresce.
+
+                  Não se esconde. Mostra-se QUANDO É A PERGUNTA: este parágrafo
+                  responde a «o que muda se eu escolher inglês?», e ela trabalha
+                  em português. Com «Português» escolhido fica uma linha, que
+                  chega para saber que há uma diferença e onde a ler; com
+                  «Inglês» escolhido abre inteiro, porque aí é a consequência do
+                  que ela acabou de fazer.
+
+                  Em ecrã largo abre sempre: lá a barra tem espaço, e a única
+                  razão para o encurtar era a que não existe. */}
               <p className="w-full text-right text-[11px] leading-snug text-foreground/50">
-                Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a data e
-                o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas «EN»; o que
-                ficar em branco sai em português. Os valores continuam à portuguesa (1.234,56 €).
+                {idiomaDoPdf === "en" ? (
+                  <>
+                    Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a
+                    data e o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas
+                    «EN»; o que ficar em branco sai em português. Os valores continuam à portuguesa
+                    (1.234,56 €).
+                  </>
+                ) : (
+                  <>
+                    <span className="sm:hidden">Em inglês muda a moldura do documento.</span>
+                    <span className="hidden sm:inline">
+                      Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a
+                      data e o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas
+                      «EN»; o que ficar em branco sai em português. Os valores continuam à
+                      portuguesa (1.234,56 €).
+                    </span>
+                  </>
+                )}
               </p>
               {/* ── O QUE FALTA, DITO ANTES DO CLIQUE ──────────────────────
                   Este é o sítio onde o PDF nasce, e o primeiro PDF inglês sai

@@ -3909,6 +3909,56 @@ describe("gerar a proposta em inglês", () => {
     );
   });
 
+  /**
+   * ── A BARRA COLADA NÃO É SÍTIO PARA PROSA ──────────────────────────────
+   * Ela mandou a fotografia do «Fazer proposta» num iPhone: o rodapé colado
+   * ocupava quase metade do ecrã e tapava a linha do email do cliente a meio.
+   *
+   * A barra é `sticky` e `flex-wrap`, e um filho `w-full` não ocupa uma linha
+   * — ocupa uma LINHA SÓ PARA ELE. A 375 px estas três frases sobre o inglês
+   * dão cinco linhas, e a barra cresce outro tanto por cima do conteúdo.
+   *
+   * Já havia uma máquina a medir a barra e a reservar essa altura ao conteúdo.
+   * Resolvia o sintoma e deixava a causa: uma barra livre de crescer cresce.
+   *
+   * Não se esconde a explicação — mostra-se quando é a pergunta. Com
+   * «Português» escolhido fica uma linha; com «Inglês», abre inteira, porque
+   * aí é a consequência do que ela acabou de fazer.
+   */
+  it("com português, a explicação do inglês não gasta cinco linhas da barra", async () => {
+    seedDraftEmIngles(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+
+    // A versão de uma linha, que é a única que o telemóvel mostra.
+    expect(screen.getByText("Em inglês muda a moldura do documento.")).toBeTruthy();
+    // E a longa continua lá para o ecrã largo, mas atrás do corte de largura.
+    expect(screen.getByText(/Da tua prosa sai em inglês/).className).toContain("hidden");
+  });
+
+  it("escolhido o inglês, a explicação abre inteira em qualquer ecrã", async () => {
+    seedDraftEmIngles(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await irParaPrever(user);
+
+    // O que o código antigo violava não era o TEXTO — era o facto de a escolha
+    // do idioma não fazer diferença nenhuma a este parágrafo. Por isso o que
+    // se compara é o antes e o depois da mesma renderização: sem esta linha, o
+    // teste passava por vacuidade contra o código que ele existe para apanhar.
+    const paragrafo = () => screen.getByText(/Da tua prosa sai em inglês/).closest("p")!;
+    const emPortugues = paragrafo().textContent;
+
+    const grupo = screen.getByRole("radiogroup", { name: "Idioma do PDF" });
+    await user.click(within(grupo).getByRole("radio", { name: /^Inglês/ }));
+
+    expect(paragrafo().textContent).not.toBe(emPortugues);
+    // A linha curta desaparece — deixou de ser um resumo, passou a ser o caso.
+    expect(screen.queryByText("Em inglês muda a moldura do documento.")).toBeNull();
+    expect(screen.getByText(/Da tua prosa sai em inglês/).className).not.toContain("hidden");
+  });
+
   it("o caminho por omissão fica intacto: «pt», e o ficheiro chama-se proposta-…", async () => {
     seedDraftEmIngles(1);
     const nomes = espiarDescarregamentos();
