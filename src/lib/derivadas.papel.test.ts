@@ -220,10 +220,13 @@ describe("a geração faz primeiro o que dói", () => {
     temaSemNada("tema-a", 20);
 
     // Cada leitura do relógio avança 1 s; o tecto são 5 s.
+    // O tecto é lido uma vez por BLOCO de seis fotografias — elas vão várias
+    // ao mesmo tempo, e abortar um bloco a meio deixava trabalho pago por
+    // metade. Com 2 s por leitura e um tecto de 3 s, pára depois do primeiro.
     let t = 0;
     const r = await gerarLoteDeDerivadas("essencial", {
-      tectoMs: 5_000,
-      agora: () => (t += 1_000),
+      tectoMs: 3_000,
+      agora: () => (t += 2_000),
     });
 
     expect(r.fotografiasFeitas).toBeGreaterThan(0);

@@ -520,6 +520,19 @@ const TECTO_DO_LOTE_MS = 40_000;
 const LOTE_FOTOS = 200;
 
 /**
+ * Quantas fotografias se tratam ao mesmo tempo.
+ *
+ * O travão de cada uma é a REDE — o download do original e os três envios —, e
+ * não o processador: as três conversões medem ~130 ms. Seis em voo mantêm a
+ * função ocupada em vez de à espera.
+ *
+ * Não mais: acima disto o ganho achata (passa a mandar a largura de banda, não
+ * a latência) e a memória cresce, porque cada fotografia aberta é o original
+ * mais a bitmap descodificada.
+ */
+const A_MESMA_HORA = 6;
+
+/**
  * Gera as derivadas em falta até ao tecto de tempo, e diz onde parou.
  *
  * **Nunca substitui o que já existe** (`upsert: false`), portanto repetir é
@@ -561,7 +574,16 @@ export async function gerarLoteDeDerivadas(
   let papel: Papel | null = null;
   /** Os buckets já confirmados NESTE lote. Confirmar é uma ida ao servidor, e
    *  era feita uma vez por derivada — cinco fotografias davam dez idas. */
-  const bucketsProntos = new Map<string, boolean>();
+  /**
+   * Guarda a PROMESSA e não o resultado.
+   *
+   * Com várias fotografias em voo, todas perguntam pelo mesmo bucket antes de a
+   * primeira resposta chegar — e com um mapa de booleanos todas viam «ainda não
+   * sei» e todas iam perguntar. Seis fotografias × três buckets davam quinze
+   * idas ao servidor para saber três coisas. Guardando a promessa, a primeira
+   * pergunta e as outras esperam pela mesma resposta.
+   */
+  const bucketsProntos = new Map<string, Promise<boolean>>();
   /** Ainda a saltar até chegar ao ponto de retoma? */
   let aSaltar = alvo !== null;
   /** O ponto de retoma foi encontrado? Se não, ele está velho — ver abaixo. */
@@ -605,6 +627,15 @@ export async function gerarLoteDeDerivadas(
         const jaLa = new Map<string, Set<string>>(
           doPapel.map((d, i) => [d.bucket, new Set(conjuntos[i])]),
         );
+        /**
+         * ── O QUE ESTA PASTA DEVE, DECIDIDO ANTES DE SE COMEÇAR ────────────
+         *
+         * Separar a DECISÃO do TRABALHO é o que permite fazer as fotografias
+         * várias ao mesmo tempo mais abaixo. Enquanto a decisão estava dentro
+         * do ciclo, cada fotografia esperava pela anterior — e o que ela
+         * esperava era rede, não contas.
+         */
+        const trabalho: { caminho: string; emFalta: typeof doPapel }[] = [];
         for (const caminho of caminhos) {
           if (aSaltar) {
             if (caminho !== alvo!.caminho) continue;
@@ -615,19 +646,47 @@ export async function gerarLoteDeDerivadas(
             encontrou = true;
           }
           const emFalta = doPapel.filter((d) => !jaLa.get(d.bucket)?.has(caminho));
-          if (emFalta.length === 0) continue;
+          if (emFalta.length > 0) trabalho.push({ caminho, emFalta });
+        }
 
-          // ── Acabou o tempo: diz-se onde se ficou e volta-se JÁ ────────────
-          //
+        /**
+         * ════════════════════════════════════════════════════════════════════
+         * VÁRIAS AO MESMO TEMPO, PORQUE O QUE SE ESPERA É REDE
+         * ════════════════════════════════════════════════════════════════════
+         *
+         * Palavras dela, com a barra já a andar: «quero que isto seja muito
+         * mais rápido».
+         *
+         * O processador não é o travão: as três conversões de uma fotografia
+         * são ~130 ms medidos. O tempo de cada uma é o download do original
+         * (~2 MB) e os três envios — espera, e não trabalho. Uma de cada vez
+         * deixava a função parada a olhar para a rede a maior parte do tempo.
+         *
+         * Seis ao mesmo tempo é o número: acima disto o ganho achata (o limite
+         * passa a ser a largura de banda da função, não a latência) e a memória
+         * cresce — cada fotografia aberta são o original mais a bitmap
+         * descodificada.
+         *
+         * O TECTO DE TEMPO é lido entre blocos e não dentro deles: um bloco a
+         * meio acaba, porque abortá-lo deixaria trabalho pago por metade. A
+         * retoma aponta para a primeira fotografia do bloco que NÃO se chegou a
+         * começar — nunca para uma que ficou a meio.
+         */
+        for (let i = 0; i < trabalho.length; i += A_MESMA_HORA) {
           // `fotografiasFeitas > 0` e não um corte seco: um lote que não gera
-          // nada não faz a travessia avançar, e a geração ficava presa. Uma
-          // fotografia é o mínimo que garante que a coisa anda.
+          // nada não faz a travessia avançar, e a geração ficava presa. Um
+          // bloco é o mínimo que garante que a coisa anda.
           if (fotografiasFeitas >= LOTE_FOTOS || (fotografiasFeitas > 0 && agora() >= ate)) {
             return {
               geradas,
               falhas,
               fotografiasFeitas,
-              retoma: { papel: passagem, origem: familia.origem, pasta, caminho },
+              retoma: {
+                papel: passagem,
+                origem: familia.origem,
+                pasta,
+                caminho: trabalho[i].caminho,
+              },
               restantes: 0,
               restantesEssenciais: 0,
               fotografiasRestantes: 0,
@@ -636,10 +695,21 @@ export async function gerarLoteDeDerivadas(
           }
 
           papel = passagem;
-          const r = await gerarAsDeUmaFoto(sb, familia.origem, caminho, emFalta, bucketsProntos);
-          geradas += r.feitas;
-          fotografiasFeitas += 1;
-          if (r.falhas.length > 0) falhas.push(...r.falhas);
+          const bloco = trabalho.slice(i, i + A_MESMA_HORA);
+          // `Promise.all` sem medo: o `gerarAsDeUmaFoto` nunca lança — uma
+          // fotografia que falhe devolve os caminhos dela em `falhas` e deixa
+          // as irmãs acabar. Rejeitar aqui deitava fora um bloco inteiro por
+          // causa de uma.
+          const feitos = await Promise.all(
+            bloco.map((t) =>
+              gerarAsDeUmaFoto(sb, familia.origem, t.caminho, t.emFalta, bucketsProntos),
+            ),
+          );
+          for (const r of feitos) {
+            geradas += r.feitas;
+            fotografiasFeitas += 1;
+            if (r.falhas.length > 0) falhas.push(...r.falhas);
+          }
         }
       }
     }
@@ -691,7 +761,7 @@ async function gerarAsDeUmaFoto(
   origem: string,
   caminho: string,
   alvos: Alvo[],
-  bucketsProntos: Map<string, boolean>,
+  bucketsProntos: Map<string, Promise<boolean>>,
 ): Promise<{ feitas: number; falhas: string[] }> {
   const falhas: string[] = [];
   let feitas = 0;
@@ -703,12 +773,14 @@ async function gerarAsDeUmaFoto(
   // antigas e passou a ser o caso de todas.
   const bons: Alvo[] = [];
   for (const alvo of alvos) {
-    let ok = bucketsProntos.get(alvo.bucket);
-    if (ok === undefined) {
-      ok = await garantirBucketDeDerivadas(alvo.bucket).catch(() => false);
-      bucketsProntos.set(alvo.bucket, ok);
+    let pronto = bucketsProntos.get(alvo.bucket);
+    if (pronto === undefined) {
+      // A promessa entra no mapa ANTES de ser esperada: é isso que faz a
+      // segunda fotografia encontrar-a em vez de ir perguntar outra vez.
+      pronto = garantirBucketDeDerivadas(alvo.bucket).catch(() => false);
+      bucketsProntos.set(alvo.bucket, pronto);
     }
-    if (ok) bons.push(alvo);
+    if (await pronto) bons.push(alvo);
     else falhas.push(`${alvo.bucket}/${caminho}`);
   }
   if (bons.length === 0) return { feitas, falhas };
@@ -725,28 +797,45 @@ async function gerarAsDeUmaFoto(
     return { feitas, falhas };
   }
 
-  for (const alvo of bons) {
-    try {
-      // Um `sharp` novo por derivada, sobre os MESMOS bytes: um pipeline não se
-      // reaproveita depois de `toBuffer`. O que não se repete é a viagem.
-      const derivada = sharp(bytes)
-        // `rotate()` sem argumento aplica a orientação do EXIF. Sem isto, uma
-        // foto de telemóvel deitada sai com os lados trocados face ao original —
-        // e a miniatura ficava com outra proporção do que a grelha reserva.
-        .rotate()
-        // `withoutEnlargement`: uma foto já menor do que o alvo fica como está.
-        // Ampliar produzia uma miniatura MAIOR do que o original, que é o
-        // contrário do que isto serve.
-        .resize(alvo.lado, alvo.lado, { fit: "inside", withoutEnlargement: true });
-      const bytesDerivada = await codificar(derivada, alvo.qualidade, alvo.avif).toBuffer();
-      const { error: erroSubida } = await sb.storage
-        .from(alvo.bucket)
-        .upload(caminho, bytesDerivada, opcoesDeCarregamento(tipoDe(alvo.avif)));
-      if (erroSubida) falhas.push(`${alvo.bucket}/${caminho}`);
-      else feitas += 1;
-    } catch {
-      falhas.push(`${alvo.bucket}/${caminho}`);
-    }
+  /**
+   * AS TRÊS EM PARALELO, e não uma de cada vez.
+   *
+   * Cada derivada é uma conversão (~40 ms) e um ENVIO (centenas de ms de
+   * rede). Em série, a segunda esperava pela viagem da primeira sem ter razão
+   * nenhuma para o fazer — as três saem dos mesmos bytes e não dependem umas
+   * das outras.
+   *
+   * `Promise.all` sem medo: cada uma trata a sua própria avaria e devolve o
+   * caminho em vez de lançar. Uma derivada que falhe não leva as irmãs.
+   */
+  const resultados = await Promise.all(
+    bons.map(async (alvo) => {
+      try {
+        // Um `sharp` novo por derivada, sobre os MESMOS bytes: um pipeline não
+        // se reaproveita depois de `toBuffer`. O que não se repete é a viagem.
+        const derivada = sharp(bytes)
+          // `rotate()` sem argumento aplica a orientação do EXIF. Sem isto, uma
+          // foto de telemóvel deitada sai com os lados trocados face ao
+          // original — e a miniatura ficava com outra proporção do que a grelha
+          // reserva.
+          .rotate()
+          // `withoutEnlargement`: uma foto já menor do que o alvo fica como
+          // está. Ampliar produzia uma miniatura MAIOR do que o original, que é
+          // o contrário do que isto serve.
+          .resize(alvo.lado, alvo.lado, { fit: "inside", withoutEnlargement: true });
+        const bytesDerivada = await codificar(derivada, alvo.qualidade, alvo.avif).toBuffer();
+        const { error: erroSubida } = await sb.storage
+          .from(alvo.bucket)
+          .upload(caminho, bytesDerivada, opcoesDeCarregamento(tipoDe(alvo.avif)));
+        return erroSubida ? `${alvo.bucket}/${caminho}` : null;
+      } catch {
+        return `${alvo.bucket}/${caminho}`;
+      }
+    }),
+  );
+  for (const r of resultados) {
+    if (r) falhas.push(r);
+    else feitas += 1;
   }
   return { feitas, falhas };
 }
