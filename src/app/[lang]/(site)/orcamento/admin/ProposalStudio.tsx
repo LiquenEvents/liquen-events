@@ -6835,10 +6835,43 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 />
               )}
               {/* ── O ÍNDICE ─────────────────────────────────────────────
-                  Em ecrã largo é uma coluna fixa ao lado; em telemóvel, uma
+                  Onde a caixa dá, é uma coluna fixa ao lado; onde não dá, uma
                   tira que se percorre por cima da lista — a 390 px, uma coluna
-                  lateral roubava metade da grelha das fotos. */}
-              <div className="lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-5">
+                  lateral roubava metade da grelha das fotos.
+
+                  ── PORQUE É QUE «ONDE A CAIXA DÁ» NÃO É `lg:` ────────────
+                  Isto era `lg:grid` — 1024 de JANELA — e era o último sítio do
+                  ficheiro onde dois cortes se SOMAVAM em vez de se
+                  compensarem: aos 1024 a coluna de conteúdo cai de 975 para
+                  504 px (aparecem a barra lateral do back office e o índice do
+                  estúdio) e era exactamente aí que esta coluna de 176 px se
+                  abria. O cartão do board ficava com 276 px e as miniaturas
+                  com 86; sem ela ficaria com 472 e 112.
+
+                  ── E A INVERSÃO QUE ISTO OBRIGA A ESCREVER ───────────────
+                  A coluna de conteúdo é MAIOR abaixo de 1024 (975 px) do que
+                  acima (504 aos 1024, 560 aos 1440). Portanto a resposta certa
+                  desliga esta coluna lateral em TODAS as larguras de desktop e
+                  liga-a entre 640 e 1023. Parece ao contrário e não é: a caixa
+                  a 1024 é mesmo mais estreita do que a 640, e um índice em
+                  coluna custa-lhe 196 px — 39% do sítio onde ela escreve. Em
+                  tira custa ~56 px de altura, uma vez.
+
+                  ── DE ONDE VÊM AS 40 REM ─────────────────────────────────
+                  A coluna custa 176 px mais os 20 do intervalo: 196. O que
+                  sobra tem de continuar a servir a grelha de fotografias na
+                  forma de quatro colunas, que pede 24 rem de cartão (384) mais
+                  os 32 do `p-4` — 416. São 612 px, e 40 rem (640) é o degrau
+                  acima. Medido: liga a 975 e desliga a 351, 504, 560 e 592.
+
+                  O `MoodBoardIndice` lê o MESMO limiar, e é obrigatório que
+                  leia: a forma dele (tira horizontal ou coluna `sticky`) e a
+                  grelha que lhe dá a largura são duas metades da mesma
+                  decisão, e metades da mesma decisão em sinais diferentes é o
+                  defeito que o `useMedida.ts:16-21` conta por extenso. Aqui
+                  seria uma tira de `overflow-x-auto` espremida em 176 px de um
+                  lado, e um índice vertical à largura toda do outro. */}
+              <div className="@min-[40rem]:grid @min-[40rem]:grid-cols-[11rem_minmax(0,1fr)] @min-[40rem]:gap-5">
                 <MoodBoardIndice
                   boards={doc.moodBoards}
                   ordem={ordemDosBoards}

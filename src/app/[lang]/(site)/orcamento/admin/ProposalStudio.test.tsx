@@ -3829,7 +3829,7 @@ describe("ver as páginas lado a lado", () => {
     await user.click(await screen.findByRole("button", { name: "Ver as páginas lado a lado" }));
 
     const vista = await screen.findByText("Vista de conjunto");
-    const grelha = document.querySelector('[class*="lg:grid-cols-[11rem"]');
+    const grelha = document.querySelector('[class*="grid-cols-[11rem"]');
     expect(grelha).toBeTruthy();
     // O índice e a lista dos boards, e mais nada: um terceiro filho é o que
     // mandava a lista para a coluna de 176 px.
@@ -7541,9 +7541,16 @@ describe("o estúdio numa coluna, e não numa janela", () => {
    * largura do CARTÃO, não a da janela.
    */
   describe("a grelha das fotografias", () => {
-    /** A largura interior do cartão do board em cada janela: coluna − índice
-     *  lateral (176 + 20 de intervalo, a partir de 1024) − 32 de `p-4`. */
-    const CARTAO: Record<number, number> = { 375: 319, 640: 560, 1023: 943, 1024: 276, 1440: 332 };
+    /**
+     * A largura interior do cartão do board em cada janela: a coluna de
+     * conteúdo, menos o índice das páginas quando ele é coluna (176 + 20 de
+     * intervalo — só a 1023, ver o bloco 3b), menos os 32 do `p-4`.
+     *
+     * Não é uma constante escrita à mão por preguiça: a mesma conta é REFEITA
+     * a partir do DOM no último teste do bloco 3b, que lê a decisão da grelha
+     * do índice em vez de a assumir. Este mapa é a leitura, aquele é a prova.
+     */
+    const CARTAO: Record<number, number> = { 375: 319, 640: 560, 1023: 747, 1024: 472, 1440: 528 };
 
     async function grelha() {
       seedDraft(4);
@@ -7563,18 +7570,18 @@ describe("o estúdio numa coluna, e não numa janela", () => {
       expect(cartao).not.toBe(colunaDeConteudo());
     });
 
-    it("num portátil a 1024 já não desenha quatro colunas em 276 px", async () => {
+    it("a 375 px são três colunas, porque em 319 px quatro não cabem", async () => {
       const el = await grelha();
-      const cols = efectivas(classesDe(el), { janela: 1024, caixa: CARTAO[1024] });
-      expect(cols.has("grid-cols-4"), "276 px a dividir por quatro dá 68").toBe(false);
+      const cols = efectivas(classesDe(el), { janela: 375, caixa: CARTAO[375] });
+      expect(cols.has("grid-cols-4")).toBe(false);
       expect(cols.has("grid-cols-3")).toBe(true);
     });
 
     /**
      * O que uma pergunta de contentor garante e uma de janela nunca pode: um
      * cartão mais estreito NUNCA leva mais colunas do que um cartão mais largo.
-     * Era exactamente isso que estava partido — aos 1024 o cartão encolhe para
-     * 276 px e ganhava a quarta coluna que a 375, com 319, não tinha.
+     * Era exactamente isso que estava partido — o cartão a 1024 encolhia para
+     * 276 px e ganhava na mesma a quarta coluna que a 375, com 319, não tinha.
      */
     it("um cartão mais estreito nunca leva mais colunas do que um mais largo", async () => {
       const el = await grelha();
@@ -7594,19 +7601,111 @@ describe("o estúdio numa coluna, e não numa janela", () => {
       }
     });
 
-    it("e a miniatura que media 68 px passa a medir mais de 80", async () => {
+    /** A tabela das cinco larguras, que é o resultado desta missão. */
+    it("a miniatura em cada uma das cinco larguras", async () => {
       const el = await grelha();
-      /** A miniatura, com os intervalos de 8 px entre colunas. */
       const miniatura = (janela: number) => {
         const n = efectivas(classesDe(el), { janela, caixa: CARTAO[janela] }).has("grid-cols-4")
           ? 4
           : 3;
         return Math.floor((CARTAO[janela] - (n - 1) * 8) / n);
       };
-      // 276 px a dividir por quatro davam 68; por três dão 86.
-      expect(miniatura(1024)).toBeGreaterThan(80);
-      // E onde há mesmo espaço para quatro, elas continuam maiores do que isso.
-      expect(miniatura(640)).toBeGreaterThan(miniatura(1024));
+      // Antes: 101 · 134 · 229 · 68 · 105 — o portátil dela era o pior de todos.
+      expect(miniatura(375)).toBe(101);
+      expect(miniatura(640)).toBe(134);
+      expect(miniatura(1023)).toBe(180);
+      expect(miniatura(1024)).toBe(112);
+      expect(miniatura(1440)).toBe(126);
+      // E nenhuma desce abaixo do telemóvel, que era o defeito de partida.
+      for (const janela of [640, 1023, 1024, 1440]) {
+        expect(miniatura(janela), `a ${janela}`).toBeGreaterThanOrEqual(miniatura(375));
+      }
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 3b · O ÍNDICE DAS PÁGINAS — O ÚLTIMO SÍTIO ONDE OS CORTES SE SOMAVAM
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * A coluna de 176 px do índice abria-se em `lg:` — no pixel exacto em que a
+   * coluna de conteúdo cai de 975 para 504 px. Os dois cortes SOMAVAM-SE: o
+   * cartão do board ficava com 276 px e as miniaturas com 86, quando sem a
+   * coluna ficariam com 472 e 112.
+   *
+   * A resposta obriga a escrever uma inversão que parece errada e não é: a
+   * caixa é MAIOR abaixo de 1024 do que acima, portanto a coluna lateral
+   * desliga-se em todas as larguras de desktop e liga-se entre 640 e 1023.
+   *
+   * E as DUAS METADES têm de ler o mesmo sinal: a grelha que dá a largura vive
+   * no `ProposalStudio` e a forma do índice (tira ou coluna) vive no
+   * `MoodBoardIndice`, que não tem largura própria nenhuma. Em sinais
+   * diferentes seria uma tira de `overflow-x-auto` espremida em 176 px de um
+   * lado e um índice vertical à largura toda do outro — o defeito do
+   * `useMedida.ts:16-21`.
+   */
+  describe("o índice das páginas de inspiração", () => {
+    async function pecas() {
+      seedDraft(4);
+      renderStudio();
+      await screen.findByRole("textbox", { name: "Clientes" });
+      const indice = screen.getByRole("navigation", { name: "Índice das páginas de inspiração" });
+      const grelha = indice.parentElement!;
+      const tira = indice.querySelector("ul")!;
+      return { indice, grelha, tira };
+    }
+
+    it("a coluna lateral já não se abre no pixel em que a caixa encolhe 471", async () => {
+      const { grelha } = await pecas();
+      // A 1023 a caixa tem 975 px e a coluna cabe sem tirar nada.
+      expect(efectivas(classesDe(grelha), naColuna(1023)).has("grid")).toBe(true);
+      // A 1024 tem 504 — e 196 px de índice são 39% do sítio onde ela escreve.
+      expect(efectivas(classesDe(grelha), naColuna(1024)).has("grid")).toBe(false);
+      expect(efectivas(classesDe(grelha), naColuna(1440)).has("grid")).toBe(false);
+      // No telemóvel continua a ser a tira, como sempre foi.
+      expect(efectivas(classesDe(grelha), naColuna(375)).has("grid")).toBe(false);
+    });
+
+    it("e a forma do índice lê o MESMO limiar da grelha que lhe dá a largura", async () => {
+      const { indice, grelha, tira } = await pecas();
+      /** O limiar que traz um dado utilitário. */
+      const limiar = (className: string, utilitario: string) => {
+        for (const classe of className.split(/\s+/).filter(Boolean)) {
+          const partes = separar(classe);
+          if (partes.pop() === utilitario && partes.length) return partes.join(":");
+        }
+        return null;
+      };
+      const daGrelha = limiar(classesDe(grelha), "grid");
+      expect(daGrelha, "a grelha do índice perdeu o limiar").toBeTruthy();
+      expect(daGrelha).toMatch(/^@min-\[/);
+      // A tira vira coluna exactamente onde a grelha abre a coluna…
+      expect(limiar(classesDe(tira), "flex-col")).toBe(daGrelha);
+      // …e o `sticky` do invólucro liga-se no mesmo sítio.
+      expect(limiar(classesDe(indice), "sticky")).toBe(daGrelha);
+    });
+
+    it("o cartão do board deixa de perder 196 px no portátil dela", async () => {
+      const { grelha } = await pecas();
+      const foto = document.querySelector('[class*="grid-cols-3"]') as HTMLElement;
+      /** A largura interior do cartão: caixa − índice (quando é coluna) − `p-4`. */
+      const cartao = (janela: number) => {
+        const comColuna = efectivas(classesDe(grelha), naColuna(janela)).has("grid");
+        return COLUNA[janela] - (comColuna ? 176 + 20 : 0) - 32;
+      };
+      const miniatura = (janela: number) => {
+        const n = efectivas(classesDe(foto), { janela, caixa: cartao(janela) }).has("grid-cols-4")
+          ? 4
+          : 3;
+        return Math.floor((cartao(janela) - (n - 1) * 8) / n);
+      };
+      // Os dois números que a missão pediu: 86 → 112 e 105 → 126.
+      expect(cartao(1024)).toBe(472);
+      expect(miniatura(1024)).toBe(112);
+      expect(cartao(1440)).toBe(528);
+      expect(miniatura(1440)).toBe(126);
+      // E o telemóvel não mexeu.
+      expect(miniatura(375)).toBe(101);
     });
   });
 
