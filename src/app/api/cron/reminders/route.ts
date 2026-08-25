@@ -6,6 +6,7 @@ import { listCalendarEvents } from "@/lib/calendar-store";
 import { sendPushToAll } from "@/lib/push";
 import { isAuthed } from "@/lib/admin-auth";
 import { log } from "@/lib/logger";
+import { gerarLoteDeDerivadas } from "@/lib/derivadas";
 import { eur0 as eur } from "@/lib/money";
 
 export const runtime = "nodejs";
@@ -63,11 +64,77 @@ function authorized(req: NextRequest): boolean {
   return timingSafeEqual(provided, expected);
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * E, DE CAMINHO, AS DERIVADAS QUE FICARAM PARA TRÁS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela: «eu queria que isto gerasse de forma automática».
+ *
+ * As fotografias novas já nascem prontas — o navegador fabrica a miniatura, a
+ * micro e a de 1200 px no mesmo desenho e sobem com o original. O que pode
+ * ficar para trás são as que entraram por outro caminho, ou antes disso
+ * existir. Sem uma varredura periódica, essas só se arranjam se alguém se
+ * lembrar de carregar num botão — e um passo que depende de alguém se lembrar
+ * é um passo que um dia não acontece.
+ *
+ * ── PORQUE É QUE ISTO VIVE AQUI E NÃO NUMA ROTINA PRÓPRIA ────────────────
+ *
+ * Porque uma rotina própria custava o site. O alojamento permite DUAS rotinas
+ * agendadas, e as duas estão tomadas (este resumo e a cópia de segurança).
+ * Uma terceira no `vercel.json` faz a PUBLICAÇÃO falhar — não é uma
+ * degradação, é o site a não sair. Enquanto o plano for este, a boleia é a
+ * forma certa: corre uma vez por dia, a seguir ao resumo, com o tempo que
+ * sobrar da função.
+ *
+ * ── E NÃO PODE ESTRAGAR O RESUMO ─────────────────────────────────────────
+ *
+ * O resumo é a razão de esta rotina existir e é ele que a hora serve. Por
+ * isso: corre DEPOIS, com o que sobra do tecto, e o que aqui acontecer nunca
+ * muda a resposta nem a impede de sair. Uma avaria aqui é uma linha no
+ * registo, não um dia sem notificação.
+ */
+async function apanharDerivadasEmAtraso(desdeMs: number): Promise<void> {
+  // O tecto da função é 60 s. Deixam-se 10 de folga para a resposta sair, e o
+  // que sobrar do resumo é o que a apanha tem para trabalhar.
+  const restante = 50_000 - (Date.now() - desdeMs);
+  // Menos de cinco segundos não chega para uma fotografia com folga, e um lote
+  // que não acaba nada é uma ida ao Storage para nada.
+  if (restante < 5_000) return;
+  try {
+    // Sem papel: faz as ESSENCIAIS primeiro em toda a biblioteca e só depois o
+    // AVIF — a ordem está explicada no `gerarLoteDeDerivadas`, e é a que faz
+    // parar a meio deixar as coisas melhores do que estavam.
+    const r = await gerarLoteDeDerivadas(undefined, { tectoMs: restante });
+    if (r.fotografiasFeitas > 0 || r.falhas.length > 0) {
+      log.info("cron reminders: derivadas apanhadas de caminho", {
+        fotografias: r.fotografiasFeitas,
+        derivadas: r.geradas,
+        falhas: r.falhas.length,
+        // `true` quer dizer que ficou trabalho para amanhã — e é normal na
+        // primeira vez, com a biblioteca inteira por fazer.
+        sobrou: r.retoma !== null,
+      });
+    }
+  } catch (err) {
+    log.warn("cron reminders: a apanha das derivadas falhou", { erro: String(err) });
+  }
+}
+
 export async function GET(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
+  const comecou = Date.now();
+  // A resposta do resumo sai INTEIRA e sem alterações — a apanha corre depois
+  // e não lhe toca. Ver `apanharDerivadasEmAtraso`.
+  const resposta = await oResumoDeHoje(request);
+  await apanharDerivadasEmAtraso(comecou);
+  return resposta;
+}
 
+async function oResumoDeHoje(request: NextRequest) {
+  void request;
   try {
     const [allQuotes, calEvents, allProposals] = await Promise.all([
       listQuotes().catch(() => []),

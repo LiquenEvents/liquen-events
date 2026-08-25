@@ -204,29 +204,35 @@ export default function Miniaturas() {
      * lote, e o feito é a subtracção. Nunca passa do total nem anda para trás.
      */
     let feito = 0;
+    /** Onde o lote anterior parou. `null` no primeiro. */
+    let retoma: unknown = null;
     const problemas: string[] = [];
     let parou = false;
     const query = alvo === "tudo" ? "" : `?papel=${alvo}`;
     try {
       for (let volta = 0; volta < MAX_LOTES; volta += 1) {
-        const res = await fetch(`/api/admin/derivadas${query}`, { method: "POST" });
+        const res = await fetch(`/api/admin/derivadas${query}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ retoma }),
+        });
         const dados = await res.json().catch(() => null);
         if (!res.ok) throw new Error(dados?.error ?? "Não consegui gerar.");
-        const porFazer = dados.fotografiasRestantes;
-        feito =
-          typeof porFazer === "number"
-            ? Math.min(total, Math.max(feito, total - porFazer))
-            : // Um servidor mais antigo do que este ecrã não manda a conta em
-              // fotografias. Melhor a conta antiga do que uma barra parada.
-              feito + (dados.geradas ?? 0);
+        // SOMA-SE, e é seguro: cada lote começa onde o anterior parou,
+        // portanto os lotes são disjuntos e nenhuma fotografia é contada duas
+        // vezes. Era essa a razão de o contador ser calculado por subtracção —
+        // e a subtracção obrigava o servidor a varrer a biblioteca toda para
+        // saber quanto faltava, que é a conta que não deixava isto acabar.
+        feito = Math.min(total, feito + (dados.fotografiasFeitas ?? 0));
         setFeitas(feito);
         setJaRespondeu(true);
+        retoma = dados.retoma ?? null;
         if (dados.papel === "essencial" || dados.papel === "leve") setAFazer(dados.papel);
         if (Array.isArray(dados.falhas)) problemas.push(...dados.falhas);
-        // Zero geradas E zero restantes é o fim. Zero geradas com restantes a
-        // sobrar quer dizer que o que resta está a falhar sempre — parar aqui é
-        // melhor do que repetir a mesma falha quatrocentas vezes.
-        if (!dados.restantes || dados.geradas === 0) break;
+        // Quem manda é o `retoma`: sem ele, a travessia chegou ao fim. E não
+        // há ciclo infinito possível, porque a travessia avança mesmo quando
+        // uma fotografia falha — a retoma é a posição, não o sucesso.
+        if (!retoma) break;
         // O «Parar» é lido ENTRE lotes: um lote a meio acaba, porque abortá-lo
         // deixaria trabalho pago por metade. Nada se perde de qualquer forma.
         if (pedidoDeParar.current) {

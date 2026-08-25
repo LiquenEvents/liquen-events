@@ -57,10 +57,22 @@ function lote(p: Partial<Record<string, unknown>> = {}) {
     restantesEssenciais: 0,
     fotografiasRestantes: 0,
     fotografiasFeitas: 0,
+    // Onde o lote parou. `null` = acabou — é ISTO que fecha o ciclo agora, e
+    // não um contador de restantes: contar o que falta obrigava o servidor a
+    // varrer a biblioteca inteira a cada lote.
+    retoma: null,
     papel: "essencial",
     ...p,
   };
 }
+
+/** Um ponto de retoma qualquer: o lote diz que ainda há mais pela frente. */
+const MAIS = {
+  papel: "essencial",
+  origem: "theme-assets",
+  pasta: "tema-a",
+  caminho: "tema-a/f.jpg",
+};
 
 /** O traço da barra do `EmCurso`, que se mede pelo `scaleX`. */
 const barra = () => document.querySelector('[data-barra="preenchimento"]') as HTMLElement | null;
@@ -97,7 +109,7 @@ describe("Miniaturas", () => {
             soltar.push(() =>
               r(
                 respostaDe(
-                  lote({ geradas: 20, restantes: 40, fotografiasRestantes: 30, papel: "leve" }),
+                  lote({ geradas: 20, fotografiasFeitas: 10, retoma: MAIS, papel: "leve" }),
                 ),
               ),
             ),
@@ -138,7 +150,7 @@ describe("Miniaturas", () => {
       vi.fn(async (_url: string, init?: RequestInit) => {
         if ((init?.method ?? "GET") === "POST") {
           return new Promise((r) =>
-            soltar.push(() => r(respostaDe(lote({ geradas: 9, fotografiasRestantes: 0 })))),
+            soltar.push(() => r(respostaDe(lote({ geradas: 9, fotografiasFeitas: 3 })))),
           );
         }
         return respostaDe(
@@ -303,7 +315,7 @@ describe("Miniaturas", () => {
       vi.fn(async (url: string, init?: RequestInit) => {
         const metodo = init?.method ?? "GET";
         chamadas.push({ metodo, url: String(url) });
-        if (metodo === "POST") return respostaDe(lote({ geradas: 94, restantes: 0 }));
+        if (metodo === "POST") return respostaDe(lote({ geradas: 94, fotografiasFeitas: 94 }));
         return respostaDe(
           contagemDe({ emFalta: 94, emFaltaEssenciais: 94, fotosSemMiniatura: 47 }),
         );
@@ -323,9 +335,9 @@ describe("Miniaturas", () => {
 
   it("gera aos poucos até não sobrar nenhuma", async () => {
     const lotes = [
-      lote({ geradas: 25, restantes: 30 }),
-      lote({ geradas: 25, restantes: 5 }),
-      lote({ geradas: 5, restantes: 0 }),
+      lote({ geradas: 25, fotografiasFeitas: 25, retoma: MAIS }),
+      lote({ geradas: 25, fotografiasFeitas: 25, retoma: MAIS }),
+      lote({ geradas: 5, fotografiasFeitas: 5 }),
     ];
     let volta = 0;
     vi.stubGlobal(
@@ -376,14 +388,14 @@ describe("Miniaturas", () => {
             return respostaDe(
               lote({
                 geradas: 52,
+                fotografiasFeitas: 52,
                 falhas: Array.from({ length: 8 }, (_, i) => `theme-thumbs/x/${i}.jpg`),
-                restantes: 0,
               }),
             );
           }
           // A segunda fica pendurada: é este o instante que interessa ver.
           return new Promise<Response>((resolve) => {
-            soltar.push(() => resolve(respostaDe(lote({ geradas: 0, restantes: 0 }))));
+            soltar.push(() => resolve(respostaDe(lote({ geradas: 0 }))));
           });
         }
         return respostaDe(
@@ -426,7 +438,7 @@ describe("Miniaturas", () => {
         // Sempre a mesma resposta: nada gerado, e continua a haver que fazer.
         // É o que uma fotografia corrompida produz.
         if (metodo === "POST")
-          return respostaDe(lote({ geradas: 0, falhas: ["theme-thumbs/x/a.jpg"], restantes: 8 }));
+          return respostaDe(lote({ geradas: 0, falhas: ["theme-thumbs/x/a.jpg"] }));
         return respostaDe(
           contagemDe({ fotos: 10, emFalta: 8, emFaltaEssenciais: 8, fotosSemMiniatura: 8 }),
         );
@@ -460,7 +472,7 @@ describe("Miniaturas", () => {
           // antes de o React conseguir desenhar o cartão — e não havia
           // instante nenhum em que carregar no «Parar».
           await new Promise((r) => setTimeout(r, 15));
-          return respostaDe(lote({ geradas: 25, restantes: 900 }));
+          return respostaDe(lote({ geradas: 25, fotografiasFeitas: 25, retoma: MAIS }));
         }
         return respostaDe(
           contagemDe({ emFalta: 925, emFaltaEssenciais: 925, fotosSemMiniatura: 925 }),

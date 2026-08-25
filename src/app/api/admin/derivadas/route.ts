@@ -77,7 +77,35 @@ export async function POST(request: NextRequest) {
     // vem do pedido nunca escolhe um bucket.
     const pedido = request.nextUrl.searchParams.get("papel");
     const papel = pedido === "essencial" || pedido === "leve" ? pedido : undefined;
-    const r = await gerarLoteDeDerivadas(papel);
+    /**
+     * ── ONDE O LOTE ANTERIOR PAROU ──────────────────────────────────────
+     *
+     * Sem isto, cada lote recomeçava na primeira pasta da biblioteca: o
+     * décimo sétimo voltava a listar tudo o que os dezasseis anteriores já
+     * tinham feito, e o trabalho crescia ao quadrado até nunca acabar.
+     *
+     * Validado campo a campo, e nunca passado em bruto: o que vem do pedido
+     * escolhe por onde COMEÇAR a travessia, e não que bucket se lê — os
+     * buckets são os das `FAMILIAS` e mais nenhuns. Um `retoma` inventado, no
+     * pior caso, faz a travessia não encontrar o ponto e recomeçar do
+     * princípio.
+     */
+    const corpo = await request.json().catch(() => null);
+    const bruto = corpo?.retoma;
+    const retoma =
+      bruto &&
+      (bruto.papel === "essencial" || bruto.papel === "leve") &&
+      typeof bruto.origem === "string" &&
+      typeof bruto.pasta === "string" &&
+      typeof bruto.caminho === "string"
+        ? {
+            papel: bruto.papel as "essencial" | "leve",
+            origem: bruto.origem.slice(0, 200),
+            pasta: bruto.pasta.slice(0, 200),
+            caminho: bruto.caminho.slice(0, 500),
+          }
+        : null;
+    const r = await gerarLoteDeDerivadas(papel, { retoma });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     log.error("derivadas: geração falhou", e);

@@ -21,7 +21,7 @@ import {
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
-import { MEDIDA_LG, useMedida } from "./useMedida";
+import { MEDIDA_LG, MEDIDA_SM, useMedida } from "./useMedida";
 import { Ajuda, Button } from "./ui";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { porqueNaoLeu, porqueNaoLeuDoErro, type LeituraFalhada } from "@/lib/porque-nao-leu";
@@ -1737,7 +1737,21 @@ export default function ThemePicker({
    */
   const idDaRazao = useId();
 
-  const procuraVisivel = procuraAberta || procuraTema !== "";
+  /**
+   * ── «ÀS VEZES NÃO APARECE A BARRA DE PESQUISA» ──────────────────────────
+   *
+   * Não era «às vezes»: no computador nunca aparecia sozinha. O comentário
+   * mesmo por cima da fila dizia, por escrito, que «a partir de `sm` a caixa
+   * de procurar volta a ficar sempre à vista por cima» — e a condição não
+   * tinha largura nenhuma. Descrevia uma intenção que o código não cumpria, e
+   * a caixa ficava atrás da lupa nos dois sítios.
+   *
+   * No telemóvel a lupa é a decisão certa e mantém-se: aqueles 55 px de linha
+   * são a altura que as fotografias não têm. Num ecrã largo não custam nada, e
+   * escrever é mais rápido do que dois toques.
+   */
+  const ecraLargo = useMedida(MEDIDA_SM);
+  const procuraVisivel = ecraLargo || procuraAberta || procuraTema !== "";
 
   function abrirOuFecharProcura() {
     if (procuraVisivel) {
@@ -2142,7 +2156,24 @@ export default function ThemePicker({
                 carrega lá as fotos de inspiração.
               </p>
             ) : (
-              <div className="flex flex-col gap-2">
+              /* ── PORQUE É QUE ESTES DOIS TÊM `lg:min-h-0 lg:flex-1` ──────
+                 Palavras dela: «não dá para fazer scroll para cima e para
+                 baixo para escolher os temas que queremos».
+
+                 A lista pedia a altura ao pai (`lg:flex-1`), o pai crescia com
+                 o conteúdo — um `flex` sem `min-h-0` nunca encolhe abaixo do
+                 que tem lá dentro — e a coluna, que tem `overflow-hidden`,
+                 CORTAVA o que passava. Os temas de baixo ficavam invisíveis e
+                 inalcançáveis, e o `overflow-y-auto` da lista nunca chegava a
+                 ter uma altura limitada onde rolar.
+
+                 «Às vezes» porque só acontece quando os temas são mais do que
+                 os que cabem: com poucos, tudo cabia e parecia bem.
+
+                 Os dois níveis precisam da marca. Um só não chega: basta um
+                 elo da cadeia a crescer com o conteúdo para a altura não
+                 chegar abaixo. */
+              <div className="flex flex-col gap-2 lg:min-h-0 lg:flex-1">
                 {/* ── A PROCURA E OS TEMAS, NA MESMA LINHA ──────────────────
                   Duas correcções na mesma fila.
 
@@ -2173,7 +2204,7 @@ export default function ThemePicker({
                   O `-mx-5 px-5` é para a fila sangrar até às arestas do painel:
                   um chip cortado a meio na margem é o que diz que há mais para
                   o lado. */}
-                <div className="-mx-5 flex items-center gap-2 px-5 sm:mx-0 sm:flex-col sm:items-start sm:gap-2 sm:px-0">
+                <div className="-mx-5 flex items-center gap-2 px-5 sm:mx-0 sm:flex-col sm:items-start sm:gap-2 sm:px-0 lg:min-h-0 lg:flex-1">
                   {procuraVisivel ? (
                     <div className="flex shrink-0 items-center gap-1 sm:w-full sm:max-w-xs">
                       <input

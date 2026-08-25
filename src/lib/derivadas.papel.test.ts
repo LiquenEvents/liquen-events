@@ -220,17 +220,22 @@ describe("a geração faz primeiro o que dói", () => {
     temaSemNada("tema-a", 20);
 
     // Cada leitura do relógio avança 1 s; o tecto são 5 s.
+    // O tecto é lido uma vez por BLOCO de seis fotografias — elas vão várias
+    // ao mesmo tempo, e abortar um bloco a meio deixava trabalho pago por
+    // metade. Com 2 s por leitura e um tecto de 3 s, pára depois do primeiro.
     let t = 0;
     const r = await gerarLoteDeDerivadas("essencial", {
-      tectoMs: 5_000,
-      agora: () => (t += 1_000),
+      tectoMs: 3_000,
+      agora: () => (t += 2_000),
     });
 
     expect(r.fotografiasFeitas).toBeGreaterThan(0);
     expect(r.fotografiasFeitas).toBeLessThan(20);
-    // Duas essenciais por fotografia, e todas as que sobram doem.
+    // Três essenciais por fotografia — a miniatura, o micro e a de 1200 px.
     expect(r.geradas).toBe(r.fotografiasFeitas * 3);
-    expect(r.restantes).toBe((20 - r.fotografiasFeitas) * 3);
-    expect(r.restantesEssenciais).toBe(r.restantes);
+    // E o que sobra diz-se dizendo ONDE se ficou: contar o resto obrigava a
+    // varrer a biblioteca toda, que é o que este lote deixou de fazer.
+    expect(r.retoma).not.toBeNull();
+    expect(r.retoma?.papel).toBe("essencial");
   });
 });

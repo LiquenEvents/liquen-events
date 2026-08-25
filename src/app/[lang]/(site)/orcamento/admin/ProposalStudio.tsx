@@ -197,6 +197,12 @@ import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-ca
 // ponto a pulsar, e a contagem quando o código sabe contar — este ficheiro não
 // inventa nenhuma espera sua.
 import { Ajuda, Button, Card, EmCurso, Field, FolhaOuDialogo, Segmented } from "./ui";
+import {
+  baseParaOEstudio,
+  degrauDosAdicionais,
+  precoDoPedidoParaBase,
+  type ContextoDoPreco,
+} from "@/lib/preco-do-pedido";
 
 /**
  * Visual editor for the studio's multi-page proposal PDF. Produces a
@@ -485,15 +491,21 @@ const STEPS: { id: Step; n: string; label: string }[] = [
  * era uma função interna que dois caminhos deviam usar e só um usava. Aqui
  * fora, os dois vêem-na e o teste também.
  */
-function baseDoPedidoParaOEcra(base: number, d: StudioDoc): number {
-  if (!d.budgetExtrasSomam) return base;
-  const mode: VatMode = d.totalVatMode ?? detectVatMode(d.totalText || d.totalEstimatedText);
-  const semExtras = round2(
-    base - somaDosExtrasSemIva(d.budgetExtras, { mode, vatRate: d.vatRate ?? DEFAULT_VAT_RATE }),
-  );
-  // Nunca negativo: um pedido com preço mais baixo do que os adicionais
-  // escritos é um estado por arrumar, e o aviso de desalinhamento já o diz.
-  return semExtras > 0 ? semExtras : 0;
+/**
+ * A conta vive agora em `lib/preco-do-pedido`, ao lado da sua INVERSA.
+ *
+ * Estavam separadas — a ida aqui, a volta dentro do componente — e nada as
+ * obrigava a concordar. Quando não concordam, o preço da proposta desloca-se a
+ * cada abertura, e a deslocação acumula: 3.000 → 3.140 → 3.280 → 3.420, com
+ * uma deslocação de 140 €. O que estava errado não era a conta; era haver duas.
+ *
+ * E devolve `null` — não zero — quando o preço do pedido é MENOR do que os
+ * adicionais escritos. Zero era uma mentira com consequências: a volta mandava
+ * 0 + 140 = 140 € para o pedido, e um pedido de 100 € passava a 140 € sem
+ * ninguém lhe ter tocado. Ver o cabeçalho de lá.
+ */
+function baseDoPedidoParaOEcra(base: number, d: StudioDoc): number | null {
+  return baseParaOEstudio(base, d as unknown as ContextoDoPreco);
 }
 
 function aplicarBase(d: StudioDoc, base: number): StudioDoc {
@@ -589,11 +601,17 @@ function seedDefaults(d: StudioDoc, quote: Quote): StudioDoc {
     // limpo TEM preço com adicionais somados, e sem isto voltava a nascer
     // inflacionado.
     const escrito = baseDoPedidoParaOEcra(quotedPrice, next);
-    next = {
-      ...next,
-      totalAmount: totalAmountParaBase(escrito, modo, next.vatRate ?? DEFAULT_VAT_RATE),
-      totalVatMode: modo,
-    };
+    // `null` = a conta não dá (o preço do pedido é menor do que os adicionais).
+    // Deixa-se o documento como está: o aviso de desalinhamento já diz o que se
+    // passa, e inventar um zero aqui fazia o preço do PEDIDO subir na gravação
+    // seguinte.
+    if (escrito != null) {
+      next = {
+        ...next,
+        totalAmount: totalAmountParaBase(escrito, modo, next.vatRate ?? DEFAULT_VAT_RATE),
+        totalVatMode: modo,
+      };
+    }
   }
   return next;
 }
@@ -1929,8 +1947,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
        */
       setDoc((d) => {
         const paraOEcra = baseDoPedidoParaOEcra(doPedido, d);
-        setTotalInput(paraOEcra > 0 ? textoDoTotal(paraOEcra) : "");
-        return paraOEcra > 0 ? aplicarBase(d, paraOEcra) : d;
+        // `null` = a conta não dá. NÃO se esvazia o campo: um campo em branco
+        // numa proposta que tem preço é ela a ver desaparecer o que escreveu, e
+        // a gravação seguinte levava o branco à frente. Fica o que o documento
+        // já diz, e o aviso de desalinhamento explica a diferença.
+        if (paraOEcra == null) return d;
+        setTotalInput(textoDoTotal(paraOEcra));
+        return aplicarBase(d, paraOEcra);
       });
     } else if (hadDraft) {
       // O pedido ainda não tem preço mas o rascunho tem um valor escrito antes
@@ -2886,11 +2909,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * Quando os adicionais estão dentro do valor, as duas não fazem nada, e o
    * comportamento é exactamente o de sempre.
    */
+  /** A INVERSA da de cima, e vive no mesmo ficheiro que ela — ver
+   *  `lib/preco-do-pedido`. */
   function baseDoEcraParaOPedido(base: number): number {
-    if (!doc.budgetExtrasSomam) return base;
-    return round2(
-      base + somaDosExtrasSemIva(doc.budgetExtras, { mode: vatMode, vatRate: money.vatRate }),
-    );
+    return precoDoPedidoParaBase(base, doc as unknown as ContextoDoPreco);
   }
 
   /** O que se grava no pedido, com a mão travada: escrever "3000" são quatro
@@ -3331,12 +3353,13 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       // só a parte dos serviços quando os adicionais somam. Ver o par de
       // conversões acima.
       const paraOEcra =
-        typeof doPedido === "number" && doPedido > 0
-          ? baseDoPedidoParaOEcra(doPedido, d)
-          : undefined;
-      setTotalInput(paraOEcra != null && paraOEcra > 0 ? textoDoTotal(paraOEcra) : "");
+        typeof doPedido === "number" && doPedido > 0 ? baseDoPedidoParaOEcra(doPedido, d) : null;
+      // Pela mesma razão da abertura: quando a conta não dá, não se apaga o que
+      // lá está. Antes, o campo esvaziava-se e o total do documento ia com ele.
+      if (paraOEcra == null && typeof doPedido === "number" && doPedido > 0) return d;
+      setTotalInput(paraOEcra != null ? textoDoTotal(paraOEcra) : "");
       const amount =
-        paraOEcra != null && paraOEcra > 0
+        paraOEcra != null
           ? totalAmountParaBase(paraOEcra, mode, d.vatRate ?? DEFAULT_VAT_RATE)
           : undefined;
       const text = amount == null ? "" : mode === "acrescer" ? `${eur(amount)} + IVA` : eur(amount);
@@ -8487,10 +8510,59 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
           <Section title="Total, IVA e validade" id="total">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
-                É o mesmo valor do <strong className="font-semibold">Preço final</strong> do pedido
-                — escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um número só.
-              </p>
+              {/**
+               * ── «HÁ UM NÚMERO SÓ» ERA MENTIRA, E CUSTOU-LHE UMA TARDE ─────
+               *
+               * Palavras dela: «sempre que vou à proposta os valores estão
+               * diferentes; não estão iguais àquilo que nós colocamos».
+               *
+               * Estava aqui. Esta frase prometia que este campo e o «Preço
+               * final» do pedido eram o mesmo número — e não são, sempre que
+               * há adicionais a somar. O pedido guarda o que o casal PAGA
+               * (serviços + deslocação); este campo é só os SERVIÇOS, porque a
+               * deslocação tem linha própria logo abaixo e somá-la aqui era
+               * contá-la duas vezes na mesma folha.
+               *
+               * Ela escrevia 3.000 na Gestão do pedido e o estúdio mostrava
+               * 2.860. Escrevia 3.000 aqui e a Gestão mostrava 3.140. Os dois
+               * números estavam certos; o ecrã é que jurava que eram um só.
+               *
+               * A aritmética não muda — mudaria o significado de um campo de
+               * dinheiro de que saem o sinal, a factura e o PDF. O que muda é
+               * o ecrã passar a dizer a verdade, com os DOIS números à vista
+               * para ela poder conferir num relance.
+               */}
+              {(() => {
+                const degrau = degrauDosAdicionais(doc as unknown as ContextoDoPreco);
+                if (!(degrau > 0)) {
+                  return (
+                    <p className="text-xs leading-relaxed text-foreground/50 sm:col-span-2">
+                      É o mesmo valor do <strong className="font-semibold">Preço final</strong> do
+                      pedido — escrever aqui altera-o lá, e alterá-lo lá aparece aqui. Há um número
+                      só.
+                    </p>
+                  );
+                }
+                // `money.base` já traz os adicionais somados (ver
+                // `dinheiroDaProposta`) — é o EFECTIVO, o que o pedido guarda.
+                // A parte dos serviços é a do resolvedor cru. Escrever aqui
+                // `money.base` somava a deslocação uma segunda vez e a nota
+                // dizia 3140 + 140 = 3280 a alguém que tem 3000 de serviços.
+                const efectivo = money.base;
+                const servicos = round2(efectivo - degrau);
+                return (
+                  <p className="text-xs leading-relaxed text-foreground/60 sm:col-span-2">
+                    Este campo é <strong className="font-semibold">só os serviços</strong>. O{" "}
+                    <strong className="font-semibold">Preço final</strong> do pedido mostra outro
+                    número, porque leva também os adicionais:{" "}
+                    <strong className="font-semibold tabular-nums">{eur(servicos)}</strong> +{" "}
+                    <span className="tabular-nums">{eur(degrau)}</span> de adicionais ={" "}
+                    <strong className="font-semibold tabular-nums">{eur(efectivo)}</strong>.
+                    Escrever aqui altera-o lá, e alterá-lo lá aparece aqui — mas os dois ecrãs
+                    mostram números diferentes, e é assim de propósito.
+                  </p>
+                );
+              })()}
               <Field
                 // Sempre a base: é o que o pedido guarda, e é o que o rótulo
                 // "(sem IVA)" da Gestão do pedido promete. O modo de IVA muda o

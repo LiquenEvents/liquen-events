@@ -84,8 +84,13 @@ describe("Miniaturas — a rede cai a meio dos lotes", () => {
               ok: true,
               geradas: 22,
               falhas: FALHAS,
-              restantes: 30,
-              restantesEssenciais: 30,
+              fotografiasFeitas: 22,
+              retoma: {
+                papel: "essencial",
+                origem: "theme-assets",
+                pasta: "tema-a",
+                caminho: "tema-a/f.jpg",
+              },
               papel: "essencial",
             });
           // Segundo: a rede foi-se. É aqui que a lista desaparecia.
@@ -115,8 +120,13 @@ describe("Miniaturas — a rede cai a meio dos lotes", () => {
               ok: true,
               geradas: 22,
               falhas: FALHAS,
-              restantes: 30,
-              restantesEssenciais: 30,
+              fotografiasFeitas: 22,
+              retoma: {
+                papel: "essencial",
+                origem: "theme-assets",
+                pasta: "tema-a",
+                caminho: "tema-a/f.jpg",
+              },
               papel: "essencial",
             });
           return respostaDe({ error: "Storage indisponível" }, 503);

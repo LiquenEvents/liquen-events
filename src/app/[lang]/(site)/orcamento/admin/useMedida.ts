@@ -47,3 +47,10 @@ export function useMedida(medida: string): boolean {
 
 /** Os cortes da casa, escritos como o Tailwind os escreve. */
 export const MEDIDA_LG = "(min-width: 1024px)";
+
+/**
+ * O `sm` do Tailwind. É a largura a partir da qual uma linha a mais de
+ * interface deixa de custar altura às fotografias — e portanto a partir da
+ * qual a caixa de procurar temas fica sempre à vista em vez de atrás da lupa.
+ */
+export const MEDIDA_SM = "(min-width: 640px)";

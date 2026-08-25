@@ -1943,6 +1943,45 @@ describe("os valores adicionais somam ao total", () => {
   }
 
   /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * «HÁ UM NÚMERO SÓ» ERA MENTIRA
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Palavras dela: «sempre que vou à proposta os valores estão diferentes; não
+   * estão iguais àquilo que nós colocamos».
+   *
+   * Estava numa frase, por cima do campo: prometia que este valor e o «Preço
+   * final» do pedido eram o MESMO número. Não são, sempre que há adicionais a
+   * somar — o pedido guarda o que o casal PAGA (serviços + deslocação) e este
+   * campo é só os SERVIÇOS, porque a deslocação tem linha própria e somá-la
+   * aqui era contá-la duas vezes na mesma folha.
+   *
+   * Ela escrevia 3.000 na Gestão do pedido e o estúdio mostrava 2.860. Os dois
+   * números estavam certos; o ecrã é que jurava que eram um só.
+   */
+  it("sem adicionais, continua a ser um número só — e diz isso", async () => {
+    desenhar(comPreco(3000));
+    expect(await screen.findByText(/Há um número só/i)).toBeInTheDocument();
+  });
+
+  it("com adicionais, deixa de prometer que são o mesmo, e mostra a conta", async () => {
+    desenhar(comPreco(3000));
+    await escreverExtra("140");
+
+    // A promessa falsa desapareceu…
+    await waitFor(() => expect(screen.queryByText(/Há um número só/i)).toBeNull());
+    // …e no lugar dela está a conta, com os DOIS números à vista para ela
+    // poder conferir num relance qual é qual.
+    // O parágrafo INTEIRO, e não o `<strong>` que o `findByText` devolve: os
+    // números vivem noutros filhos do mesmo parágrafo.
+    const nota = (await screen.findByText(/só os serviços/i)).closest("p");
+    expect(nota).not.toBeNull();
+    expect(nota!.textContent).toMatch(/3000,00/);
+    expect(nota!.textContent).toMatch(/140,00/);
+    expect(nota!.textContent).toMatch(/3140,00/);
+  });
+
+  /**
    * ── ESTE BLOCO DESCREVE A REGRA ANTIGA, E CONTINUA A DESCREVÊ-LA ─────────
    *
    * Uma proposta NOVA nasce hoje com «o valor escrito é só dos serviços, estas

@@ -156,30 +156,80 @@ describe("um lote de derivadas", () => {
   it("pára pelo relógio, e diz o que ficou por fazer", async () => {
     tema("tema-a", 20);
 
-    // Cada leitura do relógio avança 1 s; o tecto é 5 s. O lote tem de parar
-    // muito antes das 20 fotografias.
-    const r = await gerarLoteDeDerivadas("essencial", { tectoMs: 5_000, agora: relogio(1_000) });
+    // O tecto é lido uma vez por BLOCO de seis, e não por fotografia — as
+    // fotografias vão várias ao mesmo tempo, e abortar um bloco a meio deixava
+    // trabalho pago por metade. Com o relógio a andar 2 s por leitura e um
+    // tecto de 3 s, o lote pára depois do primeiro bloco.
+    const r = await gerarLoteDeDerivadas("essencial", { tectoMs: 3_000, agora: relogio(2_000) });
 
     expect(r.fotografiasFeitas).toBeGreaterThan(0);
     expect(r.fotografiasFeitas).toBeLessThan(20);
-    // O resto é dito nas duas unidades, e batem certo entre si: cada
-    // fotografia destas deve três derivadas essenciais.
-    expect(r.fotografiasRestantes).toBe(20 - r.fotografiasFeitas);
-    expect(r.restantes).toBe(r.fotografiasRestantes * 3);
-    expect(r.restantesEssenciais).toBe(r.restantes);
+    // E diz ONDE ficou, para o lote seguinte começar aí em vez de voltar à
+    // primeira pasta da biblioteca. É isto que faz o trabalho ser linear em
+    // vez de crescer ao quadrado.
+    expect(r.retoma).toEqual({
+      papel: "essencial",
+      origem: THEME_BUCKET,
+      pasta: "tema-a",
+      caminho: expect.any(String),
+    });
+  });
+
+  it("o lote seguinte começa onde o anterior parou, e não do princípio", async () => {
+    tema("tema-a", 12);
+
+    const um = await gerarLoteDeDerivadas("essencial", { tectoMs: 1_000, agora: relogio(2_000) });
+    expect(um.retoma).not.toBeNull();
+    const feitosNoPrimeiro = st.escritos.length;
+    st.descarregados = [];
+
+    const dois = await gerarLoteDeDerivadas("essencial", {
+      tectoMs: 1_000,
+      agora: relogio(2_000),
+      retoma: um.retoma,
+    });
+
+    // Nenhuma fotografia é tocada duas vezes: os lotes são disjuntos, e é por
+    // isso que quem chama pode SOMAR o que cada um fez.
+    expect(dois.fotografiasFeitas).toBeGreaterThan(0);
+    expect(st.escritos.length).toBe(feitosNoPrimeiro + dois.geradas);
+    expect(new Set(st.descarregados).size).toBe(dois.fotografiasFeitas);
+  });
+
+  it("uma retoma que já não existe recomeça do princípio, em vez de dizer que acabou", async () => {
+    // A pasta foi apagada, ou o tema mudou de nome entre dois lotes. Sem isto,
+    // o lote devolvia «acabou» sobre uma biblioteca por fazer, e a geração
+    // parava em silêncio a meio.
+    tema("tema-a", 2);
+
+    const r = await gerarLoteDeDerivadas("essencial", {
+      retoma: {
+        papel: "essencial",
+        origem: THEME_BUCKET,
+        pasta: "tema-que-nao-existe",
+        caminho: "x.jpg",
+      },
+    });
+
+    expect(r.fotografiasFeitas).toBe(2);
+    expect(r.retoma).toBeNull();
   });
 
   it("com o tempo já esgotado faz sempre uma — senão a geração nunca acabava", async () => {
-    tema("tema-a", 4);
+    tema("tema-a", 10);
 
     // O relógio já vai à frente do tecto na primeira leitura.
     const r = await gerarLoteDeDerivadas("essencial", { tectoMs: 0, agora: relogio(10_000) });
 
     // Quem chama pára o ciclo quando um lote devolve zero geradas. Um lote que
     // nunca gera nada por já estar atrasado seria uma geração que não avança.
-    expect(r.fotografiasFeitas).toBe(1);
-    expect(r.geradas).toBe(3);
-    expect(r.fotografiasRestantes).toBe(3);
+    // Um BLOCO é o mínimo, e não uma fotografia: é a unidade em que o tecto
+    // se lê agora, porque as fotografias vão várias ao mesmo tempo e abortar um
+    // bloco a meio deixava trabalho pago por metade.
+    expect(r.fotografiasFeitas).toBe(6);
+    expect(r.geradas).toBe(18);
+    // E há por onde continuar — senão isto era uma geração que não avança.
+    expect(r.retoma).not.toBeNull();
   });
 
   it("uma fotografia a que só falta metade das derivadas não regenera a outra metade", async () => {
