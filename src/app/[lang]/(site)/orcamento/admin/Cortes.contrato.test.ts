@@ -71,9 +71,11 @@ const TECTO_POR_TRATAR = new Map<string, number>([
   // O painel de detalhe do pedido (`xl:grid-cols`, `xl:hidden`, `xl:sticky`) e
   // a palavra «Pesquisar» do atalho (`hidden md:inline`).
   ["AdminClient.tsx", 4],
-  // O par PT/EN da nota do orçamento (`xl:grid`) e a coluna do enquadramento
-  // das fotos (`2xl:grid-cols-1` / `2xl:hidden`).
-  ["ProposalStudio.tsx", 4],
+  // (`ProposalStudio.tsx` esteve aqui com tecto 4 — o par PT/EN da nota do
+  // orçamento (`xl:grid`) e a coluna do enquadramento das fotos
+  // (`2xl:grid-cols-1` / `2xl:hidden`). Os quatro eram perguntas sobre a coluna
+  // de conteúdo disfarçadas de perguntas sobre a janela; passaram a `@container`
+  // e o ficheiro chegou a zero.)
   // (`Temas.tsx` esteve aqui com tecto 1 — o `md:grid-cols-5` da grelha de
   // miniaturas, escondido numa constante e não no JSX. A grelha passou a
   // `@container` e ele chegou a zero, portanto a linha saiu.)
