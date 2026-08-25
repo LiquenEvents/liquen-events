@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState, useDeferredValue } from "react";
+import { useMemo, useState, useDeferredValue } from "react";
 // `import type` é totalmente apagado no build, por isso puxar a forma do store
 // server-only nunca arrasta o guard `server-only` (→ repository → fs) para o
 // bundle cliente. O tipo vive no módulo client-safe `contract-types`.
@@ -8,7 +8,15 @@ import type { Contract, ContractStatus } from "@/lib/contract-types";
 import { TERMS_VERSION } from "@/lib/contract-terms";
 import { SkeletonList } from "./Skeleton";
 import { downloadCsv, dateStamp } from "./export";
-import { Button, Card, EmptyState, Toolbar } from "./ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  TabelaOuCartoes,
+  Toolbar,
+  useAdaptativo,
+  type Coluna,
+} from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useToast } from "./Toast";
@@ -175,6 +183,13 @@ export default function Contratos() {
   const dSearch = useDeferredValue(search);
   const [status, setStatus] = useState<"all" | ContractStatus>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
+  /**
+   * A MESMA PERGUNTA QUE O `TabelaOuCartoes` FAZ POR DENTRO — os termos
+   * abertos vivem dentro do cartão no telemóvel e num painel a seguir à
+   * tabela no computador, e têm de ser montados UMA vez.
+   */
+  const { desktop, montado } = useAdaptativo();
+  const emTabela = montado && desktop;
 
   const filtered = useMemo(() => {
     const q = dSearch.trim().toLowerCase();
@@ -192,6 +207,9 @@ export default function Contratos() {
   }, [contracts, dSearch, status]);
 
   const aceites = useMemo(() => contracts.filter((c) => c.status === "aceite").length, [contracts]);
+
+  /** O contrato cujos termos estão abertos, se ainda estiver na lista filtrada. */
+  const aberto = expanded ? (filtered.find((c) => c.id === expanded) ?? null) : null;
 
   function exportCsv() {
     const rows: (string | number)[][] = [
@@ -352,168 +370,63 @@ export default function Contratos() {
             }
           />
         ) : (
-          <>
-            {/* Mobile: one card per contract — no sideways scrolling */}
-            <ul className="divide-y divide-foreground/[0.06] md:hidden">
-              {filtered.map((c) => {
-                const isOpen = expanded === c.id;
-                return (
-                  <li key={c.id} className={`p-4 ${c.status === "pendente" ? "opacity-70" : ""}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-foreground/80" title={c.clientName}>
-                          {c.clientName || "—"}
-                        </p>
-                        {c.clientEmail && (
-                          <p className="mt-0.5 truncate text-xs text-foreground/40">
-                            {c.clientEmail}
-                          </p>
-                        )}
-                      </div>
-                      <div className="shrink-0">
-                        <StatusChip status={c.status} />
-                      </div>
-                    </div>
-                    <p className="mt-2 text-xs text-foreground/45">
-                      {c.status === "aceite" ? (
-                        <>
-                          Aceite {fmtDateTime(c.acceptedAt)}
-                          {c.acceptedName && <> · por {c.acceptedName}</>}
-                        </>
-                      ) : (
-                        <>
-                          Pedido {c.quoteId || "—"} · versão {c.termsVersion}
-                        </>
-                      )}
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setExpanded(isOpen ? null : c.id)}
-                        aria-expanded={isOpen}
-                      >
-                        {isOpen ? "Fechar" : "Ver termos"}
-                      </Button>
-                      <a
-                        href={`/api/contratos/${c.id}/pdf`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        // `pointer-coarse:h-11`, como o `ui/Button.tsx` já faz
-                        // sozinho: este link está escrito à mão e ficava de
-                        // fora. Media 46,9 × 36 px no telemóvel, ao lado do
-                        // "Ver termos", que tem 44 — os dois estão na mesma
-                        // linha e não tinham a mesma altura.
-                        className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
-                        title="Descarregar contrato em PDF"
-                      >
-                        PDF
-                      </a>
-                      <RegistarAceite contrato={c} feito={refresh} />
-                    </div>
-                    {isOpen && (
-                      <div className="mt-3">
-                        <ContractDetails c={c} />
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+          /* ── UMA LISTA, UMA ÁRVORE ────────────────────────────────────────
+             Aqui estavam DUAS: um `<ul md:hidden>` com os cartões e um
+             `<table>` de sete colunas `hidden md:block`, as duas montadas ao
+             mesmo tempo, as duas a ler e a escrever o mesmo `expanded`. É o
+             defeito que o `useMedida.ts:16-21` descreve — dois componentes
+             vivos para a mesma linha — e custava, em cada desenho, uma lista
+             inteira de nós que ninguém via.
 
-            {/* Desktop: the full contracts table */}
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-foreground/[0.08] text-foreground/40">
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Cliente</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Pedido</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Estado</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Aceite em</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Aceite por</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-left">Termos</th>
-                    <th className="bo-eyebrow px-4 py-3.5 text-right">Contrato</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-foreground/[0.06]">
-                  {filtered.map((c) => {
-                    const isOpen = expanded === c.id;
-                    return (
-                      <Fragment key={c.id}>
-                        <tr
-                          className={`hover:bg-foreground/[0.02] transition-colors ${
-                            c.status === "pendente" ? "opacity-70" : ""
-                          }`}
-                        >
-                          <td className="px-4 py-3.5">
-                            <p className="max-w-[200px] truncate font-medium text-foreground/80">
-                              {c.clientName || "—"}
-                            </p>
-                            {c.clientEmail && (
-                              <p className="mt-0.5 max-w-[200px] truncate text-xs text-foreground/40">
-                                {c.clientEmail}
-                              </p>
-                            )}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3.5 font-mono text-xs text-foreground/50">
-                            {c.quoteId || "—"}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3.5">
-                            <StatusChip status={c.status} />
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3.5 text-foreground/50">
-                            {c.status === "aceite" ? fmtDateTime(c.acceptedAt) : "—"}
-                          </td>
-                          <td
-                            className="max-w-[160px] truncate px-4 py-3.5 text-foreground/65"
-                            title={c.acceptedName ?? undefined}
-                          >
-                            {c.acceptedName || "—"}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3.5 tabular-nums text-foreground/45">
-                            Versão {c.termsVersion}
-                          </td>
-                          <td className="px-4 py-3.5 text-right">
-                            <div className="inline-flex items-center justify-end gap-1.5">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setExpanded(isOpen ? null : c.id)}
-                                aria-expanded={isOpen}
-                              >
-                                {isOpen ? "Fechar" : "Ver termos"}
-                              </Button>
-                              {/* Prova em papel do contrato — abre o PDF numa nova aba. */}
-                              <a
-                                href={`/api/contratos/${c.id}/pdf`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                // A mesma correcção da versão em cartão: num
-                                // tablet (que é um ecrã largo COM dedo) esta
-                                // tabela é a que se vê, e 32 px não é um alvo.
-                                className="inline-flex h-8 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
-                                title="Descarregar contrato em PDF"
-                              >
-                                PDF
-                              </a>
-                              <RegistarAceite contrato={c} feito={refresh} />
-                            </div>
-                          </td>
-                        </tr>
-                        {isOpen && (
-                          <tr className="bg-foreground/[0.015]">
-                            <td colSpan={7} className="px-4 py-4">
-                              <ContractDetails c={c} />
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
+             O `TabelaOuCartoes` monta uma só, e o corte passa a ser o da casa
+             (`CORTES.desktop`, 1024) em vez dos 768 px do `md:`, que este back
+             office não usa e que é justamente a largura de um iPad em retrato —
+             onde sete colunas não cabem. Ver `ui/adaptativo.ts:53-60`. */
+          <div className="p-3 sm:p-4">
+            <TabelaOuCartoes
+              itens={filtered}
+              chaveDe={(c) => c.id}
+              legenda="Contratos"
+              // O cartão traz a sua própria moldura e os seus próprios botões
+              // («Ver termos», «PDF», «Marcar como assinado»): embrulhá-lo no
+              // botão do primitivo dava um botão dentro de outro botão.
+              semMoldura
+              cartao={(c) => (
+                <CartaoDeContrato
+                  c={c}
+                  aberto={expanded === c.id}
+                  onAlternar={() => setExpanded(expanded === c.id ? null : c.id)}
+                  aoRegistar={refresh}
+                />
+              )}
+              colunas={colunasDeContratos({
+                aberto: expanded,
+                alternar: (c) => setExpanded((e) => (e === c.id ? null : c.id)),
+                aoRegistar: refresh,
+              })}
+            />
+
+            {/* ── OS TERMOS ABERTOS, NO COMPUTADOR ──────────────────────────
+                Na tabela isto era uma segunda `<tr colSpan={7}>`, e o
+                `TabelaOuCartoes` desenha uma linha por item — de propósito, é
+                o que lhe permite ordenar e rolar sem saber nada do conteúdo.
+                Os termos passam para um painel a seguir à tabela, com o nome
+                de quem se está a ver por cima. É o MESMO `ContractDetails` do
+                cartão, montado uma vez. */}
+            {emTabela && aberto && (
+              <div className="mt-3 rounded-xl border border-foreground/[0.08] bg-foreground/[0.015] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="truncate text-sm font-medium text-foreground/80">
+                    {aberto.clientName || "—"}
+                  </p>
+                  <Button size="sm" variant="ghost" onClick={() => setExpanded(null)}>
+                    Fechar
+                  </Button>
+                </div>
+                <ContractDetails c={aberto} />
+              </div>
+            )}
+          </div>
         )}
       </Card>
     </div>
@@ -556,4 +469,196 @@ function ContractDetails({ c }: { c: Contract }) {
       </div>
     </>
   );
+}
+
+/**
+ * A prova em papel — o PDF do contrato, numa aba nova.
+ *
+ * Escrito uma vez porque estava escrito duas (uma no cartão, outra na tabela) e
+ * as duas cópias já tinham divergido na altura: `h-9` num sítio, `h-8` no
+ * outro, ao lado de botões de 44. `pointer-coarse:h-11` é o que o `ui/Button`
+ * faz sozinho; este link está escrito à mão e por isso pede-o à mão.
+ */
+function PdfDoContrato({ id }: { id: string }) {
+  return (
+    <a
+      href={`/api/contratos/${id}/pdf`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-foreground/55 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/80"
+      title="Descarregar contrato em PDF"
+    >
+      PDF
+    </a>
+  );
+}
+
+/**
+ * O CARTÃO DO TELEMÓVEL — quatro coisas, não sete.
+ *
+ * cliente (+ email por baixo) · estado · aceite em/por · as acções. O pedido e
+ * a versão dos termos, que na tabela são colunas próprias, só aparecem aqui
+ * enquanto o contrato ainda está pendente — é aí que servem para alguma coisa,
+ * porque é aí que ela vai procurar o pedido de onde ele veio.
+ */
+function CartaoDeContrato({
+  c,
+  aberto,
+  onAlternar,
+  aoRegistar,
+}: {
+  c: Contract;
+  aberto: boolean;
+  onAlternar: () => void;
+  aoRegistar: () => void;
+}) {
+  return (
+    <div
+      className={`rounded-xl border border-foreground/[0.08] bg-white p-4 ${
+        c.status === "pendente" ? "opacity-70" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-medium text-foreground/80" title={c.clientName}>
+            {c.clientName || "—"}
+          </p>
+          {c.clientEmail && (
+            <p className="mt-0.5 truncate text-xs text-foreground/40">{c.clientEmail}</p>
+          )}
+        </div>
+        <div className="shrink-0">
+          <StatusChip status={c.status} />
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-foreground/45">
+        {c.status === "aceite" ? (
+          <>
+            Aceite {fmtDateTime(c.acceptedAt)}
+            {c.acceptedName && <> · por {c.acceptedName}</>}
+          </>
+        ) : (
+          <>
+            Pedido {c.quoteId || "—"} · versão {c.termsVersion}
+          </>
+        )}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="ghost" onClick={onAlternar} aria-expanded={aberto}>
+          {aberto ? "Fechar" : "Ver termos"}
+        </Button>
+        <PdfDoContrato id={c.id} />
+        <RegistarAceite contrato={c} feito={aoRegistar} />
+      </div>
+      {aberto && (
+        <div className="mt-3">
+          <ContractDetails c={c} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * AS SETE COLUNAS DA TABELA — as mesmas que já lá estavam.
+ *
+ * `Pedido` e `Termos` ficam em `soLargo`: são referências de auditoria, não é
+ * por elas que se procura um contrato, e a coluna da navegação come 336 px do
+ * ecrã. Só aparecem quando há mesmo espaço (≥1440); abaixo disso continuam à
+ * mão nos termos abertos, que os desenham os dois.
+ */
+function colunasDeContratos({
+  aberto,
+  alternar,
+  aoRegistar,
+}: {
+  aberto: string | null;
+  alternar: (c: Contract) => void;
+  aoRegistar: () => void;
+}): Coluna<Contract>[] {
+  return [
+    {
+      chave: "cliente",
+      cabecalho: "Cliente",
+      ordenar: (a, b) => (a.clientName || "").localeCompare(b.clientName || "", "pt"),
+      celula: (c) => (
+        <span className="block">
+          <span className="block max-w-[200px] truncate font-medium text-foreground/80">
+            {c.clientName || "—"}
+          </span>
+          {c.clientEmail && (
+            <span className="block max-w-[200px] truncate text-xs text-foreground/40">
+              {c.clientEmail}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      chave: "pedido",
+      cabecalho: "Pedido",
+      soLargo: true,
+      celula: (c) => (
+        <span className="whitespace-nowrap font-mono text-xs text-foreground/50">
+          {c.quoteId || "—"}
+        </span>
+      ),
+    },
+    {
+      chave: "estado",
+      cabecalho: "Estado",
+      celula: (c) => <StatusChip status={c.status} />,
+    },
+    {
+      chave: "aceiteEm",
+      cabecalho: "Aceite em",
+      ordenar: (a, b) => (a.acceptedAt ?? "").localeCompare(b.acceptedAt ?? ""),
+      celula: (c) => (
+        <span className="whitespace-nowrap text-foreground/50">
+          {c.status === "aceite" ? fmtDateTime(c.acceptedAt) : "—"}
+        </span>
+      ),
+    },
+    {
+      chave: "aceitePor",
+      cabecalho: "Aceite por",
+      celula: (c) => (
+        <span
+          className="block max-w-[160px] truncate text-foreground/65"
+          title={c.acceptedName ?? undefined}
+        >
+          {c.acceptedName || "—"}
+        </span>
+      ),
+    },
+    {
+      chave: "termos",
+      cabecalho: "Termos",
+      soLargo: true,
+      celula: (c) => (
+        <span className="whitespace-nowrap tabular-nums text-foreground/45">
+          Versão {c.termsVersion}
+        </span>
+      ),
+    },
+    {
+      chave: "contrato",
+      cabecalho: "Contrato",
+      alinharADireita: true,
+      celula: (c) => (
+        <span className="inline-flex items-center justify-end gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => alternar(c)}
+            aria-expanded={aberto === c.id}
+          >
+            {aberto === c.id ? "Fechar" : "Ver termos"}
+          </Button>
+          <PdfDoContrato id={c.id} />
+          <RegistarAceite contrato={c} feito={aoRegistar} />
+        </span>
+      ),
+    },
+  ];
 }

@@ -12,7 +12,9 @@ import {
   Field,
   MenuDeAccoes,
   PerguntaDestrutiva,
+  TabelaOuCartoes,
   Toolbar,
+  cn,
   type AccaoDeItem,
 } from "./ui";
 import { useCachedList } from "./useCachedList";
@@ -176,6 +178,99 @@ function ConditionChip({ condition }: { condition: Condition }) {
     >
       {CONDITION_LABEL[condition]}
     </span>
+  );
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * OS CINCO CAMPOS DA EDIÇÃO EM LINHA — ESCRITOS UMA VEZ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Estavam escritos DUAS vezes: uma na linha da tabela, outra no cartão do
+ * telemóvel, as duas montadas ao mesmo tempo (`md:hidden` / `hidden md:block`)
+ * e as duas ligadas ao mesmo `editForm`. Dois `<input aria-label="Quantidade">`
+ * vivos para a mesma quantidade — um invisível, mas presente para o leitor de
+ * ecrã, para o `Tab` e para os testes, que tinham de escrever
+ * `getAllByLabelText("Quantidade")[0]` para escolher um deles.
+ *
+ * O que muda entre as duas formas é só a MEDIDA (a tabela tem colunas, o cartão
+ * empilha), e a medida entra por `className`. O rótulo, o tipo e o que cada
+ * campo escreve ficam aqui, num sítio, onde não podem divergir.
+ */
+interface CampoDeEdicao {
+  f: FormState;
+  set: (f: FormState) => void;
+  className?: string;
+}
+
+function CampoNome({ f, set, className }: CampoDeEdicao) {
+  return (
+    <input
+      value={f.name}
+      onChange={(e) => set({ ...f, name: e.target.value })}
+      placeholder="Nome *"
+      aria-label="Nome"
+      className={cn("bo-input text-sm text-foreground/80", className)}
+    />
+  );
+}
+
+function CampoCategoria({ f, set, className }: CampoDeEdicao) {
+  return (
+    <select
+      value={f.category}
+      onChange={(e) => set({ ...f, category: e.target.value })}
+      aria-label="Categoria"
+      className={cn("bo-input text-sm text-foreground/70", className)}
+    >
+      {PROP_CATEGORIES.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function CampoQuantidade({ f, set, className }: CampoDeEdicao) {
+  return (
+    <input
+      type="number"
+      min={0}
+      value={f.quantity}
+      onChange={(e) => set({ ...f, quantity: e.target.value })}
+      aria-label="Quantidade"
+      className={cn("bo-input text-sm text-foreground/80", className)}
+    />
+  );
+}
+
+function CampoEstado({ f, set, className }: CampoDeEdicao) {
+  return (
+    <select
+      value={f.condition}
+      onChange={(e) => set({ ...f, condition: e.target.value as Condition })}
+      aria-label="Estado"
+      className={cn("bo-input text-sm text-foreground/70", className)}
+    >
+      {CONDITIONS.map((c) => (
+        <option key={c} value={c}>
+          {CONDITION_LABEL[c]}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function CampoLocalizacao({ f, set, className }: CampoDeEdicao) {
+  return (
+    <input
+      value={f.location}
+      onChange={(e) => set({ ...f, location: e.target.value })}
+      placeholder="Localização"
+      aria-label="Localização"
+      className={cn("bo-input text-sm text-foreground/80", className)}
+    />
   );
 }
 
@@ -712,63 +807,51 @@ export default function Inventario() {
           />
         </Card>
       ) : (
-        <>
-          {/* Mobile: one card per item with stacked fields (the 6-column table
-              scrolls sideways and its inline-edit inputs overflow a phone). */}
-          <Card padding="none" className="md:hidden">
-            <ul className="divide-y divide-foreground/[0.06]">
-              {filtered.map((i) =>
+        /* ── UMA LISTA, UMA ÁRVORE ──────────────────────────────────────────
+           Aqui estavam DUAS, e era o pior dos três ecrãs: um `<Card md:hidden>`
+           com os cartões e um `<Card hidden md:block>` com a tabela de seis
+           colunas, as duas montadas ao mesmo tempo — e portanto a LINHA EM
+           EDIÇÃO estava escrita duas vezes, cinco campos cada, as duas ligadas
+           ao mesmo `editForm` e com o mesmo `aria-label` por campo. Uma procura
+           por «Quantidade» encontrava dois campos, e o dedo podia acertar no que
+           não se via. É o defeito que o `useMedida.ts:16-21` descreve.
+
+           Agora é o `TabelaOuCartoes`: uma forma de cada vez, os cinco campos
+           escritos uma vez só (ver `CampoNome` e companhia, em baixo), e o
+           corte passa a ser o da casa (`CORTES.desktop`, 1024) em vez dos
+           768 px do `md:` — que este back office não usa e que é exactamente a
+           largura de um iPad em retrato, onde estas seis colunas não cabem.
+           Ver `ui/adaptativo.ts:53-60`. */
+        <Card padding="none">
+          <div className="p-3 sm:p-4">
+            <TabelaOuCartoes
+              itens={filtered}
+              chaveDe={(i) => i.id}
+              legenda="Inventário"
+              // O cartão traz a sua própria moldura porque a LINHA EM EDIÇÃO
+              // precisa de outra cor de fundo — e traz os seus próprios botões
+              // («Editar», «Remover», «Guardar»), que não podem viver dentro de
+              // outro botão.
+              semMoldura
+              cartao={(i) =>
+                /* A linha em edição é um caso à parte, e é o cartão que decide:
+                   os mesmos cinco campos, empilhados em vez de em colunas. */
                 editingId === i.id ? (
-                  <li key={i.id} className="flex flex-col gap-2.5 bg-foreground/[0.015] p-4">
-                    <input
-                      value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                      placeholder="Nome *"
-                      aria-label="Nome"
-                      className="bo-input w-full px-2.5 py-2 text-sm text-foreground/80"
-                    />
-                    <select
-                      value={editForm.category}
-                      onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                      aria-label="Categoria"
-                      className="bo-input w-full px-2.5 py-2 text-sm text-foreground/70"
-                    >
-                      {PROP_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="flex flex-col gap-2.5 rounded-xl border border-foreground/[0.08] bg-foreground/[0.015] p-4">
+                    <CampoNome f={editForm} set={setEditForm} className="w-full px-2.5 py-2" />
+                    <CampoCategoria f={editForm} set={setEditForm} className="w-full px-2.5 py-2" />
                     <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min={0}
-                        value={editForm.quantity}
-                        onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
-                        aria-label="Quantidade"
-                        className="bo-input w-24 px-2.5 py-2 text-right text-sm text-foreground/80"
+                      <CampoQuantidade
+                        f={editForm}
+                        set={setEditForm}
+                        className="w-24 px-2.5 py-2 text-right"
                       />
-                      <select
-                        value={editForm.condition}
-                        onChange={(e) =>
-                          setEditForm({ ...editForm, condition: e.target.value as Condition })
-                        }
-                        aria-label="Estado"
-                        className="bo-input flex-1 px-2.5 py-2 text-sm text-foreground/70"
-                      >
-                        {CONDITIONS.map((c) => (
-                          <option key={c} value={c}>
-                            {CONDITION_LABEL[c]}
-                          </option>
-                        ))}
-                      </select>
+                      <CampoEstado f={editForm} set={setEditForm} className="flex-1 px-2.5 py-2" />
                     </div>
-                    <input
-                      value={editForm.location}
-                      onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                      placeholder="Localização"
-                      aria-label="Localização"
-                      className="bo-input w-full px-2.5 py-2 text-sm text-foreground/80"
+                    <CampoLocalizacao
+                      f={editForm}
+                      set={setEditForm}
+                      className="w-full px-2.5 py-2"
                     />
                     <div className="flex gap-2 pt-1">
                       <Button
@@ -783,9 +866,13 @@ export default function Inventario() {
                         Cancelar
                       </Button>
                     </div>
-                  </li>
+                  </div>
                 ) : (
-                  <li key={i.id} className="p-4">
+                  /* ── O CARTÃO: QUATRO COISAS ────────────────────────────
+                     nome · categoria · quantidade e estado na mesma linha ·
+                     localização. As acções em baixo, por extenso — no dedo não
+                     há hover, e dois ícones de 14 px não são um alvo. */
+                  <div className="rounded-xl border border-foreground/[0.08] bg-white p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-medium text-foreground/80">{i.name}</p>
@@ -819,144 +906,127 @@ export default function Inventario() {
                         Remover
                       </Button>
                     </div>
-                  </li>
-                ),
-              )}
-            </ul>
-          </Card>
-
-          {/* Desktop: the full inventory table */}
-          <Card padding="none" className="hidden overflow-x-auto md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-foreground/[0.08]">
-                  {["Nome", "Categoria", "Qtd", "Estado", "Localização", ""].map((h, idx) => (
-                    <th
-                      key={h || "acoes"}
-                      className={`bo-eyebrow text-foreground/35 font-medium px-4 py-3.5 ${idx === 2 ? "text-right" : "text-left"} ${idx === 5 ? "text-right" : ""}`}
-                    >
-                      {idx === 5 ? "Ações" : h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((i) =>
-                  editingId === i.id ? (
-                    <tr
-                      key={i.id}
-                      className="border-b border-foreground/[0.06] bg-foreground/[0.015]"
-                    >
-                      <td className="px-4 py-2">
-                        <input
-                          value={editForm.name}
-                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          placeholder="Nome *"
-                          aria-label="Nome"
-                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-full"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <select
-                          value={editForm.category}
-                          onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                          aria-label="Categoria"
-                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/70 w-full"
-                        >
-                          {PROP_CATEGORIES.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          min={0}
-                          value={editForm.quantity}
-                          onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
-                          aria-label="Quantidade"
-                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-20 text-right"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <select
-                          value={editForm.condition}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, condition: e.target.value as Condition })
-                          }
-                          aria-label="Estado"
-                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/70 w-full"
-                        >
-                          {CONDITIONS.map((c) => (
-                            <option key={c} value={c}>
-                              {CONDITION_LABEL[c]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          value={editForm.location}
-                          onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                          placeholder="Localização"
-                          aria-label="Localização"
-                          className="bo-input px-2.5 py-1.5 text-sm text-foreground/80 w-full"
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => saveEdit(i.id)}
-                            loading={saving}
-                            disabled={!editForm.name.trim() || saving}
-                          >
-                            Guardar
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                            Cancelar
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr
-                      key={i.id}
-                      className="group border-b border-foreground/[0.06] motion-safe:transition-colors hover:bg-foreground/[0.015]"
-                    >
-                      <td className="px-4 py-3.5">
-                        <p className="text-foreground/80 font-medium">{i.name}</p>
+                  </div>
+                )
+              }
+              colunas={[
+                {
+                  chave: "nome",
+                  cabecalho: "Nome",
+                  ordenar: (a, b) => a.name.localeCompare(b.name, "pt"),
+                  celula: (i) =>
+                    editingId === i.id ? (
+                      <CampoNome f={editForm} set={setEditForm} className="w-full px-2.5 py-1.5" />
+                    ) : (
+                      <span className="block">
+                        <span className="block font-medium text-foreground/80">{i.name}</span>
                         {i.notes && (
-                          <p className="text-foreground/40 text-xs mt-0.5 line-clamp-1">
+                          <span className="mt-0.5 line-clamp-1 block text-xs text-foreground/40">
                             {i.notes}
-                          </p>
+                          </span>
                         )}
-                      </td>
-                      <td className="px-4 py-3.5 text-[#4d6350]/70 text-[11px] tracking-[0.1em] uppercase">
+                      </span>
+                    ),
+                },
+                {
+                  chave: "categoria",
+                  cabecalho: "Categoria",
+                  ordenar: (a, b) => a.category.localeCompare(b.category, "pt"),
+                  celula: (i) =>
+                    editingId === i.id ? (
+                      <CampoCategoria
+                        f={editForm}
+                        set={setEditForm}
+                        className="w-full px-2.5 py-1.5"
+                      />
+                    ) : (
+                      <span className="text-[11px] uppercase tracking-[0.1em] text-[#4d6350]/70">
                         {i.category}
-                      </td>
-                      <td className="px-4 py-3.5 text-right text-foreground/70 tabular-nums whitespace-nowrap">
+                      </span>
+                    ),
+                },
+                {
+                  chave: "quantidade",
+                  cabecalho: "Qtd",
+                  alinharADireita: true,
+                  largura: "w-24",
+                  ordenar: (a, b) => a.quantity - b.quantity,
+                  celula: (i) =>
+                    editingId === i.id ? (
+                      <CampoQuantidade
+                        f={editForm}
+                        set={setEditForm}
+                        className="w-20 px-2.5 py-1.5 text-right"
+                      />
+                    ) : (
+                      <span className="whitespace-nowrap tabular-nums text-foreground/70">
                         {i.quantity}
                         {i.unit ? <span className="text-foreground/35"> {i.unit}</span> : null}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <ConditionChip condition={i.condition} />
-                      </td>
-                      <td className="px-4 py-3.5 text-foreground/50">{i.location || "—"}</td>
-                      <td className="px-4 py-3.5">
+                      </span>
+                    ),
+                },
+                {
+                  chave: "estado",
+                  cabecalho: "Estado",
+                  celula: (i) =>
+                    editingId === i.id ? (
+                      <CampoEstado
+                        f={editForm}
+                        set={setEditForm}
+                        className="w-full px-2.5 py-1.5"
+                      />
+                    ) : (
+                      <ConditionChip condition={i.condition} />
+                    ),
+                },
+                {
+                  chave: "localizacao",
+                  cabecalho: "Localização",
+                  celula: (i) =>
+                    editingId === i.id ? (
+                      <CampoLocalizacao
+                        f={editForm}
+                        set={setEditForm}
+                        className="w-full px-2.5 py-1.5"
+                      />
+                    ) : (
+                      <span className="text-foreground/50">{i.location || "—"}</span>
+                    ),
+                },
+                {
+                  chave: "accoes",
+                  cabecalho: "Ações",
+                  alinharADireita: true,
+                  largura: "w-32",
+                  celula: (i) =>
+                    editingId === i.id ? (
+                      <span className="inline-flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => saveEdit(i.id)}
+                          loading={saving}
+                          disabled={!editForm.name.trim() || saving}
+                        >
+                          Guardar
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                          Cancelar
+                        </Button>
+                      </span>
+                    ) : (
+                      <>
                         {/* ══ AS ACÇÕES DA LINHA, EM DUAS FORMAS ══════════════
-                            Esta tabela só aparece a partir de `md` (768 px);
-                            abaixo disso o mesmo inventário desenha-se em cartões
-                            com «Editar» e «Remover» escritos por extenso.
+                            Esta tabela só aparece a partir de `CORTES.desktop`
+                            (1024 px); abaixo disso o mesmo inventário desenha-se
+                            em cartões com «Editar» e «Remover» escritos por
+                            extenso.
 
                             MEDIDO a 768×1024 com dedo — um iPad em retrato, que
-                            é EXACTAMENTE a largura onde a tabela entra: os 20
-                            botões da tabela estavam lá, com a tabela visível, e
-                            ZERO deles apareciam. Só tinham `opacity-0
-                            group-hover:opacity-100`, sem escapatória nenhuma —
-                            nem sequer a do `sm:` que os outros ecrãs tinham.
+                            era EXACTAMENTE a largura onde a tabela entrava
+                            quando o corte ainda era `md:`: os 20 botões da
+                            tabela estavam lá, com a tabela visível, e ZERO deles
+                            apareciam. Só tinham `opacity-0
+                            group-hover:opacity-100`, sem escapatória nenhuma.
                             Sem rato não há como pedir um hover: naquele
                             aparelho, editar e remover um adereço a partir da
                             tabela não existiam.
@@ -964,10 +1034,8 @@ export default function Inventario() {
                             COM RATO fica o que estava: dois ícones que aparecem
                             ao pairar sobre a linha.
                             SEM RATO fica um «⋯», com «Remover» lá dentro,
-                            separado e a vermelho. Um alvo em vez de dois numa
-                            célula de tabela, e o que apaga deixa de estar
-                            encostado ao que edita. */}
-                        <div className="hidden com-rato:flex items-center justify-end gap-1">
+                            separado e a vermelho. */}
+                        <span className="hidden com-rato:flex items-center justify-end gap-1">
                           <button
                             onClick={() => startEdit(i)}
                             className="alvo-toque text-foreground/25 sem-rato:text-foreground/55 hover:text-[#4d6350] opacity-100 com-rato:opacity-0 com-rato:group-hover:opacity-100 com-rato:focus-visible:opacity-100 motion-safe:transition-all rounded-md p-1"
@@ -982,20 +1050,19 @@ export default function Inventario() {
                           >
                             {CruzIcon}
                           </button>
-                        </div>
+                        </span>
                         <MenuDeAccoes
                           className="com-rato:hidden justify-end"
                           sobre={i.name}
                           accoes={accoesDe(i)}
                         />
-                      </td>
-                    </tr>
-                  ),
-                )}
-              </tbody>
-            </table>
-          </Card>
-        </>
+                      </>
+                    ),
+                },
+              ]}
+            />
+          </div>
+        </Card>
       )}
 
       {/* ── A PERGUNTA É A DA CASA ────────────────────────────────────────
