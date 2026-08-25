@@ -75,10 +75,28 @@ describe("o link do PDF do contrato", () => {
    * MEDIDO a 375 px: 46,9 × 36 px no cartão do telemóvel, encostado a um "Ver
    * termos" de 44 px — dois botões na mesma linha com alturas diferentes. A
    * versão em tabela tinha 32 px, e um tablet é um ecrã largo COM dedo.
+   *
+   * ── PORQUE É QUE ESTE TESTE MUDOU DE FORMA ────────────────────────────
+   * Contava a classe DUAS vezes, porque o link estava escrito duas vezes —
+   * uma no cartão do telemóvel, outra na tabela. Contar cópias era a única
+   * coisa possível enquanto elas existiam, e era uma rede fraca: as duas já
+   * tinham divergido em altura (`h-9` num sítio, `h-8` no outro) sem o teste
+   * dar por isso, porque duas cópias erradas contam na mesma como duas.
+   *
+   * O link passou a ser um componente só, usado pelas duas formas. A rede
+   * certa é agora esta: a decisão escrita UMA vez, e as duas formas a
+   * chegarem-lhe. Se alguém voltar a escrever o link à mão numa delas, é o
+   * primeiro `expect` que cai.
    */
-  it("cresce para 44 px no dedo, nas duas formas da lista", () => {
+  it("está escrito uma vez só — e é aí que cresce para 44 px no dedo", () => {
     const cresce = CONTRATOS.match(/inline-flex h-\d pointer-coarse:h-11 items-center/g) ?? [];
-    expect(cresce).toHaveLength(2);
+    expect(cresce).toHaveLength(1);
+    expect(CONTRATOS).toMatch(/function PdfDoContrato\(/);
+  });
+
+  it("e as duas formas da lista usam-no — o cartão e a tabela", () => {
+    const usos = CONTRATOS.match(/<PdfDoContrato\b/g) ?? [];
+    expect(usos).toHaveLength(2);
   });
 });
 
