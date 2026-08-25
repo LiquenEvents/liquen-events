@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -303,6 +303,21 @@ const transicoesDeLayout = (etiqueta: string) =>
     .filter((p) => (p === "all" ? true : p.slice(1, -1).split(",").some(eLayout)))
     .map((p) => `transition-${p}`);
 
+/** Todo o TSX que desenha ecrã — é onde os utilitários do Tailwind vivem. */
+function ficheirosDeEcra(): string[] {
+  const fora: string[] = [];
+  const andar = (dir: string) => {
+    for (const e of readdirSync(join(RAIZ, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) andar(rel);
+      else if (e.name.endsWith(".tsx") && !e.name.includes(".test.")) fora.push(rel);
+    }
+  };
+  andar("src/app");
+  andar("src/components");
+  return fora;
+}
+
 describe("contrato da fluidez: o movimento anima o compositor, não a geometria", () => {
   it("nenhuma transição do globals.css anima uma propriedade de layout", () => {
     const infractoras = propriedadesDeTransicao(css)
@@ -409,6 +424,77 @@ describe("contrato da fluidez: o movimento anima o compositor, não a geometria"
     ]) {
       expect(dentroDeReduce, `${seletor} sem guarda de movimento reduzido`).toContain(seletor);
     }
+  });
+
+  it("todo o zoom de hover tem guarda de movimento reduzido — não só o primeiro", () => {
+    /**
+     * A fotografia a crescer ao passar o rato é a animação mais visível do
+     * sítio, e quem pede movimento reduzido pediu-o.
+     *
+     * O guarda existia e cobria UM utilitário — `scale-[1.06]`, o da galeria e
+     * o dos clientes. Entretanto entraram mais três com outro número
+     * (`scale-105` no contacto e nos serviços, `scale-[1.04]` na confirmação),
+     * e um selector escrito à mão não cobre um número que ainda não existia.
+     * Ninguém reparou porque, com movimento normal, todos parecem bem.
+     *
+     * Esta rede é sobre os PRÓXIMOS: enumera os que estão mesmo escritos no
+     * código e exige que cada um esteja no bloco. Um zoom novo com um número
+     * novo põe isto vermelho, com o nome da classe na mensagem.
+     */
+    const usados = new Set<string>();
+    for (const rel of ficheirosDeEcra()) {
+      const fonte = readFileSync(join(RAIZ, rel), "utf8");
+      for (const m of fonte.matchAll(/group-hover:scale-(\[[^\]]+\]|\d+)/g)) usados.add(m[0]);
+    }
+    // Não passa por vacuidade: se o extractor deixar de ver nada, isto avisa.
+    expect(usados.size, "o varredor deixou de encontrar zooms de hover").toBeGreaterThan(2);
+
+    const dentroDeReduce = blocosDe(
+      css,
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{/g,
+    ).join("\n");
+    const semGuarda = [...usados].filter((classe) => {
+      // `group-hover:scale-[1.06]` escreve-se `.group-hover\:scale-\[1\.06\]`
+      // no CSS: o Tailwind escapa os dois pontos, os parênteses rectos e o ponto.
+      const selector = "." + classe.replace(/[:[\].]/g, (c) => "\\" + c);
+      return !dentroDeReduce.includes(selector);
+    });
+    expect(
+      semGuarda.sort(),
+      "estes zooms continuam a crescer para quem pediu movimento reduzido — acrescenta-os ao bloco do globals.css",
+    ).toEqual([]);
+  });
+
+  it("nenhum movimento do dossier ignora quem pediu movimento reduzido", () => {
+    /**
+     * A distinção que interessa, e que a rede anterior a esta não fazia: uma
+     * COR a esbater-se não é movimento. O `globals.css` já o diz por escrito —
+     * «o estado continua a MUDAR (a cor, o filete a aparecer, que é
+     * informação); o que desaparece é o deslocamento».
+     *
+     * Por isso a rede é sobre `transition-transform`, e deixa em paz as ~128
+     * `transition-colors` do dossier. Guardá-las seria trocar um defeito de
+     * movimento por um de legibilidade: com movimento reduzido, um botão que
+     * deixasse de mudar de cor ao ser tocado deixava de dizer que foi tocado.
+     *
+     * As setas que rodam ao abrir uma secção continuam a rodar — a rotação é
+     * informação, diz se está aberta. O que desaparece é ela a rodar devagar.
+     */
+    const DOSSIER = "src/app/[lang]/(site)/orcamento/admin";
+    const semGuarda: string[] = [];
+    for (const rel of ficheirosDeEcra().filter((f) => f.startsWith(DOSSIER))) {
+      const fonte = semComentariosTsx(readFileSync(join(RAIZ, rel), "utf8"));
+      for (const etiqueta of etiquetasDeAbertura(fonte)) {
+        if (!/\btransition-(transform|\[transform)/.test(etiqueta)) continue;
+        if (/motion-safe:|motion-reduce:/.test(etiqueta)) continue;
+        const linha = fonte.slice(0, fonte.indexOf(etiqueta)).split("\n").length;
+        semGuarda.push(`${rel}:${linha}`);
+      }
+    }
+    expect(
+      semGuarda,
+      "movimento sem `motion-safe:` — quem pede movimento reduzido pediu-o, e isto é o dossier onde ela trabalha o dia inteiro",
+    ).toEqual([]);
   });
 
   it("o anel de foco cresce com a curva do sítio, e depressa", () => {

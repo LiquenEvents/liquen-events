@@ -408,7 +408,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
                     {timeAgo(c.lastAt)}
                   </span>
                   <span
-                    className={`text-foreground/25 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                    className={`text-foreground/25 motion-safe:transition-transform ${isOpen ? "rotate-180" : ""}`}
                   >
                     <svg
                       width="14"

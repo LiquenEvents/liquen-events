@@ -2365,7 +2365,17 @@ body:has(.barra-consentimento) footer {
    `utilities` — uma regra sem camada, como esta, ganha-lhe sempre, sem precisar
    de `!important` nem de repetir a especificidade do selector gerado. */
 @media (prefers-reduced-motion: reduce) {
-  .group-hover\:scale-\[1\.06\] {
+  /* Os QUATRO números que o sítio usa, e não só o primeiro.
+     O guarda foi escrito quando só existia o 1.06 (a galeria e os clientes).
+     Entraram depois o 105 (contacto e serviços), o 1.04 (confirmação) e o
+     1.02 — e um selector escrito à mão não cobre um número que ainda não
+     existia. Ninguém reparou porque, com movimento normal, todos parecem bem.
+     Há teste a enumerar os que estão mesmo no código e a exigi-los aqui: um
+     zoom novo com um número novo põe o `Fluidez.contrato` vermelho. */
+  .group-hover\:scale-\[1\.06\],
+  .group-hover\:scale-\[1\.04\],
+  .group-hover\:scale-\[1\.02\],
+  .group-hover\:scale-105 {
     scale: none;
     transition: none;
   }

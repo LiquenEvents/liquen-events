@@ -10417,7 +10417,7 @@ function Section({
           >
             <span
               aria-hidden
-              className={`text-[10px] text-foreground/35 transition-transform ${fechada ? "" : "rotate-90"}`}
+              className={`text-[10px] text-foreground/35 motion-safe:transition-transform ${fechada ? "" : "rotate-90"}`}
             >
               ▶
             </span>

@@ -3677,7 +3677,7 @@ export default function AdminClient({
           // um leitor de ecrã anuncia "navegação" duas vezes e não há como
           // saber qual é qual — nem para quem ouve, nem para um teste.
           aria-label="Destinos principais"
-          className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--bo-surface)] border-t border-[var(--bo-hairline)] transition-transform duration-300 ${
+          className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[var(--bo-surface)] border-t border-[var(--bo-hairline)] motion-safe:transition-transform motion-safe:duration-300 ${
             selected ? "translate-y-full" : "translate-y-0"
           }`}
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -3714,7 +3714,7 @@ export default function AdminClient({
                     <span className="absolute top-2.5 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-[var(--bo-accent)]" />
                   )}
                   <span
-                    className={`transition-transform duration-150 ${isActive ? "scale-110" : ""}`}
+                    className={`motion-safe:transition-transform motion-safe:duration-150 ${isActive ? "scale-110" : ""}`}
                   >
                     {navItem.icon}
                   </span>
@@ -5960,7 +5960,7 @@ export default function AdminClient({
                                   <details className="group border-t border-foreground/10 pt-4">
                                     <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
                                       <svg
-                                        className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                        className="shrink-0 text-foreground/40 motion-safe:transition-transform group-open:rotate-90"
                                         width="14"
                                         height="14"
                                         viewBox="0 0 24 24"
@@ -6268,7 +6268,7 @@ export default function AdminClient({
                                   <details className="group border-t border-foreground/10 pt-4">
                                     <summary className="alvo-toque !justify-start flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/55 marker:content-none [&::-webkit-details-marker]:hidden hover:text-foreground/80">
                                       <svg
-                                        className="shrink-0 text-foreground/40 transition-transform group-open:rotate-90"
+                                        className="shrink-0 text-foreground/40 motion-safe:transition-transform group-open:rotate-90"
                                         width="14"
                                         height="14"
                                         viewBox="0 0 24 24"
