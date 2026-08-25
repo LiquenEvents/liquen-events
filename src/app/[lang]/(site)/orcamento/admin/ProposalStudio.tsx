@@ -5876,7 +5876,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   const realce = (campo: CampoAMudar) =>
     porConfirmar.has(campo)
-      ? "rounded-lg ring-2 ring-[#c98a2e]/45 ring-offset-2 ring-offset-background"
+      ? "rounded-lg ring-2 ring-[#c98a2e]/45 ring-offset-2 ring-offset-white"
       : undefined;
   const confirmado = (campo: CampoAMudar) => {
     // Tocar-lhe É a confirmação. Um botão "confirmar" ao lado de cada campo

@@ -288,7 +288,7 @@ export default function CriarAPartirDe({
         role="dialog"
         aria-modal="true"
         aria-labelledby="cad-titulo"
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-xl"
+        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-white shadow-xl"
         onKeyDown={teclas}
       >
         <div className="border-b border-foreground/10 px-5 py-4">
