@@ -237,6 +237,10 @@ vi.mock("@/lib/proposal-storage", () =>
       // 401" quando o que se passava era o mock a faltar.
       PROPOSAL_BUCKET: "proposal-assets",
       PROPOSAL_THUMB_BUCKET: "proposal-thumbs",
+      // A de 1200 px. Entrou na lista quando o lote passou a fabricá-la: até
+      // aí só era lida DENTRO de uma função, e um mock em falta não se notava.
+      // Agora é lida no topo do módulo, e a falta rebentava cinco rotas.
+      PROPOSAL_MID_BUCKET: "proposal-medias",
     },
   ),
 );

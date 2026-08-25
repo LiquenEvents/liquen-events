@@ -232,6 +232,25 @@ const FAMILIAS = [
     derivadas: [
       { bucket: THEME_THUMB_BUCKET, ...MINIATURA, papel: "essencial" as Papel },
       { bucket: THEME_MICRO_BUCKET, lado: 96, qualidade: 65, papel: "essencial" as Papel },
+      /**
+       * ── A DE 1200 px, QUE NÃO ERA FABRICADA POR NINGUÉM ─────────────────
+       *
+       * É a que a página do casal MOSTRA: num telemóvel a fotografia ocupa
+       * ~343 pontos a três pixéis por ponto, e é esta que o `srcset` escolhe.
+       * As de 400 px servem as GRELHAS do back office; nunca serviram aquela
+       * página.
+       *
+       * Estava fora do lote — nascia uma a uma, à primeira vez que alguém
+       * olhava, com o download, o `sharp` e o upload todos dentro do pedido e
+       * o casal à espera. Ou seja, «Gerar as miniaturas» podia correr até ao
+       * fim e deixar a proposta exactamente tão lenta como estava: fabricava
+       * tudo menos aquilo de que aquela página precisa.
+       *
+       * `essencial` e não `leve`, pela definição de sempre: sem ela a página
+       * cai para o ORIGINAL — 2200 px e ~2,6 MB por fotografia, numa página
+       * com quarenta e seis. É uma avaria, não um ganho por cobrar.
+       */
+      { bucket: THEME_MID_BUCKET, ...MEDIA, papel: "essencial" as Papel },
       // Os mesmos dois tamanhos, na oferta que só alguns navegadores aceitam.
       // Ver `THEME_AVIF_BUCKET`: é uma proposta, não uma substituição.
       { bucket: THEME_AVIF_BUCKET, ...MINIATURA, avif: true, papel: "leve" as Papel },
@@ -246,7 +265,12 @@ const FAMILIAS = [
   },
   {
     origem: PROPOSAL_BUCKET,
-    derivadas: [{ bucket: PROPOSAL_THUMB_BUCKET, ...MINIATURA, papel: "essencial" as Papel }],
+    derivadas: [
+      { bucket: PROPOSAL_THUMB_BUCKET, ...MINIATURA, papel: "essencial" as Papel },
+      // A mesma de 1200 px, do lado das propostas: as fotografias que o casal
+      // vê tanto podem vir da Biblioteca como ter sido carregadas no pedido.
+      { bucket: PROPOSAL_MID_BUCKET, ...MEDIA, papel: "essencial" as Papel },
+    ],
   },
 ] as const;
 

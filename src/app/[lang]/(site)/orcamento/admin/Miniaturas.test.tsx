@@ -55,6 +55,8 @@ function lote(p: Partial<Record<string, unknown>> = {}) {
     falhas: [],
     restantes: 0,
     restantesEssenciais: 0,
+    fotografiasRestantes: 0,
+    fotografiasFeitas: 0,
     papel: "essencial",
     ...p,
   };
@@ -72,6 +74,130 @@ describe("Miniaturas", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+  });
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * DOIS NÚMEROS PARA O MESMO TRABALHO
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * Ela carregou em «Gerar as versões leves de 389 fotografias» e o cartão
+   * respondeu «0 de 765». Os dois números estavam certos — 389 fotografias,
+   * duas codificações AVIF cada — e o ecrã não dizia isso em lado nenhum. Uma
+   * barra que fala noutra unidade que não a do botão que a abriu não se lê:
+   * lê-se como avaria.
+   */
+  it("a barra conta nas fotografias que o botão prometeu", async () => {
+    const soltar: (() => void)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        if ((init?.method ?? "GET") === "POST") {
+          return new Promise((r) =>
+            soltar.push(() =>
+              r(
+                respostaDe(
+                  lote({ geradas: 20, restantes: 40, fotografiasRestantes: 30, papel: "leve" }),
+                ),
+              ),
+            ),
+          );
+        }
+        return respostaDe(
+          contagemDe({ emFalta: 80, emFaltaLeves: 80, fotosSemVersaoLeve: 40, fotos: 40 }),
+        );
+      }),
+    );
+
+    render(<Miniaturas />);
+    await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
+    await waitFor(() => screen.getByRole("button", { name: /gerar as versões leves/i }));
+    await userEvent.click(screen.getByRole("button", { name: /gerar as versões leves/i }));
+
+    // O cartão fala das 40 fotografias, e não das 80 derivadas.
+    await waitFor(() => expect(screen.getByText(/0 de 40/)).toBeInTheDocument());
+
+    soltar[0]?.();
+    // 40 por fazer menos 30 que sobram = 10 feitas. NÃO as 20 derivadas que o
+    // lote gerou: somar derivadas numa barra de fotografias fá-la passar do fim.
+    await waitFor(() => expect(screen.getByText(/10 de 40/)).toBeInTheDocument());
+  });
+
+  /**
+   * O PRIMEIRO LOTE É O MAIS DEMORADO, E A BARRA A ZERO PARECE AVARIADA.
+   *
+   * Entre carregar no botão e a primeira resposta pode ir um minuto: o servidor
+   * percorre a biblioteca antes de gerar seja o que for. Nesse minuto a barra
+   * está a zero e parada — indistinguível de partida, e foi essa a conclusão
+   * dela.
+   */
+  it("enquanto o primeiro lote não volta, diz o que está a acontecer", async () => {
+    const soltar: (() => void)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        if ((init?.method ?? "GET") === "POST") {
+          return new Promise((r) =>
+            soltar.push(() => r(respostaDe(lote({ geradas: 9, fotografiasRestantes: 0 })))),
+          );
+        }
+        return respostaDe(
+          contagemDe({ emFalta: 9, emFaltaEssenciais: 9, fotosSemMiniatura: 3, fotos: 3 }),
+        );
+      }),
+    );
+
+    render(<Miniaturas />);
+    await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
+    await waitFor(() => screen.getByRole("button", { name: /gerar as miniaturas/i }));
+    await userEvent.click(screen.getByRole("button", { name: /gerar as miniaturas/i }));
+
+    await waitFor(() => expect(screen.getByText(/a percorrer a biblioteca/i)).toBeInTheDocument());
+    soltar[0]?.();
+    // Chegado o primeiro lote, a nota volta a ser a de sempre.
+    await waitFor(() => expect(screen.queryByText(/a percorrer a biblioteca/i)).toBeNull());
+  });
+
+  /**
+   * UM BOTÃO DESACTIVADO TEM DE CONTINUAR A DIZER O QUE FAZ.
+   *
+   * `bg-foreground text-background disabled:opacity-50`: o `opacity` desbota o
+   * elemento inteiro, o fundo escuro vira cinzento médio e o texto — que é da
+   * cor do papel — desaparece lá dentro. No ecrã dela era um rectângulo
+   * cinzento sem uma letra, mesmo ao lado do botão que ela tinha carregado.
+   */
+  it("o botão escuro desactivado não desbota o texto até desaparecer", async () => {
+    const soltar: (() => void)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        if ((init?.method ?? "GET") === "POST") {
+          return new Promise((r) => soltar.push(() => r(respostaDe(lote()))));
+        }
+        return respostaDe(
+          contagemDe({
+            emFalta: 12,
+            emFaltaEssenciais: 9,
+            emFaltaLeves: 3,
+            fotosSemMiniatura: 3,
+            fotosSemVersaoLeve: 3,
+            fotos: 3,
+          }),
+        );
+      }),
+    );
+
+    render(<Miniaturas />);
+    await userEvent.click(screen.getByRole("button", { name: /contar as que faltam/i }));
+    const escuro = await screen.findByRole("button", { name: /gerar as miniaturas/i });
+    await userEvent.click(escuro);
+
+    await waitFor(() => expect(escuro).toBeDisabled());
+    // Continua a dizer sobre quantas fotografias é — a única coisa no ecrã que
+    // distingue as duas gerações enquanto o lote corre.
+    expect(escuro.textContent).toMatch(/3 fotografias/);
+    // E não é o `opacity` a desbotá-lo: esse leva o texto atrás.
+    expect(escuro.className).not.toMatch(/disabled:opacity/);
   });
 
   it("contar não escreve nada — só faz GET", async () => {
