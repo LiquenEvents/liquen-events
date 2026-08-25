@@ -62,7 +62,8 @@ vi.mock("sharp", () => {
 });
 
 import { gerarLoteDeDerivadas } from "./derivadas";
-import { THEME_BUCKET } from "./theme-ref";
+import { THEME_BUCKET, THEME_MID_BUCKET } from "./theme-ref";
+import { PROPOSAL_BUCKET, PROPOSAL_MID_BUCKET } from "./proposal-storage";
 
 function storageFalso() {
   return {
@@ -146,9 +147,10 @@ describe("um lote de derivadas", () => {
 
     await gerarLoteDeDerivadas("essencial");
 
-    // Dois buckets essenciais. Sem memória, eram dois por fotografia — dez.
-    expect(st.bucketsConfirmados).toHaveLength(2);
-    expect(new Set(st.bucketsConfirmados).size).toBe(2);
+    // Três buckets essenciais — a miniatura, o micro e a de 1200 px. Sem
+    // memória eram três por fotografia: quinze.
+    expect(st.bucketsConfirmados).toHaveLength(3);
+    expect(new Set(st.bucketsConfirmados).size).toBe(3);
   });
 
   it("pára pelo relógio, e diz o que ficou por fazer", async () => {
@@ -161,9 +163,9 @@ describe("um lote de derivadas", () => {
     expect(r.fotografiasFeitas).toBeGreaterThan(0);
     expect(r.fotografiasFeitas).toBeLessThan(20);
     // O resto é dito nas duas unidades, e batem certo entre si: cada
-    // fotografia destas deve duas derivadas essenciais.
+    // fotografia destas deve três derivadas essenciais.
     expect(r.fotografiasRestantes).toBe(20 - r.fotografiasFeitas);
-    expect(r.restantes).toBe(r.fotografiasRestantes * 2);
+    expect(r.restantes).toBe(r.fotografiasRestantes * 3);
     expect(r.restantesEssenciais).toBe(r.restantes);
   });
 
@@ -176,7 +178,7 @@ describe("um lote de derivadas", () => {
     // Quem chama pára o ciclo quando um lote devolve zero geradas. Um lote que
     // nunca gera nada por já estar atrasado seria uma geração que não avança.
     expect(r.fotografiasFeitas).toBe(1);
-    expect(r.geradas).toBe(2);
+    expect(r.geradas).toBe(3);
     expect(r.fotografiasRestantes).toBe(3);
   });
 
@@ -193,5 +195,64 @@ describe("um lote de derivadas", () => {
     expect(st.descarregados).toHaveLength(0);
     expect(r.geradas).toBe(0);
     expect(r.fotografiasRestantes).toBe(0);
+  });
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A VERSÃO QUE A PÁGINA DO CASAL MOSTRA NÃO ERA FABRICADA POR NINGUÉM
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A proposta pede a derivada de 1200 px — é a que o `srcset` escolhe num
+ * telemóvel, onde a fotografia ocupa ~343 pontos a três pixéis por ponto. As
+ * miniaturas de 400 px servem as GRELHAS do back office; nunca serviram esta.
+ *
+ * E o lote só sabia fabricar as de 400 px e as de 96. A de 1200 nascia uma a
+ * uma, à primeira vez que alguém olhava para a fotografia — pela rota, com o
+ * download, o `sharp` e o upload todos dentro do pedido, e o casal à espera.
+ *
+ * Portanto o botão «Gerar as miniaturas» podia correr até ao fim e deixar a
+ * proposta exactamente tão lenta como estava: fabricava tudo menos aquilo de
+ * que aquela página precisa.
+ */
+describe("a versão de 1200 px, que é a que a proposta mostra", () => {
+  it("é fabricada pelo lote, e não só quando alguém olha", async () => {
+    tema("tema-a", 1);
+
+    await gerarLoteDeDerivadas("essencial");
+
+    expect(st.escritos.some((c) => c.startsWith(`${THEME_MID_BUCKET}/`))).toBe(true);
+  });
+
+  it("também nas fotografias das propostas", async () => {
+    st.conteudo[PROPOSAL_BUCKET] ??= new Set();
+    st.conteudo[PROPOSAL_BUCKET].add("ped-1/f0.jpg");
+
+    await gerarLoteDeDerivadas("essencial");
+
+    expect(st.escritos).toContain(`${PROPOSAL_MID_BUCKET}/ped-1/f0.jpg`);
+  });
+
+  it("conta como avaria, e não fica à espera do AVIF", async () => {
+    tema("tema-a", 1);
+
+    const r = await gerarLoteDeDerivadas("leve");
+
+    // A de 1200 px não é ganho: é o que evita descarregar os 2,6 MB do
+    // original. Se andasse com o AVIF, quem quisesse só arranjar a avaria
+    // tinha de esperar pelas codificações caras — que é a razão de os dois
+    // papéis existirem.
+    expect(st.escritos.some((c) => c.startsWith(`${THEME_MID_BUCKET}/`))).toBe(false);
+    expect(r.geradas).toBeGreaterThan(0);
+  });
+
+  it("uma foto que já a tem não a refaz", async () => {
+    tema("tema-a", 1);
+    await gerarLoteDeDerivadas("essencial");
+    const antes = st.escritos.length;
+
+    await gerarLoteDeDerivadas("essencial");
+
+    expect(st.escritos).toHaveLength(antes);
   });
 });

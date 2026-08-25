@@ -91,6 +91,30 @@ const MAX_LOTES = 400;
 
 const fotografias = (n: number) => `${n} ${n === 1 ? "fotografia" : "fotografias"}`;
 
+const BOTAO_VAZADO =
+  "min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-foreground/[0.05] disabled:opacity-50";
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * UM BOTÃO DESACTIVADO TEM DE CONTINUAR A DIZER O QUE FAZ
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Era `bg-foreground text-background disabled:opacity-50`. O `opacity` desbota
+ * o elemento INTEIRO: o fundo escuro a meia opacidade vira cinzento médio, e o
+ * texto — que é da cor do papel — desaparece lá dentro. No ecrã dela, com a
+ * geração a correr, este botão era um rectângulo cinzento sem uma letra.
+ *
+ * Não é só feio. Enquanto o lote corre, o botão é a única coisa no ecrã que diz
+ * QUAL das duas gerações está desactivada e sobre quantas fotografias — e era
+ * precisamente essa a pergunta dela.
+ *
+ * Desbota-se só o FUNDO, e o texto fica com o contraste que tinha. O vazado
+ * pode continuar com `opacity`: aí o texto é escuro sobre branco e a meio
+ * caminho ainda se lê.
+ */
+const BOTAO_CHEIO =
+  "min-h-11 rounded-lg bg-foreground px-3 text-sm text-background disabled:cursor-not-allowed disabled:bg-foreground/35";
+
 export default function Miniaturas() {
   const { toast } = useToast();
   const [contagem, setContagem] = useState<Contagem | null>(null);
@@ -101,6 +125,16 @@ export default function Miniaturas() {
    *  trabalho é «tudo»: primeiro as miniaturas, depois as versões leves. */
   const [aFazer, setAFazer] = useState<Papel | null>(null);
   const [feitas, setFeitas] = useState(0);
+  /**
+   * O primeiro lote já respondeu?
+   *
+   * Entre carregar no botão e a primeira resposta pode ir um minuto — o
+   * servidor percorre a biblioteca antes de gerar seja o que for. Nesse minuto
+   * a barra está a zero e parada, que é indistinguível de avariada. Foi
+   * exactamente o que ela viu: «A gerar as versões leves — 0 de 765», e a
+   * conclusão de que não funcionava.
+   */
+  const [jaRespondeu, setJaRespondeu] = useState(false);
   const [falhadas, setFalhadas] = useState<string[]>([]);
   const [tudoAVista, setTudoAVista] = useState(false);
   /** Um sinal, não um estado: o ciclo lê-o entre lotes e não precisa de
@@ -150,11 +184,25 @@ export default function Miniaturas() {
     setTarefa({ papel: alvo, total });
     setAFazer(alvo === "tudo" ? "essencial" : alvo);
     setFalhadas([]);
+    setJaRespondeu(false);
     // A contagem recomeça AQUI, e não à chegada do primeiro lote: uma segunda
     // passagem sobre as que ficaram deixava o número da primeira no ecrã — «A
     // gerar… 52 de 8», com a barra cheia e nada feito — durante todo o tempo
     // do primeiro pedido.
     setFeitas(0);
+    /**
+     * ── A BARRA CONTA FOTOGRAFIAS, COMO O BOTÃO ──────────────────────────
+     *
+     * Contava DERIVADAS. Ela carregava em «Gerar as versões leves de 389
+     * fotografias» e o cartão respondia «0 de 765» — dois números para o mesmo
+     * trabalho, e nada no ecrã a explicar que um era o dobro do outro porque
+     * cada fotografia leva duas codificações.
+     *
+     * E não se SOMA o que cada lote fez: uma fotografia pode receber uma
+     * derivada num lote e a outra no seguinte, e somar contava-a duas vezes —
+     * a barra passava do fim. Lê-se o que FALTA, que o servidor reconta a cada
+     * lote, e o feito é a subtracção. Nunca passa do total nem anda para trás.
+     */
     let feito = 0;
     const problemas: string[] = [];
     let parou = false;
@@ -164,8 +212,15 @@ export default function Miniaturas() {
         const res = await fetch(`/api/admin/derivadas${query}`, { method: "POST" });
         const dados = await res.json().catch(() => null);
         if (!res.ok) throw new Error(dados?.error ?? "Não consegui gerar.");
-        feito += dados.geradas ?? 0;
+        const porFazer = dados.fotografiasRestantes;
+        feito =
+          typeof porFazer === "number"
+            ? Math.min(total, Math.max(feito, total - porFazer))
+            : // Um servidor mais antigo do que este ecrã não manda a conta em
+              // fotografias. Melhor a conta antiga do que uma barra parada.
+              feito + (dados.geradas ?? 0);
         setFeitas(feito);
+        setJaRespondeu(true);
         if (dados.papel === "essencial" || dados.papel === "leve") setAFazer(dados.papel);
         if (Array.isArray(dados.falhas)) problemas.push(...dados.falhas);
         // Zero geradas E zero restantes é o fim. Zero geradas com restantes a
@@ -248,7 +303,7 @@ export default function Miniaturas() {
           type="button"
           onClick={contarDeNovo}
           disabled={aContar || aGerar}
-          className="min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-foreground/[0.05] disabled:opacity-50"
+          className={BOTAO_VAZADO}
         >
           {aContar ? "A contar…" : "Contar as que faltam"}
         </button>
@@ -258,9 +313,9 @@ export default function Miniaturas() {
         {essenciais > 0 && (
           <button
             type="button"
-            onClick={() => gerar("essencial", essenciais)}
+            onClick={() => gerar("essencial", semMiniatura)}
             disabled={aGerar || aContar}
-            className="min-h-11 rounded-lg bg-foreground px-3 text-sm text-background disabled:opacity-50"
+            className={BOTAO_CHEIO}
           >
             Gerar as miniaturas de {fotografias(semMiniatura)}
           </button>
@@ -268,13 +323,9 @@ export default function Miniaturas() {
         {leves > 0 && (
           <button
             type="button"
-            onClick={() => gerar("leve", leves)}
+            onClick={() => gerar("leve", semLeve)}
             disabled={aGerar || aContar}
-            className={
-              essenciais > 0
-                ? "min-h-11 rounded-lg border border-foreground/20 px-3 text-sm hover:bg-foreground/[0.05] disabled:opacity-50"
-                : "min-h-11 rounded-lg bg-foreground px-3 text-sm text-background disabled:opacity-50"
-            }
+            className={essenciais > 0 ? BOTAO_VAZADO : BOTAO_CHEIO}
           >
             Gerar as versões leves de {fotografias(semLeve)}
           </button>
@@ -287,7 +338,11 @@ export default function Miniaturas() {
           titulo={aFazer === "leve" ? "A gerar as versões leves" : "A gerar as miniaturas"}
           feito={feitas}
           total={tarefa.total}
-          nota="Podes fechar esta página — nada se perde, e voltar aqui continua de onde ficou."
+          nota={
+            jaRespondeu
+              ? "Podes fechar esta página — nada se perde, e voltar aqui continua de onde ficou."
+              : "A percorrer a biblioteca para ver o que falta. O primeiro lote é o mais demorado; podes fechar esta página que nada se perde."
+          }
           aoParar={() => {
             pedidoDeParar.current = true;
           }}

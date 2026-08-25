@@ -54,6 +54,7 @@ import {
   THEME_MICRO_BUCKET,
   THEME_AVIF_BUCKET,
   THEME_AVIF_MICRO_BUCKET,
+  THEME_MID_BUCKET,
 } from "./theme-ref";
 
 function storageFalso() {
@@ -118,10 +119,12 @@ describe("a contagem separa a avaria do ganho", () => {
     const c = await contarDerivadasEmFalta();
 
     expect(c.fotos).toBe(3);
-    // Três fotos × quatro derivadas de tema = doze em falta ao todo…
-    expect(c.emFalta).toBe(12);
-    // …das quais seis são essenciais (miniatura + micro) e seis são AVIF.
-    expect(c.emFaltaEssenciais).toBe(6);
+    // Três fotos × cinco derivadas de tema = quinze em falta ao todo…
+    expect(c.emFalta).toBe(15);
+    // …das quais NOVE são essenciais — a miniatura de 400, o micro de 96 e a
+    // de 1200 px, que é a que a página do casal mostra e que durante muito
+    // tempo não era fabricada por lote nenhum.
+    expect(c.emFaltaEssenciais).toBe(9);
     expect(c.emFaltaLeves).toBe(6);
     // Mas as FOTOGRAFIAS mal são três, e não seis: é este o número que se diz
     // em voz alta, e o que a versão anterior não sabia dizer.
@@ -133,6 +136,7 @@ describe("a contagem separa a avaria do ganho", () => {
     temaSemNada("tema-a", 2);
     st.conteudo[THEME_THUMB_BUCKET] = new Set(["tema-a/f0.jpg", "tema-a/f1.jpg"]);
     st.conteudo[THEME_MICRO_BUCKET] = new Set(["tema-a/f0.jpg", "tema-a/f1.jpg"]);
+    st.conteudo[THEME_MID_BUCKET] = new Set(["tema-a/f0.jpg", "tema-a/f1.jpg"]);
 
     const c = await contarDerivadasEmFalta();
 
@@ -150,6 +154,7 @@ describe("a contagem separa a avaria do ganho", () => {
       THEME_MICRO_BUCKET,
       THEME_AVIF_BUCKET,
       THEME_AVIF_MICRO_BUCKET,
+      THEME_MID_BUCKET,
     ]) {
       st.conteudo[b] = new Set(["tema-a/f0.jpg"]);
     }
@@ -166,6 +171,7 @@ describe("a contagem separa a avaria do ganho", () => {
     // «poucas» já tem as miniaturas: só lhe falta o ganho.
     st.conteudo[THEME_THUMB_BUCKET] = new Set(["poucas/f0.jpg"]);
     st.conteudo[THEME_MICRO_BUCKET] = new Set(["poucas/f0.jpg"]);
+    st.conteudo[THEME_MID_BUCKET] = new Set(["poucas/f0.jpg"]);
 
     const c = await contarDerivadasEmFalta();
 
@@ -197,8 +203,9 @@ describe("a geração faz primeiro o que dói", () => {
     const r = await gerarLoteDeDerivadas("essencial");
 
     expect(st.escritos.filter((c) => c.startsWith("theme-avif"))).toEqual([]);
-    expect(st.escritos).toHaveLength(6);
-    expect(r.geradas).toBe(6);
+    // Três fotografias × três essenciais: a miniatura, o micro e a de 1200 px.
+    expect(st.escritos).toHaveLength(9);
+    expect(r.geradas).toBe(9);
     // Acabou o que era essencial; o AVIF continua por fazer e não é contado
     // como resto desta tarefa.
     expect(r.restantes).toBe(0);
@@ -222,8 +229,8 @@ describe("a geração faz primeiro o que dói", () => {
     expect(r.fotografiasFeitas).toBeGreaterThan(0);
     expect(r.fotografiasFeitas).toBeLessThan(20);
     // Duas essenciais por fotografia, e todas as que sobram doem.
-    expect(r.geradas).toBe(r.fotografiasFeitas * 2);
-    expect(r.restantes).toBe((20 - r.fotografiasFeitas) * 2);
+    expect(r.geradas).toBe(r.fotografiasFeitas * 3);
+    expect(r.restantes).toBe((20 - r.fotografiasFeitas) * 3);
     expect(r.restantesEssenciais).toBe(r.restantes);
   });
 });
