@@ -76,7 +76,12 @@ export default function AdminLoading() {
         </header>
 
         {/* Content: KPI strip + panel (mirrors the default Overview view) */}
-        <div className="px-4 sm:px-6 lg:px-12 py-6 lg:py-12 flex flex-col gap-8">
+        {/* As mesmas medidas do `VIEW_WRAP` e do `ViewSkeleton`, pelos mesmos
+            tokens: o esqueleto do servidor e a vista a sério têm de assentar no
+            mesmo sítio, senão o back office salta à chegada. Os tokens vivem em
+            `:root` (e não em `body.admin-mode`) justamente por causa deste
+            ficheiro — é um componente de servidor e nunca chega a ter a classe. */}
+        <div className="px-4 sm:px-6 lg:px-12 py-[var(--bo-p-vista)] lg:py-12 flex flex-col gap-[var(--bo-gap-vista)]">
           <div>
             <div className="bo-skeleton h-2 w-40 mb-3" />
             <div className="bo-skeleton h-9 w-72 mb-3" />
@@ -84,7 +89,7 @@ export default function AdminLoading() {
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="bo-card p-5">
+              <div key={i} className="bo-card p-[var(--bo-p-cartao)]">
                 <div className="bo-skeleton h-7 w-16 mb-3" />
                 <div className="bo-skeleton h-2.5 w-20" />
               </div>

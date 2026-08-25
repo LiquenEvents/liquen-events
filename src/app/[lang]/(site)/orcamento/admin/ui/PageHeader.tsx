@@ -46,18 +46,29 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <header
+      /* ── O TOPO DE UMA VISTA CUSTA ALTURA, E CUSTAVA A MESMA EM TODO O LADO ──
+         Somado a 375 px: eyebrow 16 + 10 de margem + título 30 + 8 + subtítulo
+         23 + 24 de `pb-6` = ~111 px antes da primeira linha de conteúdo, num
+         ecrã de 667 onde o cabeçalho fixo e a barra de baixo já levaram 137. E
+         com acções, mais 16 de `gap-4` e mais a fila delas.
+
+         Todos os degraus abaixo de 640 passam a metade-e-pouco; a partir de
+         640 fica tudo exactamente como estava. O `text-2xl sm:text-3xl` do
+         título não entra nisto: já sabe encolher. */
       className={cn(
-        "flex flex-col gap-4 pb-6 sm:flex-row sm:items-end sm:justify-between",
+        "flex flex-col gap-2.5 pb-4 sm:flex-row sm:items-end sm:justify-between sm:gap-4 sm:pb-6",
         className,
       )}
     >
       <div className="min-w-0">
-        {eyebrow && <p className="bo-eyebrow mb-2.5">{eyebrow}</p>}
+        {eyebrow && <p className="bo-eyebrow mb-1.5 sm:mb-2.5">{eyebrow}</p>}
         <Heading className="font-display text-2xl leading-tight text-foreground/90 sm:text-3xl">
           {title}
         </Heading>
         {subtitle && (
-          <p className="mt-2 max-w-prose text-sm leading-relaxed text-foreground/55">{subtitle}</p>
+          <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-foreground/55 sm:mt-2">
+            {subtitle}
+          </p>
         )}
       </div>
       {actions && (

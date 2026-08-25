@@ -141,7 +141,12 @@ const LIST_PAGE_SIZE = 50;
 // consistent horizontal padding + vertical rhythm, so screens stay readable
 // instead of sprawling edge-to-edge on wide monitors. The top bar aligns to the
 // same measure. `view-in` (the enter animation) is appended per view.
-const VIEW_WRAP = "mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-10 py-6 lg:py-10";
+// O respiro vertical é o token da escala do espaço (`globals.css`): 12 px
+// abaixo de 640, 24 a partir daí, os 40 de sempre no portátil. Eram 24 px fixos
+// em ~15 vistas, antes de qualquer conteúdo — e num iPhone SE são 24 dos 667 que
+// já tinham perdido 137 para o cabeçalho fixo e para a barra de baixo.
+const VIEW_WRAP =
+  "mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-10 py-[var(--bo-p-vista)] lg:py-10";
 
 // Code-split views + detail-panel tools live in ./lazy — only the view the
 // user opens ships its JS, keeping the back-office's initial load lean.
@@ -4224,7 +4229,7 @@ export default function AdminClient({
                   não nas Definições porque é uma leitura de desempenho, e
                   porque é neste ecrã que ela olha para o que a publicidade
                   trouxe — ver o cabeçalho de `FechosMeta`. */}
-              <div className="mt-6">
+              <div className="mt-4 sm:mt-6">
                 <FechosMeta />
               </div>
             </div>
@@ -4278,7 +4283,7 @@ export default function AdminClient({
                 A partir de `lg` o painel é sempre visível e o botão desaparece:
                 no computador há largura para tudo numa fila, e era assim que já
                 estava. */}
-            <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-4 lg:mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 sm:gap-3 mb-2.5 sm:mb-4 lg:mb-6">
               <div className="flex items-center gap-2 lg:flex-1 lg:max-w-md">
                 <div className="relative flex-1">
                   <svg
@@ -4510,7 +4515,7 @@ export default function AdminClient({
 
                 `py-1` não é enfeite: `overflow-x` recorta também na vertical, e
                 sem essa folga o anel de foco das pastilhas ficava cortado. */}
-            <div className="flex flex-nowrap lg:flex-wrap overflow-x-auto lg:overflow-visible gap-1.5 py-1 mb-5 lg:mb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex flex-nowrap lg:flex-wrap overflow-x-auto lg:overflow-visible gap-1.5 py-1 mb-3 sm:mb-5 lg:mb-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {!showArchived && (
                 <>
                   <button
@@ -4548,7 +4553,11 @@ export default function AdminClient({
 
             {/* Tag filter */}
             {allTags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 mb-8 -mt-4">
+              /* O `-mt` cancela parte da margem da fila de cima: as duas filas
+                 são o mesmo gesto e não precisam de ar entre elas. Abaixo de 640
+                 a conta é sobre margens já apertadas (12 em vez de 20), portanto
+                 o cancelamento também encolhe — senão as pastilhas encostavam. */
+              <div className="flex flex-wrap items-center gap-1.5 mb-4 -mt-2 sm:mb-8 sm:-mt-4">
                 <span className="text-foreground/30 text-[9px] tracking-[0.2em] uppercase mr-1">
                   Etiquetas
                 </span>
@@ -4685,7 +4694,7 @@ export default function AdminClient({
                 detail takes over the remaining width as a spacious workspace.
                 With nothing selected the list spreads full-width. */}
             <div
-              className={`grid grid-cols-1 gap-8 ${
+              className={`grid grid-cols-1 gap-[var(--bo-gap-vista)] ${
                 selected ? "xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)]" : "xl:grid-cols-1"
               }`}
             >
@@ -4813,7 +4822,7 @@ export default function AdminClient({
                     }
                   >
                     <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
-                      <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white px-5 pt-5 sm:px-7">
+                      <div className="sticky top-0 z-10 border-b border-foreground/[0.08] bg-white px-3.5 pt-3.5 sm:px-7 sm:pt-5">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <h2
@@ -5116,7 +5125,7 @@ export default function AdminClient({
                       {/* Tudo à vista: ciclo de vida, próxima ação, o formulário de
                         gestão sempre presente e as ferramentas em separadores logo
                         abaixo — nada fica escondido atrás de revelações. */}
-                      <div className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-5 py-6 sm:px-7 sm:py-8">
+                      <div className="mx-auto flex w-full max-w-3xl flex-col gap-[var(--bo-gap-vista)] px-3.5 py-3.5 sm:px-7 sm:py-8">
                         {/* Ciclo de vida — em que fase está o pedido, num relance. */}
                         <LifecycleStepper quote={selected} />
 
@@ -5794,7 +5803,7 @@ export default function AdminClient({
                         <div
                           id="detail-tools"
                           ref={toolsRef}
-                          className="flex scroll-mt-24 flex-col gap-7 border-t border-foreground/[0.08] pt-8"
+                          className="flex scroll-mt-24 flex-col gap-[var(--bo-gap-vista)] border-t border-foreground/[0.08] pt-5 sm:pt-8"
                         >
                           {/* Section header — the command centre of the pedido. */}
                           <div className="flex flex-col gap-1.5">
@@ -5898,7 +5907,7 @@ export default function AdminClient({
                           </div>
 
                           {/* Coluna única — as ferramentas do separador ativo */}
-                          <div className="flex min-w-0 flex-col gap-6">
+                          <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
                             {/* Cada painel só monta as suas ferramentas na PRIMEIRA vez
                               que se abre (`detailTabsVisitados`, ver a nota onde é
                               declarado) — depois disso fica sempre montado e só
@@ -5911,7 +5920,7 @@ export default function AdminClient({
                               aria-labelledby="detail-tab-producao"
                               tabIndex={0}
                               hidden={detailTab !== "producao"}
-                              className="flex flex-col gap-6 focus:outline-none"
+                              className="flex flex-col gap-4 focus:outline-none sm:gap-6"
                             >
                               {detailTabsVisitados.has("producao") && (
                                 <>
@@ -5976,7 +5985,7 @@ export default function AdminClient({
                                       </svg>
                                       Plano de decoração, cronograma e convidados
                                     </summary>
-                                    <div className="flex flex-col gap-6 pt-6">
+                                    <div className="flex flex-col gap-4 pt-4 sm:gap-6 sm:pt-6">
                                       {/* Decor production plan (sourcing → strike) */}
                                       <ProductionPlan
                                         key={`prod-${selected.id}`}
@@ -6036,7 +6045,7 @@ export default function AdminClient({
                               aria-labelledby="detail-tab-financeiro"
                               tabIndex={0}
                               hidden={detailTab !== "financeiro"}
-                              className="flex flex-col gap-6 focus:outline-none"
+                              className="flex flex-col gap-4 focus:outline-none sm:gap-6"
                             >
                               {detailTabsVisitados.has("financeiro") && (
                                 <>
@@ -6093,7 +6102,7 @@ export default function AdminClient({
                               aria-labelledby="detail-tab-comunicacao"
                               tabIndex={0}
                               hidden={detailTab !== "comunicacao"}
-                              className="flex flex-col gap-6 focus:outline-none"
+                              className="flex flex-col gap-4 focus:outline-none sm:gap-6"
                             >
                               {detailTabsVisitados.has("comunicacao") && (
                                 <>
@@ -6284,7 +6293,7 @@ export default function AdminClient({
                                       </svg>
                                       Histórico de atividade
                                     </summary>
-                                    <div className="pt-6">
+                                    <div className="pt-4 sm:pt-6">
                                       <ActivityLog
                                         quote={selected}
                                         actor={userName}

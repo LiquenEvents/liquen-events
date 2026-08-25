@@ -69,7 +69,16 @@ export function SkeletonRow() {
  */
 export function ViewSkeleton() {
   return (
-    <div className="flex flex-col gap-8" data-view-skeleton="" role="status" aria-busy="true">
+    /* O MESMO espaço do conteúdo que vem a seguir, lido do MESMO token.
+       Um esqueleto mais folgado do que aquilo que substitui empurra as
+       silhuetas para baixo, e quando o conteúdo chega tudo sobe de uma vez —
+       o salto acontece precisamente no instante em que ela já está a olhar. */
+    <div
+      className="flex flex-col gap-[var(--bo-gap-vista)]"
+      data-view-skeleton=""
+      role="status"
+      aria-busy="true"
+    >
       <ADizerQueCarrega />
       {/* Greeting */}
       <div>
@@ -80,7 +89,7 @@ export function ViewSkeleton() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="bo-card p-5">
+          <div key={i} className="bo-card p-[var(--bo-p-cartao)]">
             <SkeletonBar className="h-7 w-16 mb-3" />
             <SkeletonBar className="h-2.5 w-20" />
           </div>

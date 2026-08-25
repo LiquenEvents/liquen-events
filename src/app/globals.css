@@ -294,6 +294,55 @@ body.admin-mode {
   letter-spacing: var(--bo-tracking-tight);
 }
 
+/* ── A ESCALA DO ESPAÇO DO BACK OFFICE ─────────────────────────────────────
+   A irmã da escala de LETRA que está aqui em cima (`--bo-fs-*`), e a que
+   faltava. A da letra tem cinco degraus nomeados; a do ESPAÇO não existia, e
+   por isso cada ecrã escrevia o seu à mão — `py-6` aqui, `gap-8` ali, `p-5` no
+   cartão do lado — todos com o MESMO valor a 375 px e a 1440 px.
+
+   MEDIDO a 375×667, na lista de pedidos: 24 px de respiro por cima dos
+   controlos, 32 px por baixo das etiquetas, 20 px dentro de cada cartão. São
+   números desenhados num monitor, servidos tal e qual a um telemóvel onde o
+   ecrã inteiro tem 667 px e 137 deles já estão comprometidos com o cabeçalho e
+   com a barra de baixo.
+
+   Aqui o valor pequeno é o de BASE e o grande é a excepção a partir de 640 —
+   mobile-first, para que um ecrã novo herde o degrau apertado por omissão em
+   vez de o ter de pedir. Quem precisa da medida lê o token — e o teste
+   `escala-do-espaco.test.ts` falha se alguém voltar a cravar o número à mão.
+
+   ── PORQUÊ `:root` E NÃO `body.admin-mode` ───────────────────────────────
+   O resto dos `--bo-*` vive em `body.admin-mode` porque são COR e LETRA: se
+   chegarem um instante depois, muda-se o tom de um cinzento. Estes são
+   LAYOUT — e a classe `admin-mode` só entra num `useEffect`, ou seja, depois
+   do primeiro desenho. Um `padding-top` que dependesse dela nascia a 0 e
+   saltava para 12 px quando o React montasse: exactamente o salto que o
+   `-mt-24` do `AdminClient` existe para não deixar acontecer (0,128 de CLS,
+   medido).
+
+   E há um consumidor que NUNCA tem a classe: o `loading.tsx` é um componente
+   de servidor, sem JS nenhum — se estes tokens fossem `.admin-mode`, o
+   esqueleto que ela vê primeiro desenhava-se com espaço zero, sempre. Um
+   token que o esqueleto e o conteúdo têm de partilhar não pode depender de
+   uma classe que só um dos dois chega a ter.
+
+   Fora do back office ninguém lê estes nomes: declará-los aqui não pinta um
+   pixel do sítio público. */
+:root {
+  --bo-p-vista: 0.75rem; /* 12px — respiro em cima e em baixo de uma vista */
+  --bo-gap-vista: 1.25rem; /* 20px — entre blocos de topo da mesma vista */
+  --bo-p-cartao: 0.875rem; /* 14px — dentro de um cartão */
+  --bo-p-vazio: 2rem; /* 32px — a altura de um estado vazio */
+}
+@media (min-width: 640px) {
+  :root {
+    --bo-p-vista: 1.5rem;
+    --bo-gap-vista: 1.75rem;
+    --bo-p-cartao: 1.5rem;
+    --bo-p-vazio: 4rem;
+  }
+}
+
 /* Display / working headings: tighter tracking for the calm modern-sans look. */
 body.admin-mode :is(h1, h2, h3, h4),
 body.admin-mode .font-display {
