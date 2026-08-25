@@ -6,6 +6,7 @@ import { MOOD_BOARD_MAX_IMAGES } from "@/lib/proposal-doc";
 import { ASPETO_POR_OMISSAO, type LayoutDeMoodboard } from "@/lib/proposal-geometria";
 import { layoutDoBoard as layoutEfectivo, ordemDasFotos } from "@/lib/proposal-moodboard";
 import PreviaDaPagina from "./PreviaDaPagina";
+import { CORTES } from "./ui/adaptativo";
 import { useMedida } from "./useMedida";
 
 /**
@@ -49,10 +50,10 @@ export interface PaginaParaOPainel {
  * O PAINEL SÓ CUSTA ONDE APARECE
  * ════════════════════════════════════════════════════════════════════════════
  *
- * `hidden 2xl:block` esconde-o com CSS — e o React desenha-o na mesma. Medido:
- * numa proposta no tecto do gerador, desenhar as páginas aqui dentro num ecrã
- * onde elas nem se veem foi o suficiente para o estúdio deixar de responder em
- * cinco segundos num teste que antes corria à vontade.
+ * Um `hidden 2xl:block` esconde-o com CSS — e o React desenha-o na mesma.
+ * Medido: numa proposta no tecto do gerador, desenhar as páginas aqui dentro
+ * num ecrã onde elas nem se veem foi o suficiente para o estúdio deixar de
+ * responder em cinco segundos num teste que antes corria à vontade.
  *
  * Quem trabalha num portátil não pode pagar o painel que não tem. Isto pergunta
  * ao navegador se ele CABE, e só aí é que há alguma coisa para desenhar.
@@ -62,8 +63,21 @@ export interface PaginaParaOPainel {
  * existe, e assim não há um fotograma desenhado com a resposta errada. No
  * servidor devolve `false` — o HTML sai sem painel e ele aparece na hidratação,
  * que é o mesmo que já acontece com o índice lateral.
+ *
+ * ── UM NÚMERO SÓ, E É O DA CASA ─────────────────────────────────────────
+ *
+ * Havia DOIS, e discordavam: esta medida dizia 1536 e o `<aside>` trazia
+ * `hidden 2xl:block`, que também é 1536 — mas nenhum dos dois é um corte desta
+ * casa. Os cortes são três (`ui/adaptativo.ts`), e o que quer dizer «há espaço
+ * para um painel lateral SEM tirar nada ao conteúdo» é o `CORTES.largo`, 1440.
+ * Entre 1440 e 1536 o painel cabia e não aparecia.
+ *
+ * E o `hidden … 2xl:block` sai por inteiro, não muda de número. Ele é a
+ * segunda resposta à mesma pergunta, e é a resposta errada: esconder por CSS
+ * é precisamente o que este ficheiro existe para NÃO fazer. Com a montagem
+ * condicional, quando o `<aside>` é desenhado é porque cabe.
  */
-const MEDIDA_DO_PAINEL = "(min-width: 1536px)";
+const MEDIDA_DO_PAINEL = `(min-width: ${CORTES.largo}px)`;
 
 const useLarguraQueChega = () => useMedida(MEDIDA_DO_PAINEL);
 
@@ -144,7 +158,7 @@ export default function PainelDoEstudio({
   if (!cabe) return null;
 
   return (
-    <aside className="hidden w-[21rem] shrink-0 2xl:block" aria-label="O que vai sair">
+    <aside className="w-[21rem] shrink-0" aria-label="O que vai sair">
       {/* `sticky` e não fixo: acompanha o scroll da coluna do meio sem sair da
           página, e por isso continua a poder ser percorrido no fim do
           formulário como qualquer outra coisa. */}

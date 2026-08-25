@@ -576,8 +576,14 @@ export default function EmailTemplatesBilingue() {
         </div>
       </div>
 
+      {/* ── EDITOR E PRÉ-VISUALIZAÇÃO LADO A LADO A PARTIR DE 1024 ─────────
+          Era `xl:` (1280), e este ecrã é onde o mesmo texto se escreve em duas
+          línguas: sem a pré-visualização ao lado, cada alteração custava uma
+          descida e uma subida. Entre 1024 e 1280 havia espaço para as duas
+          colunas e não se usava. O corte passa a ser o `lg` da casa — o mesmo
+          do `EmailTemplates`, que é o mesmo ecrã noutra língua. */}
       {modelo ? (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           {/* ── O editor ── */}
           <div className="bo-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -789,7 +795,7 @@ export default function EmailTemplatesBilingue() {
           </div>
 
           {/* ── Pré-visualização + teste ── */}
-          <div className="bo-card p-5 xl:sticky xl:top-5">
+          <div className="bo-card p-5 lg:sticky lg:top-5">
             <p className="bo-eyebrow mb-1.5">Pré-visualização</p>
 
             <label htmlFor="etb-pedido" className="sr-only">

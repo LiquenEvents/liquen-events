@@ -507,7 +507,18 @@ export default function Calendario({ quotes, onOpen }: Props) {
           aoTentarDeNovo={recarregar}
         />
       )}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
+      {/* ── A COLUNA DO DIA AO LADO DO MÊS A PARTIR DE 1024 ────────────────
+          Era `xl:` (1280). Entre 1024 e 1280 a lista do dia escolhido caía para
+          DEBAIXO da grelha do mês: clicar num dia mandava-a rolar para fora do
+          calendário para ler o que lá estava marcado, e voltar a subir para
+          escolher outro. É o gesto que este ecrã existe para poupar. `lg:` é o
+          corte da casa, e os 320 px da coluna cabem: a 1024 sobram mais de 600
+          para a grelha de sete dias, que a 640 já se desenha inteira.
+
+          `gap-4` empilhado e `gap-6` ao lado: com as duas caixas uma em cima da
+          outra, 24 px de intervalo são altura pura num ecrã onde ela já é o que
+          falta; lado a lado, são a goteira que separa as duas colunas. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 lg:gap-6">
         {/* Margem interna estreita no telemóvel, a de sempre a partir de `sm`.
             A CONTA: num ecrã de 375 px sobram 343 depois da margem da vista.
             Com os 24 px de `p-6` de cada lado ficavam 295 para sete colunas com

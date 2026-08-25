@@ -618,28 +618,48 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         </div>
       </div>
 
-      {/* Headline numbers — the four that answer "how are we doing?" at a glance */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi value={String(stats.total)} label="Pedidos totais" accent />
-        <Kpi value={`${stats.conversion}%`} label="Conversão" />
-        <Kpi value={eur(stats.pipelineSum)} label="Em proposta (com IVA)" />
-        <Kpi value={eur(stats.wonSum)} label="Ganho (aceite, com IVA)" accent />
-      </div>
+      {/* ── OS OITO NÚMEROS DO TOPO QUEBRAM AO MESMO TEMPO ─────────────────
+          Eram duas filas com dois cortes diferentes: a de cima passava a quatro
+          colunas aos 1024 (`lg:`) e a de baixo aos 768 (`md:`). Entre essas duas
+          larguras — o iPad ao alto, e é lá que a auditoria encontrou os quatro
+          achados Críticos — liam-se dois de cima e quatro de baixo, com o mesmo
+          desenho e o mesmo tamanho: uma escada sem razão nenhuma.
 
-      {/* Secondary indicators — still here, just quieter */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi small value={String(stats.thisMonth)} label="Este mês" />
-        <Kpi small value={stats.avgRespLabel} label="Resposta média" />
-        <Kpi
-          small
-          value={stats.avgDaysClose > 0 ? `${stats.avgDaysClose}d` : "—"}
-          label="Tempo de fecho"
-        />
-        <Kpi
-          small
-          value={stats.forecastRevenue > 0 ? eur(stats.forecastRevenue) : "—"}
-          label="Previsão pipeline (com IVA)"
-        />
+          E a pergunta nem era sobre o ecrã. Estes quadrados vivem na coluna de
+          conteúdo, que a barra lateral encolhe a partir dos 1024 sem a janela
+          encolher — é a mesma razão que pôs `@container` no `EventCosts` e no
+          `PaymentsPanel`. Por isso o corte é do CONTENTOR.
+
+          A CONTA, que é a que fixa os 40rem: o quadrado mais apertado é o da
+          fila de baixo — «202 889 €» a 24 px de Playfair pede ~117 px, mais os
+          32 px de `p-4`, dá 149. Quatro deles com três `gap-3` querem
+          4×149 + 36 = 632 px de contentor. 40rem são 640, que é de propósito o
+          mesmo número do `sm` da casa: um sistema de cortes, medido no sítio
+          certo. */}
+      <div className="@container flex flex-col gap-6">
+        {/* Headline numbers — the four that answer "how are we doing?" at a glance */}
+        <div className="grid grid-cols-2 @[40rem]:grid-cols-4 gap-3">
+          <Kpi value={String(stats.total)} label="Pedidos totais" accent />
+          <Kpi value={`${stats.conversion}%`} label="Conversão" />
+          <Kpi value={eur(stats.pipelineSum)} label="Em proposta (com IVA)" />
+          <Kpi value={eur(stats.wonSum)} label="Ganho (aceite, com IVA)" accent />
+        </div>
+
+        {/* Secondary indicators — still here, just quieter */}
+        <div className="grid grid-cols-2 @[40rem]:grid-cols-4 gap-3">
+          <Kpi small value={String(stats.thisMonth)} label="Este mês" />
+          <Kpi small value={stats.avgRespLabel} label="Resposta média" />
+          <Kpi
+            small
+            value={stats.avgDaysClose > 0 ? `${stats.avgDaysClose}d` : "—"}
+            label="Tempo de fecho"
+          />
+          <Kpi
+            small
+            value={stats.forecastRevenue > 0 ? eur(stats.forecastRevenue) : "—"}
+            label="Previsão pipeline (com IVA)"
+          />
+        </div>
       </div>
 
       {/* ── O QUE AS PROPOSTAS DIZEM ────────────────────────────────────
